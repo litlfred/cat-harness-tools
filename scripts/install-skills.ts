@@ -83,8 +83,8 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 
-import { findInstanceRoot, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { orderedDependencies, resolveSkillDirs } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { findInstanceRoot, readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.ts";
+import { orderedDependencies, resolveSkillDirs } from "../schemas/kg/harness-config.ts";
 import { isSkillMd, workflowDirs } from "./known-skills.ts";
 
 /** Where each host loads project skills from, relative to the project root. */

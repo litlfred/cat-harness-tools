@@ -41,7 +41,7 @@
 
 import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { join, relative, dirname, resolve } from "path";
-import { directionOf, type LayerRule } from "@litlfred/cat-harness/schemas/kg/layer-direction.js";
+import { directionOf, type LayerRule } from "../../schemas/kg/layer-direction.js";
 
 /** How a module came to be assigned — never collapsed into a boolean. */
 export type Provenance = "rule" | "triage" | "keyword" | "default";

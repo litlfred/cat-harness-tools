@@ -10,7 +10,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { CatHarnessDeclarationSchema } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { CatHarnessDeclarationSchema } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";
 
@@ -96,7 +96,7 @@ import { tmpdir } from "node:os";
 describe("the known-substrates registry (subscriptions-viz)", () => {
   const REPO = resolve(dirname(HARNESS_ROOT));
 
-  test("an associated harness is derived as exists, its repository read from the URL", () => {
+  test("iHRIS is derived as exists, with its repository (associated, or subscribed since bean tmo5)", () => {
     const ihris = knownSubstrates(REPO).find((r) => r.name === "ihris");
     expect(ihris?.status).toBe("exists");
     expect(ihris?.repository).toBe("litlfred/ihris");
@@ -124,6 +124,29 @@ describe("the known-substrates registry (subscriptions-viz)", () => {
       expect(staged?.status).toBe("exists");
       expect(staged?.source).toBe("hand-entered");
       expect(staged?.repository).toBe("o/staged");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a subscription is derived as exists, titled from its cached snapshot", () => {
+    const root = mkdtempSync(join(tmpdir(), "substrates-"));
+    try {
+      mkdirSync(join(root, ".git"));
+      mkdirSync(join(root, "host", "subscriptions"), { recursive: true });
+      writeFileSync(
+        join(root, "host", "host.json"),
+        JSON.stringify({
+          name: "host",
+          version: "0.1.0",
+          livesAt: { repository: "o/host", path: "host" },
+          directories: [{ id: "subscriptions", path: "subscriptions/", graphTypologies: ["substrate-snapshot"] }],
+          subscriptions: [{ id: "kb", repository: "o/kb", ref: SHA }],
+        }),
+      );
+      writeFileSync(join(root, "host", "subscriptions", "kb.substrate.json"), JSON.stringify({ summary: { name: "kb", title: "The KB" } }));
+      const kb = knownSubstrates(root).find((r) => r.name === "kb");
+      expect(kb).toMatchObject({ status: "exists", repository: "o/kb", source: "subscription", title: "The KB" });
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

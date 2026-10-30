@@ -26,7 +26,7 @@
  * @module pipeline/profile-check
  */
 
-import { folioDir, unparseableConfigsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDir, unparseableConfigsIn } from "../schemas/kg/cat-harness.js";
 import { existsSync, readFileSync } from "fs";
 import { basename } from "path";
 
@@ -35,9 +35,9 @@ import {
   profileAcceptsKind,
   profileForContentType,
   type ContentProfile,
-} from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
+} from "../schemas/content/block-kinds.ts";
 import { walkBlocks } from "./qa-utils";
-import { expectedInstanceConfigPath, readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { expectedInstanceConfigPath, readEffectiveConfig } from "../schemas/kg/harness-config.ts";
 
 export interface ProfileViolation {
   label: string;

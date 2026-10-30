@@ -77,8 +77,8 @@ import { basename } from "node:path";
 
 import { inspect as inspectBlock } from "./check-bean-blocks.ts";
 import { beanFindings, type BeanNode } from "./beans.ts";
-import { memoryForRoles, type MemoryNode } from "@litlfred/cat-harness/schemas/memory.js";
-import { findRole, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { memoryForRoles, type MemoryNode } from "../schemas/conduct/memory.js";
+import { findRole, type RoleGraph } from "../schemas/process/role-graph.js";
 import { enabled, INSTANCE_SCHEMA, type HistoryEntry, type InstanceState } from "../src/workflow/instance.js";
 import type { ProcessModel } from "../src/workflow/process-model.js";
 

@@ -18,8 +18,8 @@ import { copyFileSync, existsSync, readdirSync, readFileSync, statSync, unlinkSy
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+import { instanceDirectoriesForGraph } from "../schemas/kg/cat-harness.ts";
+import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
 
 export interface OptimizeOptions {
   dirs?: string[];

@@ -564,6 +564,16 @@ TOC_MIN_MEAN_CONFIDENCE = 0.6
 TOC_MAX_EMPTY_SHARE = 0.25
 TOC_EMPTY_SECTION_CHARS = 50
 
+# The fourth test (bean `inkl`, issue #2302): a tree whose entries largely fail
+# to locate in the body collapses its structure into the few sections that did
+# match. Measured on 9789240099456-eng (WHO immunizations DAK, 100pp): 21
+# inferred entries (mean confidence 0.70, spread across pages 12..96) cut only
+# 7 body sections (+ front matter = 8) because 14 of the 21 entries — including
+# all eight "Component N." divisions — produced no section, and the remaining 7
+# non-empty sections passed the first three tests. Refused when more than this
+# share of inferred entries fail to produce a section.
+TOC_MAX_COLLAPSED_SHARE = 0.25
+
 
 def toc_empty_share(sections: list["Section"]) -> tuple[float, int]:
     """(share of sections under TOC_EMPTY_SECTION_CHARS, how many were judged),
@@ -586,22 +596,24 @@ def inferred_toc_trust(toc: list["TocEntry"], pages: list[str],
     """(reason it may not be used or None, mean confidence, empty-section
     share) for an inferred TOC over the document's page texts.
 
-    The three tests in order: the `6xaz` concentration verdict, the mean
-    confidence floor, then the share of empty sections the tree would cut
-    (judged from TOC_MIN_ENTRIES_FOR_VERDICT sections up, as concentration
-    is). The first reason found is the one recorded. All `None` for an empty
-    list — there is nothing to trust or distrust, and nothing to report.
+    The four tests in order: the `6xaz` concentration verdict, the mean
+    confidence floor, the share of empty sections the tree would cut, then the
+    share of inferred entries that fail to produce a section (judged from
+    TOC_MIN_ENTRIES_FOR_VERDICT up, as concentration is). The first reason
+    found is the one recorded. All `None` for an empty list — there is nothing
+    to trust or distrust, and nothing to report.
 
     `from_source` is a TOC taken from the paper's LaTeX: its entries are the
     author's and not a list found on a page, so the concentration verdict,
-    which exists to catch exactly that, does not apply. The confidence and
-    empty-section tests still do.
+    which exists to catch exactly that, does not apply. The confidence,
+    empty-section and collapse tests still do.
     """
     if not toc:
         return None, None, None
     mean = round(toc_mean_confidence(toc), 3)
     share, judged = toc_empty_share(split_sections(pages, toc))
     share = round(share, 3)
+    collapsed = (len(toc) - judged) / len(toc)
     reason = None if from_source else inferred_toc_verdict(toc, len(pages))
     if reason is None and mean < TOC_MIN_MEAN_CONFIDENCE:
         reason = (f"{len(toc)} inferred entries with mean confidence {mean:.2f}, "
@@ -610,6 +622,10 @@ def inferred_toc_trust(toc: list["TocEntry"], pages: list[str],
         reason = (f"{share:.0%} of the {judged} sections it would cut hold under "
                   f"{TOC_EMPTY_SECTION_CHARS} characters (more than {TOC_MAX_EMPTY_SHARE:.0%}) — "
                   f"headings without bodies, not chapters")
+    if reason is None and len(toc) >= TOC_MIN_ENTRIES_FOR_VERDICT and collapsed > TOC_MAX_COLLAPSED_SHARE:
+        reason = (f"{len(toc)} inferred entries cut only {judged} section(s) "
+                  f"({collapsed:.0%} of entries produced no section, more than "
+                  f"{TOC_MAX_COLLAPSED_SHARE:.0%}) — contents collapse in the body")
     return reason, mean, share
 
 
@@ -1182,6 +1198,19 @@ def _match_key(text: str) -> str:
     return re.sub(r"\s+", " ", t).strip().lower()
 
 
+def _adjust_banner_mark(lines: list[str], pi: int, li: int, span: int = 1) -> tuple[int, int]:
+    """When a page-opening display banner is emitted at the end of a page's PDF
+    content stream (after the page's own body text, as InDesign writes the
+    Component 1..8 banners on pages 26..88 of 9789240099456-eng), only short
+    banner labels ("Component", a section digit) follow it on that page. Cut at
+    line 0 so the page's body stays inside the section it opens."""
+    if len(lines) >= 15 and li >= len(lines) - 5:
+        tail = [x.strip() for x in lines[li + span :] if x.strip()]
+        if all(len(x) <= 12 for x in tail):
+            return (pi, 0)
+    return (pi, li)
+
+
 def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
     """`(page_idx, line_idx)` of the line that prints outline entry `e`, or None.
 
@@ -1195,7 +1224,10 @@ def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
     run_in = _run_in_keys(e)
     lo = max(0, (e.page or 1) - 2)
     hi = min(len(pages), (e.page or 1) + 2)
-    for pi in range(lo, hi):
+    order = list(range(lo, hi))
+    if e.page and lo <= e.page - 1 < hi:
+        order = [e.page - 1] + [p for p in order if p != e.page - 1]
+    for pi in order:
         lines = pages[pi].splitlines()
         for li, line in enumerate(lines):
             cand = _match_key(line)
@@ -1205,9 +1237,38 @@ def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
             if li + 1 < len(lines) and re.fullmatch(r"[A-Z0-9]{1,3}(\.[A-Z0-9]{1,3})*\.?", line.strip()):
                 cand = _match_key(line + " " + lines[li + 1])
             if needle in cand and len(cand) < 120:
-                return (pi, li)
+                return _adjust_banner_mark(lines, pi, li, 1)
             if run_in and _starts_run_in(cand, run_in):
-                return (pi, li)
+                return _adjust_banner_mark(lines, pi, li, 1)
+        # Multi-line wrapped display headings ("National Trust / Architecture for /
+        # the DDCC:VS" on DDCC p. 63; "Generic business processes / and workflows"
+        # on DAK p. 36) on the same page before moving to neighbouring pages.
+        for span in (2, 3):
+            for li in range(len(lines) - span + 1):
+                if not all(0 < len(lines[li + k].strip()) < 90 for k in range(span)):
+                    continue
+                cand = _match_key(" ".join(lines[li : li + span]))
+                if needle in cand and len(cand) < 160:
+                    return _adjust_banner_mark(lines, pi, li, span)
+    # Minor wording inflections between the contents page and the body heading
+    # ("Tally sheets..." vs "Tally sheet... - example 1" on LNOB p. 41;
+    # "Links..." vs "Linkages..." on DAK p. 23; "Health interventions and
+    # recommendations" vs "Health interventions and recommended interventions"
+    # on DAK p. 26).
+    key = _pdf_headings.norm_title(e.title)
+    if len(key) >= 12:
+        for pi in order:
+            lines = pages[pi].splitlines()
+            for span in (1, 2, 3):
+                for li in range(len(lines) - span + 1):
+                    if not all(0 < len(lines[li + k].strip()) < 100 for k in range(span)):
+                        continue
+                    ck = _pdf_headings.norm_title(" ".join(lines[li : li + span]))
+                    if 12 <= len(ck) < 140 and (
+                        _pdf_headings.similar(key, ck) >= 0.84
+                        or _pdf_headings.similar(key[:40], ck[:40]) >= 0.88
+                    ):
+                        return _adjust_banner_mark(lines, pi, li, span)
     return None
 
 

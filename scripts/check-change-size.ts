@@ -28,7 +28,7 @@ import {
   DEFAULT_CHANGE_SIZE_THRESHOLD,
   formatSc005Metric,
   type ChangeSizeThreshold,
-} from "@litlfred/cat-harness/schemas/sdlc/change-size.ts";
+} from "../schemas/sdlc/change-size.ts";
 
 export interface GitDiffNumstatEntry {
   path: string;

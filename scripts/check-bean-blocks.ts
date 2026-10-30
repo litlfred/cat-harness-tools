@@ -71,8 +71,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { beanFindings, hasExpiry, readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
+import { repoRootFor } from "../schemas/kg/cat-harness.ts";
+import "../schemas/kg/folio-graph-typology.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

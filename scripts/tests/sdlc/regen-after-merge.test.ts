@@ -41,8 +41,8 @@ import {
   type Runner,
 } from "../../regen-after-merge.ts";
 import { loadGates } from "../../gates.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { repoRootFor } from "../../../schemas/kg/cat-harness.ts";
+import { scriptsOf } from "../../../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { regenArgs } from "../../merge-base.ts";
 

@@ -82,7 +82,7 @@ jobs:
           path: fa
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.4
       - name: Mount every instance from the index's lock
         # The same replayer choice as layer-publish-context.yml.
         run: |
@@ -140,7 +140,7 @@ jobs:
         run: |
           set -euo pipefail
           tag="$(bun -e '
-            import { subgraphIndexPackage } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.ts";
+            import { subgraphIndexPackage } from "@litlfred/cat-harness-tools/schemas/kg/subgraph-manifest.ts";
             const [repo, sha, inst] = process.argv.slice(1);
             console.log(subgraphIndexPackage(repo, sha, inst).tag);
           ' "$REPO" "$SHA" "$INSTANCE")"

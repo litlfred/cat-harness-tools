@@ -10,7 +10,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { linkKeyFromFetchState, qaResultHref, qaResultLinkFor, siteFetchStatePath, siteLinkKey } from "../qa-result-link.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { resolveQaLocation } from "../qa-store.ts";

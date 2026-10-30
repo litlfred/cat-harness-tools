@@ -37,8 +37,8 @@ import {
   criterionProfiles,
   criterionAdapters,
   profileExcludesCriterion,
-} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
-import { CONTENT_PROFILES, CONTENT_ADAPTERS } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
+} from "../../schemas/sdlc/block-qa.ts";
+import { CONTENT_PROFILES, CONTENT_ADAPTERS } from "../../schemas/content/block-kinds.ts";
 import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry";
 import { readDeclaredFolioProfile, readFolioProfile } from "../../pipeline/profile-check";
 import { initFolio } from "../init-folio";

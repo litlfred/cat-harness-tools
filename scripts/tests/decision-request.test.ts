@@ -15,7 +15,7 @@ import {
   DecisionRequestSchema,
   renderDecision,
   type DecisionRequest,
-} from "@litlfred/cat-harness/schemas/process/decision-request.ts";
+} from "../../schemas/process/decision-request.ts";
 
 const opt = (label: string) => ({
   label,

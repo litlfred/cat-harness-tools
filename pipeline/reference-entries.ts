@@ -17,7 +17,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { directoriesForGraph, folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { directoriesForGraph, folioDir } from "../schemas/kg/cat-harness.js";
 
 /** One entry, as data when it is a file and as source text when it is a `ref({…})` call. */
 export type ReferenceEntry =

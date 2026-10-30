@@ -55,7 +55,7 @@ import { join, resolve } from "node:path";
 
 import { afterAll, expect, test } from "bun:test";
 
-import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
+import { gitCorpus } from "../../schemas/sdlc/git-corpus.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

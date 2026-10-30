@@ -101,8 +101,8 @@
  *   content and must not be able to become markup.
  */
 
-import { DIFF_RENDERERS } from "@litlfred/cat-harness/schemas/ui/diff-renderers.js";
-import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/content/translation.js";
+import { DIFF_RENDERERS } from "../schemas/ui/diff-renderers.js";
+import { PUBLISHED_LOCALES } from "../schemas/content/translation.js";
 import { cleanRendered, renderFields, renderInline, renderSideBySide, renderVisual, renderWordDiff } from "./review-renderers.js";
 import { computeHeat, heatBucket, renderHeat } from "./review-heat.js";
 import { crumbFor, railOutline, renderMinimap, renderOutline } from "./review-nav.js";

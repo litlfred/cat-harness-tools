@@ -19,9 +19,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { asRecord, census, coverage, coversIn, kindUniverse, scriptsFor } from "../audit-coverage.js";
-import { KG_CRITERIA, KG_SUBJECT_GRAPH_TYPOLOGIES } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { KG_CRITERIA, KG_SUBJECT_GRAPH_TYPOLOGIES } from "../../schemas/sdlc/kg-qa.js";
+import { defaultGraphTypologies } from "../../schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

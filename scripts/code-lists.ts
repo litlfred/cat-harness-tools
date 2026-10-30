@@ -34,9 +34,9 @@
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { codeListDirs, codeListToSkos, loadCodeLists, type CodeList } from "@litlfred/cat-harness/schemas/library/code-list.ts";
+import { codeListDirs, codeListToSkos, loadCodeLists, type CodeList } from "../schemas/library/code-list.ts";
 import { workflowFiles } from "./known-skills";
-import { ownElementPattern } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
+import { ownElementPattern } from "../schemas/kg/namespaces.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

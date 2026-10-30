@@ -31,13 +31,13 @@
 
 import { isActivity, type ProcessModel, type ProcessNode } from "./process-model.js";
 import { evaluate } from "./decision-table.js";
-import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import type { ConventionScope } from "@litlfred/cat-harness/schemas/process/convention.js";
+import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from "../../schemas/process/role-graph.js";
+import type { ConventionScope } from "../../schemas/process/convention.js";
 import { authorizeTask, describeVerdict, type TaskAuthVerdict } from "./authorize.js";
 import { provActivityFor } from "./prov-record.js";
-import type { ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.js";
+import { ProvActivitySchema, type ProvActivity, type ProvAgreementRef, type ProvConsentRef } from "../../schemas/content/prov.js";
 import type { AccessContext, Principal } from "../core/access.js";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { inputSiteReached } from "../../schemas/sdlc/input-trace.ts";
 import {
   validateWorkflowModel,
   validateLaneModelCapabilities,
@@ -75,6 +75,14 @@ export interface HistoryEntry {
    * role). The PROV-O after-check reads it in preference to deriving one.
    */
   prov?: ProvActivity;
+  /**
+   * PROV-O activities a Tool performed as part of this step, handed in by the
+   * agent that completes it (for example an accepted `skill_update` write,
+   * folio-assistant#875 FR-005; owner 2026-10-30, option A: kept on the
+   * workflow step, like `prov`). Each must parse and name this step as its
+   * plan. A refused Tool call has none: it did not happen.
+   */
+  activities?: ProvActivity[];
 }
 
 /**
@@ -88,6 +96,16 @@ export interface AuthzOptions {
   /** The content the step acts on. */
   target?: string;
   mode?: "advisory" | "strict";
+  /** The Data Sharing Agreement (URL + SHA-256 digest, and optional grant id) this step is decided under (DSA B4, bean `3z44`). */
+  agreement?: ProvAgreementRef;
+  /** Optional grant identifier (DSA B5). */
+  grant?: string;
+  /** The IHE PCF / FHIR R4 Consent (`id` + `versionId`) cited when this step is a consent-based decision (PCF8, bean `2egb`). */
+  consent?: ProvConsentRef;
+  /** Whether this step is a consent-based decision requiring a Consent citation (`id` + `versionId`). */
+  consentBased?: boolean;
+  /** Link this step's `prov:Activity` into the instance's hash chain. Automatically enabled when `agreement` is supplied or when a prior step in `history` is hash-chained. */
+  chain?: boolean;
 }
 
 /**
@@ -739,6 +757,8 @@ export function complete(
     decisionTableError?: string;
     /** Carried beans to add or update during this step. */
     carriedBeans?: string[];
+    /** PROV-O activities a Tool performed in this step; see {@link HistoryEntry.activities}. */
+    activities?: readonly unknown[];
   } = {},
 ): InstanceState {
   if (state.status !== "running") {
@@ -881,8 +901,20 @@ export function complete(
     ).sort((a, b) => a.localeCompare(b));
   }
 
+  const activities = stepActivities(opts.activities, nodeId);
   state.tokens = state.tokens.filter((t) => t !== nodeId);
   const at = now();
+  const priorChainedProv = [...state.history]
+    .reverse()
+    .map((h) => h.prov)
+    .find((p) => p !== undefined && p["cat-harness:recordHash"] !== undefined);
+  const shouldChain =
+    Boolean(opts.authz?.agreement) ||
+    Boolean(opts.authz?.chain) ||
+    priorChainedProv !== undefined;
+  const previousHash = shouldChain
+    ? (priorChainedProv?.["cat-harness:recordHash"] ?? null)
+    : undefined;
   const prov =
     authz && opts.authz
       ? provActivityFor({
@@ -893,6 +925,11 @@ export function complete(
           verdict: authz,
           policies: [...opts.authz.ctx.policies.keys()],
           target: opts.authz.target,
+          ...(opts.authz.agreement ? { agreement: opts.authz.agreement } : {}),
+          ...(opts.authz.grant ? { grant: opts.authz.grant } : {}),
+          ...(opts.authz.consent ? { consent: opts.authz.consent } : {}),
+          ...(opts.authz.consentBased !== undefined ? { consentBased: opts.authz.consentBased } : {}),
+          ...(shouldChain ? { previousHash, chain: true } : {}),
         })
       : undefined;
   state.history.push({
@@ -904,6 +941,7 @@ export function complete(
     note: [opts.note, computedNote].filter(Boolean).join(" · ") || undefined,
     authz,
     prov,
+    ...(activities.length ? { activities } : {}),
   });
 
   const flowIds = chosen ? [chosen] : node.outgoing;
@@ -919,6 +957,30 @@ export function complete(
   if (state.tokens.length === 0) state.status = "completed";
   state.updatedAt = now();
   return state;
+}
+
+/**
+ * The Tool activities handed in for step `nodeId`, checked before anything is
+ * recorded: each parses as a `prov:Activity`, and its plan is THIS step
+ * (`<process>#<nodeId>`). An activity naming another step would put a record
+ * on the wrong step, so it refuses the whole call rather than being dropped.
+ */
+export function stepActivities(raw: readonly unknown[] | undefined, nodeId: string): ProvActivity[] {
+  const out: ProvActivity[] = [];
+  for (const [i, a] of (raw ?? []).entries()) {
+    const parsed = ProvActivitySchema.safeParse(a);
+    if (!parsed.success) {
+      throw new WorkflowError(
+        `activities[${i}] is not a prov:Activity: ${parsed.error.issues.map((x) => `${x.path.join(".") || "(root)"}: ${x.message}`).join("; ")}`,
+      );
+    }
+    const plan = parsed.data["prov:qualifiedAssociation"]["prov:hadPlan"];
+    if (!plan.endsWith(`#${nodeId}`)) {
+      throw new WorkflowError(`activities[${i}] was done for ${plan}, not for this step (${nodeId})`);
+    }
+    out.push(parsed.data);
+  }
+  return out;
 }
 
 /**

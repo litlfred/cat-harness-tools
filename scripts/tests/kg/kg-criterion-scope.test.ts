@@ -30,8 +30,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { KG_CRITERIA, KG_CRITERION_SCOPES, KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { KG_CRITERIA, KG_CRITERION_SCOPES, KG_CRITERIA_BY_ID } from "../../../schemas/sdlc/kg-qa.js";
+import { repoRootFor } from "../../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);

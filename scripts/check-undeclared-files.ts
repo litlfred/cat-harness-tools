@@ -64,8 +64,8 @@ import { spawnSync } from "node:child_process";
 import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { findDeclarationFile, instanceRootFor, readDeclaration, repoRootFor, rootForScope } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { findDeclarationFile, instanceRootFor, readDeclaration, repoRootFor, rootForScope } from "../schemas/kg/cat-harness.js";
+import { instanceConfigFilename } from "../schemas/kg/harness-config.js";
 
 /**
  * Repository-level files that belong at the root, each with why.

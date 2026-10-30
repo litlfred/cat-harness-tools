@@ -1,7 +1,7 @@
 /**
  * The linear floor renders every note, in document order, with no JavaScript.
  *
- * The unit half. `test/linear-floor.e2e.ts` is the other half: it serves this
+ * The unit half. `test/content/linear-floor.e2e.ts` is the other half: it serves this
  * function's output to a browser with `javaScriptEnabled: false` and asserts a
  * reader can read it. Both are needed and neither replaces the other — this
  * one pins WHAT is emitted, that one pins that a browser given only those
@@ -14,10 +14,10 @@ import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 
 import { escapeHtml, groupTodosByPage, renderTodoListing, todoListingFileFor } from "../todo-listing.js";
-import { TodoIndexItemSchema } from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
+import { TodoIndexItemSchema } from "../../schemas/sdlc/todo-index.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { todoBoardPage } from "../state-visualizer.ts";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteFileFor } from "../../schemas/kg/cat-harness.js";
 
 /** The minimum a note needs to be a valid `TodoIndexItem`. */
 function item(over: Record<string, unknown> = {}) {

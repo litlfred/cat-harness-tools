@@ -41,7 +41,7 @@
  * @module pipeline/source-ledger-merge
  */
 
-import { readSourceLedger, writeSourceLedger } from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
+import { readSourceLedger, writeSourceLedger } from "../schemas/library/bib-attestations.ts";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import type {
@@ -50,7 +50,7 @@ import type {
   RelevanceAssessment,
   SourceLedger,
   Verifier,
-} from "@litlfred/cat-harness/schemas/library/bib-verification.ts";
+} from "../schemas/library/bib-verification.ts";
 
 const REPO_ROOT = process.env.FOLIO_REPO_ROOT ?? process.cwd();
 

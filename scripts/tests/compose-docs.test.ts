@@ -28,7 +28,7 @@
  * `test/compose-docs-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -47,7 +47,7 @@ import {
   type ComposedInstance,
 } from "../compose-docs.ts";
 import { clearDeclaredVisualisers, PAGE_LOCALE } from "../viewer-declarations.ts";
-import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import {  } from "../../schemas/kg/cat-harness.js";
 import { parse as parseYaml } from "yaml";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -522,6 +522,13 @@ describe("the cut, on the REAL tree", () => {
     }
     return t;
   };
+  // Composed before the tests, under a budget of their own: composed lazily,
+  // whichever test ran first paid the compose inside its own 5 s budget, and
+  // timed out on a slower runner (cat-harness-tools#970, 5.2 s).
+  beforeAll(() => {
+    tree("all");
+    tree("cut");
+  }, 120_000);
   afterAll(() => {
     for (const { dir } of trees.values()) rmSync(join(dir, ".."), { recursive: true, force: true });
   });

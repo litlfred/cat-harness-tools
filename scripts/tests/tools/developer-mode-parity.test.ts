@@ -28,7 +28,7 @@ import {
   MODEL_PROVENANCES,
   PUBLICATION_HOSTS,
   topologyConflicts,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../../../schemas/kg/cat-harness.js";
 import {
   reasoningTierGte,
   checkModelCapabilities,
@@ -37,8 +37,8 @@ import {
   type ModelConfig,
   type ModelCapabilities,
 } from "../../../src/workflow/model-capabilities.js";
-import { defineTool, type ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.js";
-import type { RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { defineTool, type ToolDefinition } from "../../../schemas/tools/tool.js";
+import type { RoleGraph } from "../../../schemas/process/role-graph.js";
 import { loadProcessModel } from "../../../src/workflow/process-model.js";
 import { startInstance, complete } from "../../../src/workflow/instance.js";
 import { workflowFile } from "../../known-skills.ts";

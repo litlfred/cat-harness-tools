@@ -123,23 +123,23 @@
  * @conformsTo w3c-rdfs
  * @conformsTo w3c-skos
  */
-import { LEDGER_SCHEMA, LEDGER_SCHEMA_NAME, LEGACY_LEDGER_SCHEMA } from "@litlfred/cat-harness/schemas/library/glossary-ledger.ts";
+import { LEDGER_SCHEMA, LEDGER_SCHEMA_NAME, LEGACY_LEDGER_SCHEMA } from "../schemas/library/glossary-ledger.ts";
 import { tagCompatible } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { ownElementPattern, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { laneBinding, readRoleGraph, type LaneBinding, type RoleDef, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { glossaryHomeFor, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { ownElementPattern, termIri } from "../schemas/kg/namespaces.js";
+import { ownPrefixTable } from "../schemas/kg/graph-typology-registry.js";
+import { laneBinding, readRoleGraph, type LaneBinding, type RoleDef, type RoleGraph } from "../schemas/process/role-graph.js";
+import { glossaryHomeFor, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
 import { kgRoots } from "./known-skills.js";
 import { declaredSubgraphNode, exportIdentity, makeIri } from "./kg-export.js";
 import { legacyFragmentIri } from "./lib/subject-iri.ts";
 import { movedDocument, placedOut, siteRootOf } from "./lib/moved-document.ts";
-import { codeListDirs, loadCodeLists } from "@litlfred/cat-harness/schemas/library/code-list.js";
-import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
+import { codeListDirs, loadCodeLists } from "../schemas/library/code-list.js";
+import { gitFiles } from "../schemas/sdlc/git-corpus.ts";
 import { buildCodeListsDoc } from "./code-lists.js";
-import { applyVocabMapping, vocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.js";
+import { applyVocabMapping, vocabMapping } from "../schemas/content/vocab-mapping.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -153,7 +153,7 @@ export const GLOSSARY_DIR = "glossary";
 /** The ledger's filename — the one non-derivable fact this module stores. */
 export const LEDGER_FILENAME = "glossary-ledger.json";
 /** Tagged so the file declares what it is, per the directory conventions. */
-export { LEDGER_SCHEMA } from "@litlfred/cat-harness/schemas/library/glossary-ledger.ts";
+export { LEDGER_SCHEMA } from "../schemas/library/glossary-ledger.ts";
 
 // ── The corpus ──────────────────────────────────────────────────
 

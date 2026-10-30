@@ -20,15 +20,15 @@ import { join, resolve } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { kgQaHomeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { kgQaHomeFor } from "../../../schemas/kg/cat-harness.js";
 import {
   ForeignSubjectError,
   kgQaSidecarPath,
   owningInstanceOf,
   partitionBySubjectOwner,
   subjectEscapes,
-} from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
-import { portableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.js";
+} from "../../../schemas/sdlc/kg-qa.js";
+import { portableSegment } from "../../../schemas/kg/portable-path.js";
 import { toolsOf } from "../../../tools/discover.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 

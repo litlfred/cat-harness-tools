@@ -64,36 +64,53 @@
  * @module scripts/check-process-bindings
  * @covers processes, skills
  */
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { readInstances, ownerOf, type Instance } from "./check-import-direction.ts";
 import { isSkillMd, skillMdDirs } from "./known-skills.ts";
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
-import { allowedFromNeeds } from "@litlfred/cat-harness/schemas/kg/layer-direction.js";
+import { directoriesForGraph } from "../schemas/kg/cat-harness.js";
+import { ancestorsOf, flattenDependencies } from "../schemas/kg/dependency-order.js";
+import { allowedFromNeeds } from "../schemas/kg/layer-direction.js";
+import { ACTORS_DIRNAME, ROLE_GRAPH_FILENAME } from "../schemas/process/role-graph.js";
 import { BASELINE, type BindingBaselineEntry } from "./process-bindings.baseline.ts";
 import { TOOLS_ROOT } from "./lib/roots.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
+import { gitCorpus } from "../schemas/sdlc/git-corpus.js";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 
 export type BindingVerdict = "allowed" | "wrong-direction" | "dangling" | "undetermined";
 
+/**
+ * The five cross-layer KG reference joins from placement proposal §5 (`residual.py`, bean `f8wp`):
+ *
+ * - `activity-skill`: `<…:skill ref="…">` on a BPMN activity → skill holder;
+ * - `call-activity`: `calledElement="…"` on a `<bpmn:callActivity>` → process / global-task holder;
+ * - `lane-role`: `partitionElementRef` or `<…:role ref="…">` on a `<bpmn:lane>` → role holder;
+ * - `role-skill`: `roles[].skills` and `extensions[].skills` in `scenarios/roles.json` → skill holder;
+ * - `actor-role`: `roles[]` in `scenarios/actors/*.json` and `extensions[].role` in `scenarios/roles.json` → role holder.
+ */
+export type BindingKind = "activity-skill" | "call-activity" | "lane-role" | "role-skill" | "actor-role";
+
 export interface Binding {
-  /** Repo-relative BPMN file. */
+  /** Repo-relative BPMN or scenario file. */
   file: string;
-  /** The activity's id. */
+  /** The activity, lane, role, or actor id. */
   node: string;
-  /** The ref as written — `name` or `package/name`. */
+  /** The ref as written — `name` or `package/name`, process id, or role id. */
   ref: string;
   fromInstance: string;
-  /** Instances that hold a skill of that name. */
+  /** Instances that hold a target of that name. */
   holders: string[];
   verdict: BindingVerdict;
+  kind?: BindingKind;
 }
 
 /** The skill name a ref denotes: `package/name` → `name`. */
 export const skillName = (ref: string): string => ref.slice(ref.lastIndexOf("/") + 1);
+
+/** The role id a lane ref denotes: `role:name` → `name`. */
+export const roleName = (ref: string): string => ref.replace(/^role:/, "");
 
 /**
  * Judge one binding. Pure, so the tests can plant violations without a
@@ -101,7 +118,7 @@ export const skillName = (ref: string): string => ref.slice(ref.lastIndexOf("/")
  * everything it needs, or absent when the instance declared no `needs`.
  */
 export function judgeBinding(
-  b: { file: string; node: string; ref: string; fromInstance: string },
+  b: { file: string; node: string; ref: string; fromInstance: string; kind?: BindingKind },
   holders: readonly string[],
   allowed: ReadonlyMap<string, ReadonlySet<string>>,
 ): Binding {
@@ -141,6 +158,83 @@ export function activityRefs(xml: string): { node: string; ref: string }[] {
   return out;
 }
 
+/** `calledElement` per `<bpmn:callActivity>`, read from the XML. */
+export function callActivityRefs(xml: string): { node: string; ref: string }[] {
+  const out: { node: string; ref: string }[] = [];
+  for (const m of xml.matchAll(/<(?:\w+:)?callActivity\b([^>]*?)>/g)) {
+    const attrs = m[1]!;
+    const node = /\bid="([^"]+)"/.exec(attrs)?.[1];
+    const ref = /\bcalledElement="([^"]+)"/.exec(attrs)?.[1];
+    if (node && ref) out.push({ node, ref });
+  }
+  return out;
+}
+
+/** Role bindings on `<bpmn:lane>` (`partitionElementRef` or `<…:role ref="…">`), read from the XML. */
+export function laneRoleRefs(xml: string): { node: string; ref: string }[] {
+  const out: { node: string; ref: string }[] = [];
+  const seen = new Set<string>();
+  const add = (node: string, rawRef: string) => {
+    const ref = roleName(rawRef);
+    const key = `${node}\u0000${ref}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ node, ref });
+  };
+  const stack: string[] = [];
+  const tag = /<(\/?)([\w.-]+:[\w-]+|[\w-]+)\b([^>]*?)(\/?)>/g;
+  for (const m of xml.matchAll(tag)) {
+    const [, closing, name, attrs, selfClosing] = m;
+    if (closing) {
+      stack.pop();
+      continue;
+    }
+    const id = /\bid="([^"]+)"/.exec(attrs!)?.[1] ?? "";
+    if (/^(?:\w+:)?lane$/.test(name!)) {
+      const part = /\bpartitionElementRef="([^"]+)"/.exec(attrs!)?.[1];
+      if (id && part) add(id, part);
+    } else if (/:role$/.test(name!)) {
+      const ref = /\bref="([^"]+)"/.exec(attrs!)?.[1];
+      const node = [...stack].reverse().find((s) => s !== "");
+      if (ref && node) add(node, ref);
+    }
+    if (!selfClosing) stack.push(id);
+  }
+  return out;
+}
+
+/** Callable `<bpmn:process>` and `<bpmn:global*Task>` ids declared in the XML. */
+export function processIdsIn(xml: string): string[] {
+  const out: string[] = [];
+  for (const m of xml.matchAll(/<(?:\w+:)?(?:process|global\w*Task)\b[^>]*\bid="([^"]+)"/g)) {
+    out.push(m[1]!);
+  }
+  return out;
+}
+
+/** `role → skill` bindings from a `roles.json` document (`roles[].skills` and `extensions[].skills`). */
+export function roleSkillRefs(doc: {
+  roles?: readonly { id?: string; skills?: readonly string[] }[];
+  extensions?: readonly { role?: string; skills?: readonly string[] }[];
+}): { node: string; ref: string }[] {
+  const out: { node: string; ref: string }[] = [];
+  for (const r of doc.roles ?? []) {
+    if (!r.id) continue;
+    for (const s of r.skills ?? []) out.push({ node: r.id, ref: s });
+  }
+  for (const ext of doc.extensions ?? []) {
+    if (!ext.role) continue;
+    for (const s of ext.skills ?? []) out.push({ node: `ext:${ext.role}`, ref: s });
+  }
+  return out;
+}
+
+/** `actor → role` bindings from an actor JSON document (`roles[]`). */
+export function actorRoleRefs(actor: { id?: string; roles?: readonly string[] }): { node: string; ref: string }[] {
+  if (!actor.id) return [];
+  return (actor.roles ?? []).map((ref) => ({ node: actor.id!, ref }));
+}
+
 /** skill name → the instances whose own skill files hold one of that name. */
 function skillHolders(all: readonly Instance[]): Map<string, Set<string>> {
   const out = new Map<string, Set<string>>();
@@ -169,6 +263,51 @@ function skillHolders(all: readonly Instance[]): Map<string, Set<string>> {
   return out;
 }
 
+interface RoleDocEntry {
+  inst: Instance;
+  abs: string;
+  doc: {
+    roles?: readonly { id?: string; skills?: readonly string[] }[];
+    extensions?: readonly { role?: string; skills?: readonly string[] }[];
+  };
+}
+
+/** Read each instance's own `roles.json` and map role id → declaring instances. */
+function readRoleDocs(all: readonly Instance[]): { docs: RoleDocEntry[]; holders: Map<string, Set<string>> } {
+  const docs: RoleDocEntry[] = [];
+  const holders = new Map<string, Set<string>>();
+  const seen = new Set<string>();
+  for (const inst of all) {
+    let scenarioDirs: string[];
+    try {
+      scenarioDirs = [...new Set(directoriesForGraph(inst.root, "scenarios"))];
+    } catch {
+      continue;
+    }
+    for (const dir of scenarioDirs) {
+      const abs = join(dir, ROLE_GRAPH_FILENAME);
+      if (seen.has(abs) || !existsSync(abs)) continue;
+      const owner = ownerOf(abs, all);
+      if (!owner || owner.name !== inst.name) continue;
+      seen.add(abs);
+      let doc: RoleDocEntry["doc"];
+      try {
+        doc = JSON.parse(readFileSync(abs, "utf-8")) as RoleDocEntry["doc"];
+      } catch {
+        continue;
+      }
+      docs.push({ inst, abs, doc });
+      for (const r of doc.roles ?? []) {
+        if (!r.id) continue;
+        const set = holders.get(r.id) ?? new Set<string>();
+        set.add(inst.name);
+        holders.set(r.id, set);
+      }
+    }
+  }
+  return { docs, holders };
+}
+
 export function analyse(repoRoot = REPO_ROOT): Binding[] {
   const root = resolve(repoRoot);
   const all = readInstances(root);
@@ -180,7 +319,8 @@ export function analyse(repoRoot = REPO_ROOT): Binding[] {
     throw new Error(`check:process-bindings: the instance needs graph is broken — ${flat.problems.map((p) => p.detail).join("; ")}`);
   }
   const allowed = allowedFromNeeds(new Map(all.map((i) => [i.name, i.needs])), ancestorsOf(flat.order));
-  const holders = skillHolders(all);
+  const skills = skillHolders(all);
+  const { docs: roleDocs, holders: roles } = readRoleDocs(all);
 
   // `gitCorpus`, not a bare `git ls-files`: in a composed checkout every
   // instance is a REMOTE MOUNT, laid down from `index.lock.json` and ignored
@@ -190,15 +330,108 @@ export function analyse(repoRoot = REPO_ROOT): Binding[] {
   const listed = gitCorpus(root, ["*.bpmn"]);
   if (listed === undefined) throw new Error(`check:process-bindings: git could not list the files in ${root}`);
   const bpmn = listed.map((f) => relative(root, f));
-  const out: Binding[] = [];
+  const processes = new Map<string, Set<string>>();
+  const loadedBpmn: { rel: string; from: Instance; xml: string }[] = [];
   for (const rel of bpmn) {
     const abs = join(root, rel);
     const from = ownerOf(abs, all);
     if (!from) continue;
-    for (const { node, ref } of activityRefs(readFileSync(abs, "utf-8"))) {
-      out.push(judgeBinding({ file: relative(root, abs), node, ref, fromInstance: from.name }, [...(holders.get(skillName(ref)) ?? [])], allowed));
+    const xml = readFileSync(abs, "utf-8");
+    loadedBpmn.push({ rel: relative(root, abs), from, xml });
+    for (const id of processIdsIn(xml)) {
+      const set = processes.get(id) ?? new Set<string>();
+      set.add(from.name);
+      processes.set(id, set);
     }
   }
+
+  const out: Binding[] = [];
+  for (const { rel, from, xml } of loadedBpmn) {
+    for (const { node, ref } of activityRefs(xml)) {
+      out.push(
+        judgeBinding(
+          { file: rel, node, ref, fromInstance: from.name, kind: "activity-skill" },
+          [...(skills.get(skillName(ref)) ?? [])],
+          allowed,
+        ),
+      );
+    }
+    for (const { node, ref } of callActivityRefs(xml)) {
+      out.push(
+        judgeBinding(
+          { file: rel, node, ref, fromInstance: from.name, kind: "call-activity" },
+          [...(processes.get(ref) ?? [])],
+          allowed,
+        ),
+      );
+    }
+    for (const { node, ref } of laneRoleRefs(xml)) {
+      out.push(
+        judgeBinding(
+          { file: rel, node, ref, fromInstance: from.name, kind: "lane-role" },
+          [...(roles.get(ref) ?? [])],
+          allowed,
+        ),
+      );
+    }
+  }
+
+  for (const { inst, abs, doc } of roleDocs) {
+    const rel = relative(root, abs);
+    for (const { node, ref } of roleSkillRefs(doc)) {
+      out.push(
+        judgeBinding(
+          { file: rel, node, ref, fromInstance: inst.name, kind: "role-skill" },
+          [...(skills.get(skillName(ref)) ?? [])],
+          allowed,
+        ),
+      );
+    }
+  }
+
+  const seenActors = new Set<string>();
+  for (const inst of all) {
+    let scenarioDirs: string[];
+    try {
+      scenarioDirs = [...new Set(directoriesForGraph(inst.root, "scenarios"))];
+    } catch {
+      continue;
+    }
+    for (const dir of scenarioDirs) {
+      const actorsPath = join(dir, ACTORS_DIRNAME);
+      if (!existsSync(actorsPath)) continue;
+      let files: string[];
+      try {
+        files = readdirSync(actorsPath).filter((f) => f.endsWith(".json")).sort();
+      } catch {
+        continue;
+      }
+      for (const f of files) {
+        const abs = join(actorsPath, f);
+        if (seenActors.has(abs)) continue;
+        const owner = ownerOf(abs, all);
+        if (!owner || owner.name !== inst.name) continue;
+        seenActors.add(abs);
+        let actor: { id?: string; roles?: readonly string[] };
+        try {
+          actor = JSON.parse(readFileSync(abs, "utf-8")) as { id?: string; roles?: readonly string[] };
+        } catch {
+          continue;
+        }
+        const rel = relative(root, abs);
+        for (const { node, ref } of actorRoleRefs(actor)) {
+          out.push(
+            judgeBinding(
+              { file: rel, node, ref, fromInstance: inst.name, kind: "actor-role" },
+              [...(roles.get(ref) ?? [])],
+              allowed,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   return out;
 }
 
@@ -206,11 +439,12 @@ const keyOf = (b: { file: string; node: string; ref: string }) => `${b.file}\u00
 
 export function ratchet(found: readonly Binding[], baseline: readonly BindingBaselineEntry[]) {
   const wrong = found.filter((b) => b.verdict === "wrong-direction");
+  const dangling = new Set(found.filter((b) => b.verdict === "dangling").map(keyOf));
   const base = new Set(baseline.map(keyOf));
   const now = new Set(wrong.map(keyOf));
   return {
     regressions: wrong.filter((b) => !base.has(keyOf(b))),
-    stale: baseline.filter((b) => !now.has(keyOf(b))),
+    stale: baseline.filter((b) => !now.has(keyOf(b)) && !dangling.has(keyOf(b))),
   };
 }
 

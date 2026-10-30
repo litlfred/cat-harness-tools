@@ -55,9 +55,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { availableParallelism, tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { instanceRootsIn, readDeclaration } from "../../schemas/kg/cat-harness.js";
+import { readRoleGraph } from "../../schemas/process/role-graph.js";
+import { orderedDependencies } from "../../schemas/kg/harness-config.js";
 import { knownSkills } from "../known-skills.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";

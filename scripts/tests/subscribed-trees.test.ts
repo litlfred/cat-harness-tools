@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { KG_PART_RECORD_SCHEMA } from "@litlfred/cat-harness/schemas/kg/substrate-snapshot.ts";
+import { KG_PART_RECORD_SCHEMA } from "../../schemas/kg/substrate-snapshot.ts";
 import { type RootFetcher, setTopLevelKey, subscribe, treeDigest } from "../kg-subscribe.ts";
 import { composedInstances } from "../compose-docs.ts";
 import { mountable, referencedAssets, subscribedMountEntries, withRoutes } from "../mount-instance-docs.ts";

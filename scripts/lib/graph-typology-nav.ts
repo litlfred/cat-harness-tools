@@ -30,8 +30,8 @@
  * avatar, even when there is none (always have default blank/themecolor if no
  * avatar. etc)"*.
  */
-import { BLANK_AVATAR, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { BLANK_AVATAR, avatarFor, hasAvatar } from "../../schemas/content/avatars.js";
+import { defaultGraphTypologies } from "../../schemas/kg/cat-harness.js";
 
 /**
  * The first clause of a kind's registered summary — up to the first dash,

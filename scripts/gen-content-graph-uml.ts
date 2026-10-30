@@ -43,7 +43,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, wri
 import { dirname, join, relative, resolve } from "node:path";
 
 import { buildContentGraph, isElaborated, type ContentGraph } from "../pipeline/content-graph.js";
-import type { FormalizationStatus, ProofObjectsManifest } from "@litlfred/cat-harness/schemas/formalization-types.js";
+import type { FormalizationStatus, ProofObjectsManifest } from "../schemas/formalization-types.js";
 import { bothViews, renderSvgs, safeId, sha256, svgStamp, type RenderJob } from "./plantuml-render.js";
 import { readUmlPalette } from "./uml-palette.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";

@@ -18,7 +18,7 @@ import {
   retireStagingPreview,
   serializeStagingPreview,
   type StagingDeployFacts,
-} from "@litlfred/cat-harness/schemas/sdlc/staging-preview.ts";
+} from "../../../schemas/sdlc/staging-preview.ts";
 import { createOrUpdate, loadExisting } from "../../staging-record.ts";
 
 const FACTS: StagingDeployFacts = {

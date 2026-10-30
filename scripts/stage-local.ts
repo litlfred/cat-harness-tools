@@ -104,7 +104,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteDirFor } from "../schemas/kg/cat-harness.ts";
 
 import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.ts";
@@ -122,8 +122,8 @@ import {
   SITE_PUBLISHER_SLOT_PREFIX,
 } from "./site-publisher.ts";
 import { decide, readTip } from "./staging-push-gate.ts";
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
-import { readIndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.ts";
+import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
+import { readIndexConfig } from "../schemas/kg/index-config.ts";
 import { buildInstanceSite, recipeFromConfig, siteFields, type SiteRecipe } from "./build-instance-site.ts";
 
 /** Files one Artifact publish may carry, the page included (the Artifact tool's limit is 255; one is the page). */
@@ -966,7 +966,14 @@ export function previewData(
   const changeset = inPlatform(repo, "schemas/changeset.ts");
   if (!changeset) log("· this platform has no ChangeSet tool: no review data on this preview");
   else if (!existsSync(join(repo, folio))) log(`· no ${folio}/ in this checkout: no ChangeSet on this preview`);
-  else run(repo, "bun", ["run", changeset, "--folio", folio, "--base", `origin/${f.base}`, "--head", "worktree", "--out", join(site, "changeset.json"), "--text-out", join(site, "changeset-text.json"), "--structure-out", join(site, "changeset-structure.json")]);
+  // The ChangeSet is read from the folio ROOT, as the workflow path does
+  // (`inputs.folio_dir`), so each block's file starts with its document's
+  // slug. The review page takes that first segment as the document
+  // (`docOf` in gen-review-page.ts). Read from `folio/<instance>`, the files
+  // started at the chapter, and every "view on this preview" link and
+  // side-by-side frame went to `<chapter>/index.html`, a 404 (smart-ra#97,
+  // 2026-10-30).
+  else run(repo, "bun", ["run", changeset, "--folio", dirname(folio), "--base", `origin/${f.base}`, "--head", "worktree", "--out", join(site, "changeset.json"), "--text-out", join(site, "changeset-text.json"), "--structure-out", join(site, "changeset-structure.json")]);
   // The PR's tagged review comments, as the workflow's `stage` job ingests them:
   // `blocks.json` from the head's manifests and `review-comments.json`, with the
   // statuses committed to the folio's todos graph winning (bean 423d).

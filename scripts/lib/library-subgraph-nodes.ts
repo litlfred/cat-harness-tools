@@ -24,8 +24,8 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import jsonld from "jsonld";
 
-import { instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { instanceContextUrl } from "@litlfred/cat-harness/schemas/kg/jsonld.js";
+import { instanceDirectoriesForGraph } from "../../schemas/kg/cat-harness.js";
+import { instanceContextUrl } from "../../schemas/kg/jsonld.js";
 import { generateInstanceContexts, readInstanceDecls } from "../gen-instance-contexts.ts";
 import { localLoader } from "../publish-verify.ts";
 import { nonEntryDirs } from "./library-entry-graphs.ts";

@@ -56,10 +56,10 @@
  * with their hrefs. Re-resolving here would be a second answer free to
  * disagree with the index the board reads.
  */
-import type { TodoIndexItem } from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
-import { DOCS_SITE_BASE, siteNodeIri } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
-import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
-import { contentSourceContext } from "@litlfred/cat-harness/schemas/kg/subgraph-source.ts";
+import type { TodoIndexItem } from "../schemas/sdlc/todo-index.js";
+import { DOCS_SITE_BASE, siteNodeIri } from "../schemas/kg/jsonld.ts";
+import { propertyIri, termIri } from "../schemas/kg/namespaces.ts";
+import { contentSourceContext } from "../schemas/kg/subgraph-source.ts";
 import { memberOf, subgraphContainer } from "./subgraph-node.ts";
 
 /**

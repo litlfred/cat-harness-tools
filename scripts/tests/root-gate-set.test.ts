@@ -46,7 +46,14 @@ function contentRoot(): string {
   write(root, "lib/lib.json", { $schema: "cat-harness-declaration/v1", name: "lib" });
   write(root, "lib/package.json", {
     name: "lib",
-    scripts: { "check:a": "bun a.ts", "foo:check": "bun foo.ts", build: "bun build.ts", "check:corpus-gate": "bun corpus.ts" },
+    scripts: {
+      "check:a": "bun a.ts",
+      "foo:check": "bun foo.ts",
+      "uml:overview:check": "bun uml.ts",
+      "readme:subgraphs:check": "bun readme.ts",
+      build: "bun build.ts",
+      "check:corpus-gate": "bun corpus.ts",
+    },
     checkoutScripts: { "check:b": "bun b.ts" },
   });
   return root;
@@ -81,8 +88,12 @@ describe("which gate set a root is measured against", () => {
     expect(names).toContain("doc:check:own");
     expect(names).toContain("lib:check:a");
     expect(names).toContain("lib:foo:check");
+    expect(names).toContain("lib:uml:overview:check");
+    expect(names).toContain("lib:readme:subgraphs:check");
     expect(names).toContain("lib:check:b");
     expect(names).toContain("cat-harness-tools:index-config:inline:check");
+    expect(names).toContain("cat-harness-tools:agent-memory:check");
+    expect(names).toContain("cat-harness-tools:skill:commands:check");
     expect(names.some((n) => n.endsWith(":build"))).toBe(false);
     expect(set.gates["lib:check:a"]).toBe("bun run cat check:a");
   });

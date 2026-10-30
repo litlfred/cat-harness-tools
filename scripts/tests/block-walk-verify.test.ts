@@ -4,7 +4,7 @@ import { tmpdir } from "os";
 import { join, resolve } from "path";
 import { walkBlocks, readBlockManifest } from "../../pipeline/qa-utils";
 import { loadBlockModuleSync } from "../../pipeline/block-module";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { TOOLS_ROOT } from "../lib/roots.ts";
 
 /**
  * `walkBlocks` read every block's `kind` and `label` out of its source text
@@ -21,7 +21,7 @@ import { HARNESS_ROOT } from "../lib/roots.ts";
  * widen which files get executed.
  */
 
-const BUILDERS = JSON.stringify(resolve(HARNESS_ROOT, "schemas", "builders.ts"));
+const BUILDERS = JSON.stringify(resolve(TOOLS_ROOT, "schemas", "builders.ts"));
 
 let root: string;
 let ch: string;

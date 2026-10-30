@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { AGENT_INSTRUCTIONS_ROLE, declaredAssets, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { AGENT_INSTRUCTIONS_ROLE, declaredAssets, repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { auditInstance, isCheckable, markdownLinks } from "../check-declared-assets.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { checkIndexRender, leadParagraph, renderIndex } from "../index-render.js";

@@ -28,7 +28,7 @@ import {
   fallbackUses,
   transitivelyRequires,
 } from "../check-fallback-roles.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

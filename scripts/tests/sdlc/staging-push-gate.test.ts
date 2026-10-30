@@ -16,8 +16,8 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import type { RenderedImpact } from "@litlfred/cat-harness/schemas/ui/rendered-impact.ts";
+import { repoRootFor } from "../../../schemas/kg/cat-harness.js";
+import type { RenderedImpact } from "../../../schemas/ui/rendered-impact.ts";
 import {
   COMMENT_MARKER,
   EXIT_WAITED,
