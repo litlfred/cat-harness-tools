@@ -19,9 +19,12 @@ import { extractBlockLabel, isCrossPaperRef } from "@litlfred/cat-harness/schema
 import {
   renderChapter,
   validateLatexAst,
+  type LatexTranslationOptions,
 } from "./render-latex";
 import { generateMainTex } from "./generate-main-tex";
 import { collectReferencedTerms } from "./markdown-ast";
+import { mergePoSources, poResolveContext, resolvePoSources } from "./po-resolve";
+import { parsePo } from "./po-inject";
 // The LaTeX preflight and Lean coverage are the science layer's: reached
 // through pipeline slots that a higher layer fills through its `contributes`
 // module (bean `squu`).
@@ -68,7 +71,7 @@ export interface BuildResult {
  */
 export async function buildPaper(
   paperPath: string,
-  opts: RenderOptions = {},
+  opts: RenderOptions & LatexTranslationOptions & { folioRoot?: string } = {},
 ): Promise<BuildResult> {
   const issues: { level: string; message: string }[] = [];
   const paperDir = dirname(paperPath);
@@ -229,13 +232,62 @@ export async function buildPaper(
   // the loop: body prose citing a glossary term is almost always in a
   // different chapter from the entry that defines it, and a chapter-local
   // scan cannot see across that boundary.
-  const renderOpts: RenderOptions = {
+  const renderOpts: RenderOptions & LatexTranslationOptions = {
     ...opts,
     referencedTerms: collectReferencedTerms(blocks),
   };
 
+  const locale = opts.locale;
+  const shouldResolvePo = Boolean(locale && locale !== "en");
+  const folioRoot = opts.folioRoot ?? (() => {
+    const p2 = resolve(paperDir, "..", "..");
+    const p1 = resolve(paperDir, "..");
+    if (existsSync(join(p2, "translations"))) return p2;
+    if (existsSync(join(p1, "translations"))) return p1;
+    return paperDir;
+  })();
+  const poCtx = shouldResolvePo ? poResolveContext(folioRoot) : undefined;
+
   for (const { chapter, manifestIdx, dir } of resolvedChapters) {
-    const latex = renderChapter(chapter, blocks, renderOpts, dir, paperSlug);
+    let chapterOpts: RenderOptions & LatexTranslationOptions = renderOpts;
+    if (shouldResolvePo && locale) {
+      const chSources = resolvePoSources(
+        { folioRoot, locale, chapterSlug: dir, blockStem: dir },
+        poCtx,
+      );
+      const chTranslations = mergePoSources(chSources, parsePo);
+      if (opts.translations) {
+        for (const [k, v] of opts.translations) chTranslations.set(k, v);
+      }
+      const blockTranslations = new Map<string, Map<string, string>>(opts.blockTranslations ?? []);
+      for (const sec of chapter.sections) {
+        if (!("blocks" in sec)) continue;
+        const section = sec as Section;
+        const subBlocks = Array.isArray(section.subsections)
+          ? section.subsections.flatMap((s) => ("blocks" in s ? (s as Section).blocks : []))
+          : [];
+        for (const rootName of [...section.blocks, ...subBlocks]) {
+          if (blockTranslations.has(rootName)) continue;
+          const blkSources = resolvePoSources(
+            { folioRoot, locale, chapterSlug: dir, blockStem: rootName },
+            poCtx,
+          );
+          if (blkSources.length > 0) {
+            const blkMap = mergePoSources(blkSources, parsePo);
+            if (opts.translations) {
+              for (const [k, v] of opts.translations) blkMap.set(k, v);
+            }
+            blockTranslations.set(rootName, blkMap);
+          }
+        }
+      }
+      chapterOpts = {
+        ...renderOpts,
+        translations: chTranslations,
+        blockTranslations,
+      };
+    }
+    const latex = renderChapter(chapter, blocks, chapterOpts, dir, paperSlug);
     chapters.set(manifestIdx, latex);
 
     // AST validation

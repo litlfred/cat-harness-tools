@@ -33,11 +33,13 @@
 
 import { resolveLiquidValues } from "./liquid-values";
 import { existsSync, readFileSync } from "fs";
-import { dirname, isAbsolute, join, resolve } from "path";
+import { basename, dirname, isAbsolute, join, resolve } from "path";
 
 import type { Block, Chapter, Paper, Section } from "@litlfred/cat-harness/schemas/types.ts";
 import { isSectionRef } from "../adapters/manifest-entries";
 import { kindHeading } from "@litlfred/cat-harness/schemas/content/translation.ts";
+import { mergePoSources, poResolveContext, resolvePoSources } from "./po-resolve";
+import { injectMarkdown, parsePo, translateBlockFields, translateManifestText } from "./po-inject";
 
 // ── Block headers ────────────────────────────────────────────────
 
@@ -76,9 +78,52 @@ export interface MarkdownRenderOptions {
   baseHeadingLevel?: number;
   /**
    * BCP 47 locale for block kind headings (e.g. "Définition" instead of
-   * "Definition" when rendering in French). Defaults to "en".
+   * "Definition" when rendering in French) and PO resolution in
+   * `buildDocumentMarkdown`. Defaults to "en".
    */
   locale?: string;
+  /**
+   * Pre-merged gettext translations (`parsePo` / `mergePoSources` map).
+   * When provided, `renderBlockMarkdown`, `renderSectionMarkdown`, and
+   * `renderChapterMarkdown` translate manifest metadata (`title`, `caption`,
+   * `narrative`, section/chapter titles) and inject translations into each
+   * block's `.md` narrative body (G5).
+   */
+  translations?: Map<string, string>;
+  /**
+   * Optional per-block translation map (`rootName -> Map<string, string>`),
+   * populated by `buildDocumentMarkdown` when `locale` is non-source so
+   * block-specific `.po` files (`translations/<locale>/<stem>.po`) override
+   * chapter/folio `.po` files without leaking across blocks.
+   */
+  blockTranslations?: Map<string, Map<string, string>>;
+  /**
+   * Folio root directory used by `buildDocumentMarkdown` to resolve
+   * `translations/<locale>/*.po` via `resolvePoSources` when `locale` is
+   * set and `translations` is not explicitly supplied.
+   */
+  folioRoot?: string;
+}
+
+/**
+ * Translate a loaded block entry (manifest metadata + `.md` narrative body)
+ * against a merged gettext map (G5).
+ */
+export function translateBlockEntry(
+  entry: LoadedBlockEntry,
+  translations: Map<string, string>,
+  locale?: string,
+): LoadedBlockEntry {
+  if (translations.size === 0) return entry;
+  const block = translateBlockFields(
+    entry.block as Block & Record<string, unknown>,
+    translations,
+    locale,
+  ) as Block;
+  const mdContent = entry.mdContent
+    ? injectMarkdown(entry.mdContent, translations).translated
+    : entry.mdContent;
+  return { block, mdContent };
 }
 
 /** `#` repeated, clamped to the six levels HTML actually has. */
@@ -106,7 +151,11 @@ export function renderBlockMarkdown(
   entry: LoadedBlockEntry,
   opts: MarkdownRenderOptions = {},
 ): string {
-  const { block, mdContent } = entry;
+  const effectiveEntry =
+    opts.translations && opts.translations.size > 0
+      ? translateBlockEntry(entry, opts.translations, opts.locale)
+      : entry;
+  const { block, mdContent } = effectiveEntry;
   const lines: string[] = [];
   const label = blockLabel(block);
   const locale = opts.locale ?? "en";
@@ -139,6 +188,16 @@ export function renderBlockMarkdown(
   // are left for Jekyll / the IG Publisher.
   const body = resolveLiquidValues(mdContent).trim();
   if (body) lines.push(body);
+
+  if (
+    "caption" in block &&
+    typeof block.caption === "string" &&
+    block.caption.trim() !== "" &&
+    block.caption !== title
+  ) {
+    if (body) lines.push("");
+    lines.push(`*${block.caption}*`);
+  }
 
   return lines.join("\n");
 }
@@ -177,7 +236,11 @@ export function renderSectionMarkdown(
   // A chapter's LEAD (`Section.lead`) gets an anchor and no heading: the
   // chapter heading directly above already says it.
   if (!section.lead) {
-    lines.push(`${hashes(level)} ${section.title}`);
+    const secTitle =
+      opts.translations && opts.translations.size > 0
+        ? translateManifestText(section.title, opts.translations, "title")
+        : section.title;
+    lines.push(`${hashes(level)} ${secTitle}`);
     lines.push("");
   }
 
@@ -192,7 +255,10 @@ export function renderSectionMarkdown(
       lines.push("");
       continue;
     }
-    lines.push(renderBlockMarkdown(entry, opts));
+    const blockOpts = opts.blockTranslations?.has(rootName)
+      ? { ...opts, translations: opts.blockTranslations.get(rootName) }
+      : opts;
+    lines.push(renderBlockMarkdown(entry, blockOpts));
     lines.push("");
   }
 
@@ -214,7 +280,11 @@ export function renderChapterMarkdown(
   const lines: string[] = [];
 
   if (opts.anchors !== false && chapter.label) lines.push(`<a id="${chapter.label}"></a>`);
-  lines.push(`${hashes(level)} ${chapter.title}`);
+  const chTitle =
+    opts.translations && opts.translations.size > 0
+      ? translateManifestText(chapter.title, opts.translations, "title")
+      : chapter.title;
+  lines.push(`${hashes(level)} ${chTitle}`);
   lines.push("");
 
   for (const sec of chapter.sections) {
@@ -266,7 +336,46 @@ export async function buildDocumentMarkdown(
   const chapterSlugs: string[] = [];
   const rendered: string[] = [];
 
-  rendered.push(`# ${paper.title ?? "Untitled document"}`, "");
+  const locale = opts.locale;
+  const shouldResolvePo = Boolean(locale && locale !== "en");
+  // Default folioRoot: if docDir sits under `<folioRoot>/folio/<doc>` or `<folioRoot>/content/<doc>`,
+  // try docDir's parent's parent if it has `translations/`, else docDir's parent, else docDir.
+  const folioRoot = opts.folioRoot ?? (() => {
+    const p2 = resolve(docDir, "..", "..");
+    const p1 = resolve(docDir, "..");
+    if (existsSync(join(p2, "translations"))) return p2;
+    if (existsSync(join(p1, "translations"))) return p1;
+    return docDir;
+  })();
+  const poCtx = shouldResolvePo ? poResolveContext(folioRoot) : undefined;
+  const docStem = basename(manifestPath).replace(/\.ts$/, "");
+  const docTranslations = (() => {
+    const m = new Map<string, string>();
+    if (shouldResolvePo && locale) {
+      const sources = resolvePoSources({ folioRoot, locale, blockStem: docStem }, poCtx);
+      for (const [k, v] of mergePoSources(sources, parsePo)) m.set(k, v);
+      for (const chRef of paper.chapters) {
+        const chSources = resolvePoSources(
+          { folioRoot, locale, chapterSlug: chRef.dir, blockStem: chRef.dir },
+          poCtx,
+        );
+        for (const [k, v] of mergePoSources(chSources, parsePo)) {
+          if (!m.has(k)) m.set(k, v);
+        }
+      }
+    }
+    if (opts.translations) {
+      for (const [k, v] of opts.translations) m.set(k, v);
+    }
+    return m;
+  })();
+
+  const rawDocTitle = paper.title ?? "Untitled document";
+  const docTitle =
+    docTranslations.size > 0
+      ? translateManifestText(rawDocTitle, docTranslations, "title")
+      : rawDocTitle;
+  rendered.push(`# ${docTitle}`, "");
 
 
   for (const chRef of paper.chapters) {
@@ -289,9 +398,36 @@ export async function buildDocumentMarkdown(
     }
     chapterSlugs.push(chRef.dir);
 
+    const chapterTranslations = new Map<string, string>(docTranslations);
+    if (shouldResolvePo && locale) {
+      const chSources = resolvePoSources(
+        { folioRoot, locale, chapterSlug: chRef.dir, blockStem: chRef.dir },
+        poCtx,
+      );
+      for (const [k, v] of mergePoSources(chSources, parsePo)) chapterTranslations.set(k, v);
+      if (opts.translations) {
+        for (const [k, v] of opts.translations) chapterTranslations.set(k, v);
+      }
+    }
+    const blockTranslations = new Map<string, Map<string, string>>(opts.blockTranslations ?? []);
+
     for (const sec of chapter.sections) {
       if (isSectionRef(sec)) continue;
       for (const rootName of sectionBlocks(sec)) {
+        if (shouldResolvePo && locale && !blockTranslations.has(rootName)) {
+          const blkSources = resolvePoSources(
+            { folioRoot, locale, chapterSlug: chRef.dir, blockStem: rootName },
+            poCtx,
+          );
+          if (blkSources.length > 0) {
+            const blkMap = new Map<string, string>(docTranslations);
+            for (const [k, v] of mergePoSources(blkSources, parsePo)) blkMap.set(k, v);
+            if (opts.translations) {
+              for (const [k, v] of opts.translations) blkMap.set(k, v);
+            }
+            blockTranslations.set(rootName, blkMap);
+          }
+        }
         if (blocks.has(rootName)) continue;
         const tsPath = join(chDir, `${rootName}.ts`);
         const mdPath = join(chDir, `${rootName}.md`);
@@ -315,7 +451,14 @@ export async function buildDocumentMarkdown(
       }
     }
 
-    rendered.push(renderChapterMarkdown(chapter, blocks, { baseHeadingLevel: 2, ...opts }));
+    rendered.push(
+      renderChapterMarkdown(chapter, blocks, {
+        baseHeadingLevel: 2,
+        ...opts,
+        translations: chapterTranslations.size > 0 ? chapterTranslations : opts.translations,
+        blockTranslations: blockTranslations.size > 0 ? blockTranslations : opts.blockTranslations,
+      }),
+    );
   }
 
   return {
