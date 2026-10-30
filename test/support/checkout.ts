@@ -33,13 +33,16 @@
  * Callers use `test.skipIf(!inAggregate())`, or {@link notApplicableAlone}
  * where the skip should name what is absent, so a standalone run REPORTS the
  * skip rather than counting a pass; in the aggregate every guarded test runs
- * exactly as before. A test whose subject can be found in cat-harness's own
+ * exactly as before. A test that reads a BUILT site file — one the publish
+ * build writes and `.gitignore` keeps out of every clone — uses
+ * {@link siteNotBuilt}, which skips only when that file is actually absent. A test whose subject can be found in cat-harness's own
  * content is rewritten to read that instead, and does not use this at all.
  *
  * @module test/support/checkout
  */
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, relative, resolve } from "node:path";
 
 import { instanceRootsIn } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
@@ -99,4 +102,44 @@ export const STANDALONE: boolean = !inAggregate();
 export function notApplicableAlone(absent: string): boolean {
   if (STANDALONE) console.warn(`not applicable standing alone: ${absent}`);
   return STANDALONE;
+}
+
+/**
+ * The guard for a test whose subject is a BUILT SITE file: a projection,
+ * page or include the publish build writes (`docs/assets/<graph>/…`,
+ * `docs/en/<harness>/<visualiser>/index.html`, `docs/_data/harness.json`,
+ * `docs/_includes/generated/…`) and `.gitignore` keeps out of every clone, so
+ * a fresh standalone checkout has never had it (owner, 2026-10-30, bean
+ * `folio-assistant-w1gy` F18 option A: "a second named guard ('site not
+ * built') that only skips in standalone").
+ *
+ * It is narrower than {@link notApplicableAlone} on purpose: a built site is
+ * not something only a composed checkout CAN hold — a standalone clone that
+ * ran the build holds it too — so the skip needs BOTH conditions. It skips
+ * when the run stands alone AND at least one of `built` is absent, and says
+ * which; standing alone with the site built, or in the composed checkout
+ * whatever is on disk, it returns `false` and the test runs exactly as before
+ * — and fails loudly if the file is missing there.
+ *
+ * `what` names the prerequisite and what writes it, at the call site; `built`
+ * are the absolute paths the test reads. Use it as
+ * `test.skipIf(siteNotBuilt("…", path))`.
+ */
+export function siteNotBuilt(what: string, ...built: string[]): boolean {
+  return siteNotBuiltWhen(STANDALONE, what, built);
+}
+
+/**
+ * {@link siteNotBuilt} with standing-alone passed in, so the guard's own test
+ * can ask both layouts of one filesystem. Not for call sites: a caller that
+ * chose `standalone` itself would be the switch this module refuses.
+ */
+export function siteNotBuiltWhen(standalone: boolean, what: string, built: readonly string[]): boolean {
+  if (built.length === 0) throw new Error(`siteNotBuilt: no path given for ${what} — a guard over nothing cannot say what is absent`);
+  if (!standalone) return false;
+  const missing = built.filter((p) => !existsSync(p));
+  if (missing.length === 0) return false;
+  const shown = missing.map((p) => relative(dirname(INSTANCE), p)).join(", ");
+  console.warn(`site not built (standing alone): ${what} — absent: ${shown}`);
+  return true;
 }

@@ -28,6 +28,7 @@ import { viewerHtml as libraryShell, VIEWER_CSS, VIEWER_JS } from "../scripts/ge
 import { readSchemaGraph } from "../scripts/schema-graph.ts";
 import { readLibraryGraph } from "../scripts/library-graph.ts";
 import { directoriesForGraph, repoRootFor, siteDirFor } from "./kg/cat-harness.ts";
+import { siteNotBuilt } from "../test/support/checkout.ts";
 
 const ROOT = TOOLS_ROOT; // the schema corpus moved here (bean 8lcl)
 
@@ -204,7 +205,17 @@ describe("the readers agree with what the generators publish", () => {
 });
 
 describe("the projection is stable under edits that do not change the graph", () => {
-  test("no declaration carries a line number", () => {
+  // The projection is the HARNESS's: `gen-schema-viz.ts` writes it under
+  // `HARNESS_ROOT`'s site, though the corpus it reads moved here (bean 8lcl).
+  // Reading it under this layer's site named a file nothing writes, in every
+  // layout (bean w1gy F18). Standing alone it is not built either:
+  // `schema:viz` writes it at publish and it is gitignored.
+  const site = join(HARNESS_ROOT, siteDirFor(HARNESS_ROOT));
+  const own = directoriesForGraph(ROOT, "schemas").find((d) => d.startsWith(`${ROOT}/`));
+  const projection = join(site, "assets", basename(own ?? "schemas"), "index.json");
+  test.skipIf(
+    own !== undefined && siteNotBuilt("the schema projection `schema:viz` writes at publish (gitignored)", projection),
+  )("no declaration carries a line number", () => {
     // A line number is an editor coordinate, not a property of a declaration.
     // Carrying it made the staleness gate fire whenever anything ABOVE a
     // declaration moved: merging main shifted two declarations in
@@ -219,11 +230,9 @@ describe("the projection is stable under edits that do not change the graph", ()
     // first draft of this test doing exactly that — the gate working on the
     // test written to guard another gate. The published segment is the
     // declared directory's own name, the same rule the generator follows.
-    const site = join(ROOT, siteDirFor(ROOT));
-    const own = directoriesForGraph(ROOT, "schemas").find((d) => d.startsWith(`${ROOT}/`));
     expect(own).toBeDefined();
     const published = JSON.parse(
-      readFileSync(join(site, "assets", basename(own!), "index.json"), "utf-8"),
+      readFileSync(projection, "utf-8"),
     ) as { decls: Array<Record<string, unknown>> };
     expect(published.decls.length).toBeGreaterThan(0);
     expect(published.decls.filter((d) => "line" in d)).toEqual([]);

@@ -13,7 +13,7 @@
  * were equivalent and something else was wrong.
  */
 import { describe, test, expect, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, readFileSync, readdirSync } from "fs";
+import { existsSync, mkdtempSync, rmSync, readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -21,7 +21,8 @@ import {
   readBlockManifest,
   readUnlabelledBlockManifest,
 } from "../../pipeline/qa-utils";
-import { initFolio } from "../init-folio";
+import { initFolio, templatesDirs } from "../init-folio";
+import { notApplicableAlone } from "../../test/support/checkout.ts";
 
 const dirs: string[] = [];
 
@@ -56,6 +57,21 @@ function legacyKind(tsPath: string): string {
   return readFileSync(tsPath, "utf-8").match(/kind:\s*["'](\w+)["']/)?.[1] ?? "unknown";
 }
 
+/**
+ * A paper folio is scaffolded from the `paper` template profile, which a layer
+ * above holds (folio-assistant-sci, move M11): without it there is no paper
+ * folio to list (bean w1gy F18). A lookup that throws guards nothing.
+ */
+const NO_PAPER_PROFILE = ((): boolean => {
+  let held: boolean;
+  try {
+    held = templatesDirs().some((d) => existsSync(join(d, "paper")));
+  } catch {
+    return false;
+  }
+  return !held && notApplicableAlone("the `paper` folio-template profile, which folio-assistant-sci (a higher instance) holds");
+})();
+
 describe("block identification in a scaffolded folio", () => {
   test("a builder-authored block reports its real kind and label", () => {
     const ch = scaffoldChapter("document");
@@ -81,7 +97,7 @@ describe("block identification in a scaffolded folio", () => {
     expect(identify(join(ch, "introduction.ts"))).toBeUndefined();
   });
 
-  test("exactly one .ts in the starter chapter is a block", () => {
+  test.skipIf(NO_PAPER_PROFILE)("exactly one .ts in the starter chapter is a block", () => {
     // The `(N blocks)` header counts what is listed; before the fix it counted
     // `.ts` files, which is two here.
     const ch = scaffoldChapter("paper");

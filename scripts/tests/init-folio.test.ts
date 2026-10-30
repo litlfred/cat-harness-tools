@@ -48,6 +48,7 @@ import { nodeOfKind, parseTodoGraph } from "../../schemas/sdlc/todo-graph.js";
 import { defaultGraphTypologies } from "../../schemas/kg/graph-typology-registry.js";
 import { instanceStateBranch } from "../../schemas/kg/subgraph-source.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { notApplicableAlone } from "../../test/support/checkout.ts";
 import { dirname } from "node:path";
 
 /**
@@ -89,6 +90,23 @@ function scaffoldConfig(dir: string): Record<string, unknown> {
  * platform's code is under `cat-harness/` inside it.
  */
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
+
+/**
+ * A paper folio's templates include the `paper` profile, which a layer ABOVE
+ * this one holds (folio-assistant-sci, move M11). A checkout without it has no
+ * paper profile to scaffold from, so a test that scaffolds a paper folio is
+ * not applicable there (bean w1gy F18). A templates lookup that throws guards
+ * nothing: the tests then fail on it by name.
+ */
+const NO_PAPER_PROFILE = ((): boolean => {
+  let held: boolean;
+  try {
+    held = templatesDirs().some((d) => existsSync(join(d, "paper")));
+  } catch {
+    return false;
+  }
+  return !held && notApplicableAlone("the `paper` folio-template profile, which folio-assistant-sci (a higher instance) holds");
+})();
 const dirs: string[] = [];
 
 function tmp(): string {
@@ -220,7 +238,7 @@ describe("what gets written", () => {
     expect(enclosingRepoRoot(d)).toBeNull();
   });
 
-  test("a PAPER folio's staging caller is OFF: dispatch-only, and its build refuses until set (ojcx)", () => {
+  test.skipIf(NO_PAPER_PROFILE)("a PAPER folio's staging caller is OFF: dispatch-only, and its build refuses until set (ojcx)", () => {
     const d = tmp();
     const r = initFolio(opts(d, { contentType: "paper" }));
     const wf = readFileSync(join(d, ".github/workflows/staging.yml"), "utf-8");
@@ -289,7 +307,7 @@ describe("what gets written", () => {
     }
   });
 
-  test("a paper folio gitignores Lean artifacts; a document folio does not", () => {
+  test.skipIf(NO_PAPER_PROFILE)("a paper folio gitignores Lean artifacts; a document folio does not", () => {
     const pap = tmp();
     initFolio(opts(pap, { contentType: "paper" }));
     expect(readFileSync(join(pap, ".gitignore"), "utf-8")).toContain(".lake/");
@@ -335,7 +353,7 @@ describe("workflow templates (52dz)", () => {
     for (const f of LEAN_SUPPORT) expect(existsSync(join(d, f))).toBe(false);
   });
 
-  test("a PAPER folio gets the generic workflows AND the Lean ones, with what they call", () => {
+  test.skipIf(NO_PAPER_PROFILE)("a PAPER folio gets the generic workflows AND the Lean ones, with what they call", () => {
     const d = tmp();
     const r = initFolio(opts(d, { contentType: "paper" }));
     for (const wf of [...GENERIC, ...LEAN]) {
@@ -348,7 +366,7 @@ describe("workflow templates (52dz)", () => {
     }
   });
 
-  test("the Lean workflows' local action and scripts are ones the scaffold wrote", () => {
+  test.skipIf(NO_PAPER_PROFILE)("the Lean workflows' local action and scripts are ones the scaffold wrote", () => {
     // `uses: ./.github/actions/<x>` and `python3 .github/scripts/<y>` resolve in
     // the FOLIO, so each must be something this scaffold put there.
     const d = tmp();
@@ -364,7 +382,7 @@ describe("workflow templates (52dz)", () => {
     }
   });
 
-  test("nothing written names one folio's papers, and no placeholder is left", () => {
+  test.skipIf(NO_PAPER_PROFILE)("nothing written names one folio's papers, and no placeholder is left", () => {
     for (const contentType of ["document", "paper"] as const) {
       const d = tmp();
       // A non-default platform path, so a placeholder that was never
@@ -432,7 +450,7 @@ describe("workflow templates (52dz)", () => {
     expect(() => renderTemplate("run: {{nope}}", values)).toThrow(/unknown template placeholder/);
   });
 
-  test("every template parses as YAML, before and after substitution", () => {
+  test.skipIf(NO_PAPER_PROFILE)("every template parses as YAML, before and after substitution", () => {
     const values = { assistant: "folio-assistant", folio: "folio", platform_git: "g", platform_repo: "o/r" };
     const ymls = folioTemplates("paper").filter((t) => t.target.endsWith(".yml"));
     // Guard against a green run over nothing if the directory moves.
@@ -684,7 +702,7 @@ describe("a contentless instance (mer2)", () => {
     ["document folio", (d: string) => initFolio(opts(d))],
     ["paper folio", (d: string) => initFolio(opts(d, { contentType: "paper" }))],
   ] as const) {
-    test(`probe — the ${label}'s declaration loads and every declared directory exists`, () => {
+    test.skipIf(label === "paper folio" && NO_PAPER_PROFILE)(`probe — the ${label}'s declaration loads and every declared directory exists`, () => {
       const d = tmp();
       run(d);
       const decl = readDeclaration(d);
@@ -698,7 +716,7 @@ describe("a contentless instance (mer2)", () => {
     });
   }
 
-  test("a folio's probe sees the content type it asked for, not a fallback", () => {
+  test.skipIf(NO_PAPER_PROFILE)("a folio's probe sees the content type it asked for, not a fallback", () => {
     const d = tmp();
     initFolio(opts(d, { contentType: "paper" }));
     const config = scaffoldConfig(d);
