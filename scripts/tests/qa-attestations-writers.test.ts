@@ -15,8 +15,9 @@
  * a function and is tested as one.
  *
  * Writer families:
- * - block, script-only: `qa-sweep`, `integration-audit`, `language-trap-audit`
- *   (and `q-usage-audit`, which shares `finalizeCriteria(…, "script")` but needs
+ * - block, script-only: `qa-sweep`, `integration-audit` (`language-trap-audit`
+ *   moved to `folio-assistant-sci` in bean `saqd` and is tested there;
+ *   `q-usage-audit` shares `finalizeCriteria(…, "script")` but needs
  *   a paper layout to run at all; covered at the library level in
  *   `qa-attestations.test.ts`);
  * - block, attesting: `qa-merge-findings`, `qa-agent-entry`, `qa-agent-write`
@@ -193,17 +194,6 @@ describe("block, script-only writers — prior ABSENT", () => {
       writeFileSync(path, JSON.stringify({ $schema: "block-qa/v1", label: "sec:blk", kind: "prose", paths: {}, source_hashes: {}, criteria: { "voice-emoji-content": [script] }, updated_at: "t" }));
       const r = run(t.root, [join(PIPELINE, "integration-audit.ts"), join(t.root, "content"), "--criteria", "voice-emoji-content", "--no-sweep"]);
       expect(r.status).toBe(0);
-      expectSurvived(t);
-    } finally {
-      t.cleanup();
-    }
-  }, BUDGET);
-
-  test("language-trap-audit --write-sidecars keeps both attestations", () => {
-    const t = fixture();
-    try {
-      const r = run(t.root, [join(PIPELINE, "language-trap-audit.ts"), join(t.root, "content"), "--write-sidecars", "--quiet"]);
-      expect([0, 1]).toContain(r.status ?? -1);
       expectSurvived(t);
     } finally {
       t.cleanup();
