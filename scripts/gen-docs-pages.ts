@@ -87,6 +87,7 @@ import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
 import { OPEN_BEANS_UNIT, openBeanCount } from "./bean-store-read.js";
 import { qaStorageOf } from "./qa-results.ts";
 import { qaResultLinkFor, siteLinkKey } from "./qa-result-link.ts";
+import { DEFAULT_QA_BRANCH, resolveQaLocation, type QaLocation } from "./qa-store.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import { docsSources, qualifiedKey, siteNodeOf, type DocsSource } from "./lib/docs-sources.ts";
@@ -1204,10 +1205,37 @@ const QA_LINK_KEY = siteLinkKey();
  * place that reads the store's declaration.
  */
 function withSidecarLinks(doc: QaWitnessDoc): QaWitnessDoc {
+  const repoRoot = repoRootFor(CUR.root);
+  const location = qaLocationOf(repoRoot);
   const sidecarLinks = doc.sidecars.map((p) =>
-    qaResultLinkFor(resolve(CUR.root, p), { repoRoot: repoRootFor(CUR.root), repoWeb: REPO_WEB, key: QA_LINK_KEY }),
+    qaResultLinkFor(resolve(CUR.root, p), { repoRoot, repoWeb: REPO_WEB, key: QA_LINK_KEY, location }),
   );
   return { ...doc, sidecarLinks };
+}
+
+/**
+ * Where QA results live in `repoRoot`, resolved ONCE per run
+ * (cat-harness-tools#871). `resolveQaLocation` walks every instance in the
+ * checkout and reads its declarations; asked per sidecar link, as it was,
+ * that walk was ~22 s of a ~23 s run (2026-10-30, ~1200 links), and it put
+ * `gen-docs-pages-orphan-qa-checkout.test.ts` past its 30 s timeout.
+ *
+ * The answer cannot change within a run: the generator writes witnesses, not
+ * declarations. A location that does not resolve reads as "nothing stored",
+ * which is exactly what `qaStorageOf` answers when the resolve throws.
+ */
+const qaLocations = new Map<string, QaLocation>();
+function qaLocationOf(repoRoot: string): QaLocation {
+  let loc = qaLocations.get(repoRoot);
+  if (loc === undefined) {
+    try {
+      loc = resolveQaLocation(repoRoot);
+    } catch {
+      loc = { branch: DEFAULT_QA_BRANCH, keyedBy: "commit", declared: false, directories: [] };
+    }
+    qaLocations.set(repoRoot, loc);
+  }
+  return loc;
 }
 
 if (!existsSync(SRC_DIR)) {

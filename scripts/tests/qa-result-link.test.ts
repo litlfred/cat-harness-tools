@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { linkKeyFromFetchState, qaResultHref, qaResultLinkFor, siteFetchStatePath, siteLinkKey } from "../qa-result-link.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { resolveQaLocation } from "../qa-store.ts";
 
 const WEB = "https://github.com/litlfred/folio-assistant";
 const BRANCH = "cat/cat-harness/qa-reports";
@@ -122,5 +123,13 @@ describe("this repository's declaration", () => {
     expect(l.path).toBe(PATH);
     expect(l.addressedBy).toBe("entry");
     expect(l.href).toBe(`${WEB}/blob/${BRANCH}/main/${SHA}/${PATH}`);
+  });
+  test("a location resolved once and passed in gives the same address as resolving per call (#871)", () => {
+    const repoRoot = repoRootFor(join(HARNESS_ROOT));
+    const location = resolveQaLocation(repoRoot);
+    const ctx = { repoRoot, repoWeb: WEB, key: `main/${SHA}` };
+    for (const p of [PATH, "cat-harness/docs/index.md"]) {
+      expect(qaResultLinkFor(join(repoRoot, p), { ...ctx, location })).toEqual(qaResultLinkFor(join(repoRoot, p), ctx));
+    }
   });
 });
