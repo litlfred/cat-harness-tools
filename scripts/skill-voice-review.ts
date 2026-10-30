@@ -46,9 +46,9 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 
-import { loadVoices, readActiveVoices, resolveVoice, voiceKey, type ResolvedVoice, type VoiceProfile, type VoiceRef } from "@litlfred/cat-harness/schemas/content/voices.ts";
-import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import type { KgCriterionEntry, KgFinding, KgQaReport } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
+import { loadVoices, readActiveVoices, resolveVoice, voiceKey, type ResolvedVoice, type VoiceProfile, type VoiceRef } from "../schemas/content/voices.ts";
+import { instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import type { KgCriterionEntry, KgFinding, KgQaReport } from "../schemas/sdlc/kg-qa.ts";
 import {
   kgAttestationFor,
   priorKgJudgements,
@@ -56,7 +56,7 @@ import {
   readAttestationFile,
   serialiseAttestations,
   type KgAttestations,
-} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
+} from "../schemas/sdlc/qa-attestations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 export const VOICE_REVIEW_CRITERION = "skill-voice-review-current";

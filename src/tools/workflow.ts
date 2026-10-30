@@ -43,7 +43,7 @@ import { describeCapture, writeLogEntry } from "../logging/log-writer.js";
 import { instanceId, listInstances, loadInstance, saveInstance } from "../workflow/store.js";
 import { applyWorkPlanOp, onlyArchiveLeft } from "../workflow/bean-link.js";
 import { checkGate, loadRelaxations, validateRelaxations } from "../workflow/gate.js";
-import { type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { type RoleGraph } from "../../schemas/process/role-graph.js";
 import { roleGraphFor } from "../../scripts/known-skills.js";
 import { accessContext } from "../core/access.js";
 import { githubPrincipalFor } from "../core/github-auth.js";

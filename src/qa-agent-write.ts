@@ -44,11 +44,11 @@ import {
 } from "../pipeline/qa-utils";
 import { priorFromOrExit } from "../scripts/qa-results.ts";
 import { blockQaPath, existingBlockQaPath, findContentRepoRoot } from "../pipeline/qa-paths";
-import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
+import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "../schemas/sdlc/qa-attestations.ts";
 import type {
   BlockQaReport,
   QaCriterionEntry,
-} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+} from "../schemas/sdlc/block-qa.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { dirname } from "node:path";
 

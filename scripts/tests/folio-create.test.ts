@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/library/referenced-source.ts";
+import { ReferencedSourceSchema } from "../../schemas/library/referenced-source.ts";
 import { checkEntry } from "../check-l1-complete.ts";
 import {
   createDocument,
@@ -119,11 +119,11 @@ describe("createDocument", () => {
         }),
       );
       writeFileSync(
-        join(mountedRoot, "kinds", "dak.json"),
+        join(mountedRoot, "kinds", "programme.json"),
         JSON.stringify({
           ...l1.kind,
-          id: "dak",
-          title: "Digital Adaptation Kit",
+          id: "programme",
+          title: "Programme",
         }),
       );
       writeFileSync(
@@ -166,12 +166,12 @@ describe("createDocument", () => {
       );
 
       const loaded = loadedDocumentKinds(folioRoot);
-      expect(loaded.map(qualifiedKind).sort()).toEqual(["mounted-layer:dak", "upstream-dep:l1"]);
+      expect(loaded.map(qualifiedKind).sort()).toEqual(["mounted-layer:programme", "upstream-dep:l1"]);
 
-      const r1 = createDocument({ root: folioRoot, kind: "dak", slug: "anc-dak", title: "ANC DAK" });
-      expect(r1).toEqual({ path: join(folioRoot, "folio", "anc-dak", "index.md") });
-      expect(readFileSync(join(folioRoot, "folio", "anc-dak", "index.md"), "utf-8")).toContain(
-        'documentKind: "mounted-layer:dak"',
+      const r1 = createDocument({ root: folioRoot, kind: "programme", slug: "anc-programme", title: "ANC programme" });
+      expect(r1).toEqual({ path: join(folioRoot, "folio", "anc-programme", "index.md") });
+      expect(readFileSync(join(folioRoot, "folio", "anc-programme", "index.md"), "utf-8")).toContain(
+        'documentKind: "mounted-layer:programme"',
       );
 
       const r2 = createDocument({ root: folioRoot, kind: "upstream-dep:l1", slug: "anc-l1", title: "ANC L1" });
@@ -188,30 +188,30 @@ describe("linkDocument", () => {
     try {
       const r = linkDocument({
         root,
-        slug: "who-smart-guidelines",
-        title: "WHO SMART Guidelines Overview",
-        url: "https://worldhealthorganization.github.io/smart-ig-empty/",
+        slug: "upstream-overview",
+        title: "Upstream overview",
+        url: "https://example.org/upstream-ig/",
         date: "2026-10-30",
       });
       expect("error" in r).toBe(false);
       if ("error" in r) return;
-      expect(r.path).toBe(join(root, "library", "who-smart-guidelines", "referenced.json"));
-      expect(r.manifestPath).toBe(join(root, "library", "who-smart-guidelines", "manifest.jsonld"));
+      expect(r.path).toBe(join(root, "library", "upstream-overview", "referenced.json"));
+      expect(r.manifestPath).toBe(join(root, "library", "upstream-overview", "manifest.jsonld"));
 
       const rawRef = JSON.parse(readFileSync(r.path, "utf-8"));
       const parsed = ReferencedSourceSchema.safeParse(rawRef);
       expect(parsed.success).toBe(true);
       expect(rawRef.materialization.state).toBe("referenced");
       expect(rawRef.links).toEqual([
-        { label: "upstream document", url: "https://worldhealthorganization.github.io/smart-ig-empty/" },
+        { label: "upstream document", url: "https://example.org/upstream-ig/" },
       ]);
 
       const manifest = JSON.parse(readFileSync(r.manifestPath, "utf-8"));
-      expect(manifest.title).toBe("WHO SMART Guidelines Overview");
+      expect(manifest.title).toBe("Upstream overview");
       expect(manifest.contains).toEqual([]);
       expect(manifest.meta.disposition).toContain("referenced source");
 
-      const report = checkEntry(join(root, "library", "who-smart-guidelines"));
+      const report = checkEntry(join(root, "library", "upstream-overview"));
       const unmet = report.requirements.filter((q) => q.state === "unmet");
       expect(unmet).toEqual([]);
     } finally {

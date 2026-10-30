@@ -2,13 +2,13 @@ import { describe, expect, it } from "bun:test";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { OpenApiConfigSchema, fallbackOperationId, operationsOf, type OpenApiDocument } from "@litlfred/cat-harness/openapi/schemas/openapi.ts";
+import { OpenApiConfigSchema, fallbackOperationId, operationsOf, type OpenApiDocument } from "../schemas/openapi.ts";
 import { checkCommitted, configPath, provenanceFor } from "./ingest-openapi.ts";
 import { igOpenapiGraph, igSiteOpenapi } from "./ig-site-openapi.ts";
 import { PAGE_CONFIG_ID, pagesFor } from "./gen-openapi-pages.ts";
 import { thinPageConfigOf } from "../../scripts/thin-page.ts";
-import { BASE_GRAPH_TYPOLOGIES, GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
-import { isZodSchema, resolveNodeSchemas } from "@litlfred/cat-harness/schemas/kg/kind-validator.ts";
+import { BASE_GRAPH_TYPOLOGIES, GraphTypologyRegistry } from "../../schemas/kg/graph-typology-registry.ts";
+import { isZodSchema, resolveNodeSchemas } from "../../schemas/kg/kind-validator.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { dirname } from "node:path";
 

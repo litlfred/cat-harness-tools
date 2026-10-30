@@ -13,7 +13,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 
 import { generatedOnlyFrontMatter, renderMountedMarkdown } from "../../mount-instance-docs.ts";
-import { siteDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteDir } from "../../../schemas/kg/cat-harness.ts";
 
 function site(files: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), "mount-md-"));

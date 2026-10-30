@@ -46,7 +46,7 @@
  * source of truth; this script verifies external correctness of every
  * entry beyond schema-shape validation.
  */
-import { folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDirDeferred } from "../schemas/kg/cat-harness.js";
 import { references } from "./references-registry-di";
 import { findContentRepoRoot } from "./repo-root";
 import * as fs from "fs";

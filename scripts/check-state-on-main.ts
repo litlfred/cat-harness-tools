@@ -87,13 +87,13 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { contentIsOffCheckout } from "@litlfred/cat-harness/schemas/kg/subgraph-source.ts";
+import { findDeclarationFile, instanceRootsIn, nestedDirectories, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
+import { contentIsOffCheckout } from "../schemas/kg/subgraph-source.ts";
 // The registration side-effect import, same reason `check:declared-dirs` has
 // it: without it a reader's acceptance of this repository's own declaration is
 // an import-order property of the process rather than of the declaration.
-import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
+import "../schemas/kg/folio-graph-typology.js";
 
 /** Where the recorded debt lives. One file, named in one place. */
 export const BASELINE = "cat-harness-tools/scripts/state-on-main-baseline.json";

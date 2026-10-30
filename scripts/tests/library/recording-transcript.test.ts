@@ -16,7 +16,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { RecordingSchema, TranscriptSchema, segmentsCanonical } from "@litlfred/cat-harness/schemas/library/recording.ts";
+import { RecordingSchema, TranscriptSchema, segmentsCanonical } from "../../../schemas/library/recording.ts";
 import { checkEntry, entryKind } from "../../check-l1-complete.ts";
 
 const SCRIPT = resolve(import.meta.dir, "../../recording-transcript.py");

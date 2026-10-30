@@ -98,8 +98,10 @@ import { dirname, join, relative, resolve } from "node:path";
 import { githubPublishDecision, QaUsageError, REFRESH_SCHEMA, refreshReportComplete } from "./qa-store.ts";
 import { movedInventory, movedRoots, type MovedInventory } from "./qa-verify-moved.ts";
 import { BUILDING_ENV } from "./qa-working-copy.ts";
-import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
-import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { mountedInstanceRoots } from "../schemas/kg/remote-mount.ts";
+import { artefactStub, instanceRootsIn, kgQaHomeFor, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { scriptTable } from "../schemas/sdlc/script-table.ts";
+import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 import { rootProfile, type RootProfile } from "./lib/root-gate-set.ts";
 import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
 import { stateMountedDirs } from "./mount-from-lock.ts";
@@ -145,6 +147,33 @@ export interface QaWriter {
 const R = "cat-harness/test/results";
 
 /**
+ * The hosted KG-QA homes `kg:audit:all` writes under {@link R}: the harness's
+ * known hosted instances, plus any instance declared in `repoRoot` whose
+ * `kgQaHomeFor` resolves to `"hosted"` (such as a content root's own instance
+ * when it declares no `qa` directory of its own — bean `rn24`). Still named
+ * per declared instance rather than globbed, so the folded `agent-skills/` and
+ * `large-datasets/` trees remain unclaimed.
+ */
+export function hostedKgWrites(repoRoot: string | undefined = REPO_ROOT): string[] {
+  const stubs = new Set([
+    "bootstrap",
+    "bootstrap-tools",
+    "cat-harness-tools",
+    "cat-openapi",
+    "folio-assistant",
+    "folio-assistant-state",
+  ]);
+  if (repoRoot) {
+    for (const r of instanceRootsIn(repoRoot)) {
+      if (kgQaHomeFor(r, HARNESS_ROOT).by !== "hosted") continue;
+      const decl = readDeclaration(r);
+      if (decl) stubs.add(artefactStub(decl));
+    }
+  }
+  return [...stubs].map((s) => `${R}/${s}/**`);
+}
+
+/**
  * Every writer of the `qa` tree, in the order they must run. Order matters
  * where one reads another's output: the witnesses project the block and
  * translation verdicts; `lsi audit` reads the indexes; `audit:coverage`
@@ -166,22 +195,9 @@ export const QA_WRITERS: readonly QaWriter[] = [
     writes: [
       "*/test/results/kg-qa/**",
       "*/test/results/kg-qa.manifest.json",
-      `${R}/bootstrap/**`,
-      `${R}/bootstrap-tools/**`,
-      `${R}/cat-harness-tools/**`,
-      // The hosted instances added after this list was first written
-      // (measured 2026-10-04, bean `72a8`): an instance that declares no `qa`
-      // directory of its own has its KG verdicts written under this root's
-      // `test/results/<instance>/`. Named, not globbed: `*/kg-qa/**` would
-      // also claim the folded `agent-skills/` and `large-datasets/` trees,
-      // which no writer produces, and the record must lose those visibly.
-      `${R}/cat-openapi/**`,
-      `${R}/folio-assistant/**`,
-      // folio-assistant's own local instance, which holds its repository health
-      // graph (bean folio-assistant-kyrg, owner 2026-10-22).
-      `${R}/folio-assistant-state/**`,
+      ...hostedKgWrites(),
     ],
-    because: "every declared instance's KG verdicts, hosted homes included (bootstrap, bootstrap-tools, cat-harness-tools, cat-openapi, folio-assistant, folio-assistant-state)",
+    because: "every declared instance's KG verdicts, hosted homes included (bootstrap, bootstrap-tools, cat-harness-tools, cat-openapi, folio-assistant, folio-assistant-state, and any declared instance in this checkout hosted under cat-harness)",
   },
   { id: "kg:detangle", run: ["kg:detangle"], writes: [`${R}/detangle/**`], because: "detangle measurements per instance graph" },
   { id: "translation:block-qa", run: ["translation:block-qa"], writes: [`${R}/translation-qa/**`], because: "translation verdicts; read by the witnesses below" },

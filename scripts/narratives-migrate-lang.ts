@@ -26,7 +26,7 @@
  */
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { LANGUAGE_TAG, NarrativeSlotSchema } from "@litlfred/cat-harness/schemas/content/narrative.ts";
+import { LANGUAGE_TAG, NarrativeSlotSchema } from "../schemas/content/narrative.ts";
 import { LIBRARY_NARRATIVE_BEARING, NARRATIVE_BEARING, narrativesIn, slotsIn, type NarrativePath } from "./narratives.ts";
 import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
 

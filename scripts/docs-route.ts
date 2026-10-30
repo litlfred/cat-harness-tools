@@ -37,7 +37,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { declarationPathIn } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
 

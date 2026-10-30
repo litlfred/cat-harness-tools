@@ -65,7 +65,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { findInstanceRoot } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { findInstanceRoot } from "../schemas/kg/cat-harness.ts";
 import { kgRoots } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";

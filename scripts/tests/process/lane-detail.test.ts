@@ -24,7 +24,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { laneDetail } from "../../gen-processes-viz.js";
-import type { RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import type { RoleGraph } from "../../../schemas/process/role-graph.js";
 
 const GRAPH: RoleGraph = {
   name: "test",

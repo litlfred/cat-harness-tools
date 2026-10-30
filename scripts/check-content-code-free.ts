@@ -26,7 +26,12 @@
  * option A, keeping the 2026-10-09 chrome-subgraph layout): a `.js`/`.mjs`
  * under `site-chrome/assets/`, `site-chrome/_includes/` or `docs/assets/` is a
  * file the site ships to the browser, sitting next to the include that loads
- * it. The Jekyll plugins (`_plugins/*.rb`) run at build time and stay counted.
+ * it.
+ *
+ * Two build helpers stay by rule too (owner card 2026-10-30, option A):
+ * the folio file-list renderer (`folio-render/`, owner ruling 2026-10-10:
+ * cat-harness carries its own minimal renderer) and the Jekyll plugins
+ * (`_plugins/*.rb`), which belong to the same chrome layout as the assets.
  *
  * Usage: bun run cat check:content-code-free [--update] [--no-baseline]
  * Exit:  0 when every code file is listed · 1 otherwise
@@ -34,7 +39,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
-import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
+import { gitFiles } from "../schemas/sdlc/git-corpus.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 export const BASELINE_PATH = resolve(TOOLS_ROOT, "scripts", "content-code-free-baseline.json");
@@ -43,13 +48,19 @@ export const BASELINE_PATH = resolve(TOOLS_ROOT, "scripts", "content-code-free-b
 export const CODE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".cjs", ".py", ".sh", ".rb"] as const;
 
 /** Directories whose `.js`/`.mjs` files are shipped browser assets, not code. */
+// declared-path-literal: a classifier over repo-relative paths from any instance, not a read; no one declaration answers it
 export const BROWSER_ASSET_DIRS = ["site-chrome/assets/", "site-chrome/_includes/", "docs/assets/"] as const;
 
 export const isBrowserAsset = (rel: string): boolean =>
   /\.m?js$/.test(rel) && BROWSER_ASSET_DIRS.some((d) => rel.startsWith(d));
 
+/** The folio file-list renderer and the Jekyll plugins, kept by owner card (2026-10-30, option A). */
+// declared-path-literal: a classifier over repo-relative paths, as BROWSER_ASSET_DIRS above
+export const isBuildHelper = (rel: string): boolean =>
+  rel.startsWith("folio-render/") || /(^|\/)_plugins\/[^/]+\.rb$/.test(rel);
+
 export const isCode = (rel: string): boolean =>
-  CODE_EXTENSIONS.some((e) => rel.endsWith(e)) && !isBrowserAsset(rel);
+  CODE_EXTENSIONS.some((e) => rel.endsWith(e)) && !isBrowserAsset(rel) && !isBuildHelper(rel);
 
 /** Every tracked code file under `root`, as root-relative POSIX paths, sorted. */
 export function codeFiles(root: string): string[] {

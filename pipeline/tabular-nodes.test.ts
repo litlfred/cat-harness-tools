@@ -12,7 +12,7 @@
  * @module pipeline/tabular-nodes.test
  */
 import { describe, expect, test } from "bun:test";
-import { CONTENT_DOCUMENT_CONTEXT } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
+import { CONTENT_DOCUMENT_CONTEXT } from "../schemas/kg/jsonld.ts";
 
 import {
   SHEETED_FORMATS,

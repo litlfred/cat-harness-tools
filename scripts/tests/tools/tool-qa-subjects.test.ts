@@ -44,9 +44,9 @@ import {
   KgQaReportSchema,
   type KgQaReport,
   worstSeverity,
-} from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
-import { tools } from "@litlfred/cat-harness/tools/index.ts";
-import { deriveAlternatives } from "@litlfred/cat-harness/schemas/tools/tool.js";
+} from "../../../schemas/sdlc/kg-qa.ts";
+import { tools } from "../../../schemas/tools/harness-tools.ts";
+import { deriveAlternatives } from "../../../schemas/tools/tool.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 
 const INSTANCE = HARNESS_ROOT;

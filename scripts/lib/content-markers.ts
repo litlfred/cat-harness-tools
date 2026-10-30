@@ -18,7 +18,7 @@
  *   every registered type whose marker is present is reported through
  *   `describeRepository`, and every registered `{ indexSection }` type is
  *   checked against `index.config.json#contentTypes.<id>`. A type a
- *   downstream layer registers (smart-base's `dak`, fhir-harness's `ig`) is
+ *   downstream layer registers (the DAK layer's `dak`, the FHIR layer's `ig`) is
  *   picked up the moment that layer is loaded into the same process.
  * - **Directory facets** (`processes`, `beans`, `library`, `uploads`) are
  *   graph typologies, and a hint is dropped unless `BASE_GRAPH_TYPOLOGIES`
@@ -31,11 +31,11 @@
  * That much is the {@link EVIDENCE} table below: a short, explicit list, each
  * row naming the id it suggests, so a reader can disagree with one row.
  *
- * `ig` is registered by fhir-harness (`schemas/ig-content-type.ts`,
- * litlfred/fhir-harness#194), whose `include` list is what the snippet
- * proposes. This toolset does not load fhir-harness, so in a plain scan the
+ * `ig` is registered by the FHIR layer (`schemas/ig-content-type.ts`,
+ * https://github.com/litlfred/fhir-harness/pull/194), whose `include` list is what the snippet
+ * proposes. This toolset does not load the FHIR layer, so in a plain scan the
  * `ig` row is a hint with a note saying where the type lives; in a process
- * that has loaded fhir-harness it reads `source: "registry"`. The row stays
+ * that has loaded the FHIR layer it reads `source: "registry"`. The row stays
  * either way: the registry says what the section is, not which files are
  * evidence for it.
  *
@@ -52,15 +52,15 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, posix } from "node:path";
 
-import "@litlfred/cat-harness/schemas/content/content-types-base.ts";
+import "../../schemas/content/content-types-base.ts";
 import {
   defaultContentTypes,
   describeRepository,
   INDEX_SECTION_FILE,
   type ContentTypeRegistry,
-} from "@litlfred/cat-harness/schemas/content/content-type.ts";
-import { BASE_GRAPH_TYPOLOGIES } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
-import { declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+} from "../../schemas/content/content-type.ts";
+import { BASE_GRAPH_TYPOLOGIES } from "../../schemas/kg/graph-typology-registry.ts";
+import { declarationPathIn } from "../../schemas/kg/cat-harness.ts";
 
 /** Where a declaration for a finding would go. */
 export type MarkerTarget =
@@ -229,7 +229,7 @@ export const EVIDENCE: readonly Evidence[] = [
       if (files.includes("ig.ini")) out.push("ig.ini");
       return out;
     },
-    note: "`ig` is registered by fhir-harness (schemas/ig-content-type.ts), which this scan did not load; the snippet follows that type's `include` list. Its IG readers read only what `include` lists.",
+    note: "`ig` is registered by the FHIR layer (schemas/ig-content-type.ts, https://github.com/litlfred/fhir-harness), which this scan did not load; the snippet follows that type's `include` list. Its IG readers read only what `include` lists.",
   },
   {
     id: "dak",
@@ -393,7 +393,7 @@ export function scanMarkers(
 
   // 3. Sections the index already declares that no evidence row found — still
   // reported, as declared, so the list is the whole picture. A section whose
-  // type this process has not loaded (smart-base's `dak`) is `index`-sourced.
+  // type this process has not loaded (the DAK layer's `dak`) is `index`-sourced.
   for (const id of decl.contentTypes) {
     if (findings.some((f) => f.target === "contentTypes" && f.id === id)) continue;
     findings.push({

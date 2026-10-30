@@ -18,7 +18,7 @@
  * the subtler version — a truncated document that still parses.
  */
 import { describe, expect, test } from "bun:test";
-import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import { readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
@@ -27,9 +27,9 @@ import { unscopedSelectors } from "../scripts/lib/themed-page.ts";
 import { viewerHtml as libraryShell, VIEWER_CSS, VIEWER_JS } from "../scripts/gen-library-viz.ts";
 import { readSchemaGraph } from "../scripts/schema-graph.ts";
 import { readLibraryGraph } from "../scripts/library-graph.ts";
-import { directoriesForGraph, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { directoriesForGraph, repoRootFor, siteDirFor } from "./kg/cat-harness.ts";
 
-const ROOT = HARNESS_ROOT;
+const ROOT = TOOLS_ROOT; // the schema corpus moved here (bean 8lcl)
 
 /**
  * THE GRAPHS ARE READ ONCE, HERE — not inside the tests that assert on them.

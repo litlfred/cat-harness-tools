@@ -55,14 +55,14 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import type { DocumentKind } from "@litlfred/cat-harness/schemas/content/document-kind.ts";
-import { directoryForGraph, folioDir, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import type { DocumentKind } from "../schemas/content/document-kind.ts";
+import { directoryForGraph, folioDir, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.ts";
 import {
   REFERENCED_SOURCE_SCHEMA_ID,
   ReferencedSourceSchema,
   type ReferencedSource,
-} from "@litlfred/cat-harness/schemas/library/referenced-source.ts";
+} from "../schemas/library/referenced-source.ts";
 import { buildEntryNodes } from "../pipeline/gen-library-jsonld.ts";
 import { readDocumentKinds, type KindEntry } from "./gen-document-kinds-viz.ts";
 import { libraryRoot } from "./ingest-document.ts";

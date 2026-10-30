@@ -1,10 +1,10 @@
-/** The visual diff Tool's pure parts (bean 0rxe). The browser run is in cat-harness/test/block-screenshots.e2e.ts. */
+/** The visual diff Tool's pure parts (bean 0rxe). The browser run is in cat-harness-tools/test/content/block-screenshots.e2e.ts. */
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { DIFF_RENDERERS } from "@litlfred/cat-harness/schemas/ui/diff-renderers.js";
+import { DIFF_RENDERERS } from "../../schemas/ui/diff-renderers.js";
 import { VISUAL_KINDS, comparePixels, pageIn, pageOf, safeName, visualChanges } from "../block-screenshots.js";
 
 const img = (w: number, h: number, rgba: [number, number, number, number]) => ({

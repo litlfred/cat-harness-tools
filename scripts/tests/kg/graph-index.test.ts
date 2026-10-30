@@ -30,7 +30,7 @@ import {
   defaultRoots,
   type GraphIndex,
 } from "../../../pipeline/graph-index";
-import { assertEdgeTermsAreIdTyped, GRAPH_EDGE_TERMS } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
+import { assertEdgeTermsAreIdTyped, GRAPH_EDGE_TERMS } from "../../../schemas/kg/jsonld.ts";
 
 const ROOT = mkdtempSync(join(tmpdir(), "graph-index-"));
 const CONTENT = join(ROOT, "folio", "qou", "ch01");

@@ -57,7 +57,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { orderedDependencies } from "../schemas/kg/harness-config.js";
 import { docsPages, documentingPages } from "./docs-declarations.js";
 import { governingSkills, skillGovernance } from "./skill-governance.js";
 import { processIndex, resolveProcess, type ProcessIndex } from "./governing-process.js";
@@ -79,9 +79,9 @@ import {
   type CatHarnessDeclaration,
   visualisationsOf,
   visualisationResolves,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/cat-harness.js";
 import { withViewers } from "./viewer-declarations.js";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
+import { gitCorpus } from "../schemas/sdlc/git-corpus.js";
 
 /** The three obligations, in the order the owner named them. */
 export const CRITERIA = ["visualiser", "docs", "skill", "serialisations"] as const;

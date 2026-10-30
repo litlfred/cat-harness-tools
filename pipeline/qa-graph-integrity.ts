@@ -46,7 +46,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { directoriesForGraph, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { directoriesForGraph, instanceRootsIn } from "../schemas/kg/cat-harness.js";
 
 /** A start or end conflict marker, of any width git writes. */
 export const CONFLICT_MARKER = /^(?:<{7,}|>{7,})(?: |$)/m;

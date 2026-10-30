@@ -15,6 +15,7 @@
   "licence": "MIT",
   "licenceSource": "the installed package's own package.json (`license`)",
   "usedBy": [
+    "schemas/site-chrome.test.ts",
     "scripts/library-readmes.ts",
     "scripts/tests/foreign-site-scope.test.ts",
     "scripts/tests/search-split.test.ts",

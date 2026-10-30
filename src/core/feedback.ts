@@ -11,8 +11,8 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from "fs";
 import { basename, dirname, join, resolve } from "path";
 import { XMLParser } from "fast-xml-parser";
-import type { FeedbackItem, TodoOrigin, TodoPriority, TodoStatus } from "@litlfred/cat-harness/schemas/types.js";
-import { TodoItemSchema } from "@litlfred/cat-harness/schemas/constraints.js";
+import type { FeedbackItem, TodoOrigin, TodoPriority, TodoStatus } from "../../schemas/types.js";
+import { TodoItemSchema } from "../../schemas/constraints.js";
 import {
   EMPTY_NOTE_TAGS,
   NoteTagsSchema,
@@ -21,21 +21,21 @@ import {
   type KgRef,
   type NoteTags,
   type TaskRef,
-} from "@litlfred/cat-harness/schemas/kg/carried-note.js";
+} from "../../schemas/kg/carried-note.js";
 import {
   DEFAULT_TODO_GRAPH_ROOT,
   TODO_GRAPH_FILE,
   nodeOfKind,
   parseTodoGraph,
-} from "@litlfred/cat-harness/schemas/sdlc/todo-graph.js";
-import { directoriesForGraph, directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../../schemas/sdlc/todo-graph.js";
+import { directoriesForGraph, directoryForGraph } from "../../schemas/kg/cat-harness.js";
 import {
   ACTORS_DIRNAME,
   ROLE_GRAPH_DIR,
   ROLE_GRAPH_FILENAME,
   readActors,
   readRoleGraph,
-} from "@litlfred/cat-harness/schemas/process/role-graph.js";
+} from "../../schemas/process/role-graph.js";
 
 export const TodoTagsSchema = NoteTagsSchema;
 export type TodoTags = NoteTags;

@@ -8,7 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { BeanFrontMatterSchema } from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
+import { BeanFrontMatterSchema } from "../../schemas/sdlc/bean-graph.ts";
 import { readBeans } from "../beans.ts";
 import {
   checkBeanIssues,

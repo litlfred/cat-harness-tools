@@ -28,10 +28,10 @@ import {
   VECTOR_FIGURES_FILE,
   VectorFigureSchema,
   VectorFiguresSidecarSchema,
-} from "@litlfred/cat-harness/schemas/content/vector-figure.ts";
+} from "../../schemas/content/vector-figure.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
-import { narrativeFor } from "@litlfred/cat-harness/schemas/content/narrative.ts";
+import { narrativeFor } from "../../schemas/content/narrative.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const AGENT = { kind: "agent", id: "claude", model: "not-disclosed", session: "https://claude.ai/code/session_test" };

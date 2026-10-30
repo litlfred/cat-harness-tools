@@ -166,7 +166,7 @@ import { resolve } from "node:path";
 import { classifyResponse, withBackoff, type BackoffOptions } from "../src/core/retry.js";
 import { scanTriggers, type TriggerScan, type WorkflowTrigger } from "../src/core/workflow-events.js";
 import { detectRepoUrl, ownerRepo } from "../src/core/git-refs.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const REPO = repoRootFor(resolve(HARNESS_ROOT));

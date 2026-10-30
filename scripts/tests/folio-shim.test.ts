@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { vocabularies } from "@litlfred/cat-harness/schemas/content/vocabulary-modules.ts";
+import { vocabularies } from "../../schemas/content/vocabulary-modules.ts";
 import { folioShim } from "../folio-shim.ts";
 import { missingReexports, reexportLine, shimAssistant, vocabularyModulesFor } from "../lib/folio-shim.ts";
 
@@ -18,6 +18,8 @@ const SHIM = `export * from "../../.folio-assistant/cat-harness/schemas/builders
 describe("the shim's vocabulary re-exports", () => {
   test("the platform path is read off the cat-harness re-export", () => {
     expect(shimAssistant(SHIM)).toBe(".folio-assistant");
+    // A shim written since bean `8lcl` names cat-harness-tools; the older one above still reads.
+    expect(shimAssistant(`export * from "../../.folio-assistant/cat-harness-tools/schemas/builders";\n`)).toBe(".folio-assistant");
     expect(shimAssistant("export * from './elsewhere';")).toBeUndefined();
     expect(reexportLine(".folio-assistant", "folio-assistant-sci/schemas/mathpaper-vocabulary")).toBe(
       `export * from "../../.folio-assistant/folio-assistant-sci/schemas/mathpaper-vocabulary";`,

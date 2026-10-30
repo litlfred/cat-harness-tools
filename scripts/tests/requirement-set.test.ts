@@ -11,11 +11,11 @@ import { join } from "node:path";
 import Ajv from "ajv";
 
 import { RequirementSetSchema, SignerKindSchema, type SignOff } from "@litlfred/bootstrap-tools/schemas/requirement-set.ts";
-import { QA_REVIEWER_KINDS } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import { QA_REVIEWER_KINDS } from "../../schemas/sdlc/block-qa.ts";
 import {
   QaAttestationsSchema,
   requirementSignoffPath,
-} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
+} from "../../schemas/sdlc/qa-attestations.ts";
 import { loadProcessModel } from "../../src/workflow/process-model.ts";
 import { checkRequirementSet, signoffFacts, storedSignOffs, unionSignOffs } from "../check-requirements.ts";
 

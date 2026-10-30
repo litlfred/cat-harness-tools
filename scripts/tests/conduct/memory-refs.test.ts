@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { Glob } from "bun";
 
-import { list, mappingList, parseFrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.ts";
+import { list, mappingList, parseFrontMatter } from "../../../schemas/kg/front-matter.ts";
 import { MEMORY_DIRS } from "../../agent-memory.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";

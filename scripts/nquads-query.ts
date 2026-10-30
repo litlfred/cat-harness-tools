@@ -21,7 +21,7 @@ import {
   NQuadsDistributionManifestSchema,
   type NamedQueryRequest,
   type NamedQueryResponse,
-} from "@litlfred/cat-harness/schemas/kg/nquads-distribution.ts";
+} from "../schemas/kg/nquads-distribution.ts";
 
 export class MissingPartitionError extends Error {
   constructor(public missingGraphs: string[]) {

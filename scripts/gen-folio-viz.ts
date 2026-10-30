@@ -89,13 +89,13 @@ import {
   readDeclaration,
   repoRootFor,
   siteDirFor,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/cat-harness.js";
 import { makeEmit } from "./viewer-page.ts";
 import { themedPage } from "./lib/themed-page.ts";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
 import { declaredPageRoute, renderedByOf, withRenderedByFrontMatter } from "./viewer-declarations.js";
-import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.js";
+import { checkoutDirectories } from "../schemas/kg/harness-config.js";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteTarget } from "./lib/site-target.ts";
 
