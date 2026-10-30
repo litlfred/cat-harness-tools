@@ -242,6 +242,8 @@ const parser = new XMLParser({
   parseAttributeValue: false,
   parseTagValue: false,
   trimValues: false,
+  // Archi writes a line break inside a value as `&#xD;`: decode it, never show it.
+  htmlEntities: true,
   isArray: (name) => ARRAYS.has(name),
 });
 

@@ -25,6 +25,15 @@
  * the model does not hold is drawn hatched and named as missing, never
  * dropped, so a broken reference shows where it is.
  *
+ * A box drawn inside another already says how the two relate: ArchiMate's
+ * nesting notation. So a connection between a box and one that encloses it,
+ * for a relationship nesting can stand for, is not drawn — as Archi does by
+ * default. Drawn, it runs from the inner box to the outer box's centre, which
+ * lies inside or beside the inner box: its arrowhead lands in the middle of a
+ * box and the line cuts across the boxes around it.
+ *
+ * A view with nothing on it says so, rather than drawing an empty frame.
+ *
  * Every string from the model is escaped: the model is its authors', and a
  * name is text, never markup.
  */
@@ -162,6 +171,9 @@ function lineStyle(r: ArchimateRelationship | undefined): { start?: string; end?
   }
 }
 
+/** The relationships a box nested in another may stand for (ArchiMate 3.2's nesting notation). */
+const NESTABLE = new Set(["Composition", "Aggregation", "Assignment", "Realization", "Specialization"]);
+
 const MARKERS = `<defs>
 <marker id="arrow-open" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="11" markerHeight="11" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L11 6 L1 11" fill="none" stroke="#333" stroke-width="1.3"/></marker>
 <marker id="arrow-filled" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="11" markerHeight="11" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M1 1 L11 6 L1 11 Z" fill="#333"/></marker>
@@ -207,9 +219,17 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
     grow(n.x, n.y);
     grow(n.x + n.w, n.y + n.h);
   }
-  if (!Number.isFinite(minX)) { minX = 0; minY = 0; maxX = 200; maxY = 60; }
-
   const out: string[] = [];
+  if (!Number.isFinite(minX)) {
+    minX = 0; minY = 0; maxX = 360; maxY = 60;
+    out.push(`<text class="av-note" x="180" y="34" text-anchor="middle">This view is empty: the model draws nothing on it.</text>`);
+  }
+
+  /** Whether `inner` is drawn inside `outer`, at any depth. */
+  const within = (inner: string, outer: string): boolean => {
+    for (let p = nodes.get(inner)?.parent, seen = 0; p && seen < 64; p = nodes.get(p)?.parent, seen++) if (p === outer) return true;
+    return false;
+  };
   for (const n of view.nodes) {
     if (n.kind === "group") {
       const fill = n.fill ?? "#f2f2f2";
@@ -263,7 +283,10 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
     const m = mid.get(id);
     return m ? { at: m } : undefined;
   };
-  const pending = [...view.connections];
+  const pending = view.connections.filter((c) => {
+    const r = c.relationship ? relationships.get(c.relationship) : undefined;
+    return !(r && NESTABLE.has(r.type) && (within(c.source, c.target) || within(c.target, c.source)));
+  });
   for (let guard = 0; pending.length && guard < 4; guard++) {
     for (let i = 0; i < pending.length; ) {
       const c = pending[i]!;

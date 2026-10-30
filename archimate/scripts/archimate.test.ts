@@ -142,6 +142,34 @@ describe("drawing a view", () => {
     expect(renderViewSvg(broken, broken.views[0]!)).toContain("(element missing from the model)");
   });
 
+  it("does not draw a nesting relationship between a box and the box it sits in", () => {
+    // id-da sits in group id-g; give the model an element-box parent instead.
+    const nested = parseArchimate(
+      XML.replace('<folder name="Relations" id="id-f2" type="relations">', '<folder name="Relations" id="id-f2" type="relations">\n    <element xsi:type="archimate:RealizationRelationship" id="id-r3" source="id-c" target="id-b"/>\n    <element xsi:type="archimate:ServingRelationship" id="id-r4" source="id-c" target="id-b"/>')
+        .replace(
+          '<bounds x="120" y="300" width="120" height="55"/>',
+          '<bounds x="120" y="300" width="300" height="200"/>\n        <child xsi:type="archimate:DiagramObject" id="id-dc2" archimateElement="id-c"><bounds x="20" y="40" width="120" height="55"/>' +
+            '<sourceConnection xsi:type="archimate:Connection" id="id-c3" source="id-dc2" target="id-db" archimateRelationship="id-r3"/>' +
+            '<sourceConnection xsi:type="archimate:Connection" id="id-c4" source="id-dc2" target="id-db" archimateRelationship="id-r4"/></child>',
+        ),
+    );
+    const out = renderViewSvg(nested, nested.views[0]!);
+    expect(out).not.toContain("<title>Realization</title>");
+    // A relationship nesting cannot stand for is still drawn.
+    expect(out).toContain("<title>Serving</title>");
+  });
+
+  it("says a view with nothing on it is empty, rather than drawing an empty frame", () => {
+    const empty = parseArchimate(XML.replace(/<element xsi:type="archimate:ArchimateDiagramModel"[\s\S]*?<\/element>/, '<element xsi:type="archimate:ArchimateDiagramModel" name="Default View" id="id-v0"/>'));
+    expect(renderViewSvg(empty, empty.views[0]!)).toContain("This view is empty");
+  });
+
+  it("decodes the line breaks Archi writes as character references", () => {
+    const m2 = parseArchimate(XML.replace("A note &amp; its text", "Who owns it?&#xD;&#xA;Next"));
+    expect(m2.views[0]!.nodes.find((n) => n.kind === "note")!.text).toBe("Who owns it?\r\nNext");
+    expect(renderViewSvg(m2, m2.views[0]!)).not.toContain("#xD");
+  });
+
   it("wraps a long name to the box and marks what it cut", () => {
     expect(wrap("Central Health Workforce Registry and Exchange Services", 160, 2)).toEqual(["Central Health Workforce", "Registry and Exchange…"]);
   });
