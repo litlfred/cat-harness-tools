@@ -351,7 +351,7 @@ async function provisionOneRelease(
 
 /**
  * Resolve a profile (by name, e.g. `"default"`) or a list of tool release refs
- * (`["plantuml@1.2024.7"]`), computing the full transitive runtime dependency
+ * (`["plantuml@1.2026.9"]`), computing the full transitive runtime dependency
  * closure and per-tool environment injection (`JAVA_HOME` and `PATH`).
  */
 export async function resolveTools(
