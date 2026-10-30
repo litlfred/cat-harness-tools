@@ -39,12 +39,12 @@ import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { buildLsi, centroid, cosineVectors, foldIn, unitVector, type LsiIndex } from "../pipeline/lsi";
-import { declaredGraphs } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { declaredGraphs } from "../schemas/kg/cat-harness.ts";
 import { buildCa } from "../pipeline/ca";
-import { BEAN_GRAPH_FILE } from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
+import { BEAN_GRAPH_FILE } from "../schemas/sdlc/bean-graph.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { formatNearAcross, nearAcross, parseNearAcrossArgs } from "../pipeline/lsi-near-across";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));

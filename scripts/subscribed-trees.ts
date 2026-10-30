@@ -47,10 +47,10 @@ import { existsSync, mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import type { Subscription } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import type { Subscription } from "../schemas/kg/cat-harness.js";
 import { PART_RECORD_FILE, PART_TREE, partDirOf, viewOf } from "./kg-parts.js";
 import { readSnapshot, snapshotDirFor } from "./subscribed-harnesses.js";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 /** A declared directory as the substrate's own declaration writes it — every field kept, so `instanceRoot`, `composed` and the rest read as they would in-tree. */
 export type SubscribedEntry = { id: string; path: string; graphTypologies: string[] } & Record<string, unknown>;

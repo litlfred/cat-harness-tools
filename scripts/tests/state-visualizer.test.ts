@@ -51,7 +51,7 @@ import {
   workflowInstancePage,
   workflowHubPage,
 } from "../state-visualizer.ts";
-import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { readDeclaration, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 import {
   existingPageDir,
@@ -705,7 +705,7 @@ describe("the e2e spec's copy of the marker agrees with the generator's — bean
   // is fine; an unchecked one is not.
 
   test("the spec carries the exact marker the generator writes", () => {
-    const spec = readFileSync(join(TOOLS_ROOT, "test", "state-dashboards.e2e.ts"), "utf-8");
+    const spec = readFileSync(join(TOOLS_ROOT, "test", "ui", "state-dashboards.e2e.ts"), "utf-8");
     expect(spec).toContain(`const MARKER = ${JSON.stringify(GENERATED_BY)};`);
   });
 

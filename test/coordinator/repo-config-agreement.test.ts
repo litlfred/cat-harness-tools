@@ -34,7 +34,7 @@ import { join } from "node:path";
 import { findContentRepoRoot } from "../../pipeline/repo-root.ts";
 import { readDeclaredFolioProfile } from "../../pipeline/profile-check.ts";
 import { folioOptionalAxes } from "../../pipeline/qa-criteria-registry.ts";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { readEffectiveConfig } from "../../schemas/kg/harness-config.ts";
 
 /**
  * RESTATED 2026-10-09 for the index. The tests below required a

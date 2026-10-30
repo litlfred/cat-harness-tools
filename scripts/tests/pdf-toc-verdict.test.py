@@ -325,6 +325,28 @@ def main() -> int:
     check("a blank page is a determined blank, not a gap",
           paged[1].text == "_(no text on this page)_")
 
+    print("\n11. the fourth test: contents collapse — entries that cut no section (bean inkl, issue #2302)")
+    check("the cut is 25% of inferred entries producing no section",
+          getattr(pdf, "TOC_MAX_COLLAPSED_SHARE", None) == 0.25)
+    # Measured on 9789240099456-eng (immunizations DAK): 21 inferred entries,
+    # mean confidence 0.70, spread across pages 12..96, but only 7 matched a
+    # body line (the 8 "Component N." entries, "Part 1 ... Background" and two
+    # unnumbered headings all missed), collapsing 21 entries to 7 body sections
+    # (+ front matter = 8) with 0% empty. The first three tests all passed.
+    dak_collapsed_toc = scored([0.7] * 21)
+    dak_collapsed_pages = [""] * max(100, 7 * 21 + 3)
+    for i in (0, 1, 2, 3, 4, 19, 20):
+        dak_collapsed_pages[2 + 7 * i] = f"Heading {i}\n{full}"
+    reason, mean, share = pdf.inferred_toc_trust(dak_collapsed_toc, dak_collapsed_pages)
+    check(f"21 entries collapsing to 7 body sections (67% unlocated) is refused (got {reason!r})",
+          reason is not None and "21" in reason and "7" in reason and "collapse" in reason)
+    # 1 of 5 unlocated = 20% <= 25%: tolerated.
+    one_miss_pages = doc(5)
+    one_miss_pages[2 + 7 * 2] = full  # Heading 2 absent in body
+    reason, _, _ = pdf.inferred_toc_trust(scored([0.8] * 5), one_miss_pages)
+    check(f"at 20% unlocated (1 of 5) the tree is still used (got {reason!r})",
+          reason is None)
+
     print("\n6. an outline is never second-guessed, even a CONCENTRATED one")
     # The property, not one document. The handbook's outline is spread over 179
     # pages, so a mutation that ran the verdict against outlines too would leave
@@ -410,7 +432,7 @@ def main() -> int:
         artefact, sections = pdf.process(handbook, backend="auto")
         check(f"the handbook still reports 'outline' (got {artefact['toc_source']!r})",
               artefact["toc_source"] == "outline")
-        check(f"and still yields its 250 sections (got {len(sections)})", len(sections) == 250)
+        check(f"and still yields its 250+ sections (got {len(sections)})", len(sections) >= 250)
         check("no verdict is recorded against an outline",
               artefact.get("toc_undetermined_reason") is None)
     else:

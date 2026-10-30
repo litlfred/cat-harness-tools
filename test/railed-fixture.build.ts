@@ -8,7 +8,7 @@
  */
 import { basename, join } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { withViewerNav } from "../scripts/viewer-page.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 

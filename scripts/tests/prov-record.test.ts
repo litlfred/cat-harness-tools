@@ -10,7 +10,7 @@ import { loadProcessModel } from "../../src/workflow/process-model.js";
 import { complete, enabled, startInstance } from "../../src/workflow/instance.js";
 import { provActivityFor } from "../../src/workflow/prov-record.js";
 import { loadAccessContext, type Principal } from "../../src/core/access.js";
-import { ProvActivitySchema } from "@litlfred/cat-harness/schemas/content/prov.js";
+import { ProvActivitySchema } from "../../schemas/content/prov.js";
 import { reportInstance } from "../prov-qaqc.js";
 import { roleGraphFor, workflowFile } from "../known-skills.js";
 import type { TaskAuthVerdict } from "../../src/workflow/authorize.js";

@@ -20,7 +20,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { DocumentImageSchema } from "@litlfred/cat-harness/schemas/content/document-image.ts";
+import { DocumentImageSchema } from "../../schemas/content/document-image.ts";
 
 const geometry = (page: number) => ({
   method: "geometry" as const,

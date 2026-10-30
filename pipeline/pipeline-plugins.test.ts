@@ -24,8 +24,8 @@ import {
   ContributionCollisionError,
   ContributionRegistry,
   type FolioContribution,
-} from "@litlfred/cat-harness/schemas/content/contributions.ts";
-import { loadContributionsSync } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+} from "../schemas/content/contributions.ts";
+import { loadContributionsSync } from "../schemas/kg/harness-config.ts";
 import { writeDeclaration, writeInstanceConfig } from "../test/support/instance-fixture.js";
 import {
   UnregisteredPipelinePluginError,
@@ -255,7 +255,6 @@ describe("this repository", () => {
     // catches that only once the files have moved; this catches it now.
     const filled = [
       "lean-lexer",
-      "_folio-chapter-profiles.qou",
       "latex-preflight",
       "lean-coverage",
     ];
@@ -264,7 +263,6 @@ describe("this repository", () => {
     // empties this list, because the files leave this directory.
     const sciBoundHere = new Set([
       "lean-atlas-ingest.ts",
-      "qa-checkers-vacuity.ts",
       "lean-signature.ts",
     ]);
     const offenders: string[] = [];

@@ -40,16 +40,26 @@
  * With no declaration naming the writer it is exactly the old gate: the
  * writer's own `--check`, against committed bytes.
  *
+ * ## It writes into a scratch copy, never into the checkout (owner, 2026-10-30)
+ *
+ * The writer runs in a copy of the checkout made for the run and deleted after
+ * it ({@link scratchCopy}), and every question above is asked of the copy. The
+ * mounted layers are never written. Before this, `render:bpmn:check` wrote 109
+ * files into the cat-harness and bootstrap mounts on every run, so afterwards
+ * `mount:remote:check` reported them "modified". On an air-gapped machine that
+ * cannot re-clone a layer (bean `61tg`), that broke the mount until it was
+ * re-laid by hand. The owner's ruling: a check never writes into a mount.
+ *
  * Exit: 0 pass · 1 fail · 2 could not run (unknown script).
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { built, declaredPlan } from "./derive-at-publish.ts";
 import { readInstances } from "./check-import-direction.ts";
 import { BUILD_OUTPUT_DIRS } from "./input-hash.ts";
@@ -153,10 +163,53 @@ export function outsideInstances(paths: readonly string[], roots: readonly strin
   return new Set(paths.filter((p) => !rs.some((r) => resolve(repoRoot, p).startsWith(r))));
 }
 
-function run(cmd: string): number {
+function run(cmd: string, cwd = REPO_ROOT): number {
   // input-site: scripts — the writer's own command line, from the script table
-  const r = spawnSync("sh", ["-c", cmd], { cwd: REPO_ROOT, stdio: "inherit" });
+  const r = spawnSync("sh", ["-c", cmd], { cwd, stdio: "inherit" });
   return r.status ?? 1;
+}
+
+/**
+ * A copy of the checkout for one run, so a writer never touches the real one.
+ *
+ * Everything is copied except `node_modules` directories, which are linked:
+ * they are installed, not authored, and copying them would multiply the cost.
+ * The one exception is the top-level `node_modules/@litlfred`. Its workspace
+ * links are relative (`../../cat-harness`), so they are copied as links and
+ * resolve to the LAYERS IN THE COPY. Linking that folder to the original would
+ * load the original layers, and a module there that locates files from its
+ * own path would write into the real mounts again.
+ *
+ * Returns the copy's root. The caller removes it.
+ */
+export function scratchCopy(repoRoot = REPO_ROOT): string {
+  const dest = mkdtempSync(join(tmpdir(), "publish-check-tree-"));
+  const linked: Array<[string, string]> = [];
+  cpSync(repoRoot, dest, {
+    recursive: true,
+    verbatimSymlinks: true,
+    filter: (src) => {
+      if (src !== repoRoot && src.split(sep).at(-1) === "node_modules") {
+        linked.push([src, join(dest, relative(repoRoot, src))]);
+        return false;
+      }
+      return true;
+    },
+  });
+  for (const [src, to] of linked) {
+    if (dirname(src) === repoRoot) {
+      // The top-level install: link every package to the original, except the
+      // workspace links, which stay relative so they resolve inside the copy.
+      mkdirSync(to, { recursive: true });
+      for (const e of readdirSync(src)) {
+        if (e === "@litlfred") cpSync(join(src, e), join(to, e), { recursive: true, verbatimSymlinks: true });
+        else symlinkSync(join(src, e), join(to, e));
+      }
+    } else {
+      symlinkSync(src, to);
+    }
+  }
+  return dest;
 }
 
 if (import.meta.main) {
@@ -175,13 +228,15 @@ if (import.meta.main) {
     console.log(`publish:check ${writer}: no builtAtPublish entry names it — its own --check, against committed bytes`);
     process.exit(run(`${scripts[writer]} --check`));
   }
-  const instances = readInstances(REPO_ROOT);
+  const work = scratchCopy(REPO_ROOT);
+  process.on("exit", () => rmSync(work, { recursive: true, force: true }));
+  const instances = readInstances(work);
   const roots = instances.map((i) => i.root);
   // Under ANY instance's declared publish-time path or branch-stored directory
   // (e.g. `test/results/` on `qa-reports`), not only this writer's: a writer may
   // also refresh another publish-time or branch-stored artefact, and that is not
   // a commit moving.
-  const declared = declaredPlan(REPO_ROOT);
+  const declared = declaredPlan(work);
   const storedDirs = instances.flatMap((i) => {
     const decl = readDeclaration(i.root) as { directories?: Array<{ path: string; storage?: unknown }> } | undefined;
     return (decl?.directories ?? [])
@@ -189,28 +244,28 @@ if (import.meta.main) {
       .map((d) => resolve(i.root, d.path));
   });
   const under = (p: string) => {
-    const abs = resolve(REPO_ROOT, p);
+    const abs = resolve(work, p);
     return (
       declared.some((a) => (a.path.endsWith("/") ? (abs + sep).startsWith(resolve(a.abs) + sep) : abs === resolve(a.abs))) ||
       storedDirs.some((d) => (abs + sep).startsWith(d + sep) || abs === d)
     );
   };
-  const before = snapshot(roots);
+  const before = snapshot(roots, work);
 
-  if (run(`bun run cat ${writer}`) !== 0) {
+  if (run(`bun run cat ${writer}`, work) !== 0) {
     console.error(`✗ publish:check: \`${writer}\` exited non-zero`);
     process.exit(1);
   }
-  if (run(`${scripts[writer]} --check`) !== 0) {
+  if (run(`${scripts[writer]} --check`, work) !== 0) {
     console.error(`✗ publish:check: \`${writer}\`'s own --check fails against the output it just wrote — not a fixed point, or a refusal above`);
     process.exit(1);
   }
-  const empty = mine.filter((a) => a.writer.at(-1) === writer && !built(a));
+  const empty = declared.filter((a) => a.writer.includes(writer) && a.writer.at(-1) === writer && !built(a));
   for (const a of empty) console.error(`✗ publish:check: ${a.instance}/${a.path} is declared built by \`${writer}\` and is missing or empty`);
 
-  const changed = moved(before, snapshot(roots)).filter((p) => !under(p));
-  const ignored = ignoredBy(changed, roots);
-  const outside = outsideInstances(changed, roots);
+  const changed = moved(before, snapshot(roots, work)).filter((p) => !under(p));
+  const ignored = ignoredBy(changed, roots, work);
+  const outside = outsideInstances(changed, roots, work);
   const stale = changed.filter((p) => !ignored.has(p) && !outside.has(p));
   for (const p of stale) console.error(`✗ ${p} is a COMMITTED artefact and \`${writer}\` changed it — run \`bun run cat ${writer}\` and commit it`);
 

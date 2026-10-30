@@ -81,15 +81,14 @@ import { basename, join, dirname, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.js";
-import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.js";
-import { readPolicyGrants } from "@litlfred/cat-harness/schemas/content/odrl.js";
-import { KG_CONTENT_GRAPH_TYPOLOGIES, declaredAssets, declaredGraphs, declaredKinds, repoRootFor, resolveDirectories, declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { type DependsOnGap, type DependsOnRecord, dependsOnFor } from "@litlfred/cat-harness/schemas/kg/depends-on.js";
-import { type RoleDef, actorsDir, capabilitiesDir, readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
+import { propertyIri, termIri } from "../schemas/kg/namespaces.js";
+import { ownPrefixTable } from "../schemas/kg/graph-typology-registry.js";
+import { STANDARD_PREFIXES, applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "../schemas/content/vocab-mapping.js";
+import { readPolicyGrants } from "../schemas/content/odrl.js";
+import { KG_CONTENT_GRAPH_TYPOLOGIES, declaredAssets, declaredGraphs, declaredKinds, repoRootFor, resolveDirectories, declarationPathIn } from "../schemas/kg/cat-harness.js";
+import { type DependsOnGap, type DependsOnRecord, dependsOnFor } from "../schemas/kg/depends-on.js";
+import { type RoleDef, actorsDir, capabilitiesDir, readRoleGraph } from "../schemas/process/role-graph.js";
+import { REGISTRY_GROUPS } from "../schemas/kg/kg-node.js";
 import {
   artefactStub,
   defaultGraphTypologies,
@@ -105,7 +104,7 @@ import {
   renderingPath,
   siteDirFor,
   UNPUBLISHED_GRAPH_TYPOLOGIES,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/cat-harness.js";
 import { firstHeading, frontMatter } from "./front-matter.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { isExternalContract, skillContracts } from "./skill-contracts.js";
@@ -123,9 +122,9 @@ import {
 } from "./known-skills.js";
 import { auditSchemaNodes } from "./schema-nodes.js";
 import { loadSpecs } from "./external-schemas.js";
-import { declaredNamespaces } from "@litlfred/cat-harness/schemas/kg/external-schema.js";
+import { declaredNamespaces } from "../schemas/kg/external-schema.js";
 import { toolsOf } from "../tools/discover.js";
-import { toolDocumentPath, toolIri } from "@litlfred/cat-harness/schemas/tools/tool-folders.js";
+import { toolDocumentPath, toolIri } from "../schemas/tools/tool-folders.js";
 import { declaresOwnCanonical, instanceDocPath, publishesInstanceSchema } from "./instance-exports.js";
 import {
   buildDeclarationSchema,
@@ -159,8 +158,9 @@ import {
   declaredSubgraph,
   subgraphSourceOverrides,
   type DeclaredSubgraph,
-} from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { contentSourceContext, contentSourceJsonLd, resolveSubgraphSource, type SubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
+  implementingRootFor,
+} from "../schemas/kg/harness-config.js";
+import { contentSourceContext, contentSourceJsonLd, resolveSubgraphSource, type SubgraphSource } from "../schemas/kg/subgraph-source.js";
 import { subgraphIri } from "./subgraph-node.js";
 import { legacyFragmentIri, subjectBase, subjectFileStem, subjectIri, subjectPathOf } from "./lib/subject-iri.ts";
 import { placedOut, siteRootOf } from "./lib/moved-document.ts";
@@ -2242,7 +2242,10 @@ function collectTools(
  * artefact true, which is the question a reader of a schema node actually has.
  */
 function collectSchemas(doc: string, base: string, scope: CorpusScope = "checkout"): Node[] {
-  const audit = auditSchemaNodes(ROOT, scope);
+  // Bean `8lcl`: the harness's schema modules live in the layer that implements
+  // it, so the Schema nodes are read there; their module paths are unchanged.
+  // declared-path-literal: a probe for which layer implements the harness, not a read of the file.
+  const audit = auditSchemaNodes(implementingRootFor(ROOT, "schemas/kg/cat-harness.ts"), scope);
 
   // Tool → artefact, inverted once so each schema node can name its keeper.
   const keeper = new Map<string, string[]>();

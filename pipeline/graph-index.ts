@@ -35,9 +35,9 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from "fs";
 import { join, dirname, relative } from "path";
-import { GRAPH_EDGE_TERMS, type GraphEdgeTerm } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { GRAPH_EDGE_TERMS, type GraphEdgeTerm } from "../schemas/kg/jsonld.ts";
+import { folioDir } from "../schemas/kg/cat-harness.js";
+import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 
 export interface GraphNode {
   /** The `@id` — a relative IRI, minted by `resolveLabel` for authored blocks. */

@@ -24,8 +24,8 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { ActorDefSchema } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
+import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
+import { ActorDefSchema } from "../../schemas/process/role-graph.ts";
 import { ownKgRoots, workflowFile } from "../../scripts/known-skills.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */

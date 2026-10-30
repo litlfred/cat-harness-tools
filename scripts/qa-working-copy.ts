@@ -56,8 +56,8 @@ import { dirname, join } from "node:path";
 
 import { CACHE_FILE, FileDigests, cacheEnabled, trackedTreeDigest } from "./input-hash.ts";
 import { movedInventory } from "./qa-verify-moved.ts";
-import { INDEX_CONFIG_FILENAME } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { INDEX_CONFIG_FILENAME } from "../schemas/kg/instance-roots.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 import { GATES_WORKFLOW } from "./lib/gates-workflow.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
 

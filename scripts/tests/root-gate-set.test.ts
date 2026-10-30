@@ -92,6 +92,8 @@ describe("which gate set a root is measured against", () => {
     expect(names).toContain("lib:readme:subgraphs:check");
     expect(names).toContain("lib:check:b");
     expect(names).toContain("cat-harness-tools:index-config:inline:check");
+    expect(names).toContain("cat-harness-tools:agent-memory:check");
+    expect(names).toContain("cat-harness-tools:skill:commands:check");
     expect(names.some((n) => n.endsWith(":build"))).toBe(false);
     expect(set.gates["lib:check:a"]).toBe("bun run cat check:a");
   });

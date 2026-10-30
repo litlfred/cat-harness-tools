@@ -42,8 +42,8 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-import { instanceDirectoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+import { instanceDirectoriesForGraph, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
 
 import { instanceRoots, schemeOwner } from "./lib/scheme-owner.ts";
 
@@ -55,18 +55,18 @@ import {
   type TermMapping,
   TermMappingsFileSchema,
   normaliseLabel,
-} from "@litlfred/cat-harness/schemas/content/term-mapping.ts";
-import { PinnedTerminologySchema } from "@litlfred/cat-harness/schemas/content/pinned-terminology.ts";
+} from "../schemas/content/term-mapping.ts";
+import { PinnedTerminologySchema } from "../schemas/content/pinned-terminology.ts";
 import {
   TERM_ADJUDICATIONS_SUFFIX,
   TermAdjudicationsFileSchema,
   adjudicationStatus,
   type AdjudicationStatus,
-} from "@litlfred/cat-harness/schemas/content/term-adjudication.ts";
+} from "../schemas/content/term-adjudication.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult } from "./qa-results.ts";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+import { contentLayerInstance } from "../schemas/kg/graph-typology-registry.js";
 import { dirname } from "node:path";
 
 const ROOT = resolve(dirname(HARNESS_ROOT));

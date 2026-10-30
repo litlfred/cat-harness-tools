@@ -14,13 +14,13 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteDirFor } from "../../schemas/kg/cat-harness.js";
 import {
   TODO_INDEX_SCHEMA_TAG,
   TodoIndexSchema,
   resolveTarget,
   type TodoIndex,
-} from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
+} from "../../schemas/sdlc/todo-index.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

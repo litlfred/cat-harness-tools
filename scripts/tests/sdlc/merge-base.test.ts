@@ -17,8 +17,8 @@ import { pathClass } from "../../merge-pipeline-paths.ts";
 import { parseLog } from "../../merge-main-comment.js";
 import { plan as qaPlan } from "../../qa-resolve-conflicts.ts";
 import { CATALOGUE_VISUALISER, classify, declaredRouteGlobs, GLOSSARY_RENDERER, PATTERNS, resolveGeneratedRegions } from "../../merge-conflict-patterns.js";
-import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { repoRootFor, siteDirFor } from "../../../schemas/kg/cat-harness.js";
+import { scriptsOf } from "../../../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 /** This instance and the repository it sits in, for the filesystem-driven sweeps. */

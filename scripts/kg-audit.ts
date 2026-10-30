@@ -52,9 +52,10 @@
 
 import { createHash } from "node:crypto";
 import { parse as parseYaml } from "yaml";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import { contractFile, contractRefProblem, skillContracts } from "./skill-contracts.js";
 import { checkTestRuns, testRunFiles } from "./test-run-conformance.js";
+import { BUILDING_ENV } from "./qa-working-copy.ts";
 import { auditCertifications, auditTestPlans, jsonFilesUnder, auditTestPlanExitCriteria } from "./test-plan-audit.js";
 import { processArrowFindings, schemaArrowFindings } from "./arrow-direction.js";
 import { contentCodeFindings, contentInstanceCode } from "./content-holds-code.js";
@@ -65,7 +66,7 @@ import { auditLakeTargetLeanResolution } from "./check-lake-targets.js";
 import { classifyName, diagramProse, generalDeclarationProse, namedFiles } from "./prose-names.js";
 import { readSchemaGraph } from "./schema-graph.js";
 import { checkTools, unresolvedPaths } from "./check-tools.js";
-import { deriveAlternatives } from "@litlfred/cat-harness/schemas/tools/tool.js";
+import { deriveAlternatives } from "../schemas/tools/tool.js";
 import { tools, toolsOf } from "../tools/discover.js";
 import { kgDirectories, kgRoots, ownKgRoots, workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { baseDocsDir, docsLayers } from "./compose-docs.js";
@@ -82,7 +83,7 @@ import {
   readAttestationFile,
   serialiseAttestations,
   type KgAttestations,
-} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.js";
+} from "../schemas/sdlc/qa-attestations.js";
 import { claimsEntry, judgePair, rootScripts } from "./pair-claims.js";
 import { auditFolioBlocks } from "./block-reference-resolver.js";
 // `Dirent` for the orphan-sidecar sweep (bean `3jj9`), which walks the
@@ -91,7 +92,7 @@ import { withPriorAdversarialReviews } from "./lib/kg-qa-carry.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { corpusPredicate } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
+import { corpusPredicate } from "../schemas/sdlc/git-corpus.ts";
 
 import {
   KG_QA_SCHEMA,
@@ -115,7 +116,7 @@ import {
   type KgResult,
   type KgSeverity,
   type KgSubjectKind,
-} from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
+} from "../schemas/sdlc/kg-qa.js";
 import {
   laneBinding,
   readRoleGraph,
@@ -127,8 +128,8 @@ import {
   fulfilmentKindsForBpmnType,
   type RoleGraph,
   type LoadedActor,
-} from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { ANYONE, ODRL_ACTIONS, policyGrants, readPolicies } from "@litlfred/cat-harness/schemas/content/odrl.js";
+} from "../schemas/process/role-graph.js";
+import { ANYONE, ODRL_ACTIONS, policyGrants, readPolicies } from "../schemas/content/odrl.js";
 import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf } from "./qa-results.ts";
 import { readQaTree } from "./qa-store.ts";
 import { globalTaskSharedFindings } from "./lib/global-task-criteria.ts";
@@ -145,21 +146,21 @@ import {
   remotePackageSkills,
 } from "./known-skills.js";
 import { LOCAL_PACKAGES } from "./skill-packages.js";
-import { findInstanceRoot, repoRootFor, DECLARATION_SUFFIX, ownDirectoryById, resolveDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration, kgQaHomeFor} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { findInstanceRoot, repoRootFor, DECLARATION_SUFFIX, ownDirectoryById, resolveDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration, kgQaHomeFor} from "../schemas/kg/cat-harness.js";
 import { toolDownstreamEntry, undeclaredDownstreamEntry } from "./downstream-runs.ts";
 import { VERIFIERS } from "./publish-verify.ts";
-import { checkoutRootFor, orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { CONVENTION_GROUP } from "@litlfred/cat-harness/schemas/process/convention.js";
-import { USER_STORIES_FILENAME, danglingStoryRoles, readUserStories, type UserStoryGraph } from "@litlfred/cat-harness/schemas/process/user-story.js";
-import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
-import { conventionsDir, skillDefinitionDirs } from "@litlfred/cat-harness/schemas/kg/skill-definitions-dir.ts";
+import { checkoutRootFor, orderedDependencies } from "../schemas/kg/harness-config.js";
+import { CONVENTION_GROUP } from "../schemas/process/convention.js";
+import { USER_STORIES_FILENAME, danglingStoryRoles, readUserStories, type UserStoryGraph } from "../schemas/process/user-story.js";
+import { actorsDir, capabilitiesDir } from "../schemas/process/role-graph.ts";
+import { conventionsDir, skillDefinitionDirs } from "../schemas/kg/skill-definitions-dir.ts";
 import {
   checkoutActors,
   checkoutPolicies,
   checkoutRoleGraph,
   neededActors,
   neededPolicies,
-} from "@litlfred/cat-harness/schemas/process/scenario-overlay.js";
+} from "../schemas/process/scenario-overlay.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { legacyBindingFindings, mechanicalRoleUntested, skillsOutsideLaneRole } from "./lib/lane-role-criteria.ts";
 import { skillEdgeIndex } from "./lib/skill-edges.ts";
@@ -1883,6 +1884,12 @@ function testRunCriteria(skills: Set<string>): Record<string, KgCriterionEntry> 
       }
     }
     return { looked: true, files };
+  }, {
+    // A committed results directory is its own record, so its presence is
+    // determined. A branch-stored one is derived: an empty copy may be another
+    // writer's side effect, so it counts only while qa:refresh computes it
+    // (cat-harness-tools#759, owner's choice A).
+    determined: process.env[BUILDING_ENV] === "1" || qaStorageOf(resultsDir) === undefined,
   });
   // Only a DECLARED `qa` directory that is absent is unknown. An instance that
   // declares none (bootstrap, …) has no results to read, and its

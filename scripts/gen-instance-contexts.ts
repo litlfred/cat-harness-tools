@@ -94,14 +94,14 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
-import { JsonldPrefixTableSchema, type DeclaredPrefixes, type JsonldPrefixTable } from "@litlfred/cat-harness/schemas/kg/jsonld-prefixes.js";
-import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/jsonld.js";
-import { ownNamespace } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/prov-jsonld.js";
-import { SUBGRAPH_CONTEXT_PATH } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.js";
+import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { ancestorsOf, flattenDependencies } from "../schemas/kg/dependency-order.js";
+import { JsonldPrefixTableSchema, type DeclaredPrefixes, type JsonldPrefixTable } from "../schemas/kg/jsonld-prefixes.js";
+import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "../schemas/kg/jsonld.js";
+import { ownNamespace } from "../schemas/kg/namespaces.js";
+import { ownPrefixTable } from "../schemas/kg/graph-typology-registry.js";
+import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "../schemas/kg/prov-jsonld.js";
+import { SUBGRAPH_CONTEXT_PATH } from "../schemas/kg/subgraph-manifest.js";
 
 import {
   buildInstanceContext,

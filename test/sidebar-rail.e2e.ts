@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { navbarHtml } from "../scripts/lib/navbar.ts";
 import { NAV_COLLAPSED_PX, NAV_OPEN_PX, NAV_OPEN_WIDE_PX } from "../scripts/lib/navbar-geometry.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
@@ -185,9 +185,10 @@ async function _load(p: Page, scoped = false): Promise<string[]> {
   await p.route("http://sidebar.fixture/**", (r) => r.fulfill({ contentType: "text/html", body: page(scoped) }));
   await p.setViewportSize({ width: 1280, height: 800 });
   await p.goto("http://sidebar.fixture" + (scoped && SCOPE ? BASEURL + SCOPE.href : "/page"), { waitUntil: "load" });
-  // PINNED OPEN, the state the ruling is about, by the control a reader uses:
-  // from 50rem up the avatar opens and closes the bar (#1757).
-  await p.locator(".side-bar .site-title").click();
+  // PINNED OPEN, the state the ruling is about. Set on the checkbox: since
+  // 2026-10-30 a pointer click on the avatar of a hovered (open) bar goes to
+  // the landing page rather than pinning it.
+  await p.evaluate(() => { const b = document.getElementById("fa-nav-open") as HTMLInputElement; b.checked = true; b.dispatchEvent(new Event("change")); });
   await expect(p.locator("#fa-nav-open")).toBeChecked();
   await p.mouse.move(1270, 790);
   await p.waitForTimeout(300);
@@ -264,8 +265,8 @@ test.describe("on desktop opening the rail shrinks content width so they do not 
     expect(closedSidebar.x + closedSidebar.width).toBeLessThanOrEqual(closedMain.x + 0.5);
     await captureScreenshot(page, "sidebar-1280-closed.png");
 
-    // Open via click (avatar / site-title pins #fa-nav-open)
-    await page.locator(".side-bar .site-title").click();
+    // Pin open on the checkbox (a click on an open bar's avatar goes home since 2026-10-30)
+    await page.evaluate(() => { const b = document.getElementById("fa-nav-open") as HTMLInputElement; b.checked = true; b.dispatchEvent(new Event("change")); });
     await expect(page.locator("#fa-nav-open")).toBeChecked();
     await page.mouse.move(1270, 790);
     await page.waitForTimeout(300);
@@ -285,7 +286,7 @@ test.describe("on desktop opening the rail shrinks content width so they do not 
     await captureScreenshot(page, "sidebar-1280-open.png");
 
     // Close: restores full width
-    await page.locator(".side-bar .site-title").click();
+    await page.evaluate(() => { const b = document.getElementById("fa-nav-open") as HTMLInputElement; b.checked = false; b.dispatchEvent(new Event("change")); });
     await expect(page.locator("#fa-nav-open")).not.toBeChecked();
     await page.mouse.move(1270, 790);
     await page.waitForTimeout(300);
@@ -340,8 +341,10 @@ test.describe("on desktop opening the rail shrinks content width so they do not 
     expect(closedRail.x + closedRail.width).toBeLessThanOrEqual(closedContent.x + 0.5);
     await captureScreenshot(page, "rail-1280-closed.png");
 
-    // Open via click on head label (pins #fa-nav-open)
-    await page.locator(".fa-nav-head").click();
+    // Open via the head's open/close label (pins #fa-nav-open). Dispatched:
+    // a pointer over the bar opens it by hover, and an open bar's header is
+    // the landing-page link (owner, 2026-10-30).
+    await page.locator(".fa-nav-head-toggle").dispatchEvent("click");
     await expect(page.locator("#fa-nav-open")).toBeChecked();
     await page.mouse.move(1270, 790);
     await page.waitForTimeout(300);
@@ -357,7 +360,7 @@ test.describe("on desktop opening the rail shrinks content width so they do not 
     await captureScreenshot(page, "rail-1280-open.png");
 
     // Close restores width
-    await page.locator(".fa-nav-head").click();
+    await page.locator(".fa-nav-head-toggle").dispatchEvent("click");
     await expect(page.locator("#fa-nav-open")).not.toBeChecked();
     await page.mouse.move(1270, 790);
     await page.waitForTimeout(300);
@@ -385,8 +388,9 @@ test.describe("on desktop opening the rail shrinks content width so they do not 
 
     await captureScreenshot(page, "rail-390-closed.png");
 
-    // Open rail
-    await page.locator(".fa-nav-head").click();
+    // Open rail by the head's open/close label. Dispatched: this browser can
+    // hover, and an open bar's header is the landing-page link (2026-10-30).
+    await page.locator(".fa-nav-head-toggle").dispatchEvent("click");
     await expect(page.locator("#fa-nav-open")).toBeChecked();
     await page.waitForTimeout(300);
 

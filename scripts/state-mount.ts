@@ -112,7 +112,7 @@ import {
   type BranchStoreOptions,
   type TipLocation,
 } from "./branch-store.js";
-import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { instanceRootsIn, nestedDirectories, readDeclaration } from "../schemas/kg/cat-harness.js";
 import { tools } from "../tools/discover.js";
 import { exitCode as remoteExitCode, remoteFanOut } from "./remote-mount.ts";
 

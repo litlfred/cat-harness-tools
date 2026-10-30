@@ -35,7 +35,7 @@
 import { resolve } from "path";
 
 import type { PartitionSpec, PermittedEdge, Rule } from "./engine.js";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { TOOLS_ROOT } from "../lib/roots.ts";
 
 // ── The proposed repositories ───────────────────────────────────
 
@@ -397,6 +397,7 @@ export const RULES: Rule[] = [
       "schemas/kg/instance-repositories.ts",    // the derived owner/repo ↔ instance map (bean `6rmv`)
       "schemas/kg/skill-definitions-dir.ts",    // where the JSON skill definitions and conventions live (bean `rqao`)
       "schemas/kg/kg-node.ts",                  // the labels every KG node carries
+      "schemas/harness-root.ts",                // declared-path-literal: a partition plan names modules by path. Where the harness is, for code that moved out of it (bean `8lcl`)
       "schemas/kg/harness-config.ts",           // cross-instance dependency resolution
       "schemas/kg/subgraph-source.ts",          // where a declared subgraph gets its content (bean `l4ay`) — read by the declaration schema itself
       "schemas/kg/remote-mount.ts",             // declared-path-literal: a partition plan names modules by path. Remote mounts (bean `0mpw`): mountDefaults, remoteMounts, the lock
@@ -1079,7 +1080,6 @@ export const RULES: Rule[] = [
       "schemas/kg/fsh-guts.ts",        // the trashcan, not FHIR Shorthand
       "schemas/sdlc/python-deps.ts",     // the repository's own Python toolchain
       "schemas/content/avatars.ts",         // declared-path-literal: a partition plan names modules by path. An avatar for every declared kind
-      "schemas/fsh-guts.ts",           // the trashcan's one-release re-export at the old path, still not FHIR
       "schemas/ui/blank-avatar.ts",    // declared-path-literal: a partition plan names modules by path. Its blank mark, node-free for the navbar bundle
       "schemas/kg/substrate-snapshot.ts", // the node schema of `substrate-snapshot`, a kind the harness registers (issue #1719)
       "schemas/kg/kind-validator.ts",  // a graph typology's validator
@@ -1262,8 +1262,11 @@ export const RULES: Rule[] = [
     // `skills/authoring/{authoring-math,folio-paper-adapter}/` on 2026-10-01:
     // placement PR1 (bean `ybwt`) moved both packages to
     // `folio-assistant-sci/skills/content/`.
+    // `schemas/precision-scalar.ts` and `schemas/refactor-strategy.ts` moved to
+    // `folio-assistant-sci/schemas/` in bean `f8wp` (the second after `saqd`
+    // #875 moved its loader), so neither is named here any more.
     prefixes: ["computations/", "latex/", "scripts/render-tex/", "scripts/docker-latex-build/", "scripts/knot-plots/"],
-    exact: ["schemas/formalization-types.ts", "schemas/precision-scalar.ts", "schemas/refactor-strategy.ts"],
+    exact: ["schemas/formalization-types.ts"],
   },
   {
     repo: "sci",
@@ -1441,10 +1444,11 @@ export const RULES: Rule[] = [
 
 // ── Module discovery ────────────────────────────────────────────
 
-/** This instance's root: two levels up from `scripts/partition/`. */
+/** Where the harness's code lives. Since bean `8lcl` that is cat-harness-tools: the
+ * harness's modules moved to its `schemas/`, and cat-harness keeps data. */
 // declared-path-literal: the base case — a module cannot resolve its own
 // instance root through a declaration without first knowing where it is.
-export const ROOT = resolve(HARNESS_ROOT);
+export const ROOT = resolve(TOOLS_ROOT);
 
 /** Directories scanned for TypeScript modules. */
 // `"test"`, not `"tests"`: the two test trees were consolidated onto `test/`
@@ -1452,7 +1456,9 @@ export const ROOT = resolve(HARNESS_ROOT);
 // longer exists is not an error here — `walkTs` returns early on a missing
 // dir — so this would have gone on partitioning the repo while silently
 // seeing none of the e2e specs or the health sweep.
-export const SCAN_ROOTS = ["src", "schemas", "adapters", "content", "scripts", "test", "types"];
+// Since bean `8lcl` only `schemas/` holds the moved harness modules; the rest
+// of cat-harness-tools is tools code, which this partition never judged.
+export const SCAN_ROOTS = ["schemas"];
 
 // input-site: inert #08aab37b — names a build-output directory only to leave it out of a walk
 export const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", "beans", "docs"]);

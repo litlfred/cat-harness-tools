@@ -19,7 +19,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { queueRepoRelative, uploadUrl } from "../upload-url.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { gitFixtureRepo } from "../../test/support/git-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

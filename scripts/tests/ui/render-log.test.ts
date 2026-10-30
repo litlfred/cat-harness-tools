@@ -22,7 +22,7 @@ import {
   readRenderLogEntry,
   renderLogPath,
   serializeRenderLogEntry,
-} from "@litlfred/cat-harness/schemas/ui/render-log.ts";
+} from "../../../schemas/ui/render-log.ts";
 import { appendEntry, buildEntry } from "../../render-log.ts";
 
 const AT = "2026-09-20T07:30:00.000Z";

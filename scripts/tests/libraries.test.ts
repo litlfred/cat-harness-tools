@@ -11,11 +11,16 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
-import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/library/spdx-license-expression.ts";
-import { SoftwareLibrarySchema } from "@litlfred/cat-harness/schemas/library/software-library.ts";
+import { loadSpdxLicenseList } from "../../schemas/library/spdx-license-expression.ts";
+import { SoftwareLibrarySchema } from "../../schemas/library/software-library.ts";
 import {
+  HOLDER,
+  KIND_OWNER,
+  asHeld,
   codeFiles,
   deriveLayer,
+  heldLayers,
+  strayHeldDirs,
   layerFindings,
   libraryLayers,
   licenceOf,
@@ -231,7 +236,7 @@ describe("--check", () => {
   test("a licence off the pinned SPDX list is a finding", () => {
     const p = join(root, "node_modules/pkg-a/package.json");
     const before = readFileSync(p, "utf-8");
-    writeFileSync(p, JSON.stringify({ name: "pkg-a", version: "1.0.1", license: "SEE LICENSE IN LICENSE.txt" }));
+    writeFileSync(p, JSON.stringify({ name: "pkg-a", version: "1.0.1", license: "Not-A-Licence" }));
     const d = deriveLayer(root);
     writeLayer(layer, d);
     const f = layerFindings(layer, d, SPDX);
@@ -376,5 +381,84 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 describe("the layers this checkout judges", () => {
   test("cat-harness-tools declares its own libraries directory", () => {
     expect(libraryLayers(REPO).map((l) => l.name)).toContain("cat-harness-tools");
+  });
+});
+
+describe("a layer below the kind is held by the writer's layer (owner, 2026-10-30, bootstrap-tools#44)", () => {
+  let co: string;
+  const decl = (name: string, needs: string[], pkg: boolean) => {
+    mkdirSync(join(co, name), { recursive: true });
+    writeFileSync(join(co, name, `${name}.json`), JSON.stringify({ name, version: "0.1.0", needs }));
+    if (pkg) writeFileSync(join(co, name, "package.json"), JSON.stringify({ name: `@litlfred/${name}` }));
+  };
+  beforeAll(() => {
+    co = mkdtempSync(join(tmpdir(), "libraries-held-"));
+    decl("base", [], false); // no package.json: nothing to hold
+    decl("base-tools", ["base"], true); // below the kind: held
+    decl(KIND_OWNER, ["base", "base-tools"], true); // the kind's owner declares its own
+    decl("tools", [KIND_OWNER, "base-tools"], true); // the holder
+    decl("above", ["tools"], true); // reaches the kind: never held, declares its own
+  });
+  afterAll(() => rmSync(co, { recursive: true, force: true }));
+  const holder = (): LibraryLayer => ({ name: "tools", root: join(co, "tools"), dir: join(co, "tools", "libraries") });
+
+  test("the held set is derived: a layer with a package.json that does not reach the kind's owner", () => {
+    const held = heldLayers(co, [holder()], "tools");
+    expect(held.map((l) => l.name)).toEqual(["base-tools"]);
+    expect(held[0].dir).toBe(join(co, "tools", "libraries", "held", "base-tools"));
+    expect(held[0].heldBy?.name).toBe("tools");
+  });
+
+  test("with no holder in the checkout, nothing is held", () => {
+    expect(heldLayers(co, [], "tools")).toEqual([]);
+  });
+
+  test("a layer that declares its own libraries directory is never held", () => {
+    const own = [holder(), { name: "base-tools", root: join(co, "base-tools"), dir: join(co, "base-tools", "libraries") }];
+    expect(heldLayers(co, own, "tools")).toEqual([]);
+  });
+
+  test("a held node names its layer and is stamped 1.2.0; usedBy stays relative to that layer", () => {
+    const d = asHeld(deriveLayer(root), "fixture");
+    for (const n of d.nodes.values()) {
+      expect(n.layer).toBe("fixture");
+      expect(n.$schema).toBe("software-library/1.2.0");
+      expect(SoftwareLibrarySchema.safeParse(n).success).toBe(true);
+    }
+    expect(d.nodes.get("pkg-a.library.json")?.usedBy).toEqual(deriveLayer(root).nodes.get("pkg-a.library.json")!.usedBy);
+  });
+
+  test("a held directory for a layer the checkout does not hold is reported, never deleted", () => {
+    const h = holder();
+    mkdirSync(join(h.dir, "held", "gone"), { recursive: true });
+    expect(strayHeldDirs(h, heldLayers(co, [h], "tools"))).toEqual(["gone"]);
+    rmSync(join(h.dir, "held"), { recursive: true });
+  });
+
+  test("this layer is the holder", () => {
+    expect(HOLDER).toBe("cat-harness-tools");
+  });
+});
+
+describe("npm's `SEE LICENSE IN <file>`", () => {
+  test("the named file is read: a listed licence's text is its id, any other a LicenseRef", () => {
+    const dir = mkdtempSync(join(tmpdir(), "libraries-see-"));
+    const put2 = (rel: string, text: string) => {
+      mkdirSync(dirname(join(dir, rel)), { recursive: true });
+      writeFileSync(join(dir, rel), text);
+    };
+    put2("package.json", JSON.stringify({ name: "@litlfred/see", dependencies: { custom: "^1.0.0" } }));
+    put2("bun.lock", `{"lockfileVersion": 1, "workspaces": {"": {"name": "@litlfred/see"}}, "packages": {"custom": ["custom@1.0.0", "", {}, "${INTEGRITY}"]}}`);
+    put2("node_modules/custom/package.json", JSON.stringify({ name: "custom", version: "1.0.0", license: "SEE LICENSE IN LICENSE" }));
+    put2("node_modules/custom/LICENSE", "Copyright the authors. You may use this only with the watermark shown.\n");
+    put2("src/a.ts", `import c from "custom";\n`);
+    const d = deriveLayer(dir);
+    expect(d.problems).toEqual([]);
+    const n = d.nodes.get("custom.library.json")!;
+    expect(n.licence).toBe("LicenseRef-custom");
+    expect(n.licenceSource).toContain("`LICENSE`");
+    rmSync(join(dir, "node_modules/custom/LICENSE"));
+    expect(deriveLayer(dir).problems.some((p) => p.includes("no such file"))).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
   });
 });

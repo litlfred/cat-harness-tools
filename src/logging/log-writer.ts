@@ -50,7 +50,7 @@ import {
   logDirs,
   resolveCapture,
   shouldPersist,
-} from "@litlfred/cat-harness/schemas/sdlc/log-entry.ts";
+} from "../../schemas/sdlc/log-entry.ts";
 
 /** What the caller supplies. The writer fills in `$schema`, `id` and `at`. */
 export interface LogDraft {

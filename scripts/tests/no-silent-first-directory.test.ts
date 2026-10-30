@@ -38,7 +38,7 @@ import {
   instanceDirectoriesForGraph,
   instanceDirectoryForGraph,
   instanceRootsIn,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 

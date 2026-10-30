@@ -33,9 +33,9 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { readTileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
+import { readTileCounts } from "../../../schemas/ui/tile-count.ts";
+import { siteDirFor } from "../../../schemas/kg/cat-harness.ts";
+import "../../../schemas/kg/folio-graph-typology.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 /**

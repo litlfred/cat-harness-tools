@@ -36,8 +36,8 @@
  */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
-import { readStructure, type BaseSection } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { readStructure, type BaseSection } from "../schemas/content/document-structure.ts";
+import { folioDir } from "../schemas/kg/cat-harness.js";
 import { plainHeading } from "./lib/library-document.ts";
 import { loadBlocksUnder } from "../pipeline/block-module.ts";
 import { blockToJsonLd, serialise } from "../pipeline/gen-block-jsonld.ts";

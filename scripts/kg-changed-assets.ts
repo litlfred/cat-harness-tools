@@ -69,8 +69,8 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { reviewList, type RenderedImpact } from "@litlfred/cat-harness/schemas/ui/rendered-impact.ts";
-import { StagingPageComparisonSchema, type StagingPageComparison } from "@litlfred/cat-harness/schemas/sdlc/staging.ts";
+import { reviewList, type RenderedImpact } from "../schemas/ui/rendered-impact.ts";
+import { StagingPageComparisonSchema, type StagingPageComparison } from "../schemas/sdlc/staging.ts";
 import { coneByFile, docsMounts, docsRenderedImpact, indexSite } from "./docs-rendered-impact.ts";
 import type { ConeDecision } from "./staging-cone.ts";
 
@@ -346,7 +346,7 @@ if (import.meta.main) {
   const { exportIdentity } = await import("./kg-export.ts");
   const { HARNESS_ROOT } = await import("./lib/roots.ts");
   const { instanceDocPath, instanceExportPlan } = await import("./instance-exports.ts");
-  const { repoRootFor } = await import("@litlfred/cat-harness/schemas/kg/cat-harness.js");
+  const { repoRootFor } = await import("../schemas/kg/cat-harness.js");
   const repo = resolve(repoRootFor(HARNESS_ROOT));
   const render = docsRenderer(repo);
 

@@ -12,10 +12,10 @@ import { describe, expect, it } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { forgeLocation, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { forgeLocation, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { libraryResolver } from "../../scripts/lib/library-links.ts";
 import { pageParts } from "../../scripts/viewer-declarations.ts";
-import { visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.ts";
+import { visualiserRoute } from "../../schemas/kg/visualiser-route.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

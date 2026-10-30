@@ -36,9 +36,9 @@
  * @module pipeline/criterion-source
  */
 
-import type { ContributedChecker, ContributionRegistry } from "@litlfred/cat-harness/schemas/content/contributions.ts";
-import type { CheckerPaths, CheckerResult, QaCriterionDefinition } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
-import { implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import type { ContributedChecker, ContributionRegistry } from "../schemas/content/contributions.ts";
+import type { CheckerPaths, CheckerResult, QaCriterionDefinition } from "../schemas/sdlc/block-qa.ts";
+import { implementingRootFor } from "../schemas/kg/harness-config.ts";
 import { QA_CRITERIA_BY_ID, getCriterionSourceFile } from "./qa-criteria-registry";
 
 /** A criterion's checker, located. */

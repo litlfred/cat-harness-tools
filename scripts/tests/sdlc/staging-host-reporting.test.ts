@@ -21,7 +21,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { createStagingPreview, type StagingDeployFacts } from "@litlfred/cat-harness/schemas/sdlc/staging-preview.ts";
+import { createStagingPreview, type StagingDeployFacts } from "../../../schemas/sdlc/staging-preview.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { skillMdFile } from "../../known-skills.ts";
 

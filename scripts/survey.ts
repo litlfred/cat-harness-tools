@@ -43,12 +43,12 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { BEAN_GRAPH_FILE, DEFAULT_BEAN_GRAPH_ROOT, parseBeanGraph } from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
+import { BEAN_GRAPH_FILE, DEFAULT_BEAN_GRAPH_ROOT, parseBeanGraph } from "../schemas/sdlc/bean-graph.ts";
 import {
   SESSION_SURVEY_TAG,
   SessionSurveySchema,
   type SessionSurvey,
-} from "@litlfred/cat-harness/schemas/sdlc/session-survey.ts";
+} from "../schemas/sdlc/session-survey.ts";
 import { ancestorOr, isAncestor } from "./git-ancestry.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";

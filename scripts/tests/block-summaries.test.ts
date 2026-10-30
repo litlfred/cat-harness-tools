@@ -21,16 +21,16 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { corpusDirectoriesForGraph as directoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
+import { corpusDirectoriesForGraph as directoriesForGraph } from "../../schemas/kg/harness-config.ts";
 import {
   BlockSummariesSidecarSchema,
   SUMMARIES_FILE,
   sourceHash,
   summaryStatus,
   type BlockSummary,
-} from "@litlfred/cat-harness/schemas/content/block-summary.ts";
-import { NarrativeSchema } from "@litlfred/cat-harness/schemas/content/narrative.ts";
+} from "../../schemas/content/block-summary.ts";
+import { NarrativeSchema } from "../../schemas/content/narrative.ts";
 import { backlog, entryDirs, entryItems, next, record, sidecarDefects, tally } from "../summaries.ts";
 import { decide, queue } from "../narratives.ts";
 import { checkEntry } from "../check-l1-complete.ts";

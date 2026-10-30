@@ -14,8 +14,8 @@ import {
 } from "fs";
 import { join, resolve } from "path";
 import { execFileSync } from "child_process";
-import { findDeclarationFile, graphLayer, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { portableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
+import { findDeclarationFile, graphLayer, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { portableSegment } from "../schemas/kg/portable-path.ts";
 import { criterionSourceHash } from "./qa-criterion-hash";
 import { maskStringsAndComments, parseStringField } from "./uses-field";
 import {
@@ -23,7 +23,7 @@ import {
   listFormalSourceFiles,
   resolveCanonicalFormal,
   type FormalTreeCache,
-} from "@litlfred/cat-harness/schemas/formal-ref.js";
+} from "../schemas/formal-ref.js";
 import { mkdirSync } from "fs";
 import { dirname } from "path";
 import type {
@@ -33,14 +33,15 @@ import type {
   QaScriptSidecar,
   CompanionRole,
   QaCriterionDefinition,
-} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
-import { COMPANION_ROLES } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
-import { ALL_BLOCK_BUILDER_ALT, blockBuilderAlt, kindForBuilder } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
+} from "../schemas/sdlc/block-qa.ts";
+import { COMPANION_ROLES } from "../schemas/sdlc/block-qa.ts";
+import { ALL_BLOCK_BUILDER_ALT, blockBuilderAlt, kindForBuilder } from "../schemas/content/block-kinds.ts";
 import { QA_CRITERIA_BY_ID } from "./qa-criteria-registry";
 import { findContentRepoRoot } from "./repo-root";
 import { loadBlockModuleSync, type BlockLoadFailure } from "./block-module";
 import { blockQaPath, existingBlockQaPath } from "./qa-paths";
 import { readBaseline } from "../scripts/qa-results.ts";
+import { evaluateJsonManifest, isJsonManifest } from "./json-manifest.ts";
 import type { QaStoreOptions } from "../scripts/qa-store.ts";
 
 // ── Hashing ─────────────────────────────────────────────────────
@@ -703,6 +704,10 @@ export function readBlockManifest(
   contributedBuilders?: ReadonlyMap<string, string>,
 ): { kind: string; label: string } | undefined {
   if (!existsSync(tsPath)) return undefined;
+  if (tsPath.endsWith(".json")) {
+    const b = jsonBlockIdentity(tsPath);
+    return b?.label ? { kind: b.kind, label: b.label } : undefined;
+  }
   const src = readFileSync(tsPath, "utf-8");
   const masked = maskStringsAndComments(src);
   const kindMatch = masked.match(builderRegexFor(contributedBuilders));
@@ -739,6 +744,11 @@ export function readUnlabelledBlockManifest(
   contributedBuilders?: ReadonlyMap<string, string>,
 ): { kind: string; label: string } | undefined {
   if (!existsSync(tsPath)) return undefined;
+  if (tsPath.endsWith(".json")) {
+    const b = jsonBlockIdentity(tsPath);
+    if (!b || b.label) return undefined;
+    return { kind: b.kind, label: tsPath.split("/").pop()!.replace(/\.json$/, "") };
+  }
   const src = readFileSync(tsPath, "utf-8");
   if (parseStringField(src, "label")) return undefined; // labelled: not ours
   const kindMatch = maskStringsAndComments(src).match(builderRegexFor(contributedBuilders));
@@ -747,6 +757,19 @@ export function readUnlabelledBlockManifest(
   const kind = kindForBuilder(kindMatch[1]!, contributedBuilders);
   if (!kind) return undefined;
   return { kind, label: slug };
+}
+
+/**
+ * `{ kind, label }` of a JSON block manifest (bean `y9r6`), or `undefined`
+ * when the file is not one or its value is not a block. Reading data executes
+ * nothing, so unlike the `.ts` path no textual gate is needed first. A builder
+ * that rejects the data throws, as importing the `.ts` would.
+ */
+function jsonBlockIdentity(path: string): { kind: string; label?: string } | undefined {
+  if (!isJsonManifest(path)) return undefined;
+  const v = evaluateJsonManifest(path) as { kind?: unknown; label?: unknown } | undefined;
+  if (!v || typeof v !== "object" || typeof v.kind !== "string") return undefined;
+  return { kind: v.kind, label: typeof v.label === "string" && v.label ? v.label : undefined };
 }
 
 export interface WalkBlocksOptions {
@@ -971,7 +994,7 @@ export function* walkBlocks(
       if (st.isDirectory()) {
         if (nonContentDirs.has(resolve(full))) continue;
         yield* recurse(full);
-      } else if (entry.endsWith(".ts")) {
+      } else if (entry.endsWith(".ts") || (entry.endsWith(".json") && isJsonManifest(full))) {
         // Skip chapter / paper manifests by checking the export shape. The
         // masked builder-call match is the gate on what may be *executed*
         // below; the label is a question about identity, answered after.
@@ -988,7 +1011,7 @@ export function* walkBlocks(
           : textualIdentity(textual, unlabelled);
         if (!manifest) continue;
         if (!manifest.labelled && !opts.includeUnlabelled) continue;
-        const root = full.slice(0, -3); // strip ".ts"
+        const root = full.replace(/\.(ts|json)$/, ""); // strip the manifest extension
         const md = root + ".md";
         const lean = root + ".lean";
         let leanResolved: string | undefined = existsSync(lean) ? lean : undefined;
@@ -997,7 +1020,7 @@ export function* walkBlocks(
           // resolution.  Manifest is already loaded; extract the URI
           // via a regex over the raw file (mirrors q-usage-audit).
           const tsSrc = readFileSync(full, "utf-8");
-          const refMatch = tsSrc.match(/ref:\s*["']([^"']+)["']/);
+          const refMatch = tsSrc.match(/["']?ref["']?:\s*["']([^"']+)["']/);
           leanResolved = resolveCanonicalLean(refMatch?.[1], REPO_ROOT, lakeCache);
         }
         const mdResolved = existsSync(md) ? md : undefined;
@@ -1723,4 +1746,21 @@ export const LOCAL_SWEEP_ACTOR = "local-sweep";
 // input-site: env CI,GITHUB_ACTIONS #eddec1a1 — which sweep actor is named in a sidecar
 export function sweepActor(env: Record<string, string | undefined> = process.env): string {
   return env.CI === "true" || env.GITHUB_ACTIONS === "true" ? CI_SWEEP_ACTOR : LOCAL_SWEEP_ACTOR;
+}
+
+/**
+ * Where the script sidecars go: the `--script-sidecar-root` the caller gave,
+ * else the platform folder when it is the platform's own checkout, else
+ * nowhere (`null`).
+ *
+ * A folio runs this sweep from a remote-mounted copy of the platform
+ * (`cat-harness-tools/` at its root, laid down by `remote-mount.ts`). That
+ * copy has no `.git` and is fixity-checked against the lock, so a sidecar
+ * written into it is a change nobody can commit, and the next mount refuses
+ * the copy as "somebody's work" (smart-ra, 2026-10-30: a local
+ * `qa-sweep.ts folio` blocked the staging publish).
+ */
+export function scriptSidecarTarget(explicit: string | undefined, platformRoot: string): string | null {
+  if (explicit !== undefined) return explicit;
+  return existsSync(join(platformRoot, ".git")) ? platformRoot : null;
 }

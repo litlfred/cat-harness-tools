@@ -21,7 +21,7 @@
  * R25's glass is the surface that does not care. It comes down OVER whatever
  * is being browsed, so `mountGlass()` appends to `document.body` and is
  * called from `init()` unconditionally, outside the guards that decide
- * whether a board mounts. `test/glass.e2e.ts` proves it against a fixture
+ * whether a board mounts. `test/content/glass.e2e.ts` proves it against a fixture
  * with no `<main>`, no `.main-content`, no sidebar header and a todo index
  * that 404s — every condition a replica page meets.
  *

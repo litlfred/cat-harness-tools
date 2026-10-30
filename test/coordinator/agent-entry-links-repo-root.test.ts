@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { parseLinks } from "../../src/core/markdown-links.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below

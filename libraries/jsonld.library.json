@@ -16,6 +16,7 @@
   "licenceSource": "the installed package's own package.json (`license`)",
   "usedBy": [
     "pipeline/jsonld-contexts.test.ts",
+    "schemas/jsonld-base.test.ts",
     "schemas/prov-jsonld.test.ts",
     "scripts/content-compile-gates.ts",
     "scripts/gen-subgraph-jsonld.ts",

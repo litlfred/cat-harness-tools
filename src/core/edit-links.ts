@@ -1071,7 +1071,7 @@ export function injectBlockActions(
 /** `bun run cat-harness-tools/src/core/edit-links.ts --write-asset` regenerates the published runtime. */
 if (import.meta.main && process.argv.includes("--write-asset")) {
   const { writeFileSync } = await import("node:fs");
-  const { readDeclaration, siteFileFor } = await import("@litlfred/cat-harness/schemas/kg/cat-harness.js");
+  const { readDeclaration, siteFileFor } = await import("../../schemas/kg/cat-harness.js");
   const harness = join(HARNESS_ROOT);
   const own = readDeclaration(harness);
   if (!own) throw new Error(`${harness} declares no instance: nowhere to publish the runtime`);

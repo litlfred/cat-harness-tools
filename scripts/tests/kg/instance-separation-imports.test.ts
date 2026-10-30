@@ -49,8 +49,8 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { specifiersOf } from "@litlfred/bootstrap-tools/scripts/check-closure.js";
-import { declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { mountScopeFor } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
+import { declarationPathIn } from "../../../schemas/kg/cat-harness.js";
+import { mountScopeFor } from "../../../schemas/kg/remote-mount.js";
 import { inAggregate } from "../../../test/support/checkout.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 

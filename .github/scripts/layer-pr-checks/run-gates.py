@@ -127,8 +127,14 @@ CHECKOUT_GATES = {
 #     cat-harness, bootstrap and bootstrap-tools do not need cat-harness-tools,
 #     so the derived set never reached them (owner, 2026-10-15: every
 #     harnessed repository's PR checks run it).
+#   - skill:commands:check and agent-memory:check (bean `t5zb`): check each
+#     repository's own `.claude/commands/` and `.claude/agents/` + memory
+#     projections, including `cat-harness` which does not need
+#     `cat-harness-tools`.
 CHECKOUT_SCRIPTS = {
+    "agent-memory:check": "cat-harness-tools",
     "index-config:inline:check": "cat-harness-tools",
+    "skill:commands:check": "cat-harness-tools",
 }
 TIMEOUT_S = 1200
 # Gates that judge the REMOTE's live state, not the checkout: which workflows

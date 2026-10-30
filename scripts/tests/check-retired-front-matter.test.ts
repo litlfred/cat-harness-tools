@@ -17,10 +17,10 @@ import { resolve } from "node:path";
 import { describe, expect, test } from "bun:test";
 
 import { RETIRED, scan } from "../check-retired-front-matter.ts";
-import { parseFrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { corpusDirectoryForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { parseFrontMatter } from "../../schemas/kg/front-matter.ts";
+import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
+import { corpusDirectoryForGraph } from "../../schemas/kg/harness-config.ts";
+import {  } from "../../schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 const INSTANCE = HARNESS_ROOT;
