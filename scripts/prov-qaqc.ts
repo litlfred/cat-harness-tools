@@ -54,7 +54,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 
 import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { addressBook, provJsonldDocument, type AddressBook } from "@litlfred/cat-harness/schemas/kg/prov-jsonld.js";
-import { ProvActivitySchema, type ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.js";
+import { ProvActivitySchema, verifyProvHashChain, type ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.js";
 import { laneBinding, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { loadAccessContext, type AccessContext, type Principal } from "../src/core/access.js";
 import { authorizeTask, type TaskAuthVerdict } from "../src/workflow/authorize.js";
@@ -259,6 +259,22 @@ export function reportInstance(
     if (r.success) activities.push(r.data);
     else invalid.push(`${id}#${i}: ${r.error.issues.map((x) => `${x.path.join(".")} ${x.message}`).join("; ")}`);
   });
+
+  const hasChainedOrAgreement = activities.some(
+    (a) =>
+      a["cat-harness:recordHash"] !== undefined ||
+      a["cat-harness:previousHash"] !== undefined ||
+      a["cat-harness:agreement"] !== undefined,
+  );
+  if (hasChainedOrAgreement) {
+    const requireAgreement = activities.some((a) => a["cat-harness:agreement"] !== undefined);
+    const chainCheck = verifyProvHashChain(activities, { requireAgreement });
+    if (!chainCheck.valid) {
+      for (const err of chainCheck.errors) {
+        invalid.push(`${err.id ?? `${id}#${err.index}`}: ${err.kind}: ${err.detail}`);
+      }
+    }
+  }
 
   return { id, source: state.source, activities, findings, checked, invalid };
 }

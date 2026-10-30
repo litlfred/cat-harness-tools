@@ -35,7 +35,7 @@ import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from
 import type { ConventionScope } from "@litlfred/cat-harness/schemas/process/convention.js";
 import { authorizeTask, describeVerdict, type TaskAuthVerdict } from "./authorize.js";
 import { provActivityFor } from "./prov-record.js";
-import { ProvActivitySchema, type ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.js";
+import { ProvActivitySchema, type ProvActivity, type ProvAgreementRef } from "@litlfred/cat-harness/schemas/content/prov.js";
 import type { AccessContext, Principal } from "../core/access.js";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 import {
@@ -96,6 +96,12 @@ export interface AuthzOptions {
   /** The content the step acts on. */
   target?: string;
   mode?: "advisory" | "strict";
+  /** The Data Sharing Agreement (URL + SHA-256 digest, and optional grant id) this step is decided under (DSA B4, bean `3z44`). */
+  agreement?: ProvAgreementRef;
+  /** Optional grant identifier (DSA B5). */
+  grant?: string;
+  /** Link this step's `prov:Activity` into the instance's hash chain. Automatically enabled when `agreement` is supplied or when a prior step in `history` is hash-chained. */
+  chain?: boolean;
 }
 
 /**
@@ -894,6 +900,17 @@ export function complete(
   const activities = stepActivities(opts.activities, nodeId);
   state.tokens = state.tokens.filter((t) => t !== nodeId);
   const at = now();
+  const priorChainedProv = [...state.history]
+    .reverse()
+    .map((h) => h.prov)
+    .find((p) => p !== undefined && p["cat-harness:recordHash"] !== undefined);
+  const shouldChain =
+    Boolean(opts.authz?.agreement) ||
+    Boolean(opts.authz?.chain) ||
+    priorChainedProv !== undefined;
+  const previousHash = shouldChain
+    ? (priorChainedProv?.["cat-harness:recordHash"] ?? null)
+    : undefined;
   const prov =
     authz && opts.authz
       ? provActivityFor({
@@ -904,6 +921,9 @@ export function complete(
           verdict: authz,
           policies: [...opts.authz.ctx.policies.keys()],
           target: opts.authz.target,
+          ...(opts.authz.agreement ? { agreement: opts.authz.agreement } : {}),
+          ...(opts.authz.grant ? { grant: opts.authz.grant } : {}),
+          ...(shouldChain ? { previousHash, chain: true } : {}),
         })
       : undefined;
   state.history.push({
