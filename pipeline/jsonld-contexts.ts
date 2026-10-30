@@ -46,7 +46,7 @@
  * @module pipeline/jsonld-contexts
  * @covers schemas
  */
-import { mergePrefixTables, type DeclaredPrefixes, type PrefixConflict } from "@litlfred/cat-harness/schemas/kg/jsonld-prefixes.js";
+import { mergePrefixTables, type DeclaredPrefixes, type PrefixConflict } from "../schemas/kg/jsonld-prefixes.js";
 
 /** Where a prefix was met. See the module note. */
 export type PrefixPosition = "iri" | "literal";

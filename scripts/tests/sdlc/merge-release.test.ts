@@ -3,7 +3,7 @@
  * refuses, when it covers a head, and how the PR's agent builds it.
  */
 import { describe, expect, test } from "bun:test";
-import { MERGE_QUEUE_ENTRY_TAG, MergeQueueEntrySchema, releaseCovers, type MergeQueueEntry } from "@litlfred/cat-harness/schemas/sdlc/merge-queue.ts";
+import { MERGE_QUEUE_ENTRY_TAG, MergeQueueEntrySchema, releaseCovers, type MergeQueueEntry } from "../../../schemas/sdlc/merge-queue.ts";
 import { decisionFrom } from "../../merge-queue-cli.ts";
 import { releaseState } from "../../merge-steward.ts";
 

@@ -12,8 +12,8 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { FshGutsNodeSchema, readFshGutsNode, FSH_GUTS_SCHEMA_ID } from "@litlfred/cat-harness/schemas/kg/fsh-guts.ts";
-import { parseFrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.ts";
+import { FshGutsNodeSchema, readFshGutsNode, FSH_GUTS_SCHEMA_ID } from "../../../schemas/kg/fsh-guts.ts";
+import { parseFrontMatter } from "../../../schemas/kg/front-matter.ts";
 import {
   STAGING_PREVIEW_KIND,
   createStagingPreview,
@@ -23,7 +23,7 @@ import {
   retireStagingPreview,
   serializeStagingPreview,
   type StagingDeployFacts,
-} from "@litlfred/cat-harness/schemas/sdlc/staging-preview.ts";
+} from "../../../schemas/sdlc/staging-preview.ts";
 
 const DEPLOY: StagingDeployFacts = {
   slug: "claude-sleepy-babbage-ls90iz",

@@ -23,7 +23,7 @@ import { projection, viewerHtml } from "../../gen-voices-viz.ts";
 import { unscopedSelectors } from "../../lib/themed-page.ts";
 import { shippedVoices, overlaySeverityOf } from "../../../pipeline/voice-criteria.ts";
 import { overlayCriterionId } from "../../../pipeline/voice-criteria.ts";
-import { directoriesForGraph, instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { directoriesForGraph, instanceRootsIn, repoRootFor } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const INSTANCE = join(HARNESS_ROOT);
@@ -252,7 +252,7 @@ describe("vendor overrides live in DECLARED sub-graphs of voices", () => {
     // directory for a voice only where it held a `voice.json`. `vendors/` holds
     // none, so every override under it would have read as absent — a clean run
     // over real content.
-    const { loadVoices } = await import("@litlfred/cat-harness/schemas/content/voices.ts");
+    const { loadVoices } = await import("../../../schemas/content/voices.ts");
     const root = fixture();
     try {
       const ids = loadVoices(root).map((v) => v.id).sort();
@@ -263,7 +263,7 @@ describe("vendor overrides live in DECLARED sub-graphs of voices", () => {
   });
 
   test("`vendors` itself is never loaded AS a voice", async () => {
-    const { loadVoices } = await import("@litlfred/cat-harness/schemas/content/voices.ts");
+    const { loadVoices } = await import("../../../schemas/content/voices.ts");
     const root = fixture();
     try {
       expect(loadVoices(root).map((v) => v.id)).not.toContain("vendors");
@@ -276,7 +276,7 @@ describe("vendor overrides live in DECLARED sub-graphs of voices", () => {
     // The directory is where a person looks. Nothing downstream may infer
     // "this overrides that" from a path, which is the standing rule that a
     // declaration inside the file is the contract.
-    const { loadVoices } = await import("@litlfred/cat-harness/schemas/content/voices.ts");
+    const { loadVoices } = await import("../../../schemas/content/voices.ts");
     const root = fixture();
     try {
       const vendor = loadVoices(root).find((v) => v.id === "base-voice-acme")!;
@@ -289,7 +289,7 @@ describe("vendor overrides live in DECLARED sub-graphs of voices", () => {
   test("an UNDECLARED directory holding voices is refused, loudly", async () => {
     // Not a silent part of the graph, and not silently skipped either: the
     // skip is `dh4f`, a clean read over real content. The error names the fix.
-    const { loadVoices } = await import("@litlfred/cat-harness/schemas/content/voices.ts");
+    const { loadVoices } = await import("../../../schemas/content/voices.ts");
     const root = fixture();
     const stray = join(root, "skills", "voices", "notes", "draft");
     mkdirSync(stray, { recursive: true });
@@ -302,7 +302,7 @@ describe("vendor overrides live in DECLARED sub-graphs of voices", () => {
   });
 
   test("a vendor missing from vendors.json is refused, not skipped", async () => {
-    const { loadVoices } = await import("@litlfred/cat-harness/schemas/content/voices.ts");
+    const { loadVoices } = await import("../../../schemas/content/voices.ts");
     const root = fixture();
     const extra = join(root, "skills", "voices", "vendors", "base-voice-other");
     mkdirSync(extra, { recursive: true });
@@ -315,7 +315,7 @@ describe("vendor overrides live in DECLARED sub-graphs of voices", () => {
   });
 
   test("the declaration files are never loaded AS voices", async () => {
-    const { loadVoices } = await import("@litlfred/cat-harness/schemas/content/voices.ts");
+    const { loadVoices } = await import("../../../schemas/content/voices.ts");
     const root = fixture();
     try {
       const ids = loadVoices(root).map((v) => v.id);

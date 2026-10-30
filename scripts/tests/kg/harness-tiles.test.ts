@@ -16,7 +16,7 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { siteDir, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteDir, siteDirFor } from "../../../schemas/kg/cat-harness.js";
 import { harnessTiles, inertNote, ownStatePage, subgraphsOf, subjectPage } from "../../harness-tiles.js";
 import { PAGE_LOCALE } from "../../viewer-declarations.js";
 import { writeDeclaration } from "../../../test/support/instance-fixture.js";

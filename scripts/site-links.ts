@@ -59,8 +59,8 @@
 import { existsSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { artefactStub, readDeclaration, renderingPath } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import type { CatHarnessDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { artefactStub, readDeclaration, renderingPath } from "../schemas/kg/cat-harness.js";
+import type { CatHarnessDeclaration } from "../schemas/kg/cat-harness.js";
 import { instanceDocPath } from "./instance-exports.js";
 
 /**

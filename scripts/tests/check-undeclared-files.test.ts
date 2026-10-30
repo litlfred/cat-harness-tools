@@ -19,7 +19,7 @@ import {
   humanBytes,
   undeclaredAtRoot,
 } from "../check-undeclared-files.js";
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { findDeclarationFile } from "../../schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
 /** A repository with one instance, which declares a repository-scoped directory. */

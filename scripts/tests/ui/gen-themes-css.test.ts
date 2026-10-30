@@ -20,8 +20,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { ResolvedThemeSchema, type ResolvedTheme } from "@litlfred/cat-harness/schemas/ui/theme.js";
-import { THEMES } from "@litlfred/cat-harness/schemas/ui/themes.js";
+import { ResolvedThemeSchema, type ResolvedTheme } from "../../../schemas/ui/theme.js";
+import { THEMES } from "../../../schemas/ui/themes.js";
 import { renderThemesCss } from "../../gen-themes-css.js";
 import { TOOLS_ROOT } from "../../lib/roots.ts";
 

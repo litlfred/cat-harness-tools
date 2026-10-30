@@ -32,8 +32,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { allAvatars, GENERIC, TRASH_OVERLAY, type Avatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { allAvatars, GENERIC, TRASH_OVERLAY, type Avatar } from "../schemas/content/avatars.js";
+import { siteFileFor } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** Where the stylesheet goes. Derived from `siteDirFor`, never written down. */

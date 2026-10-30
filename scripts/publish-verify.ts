@@ -54,11 +54,11 @@ import { join, relative, resolve } from "node:path";
 
 import jsonld from "jsonld";
 
-import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
+import { CONTENT_CONTEXT_URL } from "../schemas/kg/jsonld.ts";
 import { INSTANCE_CONTEXT_PATH, instanceContextUrl } from "../pipeline/instance-document-context.ts";
-import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { ownNamespaceValues } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/prov-jsonld.ts";
+import { instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { ownNamespaceValues } from "../schemas/kg/graph-typology-registry.js";
+import { heldProvJsonldContext, PROV_JSONLD_CONTEXT_URL } from "../schemas/kg/prov-jsonld.ts";
 import { duplicateIds } from "./check-duplicate-ids";
 import { isVendoredViewer } from "./pdf-viewer.ts";
 import { ID_LOOKUP_DIR, SCOPES_DIR, type SearchManifest } from "./search-split.ts";

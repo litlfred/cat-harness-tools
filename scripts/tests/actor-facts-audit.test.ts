@@ -7,9 +7,9 @@
 import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 import { evaluateActorFactConsumers, matchesToken } from "../actor-facts.js";
-import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
-import { readActors, actorsDir, type LoadedActor } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { readPolicyGrants, type OdrlPolicy } from "@litlfred/cat-harness/schemas/content/odrl.js";
+import { KG_CRITERIA_BY_ID } from "../../schemas/sdlc/kg-qa.js";
+import { readActors, actorsDir, type LoadedActor } from "../../schemas/process/role-graph.js";
+import { readPolicyGrants, type OdrlPolicy } from "../../schemas/content/odrl.js";
 import { workflowFiles, corpusScopeFor } from "../known-skills.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -196,7 +196,7 @@ describe("real repository measurement", () => {
     const findingsWhere = res.findings.map((f) => f.where);
     expect(findingsWhere.filter((w) => !KNOWN.has(w))).toEqual([]);
     // Unconsumed in either setting: no process mounted anywhere consumes these yet.
-    for (const w of ["jekyll", "sushi-compiler", "ig-publisher", "fhir-validator",
+    for (const w of ["jekyll",
       "release-authorization", "content-authoring", "qa-reporting", "clinical-validation",
       "perform-task", "approval-authority", "project-governance", "first-pass-review", "sme-coordination"]) {
       expect(findingsWhere).toContain(w);

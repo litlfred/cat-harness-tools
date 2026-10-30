@@ -11,7 +11,7 @@
 import { describe, expect, test } from "bun:test";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
-import { TodoItemSchema } from "@litlfred/cat-harness/schemas/constraints.ts";
+import { TodoItemSchema } from "./constraints.ts";
 import {
   TodoTagsSchema,
   TodoNodeSchema,
@@ -21,12 +21,12 @@ import {
   danglingTags,
   TODO_SCHEMA_TAG,
   type KgIndex,
-} from "@litlfred/cat-harness/schemas/sdlc/todo.ts";
+} from "./sdlc/todo.ts";
 import { readTodoFiles, todoDefaultTheme } from "../scripts/todos.js";
 import { buildKgIndex } from "../src/core/feedback.js";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
-import { themeById } from "@litlfred/cat-harness/schemas/ui/themes.js";
+import { readDeclaration } from "./kg/cat-harness.js";
+import { resolveThemeBackdrop } from "./ui/theme.js";
+import { themeById } from "./ui/themes.js";
 
 const KG: KgIndex = {
   roles: new Set(["editor", "author"]),

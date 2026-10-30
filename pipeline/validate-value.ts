@@ -33,7 +33,7 @@ import {
   type ValOccurrence,
 } from "./render-value";
 import { LIQUID_VALUE, applyFilters, resolveKey, valueScope, type ValueScope } from "./liquid-values";
-import type { Block, ValidationIssue } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Block, ValidationIssue } from "../schemas/types.ts";
 // Content repo root (the downstream repo embedding folio-assistant); witness
 // files are resolved relative to this.  See ./repo-root for why import-relative
 // resolution is wrong under the symlinked-subdir layout.

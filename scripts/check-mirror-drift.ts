@@ -107,11 +107,11 @@
  * as drift). Every one of them moved a count.
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDir } from "../schemas/kg/cat-harness.js";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join, relative, resolve } from "path";
 
-import { LEAN_PACKAGES, type LeanPackage } from "@litlfred/cat-harness/schemas/lean-packages.ts";
+import { LEAN_PACKAGES, type LeanPackage } from "../schemas/lean-packages.ts";
 import { findContentRepoRoot } from "../pipeline/repo-root.ts";
 import { ARCHIMEDEAN_TYPE_RE } from "../pipeline/qa-checkers-voice.ts";
 

@@ -59,17 +59,17 @@
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, posix, relative, resolve } from "node:path";
-import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
+import { DOCS_SITE_BASE } from "../../schemas/kg/jsonld.ts";
 import { escHtml, thinPageConfigOf, thinPageHtml } from "../../scripts/thin-page.ts";
 import { visualiserNavDeclaration, type VisualiserNavEntry } from "../../scripts/lib/navbar.ts";
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { readArchimate, type ArchimateModel } from "@litlfred/cat-harness/archimate/schemas/archimate.ts";
+import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
+import { readArchimate, type ArchimateModel } from "../schemas/archimate.ts";
 import { renderViewSvg, typeLabel } from "./render-view.ts";
 import { CONFIG_FILE, archimateDir, localDirOf, readConfig } from "./check-archimate.ts";
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { darkRules } from "../../scripts/lib/scheme-css.ts";
 import { pageParts, withRenderedBy } from "../../scripts/viewer-declarations.ts";
-import { visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.ts";
+import { visualiserRoute } from "../../schemas/kg/visualiser-route.ts";
 
 /** The config-block id every page written here carries — how a run recognises its own output. */
 export const PAGE_CONFIG_ID = "archimate-page";

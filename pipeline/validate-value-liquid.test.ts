@@ -12,7 +12,7 @@ import { join } from "path";
 import { writeDeclaration } from "../test/support/instance-fixture";
 import { buildValueScope, type ValueScope } from "./liquid-values";
 import { extractLiquidOccurrences, validateValueDirectives } from "./validate-value";
-import type { Block } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Block } from "../schemas/types.ts";
 
 let repo: string;
 let scope: ValueScope;

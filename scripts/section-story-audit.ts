@@ -63,7 +63,7 @@
  * wired into CI as a quality gate.
  */
 
-import { folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDirDeferred } from "../schemas/kg/cat-harness.js";
 import { readFileSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
 import { findContentRepoRoot } from "../pipeline/repo-root";

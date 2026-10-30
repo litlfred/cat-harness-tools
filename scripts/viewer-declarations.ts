@@ -64,12 +64,12 @@ import {
   type HarnessVisualiser,
   type Tile,
   type Visualisation,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor, resolveLandingInstance } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
-import { DEFAULT_LOCALE } from "@litlfred/cat-harness/schemas/content/translation.js";
-import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
-import { siteRootFrom, visualiserRoute, type VisualiserRouteParts } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
+} from "../schemas/kg/cat-harness.js";
+import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor, resolveLandingInstance } from "../schemas/kg/harness-config.js";
+import { mountedInstanceRoots } from "../schemas/kg/remote-mount.js";
+import { DEFAULT_LOCALE } from "../schemas/content/translation.js";
+import { scriptTable } from "../schemas/sdlc/script-table.ts";
+import { siteRootFrom, visualiserRoute, type VisualiserRouteParts } from "../schemas/kg/visualiser-route.js";
 
 // ── Provenance: which Tool drew a page ────────────────────────────────────
 

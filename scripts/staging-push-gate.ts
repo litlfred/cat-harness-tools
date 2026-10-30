@@ -82,7 +82,7 @@ import {
   RenderedImpactSchema,
   reviewList,
   type RenderedImpact,
-} from "@litlfred/cat-harness/schemas/ui/rendered-impact.ts";
+} from "../schemas/ui/rendered-impact.ts";
 
 /** After a staging commit: longer than a Pages build (≤ 3m40s measured 2026-10-03). */
 export const STAGING_WINDOW_MS = 5 * 60_000;

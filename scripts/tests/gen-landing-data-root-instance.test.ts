@@ -18,12 +18,13 @@
  */
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { contributingRoots, ensureLandingSticky } from "../ensure-landing-sticky.ts";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { readDeclaration } from "../../schemas/kg/cat-harness.ts";
+import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const SCRIPT = join(import.meta.dir, "..", "gen-landing-data.ts");
 
@@ -60,6 +61,10 @@ function fixture(): { parent: string; checkout: string } {
   writeFileSync(join(checkout, "index.config.json"), json({ $schema: "folio-index-config/v1", instances: [{ name: "folio", source: { local: { at: "." } } }] }));
   mkdirSync(join(checkout, "cat-harness"));
   writeFileSync(join(checkout, "cat-harness", "cat-harness.json"), json({ name: "cat-harness", description: "the platform" }));
+  // The platform's code list: since bean `8lcl` the namespaces module reads it
+  // from wherever the harness is, and here the harness is this fixture.
+  mkdirSync(join(checkout, "cat-harness", "code-lists"));
+  copyFileSync(join(HARNESS_ROOT, "code-lists", "own-namespaces.json"), join(checkout, "cat-harness", "code-lists", "own-namespaces.json"));
 
   ensureLandingSticky(checkout, "2026-10-15T00:00:00.000Z");
   return { parent, checkout };

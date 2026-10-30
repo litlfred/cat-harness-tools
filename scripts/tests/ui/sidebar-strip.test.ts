@@ -40,7 +40,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteFileFor } from "../../../schemas/kg/cat-harness.js";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const read = (p: string) => readFileSync(join(REPO, p), "utf-8");

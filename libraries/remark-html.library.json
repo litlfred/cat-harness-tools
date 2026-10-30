@@ -15,6 +15,7 @@
   "licence": "MIT",
   "licenceSource": "the installed package's own package.json (`license`)",
   "usedBy": [
+    "schemas/ui/render-output.ts",
     "scripts/publish-instance-files.ts"
   ]
 }

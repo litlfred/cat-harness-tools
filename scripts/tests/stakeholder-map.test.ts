@@ -11,7 +11,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { stakeholderMap, formatStakeholderMap } from "../../src/impact/stakeholder-map.ts";
-import { readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
+import { readRoleGraph } from "../../schemas/process/role-graph.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);

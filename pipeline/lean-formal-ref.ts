@@ -86,20 +86,20 @@ import {
   type FormalRefResolution,
   type FormalRefResolverAPI,
   type FormalTreeCache,
-} from "@litlfred/cat-harness/schemas/formal-ref.js";
+} from "../schemas/formal-ref.js";
 import {
   LEAN_PACKAGES,
   LEAN_REF_PATTERN,
   leanPackageByName,
   parseLeanRef,
-} from "@litlfred/cat-harness/schemas/lean-packages.js";
+} from "../schemas/lean-packages.js";
 
 // One import installs the layer. See the module docstring: declaring the
 // package list and installing the resolver are two halves of one act, and a
 // caller doing only the first gets `undefined` from every resolution with no
 // diagnostic.
-export { configureLeanPackages, leanPackagesConfigured } from "@litlfred/cat-harness/schemas/lean-packages.js";
-export type { LeanPackage } from "@litlfred/cat-harness/schemas/lean-packages.js";
+export { configureLeanPackages, leanPackagesConfigured } from "../schemas/lean-packages.js";
+export type { LeanPackage } from "../schemas/lean-packages.js";
 import { leanStatementHash } from "./lean-signature.js";
 
 // ── Canonical lean.ref resolution (single source of truth) ──────

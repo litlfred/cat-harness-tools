@@ -41,7 +41,7 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { instanceRootsIn } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 
 /** The cat-harness instance root — the directory this file's `test/` sits in. */

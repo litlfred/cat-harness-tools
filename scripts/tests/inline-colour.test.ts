@@ -9,7 +9,7 @@
  * because nothing looks for a literal; the only thing that could have caught
  * it was an axe run over a tile view the gate did not open.
  *
- * ## Why a SOURCE check, when `test/a11y.e2e.ts` measures the real pixels
+ * ## Why a SOURCE check, when `test/content/a11y.e2e.ts` measures the real pixels
  *
  * axe measures what is on the screen. That is strictly better evidence and
  * strictly worse coverage: it proves the states somebody remembered to put
@@ -39,7 +39,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteLayersFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteLayersFor } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

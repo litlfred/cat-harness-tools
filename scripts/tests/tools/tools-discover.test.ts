@@ -14,9 +14,9 @@ import { join, resolve } from "node:path";
 
 import { discoverTools } from "../../../tools/discover.js";
 import { writeDeclaration } from "../../../test/support/instance-fixture.js";
-import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { TOOLS_ROOT } from "../../lib/roots.ts";
 
-const TOOL_TS = resolve(HARNESS_ROOT, "schemas", "tool.ts");
+const TOOL_TS = resolve(TOOLS_ROOT, "schemas", "tools", "tool.ts");
 
 /** A minimal valid Tool, as source text for a fixture's index.ts. */
 const toolSrc = (id: string) => `{

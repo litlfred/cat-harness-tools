@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { inAggregate } from "../../test/support/checkout.ts";
 import { readBeans, type BeanNode } from "../beans.ts";
 import { auditPayloadTree } from "../gen-subgraph-jsonld.ts";

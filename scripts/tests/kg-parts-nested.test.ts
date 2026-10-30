@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { KG_PART_RECORD_SCHEMA } from "@litlfred/cat-harness/schemas/kg/substrate-snapshot.js";
+import { KG_PART_RECORD_SCHEMA } from "../../schemas/kg/substrate-snapshot.js";
 import { NESTED_DIR, PART_RECORD_FILE, partDirOf } from "../kg-parts.ts";
 import { partRecordsIn } from "../kg-subscribe.ts";
 

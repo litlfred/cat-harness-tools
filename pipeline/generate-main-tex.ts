@@ -20,13 +20,37 @@
  * @module pipeline/generate-main-tex
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDir } from "../schemas/kg/cat-harness.js";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
-import type { Paper } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Paper } from "../schemas/types.ts";
 import { escapeLatex } from "./render-latex";
+import { resolveRenderTarget } from "./render-discovery";
 import { findContentRepoRoot, requirePaper } from "./repo-root";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { resolveAdapterPreamble } from "../src/builtin-adapters";
+
+/**
+ * Resolve the print preamble template for a paper build: an explicit
+ * `--preamble` path when given, else the template supplied by the `paper`
+ * adapter through {@link resolveRenderTarget} / {@link resolveAdapterPreamble}
+ * (bean `4dj5`, #2117 P2).
+ *
+ * Falls back to `join(HARNESS_ROOT, "latex", "preamble.tex")` only when no
+ * `paper` adapter is installed, so a caller's existence check still names the
+ * missing path.
+ */
+export async function resolvePaperPreamble(explicitPreamble?: string): Promise<string> {
+  if (explicitPreamble !== undefined && explicitPreamble !== "") {
+    return resolve(explicitPreamble);
+  }
+  const targetLookup = await resolveRenderTarget("paper");
+  if (targetLookup.target?.preamblePath) {
+    return resolve(targetLookup.target.preamblePath);
+  }
+  const contributed = await resolveAdapterPreamble("paper");
+  return resolve(contributed ?? join(HARNESS_ROOT, "latex", "preamble.tex"));
+}
 
 /**
  * Escape text for use in LaTeX metadata fields (title, author, etc.).
@@ -358,9 +382,16 @@ if (import.meta.main) {
   }
 
   const preambleIdx = args.indexOf("--preamble");
-  const preamblePath = resolve(
-    preambleIdx >= 0 ? args[preambleIdx + 1] : join(HARNESS_ROOT, "latex", "preamble.tex"),
+  const preamblePath = await resolvePaperPreamble(
+    preambleIdx >= 0 ? args[preambleIdx + 1] : undefined,
   );
+  if (!existsSync(preamblePath)) {
+    console.error(
+      `generate-main-tex needs a preamble and ${preamblePath} does not exist. ` +
+        "Install the paper content adapter or pass --preamble <the folio's preamble.tex>.",
+    );
+    process.exit(2);
+  }
 
   const outIdx = args.indexOf("--out");
   const outPath = resolve(outIdx >= 0 ? args[outIdx + 1] : "main.tex");

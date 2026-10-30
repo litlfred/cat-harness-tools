@@ -25,9 +25,9 @@
  */
 import { resolve } from "node:path";
 
-import { resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
-import { allowedFromNeeds } from "@litlfred/cat-harness/schemas/kg/layer-direction.js";
+import { resolveDirectories } from "../schemas/kg/cat-harness.ts";
+import { ancestorsOf, flattenDependencies } from "../schemas/kg/dependency-order.js";
+import { allowedFromNeeds } from "../schemas/kg/layer-direction.js";
 import { readInstances } from "./check-import-direction.ts";
 import { readDocumentKinds } from "./gen-document-kinds-viz.ts";
 

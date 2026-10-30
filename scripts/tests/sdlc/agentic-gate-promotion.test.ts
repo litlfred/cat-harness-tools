@@ -25,12 +25,12 @@ import {
   WOULD_HAVE_BLOCKED_TAG,
   type WouldHaveBlockedRecord,
   type WouldHaveBlockedFinding,
-} from "@litlfred/cat-harness/schemas/sdlc/merge-queue.ts";
+} from "../../../schemas/sdlc/merge-queue.ts";
 
 import {
   WouldHaveBlockedRecordSchema as ReexportedRecordSchema,
   evaluateAgenticPromotion as reexportedEvaluate,
-} from "@litlfred/cat-harness/schemas/sdlc/merge-review.ts";
+} from "../../../schemas/sdlc/merge-review.ts";
 
 const VALID_HEAD_SHA = "0123456789abcdef0123456789abcdef01234567";
 

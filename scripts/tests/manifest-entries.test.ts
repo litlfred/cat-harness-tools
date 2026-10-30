@@ -15,7 +15,7 @@
  * These pin the shared predicate and the flattening, including that case.
  */
 import { describe, test, expect } from "bun:test";
-import type { Section, SectionRef } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Section, SectionRef } from "../../schemas/types.ts";
 import { isSectionRef, sectionBlockNames } from "../../adapters/manifest-entries.ts";
 
 /** `Section` requires `blocks`; authored manifests omit it. Model that. */

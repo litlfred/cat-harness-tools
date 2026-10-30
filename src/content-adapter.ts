@@ -24,7 +24,7 @@ import { resolveBuiltinAdapter } from "./builtin-adapters.js";
 import { LEGACY_FEEDBACK_DIRNAME, resolveDeclaredFeedbackDir } from "./core/feedback.js";
 import type { GitHelper } from "./core/git.js";
 import { log } from "./core/logging.js";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { readEffectiveConfig } from "../schemas/kg/harness-config.ts";
 import { NoContentAdapter } from "./no-content-adapter.js";
 import type { ContentAdapter } from "./types.js";
 

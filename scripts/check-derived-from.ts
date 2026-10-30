@@ -59,10 +59,10 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { graphLayer, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { graphLayer, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { viewersOf } from "./viewer-declarations.ts";
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
-import { allowedFromNeeds } from "@litlfred/cat-harness/schemas/kg/layer-direction.js";
+import { ancestorsOf, flattenDependencies } from "../schemas/kg/dependency-order.js";
+import { allowedFromNeeds } from "../schemas/kg/layer-direction.js";
 import { readInstances } from "./check-import-direction.ts";
 import { BASELINE, type DerivedFromBaselineEntry } from "./derived-from.baseline.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";

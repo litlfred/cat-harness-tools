@@ -53,9 +53,9 @@
  * exemption is stale.
  */
 
-import { hasAvatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { hasAvatar } from "../schemas/content/avatars.js";
+import { repoRootFor } from "../schemas/kg/cat-harness.js";
+import { instantiatedHarnessNames } from "../schemas/kg/harness-config.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

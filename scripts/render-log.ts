@@ -48,7 +48,7 @@ import {
   serializeRenderLogEntry,
   type RenderEvent,
   type RenderLogEntry,
-} from "@litlfred/cat-harness/schemas/ui/render-log.ts";
+} from "../schemas/ui/render-log.ts";
 
 /** Build an entry, or throw with what is wrong. Pure, so it is testable. */
 export function buildEntry(o: {

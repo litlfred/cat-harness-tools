@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { RENDERED_IMPACT_TAG, RenderedImpactSchema } from "@litlfred/cat-harness/schemas/ui/rendered-impact.js";
+import { RENDERED_IMPACT_TAG, RenderedImpactSchema } from "../../schemas/ui/rendered-impact.js";
 import {
   collectInputs,
   diffBranchMount,

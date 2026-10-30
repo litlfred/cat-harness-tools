@@ -32,8 +32,8 @@ import {
 } from "../workflow-view.ts";
 import { loadProcessModel } from "../../src/workflow/process-model.js";
 import { REFUSALS_KEPT, withRefusal } from "../../src/workflow/instance.js";
-import type { MemoryNode } from "@litlfred/cat-harness/schemas/memory.js";
-import type { RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import type { MemoryNode } from "../../schemas/conduct/memory.js";
+import type { RoleGraph } from "../../schemas/process/role-graph.js";
 
 const NOW = new Date("2026-10-24T00:00:00Z");
 const daysBefore = (n: number) => new Date(NOW.getTime() - n * 24 * 60 * 60 * 1000).toISOString();

@@ -14,7 +14,7 @@ import type { TextDirective } from "mdast-util-directive";
 // Ambient: registers the directive node types on the mdast unions.
 import type {} from "mdast-util-directive";
 import type {} from "mdast-util-math";
-import type { Block, ValidationIssue } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Block, ValidationIssue } from "../schemas/types.ts";
 import { parseMdCached } from "./markdown-ast";
 
 /** Resolve the slug for a defterm/refterm node. */

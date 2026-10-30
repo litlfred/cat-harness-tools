@@ -66,7 +66,8 @@ const scratch = mkdtempSync(join(tmpdir(), "bootstrap-standalone-src-"));
 try {
   copyAsRepository("bootstrap", scratch);
   copyAsRepository("bootstrap-tools", scratch);
-  if (existsSync(join(REPO, "node_modules"))) symlinkSync(join(REPO, "node_modules"), join(scratch, "node_modules"), "dir");
+  const nm = [join(REPO, "node_modules"), join(REPO, "bootstrap-tools/node_modules")].find((p) => existsSync(p));
+  if (nm) symlinkSync(nm, join(scratch, "node_modules"), "dir");
 
   const proc = spawnSync("bun", ["run", join(scratch, "bootstrap-tools/scripts/rehearse-standalone.ts"), ...process.argv.slice(2)], {
     cwd: scratch,

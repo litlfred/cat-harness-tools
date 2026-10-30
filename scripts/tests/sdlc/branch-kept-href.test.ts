@@ -18,6 +18,7 @@ const LOCS: TipLocation[] = [
   { id: "inner", path: "beans/workflows", branch: "cat/cat-harness/state", keyedBy: "tip" },
   { id: "far", path: "who-iris/health", branch: "cat/who-iris/health", keyedBy: "tip", repository: "litlfred/who-iris", branchPath: "health" },
 ];
+// declared-path-literal: test input — a fixed path the test passes in, not one read from a declaration
 const NPUO = "beans/defs/folio-assistant-npuo--goal-5-content-the-content-model-and-the-ingest-pi.md";
 
 describe("branchKeptLocation", () => {

@@ -9,9 +9,9 @@
 import { describe, expect, test } from "bun:test";
 
 import { project, buildArgv, unmetRequirement, recordInvocation } from "../../../src/mcp/project.js";
-import { defineTool, type ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.js";
-import { toolTypeIri, isInjectionSafe, TOOL_TYPES } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
-import { ToolInvocationSchema } from "@litlfred/cat-harness/schemas/tools/tool-invocation.js";
+import { defineTool, type ToolDefinition } from "../../../schemas/tools/tool.js";
+import { toolTypeIri, isInjectionSafe, TOOL_TYPES } from "../../../schemas/tools/tool-types.js";
+import { ToolInvocationSchema } from "../../../schemas/tools/tool-invocation.js";
 import { tools } from "../../../tools/discover.js";
 
 const B = "https://example.invalid/fa";

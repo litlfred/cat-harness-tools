@@ -27,7 +27,7 @@ import { join, resolve } from "node:path";
 import { ENTRY_NAMES, findEntryFiles } from "../check-agent-entry-links.js";
 import { auditMarkdownFile, parseLinks } from "../../src/core/markdown-links.js";
 import { publishTargets } from "../../src/core/git-refs.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const REPO = repoRootFor(resolve(HARNESS_ROOT));

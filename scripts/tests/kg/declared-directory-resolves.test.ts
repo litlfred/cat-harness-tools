@@ -151,7 +151,7 @@ describe("a module that resolves a declared directory can resolve one", () => {
             "-e",
             `import "../${m}";` +
               `import { directoriesForGraph, directoryForGraph, instanceDirectoryForGraph }` +
-              ` from "../schemas/cat-harness.js";` +
+              ` from "../schemas/kg/cat-harness.js";` +
               // All THREE accessors, because all three go through the same
               // registry and any of them can be the first call a module makes.
               // Testing only the plural one would leave the two added by bean

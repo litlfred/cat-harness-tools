@@ -48,8 +48,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 
-import { decide } from "@litlfred/cat-harness/schemas/content/odrl.js";
-import { ProvActivitySchema, type ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.js";
+import { decide } from "../../schemas/content/odrl.js";
+import { ProvActivitySchema, type ProvActivity } from "../../schemas/content/prov.js";
 import { accessContext, principalFromEnv, type AccessContext } from "../core/access.js";
 import { auditLinks, classify, parseLinks } from "../core/markdown-links.js";
 import { planStem } from "../workflow/prov-record.js";

@@ -136,7 +136,7 @@ import { readBeans } from "./beans.ts";
 import { milestoneRollup, type MilestoneReport } from "./milestone-rollup.ts";
 import { git } from "./merge-pipeline-git.ts";
 import { pathClass } from "./merge-pipeline-paths.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { beanDefsDir } from "./beans.ts";
 
 const ROOT = repoRootFor(join(import.meta.dir, ".."));
