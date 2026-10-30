@@ -175,6 +175,34 @@ export function merge(copies: Copy[], home?: string): Merged {
 }
 
 
+/**
+ * How far along a status is. A stale copy (a layer's copy taken at separation,
+ * or a branch store a session stopped writing to) lags; it never moves a bean
+ * backwards. Measured 2026-10-30: 9rq1, hf2q, nytj, q2wm and v49e were
+ * `completed` in both branch stores, and keeping the home copy's text on a
+ * status conflict would have reopened them.
+ */
+const STATUS_RANK: Record<string, number> = { draft: 0, todo: 0, "in-progress": 1, completed: 2, scrapped: 2 };
+
+/**
+ * When the copies disagree on `status`, the merged bean takes the one furthest
+ * along. Two different statuses at the same rank (`completed` and `scrapped`)
+ * go to the copy updated last. Returns the text unchanged when nothing differs
+ * or a status is unknown.
+ */
+export function settleStatus(text: string, copies: Copy[]): string {
+  const seen = copies.map((c) => parse(c.text).fm).filter((fm) => typeof fm.status === "string");
+  const statuses = new Set(seen.map((fm) => fm.status as string));
+  if (statuses.size < 2 || [...statuses].some((s) => !(s in STATUS_RANK))) return text;
+  const top = Math.max(...[...statuses].map((s) => STATUS_RANK[s]));
+  const best = seen
+    .filter((fm) => STATUS_RANK[fm.status as string] === top)
+    .sort((a, b) => String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? "")))[0].status as string;
+  const m = text.match(/^(---\r?\n)([\s\S]*?)(\r?\n---)/);
+  if (!m || !/^status:/m.test(m[2])) return text;
+  return m[1] + m[2].replace(/^status:.*$/m, `status: ${best}`) + text.slice(m[1].length + m[2].length);
+}
+
 /** A merged bean must still open with front matter that parses and names its status. */
 export function headerOk(text: string): boolean {
   const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -350,6 +378,7 @@ function main() {
         : merged.carried.length || merged.widened.length
           ? "merged by section, text carried"
           : "merged by section, header only";
+    merged.text = settleStatus(merged.text, copies);
     rows.push({ id, holders, home, why, kind, merged });
   }
 
@@ -376,7 +405,7 @@ function main() {
   }
   const statusSplits = rows.filter((r) => r.merged?.fieldDiffs.some((d) => d.field === "status"));
   if (statusSplits.length) {
-    lines.push("", "## Copies that disagree on status", "", "Check these: the merged status is what the apply step would write.", "", "| Bean | Status per store | Merged status |", "|---|---|---|");
+    lines.push("", "## Copies that disagree on status", "", "Check these: the merged status is what the apply step would write. It is the status furthest along (todo, in-progress, then completed or scrapped), so a stale copy never reopens a bean.", "", "| Bean | Status per store | Merged status |", "|---|---|---|");
     for (const r of statusSplits) {
       const d = r.merged!.fieldDiffs.find((x) => x.field === "status")!;
       const after = String(parse(r.merged!.text).fm.status ?? "?");
