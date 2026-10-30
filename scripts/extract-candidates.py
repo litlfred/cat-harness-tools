@@ -15,26 +15,26 @@ reaches `content/` only when an agent or the author promotes it, per
 nothing here creates Lean. See docs/proposals/rag-document-ingestion.md
 §7-bis for why that boundary is load-bearing.
 
-Two extractor classes share the machinery and differ only in what they
-look for and which skill they route to:
-
-    math   theorem/definition/lemma environments  → formalizer
-    who-l1 boxed recommendations, GRADE tables    → l2-dak-authoring
-
-Class is auto-detected from the Stage-A metadata unless forced with
-`--class`. The `who-l1` extractor is structurally complete but has not
-been run against a real WHO L1 guideline — there is none in the corpus —
-so it reports `"validated": false` in its output and should be treated
-as untested until one is available.
+Which candidates a document offers depends on its class, and each class's
+extractor lives in the layer that owns that kind of document, under its
+`scripts/extractors/` (the contract is above `layer_roots` below). This
+file is what every class shares: reading the sections, choosing a class,
+counting, writing. Class is auto-detected — each extractor may claim a
+document, and one may be the fallback — unless forced with `--class`;
+`--list-classes` prints what the mounted layers provide. A class whose
+extractor declares `VALIDATED = False` has not been run against a real
+document of its kind and says so in its output.
 
 Usage:
     extract-candidates.py uploads/<doc-id>/ [...]
-    extract-candidates.py --corpus uploads/ --class math
+    extract-candidates.py --corpus uploads/ --class <class>
+    extract-candidates.py --list-classes
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import re
@@ -43,51 +43,165 @@ from typing import Any
 
 SCHEMA = "ingest-candidates/v1"
 
-# ---------------------------------------------------------------- math
+# ---------------------------------------------------------------- extractors
+#
+# What a document OFFERS depends on what kind of document it is, and that
+# knowledge belongs to the layer that owns the kind — not here. This file is
+# the machinery every class shares (read the sections, pick a class, count,
+# write `candidates.json`); the per-class extractors live in the mounted
+# layers, one file each, at
+#
+#     <instance root>/scripts/extractors/*.py
+#
+# A file there is an extractor when it defines:
+#
+#     CLASS: str                         the class name `--class` takes
+#     extract(sections, meta) -> list    the candidates, as dicts with at
+#                                        least `kind` and
+#                                        `formalization_candidate`
+#
+# and optionally:
+#
+#     detect(meta, sections) -> bool     claims a document during
+#                                        auto-detection
+#     PRIORITY: int = 100                detectors are asked lowest first
+#     FALLBACK: bool = False             the class taken when no detector
+#                                        claims the document (one at most)
+#     VALIDATED: bool = True             False while the class has not been
+#                                        run against a real document of its
+#                                        kind; reported as `"validated"`
+#
+# A class claimed by two layers is an error, never first-found-wins: which
+# extractor runs must not depend on the order the layers are mounted in. A
+# class no mounted layer provides is an error that says so, never an empty
+# `candidates.json` — an absent extractor must not read as a document that
+# offers nothing.
 
-# "Theorem 3.1 (Name). Statement..." at the head of a paragraph.
-RE_MATH_ENV = re.compile(
-    r"^\s*(?P<kind>Theorem|Proposition|Lemma|Corollary|Definition|Conjecture"
-    r"|Claim|Remark|Example)\s*"
-    r"(?P<num>\d+(?:\.\d+)*)?\s*"
-    r"(?:\((?P<name>[^)]{2,80})\))?\s*[.:—-]?\s*"
-    r"(?P<body>\S.*)$",
-    re.M,
-)
-# Block kinds the folio actually has (schemas/types.ts).
-KIND_MAP = {
-    "theorem": "theorem", "proposition": "proposition", "lemma": "lemma",
-    "corollary": "corollary", "definition": "definition",
-    "conjecture": "conjecture", "claim": "proposition",
-    "remark": "remark", "example": "example",
-}
-# A result the folio would plausibly want to *use* rather than merely cite.
-FORMALIZABLE = {"theorem", "proposition", "lemma", "corollary", "definition"}
+EXTRACTORS_DIR = os.path.join("scripts", "extractors")
+TOOLS_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_SKIP_DIRS = {"node_modules", ".git", "_build", "dist", "build"}
 
-# ---------------------------------------------------------------- who-l1
 
-RE_WHO_REC = re.compile(
-    r"^\s*RECOMMENDATION\s*(?P<num>\d+[a-z]?(?:\.\d+)*)?\s*[.:—-]?\s*(?P<body>.*)$",
-    re.M | re.I,
-)
-RE_WHO_GPS = re.compile(r"^\s*Good\s+practice\s+statement\s*[.:—-]?\s*(?P<body>.*)$", re.M | re.I)
-RE_WHO_REMARK = re.compile(r"^\s*Remarks?\s*[.:—-]\s*(?P<body>.*)$", re.M | re.I)
-RE_WHO_RESEARCH = re.compile(r"^\s*Research\s+(?:priority|priorities|gap)\w*\s*[.:—-]?\s*(?P<body>.*)$", re.M | re.I)
-# A GRADE marker, not merely a word that appears in GRADE tables. The
-# certainty levels must be *bound* to a certainty/evidence/quality noun:
-# an earlier form alternated on bare `\bhigh|moderate|low`, so the phrase
-# "high malaria burden" three paragraphs away flagged a recommendation as
-# GRADE-adjacent. Caught by the extractor's own negative test.
-RE_GRADE = re.compile(
-    r"(?:⊕"
-    r"|\bGRADE\b"
-    r"|\b(?:certainty|quality)\s+of\s+(?:the\s+)?evidence\b"
-    r"|\b(?:very\s+low|low|moderate|high)\s+(?:certainty|quality)\b"
-    r"|\b(?:certainty|quality)\s*[:=]\s*(?:very\s+low|low|moderate|high)\b"
-    r")",
-    re.I,
-)
-RE_STRENGTH = re.compile(r"\b(strong|conditional|context[- ]specific)\b\s+recommendation", re.I)
+class ExtractorError(Exception):
+    """A missing, duplicated or malformed extractor."""
+
+
+def _is_instance_root(d: str) -> bool:
+    """A directory holding `<name>.json` whose `name` is `<name>`."""
+    try:
+        entries = os.listdir(d)
+    except OSError:
+        return False
+    for fn in entries:
+        if not fn.endswith(".json") or fn.startswith("index."):
+            continue
+        try:
+            with open(os.path.join(d, fn), encoding="utf-8") as fh:
+                if json.load(fh).get("name") == fn[: -len(".json")]:
+                    return True
+        except (OSError, ValueError, AttributeError):
+            continue
+    return False
+
+
+def _children(d: str) -> list[str]:
+    try:
+        return sorted(
+            os.path.join(d, e) for e in os.listdir(d)
+            if not e.startswith(".") and e not in _SKIP_DIRS
+            and os.path.isdir(os.path.join(d, e))
+        )
+    except OSError:
+        return []
+
+
+def _locked_paths(scope: str) -> list[str]:
+    """Instance paths an `index.lock.json` in `scope` records (a mount an override moved deeper)."""
+    try:
+        with open(os.path.join(scope, "index.lock.json"), encoding="utf-8") as fh:
+            lock = json.load(fh)
+    except (OSError, ValueError):
+        return []
+    out = []
+    for inst in lock.get("instances", []) if isinstance(lock, dict) else []:
+        if isinstance(inst, dict) and isinstance(inst.get("path"), str) and not inst.get("hydrated"):
+            out.append(os.path.join(scope, inst["path"]))
+    return out
+
+
+def layer_roots() -> list[str]:
+    """Instance roots to look for extractors in.
+
+    `$CAT_HARNESS_EXTRACTOR_ROOTS` (os.pathsep-separated) when set; otherwise
+    the checkout this layer is mounted in: the directory above this layer,
+    its children and grandchildren (a repository whose instance sits one
+    level down), and whatever its `index.lock.json` mounted elsewhere.
+    """
+    env = os.environ.get("CAT_HARNESS_EXTRACTOR_ROOTS")
+    if env is not None:
+        cands = [p for p in env.split(os.pathsep) if p]
+    else:
+        scope = os.path.dirname(TOOLS_ROOT)
+        cands = [scope]
+        for c in _children(scope):
+            cands.append(c)
+            cands.extend(_children(c))
+        cands.extend(_locked_paths(scope))
+    seen: set[str] = set()
+    out = []
+    for c in cands:
+        r = os.path.realpath(c)
+        if r in seen:
+            continue
+        seen.add(r)
+        if os.path.isdir(os.path.join(r, EXTRACTORS_DIR)) and _is_instance_root(r):
+            out.append(r)
+    return out
+
+
+def _load(path: str):
+    name = "cat_extractor_" + re.sub(r"\W", "_", os.path.relpath(path, "/"))
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ExtractorError(f"{path}: cannot be loaded as a Python module")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def discover_extractors(roots: list[str] | None = None) -> dict[str, Any]:
+    """Every extractor the mounted layers provide, keyed by CLASS."""
+    found: dict[str, Any] = {}
+    origin: dict[str, str] = {}
+    for root in layer_roots() if roots is None else roots:
+        d = os.path.join(root, EXTRACTORS_DIR)
+        for fn in sorted(os.listdir(d)):
+            if not fn.endswith(".py") or fn.endswith(".test.py") or fn.startswith("_"):
+                continue
+            path = os.path.join(d, fn)
+            mod = _load(path)
+            cls = getattr(mod, "CLASS", None)
+            if not isinstance(cls, str) or not callable(getattr(mod, "extract", None)):
+                raise ExtractorError(f"{path}: an extractor defines CLASS (str) and extract(sections, meta)")
+            if cls in found:
+                raise ExtractorError(f'class "{cls}" is provided by both {origin[cls]} and {path}')
+            found[cls] = mod
+            origin[cls] = path
+    fallbacks = [c for c, m in found.items() if getattr(m, "FALLBACK", False)]
+    if len(fallbacks) > 1:
+        raise ExtractorError(f"more than one FALLBACK class: {', '.join(sorted(fallbacks))}")
+    return found
+
+
+def require_extractor(extractors: dict[str, Any], cls: str):
+    mod = extractors.get(cls)
+    if mod is None:
+        have = ", ".join(sorted(extractors)) or "none"
+        raise ExtractorError(
+            f'no mounted layer provides the extractor class "{cls}" (classes found: {have}). '
+            f"Mount the layer whose {EXTRACTORS_DIR}/ defines it, or set CAT_HARNESS_EXTRACTOR_ROOTS."
+        )
+    return mod
 
 
 def clean(s: str, limit: int = 600) -> str:
@@ -119,99 +233,32 @@ def read_sections(docdir: str) -> list[tuple[str, dict[str, str], str]]:
     return out
 
 
-def extract_math(sections, meta) -> list[dict[str, Any]]:
-    cands: list[dict[str, Any]] = []
-    for fn, fm, body in sections:
-        # References sections are citations, not claims.
-        if re.search(r"reference|bibliograph", fm.get("section_title", ""), re.I):
-            continue
-        for m in RE_MATH_ENV.finditer(body):
-            kind_raw = m.group("kind").lower()
-            kind = KIND_MAP.get(kind_raw)
-            if not kind:
-                continue
-            stmt = clean(m.group("body"))
-            if len(stmt) < 25:          # a bare cross-reference, not a statement
-                continue
-            if re.match(r"^\d+(\.\d+)*\s*$", stmt):
-                continue
-            cands.append({
-                "kind": kind,
-                "source_kind": kind_raw,
-                "number": m.group("num"),
-                "name": m.group("name"),
-                "statement": stmt,
-                "section_file": f"sections/{fn}",
-                "section_title": fm.get("section_title"),
-                "pages": fm.get("pages"),
-                "formalization_candidate": kind in FORMALIZABLE,
-                "formalization_note": (
-                    "Imported result — attribute to the source. If the folio uses it, "
-                    "state it in Lean with `sorry` + `-- Ref:` to this document, or "
-                    "prove it. Ingestion creates no Lean."
-                ) if kind in FORMALIZABLE else None,
-                "route_to": "formalizer" if kind in FORMALIZABLE else None,
-            })
-    return cands
+def detect_class(meta: dict[str, Any], sections, extractors: dict[str, Any]) -> str:
+    """The first extractor, by PRIORITY, whose `detect` claims the document; else the FALLBACK."""
+    ordered = sorted(extractors.items(), key=lambda kv: (getattr(kv[1], "PRIORITY", 100), kv[0]))
+    for cls, mod in ordered:
+        det = getattr(mod, "detect", None)
+        if callable(det) and det(meta, sections):
+            return cls
+    for cls, mod in ordered:
+        if getattr(mod, "FALLBACK", False):
+            return cls
+    have = ", ".join(sorted(extractors)) or "none"
+    raise ExtractorError(f"no extractor claims this document and none is FALLBACK (classes found: {have}); pass --class")
 
 
-def extract_who_l1(sections, meta) -> list[dict[str, Any]]:
-    cands: list[dict[str, Any]] = []
-    rules = (
-        (RE_WHO_REC, "definition", "recommendation", "def:who"),
-        (RE_WHO_GPS, "proposition", "good-practice-statement", "prop:who"),
-        (RE_WHO_REMARK, "remark", "remark", "rem:who"),
-        (RE_WHO_RESEARCH, "conjecture", "research-priority", "conj:who"),
-    )
-    for fn, fm, body in sections:
-        for rx, kind, source_kind, prefix in rules:
-            for m in rx.finditer(body):
-                stmt = clean(m.group("body"), 900)
-                if len(stmt) < 20:
-                    continue
-                window = body[m.start(): m.start() + 1800]
-                strength = RE_STRENGTH.search(window)
-                cands.append({
-                    "kind": kind,
-                    "source_kind": source_kind,
-                    "number": (m.groupdict().get("num") if "num" in m.groupdict() else None),
-                    "name": None,
-                    "statement": stmt,
-                    "section_file": f"sections/{fn}",
-                    "section_title": fm.get("section_title"),
-                    "pages": fm.get("pages"),
-                    "label_prefix": prefix,
-                    "grade_nearby": bool(RE_GRADE.search(window)),
-                    "strength": strength.group(1).lower() if strength else None,
-                    "formalization_candidate": False,
-                    "route_to": "l2-dak-authoring",
-                })
-    return cands
-
-
-def detect_class(meta: dict[str, Any], sections) -> str:
-    if meta.get("arxiv"):
-        return "math"
-    blob = " ".join((fm.get("section_title") or "") for _, fm, _ in sections[:40])
-    blob += " " + (meta.get("title") or "")
-    if re.search(r"\bWHO\b|World Health Organization|guideline|recommendation", blob, re.I):
-        return "who-l1"
-    return "math"
-
-
-def process(docdir: str, forced: str | None) -> dict[str, Any] | None:
+def process(docdir: str, forced: str | None, extractors: dict[str, Any] | None = None) -> dict[str, Any] | None:
     spath = os.path.join(docdir, "structure.json")
     if not os.path.exists(spath):
         return None
     art = json.load(open(spath))
     meta = art.get("metadata", {})
     sections = read_sections(docdir)
-    cls = forced or detect_class(meta, sections)
-
-    if cls == "who-l1":
-        cands = extract_who_l1(sections, meta)
-    else:
-        cands = extract_math(sections, meta)
+    if extractors is None:
+        extractors = discover_extractors()
+    cls = forced or detect_class(meta, sections, extractors)
+    mod = require_extractor(extractors, cls)
+    cands = mod.extract(sections, meta)
 
     by_kind: dict[str, int] = {}
     for c in cands:
@@ -221,7 +268,7 @@ def process(docdir: str, forced: str | None) -> dict[str, Any] | None:
         "_schema": SCHEMA,
         "doc_id": art.get("doc_id"),
         "document_class": cls,
-        "validated": cls != "who-l1",   # who-l1 path is untested — no L1 PDF in corpus
+        "validated": bool(getattr(mod, "VALIDATED", True)),
         "source": {
             "structure_sha256": art.get("source", {}).get("sha256"),
             "file": art.get("source", {}).get("file"),
@@ -247,9 +294,22 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Stage B — propose content candidates from a Stage-A artefact")
     ap.add_argument("docdirs", nargs="*")
     ap.add_argument("--corpus", help="root containing <doc-id>/ directories")
-    ap.add_argument("--class", dest="cls", choices=["math", "who-l1"], help="force document class")
+    ap.add_argument("--class", dest="cls", help="force document class (one a mounted layer's extractor provides)")
     ap.add_argument("--json", action="store_true", help="print to stdout, write nothing")
+    ap.add_argument("--list-classes", action="store_true", help="print the classes the mounted layers provide, and where")
     args = ap.parse_args()
+
+    try:
+        extractors = discover_extractors()
+        if args.list_classes:
+            for c, m in sorted(extractors.items()):
+                print(f"{c:<16} {m.__file__}")
+            return 0
+        if args.cls:
+            require_extractor(extractors, args.cls)
+    except ExtractorError as e:
+        print(f"extract-candidates: {e}", file=sys.stderr)
+        return 2
 
     dirs = list(args.docdirs)
     if args.corpus:
@@ -263,7 +323,11 @@ def main() -> int:
 
     tot = fml = docs = 0
     for d in dirs:
-        res = process(d, args.cls)
+        try:
+            res = process(d, args.cls, extractors)
+        except ExtractorError as e:
+            print(f"extract-candidates: {d}: {e}", file=sys.stderr)
+            return 2
         if res is None:
             continue
         docs += 1
