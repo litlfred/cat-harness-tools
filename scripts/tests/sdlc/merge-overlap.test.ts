@@ -7,7 +7,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { buildReport, classifyMember, measure, pairsOf, parseGhPrLines, type OverlapMember } from "../../merge-overlap.ts";
 import { makeRepo, readme, type Repo } from "../merge-pipeline-fixture.ts";
 
-const GEN = "cat-harness/docs/en/folio-assistant-core/glossary/index.md";
+const GEN = "cat-harness/docs/en/cat-harness/lsi/index.md"; // `glossary` (its literal lsi glob): take-base in every layout, unlike the core glossary route (bean w1gy F18)
 const member = (id: string, files: string[], regionOnly?: (p: string) => boolean | undefined): OverlapMember =>
   classifyMember({ id, head_sha: "0".repeat(40) }, files, regionOnly);
 
