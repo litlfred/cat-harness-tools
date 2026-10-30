@@ -20,13 +20,22 @@
  *
  * @module scripts/check-upstream-pins
  */
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_NAME, HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { assessPin, exitCode, readPin, render, type PinDef, type PinVerdict } from "../src/upstream/pins.js";
+import {
+  assessPin,
+  exitCode,
+  locatePins,
+  missingFileVerdict,
+  readPin,
+  render,
+  type LoadedRegistry,
+  type PinDef,
+  type PinVerdict,
+} from "../src/upstream/pins.js";
 
-const ROOT = HARNESS_ROOT;
 const argv = process.argv.slice(2);
 const markdown = argv.includes("--markdown");
 const outIdx = argv.findIndex((a) => a === "--out" || a.startsWith("--out="));
@@ -41,20 +50,31 @@ if (outIdx !== -1 && !outFile) {
   process.exit(2);
 }
 
-// The registry is the harness's declared `upstream/` directory
-// (`cat-harness-upstream`); it sat at the repository root until 2026-10-06
-// (bean `ar1s`, phase 3). Each row's `pinnedIn` resolves against the same
-// harness root.
-const registryPath = join(ROOT, "upstream", "upstream-pins.json");
-if (!existsSync(registryPath)) {
-  // Absent registry is `unknown`, not "nothing to watch". A declaration that
-  // vanished looks identical to one that never existed, and this check is the
-  // only thing standing between a pin and silent staleness.
-  console.error(`upstream-pins.json not found at ${registryPath} — cannot tell whether any pin is stale.`);
-  process.exit(2);
+// Two registries, one per layer that holds a pinned file (folio-assistant#1481).
+// The harness's is its declared `upstream/` directory (`cat-harness-upstream`).
+// It sat at the repository root until 2026-10-06 (bean `ar1s`, phase 3). This
+// layer's is its own `upstream/` (`cat-harness-tools-upstream`), for the pins
+// whose files moved up here with bean `70lx`, such as `scripts/pdf-viewer.ts`.
+// Each row's `pinnedIn` resolves against the root of the layer that declares
+// it. A harness row cannot name a file up here: that is a wrong-direction
+// reference.
+const sources: { layer: string; root: string }[] = [
+  { layer: HARNESS_NAME, root: HARNESS_ROOT },
+  { layer: "cat-harness-tools", root: TOOLS_ROOT },
+];
+const registries: LoadedRegistry[] = [];
+for (const { layer, root } of sources) {
+  const registryPath = join(root, "upstream", "upstream-pins.json");
+  if (!existsSync(registryPath)) {
+    // Absent registry is `unknown`, not "nothing to watch". A declaration that
+    // vanished looks identical to one that never existed, and this check is the
+    // only thing standing between a pin and silent staleness.
+    console.error(`upstream-pins.json not found at ${registryPath} — cannot tell whether any pin is stale.`);
+    process.exit(2);
+  }
+  const pins: PinDef[] = JSON.parse(readFileSync(registryPath, "utf8")).pins ?? [];
+  registries.push({ layer, root, pins });
 }
-
-const pins: PinDef[] = JSON.parse(readFileSync(registryPath, "utf8")).pins ?? [];
 
 /** Upstream's tag names, or `undefined` when the remote could not be read. */
 function remoteTags(repo: string): string[] | undefined {
@@ -73,11 +93,10 @@ function remoteTags(repo: string): string[] | undefined {
   }
 }
 
-const verdicts: PinVerdict[] = pins.map((pin) => {
-  const abs = join(ROOT, pin.pinnedIn);
-  const text = existsSync(abs) ? readFileSync(abs, "utf8") : undefined;
-  const pinned = text === undefined ? undefined : readPin(text, pin.pattern);
-  return assessPin(pin, pinned, remoteTags(pin.repo));
+const verdicts: PinVerdict[] = locatePins(registries, join).map((located) => {
+  if (!existsSync(located.file)) return missingFileVerdict(located);
+  const pinned = readPin(readFileSync(located.file, "utf8"), located.pin.pattern);
+  return assessPin(located.pin, pinned, remoteTags(located.pin.repo));
 });
 
 const report = render(verdicts);
