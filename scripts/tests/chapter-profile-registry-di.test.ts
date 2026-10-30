@@ -27,17 +27,9 @@ import {
   CATEGORICAL_CHAPTERS,
   ARCHIMEDEAN_CHAPTERS,
 } from "../../pipeline/chapter-profile-registry-di.ts";
-import { registerDefaultChapterProfiles }
-  from "../../pipeline/_folio-chapter-profiles.qou.ts";
-
-// Restore the shipped default rather than leaving the registry empty.
-// `registerDefaultChapterProfiles()` runs as a module-load side effect of
-// importing the checker, so it fires ONCE per process — a bare
-// `resetChapterProfiles()` here would leave every later test file (e.g.
-// `q-usage-chapter-regimes.test.ts`, which reads all three exports) looking
-// at an empty registry, with the failure landing in whichever file happened
-// to run next. Found exactly that way: green alone, red in the suite.
-afterEach(() => registerDefaultChapterProfiles());
+// Leave the registry empty between tests: nothing in this layer ships a
+// default any more, so empty is the state every other test file starts in.
+afterEach(resetChapterProfiles);
 
 const FIXTURE = {
   chapterExpectedRegimes: {
@@ -105,9 +97,7 @@ describe("configured", () => {
     expect(chapterHasProfile("never-heard-of-it")).toBe(false);
   });
 
-  test("a later configure wins, so a folio can override the shipped default", () => {
-    // This is what lets qou wire its own profiles without first deleting
-    // `_folio-chapter-profiles.qou.ts`.
+  test("a later configure wins", () => {
     configureChapterProfiles(FIXTURE);
     configureChapterProfiles({
       chapterExpectedRegimes: { "only-mine": new Set(["na"]) },
@@ -119,17 +109,11 @@ describe("configured", () => {
   });
 });
 
-describe("the shipped qou default", () => {
-  test("registers the profiles the checker used to hold inline", async () => {
-    // Call the entry point directly. Relying on the import side effect would
-    // pass alone and fail in the suite, where the module is already cached
-    // and the side effect will not fire again.
+describe("no shipped default", () => {
+  test("loading the checker configures nothing", async () => {
     resetChapterProfiles();
-    registerDefaultChapterProfiles();
-    const mod = await import("../../pipeline/qa-checkers-q-usage.ts");
-    expect(chapterProfilesConfigured()).toBe(true);
-    expect(Object.keys(mod.CHAPTER_EXPECTED_REGIMES).length).toBeGreaterThan(20);
-    expect(mod.CATEGORICAL_CHAPTERS.has("quantum-universes")).toBe(true);
-    expect(getChapterProfiles().archimedeanChapters.size).toBeGreaterThan(0);
+    await import("../../pipeline/qa-checkers-q-usage.ts");
+    expect(chapterProfilesConfigured()).toBe(false);
+    expect(getChapterProfiles().archimedeanChapters.size).toBe(0);
   });
 });

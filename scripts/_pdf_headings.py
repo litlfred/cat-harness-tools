@@ -253,7 +253,7 @@ def extract_lines(path: str, backend: str = "auto") -> list[Line]:
 # ---------------------------------------------------------------- helpers
 
 RE_NUM = re.compile(
-    r"^(?:(?P<prefix>chapter|section|part|annex|appendix)\s+)?"
+    r"^(?:(?P<prefix>chapter|section|part|component|annex|appendix)\s+)?"
     r"(?P<num>\d{1,2}(?:\.\d{1,2}){0,4}|[IVX]{1,5}|[A-Z](?:\.\d{1,2}){0,3})"
     r"(?:[.:)]|\s)\s*(?P<title>\S.*)$",
     re.I,
@@ -277,7 +277,7 @@ def norm_title(s: str) -> str:
     """Comparison form: lower-case, accents and numbering stripped."""
     s = unicodedata.normalize("NFKD", s)
     s = "".join(c for c in s if not unicodedata.combining(c)).lower()
-    s = re.sub(r"^\s*(?:(?:chapter|section|part|annex|appendix)\s+)?"
+    s = re.sub(r"^\s*(?:(?:chapter|section|part|component|annex|appendix)\s+)?"
                r"(?:\d+(?:\.\d+)*|[ivx]+|[a-z](?:\.\d+)*)[.:)]?\s+", "", s)
     s = re.sub(r"[^a-z0-9]+", " ", s)
     return s.strip()
@@ -438,7 +438,7 @@ def font_headings(lines: list[Line], max_levels: int = 4, styles_out: list | Non
             # joined adjacent headings and cost 0.07 title F1 overall.
             wraps = n.text.lstrip()[:1].islower() or cur.text.rstrip().endswith(("-", ","))
             if (not wraps or n.page != cur.page or n.style != cur.style
-                    or not (0 <= n.y0 - cur.y1 < 0.8 * n.size)
+                    or not (cur.y0 < n.y0 and -0.5 * n.size <= n.y0 - cur.y1 < 0.8 * n.size)
                     or split_number(n.text)[0] is not None):
                 break
             text = (cur.text[:-1] + n.text.lstrip()) if cur.text.endswith("-") and n.text[:1].islower() \
@@ -458,7 +458,7 @@ def font_headings(lines: list[Line], max_levels: int = 4, styles_out: list | Non
     for l in cands:
         p = merged[-1] if merged else None
         if (p and p.page == l.page and p.style == l.style
-                and 0 <= l.y0 - p.y1 < 0.8 * l.size
+                and p.y0 < l.y0 and -0.5 * l.size <= l.y0 - p.y1 < 0.8 * l.size
                 and split_number(l.text)[0] is None
                 and not p.text.rstrip().endswith(".")):
             merged[-1] = Line(p.page, f"{p.text} {l.text}", p.size, p.bold, p.italic, p.caps, p.font, p.uniform,
@@ -576,6 +576,25 @@ def tree_levels(heads: list[Heading]) -> list[Heading]:
 RE_LEADER = re.compile(r"^(?P<title>.*?\S)\s*(?:[.…·_]\s*){3,}\s*(?P<page>\d{1,4}|[ivxlc]{1,6})\s*$", re.I)
 RE_TRAIL = re.compile(r"^(?P<title>.*?[^\d\s.])\s{1,}(?P<page>\d{1,4}|[ivxl]{1,5})\s*$")
 RE_CONTENTS_TITLE = re.compile(r"^\s*(?:table of )?contents\s*$|^\s*sommaire\s*$|^\s*índice\s*$", re.I)
+RE_MONTH_YEAR = re.compile(
+    r"\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+    r"jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)"
+    r"\s+(?:19|20)\d\d\s*$",
+    re.I,
+)
+_ROMAN_VALS = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100}
+
+
+def _roman_to_int(s: str) -> int | None:
+    s = s.strip().lower()
+    if not s or not re.fullmatch(r"c{0,3}(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})", s):
+        return None
+    total = prev = 0
+    for ch in reversed(s):
+        v = _ROMAN_VALS[ch]
+        total += -v if v < prev else v
+        prev = v
+    return total if total > 0 else None
 
 
 def _rows(page_lines: list[Line]) -> list[Line]:
@@ -598,8 +617,13 @@ def _rows(page_lines: list[Line]) -> list[Line]:
 
 def _parse_entry(t: str) -> tuple[str, str] | None:
     t = re.sub(r"[\x00-\x08\x0b-\x1f]", " ", t)          # stray control characters
-    m = RE_LEADER.match(t) or RE_TRAIL.match(t)
+    leader = RE_LEADER.match(t)
+    m = leader or RE_TRAIL.match(t)
     if not m:
+        return None
+    # A line without leaders ending in "<Month> <YYYY>" ("... 27 August 2021")
+    # is a date in a running header or cover line, not a title on page 2021.
+    if not leader and RE_MONTH_YEAR.search(t):
         return None
     title = m.group("title").strip(" .")
     if not RE_HAS_WORD.search(title):
@@ -639,17 +663,28 @@ def contents_headings(lines: list[Line], with_labels: bool = False) -> list:
     if not pages:
         return []
 
+    n_pages = max(by_page)
+    furniture = furniture_keys(lines, n_pages)
     raw: list[tuple[str, str, float, Line]] = []    # title, label, x0, row
-    pending: Line | None = None
     for p in pages:
-        for r in _rows(by_page[p]):
-            if RE_CONTENTS_TITLE.match(r.text):
+        pending: Line | None = None
+        page_lines = [
+            l for l in by_page[p]
+            if not (l.y1 < 0.06 * l.page_height or l.y0 > 0.94 * l.page_height)
+        ]
+        for r in _rows(page_lines):
+            if RE_CONTENTS_TITLE.match(r.text) or _furniture_key(r) in furniture:
                 continue
             parsed = _parse_entry(r.text)
             if parsed:
                 title, label = parsed
                 x0 = r.x0
-                if pending is not None and r.y0 - pending.y1 < 0.8 * r.size and not split_number(title)[0]:
+                # A wrapped title continues in the same font style; a larger
+                # bold group heading ("Part 1. Overview ...") above a body-size
+                # entry ("Background . . . 2") is a separate heading, not the
+                # first line of that entry.
+                if (pending is not None and r.style == pending.style
+                        and r.y0 - pending.y1 < 0.8 * r.size and not split_number(title)[0]):
                     title, x0 = f"{pending.text} {title}", pending.x0
                 raw.append((title, label, x0, r))
                 pending = None
@@ -658,36 +693,68 @@ def contents_headings(lines: list[Line], with_labels: bool = False) -> list:
     if len(raw) < 3:
         return []
 
-    # Levels: numbering depth where present; otherwise indentation rank.
-    xs = sorted({round(x / 6) for _, _, x, _ in raw})
-    indent_rank = {x: i + 1 for i, x in enumerate(xs)}
+    # Levels: numbering depth where present; otherwise the depth of the
+    # indentation column (clustered within 6pt so 1pt jitter does not split
+    # a column), learned from its numbered entries and normalized with tree_levels.
+    clusters: list[float] = []
+    for x in sorted({x for _, _, x, _ in raw}):
+        if not clusters or x - clusters[-1] > 6.0:
+            clusters.append(x)
+
+    def _cluster(x: float) -> int:
+        return min(range(len(clusters)), key=lambda i: abs(clusters[i] - x))
+
+    col_depths: dict[int, Counter] = defaultdict(Counter)
+    for title, _, x0, _ in raw:
+        d = _depth(split_number(title)[0])
+        if d:
+            col_depths[_cluster(x0)][d] += 1
+    learned_col = {
+        c: (1 if 1 in cnt else cnt.most_common(1)[0][0])
+        for c, cnt in col_depths.items()
+    }
 
     # Printed page label -> physical page: the most common offset at which an
-    # entry's title is found as a line in the body.
+    # entry's title is found as a line in the body (learned separately for
+    # Arabic and Roman page numerals).
     body = [l for l in lines if l.page not in pages]
     index: dict[str, list[int]] = defaultdict(list)
     for l in body:
         index[norm_title(l.text)].append(l.page)
     offsets: Counter = Counter()
+    roman_offsets: Counter = Counter()
     for title, label, _, _ in raw:
-        if not label.isdigit():
-            continue
         key = norm_title(title)
-        for phys in index.get(key, []):
-            offsets[phys - int(label)] += 1
+        if label.isdigit():
+            for phys in index.get(key, []):
+                offsets[phys - int(label)] += 1
+        else:
+            r_val = _roman_to_int(label)
+            if r_val is not None:
+                for phys in index.get(key, []):
+                    if phys >= r_val:
+                        roman_offsets[phys - r_val] += 1
     offset = offsets.most_common(1)[0][0] if offsets else 0
-    n_pages = max(by_page)
+    roman_offset = roman_offsets.most_common(1)[0][0] if roman_offsets else 0
 
-    out: list = []
+    heads: list[Heading] = []
+    labels: list[str] = []
     for title, label, x0, r in raw:
         num, t = split_number(title)
-        level = _depth(num) or indent_rank[round(x0 / 6)]
-        page = int(label) + offset if label.isdigit() else None
+        col = _cluster(x0)
+        level = _depth(num) or learned_col.get(col) or (col + 1)
+        if label.isdigit():
+            page = int(label) + offset
+        elif _roman_to_int(label) is not None:
+            page = _roman_to_int(label) + roman_offset
+        else:
+            page = None
         if page is not None and not (1 <= page <= n_pages):
             page = None
-        h = Heading(level, t, page, num)
-        out.append((h, label) if with_labels else h)
-    return out
+        heads.append(Heading(level, t, page, num))
+        labels.append(label)
+    heads = tree_levels(heads)
+    return list(zip(heads, labels)) if with_labels else heads
 
 
 # ---------------------------------------------------------------- method 3: hybrid
@@ -730,16 +797,15 @@ def _found_near(title: str, page: int | None, index: dict[str, list[int]], slack
 
 
 def _hits(title: str, index: dict[str, list[int]]) -> list[int]:
-    """Pages where a body line carries `title` — exactly, or as the first
+    """Pages where a body line carries `title` — exactly, as the first
     line of a title that wraps (either is a prefix of the other, and the
-    shorter is substantial). Both kinds count: a chapter title wraps on its
-    divider page and appears whole in the running text pages later."""
+    shorter is substantial), or with minor wording inflection."""
     key = norm_title(title)
     if not key:
         return []
     hits = list(index.get(key, []))
     hits += [p for k, ps in index.items() if k != key and min(len(k), len(key)) >= 12
-             and (key.startswith(k) or k.startswith(key)) for p in ps]
+             and (key.startswith(k) or k.startswith(key) or similar(key, k) >= 0.84) for p in ps]
     return hits
 
 
@@ -784,6 +850,9 @@ def consensus_headings(lines: list[Line], others: dict[str, list[Heading]] | Non
     for l in lines:
         if l.page not in toc_pages:
             index[norm_title(l.text)].append(l.page)
+    for fh in font:
+        if fh.page and fh.page not in toc_pages:
+            index[norm_title(fh.title)].append(fh.page)
 
     def agree(h: Heading) -> list[str]:
         return [name for name, hs in others.items() if _match(h, hs)]
@@ -839,7 +908,7 @@ def consensus_headings(lines: list[Line], others: dict[str, list[Heading]] | Non
                        + 0.1 * ("stock-name" in src) + 0.25 * bool(agree(h)))
             out.append(ScoredHeading(h, conf, tuple(src)))
     kept = [s for s in out if s.confidence >= min_confidence]
-    relevelled = tree_levels([s.heading for s in kept]) if len(contents) < 5 else [s.heading for s in kept]
+    relevelled = tree_levels([s.heading for s in kept])
     return [s._replace(heading=h) for s, h in zip(kept, relevelled)]
 
 
@@ -942,10 +1011,14 @@ def contents_alignment(lines: list[Line], limit: int = 50) -> dict | None:
     for l in lines:
         by_page[l.page].append(l)
     toc_pages = set(contents_pages(by_page))
+    body_heads = font_headings(lines)
     index: dict[str, list[int]] = defaultdict(list)
     for l in lines:
         if l.page not in toc_pages:
             index[norm_title(l.text)].append(l.page)
+    for fh in body_heads:
+        if fh.page and fh.page not in toc_pages:
+            index[norm_title(fh.title)].append(fh.page)
 
     listed_not_found, page_mismatch = [], []
     for h in contents:
@@ -959,7 +1032,6 @@ def contents_alignment(lines: list[Line], limit: int = 50) -> dict | None:
     depth = max((h.number.count(".") + 1 for h in contents if h.number), default=0)
     found_not_listed = []
     if depth:
-        body_heads = font_headings(lines)
         # A number that recurs is a local enumeration restarting in each
         # block ("1 What it is", "2 Why it matters" under every component
         # of an appendix), not the document's section numbering.

@@ -44,10 +44,11 @@
  *
  * @module pipeline/qa-paths
  */
-import { dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 import { existsSync, statSync } from "node:fs";
 
 import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { manifestPath } from "./json-manifest.ts";
 
 /** Where block verdicts live now, relative to the instance root. */
 export const BLOCK_QA_RESULTS_DIR = join("test", "results", "block-qa");
@@ -192,7 +193,8 @@ export function blockOfQaPath(repoRoot: string, qaPath: string): string | undefi
   const base = join(repoRoot, BLOCK_QA_RESULTS_DIR);
   const rel = relative(base, qaPath);
   if (rel.startsWith("..") || !rel.endsWith(BLOCK_QA_SUFFIX)) return undefined;
-  return join(repoRoot, rel.slice(0, -BLOCK_QA_SUFFIX.length) + ".ts");
+  const root = join(repoRoot, rel.slice(0, -BLOCK_QA_SUFFIX.length));
+  return manifestPath(dirname(root), basename(root));
 }
 
 // ── The sweep's anchor ───────────────────────────────────────────

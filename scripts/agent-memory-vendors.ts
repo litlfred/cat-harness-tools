@@ -53,7 +53,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { dirname, join } from "node:path";
 
 import { parseFrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.js";
-import { MEMORY_LABELS, memoryForAgent, type MemoryNode } from "@litlfred/cat-harness/schemas/memory.js";
+import { MEMORY_LABELS, memoryForAgent, type MemoryNode } from "@litlfred/cat-harness/schemas/conduct/memory.js";
 import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 import {

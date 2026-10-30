@@ -1079,7 +1079,6 @@ export const RULES: Rule[] = [
       "schemas/kg/fsh-guts.ts",        // the trashcan, not FHIR Shorthand
       "schemas/sdlc/python-deps.ts",     // the repository's own Python toolchain
       "schemas/content/avatars.ts",         // declared-path-literal: a partition plan names modules by path. An avatar for every declared kind
-      "schemas/fsh-guts.ts",           // the trashcan's one-release re-export at the old path, still not FHIR
       "schemas/ui/blank-avatar.ts",    // declared-path-literal: a partition plan names modules by path. Its blank mark, node-free for the navbar bundle
       "schemas/kg/substrate-snapshot.ts", // the node schema of `substrate-snapshot`, a kind the harness registers (issue #1719)
       "schemas/kg/kind-validator.ts",  // a graph typology's validator
@@ -1262,8 +1261,12 @@ export const RULES: Rule[] = [
     // `skills/authoring/{authoring-math,folio-paper-adapter}/` on 2026-10-01:
     // placement PR1 (bean `ybwt`) moved both packages to
     // `folio-assistant-sci/skills/content/`.
+    // `schemas/precision-scalar.ts` moved to `folio-assistant-sci/schemas/` in
+    // bean `f8wp`; `schemas/refactor-strategy.ts` is already in
+    // `folio-assistant-sci/schemas/` and retained here only until `saqd` (#875)
+    // drops `cat-harness-tools/pipeline/refactor-strategy.ts`.
     prefixes: ["computations/", "latex/", "scripts/render-tex/", "scripts/docker-latex-build/", "scripts/knot-plots/"],
-    exact: ["schemas/formalization-types.ts", "schemas/precision-scalar.ts", "schemas/refactor-strategy.ts"],
+    exact: ["schemas/formalization-types.ts", "schemas/refactor-strategy.ts"],
   },
   {
     repo: "sci",

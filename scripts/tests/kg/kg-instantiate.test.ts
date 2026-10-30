@@ -13,7 +13,7 @@ import { sweep } from "../../check-instance-config.ts";
 import { harnessTiles } from "../../harness-tiles.ts";
 import { harnessHome, instantiate, stateDirectoriesOf, unsafePathReason } from "../../kg-instantiate.ts";
 import { subscribedHarnesses, subscribedTile } from "../../subscribed-harnesses.ts";
-import { type RootFetcher, setTopLevelKey, subscribe } from "../../kg-subscribe.ts";
+import { partRecordsIn, type RootFetcher, setTopLevelKey, subscribe } from "../../kg-subscribe.ts";
 import { render, subscriptionCards } from "../../subscriptions-viz.ts";
 import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
@@ -80,6 +80,11 @@ function checkout(extraInstances: string[] = []): { repo: string; host: string; 
   return { repo, host, file };
 }
 
+/** Where `kg:instantiate` puts a subscribed harness's state (G11): under the subscriber's snapshot directory. */
+function home(c: { host: string }, subscription = "ihris-kb", harness = "ihris-kb"): string {
+  return harnessHome(join(c.host, "subscriptions"), subscription, harness);
+}
+
 /** Subscribe `host` to `decl` at SHA, then record `harnesses` as chosen. */
 async function subscribed(
   c: { host: string; file: string },
@@ -105,10 +110,12 @@ describe("instantiate: writes the config and the state directories", () => {
     const body = JSON.parse(readFileSync(config, "utf8"));
     expect(body._subscription).toEqual({ subscriber: "host", id: "ihris-kb", repository: "litlfred/ihris-kb", ref: SHA });
     // The two state directories, and not the skills one.
-    const home = harnessHome(c.repo, "ihris-kb");
-    expect(existsSync(join(home, "beans/workflows/.gitkeep"))).toBe(true);
-    expect(existsSync(join(home, "beans/defs/.gitkeep"))).toBe(true);
-    expect(existsSync(join(home, "skills"))).toBe(false);
+    const h = home(c);
+    expect(existsSync(join(h, "beans/workflows/.gitkeep"))).toBe(true);
+    expect(existsSync(join(h, "beans/defs/.gitkeep"))).toBe(true);
+    expect(existsSync(join(h, "skills"))).toBe(false);
+    // G11: nothing at the repository root under the harness's name.
+    expect(existsSync(join(c.repo, "ihris-kb"))).toBe(false);
     expect(r.ok && r.written.length).toBe(3);
   });
 
@@ -136,7 +143,7 @@ describe("instantiate: writes the config and the state directories", () => {
     expect(r.ok && r.state).toBe("instantiated");
     expect(r.ok && r.written.length).toBe(3);
     expect(existsSync(join(c.repo, "ihris-kb.config.json"))).toBe(false);
-    expect(existsSync(harnessHome(c.repo, "ihris-kb"))).toBe(false);
+    expect(existsSync(home(c))).toBe(false);
   });
 
   test("idempotent: an existing config is reported, never overwritten", async () => {
@@ -157,11 +164,53 @@ describe("instantiate: writes the config and the state directories", () => {
     instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
     const config = join(c.repo, "ihris-kb.config.json");
     const before = readFileSync(config, "utf8");
-    rmSync(join(harnessHome(c.repo, "ihris-kb"), "beans/defs"), { recursive: true });
+    rmSync(join(home(c), "beans/defs"), { recursive: true });
     const r = instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
     expect(r.ok && r.state).toBe("already-instantiated");
-    expect(r.ok && r.written).toEqual([join(harnessHome(c.repo, "ihris-kb"), "beans/defs/")]);
+    expect(r.ok && r.written).toEqual([join(home(c), "beans/defs/")]);
     expect(readFileSync(config, "utf8")).toBe(before);
+  });
+});
+
+describe("instantiate: the state home is slice 5's snapshot layout (G11)", () => {
+  test("the home is <snapshot dir>/<subscription>/harnesses/<harness>/", () => {
+    expect(harnessHome("/x/host/subscriptions", "sub", "kb")).toBe(join("/x/host/subscriptions", "sub", "harnesses", "kb"));
+  });
+
+  test("a staged instance directory carrying the harness's name at the root is left untouched", async () => {
+    const c = checkout();
+    // A staged instance's directory: no declaration of its own, so it is not
+    // a local instance and the name-taken refusal does not fire.
+    mkdirSync(join(c.repo, "ihris-kb", "beans"), { recursive: true });
+    writeFileSync(join(c.repo, "ihris-kb", "beans", "keep.md"), "staged\n");
+    await subscribed(c);
+    const r = instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
+    expect(r.ok && r.state).toBe("instantiated");
+    expect(r.ok && r.written.every((f) => !f.startsWith(join(c.repo, "ihris-kb") + "/"))).toBe(true);
+    expect(existsSync(join(c.repo, "ihris-kb", "beans", "defs"))).toBe(false);
+    expect(readFileSync(join(c.repo, "ihris-kb", "beans", "keep.md"), "utf8")).toBe("staged\n");
+    expect(existsSync(join(home(c), "beans/defs/.gitkeep"))).toBe(true);
+  });
+
+  test("the config names where the state lives", async () => {
+    const c = checkout();
+    await subscribed(c);
+    instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
+    const body = JSON.parse(readFileSync(join(c.repo, "ihris-kb.config.json"), "utf8"));
+    expect(body._comment).toContain("`host/subscriptions/ihris-kb/harnesses/ihris-kb/`");
+  });
+
+  test("the home is a harness home to the part reader: no stray, no part", async () => {
+    const c = checkout();
+    await subscribed(c);
+    instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
+    const read = partRecordsIn(join(c.host, "subscriptions"), "ihris-kb");
+    expect(read.strays).toEqual([]);
+    expect(read.parts).toEqual([]);
+    expect(read.homes).toEqual([home(c)]);
+    // A file directly under harnesses/ is nobody's.
+    writeFileSync(join(c.host, "subscriptions", "ihris-kb", "harnesses", "loose.txt"), "x");
+    expect(partRecordsIn(join(c.host, "subscriptions"), "ihris-kb").strays).toEqual(["ihris-kb/harnesses/loose.txt"]);
   });
 });
 
@@ -209,7 +258,7 @@ describe("instantiate: refusals, each with its reason", () => {
     expect(!r.ok && r.state).toBe("refused");
     expect(!r.ok && r.reason).toMatch(/needs `base-kb`, `other-kb`/);
     expect(existsSync(join(c.repo, "ihris-kb.config.json"))).toBe(false);
-    expect(existsSync(harnessHome(c.repo, "ihris-kb"))).toBe(false);
+    expect(existsSync(home(c))).toBe(false);
   });
 
   test("a need is satisfied by a local instance", async () => {
