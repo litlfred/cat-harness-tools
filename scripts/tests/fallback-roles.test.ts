@@ -30,6 +30,12 @@ import {
 } from "../check-fallback-roles.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { notApplicableAlone } from "../../test/support/checkout.js";
+
+/** The Lean pair (`lean-toolchain`, `lean-mcp`) is declared by folio-assistant-sci, the instance its subject belongs to; only a composed checkout holds it. */
+const NO_LEAN_CAPABILITIES = notApplicableAlone(
+  "folio-assistant-sci's scenarios/capabilities/, which declares `lean-toolchain` and its `fallbackTo: lean-mcp`",
+);
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -154,7 +160,7 @@ describe("the capability-level fallback, and the contradiction it exposed", () =
   // subject belongs to, and the Lean pair is no longer the platform's.
   const facts = checkoutCapabilityFacts(repoRootFor(ROOT));
 
-  test("`fallbackTo` is declared ONCE, on the capability it is a property of", () => {
+  test.skipIf(NO_LEAN_CAPABILITIES)("`fallbackTo` is declared ONCE, on the capability it is a property of", () => {
     // Five skill modules each carried `fallbackCapabilityId: "lean-mcp"`.
     // What substitutes for `lean-toolchain` is a fact about
     // `lean-toolchain`, so a sixth Lean skill no longer has to remember it.
