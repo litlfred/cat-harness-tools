@@ -1,6 +1,6 @@
 """The scan/figure rule is spelled twice; these pin it. Bean `d5f1`.
 
-`roleFor` in `schemas/document-image.ts` decides what a consumer believes an
+`roleFor` in `schemas/content/document-image.ts` decides what a consumer believes an
 image is. `role_for` in `scripts/pdf-images.py` decides what gets written down.
 They are in different languages, so nothing but a test holds them together.
 
@@ -21,9 +21,8 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = os.path.dirname(HERE)
-ROOT = os.path.dirname(SCRIPTS)
+ROOT = os.path.dirname(SCRIPTS)  # this layer; schemas/ moved here with the code (8lcl)
 sys.path.insert(0, SCRIPTS)
-from _harness_root import HARNESS_ROOT  # noqa: E402 — schemas/ is the harness's (bean 70lx)
 
 
 def load(name: str):
@@ -39,7 +38,7 @@ def load(name: str):
 
 def ts_const(name: str) -> float:
     """Read a threshold OUT of the TypeScript. Restating one here is the defect."""
-    src = open(os.path.join(HARNESS_ROOT, "schemas", "content", "document-image.ts"), encoding="utf-8").read()
+    src = open(os.path.join(ROOT, "schemas", "content", "document-image.ts"), encoding="utf-8").read()
     m = re.search(name + r"\s*=\s*([0-9.]+)", src)
     assert m, f"{name} not found in document-image.ts — did it move?"
     return float(m.group(1))
@@ -286,7 +285,7 @@ def main() -> int:
     check("a threshold never overrides a capture's chrome",
           images.role_for(cap_py / 2, 2, True, cap_py) == "chrome")
     check("the TypeScript schema knows the role the cutoff writes",
-          '"furniture"' in open(os.path.join(HARNESS_ROOT, "schemas", "content", "document-image.ts"), encoding="utf-8").read())
+          '"furniture"' in open(os.path.join(ROOT, "schemas", "content", "document-image.ts"), encoding="utf-8").read())
 
     print()
     print("  all checks passed" if rc == 0 else "  FAILURES above")
