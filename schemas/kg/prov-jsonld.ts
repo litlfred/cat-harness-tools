@@ -43,6 +43,18 @@
  * release address while its instance declares no `iriBase`. A record with no
  * Handle, or an id nobody catalogues, stays a literal with its reason.
  *
+ * A decision record's agreement and grant are `prov:used` entities that are
+ * already described (bean `yy40`): the agreement's DCAT 3 `dcat:Distribution`
+ * with its `spdx:checksum`, and the grant's W3C VC 2.0 credential `id`. They
+ * are absolute IRIs, so they are emitted as they are, under the `dcat`,
+ * `spdx` and `cred` prefixes, with no address-book lookup.
+ *
+ * The hash-chain terms `cat-harness:previousHash` / `cat-harness:recordHash`
+ * are a **local extension** — no open standard defines a hash-chained PROV
+ * log. A document that uses them also describes each in its `@graph` as an
+ * `rdf:Property` with an `rdfs:comment` saying so, so the label travels with
+ * the data rather than living only in this source.
+ *
  * @module schemas/prov-jsonld
  * @graphNode schema
  * @conformsTo w3c-prov-jsonld
@@ -55,7 +67,7 @@ import { basename, join, relative } from "node:path";
 import { releaseIris, releaseIri } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
 import { instanceDirectoryForGraph, instanceRootsIn, readDeclaration } from "./cat-harness.ts";
 import { CAT_HARNESS_NS, FOLIO_BASE } from "./namespaces.ts";
-import { PROV_CONTEXT, type ProvActivity } from "../content/prov.ts";
+import { CRED_NS, DCAT_NS, PROV_CONTEXT, PROV_LOCAL_EXTENSION_TERMS, SPDX_NS, type ProvActivity } from "../content/prov.ts";
 
 /**
  * Where the PROV-JSONLD context is published — the address the owner
@@ -276,14 +288,15 @@ export function provJsonldDocument(
       ...(a["prov:used"]
         ? {
             "prov:used": a["prov:used"].map((u) => {
+              // A described entity (agreement distribution, grant credential)
+              // is already an absolute IRI: emitted as it is.
+              if (typeof u !== "string") return u;
               const v = field("entity", u);
               return typeof v === "string" ? { "@id": v } : v;
             }),
           }
         : {}),
       "cat-harness:underPolicy": a["cat-harness:underPolicy"],
-      ...(a["cat-harness:agreement"] ? { "cat-harness:agreement": a["cat-harness:agreement"] } : {}),
-      ...(a["cat-harness:grant"] ? { "cat-harness:grant": a["cat-harness:grant"] } : {}),
       ...(a["cat-harness:consent"] ? { "cat-harness:consent": a["cat-harness:consent"] } : {}),
       ...(a["cat-harness:consentBased"] !== undefined ? { "cat-harness:consentBased": a["cat-harness:consentBased"] } : {}),
       ...(a["cat-harness:previousHash"] !== undefined ? { "cat-harness:previousHash": a["cat-harness:previousHash"] } : {}),
@@ -297,6 +310,12 @@ export function provJsonldDocument(
       plan: field("plan", q["prov:hadPlan"]),
     });
   }
+  // Label the hash-chain terms as the local extension they are, in the data.
+  for (const [term, comment] of Object.entries(PROV_LOCAL_EXTENSION_TERMS)) {
+    if (activities.some((a) => (a as Record<string, unknown>)[term] !== undefined)) {
+      graph.push({ "@id": term, "@type": "rdf:Property", "rdfs:comment": comment, "rdfs:isDefinedBy": { "@id": CAT_HARNESS_NS } });
+    }
+  }
   return {
     document: {
       "@context": [
@@ -304,7 +323,13 @@ export function provJsonldDocument(
         {
           "@base": FOLIO_BASE,
           "cat-harness": CAT_HARNESS_NS,
+          dcat: DCAT_NS,
+          spdx: SPDX_NS,
+          cred: CRED_NS,
           "cat-harness:underPolicy": { "@type": "@id" },
+          "spdx:algorithm": { "@type": "@id" },
+          "spdx:checksumValue": { "@type": "xsd:hexBinary" },
+          "dcat:downloadURL": { "@type": "@id" },
         },
       ],
       "@id": id,
