@@ -223,7 +223,7 @@ export function checkUsesEditorialHygiene(tsPath?: string): CheckerResult {
  * Automated checkers for the generic `uses` axis (`uses-editorial-hygiene`).
  *
  * The paper/Lean `uses` checkers (`uses-formal-coverage` and `lean-ref-owns-decl`)
- * live in `folio-assistant-sci/pipeline/qa-checkers-uses.ts` and are registered
+ * live in the sci layer (https://github.com/litlfred/folio-assistant-sci/blob/main/pipeline/qa-checkers-uses.ts) and are registered
  * via `folio-qa-checker/v1` contribution nodes (bean `saqd` Group 8).
  *
  * `uses-editorial-completeness` is deliberately absent: it is
