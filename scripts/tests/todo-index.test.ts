@@ -36,7 +36,7 @@ const published = (): { raw: string; doc: TodoIndex } => {
 };
 
 describe("the artefact answers `what am I?` from itself", () => {
-  test("the published file parses against the schema that names it", () => {
+  test.skipIf(NOT_BUILT())("the published file parses against the schema that names it", () => {
     // The defect this module exists to end: `folio-todo-index` appeared in
     // exactly two places in this repository, neither of them a schema.
     expect(existsSync(ASSET)).toBe(true);

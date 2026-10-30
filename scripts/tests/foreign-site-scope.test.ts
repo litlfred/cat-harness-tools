@@ -376,7 +376,7 @@ describe("the IG site's shell (compose-docs --shell), end to end", () => {
     expect(existsSync(join(out, "assets", "todos", "todo-page.js"))).toBe(true);
   });
 
-  test("(c) the platform's translation sweep and index are not shipped as the folio's", () => {
+  test.skipIf(noSmartTrust())("(c) the platform's translation sweep and index are not shipped as the folio's", () => {
     for (const rel of Object.keys(HOST_DATA_PROJECTIONS)) {
       expect(existsSync(join(out, rel))).toBe(false);
       expect(r.scoped?.hostProjections).toContain(rel);
@@ -474,7 +474,13 @@ describe("the injected rail (rail-standalone-pages --foreign-site) over a fixtur
     ensureThemesCss(HARNESS_ROOT);
   });
 
-  test("its icon row names no platform work plan and no root-relative destination", () => {
+  // The icon row is the harness data's `navbar`, which `docs:harness` writes at publish (gitignored).
+  test.skipIf(
+    siteNotBuilt(
+      "the harness data `docs:harness` writes at publish (gitignored), whose `navbar` is the icon row",
+      join(HARNESS_ROOT, siteDirFor(HARNESS_ROOT), "_data", "harness.json"),
+    ),
+  )("its icon row names no platform work plan and no root-relative destination", () => {
     const root = mkdtempSync(join(tmpdir(), "foreign-rail-"));
     mkdirSync(join(root, "doc"), { recursive: true });
     writeFileSync(join(root, "doc", "index.html"), "<!doctype html>\n<html><head><title>t</title></head><body><h1>Doc</h1></body></html>\n");

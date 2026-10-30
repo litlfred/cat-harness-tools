@@ -54,6 +54,24 @@ const run = (root: string) => railStandalonePages(root, "cat-harness", "cat-harn
 const railed = (root: string, rel: string): boolean =>
   /<nav class="fa-nav"/.test(readFileSync(join(root, rel), "utf-8"));
 
+/** The harness data `docs:harness` writes at publish (gitignored): the icon row a railed page carries. */
+const HARNESS_DATA_NOT_BUILT = (): boolean =>
+  siteNotBuilt(
+    "the harness data `docs:harness` writes at publish (gitignored), whose `navbar` is the icon row",
+    join(HARNESS_ROOT, siteDirFor(HARNESS_ROOT), "_data", "harness.json"),
+  );
+/**
+ * A folio's site ships the platform chrome as its pinned copy, `themes.css`
+ * among it (`themes:css`, gitignored), and its rail's graphs and icon row are
+ * the harness data (`docs:harness`, gitignored). Both are written at publish.
+ */
+const FOLIO_CHROME_NOT_BUILT = (): boolean =>
+  siteNotBuilt(
+    "site-chrome/assets/css/themes.css (`themes:css`) and the harness data (`docs:harness`), both written at publish (gitignored), which a folio's pinned chrome and rail read",
+    join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/css/themes.css")),
+    join(HARNESS_ROOT, siteDirFor(HARNESS_ROOT), "_data", "harness.json"),
+  );
+
 describe("what it rails", () => {
   // The row is read off the harness's `_data/harness.json`, which `docs:harness`
   // writes at publish and is gitignored: standing alone it is not built (w1gy F18).
@@ -120,7 +138,8 @@ describe("what it rails", () => {
     expect(html).toContain('<nav class="fa-nav"');
   });
 
-  test("the id-lookup page gets the rail with linked style and visualiser nav (bean 7ji4)", () => {
+  // `navbar-row.js` is linked only when there is a row, read off the harness data.
+  test.skipIf(HARNESS_DATA_NOT_BUILT())("the id-lookup page gets the rail with linked style and visualiser nav (bean 7ji4)", () => {
     // The page's own head, inlined: `cat-harness-tools/` is a sibling layer the
     // standalone cat-harness checkout does not have. That the real page carries
     // these declarations is asserted where it lives, in publish-id-lookup.test.ts.
@@ -248,7 +267,7 @@ describe("the mount routes are ASKED for, not guessed", () => {
   });
 });
 
-describe("a FOLIO's site (folio-staging.yml): platform links point at the platform's site", () => {
+describe.skipIf(FOLIO_CHROME_NOT_BUILT())("a FOLIO's site (folio-staging.yml): platform links point at the platform's site", () => {
   // Measured 2026-10-05 on litlfred/smart-ra: a document folio's pages carried
   // no navbar at all, and re-basing the platform's graphs against the FOLIO's
   // root would have made every one of them a 404 on the folio's Pages site.

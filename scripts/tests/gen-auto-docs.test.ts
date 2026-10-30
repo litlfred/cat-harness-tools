@@ -23,7 +23,7 @@ import { TYPES, autoDocPage, declaredDirectories, levelPage, owningDirectory } f
 import { knownSkills } from "../known-skills.ts";
 import { instanceRootsIn, isExemptFrom, readDeclaration, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { siteNotBuilt } from "../../test/support/checkout.ts";
+import { notApplicableAlone, siteNotBuilt } from "../../test/support/checkout.ts";
 
 // The harness whose docs the generator writes; the test moved up with it (70lx B2).
 const INSTANCE = HARNESS_ROOT;
@@ -247,7 +247,8 @@ describe("a THEMED page, so the layout gives it the top band (2026-10-07)", () =
 });
 
 describe("what is published", () => {
-  it("a sub-graph page exists for who-iris, the sparse case", () => {
+  // who-iris is a higher instance; standing alone it contributes nothing to render.
+  it.skipIf(notApplicableAlone("who-iris, whose one skill (iris-dspace) is the sparse sub-graph this page renders"))("a sub-graph page exists for who-iris, the sparse case", () => {
     // The owner asked for the handler to be exercised on who-iris, which
     // contributes ONE skill. A thin index is a real answer; the test is that
     // it is rendered at all rather than dropped as uninteresting.
@@ -274,7 +275,8 @@ describe("the LEVEL pages — a route that reads like a section must answer", ()
       ...levels.map((l) => join(SITE, HANDLER ?? "", "auto-docs", ...l, "index.html")),
     );
 
-  it("every level above a built type has an index", () => {
+  // The root level is the one every built type sits under: absent, none is built.
+  it.skipIf(notBuilt([]))("every level above a built type has an index", () => {
     // Bean `06e3`: a type id may carry a slash, so `viewerPlacement` nests its
     // page directory and the levels above came into existence holding nothing.
     // `/cat-harness/auto-docs/` and `/cat-harness/auto-docs/index/` were both
