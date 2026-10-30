@@ -148,6 +148,8 @@
     "check:workflow-submodules": "bun run cat-harness-tools/scripts/check-workflow-submodules.ts",
     "check:code-accounting": "bun run cat-harness-tools/scripts/check-code-accounting.ts",
     "check:command-paths": "bun run cat-harness-tools/scripts/check-command-paths.ts",
+    "check:content-code-free": "bun run cat-harness-tools/scripts/check-content-code-free.ts",
+    "content-code-free:baseline": "bun run cat-harness-tools/scripts/check-content-code-free.ts --update",
     "check:content-keys": "bun run cat-harness-tools/scripts/check-content-keys.ts",
     "check:corpus-gate": "bun run cat-harness-tools/scripts/check-corpus-gate.ts",
     "check:concern-groups": "bun run cat-harness-tools/scripts/check-concern-groups.ts",
