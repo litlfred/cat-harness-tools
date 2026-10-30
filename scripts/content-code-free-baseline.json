@@ -208,7 +208,6 @@
     "schemas/process/scenario-overlay.ts",
     "schemas/process/user-story.test.ts",
     "schemas/process/user-story.ts",
-    "schemas/refactor-strategy.ts",
     "schemas/remote-mount-tools.test.ts",
     "schemas/render-exemption.test.ts",
     "schemas/review-thread-id.test.ts",
