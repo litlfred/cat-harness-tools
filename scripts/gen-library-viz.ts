@@ -1660,7 +1660,7 @@ if (import.meta.main) {
   // THE LANDING HARNESS'S directories only, because those are the ones that
   // produce tiles (`tileDirectories`, the list `sync-docs-harness.ts` hands
   // `graphTiles`; #931: reading `ROOT`'s own declaration keyed every count by
-  // a cat-harness id once the landing moved to folio-assistant-core). Scanning every instance was the first draft and it was
+  // a cat-harness id once the landing moved to the core content layer). Scanning every instance was the first draft and it was
   // wrong in a way worth recording, because it looked more thorough:
   //
   // a page is NOT uniquely owned by one directory id. The page at

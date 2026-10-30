@@ -82,7 +82,7 @@
 # Main's answer, once found, is RESTORED by prepare-base and handed to
 # compare as a run artifact (cat-harness-tools#926). It used to be only looked
 # up there and restored by compare, after the head shards, with
-# `fail-on-cache-miss`; on smart-base#216 (run 41064407930) that was two hours
+# `fail-on-cache-miss`; on https://github.com/litlfred/smart-base/pull/216 (run 41064407930) that was two hours
 # later, the entry had been evicted, and the gate failed without judging
 # anything. An artifact lives as long as the run. Should the restore or the
 # hand-off fail, prepare-base computes main's side itself, as on a miss.

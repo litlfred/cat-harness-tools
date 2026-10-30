@@ -3975,7 +3975,7 @@ export function writeToolDocuments(published: Record<string, unknown>, out: stri
  *
  * ## A COPY, when the document is served somewhere its IRI does not name
  *
- * An instance with its own `canonicalUrl` (smart-base:
+ * An instance with its own `canonicalUrl` (the DAK layer:
  * `http://smart.who.int/base`) mints its subjects there, and that site serves
  * none of them. Owner, 2026-10-29 (litlfred/cat-harness-tools#638, option B):
  * publish a copy on THIS site and link it to the canonical IRI with
