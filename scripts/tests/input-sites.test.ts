@@ -23,7 +23,7 @@ import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "../../schemas/ui/
 import { blankSource, auditClosure, mainBlockLines, parseVerdicts, scanSource, SiteMemo, statementPin } from "../input-sites.ts";
 import { checkFingerprint, entryFiles, FileDigests, TRACKED, type Fingerprint } from "../input-hash.ts";
 import { inputSiteReached, openTrace, qaRefLine, quietly, TRACE_ENV } from "../../schemas/sdlc/input-trace.ts";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 
 const isUndetermined = (f: Fingerprint, needle?: string) => {
@@ -282,7 +282,7 @@ describe("the runtime trace", () => {
 
   const inChild = (env: Record<string, string | undefined>, code: string) => {
     const file = join(root, "child.ts");
-    writeFileSync(file, `import { inputSiteReached, qaRefLine, quietly } from ${JSON.stringify(join(HARNESS_ROOT, "schemas", "sdlc", "input-trace.ts"))};\n${code}\n`);
+    writeFileSync(file, `import { inputSiteReached, qaRefLine, quietly } from ${JSON.stringify(join(TOOLS_ROOT, "schemas", "sdlc", "input-trace.ts"))};\n${code}\n`);
     const r = Bun.spawnSync(["bun", file], { env, stdout: "pipe", stderr: "pipe" });
     expect(r.exitCode).toBe(0);
   };

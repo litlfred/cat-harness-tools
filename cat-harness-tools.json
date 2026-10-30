@@ -165,17 +165,35 @@
     },
     {
       "id": "cat-harness-tools-archimate",
-      "path": "archimate/",
-      "description": "The ArchiMate subgraph's generators, checker and tests; the subgraph's content stays in `cat-harness/archimate/`; its Zod schema (`archimate/schemas/`) followed in bean `8lcl`. Moved by bean `70lx`.",
+      "path": "archimate/scripts/",
+      "description": "The ArchiMate subgraph's generators, checker and tests; the subgraph's content and schema stay in `cat-harness/archimate/`. Moved by bean `70lx`.",
       "graphTypologies": [
         "code"
       ]
     },
     {
-      "id": "cat-harness-tools-openapi",
-      "path": "openapi/",
-      "description": "The OpenAPI subgraph's ingester, page generator and tests; the subgraph's content stays in `cat-harness/openapi/`; its Zod schema (`openapi/schemas/`) followed in bean `8lcl`. Moved by bean `70lx`.",
+      "id": "cat-harness-tools-archimate-schemas",
+      "path": "archimate/schemas/",
+      "description": "The ArchiMate subgraph's Zod schema, moved from `cat-harness/archimate/schemas/` in bean `8lcl` (owner card \"A. One coordinated move\", 2026-10-30). Module paths are unchanged, so the Schema node keeps its IRI; the subgraph's content stays in `cat-harness/archimate/`.",
       "graphTypologies": [
+        "schemas",
+        "code"
+      ]
+    },
+    {
+      "id": "cat-harness-tools-openapi",
+      "path": "openapi/scripts/",
+      "description": "The OpenAPI subgraph's ingester, page generator and tests; the subgraph's content and schema stay in `cat-harness/openapi/`. Moved by bean `70lx`.",
+      "graphTypologies": [
+        "code"
+      ]
+    },
+    {
+      "id": "cat-harness-tools-openapi-schemas",
+      "path": "openapi/schemas/",
+      "description": "The OpenAPI subgraph's Zod schema, moved from `cat-harness/openapi/schemas/` in bean `8lcl` (owner card \"A. One coordinated move\", 2026-10-30). Module paths are unchanged, so the Schema node keeps its IRI; the subgraph's content stays in `cat-harness/openapi/`.",
+      "graphTypologies": [
+        "schemas",
         "code"
       ]
     },

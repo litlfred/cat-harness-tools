@@ -7,13 +7,20 @@ generated: "scripts/subgraph-readmes.ts of the bootstrap toolset (https://github
 
 # cat-harness-tools-openapi
 
-The OpenAPI subgraph's ingester, page generator and tests; the subgraph's content stays in `cat-harness/openapi/`; its Zod schema (`openapi/schemas/`) followed in bean `8lcl`. Moved by bean `70lx`.
+The OpenAPI subgraph's ingester, page generator and tests; the subgraph's content and schema stay in `cat-harness/openapi/`. Moved by bean `70lx`.
 
-Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-openapi`, holding `code`.
+Part of [C@T Harness Tools](../../README.md) 0.1.0, declared as `cat-harness-tools-openapi`, holding `code`.
 
 | file | what it is | used by |
 |---|---|---|
-| [`schemas/`](schemas/) | _nothing declares what this holds_ | |
-| [`scripts/`](scripts/) | _nothing declares what this holds_ | |
+| [`gen-openapi-pages.ts`](gen-openapi-pages.ts) | a file |  |
+| [`gen-openapi-viewer.test.ts`](gen-openapi-viewer.test.ts) | a file |  |
+| [`gen-openapi-viewer.ts`](gen-openapi-viewer.ts) | a file |  |
+| [`ig-site-openapi.ts`](ig-site-openapi.ts) | a file |  |
+| [`ingest-openapi-rendered.ts`](ingest-openapi-rendered.ts) | a file |  |
+| [`ingest-openapi.ts`](ingest-openapi.ts) | a file |  |
+| [`ingest-tools.test.ts`](ingest-tools.test.ts) | a file |  |
+| [`openapi.test.ts`](openapi.test.ts) | a file |  |
+| [`templates/`](templates/) | _nothing declares what this holds_ | |
 
 <!-- kg:subgraph:end -->

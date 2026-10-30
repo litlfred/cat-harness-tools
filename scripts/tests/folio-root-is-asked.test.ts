@@ -45,7 +45,7 @@ const ROOT = repoRootFor(INSTANCE);
 const LITERAL = /(?<![.\w])(?:join|resolve)\s*\([^,()]*(?:\([^()]*\))?[^,()]*,\s*"folio"\s*[,)]/;
 
 /** The one module that may spell it, because it is where the answer lives. */
-const BASE_CASE = "cat-harness/schemas/kg/cat-harness.ts";
+const BASE_CASE = "cat-harness-tools/schemas/kg/cat-harness.ts"; // moved up a layer in bean `8lcl`
 
 /**
  * The harness and the layer that implements its tools. The MCP server moved to

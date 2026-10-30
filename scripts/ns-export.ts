@@ -79,7 +79,7 @@ import {
   type TermGloss,
   type TermLayer,
 } from "../schemas/content/vocabulary.js";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 // The instance that declares the `core` term layer's kinds — the content layer
@@ -223,9 +223,12 @@ export function mintedTermsFromSource(root = ROOT): Set<string> {
   // `xd1g`. Measured at the conversion: **936 before, 935 after** — the one it
   // drops is a gitignored `dist/index.d.ts`, and a generated declaration file
   // minting a term would be a term nobody wrote. Nothing gained.
-  for (const p of gitFiles(root, (rel) =>
+  // Since bean `8lcl` the harness's code lives in cat-harness-tools, so the
+  // harness's own minting sites are read there as well as here.
+  const roots = root === ROOT ? [ROOT, resolve(TOOLS_ROOT)] : [root];
+  for (const p of roots.flatMap((r) => gitFiles(r, (rel) =>
     rel.endsWith(".ts") && !rel.endsWith(".test.ts") && !rel.split("/").some((s) => s.startsWith(".")),
-  ).files) {
+  ).files)) {
     // COMMENTS ARE STRIPPED FIRST, and this is not fussiness: the first
     // version scanned raw source and reported `Name` as an undefined term,
     // matched from THIS function's own comment describing the pattern it looks

@@ -40,6 +40,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { directoryForGraph } from "../schemas/kg/cat-harness.ts";
+import { requireHarnessRoot } from "../schemas/harness-root.ts";
 import { readRoleGraph } from "../schemas/process/role-graph.js";
 import {
   buildTestRun,
@@ -63,9 +64,9 @@ import { assertBenchmarkOutputPath } from "./benchmark-guard.ts";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const TOOLS_ROOT = resolve(SCRIPT_DIR, "..");
-export const HARNESS_ROOT = dirname(
-  dirname(dirname(fileURLToPath(import.meta.resolve("../schemas/kg/cat-harness.ts")))),
-);
+// The harness is found through harness-root.ts since bean `8lcl` moved its
+// schemas here; resolving a schema module would now land in cat-harness-tools.
+export const HARNESS_ROOT = requireHarnessRoot();
 
 export const DEFAULT_BENCHMARK_OUT_DIR = join(
   TOOLS_ROOT,

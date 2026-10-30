@@ -158,6 +158,7 @@ import {
   declaredSubgraph,
   subgraphSourceOverrides,
   type DeclaredSubgraph,
+  implementingRootFor,
 } from "../schemas/kg/harness-config.js";
 import { contentSourceContext, contentSourceJsonLd, resolveSubgraphSource, type SubgraphSource } from "../schemas/kg/subgraph-source.js";
 import { subgraphIri } from "./subgraph-node.js";
@@ -2241,7 +2242,10 @@ function collectTools(
  * artefact true, which is the question a reader of a schema node actually has.
  */
 function collectSchemas(doc: string, base: string, scope: CorpusScope = "checkout"): Node[] {
-  const audit = auditSchemaNodes(ROOT, scope);
+  // Bean `8lcl`: the harness's schema modules live in the layer that implements
+  // it, so the Schema nodes are read there; their module paths are unchanged.
+  // declared-path-literal: a probe for which layer implements the harness, not a read of the file.
+  const audit = auditSchemaNodes(implementingRootFor(ROOT, "schemas/kg/cat-harness.ts"), scope);
 
   // Tool → artefact, inverted once so each schema node can name its keeper.
   const keeper = new Map<string, string[]>();

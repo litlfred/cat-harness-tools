@@ -141,7 +141,7 @@ describe("the reason the page has to say that is still true", () => {
   });
 
   test("`sync` is optional, so a Docker-only wrapper need not claim a strategy", () => {
-    expect(readFileSync(join(ROOT, "schemas/kg/skill-package.ts"), "utf8")).toContain(
+    expect(readFileSync(join(implementingRootFor(ROOT, "schemas/kg/skill-package.ts"), "schemas/kg/skill-package.ts"), "utf8")).toContain(
       "sync: RemoteSyncConfigSchema.optional()",
     );
   });
