@@ -37,6 +37,8 @@ const tree: Array<[string, string]> = [
   ["_layouts/wide.html", "{% include wide_nav.html %}"],
   ["_includes/wide_nav.html", "<nav>"],
   ["reference/kinds.md", "---\n---\n{% for k in site.data.node-kinds.kinds %}{{k}}{% endfor %}"],
+  ["assets/js/harness-data.liquid", "---\nlayout: null\npermalink: /assets/js/harness-data.js\n---\n{{ site.data.harness.tiles | jsonify }}"],
+  ["assets/harness/tiles.json", "---\nlayout: null\npermalink: /assets/harness/tiles.json\n---\n{{ site.data.harness.tiles | jsonify }}"],
 ];
 const theme = new Set(["head_custom.html", "title.html"]);
 const ix = indexSite(tree, theme);
@@ -91,6 +93,22 @@ describe("docsRenderedImpact", () => {
       "content:index.html",
     ]);
     expect(paths(docsRenderedImpact(opts(["cat-harness/docs/_data/node-kinds.json"])))).toContain("content:reference/kinds.html");
+  });
+
+  test("Liquid-rendered non-HTML templates (.liquid, .json with front matter) render at their permalink as data, without touching the search index", () => {
+    expect(paths(docsRenderedImpact(opts(["cat-harness/docs/_data/harness.json"])))).toEqual([
+      "data:assets/harness/tiles.json",
+      "data:assets/js/harness-data.js",
+    ]);
+    expect(
+      paths(
+        docsRenderedImpact(
+          opts(["cat-harness/site-chrome/assets/js/harness-data.liquid"], {
+            read: () => "---\nlayout: null\npermalink: /assets/js/harness-data.js\n---\nbody",
+          }),
+        ),
+      ),
+    ).toEqual(["data:assets/js/harness-data.js"]);
   });
 
   test("an include the THEME defines, one nothing calls, or one a layout calls, can change any page", () => {

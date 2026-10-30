@@ -92,6 +92,13 @@ describe("this checkout", () => {
     const j = analyse();
     expect(j.findings.filter((f) => f.kind !== "layering-gap")).toEqual([]);
   });
+  it("resolves scope: 'repository' directories against the checkout root, not the declaring instance", () => {
+    const ch = readTree().find((i) => i.name === "cat-harness");
+    expect(ch).toBeDefined();
+    expect(ch!.dirs.find((d) => d.id === "beans")?.path).toBe("beans/");
+    expect(ch!.dirs.find((d) => d.id === "todos")?.path).toBe("todos/");
+    expect(ch!.dirs.find((d) => d.id === "health")?.path).toBe("test/health/results/");
+  });
 });
 
 describe("the rendering order, derived from the edges", () => {
