@@ -130,9 +130,11 @@ describe("criterionSourceHash", () => {
       VOICE_CHECKERS,
       "voice-scholarly-default",
     );
-    const wall = criterionSourceHash(VOICE_CHECKERS, "wall-side-correct");
+    // `voice-ai-slop`, not `wall-side-correct`: that checker moved to the
+    // science layer (bean saqd, row 9) and is no longer in this module.
+    const slop = criterionSourceHash(VOICE_CHECKERS, "voice-ai-slop");
     expect(scholarly).toBeTruthy();
-    expect(wall).toBeTruthy();
-    expect(scholarly).not.toBe(wall);
+    expect(slop).toBeTruthy();
+    expect(scholarly).not.toBe(slop);
   });
 });
