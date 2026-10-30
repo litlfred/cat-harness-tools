@@ -6,7 +6,7 @@ status: in-progress
 type: feature
 priority: normal
 created_at: 2026-10-29T12:10:00Z
-updated_at: 2026-10-29T12:10:00Z
+updated_at: 2026-10-30T13:35:00Z
 ---
 
 Governing issue: litlfred/folio-assistant#875. Spec: the spec-kit comment on that issue, Adjudicated by the owner 2026-10-29 11:33Z (card "A. Accept all four, then build"):
@@ -25,3 +25,5 @@ Definition: litlfred/cat-harness `tools/skill-update/` and the `skill-update` pe
 - [ ] Graduation (FR-013): the accepted FRs become `req:*` statements with tests
 
 Session: https://claude.ai/code/session_01Qmmkt7rXCDPexdBbNqeJqU
+
+_2026-10-30T13:35:00Z_ — Filed: litlfred/cat-harness#727 (merged c53d772) adds `skills/requirements/skill-update.json`, `req:skill-update`, `status: proposed`, from the adjudicated spec (filing at adjudication, owner 2026-10-30 option E on cat-harness#686). SC-001 to SC-004 keep their spec keys. The graduation box stays open: `status` flips to `in-force` once FR-005 is settled and built. FR-005's open question (where the activity is persisted, and whether refusals are logged) is the one thing left, and it needs the owner. (https://claude.ai/code/session_01Qmmkt6TFC8Yd4jePf6WnBv)
