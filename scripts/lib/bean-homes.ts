@@ -7,7 +7,7 @@
  * rule is stated once.
  *
  * - `cat-tools-*` and the beans cat-harness-tools took → cat-harness-tools `main`.
- * - `folio-core-*` and the beans folio-assistant-core took → folio-assistant-core `main`.
+ * - `folio-core-*` and the beans the core content layer took → its `main`, at https://github.com/litlfred/folio-assistant-core.
  * - Every other bean → `litlfred/folio-assistant`, branch `cat/cat-harness/beans`.
  *
  * `litlfred/cat-harness`'s `cat/cat-harness/beans` is RETIRED: it keeps its
@@ -19,12 +19,20 @@ import { spawnSync } from "node:child_process";
 
 export type StoreSpec = { name: string; repo: string; branch: string; path: string };
 
+/**
+ * The core content layer's store, given by its ADDRESS. This layer sits below
+ * that one, so it may say where the store is but not name the layer
+ * (`check:reference-direction`); the store's name is its repository's.
+ */
+const CORE_REPO = repoOfUrl("https://github.com/litlfred/folio-assistant-core")!;
+const CORE_STORE = CORE_REPO.slice(CORE_REPO.indexOf("/") + 1);
+
 // declared-path-literal: these name folders in OTHER repositories' trees, read over git; no declaration in this checkout answers them.
 export const DEFAULT_STORES: StoreSpec[] = [
   { name: "folio-assistant", repo: "litlfred/folio-assistant", branch: "cat/cat-harness/beans", path: "beans/defs" },
   { name: "cat-harness", repo: "litlfred/cat-harness", branch: "cat/cat-harness/beans", path: "beans/defs" },
   { name: "cat-harness-tools", repo: "litlfred/cat-harness-tools", branch: "main", path: "beans/defs" },
-  { name: "folio-assistant-core", repo: "litlfred/folio-assistant-core", branch: "main", path: "beans/defs" },
+  { name: CORE_STORE, repo: CORE_REPO, branch: "main", path: "beans/defs" },
 ];
 
 /** The store that keeps whatever no layer took (owner, 2026-10-20). */
@@ -32,16 +40,16 @@ export const MAIN_STORE = "folio-assistant";
 /** Prefixes that already name their home. */
 export const PREFIX_HOME: Record<string, string> = {
   "cat-tools-": "cat-harness-tools",
-  "folio-core-": "folio-assistant-core",
+  "folio-core-": CORE_STORE,
 };
 /** Layers whose copies of `folio-assistant-*` beans mark where those beans belong. */
-export const LAYERS = ["cat-harness-tools", "folio-assistant-core"];
+export const LAYERS = ["cat-harness-tools", CORE_STORE];
 /** Stores that keep no bean files any more (owner, 2026-10-30, #459 card Q4 "A"). */
 export const RETIRED_STORES = ["cat-harness"];
 
 /** One line naming where beans go instead of a retired store. */
 export const HOMES_LINE =
-  "each bean has one home (cat-harness-tools#459): cat-tools-* beans on litlfred/cat-harness-tools main, folio-core-* on litlfred/folio-assistant-core main, every other bean on litlfred/folio-assistant branch cat/cat-harness/beans";
+  `each bean has one home (cat-harness-tools#459): cat-tools-* beans on litlfred/cat-harness-tools main, folio-core-* on ${CORE_REPO} main, every other bean on litlfred/folio-assistant branch cat/cat-harness/beans`;
 
 /** `owner/repo` from a remote URL (https, ssh, or a proxy path ending in `owner/repo[.git]`). */
 export function repoOfUrl(url: string): string | undefined {
