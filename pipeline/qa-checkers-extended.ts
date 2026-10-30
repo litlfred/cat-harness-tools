@@ -24,7 +24,7 @@
 
 import { folioDirDeferred } from "../schemas/kg/cat-harness.js";
 // The `proof-*` checkers (including `checkProofNoTrivialSkeleton`, which calls
-// `stripLeanComments`) moved to `folio-assistant-sci/pipeline/qa-checkers-extended.ts`
+// `stripLeanComments`) moved to the sci layer (https://github.com/litlfred/folio-assistant-sci/blob/main/pipeline/qa-checkers-extended.ts)
 // (bean `saqd` Group 8).
 import { existsSync, readFileSync, readdirSync } from "fs";
 import type { CheckerPaths, CheckerHit, CheckerResult } from "../schemas/sdlc/block-qa.ts";
