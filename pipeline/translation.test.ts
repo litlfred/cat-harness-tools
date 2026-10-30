@@ -833,7 +833,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { poContextKey } from "./po-inject";
 import { renderBlockMarkdown, buildDocumentMarkdown } from "./render-markdown";
-import { renderBlock, renderChapter } from "./render-latex";
+import { renderBlock } from "./render-latex";
 import { measureBlock, buildReport } from "./translation-block-qa";
 
 describe("bean h11k — G1: math protection through extraction and injection", () => {

@@ -22,7 +22,7 @@ import { z } from "zod";
 import { createHash } from "crypto";
 
 import { extractMarkdown, extractFromManifest, formatPot, type PotEntry } from "../../pipeline/pot-extract.js";
-import { parsePo, injectMarkdown, poContextKey } from "../../pipeline/po-inject.js";
+import { parsePo, injectMarkdown } from "../../pipeline/po-inject.js";
 /**
  * The declared `translation-sources` graph — where a translator's `.pot` and
  * `.po` live. Falls back to the convention because extraction CREATES the
