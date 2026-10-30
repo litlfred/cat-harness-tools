@@ -86,6 +86,8 @@ import { LICENCE_FILENAME } from "../pipeline/gen-library-jsonld.ts";
 import { TITLE_CORRECTION_FILE } from "../pipeline/library-title.ts";
 import { COVER_FILENAME } from "./library-graph.ts";
 import { NARRATIVE_BEARING, narrativesIn } from "./narratives.ts";
+import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
+import { readHarnessConfig, TranslationConfigSchema } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 
 /**
  * A slot's state(s) for a one-line detail: one state for the single form,
@@ -562,6 +564,56 @@ export function declaredFigureCaptions(sectionsDir: string): Map<string, string 
     }
   }
   return figures;
+}
+
+/**
+ * The locales an entry's narratives are owed in: the `translation.supportedLocales`
+ * its instance declares, else the schema's default (the six UN languages).
+ *
+ * Bean `d5f1`'s Done-when is *"a description per configured language"*. The
+ * gate used to ask only whether an image had ANY narrative, so an entry whose
+ * figures were described in English alone read `met`: on 2026-10-30 the drain
+ * reported "0 remaining English-only figures" while smart-ra's copy of the
+ * DPI-H reference architecture held 31, which nothing could see.
+ *
+ * The entry is `<instance>/library/<slug>`, so its instance is two levels up.
+ */
+export function entryLocales(dir: string): string[] {
+  let raw: unknown = {};
+  try {
+    raw = (readHarnessConfig(resolve(dir, "..", "..")) as { translation?: unknown } | null)?.translation ?? {};
+  } catch {
+    raw = {};
+  }
+  const parsed = TranslationConfigSchema.safeParse(raw);
+  return (parsed.success ? parsed.data : TranslationConfigSchema.parse({})).supportedLocales;
+}
+
+/**
+ * Which of these images lack an authored narrative in which locale: `images`
+ * counts the images with any gap, `byLocale` how many miss each locale (only a
+ * locale with a gap is in it). An entry with no `lang` is in
+ * {@link DEFAULT_NARRATIVE_LANG}, as `narrativeFor` reads it; a `not-authored`
+ * entry covers nothing.
+ */
+export function localeGaps(
+  images: readonly { narrative?: NarrativeSlot }[],
+  locales: readonly string[],
+): { images: number; byLocale: Map<string, number> } {
+  const byLocale = new Map<string, number>();
+  let short = 0;
+  for (const img of images) {
+    if (img.narrative === undefined) continue;
+    const have = new Set(
+      narrativesOfSlot(img.narrative)
+        .filter((n) => n.state !== "not-authored")
+        .map((n) => n.lang ?? DEFAULT_NARRATIVE_LANG),
+    );
+    const missing = locales.filter((l) => !have.has(l));
+    if (missing.length) short++;
+    for (const l of missing) byLocale.set(l, (byLocale.get(l) ?? 0) + 1);
+  }
+  return { images: short, byLocale };
 }
 
 export function entryKind(has: (file: string) => boolean): EntryKind {
@@ -1342,13 +1394,29 @@ function derivableRequirements(dir: string, registry: GraphTypologyRegistry = de
               });
             }
           } else {
-            out.push({
-              name: "image-descriptions",
-              state: "met",
-              detail:
-                `${parsed.images.length} image(s), ${describable.length} describable ` +
-                `and all described.${declaredNote}`,
-            });
+            // Described — but in every configured language? Bean `d5f1`'s
+            // Done-when is one description per language, and a figure
+            // described in English alone is not that. Still QA-only
+            // (`QA_ONLY`), so a missing translation never stops a publish.
+            const gaps = localeGaps(describable, entryLocales(dir));
+            if (gaps.images > 0) {
+              out.push({
+                name: "image-descriptions",
+                state: "unmet",
+                detail:
+                  `${parsed.images.length} image(s), ${describable.length} describable and all described, ` +
+                  `but ${gaps.images} lack a narrative in a configured language: ` +
+                  `${[...gaps.byLocale].map(([l, n]) => `${l} (${n})`).join(", ")}.${declaredNote}`,
+              });
+            } else {
+              out.push({
+                name: "image-descriptions",
+                state: "met",
+                detail:
+                  `${parsed.images.length} image(s), ${describable.length} describable ` +
+                  `and all described.${declaredNote}`,
+              });
+            }
           }
         }
       } catch (e) {
