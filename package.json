@@ -179,6 +179,8 @@
     "witness:conformance": "bun run cat-harness-tools/scripts/witness-conformance.ts",
     "check:kind-validators": "bun run cat-harness-tools/scripts/check-kind-validators.ts",
     "check:kind-validators:require-all": "bun run cat-harness-tools/scripts/check-kind-validators.ts --require-all",
+    "kind:json-schemas": "bun run cat-harness-tools/scripts/gen-kind-json-schemas.ts",
+    "kind:json-schemas:check": "bun run cat-harness-tools/scripts/gen-kind-json-schemas.ts --check",
     "check:library-qa": "bun run cat-harness-tools/scripts/check-library-qa.ts",
     "check:library-qa:check": "bun run cat-harness-tools/scripts/check-library-qa.ts --check",
     "check:uploads-retired": "bun run cat-harness-tools/scripts/check-uploads-retired.ts",

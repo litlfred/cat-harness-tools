@@ -22,7 +22,7 @@
  * `code` is the source field. Each `target` names the target term (`code`) and
  * the relationship between them. That is what makes the owner's requirement
  * cheap: an existing ConceptMap, R5 or R4, is representable here without loss
- * (`fromConceptMap` in `vocab-mapping-fhir.ts`), and a table can be produced as
+ * (`fromConceptMap` in the FHIR IG layer's `schemas/vocab-mapping-fhir.ts`), and a table can be produced as
  * a ConceptMap, lossily, with the loss reported (`toConceptMap`).
  *
  * ## Where the schema goes beyond a ConceptMap, and why

@@ -53,7 +53,7 @@
 
 const MD_HTML_COMMENT_RE = /<!--.*?-->/gs;
 const MD_IMAGE_RE = /!\[([^\]]*)\]\([^)]*\)/g;
-const MD_LINK_RE = /\[([^\]]+)\]\([^)]*\)/g;
+const MD_LINK_RE = /\[([^\]]+)\]\(([^)]*)\)/g;
 const MD_ANGLE_LINK_RE = /<https?:\/\/[^>]+>/g;
 const MD_INLINE_CODE_RE = /`[^`]+`/g;
 const MD_BOLD_RE = /\*{2,3}([^*]+)\*{2,3}/g;
@@ -162,6 +162,54 @@ export const MD_KRAMDOWN_ATTR_RE = /^\{[:%][^}]*\}\s*$/;
 const MD_KRAMDOWN_CONSUMING_RE = /^\{:\s*toc\s*\}$/;
 
 /**
+ * Opening line of a standalone LaTeX math/diagram environment in Markdown.
+ * Shared with `po-inject.ts` so both halves skip multi-line display math blocks.
+ */
+export const MD_MATH_ENV_OPEN_RE =
+  /^\\begin\{(equation\*?|align\*?|aligned|gather\*?|gathered|multline\*?|flalign\*?|[pbBvV]?matrix|cases|split|array|tikzcd|tikzpicture)\}/;
+
+/**
+ * Strip non-translatable tokens (math spans, inline-code placeholders, Liquid
+ * placeholders, and link tags) before counting letters in {@link isTranslatable}.
+ */
+export function stripNonTranslatableTokens(text: string): string {
+  return text
+    .replace(/\$\$[\s\S]+?\$\$/g, "")
+    .replace(/\\\[[\s\S]+?\\\]/g, "")
+    .replace(/\\begin\{([a-zA-Z]+\*?)\}[\s\S]*?\\end\{\1\}/g, "")
+    .replace(/\\\([\s\S]+?\\\)/g, "")
+    .replace(/(?<!\\|\$)\$(?!\$|\s)(?:\\.|[^$\\\n])*?(?<!\\|\s)\$(?!\$)/g, "")
+    .replace(/\{code\d+\}/g, "")
+    .replace(/\{lqd_[^{}\n]+\}/g, "")
+    .replace(/<\/?a\d+>/g, "");
+}
+
+/**
+ * Split the interior of a Markdown pipe-table row (`stripped.slice(1, -1)`)
+ * into cells without splitting on `|` inside inline code (`` `a | b` ``),
+ * inline math (`$|\psi|^2$`), or escaped pipes (`\|`).
+ */
+export function splitTableCells(rowInner: string): string[] {
+  const masked = rowInner
+    .replace(/\\./g, "  ")
+    .replace(MD_INLINE_CODE_RE, (m) => " ".repeat(m.length))
+    .replace(/\$\$[\s\S]+?\$\$/g, (m) => " ".repeat(m.length))
+    .replace(/(?<!\\|\$)\$(?!\$|\s)(?:\\.|[^$\\\n])*?(?<!\\|\s)\$(?!\$)/g, (m) =>
+      " ".repeat(m.length),
+    );
+  const cells: string[] = [];
+  let start = 0;
+  for (let i = 0; i < masked.length; i++) {
+    if (masked[i] === "|") {
+      cells.push(rowInner.slice(start, i));
+      start = i + 1;
+    }
+  }
+  cells.push(rowInner.slice(start));
+  return cells;
+}
+
+/**
  * Is there anything here a translator can act on?
  *
  * **A count of LETTERS, not of characters, and the difference is not cosmetic.**
@@ -234,9 +282,10 @@ export function isTranslatable(text: string): boolean {
   // goes from source 149 / translation 145 to 149 / **150**, short by four
   // becoming long by one. That was measured twice, on 2026-09-26 and again on
   // 2026-09-27 after `o29r` and `3mo4` moved 438 msgids between them.
-  if (MD_IDEOGRAPH_RE.test(text)) return true;
+  const prose = stripNonTranslatableTokens(text);
+  if (MD_IDEOGRAPH_RE.test(prose)) return true;
   let letters = 0;
-  for (const ch of text) {
+  for (const ch of prose) {
     if (/\p{L}/u.test(ch) && ++letters >= MD_MIN_TEXT_LETTERS) return true;
   }
   return false;
@@ -278,7 +327,18 @@ const LQD_PREFIX = "lqd_";
  * handling preserves the upstream `{lqd_expr}` convention for IG
  * Publisher compatibility.
  */
-export function cleanMarkdownText(text: string): string {
+export interface CleanedMarkdown {
+  text: string;
+  codeSpans: string[];
+  linkTargets: string[];
+}
+
+/**
+ * Clean markdown formatting while returning the extracted inline code spans
+ * and link targets so `po-inject.ts` can restore `{code0}`, `<a0>…</a0>`,
+ * etc. after translation lookup (G1 + G3).
+ */
+export function cleanMarkdownWithTokens(text: string): CleanedMarkdown {
   // Remove Liquid control tags first
   let result = text.replace(MD_LIQUID_TAG_RE, "");
 
@@ -291,56 +351,79 @@ export function cleanMarkdownText(text: string): string {
 
   // Remove HTML comments
   result = result.replace(MD_HTML_COMMENT_RE, "");
+
+  // Tokenise inline code spans FIRST so backticks protect `$`, `[...]`, `*`,
+  // `_`, and `<...>` inside code spans, and survive as `{code0}`, `{code1}`, ...
+  // in the extracted msgid (G3) while still giving surrounding emphasis a
+  // non-empty token between its markers (bean `3mo4`).
+  const codeSpans: string[] = [];
+  result = result.replace(MD_INLINE_CODE_RE, (m) => {
+    const idx = codeSpans.length;
+    codeSpans.push(m);
+    return `\x00CODE${idx}\x00`;
+  });
+
+  // Tokenise math spans BEFORE links, emphasis, and HTML tag stripping so
+  // `$a*b*c$`, subscripts `\sum_{\lambda_i}`, and `<`/`>` inside math
+  // survive untouched in the extracted msgid (G1).
+  const mathTokens: string[] = [];
+  const pushMath = (m: string): string => {
+    const idx = mathTokens.length;
+    mathTokens.push(m);
+    return `\x00MATH${idx}\x00`;
+  };
+  result = result.replace(/\$\$[\s\S]+?\$\$/g, pushMath);
+  result = result.replace(/\\\[[\s\S]+?\\\]/g, pushMath);
+  result = result.replace(/\\begin\{([a-zA-Z]+\*?)\}[\s\S]*?\\end\{\1\}/g, pushMath);
+  result = result.replace(/\\\([\s\S]+?\\\)/g, pushMath);
+  result = result.replace(
+    /(?<!\\|\$)\$(?!\$|\s)(?:\\.|[^$\\\n])*?(?<!\\|\s)\$(?!\$)/g,
+    pushMath,
+  );
+
   // Replace images with alt text
   result = result.replace(MD_IMAGE_RE, "$1");
-  // Replace links with link text
-  result = result.replace(MD_LINK_RE, "$1");
+
+  // Tokenise links as `<a0>text</a0>` while preserving target URLs for
+  // restoration on injection (G3) and allowing emphasis inside link text to
+  // be cleaned below.
+  const linkTargets: string[] = [];
+  result = result.replace(MD_LINK_RE, (_m, label: string, target: string) => {
+    const idx = linkTargets.length;
+    linkTargets.push(target);
+    return `\x00AOPEN${idx}\x00${label}\x00ACLOSE${idx}\x00`;
+  });
+
   // Remove angle-bracket autolinks
   result = result.replace(MD_ANGLE_LINK_RE, "");
-  // Tokenise inline code spans rather than removing them here, for the same
-  // reason the Liquid expressions above are tokenised: what follows strips
-  // emphasis, and emphasis WRAPPING a code span has to see something between its
-  // markers. Bean `3mo4`.
-  //
-  // Removing the span first left the emphasis pair empty, and `MD_BOLD_RE`
-  // requires `[^*]+` between its runs, so `**`x`**` became four literal
-  // asterisks in the msgid — noise the translator is asked to reproduce, and part
-  // of the catalogue key. Measured over 660 files / 46 780 msgids before the fix:
-  // **190** msgids carried a run of four or more asterisks, and the defect had
-  // already reached the translations — `es/skills.md` and `ru/architecture.md`
-  // among them, where a translator faithfully copied the asterisks across.
-  //
-  // The obvious alternative, stripping emphasis BEFORE removing code spans, is
-  // declined: it points the emphasis regexes at the inside of code spans, where
-  // `content/**/*.lean` lives. A token containing no `*` is unreachable by them
-  // by construction, which is a property rather than a case that happens to pass.
-  //
-  // Position is deliberately unchanged from the removal it replaces, so no other
-  // construct's handling moves. The pre-existing consequence — the link and image
-  // regexes above still reach inside a code span — is left as it is rather than
-  // fixed silently here.
-  const codeTokens: string[] = [];
-  result = result.replace(MD_INLINE_CODE_RE, () => `\x00CODE${codeTokens.push("") - 1}\x00`);
+
   // Strip bold/italic markers (keep content)
   result = result.replace(MD_BOLD_RE, "$1");
   result = result.replace(MD_ITALIC_STAR_RE, "$1");
   result = result.replace(MD_ITALIC_UNDER_RE, "$1");
-  // Now drop the code spans. The whitespace this leaves is NOT collapsed: 8188 of
-  // this instance's 46 780 msgids already contain a double space, so collapsing
-  // would rewrite 17.5 % of the corpus and obsolete that many catalogue entries —
-  // a corpus-wide reformatting decision rather than part of this fix.
-  for (let i = 0; i < codeTokens.length; i++) {
-    result = result.replace(`\x00CODE${i}\x00`, "");
-  }
-  // Remove remaining HTML tags
+
+  // Remove remaining HTML tags (before restoring `<a0>...</a0>` so link
+  // placeholders are not stripped as HTML tags)
   result = result.replace(MD_HTML_TAG_RE, "");
 
-  // Restore Liquid tokens as {lqd_expr} gettext variables
+  // Restore link placeholders, code placeholders, math spans, and Liquid tokens
+  result = result.replace(/\x00AOPEN(\d+)\x00/g, "<a$1>");
+  result = result.replace(/\x00ACLOSE(\d+)\x00/g, "</a$1>");
+  for (let i = 0; i < codeSpans.length; i++) {
+    result = result.replace(`\x00CODE${i}\x00`, `{code${i}}`);
+  }
+  for (let i = 0; i < mathTokens.length; i++) {
+    result = result.replace(`\x00MATH${i}\x00`, () => mathTokens[i]);
+  }
   for (let i = 0; i < lqdTokens.length; i++) {
-    result = result.replace(`\x00LQD${i}\x00`, `{${LQD_PREFIX}${lqdTokens[i]}}`);
+    result = result.replace(`\x00LQD${i}\x00`, () => `{${LQD_PREFIX}${lqdTokens[i]}}`);
   }
 
-  return result.trim();
+  return { text: result.trim(), codeSpans, linkTargets };
+}
+
+export function cleanMarkdownText(text: string): string {
+  return cleanMarkdownWithTokens(text).text;
 }
 
 // ── POT entry ───────────────────────────────────────────────────
@@ -372,6 +455,8 @@ export type PotEntryKind =
   // whose shape it cannot check.
   | "bpmn-label"
   | "manifest-title"
+  | "manifest-caption"
+  | "manifest-narrative"
   | "ui-string"
   // A glossary term's label, alternative label or definition
   // (the content core's glossary producer). Declared 2026-09-30: that
@@ -389,6 +474,8 @@ export interface PotEntry {
   msgid: string;
   /** Which construct it came from — see {@link PotEntryKind}. */
   kind: PotEntryKind;
+  /** Optional gettext context (e.g. manifest field name: "title", "caption"). */
+  msgctxt?: string;
   /** Published/context URL for Weblate (optional). */
   contextUrl?: string;
   /** Optional translator comment. */
@@ -419,6 +506,7 @@ export function extractMarkdown(md: string, source: string): PotEntry[] {
   let codeFence: string | null = null;
   let inHtmlBlock = false;
   let htmlCloseTag = "";
+  let inMathBlock: string | null = null;
   /**
    * The multi-line construct currently being accumulated.
    *
@@ -512,6 +600,9 @@ export function extractMarkdown(md: string, source: string): PotEntry[] {
     !MD_TABLE_SEP_RE.test(stripped) &&
     !MD_KRAMDOWN_ATTR_RE.test(stripped) &&
     !MD_CODE_FENCE_RE.test(stripped) &&
+    !stripped.startsWith("$$") &&
+    !stripped.startsWith("\\[") &&
+    !MD_MATH_ENV_OPEN_RE.test(stripped) &&
     !(stripped.startsWith("|") && stripped.endsWith("|"));
 
   let listRunStart: number | null = null;
@@ -599,6 +690,49 @@ export function extractMarkdown(md: string, source: string): PotEntry[] {
       continue;
     }
 
+    // --- Display math blocks ($$...$$, \[...\], \begin{env}...\end{env}) ---
+    if (inMathBlock !== null) {
+      if (stripped.includes(inMathBlock)) {
+        inMathBlock = null;
+      }
+      continue;
+    }
+    if (stripped.startsWith("$$")) {
+      const rest = stripped.slice(2);
+      const closeIdx = rest.indexOf("$$");
+      if (closeIdx === -1) {
+        flushPending();
+        inMathBlock = "$$";
+        continue;
+      }
+      if (rest.slice(closeIdx + 2).trim() === "") {
+        flushPending();
+        continue;
+      }
+    } else if (stripped.startsWith("\\[")) {
+      const rest = stripped.slice(2);
+      const closeIdx = rest.indexOf("\\]");
+      if (closeIdx === -1) {
+        flushPending();
+        inMathBlock = "\\]";
+        continue;
+      }
+      if (rest.slice(closeIdx + 2).trim() === "") {
+        flushPending();
+        continue;
+      }
+    } else {
+      const mathEnvMatch = stripped.match(MD_MATH_ENV_OPEN_RE);
+      if (mathEnvMatch) {
+        const closeToken = `\\end{${mathEnvMatch[1]}}`;
+        flushPending();
+        if (!stripped.includes(closeToken)) {
+          inMathBlock = closeToken;
+        }
+        continue;
+      }
+    }
+
     // --- Blank line: end of paragraph ---
     if (!stripped) {
       flushPending();
@@ -662,7 +796,7 @@ export function extractMarkdown(md: string, source: string): PotEntry[] {
     // --- Table rows: extract cell content ---
     if (stripped.startsWith("|") && stripped.endsWith("|")) {
       flushPending();
-      const cells = stripped.slice(1, -1).split("|");
+      const cells = splitTableCells(stripped.slice(1, -1));
       for (const cell of cells) {
         const text = cleanMarkdownText(cell.trim());
         if (isTranslatable(text)) {
@@ -706,26 +840,322 @@ export function extractMarkdown(md: string, source: string): PotEntry[] {
 
 // ── Block manifest extraction ───────────────────────────────────
 
+export interface ManifestNarrativeItem {
+  text?: string | null;
+  lang?: string;
+  state?: string;
+}
+
+export interface ManifestSectionInput {
+  title?: string;
+  label?: string;
+  subsections?: ManifestSectionInput[];
+}
+
+export interface ManifestInput {
+  title?: string;
+  label?: string;
+  kind?: string;
+  caption?: string;
+  abstract?: string;
+  narrative?: string | ManifestNarrativeItem | ManifestNarrativeItem[];
+  defaultView?: { title?: string };
+  views?: Array<{ title?: string }>;
+  sections?: ManifestSectionInput[];
+  chapters?: Array<{ dir?: string; partTitle?: string }>;
+  _lines?: Record<string, number>;
+}
+
 /**
- * Extract translatable strings from a block manifest (.ts).
- * Extracts the `title` field if present.
+ * Unescape a JavaScript/TypeScript string literal body.
+ */
+function unescapeTsString(raw: string): string {
+  return raw
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, "\t")
+    .replace(/\\r/g, "\r")
+    .replace(/\\(['"`\\])/g, "$1");
+}
+
+/**
+ * Parse translatable fields from a `.ts` manifest source string without
+ * executing it. Used when `extractFromManifest` is handed raw `.ts` source
+ * text by `translation_extract`, `translation_validate`, or `simulate-translation`.
+ */
+export function parseManifestSource(tsSource: string): ManifestInput {
+  const out: ManifestInput = { _lines: {} };
+  const lineAt = (offset: number): number => {
+    let n = 1;
+    for (let i = 0; i < offset && i < tsSource.length; i++) {
+      if (tsSource[i] === "\n") n++;
+    }
+    return n;
+  };
+
+  // Detect builder function name: `export default definition({ ... })`
+  const builderMatch = tsSource.match(/export\s+default\s+([A-Za-z_]\w*)\s*\(/);
+  if (builderMatch) {
+    out.kind = builderMatch[1];
+  }
+
+  // Helper to match a string property `propName: "..."` | `'...'` | `` `...` ``
+  const readTopString = (prop: string): { value: string; line: number } | undefined => {
+    const re = new RegExp(
+      `(?:^|[,{\\s])\\b${prop}\\s*:\\s*(?:"((?:\\\\.|[^"\\\\])*)"|'((?:\\\\.|[^'\\\\])*)'|\`((?:\\\\.|[^\`\\\\])*)\`)`,
+      "m",
+    );
+    const m = re.exec(tsSource);
+    if (!m) return undefined;
+    const raw = m[1] ?? m[2] ?? m[3] ?? "";
+    return { value: unescapeTsString(raw), line: lineAt(m.index) };
+  };
+
+  const labelProp = readTopString("label");
+  if (labelProp) out.label = labelProp.value;
+
+  const kindProp = readTopString("kind");
+  if (kindProp) out.kind = kindProp.value;
+
+  // For `title`, avoid matching `defaultView: { title: ... }` as the top-level title
+  // by checking top-level `title:` before `defaultView` / `views` / `sections` or at indent <= 4.
+  const titleRe = /^[ \t]{0,4}title\s*:\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|`((?:\\.|[^`\\])*)`)/m;
+  const titleMatch = titleRe.exec(tsSource) ?? readTopString("title");
+  if (titleMatch) {
+    if ("value" in titleMatch) {
+      out.title = titleMatch.value;
+      out._lines!["title"] = titleMatch.line;
+    } else {
+      out.title = unescapeTsString(titleMatch[1] ?? titleMatch[2] ?? titleMatch[3] ?? "");
+      out._lines!["title"] = lineAt(titleMatch.index);
+    }
+  }
+
+  const captionProp = readTopString("caption");
+  if (captionProp) {
+    out.caption = captionProp.value;
+    out._lines!["caption"] = captionProp.line;
+  }
+
+  const abstractProp = readTopString("abstract");
+  if (abstractProp) {
+    out.abstract = abstractProp.value;
+    out._lines!["abstract"] = abstractProp.line;
+  }
+
+  // defaultView: { ... title: "..." ... }
+  const dvMatch = /defaultView\s*:\s*\{([\s\S]*?)\}/m.exec(tsSource);
+  if (dvMatch) {
+    const dvTitle = /\btitle\s*:\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|`((?:\\.|[^`\\])*)`)/m.exec(
+      dvMatch[1],
+    );
+    if (dvTitle) {
+      out.defaultView = {
+        title: unescapeTsString(dvTitle[1] ?? dvTitle[2] ?? dvTitle[3] ?? ""),
+      };
+      out._lines!["defaultView.title"] = lineAt(dvMatch.index + (dvTitle.index ?? 0));
+    }
+  }
+
+  // views: [ { ... title: "..." ... }, ... ]
+  const viewsMatch = /\bviews\s*:\s*\[([\s\S]*?)\]/m.exec(tsSource);
+  if (viewsMatch) {
+    const viewsBody = viewsMatch[1];
+    const viewTitleRe =
+      /\btitle\s*:\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|`((?:\\.|[^`\\])*)`)/gm;
+    const views: Array<{ title?: string }> = [];
+    let vm: RegExpExecArray | null;
+    let idx = 0;
+    while ((vm = viewTitleRe.exec(viewsBody)) !== null) {
+      views.push({
+        title: unescapeTsString(vm[1] ?? vm[2] ?? vm[3] ?? ""),
+      });
+      out._lines![`views[${idx}].title`] = lineAt(viewsMatch.index + vm.index);
+      idx++;
+    }
+    if (views.length > 0) out.views = views;
+  }
+
+  // narrative: "..." or { ... text: "..." } or [ { ... text: "..." } ]
+  const narrStrProp = readTopString("narrative");
+  if (narrStrProp) {
+    out.narrative = narrStrProp.value;
+    out._lines!["narrative.text"] = narrStrProp.line;
+  } else {
+    const narrMatch = /\bnarrative\s*:\s*(\[[\s\S]*?\]|\{[\s\S]*?\})/m.exec(tsSource);
+    if (narrMatch) {
+      const narrBody = narrMatch[1];
+      const textMatch =
+        /\btext\s*:\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|`((?:\\.|[^`\\])*)`)/m.exec(
+          narrBody,
+        );
+      if (textMatch) {
+        out.narrative = {
+          text: unescapeTsString(textMatch[1] ?? textMatch[2] ?? textMatch[3] ?? ""),
+        };
+        out._lines!["narrative.text"] = lineAt(narrMatch.index + textMatch.index);
+      }
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Extract translatable strings from a block, chapter, section, or paper
+ * manifest (either a parsed manifest object or raw `.ts` source text).
+ *
+ * Extracts:
+ * - `title` (`msgctxt: "title"`)
+ * - `caption` on `diagram`, `table`, `figure` (`msgctxt: "caption"`)
+ * - `narrative.text` on `figure` (`msgctxt: "narrative.text"`)
+ * - `defaultView.title` and `views[i].title` on `simulator`
+ * - `abstract` and `chapters[i].partTitle` on `Paper`
+ * - `sections[i].title` (and nested `subsections`) on `Chapter` / `Section`
  */
 export function extractFromManifest(
-  manifest: { title?: string; label: string; kind?: string },
+  manifestOrSource: ManifestInput | string,
   sourcePath: string,
+  line: number = 1,
 ): PotEntry[] {
+  const manifest: ManifestInput =
+    typeof manifestOrSource === "string"
+      ? parseManifestSource(manifestOrSource)
+      : manifestOrSource;
   const entries: PotEntry[] = [];
-  if (manifest.title) {
+  const lineFor = (ctx: string): number => manifest._lines?.[ctx] ?? line;
+
+  const pushEntry = (
+    raw: string | undefined | null,
+    msgctxt: string,
+    kind: PotEntryKind,
+    comment: string,
+  ): void => {
+    if (!raw || typeof raw !== "string") return;
+    const cleaned = cleanMarkdownText(raw);
+    if (!cleaned) return;
     entries.push({
       source: sourcePath,
-      line: 1,
-      msgid: manifest.title,
-      kind: "manifest-title",
-      comment: manifest.kind
-        ? `Title of ${manifest.kind} block "${manifest.label}"`
-        : `Title of block "${manifest.label}"`,
+      line: lineFor(msgctxt),
+      msgid: cleaned,
+      msgctxt,
+      kind,
+      comment,
     });
+  };
+
+  if (manifest.title) {
+    const comment = manifest.kind
+      ? `Title of ${manifest.kind} block "${manifest.label ?? ""}"`
+      : `Title of block "${manifest.label ?? ""}"`;
+    pushEntry(manifest.title, "title", "manifest-title", comment);
   }
+
+  if (manifest.caption) {
+    const comment = manifest.kind
+      ? `Caption of ${manifest.kind} block "${manifest.label ?? ""}"`
+      : `Caption of block "${manifest.label ?? ""}"`;
+    pushEntry(manifest.caption, "caption", "manifest-caption", comment);
+  }
+
+  if (manifest.narrative) {
+    let narrativeText: string | undefined;
+    if (typeof manifest.narrative === "string") {
+      narrativeText = manifest.narrative;
+    } else if (Array.isArray(manifest.narrative)) {
+      const enEntry =
+        manifest.narrative.find(
+          (n) =>
+            n &&
+            n.state !== "not-authored" &&
+            typeof n.text === "string" &&
+            (!n.lang || n.lang === "en" || n.lang.toLowerCase().startsWith("en-")),
+        ) ??
+        manifest.narrative.find(
+          (n) => n && n.state !== "not-authored" && typeof n.text === "string" && n.text.length > 0,
+        );
+      if (enEntry?.text) narrativeText = enEntry.text;
+    } else if (
+      typeof manifest.narrative === "object" &&
+      manifest.narrative.state !== "not-authored" &&
+      typeof manifest.narrative.text === "string"
+    ) {
+      narrativeText = manifest.narrative.text;
+    }
+    if (narrativeText) {
+      const comment = manifest.kind
+        ? `Narrative of ${manifest.kind} block "${manifest.label ?? ""}"`
+        : `Narrative of block "${manifest.label ?? ""}"`;
+      pushEntry(narrativeText, "narrative.text", "manifest-narrative", comment);
+    }
+  }
+
+  if (manifest.defaultView?.title) {
+    pushEntry(
+      manifest.defaultView.title,
+      "defaultView.title",
+      "manifest-title",
+      `Default view title of simulator "${manifest.label ?? ""}"`,
+    );
+  }
+
+  if (Array.isArray(manifest.views)) {
+    for (let i = 0; i < manifest.views.length; i++) {
+      const v = manifest.views[i];
+      if (v?.title) {
+        pushEntry(
+          v.title,
+          `views[${i}].title`,
+          "manifest-title",
+          `View ${i} title of simulator "${manifest.label ?? ""}"`,
+        );
+      }
+    }
+  }
+
+  if (manifest.abstract) {
+    pushEntry(
+      manifest.abstract,
+      "abstract",
+      "manifest-narrative",
+      `Abstract of "${manifest.title ?? sourcePath}"`,
+    );
+  }
+
+  const walkSections = (sections: ManifestSectionInput[] | undefined, prefix: string): void => {
+    if (!Array.isArray(sections)) return;
+    for (let i = 0; i < sections.length; i++) {
+      const sec = sections[i];
+      if (!sec || typeof sec !== "object") continue;
+      const ctx = sec.label ? `section:${sec.label}:title` : `${prefix}[${i}].title`;
+      if (sec.title) {
+        pushEntry(
+          sec.title,
+          ctx,
+          "manifest-title",
+          `Title of section "${sec.label ?? sec.title}"`,
+        );
+      }
+      if (Array.isArray(sec.subsections)) {
+        walkSections(sec.subsections, `${prefix}[${i}].subsections`);
+      }
+    }
+  };
+  walkSections(manifest.sections, "sections");
+
+  if (Array.isArray(manifest.chapters)) {
+    for (let i = 0; i < manifest.chapters.length; i++) {
+      const ch = manifest.chapters[i];
+      if (ch?.partTitle) {
+        pushEntry(
+          ch.partTitle,
+          `chapters[${i}].partTitle`,
+          "manifest-title",
+          `Part title before chapter "${ch.dir ?? i}"`,
+        );
+      }
+    }
+  }
+
   return entries;
 }
 
@@ -734,21 +1164,23 @@ export function extractFromManifest(
 /**
  * Format POT entries into a GNU gettext POT file string.
  *
- * Deduplicates entries with the same msgid (merging source references),
- * matching upstream `write_pot()` behaviour.
+ * Deduplicates entries with the same (msgctxt, msgid) pair (merging source
+ * references), matching upstream `write_pot()` behaviour.
  */
 export function formatPot(entries: PotEntry[], metadata?: {
   projectName?: string;
   locale?: string;
 }): string {
-  // Deduplicate by msgid
+  // Deduplicate by (msgctxt, msgid) so distinct manifest fields that happen
+  // to share an English string remain distinct entries when msgctxt differs.
   const deduped = new Map<string, PotEntry[]>();
   for (const entry of entries) {
-    const existing = deduped.get(entry.msgid);
+    const key = entry.msgctxt ? `${entry.msgctxt}\x04${entry.msgid}` : entry.msgid;
+    const existing = deduped.get(key);
     if (existing) {
       existing.push(entry);
     } else {
-      deduped.set(entry.msgid, [entry]);
+      deduped.set(key, [entry]);
     }
   }
 
@@ -779,8 +1211,10 @@ export function formatPot(entries: PotEntry[], metadata?: {
   );
 
   const body = sortedKeys
-    .map((msgid) => {
-      const locations = deduped.get(msgid)!;
+    .map((key) => {
+      const locations = deduped.get(key)!;
+      const first = locations[0];
+      const msgid = first.msgid;
       const parts: string[] = [];
 
       // Source references
@@ -794,12 +1228,17 @@ export function formatPot(entries: PotEntry[], metadata?: {
         if (loc.contextUrl) parts.push(`#. URL: ${loc.contextUrl}`);
       }
 
-      // Check for python-brace-format flag (Liquid variables)
-      const hasLqdVars = /\{lqd_[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\}/.test(msgid);
-      if (hasLqdVars) {
+      // Check for python-brace-format flag (Liquid variables or inline-code placeholders)
+      const hasBraceVars =
+        /\{lqd_[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\}/.test(msgid) ||
+        /\{code\d+\}/.test(msgid);
+      if (hasBraceVars) {
         parts.push("#, python-brace-format");
       }
 
+      if (first.msgctxt) {
+        parts.push(`msgctxt ${potQuote(first.msgctxt)}`);
+      }
       parts.push(`msgid ${potQuote(msgid)}`);
       parts.push(`msgstr ""`);
 

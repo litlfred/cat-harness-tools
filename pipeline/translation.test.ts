@@ -84,9 +84,9 @@ describe("cleanMarkdownText", () => {
     expect(cleanMarkdownText("(_parenthesised_)")).toBe("(parenthesised)");
   });
 
-  test("replaces links with link text", () => {
+  test("replaces links with indexed <aN> placeholders (G3)", () => {
     expect(cleanMarkdownText("[click here](https://example.com)")).toBe(
-      "click here"
+      "<a0>click here</a0>"
     );
   });
 
@@ -94,8 +94,8 @@ describe("cleanMarkdownText", () => {
     expect(cleanMarkdownText("![alt text](image.png)")).toBe("alt text");
   });
 
-  test("removes inline code", () => {
-    expect(cleanMarkdownText("use `foo()` function")).toBe("use  function");
+  test("replaces inline code with indexed {codeN} placeholders (G3)", () => {
+    expect(cleanMarkdownText("use `foo()` function")).toBe("use {code0} function");
   });
 
   test("removes HTML comments", () => {
@@ -142,16 +142,17 @@ describe("cleanMarkdownText", () => {
 // The four rows the bean tabulated are pinned below, plus a fifth it did not
 // list and the case that proves the fix cannot reach inside a code span.
 
-describe("cleanMarkdownText — emphasis around a code span (bean `3mo4`)", () => {
+describe("cleanMarkdownText — emphasis around a code span (bean `3mo4` + G3)", () => {
   test("bold wrapping a code span leaves no asterisks", () => {
     // Was `"**** — fail if x"`. Now identical to the bare-code-span row below,
-    // which is the point: one construct, one answer.
-    expect(cleanMarkdownText("**`clarity-defn-single`** — fail if x")).toBe("— fail if x");
+    // which is the point: one construct, one answer. With G3 (`h11k`), the code
+    // span is preserved as `{code0}` rather than dropped.
+    expect(cleanMarkdownText("**`clarity-defn-single`** — fail if x")).toBe("{code0} — fail if x");
   });
 
   test("italic wrapping a code span leaves no asterisks", () => {
     // Not in the bean's table — found while reproducing it. Was `"** trailing"`.
-    expect(cleanMarkdownText("*`italic-code`* trailing")).toBe("trailing");
+    expect(cleanMarkdownText("*`italic-code`* trailing")).toBe("{code0} trailing");
   });
 
   test("bold around ordinary text is unaffected", () => {
@@ -159,59 +160,24 @@ describe("cleanMarkdownText — emphasis around a code span (bean `3mo4`)", () =
   });
 
   test("a bare code span is unaffected", () => {
-    expect(cleanMarkdownText("`code` — fail if x")).toBe("— fail if x");
+    expect(cleanMarkdownText("`code` — fail if x")).toBe("{code0} — fail if x");
   });
 
-  test("the construct TWICE in one string — and the double space is deliberate", () => {
-    // The bean asked for this row's spacing to be fixed as well. It is not, on
-    // purpose. The double space is not specific to this defect — removing ANY
-    // code span leaves one — and 8188 of this instance's 46780 msgids already
-    // contain a double space. Collapsing would rewrite 17.5 % of the corpus and
-    // obsolete that many catalogue entries, which is a reformatting decision for
-    // the owner rather than part of a bug fix. Pinned as it is so the choice is
-    // visible rather than forgotten.
-    expect(cleanMarkdownText("**`a`** and **`b`** both")).toBe("and  both");
+  test("the construct TWICE in one string preserves both code placeholders", () => {
+    expect(cleanMarkdownText("**`a`** and **`b`** both")).toBe("{code0} and {code1} both");
   });
 
   test("TWO bold runs, the first wrapping a code span, left the markers asymmetric", () => {
-    // The shape the bean did not have, and 19 of the 209 msgids this changed. It
-    // needs two emphasis runs to reproduce, which is why this fixture is the real
-    // line rather than a constructed one: my first attempt used a single run and
-    // produced identical output before and after, so it pinned nothing while its
-    // comment claimed to pin the defect. Taken verbatim from
-    // `docs/reference/skill-instructions/kg-navigation.md:70`.
-    //
-    // Emptying the FIRST run to `****` let `MD_BOLD_RE` start one character late
-    // and pair its opening `**` with the SECOND run's closing one, so it consumed
-    // the text between and left a single `*` at the front and `**` before the
-    // comma. Measured before the fix:
-    //   "* — every servable skill with its one-line summary**,"
     const real = "**`skill_list`** — every servable skill **with its one-line summary**,";
-    expect(cleanMarkdownText(real)).toBe("— every servable skill with its one-line summary,");
+    expect(cleanMarkdownText(real)).toBe("{code0} — every servable skill with its one-line summary,");
   });
 
   test("a glob INSIDE a code span is never reached by the emphasis regexes", () => {
-    // Why the repair tokenises rather than reordering. Stripping emphasis first
-    // would point `MD_BOLD_RE` at the inside of code spans, where
-    // `content/**/*.lean` lives. A token containing no `*` is unreachable by
-    // construction — a property, not a case that happens to pass.
-    //
-    // This passes on the OLD code too, and that is expected rather than a
-    // weakness: the old order removed the span whole, so the glob was safe there
-    // as well. It guards the repair that was NOT chosen — reordering the regexes —
-    // which is the one a later reader is most likely to reach for.
-    expect(cleanMarkdownText("see `content/**/*.lean` glob")).toBe("see  glob");
-    expect(cleanMarkdownText("`a/**/b` and `c/**/d`")).toBe("and");
+    expect(cleanMarkdownText("see `content/**/*.lean` glob")).toBe("see {code0} glob");
+    expect(cleanMarkdownText("`a/**/b` and `c/**/d`")).toBe("{code0} and {code1}");
   });
 
   test("over the REAL corpus: no msgid carries a run of four asterisks", () => {
-    // Measured before the fix: 190 did, across 660 files and 46780 msgids, and
-    // the defect had already reached the translations — a translator copied the
-    // asterisks into `es/skills.md` and `ru/architecture.md`.
-    //
-    // Asserted as ZERO rather than as a reduction, and separately from the 95
-    // msgids that carry `**` WITHOUT `****`: those are prose emphasis spanning a
-    // construct boundary, a different question that this must not touch.
     const root = resolve(HARNESS_ROOT);
     const docs = siteRoot(root);
     expect(docs).toBeDefined();
@@ -235,8 +201,9 @@ describe("cleanMarkdownText — emphasis around a code span (bean `3mo4`)", () =
     }
     expect(offenders).toEqual([]);
     // Anti-vacuity: a walk that found nothing would satisfy the line above.
-    expect(files.length).toBeGreaterThan(500);
-    expect(msgids).toBeGreaterThan(40000);
+    // Adjusted for M6–M8 moves (matching lines 327 and 798 below).
+    expect(files.length).toBeGreaterThan(300);
+    expect(msgids).toBeGreaterThan(20000);
   });
 });
 
@@ -857,5 +824,371 @@ describe("round-trip", () => {
     expect(result.translated).toContain("[FR] Introduction"); // heading translated
     expect(result.translated).toContain("[FR] First item in the list"); // list item translated
     expect(result.translated).toContain("[FR] A blockquote for emphasis."); // blockquote translated
+  });
+});
+
+// ── Bean h11k: G1, G3, G4, G5 ───────────────────────────────────
+
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { poContextKey } from "./po-inject";
+import { renderBlockMarkdown, buildDocumentMarkdown } from "./render-markdown";
+import { renderBlock } from "./render-latex";
+import { measureBlock, buildReport } from "./translation-block-qa";
+
+describe("bean h11k — G1: math protection through extraction and injection", () => {
+  test("inline math with asterisks $a*b*c$ is preserved verbatim", () => {
+    expect(cleanMarkdownText("Let $a*b*c$ be the product.")).toBe(
+      "Let $a*b*c$ be the product.",
+    );
+    expect(cleanMarkdownText("We have $f^* \\circ g^*$ and *italic* text.")).toBe(
+      "We have $f^* \\circ g^*$ and italic text.",
+    );
+  });
+
+  test("subscripts after closing braces in math survive", () => {
+    const src = "The group $\\pi_K = \\pi_1(S^3 \\setminus K)$ has presentation $\\langle g_1\\rangle_{i_0}$.";
+    expect(cleanMarkdownText(src)).toBe(src);
+  });
+
+  test("multi-line display math $$...$$ is skipped as a block, never split on '- x + y'", () => {
+    const md = [
+      "Consider the system:",
+      "",
+      "$$",
+      "\\begin{aligned}",
+      "  f(x) &= x^2 \\\\",
+      "  - x + y &= 0",
+      "\\end{aligned}",
+      "$$",
+      "",
+      "where $x, y \\in \\mathbb{R}$.",
+    ].join("\n");
+
+    const entries = extractMarkdown(md, "sys.md");
+    expect(entries.map((e) => e.msgid)).toEqual([
+      "Consider the system:",
+      "where $x, y \\in \\mathbb{R}$.",
+    ]);
+
+    const po = new Map([
+      ["Consider the system:", "Considérons le système :"],
+      ["where $x, y \\in \\mathbb{R}$.", "où $x, y \\in \\mathbb{R}$."],
+    ]);
+    const res = injectMarkdown(md, po);
+    expect(res.translated).toContain("Considérons le système :");
+    expect(res.translated).toContain("  - x + y &= 0");
+    expect(res.translated).toContain("où $x, y \\in \\mathbb{R}$.");
+  });
+
+  test("pure-math strings are excluded by isTranslatable", () => {
+    expect(isTranslatable("$x^2 + y^2 = z^2$")).toBe(false);
+    expect(isTranslatable("$$\\int_0^1 f(x)\\,dx$$")).toBe(false);
+    expect(isTranslatable("Let $x > 0$ be positive.")).toBe(true);
+  });
+
+  test("table cell containing $|\\psi|^2$ is not split at the pipe", () => {
+    const md = [
+      "| Quantity | Expression |",
+      "|---|---|",
+      "| Probability density | The norm $|\\psi|^2$ vanishes at the boundary |",
+    ].join("\n");
+
+    const entries = extractMarkdown(md, "table.md");
+    expect(entries.map((e) => e.msgid)).toContain(
+      "The norm $|\\psi|^2$ vanishes at the boundary",
+    );
+
+    const po = new Map([
+      ["Quantity", "Quantité"],
+      ["Expression", "Expression"],
+      ["Probability density", "Densité de probabilité"],
+      [
+        "The norm $|\\psi|^2$ vanishes at the boundary",
+        "La norme $|\\psi|^2$ s'annule sur le bord",
+      ],
+    ]);
+    const res = injectMarkdown(md, po);
+    expect(res.translated).toContain(
+      "| Densité de probabilité | La norme $|\\psi|^2$ s'annule sur le bord |",
+    );
+  });
+});
+
+describe("bean h11k — G3: inline-code and link placeholders", () => {
+  test("extracts {code0}, {code1} and <a0>...</a0> and restores them on inject", () => {
+    const md = "Call `compute(x)` and `verify(y)` as described in [Section 2](#sec:two).\n";
+    const entries = extractMarkdown(md, "api.md");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.msgid).toBe(
+      "Call {code0} and {code1} as described in <a0>Section 2</a0>.",
+    );
+
+    const pot = formatPot(entries);
+    expect(pot).toContain("#, python-brace-format");
+
+    const po = new Map([
+      [
+        "Call {code0} and {code1} as described in <a0>Section 2</a0>.",
+        "Appelez {code0} puis {code1} comme décrit dans la <a0>Section 2</a0>.",
+      ],
+    ]);
+    const res = injectMarkdown(md, po);
+    expect(res.translated.trim()).toBe(
+      "Appelez `compute(x)` puis `verify(y)` comme décrit dans la [Section 2](#sec:two).",
+    );
+  });
+
+  test("preserves standalone image ![alt](src) wrapper on inject", () => {
+    const md = "![Architecture overview](assets/arch.svg)\n";
+    const entries = extractMarkdown(md, "fig.md");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.msgid).toBe("Architecture overview");
+
+    const po = new Map([["Architecture overview", "Vue d'ensemble de l'architecture"]]);
+    const res = injectMarkdown(md, po);
+    expect(res.translated.trim()).toBe(
+      "![Vue d'ensemble de l'architecture](assets/arch.svg)",
+    );
+  });
+});
+
+describe("bean h11k — G4: extractFromManifest on objects, .ts sources, and QA pipeline", () => {
+  test("extracts title, caption, narrative, simulator views, and section titles with msgctxt", () => {
+    const tsSource = `
+import { simulator } from "../schema/builders";
+
+export default simulator({
+  label: "sim:wave-packet",
+  title: "Wave-Packet Dispersion",
+  caption: "Time evolution of $|\\\\psi(x, t)|^2$ under free propagation.",
+  narrative: "Adjust the initial momentum $k_0$ to observe dispersion.",
+  defaultView: {
+    title: "Gaussian wave packet",
+  },
+  views: [
+    { name: "narrow", title: "Narrow barrier" },
+    { name: "wide", title: "Wide barrier" },
+  ],
+});
+`;
+    const entries = extractFromManifest(tsSource, "wave-packet.ts");
+    expect(entries.map((e) => ({ msgid: e.msgid, msgctxt: e.msgctxt, kind: e.kind }))).toEqual([
+      { msgid: "Wave-Packet Dispersion", msgctxt: "title", kind: "manifest-title" },
+      {
+        msgid: "Time evolution of $|\\psi(x, t)|^2$ under free propagation.",
+        msgctxt: "caption",
+        kind: "manifest-caption",
+      },
+      {
+        msgid: "Adjust the initial momentum $k_0$ to observe dispersion.",
+        msgctxt: "narrative.text",
+        kind: "manifest-narrative",
+      },
+      { msgid: "Gaussian wave packet", msgctxt: "defaultView.title", kind: "manifest-title" },
+      { msgid: "Narrow barrier", msgctxt: "views[0].title", kind: "manifest-title" },
+      { msgid: "Wide barrier", msgctxt: "views[1].title", kind: "manifest-title" },
+    ]);
+
+    const pot = formatPot(entries);
+    expect(pot).toContain('msgctxt "title"');
+    expect(pot).toContain('msgctxt "caption"');
+    expect(pot).toContain('msgctxt "narrative.text"');
+
+    const parsed = parsePo(
+      [
+        'msgctxt "title"',
+        'msgid "Wave-Packet Dispersion"',
+        'msgstr "Dispersion du paquet d\'ondes"',
+        "",
+        'msgctxt "caption"',
+        'msgid "Time evolution of $|\\psi(x, t)|^2$ under free propagation."',
+        'msgstr "Évolution temporelle de $|\\psi(x, t)|^2$ en propagation libre."',
+      ].join("\n"),
+    );
+    expect(parsed.get(poContextKey("title", "Wave-Packet Dispersion"))).toBe(
+      "Dispersion du paquet d'ondes",
+    );
+    expect(parsed.get("Wave-Packet Dispersion")).toBe("Dispersion du paquet d'ondes");
+  });
+
+  test("measureBlock and buildReport include companion .ts manifest strings", () => {
+    const dir = mkdtempSync(join(tmpdir(), "h11k-qa-"));
+    try {
+      const mdPath = join(dir, "thm.md");
+      const tsPath = join(dir, "thm.ts");
+      const poPath = join(dir, "fr.po");
+      writeFileSync(
+        tsPath,
+        'export default theorem({ label: "thm:main", title: "Fundamental Theorem of Arithmetic" });\n',
+      );
+      writeFileSync(mdPath, "Every integer $n > 1$ factors uniquely into primes.\n");
+      writeFileSync(
+        poPath,
+        [
+          'msgid ""',
+          'msgstr ""',
+          '"Language: fr\\n"',
+          "",
+          'msgctxt "title"',
+          'msgid "Fundamental Theorem of Arithmetic"',
+          'msgstr "Théorème fondamental de l\'arithmétique"',
+          "",
+          'msgid "Every integer $n > 1$ factors uniquely into primes."',
+          'msgstr "Tout entier $n > 1$ se factorise de manière unique en nombres premiers."',
+        ].join("\n"),
+      );
+
+      const m = measureBlock(
+        readFileSync(mdPath, "utf-8"),
+        "thm.md",
+        parsePo(readFileSync(poPath, "utf-8")),
+        new Map(),
+        readFileSync(tsPath, "utf-8"),
+        "thm.ts",
+      );
+      expect(m.total).toBe(2);
+      expect(m.translated).toBe(2);
+
+      const report = buildReport(mdPath, "thm:main", "fr", [poPath]);
+      expect(report).toBeDefined();
+      expect(report!.criteria["translation-coverage"]![0]!.metrics).toMatchObject({
+        translated: 2,
+        total: 2,
+        pct: 100,
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("bean h11k — G5: translated block render path (Markdown & LaTeX)", () => {
+  test("renderBlockMarkdown and renderBlock translate block title, caption, kind heading, and .md body", () => {
+    const translations = parsePo(
+      [
+        'msgctxt "title"',
+        'msgid "Noether\'s Theorem"',
+        'msgstr "Théorème de Noether"',
+        "",
+        'msgid "Every differentiable symmetry of the action $S$ yields a conserved current {code0}."',
+        'msgstr "Chaque symétrie différentiable de l\'action $S$ engendre un courant conservé {code0}."',
+      ].join("\n"),
+    );
+
+    const entry = {
+      block: {
+        kind: "theorem" as const,
+        label: "thm:noether",
+        title: "Noether's Theorem",
+      } as never,
+      mdContent:
+        "Every differentiable symmetry of the action $S$ yields a conserved current `j^mu`.\n",
+    };
+
+    const mdOut = renderBlockMarkdown(entry, { locale: "fr", translations });
+    expect(mdOut).toContain("**Théorème.** *Théorème de Noether*");
+    expect(mdOut).toContain(
+      "Chaque symétrie différentiable de l'action $S$ engendre un courant conservé `j^mu`.",
+    );
+
+    const texOut = renderBlock(
+      entry.block,
+      entry.mdContent,
+      undefined,
+      "noether",
+      undefined,
+      { locale: "fr", translations },
+    );
+    expect(texOut).toContain("\\begin{theorem}[{Théorème de Noether}]");
+    expect(texOut).toContain(
+      "Chaque symétrie différentiable de l'action $S$ engendre un courant conservé \\texttt{j\\textasciicircum{}mu}.",
+    );
+  });
+
+  test("buildDocumentMarkdown resolves translations/<locale>/*.po via resolvePoSources and renders translated document", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "h11k-doc-"));
+    try {
+      const docDir = join(dir, "folio", "guideline");
+      const chDir = join(docDir, "ch1");
+      const trDir = join(dir, "translations", "fr");
+      mkdirSync(chDir, { recursive: true });
+      mkdirSync(trDir, { recursive: true });
+
+      writeFileSync(
+        join(docDir, "guideline.ts"),
+        `export default { title: "Clinical Guideline", chapters: [{ dir: "ch1" }] };\n`,
+      );
+      writeFileSync(
+        join(chDir, "ch1.ts"),
+        `export default {
+          title: "Chapter One",
+          label: "ch:one",
+          sections: [
+            {
+              title: "First Section",
+              label: "sec:first",
+              blocks: ["def-care"],
+            },
+          ],
+        };\n`,
+      );
+      writeFileSync(
+        join(chDir, "def-care.ts"),
+        `export default {
+          kind: "definition",
+          label: "def:care",
+          title: "Continuity of Care",
+        };\n`,
+      );
+      writeFileSync(
+        join(chDir, "def-care.md"),
+        "Care is coordinated across `L1` and [clinical teams](#sec:first) with rate $\\alpha*\\beta$.\n",
+      );
+
+      writeFileSync(
+        join(trDir, "ch1.po"),
+        [
+          'msgid ""',
+          'msgstr ""',
+          '"Language: fr\\n"',
+          "",
+          'msgctxt "title"',
+          'msgid "Clinical Guideline"',
+          'msgstr "Directive clinique"',
+          "",
+          'msgctxt "title"',
+          'msgid "Chapter One"',
+          'msgstr "Chapitre premier"',
+          "",
+          'msgctxt "title"',
+          'msgid "First Section"',
+          'msgstr "Première section"',
+          "",
+          'msgctxt "title"',
+          'msgid "Continuity of Care"',
+          'msgstr "Continuité des soins"',
+          "",
+          'msgid "Care is coordinated across {code0} and <a0>clinical teams</a0> with rate $\\alpha*\\beta$."',
+          'msgstr "Les soins sont coordonnés entre {code0} et les <a0>équipes cliniques</a0> au taux $\\alpha*\\beta$."',
+        ].join("\n"),
+      );
+
+      const built = await buildDocumentMarkdown(join(docDir, "guideline.ts"), {
+        locale: "fr",
+        folioRoot: dir,
+      });
+
+      expect(built.issues).toEqual([]);
+      expect(built.markdown).toContain("# Directive clinique");
+      expect(built.markdown).toContain("## Chapitre premier");
+      expect(built.markdown).toContain("### Première section");
+      expect(built.markdown).toContain("**Définition.** *Continuité des soins*");
+      expect(built.markdown).toContain(
+        "Les soins sont coordonnés entre `L1` et les [équipes cliniques](#sec:first) au taux $\\alpha*\\beta$.",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

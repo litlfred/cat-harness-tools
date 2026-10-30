@@ -21,9 +21,9 @@
  * Default test page: docs/guides/agent-onboarding.md
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join, basename } from "path";
-import { extractMarkdown, formatPot } from "../../pipeline/pot-extract.ts";
+import { extractMarkdown, extractFromManifest, formatPot } from "../../pipeline/pot-extract.ts";
 import { parsePo, injectMarkdown } from "../../pipeline/po-inject.ts";
 import { directoryForGraph, deferResolution} from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -105,7 +105,11 @@ function main() {
   // ── Step 1: Extract ──────────────────────────────────────────
 
   console.log("━━━ STEP 1: Extract translatable strings (POT) ━━━\n");
-  const entries = extractMarkdown(sourceMd, sourceFile);
+  const siblingTs = inputFile.replace(/\.md$/, ".ts");
+  const manifestEntries = existsSync(siblingTs)
+    ? extractFromManifest(readFileSync(siblingTs, "utf-8"), basename(siblingTs))
+    : [];
+  const entries = [...manifestEntries, ...extractMarkdown(sourceMd, sourceFile)];
   console.log(`  Extracted ${entries.length} translatable strings\n`);
 
   // Show first few

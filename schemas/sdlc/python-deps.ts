@@ -130,7 +130,7 @@ export const PYTHON_DEPS: readonly PythonDep[] = [
   {
     distribution: "lxml",
     tier: "lean",
-    why: "`smart-base-transform.py` and both translation extract/inject scripts — XML with namespaces, which `xml.etree` handles poorly enough to matter here.",
+    why: "Both translation extract/inject scripts — XML with namespaces, which `xml.etree` handles poorly enough to matter here.",
   },
   {
     distribution: "requests",

@@ -312,3 +312,27 @@ export function splitDeclarations(stripped: string): DeclSpan[] {
   }
   return spans;
 }
+
+
+import { readFileSync } from "fs";
+
+/**
+ * Does `file` textually declare a top-level `name` (theorem/def/...)?
+ *
+ * Used to reject import-only aggregators when resolving a declaration to a
+ * module file.
+ */
+export function fileDeclaresName(file: string, name: string): boolean {
+  let body: string;
+  try {
+    body = readFileSync(file, "utf-8");
+  } catch {
+    return false;
+  }
+  const short = name.includes(".") ? name.split(".").pop()! : name;
+  const esc = short.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `\\b(?:theorem|lemma|def|abbrev|instance|structure|class|inductive|opaque|axiom)\\s+(?:[\\w'.\\u00C0-\\uFFFF]*\\.)?${esc}\\b`,
+    "u",
+  ).test(body);
+}

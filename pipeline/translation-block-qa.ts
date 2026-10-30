@@ -86,10 +86,10 @@ import type {
   QaReviewer,
   UntaintedDispatch,
 } from "../schemas/sdlc/block-qa.ts";
-import { parsePo, parsePoEntries } from "./po-inject.ts";
+import { parsePo, parsePoEntries, poContextKey } from "./po-inject.ts";
 import { directoryForGraph } from "../schemas/kg/cat-harness.js";
 import { poResolveContext, resolvePoSources, type PoResolveContext } from "./po-resolve.ts";
-import { extractMarkdown } from "./pot-extract.ts";
+import { extractMarkdown, extractFromManifest, type ManifestInput } from "./pot-extract.ts";
 import { gitFileCommitSha, gitHeadSha, hashFile, sweepActor, walkBlocks } from "./qa-utils.ts";
 import { existingTranslationQaPath, translationQaPath } from "./qa-paths.ts";
 import {
@@ -464,15 +464,20 @@ export function measureBlock(
   source: string,
   po: Map<string, string>,
   glossary: Glossary = new Map(),
+  manifest?: ManifestInput | string,
+  manifestSource?: string,
 ): Measured {
-  const entries = extractMarkdown(md, source);
+  const manifestEntries = manifest
+    ? extractFromManifest(manifest, manifestSource ?? source.replace(/\.md$/, ".ts"))
+    : [];
+  const entries = [...manifestEntries, ...extractMarkdown(md, source)];
   const m: Measured = {
     total: entries.length, translated: 0, echoed: 0,
     missingStrict: [], missingAcronyms: [],
     resolvedAcronyms: [], brokenGlossaryTerms: [],
   };
   for (const e of entries) {
-    const msgstr = po.get(e.msgid);
+    const msgstr = (e.msgctxt ? po.get(poContextKey(e.msgctxt, e.msgid)) : undefined) ?? po.get(e.msgid);
     if (!msgstr || msgstr.trim() === "") continue;
     m.translated++;
     if (isEcho(e.msgid, msgstr)) m.echoed++;
@@ -582,13 +587,15 @@ function entry(
  */
 export function poCovers(poText: string, subjectRel: string): boolean {
   const base = basename(subjectRel);
+  const tsRel = subjectRel.replace(/\.md$/, ".ts");
+  const tsBase = base.replace(/\.md$/, ".ts");
   let sawAny = false;
   for (const entry of parsePoEntries(poText)) {
     for (const ref of entry.references ?? []) {
       sawAny = true;
       const path = ref.replace(/:\d+$/, "").trim();
       const bare = !path.includes("/");
-      if (bare ? path === base : path === subjectRel) return true;
+      if (bare ? (path === base || path === tsBase) : (path === subjectRel || path === tsRel)) return true;
     }
   }
   return !sawAny;
@@ -615,13 +622,21 @@ export function buildReport(
   // does not belong to it. Absence, exactly as if no PO had resolved at all.
   if (merged.size === 0) return undefined;
   const md = readFileSync(blockMd, "utf-8");
-  const m = measureBlock(md, rel, merged, readGlossary(INSTANCE_ROOT, locale));
+  const stem = basename(blockMd).replace(/\.md$/, "");
+  const tsPath = manifestPath(dirname(blockMd), stem);
+  const tsSource = existsSync(tsPath) ? readFileSync(tsPath, "utf-8") : undefined;
+  const m = measureBlock(
+    md,
+    rel,
+    merged,
+    readGlossary(INSTANCE_ROOT, locale),
+    tsSource,
+    tsSource !== undefined ? relative(INSTANCE_ROOT, tsPath) : undefined,
+  );
   // Nothing of this block is in the PO: it is untranslated, which is an absence
   // and not a failing translation. See the header.
   if (m.translated === 0) return undefined;
 
-  const stem = basename(blockMd).replace(/\.md$/, "");
-  const tsPath = manifestPath(dirname(blockMd), stem);
   const poRel = relative(INSTANCE_ROOT, poPaths[poPaths.length - 1]!);
   const hashes: TranslationFieldHash = {
     md: hashFile(blockMd),

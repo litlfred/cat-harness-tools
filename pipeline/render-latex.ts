@@ -42,6 +42,17 @@ import {
   parseValAttrs,
   substituteValuesInMath,
 } from "./render-value";
+import { kindHeading } from "../schemas/content/translation.ts";
+import { injectMarkdown, translateBlockFields, translateManifestText } from "./po-inject";
+
+export interface LatexTranslationOptions {
+  /** Target locale for localized headings (e.g. "Recommandation"). */
+  locale?: string;
+  /** Pre-merged gettext translations (`parsePo` / `mergePoSources` map). */
+  translations?: Map<string, string>;
+  /** Per-block translation overrides (`rootName -> Map<string, string>`). */
+  blockTranslations?: Map<string, Map<string, string>>;
+}
 
 // ── LaTeX character escaping ─────────────────────────────────────
 
@@ -1079,7 +1090,18 @@ export function renderBlock(
    * so emitting it again would make it multiply-defined.
    */
   enclosingSectionLabel?: string,
+  translationOpts?: LatexTranslationOptions,
 ): string {
+  if (translationOpts?.translations && translationOpts.translations.size > 0) {
+    block = translateBlockFields(
+      block as Block & Record<string, unknown>,
+      translationOpts.translations,
+      translationOpts.locale,
+    ) as Block;
+    if (mdContent) {
+      mdContent = injectMarkdown(mdContent, translationOpts.translations).translated;
+    }
+  }
   const lines: string[] = [];
 
   // Build the `\sourcebase`-relative path for the .md GitHub link.  The
@@ -1122,8 +1144,11 @@ export function renderBlock(
       // borrowing `remark` would print the wrong word. So it is a run-in
       // heading in the document's own words, anchored like a labelled prose
       // block, with the body unchanged.
+      const recHeading = translationOpts?.locale
+        ? (kindHeading("recommendation", translationOpts.locale) ?? "Recommendation")
+        : "Recommendation";
       const title = "title" in block && block.title ? ` ${escapeLatex(block.title)}` : "";
-      lines.push(`\\paragraph{Recommendation.${title}}`);
+      lines.push(`\\paragraph{${escapeLatex(recHeading)}.${title}}`);
       if ("label" in block && block.label && block.label !== enclosingSectionLabel) {
         lines.push(`\\phantomsection\\label{${block.label}}`);
       }
@@ -1509,15 +1534,19 @@ export function loadAndRenderBlock(rootName: string, objectsDir: string): {
 export function renderSection(
   section: Section,
   blocks: Map<string, { block: Block; mdContent: string; sourceDir?: string }>,
-  opts: RenderOptions = {},
+  opts: RenderOptions & LatexTranslationOptions = {},
   chapterReferencedLabels?: Set<string>,
 ): string {
   const lines: string[] = [];
   const sectionLabel = section.label ? `\\label{${section.label}}` : "";
+  const secTitle =
+    opts.translations && opts.translations.size > 0
+      ? translateManifestText(section.title, opts.translations, "title")
+      : section.title;
   // Section heading + margin annotation (tracker + comment-stub for the
   // whole section).  Only emit \sectionannot when the section carries a
   // label — anonymous sections have nothing to filter the tracker by.
-  lines.push(`\\section{${escapeLatex(section.title)}}`);
+  lines.push(`\\section{${escapeLatex(secTitle)}}`);
   if (section.label) {
     lines.push(sectionLabel);
     lines.push(`\\sectionannot{${section.label}}`);
@@ -1560,6 +1589,7 @@ export function renderSection(
         }
         continue;
       }
+      const blockTrans = opts.blockTranslations?.get(rootName) ?? opts.translations;
       lines.push(
         renderBlock(
           entry.block,
@@ -1567,6 +1597,7 @@ export function renderSection(
           entry.sourceDir,
           rootName,
           section.label,
+          blockTrans || opts.locale ? { locale: opts.locale, translations: blockTrans } : undefined,
         ),
       );
       lines.push(""); // blank line between blocks
@@ -1576,7 +1607,11 @@ export function renderSection(
   renderBlockList(section.blocks);
 
   for (const sub of subsections) {
-    lines.push(`\\subsection{${escapeLatex(sub.title)}}`);
+    const subTitle =
+      opts.translations && opts.translations.size > 0
+        ? translateManifestText(sub.title, opts.translations, "title")
+        : sub.title;
+    lines.push(`\\subsection{${escapeLatex(subTitle)}}`);
     if (sub.label) {
       lines.push(`\\label{${sub.label}}`);
       lines.push(`\\sectionannot{${sub.label}}`);
@@ -1597,7 +1632,7 @@ export function renderSection(
 export function renderChapter(
   chapter: Chapter,
   blocks: Map<string, { block: Block; mdContent: string; sourceDir?: string }>,
-  opts: RenderOptions = {},
+  opts: RenderOptions & LatexTranslationOptions = {},
   chapterDir?: string,
   paperSlug?: string,
 ): string {
@@ -1607,9 +1642,13 @@ export function renderChapter(
   const labelLine = chapter.label ? `\\label{${chapter.label}}\n` : "";
   // Chapters with tabLabel are unnumbered (\chapter*); all others are auto-numbered by LaTeX.
   const star = chapter.tabLabel != null ? "*" : "";
-  lines.push(`\\chapter${star}{${escapeLatex(chapter.title)}}\n${labelLine}`);
+  const chTitle =
+    opts.translations && opts.translations.size > 0
+      ? translateManifestText(chapter.title, opts.translations, "title")
+      : chapter.title;
+  lines.push(`\\chapter${star}{${escapeLatex(chTitle)}}\n${labelLine}`);
   if (star === "*") {
-    lines.push(`\\addcontentsline{toc}{chapter}{${escapeLatex(chapter.title)}}`);
+    lines.push(`\\addcontentsline{toc}{chapter}{${escapeLatex(chTitle)}}`);
   }
   // Chapter-level margin annotation: link to the chapter directory + tracker.
   // We use the chapter's own label as the tracker filter; if the chapter

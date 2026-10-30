@@ -1267,7 +1267,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // through the `vocab-map` Tool; nothing writes them.
   "vocab-mapping": {
     description:
-      "vocabulary mapping tables (`vocab-mappings/`) — one `folio-vocab-mapping/v1` table per source content type and target node, saying which source field becomes which target predicate and with what relationship. Shaped like a FHIR ConceptMap: an existing ConceptMap is representable here, and a table can be produced as one with every loss reported (`schemas/vocab-mapping-fhir.ts`). `content`, by the `code-list` argument: which predicate a field becomes, and which of two is authoritative, is a DECISION. Generators READ these through the `vocab-map` Tool; nothing writes them. Owner, 2026-10-02 (bean `k74z`). Governed by [`vocabulary-authority`](vocabulary-authority.md).",
+      "vocabulary mapping tables (`vocab-mappings/`) — one `folio-vocab-mapping/v1` table per source content type and target node, saying which source field becomes which target predicate and with what relationship. Shaped like a FHIR ConceptMap: an existing ConceptMap is representable here, and a table can be produced as one with every loss reported (the FHIR IG layer's `schemas/vocab-mapping-fhir.ts`). `content`, by the `code-list` argument: which predicate a field becomes, and which of two is authoritative, is a DECISION. Generators READ these through the `vocab-map` Tool; nothing writes them. Owner, 2026-10-02 (bean `k74z`). Governed by [`vocabulary-authority`](vocabulary-authority.md).",
     renderable: false,
     holds: "content",
     // declared-path-literal: this table IS the declaration, as on `health`.
