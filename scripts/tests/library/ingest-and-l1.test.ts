@@ -32,6 +32,8 @@ import {
   ENTRY_DIRECTORIES,
   ENTRY_SIDECARS,
   libraryRootFor,
+  entryLocales,
+  localeGaps,
 } from "../../check-l1-complete.ts";
 import { resolveQaLocation } from "../../qa-store.ts";
 import { NARRATIVE_BEARING } from "../../narratives.ts";
@@ -594,6 +596,54 @@ describe("image-descriptions has three states, and the third is not a pass", () 
     expect(imgState({ ...base, images: [scan] }).state).toBe("met");
   });
 
+  describe("a description per configured language (bean d5f1)", () => {
+    const by = { kind: "agent", id: "claude", model: "claude-opus-5-5" };
+    const said = (lang: string | undefined, state = "draft") => ({
+      text: `described in ${lang ?? "the default"}`,
+      state,
+      drafted_by: by,
+      drafted_at: "2026-10-30",
+      ...(lang ? { lang } : {}),
+    });
+    const figure = (narrative: unknown) => ({
+      id: "f1",
+      file: "images/f1.png",
+      role: "figure",
+      basis: { method: "inspection", by, at: "2026-10-30", saw: "a figure", page: 1 },
+      narrative,
+    });
+    const UN = ["ar", "zh", "en", "fr", "ru", "es"];
+
+    test("English alone is unmet, and the detail names each missing locale", () => {
+      // The defect this closes: the drain reported 0 English-only figures
+      // while 31 sat in smart-ra, because the gate asked only for ANY narrative.
+      const r = imgState({ ...base, images: [scan, figure([said("en")])] });
+      expect(r.state).toBe("unmet");
+      expect(r.detail).toContain("1 lack a narrative in a configured language");
+      for (const l of ["ar", "zh", "fr", "ru", "es"]) expect(r.detail).toContain(`${l} (1)`);
+      expect(r.detail).not.toContain("en (1)");
+    });
+
+    test("all six UN languages is met", () => {
+      expect(imgState({ ...base, images: [figure(UN.map((l) => said(l)))] }).state).toBe("met");
+    });
+
+    test("a single-form narrative with no lang counts as English", () => {
+      const gaps = localeGaps([{ narrative: said(undefined) } as never], ["en"]);
+      expect(gaps.images).toBe(0);
+    });
+
+    test("a not-authored entry covers nothing", () => {
+      const gaps = localeGaps([{ narrative: [said("en"), said("fr", "not-authored")] } as never], ["en", "fr"]);
+      expect(gaps.images).toBe(1);
+      expect([...gaps.byLocale]).toEqual([["fr", 1]]);
+    });
+
+    test("an entry with no instance config is owed the six UN languages", () => {
+      expect([...entryLocales(entry())].sort()).toEqual([...UN].sort());
+    });
+  });
+
   test("a missing images.json is UNMET, not not-derivable", () => {
     // The arm exists now, so its absence is a defect in this entry rather
     // than a gap in the platform. That distinction is the whole point of
@@ -1116,14 +1166,13 @@ describe("a document's figures can be VECTOR, and the gate no longer passes over
           file: "images/i1.png",
           role: "figure",
           basis: { method: "geometry", coverage: 0.4, imagesOnPage: 1, page: 1 },
-          narrative: [
-            {
-              text: "A logo.",
-              lang: "en",
-              state: "draft",
-              drafted_by: { kind: "agent", id: "a", model: "m" },
-            },
-          ],
+          // One per configured language: English alone is unmet now (d5f1).
+          narrative: ["ar", "zh", "en", "fr", "ru", "es"].map((lang) => ({
+            text: "A logo.",
+            lang,
+            state: "draft",
+            drafted_by: { kind: "agent", id: "a", model: "m" },
+          })),
         },
       ],
     });
