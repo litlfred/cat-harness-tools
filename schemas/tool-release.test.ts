@@ -27,7 +27,7 @@ function release(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     $schema: TOOL_RELEASE_SCHEMA_TAG,
     name: "plantuml",
-    version: "1.2024.7",
+    version: "1.2026.9",
     role: "tool",
     kind: "jar",
     digest: { algorithm: "sha256", digest: SHA },
@@ -114,7 +114,7 @@ describe("folio-tool-release/v1", () => {
     });
 
     test("a release cannot be its own runtime", () => {
-      expect(ok(release({ runtimes: [{ release: "plantuml@1.2024.7", inject: "PATH" }] }))).toBe(false);
+      expect(ok(release({ runtimes: [{ release: "plantuml@1.2026.9", inject: "PATH" }] }))).toBe(false);
     });
 
     test("one runtime named twice is refused", () => {

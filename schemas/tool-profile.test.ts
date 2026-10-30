@@ -32,7 +32,7 @@ function profile(tools: Record<string, string>, name = "default"): unknown {
 
 const JRE = rel("temurin-jre", "21.0.4+7", { role: "runtime", entry: { template: "{home}/bin/java", home: "jdk" } });
 const GRAPHVIZ = rel("graphviz", "16.1.0");
-const PLANTUML = rel("plantuml", "1.2024.7", {
+const PLANTUML = rel("plantuml", "1.2026.9", {
   kind: "jar",
   runtimes: [
     { release: "temurin-jre@21.0.4+7", inject: "JAVA_HOME" },
@@ -43,7 +43,7 @@ const PLANTUML = rel("plantuml", "1.2024.7", {
 
 describe("folio-tool-profile/v1", () => {
   test("a valid profile parses", () => {
-    expect(ToolProfileSchema.safeParse(profile({ plantuml: "plantuml@1.2024.7" })).success).toBe(true);
+    expect(ToolProfileSchema.safeParse(profile({ plantuml: "plantuml@1.2026.9" })).success).toBe(true);
   });
 
   test("an empty profile is refused", () => {
@@ -59,7 +59,7 @@ describe("folio-tool-profile/v1", () => {
   });
 
   test("strict: an unknown field is refused", () => {
-    expect(ToolProfileSchema.safeParse({ ...(profile({ plantuml: "plantuml@1.2024.7" }) as object), runtimes: {} }).success).toBe(false);
+    expect(ToolProfileSchema.safeParse({ ...(profile({ plantuml: "plantuml@1.2026.9" }) as object), runtimes: {} }).success).toBe(false);
   });
 });
 
@@ -67,7 +67,7 @@ describe("the graph — what one file cannot know", () => {
   const p = (tools: Record<string, string>, name?: string) => ToolProfileSchema.parse(profile(tools, name)) as ToolProfile;
 
   test("the T4 set is clean: PlantUML with its JRE and graphviz, and a default profile naming tools only", () => {
-    expect(toolReleaseGraphProblems([JRE, GRAPHVIZ, PLANTUML], [p({ plantuml: "plantuml@1.2024.7", graphviz: "graphviz@16.1.0" })])).toEqual([]);
+    expect(toolReleaseGraphProblems([JRE, GRAPHVIZ, PLANTUML], [p({ plantuml: "plantuml@1.2026.9", graphviz: "graphviz@16.1.0" })])).toEqual([]);
   });
 
   test("a profile NAMING A RUNTIME is refused — that is the global java pin by another name", () => {

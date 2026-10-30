@@ -327,9 +327,12 @@ function storedOn(absPath: string, repoRoot?: string, location?: QaLocation): st
  * not in a stored directory (bean `oqe3`). A producer asks this to decide
  * whether its working copy is a RECORD (unstored: stale and orphaned files
  * there are findings) or a measurement of the last run (stored: advisory).
+ *
+ * A caller asking of many paths passes `location`, resolved once: see
+ * `storedOn`.
  */
-export function qaStorageOf(absPath: string, repoRoot?: string): string | undefined {
-  return storedOn(absPath, repoRoot);
+export function qaStorageOf(absPath: string, repoRoot?: string, location?: QaLocation): string | undefined {
+  return storedOn(absPath, repoRoot, location);
 }
 
 /**
