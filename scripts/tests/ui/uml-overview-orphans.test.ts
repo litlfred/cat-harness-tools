@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { instanceDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { instanceDirectories } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { overviewFilesFor, sectionsOf, umlOrphans } from "../../gen-uml-overview.ts";
 
