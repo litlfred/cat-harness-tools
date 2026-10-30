@@ -1138,7 +1138,8 @@ export function documentIndexOf(html: string, label: string = RAIL_SECTION_LABEL
       .replace(/\s+/g, " ")
       .trim();
     if (!text) continue;
-    flat.push({ href: `#${m[2]}`, label: text, ...(m[1].toLowerCase() === "h3" ? { depth: 1 } : {}) });
+    const { icon, label: rest } = numberedHeading(text);
+    flat.push({ href: `#${m[2]}`, label: rest, ...(icon ? { icon } : {}), ...(m[1].toLowerCase() === "h3" ? { depth: 1 } : {}) });
   }
   // SUB-SECTIONS FOLD UNDER THEIR SECTION (bean `r2ld`): an h3 becomes a
   // child of the h2 above it, behind a closed "N sub-sections" disclosure.
@@ -1160,6 +1161,29 @@ export function documentIndexOf(html: string, label: string = RAIL_SECTION_LABEL
   // `§`, not `≡`: at rest the rail shows only this glyph, directly under the
   // avatar, and `≡` there reads as the hamburger #1757 excised.
   return { label, icon: "§", items, collapsible: true };
+}
+
+/**
+ * A heading's NUMBER as the row's mark, and the rest as its label.
+ *
+ * At rest the rail shows a row's mark and a few characters of its label, so
+ * "Chapter 1. Why digital…" spent the mark on a `C` every chapter shares and
+ * the label on words every chapter repeats (owner, 2026-10-30: "lots of waste
+ * in navbar dont spell out Chapter 1"). A heading that opens with its number
+ * -- `Chapter 7.`, `Annex 9:`, `Appendix A`, `7.1`, `3.` -- gives the
+ * number to the mark (`7`, `9`, `A`, `7.1`, `3`) and keeps only the title as
+ * the label. A heading with no number, whose number is all it says, or whose
+ * number is too long for the mark, is left as it is. The page's own heading
+ * text is not touched.
+ */
+export function numberedHeading(text: string): { icon?: string; label: string } {
+  const m =
+    /^(?:chapter|annex|appendix|part|section)\s+([0-9]+|[A-Z]|[IVXLC]+)\b[.:)]?\s*[-—–:]?\s+(.+)$/i.exec(text) ??
+    /^([0-9]{1,2}(?:\.[0-9]+)*)[.)]?\s+(.+)$/.exec(text);
+  // The mark holds about three characters; a deeper number (`1.1.1`) stays in
+  // the label rather than overflow it.
+  if (!m || !m[2]!.trim() || m[1]!.length > 3) return { label: text };
+  return { icon: m[1]!.toUpperCase(), label: m[2]!.trim() };
 }
 
 /** The summary of a folded set of sub-sections — one wording, both surfaces. */
