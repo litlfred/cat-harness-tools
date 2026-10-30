@@ -23,6 +23,9 @@
  *   kind must be declared by a block-kind node of the same adapter.
  * - `constraintRules` (optional) — {@link ConstraintRule}s, run beside
  *   `CONSTRAINT_RULES`.
+ * - `constraintContext` (optional) — a {@link ConstraintContextContributor}:
+ *   what its rules read beyond the generic context (the science layer's
+ *   sibling `.lean` and Lake-tree lookup, bean `saqd`).
  * - `builders` (optional) — the manifest builders for its kinds, by name.
  *
  * A kind is typed either by `BlockSchema` or by a module. While one moves, a
@@ -47,7 +50,13 @@ import type { z } from "zod";
 
 import { DISCOVERED_BLOCK_KIND_NODES, discoverContentAdapterFiles } from "./block-kinds";
 import { findInstanceRoot } from "../kg/cat-harness";
-import { BlockSchema, CONSTRAINT_RULES, type ConstraintRule, typedBlockKinds } from "../constraints";
+import {
+  BlockSchema,
+  CONSTRAINT_RULES,
+  type ConstraintContextContributor,
+  type ConstraintRule,
+  typedBlockKinds,
+} from "../constraints";
 import type { Block } from "../types";
 
 const require = createRequire(import.meta.url);
@@ -59,6 +68,7 @@ type KindSchema = z.ZodObject<{ kind: z.ZodLiteral<string> } & z.ZodRawShape>;
 export interface VocabularyModule {
   blockSchemas: readonly KindSchema[];
   constraintRules?: readonly ConstraintRule[];
+  constraintContext?: ConstraintContextContributor;
   builders?: Readonly<Record<string, (...args: never[]) => unknown>>;
 }
 
@@ -68,6 +78,7 @@ export interface LoadedVocabulary {
   module: string;
   schemas: ReadonlyMap<string, KindSchema>;
   constraintRules: readonly ConstraintRule[];
+  constraintContext?: ConstraintContextContributor;
   builders: Readonly<Record<string, (...args: never[]) => unknown>>;
 }
 
@@ -93,8 +104,16 @@ export function readVocabulary(adapter: string, module: string, exports: unknown
     schemas.set(kind as string, s);
   }
   if (m!.constraintRules !== undefined && !Array.isArray(m!.constraintRules)) fail("exports `constraintRules` that is not an array");
+  if (m!.constraintContext !== undefined && typeof m!.constraintContext !== "function") fail("exports `constraintContext` that is not a function");
   if (m!.builders !== undefined && (typeof m!.builders !== "object" || m!.builders === null)) fail("exports `builders` that is not an object");
-  return { adapter, module, schemas, constraintRules: m!.constraintRules ?? [], builders: m!.builders ?? {} };
+  return {
+    adapter,
+    module,
+    schemas,
+    constraintRules: m!.constraintRules ?? [],
+    ...(m!.constraintContext ? { constraintContext: m!.constraintContext } : {}),
+    builders: m!.builders ?? {},
+  };
 }
 
 let loaded: readonly LoadedVocabulary[] | undefined;
@@ -152,4 +171,13 @@ export function allConstraintRules(): readonly ConstraintRule[] {
   const contributed = vocabularies().flatMap((v) => v.constraintRules);
   const replaced = new Set(contributed.map((r) => r.id));
   return [...CONSTRAINT_RULES.filter((r) => !replaced.has(r.id)), ...contributed];
+}
+
+/**
+ * Every vocabulary module's {@link ConstraintContextContributor}, in adapter
+ * order — what `pipeline/validate.ts` merges into each block's context, so a
+ * vocabulary's rules (`allConstraintRules`) read what its own layer supplies.
+ */
+export function allConstraintContextContributors(): readonly ConstraintContextContributor[] {
+  return vocabularies().flatMap((v) => (v.constraintContext ? [v.constraintContext] : []));
 }
