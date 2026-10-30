@@ -29,7 +29,7 @@ import {
   transitivelyRequires,
 } from "../check-fallback-roles.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.js";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -80,7 +80,8 @@ describe("the derivation that replaced the declaration", () => {
     // is not applied to these modules at build time.
     const { readFileSync } = await import("node:fs");
     for (const f of ["schemas/conduct/assistant-types.ts", "schemas/kg/skill-package.ts"]) {
-      const src = readFileSync(resolve(ROOT, f), "utf-8");
+      // Both modules moved into this layer with schemas/ (8lcl).
+      const src = readFileSync(resolve(TOOLS_ROOT, f), "utf-8");
       // Mentioned in prose (the record of why it went), never re-declared.
       expect(src).not.toMatch(/^\s*fallbackRole[?]?:/m);
     }

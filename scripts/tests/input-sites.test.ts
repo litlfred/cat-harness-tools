@@ -381,7 +381,8 @@ describe("annotations hold to the data that chooses their targets", () => {
         }
       }
     }
-    for (const g of globs) expect(annotated("cat-harness/schemas/kg/harness-config.ts", g), g).toBe(true);
+    // The module moved into this layer with schemas/kg/ (8lcl); named from TOOLS_ROOT, not spelled.
+    for (const g of globs) expect(annotated(relTo(join(TOOLS_ROOT, "schemas/kg/harness-config.ts")), g), g).toBe(true);
   });
 
 
@@ -392,7 +393,7 @@ describe("annotations hold to the data that chooses their targets", () => {
         if (existsSync(f)) expect(globMatch("*/themes/themes.ts", relTo(f)), `${relTo(f)} is outside the glob`).toBe(true);
       }
     }
-    expect(annotated("cat-harness/schemas/ui/theme-by-ref.ts", "*/themes/themes.ts")).toBe(true);
+    expect(annotated(relTo(join(TOOLS_ROOT, "schemas/ui/theme-by-ref.ts")), "*/themes/themes.ts")).toBe(true);
   });
 
   test("skill-register's `scripts` annotation names exactly the verify half of its STEPS", async () => {
