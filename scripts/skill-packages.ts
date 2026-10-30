@@ -14,7 +14,7 @@
 import { readdirSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-import { isSkillMd, kgRoots, corpusScopeFor } from "./known-skills.js";
+import { isSkillMd, kgRoots, corpusScopeFor, type CorpusScope } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { resolveSkillDirs } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 // The `folio` graph typology is registered by CORE. This module is a LIBRARY, so it
@@ -86,7 +86,7 @@ export function holdsSkill(dir: string): boolean {
  * assigning in order means a root package of the same name overrides a
  * dependency's. Same rule the directory declaration uses, one level down.
  */
-export function discoverLocalPackages(root: string): Record<string, string> {
+export function discoverLocalPackages(root: string, scope?: CorpusScope): Record<string, string> {
   const out: Record<string, string> = {};
   // Collected first and named in a SECOND PASS, because which directly-held
   // directory gets the instance name depends on how many there are — see
@@ -97,7 +97,12 @@ export function discoverLocalPackages(root: string): Record<string, string> {
   // run the CORPUS stacked on it — which the 19 `scope: "repository"` mirrors
   // supplied until placement PR0 (bean `ejye`), so core's, sci's and the
   // others' packages stay servable from here with the arrow the right way round.
-  const kgDirs = [...new Set([...resolveSkillDirs(root), ...kgRoots(root, corpusScopeFor(root))].map((d) => resolve(d)))];
+  // When `scope === "instance"` (bean `t5zb`), only `root`'s OWN declared skill
+  // directories are read, never its `needs` overlay or sibling instances.
+  const kgDirs =
+    scope === "instance"
+      ? [...new Set(kgRoots(root, "instance").map((d) => resolve(d)))]
+      : [...new Set([...resolveSkillDirs(root), ...kgRoots(root, scope ?? corpusScopeFor(root))].map((d) => resolve(d)))];
   for (const kgDir of kgDirs) {
     // A kg directory may hold skills DIRECTLY as well as in subdirectories,
     // and BOTH shapes are real: `skills/` holds none directly and every
