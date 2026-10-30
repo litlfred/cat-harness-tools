@@ -46,10 +46,20 @@
  * falls back to a section merge: split at `## ` headings, carry over sections
  * only one copy has, keep the longer of two texts where one contains the other.
  *
- *   bun run cat-harness-tools/scripts/bean-dedupe.ts [--out <dir>] [--stores <file.json>]
+ * ## Emitting the apply (owner, 2026-10-30)
+ *
+ * `--emit <dir>` writes, per store, what applying the plan would change:
+ * `<dir>/<store>/files/<path>` (each bean's merged text, in its home store)
+ * and `<dir>/<store>/delete.txt` (the copies to remove elsewhere), plus
+ * `<dir>/<store>/source.txt` naming the commit it was read at. It still
+ * writes to no store: a person or session commits the emitted tree. A text
+ * conflict loses nothing: the home copy's text stays, and every hunk the
+ * other copies disagreed on is appended under a dated "Merged from" section.
+ *
+ *   bun run cat-harness-tools/scripts/bean-dedupe.ts [--out <dir>] [--emit <dir>] [--stores <file.json>]
  */
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 
@@ -111,7 +121,10 @@ export function homeOf(id: string, storesHolding: string[]): { home?: string; wh
   for (const [p, store] of Object.entries(PREFIX_HOME)) if (id.startsWith(p)) return { home: store, why: `prefix ${p}` };
   const layers = LAYERS.filter((l) => storesHolding.includes(l));
   if (layers.length === 1) return { home: layers[0], why: `taken by ${layers[0]} at separation` };
-  if (layers.length > 1) return { why: `taken by ${layers.join(" and ")}: owner to choose` };
+  // Owner, 2026-10-30 (#459, card "A. Apply with safe defaults"): a bean BOTH
+  // layers took belongs to neither alone, so it goes where every bean no
+  // single layer owns goes.
+  if (layers.length > 1) return { home: MAIN_STORE, why: `taken by ${layers.join(" and ")}: main store (owner, 2026-10-30)` };
   return { home: MAIN_STORE, why: "main store" };
 }
 
@@ -201,6 +214,33 @@ export function settleStatus(text: string, copies: Copy[]): string {
   const m = text.match(/^(---\r?\n)([\s\S]*?)(\r?\n---)/);
   if (!m || !/^status:/m.test(m[2])) return text;
   return m[1] + m[2].replace(/^status:.*$/m, `status: ${best}`) + text.slice(m[1].length + m[2].length);
+}
+
+/** A fence longer than any backtick run in `text`, so the text cannot close it. */
+function fenceFor(text: string): string {
+  const longest = Math.max(2, ...(text.match(/`+/g) ?? []).map((r) => r.length));
+  return "`".repeat(longest + 1);
+}
+
+/**
+ * The home copy's text with every conflicting hunk the other copies held
+ * appended, so applying the plan loses no text (owner, 2026-10-30, #459).
+ */
+export function withConflictNotes(text: string, conflicts: Conflict[], date: string): string {
+  const real = conflicts.filter((c) => c.otherStore !== "-" && c.other.trim() !== "");
+  if (real.length === 0) return text;
+  const byStore = new Map<string, Conflict[]>();
+  for (const c of real) byStore.set(c.otherStore, [...(byStore.get(c.otherStore) ?? []), c]);
+  const parts: string[] = [text.replace(/\s+$/, "")];
+  for (const [store, cs] of byStore) {
+    parts.push("", `## Merged from the ${store} copy (bean dedupe, ${date})`, "");
+    parts.push("These lines differed from the kept copy and could not be merged automatically (cat-harness-tools#459). They are kept here so nothing is lost.");
+    for (const c of cs) {
+      const fence = fenceFor(c.other);
+      parts.push("", `Where: ${c.where}`, "", `${fence}text`, c.other, fence);
+    }
+  }
+  return parts.join("\n") + "\n";
 }
 
 /** A merged bean must still open with front matter that parses and names its status. */
@@ -345,22 +385,25 @@ function main() {
   const base = readBase(stores, cache);
   const ids = new Set(Object.values(read).flatMap((r) => [...r.copies.keys()]));
 
-  type Row = { id: string; holders: string[]; home?: string; why: string; kind: string; merged?: Merged };
+  type Row = { id: string; holders: string[]; home?: string; why: string; kind: string; merged?: Merged; copies: Copy[] };
   const rows: Row[] = [];
   for (const id of [...ids].sort()) {
     const copies = stores.map((s) => read[s.name].copies.get(id)).filter((c): c is Copy => !!c);
     const holders = copies.map((c) => c.store);
     const { home, why } = homeOf(id, holders);
     if (copies.length === 1) {
-      rows.push({ id, holders, home, why, kind: home === holders[0] ? "single, in place" : "single, moves" });
+      rows.push({ id, holders, home, why, kind: home === holders[0] ? "single, in place" : "single, moves", copies });
       continue;
     }
     const merged = merge(copies, home);
     const identical = new Set(copies.map((c) => c.text)).size === 1;
     const baseText = base.copies.get(id);
     let kind: string;
-    if (identical) kind = "identical copies";
-    else if (baseText !== undefined) {
+    if (identical) {
+      kind = "identical copies";
+      merged.text = copies[0].text;
+      merged.conflicts = [];
+    } else if (baseText !== undefined) {
       // The home copy goes first, so a conflict keeps the home's text.
       const ordered = [...copies].sort((x, y) => (x.store === home ? -1 : y.store === home ? 1 : 0));
       const m3 = merge3(ordered, baseText);
@@ -370,6 +413,9 @@ function main() {
       kind = m3.conflicts.length ? "conflict (three-way)" : m3.resolved ? "merged three-way, mechanical fixes" : "merged three-way, clean";
       if (!headerOk(m3.text)) {
         kind = "conflict (merged header invalid)";
+        // Keep the home copy whole; the others' text goes in the notes.
+        merged.text = ordered[0].text;
+        for (const c of ordered.slice(1)) merged.conflicts.push({ where: "(the whole copy: the merged header did not parse)", kept: "", other: c.text, otherStore: c.store });
         merged.conflicts.push({ where: "(merged header does not parse, or repeats a key)", kept: "", other: "", otherStore: "-" });
       }
     } else
@@ -379,7 +425,35 @@ function main() {
           ? "merged by section, text carried"
           : "merged by section, header only";
     merged.text = settleStatus(merged.text, copies);
-    rows.push({ id, holders, home, why, kind, merged });
+    rows.push({ id, holders, home, why, kind, merged, copies });
+  }
+
+  const emit = opt("--emit");
+  if (emit) {
+    const date = new Date().toISOString().slice(0, 10);
+    const deletes = new Map<string, string[]>(stores.map((s) => [s.name, []]));
+    let written = 0;
+    for (const r of rows) {
+      if (r.home === undefined) continue;
+      const homeSpec = stores.find((s) => s.name === r.home)!;
+      const homeCopy = r.copies.find((c) => c.store === r.home);
+      if (r.copies.length === 1 && homeCopy) continue; // single, in place
+      const text = r.merged ? withConflictNotes(r.merged.text, r.merged.conflicts, date) : r.copies[0].text;
+      const file = homeCopy?.file ?? join(homeSpec.path, r.copies[0].file.split("/").pop()!);
+      if (!homeCopy || homeCopy.text !== text) {
+        const dest = join(emit, r.home, "files", file);
+        mkdirSync(dirname(dest), { recursive: true });
+        writeFileSync(dest, text);
+        written++;
+      }
+      for (const c of r.copies) if (c.store !== r.home) deletes.get(c.store)!.push(c.file);
+    }
+    for (const s of stores) {
+      mkdirSync(join(emit, s.name), { recursive: true });
+      writeFileSync(join(emit, s.name, "delete.txt"), deletes.get(s.name)!.sort().join("\n") + (deletes.get(s.name)!.length ? "\n" : ""));
+      writeFileSync(join(emit, s.name, "source.txt"), `${s.repo} ${s.branch} ${read[s.name].commit}\n`);
+    }
+    console.log(`emitted ${written} bean file(s) to write and ${[...deletes.values()].reduce((n, d) => n + d.length, 0)} copies to delete under ${emit}`);
   }
 
   const count = (f: (r: Row) => boolean) => rows.filter(f).length;

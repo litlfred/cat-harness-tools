@@ -3,7 +3,7 @@
  * it cannot. Each case is a shape measured on the live stores 2026-10-20.
  */
 import { describe, expect, test } from "bun:test";
-import { headerOk, homeOf, merge3, resolveDiff3, settleStatus } from "../scripts/bean-dedupe.ts";
+import { headerOk, homeOf, merge3, resolveDiff3, settleStatus, withConflictNotes } from "../scripts/bean-dedupe.ts";
 
 const bean = (status: string, updated: string, body: string) =>
   `---\n# folio-assistant-abcd\ntitle: A bean\nstatus: ${status}\ntype: task\nupdated_at: ${updated}\n---\n\n${body}\n`;
@@ -16,8 +16,8 @@ describe("homeOf", () => {
   test("a bean one layer took belongs to that layer", () => {
     expect(homeOf("folio-assistant-abcd", ["folio-assistant", "cat-harness", "cat-harness-tools"]).home).toBe("cat-harness-tools");
   });
-  test("taken by two layers: no home, the owner chooses", () => {
-    expect(homeOf("folio-assistant-abcd", ["cat-harness-tools", "folio-assistant-core"]).home).toBeUndefined();
+  test("taken by both layers: the main store (owner, 2026-10-30)", () => {
+    expect(homeOf("folio-assistant-abcd", ["cat-harness-tools", "folio-assistant-core"]).home).toBe("folio-assistant");
   });
   test("everything else goes to the main store", () => {
     expect(homeOf("folio-assistant-abcd", ["folio-assistant", "cat-harness"]).home).toBe("folio-assistant");
@@ -91,5 +91,23 @@ describe("settleStatus", () => {
     expect(settleStatus(same[0].text, same)).toBe(same[0].text);
     const odd = [copy("a", "todo", "2026-10-20T00:00:00Z"), copy("b", "parked", "2026-10-21T00:00:00Z")];
     expect(settleStatus(odd[0].text, odd)).toBe(odd[0].text);
+  });
+});
+
+describe("withConflictNotes", () => {
+  test("every other copy's hunk is kept, under a dated section per store", () => {
+    const text = bean("todo", "2026-10-20T00:00:00Z", "Ours.");
+    const out = withConflictNotes(text, [
+      { where: "(three-way hunk)", kept: "Ours.", other: "Theirs, with ``` inside.", otherStore: "cat-harness" },
+      { where: "(merged header does not parse, or repeats a key)", kept: "", other: "", otherStore: "-" },
+    ], "2026-10-30");
+    expect(out.startsWith(text.trimEnd())).toBe(true);
+    expect(out).toContain("## Merged from the cat-harness copy (bean dedupe, 2026-10-30)");
+    expect(out).toContain("````text\nTheirs, with ``` inside.\n````");
+    expect(headerOk(out)).toBe(true);
+  });
+  test("no conflicts: the text is unchanged", () => {
+    const text = bean("todo", "2026-10-20T00:00:00Z", "Ours.");
+    expect(withConflictNotes(text, [], "2026-10-30")).toBe(text);
   });
 });
