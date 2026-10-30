@@ -282,6 +282,12 @@ export function provJsonldDocument(
           }
         : {}),
       "cat-harness:underPolicy": a["cat-harness:underPolicy"],
+      ...(a["cat-harness:agreement"] ? { "cat-harness:agreement": a["cat-harness:agreement"] } : {}),
+      ...(a["cat-harness:grant"] ? { "cat-harness:grant": a["cat-harness:grant"] } : {}),
+      ...(a["cat-harness:consent"] ? { "cat-harness:consent": a["cat-harness:consent"] } : {}),
+      ...(a["cat-harness:consentBased"] !== undefined ? { "cat-harness:consentBased": a["cat-harness:consentBased"] } : {}),
+      ...(a["cat-harness:previousHash"] !== undefined ? { "cat-harness:previousHash": a["cat-harness:previousHash"] } : {}),
+      ...(a["cat-harness:recordHash"] ? { "cat-harness:recordHash": a["cat-harness:recordHash"] } : {}),
     });
     graph.push({
       "@type": "Association",
