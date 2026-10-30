@@ -6,6 +6,7 @@
  *
  * @module scripts/site-dead-links
  * @graphNode none — a check over a built site, not a schema
+ * @covers none — it reads the built site's HTML, not a declared graph
  *
  * litlfred/folio-assistant#2741: a link check of the published tree found 262
  * missing targets linked from 399 places, and nothing in CI had ever looked.
