@@ -42,3 +42,22 @@ the `dh4f` defect.
 
 The layout mirrors `cat-harness/` on purpose: as `src/` moves here, imports
 between modules that move together stay the same.
+
+## The libraries of the layers below the kind are held here
+
+`libraries/` holds this layer's own `software-library` nodes, and
+`libraries/held/<layer>/` holds the nodes of each layer below the kind
+(owner, 2026-10-30, bootstrap-tools#44: "A. Holder records, keyed by layer").
+bootstrap-tools needs only bootstrap, so it may not name cat-harness's
+`software-library` kind or declare a `libraries/` of its own. This layer owns
+the writer and the gate (`scripts/libraries.ts`), so it records them, keyed by
+the layer each node describes (`layer`, `software-library/1.2.0`). It is the
+same rule core uses for the glossary schemes of the layers below its typology
+(bean `q3n9`).
+
+The held set is derived, not listed: every instance with a `package.json` that
+declares no `software-library` directory and does not reach cat-harness
+through `needs`. The nodes are derived at this layer's pins, so a re-pin of
+bootstrap-tools runs `bun run cat libraries:derive` in the same PR, and
+`libraries:check` fails until it does. Never hand-edit a held node, and never
+add a `libraries/` to bootstrap-tools.
