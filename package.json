@@ -651,6 +651,7 @@
     "archimate:pages": "bun run cat-harness-tools/archimate/scripts/gen-archimate-pages.ts",
     "rail:standalone-pages": "bun run cat-harness-tools/scripts/rail-standalone-pages.ts",
     "stage:local": "bun run cat-harness-tools/scripts/stage-local.ts",
+    "site:workflow": "bun run cat-harness-tools/scripts/site-workflow.ts",
     "compose:docs": "bun run cat-harness-tools/scripts/compose-docs.ts",
     "block:screenshots": "bun run cat-harness-tools/scripts/block-screenshots.ts",
     "pdf:cover": "python3 cat-harness-tools/scripts/pdf-cover.py",
