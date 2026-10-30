@@ -27,6 +27,7 @@ import type { ContributionRegistry } from "@litlfred/cat-harness/schemas/content
 import { RENDER_TARGETS } from "@litlfred/cat-harness/schemas/ui/render-targets.ts";
 import { implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { resolveAdapterPreamble } from "../src/builtin-adapters.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -40,6 +41,11 @@ export interface ResolvedRenderTarget {
    * validation record over output nobody examined.
    */
   validate?: (rendered: string) => { valid: boolean; errors: string[] };
+  /**
+   * Default print preamble template supplied by the adapter or renderer
+   * contribution for this profile, if any (bean `4dj5`, #2117 P2).
+   */
+  preamblePath?: string;
 }
 
 /** Why no target came back. Never collapsed into "the folio is fine". */
@@ -78,11 +84,15 @@ export async function resolveRenderTarget(
 
   const contributed = registry?.renderer(RENDER_TARGETS[profile]?.format ?? profile);
   if (contributed) {
+    const preamblePath =
+      (contributed as { preamblePath?: string }).preamblePath ??
+      (await resolveAdapterPreamble(profile));
     return {
       target: {
         format: contributed.format,
         render: contributed.render,
         validate: contributed.validate,
+        ...(preamblePath !== undefined ? { preamblePath } : {}),
       },
     };
   }
@@ -160,5 +170,13 @@ export async function resolveRenderTarget(
     validate = fn as ResolvedRenderTarget["validate"];
   }
 
-  return { target: { format: decl.format, render, validate } };
+  const preamblePath = await resolveAdapterPreamble(profile);
+  return {
+    target: {
+      format: decl.format,
+      render,
+      validate,
+      ...(preamblePath !== undefined ? { preamblePath } : {}),
+    },
+  };
 }
