@@ -1,79 +1,16 @@
-# Section-title + structure audit (chapter-scoped).
+# Section-title + structure audit.
 #
-# Written by `folio_init` from the platform's template
-# (cat-harness-tools/templates/document/github/workflows/section-title-audit.yml).
-#
-# Two reviews:
-#   - MACHINE review — the platform's qa-section-title-audit.ts flags
-#     auto-split " : <tag>" title artifacts, trailing colons, over-long /
-#     compound titles, and structure findings (depth/band/balance).
-#     Derived findings belong with QA results on the orphan `qa-reports` branch.
-#   - AGENT review — story-coherence verdicts are judgements, so they live on
-#     `main` in the attestations store
-#     (test/attestations/section-title/<document>/section-title-audit.attestations.json),
-#     recorded with `--verdict`. A verdict counts only while the chapter
-#     manifest (or, under --thorough, the section's subtree) it reviewed is
-#     unchanged; after that its slot re-opens.
-#
-# COMPUTE AND JUDGE (bean 5qy8). Nothing derived is committed, so there is no
-# freshness gate: each run computes the derived copy
-# (test/results/section-title/<document>/section-title-audit.json, gitignored,
-# recorded on the orphan `qa-reports` branch like the rest of test/results/)
-# from the live manifests and the stored verdicts. It HARD-gates the machine
-# side, and exits 2 — could not determine, never green — when the verdict
-# store cannot be read. Open and stale slots are reported as a worklist.
-#
-# Triggers: `workflow_dispatch` only as written. Uncomment `pull_request`
-# to run it on every pull request.
-
+# Written by `folio_init` from cat-harness-tools/templates/document/. The
+# steps are the platform's reusable
+# litlfred/cat-harness-tools/.github/workflows/folio-section-title-audit.yml.
 name: Section-title + structure audit
 
 on:
   workflow_dispatch:
-  # pull_request:
-  #   types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
 
 jobs:
   audit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Check out the platform if the folio does not carry it
-        run: |
-          if [ ! -f "{{assistant}}/bun.lock" ]; then
-            git clone --depth 1 "{{platform_git}}" "{{assistant}}"
-          fi
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      # The platform is an INDEX: its layers (cat-harness-tools, core, …) are not
-      # in the checkout but mounted from its index.lock.json, by the mounter the
-      # index itself ships. Without this every `{{assistant}}/cat-harness-tools/…`
-      # path below is "Module not found" (folio-test qa-sweep, 2026-10-12).
-      - name: Mount the platform's layers and install their dependencies
-        run: |
-          cd "{{assistant}}"
-          bash .github/mount-from-lock.sh --root .
-          bun install --frozen-lockfile
-
-      # MACHINE review — HARD GATE. A split-artifact / trailing-colon /
-      # empty title (or a depth>3 nesting) fails CI. Soft conciseness
-      # warnings (compound / too-long) do not. Run from the folio root: the
-      # audit reads the content root relative to the working directory.
-      - name: Machine review — titles + structure (hard gate)
-        run: bun run "{{assistant}}/cat-harness-tools/pipeline/qa-section-title-audit.ts"
-
-      # COMPUTE AND JUDGE: compute the derived copy from the live manifests and
-      # the stored verdicts. Exit 2 means the verdict store could not be read —
-      # could not determine, which is never a pass. A legacy committed
-      # {{folio}}/<document>/section-title-audit.qa.json is read once and its
-      # verdicts moved into the store; removing it from main is a person's call.
-      - name: Compute the derived copy and judge the verdict store
-        run: bun run "{{assistant}}/cat-harness-tools/pipeline/qa-section-title-audit.ts" --report-only --write-sidecar --thorough
+    uses: litlfred/cat-harness-tools/.github/workflows/folio-section-title-audit.yml@main

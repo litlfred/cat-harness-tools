@@ -1838,7 +1838,7 @@ export function initFolio(options: InitFolioOptions): InitFolioResult {
     write(t.target, renderTemplate(readFileSync(t.source, "utf-8"), templateValues));
   }
   result.notes.push(
-    "QA workflows (qa-sweep, qa-sweep-nightly, section-title-audit)" +
+    "QA and site workflows (qa-sweep, qa-sweep-nightly, section-title-audit, site-publish; thin callers of cat-harness-tools' folio-* reusable workflows)" +
       (o.contentType === "paper" ? " and Lean workflows (blueprint, lean-build, lean-build-sidecar, lean_ci)" : "") +
       " are written dispatch-only: enable their triggers in .github/workflows/ when you want them to run.",
   );
