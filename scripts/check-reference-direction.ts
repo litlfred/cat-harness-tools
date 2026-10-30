@@ -695,6 +695,11 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
       "TEST MATERIAL. Not a carve invented here — it is the rule the import axis already applies, stated in `partition/instance-rules.ts`: *\"A test may reach anywhere it needs to; that is what a test is for.\"* A fixture naming a downstream instance is exercising the layering, not depending on it, and the two axes agreeing on this is the point of absorbing one into the other. `check:partition` buckets 486 modules as `(test material)` on the same ground",
   },
   {
+    pattern: /^\s*"(?:[^"\/]+\/)*(test|tests|__tests__)\/[^"]*",?\s*$/,
+    reason:
+      "a PATH INTO TEST MATERIAL, alone on its line as a quoted string (a file list such as the content-code-free ratchet). The instance name is a directory inside a test fixture, so the line points at the fixture, which the TEST MATERIAL rule above already exempts; listing a fixture's path is not depending on the instance its folder is named after",
+  },
+  {
     pattern: /^\s*(\/\/|\*|#)?\s*declared-path-literal:/,
     reason:
       "`check:declared-paths`'s own exemption marker, whose reason text necessarily names the directory it is excusing. Scanning it would make satisfying one gate breach another",

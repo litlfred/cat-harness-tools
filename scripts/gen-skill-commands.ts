@@ -46,9 +46,12 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
+import { checkoutRootFor, findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { userInvocableSkills, type InvocableSkill } from "./invocable-skills.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { dirname } from "node:path";
+import { discoverLocalPackages } from "./skill-packages.ts";
+
+export const REPO_ROOT = checkoutRootFor(resolve(HARNESS_ROOT));
 
 export const GENERATED_BY = "cat-harness-tools/scripts/gen-skill-commands.ts";
 /**
@@ -110,7 +113,18 @@ export interface CommandReport {
   duplicates: { name: string; paths: string[] }[];
 }
 
-export function reconcile(repo: string, packages?: Record<string, string>): CommandReport {
+/**
+ * Skill packages for `repo`: an instance root gets only the skills it owns
+ * (`"instance"`, bean `t5zb`), while an index root gets the checkout overlay.
+ */
+export function packagesFor(repo: string = REPO_ROOT): Record<string, string> {
+  const abs = resolve(repo);
+  return findDeclarationFile(abs) !== undefined
+    ? discoverLocalPackages(abs, "instance")
+    : discoverLocalPackages(resolve(HARNESS_ROOT));
+}
+
+export function reconcile(repo: string = REPO_ROOT, packages: Record<string, string> = packagesFor(repo)): CommandReport {
   const { skills, duplicates } = userInvocableSkills(packages);
   const dir = join(repo, COMMANDS_DIR);
   const present = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith(".md")) : [];
@@ -136,7 +150,7 @@ export function reconcile(repo: string, packages?: Record<string, string>): Comm
 }
 
 /** Write what is missing or stale and remove this generator's orphans. Returns the files changed. */
-export function write(repo: string, packages?: Record<string, string>): string[] {
+export function write(repo: string = REPO_ROOT, packages: Record<string, string> = packagesFor(repo)): string[] {
   const { skills } = userInvocableSkills(packages);
   const byName = new Map(skills.map((s) => [s.name, s]));
   const changed: string[] = [];
@@ -155,24 +169,46 @@ export function write(repo: string, packages?: Record<string, string>): string[]
 }
 
 if (import.meta.main) {
-  const repo = resolve(dirname(HARNESS_ROOT));
+  const dirIdx = process.argv.indexOf("--dir");
+  const explicitDir = dirIdx >= 0 && process.argv[dirIdx + 1] ? resolve(process.argv[dirIdx + 1]!) : undefined;
   const check = process.argv.includes("--check");
-  if (!check) {
-    const changed = write(repo);
-    console.log(changed.length ? changed.map((f) => `  wrote ${f}`).join("\n") : "  nothing to write");
+  const cwdRoot = checkoutRootFor(process.cwd());
+  const baseRoot =
+    findDeclarationFile(cwdRoot) !== undefined || existsSync(join(cwdRoot, "index.config.json")) ? cwdRoot : REPO_ROOT;
+  const targets =
+    explicitDir !== undefined
+      ? [explicitDir]
+      : [
+          baseRoot,
+          ...(findDeclarationFile(baseRoot) === undefined
+            ? instanceRootsIn(baseRoot).filter((r) => existsSync(join(r, COMMANDS_DIR)))
+            : []),
+        ];
+  let totalBad = 0;
+  for (const repo of targets) {
+    const prefix = targets.length > 1 ? `${relative(baseRoot, repo) || "."}: ` : "";
+    if (!check) {
+      const changed = write(repo);
+      console.log(changed.length ? changed.map((f) => `  wrote ${prefix}${f}`).join("\n") : `  ${prefix}nothing to write`);
+    }
+    const r = reconcile(repo);
+    for (const d of r.duplicates) {
+      console.log(`✗ ${prefix}${d.name} is declared by ${d.paths.length} files: ${d.paths.map((p) => relative(repo, p)).join(", ")}`);
+    }
+    for (const f of r.findings) {
+      const why = {
+        missing: "declares user_invocable and has no command — run `bun run cat skill:commands`",
+        stale: "generated command is stale — run `bun run cat skill:commands`",
+        orphaned: "generated command whose skill no longer declares user_invocable — run `bun run cat skill:commands`",
+        undeclared: "hand-written command with no user_invocable skill of that name — give the skill `name:` and `user_invocable: true`, or remove the command (a person's call)",
+      }[f.kind];
+      console.log(`✗ ${prefix}${f.file}: ${why}`);
+    }
+    const bad = r.findings.length + r.duplicates.length;
+    totalBad += bad;
+    if (bad === 0) {
+      console.log(`✓ ${prefix}${r.declared} user_invocable skill(s), each with a command; every command has a declared skill`);
+    }
   }
-  const r = reconcile(repo);
-  for (const d of r.duplicates) console.log(`✗ ${d.name} is declared by ${d.paths.length} files: ${d.paths.map((p) => relative(repo, p)).join(", ")}`);
-  for (const f of r.findings) {
-    const why = {
-      missing: "declares user_invocable and has no command — run `bun run cat skill:commands`",
-      stale: "generated command is stale — run `bun run cat skill:commands`",
-      orphaned: "generated command whose skill no longer declares user_invocable — run `bun run cat skill:commands`",
-      undeclared: "hand-written command with no user_invocable skill of that name — give the skill `name:` and `user_invocable: true`, or remove the command (a person's call)",
-    }[f.kind];
-    console.log(`✗ ${f.file}: ${why}`);
-  }
-  const bad = r.findings.length + r.duplicates.length;
-  if (bad === 0) console.log(`✓ ${r.declared} user_invocable skill(s), each with a command; every command has a declared skill`);
-  process.exit(check && bad > 0 ? 1 : 0);
+  process.exit(check && totalBad > 0 ? 1 : 0);
 }

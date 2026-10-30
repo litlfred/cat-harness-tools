@@ -38,7 +38,9 @@ import {
   droppedEntryReport,
   droppedTargetNodesReport,
   entriesPastBudget,
+  ROOT,
   lowestPriorityFirst,
+  memoryDirsFor,
   parseMemoryFile,
   readMemoryNodes,
   rebaseAgentsMdLinks,
@@ -598,5 +600,15 @@ describe("Repo-wide AGENTS.md section and per-target budgets (bean 31ni)", () =>
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  test("per-repo memory scope and link rebasing inside cat-harness (bean t5zb)", () => {
+    expect(memoryDirsFor(ROOT).map((d) => d.replace(/\/+$/, ""))).toEqual([join(ROOT, "memory")]);
+    expect(rebaseRuleLinks("See [`x`](../skills/ui/ui-core/render-logging.md).", ROOT)).toBe(
+      "See [`x`](../../skills/ui/ui-core/render-logging.md).",
+    );
+    expect(rebaseAgentsMdLinks("See [`x`](../skills/ui/ui-core/render-logging.md).", ROOT)).toBe(
+      "See [`x`](skills/ui/ui-core/render-logging.md).",
+    );
   });
 });

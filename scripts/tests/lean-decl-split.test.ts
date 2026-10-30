@@ -18,8 +18,7 @@
  * None of the three surfaces an error. That is what these pin.
  */
 import { describe, expect, test } from "bun:test";
-import { splitDeclarations, topLevelCut } from "../../pipeline/lean-atlas-ingest";
-import { stripLeanComments } from "../../pipeline/lean-atlas-ingest";
+import { splitDeclarations, stripLeanComments, topLevelCut } from "../../pipeline/lean-lexer";
 
 /** The cut exactly as it was before the fix, for the equivalence check. */
 const oldCut = (t: string) => t.search(/:=|\bwhere\b/);
