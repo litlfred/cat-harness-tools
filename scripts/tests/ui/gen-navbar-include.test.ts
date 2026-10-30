@@ -23,6 +23,7 @@ import { instanceView, render, type Harness } from "../../gen-navbar-include.js"
 import { harnessTiles } from "../../harness-tiles.js";
 import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { siteNotBuilt } from "../../../test/support/checkout.ts";
 import { dirname } from "node:path";
 
 const ROOT = join(dirname(HARNESS_ROOT));
@@ -35,6 +36,9 @@ const INCLUDE = join(SITE, "_includes", "generated", "navbar-footer.html");
 const TEMPLATE = join(INSTANCE, siteFileFor(INSTANCE, "_includes/nav_footer_custom.html"));
 
 const file = (): string => readFileSync(INCLUDE, "utf-8");
+/** Standing alone, the include is not built: `navbar:include` writes it at publish, and it is gitignored (bean w1gy F18). */
+const NOT_BUILT = (): boolean =>
+  siteNotBuilt("the generated sidebar include `navbar:include` writes at publish (gitignored)", INCLUDE);
 
 /** The two deploy variants, split on the one Liquid conditional that makes them. */
 function variants(s: string): { canonical: string; staging: string } {
@@ -44,7 +48,7 @@ function variants(s: string): { canonical: string; staging: string } {
 }
 
 describe("what Jekyll is handed", () => {
-  test("every href goes through `relative_url`", () => {
+  test.skipIf(NOT_BUILT())("every href goes through `relative_url`", () => {
     // `68au`: every graph tile in this navbar 404'd because an href was
     // composed without the baseurl. The site is served from
     // `/folio-assistant/` on the canonical deploy and from
@@ -59,7 +63,7 @@ describe("what Jekyll is handed", () => {
     expect(unfiltered).toEqual([]);
   });
 
-  test("the avatar `src` goes through it too — the one that looks like content", () => {
+  test.skipIf(NOT_BUILT())("the avatar `src` goes through it too — the one that looks like content", () => {
     // Missed the first time for a reason worth keeping: an `img src` is
     // composed exactly like an href and does not read like a link, so a sweep
     // looking for navigation skips it. Omitting the filter rendered the mark
@@ -70,7 +74,7 @@ describe("what Jekyll is handed", () => {
     expect(srcs.filter((h) => !h.includes("relative_url"))).toEqual([]);
   });
 
-  test("the checkbox is rendered ONCE, inside the copy guard", () => {
+  test.skipIf(NOT_BUILT())("the checkbox is rendered ONCE, inside the copy guard", () => {
     // just-the-docs renders this extension point twice per page by design:
     // once in `.site-footer` inside `.side-bar`, once in a `.d-md-none` block
     // outside it. With the input in both, `id="fa-nav-open"` appeared twice on
@@ -86,7 +90,7 @@ describe("what Jekyll is handed", () => {
     expect(guard![1]).toContain('id="fa-nav-open"');
   });
 
-  test("neither variant renders a label: the theme's avatar is the way in (#1757)", () => {
+  test.skipIf(NOT_BUILT())("neither variant renders a label: the theme's avatar is the way in (#1757)", () => {
     // There were two labels per copy, the `☰` and the `[x]`, and the owner
     // asked for both to go because they duplicated the avatar. So the way in
     // is no longer in this include at all — it is `.site-title`, which
@@ -115,7 +119,7 @@ describe("the two deploy variants differ ONLY at a staging-only viewer", () => {
    * nothing else — a second difference hiding in there would be a branch
    * nobody declared, which is the thing `sjic` is against.
    */
-  test("the difference is the staging-only rows, and no other row", () => {
+  test.skipIf(NOT_BUILT())("the difference is the staging-only rows, and no other row", () => {
     const { canonical, staging } = variants(file());
     const rows = (s: string): string[] => [...s.matchAll(/fa-nav-label">([^<]*)</g)].map((m) => m[1]!);
     // Same rows, in the same order, on both deploys. Only their REACHABILITY
@@ -127,7 +131,7 @@ describe("the two deploy variants differ ONLY at a staging-only viewer", () => {
     expect(staging).not.toContain("staging only");
   });
 
-  test("the canonical side renders the withheld viewer as a DEAD row, not a hidden one", () => {
+  test.skipIf(NOT_BUILT())("the canonical side renders the withheld viewer as a DEAD row, not a hidden one", () => {
     // `pb04`, and the rule the rest of the navbar follows. Dropping it would
     // answer "what is in this harness" with a shorter and wronger list; making
     // it a link would invite a click that 404s on this deploy.

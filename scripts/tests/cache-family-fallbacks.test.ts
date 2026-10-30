@@ -21,8 +21,10 @@
  * @module cat-harness-tools/scripts/tests/cache-family-fallbacks
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+
+import { notApplicableAlone } from "../../test/support/checkout.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..");
 
@@ -43,7 +45,10 @@ const FAMILIES = {
 describe("cache scripts carry the built-in family names newest first, and none unknown", () => {
   for (const [family, { names, files }] of Object.entries(FAMILIES)) {
     for (const file of files) {
-      test(`${file}: its ${family} fallback list is a newest-first prefix of the known names`, () => {
+      // The script is in the layer that owns the family (`fhir-harness`), a
+      // higher instance a standalone checkout does not hold (bean w1gy F18).
+      const absent = !existsSync(resolve(REPO, file)) && notApplicableAlone(`${file}, in ${file.split("/")[0]}'s checkout (a higher instance)`);
+      test.skipIf(absent)(`${file}: its ${family} fallback list is a newest-first prefix of the known names`, () => {
         const text = readFileSync(resolve(REPO, file), "utf-8");
         const m = /for p in ((?:"[^"]+"\s*)+); do/.exec(text);
         expect(m, `${file} writes its list as one \`for p in "…"; do\` literal`).not.toBeNull();

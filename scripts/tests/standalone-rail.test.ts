@@ -18,7 +18,8 @@ import { join } from "node:path";
 
 import { PINNED_CHROME_FILES, PINNED_DATA_FILES, mountRoutes, pinPlatformChrome, railStandalonePages } from "../mount-instance-docs.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { siteFileFor } from "../../schemas/kg/cat-harness.js";
+import { siteNotBuilt } from "../../test/support/checkout.ts";
+import { siteDirFor, siteFileFor } from "../../schemas/kg/cat-harness.js";
 import { expandRail, navbarRowJsonOf, railDataJson } from "../lib/harness-rail.ts";
 
 const page = (body: string): string =>
@@ -54,7 +55,14 @@ const railed = (root: string, rel: string): boolean =>
   /<nav class="fa-nav"/.test(readFileSync(join(root, rel), "utf-8"));
 
 describe("what it rails", () => {
-  test("a railed page carries the harness's icon-row data, so docs-ui draws the row (bean wckf, #2147)", () => {
+  // The row is read off the harness's `_data/harness.json`, which `docs:harness`
+  // writes at publish and is gitignored: standing alone it is not built (w1gy F18).
+  test.skipIf(
+    siteNotBuilt(
+      "the harness data `docs:harness` writes at publish (gitignored), whose `navbar` is the icon row",
+      join(HARNESS_ROOT, siteDirFor(HARNESS_ROOT), "_data", "harness.json"),
+    ),
+  )("a railed page carries the harness's icon-row data, so docs-ui draws the row (bean wckf, #2147)", () => {
     // The rail had the harness's navbar without the harness's row: the row's
     // data was written only by the theme's head include. Read from the same
     // `_data/harness.json` the Jekyll sidebar reads, so the two cannot differ.

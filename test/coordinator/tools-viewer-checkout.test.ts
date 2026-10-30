@@ -18,6 +18,7 @@ import { baseDocsDir } from "../../scripts/compose-docs.js";
 import { docsPages, documentingPages } from "../../scripts/docs-declarations.js";
 import { page, publishedPage, pageRelPath, skillIds, toolRows, toolSubjects } from "../../scripts/gen-tools-viz.js";
 import { discoverTools } from "../../tools/discover.ts";
+import { siteNotBuilt } from "../support/checkout.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -173,7 +174,17 @@ describe("the generator writes where the declaration says", () => {
     expect(readFileSync(join(DOCS, rel), "utf-8")).toBe(publishedPage(all, skillIds(REPO), REPO, scope));
   });
 
-  it("draws one current page per instance that declares Tools, and none for an empty graph", () => {
+  // Standing alone the per-instance pages are not built: `tools:viz` writes
+  // them at publish and `tools/` is gitignored (bean w1gy F18). A subject with
+  // no page route guards nothing, so the assertion below still names it.
+  const subjectPages = subjects.flatMap((x) => {
+    const rel = pageRelPath(REPO, x.name);
+    return rel === undefined ? [] : [join(DOCS, rel)];
+  });
+  it.skipIf(
+    subjectPages.length > 0 &&
+      siteNotBuilt("the per-instance Tools pages `tools:viz` writes at publish (gitignored)", ...subjectPages),
+  )("draws one current page per instance that declares Tools, and none for an empty graph", () => {
     // Vacuity guard: more than cat-harness's own graph is drawn.
     expect(subjects.length).toBeGreaterThan(1);
     for (const x of subjects) {
