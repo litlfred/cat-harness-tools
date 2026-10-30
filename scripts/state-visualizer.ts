@@ -166,6 +166,7 @@ import {
   beanStepsOf,
   diagramLevels,
   DYNAMIC_STATE_FILE,
+  dynamicStateDocument,
   endNodesOf,
   GATE_REFUSALS,
   lastMoved,
@@ -2926,6 +2927,8 @@ function unlinkedSection(s: InstanceSubject): string {
  * instance at `<store page>/workflows/<id>/`, and the hub listing them.
  * Returns the store's orphaned instance pages, site-relative.
  */
+/** How many workflow instance pages this run drew: each one reads `state.jsonld` when it loads. */
+let workflowPagesDrawn = 0;
 function drawWorkflows(visualiser: string, s: InstanceSubject, storeDir: string, models: ReadonlyMap<string, ModelRead>): string[] {
   const read = readSubjectBeans(s.instanceRoot);
   if (!("beans" in read) || read.beans === null) return [];
@@ -2957,6 +2960,7 @@ function drawWorkflows(visualiser: string, s: InstanceSubject, storeDir: string,
       },
     });
     emit(join(pageDir, "index.html"), withRenderedByFrontMatter(html, VIEWER_TOOL));
+    workflowPagesDrawn++;
   }
   if (flows.length > 0) emit(join(hubDir, "index.html"), withRenderedByFrontMatter(workflowHubPage(s.name, s.absPath, view), VIEWER_TOOL));
   const { owned } = orphanSubjectPages(hubDir, ids, carriesMarker(GENERATED_BY));
@@ -3057,6 +3061,19 @@ if (check) {
 } else {
   for (const o of orphans) unlinkSync(join(SITE, o));
   for (const o of subjectOrphans) rmSync(join(SITE, o), { recursive: true });
+  // The workflow pages read `<site>/<harness>/state.jsonld` when they load.
+  // The platform's own render pipeline exports it as stage 3 (`kg-dynamic`),
+  // but a folio's site build runs this writer and no stage 3, so its pages
+  // linked a file that was never there (smart-ra, 2026-10-30: the publish's
+  // link check refused it). The writer of the pages writes the file they read,
+  // from the same inputs the exporter uses; stage 3, where it runs, rewrites it.
+  if (workflowPagesDrawn > 0) {
+    const { harness, inputs, unread } = await dynamicStateInputs();
+    const target = dynamicStateTarget();
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, JSON.stringify(dynamicStateDocument(harness, inputs, NOW, unread), null, 2) + "\n");
+    console.log(`  wrote ${relative(ROOT, target)} for ${workflowPagesDrawn} workflow page(s)`);
+  }
   console.log(`\nWrote ${wrote} dashboard(s) under ${relative(ROOT, SITE)}/`);
   if (taken.length > 0) process.exit(1);
 }
