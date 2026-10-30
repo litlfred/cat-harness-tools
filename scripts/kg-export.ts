@@ -83,8 +83,7 @@ import { fileURLToPath } from "node:url";
 
 import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
 import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
-import { applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.js";
-import { STANDARD_PREFIXES } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.js";
+import { STANDARD_PREFIXES, applyVocabMapping, contextBindings, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.js";
 import { readPolicyGrants } from "@litlfred/cat-harness/schemas/content/odrl.js";
 import { KG_CONTENT_GRAPH_TYPOLOGIES, declaredAssets, declaredGraphs, declaredKinds, repoRootFor, resolveDirectories, declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { type DependsOnGap, type DependsOnRecord, dependsOnFor } from "@litlfred/cat-harness/schemas/kg/depends-on.js";
