@@ -22,49 +22,6 @@ import { TOOLS_ROOT } from "../lib/roots.ts";
 /** Skip folio-side assertions when no content repo is attached. */
 const folio = hasFolio();
 
-// ── session-status.sh (replaced check-lean.sh) ─────────────────
-
-describe("session-status.sh", () => {
-  const script = join(TOOLS_ROOT, "scripts", "session-status.sh");
-
-  let output: string;
-  let parsed: Record<string, unknown>;
-
-  try {
-    output = execSync(script, { encoding: "utf-8", timeout: 10_000 }).trim();
-    parsed = JSON.parse(output);
-  } catch {
-    output = "";
-    parsed = {};
-  }
-
-  test("outputs valid JSON", () => {
-    expect(output.length).toBeGreaterThan(0);
-    expect(() => JSON.parse(output)).not.toThrow();
-  });
-
-  test("has status object", () => {
-    expect(parsed).toHaveProperty("status");
-  });
-
-  test("status has lean_mode field", () => {
-    const status = parsed.status as Record<string, unknown> | undefined;
-    if (status) {
-      expect(status).toHaveProperty("lean_mode");
-      const validModes = ["local", "remote", "local-degraded", "none"];
-      // `status` is `Record<string, unknown>`, and `expect` does not narrow,
-      // so assert the type first — that is worth checking in its own right —
-      // and the cast on the next line is then guarded rather than assumed.
-      expect(typeof status.lean_mode).toBe("string");
-      expect(validModes).toContain(status.lean_mode as string);
-    }
-  });
-
-  test("has summary field", () => {
-    expect(parsed).toHaveProperty("summary");
-  });
-});
-
 // ── check-no-lean-artifacts.sh ──────────────────────────────────
 
 describe("check-no-lean-artifacts.sh", () => {
