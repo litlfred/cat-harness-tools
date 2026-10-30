@@ -57,31 +57,16 @@
  * other copies disagreed on is appended under a dated "Merged from" section.
  *
  *   bun run cat-harness-tools/scripts/bean-dedupe.ts [--out <dir>] [--emit <dir>] [--stores <file.json>]
+ *   bun run cat-harness-tools/scripts/bean-dedupe.ts --check   # exit 1 unless every bean has one home
  */
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 
-export type StoreSpec = { name: string; repo: string; branch: string; path: string };
+import { DEFAULT_STORES, LAYERS, MAIN_STORE, PREFIX_HOME, oneHomeProblems, type StoreSpec } from "./lib/bean-homes.ts";
 
-// declared-path-literal: these name folders in OTHER repositories' trees, read over git; no declaration in this checkout answers them.
-export const DEFAULT_STORES: StoreSpec[] = [
-  { name: "folio-assistant", repo: "litlfred/folio-assistant", branch: "cat/cat-harness/beans", path: "beans/defs" },
-  { name: "cat-harness", repo: "litlfred/cat-harness", branch: "cat/cat-harness/beans", path: "beans/defs" },
-  { name: "cat-harness-tools", repo: "litlfred/cat-harness-tools", branch: "main", path: "beans/defs" },
-  { name: "folio-assistant-core", repo: "litlfred/folio-assistant-core", branch: "main", path: "beans/defs" },
-];
-
-/** The store that keeps whatever no layer took (owner, 2026-10-20). */
-export const MAIN_STORE = "folio-assistant";
-/** Prefixes that already name their home. */
-export const PREFIX_HOME: Record<string, string> = {
-  "cat-tools-": "cat-harness-tools",
-  "folio-core-": "folio-assistant-core",
-};
-/** Layers whose copies of `folio-assistant-*` beans mark where those beans belong. */
-export const LAYERS = ["cat-harness-tools", "folio-assistant-core"];
+export { DEFAULT_STORES, LAYERS, MAIN_STORE, PREFIX_HOME, type StoreSpec };
 
 export type Copy = { store: string; file: string; text: string };
 
@@ -382,6 +367,18 @@ function main() {
   mkdirSync(cache, { recursive: true });
 
   const read = Object.fromEntries(stores.map((s) => [s.name, readStore(s, cache)]));
+  if (argv.includes("--check")) {
+    // #459 step 4: every bean in exactly one store, none in a retired one.
+    const problems = oneHomeProblems(Object.fromEntries(stores.map((s) => [s.name, read[s.name].copies.keys()])));
+    for (const s of stores) console.log(`${s.name}: ${s.repo} ${s.branch} @ ${read[s.name].commit.slice(0, 7)}, ${read[s.name].copies.size} beans`);
+    if (problems.length) {
+      for (const p of problems) console.error(`  ${p}`);
+      console.error(`check:bean-one-home: ${problems.length} bean(s) without one home. Fix with \`bun run cat beans:dedupe --emit <dir>\` and commit the emitted tree.`);
+      process.exit(1);
+    }
+    console.log("check:bean-one-home: every bean has one home");
+    return;
+  }
   const base = readBase(stores, cache);
   const ids = new Set(Object.values(read).flatMap((r) => [...r.copies.keys()]));
 
