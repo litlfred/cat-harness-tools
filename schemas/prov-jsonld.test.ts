@@ -15,6 +15,7 @@ import { localLoader } from "../scripts/publish-verify.ts";
 import {
   addressBook,
   heldProvJsonldContext,
+  processHolding,
   provJsonldDocument,
   PROV_JSONLD_CONTEXT_URL,
   type AddressBook,
@@ -119,5 +120,46 @@ describe("the context is named, never fetched", () => {
     const ctx = provJsonldDocument("t", [], stub).document["@context"] as unknown[];
     expect(ctx[0]).toBe(PROV_JSONLD_CONTEXT_URL);
     expect((ctx[1] as Record<string, unknown>)["@base"]).toBeDefined();
+  });
+});
+
+describe("subject IRIs beside the release addresses (issue #959, owner 2026-10-30 option A)", () => {
+  const book: AddressBook = {
+    resolve: (kind, v) => ({ iri: `https://example.org/release/${kind}/${v}` }),
+    subject: (kind, v) => (kind === "agent" ? undefined : `https://example.org/kg/${kind}/${v.replace("#", "/node/")}`),
+  };
+
+  test("plan and role subjects are links; the stored short reference stays the plan", async () => {
+    const { document } = provJsonldDocument("t--s", [activity("owner", "merge-steward", "merge-train#Task_ReadLive")], book);
+    const assoc = (document["@graph"] as Record<string, unknown>[]).find((n) => n["@type"] === "Association")!;
+    expect(assoc.plan).toBe("https://example.org/release/plan/merge-train#Task_ReadLive");
+    expect(assoc["cat-harness:planSubject"]).toBe("https://example.org/kg/plan/merge-train/node/Task_ReadLive");
+    expect(assoc["cat-harness:roleSubject"]).toBe("https://example.org/kg/role/merge-steward");
+    // No subject, no term: an agent with no page is not given an address.
+    expect("cat-harness:agentSubject" in assoc).toBe(false);
+    const node = (await expanded(document)).find((n) => Object.keys(n).some((k) => k.endsWith("planSubject")))!;
+    const key = Object.keys(node).find((k) => k.endsWith("planSubject"))!;
+    expect(node[key]).toEqual([{ "@id": "https://example.org/kg/plan/merge-train/node/Task_ReadLive" }]);
+  });
+
+  test("a book without subjects publishes only the release addresses", () => {
+    const plain: AddressBook = { resolve: book.resolve };
+    const { document } = provJsonldDocument("t--p", [activity("owner", "merge-steward", "merge-train#Task_ReadLive")], plain);
+    const assoc = (document["@graph"] as Record<string, unknown>[]).find((n) => n["@type"] === "Association")!;
+    expect(Object.keys(assoc).filter((k) => k.endsWith("Subject"))).toEqual([]);
+  });
+});
+
+describe("processHolding — the process a task belongs to", () => {
+  const xml = `<bpmn:definitions>
+  <bpmn:collaboration id="C"><bpmn:participant id="P1" processRef="A"/></bpmn:collaboration>
+  <bpmn:process id="A" isExecutable="false"><bpmn:task id="T1"/></bpmn:process>
+  <bpmn:process id="B"><bpmn:userTask id="T2"/></bpmn:process>
+</bpmn:definitions>`;
+  test("each task resolves to its own process; unknown ids and ids outside any process to none", () => {
+    expect(processHolding(xml, "T1")).toBe("A");
+    expect(processHolding(xml, "T2")).toBe("B");
+    expect(processHolding(xml, "nope")).toBeUndefined();
+    expect(processHolding(xml, "P1")).toBeUndefined();
   });
 });

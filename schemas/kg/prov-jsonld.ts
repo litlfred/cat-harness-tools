@@ -90,6 +90,35 @@ export type Address = { iri: string } | { unaddressed: string };
 
 export interface AddressBook {
   resolve(kind: AddressKind, value: string): Address;
+  /**
+   * The value's SUBJECT in its owner's published knowledge graph — the page
+   * `<doc dir>/<kind>/<id>` serves — or `undefined` when there is none to
+   * name. An agent is its `actor`, a role its `role`, a plan `stem#task` the
+   * task's `process/<P>/node/<task>` (issue #959). Optional: a book that
+   * cannot mint subjects publishes only the release addresses.
+   */
+  subject?(kind: AddressKind, value: string): string | undefined;
+}
+
+/** Mints a subject IRI in the published document of the instance at `root`. */
+export type SubjectMinter = (root: string, kind: "actor" | "role" | "process", id: string) => string | undefined;
+
+/**
+ * The id of the BPMN process in `xml` that holds the element `taskId`, or
+ * `undefined`. A collaboration's processes are each their own
+ * `<bpmn:process>` element, so the task's process is the one whose body
+ * declares the id.
+ */
+export function processHolding(xml: string, taskId: string): string | undefined {
+  const at = xml.indexOf(`id="${taskId}"`);
+  if (at === -1) return undefined;
+  let holder: { id: string; end: number } | undefined;
+  for (const m of xml.slice(0, at).matchAll(/<(?:[\w-]+:)?process\b[^>]*\bid="([^"]+)"[^>]*>/g)) {
+    holder = { id: m[1]!, end: m.index! + m[0].length };
+  }
+  if (!holder) return undefined;
+  // Closed before the task: the task sits outside every process.
+  return /<\/(?:[\w-]+:)?process>/.test(xml.slice(holder.end, at)) ? undefined : holder.id;
 }
 
 interface Owned {
@@ -98,6 +127,8 @@ interface Owned {
   /** Path inside the instance, without extension, `/`-separated. */
   path: string;
   fragment?: string;
+  /** The file itself, absolute (plans only). */
+  file?: string;
 }
 
 function* filesUnder(dir: string, ext: string): Generator<string> {
@@ -119,7 +150,7 @@ const rel = (root: string, file: string): string => relative(root, file).split("
  * (`instanceRootsIn`), so a process file is attributed to the DEEPEST instance
  * holding it.
  */
-export function addressBook(repo: string): AddressBook {
+export function addressBook(repo: string, mint?: SubjectMinter): AddressBook {
   const roots = instanceRootsIn(repo).sort((a, b) => b.length - a.length);
   const owner = (file: string): string | undefined => roots.find((r) => file.startsWith(`${r}/`));
   const actors = new Map<string, Owned>();
@@ -174,7 +205,7 @@ export function addressBook(repo: string): AddressBook {
     const root = owner(f);
     if (!root) continue;
     const stem = basename(f, ".bpmn").toLowerCase();
-    if (!plans.has(stem)) plans.set(stem, { root, path: rel(root, f) });
+    if (!plans.has(stem)) plans.set(stem, { root, path: rel(root, f), file: f });
   }
 
   const addressOf = (o: Owned, fragment?: string): Address => {
@@ -225,6 +256,26 @@ export function addressBook(repo: string): AddressBook {
       const o = plans.get(stem.toLowerCase());
       return o ? addressOf(o, task) : { unaddressed: `no .bpmn named ${stem} in this checkout` };
     },
+    ...(mint
+      ? {
+          subject(kind: AddressKind, value: string): string | undefined {
+            if (kind === "agent") {
+              const o = actors.get(value);
+              return o ? mint(o.root, "actor", value) : undefined;
+            }
+            if (kind === "role") {
+              const o = roles.get(value);
+              return o ? mint(o.root, "role", value) : undefined;
+            }
+            if (kind !== "plan") return undefined;
+            const [stem, task] = value.split("#") as [string, string | undefined];
+            const o = plans.get(stem.toLowerCase());
+            if (!o?.file || !task) return undefined;
+            const pid = processHolding(readFileSync(o.file, "utf-8"), task);
+            return pid ? mint(o.root, "process", `${pid}/node/${task}`) : undefined;
+          },
+        }
+      : {}),
   };
 }
 
@@ -289,12 +340,25 @@ export function provJsonldDocument(
       ...(a["cat-harness:previousHash"] !== undefined ? { "cat-harness:previousHash": a["cat-harness:previousHash"] } : {}),
       ...(a["cat-harness:recordHash"] ? { "cat-harness:recordHash": a["cat-harness:recordHash"] } : {}),
     });
+    // Beside each release address, the subject page in the owner's knowledge
+    // graph (issue #959, owner 2026-10-30: add the IRI when published). The
+    // stored, hash-chained record keeps its short `stem#task` reference.
+    const subjects: Record<string, string> = {};
+    for (const [term, kind, raw] of [
+      ["cat-harness:agentSubject", "agent", q["prov:agent"]],
+      ["cat-harness:roleSubject", "role", q["prov:hadRole"]],
+      ["cat-harness:planSubject", "plan", q["prov:hadPlan"]],
+    ] as const) {
+      const s = book.subject?.(kind, raw);
+      if (s) subjects[term] = s;
+    }
     graph.push({
       "@type": "Association",
       activity: a["@id"],
       agent: field("agent", q["prov:agent"]),
       role: field("role", q["prov:hadRole"]),
       plan: field("plan", q["prov:hadPlan"]),
+      ...subjects,
     });
   }
   return {
@@ -305,6 +369,9 @@ export function provJsonldDocument(
           "@base": FOLIO_BASE,
           "cat-harness": CAT_HARNESS_NS,
           "cat-harness:underPolicy": { "@type": "@id" },
+          "cat-harness:agentSubject": { "@type": "@id" },
+          "cat-harness:roleSubject": { "@type": "@id" },
+          "cat-harness:planSubject": { "@type": "@id" },
         },
       ],
       "@id": id,

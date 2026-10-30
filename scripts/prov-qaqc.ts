@@ -52,10 +52,10 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.js";
-import { addressBook, provJsonldDocument, type AddressBook } from "../schemas/kg/prov-jsonld.js";
+import { instanceRootsIn, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { addressBook, provJsonldDocument, type AddressBook, type SubjectMinter } from "../schemas/kg/prov-jsonld.js";
 import { ProvActivitySchema, ProvConsentRefSchema, isConsentBasedRecord, isConsentPolicyUid, verifyProvHashChain, type ProvActivity } from "../schemas/content/prov.js";
-import { laneBinding, type RoleGraph } from "../schemas/process/role-graph.js";
+import { actorsDir, laneBinding, type RoleGraph } from "../schemas/process/role-graph.js";
 import { loadAccessContext, type AccessContext, type Principal } from "../src/core/access.js";
 import { authorizeTask, type TaskAuthVerdict } from "../src/workflow/authorize.js";
 import type { HistoryEntry, InstanceState } from "../src/workflow/instance.js";
@@ -63,6 +63,8 @@ import { isActivity, isDecision, loadProcessModel, processDiagrams, type Process
 import { listInstances } from "../src/workflow/store.js";
 import { roleGraphFor, workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { exportIdentity, publishedIdentity } from "./kg-export.ts";
+import { subjectIri } from "./lib/subject-iri.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
 const REPO = repoRootFor(HARNESS);
@@ -380,13 +382,33 @@ export async function buildReport(
 }
 
 /**
- * The PROV log for one top-level instance and its subprocesses, in
- * PROV-JSONLD's shape with each agent, role and plan a link at its release
- * address (`schemas/kg/prov-jsonld.ts`, beans `jcet`, `9y9j`). Until 2026-10-01
- * this emitted the activities as they are stored, with `prov:`-prefixed keys
- * nothing coerced, so every agent, role and plan was a string literal.
+ * Mints a subject in the published knowledge graph of the instance that owns
+ * it: `<doc dir>/<kind>/<id>`, against the document the deploy writes for
+ * that instance (`publishedIdentity` at the host's base), so the IRI is the
+ * page `kg-export` serves for it (issue #959).
+ *
+ * An actor is the exception: `kg-export` publishes the actor registry it
+ * reads at the checkout root (`actorsDir`), in the document of the instance
+ * holding it, and no other. An actor only another instance declares has no
+ * page, so it gets no subject rather than an address nobody serves.
  */
-export function provDocument(id: string, parts: InstanceReport[], book: AddressBook = addressBook(REPO)): Record<string, unknown> {
+export function publishedSubjects(repo: string = REPO): SubjectMinter {
+  const base = exportIdentity({}).base;
+  const docs = new Map<string, string>();
+  const docOf = (root: string): string => {
+    if (!docs.has(root)) docs.set(root, publishedIdentity(root, base || undefined).docIri);
+    return docs.get(root)!;
+  };
+  const actors = actorsDir(repo);
+  const actorHome = actors ? instanceRootsIn(repo).filter((r) => actors.startsWith(`${r}/`)).sort((a, b) => b.length - a.length)[0] : undefined;
+  return (root, kind, id) => {
+    if (kind !== "actor") return subjectIri(docOf(root), kind, id);
+    if (!actors || !actorHome || !existsSync(join(actors, `${id}.json`))) return undefined;
+    return subjectIri(docOf(actorHome), kind, id);
+  };
+}
+
+export function provDocument(id: string, parts: InstanceReport[], book: AddressBook = addressBook(REPO, publishedSubjects())): Record<string, unknown> {
   return provJsonldDocument(id, parts.flatMap((p) => p.activities), book).document;
 }
 
@@ -484,7 +506,7 @@ ${sections.join("\n\n")}
 /** Every file this generator owns, path → content. */
 export function outputs(r: Report, site: { page: string; assets: string } = { page: PAGE, assets: ASSETS }): Map<string, string> {
   const out = new Map<string, string>([[site.page, renderPage(r)]]);
-  const book = addressBook(REPO);
+  const book = addressBook(REPO, publishedSubjects());
   for (const [id, parts] of r.instances) out.set(join(site.assets, assetName(id)), stableJson(provDocument(id, parts, book)));
   return out;
 }
