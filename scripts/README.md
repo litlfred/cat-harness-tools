@@ -45,7 +45,6 @@ Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-
 | [`check-docs-populated.ts`](check-docs-populated.ts) | a file |  |
 | [`check-docs-templates.ts`](check-docs-templates.ts) | a file |  |
 | [`check-document-kind-sources.ts`](check-document-kind-sources.ts) | a file |  |
-| [`check-duplicate-decls.ts`](check-duplicate-decls.ts) | a file |  |
 | [`check-escaped-markup.ts`](check-escaped-markup.ts) | a file |  |
 | [`check-folio-mount.ts`](check-folio-mount.ts) | a file |  |
 | [`check-foreign-paths.ts`](check-foreign-paths.ts) | a file |  |
@@ -96,7 +95,6 @@ Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-
 | [`check-schema-nodes.ts`](check-schema-nodes.ts) | a file |  |
 | [`check-script-placement.ts`](check-script-placement.ts) | a file |  |
 | [`check-secret-leaks.ts`](check-secret-leaks.ts) | a file |  |
-| [`check-self-discharging-instances.ts`](check-self-discharging-instances.ts) | a file |  |
 | [`check-session-staleness.ts`](check-session-staleness.ts) | a file |  |
 | [`check-soft-hyphens.ts`](check-soft-hyphens.ts) | a file |  |
 | [`check-source-licence.ts`](check-source-licence.ts) | a file |  |
@@ -158,7 +156,6 @@ Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-
 | [`vocab-mappings.ts`](vocab-mappings.ts) | a file |  |
 | [`witness-conformance.ts`](witness-conformance.ts) | a file |  |
 | [`witness-parity.ts`](witness-parity.ts) | a file |  |
-| [`docker-latex-build/`](docker-latex-build/) | _nothing declares what this holds_ | |
 | [`lib/`](lib/) | _nothing declares what this holds_ | |
 | [`tests/`](tests/) | _nothing declares what this holds_ | |
 | [`translation/`](translation/) | _nothing declares what this holds_ | |
