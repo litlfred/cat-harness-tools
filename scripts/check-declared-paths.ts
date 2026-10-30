@@ -573,7 +573,10 @@ export function scanDeclaredPaths(root: string, codeRoots: string[] = [...new Se
       // holds since bean `8lcl` moved it (`schemas/**/*.ts`); resolve it there
       // as the readers do (`implementingRootFor`), so the witness survives.
       let abs = join(root, value);
-      if (!existsSync(abs)) {
+      // Code only: the implementing layer also holds its OWN state graphs
+      // (its `beans/` store, say), and a harness literal naming `beans/…` is
+      // not a module that moved, so it must not resolve against that layer.
+      if (!existsSync(abs) && /\.(?:[cm]?[jt]s|tsx)$/.test(value)) {
         const r = resolveImplementingPath(root, value);
         if (r.state === "found") abs = join(r.root, value);
       }

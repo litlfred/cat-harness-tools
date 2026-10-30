@@ -120,7 +120,6 @@ describe("declared means TRANSITIVELY declared", () => {
     const root = instance(
       { name: "n", directories: [{ id: "beans", path: "beans/", graphTypologies: ["beans"] }] },
       {
-        // declared-path-literal: a fixture file this test writes into its own temp instance; it names nothing in this checkout.
         "beans/beans.json": JSON.stringify({
           name: "beans",
           directories: [
@@ -138,7 +137,6 @@ describe("declared means TRANSITIVELY declared", () => {
     const root = instance(
       { name: "n", directories: [{ id: "beans", path: "beans/", graphTypologies: ["beans"] }] },
       {
-        // declared-path-literal: a fixture file this test writes into its own temp instance; it names nothing in this checkout.
         "beans/beans.json": JSON.stringify({
           name: "beans",
           directories: [{ id: "defs", path: "defs", kinds: ["bean-defs"] }],
@@ -154,7 +152,6 @@ describe("declared means TRANSITIVELY declared", () => {
     // `check:harness-dirs`'s to report, and it does so loudly.
     const root = instance(
       { name: "n", directories: [{ id: "beans", path: "beans/", graphTypologies: ["beans"] }] },
-      // declared-path-literal: a fixture file this test writes into its own temp instance; it names nothing in this checkout.
       { "beans/beans.json": "{ not json" },
     );
     const kinds = declaredKinds(root, JSON.parse(readFileSync(declarationPathIn(root)!, "utf-8")));

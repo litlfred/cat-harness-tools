@@ -111,7 +111,6 @@ describe("instantiate: writes the config and the state directories", () => {
     expect(body._subscription).toEqual({ subscriber: "host", id: "ihris-kb", repository: "litlfred/ihris-kb", ref: SHA });
     // The two state directories, and not the skills one.
     const h = home(c);
-    // declared-path-literal: a path in the instantiated home under test (its temp directory), asserted as what instantiation wrote; it names nothing in this checkout.
     expect(existsSync(join(h, "beans/workflows/.gitkeep"))).toBe(true);
     expect(existsSync(join(h, "beans/defs/.gitkeep"))).toBe(true);
     expect(existsSync(join(h, "skills"))).toBe(false);

@@ -783,7 +783,6 @@ describe("state graphs follow their resolved source (hp54)", () => {
     }
     expect(r.stateGraphs.find((x) => x.id === "todos")!.seed).toContain("todos/todos.json");
     // beans:claim reads the bean graph's declaration FROM THE BRANCH, so the seed must carry it.
-    // declared-path-literal: a path in the scaffolded folio under test (its temp directory), asserted as the scaffold's output; it names nothing in this checkout.
     expect(r.stateGraphs.find((x) => x.id === "beans")!.seed).toContain("beans/beans.json");
     // The mount must never be committed to main.
     const ignore = readFileSync(join(d, ".gitignore"), "utf-8");
@@ -807,7 +806,6 @@ describe("state graphs follow their resolved source (hp54)", () => {
       expect(g.source.declaredIn).toBe("config");
       expect(g.seed).toBeUndefined();
     }
-    // declared-path-literal: a path in the scaffolded folio under test (its temp directory), asserted as the scaffold's output; it names nothing in this checkout.
     expect(r.created).toContain("beans/beans.json");
     expect(r.created).toContain("todos/todos.json");
     expect(readFileSync(join(d, ".gitignore"), "utf-8")).not.toContain("/beans/**");
