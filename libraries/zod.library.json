@@ -189,6 +189,7 @@
     "src/tools/skill-update.ts",
     "src/tools/stakeholder-map.ts",
     "src/tools/translation.ts",
-    "src/tools/workflow.ts"
+    "src/tools/workflow.ts",
+    "test/fixtures/standalone-checkout/folio-assistant-sci/schemas/mathpaper-vocabulary.ts"
   ]
 }
