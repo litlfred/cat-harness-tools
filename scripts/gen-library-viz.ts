@@ -402,15 +402,6 @@ function openViewPanel(){
 }
 openViewPanel();
 window.addEventListener("hashchange", openViewPanel);
-/* A #lib-view link pressed on the page it points at fires no hashchange when
-   the hash is already #lib-view (a reader who closed the panel and presses
-   the source name again), so the press itself opens the panel. */
-document.addEventListener("click", function(ev){
-  var a = ev.target && ev.target.closest ? ev.target.closest('a[href$="#lib-view"]') : null;
-  if (!a || a.pathname !== location.pathname) return;
-  var d = document.querySelector("#lib-view details");
-  if (d && !d.open) d.open = true;
-});
 /* The SUBJECT this page is scoped to, or "" for the handler's whole view.
    One projection serves both — a second JSON per subject would be the same
    facts written N+1 times, free to disagree the moment one is regenerated. */
@@ -550,11 +541,12 @@ var COLS = [
   /* THE SOURCE FILE NAME OPENS IT -- owner, 2026-10-30: "the link to the
      source should be clickable to view under source". An entry whose held
      source has a viewer (e.viewable, set by the projection from viewableOf)
-     links to its own page's view panel, #lib-view, which opens on arrival.
-     Any other entry keeps the plain name: there is nothing here to open. */
+     links to its own page's view panel, #lib-view, which opens on arrival,
+     in a NEW TAB (owner, 2026-10-30, option B) so the listing stays where the
+     reader left it. Any other entry keeps the plain name. */
   { k:"upload",   t:"source",   n:false, c:"t-source", f:function(e){ var s=uploadState(e);
       var name = '<span class="slug" style="font-size:.72rem;color:var(--muted)">'+esc(e.sourceFile)+"</span>";
-      if (e.sourceFile && e.viewable) name = '<a class="src lib-src" href="'+esc(entryHref(e))+'#lib-view">'+esc(e.sourceFile)+"</a>";
+      if (e.sourceFile && e.viewable) name = '<a class="src lib-src" href="'+esc(entryHref(e))+'#lib-view" target="_blank" rel="noopener">'+esc(e.sourceFile)+"</a>";
       return '<span class="pill '+s.cls+'">'+esc(s.label)+"</span>"+(e.sourceFile?"<br>"+name:""); } }
 ];
 
