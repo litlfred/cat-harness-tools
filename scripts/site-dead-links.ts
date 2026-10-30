@@ -24,7 +24,10 @@
  *    segment of the viewers, not a translation).
  * 2. **A source file the site does not publish.** Docs link the `.md`,
  *    `.bpmn`, `.dmn`, `.json` or `.ts` beside them, written relative to where
- *    the page sat in its repository. The site serves no such file. When the
+ *    the page sat in its repository. The site serves no such file. A `.html`
+ *    page of a folder the site does not render (`proposals/x.html`) is looked
+ *    up as its `.md`, a folder link (`skills/tools/x/`) as its `README.md` or
+ *    `index.md`, and a translation of either as the source it translates. When the
  *    missing path's tail names exactly ONE file in the checkout (at least two
  *    segments, the longest tail that matches), the link goes to that file on
  *    GitHub, at the commit the index pins (`index.lock.json`). Two or more
@@ -56,6 +59,9 @@ export function isInternal(value: string): boolean {
   if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return false;
   // Unrendered Liquid, and a script's template literal caught by the attribute pattern.
   if (value.includes("{{") || value.includes("{%") || value.includes("${")) return false;
+  // A script's string concatenation caught by the attribute pattern:
+  // `'<a href="' + esc(r.page) + '">'` yields the value `' + esc(r.page) + '`.
+  if (/'\s*\+|\+\s*'/.test(value)) return false;
   return true;
 }
 
@@ -223,8 +229,26 @@ export function repointFor(
     const rel = posix.relative(posix.dirname(page), plain) || ".";
     return { to: target.endsWith("/") && !rel.endsWith("/") ? `${rel}/` : rel, why: "locale" };
   }
-  const url = resolveSource(target);
-  return url === undefined ? undefined : { to: url, why: "source" };
+  // A missing translation of a page the site does not publish at all: its
+  // source, in the language it was written in.
+  for (const candidate of plain === undefined ? [target] : [target, plain]) {
+    const url = resolveSource(candidate);
+    if (url !== undefined) return { to: url, why: "source" };
+  }
+  return undefined;
+}
+
+/**
+ * The checkout paths a missing site path may have been rendered from, most
+ * literal first: itself; for a page, `x.html` from `x.md`; for a directory,
+ * its `README.md` or `index.md`. Docs link a page by its rendered name
+ * (`proposals/workflow-orchestration.html`) whether or not the site renders
+ * that folder, and a folder by its slash.
+ */
+export function sourceCandidates(rel: string): string[] {
+  if (rel.endsWith("/")) return [`${rel}README.md`, `${rel}index.md`];
+  if (rel.endsWith(".html")) return [rel, rel.replace(/\.html$/, ".md")];
+  return [rel];
 }
 
 /** Check (and with `fix`, repoint) every page. Returns what is still dead and what was repointed. */
@@ -283,8 +307,11 @@ if (import.meta.main) {
     const origins = originsOf(root, repo && sha ? { repository: repo, ref: sha } : undefined);
     const idx = tailIndex(checkoutFiles(root));
     resolveSource = (rel) => {
-      const f = sourceFor(rel, idx);
-      return f === undefined ? undefined : blobUrl(f, origins);
+      for (const c of sourceCandidates(rel)) {
+        const f = sourceFor(c, idx);
+        if (f !== undefined) return blobUrl(f, origins);
+      }
+      return undefined;
     };
   }
   const { dead, repointed, pages } = checkSite({ site, basePath, fix, resolveSource });
