@@ -28,17 +28,18 @@
  * before that, so this file imports only the two leaves it needs and runs
  * first (`bunfig.toml`).
  */
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 
 import { harnessRoot } from "./harness-root";
-import { ownDeclaredDirectories } from "./kg/declared-nodes";
 import { instanceRootsIn, repoRootFor } from "./kg/instance-roots";
 
 /** The checkout this preload's harness sits in. */
 const CHECKOUT = repoRootFor(harnessRoot() ?? resolve(import.meta.dir, ".."));
 
-const holdsVocabulary = instanceRootsIn(CHECKOUT).some((r) => ownDeclaredDirectories(r, "block-kinds", CHECKOUT).length > 0);
-if (!holdsVocabulary && process.env.FOLIO_FIXTURE_CHECKOUT === undefined) {
+const FIXTURE = resolve(import.meta.dir, "..", "test", "fixtures", "standalone-checkout");
+const ownNames = new Set(instanceRootsIn(CHECKOUT).map((r) => basename(r)));
+const allFixtureInstancesPresent = instanceRootsIn(FIXTURE).every((r) => ownNames.has(basename(r)));
+if (!allFixtureInstancesPresent && process.env.FOLIO_FIXTURE_CHECKOUT === undefined) {
   // The fixture moved here from cat-harness with the tests that read it (bean `8lcl`).
-  process.env.FOLIO_FIXTURE_CHECKOUT = resolve(import.meta.dir, "..", "test", "fixtures", "standalone-checkout");
+  process.env.FOLIO_FIXTURE_CHECKOUT = FIXTURE;
 }

@@ -683,7 +683,7 @@ describe("odrl:obtainConsent duty evaluated via injected ConsentEvaluator (beans
     expect(odrlSrc).not.toContain("PcfConsent");
     expect(odrlSrc).not.toMatch(/\b(?:Bundle|OperationOutcome|Patient|Practitioner|Encounter)\b/);
 
-    const fixtureDir = join(INSTANCE, "test", "fixtures", HL7_TERMINOLOGY_PACKAGE_ID);
+    const fixtureDir = resolve(import.meta.dir, "../..", "test", "fixtures", HL7_TERMINOLOGY_PACKAGE_ID);
     const prov = JSON.parse(readFileSync(join(fixtureDir, "provenance.json"), "utf-8"));
     const csBytes = readFileSync(join(fixtureDir, "CodeSystem-v3-ActReason.json"));
     const sha = createHash("sha256").update(csBytes).digest("hex");
