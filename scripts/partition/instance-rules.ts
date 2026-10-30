@@ -1262,8 +1262,12 @@ export const RULES: Rule[] = [
     // `skills/authoring/{authoring-math,folio-paper-adapter}/` on 2026-10-01:
     // placement PR1 (bean `ybwt`) moved both packages to
     // `folio-assistant-sci/skills/content/`.
+    // `schemas/precision-scalar.ts` moved to `folio-assistant-sci/schemas/` in
+    // bean `f8wp`; `schemas/refactor-strategy.ts` is already in
+    // `folio-assistant-sci/schemas/` and retained here only until `saqd` (#875)
+    // drops `cat-harness-tools/pipeline/refactor-strategy.ts`.
     prefixes: ["computations/", "latex/", "scripts/render-tex/", "scripts/docker-latex-build/", "scripts/knot-plots/"],
-    exact: ["schemas/formalization-types.ts", "schemas/precision-scalar.ts", "schemas/refactor-strategy.ts"],
+    exact: ["schemas/formalization-types.ts", "schemas/refactor-strategy.ts"],
   },
   {
     repo: "sci",
