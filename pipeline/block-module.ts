@@ -54,6 +54,7 @@ import { createRequire } from "node:module";
 import { join, dirname, basename } from "node:path";
 import { ALL_BLOCK_KINDS } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
 import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { evaluateJsonManifest, isJsonManifest } from "./json-manifest.ts";
 
 /** A block as the pipeline sees it, plus where it came from. */
 export interface LoadedBlock {
@@ -91,6 +92,8 @@ export async function loadBlockModule(
 ): Promise<LoadedBlock | undefined> {
   // input-site: traced #9589922f — a content block's manifest, loaded by path
   inputSiteReached("block-module: loadBlockModule loads a computed block file");
+  // A `.json` manifest (bean `y9r6`) is data: evaluated, not imported.
+  if (tsPath.endsWith(".json")) return asLoadedBlock(evaluateJsonManifest(tsPath), tsPath, contributedKinds);
   const mod = (await import(tsPath)) as { default?: unknown };
   return asLoadedBlock(mod.default, tsPath, contributedKinds);
 }
@@ -141,6 +144,7 @@ export function loadBlockModuleSync(
   tsPath: string,
   contributedKinds?: ReadonlySet<string>,
 ): LoadedBlock | undefined {
+  if (tsPath.endsWith(".json")) return asLoadedBlock(evaluateJsonManifest(tsPath), tsPath, contributedKinds);
   const mod = requireSync(tsPath) as { default?: unknown };
   return asLoadedBlock(mod.default, tsPath, contributedKinds);
 }
@@ -203,8 +207,8 @@ export async function loadBlocksUnder(
     if (!d.isDirectory()) continue;
     const dirPath = join(root, d.name);
     for (const f of await readdir(dirPath)) {
-      if (!f.endsWith(".ts")) continue;
       const path = join(dirPath, f);
+      if (!f.endsWith(".ts") && !(f.endsWith(".json") && isJsonManifest(path))) continue;
       try {
         const b = await loadBlockModule(path, contributedKinds);
         if (b) blocks.set(b.label, b);

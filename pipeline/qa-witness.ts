@@ -71,6 +71,7 @@ import {
   translationQaPath,
 } from "./qa-paths.ts";
 import type { QaFreshness, QaWitness } from "@litlfred/cat-harness/schemas/kg/qa-record-shapes.ts";
+import { manifestPath } from "./json-manifest.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/
 export type { QaFreshness, QaWitness };
 
@@ -470,7 +471,8 @@ function liveBlockHashes(blockDir: string, stem: string, extra: Record<string, s
   const live: Record<string, string | undefined> = {};
   for (const [role, file] of Object.entries({
     md: `${stem}.md`,
-    ts: `${stem}.ts`,
+    // The manifest: `.ts`, or a `.json` manifest (bean `y9r6`). The role keeps its name.
+    ts: basename(manifestPath(blockDir, stem)),
     lean: `${stem}.lean`,
     bpmn: `${stem}.bpmn`,
     dmn: `${stem}.dmn`,
