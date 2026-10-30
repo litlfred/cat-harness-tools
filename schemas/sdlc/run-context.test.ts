@@ -187,7 +187,7 @@ describe("the reference a report carries (C1: by sha256)", () => {
       TestReportSchema.safeParse({
         $schema: TEST_REPORT_SCHEMA_ID,
         plan: { id: "crdm-detect", version: "1" },
-        sut: { actor: "claude-code", version: "1.0", reach: "internet" },
+        sut: { kind: "agent" as const, model: "claude-opus-5", configuration: "harness", actor: "claude-code", version: "1.0", reach: "internet" },
         run: { id: "r1", data: "abcdef012345", process: "fedcba543210" },
         status: "completed",
         started_at: "2026-10-07T00:00:00Z",

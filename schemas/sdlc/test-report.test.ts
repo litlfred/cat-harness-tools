@@ -34,7 +34,7 @@ function report(over: Partial<TestReport> = {}): TestReport {
   return {
     $schema: TEST_REPORT_SCHEMA_ID,
     plan: { id: "crdm-detect", version: "1" },
-    sut: { actor: "claude-code", version: "2.1.0", reach: "internet" },
+    sut: { kind: "agent" as const, model: "claude-opus-5", configuration: "harness", actor: "claude-code", version: "2.1.0", reach: "internet" },
     run: { id: "r1", data: "2e3ab7fa317f", process: "cac2af445036" },
     status: "completed",
     started_at: "2026-10-01T00:00:00Z",
@@ -88,7 +88,7 @@ describe("a rollup per plan, never a total across plans (py74)", () => {
   test("rollupPanels gives one panel per report, keyed by plan, and NO total anywhere", () => {
     const a = TestReportSchema.parse(report());
     const b = TestReportSchema.parse({ ...report(), plan: { id: "workflow-complete", version: "3" } });
-    const c = TestReportSchema.parse({ ...report(), sut: { actor: "gemini-cli", version: "1", reach: "unknown" } });
+    const c = TestReportSchema.parse({ ...report(), sut: { kind: "agent", model: "gemini-2.5-pro", configuration: "bare", actor: "gemini-cli", version: "1", reach: "unknown" } });
     const panels = rollupPanels([a, b, c]);
     expect([...panels.keys()].sort()).toEqual(["crdm-detect", "workflow-complete"]);
     // Two systems under the same plan are two panels — summing them certifies neither.

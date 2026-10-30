@@ -18,7 +18,6 @@ import { INSTANCE_ROOT, FOLIO_ROOT, hasFolio, REPO_ROOT } from "./helpers";
 import { TOOLS_ROOT } from "../lib/roots.ts";
 import { maskComments } from "../../pipeline/uses-field";
 import { repoRootFor } from "../../schemas/kg/cat-harness.js";
-import { TOOLS_ROOT } from "../lib/roots.ts";
 
 /** Skip folio-side assertions when no content repo is attached. */
 const folio = hasFolio();

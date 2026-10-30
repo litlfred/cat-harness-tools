@@ -86,7 +86,9 @@ import { join } from "node:path";
 import { SkillNameSchema } from "../tools/tool-types";
 
 import { RequirementRefSchema } from "@litlfred/bootstrap-tools/schemas/requirement.ts";
+import { ModelIdSchema } from "@litlfred/bootstrap-tools/schemas/model-registry.ts";
 import { NETWORK_REACHES, REACH_UNKNOWN } from "../process/actor-reach";
+import { SutKindSchema } from "./test-plan";
 import { inputSiteReached } from "./input-trace.ts";
 
 const RunContextRefFieldSchema = z
@@ -162,11 +164,33 @@ export type TestPlanRef = z.infer<typeof TestPlanRefSchema>;
  * because a run must say it did not know, and an absent field would read the
  * same as "not relevant".
  */
-export const SutRefSchema = z.strictObject({
+const SutBase = {
   actor: z.string().min(1),
   version: z.string().min(1),
   reach: z.enum([...NETWORK_REACHES, REACH_UNKNOWN]),
-});
+};
+
+/**
+ * `kind` is the actor's own system-under-test kind (`SUT_KINDS` in
+ * `test-plan.ts`), so a plan's scope, an actor's facet and a run are read in
+ * ONE vocabulary. Owner, 2026-10-30, FR-002 card, option A ("Model only if it
+ * is a model"): an `agent` is a model run in a configuration, so it names the
+ * model (`ModelIdSchema`, as the runtime reports it) and the configuration
+ * (`harness` with the harness's skills loaded, `bare` without, or another
+ * named one), and a record that leaves either out is refused. Every other
+ * kind runs deterministic code and names no model; a model on it is refused
+ * too, because the field would claim something that did not run
+ * (`req:model-benchmark#system-names-model`).
+ */
+export const SutRefSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    kind: z.literal("agent"),
+    ...SutBase,
+    model: ModelIdSchema,
+    configuration: z.string().regex(/^[a-z][a-z0-9-]*$/, "a configuration name such as harness or bare"),
+  }),
+  z.strictObject({ kind: SutKindSchema.exclude(["agent"]), ...SutBase }),
+]);
 export type SutRef = z.infer<typeof SutRefSchema>;
 
 export const TestRunSchema = z
