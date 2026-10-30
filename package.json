@@ -481,6 +481,7 @@
     "landing:sticky:check": "bun run cat-harness-tools/scripts/ensure-landing-sticky.ts --check",
     "library:graph": "bun run cat-harness-tools/scripts/library-graph.ts",
     "library:covers": "bun run cat-harness-tools/scripts/library-covers.ts",
+    "library:covers:check": "bun run cat-harness-tools/scripts/library-covers.ts --check",
     "library:viz": "bun run cat-harness-tools/scripts/gen-library-viz.ts",
     "library:viz:check": "bun run cat-harness-tools/scripts/gen-library-viz.ts --check",
     "methodologies:viz": "bun run cat-harness-tools/scripts/gen-methodologies-viz.ts",

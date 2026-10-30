@@ -305,6 +305,7 @@ export function avatarOf(
   slug: string,
   images: { images?: unknown[] } | null | undefined,
   repoRoot: string,
+  sourceFile?: string,
 ): LibraryAvatar | undefined {
   const fits = (abs: string): boolean =>
     existsSync(abs) && statSync(abs).isFile() && statSync(abs).size <= AVATAR_MAX_BYTES;
@@ -322,6 +323,13 @@ export function avatarOf(
   // `library-covers.ts`), kept inside the entry so promotion carries it.
   const rendered = join(libDir, slug, COVER_FILENAME);
   if (fits(rendered)) return make(rendered, "cover");
+  // A PDF WITH NO COVER GETS NO PICTURE -- owner, 2026-10-30 (option C). Its
+  // first figure is whatever happened to come first: for arxiv-2404.04834v4 a
+  // near-black game screenshot from page 11, shown as the book's face on the
+  // library row and the folio glass. The book glyph says "no cover" honestly;
+  // `library:covers` renders the page-1 cover and `library:covers:check`
+  // fails where a held PDF lacks one.
+  if (typeof sourceFile === "string" && /\.pdf$/i.test(sourceFile)) return undefined;
   for (const raw of images?.images ?? []) {
     const img = raw as { file?: unknown; role?: unknown };
     if (img.role !== "figure" || typeof img.file !== "string") continue;
@@ -940,7 +948,7 @@ export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRoo
             const by = { ...(w.gates ? { gates: w.gates } : {}), ...(w.record ? { record: w.record } : {}) };
             return { withheld: w.reason, ...(Object.keys(by).length ? { withheldBy: by } : {}) };
           }
-          const avatar = avatarOf(libDir, instance, slug, images, repoRoot);
+          const avatar = avatarOf(libDir, instance, slug, images, repoRoot, sourceFile);
           return avatar ? { avatar } : {};
         })(),
       });
