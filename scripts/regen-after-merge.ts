@@ -446,9 +446,17 @@ export const JUDGE_CHECKS: ReadonlySet<string> = new Set([
   "audit:coverage:check",
   "audit:reachability:check",
   "audit:reachability:strict",
+  "check:harness-state:check",
+  "check:reference-direction:check",
   "check:term-mapping",
+  "check:viewer-nav",
+  "kg:audit:all:check",
+  "kg:audit:check",
+  "kg:detangle:check",
   "kg:export:check",
+  "lsi:skills:check",
   "root-scan-census:check",
+  "translation:block-qa:check",
 ]);
 
 /** Whether a check or pair is a judge/baseline verdict rather than an artefact staleness check. */

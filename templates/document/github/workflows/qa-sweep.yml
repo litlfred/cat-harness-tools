@@ -40,7 +40,7 @@ on:
   #   types: [opened, synchronize, reopened]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   qa-sweep:
@@ -159,6 +159,34 @@ jobs:
               echo "attestation schema sanity: all $att_seen attestation file(s) on main pass"
             fi
           fi
+
+      # Derived QA results live on the orphan qa-reports branch (arc 3fva,
+      # skills/sdlc/sdlc-core/qa-reports.md), keyed by commit: pr/<n>/<sha> on
+      # same-repo pull requests (matching folio-staging.yml's fetch), or
+      # main/<sha> on main / manual dispatch. Judgements (attestations) stay on main.
+      - name: Publish QA verdicts to qa-reports
+        env:
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
+        run: |
+          if [ ! -d test/results ] || [ -z "$(find test/results -type f 2>/dev/null)" ]; then
+            echo "No QA results to publish — exiting cleanly."
+            exit 0
+          fi
+          if [ -n "$PR" ] && [ "$HEAD_REPO" != "$BASE_REPO" ]; then
+            echo "::notice::Fork PR — skipping qa-reports publish (read-only token)."
+            exit 0
+          fi
+          if [ -n "$PR" ] && [ -n "$HEAD_SHA" ]; then
+            QA_REF="pr/$PR/$HEAD_SHA"
+          else
+            QA_REF="main/$(git rev-parse HEAD)"
+          fi
+          bun run "{{assistant}}/cat-harness-tools/scripts/qa-store.ts" publish \
+            --ref "$QA_REF" \
+            --root test/results
 
       - name: Upload sweep + staleness logs
         if: always()
