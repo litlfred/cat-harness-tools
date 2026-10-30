@@ -8,10 +8,16 @@ import { dirname, join, resolve } from "node:path";
 import { readDeclaration } from "../../schemas/kg/cat-harness.ts";
 import { instanceHarnesses } from "../mount-instance-docs.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { notApplicableAlone } from "../../test/support/checkout.js";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 
-describe("instanceHarnesses", () => {
+/** The subject is smart-immunizations' own site and the smart-base layer it stands on; only a composed checkout holds them. */
+const NO_SMART_INSTANCES = notApplicableAlone(
+  "smart-immunizations and the smart-base layer it is built on, whose declarations these rows are drawn from",
+);
+
+describe.skipIf(NO_SMART_INSTANCES)("instanceHarnesses", () => {
   const rows = instanceHarnesses("cat-harness", "smart-immunizations", "https://example.org/fa", ".")!;
   test("the instance comes first and links to its own site's root", () => {
     // Labelled as every row is (label, else title, else name): the restored

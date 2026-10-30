@@ -23,6 +23,7 @@ import { tmpdir } from "os";
 import { spawnSync } from "child_process";
 
 import { parse as parseYaml } from "yaml";
+import { notApplicableAlone } from "../../test/support/checkout.js";
 
 import {
   enclosingRepoRoot,
@@ -147,6 +148,21 @@ function writeDirectoryOverride(dir: string): void {
     JSON.stringify({ subgraphSources: { beans: { kind: "directory" }, todos: { kind: "directory" } } }, null, 2) + "\n",
   );
 }
+
+/**
+ * Composed-only inputs. folio-assistant-sci holds the `paper` template
+ * profile (move M11) and declares the paper adapter; folio-assistant-core
+ * declares the document adapter. A checkout of the platform alone declares
+ * neither, so the remote mounts derived from the checkout's adapters, and a
+ * paper scaffold, have nothing to derive from. The derivation itself is
+ * pinned standing alone by the fixture tests in "remote link mode".
+ */
+const NO_PAPER_LAYER = notApplicableAlone(
+  "folio-assistant-sci, which holds the `paper` folio-templates member (move M11) and declares the paper adapter",
+);
+const NO_CONTENT_ADAPTERS = notApplicableAlone(
+  "folio-assistant-core and folio-assistant-sci, whose declared document and paper adapters the remote mounts are derived from",
+);
 
 describe("slug validation", () => {
   test("accepts lowercase hyphen-joined words", () => {
@@ -465,13 +481,17 @@ describe("workflow templates (52dz)", () => {
 
   test("the templates come from the declared directory, not a path written in code", () => {
     // `folio-templates` is looked up by id. This layer's own member holds the
-    // profile every folio gets; the paper profile is a member a dependent
-    // layer holds (move M11), found across the checkout, never by its name.
+    // profile every folio gets.
     const dir = templatesDir();
     expect(existsSync(join(dir, "document"))).toBe(true);
     expect(templatesDirs()[0]).toBe(dir);
-    expect(templatesDirs().some((d) => existsSync(join(d, "paper")))).toBe(true);
     expect(folioTemplates("document").every((t) => !t.target.includes("lean"))).toBe(true);
+  });
+
+  test.skipIf(NO_PAPER_LAYER)("the paper profile is a member a dependent layer holds, found across the checkout", () => {
+    // Move M11: folio-assistant-sci holds it, found across the checkout,
+    // never by its name.
+    expect(templatesDirs().some((d) => existsSync(join(d, "paper")))).toBe(true);
   });
 });
 
@@ -875,7 +895,7 @@ describe("remote link mode (--link remote, bean c4lg)", () => {
     expect(remotePlatformLayers("paper", [adapter("other", "layer-o")], () => [])).toEqual(PLATFORM);
   });
 
-  test("initFolio with link: 'remote' writes pinned source.remote mounts, site.landing, .gitignore index-mounts block, and root-relative shims", () => {
+  test.skipIf(NO_CONTENT_ADAPTERS)("initFolio with link: 'remote' writes pinned source.remote mounts, site.landing, .gitignore index-mounts block, and root-relative shims", () => {
     const d = tmp();
     const r = initFolio({
       targetDir: d,
@@ -923,7 +943,7 @@ describe("remote link mode (--link remote, bean c4lg)", () => {
     expect(r.notes.join("\n")).toContain("Linked via remote mounts in index.config.json");
   });
 
-  test("CLI --link remote scaffolds a paper folio with folio-assistant-sci included in remote mounts", () => {
+  test.skipIf(NO_CONTENT_ADAPTERS)("CLI --link remote scaffolds a paper folio with folio-assistant-sci included in remote mounts", () => {
     const d = tmp();
     const cli = spawnSync(
       "bun",
