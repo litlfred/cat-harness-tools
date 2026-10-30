@@ -28,7 +28,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
-import { NOTEBOOK_STRUCTURE_SCHEMA_ID, NotebookStructureSchema, STRUCTURE_FILENAME, type NotebookStructure } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
+import { NOTEBOOK_STRUCTURE_SCHEMA_ID, NotebookStructureSchema, STRUCTURE_FILENAME, type NotebookStructure } from "../schemas/content/document-structure.ts";
 
 interface Cell {
   cell_type: "markdown" | "code" | "raw" | string;

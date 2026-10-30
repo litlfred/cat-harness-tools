@@ -93,9 +93,9 @@ import {
   instanceRootsIn,
   readDeclaration,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { addIndexInstance, readIndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.js";
+} from "../schemas/kg/cat-harness.js";
+import { instanceConfigFilename } from "../schemas/kg/harness-config.js";
+import { addIndexInstance, readIndexConfig } from "../schemas/kg/index-config.js";
 import { harnessHomeOf } from "./kg-parts.js";
 import { type HarnessDeclaration, harnessDeclarationIn, readSnapshot, snapshotDirFor } from "./subscribed-harnesses.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";

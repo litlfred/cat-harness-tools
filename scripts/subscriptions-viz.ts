@@ -50,13 +50,13 @@ import {
   siteDirFor,
   type KnownSubstrate,
   type Subscription,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { instanceRepositories } from "@litlfred/cat-harness/schemas/kg/instance-repositories.ts";
+} from "../schemas/kg/cat-harness.ts";
+import { instantiatedHarnessNames } from "../schemas/kg/harness-config.ts";
+import { instanceRepositories } from "../schemas/kg/instance-repositories.ts";
 import { partRecordsIn, snapshotDirOf, type PartView } from "./kg-subscribe.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
-import { SNAPSHOT_SUFFIX } from "@litlfred/cat-harness/schemas/kg/substrate-snapshot.ts";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
+import { SNAPSHOT_SUFFIX } from "../schemas/kg/substrate-snapshot.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const INSTANCE = resolve(HARNESS_ROOT);

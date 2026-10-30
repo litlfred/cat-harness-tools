@@ -31,7 +31,7 @@ import {
   toolGroupsFromNodes,
   type ToolGroupDeclaration,
 } from "../src/tool-groups.ts";
-import { tools as harnessTools } from "@litlfred/cat-harness/tools/index.ts";
+import { tools as harnessTools } from "../schemas/tools/harness-tools.ts";
 import { discoverTools } from "../tools/discover.ts";
 
 /** This instance's root, for the ad-hoc declarations below. */

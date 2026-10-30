@@ -34,7 +34,7 @@ import { join, relative, resolve } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteDirFor } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

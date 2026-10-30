@@ -21,7 +21,7 @@ import {
   LogEntrySchema,
   resolveCapture,
   shouldPersist,
-} from "@litlfred/cat-harness/schemas/sdlc/log-entry.ts";
+} from "../../schemas/sdlc/log-entry.ts";
 import { buildExport } from "../kg-export.js";
 
 /**

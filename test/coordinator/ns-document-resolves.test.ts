@@ -41,8 +41,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { namespaceForLayer } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
-import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
+import { namespaceForLayer } from "../../schemas/kg/namespaces.ts";
+import { contentLayerInstance } from "../../schemas/kg/graph-typology-registry.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

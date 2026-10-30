@@ -22,12 +22,12 @@
  * @module pipeline/qa-checkers-extended
  */
 
-import { folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDirDeferred } from "../schemas/kg/cat-harness.js";
 // The `proof-*` checkers (including `checkProofNoTrivialSkeleton`, which calls
 // `stripLeanComments`) moved to `folio-assistant-sci/pipeline/qa-checkers-extended.ts`
 // (bean `saqd` Group 8).
 import { existsSync, readFileSync, readdirSync } from "fs";
-import type { CheckerPaths, CheckerHit, CheckerResult } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import type { CheckerPaths, CheckerHit, CheckerResult } from "../schemas/sdlc/block-qa.ts";
 import { resolve, dirname, join, relative } from "path";
 // The conformance check itself, plus its result type. Imported here rather than
 // given its own module because a checker belongs in the registry's file, and the

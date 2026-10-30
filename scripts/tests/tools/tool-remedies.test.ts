@@ -14,7 +14,7 @@ import {
   networkToolsWithoutRemedies,
   remediesFor,
   type ToolDefinition,
-} from "@litlfred/cat-harness/schemas/tools/tool.js";
+} from "../../../schemas/tools/tool.js";
 
 function tool(id: string, extra: Partial<ToolDefinition> = {}): ToolDefinition {
   return ToolDefinitionSchema.parse({

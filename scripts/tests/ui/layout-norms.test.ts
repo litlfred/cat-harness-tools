@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
+import { GraphTypologyRegistry } from "../../../schemas/kg/graph-typology-registry.ts";
 
 import { checkLayoutNorms, pairKey, readBaseline } from "../../check-layout-norms.ts";
 

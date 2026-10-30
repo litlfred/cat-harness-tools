@@ -10,8 +10,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import type { StandingConsent } from "@litlfred/cat-harness/schemas/kg/mount-trust.js";
-import type { RemoteMount } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
+import type { StandingConsent } from "../../../schemas/kg/mount-trust.js";
+import type { RemoteMount } from "../../../schemas/kg/remote-mount.js";
 import { applyRepin, candidateFor, planRepin, summaryOf, verdictOf, type CommitVerdict, type GitHubApi } from "../../repin-standing.ts";
 
 const A = "a".repeat(40);
@@ -179,7 +179,7 @@ describe("applyRepin: index.config.json and index.lock.json move through the mou
     expect(rm.mountRemote({ instanceRoot: root, urlFor, install: false }).plan.outcomes.every((o) => o.state === "mounted")).toBe(true);
     const otherBefore = JSON.parse(readFileSync(join(root, "index.config.json"), "utf-8")).instances.find((i: { name: string }) => i.name === "other");
 
-    const { readDeclaredMounts } = await import("@litlfred/cat-harness/schemas/kg/index-config.js");
+    const { readDeclaredMounts } = await import("../../../schemas/kg/index-config.js");
     const plan = await planRepin(readDeclaredMounts(root).mounts, stubApi({ "o/up@main": [up.second, up.first] }, { [up.second]: "green", [up.first]: "green" }));
     expect(plan.moves.map((m) => [m.harness, m.to])).toEqual([["up", up.second]]);
     const r = await applyRepin(root, plan, { on: "2026-10-17", urlFor, install: false });
@@ -205,7 +205,7 @@ describe("applyRepin: index.config.json and index.lock.json move through the mou
 
   test("withdrawing the rule afterwards makes the check refuse the pin it moved (it asks again)", async () => {
     const root = site();
-    const { readDeclaredMounts } = await import("@litlfred/cat-harness/schemas/kg/index-config.js");
+    const { readDeclaredMounts } = await import("../../../schemas/kg/index-config.js");
     const plan = await planRepin(readDeclaredMounts(root).mounts, stubApi({ "o/up@main": [up.second] }, { [up.second]: "green" }));
     await applyRepin(root, plan, { urlFor, install: false });
     const f = join(root, "index.config.json");

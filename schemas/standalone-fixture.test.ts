@@ -2,7 +2,7 @@
  * The standalone fixture is a COPY of real nodes, and must stay one.
  *
  * `test/fixtures/standalone-checkout/` holds core's and sci's node graphs that
- * cat-harness's own tests read, so they pass with cat-harness standing alone
+ * the schema tests read, so they pass with this layer standing alone
  * (owner, 2026-10-05: fixture the tests rather than grow the standalone
  * baseline; `test-fixture-preload.ts` says when it is scanned). A fixture that
  * drifts from what it copies would let a test pass on a vocabulary nobody
@@ -16,12 +16,13 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import { dirname } from "node:path";
 
-// The fixture is cat-harness's: its tests read it (schemas/test-fixture-preload.ts).
-// 70lx moved it here by mistake; cat-harness#117 took it home.
-const FIXTURE = resolve(HARNESS_ROOT, "test", "fixtures", "standalone-checkout");
+// The fixture sits with the tests that read it (schemas/test-fixture-preload.ts).
+// 70lx moved it here while those tests were still in cat-harness, and
+// cat-harness#117 took it back; 8lcl then moved the tests here, so it follows.
+const FIXTURE = resolve(TOOLS_ROOT, "test", "fixtures", "standalone-checkout");
 const CHECKOUT = resolve(dirname(HARNESS_ROOT));
 
 function filesUnder(dir: string): string[] {

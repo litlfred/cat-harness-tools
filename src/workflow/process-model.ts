@@ -35,13 +35,13 @@ import { BpmnModdle } from "bpmn-moddle";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { loadDecisionTable, possibleOutcomes, type DecisionTable } from "./decision-table.js";
-import { ACTOR_KINDS, laneRoleRef, type ActorKind } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import { CONVENTION_EXT, conventionsInForce, type ConventionScope } from "@litlfred/cat-harness/schemas/process/convention.js";
+import { ACTOR_KINDS, laneRoleRef, type ActorKind } from "../../schemas/process/role-graph.js";
+import { CONVENTION_EXT, conventionsInForce, type ConventionScope } from "../../schemas/process/convention.js";
 import { WORK_PLAN_OPS, type WorkPlanOp } from "./bean-link.js";
-import { activeCodes, codeListDirs, loadCodeLists, type CodeList } from "@litlfred/cat-harness/schemas/library/code-list.js";
-import { directoriesForGraph, findInstanceRoot } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { CANONICAL_EXTENSION_PREFIX, isOwnExtensionNamespace } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
+import { activeCodes, codeListDirs, loadCodeLists, type CodeList } from "../../schemas/library/code-list.js";
+import { directoriesForGraph, findInstanceRoot } from "../../schemas/kg/cat-harness.js";
+import { orderedDependencies } from "../../schemas/kg/harness-config.js";
+import { CANONICAL_EXTENSION_PREFIX, isOwnExtensionNamespace } from "../../schemas/kg/namespaces.js";
 
 /** Element types the interpreter can walk faithfully. */
 const ACTIVITY_TYPES = [

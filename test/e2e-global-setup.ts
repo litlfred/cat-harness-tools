@@ -21,7 +21,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { artefactStubFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { artefactStubFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 export default function globalSetup(): void {

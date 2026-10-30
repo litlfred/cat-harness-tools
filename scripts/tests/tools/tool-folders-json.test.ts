@@ -7,8 +7,8 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { toolsFromFolders } from "@litlfred/cat-harness/schemas/tools/tool-folders.js";
-import { toolTypeIri } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
+import { toolsFromFolders } from "../../../schemas/tools/tool-folders.js";
+import { toolTypeIri } from "../../../schemas/tools/tool-types.js";
 
 const BASE = "https://example.org/h";
 let dir: string;

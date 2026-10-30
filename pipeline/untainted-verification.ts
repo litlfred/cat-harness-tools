@@ -55,7 +55,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import type { QaCriterionEntry, QaFieldHash } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import type { QaCriterionEntry, QaFieldHash } from "../schemas/sdlc/block-qa.ts";
 import {
   attestationKeyForDerived,
   composeCriteria,
@@ -63,7 +63,7 @@ import {
   isAsciiEscaped,
   refusalLine,
   resolvePrior,
-} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
+} from "../schemas/sdlc/qa-attestations.ts";
 
 /** Who ran, and under what. `model` is meaningless without `model_source`. */
 export interface UntaintedParty {

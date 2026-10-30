@@ -18,7 +18,7 @@ import {
   readDeclaration,
   repoRootFor,
   siteDir,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

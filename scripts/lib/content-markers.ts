@@ -52,15 +52,15 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, posix } from "node:path";
 
-import "@litlfred/cat-harness/schemas/content/content-types-base.ts";
+import "../../schemas/content/content-types-base.ts";
 import {
   defaultContentTypes,
   describeRepository,
   INDEX_SECTION_FILE,
   type ContentTypeRegistry,
-} from "@litlfred/cat-harness/schemas/content/content-type.ts";
-import { BASE_GRAPH_TYPOLOGIES } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
-import { declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+} from "../../schemas/content/content-type.ts";
+import { BASE_GRAPH_TYPOLOGIES } from "../../schemas/kg/graph-typology-registry.ts";
+import { declarationPathIn } from "../../schemas/kg/cat-harness.ts";
 
 /** Where a declaration for a finding would go. */
 export type MarkerTarget =

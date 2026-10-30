@@ -72,7 +72,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { isRenderable, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { isRenderable, resolveDirectories } from "../schemas/kg/cat-harness.js";
 import { knownLocales } from "./kg-locale-export.js";
 import { scanSubgraphs } from "./check-subgraphs.js";
 

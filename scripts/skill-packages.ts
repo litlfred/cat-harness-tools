@@ -16,7 +16,7 @@ import { basename, join, resolve } from "node:path";
 
 import { isSkillMd, kgRoots, corpusScopeFor, type CorpusScope } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
-import { resolveSkillDirs } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { resolveSkillDirs } from "../schemas/kg/harness-config.js";
 // The `folio` graph typology is registered by CORE. This module is a LIBRARY, so it
 // does NOT import that registration: a library's edge is inherited by every
 // module that imports it, and the harness may not depend on core. The
@@ -31,7 +31,7 @@ import { resolveSkillDirs } from "@litlfred/cat-harness/schemas/kg/harness-confi
 // gate failed to say so — the same silence this repository keeps paying for.
 // It is moot now rather than fixed: #840 made the registration automatic, so
 // there is no longer a command that can forget it (bean `z9ax`).
-import { readDeclaration, findInstanceRoot } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { readDeclaration, findInstanceRoot } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** A directory is a skill PACKAGE when it directly holds at least one skill `.md`. */

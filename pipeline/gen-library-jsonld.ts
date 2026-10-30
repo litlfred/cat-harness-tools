@@ -71,35 +71,35 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
 import { basename, dirname, join, resolve } from "path";
-import { typesForKind } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
+import { typesForKind } from "../schemas/kg/jsonld.ts";
 import {
   defaultInstancePrefixes,
   documentContext,
   instancePrefixes,
-} from "@litlfred/cat-harness/schemas/content/content-context.ts";
-import { termCurie } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
-import { LABEL_PREFIXES } from "@litlfred/cat-harness/schemas/constraints.ts";
+} from "../schemas/content/content-context.ts";
+import { termCurie } from "../schemas/kg/namespaces.ts";
+import { LABEL_PREFIXES } from "../schemas/constraints.ts";
 import { findContentRepoRoot } from "./repo-root";
 import { serialisedAtInstanceContext } from "./instance-document-context.ts";
 import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
-import type { DocumentImage, ImagesSidecar } from "@litlfred/cat-harness/schemas/content/document-image.ts";
+import type { DocumentImage, ImagesSidecar } from "../schemas/content/document-image.ts";
 import { buildTabularNodes, tabularShapeOf } from "./tabular-nodes.ts";
-import { TABULAR_CSVW_FILENAME } from "@litlfred/cat-harness/schemas/library/tabular-csvw.ts";
+import { TABULAR_CSVW_FILENAME } from "../schemas/library/tabular-csvw.ts";
 import {
   RECORDING_FILENAME,
   RecordingSchema,
   TRANSCRIPT_DIR,
   TranscriptSchema,
   type Transcript,
-} from "@litlfred/cat-harness/schemas/library/recording.ts";
-import { readStructure, STRUCTURE_FILENAME, type BaseStructure, type DocumentStructure } from "@litlfred/cat-harness/schemas/content/document-structure.ts";
-import type { INGEST_RUNGS } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { applyVocabMapping, vocabMapping, type VocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.ts";
-import type { SourceLicence } from "@litlfred/cat-harness/schemas/library/source-licence.ts";
-import { libraryAssetIri } from "@litlfred/cat-harness/schemas/library/library-iri.ts";
-import { instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+} from "../schemas/library/recording.ts";
+import { readStructure, STRUCTURE_FILENAME, type BaseStructure, type DocumentStructure } from "../schemas/content/document-structure.ts";
+import type { INGEST_RUNGS } from "../schemas/ui/site-indexes.ts";
+import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
+import { applyVocabMapping, vocabMapping, type VocabMapping } from "../schemas/content/vocab-mapping.ts";
+import type { SourceLicence } from "../schemas/library/source-licence.ts";
+import { libraryAssetIri } from "../schemas/library/library-iri.ts";
+import { instanceDirectories, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import {
   readTitleCandidates,
   resolveLibraryTitle,

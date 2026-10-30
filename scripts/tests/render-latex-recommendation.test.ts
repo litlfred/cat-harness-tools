@@ -9,7 +9,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import type { Block } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Block } from "../../schemas/types.ts";
 
 import { ENV_NAMES, renderBlock } from "../../pipeline/render-latex";
 

@@ -59,7 +59,7 @@ import {
   RenderedImpactSchema,
   type RenderedFile,
   type RenderedImpact,
-} from "@litlfred/cat-harness/schemas/ui/rendered-impact.ts";
+} from "../schemas/ui/rendered-impact.ts";
 import { judge, readTree, renderingOrder } from "./check-derived-from.ts";
 import { composedInstances, docsLayers } from "./compose-docs.ts";
 import { gitBlobs } from "./git-blobs.ts";

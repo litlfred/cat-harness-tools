@@ -74,8 +74,8 @@ import { basename, join, posix, relative } from "node:path";
 
 import ts from "typescript";
 
-import { checkoutRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, rootInstanceName } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { checkoutRootFor } from "../schemas/kg/cat-harness.js";
+import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, rootInstanceName } from "../schemas/kg/harness-config.js";
 import { withConcernGroupDirs } from "./concern-groups.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

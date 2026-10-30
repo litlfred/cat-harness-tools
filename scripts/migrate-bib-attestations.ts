@@ -50,7 +50,7 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
+import "../schemas/kg/folio-graph-typology.js";
 import {
   BIB_HUMAN_REVIEW_FAMILY,
   BIB_REVIEW_STATUSES,
@@ -67,8 +67,8 @@ import {
   writeSourceLedger,
   type BibFamily,
   type BibReview,
-} from "@litlfred/cat-harness/schemas/library/bib-attestations.js";
-import type { SourceLedger } from "@litlfred/cat-harness/schemas/library/bib-verification.js";
+} from "../schemas/library/bib-attestations.js";
+import type { SourceLedger } from "../schemas/library/bib-verification.js";
 
 export interface FamilyReport {
   family: BibFamily;

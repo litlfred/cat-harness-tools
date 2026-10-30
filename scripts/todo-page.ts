@@ -15,7 +15,7 @@
  * The script and stylesheet are static assets under `assets/todos/`, shared
  * by every todo page, so a page is a few hundred bytes of identity.
  */
-import type { TodoIndexItem } from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
+import type { TodoIndexItem } from "../schemas/sdlc/todo-index.js";
 import { themedPage } from "./lib/themed-page.ts";
 import { escHtml, thinPageConfigOf } from "./thin-page.ts";
 import { segment } from "./todo-graph.ts";

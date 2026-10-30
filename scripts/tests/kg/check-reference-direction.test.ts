@@ -16,15 +16,15 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.ts";
-import { allowedFromNeeds, type LayerRule } from "@litlfred/cat-harness/schemas/kg/layer-direction.ts";
+import { ancestorsOf, flattenDependencies } from "../../../schemas/kg/dependency-order.ts";
+import { allowedFromNeeds, type LayerRule } from "../../../schemas/kg/layer-direction.ts";
 import {
   classifyReference,
   occurrencesOf,
   type NameCollision,
   type Occurrence,
   type ReferenceExemption,
-} from "@litlfred/cat-harness/schemas/kg/reference-direction.ts";
+} from "../../../schemas/kg/reference-direction.ts";
 import {
   analyse,
   buildDirectionResult,

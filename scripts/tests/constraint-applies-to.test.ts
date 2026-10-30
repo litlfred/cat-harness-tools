@@ -22,8 +22,8 @@
 import { describe, expect, test } from "bun:test";
 // The rules validate.ts runs: cat-harness's, and each vocabulary module's
 // (the science layer carries the rules about its own kinds since 2026-10-22).
-import { allConstraintRules } from "@litlfred/cat-harness/schemas/content/vocabulary-modules.ts";
-import { BLOCK_KINDS } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
+import { allConstraintRules } from "../../schemas/content/vocabulary-modules.ts";
+import { BLOCK_KINDS } from "../../schemas/content/block-kinds.ts";
 
 /**
  * Rules that are deliberately narrower, with the reason. Anything not

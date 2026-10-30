@@ -10,7 +10,7 @@
  * in bean `saqd` Group 8 and are tested there.)
  */
 import { describe, expect, test } from "bun:test";
-import type { CheckerResult } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import type { CheckerResult } from "../../schemas/sdlc/block-qa.ts";
 import {
   checkDetanglerNoXChapterFwd,
   checkDetanglerArchimedeanWall,

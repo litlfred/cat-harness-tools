@@ -13,7 +13,7 @@
  * @module folio-assistant/adapters/manifest-entries
  */
 
-import type { Block, Section, SectionRef } from "@litlfred/cat-harness/schemas/types.js";
+import type { Block, Section, SectionRef } from "../schemas/types.js";
 
 /**
  * Is this `sections[]` entry a bare reference to a section file, rather than

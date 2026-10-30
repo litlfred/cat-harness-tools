@@ -54,7 +54,7 @@ import {
   retireStagingPreview,
   serializeStagingPreview,
   type StagingPreviewNode,
-} from "@litlfred/cat-harness/schemas/sdlc/staging-preview.ts";
+} from "../schemas/sdlc/staging-preview.ts";
 
 /** What `create` does to a record that is already there. */
 export type CreateOutcome =

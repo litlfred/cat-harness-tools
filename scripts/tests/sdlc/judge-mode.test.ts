@@ -55,7 +55,7 @@ import {
   type Family,
 } from "../../check-harness-state.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
-import { implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { implementingRootFor } from "../../../schemas/kg/harness-config.ts";
 
 // The harness owns the sidecars and baselines; this test moved up in 70lx B2b.
 const INSTANCE_ROOT = HARNESS_ROOT;

@@ -49,18 +49,18 @@ import {
   namespaceMentions,
   namespacesInUse,
 } from "./external-schemas.js";
-import { OWN_XML_NAMESPACES } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
+import { OWN_XML_NAMESPACES } from "../schemas/kg/namespaces.js";
 import { specUsers, type SpecUse, type SpecUseForm, type SpecUsers } from "./spec-users.js";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
-import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+import { gitCorpus } from "../schemas/sdlc/git-corpus.js";
+import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import {
   undeclaredNamespaces,
   unusedNamespaces,
   type ExternalSchema,
-} from "@litlfred/cat-harness/schemas/kg/external-schema.js";
+} from "../schemas/kg/external-schema.js";
 import { checkoutInstanceRoots, pageParts, visualiserFor, visualiserPageDir, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
-import { readDeclaration, siteDirFor, sourceLinks } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.js";
+import { readDeclaration, siteDirFor, sourceLinks } from "../schemas/kg/cat-harness.ts";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { darkRules } from "./lib/scheme-css.js";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";

@@ -52,7 +52,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { directoryForGraph, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { directoryForGraph, siteDirFor } from "../schemas/kg/cat-harness.js";
 import { extractMarkdown, formatPot, potWithoutTimestamp } from "./pot-extract.js";
 import { driftFor } from "./translation-drift.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";

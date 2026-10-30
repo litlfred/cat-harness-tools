@@ -154,9 +154,9 @@ import {
   isDerivedGraph,
   isStateGraph,
   rootForScope,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
-import { allowedFromNeeds, type LayerRule } from "@litlfred/cat-harness/schemas/kg/layer-direction.js";
+} from "../schemas/kg/cat-harness.js";
+import { ancestorsOf, flattenDependencies } from "../schemas/kg/dependency-order.js";
+import { allowedFromNeeds, type LayerRule } from "../schemas/kg/layer-direction.js";
 import {
   classifyReference,
   occurrencesOf,
@@ -164,9 +164,9 @@ import {
   type Occurrence,
   type ReferenceExemption,
   type ReferenceVerdict,
-} from "@litlfred/cat-harness/schemas/kg/reference-direction.js";
+} from "../schemas/kg/reference-direction.js";
 import { BEGIN as SUBGRAPH_README_BEGIN } from "@litlfred/bootstrap-tools/scripts/subgraph-readmes.ts";
-import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
+import { aliasRoute, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { declaredVisualisers, forwardingParts, pageParts, siteOwnerDir } from "./viewer-declarations.js";
 import {
   againstOrUsage,
