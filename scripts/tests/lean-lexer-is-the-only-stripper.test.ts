@@ -102,7 +102,7 @@ describe("there is exactly one Lean comment stripper", () => {
     const callers = files.filter(
       (f) => relative(ROOT, f) !== CANONICAL && /stripLeanComments/.test(readFileSync(f, "utf-8")),
     );
-    expect(callers.length).toBeGreaterThanOrEqual(5);
+    expect(callers.length).toBeGreaterThanOrEqual(4);
   });
 });
 

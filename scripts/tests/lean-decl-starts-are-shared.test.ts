@@ -188,7 +188,6 @@ describe("there is exactly one declaration pattern", () => {
     // pattern does not fail this. The list may only shrink: a third file fails
     // here, and converging one lets somebody delete a row.
     expect(patternFiles()).toEqual([
-      "cat-harness-tools/pipeline/lean-formal-ref.ts",
       "cat-harness-tools/pipeline/lean-lexer.ts",
     ]);
   });
