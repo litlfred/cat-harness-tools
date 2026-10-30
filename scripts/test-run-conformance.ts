@@ -42,10 +42,16 @@ export interface TestRunConformance {
   /** Every `*.test-run.json` found. */
   runs: number;
   /**
-   * Whether the results directory was there to look in. Absent is NOT "no
-   * runs": since 5hox the directory is derived and may simply not have been
-   * computed or fetched, so a caller must report `unknown`, never `n/a`
-   * (audit C5, bean `2gst`).
+   * Whether the runs were determined. Absent is NOT "no runs": since 5hox the
+   * directory is derived and may simply not have been computed or fetched, so
+   * a caller must report `unknown`, never `n/a` (audit C5, bean `2gst`).
+   *
+   * An existing but EMPTY directory is not enough either: another writer
+   * (kg-audit's own sidecars) creates it as a side effect, which made the
+   * check pass or fail by run order (cat-harness-tools#759). So it is looked
+   * at when it holds a run, when the store has the tree, or when the caller
+   * says the directory is `determined` (qa:refresh is computing it, or it is
+   * committed rather than branch-stored) — owner's choice A, 2026-10-30.
    */
   looked: boolean;
 }
@@ -72,11 +78,14 @@ export function checkTestRuns(
   resultsDir: string,
   knownSkills: Set<string>,
   storeFallback?: () => TestRunStoreFallback,
+  opts: { determined?: boolean } = {},
 ): TestRunConformance {
-  const out: TestRunConformance = { unresolved: [], nonconforming: [], unchecked: [], checked: 0, runs: 0, looked: existsSync(resultsDir) };
+  const local = testRunFiles(resultsDir);
+  const looked = local.length > 0 || (opts.determined === true && existsSync(resultsDir));
+  const out: TestRunConformance = { unresolved: [], nonconforming: [], unchecked: [], checked: 0, runs: 0, looked };
   let entries: { where: string; text: string }[] = [];
   if (out.looked) {
-    entries = testRunFiles(resultsDir).map((file) => ({ where: relative(root, file), text: readFileSync(file, "utf-8") }));
+    entries = local.map((file) => ({ where: relative(root, file), text: readFileSync(file, "utf-8") }));
   } else if (storeFallback) {
     const fb = storeFallback();
     if (fb.looked) {

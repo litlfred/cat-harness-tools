@@ -43,6 +43,7 @@ import {
   AdapterDeclarationCollisionError,
   BUILTIN_ADAPTERS,
   discoverBuiltinAdapters,
+  resolveAdapterPreamble,
   resolveBuiltinAdapter,
 } from "../src/builtin-adapters.ts";
 import { SERVER_ROUTES } from "../src/server.ts";
@@ -223,6 +224,34 @@ describe("built-in content adapters", () => {
     for (const d of BUILTIN_ADAPTERS) {
       const r = await resolveBuiltinAdapter(d.contentType);
       expect(r.ctor.name).toBe(d.className);
+    }
+  });
+
+  test("resolveAdapterPreamble returns the adapter's preamblePath or undefined on fallback", async () => {
+    // An unknown contentType falls back in resolveBuiltinAdapter, but must not
+    // masquerade as supplying a preamble for the unknown type.
+    expect(await resolveAdapterPreamble("no-such-type")).toBeUndefined();
+    expect(await resolveAdapterPreamble("document")).toBeUndefined();
+
+    // When an adapter declares `static readonly preamblePath`, resolveAdapterPreamble
+    // surfaces it without naming any layer path in the harness.
+    const tmp = mkdtempSync(join(tmpdir(), "adapter-preamble-"));
+    try {
+      const modPath = join(tmp, "mock-paper-adapter.ts");
+      const tplPath = join(tmp, "template.tex");
+      writeFileSync(tplPath, "% mock preamble\n");
+      writeFileSync(
+        modPath,
+        `export class MockPaperAdapter {\n  static readonly preamblePath = ${JSON.stringify(tplPath)};\n}\n`,
+      );
+      const resolved = await resolveAdapterPreamble(
+        "paper",
+        [{ contentType: "paper", instance: "mock", module: modPath, className: "MockPaperAdapter", root: tmp }],
+        [],
+      );
+      expect(resolved).toBe(tplPath);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
     }
   });
 });

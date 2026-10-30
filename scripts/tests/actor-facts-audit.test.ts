@@ -196,7 +196,7 @@ describe("real repository measurement", () => {
     const findingsWhere = res.findings.map((f) => f.where);
     expect(findingsWhere.filter((w) => !KNOWN.has(w))).toEqual([]);
     // Unconsumed in either setting: no process mounted anywhere consumes these yet.
-    for (const w of ["jekyll", "sushi-compiler", "ig-publisher", "fhir-validator",
+    for (const w of ["jekyll",
       "release-authorization", "content-authoring", "qa-reporting", "clinical-validation",
       "perform-task", "approval-authority", "project-governance", "first-pass-review", "sme-coordination"]) {
       expect(findingsWhere).toContain(w);

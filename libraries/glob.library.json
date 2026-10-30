@@ -19,7 +19,6 @@
     "scripts/audit-wiring-migrate.ts",
     "scripts/audit-wiring.ts",
     "scripts/lean-witness.ts",
-    "scripts/migrate-computation-paths.ts",
-    "scripts/witness-audit.ts"
+    "scripts/migrate-computation-paths.ts"
   ]
 }

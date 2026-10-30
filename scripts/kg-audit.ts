@@ -55,6 +55,7 @@ import { parse as parseYaml } from "yaml";
 import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { contractFile, contractRefProblem, skillContracts } from "./skill-contracts.js";
 import { checkTestRuns, testRunFiles } from "./test-run-conformance.js";
+import { BUILDING_ENV } from "./qa-working-copy.ts";
 import { auditCertifications, auditTestPlans, jsonFilesUnder, auditTestPlanExitCriteria } from "./test-plan-audit.js";
 import { processArrowFindings, schemaArrowFindings } from "./arrow-direction.js";
 import { contentCodeFindings, contentInstanceCode } from "./content-holds-code.js";
@@ -1883,6 +1884,12 @@ function testRunCriteria(skills: Set<string>): Record<string, KgCriterionEntry> 
       }
     }
     return { looked: true, files };
+  }, {
+    // A committed results directory is its own record, so its presence is
+    // determined. A branch-stored one is derived: an empty copy may be another
+    // writer's side effect, so it counts only while qa:refresh computes it
+    // (cat-harness-tools#759, owner's choice A).
+    determined: process.env[BUILDING_ENV] === "1" || qaStorageOf(resultsDir) === undefined,
   });
   // Only a DECLARED `qa` directory that is absent is unknown. An instance that
   // declares none (bootstrap, …) has no results to read, and its

@@ -106,21 +106,48 @@ function coveredDirectories(v: DeclaredVisualiser): { instance: string; absPath:
  * throws (a declared graph that does not load) falls back to it too, so the
  * guard still reports rather than goes quiet.
  */
-export const SUBJECT_READERS: Readonly<Record<string, (root: string) => readonly string[]>> = {
+/** A writer's own reader: the instances it draws a page for, given the checkout and the visualiser's covered directories. */
+export type SubjectReader = (root: string, dirs: readonly { instance: string; absPath: string }[]) => readonly string[];
+
+export const SUBJECT_READERS: Readonly<Record<string, SubjectReader>> = {
   "tools-viewer": (root) => toolSubjects(root).subjects.map((s) => s.name),
+  "ig-pages": igIndexSubjects,
 };
+
+/**
+ * The instances whose artefact index this checkout holds, among the
+ * visualiser's covered `fhir-artifact-index` directories: what `ig-pages`
+ * (fhir-harness `gen-ig-pages.ts`) draws from, `<instance>/fhir-artifact-index/index.json`.
+ *
+ * Since fhir-harness#124 an IG instance commits no index; `ig-index:build`
+ * writes it at publish. A site that builds an IG's index owes that IG's
+ * artefact pages. A site that mounts the IG layer and builds none (a
+ * document folio such as smart-ra, mounting smart-base) owes none: the
+ * directory's other files (a README, retired sidecars) are not an index the
+ * writer can draw. Owner, 2026-10-30, smart-ra#103: "this is not an IG".
+ */
+export function igIndexSubjects(_root: string, dirs: readonly { instance: string; absPath: string }[]): string[] {
+  return [...new Set(dirs.filter((d) => existsSync(join(d.absPath, "index.json"))).map((d) => d.instance))].sort();
+}
+
+/**
+ * Writers whose page at the visualiser's own route is owed only when their
+ * reader finds a subject: `ig-pages` draws its index page from the indexes it
+ * reads, so with none there is nothing at `<harness>/artifact-index/` either.
+ */
+export const INDEX_PAGE_NEEDS_SUBJECTS: ReadonlySet<string> = new Set(["ig-pages"]);
 
 /** The instances `v` owes a sub-graph page, by its writer's reader when it has one, else by the sub-directory test. */
 export function subjectInstances(
   v: Pick<DeclaredVisualiser, "renderedBy">,
   root: string,
   dirs: readonly { instance: string; absPath: string }[],
-  readers: Readonly<Record<string, (root: string) => readonly string[]>> = SUBJECT_READERS,
+  readers: Readonly<Record<string, SubjectReader>> = SUBJECT_READERS,
 ): string[] {
   const read = readers[v.renderedBy];
   if (read !== undefined) {
     try {
-      return [...new Set(read(root))].sort();
+      return [...new Set(read(root, dirs))].sort();
     } catch {
       // fall through: the generic test still names what is expected
     }
@@ -156,13 +183,16 @@ export function expectedPages(root: string, opts: { staging?: boolean; ownInstan
     if (withAnything.length === 0) continue;
     const parts = pageParts({ harness: v.harness, visualiser: v.id });
     const legacy = visualiserRoute(forwardingParts(parts));
-    out.push({ route: visualiserRoute(parts), legacyRoute: legacy, ...own(v.harness, legacy), harness: v.harness, visualiser: v.id });
-    if (v.subgraphs !== "instance") continue;
     // A directory the checkout ROOT declares (`(root)`, the index's own
     // `test/`) belongs to no instance and has no route segment, so no writer
     // draws a page for it (`perInstanceSubjects` in state-visualizer.ts) and
     // none is owed. Composing its route threw, and took the whole guard down.
-    const instances = subjectInstances(v, root, dirs).filter((i) => ROUTE_SEGMENT.test(i));
+    const instances = v.subgraphs === "instance" || INDEX_PAGE_NEEDS_SUBJECTS.has(v.renderedBy)
+      ? subjectInstances(v, root, dirs).filter((i) => ROUTE_SEGMENT.test(i))
+      : [];
+    if (INDEX_PAGE_NEEDS_SUBJECTS.has(v.renderedBy) && instances.length === 0) continue;
+    out.push({ route: visualiserRoute(parts), legacyRoute: legacy, ...own(v.harness, legacy), harness: v.harness, visualiser: v.id });
+    if (v.subgraphs !== "instance") continue;
     for (const instance of instances) {
       const sub = { ...parts, subgraph: instanceSubgraph(instance, dirs) };
       const subLegacy = visualiserRoute(forwardingParts(sub));

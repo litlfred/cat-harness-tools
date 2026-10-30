@@ -8,7 +8,7 @@ import { commentGuard, commentRanges } from "../html-comments.ts";
  * The folio mount's two halves agree, and the comment scanner is ONE
  * scanner. Bean `jpjt`.
  *
- * The browser half of this is `test/folio-mount.e2e.ts`, which drives a real
+ * The browser half of this is `test/content/folio-mount.e2e.ts`, which drives a real
  * generated who-iris page. This file pins the things a browser test cannot
  * see cheaply: that the derivation and the shipped string are the same
  * expression, and that `ur84` cannot come back through a second copy of the
