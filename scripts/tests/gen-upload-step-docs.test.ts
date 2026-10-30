@@ -209,7 +209,7 @@ describe("the page", () => {
     const model = await diagram(ACTIVITY);
     const page = render(model, firstActivity(model), [tool()]);
     expect(page.startsWith("---\n")).toBe(true);
-    expect(page).toContain("generated: cat-harness/scripts/gen-upload-step-docs.ts");
+    expect(page).toContain("generated: cat-harness-tools/scripts/gen-upload-step-docs.ts");
     expect(page).toContain("do not hand-edit");
   });
 });
