@@ -185,7 +185,7 @@ describe("bootstrap — the instance with the one varying performer", () => {
     // Bean `ug4r`. The absence is an assertion: the performer is whoever
     // called the sub-process, so there is no persona to define. Without
     // `laneBinding` this would be indistinguishable from a lane nobody bound.
-    const actor = concepts(doc).find((c) => String(c["@id"]).includes("#process/Process_LogMessage/lane/Lane_Actor"));
+    const actor = concepts(doc).find((c) => String(c["@id"]).includes("/process/Process_LogMessage/lane/Lane_Actor"));
     expect(actor).toBeDefined();
     expect(actor!.definition).toBeUndefined();
     expect(actor!.performerVaries).toBe(true);

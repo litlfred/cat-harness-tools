@@ -68,16 +68,13 @@ const KINDS = new Set(SUBJECT_KINDS);
 
 /**
  * Stubs whose document is still published by a generator that mints
- * `#fragment` subjects — bootstrap's, by bootstrap-tools' `export-graph.ts`
- * (`instance-exports.ts` `PUBLISHED_ELSEWHERE`), until its own phase of #603.
- *
- * A link INTO such a document has to name what that document holds, so
- * {@link subjectIri} keeps the old form for it: `kg-export` links a Tool to
- * `bootstrap.jsonld#skill/<id>`, and `glossary-export` mints bootstrap's
- * concepts the same way. Remove the entry in the PR that moves its publisher
- * to paths. `subject-iri.test.ts` holds it to `PUBLISHED_ELSEWHERE`.
+ * `#fragment` subjects. Empty since litlfred/cat-harness-tools#958: bootstrap's
+ * publisher, bootstrap-tools' `export-graph.ts`, mints `<doc dir>/<kind>/<id>`
+ * too (litlfred/bootstrap-tools#52), and keeps a tombstone per old fragment
+ * for one release. Kept, empty, so a publisher that ever lags again has one
+ * place to be named; `subject-iri.test.ts` holds it to that publisher list.
  */
-export const FRAGMENT_DOCUMENT_STUBS: readonly string[] = ["bootstrap"];
+export const FRAGMENT_DOCUMENT_STUBS: readonly string[] = [];
 
 const FRAGMENT_STUBS = new Set(FRAGMENT_DOCUMENT_STUBS);
 
