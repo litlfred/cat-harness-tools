@@ -153,6 +153,7 @@
  *   bun run cat regen --explain      # say, per pair, why it ran or was skipped
  *   bun run cat regen --changed <base>  # ask only pairs whose inputs changed since <base>
  *   bun run cat regen --max-passes 8 # raise the fixpoint bound (default: DEFAULT_MAX_PASSES)
+ *   bun run cat regen --no-mount     # skip the `state:mount` regen runs first (merge:main has just run it)
  *
  * `--all` is accepted and is the default.
  *
@@ -161,6 +162,7 @@
  *   1  at least one check is `unrepaired` or `no-writer` — not staleness
  *   2  the run did not reach a fixed point: COULD NOT DETERMINE, never clean
  */
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -1090,8 +1092,35 @@ export function hashesToRecord(
   return next;
 }
 
+/**
+ * Whether regen mounts the branch-kept graphs before it grades anything —
+ * folio-assistant#2247, gap 3. `merge:main` mounts against the MERGED
+ * declarations and then runs regen (bean `9c7h`), but a bare `bun run cat
+ * regen` never mounted. With `cat/cat-harness/fsh-guts` unmounted it reported
+ * `audit:coverage:strict` as "a real defect, not staleness" and `fsh-guts:viz`
+ * as "the declared writer is not a writer" (seen on #2245); both passed after
+ * `state:mount`. `--no-mount` is for a caller that has just mounted.
+ */
+export function mountFirst(argv: readonly string[]): boolean {
+  return !argv.includes("--no-mount");
+}
+
 if (import.meta.main) {
   const repoRoot = repoRootFor(ROOT);
+  if (mountFirst(process.argv)) {
+    // Idempotent, and the mounted paths are ignored, so the tree regen grades
+    // is unchanged apart from what it reads. A mount that fails leaves regen
+    // reading graphs that may be absent: could-not-determine (exit 2), never
+    // a verdict about the tree.
+    const mount = spawnSync("bun", ["run", "cat", "state:mount"], { cwd: repoRoot, stdio: "inherit" });
+    if (mount.status !== 0) {
+      console.error(
+        `\nCOULD NOT DETERMINE — \`bun run cat state:mount\` failed (exit ${mount.status ?? mount.signal}), so the ` +
+          "branch-kept graphs regen reads may be missing. Fix the mount, or pass --no-mount if you have just mounted. Not a pass.",
+      );
+      process.exit(2);
+    }
+  }
   const scripts = scriptTableOf(repoRoot);
   const jobs = jobsFromArgv(process.argv);
   const maxPasses = maxPassesFromArgv(process.argv);
@@ -1360,6 +1389,14 @@ if (import.meta.main) {
   if (verdict.code !== 0) process.exit(verdict.code);
   // `--dry-run` changed nothing, so there is nothing to review or commit.
   if (!dryRun && by("regenerated").length > 0) {
-    console.log("\nReview `git diff`, then commit the regenerated artefacts with your merge.");
+    // folio-assistant#2247, gap 2: generated files tracked under a gitignored
+    // directory are staged by `git add -A` but skipped by `git add -A <dir>`
+    // and refused by `git add <file>`. A pathspec-limited add once left the
+    // skills LSI out of a commit and `skill:register:check` failed in CI.
+    console.log(
+      "\nReview `git diff`, then commit the regenerated artefacts with your merge: `git add -A` " +
+        "(not a pathspec-limited add, which skips tracked files under an ignored directory). Regenerated: " +
+        by("regenerated").map((r) => r.writer ?? r.check).join(", "),
+    );
   }
 }
