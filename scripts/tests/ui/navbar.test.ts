@@ -239,7 +239,7 @@ describe("the exploding menu", () => {
   });
 
   it("carries a declared tone through to the mark", () => {
-    expect(navbarHtml(model)).toContain("hsl(268 45% 28%)");
+    expect(navbarHtml(model)).toContain("--fa-nav-hue:268");
   });
 
   it("an item with nowhere to go is NOT a link", () => {
@@ -302,7 +302,7 @@ describe("at rest it is a strip, and opens three ways", () => {
   it("the header carries the declared avatar when there is one", () => {
     const html = navbarHtml({ ...model, mark: { avatar: { src: "../a.svg" }, tone: 268 } });
     expect(region(html, "fa-nav-top")).toContain('<img src="../a.svg" alt="" loading="lazy" decoding="async">');
-    expect(region(html, "fa-nav-top")).toContain("hsl(268 45% 28%)");
+    expect(region(html, "fa-nav-top")).toContain("--fa-nav-hue:268");
   });
 
   it("every avatar image is lazy, so a folded Harnesses row fetches nothing until opened (2026-10-10)", () => {
@@ -318,7 +318,7 @@ describe("at rest it is a strip, and opens three ways", () => {
   it("an avatar that declares its ground `none` sits on the rail itself — no tone square (issue #46, gap 5)", () => {
     const html = navbarHtml({ ...model, mark: { avatar: { src: "../a.svg", ground: "none" }, tone: 268 } });
     expect(region(html, "fa-nav-top")).toContain('<img src="../a.svg" alt="" loading="lazy" decoding="async">');
-    expect(region(html, "fa-nav-top")).not.toContain("hsl(268 45% 28%)");
+    expect(region(html, "fa-nav-top")).not.toContain("--fa-nav-hue:268");
   });
 
   it("escapes what it is given", () => {
@@ -1330,5 +1330,13 @@ describe("a fold opens from its parent's row — owner, 2026-10-15: \"what is 26
     const page = "<!doctype html><html><head></head><body><p>x</p></body></html>";
     expect(injectNavbar(page, { instance: "x", pages: { label: "Pages", items, collapsible: true } })!).toContain("<script data-fa-nav-folds>");
     expect(injectNavbar(page, { instance: "x" })!).not.toContain("data-fa-nav-folds");
+  });
+});
+
+describe("a toned mark's ground follows the scheme", () => {
+  it("light mode gives the mark a pale ground and its own deep ink", () => {
+    const css = navbarCss();
+    expect(css).toContain('.fa-nav-tone[style*="--fa-nav-hue"]{background:hsl(var(--fa-nav-hue) 45% 28%);color:#f6f8fa}');
+    expect(css).toContain(':root[data-fa-scheme="light"] .fa-nav-tone[style*="--fa-nav-hue"]{background:hsl(var(--fa-nav-hue) 50% 90%)');
   });
 });
