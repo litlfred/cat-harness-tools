@@ -68,15 +68,24 @@
 # hit it in the 2026-10-23 sample, and every PR ran prepare-base and four base
 # shards, about half its runner minutes, to recompute main. So on a PR's first
 # attempt, when the exact key misses, the answer a run on the caller's main
-# saved is used instead: the one for the same caller commit first, else the
-# newest for any earlier main of the caller. A push to main saves it, as
-# before. The PR is then judged against it and its base side is not run; the
-# step summary says which main it is and how old. What it costs: a failure
-# that arrived on main through the index, a lower layer or a branch-kept graph
-# after that main's run is shown as the PR's own, and a gate main fixed since
-# reads as already red. Re-running ALL jobs (a second attempt) recomputes
-# main exactly, as before. No stored answer at all: the base side runs, as
-# before. The head side is unchanged. `reuse-stored-main: false` turns it off.
+# saved FOR THE PR'S OWN BASE is used instead: the merge commit's first
+# parent, which is `git merge-base origin/main HEAD` of the tree under test.
+# A push to main saves it, as before. The PR is then judged against it and its
+# base side is not run; the step summary says which main it is and how old.
+# Never an EARLIER main's answer (cat-harness-tools#926): the head is the PR
+# merged into the current main, so an earlier main's answer charged every
+# failure main took on since to the PR, and read main's fixes as already red.
+# No answer for the PR's base: the base side is computed, by this run.
+# Re-running ALL jobs (a second attempt) recomputes main exactly, as before.
+# `reuse-stored-main: false` turns the reuse off.
+#
+# Main's answer, once found, is RESTORED by prepare-base and handed to
+# compare as a run artifact (cat-harness-tools#926). It used to be only looked
+# up there and restored by compare, after the head shards, with
+# `fail-on-cache-miss`; on smart-base#216 (run 41064407930) that was two hours
+# later, the entry had been evicted, and the gate failed without judging
+# anything. An artifact lives as long as the run. Should the restore or the
+# hand-off fail, prepare-base computes main's side itself, as on a miss.
 #
 # The CI cone (bean `4rbc`, cat-harness-tools#398). On a PR, a declared gate
 # whose read set, recorded by a green traced run on the caller's main, is
@@ -201,7 +210,7 @@ on:
         type: string
         default: "main"
       reuse-stored-main:
-        description: "On a PR's first attempt, when main's answer for these exact inputs is not cached, judge the PR against the answer a run on the caller's main stored instead of recomputing main (see the header). Off: the base side runs on every cache miss."
+        description: "On a PR's first attempt, when main's answer for these exact inputs is not cached, judge the PR against the answer a run on the caller's main stored for the PR's own base commit (its merge-base with main) instead of recomputing main (see the header). Off: the base side runs on every cache miss."
         required: false
         type: boolean
         default: true
@@ -913,8 +922,9 @@ jobs:
       # True when main's answer is not computed by this run: cached under the
       # exact key, or stored by a run on the caller's main (`stored-key`).
       cached: ${{ steps.base-hit.outputs.hit }}
-      # The key the compare job restores main's answer from, and which it is:
-      # `exact`, `this PR's main` or `an earlier main` (the header).
+      # The key main's answer was restored from, and which it is: `exact` or
+      # `this PR's main` (the header). compare reads the answer itself from
+      # this run's `base-answer` artifact, never from the cache.
       stored-key: ${{ steps.base-hit.outputs.key }}
       stored-tier: ${{ steps.base-hit.outputs.tier }}
       # The commit of main this run computes, when it does (kept beside its answer).
@@ -991,7 +1001,7 @@ jobs:
           echo "main's answer is computed from: $raw"
           hash="$(printf '%s' "$raw" | sha256sum | cut -d' ' -f1)"
           # The caller's own tree leads the hash (v4), so a PR can find main's
-          # stored answer for the same caller commit by prefix when the rest
+          # stored answer for its own base commit by prefix when the rest
           # moved (the header's "main's STORED answer").
           own_tree="$src_tree"; own_dir=src
           [ "$MODE" = "layer" ] || { own_tree="$root_tree"; own_dir=fa; }
@@ -1000,20 +1010,22 @@ jobs:
           {
             echo "key=$key"
             echo "prefix-own=${any}${own_tree}-"
-            echo "prefix-any=${any}"
             echo "own-sha=$(git -C "$own_dir" rev-parse HEAD)"
           } >> "$GITHUB_OUTPUT"
           # The CI cone's records of the same main (cat-harness-tools#398). A
           # PR restores the newest under the prefix, not this exact key: a
           # record is checked path by path, so an older main's still serves.
           echo "cone=layer-pr-checks-cone-v1-${GITHUB_REPOSITORY}-$hash" >> "$GITHUB_OUTPUT"
+      # Restored here, not only looked up: compare runs after the head
+      # shards, hours later on a busy day, and the entry may be evicted by
+      # then (cat-harness-tools#926). What is restored goes to compare as an
+      # artifact (below).
       - name: Is main's answer already known?
         id: base-lookup
         uses: actions/cache/restore@v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ steps.base-key.outputs.key }}
-          lookup-only: true
       - name: Are this main's cone records already kept? (a push)
         id: cone-lookup
         if: github.event_name == 'push'
@@ -1023,11 +1035,13 @@ jobs:
           key: ${{ steps.base-key.outputs.cone }}
           lookup-only: true
       # Not for these exact inputs: the answer a run on the caller's main
-      # stored, for the same caller commit first, then the newest of any
-      # (the header). The last line is the key this answer had before v4,
-      # so the callers' existing mains serve until their next push. A PR's first attempt only: re-running all jobs is how
-      # main is recomputed exactly. Never on a push, which is main's own run.
-      - name: Has a run on main stored an answer to judge against?
+      # stored for the PR's OWN base commit, the merge commit's first parent
+      # (`git merge-base origin/main HEAD` of the tree under test), whose tree
+      # leads the key. Never an earlier main's (the header): on a miss the
+      # base side is computed. A PR's first attempt only: re-running all jobs
+      # is how main is recomputed exactly. Never on a push, which is main's
+      # own run.
+      - name: Has a run on main stored an answer for this PR's base?
         id: stored-lookup
         if: >-
           steps.base-lookup.outputs.cache-hit != 'true' && github.event_name != 'push' &&
@@ -1038,27 +1052,56 @@ jobs:
           key: ${{ steps.base-key.outputs.key }}
           restore-keys: |
             ${{ steps.base-key.outputs.prefix-own }}
-            ${{ steps.base-key.outputs.prefix-any }}
-            layer-pr-checks-main-v3-${{ github.repository }}-
-          lookup-only: true
+      # A PR only: a push computes main's side whatever is cached.
+      - name: Hand main's answer to the compare job
+        id: base-answer
+        if: >-
+          github.event_name != 'push' &&
+          (steps.base-lookup.outputs.cache-hit == 'true' || steps.stored-lookup.outputs.cache-matched-key != '')
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: base-answer
+          path: |
+            ${{ runner.temp }}/base-results/junit.xml
+            ${{ runner.temp }}/base-results/gates.json
+            ${{ runner.temp }}/base-results/from.json
+          if-no-files-found: error
+          retention-days: 1
       - name: Skip the base side when it is
         id: base-hit
         env:
           EXACT: ${{ steps.base-lookup.outputs.cache-hit == 'true' }}
           KEY: ${{ steps.base-key.outputs.key }}
           STORED: ${{ steps.stored-lookup.outputs.cache-matched-key }}
-          OWN: ${{ steps.base-key.outputs.prefix-own }}
+          HANDED: ${{ steps.base-answer.outcome == 'success' }}
+          PUSH: ${{ github.event_name == 'push' }}
+          DIR: ${{ runner.temp }}/base-results
         run: |
           set -euo pipefail
+          hit=false; key=""; tier=""
           if [ "$EXACT" = "true" ]; then
-            hit=true; key="$KEY"; tier=exact
-            echo "main's answer is cached: the base side is not run again"
+            key="$KEY"; tier=exact
           elif [ -n "$STORED" ]; then
-            hit=true; key="$STORED"
-            case "$STORED" in "$OWN"*) tier="this PR's main" ;; *) tier="an earlier main" ;; esac
-            echo "main's answer for these exact inputs is not cached; the PR is judged against the one stored for $tier ($STORED), and the base side is not run"
+            key="$STORED"; tier="this PR's main"
+          fi
+          if [ "$PUSH" = "true" ]; then
+            # main's own run judges nothing and reads no answer: "kept" is all
+            # it asks, to skip work that is already kept (below).
+            [ "$EXACT" = "true" ] && hit=true
+          elif [ -n "$key" ]; then
+            # Restored AND handed to compare, with both halves of the answer:
+            # only then is main's side not computed. Anything less is a miss,
+            # never a red gate (cat-harness-tools#926).
+            if [ "$HANDED" = "true" ] && [ -s "$DIR/junit.xml" ] && [ -s "$DIR/gates.json" ]; then
+              hit=true
+              echo "main's answer ($tier, $key) is restored and handed to compare: the base side is not run"
+            else
+              echo "main's answer ($tier, $key) was found but could not be restored and handed on: main's side is computed by this run"
+              key=""; tier=""
+            fi
           else
-            hit=false; key=""; tier=""
+            echo "no answer for this PR's base commit is kept: main's side is computed by this run"
           fi
           { echo "hit=$hit"; echo "key=$key"; echo "tier=$tier"; } >> "$GITHUB_OUTPUT"
       # A PR needs only main's answer. A push is run for the records, so it
@@ -1355,13 +1398,15 @@ jobs:
         with:
           path: results
           pattern: results-*
+      # Handed on by prepare-base, which restored it (cat-harness-tools#926):
+      # an artifact of this run, never a cache entry that can be evicted
+      # while the head shards run. `cached` is true only when it was handed.
       - name: Main's answer, cached or stored (bean cis2)
         if: steps.pins-only.outputs.only != 'true' && needs.prepare-base.outputs.cached == 'true' && github.event_name != 'push'
-        uses: actions/cache/restore@v6
+        uses: actions/download-artifact@v8
         with:
+          name: base-answer
           path: ${{ runner.temp }}/base-results
-          key: ${{ needs.prepare-base.outputs.stored-key }}
-          fail-on-cache-miss: true
       - name: Say which main the PR is judged against
         if: steps.pins-only.outputs.only != 'true' && needs.prepare-base.outputs.cached == 'true' && github.event_name != 'push'
         env:
@@ -1393,7 +1438,7 @@ jobs:
           else:
               print(f"\n- stored before its provenance was kept: `{key}`")
           if tier != "exact":
-              print("\nA failure main took on after that run (through the index, a lower layer or a branch-kept graph) shows here as new. If a NEW failure below is not this PR's, re-run **all** jobs: a second attempt recomputes main exactly.")
+              print("\nIt is the answer for this PR's own base commit; a failure that reached it after that run through the index, a lower layer or a branch-kept graph shows here as new. If a NEW failure below is not this PR's, re-run **all** jobs: a second attempt recomputes main exactly.")
           PY
       - name: Join each side's shards
         id: join
