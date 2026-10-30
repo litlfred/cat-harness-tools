@@ -31,6 +31,7 @@ import { join, relative, resolve, sep } from "node:path";
 import { Glob } from "bun";
 
 import { fshGutsDirectory } from "../../schemas/kg/fsh-guts.js";
+import { skillDefinitionDirs } from "../../schemas/kg/skill-definitions-dir.js";
 import { kgRoots } from "../known-skills.js";
 import { notApplicableAlone } from "../../test/support/checkout.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
@@ -71,7 +72,28 @@ function skillDefinitionFiles(): string[] {
       if (/:\s*SkillDefinition\s*=/.test(text)) out.push(abs);
     }
   }
+  // cat-harness's own definitions are JSON data since y9r6 step 4a
+  // (cat-harness#749: its eight `: SkillDefinition =` literals became
+  // `skills/skill-definitions/*.json`), so the TypeScript sweep above no
+  // longer reaches them. Read every JSON definition directory the harness and
+  // the checkout beside it resolve, so the retired fields are still swept there.
+  for (const dir of new Set([...skillDefinitionDirs(ROOT), ...skillDefinitionDirs(resolve(ROOT, ".."))])) {
+    for (const rel of new Glob("*.json").scanSync({ cwd: dir })) {
+      const abs = resolve(dir, rel);
+      if (!out.includes(abs)) out.push(abs);
+    }
+  }
   return out;
+}
+
+/** Whether a definition file declares `field`: a top-level key of a JSON one, a property line of a TypeScript one. */
+function declaresField(file: string, field: string): boolean {
+  const text = readFileSync(file, "utf-8");
+  if (file.endsWith(".json")) {
+    const def = JSON.parse(text) as unknown;
+    return typeof def === "object" && def !== null && Object.hasOwn(def, field);
+  }
+  return new RegExp(`^\\s*${field}:`, "m").test(text);
 }
 
 /**
@@ -105,7 +127,7 @@ describe("retired SkillDefinition fields", () => {
     // The same vacuity guard over the trees that are here in every checkout,
     // so a standalone run is not a pass over an empty list either.
     const own = files.filter((f) => f.startsWith(ROOT + sep));
-    expect(own.length, "no `: SkillDefinition =` literals in cat-harness's own trees").toBeGreaterThan(0);
+    expect(own.length, "no skill definitions (`: SkillDefinition =` literals or JSON) in cat-harness's own trees").toBeGreaterThan(0);
   });
 
   test.skipIf(NO_TRASHCAN)("every record named here dereferences", () => {
@@ -122,7 +144,7 @@ describe("retired SkillDefinition fields", () => {
   for (const [field, record] of Object.entries(RETIRED)) {
     test(`no SkillDefinition declares \`${field}\``, () => {
       const declaring = files
-        .filter((f) => new RegExp(`^\\s*${field}:`, "m").test(readFileSync(f, "utf-8")))
+        .filter((f) => declaresField(f, field))
         .map((f) => f.slice(ROOT.length + 1));
       expect(
         declaring,

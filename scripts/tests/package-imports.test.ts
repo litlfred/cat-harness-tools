@@ -18,19 +18,30 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
-const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf-8")) as {
+/**
+ * The package that imports bootstrap-tools: this tools layer since bean `8lcl`
+ * moved cat-harness's code here. cat-harness's own `package.json` declares
+ * neither the dependency nor the workspaces any more, so reading it asked a
+ * package with no such import whether it declared one.
+ */
+const CODE = resolve(TOOLS_ROOT);
+const pkg = JSON.parse(readFileSync(join(CODE, "package.json"), "utf-8")) as {
   workspaces?: string[];
   dependencies?: Record<string, string>;
 };
 
 describe("bootstrap-tools by package name (pxtk)", () => {
   test("no tracked source imports bootstrap-tools by climbing out of the repository", () => {
-    const r = spawnSync("git", ["grep", "-nE", "(from|import)[ (]*['\"](\\.\\./)+bootstrap-tools/", "--", "*.ts", "*.js"], { cwd: ROOT, encoding: "utf-8" });
-    // git grep exits 1 when nothing matches — the state this test requires.
-    expect(r.status === 1 ? "" : r.stdout).toBe("");
+    // Both repositories: the code is here, and the content repository must not
+    // grow a climbing import either.
+    for (const cwd of new Set([CODE, ROOT])) {
+      const r = spawnSync("git", ["grep", "-nE", "(from|import)[ (]*['\"](\\.\\./)+bootstrap-tools/", "--", "*.ts", "*.js"], { cwd, encoding: "utf-8" });
+      // git grep exits 1 when nothing matches — the state this test requires.
+      expect(r.status === 1 ? "" : r.stdout, cwd).toBe("");
+    }
   });
 
   test("the package is declared, and resolved by workspace both inside and beside", () => {
@@ -39,7 +50,7 @@ describe("bootstrap-tools by package name (pxtk)", () => {
   });
 
   test("the name resolves to a bootstrap-tools beside or inside this checkout, not a downloaded copy", () => {
-    const at = Bun.resolveSync("@litlfred/bootstrap-tools/schemas/graph.ts", ROOT);
+    const at = Bun.resolveSync("@litlfred/bootstrap-tools/schemas/graph.ts", CODE);
     expect(at.includes("/node_modules/") && !at.includes("/bootstrap-tools/schemas/")).toBe(false);
     expect(at.endsWith("/bootstrap-tools/schemas/graph.ts")).toBe(true);
   });

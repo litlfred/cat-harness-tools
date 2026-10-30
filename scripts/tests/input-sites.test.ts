@@ -382,6 +382,7 @@ describe("annotations hold to the data that chooses their targets", () => {
       }
     }
     // The module moved into this layer with schemas/kg/ (8lcl); named from TOOLS_ROOT, not spelled.
+    // declared-path-literal: the module whose `input-site` annotation is the subject of this assertion, the same file this test imports; no declaration answers where a module of this layer sits.
     for (const g of globs) expect(annotated(relTo(join(TOOLS_ROOT, "schemas/kg/harness-config.ts")), g), g).toBe(true);
   });
 
@@ -393,6 +394,7 @@ describe("annotations hold to the data that chooses their targets", () => {
         if (existsSync(f)) expect(globMatch("*/themes/themes.ts", relTo(f)), `${relTo(f)} is outside the glob`).toBe(true);
       }
     }
+    // declared-path-literal: the module whose `input-site` annotation is the subject of this assertion, the same file this test imports; no declaration answers where a module of this layer sits.
     expect(annotated(relTo(join(TOOLS_ROOT, "schemas/ui/theme-by-ref.ts")), "*/themes/themes.ts")).toBe(true);
   });
 
