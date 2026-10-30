@@ -612,4 +612,135 @@ describe("builtAtPublish outputs are never stale (bean folio-assistant-p7mb)", (
       done();
     }
   });
+
+  test("clean checks from the audit pass are not re-run during builtAtPublish convergence across passes", async () => {
+    const { repo, decls, done } = scratch();
+    try {
+      let libraryBuilt = false;
+      let sqliteBuilt = false;
+      const calls = new Map<string, number>();
+      const runner: Runner = (script) => {
+        calls.set(script, (calls.get(script) ?? 0) + 1);
+        // `slice:sqlite` comes BEFORE `library:viz` and needs `PUBLISH_FILE` written by `library:viz`
+        if (script === "slice:sqlite:check") return sqliteBuilt;
+        if (script === "slice:sqlite") {
+          if (!libraryBuilt) return false;
+          mkdirSync(join(repo, "inst/out/pages"), { recursive: true });
+          writeFileSync(join(repo, "inst/out/pages/slice.sqlite"), "sqlite");
+          sqliteBuilt = true;
+          return true;
+        }
+        if (script === "library:viz:check") return libraryBuilt;
+        if (script === "library:viz") {
+          mkdirSync(join(repo, "inst/out"), { recursive: true });
+          writeFileSync(join(repo, "inst", PUBLISH_FILE), "{}");
+          libraryBuilt = true;
+          return true;
+        }
+        // `translation:block-qa:check` is clean in the audit pass and must NOT be re-run in Pass 1 or Pass 2
+        if (script === "translation:block-qa:check") return true;
+        return true;
+      };
+      const report = await checkPostMergeRegen({
+        repoRoot: repo,
+        pairs: [
+          { check: "translation:block-qa:check", writer: "translation:block-qa" },
+          { check: "slice:sqlite:check", writer: "slice:sqlite" },
+          { check: "library:viz:check", writer: "library:viz" },
+        ],
+        runner,
+        tracker: treeMoveTracker(repo, decls),
+        git: quietGit(),
+        gh: noPr,
+        createPr: true,
+      });
+      expect(report.status).toBe("clean");
+      expect(report.staleChecks).toEqual([]);
+      expect(report.repairedChecks).toEqual([]);
+      expect(report.builtAtPublishChecks).toEqual(["slice:sqlite:check", "library:viz:check"]);
+      // Clean check from audit pass ran ONCE (in the audit pass), never re-asked in fixpoint passes
+      expect(calls.get("translation:block-qa:check")).toBe(1);
+    } finally {
+      done();
+    }
+  });
+
+  test("a committed file move in pass 1 re-asks only checks whose declared inputs match", async () => {
+    const { repo, decls, done } = scratch();
+    try {
+      mkdirSync(join(repo, "inst/data"), { recursive: true });
+      mkdirSync(join(repo, "inst/other"), { recursive: true });
+      writeFileSync(join(repo, "inst/data/source.json"), "v1\n");
+      writeFileSync(join(repo, "inst/data/derived.json"), "v1\n");
+      writeFileSync(join(repo, "inst/other/untouched.json"), "ok\n");
+      let sourceFixed = false;
+      let derivedStale = false;
+      const calls = new Map<string, number>();
+      const runner: Runner = (script) => {
+        calls.set(script, (calls.get(script) ?? 0) + 1);
+        if (script === "source:check") return sourceFixed;
+        if (script === "source:write") {
+          writeFileSync(join(repo, "inst/data/source.json"), "v2\n");
+          sourceFixed = true;
+          derivedStale = true;
+          return true;
+        }
+        if (script === "derived:check") return !derivedStale;
+        if (script === "derived:write") {
+          writeFileSync(join(repo, "inst/data/derived.json"), "v2\n");
+          derivedStale = false;
+          return true;
+        }
+        if (script === "unrelated:check") return true;
+        return true;
+      };
+      const report = await checkPostMergeRegen({
+        repoRoot: repo,
+        pairs: [
+          { check: "derived:check", writer: "derived:write", io: { inputs: ["data/source.json"], outputs: ["data/derived.json"] } },
+          { check: "source:check", writer: "source:write", io: { inputs: ["data/source.json"], outputs: ["data/source.json"] } },
+          { check: "unrelated:check", writer: "unrelated:write", io: { inputs: ["other/**"], outputs: [] } },
+        ],
+        runner,
+        tracker: treeMoveTracker(repo, decls),
+        git: quietGit(["inst/data/source.json", "inst/data/derived.json"]),
+        gh: noPr,
+      });
+      expect(report.status).toBe("repaired");
+      expect(report.repairedChecks).toEqual(["derived:check", "source:check"]);
+      // `unrelated:check` passed in audit and its `other/**` input never moved, so it ran only once
+      expect(calls.get("unrelated:check")).toBe(1);
+    } finally {
+      done();
+    }
+  });
+
+  test("barren pass: a writer that neither repairs its check nor moves any file settles after 1 repair pass", async () => {
+    const { repo, decls, done } = scratch();
+    try {
+      let writerCalls = 0;
+      const runner: Runner = (script) => {
+        if (script === "broken:check") return false;
+        if (script === "broken:write") {
+          writerCalls++;
+          return true;
+        }
+        return true;
+      };
+      const report = await checkPostMergeRegen({
+        repoRoot: repo,
+        pairs: [{ check: "broken:check", writer: "broken:write" }],
+        runner,
+        tracker: treeMoveTracker(repo, decls),
+        git: quietGit(),
+        gh: noPr,
+        maxPasses: 6,
+      });
+      expect(report.status).toBe("unrepaired");
+      expect(report.unrepairedChecks).toEqual(["broken:check"]);
+      expect(writerCalls).toBe(1);
+    } finally {
+      done();
+    }
+  });
 });

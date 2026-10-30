@@ -10,7 +10,7 @@
  * - `litlfred/folio-assistant` and `litlfred/cat-harness` each carry the whole
  *   `cat/cat-harness/beans` branch (1707 beans), and sessions write every change
  *   to both, seconds apart. Only 50 of the 1707 copies are still identical.
- * - `cat-harness-tools` and `folio-assistant-core` took copies of their layer's
+ * - `cat-harness-tools` and the core content layer (https://github.com/litlfred/folio-assistant-core) took copies of their layer's
  *   `folio-assistant-*` beans when they were split off (294 and 194), and the
  *   originals stayed behind.
  *
@@ -21,7 +21,7 @@
  *
  * ## Where each bean belongs (owner, 2026-10-20)
  *
- * 1. `cat-tools-*` → cat-harness-tools; `folio-core-*` → folio-assistant-core.
+ * 1. `cat-tools-*` → cat-harness-tools; `folio-core-*` → the core content layer (https://github.com/litlfred/folio-assistant-core).
  * 2. A `folio-assistant-*` bean a layer took at separation → that layer. Taken
  *    by BOTH layers → listed for the owner, no home chosen.
  * 3. Every other bean → the `litlfred/folio-assistant` branch store.

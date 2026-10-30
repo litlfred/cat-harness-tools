@@ -31,8 +31,16 @@ describe("check:content-code-free", () => {
 
   test("the committed list is sorted and has no duplicates", () => {
     const files = readBaseline();
-    expect(files.length).toBeGreaterThan(0);
     expect([...files].sort()).toEqual(files);
     expect(new Set(files).size).toBe(files.length);
+  });
+
+  test("the committed list is read, and an empty one allows nothing", () => {
+    // The ratchet reached zero on 2026-10-30 (bean y9r6, box 1): an empty
+    // list is the goal state, not a failed read.
+    expect(Array.isArray(readBaseline())).toBe(true);
+    const j = judge(["tools/new.ts"], []);
+    expect(j.added).toEqual(["tools/new.ts"]);
+    expect(j.gone).toEqual([]);
   });
 });

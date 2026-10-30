@@ -701,7 +701,7 @@ function main(): void {
     // reads whatever a projection names, so what it names has to be the
     // directory, which is the half a reader gets wrong first. And it is the
     // id in the TILES' list (`tileDirectories`), not this instance's: since
-    // the landing moved to folio-assistant-core the tile is
+    // the landing moved to the core content layer the tile is
     // `folio-assistant-core-translations`, and the literal
     // `translation-sources` badged nothing (#931). The page is unscoped, so
     // every tile of the kind opens it and every one gets this count.

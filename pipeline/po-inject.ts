@@ -35,6 +35,8 @@
 
 import {
   cleanMarkdownText,
+  cleanMarkdownWithTokens,
+  type CleanedMarkdown,
   isTranslatable,
   MD_BLOCKQUOTE_RE,
   MD_CODE_FENCE_RE,
@@ -45,10 +47,12 @@ import {
   MD_HTML_SKIP_OPEN_RE,
   MD_KRAMDOWN_ATTR_RE,
   MD_LIST_ITEM_RE,
+  MD_MATH_ENV_OPEN_RE,
   MD_TABLE_SEP_RE,
+  splitTableCells,
 } from "./pot-extract";
 
-// ── Liquid restoration ──────────────────────────────────────────
+// ── Liquid & placeholder restoration ────────────────────────────
 
 /** Prefix used by pot-extract for Liquid output variables. */
 const LQD_PREFIX = "lqd_";
@@ -63,6 +67,34 @@ const LQD_VAR_RE = new RegExp("\\{" + LQD_PREFIX + "([^{}\n]+)\\}", "g");
  */
 function gettextToLiquid(text: string): string {
   return text.replace(LQD_VAR_RE, (_match, expr: string) => `{{ ${expr} }}`);
+}
+
+/**
+ * Restore `{lqd_…}`, `<aN>…</aN>`, and `{codeN}` placeholders in a
+ * translated string using the tokens captured by `cleanMarkdownWithTokens` (G3).
+ */
+export function restorePlaceholders(
+  translated: string,
+  tokens: CleanedMarkdown,
+): string {
+  let s = gettextToLiquid(translated);
+  s = s.replace(
+    /<a(\d+)>([\s\S]*?)<\/a\1>/g,
+    (_m, idxStr: string, inner: string) => {
+      const target = tokens.linkTargets[Number(idxStr)];
+      return target !== undefined ? `[${inner}](${target})` : inner;
+    },
+  );
+  s = s.replace(/\{code(\d+)\}/g, (_m, idxStr: string) => {
+    const code = tokens.codeSpans[Number(idxStr)];
+    return code !== undefined ? code : _m;
+  });
+  return s;
+}
+
+/** Build the composite lookup key for a `msgctxt`-qualified PO entry. */
+export function poContextKey(msgctxt: string, msgid: string): string {
+  return `${msgctxt}\x04${msgid}`;
 }
 
 // ── PO parsing ──────────────────────────────────────────────────
@@ -112,11 +144,24 @@ export function parsePo(poContent: string): Map<string, string> {
       continue;
     }
 
+    const msgctxtLine = lines.find((l) => l.trim().startsWith("msgctxt "));
+    const context = msgctxtLine
+      ? unescapePo(extractPoValue(lines, "msgctxt"))
+      : undefined;
     const msgid = extractPoValue(lines, "msgid");
     const msgstr = extractPoValue(lines, "msgstr");
 
     if (msgid && msgstr) {
-      translations.set(unescapePo(msgid), unescapePo(msgstr));
+      const unescapedId = unescapePo(msgid);
+      const unescapedStr = unescapePo(msgstr);
+      if (context) {
+        translations.set(poContextKey(context, unescapedId), unescapedStr);
+        if (!translations.has(unescapedId)) {
+          translations.set(unescapedId, unescapedStr);
+        }
+      } else {
+        translations.set(unescapedId, unescapedStr);
+      }
     }
   }
 
@@ -307,17 +352,38 @@ export function injectMarkdown(
   let codeFence: string | null = null;
   let inHtmlBlock = false;
   let htmlCloseTag = "";
+  let inMathBlock: string | null = null;
   const paragraphBuf: Array<{ idx: number; text: string }> = [];
 
-  /** Look up translation for raw text, return Liquid-restored result or null. */
+  /** Look up translation for raw text, return placeholder-restored result or null. */
   const translate = (rawText: string): string | null => {
-    const msgid = cleanMarkdownText(rawText);
+    const tokens = cleanMarkdownWithTokens(rawText);
+    const msgid = tokens.text;
     if (!isTranslatable(msgid)) return null;
     totalSpans++;
-    const msgstr = translations.get(msgid);
-    if (msgstr && msgstr !== msgid) {
+    let msgstr = translations.get(msgid);
+    let matchedId = msgid;
+    if (msgstr === undefined) {
+      // Fallback for pre-G3 catalogues where code spans were stripped and
+      // links were reduced to link text.
+      const legacyId = msgid
+        .replace(/\{code\d+\}/g, "")
+        .replace(/<\/?a\d+>/g, "")
+        .trim();
+      if (legacyId && legacyId !== msgid) {
+        msgstr = translations.get(legacyId);
+        matchedId = legacyId;
+      }
+    }
+    if (msgstr && msgstr !== matchedId) {
       translatedSpans++;
-      return gettextToLiquid(msgstr);
+      const restored = restorePlaceholders(msgstr, tokens);
+      // Preserve standalone image wrapper `![alt](src)` when translating alt text
+      const imgMatch = rawText.trim().match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+      if (imgMatch) {
+        return `![${restored}](${imgMatch[2]})`;
+      }
+      return restored;
     }
     untranslatedSpans++;
     return null;
@@ -400,6 +466,49 @@ export function injectMarkdown(
       continue;
     }
 
+    // --- Display math blocks ($$...$$, \[...\], \begin{env}...\end{env}) ---
+    if (inMathBlock !== null) {
+      if (stripped.includes(inMathBlock)) {
+        inMathBlock = null;
+      }
+      continue;
+    }
+    if (stripped.startsWith("$$")) {
+      const rest = stripped.slice(2);
+      const closeIdx = rest.indexOf("$$");
+      if (closeIdx === -1) {
+        flushParagraph();
+        inMathBlock = "$$";
+        continue;
+      }
+      if (rest.slice(closeIdx + 2).trim() === "") {
+        flushParagraph();
+        continue;
+      }
+    } else if (stripped.startsWith("\\[")) {
+      const rest = stripped.slice(2);
+      const closeIdx = rest.indexOf("\\]");
+      if (closeIdx === -1) {
+        flushParagraph();
+        inMathBlock = "\\]";
+        continue;
+      }
+      if (rest.slice(closeIdx + 2).trim() === "") {
+        flushParagraph();
+        continue;
+      }
+    } else {
+      const mathEnvMatch = stripped.match(MD_MATH_ENV_OPEN_RE);
+      if (mathEnvMatch) {
+        const closeToken = `\\end{${mathEnvMatch[1]}}`;
+        flushParagraph();
+        if (!stripped.includes(closeToken)) {
+          inMathBlock = closeToken;
+        }
+        continue;
+      }
+    }
+
     // --- Blank line ---
     if (!stripped) {
       flushParagraph();
@@ -454,7 +563,7 @@ export function injectMarkdown(
     // --- Table rows ---
     if (stripped.startsWith("|") && stripped.endsWith("|")) {
       flushParagraph();
-      const cells = stripped.slice(1, -1).split("|");
+      const cells = splitTableCells(stripped.slice(1, -1));
       const newCells: string[] = [];
       let rowChanged = false;
       for (const cell of cells) {
@@ -502,4 +611,160 @@ export function injectMarkdown(
       untranslatedSpans,
     },
   };
+}
+
+/**
+ * Translate a single manifest string field (e.g. `title`, `caption`,
+ * `narrative.text`), consulting the `msgctxt`-qualified key first and
+ * falling back to the uncontextualized `msgid`.
+ */
+export function translateManifestText(
+  rawText: string,
+  translations: Map<string, string>,
+  msgctxt?: string,
+): string {
+  if (!rawText) return rawText;
+  const tokens = cleanMarkdownWithTokens(rawText);
+  const msgid = tokens.text || cleanMarkdownText(rawText);
+  if (!msgid) return rawText;
+  let msgstr =
+    (msgctxt ? translations.get(poContextKey(msgctxt, msgid)) : undefined) ??
+    translations.get(msgid);
+  if (msgstr === undefined) {
+    const legacyId = msgid
+      .replace(/\{code\d+\}/g, "")
+      .replace(/<\/?a\d+>/g, "")
+      .trim();
+    if (legacyId && legacyId !== msgid) {
+      msgstr =
+        (msgctxt ? translations.get(poContextKey(msgctxt, legacyId)) : undefined) ??
+        translations.get(legacyId);
+    }
+  }
+  if (!msgstr) return rawText;
+  return restorePlaceholders(msgstr, tokens);
+}
+
+/**
+ * Return a shallow copy of a block manifest with its translatable fields
+ * (`title`, `caption`, `narrative`, `defaultView.title`, `views[].title`)
+ * translated from `translations` (G4 + G5).
+ */
+export function translateBlockFields<T>(
+  block: T,
+  translations: Map<string, string>,
+  locale?: string,
+): T {
+  if (!block || typeof block !== "object" || translations.size === 0) {
+    return block;
+  }
+  const copy = { ...(block as Record<string, unknown>) };
+
+  if (typeof copy.title === "string" && copy.title) {
+    copy.title = translateManifestText(copy.title, translations, "title");
+  }
+
+  if (typeof copy.caption === "string" && copy.caption) {
+    copy.caption = translateManifestText(copy.caption, translations, "caption");
+  }
+
+  if (
+    copy.defaultView &&
+    typeof copy.defaultView === "object" &&
+    typeof (copy.defaultView as { title?: unknown }).title === "string"
+  ) {
+    const dv = { ...(copy.defaultView as Record<string, unknown>) };
+    dv.title = translateManifestText(
+      dv.title as string,
+      translations,
+      "defaultView.title",
+    );
+    copy.defaultView = dv;
+  }
+
+  if (Array.isArray(copy.views)) {
+    copy.views = copy.views.map((v, idx) => {
+      if (v && typeof v === "object" && typeof (v as { title?: unknown }).title === "string") {
+        return {
+          ...(v as Record<string, unknown>),
+          title: translateManifestText(
+            (v as { title: string }).title,
+            translations,
+            `views[${idx}].title`,
+          ),
+        };
+      }
+      return v;
+    });
+  }
+
+  if (typeof copy.narrative === "string" && copy.narrative) {
+    copy.narrative = translateManifestText(
+      copy.narrative,
+      translations,
+      "narrative.text",
+    );
+  } else if (Array.isArray(copy.narrative)) {
+    const enEntry = copy.narrative.find(
+      (n: unknown) =>
+        n &&
+        typeof n === "object" &&
+        (n as { state?: string }).state !== "not-authored" &&
+        typeof (n as { text?: unknown }).text === "string",
+    ) as { text: string; lang?: string; state?: string } | undefined;
+    if (enEntry?.text) {
+      const translatedText = translateManifestText(
+        enEntry.text,
+        translations,
+        "narrative.text",
+      );
+      if (translatedText !== enEntry.text) {
+        if (locale) {
+          const existingIdx = copy.narrative.findIndex(
+            (n: unknown) =>
+              n &&
+              typeof n === "object" &&
+              (n as { lang?: string }).lang?.toLowerCase() === locale.toLowerCase(),
+          );
+          if (existingIdx >= 0) {
+            copy.narrative = copy.narrative.map((n: unknown, i: number) =>
+              i === existingIdx
+                ? { ...(n as Record<string, unknown>), text: translatedText }
+                : n,
+            );
+          } else {
+            copy.narrative = [
+              ...copy.narrative,
+              { ...(enEntry as Record<string, unknown>), lang: locale, text: translatedText },
+            ];
+          }
+        } else {
+          copy.narrative = copy.narrative.map((n: unknown) =>
+            n === enEntry
+              ? { ...(enEntry as Record<string, unknown>), text: translatedText }
+              : n,
+          );
+        }
+      }
+    }
+  } else if (
+    copy.narrative &&
+    typeof copy.narrative === "object" &&
+    typeof (copy.narrative as { text?: unknown }).text === "string"
+  ) {
+    const rawText = (copy.narrative as { text: string }).text;
+    const translatedText = translateManifestText(
+      rawText,
+      translations,
+      "narrative.text",
+    );
+    if (translatedText !== rawText) {
+      copy.narrative = {
+        ...(copy.narrative as Record<string, unknown>),
+        text: translatedText,
+      };
+    }
+  }
+
+  return copy as T;
 }

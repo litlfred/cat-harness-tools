@@ -415,6 +415,17 @@ describe("workflow templates (52dz)", () => {
     expect(readFileSync(join(d, ".gitignore"), "utf-8")).toMatch(/^test\/results\/$/m);
   });
 
+  test("a freshly initialised folio publishes QA sweep verdicts to its own qa-reports branch (beans 5qy8, 7mwa)", () => {
+    const d = tmp();
+    initFolio(opts(d, { contentType: "document" }));
+    for (const wf of ["qa-sweep.yml", "qa-sweep-nightly.yml"]) {
+      const raw = readFileSync(join(d, ".github/workflows", wf), "utf-8");
+      const doc = parseYaml(raw) as { permissions?: Record<string, string> };
+      expect(doc.permissions?.contents, `${wf} permissions.contents`).toBe("write");
+      expect(raw, `${wf} publishes via qa-store.ts`).toContain("cat-harness-tools/scripts/qa-store.ts\" publish");
+    }
+  });
+
   test("an unknown placeholder is refused, not written through", () => {
     const values = { assistant: "a", folio: "f", platform_git: "g", platform_repo: "r" };
     expect(renderTemplate("run: {{assistant}}/x ${{ github.ref }}", values)).toBe("run: a/x ${{ github.ref }}");

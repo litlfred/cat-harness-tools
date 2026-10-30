@@ -131,6 +131,7 @@ const OWN_TASK_IO: Readonly<Record<string, ScriptIO>> = {
   "avatars:css:check": TREE_READER,
   "boards:default:check": TREE_READER,
   "bootstrap:schemas:check": TREE_READER,
+  "kind:json-schemas:check": TREE_READER,
   "bootstrap:validate": READ_ONLY,
   "bootstrap:vocabulary:check": TREE_READER,
   "check:actor-reach": TREE_READER,
@@ -404,6 +405,7 @@ export function collectTaskIo(
  */
 export const OWN_WRITES: Readonly<Record<string, readonly string[]>> = {
   "schema:docs": ["cat-harness:docs/reference/skills/*.md"],
+  "kind:json-schemas": ["cat-harness:schemas/kinds/*.schema.json"],
   "upload-step:docs": ["cat-harness:docs/reference/upload-step/index.md"],
   "prov:qaqc": ["cat-harness:docs/prov-qaqc/index.md"],
 };

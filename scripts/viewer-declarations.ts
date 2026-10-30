@@ -838,7 +838,7 @@ export function landingRoot(repoRoot: string, fallback: string): string {
  * list, or the count names a directory that is not a tile and the badge is
  * silently absent (litlfred/folio-assistant#931). Reading `ROOT`'s own
  * declaration was right while `ROOT` was the landing harness; since the
- * landing moved to folio-assistant-core it keyed every scoped count by a
+ * landing moved to the core content layer it keyed every scoped count by a
  * cat-harness id, and the core tiles over the same pages drew no badge.
  */
 export function tileDirectories<T extends ViewedDirectory>(repoRoot: string, fallback: string): T[] {

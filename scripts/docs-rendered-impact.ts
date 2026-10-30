@@ -147,7 +147,7 @@ export function indexSite(files: Iterable<[string, string]>, themeIncludes?: Set
   for (const [rel, text] of files) {
     if (!rel.startsWith("_")) {
       const fm = frontMatter(text);
-      if (/\.(md|markdown)$/i.test(rel) || (fm !== null && /\.html$/i.test(rel))) ix.pages.set(rel, pagePath(rel, fm?.permalink));
+      if (/\.(md|markdown)$/i.test(rel) || fm !== null) ix.pages.set(rel, pagePath(rel, fm?.permalink));
     }
     for (const m of text.matchAll(INCLUDE)) push(ix.includers, m[1]!, rel);
     for (const m of text.matchAll(DATA_REF)) push(ix.dataReaders, m[1]!, rel);
@@ -233,7 +233,7 @@ export function docsRenderedImpact(o: DocsImpactOptions): RenderedImpact {
       if (reach === "all") {
         undetermined.push({ input: f, reason: `${label} reaches a layout, a theme include, or an include nothing in the tree calls: can change any page`, scope: "all" });
       } else {
-        for (const p of reach) add({ path: `${pre}${p}`, change: "changed", role: "content", via: [f, label] });
+        for (const p of reach) add({ path: `${pre}${p}`, change: "changed", role: /\.html$/i.test(p) ? "content" : "data", via: [f, label] });
       }
       continue;
     }
@@ -245,10 +245,14 @@ export function docsRenderedImpact(o: DocsImpactOptions): RenderedImpact {
       add({ path: `${pre}${rel}`, change, role: "data", via: [f] });
       continue;
     }
-    const fm = /\.(md|markdown|html)$/i.test(rel) ? frontMatter(text) : null;
-    const isPage = /\.(md|markdown)$/i.test(rel) || (fm !== null && /\.html$/i.test(rel));
-    if (isPage) add({ path: `${pre}${pagePath(rel, fm?.permalink)}`, change, role: "content", via: [f] });
-    else add({ path: `${pre}${rel}`, change, role: /\.html$/i.test(rel) ? "content" : "data", via: [f] });
+    const fm = text !== undefined ? frontMatter(text) : /\.(md|markdown|html)$/i.test(rel) ? {} : null;
+    const isPage = /\.(md|markdown)$/i.test(rel) || fm !== null;
+    if (isPage) {
+      const p = pagePath(rel, fm?.permalink);
+      add({ path: `${pre}${p}`, change, role: /\.html$/i.test(p) ? "content" : "data", via: [f] });
+    } else {
+      add({ path: `${pre}${rel}`, change, role: /\.html$/i.test(rel) ? "content" : "data", via: [f] });
+    }
   }
   if ([...files.values()].some((f) => f.role === "content")) add({ path: `${pre}${SEARCH_INDEX}`, change: "changed", role: "index", via: [] });
   return RenderedImpactSchema.parse({
@@ -266,7 +270,7 @@ export function docsRenderedImpact(o: DocsImpactOptions): RenderedImpact {
 
 /** Every text file under the composed tree's mounts, as composed-tree paths. */
 function* composedSources(repo: string, mounts: readonly Mount[]): Generator<[string, string]> {
-  const TEXT = /\.(md|markdown|html|liquid|scss|yml|yaml|json)$/i;
+  const TEXT = /\.(md|markdown|html|liquid|scss|yml|yaml|json|js)$/i;
   for (const m of mounts) {
     const root = join(repo, m.from);
     if (!existsSync(root)) continue;

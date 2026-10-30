@@ -45,7 +45,7 @@ describe("no checker is a silent n/a stub (folio-assistant-89wq, as a class)", (
     expect(MODULES.length).toBeGreaterThan(0);
     const all = MODULES.flatMap((f) => checkers(readFileSync(join(DIR, f), "utf8")));
     // The four this bean names are among them, so the parse reaches the file's tail.
-    for (const n of ["checkDetanglerNoXChapterFwd", "checkProofBuildGreen"]) {
+    for (const n of ["checkDetanglerNoXChapterFwd", "checkDetanglerArchimedeanWall", "checkVoiceTitleScholarly"]) {
       expect(all.map((c) => c.name)).toContain(n);
     }
   });

@@ -20,7 +20,11 @@
  * 1. **`fetch`**, before the docs generator. Reads the entry for this build's
  *    ref (`main/<sha>`, `pr/<n>/<sha>`) — and optional fallbacks — from
  *    `qa-reports` into a scratch directory, never into the checkout. Then:
- *    - the checkout already holds the corpus (it is still committed today):
+ *    - an exact `main/<sha>` hit (index 0) holding a corpus: source `fetched`,
+ *      materialised into the checkout's `test/results/` paths even when the
+ *      checkout still holds a committed corpus, because `main/<sha>` is
+ *      evidence about the exact tree being built;
+ *    - otherwise, the checkout already holds the corpus (still committed today):
  *      source `checkout`, and the expected counts are the checkout's;
  *    - it does not, and the fetch hit: the entry is MATERIALISED into the
  *      checkout's `test/results/` paths (`fetched`, or `fetched-fallback` when
@@ -33,14 +37,15 @@
  *    writes `_site/assets/qa/availability.json` saying which source the
  *    evidence came from — so the published site carries the answer too.
  *
- * ## Why the checkout wins while the corpus is committed
+ * ## Why the checkout wins on PR previews while the corpus is committed
  *
  * A PR's entry is published from the pull request's MERGE checkout, while a
  * staging preview builds the head. Overwriting the head's committed results
  * with the merge commit's would publish evidence about a tree the preview does
- * not show. Once `storage` is declared and the corpus leaves the checkout
- * (bean `5hox`) the fetched entry is the only source and this question goes
- * away.
+ * not show. On a `main` build, by contrast, an exact `main/<sha>` hit is
+ * evidence about the very tree being built, so it wins over the checkout. Once
+ * `storage` is declared and the corpus leaves the checkout (bean `5hox`) the
+ * fetched entry is the only source and this question goes away.
  *
  * ## A miss is never clean
  *
@@ -67,7 +72,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { fetchQa, QaUsageError } from "./qa-store.ts";
+import { fetchQa, parseQaRef, QaUsageError } from "./qa-store.ts";
 import { siteFetchStatePath } from "./qa-result-link.ts";
 
 export const AVAILABILITY_SCHEMA = "folio-qa-availability/v1" as const;
@@ -183,9 +188,19 @@ export function countPublished(siteDir: string): Pick<QaAssetCounts, "witnesses"
  */
 export function decideSource(
   local: QaAssetCounts & { corpus: boolean },
-  hit: { index: number; key: string; counts: QaAssetCounts } | undefined,
+  hit: { index: number; key: string; counts: QaAssetCounts; exact?: boolean; corpus?: boolean } | undefined,
 ): { source: QaSource; expected: QaAssetCounts; reason: string } {
-  if (local.corpus) {
+  // On a main build, an exact `main/<sha>` hit at index 0 is evidence about the
+  // very tree being built, so it wins over a still-committed checkout corpus.
+  // The merge-vs-head reason for `checkout` winning applies to PR previews
+  // (`pr/...`), fallback refs (`index > 0`), and floating/skipped resolutions.
+  const exactMainHit =
+    hit !== undefined &&
+    hit.index === 0 &&
+    hit.key.startsWith("main/") &&
+    hit.exact !== false &&
+    hit.corpus !== false;
+  if (local.corpus && !exactMainHit) {
     return {
       source: "checkout",
       expected: { witnesses: local.witnesses, results: local.results, files: local.files },
@@ -200,7 +215,8 @@ export function decideSource(
       expected: hit.counts,
       reason:
         hit.index === 0
-          ? `fetched ${hit.key} from qa-reports`
+          ? `fetched ${hit.key} from qa-reports` +
+            (local.corpus ? " (exact main/<sha> entry for this commit wins over the checkout)" : "")
           : `no entry for the requested ref; fetched ${hit.key} instead — QA evidence from ANOTHER commit, labelled as such`,
     };
   }
@@ -316,23 +332,35 @@ function cmdFetch(a: ReturnType<typeof args>): number {
 
   const scratch = mkdtempSync(join(tmpdir(), "qa-site-assets-"));
   const attempts: QaFetchState["attempts"] = [];
-  let hit: { index: number; key: string; counts: QaAssetCounts } | undefined;
+  let hit: { index: number; key: string; counts: QaAssetCounts; exact: boolean; corpus: boolean } | undefined;
   try {
     for (const [index, r] of requested.entries()) {
       const into = join(scratch, String(index));
       const f = fetchQa({ ref: r, into }, { repoRoot: root });
       attempts.push({ ref: r, state: f.state, ...(f.reason ? { reason: f.reason } : {}) });
       if (f.state === "hit") {
-        hit = { index, key: f.key!, counts: countResults(join(into, resultsRel)) };
+        const intoResults = join(into, resultsRel);
+        const spec = parseQaRef(r);
+        hit = {
+          index,
+          key: f.key!,
+          counts: countResults(intoResults),
+          exact: spec.kind === "main" && f.key!.startsWith(`main/${spec.sha}`),
+          corpus: holdsCorpus(intoResults),
+        };
         break;
       }
     }
     const d = decideSource(local, hit);
     if (hit && d.source !== "checkout") {
+      const hitDir = join(scratch, String(hit.index));
+      if (local.corpus && existsSync(join(hitDir, resultsRel))) {
+        rmSync(results, { recursive: true, force: true });
+      }
       // Materialise the WHOLE entry: the generator reads block, translation
       // and kg sidecars across every instance's results tree, not only the
       // tree this build publishes from.
-      cpSync(join(scratch, String(hit.index)), root, { recursive: true });
+      cpSync(hitDir, root, { recursive: true });
     }
     const state: QaFetchState = {
       $schema: STATE_SCHEMA,
