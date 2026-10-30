@@ -73,6 +73,8 @@ export function stagingExempt(file: string, text: string): boolean {
 
 /** This repository, whose own reusable workflows are first-party. */
 export const FIRST_PARTY = "litlfred/folio-assistant";
+/** First-party repositories whose reusable workflows are not third-party actions (bean 70lx moved layer-*.yml to cat-harness-tools). */
+export const FIRST_PARTY_REPOS: ReadonlySet<string> = new Set([FIRST_PARTY, "litlfred/cat-harness-tools"]);
 
 const SHA40 = /^[0-9a-f]{40}$/;
 /** `uses:` as the key of a block line (`- uses: x`, `uses: "x"`). Group 1 = everything before the value, 2 = the value. */
@@ -139,7 +141,7 @@ export function parseUses(line: string): UsesLine | undefined {
   const ref = m[2]!;
   const repo = action.split("/").slice(0, 2).join("/");
   const status: PinStatus = !SHA40.test(ref) ? "unpinned" : v.label ? "pinned" : "unpinned-unlabelled";
-  return { action, ref, pinned: status === "pinned", status, label: v.label, firstParty: repo === FIRST_PARTY, flow: v.flow };
+  return { action, ref, pinned: status === "pinned", status, label: v.label, firstParty: FIRST_PARTY_REPOS.has(repo), flow: v.flow };
 }
 
 export interface DockerUses {
