@@ -117,28 +117,28 @@ The core document model, organized as atomic knowledge units:
 Not content. These describe the **instance** and the people and processes
 around it, and they are read by tools rather than rendered.
 
-- **[cat-harness.ts](./cat-harness.ts)** — the repository's declaration
+- **[cat-harness.ts](./kg/cat-harness.ts)** — the repository's declaration
   declaration: which directories an instance scans and what **kind of graph**
   each holds (`tools`, `kg`, `schemas`, `beans`, and `folio`, which core
   registers because only core can render).
-- **[bean-graph.ts](./bean-graph.ts)** — what `beans/` is: a graph with named
+- **[bean-graph.ts](./sdlc/bean-graph.ts)** — what `beans/` is: a graph with named
   nodes (`defs` for work items, `workflows` for running BPMN state), declared by
   `beans/beans.json` so the whole store relocates by moving one folder.
-- **[role-graph.ts](./role-graph.ts)** — **Actor, Role, Skill.** *An actor
+- **[role-graph.ts](./process/role-graph.ts)** — **Actor, Role, Skill.** *An actor
   performs a task in a process as a role, using that role's skills.* A role **is
   a BPMN swimlane**; `inherits` is a static IS-A closure and the subprocess stack
   is a scoped union along a call path, and the two are deliberately not merged.
   Declared in `scenarios/roles.json`.
-- **[deployment-description.ts](./deployment-description.ts)** — **where**
+- **[deployment-description.ts](./process/deployment-description.ts)** — **where**
   declared actors run in one deployment: `DeploymentDescription`, `Placement`,
   `Jurisdiction`, and the checks that a placement names a declared actor,
   contradicts none of its own facts, and reaches no further than its
   deployment. Read from `scenarios/deployments/`. Proposal:
   `docs/proposals/deployment-descriptions.md`.
-- **[deployment-resolver.ts](./deployment-resolver.ts)** — for each process
+- **[deployment-resolver.ts](./process/deployment-resolver.ts)** — for each process
   task, which placements may run it and with which Tool, and the tasks no
   placement can run. **Reports only; never fails** (owner, 2026-10-24).
-- **[kg-qa.ts](./kg-qa.ts)** — the QA sidecar for that graph: 14 criteria, one
+- **[kg-qa.ts](./sdlc/kg-qa.ts)** — the QA sidecar for that graph: 14 criteria, one
   per join, written to `kg-qa/` beside each audited node by
   `scripts/kg-audit.ts`. The third QA subject kind, after blocks and scripts.
 
