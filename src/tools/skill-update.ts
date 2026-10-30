@@ -32,11 +32,13 @@
  *
  * - It does not create, rename or delete a skill (spec, Assumption 1).
  * - It does not write any other knowledge-graph node (#875, "Not proposed").
- * - It does not persist a PROV-O activity. It RETURNS the activity for an
- *   accepted write when the call names its process, task and role, because
+ * - It does not persist a PROV-O activity itself. It RETURNS the activity for
+ *   an accepted write when the call names its process, task and role, because
  *   `ProvActivitySchema` requires a plan and a role and an invented one is
- *   fabrication (`workflow/prov-record.ts`). A refused write gets no activity,
- *   as in the engine: it did not happen.
+ *   fabrication (`workflow/prov-record.ts`). The agent hands it to
+ *   `workflow_complete` (`activities`) for that step, and the engine keeps it
+ *   on the step's history entry (FR-005; owner 2026-10-30, option A). A
+ *   refused write gets no activity, as in the engine: it did not happen.
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
