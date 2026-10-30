@@ -47,12 +47,12 @@ import {
 import { priorFromOrExit } from "../scripts/qa-results.ts";
 import { qaCriteriaByIdFor } from "./qa-criteria-registry";
 import { blockQaPath, existingBlockQaPath, findContentRepoRoot } from "./qa-paths";
-import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 import type {
   BlockQaReport,
   QaCriterionEntry,
   QaReviewer,
-} from "@litlfred/cat-harness/schemas/block-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 
 interface FindingInput {
   block_md?: string;

@@ -2,8 +2,8 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { UN_LOCALES } from "@litlfred/cat-harness/schemas/translation.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { UN_LOCALES } from "@litlfred/cat-harness/schemas/content/translation.ts";
 import { qaResultHref } from "../scripts/qa-result-link.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 

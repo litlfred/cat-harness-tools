@@ -13,10 +13,10 @@ import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, write
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 
 import { loadProcessModel } from "../src/workflow/process-model.ts";
-import { BOOTSTRAP_PROCESSES_NS, CAT_HARNESS_PROCESSES_NS, FOLIO_BPMN_NS, ownElementPattern, ownExtensionPrefixes } from "@litlfred/cat-harness/schemas/namespaces.ts";
+import { BOOTSTRAP_PROCESSES_NS, CAT_HARNESS_PROCESSES_NS, FOLIO_BPMN_NS, ownElementPattern, ownExtensionPrefixes } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
 
 const REPO_ROOT = join(import.meta.dir, "..", "..");
 const DIAGRAM = join("processes", "initialize-harness.bpmn");
@@ -124,7 +124,7 @@ describe("nothing matches our elements by the text folio: again", () => {
    * test files read the real diagrams this way and, once the diagrams moved to
    * the new prefixes, counted zero and still passed.
    * `$type === "folio:…"` is fine: the parser has already normalised it by
-   * namespace. Use `ownElementPattern` from `schemas/namespaces.ts` instead.
+   * namespace. Use `ownElementPattern` from `schemas/kg/namespaces.ts` instead.
    */
   const ELEMENTS =
     "skill|role|precondition|bean|policy|adjudication|no-skill|no-call|job|implements|judgement|fulfilment|raci|involvement|link|decision|log|convention";

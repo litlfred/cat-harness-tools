@@ -4,7 +4,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { TEST_REPORT_SCHEMA_ID, TestReportSchema, computeRollup, type TestCaseVerdict } from "@litlfred/cat-harness/schemas/test-report.ts";
+import { TEST_REPORT_SCHEMA_ID, TestReportSchema, computeRollup, type TestCaseVerdict } from "@litlfred/cat-harness/schemas/sdlc/test-report.ts";
 import { renderTestReport, testReportBadge } from "../../render-test-report.ts";
 
 const reviewer = { kind: "script" as const, id: "runner.ts", actor: "ci-pipeline" };

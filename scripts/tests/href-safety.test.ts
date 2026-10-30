@@ -23,8 +23,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { safeHref } from "@litlfred/cat-harness/schemas/safe-url.js";
+import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { safeHref } from "@litlfred/cat-harness/schemas/ui/safe-url.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -75,7 +75,7 @@ describe("every href in the client goes through the check", () => {
     });
     expect(
       offenders.map((o) => `${o.line}: ${o.text.trim()}`),
-      "a new href must go through `safeHref` — see `schemas/safe-url.ts`",
+      "a new href must go through `safeHref` — see `schemas/ui/safe-url.ts`",
     ).toEqual([]);
   });
 

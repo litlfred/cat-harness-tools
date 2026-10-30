@@ -15,9 +15,9 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "@litlfred/cat-harness/schemas/index-config.ts";
-import { MountLockSchema } from "@litlfred/cat-harness/schemas/remote-mount.ts";
-import { checkRemote, mountRemote, parseSeed, seedRemote } from "../remote-mount.ts";
+import { INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "@litlfred/cat-harness/schemas/kg/index-config.ts";
+import { MountLockSchema } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
+import { checkRemote, chooseRemote, mountRemote, parseChoose, parseSeed, seedRemote } from "../remote-mount.ts";
 import { enclosingWorkspaceRoot, installDependencies, isInstallArtefact, run as replayLocks } from "../mount-from-lock.ts";
 
 function git(cwd: string, ...args: string[]): string {
@@ -250,6 +250,37 @@ describe("(c) seeding a remote instance writes its consent", () => {
     expect(m.trust?.consent?.ref).toBe(lib.sha);
     expect(m.trust?.consent?.evidence).toBe(grant.evidence);
     expect(m.overrides?.lib?.whole).toBe(true);
+  });
+
+  test("a re-pin over edited mounts is refused, unless --fresh will replace them (folio-assistant#2682)", () => {
+    const root = indexed([]);
+    seedRemote(root, [{ ...parseSeed(`lib=o/lib@${lib.sha}`), whole: true }], grant);
+    mountRemote({ instanceRoot: root, urlFor, install: false });
+    const lockPath = (p: string) => join(root, p);
+    const lockText = readFileSync(join(root, "index.lock.json"), "utf-8");
+    const mounted = JSON.parse(lockText).instances.find((i: { instance: string }) => i.instance === "lib");
+    writeFileSync(lockPath(join(mounted.path, "schemas/answer.ts")), "export const answer = 41;\n");
+    const before = readFileSync(join(root, "index.config.json"), "utf-8");
+    const moved = parseSeed(`lib=o/lib@${"c".repeat(40)}`);
+    expect(() => seedRemote(root, [moved], grant)).toThrow(/edits the lock does not hold.*lib/);
+    expect(readFileSync(join(root, "index.config.json"), "utf-8")).toBe(before);
+    seedRemote(root, [moved], grant, { discardEdits: true });
+    expect(readDeclaredMounts(root).mounts.find((x) => x.harness === "lib")!.ref).toBe("c".repeat(40));
+  });
+
+  test("a review's choice is written back to the mount entry, keeping the pin and consent (bean mo75)", () => {
+    const root = indexed([]);
+    seedRemote(root, [parseSeed(`lib=o/lib@${lib.sha}`)], grant);
+    const before = readDeclaredMounts(root).mounts.find((x) => x.harness === "lib")!;
+    chooseRemote(root, { ...parseChoose("lib"), directories: ["lib-schemas", "lib-schemas"] });
+    const m = readDeclaredMounts(root).mounts.find((x) => x.harness === "lib")!;
+    expect(m.overrides?.lib).toEqual({ directories: ["lib-schemas"] });
+    expect(m.ref).toBe(before.ref);
+    expect(m.trust).toEqual(before.trust);
+    expect(states(mountRemote({ instanceRoot: root, urlFor, install: false }).plan.outcomes)).toEqual({ lib: "mounted" });
+    expect(parseChoose("a:b")).toEqual({ harness: "a", instance: "b" });
+    expect(() => chooseRemote(root, { harness: "lib" })).toThrow(/a choice of nothing/);
+    expect(() => chooseRemote(root, { harness: "nope", directories: ["x"] })).toThrow(/no mount entry/);
   });
 
   test("a seed spec must be <name>=<owner/repo>@<40-char sha>, and an empty grant writes nothing", () => {

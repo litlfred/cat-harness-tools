@@ -110,7 +110,7 @@ describe("one answer, not two", () => {
     const text = readFileSync(scriptPath("check-instance-themes.ts"), "utf-8");
     // The SAME module, wherever the script sits relative to it (70lx moves
     // scripts to `cat-harness-tools/`, which reaches it through `cat-harness/`).
-    expect(text).toMatch(/import \{[^}]*instanceThemes[^}]*\} from "(?:\.\.\/|@litlfred\/cat-harness\/)schemas\/theme-by-ref\.js"/s);
+    expect(text).toMatch(/import \{[^}]*instanceThemes[^}]*\} from "(?:\.\.\/|@litlfred\/cat-harness\/)schemas\/(?:ui\/)?theme-by-ref\.js"/s);
   });
 });
 

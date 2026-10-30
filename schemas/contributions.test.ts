@@ -15,9 +15,9 @@ import {
   ContributionCollisionError,
   composedKindOwner,
   type FolioContribution,
-} from "@litlfred/cat-harness/schemas/contributions.ts";
-import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { CONTENT_ADAPTERS, adapterForKind } from "@litlfred/cat-harness/schemas/block-kinds.ts";
+} from "@litlfred/cat-harness/schemas/content/contributions.ts";
+import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { CONTENT_ADAPTERS, adapterForKind } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
 import { writeDeclaration, writeInstanceConfig } from "../test/support/instance-fixture.js";
 
 // Under the system temp directory, not beside this file (bean `dlqu`): an

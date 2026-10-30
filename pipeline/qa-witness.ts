@@ -58,19 +58,19 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 
-import type { BlockQaReport, QaCriterionEntry } from "@litlfred/cat-harness/schemas/block-qa.ts";
-import { KG_QA_MANIFEST_PATH, KG_QA_RESULTS_DIR, kgQaSidecarPath, owningInstanceOf, subjectEscapes } from "@litlfred/cat-harness/schemas/kg-qa.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { checkoutRootFor } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import type { KgQaManifest, KgQaReport } from "@litlfred/cat-harness/schemas/kg-qa.ts";
-import type { ScriptQaReport } from "@litlfred/cat-harness/schemas/script-qa.ts";
+import type { BlockQaReport, QaCriterionEntry } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import { KG_QA_MANIFEST_PATH, KG_QA_RESULTS_DIR, kgQaSidecarPath, owningInstanceOf, subjectEscapes } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { checkoutRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import type { KgQaManifest, KgQaReport } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
+import type { ScriptQaReport } from "@litlfred/cat-harness/schemas/sdlc/script-qa.ts";
 import {
   BLOCK_QA_RESULTS_DIR,
   TRANSLATION_QA_RESULTS_DIR,
   existingBlockQaPath,
   translationQaPath,
 } from "./qa-paths.ts";
-import type { QaFreshness, QaWitness } from "@litlfred/cat-harness/schemas/qa-record-shapes.ts";
+import type { QaFreshness, QaWitness } from "@litlfred/cat-harness/schemas/kg/qa-record-shapes.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/
 export type { QaFreshness, QaWitness };
 
@@ -140,7 +140,7 @@ export type QaState = "fail" | "warn" | "pass" | "unswept";
 /**
  * Hashed inputs that are computed rather than read off disk.
  *
- * See {@link QaFieldHash} in `schemas/block-qa.ts`: `graph` is a property of
+ * See {@link QaFieldHash} in `schemas/sdlc/block-qa.ts`: `graph` is a property of
  * the whole chapter's edge set, `lean_statement` of the declarations lexed out
  * of the `.lean`.
  */

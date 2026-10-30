@@ -9,10 +9,10 @@ import {
   cell, columnsFor, dashboardHtml, dashboardSection, fieldsOf, isKindPages, kindDir, LOCALES, nodeHtml, nodeSection, PAGE_MARK, pageBuiltAtPublish, plannedPages,
   unresolvedPages, type FieldInfo,
 } from "../../gen-node-kind-pages.ts";
-import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.ts";
+import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/content/translation.ts";
 import { unscopedSelectors } from "../../lib/themed-page.ts";
-import type { NodeKindEntry } from "@litlfred/cat-harness/schemas/node-kind-index.ts";
-import type { KindNode } from "@litlfred/cat-harness/schemas/node-kind-nodes.ts";
+import type { NodeKindEntry } from "@litlfred/cat-harness/schemas/kg/node-kind-index.ts";
+import type { KindNode } from "@litlfred/cat-harness/schemas/kg/node-kind-nodes.ts";
 
 /** Issue #2195: generic pages, built from the kind's schema. */
 

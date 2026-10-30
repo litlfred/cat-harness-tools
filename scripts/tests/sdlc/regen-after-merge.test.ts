@@ -40,8 +40,8 @@ import {
   type Runner,
 } from "../../regen-after-merge.ts";
 import { loadGates } from "../../gates.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 function resolveRepoRoot(instance: string): string {

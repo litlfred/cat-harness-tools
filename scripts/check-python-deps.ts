@@ -2,7 +2,7 @@
 /**
  * Every third-party Python import is declared, and nothing declared is dead.
  *
- * Bean `68dt`. The declaration is `schemas/python-deps.ts`; this is what stops
+ * Bean `68dt`. The declaration is `schemas/sdlc/python-deps.ts`; this is what stops
  * it becoming a list somebody once wrote. `scripts/ci-gates.ts` was retired
  * this week for being exactly that — a hand-transcribed list that missed 3 of
  * 33 gates — so the set is DERIVED from the source and compared, never typed
@@ -40,7 +40,7 @@
 import { spawnSync } from "node:child_process";
 import { TOOLS_ROOT } from "./lib/roots.ts";
 
-import { PYTHON_DEPS, importNameOf, type PythonDep } from "@litlfred/cat-harness/schemas/python-deps.ts";
+import { PYTHON_DEPS, importNameOf, type PythonDep } from "@litlfred/cat-harness/schemas/sdlc/python-deps.ts";
 
 // THE INSTANCE root — this module scans `scripts/**/*.py`, and those scripts
 // are the instance's. Distinct from the root `gen-python-deps.ts` uses for
@@ -134,7 +134,7 @@ if (import.meta.main) {
     bad = true;
     console.error(`\n✗ ${r.undeclared.length} import(s) no declaration covers:`);
     for (const u of r.undeclared) console.error(`    ${u.module}  — ${u.files.join(", ")}`);
-    console.error("    Add it to PYTHON_DEPS in schemas/python-deps.ts, with its tier and why.");
+    console.error("    Add it to PYTHON_DEPS in schemas/sdlc/python-deps.ts, with its tier and why.");
   }
   if (r.unused.length > 0) {
     bad = true;

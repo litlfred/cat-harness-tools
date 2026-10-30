@@ -17,8 +17,8 @@ import { pathClass } from "../../merge-pipeline-paths.ts";
 import { parseLog } from "../../merge-main-comment.js";
 import { plan as qaPlan } from "../../qa-resolve-conflicts.ts";
 import { CATALOGUE_VISUALISER, classify, declaredRouteGlobs, GLOSSARY_RENDERER, PATTERNS, resolveGeneratedRegions } from "../../merge-conflict-patterns.js";
-import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 /** This instance and the repository it sits in, for the filesystem-driven sweeps. */
@@ -194,8 +194,10 @@ describe("classify", () => {
     // blocked #1888 after 53 of its 55 conflicts had resolved.
     const pages = generatedDocsPages();
     // 10 since moves M6–M8 (cat-harness#445) took seven pages up to the
-    // layers whose processes they show. A floor, so an empty walk still fails.
-    expect(pages.length).toBeGreaterThanOrEqual(10);
+    // layers whose processes they show; 8 since `docs/fhir/`'s two pages
+    // (fhir-content, ig-publisher) went to fhir-harness. A floor, so an empty
+    // walk still fails.
+    expect(pages.length).toBeGreaterThanOrEqual(8);
     // Deriving the subjects from the tree is the point: a page added to
     // `docs/source/` lands here and fails until the glob names its slug.
     const unmatched = pages.filter((p) => classify(p).pattern?.id !== "docs-pages");

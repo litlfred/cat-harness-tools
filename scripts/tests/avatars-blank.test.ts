@@ -16,7 +16,7 @@ import {
   blankAvatar,
   GENERIC,
   hasAvatar,
-} from "@litlfred/cat-harness/schemas/avatars.js";
+} from "@litlfred/cat-harness/schemas/content/avatars.js";
 import { navMarkFields } from "../lib/harness-mark.js";
 import { navbarCss, navbarRegionsHtml } from "../lib/navbar.js";
 import { railModel } from "../lib/harness-rail.js";

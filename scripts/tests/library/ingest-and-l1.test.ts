@@ -45,11 +45,11 @@ import {
   withDerivedArms,
   withKnownTitle,
 } from "../../ingest-document.ts";
-import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
-import { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+import { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 
 const made: string[] = [];
 afterEach(() => {
@@ -381,15 +381,16 @@ describe("the verdict as a committed sidecar", () => {
     expect(d.families.notDerivable.count).toBe(NOT_DERIVABLE.length);
   });
 
-  test("total is NEVER zero — no entry is fully verified yet", () => {
+  test("total counts the not-derivable too, so it is zero only when every requirement was checked", () => {
     // The tempting design counts only `unmet`, so a good entry reads
-    // `total: 0`. That is the lie: six requirements no arm can produce have
-    // never been checked, and "unknown rendered as a pass" is the failure this
-    // repository keeps paying for.
+    // `total: 0` while requirements no arm can produce were never checked:
+    // "unknown rendered as a pass". The last not-derivable requirement,
+    // `audio-transcripts`, moved into the checked set with its arm (bean
+    // `1r0p`), so a clean entry's zero is now a measurement.
     const clean = doc(entry());
     expect(clean.families.unmet.count).toBe(0);
     expect(clean.total).toBe(NOT_DERIVABLE.length);
-    expect(clean.total).toBeGreaterThan(0);
+    expect(clean.families.notDerivable.count).toBe(NOT_DERIVABLE.length);
   });
 
   test("rerunning produces the same bytes, and carries no timestamp", () => {
@@ -439,13 +440,17 @@ describe("the verdict as a committed sidecar", () => {
 
 
 describe("the third state has to EXPIRE — bean `pn6j`", () => {
+  // The last entry NOT_DERIVABLE held, until its arm landed (bean `1r0p`).
+  // The expiry mechanism is tested on it as a fixture.
+  const AUDIO_WAS = [{ name: "audio-transcripts", bean: "1r0p", probe: "transcript" }] as const;
+
   test("an expired claim is REPORTED: the probe exists, so the arm runs", () => {
     // The failure this guards, measured 2026-09-20: `image-descriptions` sat
     // in NOT_DERIVABLE naming `d5f1` while all four library entries carried a
     // complete `images.json` — 2, 20, 121 and 21 images, every one with a
     // role and a basis. The gate reported "no arm builds this yet" and
     // checked none of it.
-    const found = expiredExceptions(["/x", "/y"], (d, f) => d === "/y" && f === "transcript");
+    const found = expiredExceptions(["/x", "/y"], (d, f) => d === "/y" && f === "transcript", AUDIO_WAS);
     expect(found.map((e) => e.name)).toEqual(["audio-transcripts"]);
     expect(found[0].bean).toBe("1r0p");
     expect(found[0].found).toBe("/y");
@@ -471,15 +476,15 @@ describe("the third state has to EXPIRE — bean `pn6j`", () => {
     expect(expiredExceptions(dirs, (d, f) => existsSync(join(d, f)))).toEqual([]);
   });
 
-  test("the probe matches what the BEAN says its arm will write", () => {
+  test("the probe was what the BEAN said its arm writes, and the arm writes it", () => {
     // `1r0p`: "library/<slug>/transcript/ holds the source-language
     // transcript and each translation" — a DIRECTORY. The first version of
     // this probe guessed `transcript.json` and would never have fired, so the
-    // ratchet could not ratchet. A probe is a claim about another arm's
-    // output and has to be read from that arm's own statement.
-    const audio = NOT_DERIVABLE.find((nd) => nd.name === "audio-transcripts");
-    expect(audio?.probe).toBe("transcript");
-    expect(audio?.probe).not.toContain(".");
+    // ratchet could not ratchet. The arm landed writing exactly that
+    // directory, so the requirement left NOT_DERIVABLE for the checked set.
+    expect(AUDIO_WAS[0]!.probe).toBe("transcript");
+    expect(ENTRY_DIRECTORIES).toContain(AUDIO_WAS[0]!.probe);
+    expect(NOT_DERIVABLE.find((nd) => nd.name === "audio-transcripts")).toBeUndefined();
   });
 
   test("a DIRECTORY probe fires — existsSync is not file-only", () => {
@@ -490,7 +495,7 @@ describe("the third state has to EXPIRE — bean `pn6j`", () => {
     made.push(root);
     const entry = join(root, "doc");
     mkdirSync(join(entry, "transcript"), { recursive: true });
-    expect(expiredExceptions([entry], (d, f) => existsSync(join(d, f))).map((e) => e.name)).toEqual([
+    expect(expiredExceptions([entry], (d, f) => existsSync(join(d, f)), AUDIO_WAS).map((e) => e.name)).toEqual([
       "audio-transcripts",
     ]);
   });
@@ -849,7 +854,7 @@ describe("refuse to promote — the gate between the arms and the library", () =
   });
 
   test("`not-derivable` does NOT refuse — that is the third state's whole job", () => {
-    // `audio-transcripts` has no arm. Refusing every document until every arm
+    // A requirement with no arm (`audio-transcripts`, until bean `1r0p`). Refusing every document until every arm
     // exists makes the gate unusable, and an unusable gate gets switched off.
     expect(mayPromote([{ name: "audio-transcripts", state: "not-derivable", detail: "" }])).toBe(true);
     expect(

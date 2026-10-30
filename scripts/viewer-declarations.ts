@@ -19,7 +19,7 @@
  * re-read with every `renders` entry prefixed by the mount path to be found at
  * all. None of that survives. A visualiser is declared in `<instance>.json`
  * (`visualisers`, `HarnessVisualiserSchema`), its URL is
- * `visualiserRoute({ harness, visualiser })` (`schemas/visualiser-route.ts`),
+ * `visualiserRoute({ harness, visualiser })` (`schemas/kg/visualiser-route.ts`),
  * and a page is found because the declaration says where it is.
  *
  * ## What a page still carries
@@ -64,12 +64,12 @@ import {
   type HarnessVisualiser,
   type Tile,
   type Visualisation,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.js";
-import { DEFAULT_LOCALE } from "@litlfred/cat-harness/schemas/translation.js";
-import { scriptTable } from "@litlfred/cat-harness/schemas/script-table.ts";
-import { siteRootFrom, visualiserRoute, type VisualiserRouteParts } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { checkoutDirectories, corpusDirectoriesForGraph, implementingRootFor, resolveLandingInstance } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
+import { DEFAULT_LOCALE } from "@litlfred/cat-harness/schemas/content/translation.js";
+import { scriptTable } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { siteRootFrom, visualiserRoute, type VisualiserRouteParts } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
 
 // ── Provenance: which Tool drew a page ────────────────────────────────────
 
@@ -342,7 +342,7 @@ export function visualiserFor(harnessRoot: string, tool: string, repoRoot: strin
     if (d?.name !== undefined && own.length === 1) return { ...own[0]!, harness: d.name, harnessRoot: resolve(harnessRoot) };
     throw new Error(
       `${harnessRoot}: declares ${own.length === 0 ? "no" : own.length} visualiser(s) rendered by \`${tool}\` — ` +
-        "declare exactly one in its `visualisers` (cat-harness/schemas/cat-harness.ts, HarnessVisualiserSchema)",
+        "declare exactly one in its `visualisers` (cat-harness/schemas/kg/cat-harness.ts, HarnessVisualiserSchema)",
     );
   }
   if (mine.length > 1) {
@@ -699,11 +699,12 @@ export function viewersOf(
             : [at(`${owner}-${d.id}`), ...(harnessIds.has(d.id) ? [] : [at(d.id)])]
           : [];
     // A sub-graph page counts when it is on disk OR when the declaring harness
-    // builds it at publish (`builtAtPublish`): a page that is deliberately not
-    // committed is not missing, and its writer is named on the tile instead.
+    // builds it at publish (`writer` or `builtAtPublish`): a page that is
+    // deliberately not committed is not missing, and its writer is named on the
+    // tile instead.
     const subRef = subs
       .map((sub) => visualiserPageRef(repoRoot, { ...full, subgraph: sub }, site!))
-      .find((r) => existsSync(join(repoRoot, r)) || builtAtPublishWriter(repoRoot, v.harnessRoot, r) !== undefined);
+      .find((r) => existsSync(join(repoRoot, r)) || v.writer !== undefined || builtAtPublishWriter(repoRoot, v.harnessRoot, r) !== undefined);
     // Covered BY KIND, a visualiser that draws per-sub-graph views covers a
     // directory only where it drew that directory's view: the full KG page of
     // a viewer that never reached this instance is not its viewer.
@@ -807,6 +808,77 @@ function checkoutSharedDirectories<T extends ViewedDirectory>(
   const decl = q === undefined ? undefined : read(q);
   if (ownerRoot === undefined || decl === undefined) return undefined;
   return { root: resolve(ownerRoot), directories: (decl.directories ?? []).filter((d) => d.scope === "repository") };
+}
+
+/**
+ * The landing harness's own directory: where the declaration whose
+ * directories become the site's tiles lives (issue #1904).
+ *
+ * `instance` is that harness's root. A hub, or a checkout where nothing can
+ * be decided, falls back to the checkout root when it declares an instance,
+ * else to `fallback`. `sync-docs-harness.ts` refuses an ambiguous or invalid
+ * landing before it gets here; a generator only needs the same answer when
+ * there is one.
+ */
+export function landingRoot(repoRoot: string, fallback: string): string {
+  const choice = resolveLandingInstance(repoRoot);
+  if (choice.kind === "instance") {
+    const r = instanceRootsIn(repoRoot).find((x) => readDeclaration(x)?.name === choice.name);
+    if (r !== undefined) return r;
+  }
+  return readDeclaration(repoRoot) !== undefined ? repoRoot : fallback;
+}
+
+/**
+ * THE DIRECTORIES THE SITE'S TILES ARE MADE FROM, with their viewers
+ * resolved: the landing harness's declaration plus the checkout's shared
+ * directories, exactly what `sync-docs-harness.ts` hands `graphTiles`.
+ *
+ * A generator that declares a tile count must key it by an id from THIS
+ * list, or the count names a directory that is not a tile and the badge is
+ * silently absent (litlfred/folio-assistant#931). Reading `ROOT`'s own
+ * declaration was right while `ROOT` was the landing harness; since the
+ * landing moved to folio-assistant-core it keyed every scoped count by a
+ * cat-harness id, and the core tiles over the same pages drew no badge.
+ */
+export function tileDirectories<T extends ViewedDirectory>(repoRoot: string, fallback: string): T[] {
+  const root = landingRoot(repoRoot, fallback);
+  const own = (readDeclaration(root)?.directories ?? []) as unknown as T[];
+  return withViewers(siteDirectories(own, root, repoRoot), root, repoRoot);
+}
+
+/**
+ * A tile count for each page a generator wrote that is a TILE's page, keyed
+ * by that tile's directory id, in the shape `tileCounts` takes.
+ *
+ * `pages` holds each page's repository-relative path and its own count:
+ * the number computed FOR that page, the rule #889 set. A page no tile
+ * opens contributes nothing, so there is no badge rather than a wrong one.
+ *
+ * Pages are matched by their DIRECTORY, not their file name: a declaration
+ * spells a tile's page `…/index.html` while a Jekyll source is
+ * `…/index.md`, and both are the one page at that directory. A ref declared
+ * by two tiles keeps the first, as `directoryByVisualisationRef` does.
+ */
+export function tileCountsForPages(
+  pages: Readonly<Array<{ page: string; count: number; unit: readonly [string, string] }>>,
+  repoRoot: string,
+  fallback: string,
+): Record<string, readonly [number, string]> {
+  const dirOf = (ref: string): string => ref.split("/").slice(0, -1).join("/");
+  const byDir = new Map<string, string>();
+  for (const d of tileDirectories(repoRoot, fallback)) {
+    for (const v of visualisationsOf(d.coverage, d.id)) {
+      const k = dirOf(v.ref);
+      if (!byDir.has(k)) byDir.set(k, d.id);
+    }
+  }
+  const out: Record<string, readonly [number, string]> = {};
+  for (const p of pages) {
+    const id = byDir.get(dirOf(p.page.split(sep).join("/")));
+    if (id !== undefined && !(id in out)) out[id] = [p.count, p.count === 1 ? p.unit[0] : p.unit[1]];
+  }
+  return out;
 }
 
 export function withViewers<T extends ViewedDirectory>(

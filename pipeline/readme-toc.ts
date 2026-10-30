@@ -43,12 +43,12 @@
  * @module pipeline/readme-toc
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 
 import { findPapers } from "./repo-root";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 // The git facts and the publish targets are generic and live in harness
 // (bean `cp3l`). Re-exported because this module's callers have always got
 // them from here, and moving a file should not break a folio's tooling.

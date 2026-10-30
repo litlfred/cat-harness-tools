@@ -18,8 +18,8 @@
  *
  * ## Directories are resolved from the declarations, never hardcoded
  *
- * `beans/defs/` and `todos/items/` are read through `schemas/bean-graph.ts`
- * and `schemas/todo-graph.ts`, so relocating either store moves this sweep
+ * `beans/defs/` and `todos/items/` are read through `schemas/sdlc/bean-graph.ts`
+ * and `schemas/sdlc/todo-graph.ts`, so relocating either store moves this sweep
  * with it. A literal path here would be a second spelling of one fact and
  * would go wrong on the day the store moves — which is the day somebody most
  * needs the sweep to still work.
@@ -37,20 +37,21 @@ import {
   DEFAULT_BEAN_GRAPH_ROOT,
   nodeOfKind as beanNodeOfKind,
   parseBeanGraph,
-} from "@litlfred/cat-harness/schemas/bean-graph.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
 import {
   DEFAULT_TODO_GRAPH,
   DEFAULT_TODO_GRAPH_ROOT,
   TODO_GRAPH_FILE,
   nodeOfKind as todoNodeOfKind,
   parseTodoGraph,
-} from "@litlfred/cat-harness/schemas/todo-graph.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/todo-graph.ts";
 import {
   PAGES_SERVING_FILENAME,
   PagesServingObservationSchema,
-} from "@litlfred/cat-harness/schemas/health-report.ts";
-import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/health-report.ts";
+import { instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { readQaTree, type QaTreeRead } from "../../scripts/qa-store.ts";
+import { checkRemote } from "../../scripts/remote-mount.ts";
 import {
   stagingSlug,
   type BranchEvidence,
@@ -58,6 +59,7 @@ import {
 } from "./checks.ts";
 import type {
   PagesServingEvidence,
+  RemoteMountEvidence,
   BeanEvidence,
   DoneWhenState,
   HealthContext,
@@ -654,7 +656,7 @@ const OPTION_ENUMERATED = /^\*\*[A-Z][.)]\s/;
  */
 
 /**
- * The five row labels `renderDecision` emits, in `schemas/decision-request.ts`.
+ * The five row labels `renderDecision` emits, in `schemas/process/decision-request.ts`.
  *
  * A decision put through the schema leaves this table behind; a hand-written
  * `## Options` section does not. The distinction is load-bearing and was
@@ -1151,5 +1153,21 @@ export async function gatherContext(o: GatherOptions): Promise<HealthContext> {
       rows: readSpecialBranches(o.specialBranchesPath ?? SPECIAL_BRANCHES_JSON, o.repoRoot),
     }),
     pagesServing: probePagesServing({ repoRoot: o.repoRoot }),
+    remoteMounts: probeRemoteMounts(o.repoRoot),
   };
+}
+
+/** `mount:remote:check` at `repoRoot`, as evidence: absent when nothing is declared. No network. */
+export function probeRemoteMounts(repoRoot: string): StoreProbe<RemoteMountEvidence> {
+  try {
+    const r = checkRemote({ instanceRoot: repoRoot });
+    if (r.state === "not-enabled") return { state: "absent", reason: r.reason };
+    if (r.outcomes.length === 0) return { state: "unknown", reason: r.reason };
+    return {
+      state: "ok",
+      value: { outcomes: r.outcomes.map((o) => ({ instance: o.instance, state: o.state, ...(o.detail ? { detail: o.detail } : {}) })), command: "bun run cat mount:remote:check" },
+    };
+  } catch (e) {
+    return { state: "unknown", reason: `mount:remote:check threw: ${(e as Error).message}` };
+  }
 }

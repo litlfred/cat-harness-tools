@@ -8,7 +8,7 @@
  * > author may always bump further than computed (a prose rewrite released as
  * > minor is their call), but never less.
  *
- * The rules live in `schemas/version-bump.ts`, including the record of §4.1's
+ * The rules live in `schemas/kg/version-bump.ts`, including the record of §4.1's
  * falsifier being run before any of this was written. This script is the
  * plumbing: find the baseline, produce two surfaces, compare.
  *
@@ -64,7 +64,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootFor, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { againstRef, qaResultPath, qaResultState, readQaResult, type QaResultState } from "./qa-results.js";
 import {
   type Bump,
@@ -74,7 +74,7 @@ import {
   comparable,
   diffSurface,
   surfaceOf,
-} from "@litlfred/cat-harness/schemas/version-bump.js";
+} from "@litlfred/cat-harness/schemas/kg/version-bump.js";
 
 export type BumpState = "ok" | "under" | "unreleased" | "undetermined";
 

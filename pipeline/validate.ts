@@ -16,7 +16,7 @@
  * @module pipeline/validate
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readdirSync, readFileSync, existsSync } from "fs";
 import { resolve, join, basename, dirname, relative, isAbsolute } from "path";
 import {
@@ -26,7 +26,7 @@ import {
 } from "@litlfred/cat-harness/schemas/constraints.ts";
 // A block is parsed by the schema its kind is typed by: a vocabulary module's
 // (a layer above cat-harness typing its own kinds), else BlockSchema.
-import { allConstraintRules, parseBlock } from "@litlfred/cat-harness/schemas/vocabulary-modules.ts";
+import { allConstraintRules, parseBlock } from "@litlfred/cat-harness/schemas/content/vocabulary-modules.ts";
 import type { Block, Paper, Chapter, Section, ValidationIssue, ValidationResult } from "@litlfred/cat-harness/schemas/types.ts";
 import { resolveRenderTarget } from "./render-discovery";
 import { readDeclaredFolioProfile } from "./profile-check";
@@ -935,7 +935,7 @@ export async function validateObjects(
   // file. It used to render every block to LaTeX unconditionally, which on a
   // document folio raises `LaTeX AST:` errors against output that folio never
   // produces — its render path goes through pandoc and deliberately never
-  // falls back to `latexmk`. See `schemas/render-targets.ts`.
+  // falls back to `latexmk`. See `schemas/ui/render-targets.ts`.
   const declaredProfile = readDeclaredFolioProfile(REPO_ROOT);
   const lookup = await resolveRenderTarget(declaredProfile.profile);
   if (lookup.miss) {

@@ -64,7 +64,7 @@ import {
   SCRIPT_ROOTS,
   type ScriptTarget,
 } from "./script-walker";
-import { implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 import { findContentRepoRoot } from "./repo-root";
 import {
   checkDoesNotDefaultToFloat,
@@ -82,11 +82,11 @@ import type { CheckerResult } from "./qa-checkers-voice";
 import type {
   ScriptQaReport,
   ScriptLanguage,
-} from "@litlfred/cat-harness/schemas/script-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/script-qa.ts";
 import type {
   QaCriterionEntry,
   QaScriptSidecar,
-} from "@litlfred/cat-harness/schemas/block-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 
 // ─── Dispatch ──────────────────────────────────────────────────
 

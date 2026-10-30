@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { declaredKinds, formatReport, instancesIn, renderInstance } from "../../check-instance-render.ts";
-import { repoRootFor, declarationPathIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor, declarationPathIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 
 const made: string[] = [];

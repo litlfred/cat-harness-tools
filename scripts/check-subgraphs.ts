@@ -19,7 +19,7 @@
  *   an edgeless set of nodes is a perfectly good one.
  * - A **directory** is a CONVENIENCE: where a subgraph somebody chose to name
  *   gets written down so tooling can find it. Bookkeeping, not the object.
- *   `subgraphTree` and `owningDirectory` in `schemas/cat-harness.ts` are pure
+ *   `subgraphTree` and `owningDirectory` in `schemas/kg/cat-harness.ts` are pure
  *   path containment for exactly this reason.
  *
  * The inversion is not pedantry, because it is what makes the property this
@@ -39,7 +39,7 @@
  * something false. It did — *"every declared directory is a disconnected
  * component"* — and that is corrected below too.
  *
- * The declaration half lives in `schemas/cat-harness.ts` — `subgraphTree` and
+ * The declaration half lives in `schemas/kg/cat-harness.ts` — `subgraphTree` and
  * `owningDirectory`, both DERIVED from the paths already declared rather than
  * restated, with the reasoning on those functions. This is the other half:
  * measuring how far the corpus is from the intent.
@@ -68,7 +68,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { Glob } from "bun";
 
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 
 import {
   defaultGraphTypologies,
@@ -78,8 +78,9 @@ import {
   owningDirectory,
   resolveDirectories,
   subgraphTree,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { checkoutDirectories } from "@litlfred/cat-harness/schemas/harness-config.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { checkoutDirectories } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import type { GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { corpusScopeFor } from "./known-skills.js";
 import { mayLeaveMain } from "./qa-results.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -179,7 +180,7 @@ export interface SubgraphReport {
    * edges in this graph, and there is nothing to repoint.
    *
    * **The rule already existed one layer down, and this check was simply not
-   * applying it.** `schemas/cat-harness.ts` says of the `derived` layer that
+   * applying it.** `schemas/kg/cat-harness.ts` says of the `derived` layer that
    * *"a QA finding against a derived section is a finding against its
    * GENERATOR, not against the corpus, and it sends a reviewer to fix the
    * wrong file"*. That is exactly what happened on 2026-09-23: five ingested
@@ -287,9 +288,26 @@ function linkTargets(raw: string): string[] {
  */
 /** A link destination as a path: percent-decoded, or unchanged if the escapes are malformed. */
 /** A typology whose pages a renderable PARENT publishes — `within` a renderable one. */
-function publishedByParent(g: string): boolean {
-  const parent = defaultGraphTypologies.get(g)?.within;
-  return parent !== undefined && isRenderable(parent);
+function publishedByParent(g: string, registry: GraphTypologyRegistry): boolean {
+  const parent = registry.get(g)?.within;
+  return parent !== undefined && isRenderable(parent, registry);
+}
+
+/**
+ * Do the links of a directory of these kinds address the PUBLISHED tree
+ * rather than this one? A renderable kind's do; so do a kind `within` a
+ * renderable one ({@link publishedByParent}) and a kind whose markdown is
+ * shown on a published page (`shownOnPublishedPages`: an IG annex appended
+ * to its host page). Those links go to
+ * `siteResolved`; judging them from the page that shows them is the kind
+ * owner's gate (fhir-harness's `check:ig-annex-links`), since only it knows
+ * which page that is.
+ *
+ * Read through a cast so this compiles against a cat-harness pinned before
+ * cat-harness#618 added the field; an older registry simply never sets it.
+ */
+export function addressesPublishedTree(kinds: readonly string[], registry: GraphTypologyRegistry = defaultGraphTypologies): boolean {
+  return kinds.some((g) => isRenderable(g, registry) || publishedByParent(g, registry) || (registry.get(g) as { shownOnPublishedPages?: boolean } | undefined)?.shownOnPublishedPages === true);
 }
 
 export function decodeLinkTarget(target: string): string {
@@ -449,7 +467,8 @@ export function scanSubgraphs(root: string = ROOT): SubgraphReport {
           // docs graph's named groups (bean `xka5`), `proposals` and
           // `requirements` are not sites of their own, but their pages are docs
           // pages on the docs site, so their links address the same tree.
-          const renderable = owner.graphTypologies.some((g) => isRenderable(g) || publishedByParent(g));
+          // A kind whose markdown a published page SHOWS (an IG annex) is the same case.
+          const renderable = addressesPublishedTree(owner.graphTypologies);
           // A DERIVED graph's links came from the SOURCE document rather than
           // from an author here — see `derivedLinks`. Tested after
           // `renderable` only because no kind is currently both; if one ever

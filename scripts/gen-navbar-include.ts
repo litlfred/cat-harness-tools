@@ -67,7 +67,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { graphTypologyRowDecor } from "./lib/graph-typology-nav.js";
 import { kindTitle } from "./lib/nav-label.js";
 import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
@@ -335,7 +335,7 @@ function main(): void {
   // (`lib/jekyll-pages-nav.ts`). Hrefs are site-absolute and go through
   // `relative_url` like every other row here.
   const pagesDir = opt("--pages");
-  const pages = pagesDir ? pagesNav(jekyllNavPages(pagesDir)) : undefined;
+  const pages = pagesDir ? pagesNav(jekyllNavPages(pagesDir), { locale: opt("--locale") ?? "en" }) : undefined;
   if (pages?.orphans.length) console.warn(`gen-navbar-include: ${pages.orphans.length} page(s) name a parent no listed page has; kept at the top level: ${pages.orphans.slice(0, 5).join(", ")}`);
   const instance = opt("--instance");
   if (instance) {

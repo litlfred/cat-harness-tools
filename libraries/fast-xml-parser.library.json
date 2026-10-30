@@ -15,6 +15,7 @@
   "licence": "MIT",
   "licenceSource": "the installed package's own package.json (`license`)",
   "usedBy": [
-    "scripts/tests/report.ts"
+    "scripts/tests/report.ts",
+    "src/core/feedback.ts"
   ]
 }

@@ -3,7 +3,7 @@
  * check:derived-from — the edges between derived subgraphs resolve, form no
  * cycle, and respect the interim rendering order. Bean `nama`, step 2.
  *
- * `derivedFrom` (schemas/cat-harness.ts) names the declared directory ids a
+ * `derivedFrom` (schemas/kg/cat-harness.ts) names the declared directory ids a
  * derived graph is computed FROM. An edge nothing checks is prose, so this
  * gate gives it three refusals and one ratchet, per the owner's rulings of
  * 2026-10-04 (design note docs/proposals/derived-graph-dependencies-2026-10-04.md):
@@ -59,10 +59,10 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { graphLayer, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { graphLayer, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { viewersOf } from "./viewer-declarations.ts";
-import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
-import { allowedFromNeeds } from "@litlfred/cat-harness/schemas/layer-direction.js";
+import { ancestorsOf, flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
+import { allowedFromNeeds } from "@litlfred/cat-harness/schemas/kg/layer-direction.js";
 import { readInstances } from "./check-import-direction.ts";
 import { BASELINE, type DerivedFromBaselineEntry } from "./derived-from.baseline.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";

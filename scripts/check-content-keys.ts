@@ -5,7 +5,7 @@
  * `check-context-emission` that per-instance contexts do not replace.
  *
  * @module scripts/check-content-keys
- * @covers schemas — the thing graded is `CONTENT_CONTEXT` in `schemas/jsonld.ts`: a key a document
+ * @covers schemas — the thing graded is `CONTENT_CONTEXT` in `schemas/kg/jsonld.ts`: a key a document
  *   writes that it does not declare, and a path under a term it coerces to `@id`
  *
  * ## Why these two outlived the check they lived in (bean `folio-assistant-63q4`)
@@ -34,7 +34,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.js";
+import { CONTENT_CONTEXT, CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/jsonld.js";
 
 import { INSTANCE_CONTEXT_PATH } from "../pipeline/instance-document-context.ts";
 import { contentDocuments } from "./lib/jsonld-corpus.ts";
@@ -217,7 +217,7 @@ function reportKeys(k: KeyDeclarationReport): boolean {
   if (k.undeclared.length > 0) {
     console.error(`\n${k.undeclared.length} key(s) are not declared terms — a JSON-LD processor DROPS them:`);
     for (const u of k.undeclared) console.error(`  ✗ ${u.prefix}  ×${u.count}  e.g. ${u.example}`);
-    console.error("\nDeclare each in CONTENT_CONTEXT (schemas/jsonld.ts), or nest it under an `@json` term if it is data rather than a property.");
+    console.error("\nDeclare each in CONTENT_CONTEXT (schemas/kg/jsonld.ts), or nest it under an `@json` term if it is data rather than a property.");
     return true;
   }
   console.log("✓ every key in every content-context document is a declared term");

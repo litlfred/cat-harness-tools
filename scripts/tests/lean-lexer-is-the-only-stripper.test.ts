@@ -38,7 +38,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { stripLeanComments } from "../../pipeline/lean-lexer.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 

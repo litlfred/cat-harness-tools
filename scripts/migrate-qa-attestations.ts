@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * IDEMPOTENT: move every QA judgement still inside a derived file into the
- * attestation store (`schemas/qa-attestations.ts`) — the ONE migration path
+ * attestation store (`schemas/sdlc/qa-attestations.ts`) — the ONE migration path
  * for all three families.
  *
  * Beans `2gst` (kg-qa) and `8wj1` (block-qa, translation-qa), arc `3fva`.
@@ -32,7 +32,7 @@
  * `script` is added to the subject's store file, verbatim, unless the store
  * already holds it (same serialisation). The derived report keeps its copy:
  * it is the PROJECTION readers still take `criteria[id][0]` from (see the
- * module comment of `schemas/qa-attestations.ts`). The store file keeps the
+ * module comment of `schemas/sdlc/qa-attestations.ts`). The store file keeps the
  * escaping of the report its entries came from, so their bytes survive.
  *
  * Nothing is deleted, in either family. `--dry-run` reports the plan and
@@ -52,19 +52,21 @@ import { dirname, join, relative, resolve } from "node:path";
 
 // `readDeclaration` throws on the `folio` kind unless core has registered it —
 // the same side-effect import `qa-store.ts` carries, same reason.
-import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
+import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   ATTESTATIONS_SUFFIX,
   attestationKeyForDerived,
   attestationPathFor,
   CRITERIA_FAMILIES,
+  criteriaAttestationsHome,
   entryIdentity,
   isAsciiEscaped,
   KG_JUDGEMENT_FIELDS,
   kgAttestationTrees,
   KG_QA_SIDECAR_SUFFIX as KG_SIDECAR_SUFFIX,
   QA_ATTESTATIONS_SCHEMA,
+  readAttestationFile,
   readCriteriaAttestations,
   serialiseAttestations,
   splitCriteria,
@@ -73,7 +75,7 @@ import {
   type CriteriaMap,
   type KgAttestations,
   type KgAttestationTree as TreePair,
-} from "@litlfred/cat-harness/schemas/qa-attestations.js";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The kg-qa arrays that are judgements, in the order the sidecar carried them. */
@@ -297,11 +299,26 @@ export function migrateCriteria(instanceRoot: string, opts: { check?: boolean; d
 
   for (const { key, att, asciiEscape } of pending.values()) {
     const read = readCriteriaAttestations(instanceRoot, key);
-    if (read.state === "corrupt" || read.state === "unknown") {
-      report.unreadable.push(`${relative(instanceRoot, read.path)}: ${read.reason}`);
-      continue;
+    let movedSubject = false;
+    let held: CriteriaMap = {};
+    if (read.state === "hit") {
+      held = structuredClone(read.criteria);
+    } else if (read.state === "corrupt" || read.state === "unknown") {
+      // A store file moved with its content directory (`git mv docs/source/... site-docs/source/...`)
+      // still carries its old `subject.path` header until rewritten. If the file parses cleanly and
+      // matches `key.family` and `key.locale`, treat its stale header as a pending migration rather
+      // than an unreadable file so `qa:attestations:migrate` repairs it in place.
+      const raw = read.state === "corrupt" ? readAttestationFile(read.path, criteriaAttestationsHome(instanceRoot).storeRoot) : undefined;
+      const rawLocale = raw?.state === "hit" && raw.file.family === "translation-qa" ? raw.file.locale : undefined;
+      if (raw?.state === "hit" && raw.file.family === key.family && rawLocale === key.locale && raw.file.subject.path !== key.subject) {
+        movedSubject = true;
+        held = structuredClone((raw.file as unknown as { criteria: CriteriaMap }).criteria);
+        report.missing.push(`${relative(instanceRoot, read.path)} subject.path`);
+      } else {
+        report.unreadable.push(`${relative(instanceRoot, read.path)}: ${read.reason}`);
+        continue;
+      }
     }
-    const held: CriteriaMap = read.state === "hit" ? structuredClone(read.criteria) : {};
     let added = 0;
     for (const [cid, list] of Object.entries(att)) {
       const into = (held[cid] ??= []);
@@ -316,7 +333,7 @@ export function migrateCriteria(instanceRoot: string, opts: { check?: boolean; d
         into.push(e);
       }
     }
-    if (added === 0 || opts.check || opts.dryRun) continue;
+    if ((added === 0 && !movedSubject) || opts.check || opts.dryRun) continue;
     report.added += added;
     if (writeCriteriaAttestations(instanceRoot, key, held, { asciiEscape })) report.storeFilesWritten++;
   }

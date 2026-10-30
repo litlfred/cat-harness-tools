@@ -158,7 +158,7 @@ describe("a filtered push trigger is decided, not waved away", () => {
 
   const jsonld =
     "on:\n  push:\n    paths:\n      - 'folio/**/*.ts'\n" +
-    "      - 'schemas/jsonld.ts'\n      - 'library/**/structure.json'\njobs: {}\n";
+    "      - 'schemas/kg/jsonld.ts'\n      - 'library/**/structure.json'\njobs: {}\n";
 
   test("`a/**/b` matches zero directories as well as many", () => {
     // The case a naive `.*` gets wrong: GitHub runs this for `folio/a.ts`.
@@ -176,8 +176,8 @@ describe("a filtered push trigger is decided, not waved away", () => {
   });
 
   test("an exact path is exact", () => {
-    expect(pushTriggerOf(jsonld, { changedFiles: ["schemas/jsonld.ts"] })).toBe(true);
-    expect(pushTriggerOf(jsonld, { changedFiles: ["schemas/jsonld.ts.bak"] })).toBe(false);
+    expect(pushTriggerOf(jsonld, { changedFiles: ["schemas/kg/jsonld.ts"] })).toBe(true);
+    expect(pushTriggerOf(jsonld, { changedFiles: ["schemas/kg/jsonld.ts.bak"] })).toBe(false);
   });
 
   test("paths without the file list claims nothing", () => {

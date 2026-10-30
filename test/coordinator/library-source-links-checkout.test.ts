@@ -18,9 +18,9 @@ import { viewerPlacement } from "../../scripts/gen-schema-viz.ts";
 import { entryGraphFiles } from "../../scripts/lib/library-entry-graphs.ts";
 import { instanceOf } from "../../scripts/library-graph.ts";
 import { declaredPageRoute } from "../../scripts/viewer-declarations.ts";
-import { LibraryIndexSchema } from "@litlfred/cat-harness/schemas/site-indexes.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { LibraryIndexSchema } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 
 const TOOL = resolve(import.meta.dir, "../../scripts/gen-library-viz.ts");
 const HARNESS = resolve(import.meta.dir, "../../../cat-harness");

@@ -64,7 +64,7 @@ import { basename, join, resolve } from "node:path";
 // @ts-expect-error -- lunr ships no types; only `lunr()`, `tokenizer` and `Index.load` are used.
 import lunr from "lunr";
 
-import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { targetLocales } from "../pipeline/translation-index.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

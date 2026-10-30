@@ -140,6 +140,46 @@ export const RootSchema = z.object({ leaf: LeafSchema, many: z.array(LeafSchema)
     }
   });
 
+  test("a declared concern group is read, and an import through an old-path shim still resolves", () => {
+    // Bean `f8wp`: `schemas/<group>/` holds the moved modules, declared from
+    // within by `schemas/schemas.json`, with a re-export left at each old
+    // path. Reading the top level alone saw only the shims, and the schemas
+    // page lost every moved declaration (its overview e2e went red on fa main).
+    const f = fixture({
+      "schemas.json": JSON.stringify({ $schema: "concern-groups/v1", groups: ["kg"] }),
+      "leaf.ts": `/**\n * Moved.\n *\n * @graphNode none — a re-export at the old path\n */\nexport * from "./kg/leaf.js";\n`,
+      "root.ts": `
+import { z } from "zod";
+import { LeafSchema } from "./leaf.js";
+export const RootSchema = z.object({ leaf: LeafSchema });
+`,
+    });
+    mkdirSync(join(f.root, "schemas", "kg"));
+    writeFileSync(join(f.root, "schemas", "kg", "leaf.ts"), `import { z } from "zod";\nexport const LeafSchema = z.string();\n`);
+    writeFileSync(
+      join(f.root, "schemas", "kg", "mid.ts"),
+      `import { z } from "zod";\nimport { LeafSchema } from "./leaf.js";\nimport { RootSchema } from "../root.js";\n` +
+        `export const MidSchema = z.object({ leaf: LeafSchema, root: RootSchema });\n`,
+    );
+    try {
+      const g = readSchemaGraph(f.root)!;
+      const leaf = g.decls.find((d) => d.name === "LeafSchema")!;
+      expect(leaf.module.endsWith("schemas/kg/leaf.ts")).toBe(true);
+      // The shim declares nothing, so the moved declaration is not counted twice.
+      expect(g.decls.filter((d) => d.name === "LeafSchema")).toHaveLength(1);
+      // Through the shim, from the top level.
+      const root = g.decls.find((d) => d.name === "RootSchema")!;
+      expect(root.refs).toEqual([leaf.id]);
+      expect(root.unresolved).toEqual([]);
+      // Within the group, and back up out of it.
+      const mid = g.decls.find((d) => d.name === "MidSchema")!;
+      expect([...mid.refs].sort()).toEqual([leaf.id, root.id].sort());
+      expect(mid.unresolved).toEqual([]);
+    } finally {
+      f.cleanup();
+    }
+  });
+
   test("an unrecognised expression is undetermined and says what it saw", () => {
     const f = fixture({
       // A bare object literal, not a Zod call. This is the real shape:

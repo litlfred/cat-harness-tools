@@ -14,7 +14,7 @@
  *
  * Owner, 2026-09-19, on where the write and remove logic belongs: *"that's
  * part of the behaviour of that node type."* The rules live in
- * `schemas/staging-preview.ts` — what a record carries, that retirement is a
+ * `schemas/sdlc/staging-preview.ts` — what a record carries, that retirement is a
  * state rather than a deletion, that retiring twice keeps the first
  * retirement. A workflow step that built the JSON with `jq` would be a second
  * copy of those rules, free to disagree with the first the moment either
@@ -54,7 +54,7 @@ import {
   retireStagingPreview,
   serializeStagingPreview,
   type StagingPreviewNode,
-} from "@litlfred/cat-harness/schemas/staging-preview.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/staging-preview.ts";
 
 /** What `create` does to a record that is already there. */
 export type CreateOutcome =

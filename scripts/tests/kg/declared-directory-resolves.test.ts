@@ -4,7 +4,7 @@
  * ## What went wrong
  *
  * `folio` is registered into the graph-typology registry by an IMPORT SIDE EFFECT
- * at the bottom of `schemas/folio-graph-typology.ts`, and that module's own
+ * at the bottom of `schemas/kg/folio-graph-typology.ts`, and that module's own
  * comment says why: *"Registering on import is what makes `folio` available to
  * anything that imports core. The harness alone never sees it."* The layering
  * is deliberate — `folio` is CORE's kind and the harness must not know it.
@@ -20,7 +20,7 @@
  *
  * Every gate passed. All 3 298 tests passed. `check:harness-dirs`,
  * `kg:schema:check` and `docs:harness:check` — the three that
- * `schemas/cat-harness.ts` explicitly predicts will throw when a `folio`
+ * `schemas/kg/cat-harness.ts` explicitly predicts will throw when a `folio`
  * directory entry is added — all passed, because each runs inside a process
  * that reaches the registration transitively.
  *

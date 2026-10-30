@@ -27,11 +27,11 @@ import { join, resolve } from "node:path";
 
 import { ADDRESS_JS } from "../../lib/library-address.ts";
 import { entryPageHtml, isEntryShellFor, isSubjectShell, libraryConfigOf, VIEWER_JS, viewerHtml } from "../../gen-library-viz.ts";
-import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
-import { LibraryIndexSchema } from "@litlfred/cat-harness/schemas/site-indexes.ts";
+import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/library/referenced-source.ts";
+import { LibraryIndexSchema } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
 import { checkEntry } from "../../check-l1-complete.ts";
-import { readDeclaration, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { DOCS_SITE, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
+import { readDeclaration, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { DOCS_SITE, libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library/library-iri.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { declaredPageRoute } from "../../viewer-declarations.ts";
 

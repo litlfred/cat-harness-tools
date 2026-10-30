@@ -44,7 +44,7 @@ import { createHash } from "node:crypto";
 import { dirname, join, resolve, sep } from "node:path";
 
 import { parseQaRef, QaUsageError, readQa, readQaManifest, resolveQaLocation, type QaLocation, type QaStoreOptions } from "./qa-store.js";
-import type { QaResultFamily, QaResult } from "@litlfred/cat-harness/schemas/qa-record-shapes.ts";
+import type { QaResultFamily, QaResult } from "@litlfred/cat-harness/schemas/kg/qa-record-shapes.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/
 export type { QaResultFamily, QaResult };
 

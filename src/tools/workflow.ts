@@ -37,13 +37,13 @@ import { processFiles, processRoots } from "../workflow/process-files.js";
 import { z } from "zod";
 import { basename, resolve } from "node:path";
 import { findInModel, loadProcessModel, type ProcessModel } from "../workflow/process-model.js";
-import { complete, describe, startInstance, type InstanceState } from "../workflow/instance.js";
+import { complete, describe, startInstance, withRefusal, WorkflowError, type InstanceState } from "../workflow/instance.js";
 import { describePreflight, preflight, preflightRefusal } from "../workflow/preflight.js";
 import { describeCapture, writeLogEntry } from "../logging/log-writer.js";
 import { instanceId, listInstances, loadInstance, saveInstance } from "../workflow/store.js";
 import { applyWorkPlanOp, onlyArchiveLeft } from "../workflow/bean-link.js";
 import { checkGate, loadRelaxations, validateRelaxations } from "../workflow/gate.js";
-import { type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { roleGraphFor } from "../../scripts/known-skills.js";
 import { accessContext } from "../core/access.js";
 import { githubPrincipalFor } from "../core/github-auth.js";
@@ -417,13 +417,32 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string): void
       // `actor` stays in the history as what the caller SAID it was acting as;
       // authorization is decided on the principal GitHub vouches for.
       const { principal } = await githubPrincipalFor(root, process.env);
-      const next = complete(model, state, node, {
-        outcome,
-        facts: screenedFacts,
-        actor: actor ?? principal.account,
-        note,
-        authz: { ctx: accessContext(root), principal, target, mode: ENGINE_MODE },
-      });
+      let next: InstanceState;
+      try {
+        next = complete(model, state, node, {
+          outcome,
+          facts: screenedFacts,
+          actor: actor ?? principal.account,
+          note,
+          authz: { ctx: accessContext(root), principal, target, mode: ENGINE_MODE },
+        });
+      } catch (e) {
+        // Bean `v49e`: a refusal is recorded on the instance, so a gate that
+        // keeps refusing is visible as a state rather than as nothing. Only the
+        // engine's own refusals (`WorkflowError`); anything else is a fault,
+        // not a gate. Recorded on a FRESH read, since `complete` may have
+        // touched the copy it was given before it refused.
+        if (e instanceof WorkflowError) {
+          const fresh = loadInstance(root, instance);
+          if (fresh) {
+            saveInstance(
+              root,
+              withRefusal(fresh, { at: new Date().toISOString(), node, actor: actor ?? principal.account, reason: e.message }),
+            );
+          }
+        }
+        throw e;
+      }
       saveInstance(root, next);
 
       // A bean-marked step IS the work-plan operation, not a step about it.
@@ -432,7 +451,8 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string): void
       //
       // Looked up through the subprocess tree, not in the top-level process:
       // once a diagram is decomposed the bean-marked steps live in its phases
-      // (`A_Close` carries `op="resolve"` and sits in CRDM's close-out), and a
+      // (`Close_Complete` carries `op="resolve"` and sits in Process_BeanClose,
+      // which every bean-touching process calls — bean `m8gz`), and a
       // lookup that only knew the parent would find nothing and perform nothing
       // — silently, which is the worst way for a work-plan write to stop.
       // `instanceCompleted` stays the PARENT's status on purpose: a bean is

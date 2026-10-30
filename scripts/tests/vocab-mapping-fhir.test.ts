@@ -31,7 +31,7 @@ import {
   VocabMappingSchema,
   applyVocabMapping,
   type VocabMapping,
-} from "@litlfred/cat-harness/schemas/vocab-mapping.ts";
+} from "@litlfred/cat-harness/schemas/content/vocab-mapping.ts";
 import { detectRelease, fromConceptMap, toConceptMap, type FhirRelease } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.ts";
 
 const FIX = resolve(import.meta.dir, "fixtures", "conceptmap");
@@ -255,7 +255,7 @@ describe("the vocab-mappings:check gate's own judgements", () => {
   test("a clean table passes; a derived target with no authoritative source, and an undeclared prefix, are each a finding", async () => {
     const { tableFindings } = await import("../vocab-mappings");
     const { STANDARD_PREFIXES } = await import("@litlfred/cat-harness/schemas/vocab-mapping-fhir.ts");
-    const { ownPrefixTable } = await import("@litlfred/cat-harness/schemas/graph-typology-registry.js");
+    const { ownPrefixTable } = await import("@litlfred/cat-harness/schemas/kg/graph-typology-registry.js");
     const prefixes = { ...STANDARD_PREFIXES, ...ownPrefixTable() };
     expect(tableFindings(SCHEME, prefixes)).toEqual([]);
     const orphan = VocabMappingSchema.parse({

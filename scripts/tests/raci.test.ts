@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 
 import { declaredRoles, raciBreaches, raciRows, type RaciBreachKind, type RaciRow } from "../raci-chart.ts";
-import { KG_CRITERIA } from "@litlfred/cat-harness/schemas/kg-qa.ts";
+import { KG_CRITERIA } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
 import { RACI_INVOLVEMENTS } from "../../src/workflow/process-model.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

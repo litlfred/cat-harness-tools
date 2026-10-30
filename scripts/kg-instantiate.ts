@@ -49,7 +49,7 @@
  * Under `<instantiation root>/<harness>/`, at each directory's declared path,
  * with a `.gitkeep` so an empty directory survives a commit. The harness has no
  * local declaration (its declaration is the snapshot, on purpose: see
- * `schemas/substrate-snapshot.ts`), so `<harness>/` is where its local bytes
+ * `schemas/kg/substrate-snapshot.ts`), so `<harness>/` is where its local bytes
  * live; no scanner reads it as an instance because it carries no declaration.
  *
  * ## Idempotent, and the config is never overwritten
@@ -85,9 +85,9 @@ import {
   instanceRootsIn,
   readDeclaration,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { addIndexInstance, readIndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { instanceConfigFilename } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { addIndexInstance, readIndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.js";
 import { type HarnessDeclaration, harnessDeclarationIn, readSnapshot } from "./subscribed-harnesses.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

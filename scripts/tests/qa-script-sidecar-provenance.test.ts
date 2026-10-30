@@ -7,7 +7,7 @@ import {
   loadQaScriptSidecar,
   scriptSidecarPath,
 } from "../../pipeline/qa-utils";
-import type { QaScriptSidecar } from "@litlfred/cat-harness/schemas/block-qa.ts";
+import type { QaScriptSidecar } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 
 /**
  * Script sidecars live in the PLATFORM repo and describe the platform's own

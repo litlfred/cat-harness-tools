@@ -104,7 +104,7 @@ if [ -f "$INTERACTION" ]; then
       | [ $u | to_entries[] | select(([.key] + (.value.aliases // [])) as $names | any($ids[]; . as $i | $names | index($i))) ] as $hit
       | if ($hit | length) > 0 then
           (if ($hit | length) > 1
-            then "**This session matches several people: " + ($hit | map(.key) | join(", ")) + ". Apply the STRICTEST of their profiles to every question, not the first one listed:**"
+            then "**This session matches several people: " + ($hit | map(.key) | join(", ")) + ". Apply the STRICTEST of their profiles to every question, not the first one listed (set `CAT_HARNESS_PROFILE` or `CAT_HARNESS_PERSON` to say which):**"
             else "**This session is " + ($hit | map(.key) | join(", ")) + " — apply this to every question:**" end), ($hit[] | line(.key; .value))
         else
           ([ $u | to_entries[] | select((.value.profiles | length) > 0) ] | sort_by(-(.value.profiles | length))) as $strict

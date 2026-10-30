@@ -9,8 +9,8 @@ import { existsSync, mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { downstreamState, listToolRuns, readToolRun, writeToolRun, TOOL_RUNS_DIR, UNKNOWN_FINGERPRINT, type ToolRunRecord } from "@litlfred/cat-harness/schemas/tool-run.ts";
-import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.ts";
+import { downstreamState, listToolRuns, readToolRun, writeToolRun, TOOL_RUNS_DIR, UNKNOWN_FINGERPRINT, type ToolRunRecord } from "@litlfred/cat-harness/schemas/tools/tool-run.ts";
+import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.ts";
 import { MEMBERS, toolDownstreamEntry, undeclaredDownstreamEntry } from "../downstream-runs";
 import { tools } from "../../tools/discover";
 import { VERIFIERS } from "../publish-verify";

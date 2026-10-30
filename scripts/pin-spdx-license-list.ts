@@ -43,8 +43,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { PinnedTerminologySchema, PINNED_TERMINOLOGY_TAG, type PinnedConcept } from "@litlfred/cat-harness/schemas/pinned-terminology.ts";
-import { SPDX_LICENSE_LIST_PIN, SPDX_LICENSE_LIST_SNAPSHOT } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";
+import { PinnedTerminologySchema, PINNED_TERMINOLOGY_TAG, type PinnedConcept } from "@litlfred/cat-harness/schemas/content/pinned-terminology.ts";
+import { SPDX_LICENSE_LIST_PIN, SPDX_LICENSE_LIST_SNAPSHOT } from "@litlfred/cat-harness/schemas/library/spdx-license-expression.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(dirname(HARNESS_ROOT));

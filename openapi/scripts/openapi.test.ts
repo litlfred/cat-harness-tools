@@ -7,8 +7,8 @@ import { checkCommitted, configPath, provenanceFor } from "./ingest-openapi.ts";
 import { igOpenapiGraph, igSiteOpenapi } from "./ig-site-openapi.ts";
 import { PAGE_CONFIG_ID, pagesFor } from "./gen-openapi-pages.ts";
 import { thinPageConfigOf } from "../../scripts/thin-page.ts";
-import { BASE_GRAPH_TYPOLOGIES, GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
-import { isZodSchema, resolveNodeSchemas } from "@litlfred/cat-harness/schemas/kind-validator.ts";
+import { BASE_GRAPH_TYPOLOGIES, GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
+import { isZodSchema, resolveNodeSchemas } from "@litlfred/cat-harness/schemas/kg/kind-validator.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { dirname } from "node:path";
 

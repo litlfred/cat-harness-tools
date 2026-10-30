@@ -54,7 +54,7 @@ export interface HarnessMark {
  * `rebase` turns the row's site-relative `src` into what the page can load —
  * the identity for the Jekyll include (Liquid re-bases it), `toRoot + src` for
  * a mounted or viewer page. `tone` passes through as written: a 0 is
- * `GENERIC`'s tone (`schemas/avatars.ts`), and `navbar.ts`'s `mark()` draws
+ * `GENERIC`'s tone (`schemas/content/avatars.ts`), and `navbar.ts`'s `mark()` draws
  * no tone for it — which is the generic fallback, not a dropped hue.
  */
 export function navMarkFields(

@@ -28,7 +28,7 @@
  * `test/compose-docs-checkout.test.ts` (bean `7zz1`): standing alone,
  * cat-harness has none of it.
  */
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -47,7 +47,7 @@ import {
   type ComposedInstance,
 } from "../compose-docs.ts";
 import { clearDeclaredVisualisers, PAGE_LOCALE } from "../viewer-declarations.ts";
-import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { parse as parseYaml } from "yaml";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -506,17 +506,35 @@ describe("carriedInstances — what a preview must carry (bean `ga8a`)", () => {
 });
 
 describe("the cut, on the REAL tree", () => {
+  // Each real-tree compose costs seconds, and these tests ask about only two
+  // trees: the full one and the one cut for a branch touching no instance. So
+  // each is composed once, on first use, and read by every test that needs it
+  // (read only — no test writes into either). Composing the same tree again
+  // per test bought nothing and pushed the ratio test past its 5 s budget.
+  const trees = new Map<string, { dir: string; report: ReturnType<typeof compose> }>();
+  const tree = (key: "all" | "cut") => {
+    let t = trees.get(key);
+    if (!t) {
+      const dir = join(mkdtempSync(join(tmpdir(), `compose${key}-`)), "site");
+      const report = key === "all" ? compose(dir, REPO) : compose(dir, REPO, { changedFiles: ["cat-harness/docs/index.md"] });
+      t = { dir, report };
+      trees.set(key, t);
+    }
+    return t;
+  };
+  afterAll(() => {
+    for (const { dir } of trees.values()) rmSync(join(dir, ".."), { recursive: true, force: true });
+  });
+
   test("every composed instance gets exactly one decision", () => {
     // Reported rather than inferred: a tree quietly missing an instance's
     // pages must be distinguishable from an instance that failed to read.
-    const dest = join(mkdtempSync(join(tmpdir(), "composecarry-")), "site");
-    const r = compose(dest, REPO, { changedFiles: ["cat-harness/docs/index.md"] });
+    const r = tree("cut").report;
     // No instance composes on the real tree since bean `mftp` (each smart-* IG
     // builds its own site); the decisions must still match the compositions.
     expect(r.carried.map((d) => d.instance.under).sort()).toEqual(
       r.composed.map((c) => c.under).sort(),
     );
-    rmSync(join(dest, ".."), { recursive: true, force: true });
   });
 
   test("a branch touching no instance composes MATERIALLY fewer files", () => {
@@ -524,10 +542,8 @@ describe("the cut, on the REAL tree", () => {
     // Done-when. Stated as a ratio with a floor rather than as megabytes: a
     // pinned byte count would fail on every added page while saying nothing
     // about whether the cut still fires.
-    const a = join(mkdtempSync(join(tmpdir(), "composeall-")), "site");
-    const b = join(mkdtempSync(join(tmpdir(), "composecut-")), "site");
-    const all = compose(a, REPO);
-    const cut = compose(b, REPO, { changedFiles: ["cat-harness/docs/index.md"] });
+    const all = tree("all").report;
+    const { dir: b, report: cut } = tree("cut");
 
     const nAll = Object.keys(all.suppliedBy).length;
     const nCut = Object.keys(cut.suppliedBy).length;
@@ -537,8 +553,6 @@ describe("the cut, on the REAL tree", () => {
     // there is nothing to cut and the two trees must be the same size.
     if (all.composed.length === 0) {
       expect(nCut).toBe(nAll);
-      rmSync(join(a, ".."), { recursive: true, force: true });
-      rmSync(join(b, ".."), { recursive: true, force: true });
       return;
     }
     expect(cut.carried.some((d) => !d.carry)).toBe(true);
@@ -578,17 +592,13 @@ describe("the cut, on the REAL tree", () => {
       expect(existsSync(stub)).toBe(true);
       expect(readFileSync(stub, "utf-8")).toContain("not built into this preview");
     }
-    rmSync(join(a, ".."), { recursive: true, force: true });
-    rmSync(join(b, ".."), { recursive: true, force: true });
   });
 
   test("with no list, the real tree carries every instance in full", () => {
     // The canonical publisher passes nothing, so this is the property that
     // keeps `docs-site.yml` unaffected by the flag.
-    const dest = join(mkdtempSync(join(tmpdir(), "composefull-")), "site");
-    const r = compose(dest, REPO);
+    const r = tree("all").report;
     expect(r.carried.every((d) => d.carry)).toBe(true);
-    rmSync(join(dest, ".."), { recursive: true, force: true });
   });
 });
 

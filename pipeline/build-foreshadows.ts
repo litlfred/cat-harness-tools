@@ -40,7 +40,7 @@
  * `--check` regenerates in memory and exits 1 if the committed file differs,
  * naming the drifted blocks. That is the CI gate; it never rewrites.
  */
-import { folioDirDeferred } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import {

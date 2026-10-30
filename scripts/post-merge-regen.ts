@@ -40,6 +40,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
 import { loadGates } from "./gates.ts";
+import { COVERED } from "./pair-cover.ts";
 import {
   DEFAULT_MAX_PASSES,
   UNGATED_INPUTS,
@@ -49,10 +50,10 @@ import {
   type Pair,
   type Runner,
 } from "./regen-after-merge.ts";
-import { isBuiltAtPublish, type BuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
-import { readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
-import { scriptsOf as scriptTableOf } from "@litlfred/cat-harness/schemas/script-table.ts";
+import { isBuiltAtPublish, type BuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
+import { readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+import { scriptsOf as scriptTableOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
 import { pairIO } from "./task-io.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -153,7 +154,16 @@ export interface MoveTracker {
 /** Never content: install artefacts, git, and the scratch a build writes (as `publish-check.ts`). */
 const UNWATCHED_DIRS = new Set(["node_modules", ".git", "_site", "build"]);
 
-export function treeMoveTracker(repoRoot: string, decls: readonly PublishTimeDeclaration[] = publishTimeDeclarations(repoRoot)): MoveTracker {
+export function treeMoveTracker(
+  repoRoot: string,
+  decls: readonly PublishTimeDeclaration[] = publishTimeDeclarations(repoRoot),
+  instance?: string,
+): MoveTracker {
+  const cleanInstance = instance?.replace(/^\/+|\/+$/g, "");
+  const inScope = (rel: string): boolean =>
+    cleanInstance === undefined || cleanInstance === "" || cleanInstance === "."
+      ? true
+      : rel === cleanInstance || rel.startsWith(`${cleanInstance}/`);
   type Seen = { stat: string; publishTime: boolean; hash?: string };
   let last: Map<string, Seen> | undefined;
   const walk = (prev: Map<string, Seen> | undefined): Map<string, Seen> => {
@@ -174,7 +184,7 @@ export function treeMoveTracker(repoRoot: string, decls: readonly PublishTimeDec
           const st = statSync(abs);
           const stat = `${st.size}:${st.mtimeMs}:${st.ctimeMs}`;
           const before = prev?.get(rel);
-          const publishTime = before?.publishTime ?? builtAtPublishIn(rel, decls, repoRoot);
+          const publishTime = before?.publishTime ?? (!inScope(rel) || builtAtPublishIn(rel, decls, repoRoot));
           if (publishTime) out.set(rel, { stat, publishTime });
           else if (before !== undefined && before.stat === stat) out.set(rel, before);
           else out.set(rel, { stat, publishTime, hash: createHash("sha256").update(readFileSync(abs)).digest("hex") });
@@ -206,22 +216,27 @@ export function treeMoveTracker(repoRoot: string, decls: readonly PublishTimeDec
 }
 
 /**
- * Wrap `runner` so every run of a pair's WRITER is watched by `tracker`, and
- * what it moved is added up per writer in `moves` (all passes together).
+ * Wrap `runner` so every run of a pair's WRITER (or of a check routed through
+ * `publish-check.ts <writer>`, which invokes `<writer>` inside the check) is
+ * watched by `tracker`, and what it moved is added up per writer in `moves`
+ * (all passes together).
  */
 export function watchWriters(
   runner: Runner,
-  writers: ReadonlySet<string>,
+  writers: ReadonlySet<string> | ReadonlyMap<string, string>,
   tracker: MoveTracker,
   moves: Map<string, WriterMoves>,
 ): Runner {
+  const writerFor = (script: string): string | undefined =>
+    writers instanceof Map ? writers.get(script) : (writers as ReadonlySet<string>).has(script) ? script : undefined;
   return async (script: string): Promise<boolean> => {
-    if (!writers.has(script)) return runner(script);
+    const key = writerFor(script);
+    if (key === undefined) return runner(script);
     tracker.take(); // what moved before it is not this writer's
     const ok = await runner(script);
     const m = tracker.take();
-    const sum = moves.get(script) ?? { builtAtPublish: [], committed: [] };
-    moves.set(script, { builtAtPublish: [...sum.builtAtPublish, ...m.builtAtPublish], committed: [...sum.committed, ...m.committed] });
+    const sum = moves.get(key) ?? { builtAtPublish: [], committed: [] };
+    moves.set(key, { builtAtPublish: [...sum.builtAtPublish, ...m.builtAtPublish], committed: [...sum.committed, ...m.committed] });
     return ok;
   };
 }
@@ -271,6 +286,13 @@ export interface GhExecutor {
 /** Options for post-merge regen check. */
 export interface PostMergeRegenOptions {
   repoRoot?: string;
+  /**
+   * In a layer run (`layer-post-merge-regen.yml`), the caller instance's mount
+   * path in the composed index (e.g. `"cat-harness"`). Only files inside this
+   * instance's tree are committed to the caller repository; another layer's
+   * changes are that layer's to repair.
+   */
+  instance?: string;
   dryRun?: boolean;
   checkOnly?: boolean;
   createPr?: boolean;
@@ -441,10 +463,20 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
     });
   // Bean `p7mb`: what each writer moves, so a check red only for want of its
   // publish-time outputs is told apart from a stale one after the repair pass.
-  const tracker = opts.tracker ?? (opts.runner === undefined ? treeMoveTracker(repoRoot) : undefined);
+  // Watch both `p.writer` and `p.check`: checks routed through `publish-check.ts <writer>`
+  // execute `<writer>` on disk inside the check call itself.
+  const tracker =
+    opts.tracker ??
+    (opts.runner === undefined ? treeMoveTracker(repoRoot, publishTimeDeclarations(repoRoot), opts.instance) : undefined);
   const moves = new Map<string, WriterMoves>();
-  const writers = new Set(pairs.flatMap((p) => (p.writer === undefined ? [] : [p.writer])));
-  const runner: Runner = tracker === undefined ? baseRunner : watchWriters(baseRunner, writers, tracker, moves);
+  const scriptToWriter = new Map<string, string>();
+  for (const p of pairs) {
+    if (p.writer !== undefined) {
+      scriptToWriter.set(p.writer, p.writer);
+      scriptToWriter.set(p.check, p.writer);
+    }
+  }
+  const runner: Runner = tracker === undefined ? baseRunner : watchWriters(baseRunner, scriptToWriter, tracker, moves);
 
   // Step 1: Audit pass with dryRun: true to inspect current state of derived artefacts
   const { results: auditResults } = await regenPass(pairs, runner, { dryRun: true });
@@ -543,13 +575,45 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
   const unrepaired = fixpoint.results.filter(
     (r) => r.outcome === "unrepaired" || r.outcome === "writer-failed" || r.outcome === "no-writer",
   );
-  // A repair whose writer moved only `builtAtPublish` paths built what the
-  // publish builds; nothing a commit holds was stale (bean `p7mb`).
+  // A repair whose writer moved only `builtAtPublish` paths (or, when a check
+  // failed in the audit pass before another writer built its `builtAtPublish`
+  // inputs or after `publish-check.ts <writer>` built its `builtAtPublish`
+  // outputs in the audit pass, moved 0 committed paths) built what the publish
+  // builds; nothing a commit holds was stale (bean `p7mb`).
+  const staleSet = new Set(staleCheckNames);
+  const noCommittedMove = (writer: string | undefined): boolean =>
+    tracker !== undefined && writer !== undefined && (moves.get(writer)?.committed.length ?? 0) === 0;
+  const hasCommittedMove = (writer: string | undefined): boolean =>
+    tracker !== undefined && writer !== undefined && (moves.get(writer)?.committed.length ?? 0) > 0;
+  const directPublishTime = new Set(
+    fixpoint.results
+      .filter(
+        (r) =>
+          COVERED[r.check] === undefined &&
+          ((r.outcome === "regenerated" && onlyBuiltAtPublish(r.writer, moves)) ||
+            (staleSet.has(r.check) && (r.outcome === "regenerated" || r.outcome === "current") && noCommittedMove(r.writer))),
+      )
+      .map((r) => r.check),
+  );
   const builtAtPublishCheckNames = fixpoint.results
-    .filter((r) => r.outcome === "regenerated" && onlyBuiltAtPublish(r.writer, moves))
+    .filter((r) => {
+      if (directPublishTime.has(r.check)) return true;
+      const cov = COVERED[r.check];
+      if (cov === undefined) return false;
+      return (
+        staleSet.has(r.check) &&
+        (r.outcome === "regenerated" || r.outcome === "current") &&
+        noCommittedMove(r.writer) &&
+        cov.covers.every((c) => !staleSet.has(c) || directPublishTime.has(c))
+      );
+    })
     .map((r) => r.check);
   const publishTime = new Set(builtAtPublishCheckNames);
-  const repaired = fixpoint.results.filter((r) => r.outcome === "regenerated" && !publishTime.has(r.check));
+  const repaired = fixpoint.results.filter(
+    (r) =>
+      !publishTime.has(r.check) &&
+      (r.outcome === "regenerated" || (staleSet.has(r.check) && r.outcome === "current" && hasCommittedMove(r.writer))),
+  );
   const repairedCheckNames = repaired.map((r) => r.check);
   const unrepairedCheckNames = unrepaired.map((u) => u.check);
   staleCheckNames = staleCheckNames.filter((c) => !publishTime.has(c));
@@ -592,7 +656,14 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
     };
   }
 
-  const changedFiles = await git.getChangedFiles();
+  const cleanInstance = opts.instance?.replace(/^\/+|\/+$/g, "");
+  const inInstance = (rel: string): boolean =>
+    cleanInstance === undefined || cleanInstance === "" || cleanInstance === "."
+      ? true
+      : rel === cleanInstance || rel.startsWith(`${cleanInstance}/`);
+  const gitChanged = (await git.getChangedFiles()).filter(inInstance);
+  const committedMoves = [...new Set([...moves.values()].flatMap((m) => m.committed))].sort();
+  const changedFiles = gitChanged.length > 0 ? gitChanged : committedMoves;
 
   if (changedFiles.length === 0) {
     return {
@@ -686,13 +757,19 @@ if (import.meta.main) {
   const explain = argv.includes("--explain");
 
   let branchName: string | undefined;
+  // `layer-post-merge-regen.yml` exports `INSTANCE` at workflow scope.
+  let instance: string | undefined = process.env.INSTANCE?.trim() || undefined;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--branch" && argv[i + 1]) {
       branchName = argv[i + 1];
     }
+    if (argv[i] === "--instance" && argv[i + 1]) {
+      instance = argv[i + 1];
+    }
   }
 
   const report = await checkPostMergeRegen({
+    instance,
     dryRun,
     checkOnly,
     createPr,

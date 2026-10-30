@@ -15,7 +15,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, isAbsolute, join, join as joinPath, relative, resolve } from "node:path";
 
-import { checkoutRootFor, resolveDirectories, repoRootFor, isKgContentDirectory } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { checkoutRootFor, resolveDirectories, repoRootFor, isKgContentDirectory } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**
@@ -65,11 +65,11 @@ export type CorpusScope = "instance" | "checkout";
 export function corpusScopeFor(root: string): CorpusScope {
   return resolve(root) === OWN_INSTANCE ? "checkout" : "instance";
 }
-import { readRoleGraph, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
-import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { readRoleGraph, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { checkoutDirectories, orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { packageDirsIn } from "./skill-topics.js";
-import { checkoutRoleGraph } from "@litlfred/cat-harness/schemas/scenario-overlay.js";
-import { parseFrontMatter, scalar, type FrontMatter } from "@litlfred/cat-harness/schemas/front-matter.js";
+import { checkoutRoleGraph } from "@litlfred/cat-harness/schemas/process/scenario-overlay.js";
+import { parseFrontMatter, scalar, type FrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.js";
 // The `folio` graph typology is registered by CORE. This module is a LIBRARY, so it
 // does NOT import that registration: a library's edge is inherited by every
 // module that imports it, and the harness may not depend on core. The

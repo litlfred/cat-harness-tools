@@ -10,15 +10,15 @@
  *
  * It lives here, below both of its readers, so there is one implementation:
  * `check-term-mapping.ts` (this layer) keys the term-mapping record by it, and
- * `folio-assistant-core/scripts/glossary-page.ts` (a layer above) mints IRIs
+ * the content core's `scripts/glossary-page.ts` (a layer above) mints IRIs
  * and places terms by it. The page used to hold the only copy, which the
  * record could not import without reading upward.
  */
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 
 /** An instance's root and its declared name. */
 export interface InstanceRoot {

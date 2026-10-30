@@ -60,9 +60,9 @@ import {
   showsOn,
   TILE_SURFACES,
   visualisationsOf,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { tileLabel } from "./lib/nav-label.js";
-import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 
 /** Where a tile may appear. A visualisation that says nothing appears on every surface. */
 export type TileSurface = CatHarnessTileSurface;
@@ -181,7 +181,7 @@ export interface GraphTile {
    * The projection's DECLARED headline number, and what it counts.
    *
    * Both present or both absent — a count with no unit is the ambiguity
-   * `schemas/tile-count.ts` exists to remove, and {@link withTileCounts} is
+   * `schemas/ui/tile-count.ts` exists to remove, and {@link withTileCounts} is
    * the only writer, so the pair cannot come apart.
    *
    * ABSENT is a third state and must not be rendered as `0`. A tile whose

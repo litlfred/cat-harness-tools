@@ -28,10 +28,12 @@
  * is `{ ok: false, detail }`, never an empty list read as "declares nothing
  * from within".
  */
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { defaultGraphTypologies, instanceDirectories, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { defaultGraphTypologies, instanceDirectories, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import type { RemoteTree } from "./remote-tree.ts";
+import { groupsOfDeclaration } from "./concern-groups.ts";
 
 /** One directory as a planner needs it: the id, its instance-relative path, and the fields that say it is not where its path says. */
 export interface UpstreamDirectory {
@@ -92,4 +94,52 @@ export function upstreamDirectories(
   } catch (e) {
     return { ok: false, detail: `its declaration at ${tree.sha.slice(0, 12)} could not be resolved here: ${(e as Error).message}` };
   }
+}
+
+/**
+ * A CONCERN NAME at a pin (bean `mo75`): the kind-first members of concern
+ * group `code` — `processes/sdlc/`, `skills/sdlc/`, `schemas/sdlc/` … — that
+ * instance `root` declares. Each top-level directory whose kind groups by
+ * concern is read through its own declaration file (`processes.json`
+ * `groups`, `skills.json` `topics`); a group it names `code` is one member,
+ * with the id `<directory id>/<code>`. `[]` when no directory names the code.
+ * Like {@link upstreamDirectories}, it sets the sparse checkout to the
+ * declaration files.
+ */
+export function upstreamConcernMembers(
+  tree: RemoteTree,
+  root: string,
+  declarationFile: string,
+  top: ReadonlyArray<{ id: string; path: string; graphTypologies?: unknown }>,
+  code: string,
+  registry: GraphTypologyRegistry = defaultGraphTypologies,
+): UpstreamDirectories {
+  const at = root.replace(/\/+$/, "");
+  const under = at ? `${at}/` : "";
+  let work: string;
+  try {
+    work = tree.checkout([declarationFile, ...declarationFileNames(registry).map((f) => `${under}**/${f}`)]);
+  } catch (e) {
+    return { ok: false, detail: `could not check the declaration files out at ${tree.sha.slice(0, 12)}: ${(e as Error).message}` };
+  }
+  const out: UpstreamDirectory[] = [];
+  for (const d of top) {
+    const kinds = Array.isArray(d.graphTypologies) ? d.graphTypologies.filter((k): k is string => typeof k === "string") : [];
+    for (const kind of kinds) {
+      const def = registry.get(kind);
+      if (def?.concernGroups !== true || def.declarationFile === undefined) continue;
+      const file = join(work, at, d.path, def.declarationFile);
+      if (!existsSync(file)) continue;
+      try {
+        for (const g of groupsOfDeclaration(JSON.parse(readFileSync(file, "utf-8")), kind, file)) {
+          if (g.code !== code) continue;
+          const path = `${d.path.replace(/\/+$/, "")}/${g.path.replace(/\/+$/, "")}/`;
+          if (!out.some((o) => o.path === path)) out.push({ id: `${d.id}/${code}`, path, within: d.id });
+        }
+      } catch (e) {
+        return { ok: false, detail: `${d.path}${def.declarationFile} at ${tree.sha.slice(0, 12)} could not be read: ${(e as Error).message}` };
+      }
+    }
+  }
+  return { ok: true, directories: out };
 }

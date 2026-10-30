@@ -29,7 +29,9 @@
  * archive step would turn the resolve before it into a note.
  *
  * `archive` is the per-activity disposition of bean `folio-assistant-m8gz`
- * (owner, 2026-10-20: "a step op", not a call into `Process_BeanLifecycle`).
+ * (owner, 2026-10-20: "a step op"). Since 2026-10-24 (option A) claim, resolve
+ * and archive are drawn only in `Process_BeanOpen` and `Process_BeanClose`,
+ * which every bean-touching process calls; `check:bean-calls` holds that.
  * Archiving is a VIEW, not a terminal state (bean `e8m3`): the bean keeps its
  * status and moves to the store's `archive/`, and `check:bean-archive` holds
  * that everything there is terminal. So the op refuses to move a bean that is
@@ -47,7 +49,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 import { resolveBeanDefs } from "../../scripts/beans.ts";
 import type { InstanceState } from "./instance.js";
 import type { ProcessModel } from "./process-model.js";

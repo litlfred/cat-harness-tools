@@ -58,9 +58,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { flattenDependencies, runInOrder, type OrderedStep } from "@litlfred/cat-harness/schemas/dependency-order.js";
+import { flattenDependencies, runInOrder, type OrderedStep } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
 import { buildManifest, readManifest, selectSteps } from "./render-selection.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** A step, plus the command that performs it. */
@@ -160,7 +160,7 @@ export function pipeline(scratch: string): RenderStep[] {
       fatal: false,
       inputGraphs: ["beans", "todos"],
       // declared-path-literal: the `folio` graph typology is CORE's — registered
-      // by `schemas/folio-graph-typology.ts`, which this layer may not import
+      // by `schemas/kg/folio-graph-typology.ts`, which this layer may not import
       // ("a layer that cannot render must not own the renderable kind"). So
       // asking the resolver for it throws, and the authored pages would
       // otherwise go undeclared — which under-declares, the direction bean
@@ -186,25 +186,24 @@ export function pipeline(scratch: string): RenderStep[] {
     // ── Stage 3: the dynamic state, after stage 2 has contributed ───────
     //
     // The owner named this *"cat-harness/state.jsonld or so (whatever matches
-    // the dyanmic state vsualizesrs)"* — an explicit uncertainty, so the NAME
-    // is not invented here. The step exists, its position is fixed, and what
-    // it writes is settled when the dynamic-state visualisers say what they
-    // read. Until then it re-exports the graph the stage-2 renderers have
-    // contributed to, which is the one part of the description that is not in
-    // question.
+    // the dyanmic state vsualizesrs)"*, and settled it on 2026-10-29 (bean
+    // 6h47, option A): the workflow pages are the dynamic-state visualiser,
+    // and they read `<site>/<harness>/state.jsonld`: the running instances,
+    // their positions and their stuck states, typed `cat-harness:DynamicState`
+    // so it cannot be mistaken for the stage-1 graph export.
     {
       id: "kg-dynamic",
-      // Declared ALWAYS-RUN rather than left input-less. It exports the graph
-      // AFTER the stage-2 renderers have contributed to it, so its real input
-      // is their output rather than any source file — there is no hash that
-      // would make caching it correct. Saying so is different from not
-      // saying: an undeclared step also always runs, but nobody can tell
-      // whether that was a decision.
-      alwaysRun: "exports the graph after stage 2 has contributed to it — its input is that output, not a source file",
+      // Declared ALWAYS-RUN rather than left input-less. Its stuck states are
+      // measured against the clock (a token unmoved for a week is stuck), so
+      // the same committed instance files give a different document tomorrow,
+      // and there is no source hash that would make caching it correct.
+      // Saying so is different from not saying: an undeclared step also
+      // always runs, but nobody can tell whether that was a decision.
+      alwaysRun: "exports the running workflows' state as of this run: a token ages by the clock, not by a source file",
       needs: ["schema-docs", "skill-docs", "docs-pages", "bpmn"],
       fatal: true,
-      label: "the DYNAMIC state, exported after the stage-2 renderers have contributed",
-      run: ["bun", "run", "cat-harness-tools/scripts/kg-export.ts", "--out", join(scratch, "state.jsonld")],
+      label: "the DYNAMIC state (<site>/<harness>/state.jsonld), exported after the stage-2 renderers have contributed",
+      run: ["bun", "run", "cat-harness-tools/scripts/dynamic-state-export.ts"],
     },
   ];
 }

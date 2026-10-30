@@ -41,7 +41,7 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, posix, relative, resolve } from "node:path";
 
-import { AttributionSchema, type Attribution } from "@litlfred/cat-harness/schemas/attribution.ts";
+import { AttributionSchema, type Attribution } from "@litlfred/cat-harness/schemas/content/attribution.ts";
 import {
   BLOCK_SUMMARIES_SCHEMA,
   BlockSummariesSidecarSchema,
@@ -55,12 +55,12 @@ import {
   type BlockSummariesSidecar,
   type BlockSummary,
   type SummaryStatus,
-} from "@litlfred/cat-harness/schemas/block-summary.ts";
-import { NarrativeSchema, narrativesOfSlot, type Narrative } from "@litlfred/cat-harness/schemas/narrative.ts";
+} from "@litlfred/cat-harness/schemas/content/block-summary.ts";
+import { NarrativeSchema, narrativesOfSlot, type Narrative } from "@litlfred/cat-harness/schemas/content/narrative.ts";
 import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
-import { declarationPathIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { specimenSections } from "@litlfred/cat-harness/schemas/section-verdicts.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { declarationPathIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { specimenSections } from "@litlfred/cat-harness/schemas/content/section-verdicts.ts";
+import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

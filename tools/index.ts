@@ -38,9 +38,9 @@ import { fileURLToPath } from "node:url";
 import { dirname } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 
-import { declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
-import { toolsFromFolders } from "@litlfred/cat-harness/schemas/tool-folders.js";
+import { declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import type { ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.js";
+import { toolsFromFolders } from "@litlfred/cat-harness/schemas/tools/tool-folders.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { hostSchemaBase } from "../scripts/lib/host-schema.ts";
 

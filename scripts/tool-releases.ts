@@ -24,7 +24,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { homedir } from "node:os";
 import { basename, delimiter, join, relative, resolve } from "node:path";
 
-import type { ProvActivity } from "@litlfred/cat-harness/schemas/prov.ts";
+import type { ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.ts";
 import {
   RUN_CONTEXT_SCHEMA_TAG,
   RunContextSchema,
@@ -34,16 +34,16 @@ import {
   type RunContext,
   type RunContextRef,
   type RunRelease,
-} from "@litlfred/cat-harness/schemas/run-context.ts";
-import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";
-import type { TestReport } from "@litlfred/cat-harness/schemas/test-report.ts";
-import { TestRunSchema, UNKNOWN_HASH, type HashBasis, type TestRun } from "@litlfred/cat-harness/schemas/test-run.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/run-context.ts";
+import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/library/spdx-license-expression.ts";
+import type { TestReport } from "@litlfred/cat-harness/schemas/sdlc/test-report.ts";
+import { TestRunSchema, UNKNOWN_HASH, type HashBasis, type TestRun } from "@litlfred/cat-harness/schemas/sdlc/test-run.ts";
 import {
   TOOL_PROFILE_SCHEMA_TAG,
   ToolProfileSchema,
   toolReleaseGraphProblems,
   type ToolProfile,
-} from "@litlfred/cat-harness/schemas/tool-profile.ts";
+} from "@litlfred/cat-harness/schemas/tools/tool-profile.ts";
 import {
   TOOL_RELEASE_SCHEMA_TAG,
   ToolReleaseSchema,
@@ -53,7 +53,7 @@ import {
   type ToolPlatform,
   type ToolRelease,
   type ToolReleaseRef,
-} from "@litlfred/cat-harness/schemas/tool-release.ts";
+} from "@litlfred/cat-harness/schemas/tools/tool-release.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -67,8 +67,8 @@ export const SPDX_3_0_1_CONTEXT_URL = "https://spdx.org/rdf/3.0.1/spdx-context.j
  * `codeListDirs` does. T1: every layer inherits cat-harness's.
  */
 export async function toolReleaseDirs(instanceRoot: string): Promise<string[]> {
-  const { orderedDependencies } = await import("@litlfred/cat-harness/schemas/harness-config.js");
-  const { ownDirectories } = await import("@litlfred/cat-harness/schemas/cat-harness.js");
+  const { orderedDependencies } = await import("@litlfred/cat-harness/schemas/kg/harness-config.js");
+  const { ownDirectories } = await import("@litlfred/cat-harness/schemas/kg/cat-harness.js");
   const dirs: string[] = [];
   const add = (name: string, root: string, own: boolean) => {
     for (const d of ownDirectories({ name, root, own })) {

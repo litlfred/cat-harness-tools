@@ -40,12 +40,12 @@
  * @covers docs
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { mountScopeFor } from "@litlfred/cat-harness/schemas/remote-mount.js";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.ts";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { mountScopeFor } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.ts";
 import { spawnSync } from "child_process";
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
-import { basename, join, relative, resolve } from "path";
+import { basename, dirname, join, relative, resolve } from "path";
 
 /**
  * Is `dir` the root of a git submodule? A submodule's `.git` is a FILE (a
@@ -69,9 +69,11 @@ export function isForeignRoot(dir: string): boolean {
 import { discoverPapers, injectSection, loadReadmeConfig, renderToc, type ReadmeTocConfig } from "./readme-toc";
 import { findContentRepoRoot } from "./repo-root";
 import { optionalPipelinePlugin } from "./pipeline-plugins";
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, declaredAssetPath, instanceRootsIn, readDeclaration, workPlanGraphsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { AGENT_INSTRUCTIONS_ROLE, assetRolePurpose, INSTANCE_README_ROLE, declaredAssetPath, instanceRootsIn, readDeclaration, workPlanGraphsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { generatedBanner } from "@litlfred/bootstrap-tools/scripts/generated-by.ts";
+import { frontMatter, nodeSummary } from "../scripts/front-matter.ts";
+import { isSkillMd, skillMdDirs } from "../scripts/known-skills.ts";
 import { filesSection, processesSection, rolesSection } from "@litlfred/bootstrap-tools/scripts/readme-graph-sections.ts";
 
 // ── Section contract ────────────────────────────────────────────────────────
@@ -106,6 +108,12 @@ export interface SectionContext {
    * no headings.
    */
   readme?: string;
+  /**
+   * The most bytes the file being synced may hold, when it has a reader that
+   * stops reading (an AGENTS.md: {@link AGENTS_MD_BYTE_BUDGET}). Only the skill
+   * index reads it. `undefined` means no budget.
+   */
+  byteBudget?: number;
 }
 
 /**
@@ -927,6 +935,180 @@ const readmeTocSection: ReadmeSection = {
   },
 };
 
+// ── Skills this instance publishes ──────────────────────────────────────────
+
+/** The marker for the per-repository skill index (bean `e0uk`). */
+export const SKILLS_INDEX_MARKER = "skills:index";
+
+/** One line of a skill's summary: its first sentence, capped at a word, never empty-as-said. */
+export function skillSummaryLine(text: string | undefined, cap = 200): string | undefined {
+  if (text === undefined) return undefined;
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (flat === "") return undefined;
+  const sentence = flat.match(/^(.+?[.!?])(\s|$)/)?.[1] ?? flat;
+  if (sentence.length <= cap) return sentence;
+  const cut = sentence.slice(0, cap - 1);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > cap / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
+/** The body's first prose paragraph: not front matter, a heading, a quote, a list, a table or a fence. */
+export function firstParagraph(text: string): string | undefined {
+  let body = text;
+  if (body.startsWith("---")) {
+    const end = body.indexOf("\n---", 3);
+    if (end !== -1) body = body.slice(body.indexOf("\n", end + 1) + 1);
+  }
+  let inFence = false;
+  for (const para of body.split(/\n\s*\n/)) {
+    const t = para.trim();
+    if (t.startsWith("```") || t.startsWith("~~~")) {
+      const fences = (t.match(/^(```|~~~)/gm) ?? []).length;
+      if (fences % 2 === 1) inFence = !inFence;
+      continue;
+    }
+    if (inFence || t === "" || /^(#|>|[-*+] |\d+\. |\||<|!\[)/.test(t)) continue;
+    return t;
+  }
+  return undefined;
+}
+
+/**
+ * What a skill says it is for. Its `description:` first; a heading only when
+ * it says more than the name (a heading that IS the name tells an agent
+ * nothing it has not just read); otherwise the first prose paragraph.
+ */
+export function skillPurpose(text: string, name: string): { summary?: string; from: "description" | "heading" | "paragraph" | "none" } {
+  const fm = frontMatter(text);
+  if (fm.description) return { summary: skillSummaryLine(fm.description), from: "description" };
+  const heading = nodeSummary(text);
+  if (heading !== undefined && heading.replace(/`/g, "").trim() !== name) return { summary: skillSummaryLine(heading), from: "heading" };
+  const para = skillSummaryLine(firstParagraph(text));
+  return para === undefined ? { from: "none" } : { summary: para, from: "paragraph" };
+}
+
+/**
+ * The byte budget an AGENTS.md is held to: Codex reads the first 32 KiB of
+ * `AGENTS.md` by default (`project_doc_max_bytes`). Past it the full list
+ * moves to {@link SKILLS_INDEX_FILE} and AGENTS.md keeps the directories.
+ */
+export const AGENTS_MD_BYTE_BUDGET = 32_768;
+
+/** Where the full list goes when it does not fit in AGENTS.md: beside it, at the instance root. */
+export const SKILLS_INDEX_FILE = "SKILLS.md";
+
+/** The instance's own skills, grouped by declared directory. */
+export function ownSkillIndex(root: string): { packages: { dir: string; rows: string[] }[]; total: number; notes: string[] } {
+  const notes: string[] = [];
+  const packages: { dir: string; rows: string[] }[] = [];
+  let total = 0;
+  for (const parts of skillMdDirs(root, "instance")) {
+    const abs = join(root, ...parts);
+    if (!existsSync(abs)) continue;
+    const files = readdirSync(abs)
+      .filter((f) => f.endsWith(".md") && isSkillMd(join(abs, f)))
+      .sort();
+    if (files.length === 0) continue;
+    const dir = parts.join("/");
+    const rows = files.map((f) => {
+      const text = readFileSync(join(abs, f), "utf-8");
+      const name = frontMatter(text).name ?? f.slice(0, -3);
+      const { summary, from } = skillPurpose(text, name);
+      if (from !== "description") notes.push(`${dir}/${f}: no \`description:\` in front matter (summary from ${from})`);
+      return `| [\`${cell(name)}\`](${dir}/${f}) | ${summary === undefined ? "_(no description)_" : cell(summary)} |`;
+    });
+    total += rows.length;
+    packages.push({ dir, rows });
+  }
+  return { packages, total, notes };
+}
+
+const INDEX_FOOTER =
+  "`bun run cat readme:sync` rewrites this list and `readme:sync:check` fails when it is stale. " +
+  "Skills this repository inherits are listed by the repositories that publish them.";
+
+/** The full list: every skill with its one-line purpose. */
+export function renderFullSkillIndex(idx: ReturnType<typeof ownSkillIndex>): string {
+  const n = idx.total;
+  const lines = [
+    `_${n} skill${n === 1 ? "" : "s"} in ${idx.packages.length} director${idx.packages.length === 1 ? "y" : "ies"}, generated from each skill's front matter. ${INDEX_FOOTER}_`,
+    "",
+  ];
+  for (const p of idx.packages) {
+    lines.push(`**\`${p.dir}/\`** (${p.rows.length})`, "", "| Skill | What it is for |", "|---|---|", ...p.rows, "");
+  }
+  return lines.join("\n");
+}
+
+/** The short form for an AGENTS.md the full list would push past its budget. */
+export function renderCompactSkillIndex(idx: ReturnType<typeof ownSkillIndex>, budget: number): string {
+  const n = idx.total;
+  return [
+    `_${n} skill${n === 1 ? "" : "s"} in ${idx.packages.length} directories. The full list, with what each skill is for, is in ` +
+      `[\`${SKILLS_INDEX_FILE}\`](${SKILLS_INDEX_FILE}): here it would take this file past ${Math.round(budget / 1024)} KiB, ` +
+      `the most of an \`AGENTS.md\` some agents read. ${INDEX_FOOTER}_`,
+    "",
+    "| Directory | Skills |",
+    "|---|---|",
+    ...idx.packages.map((p) => `| [\`${p.dir}/\`](${p.dir}/) | ${p.rows.length} |`),
+    "",
+  ].join("\n");
+}
+
+/** Bytes of `text` once the region of `marker` holds `body` (the same write `injectSection` makes). */
+export function sizeWithRegion(text: string, marker: string, body: string): number {
+  return Buffer.byteLength(injectSection(text, body, marker).content, "utf-8");
+}
+
+/** Whether the AGENTS.md text `agentsText` would get the directory table rather than the full list. */
+export function skillIndexIsCompact(root: string, agentsText: string, budget = AGENTS_MD_BYTE_BUDGET): boolean {
+  if (!agentsText.includes(`<!-- ${SKILLS_INDEX_MARKER}:begin -->`)) return false;
+  const idx = ownSkillIndex(root);
+  return idx.total > 0 && sizeWithRegion(agentsText, SKILLS_INDEX_MARKER, renderFullSkillIndex(idx)) > budget;
+}
+
+/**
+ * The skills THIS instance publishes, so an agent opened in this repository
+ * alone sees them without an MCP server or a query.
+ *
+ * The owner, 2026-10-24 09:49Z: *"all repos should have agentic advice (e.g.
+ * based on the skills that they publish)"*; option D, phase 1 (bean `e0uk`).
+ *
+ * The cold-start section above never lists skills, because "a README is the
+ * one file no check reads". This section is the answer to that reason rather
+ * than an exception to it: it is generated from each skill's own front
+ * matter, and `readme:sync:check` fails CI the day it goes stale. It lists
+ * the instance's OWN skills (`scope: "instance"`), never what it inherits, so
+ * a skill added upstream changes no downstream file.
+ *
+ * With {@link SectionContext.byteBudget} set (the AGENTS.md target), a full
+ * list that would take the file past it renders the directory table instead,
+ * and the caller writes the full list to {@link SKILLS_INDEX_FILE}.
+ */
+const skillsIndexSection: ReadmeSection = {
+  marker: SKILLS_INDEX_MARKER,
+  summary: "The skills this instance publishes (its own, not inherited), from each skill's front matter",
+  render({ root, readme, byteBudget }) {
+    let idx: ReturnType<typeof ownSkillIndex>;
+    try {
+      idx = ownSkillIndex(root);
+    } catch (e) {
+      return undetermined(`the instance's skill directories could not be resolved: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (idx.total === 0) {
+      return { markdown: "_This instance publishes no skills._\n", notes: ["no skills found in the declared skill directories"] };
+    }
+    const full = renderFullSkillIndex(idx);
+    if (byteBudget !== undefined && readme !== undefined && sizeWithRegion(readme, SKILLS_INDEX_MARKER, full) > byteBudget) {
+      return {
+        markdown: renderCompactSkillIndex(idx, byteBudget),
+        notes: [...idx.notes, `the full list would pass ${byteBudget} bytes; the directories are listed and the full list is in ${SKILLS_INDEX_FILE}`],
+      };
+    }
+    return { markdown: full, notes: idx.notes };
+  },
+};
+
 /**
  * `readme:toc` is registered LAST, and the order is load-bearing: it reads the
  * README as the sections before it have left it, so a heading another section
@@ -937,6 +1119,7 @@ const readmeTocSection: ReadmeSection = {
 export const SECTIONS: readonly ReadmeSection[] = [
   tocSection,
   coldStartSection,
+  skillsIndexSection,
   instancesSection,
   leanCoverageSection,
   leanModulesSection,
@@ -1068,17 +1251,67 @@ export async function runReadmeSync(opts: {
     return { text: `No README at ${readmePath}.`, exitCode: 2 };
   }
 
-  const current = readFileSync(readmePath, "utf-8");
-  const result = syncSections(
-    current,
-    { root, cfg, fetch: opts.fetch ?? false, leanCoverage },
-    opts.only,
-  );
+  const ctx = { root, cfg, fetch: opts.fetch ?? false, leanCoverage };
+  const check = opts.check ?? false;
+  const readme = syncOneFile(readmePath, ctx, opts.only, check);
+
+  // The instance's AGENTS.md is a second target for the skill index ONLY
+  // (bean `e0uk`: the index belongs where every vendor's agent reads). Only
+  // that marker, because other regions of an AGENTS.md (the root's
+  // `cat-harness:cold-start`) have their own writer, `index-render.ts`, and two
+  // writers of one region make each other's `--check` red. Skipped when the
+  // caller named one file with `--readme`, or `--only` leaves the index out.
+  const agentsPath =
+    opts.readmePath === undefined
+      ? declaredAssetPath(root, AGENT_INSTRUCTIONS_ROLE) ?? join(root, "AGENTS.md")
+      : undefined;
+  const wantsIndex = opts.only === undefined || opts.only.includes(SKILLS_INDEX_MARKER);
+  if (
+    !wantsIndex ||
+    agentsPath === undefined ||
+    resolve(agentsPath) === resolve(readmePath) ||
+    !existsSync(agentsPath) ||
+    !statSync(agentsPath).isFile() ||
+    !readFileSync(agentsPath, "utf-8").includes(`<!-- ${SKILLS_INDEX_MARKER}:begin -->`)
+  ) {
+    return readme;
+  }
+  const agentsText = readFileSync(agentsPath, "utf-8");
+  const agents = syncOneFile(agentsPath, { ...ctx, byteBudget: AGENTS_MD_BYTE_BUDGET }, [SKILLS_INDEX_MARKER], check);
+  const out = { text: `${readme.text}\n${agents.text}`, exitCode: Math.max(readme.exitCode, agents.exitCode) };
+
+  // The full list, when AGENTS.md could only take the directories. Created on
+  // a write; under --check a missing one is a failure, since AGENTS.md links it.
+  const indexPath = join(dirname(agentsPath), SKILLS_INDEX_FILE);
+  const compact = skillIndexIsCompact(root, agentsText);
+  if (!compact && !existsSync(indexPath)) return out;
+  if (!existsSync(indexPath)) {
+    if (check) {
+      return { text: `${out.text}\n${indexPath} is missing; AGENTS.md links it. Run: bun run cat readme:sync`, exitCode: 1 };
+    }
+    writeFileSync(
+      indexPath,
+      `# Skills\n\nThe skills this repository publishes. Generated; edit each skill's front matter, not this file.\n\n<!-- ${SKILLS_INDEX_MARKER}:begin -->\n<!-- ${SKILLS_INDEX_MARKER}:end -->\n`,
+    );
+  }
+  const index = syncOneFile(indexPath, ctx, [SKILLS_INDEX_MARKER], check);
+  return { text: `${out.text}\n${index.text}`, exitCode: Math.max(out.exitCode, index.exitCode) };
+}
+
+/** Sync (or check) the marked regions of one file; the README's wording is kept for both targets. */
+function syncOneFile(
+  path: string,
+  ctx: SectionContext,
+  only: string[] | undefined,
+  check: boolean,
+): { text: string; exitCode: number } {
+  const current = readFileSync(path, "utf-8");
+  const result = syncSections(current, ctx, only);
 
   if (result.written.length === 0 && result.skipped.length === 0) {
     return {
       text:
-        `${readmePath} carries no generated-section markers, so nothing was written.\n` +
+        `${path} carries no generated-section markers, so nothing was written.\n` +
         `Add a marker pair where a section should go, e.g.:\n` +
         `  <!-- folio:toc:begin -->\n  <!-- folio:toc:end -->\n` +
         `Available: ${SECTIONS.map((s) => s.marker).join(", ")}`,
@@ -1089,21 +1322,21 @@ export async function runReadmeSync(opts: {
   const summary =
     `sections: ${result.written.join(", ") || "none"}` +
     (result.skipped.length ? `; left unchanged: ${result.skipped.join(", ")}` : "");
-  if (opts.check) {
+  if (check) {
     return result.changed
       ? {
-          text: [`${readmePath} is out of date (${summary}). Run: bun run cat readme:sync`, ...result.notes].join("\n"),
+          text: [`${path} is out of date (${summary}). Run: bun run cat readme:sync`, ...result.notes].join("\n"),
           exitCode: 1,
         }
-      : { text: [`${readmePath} is up to date (${summary}).`, ...result.notes].join("\n"), exitCode: 0 };
+      : { text: [`${path} is up to date (${summary}).`, ...result.notes].join("\n"), exitCode: 0 };
   }
 
-  if (result.changed) writeFileSync(readmePath, result.content);
+  if (result.changed) writeFileSync(path, result.content);
   return {
     text: [
       result.changed
-        ? `${readmePath} updated (${summary}).`
-        : `${readmePath} already current (${summary}).`,
+        ? `${path} updated (${summary}).`
+        : `${path} already current (${summary}).`,
       ...result.notes,
     ].join("\n"),
     exitCode: 0,

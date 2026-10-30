@@ -10,7 +10,7 @@ import { join } from "node:path";
 
 import { expectedPages, legacyOnlyPages, instanceSubgraph, missingPages, subjectInstances, type ExpectedPage } from "../site-coverage.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 const page = (route: string, legacyRoute: string): ExpectedPage => ({ route, legacyRoute, harness: "h", visualiser: "v" });
 

@@ -25,7 +25,7 @@
  * cannot separate a new defect from inherited debt. The sidecars are committed,
  * so the diff says exactly which findings a change introduced. Same argument,
  * and same file shape, as the block sweep's `*.qa.json` and the script sweep's
- * `*.script-qa.json`; schema in `schemas/kg-qa.ts`.
+ * `*.script-qa.json`; schema in `schemas/sdlc/kg-qa.ts`.
  *
  * ## Gate
  *
@@ -52,7 +52,7 @@
 
 import { createHash } from "node:crypto";
 import { parse as parseYaml } from "yaml";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { contractFile, contractRefProblem, skillContracts } from "./skill-contracts.js";
 import { checkTestRuns, testRunFiles } from "./test-run-conformance.js";
 import { auditCertifications, auditTestPlans, jsonFilesUnder, auditTestPlanExitCriteria } from "./test-plan-audit.js";
@@ -65,7 +65,7 @@ import { auditLakeTargetLeanResolution } from "./check-lake-targets.js";
 import { classifyName, diagramProse, generalDeclarationProse, namedFiles } from "./prose-names.js";
 import { readSchemaGraph } from "./schema-graph.js";
 import { checkTools, unresolvedPaths } from "./check-tools.js";
-import { deriveAlternatives } from "@litlfred/cat-harness/schemas/tool.js";
+import { deriveAlternatives } from "@litlfred/cat-harness/schemas/tools/tool.js";
 import { tools, toolsOf } from "../tools/discover.js";
 import { kgDirectories, kgRoots, ownKgRoots, workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { baseDocsDir, docsLayers } from "./compose-docs.js";
@@ -82,7 +82,7 @@ import {
   readAttestationFile,
   serialiseAttestations,
   type KgAttestations,
-} from "@litlfred/cat-harness/schemas/qa-attestations.js";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.js";
 import { claimsEntry, judgePair, rootScripts } from "./pair-claims.js";
 import { auditFolioBlocks } from "./block-reference-resolver.js";
 // `Dirent` for the orphan-sidecar sweep (bean `3jj9`), which walks the
@@ -91,7 +91,7 @@ import { withPriorAdversarialReviews } from "./lib/kg-qa-carry.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { corpusPredicate } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { corpusPredicate } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 
 import {
   KG_QA_SCHEMA,
@@ -115,7 +115,7 @@ import {
   type KgResult,
   type KgSeverity,
   type KgSubjectKind,
-} from "@litlfred/cat-harness/schemas/kg-qa.js";
+} from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import {
   laneBinding,
   readRoleGraph,
@@ -127,8 +127,8 @@ import {
   fulfilmentKindsForBpmnType,
   type RoleGraph,
   type LoadedActor,
-} from "@litlfred/cat-harness/schemas/role-graph.js";
-import { ANYONE, ODRL_ACTIONS, policyGrants, readPolicies } from "@litlfred/cat-harness/schemas/odrl.js";
+} from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { ANYONE, ODRL_ACTIONS, policyGrants, readPolicies } from "@litlfred/cat-harness/schemas/content/odrl.js";
 import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf } from "./qa-results.ts";
 import { readQaTree } from "./qa-store.ts";
 import { globalTaskSharedFindings } from "./lib/global-task-criteria.ts";
@@ -145,24 +145,25 @@ import {
   remotePackageSkills,
 } from "./known-skills.js";
 import { LOCAL_PACKAGES } from "./skill-packages.js";
-import { findInstanceRoot, repoRootFor, DECLARATION_SUFFIX, ownDirectoryById, resolveDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration, kgQaHomeFor} from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { findInstanceRoot, repoRootFor, DECLARATION_SUFFIX, ownDirectoryById, resolveDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration, kgQaHomeFor} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { toolDownstreamEntry, undeclaredDownstreamEntry } from "./downstream-runs.ts";
 import { VERIFIERS } from "./publish-verify.ts";
-import { checkoutRootFor, orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { CONVENTION_GROUP } from "@litlfred/cat-harness/schemas/convention.js";
-import { USER_STORIES_FILENAME, danglingStoryRoles, readUserStories, type UserStoryGraph } from "@litlfred/cat-harness/schemas/user-story.js";
-import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/role-graph.ts";
-import { conventionsDir, skillDefinitionDirs } from "@litlfred/cat-harness/schemas/skill-definitions-dir.ts";
+import { checkoutRootFor, orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { CONVENTION_GROUP } from "@litlfred/cat-harness/schemas/process/convention.js";
+import { USER_STORIES_FILENAME, danglingStoryRoles, readUserStories, type UserStoryGraph } from "@litlfred/cat-harness/schemas/process/user-story.js";
+import { actorsDir, capabilitiesDir } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
+import { conventionsDir, skillDefinitionDirs } from "@litlfred/cat-harness/schemas/kg/skill-definitions-dir.ts";
 import {
   checkoutActors,
   checkoutPolicies,
   checkoutRoleGraph,
   neededActors,
   neededPolicies,
-} from "@litlfred/cat-harness/schemas/scenario-overlay.js";
+} from "@litlfred/cat-harness/schemas/process/scenario-overlay.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { legacyBindingFindings, mechanicalRoleUntested, skillsOutsideLaneRole } from "./lib/lane-role-criteria.ts";
 import { skillEdgeIndex } from "./lib/skill-edges.ts";
+import { type ActorScope, declaredCapabilityIds, unresolvedActorCapabilities } from "./lib/actor-capabilities.ts";
 
 const ENGINE_VERSION = "1";
 
@@ -280,7 +281,7 @@ const root = resolve(instanceArg(process.argv.slice(2)) ?? AUDITOR_ROOT);
  * longer exists is worse than none, which is the only reason this is five
  * lines instead of one.
  */
-// `ownDirectoryById` moved to `schemas/cat-harness.ts` (2026-09-30) when
+// `ownDirectoryById` moved to `schemas/kg/cat-harness.ts` (2026-09-30) when
 // `pipeline/translation-index.ts` became its second caller. The
 // reasoning for the BY-ID lookup travelled with it.
 
@@ -377,7 +378,7 @@ const KG_QA_TREE = join(QA_HOME.root, "kg-qa");
  * apart from the derived sidecars above (bean `2gst`, owner ruling D2 (a)).
  * The same own / hosted / convention answer as `QA_HOME`, from the
  * `attestations` directory; the tree under it mirrors `KG_QA_TREE` exactly.
- * See `schemas/qa-attestations.ts`.
+ * See `schemas/sdlc/qa-attestations.ts`.
  */
 const ATT_HOME = attestationsHomeFor(root, INSTANCE_RUN ? AUDITOR_ROOT : undefined);
 const KG_ATT_TREE = join(ATT_HOME.root, "kg-qa");
@@ -714,7 +715,7 @@ async function auditProcess(
 
   // A skill that owns a same-named process, named by exactly ONE plain step
   // here. Several steps naming it are using its know-how, not calling it —
-  // see the criterion's note in `schemas/kg-qa.ts`.
+  // see the criterion's note in `schemas/sdlc/kg-qa.ts`.
   const stem = basename(p.file, ".bpmn");
   const namers = new Map<string, typeof activities>();
   for (const n of activities) {
@@ -898,7 +899,7 @@ async function auditProcess(
 
   // DECISIONS — diverging exclusive gateways. Merges, forks and joins decide
   // nothing, so `isDecision` leaves them out; see the criteria's notes in
-  // `schemas/kg-qa.ts` for the measurement behind both.
+  // `schemas/sdlc/kg-qa.ts` for the measurement behind both.
   const decisions = [...m.nodes.values()].filter(isDecision);
   const undocumentedDecision: KgFinding[] = decisions
     .filter((n) => !n.documentation)
@@ -2346,21 +2347,10 @@ function auditGraph(
       })),
   );
 
-  const capabilities = new Set<string>();
-  if (existsSync(CAPABILITY_DIR)) {
-    for (const f of readdirSync(CAPABILITY_DIR)) if (f.endsWith(".json")) capabilities.add(f.slice(0, -5));
-  }
-  const badCaps: KgFinding[] = [];
-  for (const a of actors) {
-    for (const c of a.capabilities ?? []) {
-      if (!capabilities.has(c)) {
-        badCaps.push({
-          where: a.id,
-          detail: `${relative(root, a.path)} claims capability "${c}", which the registry does not declare.`,
-        });
-      }
-    }
-  }
+  // Over the SAME layers the actors were read from (see `actors` below): an
+  // actor a higher instance declares may claim a capability declared beside it.
+  const capabilities = declaredCapabilityIds(root, CAPABILITY_DIR, ACTOR_SCOPE);
+  const badCaps = unresolvedActorCapabilities(root, actors, capabilities);
 
   // The folio ODRL profile is declared once, by the platform: an instance that
   // declares none of its own (one whose actors' grants live in its own
@@ -2433,7 +2423,7 @@ function auditGraph(
       // value, `src/tools/skill-fetch.ts` and `scripts/generate-registry.ts`
       // contain no mention of `remote-packages/` at all, and the single consumer —
       // `scripts/generate-docs.ts` — reads those files solely for Docker
-      // requirements, which is what `schemas/skill-package.ts` documents them as.
+      // requirements, which is what `schemas/kg/skill-package.ts` documents them as.
       // (That consumer was retired to `fsh-guts/scripts/` on 2026-09-20,
       // having never been invoked in any commit since the root commit — bean
       // `folio-assistant-3w0i`. The reading below only gets stronger.)
@@ -2689,8 +2679,8 @@ const resolvableSkills: Set<string> = (() => {
  *
  * `needs` is OPTIONAL with a documented THIRD STATE: an absent value is
  * UNDETERMINED, never `[]` — `[]` is an assertion that this instance is the
- * floor, absent is nobody having said (`schemas/cat-harness.ts`, `needs`;
- * `schemas/layer-direction.ts` refuses the same collapse for edges).
+ * floor, absent is nobody having said (`schemas/kg/cat-harness.ts`, `needs`;
+ * `schemas/kg/layer-direction.ts` refuses the same collapse for edges).
  *
  * Read straight from the declaration rather than inferred from
  * {@link resolvableSkills} being no wider than {@link skills}, because
@@ -2739,10 +2729,12 @@ const refUnjudgeable = (ref: string): boolean =>
 const PLATFORM_ROOT = ACTOR_DIR ? findInstanceRoot(ACTOR_DIR) : undefined;
 // declared-path-literal: the convention fallback, at the call site, as POLICY_DIR.
 const PLATFORM_POLICY_DIR = PLATFORM_ROOT ? ownDirectoryById(PLATFORM_ROOT, "policies", "policies") : POLICY_DIR;
+/** Which layers the actors are read over; their capabilities are read over the same. */
+const ACTOR_SCOPE: ActorScope = corpusScopeFor(root) === "checkout" ? "checkout" : INSTANCE_RUN ? "needed" : "own";
 const actors =
-  corpusScopeFor(root) === "checkout"
+  ACTOR_SCOPE === "checkout"
     ? checkoutActors(root, ACTOR_DIR, policyGrants(checkoutPolicies(root, POLICY_DIR)))
-    : INSTANCE_RUN
+    : ACTOR_SCOPE === "needed"
       ? neededActors(root, ACTOR_DIR, policyGrants(neededPolicies(root, PLATFORM_POLICY_DIR)))
       : readActors(ACTOR_DIR, policyGrants(readPolicies(POLICY_DIR)));
 
@@ -3331,7 +3323,7 @@ if (asJson) {
       `  instance run: ${relative(repoRootFor(AUDITOR_ROOT), root) || "."} — ` +
         `${scopeSuppressed} \`repo\`-scoped criterion result(s) recorded n/a, each with its basis ` +
         `in the sidecar. ${KG_CRITERIA.filter((c) => c.scope === "repo").length} of ${KG_CRITERIA.length} ` +
-        `criteria are \`repo\`-scoped; see \`scopeBasis\` in schemas/kg-qa.ts.\n`,
+        `criteria are \`repo\`-scoped; see \`scopeBasis\` in schemas/sdlc/kg-qa.ts.\n`,
     );
   }
 

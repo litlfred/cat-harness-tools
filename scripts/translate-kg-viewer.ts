@@ -46,7 +46,7 @@ import { formatPot, potQuote } from "../pipeline/pot-extract.js";
 import { parsePo, parsePoEntries } from "../pipeline/po-inject.js";
 import type { PoEntry } from "../pipeline/po-inject.js";
 import type { PotEntry } from "../pipeline/pot-extract.js";
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   STRINGS_SOURCE,
   UI_STRINGS,

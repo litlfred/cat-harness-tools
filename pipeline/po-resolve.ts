@@ -23,8 +23,8 @@ import {
   readHarnessConfig,
   orderedDependencies,
   type HarnessConfig,
-} from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -115,7 +115,7 @@ export interface PoResolveContext {
 export function poResolveContext(folioRoot: string): PoResolveContext {
   const dependencies: PoResolveContext["dependencies"] = [];
   // Dependency walk — deepest first, each dependency once (bean a1lq).
-  // Uses the canonical resolution from schemas/harness-config.ts.
+  // Uses the canonical resolution from schemas/kg/harness-config.ts.
   for (const resolved of orderedDependencies(folioRoot)) {
     // Skip deps that don't provide translations
     if (

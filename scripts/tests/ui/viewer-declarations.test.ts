@@ -13,7 +13,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { DEFAULT_LOCALE, PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.js";
+import { DEFAULT_LOCALE, PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/content/translation.js";
 import {
   builtAtPublishWriter,
   carriesRenders,
@@ -117,6 +117,23 @@ describe("the declaration is the only source of a visualiser and its route", () 
     const repo = fixture();
     const got = viewersOf({ id: "top-library", path: "library/", graphTypologies: ["library"] }, join(repo, "top"), repo);
     expect(got.map((g) => g.ref)).toEqual(["base/docs/cat-harness/library/top/index.html"]);
+  });
+
+  test("`coversKinds` + `subgraphs: instance` + `writer`: a publish-time sub-graph view resolves before its writer runs (bean 8jur)", () => {
+    const repo = fixture();
+    writeFileSync(
+      join(repo, "base/cat-harness.json"),
+      JSON.stringify({
+        name: "cat-harness",
+        visualisers: [
+          { id: "ig-ast", renderedBy: "ig-ast-pages", coversKinds: ["ig-ast"], subgraphs: "instance", writer: ["scripts/gen-ig-ast-pages.ts"] },
+        ],
+      }),
+    );
+    clearDeclaredVisualisers();
+    const got = viewersOf({ id: "top-ast", path: "ast/", graphTypologies: ["ig-ast"] }, join(repo, "top"), repo);
+    expect(got.map((g) => g.ref)).toEqual([`base/docs/${PAGE_LOCALE}/cat-harness/ig-ast/top/index.html`]);
+    expect(got[0]?.writer).toEqual(["base/scripts/gen-ig-ast-pages.ts"]);
   });
 
   test("a directory nothing covers has no viewer — no page can claim one", () => {

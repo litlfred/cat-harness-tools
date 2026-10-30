@@ -11,9 +11,9 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { defaultGraphTypologies, isActiveKg, undecidedWorkKinds, workPlanGraphsIn } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { defaultGraphTypologies, isActiveKg, undecidedWorkKinds, workPlanGraphsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { formatReport } from "../../check-graph-typology-work";
-import { readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../../test/support/instance-fixture.js";
 
 function repoWith(instances: Record<string, unknown>): string {

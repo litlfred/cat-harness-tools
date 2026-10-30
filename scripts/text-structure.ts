@@ -49,7 +49,7 @@ import {
   TextStructureSchema,
   TextUpstreamSchema,
   type TextStructure,
-} from "@litlfred/cat-harness/schemas/document-structure.ts";
+} from "@litlfred/cat-harness/schemas/content/document-structure.ts";
 
 export interface InputFile {
   /** Path as recorded — relative to the base. */

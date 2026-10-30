@@ -12,7 +12,7 @@
  * @module pipeline/tabular-nodes.test
  */
 import { describe, expect, test } from "bun:test";
-import { CONTENT_DOCUMENT_CONTEXT } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { CONTENT_DOCUMENT_CONTEXT } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 
 import {
   SHEETED_FORMATS,
@@ -43,7 +43,7 @@ const XLSX_RECORD = {
 
 describe("a sheet node appears IFF the source has sheets", () => {
   test("a CSV gets NO sheet — inventing one is the lie this rejects", () => {
-    // `schemas/tabular-csvw.ts` already decided this a level down, setting
+    // `schemas/library/tabular-csvw.ts` already decided this a level down, setting
     // `fac:anchor.sheet` to null for a CSV: "a CSV genuinely has no sheet, and
     // writing `Sheet1` would invent one."
     const nodes = build({ hasSheets: false, sheets: [{ name: "coverage", headers: ["a"] }] });

@@ -21,7 +21,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { sidecarSubjects } from "../../kg-export.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";

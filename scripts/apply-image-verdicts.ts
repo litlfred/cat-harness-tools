@@ -12,7 +12,7 @@
  * So the finer roles come from LOOKING, and this writes that down as what it
  * is: an `inspection` basis naming who looked, when, and what they saw. The
  * schema refuses `logo` or `decorative` on a geometry basis precisely so the
- * two can never be confused (`schemas/document-image.ts`).
+ * two can never be confused (`schemas/content/document-image.ts`).
  *
  * ## The verdicts are DATA, not code
  *
@@ -23,7 +23,7 @@
  * ## Every narrative lands as a DRAFT
  *
  * An agent may write a description; only a human may accept one. That rule is
- * in `schemas/narrative.ts` and it is the whole reason the state machine
+ * in `schemas/content/narrative.ts` and it is the whole reason the state machine
  * exists — an uncited narrative is indistinguishable from a transcription of
  * the source, and the two have very different standing. This script therefore
  * cannot produce a `confirmed` narrative even if asked; `scripts/narratives.ts`
@@ -93,20 +93,20 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { AttributionSchema } from "@litlfred/cat-harness/schemas/attribution.ts";
+import { AttributionSchema } from "@litlfred/cat-harness/schemas/content/attribution.ts";
 import {
   DESCRIBABLE_ROLES,
   ImagesSidecarSchema,
   SETTLED_BY_COMPUTATION,
   requiresInspection,
   type ImageRole,
-} from "@litlfred/cat-harness/schemas/document-image.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+} from "@litlfred/cat-harness/schemas/content/document-image.ts";
+import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import {
   VECTOR_FIGURES_FILE,
   VectorFiguresSidecarSchema,
   isVectorFigureId,
-} from "@litlfred/cat-harness/schemas/vector-figure.ts";
+} from "@litlfred/cat-harness/schemas/content/vector-figure.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
 

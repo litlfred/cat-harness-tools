@@ -26,8 +26,8 @@ import {
 } from "../../pipeline/qa-checker-discovery.ts";
 import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry.ts";
 import { resolveCriterionSource } from "../../pipeline/criterion-source.ts";
-import { loadContributions } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/contributions.ts";
+import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/content/contributions.ts";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";

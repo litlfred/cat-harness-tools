@@ -47,7 +47,7 @@
  *   QA, health, uploads …) is NOT borrowed: no link and no count. State is a
  *   fact about one instance's work, and another instance's number is not this
  *   folio's — `zero` would be a lie too, because the folio has not said
- *   (`schemas/tile-count.ts`: absent is a third state). The icon row says why
+ *   (`schemas/ui/tile-count.ts`: absent is a third state). The icon row says why
  *   in words (`harness-tiles` §"An inert row SAYS why").
  * - A tile over the PLATFORM's content, context or derived graphs (skills,
  *   processes, tools, schemas, docs …) is re-based to the platform's
@@ -72,9 +72,9 @@
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { readDeclaration, siteDirFor, visualisationResolves, visualisationsOf } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { readDeclaration, siteDirFor, visualisationResolves, visualisationsOf } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 import { generatedPageOf, isGeneratedSite, publishedUrlOf } from "../harness-tiles.ts";
 
 /** What the scoping needs to know about the site and the declarations. */
@@ -420,7 +420,7 @@ function absentFigures(navbar: NavbarRow | undefined, scope: ForeignScope): Reco
 
 /**
  * Is this file a projection of the HOST's graph rather than chrome? A JSON
- * asset declaring a headline `tile` count (`schemas/tile-count.ts`) is one:
+ * asset declaring a headline `tile` count (`schemas/ui/tile-count.ts`) is one:
  * the bean and todo indexes and their `count.json`, the library, QA and
  * schema indexes. So is every {@link HOST_DATA_PROJECTIONS} data file. On a
  * folio's site either would be read as the folio's own.

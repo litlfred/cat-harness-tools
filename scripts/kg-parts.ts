@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { KG_PART_RECORD_SCHEMA } from "@litlfred/cat-harness/schemas/substrate-snapshot.js";
+import { KG_PART_RECORD_SCHEMA } from "@litlfred/cat-harness/schemas/kg/substrate-snapshot.js";
 
 /**
  * Slices 5 and 6 copy a CHOSEN subgraph, or one asset, of a subscribed

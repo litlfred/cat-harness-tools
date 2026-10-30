@@ -35,15 +35,34 @@
  * | `bean-closed` | its bean is completed or scrapped while the instance still runs |
  * | `no-token` | `running` with no token anywhere: nothing can be completed |
  * | `no-status` | the file records no `status` at all |
+ * | `refused-gate` | the engine refused a step after the instance last moved (`refusals`) |
  *
- * **A refused gate is NOT among them, because it is not recorded.**
- * `workflow_complete` refuses by throwing — `complete()` raises a
- * `WorkflowError`, the hand-over screen and the preflight gate raise an
- * `Error` — and nothing writes the refusal down: the instance file is saved
- * only after a step is accepted, and the activity log gets a `task-end` only
- * then. So "this gate keeps refusing" has no data on disk, and
- * {@link GATE_REFUSALS} says so on every page rather than drawing nothing,
- * which would read as "never refused".
+ * **A refused gate is recorded since 2026-10-29.** `workflow_complete`
+ * refuses by throwing a `WorkflowError`; it now also appends the refusal to
+ * the instance's `refusals` and saves it, so "this gate keeps refusing" is on
+ * disk. A file written before then carries no `refusals`, and
+ * {@link GATE_REFUSALS} says so on every page rather than reading the absence
+ * as "never refused". The hand-over screen's refusals are not recorded: they
+ * refuse the caller's ARGUMENTS before the instance is read, which is not a
+ * gate of the process.
+ *
+ * ## The working context, by the step's role
+ *
+ * Bean `v49e`, item 3: *"for a task: the working context/memory its
+ * dependency tree implies"*. The engine already computes the context of an
+ * enabled step (`enabled()`'s `TaskContext`: the role, the role stack down the
+ * call path, the skills closed over `inherits`, the conventions in force and
+ * the beans the token carries), so {@link workingContextOf} reads it rather
+ * than computing a second one. Memory is joined by ROLE, the axis
+ * `memoryForRoles` defines: the step's role and the roles it `inherits`, plus
+ * every untagged entry. The outer roles of the call path are NOT overlaid,
+ * because `schemas/memory.ts` leaves the call-path overlay open on purpose.
+ *
+ * ## The log
+ *
+ * The instance's `history` is its committed log. The activity log
+ * (`fsh-guts/logs/`) is git-ignored scratch on the machine that ran the step,
+ * so it is not committed state and the view does not read it.
  *
  * ## The clock
  *
@@ -58,7 +77,9 @@ import { basename } from "node:path";
 
 import { inspect as inspectBlock } from "./check-bean-blocks.ts";
 import { beanFindings, type BeanNode } from "./beans.ts";
-import { INSTANCE_SCHEMA, type HistoryEntry, type InstanceState } from "../src/workflow/instance.js";
+import { memoryForRoles, type MemoryNode } from "@litlfred/cat-harness/schemas/memory.js";
+import { findRole, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { enabled, INSTANCE_SCHEMA, type HistoryEntry, type InstanceState } from "../src/workflow/instance.js";
 import type { ProcessModel } from "../src/workflow/process-model.js";
 
 /**
@@ -76,13 +97,13 @@ export const STUCK_AFTER_DAYS = 7;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** What the view can say about refused gates: nothing is recorded. */
+/** What the view can say about refused gates, for an instance that records none. */
 export const GATE_REFUSALS = {
-  state: "not-recorded",
+  since: "2026-10-29",
   why:
-    "workflow_complete refuses a step by throwing an error, and nothing records the refusal: " +
-    "the instance file is written only when a step is accepted, and the activity log gets an " +
-    "entry only then. So whether a gate keeps refusing cannot be read from committed state.",
+    "workflow_complete records each step the engine refuses in the instance's `refusals` since " +
+    "2026-10-29. An instance last saved before then carries none, which means \"not recorded\", " +
+    "not \"never refused\".",
 } as const;
 
 export type StuckKind =
@@ -92,7 +113,8 @@ export type StuckKind =
   | "blocked-without-expiry"
   | "bean-closed"
   | "no-token"
-  | "no-status";
+  | "no-status"
+  | "refused-gate";
 
 export interface StuckState {
   kind: StuckKind;
@@ -194,6 +216,18 @@ export function stuckStatesOf(
     out.push({
       kind: "enabled-not-taken",
       detail: `the token has not moved since ${moved} — ${days(now.getTime() - movedMs)}, past the ${STUCK_AFTER_DAYS}-day threshold`,
+    });
+  }
+
+  const since = Number.isNaN(movedMs) ? Number.NEGATIVE_INFINITY : movedMs;
+  const refusedSince = (s.refusals ?? []).filter((r) => Date.parse(r.at) > since);
+  if (refusedSince.length > 0) {
+    const last = refusedSince.at(-1)!;
+    out.push({
+      kind: "refused-gate",
+      detail:
+        `the engine refused ${refusedSince.length} step(s) since the instance last moved; the newest, at ${last.at}, ` +
+        `asked for \`${last.node}\`${last.actor ? ` as ${last.actor}` : ""}: ${last.reason}`,
     });
   }
 
@@ -379,4 +413,214 @@ export function instancesByProcess(links: readonly InstanceLink[]): Map<string, 
   for (const l of links) for (const p of new Set(l.processIds)) out.set(p, [...(out.get(p) ?? []), l]);
   for (const list of out.values()) list.sort((a, b) => a.store.localeCompare(b.store) || a.id.localeCompare(b.id));
   return out;
+}
+
+/** A role and every role it `inherits`, nearest first, each once. */
+export function inheritsClosure(graph: RoleGraph | undefined, roleId: string): string[] {
+  const out: string[] = [];
+  let frontier = [roleId];
+  while (frontier.length > 0) {
+    const next: string[] = [];
+    for (const id of frontier) {
+      if (out.includes(id)) continue;
+      out.push(id);
+      next.push(...((graph ? findRole(graph, id)?.inherits : undefined) ?? []));
+    }
+    frontier = next;
+  }
+  return out;
+}
+
+/** The working context of one step holding a token, as the instance page shows it. */
+export interface StepContext {
+  node: string;
+  name: string;
+  kind: "activity" | "decision";
+  /** Call activities above the step, outermost first, as the parent diagram names them. */
+  phase: string[];
+  /** The role the lane binds, when the role graph was found and the lane binds one. */
+  role?: string;
+  /** Roles down the call path, outermost first (the engine's `roleStack`). */
+  roleStack: string[];
+  /** The roles memory is joined on: the step's role and what it inherits. */
+  memoryRoles: string[];
+  skills: string[];
+  conventions: string[];
+  carriedBeans: string[];
+  /** Memory tagged with one of {@link memoryRoles}. */
+  roleMemory: Array<Pick<MemoryNode, "id" | "summary" | "label">>;
+  /** How many untagged entries reach every step as well. */
+  everyoneMemory: number;
+}
+
+/**
+ * The working context of every step holding a token: the engine's own
+ * `TaskContext` (role, role stack, skills, conventions, carried beans), plus
+ * the memory its role reaches. Archived entries reach nobody. A model or role
+ * graph that is missing yields fewer facts, never invented ones.
+ */
+export function workingContextOf(
+  model: ProcessModel,
+  state: InstanceState,
+  roles: RoleGraph | undefined,
+  memory: readonly MemoryNode[],
+): StepContext[] {
+  if (state.status === "completed") return [];
+  const live = memory.filter((m) => !m.archived);
+  const everyone = live.filter((m) => m.tags.roles.length === 0).length;
+  let steps;
+  try {
+    steps = enabled(model, state, roles);
+  } catch {
+    return [];
+  }
+  return steps.map((e) => {
+    const ctx = e.context;
+    const role = e.role ?? ctx?.role;
+    const memoryRoles = role ? inheritsClosure(roles, role) : [];
+    const roleMemory = memoryForRoles(live, memoryRoles)
+      .filter((m) => m.tags.roles.length > 0)
+      .map((m) => ({ id: m.id, summary: m.summary, label: m.label }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    return {
+      node: e.node,
+      name: e.name,
+      kind: e.kind,
+      phase: e.phase ?? [],
+      ...(role ? { role } : {}),
+      roleStack: ctx?.roleStack ?? [],
+      memoryRoles,
+      skills: ctx?.effectiveSkills ?? [],
+      conventions: (ctx?.conventions ?? []).map((c) => c.ref),
+      carriedBeans: ctx?.carriedBeans ?? [],
+      roleMemory,
+      everyoneMemory: everyone,
+    };
+  });
+}
+
+// ── The dynamic-state document (bean 6h47 / cat-tools-1as6) ─────────────────
+//
+// Owner, 2026-10-29 (Lane B card Q1, "A. Publish <harness>/state.jsonld" and
+// "A. Publish state.jsonld, pages read it"): render stage 3 (`kg-dynamic`)
+// publishes the running workflows' state as JSON-LD at
+// `<site>/<harness>/state.jsonld`, and the workflow pages read it. It is NOT
+// the stage-1 graph export: that is `../<stub>.jsonld`, typed as the graph;
+// this is typed `cat-harness:DynamicState` and carries only instances,
+// positions and stuck states.
+
+/** The file the workflow pages read, under `<site>/<harness>/`. */
+export const DYNAMIC_STATE_FILE = "state.jsonld";
+
+/** The schema tag, so a reader can tell the two documents apart without the path. */
+export const DYNAMIC_STATE_SCHEMA = "cat-harness-dynamic-state/v1";
+
+const CAT_NS = "https://litlfred.github.io/cat-harness/v0/ns#";
+const PROV_NS = "http://www.w3.org/ns/prov#";
+const XSD_NS = "http://www.w3.org/2001/XMLSchema#";
+
+/**
+ * Every term declared with its full IRI and no `@vocab`, as `kg-export.ts`
+ * does, so an undeclared key stays undeclared rather than minting an IRI.
+ */
+export function dynamicStateContext(): Record<string, unknown> {
+  const link = { "@type": "@id" } as const;
+  return {
+    "@version": 1.1,
+    "cat-harness": CAT_NS,
+    prov: PROV_NS,
+    xsd: XSD_NS,
+    id: "@id",
+    type: "@type",
+    graph: "@graph",
+    generatedAt: { "@id": `${PROV_NS}generatedAtTime`, "@type": `${XSD_NS}dateTime` },
+    harness: { "@id": `${CAT_NS}harness` },
+    store: { "@id": `${CAT_NS}beanStore` },
+    process: { "@id": `${CAT_NS}process` },
+    status: { "@id": `${CAT_NS}instanceStatus` },
+    tokens: { "@id": `${CAT_NS}token`, "@container": "@set" },
+    lastMoved: { "@id": `${CAT_NS}lastMoved`, "@type": `${XSD_NS}dateTime` },
+    beans: { "@id": `${CAT_NS}namesBean`, "@container": "@set" },
+    children: { "@id": `${CAT_NS}runningChild`, "@container": "@set" },
+    stuck: { "@id": `${CAT_NS}stuckState`, "@container": "@set" },
+    kind: { "@id": `${CAT_NS}stuckKind` },
+    detail: { "@id": `${CAT_NS}stuckDetail` },
+    page: { "@id": `${CAT_NS}instancePage`, ...link },
+    unreadStores: { "@id": `${CAT_NS}unreadBeanStore`, "@container": "@set" },
+  };
+}
+
+export interface DynamicStateInput {
+  store: string;
+  state: InstanceState;
+  beans: readonly BeanNode[];
+  /** The diagram's end events, when it was found. */
+  ends?: ReadonlySet<string>;
+  /** The instance's page, site-relative, when one is drawn. */
+  page?: string;
+}
+
+export interface DynamicStateInstance {
+  id: string;
+  type: "cat-harness:WorkflowInstance";
+  store: string;
+  process: string;
+  status: string;
+  tokens: string[];
+  lastMoved?: string;
+  beans: string[];
+  children: Array<{ process: string; status: string; tokens: string[] }>;
+  stuck: Array<{ kind: StuckKind; detail: string }>;
+  page?: string;
+}
+
+export interface DynamicStateDocument {
+  "@context": Record<string, unknown>;
+  $schema: typeof DYNAMIC_STATE_SCHEMA;
+  id: string;
+  type: "cat-harness:DynamicState";
+  harness: string;
+  generatedAt: string;
+  /** Stores that could not be read: their instances are unknown, not none. */
+  unreadStores: string[];
+  graph: DynamicStateInstance[];
+}
+
+/** The published document: one node per instance, sorted by store then id. */
+export function dynamicStateDocument(
+  harness: string,
+  inputs: readonly DynamicStateInput[],
+  now: Date,
+  unreadStores: readonly string[] = [],
+): DynamicStateDocument {
+  const graph = inputs
+    .map((i): DynamicStateInstance => {
+      const s = i.state;
+      const moved = lastMoved(s);
+      return {
+        // Relative: it resolves against wherever the document is published.
+        id: `#workflow/${i.store}/${s.id}`,
+        type: "cat-harness:WorkflowInstance",
+        store: i.store,
+        process: s.processId,
+        status: s.status ?? "unknown",
+        tokens: [...s.tokens],
+        ...(moved ? { lastMoved: moved } : {}),
+        beans: beansNamedBy(s),
+        children: Object.values(s.children ?? {}).map((c) => ({ process: c.processId, status: c.status ?? "unknown", tokens: [...c.tokens] })),
+        stuck: stuckStatesOf(s, i.beans, now, i.ends ?? new Set()).map((x) => ({ kind: x.kind, detail: x.detail })),
+        ...(i.page ? { page: i.page } : {}),
+      };
+    })
+    .sort((a, b) => a.store.localeCompare(b.store) || a.id.localeCompare(b.id));
+  return {
+    "@context": dynamicStateContext(),
+    $schema: DYNAMIC_STATE_SCHEMA,
+    id: "",
+    type: "cat-harness:DynamicState",
+    harness,
+    generatedAt: now.toISOString(),
+    unreadStores: [...unreadStores].sort(),
+    graph,
+  };
 }

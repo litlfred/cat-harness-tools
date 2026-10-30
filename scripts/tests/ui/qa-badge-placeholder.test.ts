@@ -33,8 +33,8 @@ import {
   translationQaPagesDoc,
   TRANSLATION_QA_PAGES_FILE,
 } from "../../gen-docs-pages.ts";
-import { QaIndexSchema, QaTranslationPagesSchema } from "@litlfred/cat-harness/schemas/site-indexes.ts";
-import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { QaIndexSchema, QaTranslationPagesSchema } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
+import { siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);

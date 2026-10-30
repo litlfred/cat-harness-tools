@@ -23,10 +23,10 @@
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import type { LoadedActor } from "@litlfred/cat-harness/schemas/role-graph.js";
+import type { LoadedActor } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import type { ProcessModel } from "../src/workflow/process-model.js";
-import { readPolicies, type OdrlPolicy } from "@litlfred/cat-harness/schemas/odrl.js";
-import type { KgFinding, KgCriterionEntry } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import { readPolicies, type OdrlPolicy } from "@litlfred/cat-harness/schemas/content/odrl.js";
+import type { KgFinding, KgCriterionEntry } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 
 export interface ProcessInput {
   file: string;

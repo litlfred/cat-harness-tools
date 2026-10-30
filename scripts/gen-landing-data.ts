@@ -10,7 +10,7 @@
  * It was part of it, and that was a **layering violation I introduced**.
  * `repo-partition --edges` reported two wrong-direction edges out of
  * `sync-docs-harness.ts` (agentic-harness) into `ensure-landing-sticky.ts` and
- * `schemas/landing-sticky.ts` (folio-assist-core): the harness reaching up into
+ * `schemas/content/landing-sticky.ts` (folio-assist-core): the harness reaching up into
  * core's content nodes.
  *
  * The fix is not an exemption, it is the right owner. **Core owns the folio
@@ -36,21 +36,21 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { resolveLandingInstance } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { instanceRootNamed } from "@litlfred/cat-harness/schemas/instance-roots.js";
-import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.js";
+import { resolveLandingInstance } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { instanceRootNamed } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
+import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
 import {
   checkoutRootFor,
   publishedAssetPath,
   readDeclaration,
   siteDirFor,
   sourceLinks,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
-import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/theme.js";
-import { themeByRef } from "@litlfred/cat-harness/schemas/theme-by-ref.js";
+import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
+import { themeByRef } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
 import { readLandingStickies } from "./ensure-landing-sticky.js";
-import { isExternalLink } from "@litlfred/cat-harness/schemas/landing-sticky.js";
+import { isExternalLink } from "@litlfred/cat-harness/schemas/content/landing-sticky.js";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -140,7 +140,7 @@ const decl = readDeclaration(ROOT);
  * `docs/assets/x.png` → `/assets/x.png`; anything else is passed through.
  *
  * A one-line wrapper, kept so the call sites below read as they did. The
- * IMPLEMENTATION moved to `publishedAssetPath` in `schemas/cat-harness.ts`
+ * IMPLEMENTATION moved to `publishedAssetPath` in `schemas/kg/cat-harness.ts`
  * when the todo board needed the same transform (bean `5y4b`): this copy
  * hardcoded `docs/` where the site directory has a single answer already, and
  * a second hardcoded copy is how an instance that moves its site directory

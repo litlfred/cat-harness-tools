@@ -7,7 +7,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { artefactStub, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { artefactStub, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   artefactDeclarationDrift,
   buildSkillIoContracts,

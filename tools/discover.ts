@@ -43,8 +43,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, relative, resolve } from "node:path";
 
-import { declarationPathIn, instanceDirectoryForGraph, instanceRootsIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { ToolDefinitionSchema, type ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
+import { declarationPathIn, instanceDirectoryForGraph, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { ToolDefinitionSchema, type ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { hostSchemaBase } from "../scripts/lib/host-schema.ts";
 
@@ -56,7 +56,7 @@ const REPO = resolve(HARNESS, "..");
  * The base every Tool's I/O type IRIs are minted against when the caller
  * names none: THIS instance's declared `canonicalUrl`.
  *
- * The tool-type vocabulary (`schemas/tool-types.ts`) is the harness's, and
+ * The tool-type vocabulary (`schemas/tools/tool-types.ts`) is the harness's, and
  * it is published once, at the harness's base. Before discovery, each
  * instance's `tools()` fell back to its OWN canonical. Nothing checked that,
  * because nothing could see those Tools, and so the DAK base layer's nine pointed at

@@ -12,8 +12,8 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { FshGutsNodeSchema, readFshGutsNode, FSH_GUTS_SCHEMA_ID } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
-import { parseFrontMatter } from "@litlfred/cat-harness/schemas/front-matter.ts";
+import { FshGutsNodeSchema, readFshGutsNode, FSH_GUTS_SCHEMA_ID } from "@litlfred/cat-harness/schemas/kg/fsh-guts.ts";
+import { parseFrontMatter } from "@litlfred/cat-harness/schemas/kg/front-matter.ts";
 import {
   STAGING_PREVIEW_KIND,
   createStagingPreview,
@@ -23,7 +23,7 @@ import {
   retireStagingPreview,
   serializeStagingPreview,
   type StagingDeployFacts,
-} from "@litlfred/cat-harness/schemas/staging-preview.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/staging-preview.ts";
 
 const DEPLOY: StagingDeployFacts = {
   slug: "claude-sleepy-babbage-ls90iz",
@@ -213,7 +213,7 @@ describe("the trashcan constraints — one fixed, one still real", () => {
 describe("a staging-preview record now reaches the published document", () => {
   // This is what bean 6pfo was blocked on. The node type shipped first with
   // its own reader, because the trashcan stripped its fields; those two
-  // limits are now fixed in schemas/fsh-guts.ts, so the generic path works
+  // limits are now fixed in schemas/kg/fsh-guts.ts, so the generic path works
   // and this module's reader is a convenience rather than a workaround.
 
   test("the trashcan's own reader keeps the staging block", () => {

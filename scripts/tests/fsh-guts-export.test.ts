@@ -19,11 +19,11 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { readFshGutsNode } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
+import { readFshGutsNode } from "@litlfred/cat-harness/schemas/kg/fsh-guts.ts";
 import { buildFshGutsExport, fshGutsDirs } from "../fsh-guts-export.ts";
-import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/fsh-guts.ts";
+import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/kg/fsh-guts.ts";
 import { buildExport } from "../kg-export.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -276,7 +276,7 @@ describe("a kind's own fields survive, because `kind` is open", () => {
 
 describe("a JSON node of THIS graph is read, and a log still is not", () => {
   test("the JSON carrier works, because front matter is flat", () => {
-    // Measured: `schemas/front-matter.ts` parses to Record<string, string |
+    // Measured: `schemas/kg/front-matter.ts` parses to Record<string, string |
     // string[]>, so a nested `staging:` block comes back as []. A record a
     // workflow writes and a tool reads cannot use that carrier.
     const r = readFshGutsNode(

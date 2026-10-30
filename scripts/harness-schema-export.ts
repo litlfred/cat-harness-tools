@@ -36,7 +36,7 @@
 import { writeFileSync, mkdirSync, readFileSync, readdirSync, existsSync } from "node:fs";
 import { basename, dirname, join, posix, relative } from "node:path";
 import type { z } from "zod";
-import { namedJsonSchema, toJsonSchema } from "@litlfred/cat-harness/schemas/to-json-schema.ts";
+import { namedJsonSchema, toJsonSchema } from "@litlfred/cat-harness/schemas/kg/to-json-schema.ts";
 
 import {
   CatHarnessDeclarationSchema,
@@ -45,13 +45,14 @@ import {
   readDeclaration,
   renderingPath,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { isZodSchema } from "@litlfred/cat-harness/schemas/kind-validator.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { isZodSchema } from "@litlfred/cat-harness/schemas/kg/kind-validator.js";
 import { tools } from "../tools/discover.js";
-import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tool.js";
-import { TOOL_TYPES, toolTypeDocumentIri, toolTypePath, type ToolTypeName } from "@litlfred/cat-harness/schemas/tool-types.js";
+import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tools/tool.js";
+import { TOOL_TYPES, toolTypeDocumentIri, toolTypePath, type ToolTypeName } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
 import { stagingFields } from "./staging-stamp.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { withConcernGroupDirs } from "./concern-groups.ts";
 import { hostSchemaBase, hostSchemaPath, legacyHostSchemaPath, movedSchema } from "./lib/host-schema.ts";
 
 /**
@@ -119,7 +120,7 @@ export function buildDeclarationSchema(opts: SchemaExportOptions = {}): Record<s
     description:
       "The root declaration every instance carries as `<name>.json`: what it is called, " +
       "where it publishes, and which directories it scans for which kind of graph. " +
-      "Generated from `CatHarnessDeclarationSchema` in schemas/cat-harness.ts, which is authoritative.",
+      "Generated from `CatHarnessDeclarationSchema` in schemas/kg/cat-harness.ts, which is authoritative.",
     // Under the instance's own directory, the host's included, since #603
     // decision 1b (owner, 2026-10-23) — `kg-export`'s `exportIdentity`.
     ...(base ? { $comment: `Instance graph: ${renderingPath(base, decl?.name ?? stub, `${stub}.jsonld`)}` } : {}),
@@ -149,7 +150,7 @@ export function buildToolTypes(opts: SchemaExportOptions = {}): Record<string, u
     description:
       "The shared types a Tool's io.inputs/io.outputs reference by absolute IRI. " +
       "Each is also published as its own document, tool-types/<Name>.schema.json (its own IRI). " +
-      "Generated from schemas/tool-types.ts, which is authoritative.",
+      "Generated from schemas/tools/tool-types.ts, which is authoritative.",
     $defs: defs,
   };
 }
@@ -161,7 +162,7 @@ export function buildToolTypes(opts: SchemaExportOptions = {}): Record<string, u
  * The owner, 2026-10-15: *"input ouput schemas should be their own files/json
  * schema when published w/ IRIs so can be referernced easy."* `toolTypeDocumentIri`
  * mints the IRI and `toolTypePath` the published path, from one definition in
- * `schemas/tool-types.ts`, so a port and the file it names cannot drift.
+ * `schemas/tools/tool-types.ts`, so a port and the file it names cannot drift.
  *
  * ## The combined document stays, inline
  *
@@ -213,7 +214,7 @@ export function buildToolSchema(opts: SchemaExportOptions = {}): Record<string, 
     description:
       "One concrete way to exercise a skill. A skill states a capability generically; " +
       "a Tool names the skills it satisfies and how to install and invoke it. " +
-      "Generated from schemas/tool.ts, which is authoritative.",
+      "Generated from schemas/tools/tool.ts, which is authoritative.",
   };
 }
 
@@ -230,7 +231,7 @@ export function buildToolSchema(opts: SchemaExportOptions = {}): Record<string, 
  *
  * That is the same defect `AGENTS.md` records for the README's chapter table —
  * a link COMPOSED by convention and checked against nothing — repeated one
- * layer down, and it matters more here. `schemas/tool.ts` requires a Tool's
+ * layer down, and it matters more here. `schemas/tools/tool.ts` requires a Tool's
  * `io.*.schema` to be an absolute IRI precisely so "the types it names have to
  * exist somewhere fetchable"; a Tool node pointing at a 403 would satisfy the
  * schema and mean nothing. So the contracts had to become fetchable before a
@@ -368,7 +369,7 @@ const SELF_INVOCATION = "bun run cat kg:schema";
  * Artefacts a Tool node declares itself authoritative for, by published path.
  *
  * Reads `maintains` off the `tools` graph — see {@link ToolMaintainsSchema} in
- * `schemas/tool.ts`. The base is irrelevant here: the comparison is on the
+ * `schemas/tools/tool.ts`. The base is irrelevant here: the comparison is on the
  * path relative to the instance base, which is what the declaration carries.
  */
 export function declaredArtefacts(): Map<string, { tool: string; source: string; producedBy?: string }> {
@@ -645,7 +646,22 @@ export const PUBLIC_SCHEMA_EXPORT = /Schema$/;
 export function instanceZodSchemaDirs(root: string): string[] {
   const declared = instanceDirectoriesForGraph(root, "schemas");
   // declared-path-literal: the convention fallback for an instance that declares no `schemas` graph, the same fallback `schemasRoot` uses for the host.
-  return declared.length > 0 ? declared : [join(root, "schemas")];
+  // With each one's concern groups (`schemas/<group>/`, bean `f8wp`).
+  return withConcernGroupDirs(declared.length > 0 ? declared : [join(root, "schemas")], "schemas");
+}
+
+/**
+ * A module that only re-exports a module moved into a concern group — the
+ * one-release shim a regroup leaves at the old path (bean `f8wp`). Its exports
+ * are the moved module's own objects, so scanning it would publish each
+ * schema twice under one basename.
+ */
+export function isReexportShim(text: string): boolean {
+  const body = text
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "")
+    .trim();
+  return body.length > 0 && body.split(/;\s*/).filter((s) => s.trim() !== "").every((s) => /^export\s+(\*|\{\s*default\s*\})\s+from\s+["'][^"']+["']$/.test(s.trim()));
 }
 
 /**
@@ -705,7 +721,8 @@ export interface ZodSchemaScan {
  * static import edge, so `check:import-direction` does not see it, and it
  * should not — this module does not depend on what it renders.
  *
- * Top-level `.ts` only, matching `schemaModules` in `schema-nodes.ts`, which is
+ * Top-level `.ts` of each directory and of its declared concern groups,
+ * matching `schemaModules` in `schema-nodes.ts`, which is
  * this graph's other reader. A module that fails to import is a PROBLEM, never
  * a skip: a silently missing module is "there are none" said falsely.
  */
@@ -730,6 +747,7 @@ export async function scanInstanceZodSchemas(root: string): Promise<ZodSchemaSca
     if (!existsSync(dir)) continue;
     for (const f of readdirSync(dir).sort()) {
       if (!f.endsWith(".ts") || f.endsWith(".test.ts") || f.endsWith(".d.ts")) continue;
+      if (isReexportShim(readFileSync(join(dir, f), "utf-8"))) continue;
       const module = rel(join(dir, f));
       let mod: Record<string, unknown>;
       try {

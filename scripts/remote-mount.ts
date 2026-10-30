@@ -10,7 +10,7 @@
  * mount that claimed their coverage would let them be removed unnoticed (the
  * reasoning `state-mount.ts` records for the branch mounts).
  *
- * Bean `0mpw`. Schema and the owner's rulings: `schemas/remote-mount.ts`.
+ * Bean `0mpw`. Schema and the owner's rulings: `schemas/kg/remote-mount.ts`.
  *
  *   bun run cat mount:remote              # plan, fetch, mount, write the lock, re-render the agent surface if it changed
  *   bun run cat mount:remote --plan       # resolve the closure and print it; write nothing
@@ -19,6 +19,8 @@
  *   bun run cat mount:remote --help       # print this header; run nothing
  *   echo "<where they said yes>" | bun run cat mount:remote --seed <name>=<owner/repo>@<sha> --consent-by <who> [--whole]
  *                                          # create or re-pin a remote instance in index.config.json, WITH its consent
+ *   bun run cat mount:remote --choose <harness>[:<instance>] [--directories a,b] [--tools x,y]
+ *                                          # write a review's choice into overrides.<instance>, so a fresh clone replays it (bean mo75)
  *   bun run cat mount:repin:standing [--dry-run]
  *                                          # re-pin every instance a STANDING consent covers (repin-standing.ts, #401)
  *
@@ -95,7 +97,7 @@
  * declared in-checkout directory whose hydrated file the pin HOLDS — the
  * others are named in the detail, and a pin that holds none is `missing`,
  * never an empty "mounted". No `<name>.json` is laid down and the lock marks
- * the instance `hydrated` (`schemas/remote-mount.ts` says why).
+ * the instance `hydrated` (`schemas/kg/remote-mount.ts` says why).
  *
  * Absent, it is NOT `mountDefaults.directories`, on purpose. That list is the
  * harness's answer to "which FILES does a downstream want unless it says
@@ -121,6 +123,17 @@
  * holds what is declared within it — its files, or, hydrated, its nested
  * subgraphs inline (`hasSubgraph`).
  *
+ * ## Concern names (bean `mo75`)
+ *
+ * An id that is neither, but is a concern group's code (`sdlc`, `kg`, `ui`
+ * …, from `code-lists/concern-group.json`), names that concern across kinds:
+ * it expands to every kind-first member the instance declares —
+ * `processes/sdlc/`, `skills/sdlc/`, `schemas/sdlc/` — read from each
+ * grouping kind's own declaration file at the pin (`processes.json`
+ * `groups`, `skills.json` `topics`; the walk `concern-groups.ts` owns). Each
+ * member is locked under the id `<directory id>/<code>`. A code no kind of
+ * the instance declares is refused like any other unknown id.
+ *
  * ## Tools: chosen by id, mounted runnable (bean `mo75` G3)
  *
  * `overrides.<instance>.tools` names Tools that instance declares. Each is
@@ -128,7 +141,11 @@
  * closure — as the declared directories that closure touches, and with
  * `tools` named anywhere in an entry, that entry's instances mount those
  * directories (plus any their override names) instead of their default list.
- * A `whole` instance stays whole. The owner's rulings and why each is so are
+ * A `whole` instance stays whole. An instance of ANOTHER entry the closure
+ * reaches shrinks too, to the directories the closures need from it (owner,
+ * 2026-10-29, option B: "every touched entry"), unless its own entry mounts
+ * it whole or names its `directories`: then that list stands, and must
+ * already bring what the closure needs. The owner's rulings and why each is so are
  * in `tool-closure.ts`, which computes it; this file only plans with it:
  *
  * - each chosen Tool's `invoke` is read from the declaring instance's
@@ -160,9 +177,9 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { z } from "zod";
 
-import { mountTrust, withConsent, type ConsentGrant, type TrustVerdict } from "@litlfred/cat-harness/schemas/mount-trust.js";
-import { checkoutRootFor, instanceDirectories, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { INDEX_CONFIG_SCHEMA, lockedMountPaths, readDeclaredMounts, readIndexConfig, readMountFields, syncIgnoreBlock, writeDeclaredMounts, type IndexConfig } from "@litlfred/cat-harness/schemas/index-config.js";
+import { mountTrust, withConsent, type ConsentGrant, type TrustVerdict } from "@litlfred/cat-harness/schemas/kg/mount-trust.js";
+import { checkoutRootFor, instanceDirectories, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { INDEX_CONFIG_SCHEMA, lockedMountPaths, readDeclaredMounts, readIndexConfig, readMountFields, syncIgnoreBlock, writeDeclaredMounts, type IndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.js";
 import {
   MOUNT_LOCK_SCHEMA,
   MountDefaultsSchema,
@@ -175,15 +192,16 @@ import {
   type RemoteMount,
   WHOLE_INSTANCE_ID,
   checkMountPathCollisions,
-} from "@litlfred/cat-harness/schemas/remote-mount.js";
-import { contentIsOffCheckout, HydratedSourceSchema, type HydratedSource, type SubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
-import { publishedSubgraphDir, SUBGRAPH_HYDRATED_FILE, SubgraphHydratedSchema } from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
+} from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
+import { contentIsOffCheckout, HydratedSourceSchema, type HydratedSource, type SubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
+import { publishedSubgraphDir, SUBGRAPH_HYDRATED_FILE, SubgraphHydratedSchema } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.js";
 import { treeDigest, treeEntries } from "./kg-parts.ts";
 import { builtAtPublishOf, installDependencies, isInstallArtefact, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from "./subgraph-index-package.ts";
 import { toolClosure, type ClosureInstance, type ResolvedTool, type ToolChoice } from "./tool-closure.ts";
-import { upstreamDirectories, type UpstreamDirectory } from "./upstream-directories.ts";
+import { upstreamConcernMembers, upstreamDirectories, type UpstreamDirectory } from "./upstream-directories.ts";
+import { ConcernGroupCodeSchema } from "@litlfred/cat-harness/schemas/kg/concern-groups.ts";
 
 /**
  * Move every state mount under `target` (per `stateMountedDirs`) out of the
@@ -455,9 +473,16 @@ function downstreamOf(opts: RemoteMountOptions): { instanceRoot: string; name: s
   const idx = readIndexConfig(instanceRoot);
   if (!decl && idx.state !== "ok") throw new Error(`${instanceRoot} holds no instance declaration or index.config.json`);
   // `index.config.json` when the checkout has one, else the declaration's
-  // `remoteMounts` — and BOTH is an error, never a pick (schemas/index-config.ts).
+  // `remoteMounts` — and BOTH is an error, never a pick (schemas/kg/index-config.ts).
   const name = decl?.name ?? (idx.state === "ok" ? idx.config.site?.landing ?? "coordinator" : "downstream");
-  return { instanceRoot, name, mounts: readDeclaredMounts(instanceRoot).mounts, approvers: decl?.mountApprovers };
+  // Who may consent: the index's list, or the declaration's — never both
+  // (folio-assistant#2389: a checkout whose index lists the mounts may
+  // declare no instance of its own).
+  // Read structurally: the field is new in cat-harness#625, and a pinned
+  // cat-harness without it rejects an index that carries it anyway.
+  const fromIndex = idx.state === "ok" ? (idx.config as { mountApprovers?: string[] }).mountApprovers : undefined;
+  if (fromIndex && decl?.mountApprovers) throw new Error(`${instanceRoot} declares mountApprovers in both index.config.json and its instance declaration — keep one`);
+  return { instanceRoot, name, mounts: readDeclaredMounts(instanceRoot).mounts, approvers: fromIndex ?? decl?.mountApprovers };
 }
 
 /**
@@ -502,14 +527,31 @@ function directoriesById(
   tree: RemoteTree,
   found: { root: string; file: string; decl: UpstreamDeclaration },
   named: readonly string[],
-): { byId: Map<string, UpstreamDirectory> } | { unknown: string[]; why: string } {
+): { byId: Map<string, UpstreamDirectory>; ids: string[] } | { unknown: string[]; why: string } {
   const byId = new Map<string, UpstreamDirectory>(found.decl.directories.map((d) => [d.id, d]));
-  if (named.every((id) => byId.has(id))) return { byId };
+  if (named.every((id) => byId.has(id))) return { byId, ids: [...named] };
   const nested = upstreamDirectories(tree, found.root, found.file);
   if (nested.ok) for (const d of nested.directories) if (!byId.has(d.id)) byId.set(d.id, d);
-  const unknown = named.filter((id) => !byId.has(id));
-  if (unknown.length === 0) return { byId };
-  return { unknown, why: nested.ok ? "neither in its declaration nor from within a directory it declares" : `not in its declaration, and what it declares from within was not read: ${nested.detail}` };
+  // A CONCERN NAME (bean `mo75`): an id that is no directory but a concern
+  // group's code expands to its kind-first members, `processes/sdlc/`,
+  // `skills/sdlc/` …, read from each kind's own declaration file at the pin.
+  const expanded = new Map<string, string[]>();
+  let concernWhy: string | undefined;
+  for (const id of named) {
+    if (byId.has(id) || !ConcernGroupCodeSchema.safeParse(id).success) continue;
+    const members = upstreamConcernMembers(tree, found.root, found.file, found.decl.directories, id);
+    if (!members.ok) {
+      concernWhy = members.detail;
+      continue;
+    }
+    if (members.directories.length === 0) continue;
+    for (const m of members.directories) if (!byId.has(m.id)) byId.set(m.id, m);
+    expanded.set(id, members.directories.map((m) => m.id));
+  }
+  const unknown = named.filter((id) => !byId.has(id) && !expanded.has(id));
+  if (unknown.length === 0) return { byId, ids: [...new Set(named.flatMap((id) => expanded.get(id) ?? [id]))] };
+  const why = nested.ok ? "neither in its declaration nor from within a directory it declares, and no concern group of its kinds" : `not in its declaration, and what it declares from within was not read: ${nested.detail}`;
+  return { unknown, why: concernWhy ? `${why}; a concern group's declaration was not read: ${concernWhy}` : why };
 }
 
 /**
@@ -554,7 +596,7 @@ function planHydrated(a: {
   const notPublished: string[] = [];
   /** The pin's package, once a directory's file was not in the tree (G2b). */
   let looked: SubgraphIndexFetch | undefined;
-  for (const id of ids) {
+  for (const id of lookup.ids) {
     const d = byId.get(id)!;
     let pub: string;
     try {
@@ -647,7 +689,14 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
     prior.ok ? [...prior.lock.instances.map((i) => i.instance), ...prior.lock.unmounted.flatMap((u) => (u.leftOnDisk ? [u.instance] : []))] : [],
   );
   const local = new Map<string, string>();
+  // An instance directory in a git checkout with NO tracked file is not the
+  // checkout's own: it is what something else left behind (a removed
+  // submodule, a lock deleted by hand). It is a mount target, adopted only if
+  // it is exactly the pinned bytes (folio-assistant#2467, decision 2).
+  const inCheckout = gitIn(ds.instanceRoot, ["rev-parse", "--is-inside-work-tree"]).stdout.trim() === "true";
   for (const root of instanceRootsIn(ds.instanceRoot)) {
+    const rel = relative(ds.instanceRoot, root);
+    if (inCheckout && rel !== "" && !tracked(ds.instanceRoot, rel)) continue;
     try {
       const n = readDeclaration(root)?.name;
       if (n && !previouslyMounted.has(n)) local.set(n, root);
@@ -805,7 +854,7 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
       }
       const { byId } = lookup;
       const directories: PlannedDirectory[] = [];
-      if (!whole) for (const id of ids) {
+      if (!whole) for (const id of lookup.ids) {
         const d = byId.get(id)!;
         if (strip(d.path).split("/").includes("..")) continue; // a path that climbs out is not this instance's to give
         directories.push({ id, path: joinRel(path, d.path), upstreamPath: joinRel(found.root, d.path) });
@@ -959,8 +1008,10 @@ function applyToolChoices(
   local: Map<string, string>,
   pkgAt: (repository: string, sha: string) => (harness: string) => SubgraphIndexFetch,
 ): void {
-  const choosing = plan.mounts.filter((m) => Object.values(m.overrides ?? {}).some((o) => o.tools?.length));
+  const choosing = plan.mounts.filter(entryChoosesTools);
   if (choosing.length === 0) return;
+  /** Instances of other entries that shrink to Tool closures, and the directory ids those closures need. */
+  const shrunk = new Map<string, Set<string>>();
 
   // Every instance the closure may reach: those laid down as files, and the ones this checkout holds.
   const instances: ClosureInstance[] = [];
@@ -1048,11 +1099,21 @@ function applyToolChoices(
     }
 
     const result = failures.length ? undefined : toolClosure(instances, choices);
+    /** What this entry's closure asks of instances of OTHER entries that shrink to it (owner, 2026-10-29, option B). */
+    const asks = new Map<string, string[]>();
     if (result) {
-      // An instance of ANOTHER entry the closure needs a directory of must already bring it.
+      // An instance of ANOTHER entry the closure touches shrinks to what the
+      // closure needs from it, unless its own entry says otherwise: an
+      // explicit `directories` list or `whole` wins, and then it must already
+      // bring what the closure needs.
       for (const [name, ids] of result.directories) {
-        const p = plan.instances.find((i) => i.instance === name)!;
-        if (reached.get(name)?.via === m) continue;
+        const p = plan.instances.find((i) => i.instance === name);
+        const r = reached.get(name);
+        if (!p || !r || r.via === m) continue;
+        if (shrinksToClosure(p, r)) {
+          asks.set(name, ids);
+          continue;
+        }
         const have = p.directories.map((d) => d.path);
         const inst = instances.find((i) => i.instance === name)!;
         for (const id of ids) {
@@ -1094,7 +1155,47 @@ function applyToolChoices(
       const p = plan.instances.find((i) => i.instance === c.instance);
       if (p) p.tools = result!.tools.filter((t) => t.instance === c.instance);
     }
+    for (const [name, ids] of asks) {
+      const prev = shrunk.get(name) ?? new Set<string>();
+      for (const id of ids) prev.add(id);
+      shrunk.set(name, prev);
+    }
   }
+
+  // Each shrinking instance mounts the union of what every closure asked of it.
+  // An entry that chooses Tools itself already started from its own closure, so
+  // what others ask is added to it; any other entry's default list is replaced.
+  for (const [name, ids] of shrunk) {
+    const p = plan.instances.find((i) => i.instance === name);
+    const r = reached.get(name);
+    if (!p || !r) continue;
+    const inst = instances.find((i) => i.instance === name)!;
+    const own = entryChoosesTools(r.via);
+    const keep = own ? p.directories : [];
+    const have = new Set(keep.map((d) => d.id));
+    for (const id of [...ids].sort()) {
+      if (have.has(id)) continue;
+      const d = inst.directories.find((x) => x.id === id)!;
+      keep.push({ id, path: joinRel(p.path, d.path), upstreamPath: joinRel(r.found.root, d.path) });
+      have.add(id);
+    }
+    p.directories = keep;
+  }
+}
+
+/** Whether a mount entry names `tools` for any of its instances. */
+function entryChoosesTools(m: RemoteMount): boolean {
+  return Object.values(m.overrides ?? {}).some((o) => o.tools?.length);
+}
+
+/**
+ * Whether an instance reached through another entry shrinks to a Tool
+ * closure's needs (owner, 2026-10-29, option B): yes, unless its entry mounts
+ * it whole or as metadata, or names its directories explicitly.
+ */
+function shrinksToClosure(p: PlannedInstance, r: { whole: boolean; via: RemoteMount }): boolean {
+  if (r.whole || p.hydrated) return false;
+  return !r.via.overrides?.[p.instance]?.directories?.length;
 }
 
 /** Resolve the closure and close every fetched tree. Writes nothing. */
@@ -1127,6 +1228,53 @@ function digestOf(abs: string, skip: readonly string[] = []): { treeDigest: stri
     builtAtPublishOf(abs),
   );
   return { treeDigest: treeDigest(abs, files), files: files.length };
+}
+
+/**
+ * Whether the bytes already at a planned instance's target ARE the pinned
+ * bytes (folio-assistant#2467, decision 2, "adopt if identical"): every
+ * declared directory holds exactly the pinned files (none absent, none
+ * extra, none different, install artefacts and state mounts aside), the
+ * declaration file matches, and every declared asset's sha256 matches.
+ * Reads only; never writes or deletes.
+ */
+export function identicalToPin(
+  base: string,
+  work: string,
+  p: Pick<PlannedInstance, "path" | "instance" | "declarationFile" | "directories" | "assets" | "upstreamRoot" | "hydrated">,
+): { same: true } | { same: false; differ: string[]; extra: string[]; absent: string[] } {
+  const differ: string[] = [];
+  const extra: string[] = [];
+  const absent: string[] = [];
+  const skip = stateMountedDirs(base);
+  for (const d of p.directories) {
+    if (d.package) continue;
+    const src = join(work, d.upstreamPath);
+    const dst = join(base, d.path);
+    const pinned = existsSync(src)
+      ? withoutInstallArtefacts(treeEntries(src).files.filter((f) => !(d.upstreamPath === "." && (f === ".git" || f.startsWith(".git/")))))
+      : [];
+    const onDisk = existsSync(dst) ? withoutBuiltAtPublish(withoutInstallArtefacts(withoutStateMounts(dst, treeEntries(dst).files, skip)), builtAtPublishOf(dst)) : [];
+    const have = new Set(onDisk);
+    const want = new Set(pinned);
+    for (const f of pinned) {
+      if (!have.has(f)) absent.push(`${d.path}/${f}`.replace(/\/\/+/g, "/"));
+      else if (sha256Text(readFileSync(join(src, f))) !== sha256Text(readFileSync(join(dst, f)))) differ.push(`${d.path}/${f}`.replace(/\/\/+/g, "/"));
+    }
+    for (const f of onDisk) if (!want.has(f)) extra.push(`${d.path}/${f}`.replace(/\/\/+/g, "/"));
+  }
+  const decl = join(base, p.path, `${p.instance}.json`);
+  if (!existsSync(decl)) absent.push(`${p.path}/${p.instance}.json`);
+  else if (sha256Text(readFileSync(decl)) !== sha256Text(readFileSync(join(work, p.declarationFile)))) differ.push(`${p.path}/${p.instance}.json`);
+  for (const a of p.assets ?? []) {
+    const src = join(work, p.upstreamRoot, a);
+    const dst = join(base, p.path, a);
+    if (!existsSync(src)) continue;
+    if (!existsSync(dst)) absent.push(`${p.path}/${a}`);
+    else if (sha256Text(readFileSync(src)) !== sha256Text(readFileSync(dst))) differ.push(`${p.path}/${a}`);
+  }
+  const uniq = (xs: string[]) => [...new Set(xs)].sort();
+  return differ.length || extra.length || absent.length ? { same: false, differ: uniq(differ), extra: uniq(extra), absent: uniq(absent) } : { same: true };
 }
 
 function gitIn(cwd: string, args: string[]): { status: number; stdout: string } {
@@ -1269,25 +1417,34 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
         plan.outcomes.push({ instance: p.instance, state: trust.state, path: p.path, detail });
         continue;
       }
+      let adopting = false;
       try {
         if (before) {
           const changed = modifiedSince(plan.instanceRoot, before);
           if (changed.length && opts.discardEdits) {
             console.error(`fresh: replacing ${p.path}/ (${changed.length} path(s) no longer hashed to the lock)`);
           } else if (changed.length) {
+            // folio-assistant#2682: when the pin moved, say so. The lock keeps
+            // this entry at its old commit, so the layer was NOT re-pinned.
+            const moved = before.sha !== p.sha ? `; the pin moved to ${p.sha.slice(0, 12)} but this instance stays at ${before.sha.slice(0, 12)}, so it is NOT re-pinned (\`--fresh\` replaces it)` : "";
             plan.outcomes.push({
               instance: p.instance,
               state: "missing",
               path: p.path,
-              detail: `left untouched: ${changed.join(", ")} no longer hash to the lock — edits there are somebody's work; move them upstream or delete the directory, then re-mount`,
+              detail: `left untouched: ${changed.join(", ")} no longer hash to the lock — edits there are somebody's work; move them upstream or delete the directory, then re-mount${moved}`,
             });
             locked.push(before);
             untouched.add(p.instance);
             continue;
           }
         } else if (existsSync(target)) {
-          plan.outcomes.push({ instance: p.instance, state: "missing", path: p.path, detail: `\`${p.path}/\` already exists and no lock says this mount put it there — refused` });
-          continue;
+          // folio-assistant#2467, decision 2: adopt it if it IS the pinned
+          // bytes (checked once the pin is checked out, below); else refuse.
+          if (p.hydrated) {
+            plan.outcomes.push({ instance: p.instance, state: "missing", path: p.path, detail: `\`${p.path}/\` already exists and no lock says this mount put it there — refused` });
+            continue;
+          }
+          adopting = true;
         }
         if (tracked(plan.instanceRoot, p.path)) {
           plan.outcomes.push({ instance: p.instance, state: "missing", path: p.path, detail: `\`${p.path}/\` holds tracked files — a mount never lands on tracked bytes` });
@@ -1314,6 +1471,54 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
             state: "could-not-determine",
             path: p.path,
             detail: `\`${pinsArtefacts.upstreamPath}\` at ${p.sha.slice(0, 12)} tracks files under node_modules/, which the mount digest excludes as install artefacts — refused rather than locked with bytes no check would see`,
+          });
+          continue;
+        }
+
+        if (adopting) {
+          const same = identicalToPin(plan.instanceRoot, work, p);
+          if (!same.same) {
+            const list = (label: string, xs: string[]) => (xs.length ? `${label} ${xs.slice(0, 5).map((x) => `\`${x}\``).join(", ")}${xs.length > 5 ? ` and ${xs.length - 5} more` : ""}` : "");
+            plan.outcomes.push({
+              instance: p.instance,
+              state: "missing",
+              path: p.path,
+              detail:
+                `\`${p.path}/\` already exists, no lock says this mount put it there, and it is not the pinned bytes (${[list("differ:", same.differ), list("extra:", same.extra), list("absent:", same.absent)].filter(Boolean).join("; ")}) — refused, nothing changed. ` +
+                "Move the edits upstream to the fork, or delete or rename the directory, then re-mount",
+            });
+            continue;
+          }
+          const declText = readFileSync(join(work, p.declarationFile));
+          const dirs: LockedInstance["directories"] = p.directories
+            .filter((d) => existsSync(join(plan.instanceRoot, d.path)))
+            .map((d) => ({
+              id: d.id,
+              path: d.path,
+              upstreamPath: d.upstreamPath,
+              ...digestOf(join(plan.instanceRoot, d.path), stateMountedDirs(plan.instanceRoot)),
+              ...(d.package ? { package: { url: d.package.url, sha256: d.package.sha256, member: d.package.member } } : {}),
+            }));
+          const assets = (p.assets ?? []).filter((a) => existsSync(join(target, a))).map((a) => ({ src: a, sha256: sha256Text(readFileSync(join(target, a))) }));
+          ensureIgnored(plan.instanceRoot, p.path, true);
+          locked.push({
+            instance: p.instance,
+            repository: p.repository,
+            sha: p.sha,
+            upstreamRoot: p.upstreamRoot,
+            path: p.path,
+            via: p.via,
+            pinnedBy: p.pinnedBy,
+            declaration: { file: `${p.instance}.json`, sha256: sha256Text(declText) },
+            directories: dirs,
+            ...(assets.length ? { assets } : {}),
+            trust: trust.record,
+          });
+          plan.outcomes.push({
+            instance: p.instance,
+            state: mountedState(trust),
+            path: p.path,
+            detail: `adopted: \`${p.path}/\` was already the pinned bytes of ${p.repository}@${p.sha.slice(0, 12)} (${dirs.length} director${dirs.length === 1 ? "y" : "ies"} compared file by file), so it was locked, not re-laid; basis: ${trust.detail}`,
           });
           continue;
         }
@@ -1532,8 +1737,17 @@ export function parseSeed(arg: string): SeedSpec {
  * the committed `.gitignore` block moves with it. Nothing is fetched: run
  * `mount:remote` afterwards.
  */
-export function seedRemote(instanceRoot: string, specs: readonly SeedSpec[], grant: ConsentGrant): { file: string; mounts: RemoteMount[] } {
+export function seedRemote(instanceRoot: string, specs: readonly SeedSpec[], grant: ConsentGrant, opts: { discardEdits?: boolean } = {}): { file: string; mounts: RemoteMount[] } {
   if (specs.length === 0) throw new Error("nothing to seed");
+  // folio-assistant#2682: re-pinning over edited mounts moved the pin while
+  // the next mount left the edited instances at their old commit. Refuse up
+  // front, unless the caller will replace them (`--fresh`).
+  const edited = opts.discardEdits ? [] : editedMounts(instanceRoot, specs.map((s) => s.harness));
+  if (edited.length) {
+    throw new Error(
+      `the mounts this re-pin moves have edits the lock does not hold (${edited.join("; ")}), so the next mount would leave them at the old commit — move the edits upstream, or re-pin from a checkout mounted from the lock (\`.github/mount-from-lock.sh\`), or pass \`--fresh\` to discard them`,
+    );
+  }
   const current = readDeclaredMounts(instanceRoot).mounts;
   const next: RemoteMount[] = [...current];
   for (const spec of specs) {
@@ -1546,6 +1760,75 @@ export function seedRemote(instanceRoot: string, specs: readonly SeedSpec[], gra
   }
   const { file } = writeDeclaredMounts(instanceRoot, next);
   return { file, mounts: next.filter((m) => specs.some((s) => s.harness === m.harness)) };
+}
+
+/** Locked instances reached through `harnesses` whose bytes on disk no longer hash to the lock, as `<instance>: <paths>`. */
+export function editedMounts(instanceRoot: string, harnesses: readonly string[]): string[] {
+  let lockFile: string;
+  try {
+    lockFile = mountLockPathFor(instanceRoot, downstreamOf({ instanceRoot }).name);
+  } catch {
+    return [];
+  }
+  const r = readMountLock(lockFile);
+  if (!r.ok) return [];
+  return r.lock.instances
+    .filter((i) => harnesses.includes(i.via))
+    .flatMap((i) => {
+      const changed = modifiedSince(instanceRoot, i);
+      return changed.length ? [`${i.instance}: ${changed.join(", ")}`] : [];
+    });
+}
+
+// ── Writing back a review's choice (bean `mo75`) ──────────────────────────
+
+/** One `--choose <harness>[:<instance>]` with what was chosen. */
+export interface ChoiceSpec {
+  /** The mount entry, by its harness name. */
+  harness: string;
+  /** The instance of that entry's closure the choice is for; the harness itself when omitted. */
+  instance?: string;
+  directories?: string[];
+  tools?: string[];
+}
+
+/** Parse `<harness>` or `<harness>:<instance>`; throws with the expected shape. */
+export function parseChoose(arg: string): { harness: string; instance?: string } {
+  const m = /^([^:\s]+)(?::([^:\s]+))?$/.exec(arg);
+  if (!m) throw new Error(`--choose \`${arg}\`: expected <harness> or <harness>:<instance>`);
+  return { harness: m[1]!, ...(m[2] ? { instance: m[2] } : {}) };
+}
+
+/**
+ * Write the CHOICE a review made — which directories (nested ids and concern
+ * names included) and which Tools — into the mount entry's
+ * `overrides.<instance>`, so a fresh clone replays it (bean `mo75`; the
+ * proposal's "the choice, never the state"). The pin and its consent are not
+ * touched: a choice moves no commit. The choice replaces the override's
+ * `whole` and `skip`, and ends the review: the chosen set is mounted as files,
+ * so a `hydrated` the instance had is dropped (set `false` where the entry
+ * itself is hydrated). Nothing is fetched or checked here; the next
+ * `mount:remote` resolves the choice at the pin, refuses an id the pin does
+ * not declare, and records what it resolved to in `index.lock.json`.
+ */
+export function chooseRemote(instanceRoot: string, spec: ChoiceSpec): { file: string; mount: RemoteMount } {
+  if (!spec.directories?.length && !spec.tools?.length) throw new Error("--choose needs --directories and/or --tools: a choice of nothing is not one");
+  const current = readDeclaredMounts(instanceRoot).mounts;
+  const at = current.findIndex((m) => m.harness === spec.harness);
+  if (at < 0) throw new Error(`no mount entry \`${spec.harness}\` — seed it first (\`mount:remote --seed\`)`);
+  const instance = spec.instance ?? spec.harness;
+  const m = current[at]!;
+  const { whole: _w, skip: _s, hydrated: _h, directories: _d, tools: _t, ...kept } = m.overrides?.[instance] ?? {};
+  const override = {
+    ...kept,
+    ...(spec.directories?.length ? { directories: [...new Set(spec.directories)] } : {}),
+    ...(spec.tools?.length ? { tools: [...new Set(spec.tools)] } : {}),
+    ...(m.hydrated ? { hydrated: false } : {}),
+  };
+  const next = [...current];
+  next[at] = { ...m, overrides: { ...m.overrides, [instance]: override } } as RemoteMount;
+  const { file } = writeDeclaredMounts(instanceRoot, next);
+  return { file, mount: next[at]! };
 }
 
 // ── Checking (no network) ────────────────────────────────────────────────────
@@ -1591,6 +1874,21 @@ export function checkRemote(opts: { instanceRoot?: string } = {}): CheckResult {
   const have = JSON.stringify(r.lock.mounts.map((m) => [m.harness, m.repository, m.ref]).sort());
   if (want !== have) {
     return { state: "missing", reason: "the lock was written for different pins than the declaration names — run `bun run cat mount:remote`", outcomes: [] };
+  }
+  // A pin's own instances were mounted from that pin (folio-assistant#2682):
+  // `mount:remote --seed` in a checkout whose mounts had drifted rewrote the
+  // top-level `ref` and left the instance entries at the old commit, and CI,
+  // which mounts from the entries, kept testing the old layer.
+  const stale = r.lock.instances.flatMap((inst) => {
+    const m = r.lock.mounts.find((x) => x.harness === inst.via && x.repository === inst.repository);
+    return m && inst.sha !== m.ref ? [`${inst.instance} at ${inst.sha.slice(0, 12)}, pinned at ${m.ref.slice(0, 12)}`] : [];
+  });
+  if (stale.length) {
+    return {
+      state: "missing",
+      reason: `the lock's instance entries are not the pinned commits (${stale.join("; ")}) — re-pin from a checkout mounted from the lock: \`bun run cat mount:remote --seed …\` then \`bun run cat mount:remote\``,
+      outcomes: [],
+    };
   }
   // What the mount reached and did not lay down is carried in the lock, so
   // "the lock lists nothing wrong" is never mistaken for "nothing was wrong".
@@ -1824,6 +2122,9 @@ export const MOUNT_REMOTE_FLAGS: ReadonlyMap<string, "switch" | "value"> = new M
   ["--consent-by", "value"],
   ["--consent-on", "value"],
   ["--evidence", "value"],
+  ["--choose", "value"],
+  ["--directories", "value"],
+  ["--tools", "value"],
 ]);
 
 /** What is wrong with `argv`, one line each; empty when every argument is a known flag or a known flag's value. */
@@ -1864,6 +2165,24 @@ if (import.meta.main) {
     process.exit(2);
   }
   const at = argv.indexOf("--instance");
+  if (argv.includes("--choose")) {
+    const list = (flag: string): string[] | undefined => {
+      const i = argv.indexOf(flag);
+      return i >= 0 ? argv[i + 1]!.split(",").map((x) => x.trim()).filter(Boolean) : undefined;
+    };
+    try {
+      const root = at === -1 ? checkoutRootFor(process.cwd()) : resolve(argv[at + 1]!);
+      const target = parseChoose(argv[argv.indexOf("--choose") + 1]!);
+      const r = chooseRemote(root, { ...target, directories: list("--directories"), tools: list("--tools") });
+      const o = r.mount.overrides?.[target.instance ?? target.harness];
+      console.log(`✓ ${target.harness}${target.instance ? `:${target.instance}` : ""}: ${JSON.stringify(o)}`);
+      console.log(`wrote ${r.file} — run \`bun run cat mount:remote\` to mount the choice; the lock records what it resolves to`);
+      process.exit(0);
+    } catch (e) {
+      console.error(`✗ ${(e as Error).message}`);
+      process.exit(2);
+    }
+  }
   if (argv.includes("--seed")) {
     const valueOf = (flag: string): string | undefined => {
       const i = argv.indexOf(flag);
@@ -1882,7 +2201,7 @@ if (import.meta.main) {
     try {
       const specs = argv.flatMap((a, i) => (a === "--seed" ? [parseSeed(argv[i + 1] ?? "")] : [])).map((s) => ({ ...s, whole: argv.includes("--whole") }));
       const root = at === -1 ? checkoutRootFor(process.cwd()) : resolve(argv[at + 1]!);
-      const r = seedRemote(root, specs, { by, evidence, on: valueOf("--consent-on") });
+      const r = seedRemote(root, specs, { by, evidence, on: valueOf("--consent-on") }, { discardEdits: argv.includes("--fresh") });
       for (const m of r.mounts) console.log(`✓ ${m.harness} = ${m.repository}@${m.ref.slice(0, 12)}; consent by ${m.trust?.consent?.by} on ${m.trust?.consent?.on}`);
       console.log(`wrote ${r.file} — run \`bun run cat mount:remote\` to lay the bytes down`);
       process.exit(0);

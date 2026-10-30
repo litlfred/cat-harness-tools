@@ -138,14 +138,14 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSy
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { LibraryEntrySchema, LibraryIndexSchema } from "@litlfred/cat-harness/schemas/site-indexes.ts";
-import { PAYLOAD_MEDIA_TYPES, PAYLOAD_PATH, type PayloadLink } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
-import { TodoIndexSchema } from "@litlfred/cat-harness/schemas/todo-index.ts";
+import { readDeclaration, repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { LibraryEntrySchema, LibraryIndexSchema } from "@litlfred/cat-harness/schemas/ui/site-indexes.ts";
+import { PAYLOAD_MEDIA_TYPES, PAYLOAD_PATH, type PayloadLink } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.ts";
+import { TodoIndexSchema } from "@litlfred/cat-harness/schemas/sdlc/todo-index.ts";
 import { declaredBlockEdges, readBeans, resolveBeanDefs, type BeanNode } from "./beans.ts";
 import { auditPayloadTree, payloadOutDir, planPayloads, renderPayloadFiles, type PayloadEntry, type PayloadPlan } from "./gen-subgraph-jsonld.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { nodeKind } from "@litlfred/cat-harness/schemas/node-kind.ts";
+import { nodeKind } from "@litlfred/cat-harness/schemas/kg/node-kind.ts";
 import { z } from "zod";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
@@ -165,9 +165,10 @@ export const PAGE_SIZE = 4096;
  * change nobody made. The measurement in the manifest is what a person reads.
  * Raised from 5 MB to 10 MB by the owner on 2026-10-24 ("Raise to 10 MB"),
  * when the whole-repo KG slice reached 8.3 MB (issue #733). Shrinking that
- * slice is bean `0exf`.
+ * slice is bean `0exf`, and once 0exf shrank it the owner set 6 MB on
+ * 2026-10-29 (card option "B. 6 MB").
  */
-export const SIZE_BUDGET_BYTES = 10 * 1024 * 1024;
+export const SIZE_BUDGET_BYTES = 6 * 1024 * 1024;
 
 /** The repository root a source `file` is relative to. */
 export const REPO_ROOT = repoRootFor(INSTANCE_ROOT);

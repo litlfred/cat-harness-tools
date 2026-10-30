@@ -7,7 +7,7 @@
  *
  * ## Why the tag is restored rather than trusted
  *
- * A bean is a node kind (`bean/1.0.0`, `schemas/bean-graph.ts#BeanKind`)
+ * A bean is a node kind (`bean/1.0.0`, `schemas/sdlc/bean-graph.ts#BeanKind`)
  * and says so in its own front matter, as every node-kind file does. But the
  * `beans` CLI owns that front matter. `beans update` rewrites it and drops every
  * key it does not know, `$schema` included (measured 2026-10-06 on a scratch
@@ -49,9 +49,9 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { BEAN_SCHEMA_TAG, BeanKind } from "@litlfred/cat-harness/schemas/bean-graph.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { acceptsSchemaTag } from "@litlfred/cat-harness/schemas/node-kind.ts";
+import { BEAN_SCHEMA_TAG, BeanKind } from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { acceptsSchemaTag } from "@litlfred/cat-harness/schemas/kg/node-kind.ts";
 
 import { NOT_BEANS, readBeanStore } from "./bean-store-read.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";

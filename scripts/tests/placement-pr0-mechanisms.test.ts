@@ -23,7 +23,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, readDeclaration, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   checkoutDependentsOf,
   checkoutDirectories,
@@ -31,16 +31,16 @@ import {
   corpusDirectoriesForGraph,
   declarationChain,
   repositoryMirrors,
-} from "@litlfred/cat-harness/schemas/harness-config.js";
-import { readRoleGraph, type LoadedActor, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
+} from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { readRoleGraph, type LoadedActor, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import {
   checkoutActors,
   checkoutCapabilities,
   checkoutRoleGraph,
   overlayRoleGraphs,
-} from "@litlfred/cat-harness/schemas/scenario-overlay.js";
-import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tool.js";
-import { ConcernGroupsSchema } from "@litlfred/cat-harness/schemas/concern-groups.js";
+} from "@litlfred/cat-harness/schemas/process/scenario-overlay.js";
+import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tools/tool.js";
+import { ConcernGroupsSchema } from "@litlfred/cat-harness/schemas/kg/concern-groups.js";
 import { declaredGroupsIn, groupedChildrenIn, groupingKinds, resolveGroups } from "../concern-groups.js";
 import { packageDirsIn } from "../skill-topics.js";
 import { knownSkills, workflowFiles } from "../known-skills.js";

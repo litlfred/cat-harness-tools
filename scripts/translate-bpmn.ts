@@ -77,7 +77,7 @@
  * @covers processes, translation-sources
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { instanceRootsIn, localeDirIn, translationsHomeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, localeDirIn, translationsHomeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { extractBpmn, injectBpmn } from "../pipeline/bpmn-translate.js";

@@ -24,7 +24,7 @@ import {
   TermMappingSchema,
   TermMappingsFileSchema,
   normaliseLabel,
-} from "@litlfred/cat-harness/schemas/term-mapping.ts";
+} from "@litlfred/cat-harness/schemas/content/term-mapping.ts";
 
 import {
   candidates,

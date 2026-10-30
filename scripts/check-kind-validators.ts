@@ -34,22 +34,22 @@
 // kinds in a typologies/ graph, and a sweep over the code list alone stopped checking
 // every kind that moved (the FHIR IG harness's, cat-openapi's — now cat-harness/openapi/ — core's). Measured
 // 2026-10-04 while building riit; core's code-registered kinds are imported too.
-import { BASE_GRAPH_TYPOLOGIES, declaredKindNodes, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
-import { FOLIO_GRAPH_TYPOLOGY } from "@litlfred/cat-harness/schemas/folio-graph-typology.js";
-import { BLOCK_KINDS, CONTENT_ADAPTER_NODES, DISCOVERED_BLOCK_KIND_NODES } from "@litlfred/cat-harness/schemas/block-kinds.js";
-import { declaredNodeFiles } from "@litlfred/cat-harness/schemas/declared-nodes.js";
-import { allTypedBlockKinds, vocabularies as loadedVocabularies } from "@litlfred/cat-harness/schemas/vocabulary-modules.js";
+import { BASE_GRAPH_TYPOLOGIES, declaredKindNodes, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+import { FOLIO_GRAPH_TYPOLOGY } from "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
+import { BLOCK_KINDS, CONTENT_ADAPTER_NODES, DISCOVERED_BLOCK_KIND_NODES } from "@litlfred/cat-harness/schemas/content/block-kinds.js";
+import { declaredNodeFiles } from "@litlfred/cat-harness/schemas/kg/declared-nodes.js";
+import { allTypedBlockKinds, vocabularies as loadedVocabularies } from "@litlfred/cat-harness/schemas/content/vocabulary-modules.js";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { directoryEntriesForGraph, findInstanceRoot, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { familyBody, nodeFamilyTag, resolveKindValidator, resolveNodeSchemas } from "@litlfred/cat-harness/schemas/kind-validator.js";
+import { directoryEntriesForGraph, findInstanceRoot, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { familyBody, nodeFamilyTag, resolveKindValidator, resolveNodeSchemas } from "@litlfred/cat-harness/schemas/kg/kind-validator.js";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
-import { ContributionRegistry } from "@litlfred/cat-harness/schemas/contributions.js";
-import { loadContributionsSync } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { resolveSubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
+import { ContributionRegistry } from "@litlfred/cat-harness/schemas/content/contributions.js";
+import { loadContributionsSync } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { resolveSubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
 import { graphReadPath } from "./graph-read.ts";
 
 /** The INSTANCE root — this file lives at `<instance>/scripts/`. */

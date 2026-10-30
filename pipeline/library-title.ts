@@ -63,7 +63,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, extname, join } from "node:path";
 
-import { directoriesForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /** Where a manifest's title came from. Recorded as `meta.title_source`. */
 export const LIBRARY_TITLE_SOURCES = [
@@ -103,7 +103,7 @@ export interface TitleCandidates {
   editorial?: string | null;
   /** The catalogue's Dublin Core `dc.title`, via the node whose `libraryId` is the slug. */
   "dc-record"?: string | null;
-  /** `referenced.json` `identity.title`. */
+  /** `referenced.json` `identity.title`, or a recording's `recording.json` `identity.title`. */
   referenced?: string | null;
   /** `structure.json` `metadata.docinfo.Title`, on a `pdf-structure/v1` entry. */
   "pdf-info"?: string | null;
@@ -376,6 +376,14 @@ export function readTitleCandidates(
   if (refTitle) {
     candidates.referenced = refTitle;
     from.referenced = "referenced.json identity.title";
+  } else {
+    // A recording's identity is a record of the same sort (bean `1r0p`): the
+    // title as its meeting record names it, transcribed by whoever filed it.
+    const recTitle = str(obj((readJsonFile(join(dir, "recording.json")) ?? undefined)?.identity).title);
+    if (recTitle) {
+      candidates.referenced = recTitle;
+      from.referenced = "recording.json identity.title";
+    }
   }
 
   if (pre.structure) {

@@ -36,9 +36,9 @@ import {
   mintNodeId,
   typesForKind,
   BLOCK_KIND_TO_FOLIO_TYPE,
-} from "@litlfred/cat-harness/schemas/jsonld.ts";
+} from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import { isCrossPaperRef, KNOWN_LABEL_PREFIXES } from "@litlfred/cat-harness/schemas/constraints.ts";
-import { BLOCK_KINDS } from "@litlfred/cat-harness/schemas/block-kinds.ts";
+import { BLOCK_KINDS } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
 
 describe("prefix list stays in sync with constraints.ts", () => {
   test("KIND_PREFIXES mirrors KNOWN_LABEL_PREFIXES", () => {

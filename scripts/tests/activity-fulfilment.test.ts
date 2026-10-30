@@ -4,7 +4,7 @@
  * ## The question this answers, which nothing could answer before
  *
  * *"Tasks can be fulfilled by only certain actor types."* An actor is human,
- * agentic or mechanical (`schemas/skill-package.ts`), and those are not
+ * agentic or mechanical (`schemas/kg/skill-package.ts`), and those are not
  * interchangeable: an agent exercises judgement and a mechanical system runs a
  * procedure. So a step that requires a judgement cannot be handed to a build
  * pipeline, and a step that is a fixed program does not need a reader.

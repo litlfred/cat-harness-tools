@@ -12,7 +12,7 @@
     "tone": 268,
     "reads": "a wrench, in cat-harness's colour — the code that implements its tools"
   },
-  "_avatar_comment": "A wrench — what implements the harness's tool definitions. Moved here from cat-harness/schemas/avatars.ts, 2026-10-05 (bean sod4 #4): an instance declares its own mark.",
+  "_avatar_comment": "A wrench — what implements the harness's tool definitions. Moved here from cat-harness/schemas/content/avatars.ts, 2026-10-05 (bean sod4 #4): an instance declares its own mark.",
   "directories": [
     {
       "id": "cat-harness-tools-adapters",
@@ -49,7 +49,7 @@
     {
       "id": "cat-harness-tools-scripts",
       "path": "scripts/",
-      "description": "Scripts this layer runs. Holds `lib/roots.ts`, the one place that names the three roots a moved file can mean (HARNESS_ROOT, TOOLS_ROOT, REPO_ROOT), and its test; the harness's own `scripts/` arrives here batch by batch in the code move (bean `70lx`). Also the identifier lookup's pair, moved here from large-datasets when it dissolved into cat-harness (bean `j7ql`, 2026-10-01; D1: code goes to cat-harness-tools): `gen-id-lookup.ts` builds the prefix-sharded lookup over a catalogue's REFERENCED nodes for every instance that declares an `id-lookup` directory, and writes it THERE (`bun run cat id-lookup`, gated by `id-lookup:check`); `bench-id-lookup.ts` measures it at full catalogue scale on a seeded synthetic corpus (bean `4pm8`). Neither names a corpus: both read the checkout's declarations. And `extract-assets.ts`, the tool behind the harness's `asset-extraction` skill: a container's INDEX into a `folio-extraction/v1` record, moved down from `folio-assistant-core/scripts/` with its contract `cat-harness/schemas/extraction.ts` (bean `tlat`, placement PR5, owner ruling 2 of 2026-09-30).",
+      "description": "Scripts this layer runs. Holds `lib/roots.ts`, the one place that names the three roots a moved file can mean (HARNESS_ROOT, TOOLS_ROOT, REPO_ROOT), and its test; the harness's own `scripts/` arrives here batch by batch in the code move (bean `70lx`). Also the identifier lookup's pair, moved here from large-datasets when it dissolved into cat-harness (bean `j7ql`, 2026-10-01; D1: code goes to cat-harness-tools): `gen-id-lookup.ts` builds the prefix-sharded lookup over a catalogue's REFERENCED nodes for every instance that declares an `id-lookup` directory, and writes it THERE (`bun run cat id-lookup`, gated by `id-lookup:check`); `bench-id-lookup.ts` measures it at full catalogue scale on a seeded synthetic corpus (bean `4pm8`). Neither names a corpus: both read the checkout's declarations. And `extract-assets.ts`, the tool behind the harness's `asset-extraction` skill: a container's INDEX into a `folio-extraction/v1` record, moved down from `folio-assistant-core/scripts/` with its contract `cat-harness/schemas/content/extraction.ts` (bean `tlat`, placement PR5, owner ruling 2 of 2026-09-30).",
       "graphTypologies": [
         "code"
       ],
@@ -87,7 +87,7 @@
     {
       "id": "cat-harness-tools-types",
       "path": "types/",
-      "description": "Ambient type declarations for untyped dependencies: `bpmn-moddle.d.ts` and `dmn-moddle.d.ts`. This layer's `tsconfig.json` includes `types/**/*.d.ts`, and so does folio-assistant-core's (`../cat-harness-tools/types/**/*.d.ts`), so the path is a contract with a layer above and stays where it is. Declared 2026-10-24 under bean `0uu2`, where the owner ruled to keep it in place and declare it rather than fold it into `src/`.",
+      "description": "Ambient type declarations for untyped dependencies: `bpmn-moddle.d.ts` and `dmn-moddle.d.ts`. This layer's `tsconfig.json` includes `types/**/*.d.ts`, and so does the content core's (`../cat-harness-tools/types/**/*.d.ts`), so the path is a contract with a layer above and stays where it is. Declared 2026-10-24 under bean `0uu2`, where the owner ruled to keep it in place and declare it rather than fold it into `src/`.",
       "graphTypologies": [
         "code"
       ]
@@ -104,13 +104,14 @@
     {
       "id": "cat-harness-tools-python",
       "path": "python/",
-      "description": "The Python toolchain's dependency manifests: `requirements.txt` (the LEAN set CI installs, `pip install -r cat-harness-tools/python/requirements.txt` from the checkout root) and `requirements-extended.txt` (declared, deliberately not installed in CI — its cost is stated per entry). GENERATED, never hand-edited: the source is `cat-harness/schemas/python-deps.ts`, whose `requirementsPath` is the one place this location is written, and `bun run cat deps:python` writes both (`deps:python:check` fails when either is stale). Moved here from the repository root on 2026-10-06 (bean `ar1s`, phase 3: tooling leaves the root before the repo split); dependabot's pip `directory:` names this directory. `code`: a dependency manifest is the toolchain's, the same class as a `package.json`.",
+      "description": "The Python toolchain's dependency manifests: `requirements.txt` (the LEAN set CI installs, `pip install -r cat-harness-tools/python/requirements.txt` from the checkout root) and `requirements-extended.txt` (declared, deliberately not installed in CI — its cost is stated per entry). GENERATED, never hand-edited: the source is `cat-harness/schemas/sdlc/python-deps.ts`, whose `requirementsPath` is the one place this location is written, and `bun run cat deps:python` writes both (`deps:python:check` fails when either is stale). Moved here from the repository root on 2026-10-06 (bean `ar1s`, phase 3: tooling leaves the root before the repo split); dependabot's pip `directory:` names this directory. `code`: a dependency manifest is the toolchain's, the same class as a `package.json`.",
       "graphTypologies": [
         "code"
       ]
     },
     {
       "id": "cat-harness-tools-libraries",
+      "coverage": { "exempt": { "visualiser": "Owner, 2026-10-29 (cat-harness#691): no viewer by design. Each node is an outside package whose registry tarball and SPDX licence the node already links, so a viewer would only repeat the registry." } },
       "path": "libraries/",
       "title": "Software libraries",
       "description": "The outside libraries this layer's code imports: one `software-library/1.0.0` node per dependency in `package.json`, with the version and sha512 that `bun.lock` pins, the registry tarball, the SPDX licence read from the installed package, the range, whether it is a dev dependency, the files that import it (`usedBy`) and the `types/*.d.ts` shim that types it (bpmn-moddle, dmn-moddle). GENERATED, never hand-edited: `bun run cat libraries:derive` writes it and `libraries:check` fails on a stale node, an import no node names, and a shim no node names. The kind is cat-harness's (bean `jbvi`, option D: one outside-software core shared with `tool-release`); this layer keeps its own nodes because it pins its own versions.",

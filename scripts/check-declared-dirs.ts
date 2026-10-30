@@ -119,15 +119,15 @@ import { spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
-import { DEFAULT_DIRECTORIES, instanceRootsIn, nestedDirectories, readDeclaration, rootForScope } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import type { DeclarationScope } from "@litlfred/cat-harness/schemas/kg-node.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { DEFAULT_DIRECTORIES, instanceRootsIn, nestedDirectories, readDeclaration, rootForScope } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import type { DeclarationScope } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import {
   contentIsOffCheckout,
   resolveSubgraphSource,
   type ResolvedSubgraphSource,
   type SubgraphSource,
-} from "@litlfred/cat-harness/schemas/subgraph-source.js";
+} from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
 // The marker format has ONE reader, in `branch-store.ts`. This gate asking
 // `existsSync` on a path it spelled itself would be a second, and the two
 // would drift the first time the marker moved — which it already did once,
@@ -137,7 +137,7 @@ import { markerAtPath, readMarker } from "./branch-store.ts";
 // the harness alone does not know it exists and `readDeclaration` throws on a
 // perfectly valid declaration that uses it. Same import, same reason, as
 // `check-declared-assets.ts` and `kg-export.ts` carry.
-import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
+import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 
 export interface DirFinding {
   instance: string;
@@ -333,7 +333,7 @@ export function routePresence(
 
 /**
  * The directories this instance declares it BUILDS AT PUBLISH (`builtAtPublish`,
- * `schemas/built-at-publish.ts`; owner, 2026-10-14, "B1"), as absolute paths
+ * `schemas/kg/built-at-publish.ts`; owner, 2026-10-14, "B1"), as absolute paths
  * ending in the separator. A declared directory among them is never on disk in
  * a checkout that has not run `derive:publish`, and that is its correct state,
  * not an `absent` one: whether the publish step built it is

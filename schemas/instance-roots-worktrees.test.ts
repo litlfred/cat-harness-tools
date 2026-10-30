@@ -22,7 +22,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { checkoutRootFor, isForeignCheckout, instanceRootsIn, repoRootFor, rootForScope, siblingScopeFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { checkoutRootFor, isForeignCheckout, instanceRootsIn, repoRootFor, rootForScope, siblingScopeFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { checkoutHolding } from "../test/support/checkout.js";
 import { declareInstance } from "../test/support/instance-fixture.js";
 import { skillMdDirs } from "../scripts/known-skills.js";

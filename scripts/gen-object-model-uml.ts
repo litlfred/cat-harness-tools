@@ -9,7 +9,7 @@
  * from a schema, and the stereotype names which one:
  *
  * - `«json: X»` — a JSON Schema generated from the Zod schema `X` in
- *   `schemas/` (`toJsonSchema` in `schemas/to-json-schema.ts`, Zod 4's native
+ *   `schemas/` (`toJsonSchema` in `schemas/kg/to-json-schema.ts`, Zod 4's native
  *   converter — the route every generator here takes).
  * - `«ext: …»` — a schema this repository does not own: the WHO SMART DAK's
  *   own JSON Schema for User Story (read from a DAK base layer), the beans CLI's
@@ -45,21 +45,21 @@ import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import type { z } from "zod";
 
-import { toJsonSchema } from "@litlfred/cat-harness/schemas/to-json-schema.js";
+import { toJsonSchema } from "@litlfred/cat-harness/schemas/kg/to-json-schema.js";
 
-import { ActorDefSchema, RoleDefSchema } from "@litlfred/cat-harness/schemas/role-graph.js";
-import { UserStorySchema } from "@litlfred/cat-harness/schemas/user-story.js";
-import { SkillDefinitionSchema } from "@litlfred/cat-harness/schemas/skill-package.js";
-import { TaskRefSchema } from "@litlfred/cat-harness/schemas/carried-note.js";
-import { TodoNodeSchema } from "@litlfred/cat-harness/schemas/todo.js";
-import { TestRunSchema } from "@litlfred/cat-harness/schemas/test-run.js";
-import { KgQaReportSchema } from "@litlfred/cat-harness/schemas/kg-qa.js";
-import { ExternalSchemaSchema } from "@litlfred/cat-harness/schemas/external-schema.js";
-import { VoiceProfileSchema } from "@litlfred/cat-harness/schemas/voices.js";
-import { instanceDirectoryForGraph, readDeclaration, siteDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { ActorDefSchema, RoleDefSchema } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { UserStorySchema } from "@litlfred/cat-harness/schemas/process/user-story.js";
+import { SkillDefinitionSchema } from "@litlfred/cat-harness/schemas/kg/skill-package.js";
+import { TaskRefSchema } from "@litlfred/cat-harness/schemas/kg/carried-note.js";
+import { TodoNodeSchema } from "@litlfred/cat-harness/schemas/sdlc/todo.js";
+import { TestRunSchema } from "@litlfred/cat-harness/schemas/sdlc/test-run.js";
+import { KgQaReportSchema } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
+import { ExternalSchemaSchema } from "@litlfred/cat-harness/schemas/kg/external-schema.js";
+import { VoiceProfileSchema } from "@litlfred/cat-harness/schemas/content/voices.js";
+import { instanceDirectoryForGraph, readDeclaration, siteDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readUmlPalette } from "./uml-palette.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { PAGE_LOCALE, declaredPageRoute, declaredRoute } from "./viewer-declarations.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);

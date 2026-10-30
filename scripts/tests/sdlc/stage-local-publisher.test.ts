@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { ContributionRegistry } from "@litlfred/cat-harness/schemas/contributions.ts";
+import { ContributionRegistry } from "@litlfred/cat-harness/schemas/content/contributions.ts";
 
 import { callerInputs, declaredSitePublishers, detectPublisher, FOLIO_PUBLISHER, isSitePublisher, parseUses, type PublisherWorkflows } from "../../site-publisher.ts";
 import { chooseTarget, composeMain, mainCommitMessage, parseSymref, platformScript, previewCommitMessage } from "../../stage-local.ts";

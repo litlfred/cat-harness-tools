@@ -50,8 +50,8 @@
  * down in the avatar registry. `toneFrom` says which answer was used.
  *
  * Otherwise the avatar's tone, as before: inventing a palette per instance
- * would put a second colour vocabulary beside `schemas/theme.ts`, and
- * `schemas/avatars.ts` already gives every kind a **hue angle**. An instance
+ * would put a second colour vocabulary beside `schemas/ui/theme.ts`, and
+ * `schemas/content/avatars.ts` already gives every kind a **hue angle**. An instance
  * with no avatar of its own takes `GENERIC`, which is reported as a finding
  * rather than rendered as a blank.
  *
@@ -62,11 +62,11 @@
 import { existsSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { BLANK_AVATAR, GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";
-import { hexHue, resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/theme.js";
-import { PLATFORM_THEME_OWNER, themeByRef } from "@litlfred/cat-harness/schemas/theme-by-ref.js";
-import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/harness-config.js";
-import { flattenDependencies } from "@litlfred/cat-harness/schemas/dependency-order.js";
+import { BLANK_AVATAR, GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
+import { hexHue, resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
+import { PLATFORM_THEME_OWNER, themeByRef } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
+import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
 import {
   type CatHarnessDeclaration,
   type NavbarIcon,
@@ -81,9 +81,9 @@ import {
   defaultGraphTypologies,
   instanceDirectories,
   nestedDirectories,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { declaredVisualisers, existingPageDir, pageParts, withViewers } from "./viewer-declarations.js";
-import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
 import { subscribedHarnesses, subscribedTile } from "./subscribed-harnesses.js";
 import { labelVisualisations, nameInstanceRoot } from "./lib/nav-label.js";
 import type { HarnessMark } from "./lib/harness-mark.js";

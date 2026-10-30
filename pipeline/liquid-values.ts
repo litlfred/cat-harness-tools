@@ -51,7 +51,7 @@ import {
   instanceRootsIn,
   readDeclaration,
   rootForScope,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { asScalar, formatScalar, resolvePath } from "./render-value";
 import { findContentRepoRoot } from "./repo-root";
 

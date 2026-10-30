@@ -21,7 +21,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/referenced-source.ts";
+import { ReferencedSourceSchema } from "@litlfred/cat-harness/schemas/library/referenced-source.ts";
 import { checkEntry, entryKind } from "../../check-l1-complete.ts";
 
 const SCRIPT = resolve(import.meta.dir, "../../referenced-source.py");

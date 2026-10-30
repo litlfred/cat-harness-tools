@@ -92,6 +92,7 @@ cat <<'EOF'
 EOF
 
 rc=0
-printf '%s' "$input" | bun "$(dirname "${BASH_SOURCE[0]}")/ask-gate.ts" || rc=$?
+here="$(dirname "${BASH_SOURCE[0]}")"
+printf '%s' "$input" | bun "$here/ask-gate.ts" || rc=$?
 [ "$rc" -eq 2 ] && exit 2
 exit 0

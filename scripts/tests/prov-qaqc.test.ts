@@ -23,9 +23,9 @@ import {
   type Report,
 } from "../prov-qaqc.js";
 import { roleGraphFor, workflowFile } from "../known-skills.js";
-import { ProvActivitySchema } from "@litlfred/cat-harness/schemas/prov.js";
-import { actionGraph, OdrlPolicySchema, type OdrlPolicy } from "@litlfred/cat-harness/schemas/odrl.js";
-import { readPermissions, type LoadedActor } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { ProvActivitySchema } from "@litlfred/cat-harness/schemas/content/prov.js";
+import { actionGraph, OdrlPolicySchema, type OdrlPolicy } from "@litlfred/cat-harness/schemas/content/odrl.js";
+import { readPermissions, type LoadedActor } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import type { AccessContext } from "../../src/core/access.js";
 import type { HistoryEntry } from "../../src/workflow/instance.js";
 import { loadProcessModel } from "../../src/workflow/process-model.js";

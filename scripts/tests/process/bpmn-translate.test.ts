@@ -1,7 +1,7 @@
 /**
  * BPMN label extraction and injection.
  *
- * The `bpmn` format was declared in schemas/translation-tools.ts with no
+ * The `bpmn` format was declared in schemas/library/translation-tools.ts with no
  * extractModule, no injectModule and no code — so these tests pin the
  * behaviour the declaration implied, and in particular the things a
  * translation pass must NOT touch. Translating an id disconnects the graph;
@@ -69,8 +69,9 @@ describe("injectBpmn", () => {
     expect(out).toContain('<bootstrap.processes:skill ref="crdm-detect"/>');
 
     // A bean operation is structure too, and this diagram's are in its phases.
+    // The phase's own op is a `note`: its claim is bean-open.bpmn's (bean m8gz).
     const phase = injectBpmn(PHASE_XML, new Map([["Agent", "Agent (fr)"]]));
-    expect(phase).toContain('<cat-harness.processes:bean op="claim"/>');
+    expect(phase).toContain('<cat-harness.processes:bean op="note"/>');
   });
 
   test("an untranslated msgid keeps its source text", () => {

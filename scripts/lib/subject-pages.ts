@@ -12,15 +12,18 @@
  *
  * A link is answered ONLY where a page is written: the host's document and
  * every instance `instance-exports.ts` exports that mints against this site
- * (not its own `canonicalUrl`). bootstrap's graph is still
+ * (not its own `canonicalUrl`), and — since the owner's 2026-10-29 choice
+ * on litlfred/cat-harness-tools#638 (option B) — the COPY this site publishes
+ * of an own-canonical instance's subjects, `owl:sameAs` the canonical IRI.
+ * bootstrap's graph is still
  * bootstrap-tools' `export-graph.ts`, which mints fragments until its own
  * phase of #603, so its subjects get `undefined` and the caller keeps the
  * link it had — never a slash path nothing serves.
  */
 import { resolve } from "node:path";
-import { findInstanceRoot, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { findInstanceRoot, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { makeIri, publishedIdentity } from "../kg-export.js";
-import { declaresOwnCanonical, publishesInstanceSchema } from "../instance-exports.js";
+import { declaresOwnCanonical, instanceDocPath, publishesInstanceSchema } from "../instance-exports.js";
 import { HARNESS_ROOT } from "./roots.ts";
 
 const docIris = new Map<string, string | undefined>();
@@ -32,13 +35,17 @@ function servingDocIri(instanceRoot: string): string | undefined {
     let doc: string | undefined;
     try {
       const host = key === resolve(HARNESS_ROOT);
-      // An instance minting against its OWN `canonicalUrl` (e.g. one whose canonical is
-      // `http://smart.who.int/base`) gets its pages written on THIS site
-      // under `<name>/`, at a path its IRIs do not name — so a link to its
-      // IRI would leave the site for a host that serves nothing. It keeps
-      // the link it had until that is settled (#603, reported).
-      if (host || (publishesInstanceSchema(key) && !declaresOwnCanonical(readDeclaration(key)))) {
+      const decl = readDeclaration(key);
+      if (host || (publishesInstanceSchema(key) && !declaresOwnCanonical(decl))) {
         doc = publishedIdentity(key).docIri;
+      } else if (publishesInstanceSchema(key) && decl !== undefined) {
+        // An instance minting against its OWN `canonicalUrl` (e.g.
+        // `http://smart.who.int/base`), which serves nothing yet: link the
+        // copy `instance-exports` publishes on THIS site under `<name>/`
+        // (#638 option B), never the canonical IRI.
+        const stub = publishedIdentity(key).docPath.replace(/\.jsonld$/, "").split("/").pop()!;
+        const siteBase = publishedIdentity(resolve(HARNESS_ROOT)).base;
+        if (/^https?:\/\//.test(siteBase)) doc = `${siteBase}/${instanceDocPath({ name: decl.name, stub })}`;
       }
     } catch {
       doc = undefined;

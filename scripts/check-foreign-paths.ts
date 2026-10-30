@@ -52,7 +52,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, normalize, relative, resolve, sep } from "node:path";
 
-import { instanceRootsIn, readDeclaration, resolveDirectories, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { instanceRootsIn, readDeclaration, resolveDirectories, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   LITERAL,
   firstLiteralIn,
@@ -63,7 +63,7 @@ import {
   stripComments,
 } from "./check-declared-paths.js";
 import { TOOLS_ROOT } from "./lib/roots.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
 
 export const BASELINE_PATH = resolve(TOOLS_ROOT, "scripts", "foreign-path-baseline.json");
 

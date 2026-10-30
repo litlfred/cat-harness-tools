@@ -47,11 +47,11 @@ import { join } from "node:path";
 
 import { MOUNT_MARKER_SCHEMA, markerPath } from "../../branch-store.ts";
 
-import { ContentDirectorySchema, DirectoryStorageSchema, materialiseDirectories, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { ContentDirectorySchema, DirectoryStorageSchema, materialiseDirectories, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { censusDirectories } from "../../audit-coverage.js";
 import { auditInstance } from "../../check-declared-dirs.ts";
 import { graphReadPath } from "../../graph-read.js";
-import { resolveSubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.js";
+import { resolveSubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
 import { QaUsageError, resolveQaLocation } from "../../qa-store.js";
 
 const made: string[] = [];

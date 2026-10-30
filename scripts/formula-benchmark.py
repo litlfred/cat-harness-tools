@@ -18,9 +18,35 @@ Each formula is canonicalised, then looked for in the canonicalised section:
    (Sellers' algorithm: free start and end in the text), divided by the
    formula's length. Below `--threshold` it counts as found.
 
-The paper does not publish its threshold; 0.2 is ours and is a flag. Their
-third stage, an LLM judge of semantic equivalence, is not run here: it needs a
-model at run time, and the two string stages are what it was checking anyway.
+The paper does not publish its threshold; 0.2 is ours and is a flag.
+
+## Stage 3 — the judge, read as data (cat-harness-tools#130)
+
+The paper's third stage, an LLM judge of semantic equivalence, is the one it
+validates against people (r = 0.78 with human ratings, against 0.34 for
+character-level CDM). It needs a model, so this script never runs one: CI
+stays model-free. The verdicts are DATA, the way image narratives are read
+from `image-verdicts.json`:
+
+- `<library>/formula-verdicts.json` (`formula-verdicts/v1`, or `--verdicts`)
+  holds one verdict per (entry, section, formula): `equivalent`,
+  `not-equivalent` or `undetermined`, with `judged_by` naming the model.
+  Each records `text_sha256`, the sha256 of the canonical section text the
+  judge was shown. When the text has changed since, the verdict is STALE: it
+  is counted as stale and never used.
+- `--judge-queue FILE` writes the pairs that still need a verdict (stage 2
+  `fuzzy` or `missed`, no current verdict), each with the formula, the
+  section text and its `text_sha256`, so an agent can judge them offline and
+  append to the verdicts file.
+- The judge figures are reported beside the string figures, never in place
+  of them. `recall_judged` is over judged formulas only, and `coverage` says
+  how many that is. `recall_combined` counts a formula found when stage 1 or 2
+  found it or the judge said `equivalent`. An unjudged miss stays a miss, so
+  this is still a lower bound.
+- **Calibration first.** The paper's r = 0.78 is on its own synthetic set,
+  not on a library. `--held-set FILE` (`formula-judge-held-set/v1`: pairs with
+  a known `truth` and the judge's `verdict`) scores the judge against ground
+  truth. Without it, every judge figure carries `calibrated: false`.
 
 Canonical form: a small table maps common commands to the characters a PDF
 text layer prints (`\\phi` → φ, `\\to` → →, `\\mathbb{R}` → R), then
@@ -41,6 +67,8 @@ Metrics per section and per entry (micro over formulas):
   recall_exact   share of formulas found by stage 1
   recall         share found by stage 1 or 2
   mean_distance  mean normalised distance over all formulas (0 for exact)
+  judge          present only when a verdicts file is read:
+                 judged, stale, coverage, recall_judged, recall_combined
 
 Output is a report, not KG content: it is written to
 `build/benchmarks/formula-benchmark.json` unless `--json` says otherwise, and a
@@ -48,6 +76,8 @@ path inside a declared graph directory is refused (`_benchmark_guard.py`).
 
 Usage:
   python3 scripts/formula-benchmark.py library/arxiv-0705.1468v1
+  python3 scripts/formula-benchmark.py library/arxiv-* --judge-queue build/benchmarks/judge-queue.json
+  python3 scripts/formula-benchmark.py library/arxiv-* --verdicts library/formula-verdicts.json --held-set held.json
   python3 scripts/formula-benchmark.py library/arxiv-* --json build/benchmarks/formula.json
   python3 scripts/formula-benchmark.py ENTRY --source e-print.tgz --threshold 0.15
 
@@ -58,6 +88,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import hashlib
 import importlib.util
 import json
 import os
@@ -75,6 +106,11 @@ sys.modules["latex_math_overlay"] = ovl  # its dataclasses look themselves up he
 _spec.loader.exec_module(ovl)
 
 SCHEMA = "formula-benchmark/v1"
+VERDICTS_SCHEMA = "formula-verdicts/v1"
+QUEUE_SCHEMA = "formula-judge-queue/v1"
+HELD_SET_SCHEMA = "formula-judge-held-set/v1"
+VERDICTS_FILE = "formula-verdicts.json"
+VERDICTS = ("equivalent", "not-equivalent", "undetermined")
 THRESHOLD = 0.2
 MIN_LEN = 2  # a canonical formula shorter than this ("x") is found anywhere
 
@@ -151,20 +187,109 @@ def score(formula: str, text_canon: str, threshold: float) -> dict:
     return {"formula": formula, "stage": "fuzzy" if d <= threshold else "missed", "distance": round(d, 3)}
 
 
+def sha256_text(s: str) -> str:
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+
+def judge_summary(scored: list[dict]) -> dict | None:
+    """Stage 3 over rows that carry a `judge` field; None when no verdicts were read."""
+    if not any("judge" in r for r in scored):
+        return None
+    n = len(scored)
+    judged = [r for r in scored if r.get("judge", {}).get("verdict") in ("equivalent", "not-equivalent")]
+    stale = sum(r.get("judge", {}).get("state") == "stale" for r in scored)
+    eq = [r for r in judged if r["judge"]["verdict"] == "equivalent"]
+    found = sum(r["stage"] in ("exact", "fuzzy") or r.get("judge", {}).get("verdict") == "equivalent" for r in scored)
+    return {
+        "judged": len(judged),
+        "stale": stale,
+        "coverage": round(len(judged) / n, 3),
+        "recall_judged": round(len(eq) / len(judged), 3) if judged else None,
+        "recall_combined": round(found / n, 3),
+    }
+
+
 def summarise(rows: list[dict]) -> dict:
     scored = [r for r in rows if r["stage"] != "too-short"]
     if not scored:
         return {"formulas": 0}
     n = len(scored)
-    return {
+    out = {
         "formulas": n,
         "recall_exact": round(sum(r["stage"] == "exact" for r in scored) / n, 3),
         "recall": round(sum(r["stage"] in ("exact", "fuzzy") for r in scored) / n, 3),
         "mean_distance": round(sum(r["distance"] for r in scored) / n, 3),
     }
+    j = judge_summary(scored)
+    if j is not None:
+        out["judge"] = j
+    return out
 
 
-def bench_entry(entry: str, source: str | None, threshold: float, library: str | None = None) -> dict:
+def read_verdicts(path: str) -> dict:
+    """{(entry slug, section id, formula): verdict row} from a formula-verdicts/v1 file."""
+    with open(path, encoding="utf-8") as fh:
+        doc = json.load(fh)
+    if doc.get("$schema") != VERDICTS_SCHEMA:
+        raise ValueError(f"{path}: expected $schema {VERDICTS_SCHEMA!r}, got {doc.get('$schema')!r}")
+    out: dict = {}
+    for i, v in enumerate(doc.get("verdicts", [])):
+        missing = [k for k in ("entry", "section", "formula", "text_sha256", "verdict", "judged_by") if not v.get(k)]
+        if missing:
+            raise ValueError(f"{path}: verdicts[{i}] lacks {', '.join(missing)}")
+        if v["verdict"] not in VERDICTS:
+            raise ValueError(f"{path}: verdicts[{i}] verdict {v['verdict']!r} is not one of {', '.join(VERDICTS)}")
+        if not (isinstance(v["judged_by"], dict) and v["judged_by"].get("model")):
+            raise ValueError(f"{path}: verdicts[{i}] judged_by must name the model that gave the verdict")
+        key = (v["entry"], v["section"], v["formula"])
+        if key in out:
+            raise ValueError(f"{path}: verdicts[{i}] repeats ({v['entry']}, {v['section']}, a formula already judged)")
+        out[key] = v
+    return out
+
+
+def attach_verdicts(slug: str, section: str, text_canon: str, rows: list[dict], verdicts: dict) -> None:
+    """Give each row its judge verdict: current, stale (text changed) or none."""
+    sha = sha256_text(text_canon)
+    for r in rows:
+        if r["stage"] == "too-short":
+            continue
+        v = verdicts.get((slug, section, r["formula"]))
+        if v is None:
+            r["judge"] = {"state": "none"}
+        elif v["text_sha256"] != sha:
+            r["judge"] = {"state": "stale"}
+        else:
+            r["judge"] = {"state": "current", "verdict": v["verdict"], "model": v["judged_by"]["model"]}
+
+
+def score_held_set(path: str) -> dict:
+    """The judge against ground truth: agreement, and precision/recall for `equivalent`."""
+    with open(path, encoding="utf-8") as fh:
+        doc = json.load(fh)
+    if doc.get("$schema") != HELD_SET_SCHEMA:
+        raise ValueError(f"{path}: expected $schema {HELD_SET_SCHEMA!r}, got {doc.get('$schema')!r}")
+    pairs = doc.get("pairs", [])
+    rated = [p for p in pairs if isinstance(p.get("truth"), bool) and p.get("verdict") in ("equivalent", "not-equivalent")]
+    if not rated:
+        raise ValueError(f"{path}: no pair has both a boolean truth and an equivalent/not-equivalent verdict")
+    tp = sum(p["truth"] and p["verdict"] == "equivalent" for p in rated)
+    fp = sum(not p["truth"] and p["verdict"] == "equivalent" for p in rated)
+    fn = sum(p["truth"] and p["verdict"] == "not-equivalent" for p in rated)
+    agree = sum(p["truth"] == (p["verdict"] == "equivalent") for p in rated)
+    return {
+        "held_set": path,
+        "pairs": len(pairs),
+        "rated": len(rated),
+        "agreement": round(agree / len(rated), 3),
+        "precision": round(tp / (tp + fp), 3) if tp + fp else None,
+        "recall": round(tp / (tp + fn), 3) if tp + fn else None,
+        "models": sorted({p["judged_by"]["model"] for p in rated if isinstance(p.get("judged_by"), dict) and p["judged_by"].get("model")}),
+    }
+
+
+def bench_entry(entry: str, source: str | None, threshold: float, library: str | None = None,
+                verdicts: dict | None = None, queue: list | None = None) -> dict:
     rep: dict = {"entry": entry, "status": "skipped", "reason": "", "sections": []}
     spath = os.path.join(entry, "structure.json")
     if not os.path.exists(spath):
@@ -216,6 +341,15 @@ def bench_entry(entry: str, source: str | None, threshold: float, library: str |
             continue
         text_canon = canon(text)
         rows = [score(f, text_canon, threshold) for f in fs]
+        slug = os.path.basename(entry.rstrip("/"))
+        if verdicts is not None:
+            attach_verdicts(slug, s["id"], text_canon, rows, verdicts)
+        if queue is not None:
+            sha = sha256_text(text_canon)
+            for r in rows:
+                if r["stage"] in ("fuzzy", "missed") and r.get("judge", {}).get("state") != "current":
+                    queue.append({"entry": slug, "section": s["id"], "formula": r["formula"],
+                                  "text_sha256": sha, "text": text})
         row.update({"result": "scored", **summarise(rows), "matches": rows})
         every += rows
 
@@ -225,12 +359,22 @@ def bench_entry(entry: str, source: str | None, threshold: float, library: str |
     return rep
 
 
-def _bench_worker(item: tuple[str, str | None, float, str | None]) -> dict:
-    e, source, threshold, library = item
+def _bench_worker(item: tuple) -> tuple[dict, list]:
+    e, source, threshold, library, verdicts, want_queue = item
+    queue: list | None = [] if want_queue else None
     try:
-        return bench_entry(e.rstrip("/"), source, threshold, library)
+        return bench_entry(e.rstrip("/"), source, threshold, library, verdicts, queue), queue or []
     except Exception as exc:  # one bad bundle must not stop a library run
-        return {"entry": e, "status": "failed", "reason": f"{type(exc).__name__}: {exc}", "sections": []}
+        return {"entry": e, "status": "failed", "reason": f"{type(exc).__name__}: {exc}", "sections": []}, []
+
+
+def default_verdicts(entries: list[str], library: str | None) -> str | None:
+    """`<library>/formula-verdicts.json` when every entry sits in one library that has one."""
+    libs = {library} if library else {os.path.dirname(os.path.abspath(e.rstrip("/"))) for e in entries}
+    if len(libs) != 1:
+        return None
+    p = os.path.join(next(iter(libs)), VERDICTS_FILE)
+    return p if os.path.exists(p) else None
 
 
 def main() -> int:
@@ -243,19 +387,30 @@ def main() -> int:
                     help="write the full report here (default: build/benchmarks/formula-benchmark.json; never a graph directory)")
     ap.add_argument("--stdout-json", action="store_true", help="print the report as JSON instead of a table")
     ap.add_argument("--jobs", "-j", type=int, default=1, help="worker processes (default 1)")
+    ap.add_argument("--verdicts", help=f"stage-3 judge verdicts ({VERDICTS_SCHEMA}); default <library>/{VERDICTS_FILE} when present")
+    ap.add_argument("--judge-queue", help="write the pairs still needing a verdict here (never a graph directory)")
+    ap.add_argument("--held-set", help=f"score the judge against ground truth first ({HELD_SET_SCHEMA})")
     args = ap.parse_args()
     if args.source and len(args.entries) > 1:
         ap.error("--source names one entry's source; give one entry")
     if args.json:
         assert_not_declared_graph_path(args.json, os.getcwd())
+    if args.judge_queue:
+        assert_not_declared_graph_path(args.judge_queue, os.getcwd())
 
-    items = [(e, args.source, args.threshold, args.library) for e in args.entries]
+    vpath = args.verdicts or default_verdicts(args.entries, args.library)
+    verdicts = read_verdicts(vpath) if vpath else None
+    calibration = score_held_set(args.held_set) if args.held_set else None
+
+    items = [(e, args.source, args.threshold, args.library, verdicts, bool(args.judge_queue)) for e in args.entries]
     if args.jobs > 1:
         from concurrent.futures import ProcessPoolExecutor
         with ProcessPoolExecutor(max_workers=args.jobs) as ex:
-            reports = list(ex.map(_bench_worker, items))
+            results = list(ex.map(_bench_worker, items))
     else:
-        reports = [_bench_worker(it) for it in items]
+        results = [_bench_worker(it) for it in items]
+    reports = [r for r, _ in results]
+    queue = [q for _, qs in results for q in qs]
 
     scored = [r for r in reports if r["status"] == "scored" and r.get("formulas")]
     n = sum(r["formulas"] for r in scored)
@@ -266,7 +421,18 @@ def main() -> int:
         "recall": round(sum(r["recall"] * r["formulas"] for r in scored) / n, 3) if n else None,
         "mean_distance": round(sum(r["mean_distance"] * r["formulas"] for r in scored) / n, 3) if n else None,
     }
+    if verdicts is not None:
+        rows = [m for r in scored for sec in r["sections"] for m in sec.get("matches", []) if m["stage"] != "too-short"]
+        j = judge_summary(rows) or {"judged": 0, "stale": 0, "coverage": 0.0, "recall_judged": None, "recall_combined": overall["recall"]}
+        overall["judge"] = {"verdicts": vpath, **j, "calibrated": calibration is not None,
+                            **({"calibration": calibration} if calibration else {})}
+    elif calibration is not None:
+        overall["judge"] = {"verdicts": None, "calibrated": True, "calibration": calibration}
     out = {**overall, "reports": reports}
+    if args.judge_queue:
+        os.makedirs(os.path.dirname(os.path.abspath(args.judge_queue)), exist_ok=True)
+        with open(args.judge_queue, "w", encoding="utf-8") as fh:
+            json.dump({"$schema": QUEUE_SCHEMA, "verdicts_schema": VERDICTS_SCHEMA, "pairs": queue}, fh, indent=1, ensure_ascii=False)
     if args.json:
         os.makedirs(os.path.dirname(os.path.abspath(args.json)), exist_ok=True)
         with open(args.json, "w") as fh:
@@ -280,6 +446,14 @@ def main() -> int:
         if n:
             print(f"\n{n} formulas in {len(scored)} entries: recall {overall['recall']}, "
                   f"exact {overall['recall_exact']}, mean distance {overall['mean_distance']}", file=sys.stderr)
+    j = overall.get("judge")
+    if j and "judged" in j:
+        print(f"judge: {j['judged']} judged ({j['coverage']} coverage, {j['stale']} stale), "
+              f"recall_judged {j['recall_judged']}, recall_combined {j['recall_combined']}"
+              + ("" if j["calibrated"] else " — UNCALIBRATED: score a held set (--held-set) before citing these"),
+              file=sys.stderr)
+    if args.judge_queue:
+        print(f"judge queue: {len(queue)} pair(s) -> {args.judge_queue}", file=sys.stderr)
     return 1 if any(r["status"] == "failed" for r in reports) else 0
 
 

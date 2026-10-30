@@ -22,7 +22,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { layerArgError } from "../../ns-export.js";
-import { TERM_LAYERS } from "@litlfred/cat-harness/schemas/vocabulary.js";
+import { TERM_LAYERS } from "@litlfred/cat-harness/schemas/content/vocabulary.js";
 
 describe("--layer accepts exactly the declared layers", () => {
   test("every declared layer is accepted", () => {

@@ -7,7 +7,7 @@
  * @covers software-library — it derives every node of each declared `libraries/` directory, vendored bundles included, and fails on a stale node, an import no node names, a shim no node names, and a vendored bundle whose bytes or manifest it cannot vouch for
  *
  * Option D of bean `jbvi` (owner, 2026-10-24 08:25Z, "D. Shared core"). The
- * kind is cat-harness's (`schemas/software-library.ts`, a node kind on the
+ * kind is cat-harness's (`schemas/library/software-library.ts`, a node kind on the
  * `outside-software` core it shares with `tool-release`); this is its writer
  * and its gate.
  *
@@ -93,8 +93,8 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
 
-import { defaultGraphTypologies, ownDirectories } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { defaultGraphTypologies, ownDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 import {
   LIBRARY_FILE_SUFFIX,
   SoftwareLibrarySchema,
@@ -103,9 +103,9 @@ import {
   librarySchemaTag,
   vendoredLibraryFileName,
   type SoftwareLibrary,
-} from "@litlfred/cat-harness/schemas/software-library.ts";
-import { parseOutsideSoftwareRef } from "@litlfred/cat-harness/schemas/outside-software.ts";
-import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";
+} from "@litlfred/cat-harness/schemas/library/software-library.ts";
+import { parseOutsideSoftwareRef } from "@litlfred/cat-harness/schemas/library/outside-software.ts";
+import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/library/spdx-license-expression.ts";
 
 /** The graph typology a `libraries/` directory is declared with. */
 export const LIBRARY_KIND = "software-library";
@@ -277,14 +277,41 @@ export function installedManifest(from: string, name: string): { path: string; m
 }
 
 /** Every directory under `root` the import walk enters, layer-relative and POSIX (`""` for the root). */
+/** The lockfiles that make a directory with a package.json its own package. */
+const NESTED_LOCKFILES = ["bun.lock", "bun.lockb", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"];
+
+/**
+ * Is `file` an instance declaration, rather than another JSON named like one?
+ * A file that names a `$schema` other than `cat-harness-declaration/…` is not
+ * (a concern-groups file); one naming none still is (bootstrap's declarations
+ * carry no `$schema`).
+ */
+function isInstanceDeclarationFile(file: string): boolean {
+  if (!existsSync(file)) return false;
+  try {
+    const schema = (JSON.parse(readFileSync(file, "utf-8")) as { $schema?: unknown }).$schema;
+    return typeof schema !== "string" || schema.startsWith("cat-harness-declaration");
+  } catch {
+    // Unreadable: keep the old reading, so a broken declaration still bounds the walk.
+    return true;
+  }
+}
+
 function walkDirs(root: string, visit: (rel: string, abs: string) => boolean | void): void {
   const walk = (dir: string): void => {
     if (visit(relative(root, dir).split(sep).join("/"), dir) === false) return;
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       if (!e.isDirectory() || e.name.startsWith(".") || SKIP_DIRS.has(e.name)) continue;
       const p = join(dir, e.name);
-      // Another instance nested inside this one is its own layer.
-      if (existsSync(join(p, `${e.name}.json`)) && existsSync(join(p, "package.json"))) continue;
+      // Another instance nested inside this one is its own layer. Its
+      // `<name>.json` must BE an instance declaration: a grouped graph's
+      // from-within file has the same shape of name (`schemas/schemas.json`,
+      // `concern-groups/v1`, bean `f8wp`) and its directory is still ours.
+      if (isInstanceDeclarationFile(join(p, `${e.name}.json`)) && existsSync(join(p, "package.json"))) continue;
+      // So is a nested package with its own lockfile (cat-harness's
+      // `schemas/block-qa-schema`): it pins its own dependencies, and its
+      // imports are judged against its own package.json, not the layer's.
+      if (existsSync(join(p, "package.json")) && NESTED_LOCKFILES.some((f) => existsSync(join(p, f)))) continue;
       walk(p);
     }
   };

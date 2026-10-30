@@ -253,7 +253,7 @@ def extract_lines(path: str, backend: str = "auto") -> list[Line]:
 # ---------------------------------------------------------------- helpers
 
 RE_NUM = re.compile(
-    r"^(?:(?:chapter|section|part|annex|appendix)\s+)?"
+    r"^(?:(?P<prefix>chapter|section|part|annex|appendix)\s+)?"
     r"(?P<num>\d{1,2}(?:\.\d{1,2}){0,4}|[IVX]{1,5}|[A-Z](?:\.\d{1,2}){0,3})"
     r"(?:[.:)]|\s)\s*(?P<title>\S.*)$",
     re.I,
@@ -295,6 +295,14 @@ def split_number(text: str) -> tuple[str | None, str]:
             return None, text
     if re.fullmatch(r"[IVX]+", num, re.I) and not re.match(r"^[IVX]+[.:)]", text, re.I):
         return None, text
+    # An annex or appendix is a numbering series of its own. Dropping the word
+    # made "Annex 1" and chapter "1" the same number, so annexes collided with
+    # chapters (folio-assistant#2302, measured on LNOB and DDCC:VS). The word is
+    # kept, capitalised, for those two only: "Chapter 1" and "Section 1" are
+    # the main series and stay "1".
+    prefix = (m.group("prefix") or "").lower()
+    if prefix in ("annex", "appendix"):
+        num = f"{prefix.capitalize()} {num}"
     return num, title
 
 
@@ -304,6 +312,8 @@ def _depth(num: str | None) -> int | None:
     under "II") so it states nothing and the style decides."""
     if not num:
         return None
+    # "Annex 2" and "Appendix B.1" state their depth after the word.
+    num = re.sub(r"^(?:annex|appendix)\s+", "", num, flags=re.I)
     if re.fullmatch(r"[IVX]+", num, re.I):
         return 1
     if re.fullmatch(r"[A-Z]", num, re.I):

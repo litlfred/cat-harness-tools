@@ -5,7 +5,7 @@
  * Bean `7wou`, under `5yhm`. The check the owner asked for on 2026-09-29:
  * *"extracting exsiting glossary needs compaision to existing
  * termonology/coding."* The contract, the three states and why `exact` and
- * `concept` are a pair are in `schemas/term-mapping.ts` and are not restated
+ * `concept` are a pair are in `schemas/content/term-mapping.ts` and are not restated
  * here. Three things decide what the code below does:
  *
  *   * TWO TARGETS, NEVER MERGED. `skos` is authoritative for meaning, `fhir`
@@ -15,10 +15,17 @@
  *     one and unmapped in the other without contradiction.
  *
  *   * A RESOLVER THAT CANNOT BE REACHED RETURNS `undetermined`, WITH ITS
- *     REASON — never `unmapped`. In this checkout that is not hypothetical:
- *     the network policy refuses `api.openconceptlab.org:443`, so every
- *     `fhir` row is undetermined and says so, while `skos` resolves locally
- *     and returns real verdicts.
+ *     REASON — never `unmapped`. Before `who-smart-base@v1.0.0` was pinned
+ *     (2026-09-30, bean `ejug`), cloud sessions were refused
+ *     `api.openconceptlab.org:443` by proxy policy (`403 to CONNECT`), and a
+ *     direct connected-agent probe on 2026-10-24 (`q7ds`) confirmed that
+ *     `api.openconceptlab.org` (`v2.3.234-3e606025`) itself refuses anonymous
+ *     reads with HTTP 403 (`"Authentication required. Anonymous API access is
+ *     disabled."`). With `who-smart-base@v1.0.0` snapshotted offline in
+ *     `cat-harness/external-schemas/who-smart-base.terminology.json` (12 code
+ *     systems, 585 concepts), both `skos` and `fhir` resolve locally and return
+ *     determined verdicts (`0 undetermined`), while an absent or unusable
+ *     snapshot still returns `undetermined` with its reason.
  *
  *   * IT REPORTS AND NEVER GRADES. No ratio, no threshold, no exit code that
  *     depends on how many mapped. An unmapped candidate may be a term this
@@ -35,8 +42,8 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-import { instanceDirectoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { instanceDirectoriesForGraph, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 
 import { instanceRoots, schemeOwner } from "./lib/scheme-owner.ts";
 
@@ -48,18 +55,18 @@ import {
   type TermMapping,
   TermMappingsFileSchema,
   normaliseLabel,
-} from "@litlfred/cat-harness/schemas/term-mapping.ts";
-import { PinnedTerminologySchema } from "@litlfred/cat-harness/schemas/pinned-terminology.ts";
+} from "@litlfred/cat-harness/schemas/content/term-mapping.ts";
+import { PinnedTerminologySchema } from "@litlfred/cat-harness/schemas/content/pinned-terminology.ts";
 import {
   TERM_ADJUDICATIONS_SUFFIX,
   TermAdjudicationsFileSchema,
   adjudicationStatus,
   type AdjudicationStatus,
-} from "@litlfred/cat-harness/schemas/term-adjudication.ts";
+} from "@litlfred/cat-harness/schemas/content/term-adjudication.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult } from "./qa-results.ts";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { dirname } from "node:path";
 
 const ROOT = resolve(dirname(HARNESS_ROOT));
@@ -523,10 +530,24 @@ export type TermStateAnswer =
 
 export function termState(
   states: readonly SchemeState[],
-  key: { instance: string; scheme: string },
+  key: { instance: string; scheme: string } | string,
   target: string,
   term: string,
 ): TermStateAnswer {
+  if (typeof key === "string") {
+    const scheme = key;
+    const rows = states.filter((s) => s.scheme === scheme && s.target === target);
+    const which = `scheme \`${scheme}\``;
+    if (rows.length === 0) return { state: "unknown", why: `no row for ${which} on \`${target}\`` };
+    const hits = rows.flatMap((r) => r.mappedTerms.filter((m) => m.term === term));
+    if (hits.length > 1) return { state: "unknown", why: `${hits.length} rows match \`${term}\` in ${which} on \`${target}\`` };
+    if (hits.length === 1) return { state: "mapped", exact: hits[0]!.exact, concepts: hits[0]!.concepts };
+    const reason = rows.find((r) => r.reason)?.reason;
+    const undetermined = (): TermStateAnswer => ({ state: "undetermined", ...(reason ? { reason } : {}) });
+    if (rows.every((r) => r.undetermined === 0)) return { state: "unmapped" };
+    if (rows.every((r) => r.unmapped === 0)) return undetermined();
+    return { state: "unknown", why: `${which} on \`${target}\` mixes unmapped and undetermined terms` };
+  }
   const { instance, scheme } = key;
   const rows = states.filter((s) => s.instance === instance && s.scheme === scheme && s.target === target);
   const which = `scheme \`${scheme}\` of \`${instance}\``;

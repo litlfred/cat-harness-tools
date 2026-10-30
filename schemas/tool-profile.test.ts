@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 
-import { TOOL_PROFILE_SCHEMA_TAG, ToolProfileSchema, toolReleaseGraphProblems, type ToolProfile } from "@litlfred/cat-harness/schemas/tool-profile.ts";
-import { TOOL_RELEASE_SCHEMA_TAG, ToolReleaseSchema, type ToolRelease } from "@litlfred/cat-harness/schemas/tool-release.ts";
+import { TOOL_PROFILE_SCHEMA_TAG, ToolProfileSchema, toolReleaseGraphProblems, type ToolProfile } from "@litlfred/cat-harness/schemas/tools/tool-profile.ts";
+import { TOOL_RELEASE_SCHEMA_TAG, ToolReleaseSchema, type ToolRelease } from "@litlfred/cat-harness/schemas/tools/tool-release.ts";
 import { loadToolReleases } from "../scripts/tool-releases";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { dirname } from "node:path";

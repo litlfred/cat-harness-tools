@@ -6,7 +6,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 
-import type { KgQaReport } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import type { KgQaReport } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 
 /**
  * `r`, carrying forward the `adversarial_reviews` the sidecar at `path`

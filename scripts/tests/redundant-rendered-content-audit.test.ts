@@ -20,7 +20,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { auditRenderedBloat, classifyCandidate, extractHtmlBlocks, CRITERION_ID } from "../audit-rendered-bloat.js";
-import { KgQaReportSchema, KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import { KgQaReportSchema, KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 
 describe("redundant-rendered-content-audit registration", () => {
   test("criterion is registered in KG_CRITERIA_BY_ID with expected properties", () => {
@@ -344,7 +344,7 @@ describe("auditRenderedBloat end-to-end with fixtures", () => {
     expect(kgCandidate!.reason).toContain("sample-spec.json");
   });
 
-  test("sidecar output conforms to schemas/kg-qa.ts when all candidates are keep_serverside (pass)", () => {
+  test("sidecar output conforms to schemas/sdlc/kg-qa.ts when all candidates are keep_serverside (pass)", () => {
     // Page with navigation repeated across pages, but no heavy data tables
     const navBlock = `<nav class="site-navbar"><ul><li><a href="/">Home</a></li><li><a href="/about">About</a></li></ul></nav>`;
     const pageA = `<!DOCTYPE html><html><body>${navBlock}<h1>Hello A</h1></body></html>`;

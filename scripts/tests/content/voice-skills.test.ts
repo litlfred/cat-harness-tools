@@ -1,5 +1,5 @@
 /**
- * `check:voice-skills` — the gate `schemas/voice-skill.ts` promised.
+ * `check:voice-skills` — the gate `schemas/content/voice-skill.ts` promised.
  *
  * Bean `n8br`. The doc comment said "`check:voice-skills` enforces it" from the
  * day it was written, and four `SKILL.md` files repeat the claim in their own
@@ -17,7 +17,7 @@ import { dirname, join } from "node:path";
 
 import { checkVoiceSkills, restatements } from "../../check-voice-skills.ts";
 import { readVoicesGraph } from "../../voices-graph.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 const REPO = repoRootFor(join(import.meta.dir, "..", "..", ".."));
 

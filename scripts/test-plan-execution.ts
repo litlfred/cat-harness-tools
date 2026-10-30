@@ -23,12 +23,12 @@ import { resolve } from "node:path";
 import { loadDecisionTable, evaluate, type DecisionTable } from "../src/workflow/decision-table.js";
 import { complete, type InstanceState, type AuthzOptions } from "../src/workflow/instance.js";
 import type { ProcessModel } from "../src/workflow/process-model.js";
-import type { TestPlan } from "@litlfred/cat-harness/schemas/test-plan.js";
+import type { TestPlan } from "@litlfred/cat-harness/schemas/sdlc/test-plan.js";
 import {
   fileCertification,
   readCertificationAttestations,
   type CertificationEntry,
-} from "@litlfred/cat-harness/schemas/qa-attestations.js";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.js";
 
 export interface ResolvedPlanDmn {
   ok: true;
@@ -138,6 +138,32 @@ export async function evaluatePlanExitCriteria(
     note: `${resolution.table.id} → ${result.outcome} by ${result.rule}` +
       (result.ruleDescription ? ` (${result.ruleDescription})` : ""),
   };
+}
+
+/**
+ * Open the bean this instance tracks, so the next enabled step is `A_Request`.
+ *
+ * `test-plan-execution.bpmn` starts `Start_Request → Call_BeanOpen →
+ * GW_BeanYours → A_Request`: the claim is drawn once, in `bean-open.bpmn`, and
+ * every process that works a bean calls it (bean `m8gz`, owner 2026-10-24).
+ * This walks `Process_BeanOpen` the way a runner that owns its bean does —
+ * check, then create it (`exists: false`) or find it is ours (`exists: true`),
+ * claim it — and takes `GW_BeanYours`'s `claimed` branch. A bean someone else
+ * holds is not opened here: that branch ends the run, and a caller that meets
+ * it should stop, not call this.
+ */
+export function openTrackedBean(
+  model: ProcessModel,
+  state: InstanceState,
+  opts: { exists: boolean; actor?: string; authz?: AuthzOptions },
+): InstanceState {
+  const by = { actor: opts.actor, authz: opts.authz };
+  complete(model, state, "Open_CheckExists", by);
+  complete(model, state, "Open_Exists", { ...by, outcome: opts.exists ? "yes" : "no" });
+  if (opts.exists) complete(model, state, "Open_Owner", { ...by, outcome: "mine / unclaimed" });
+  else complete(model, state, "Open_Create", by);
+  complete(model, state, "Open_Claim", by);
+  return complete(model, state, "GW_BeanYours", { ...by, outcome: "claimed" });
 }
 
 /**

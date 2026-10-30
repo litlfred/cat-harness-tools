@@ -11,7 +11,7 @@
  * import core. `kg-instantiate.ts` writes the config and sits beside
  * `kg-subscribe.ts` in core. Reading a snapshot is the half both need, so it
  * lives here, below both, and the snapshot's node schema
- * (`schemas/substrate-snapshot.ts`) is harness for the same reason: the
+ * (`schemas/kg/substrate-snapshot.ts`) is harness for the same reason: the
  * harness registers the `substrate-snapshot` graph typology, and a kind's node
  * schema belongs with the kind.
  *
@@ -25,17 +25,17 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { KnowledgeGraphDeclarationSchema } from "@litlfred/bootstrap-tools/schemas/graph.ts";
-import { GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";
-import { type CatHarnessDeclaration, type Subscription, rootForScope } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/harness-config.js";
-import type { DeclarationScope } from "@litlfred/cat-harness/schemas/kg-node.js";
+import { GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
+import { type CatHarnessDeclaration, type Subscription, rootForScope } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import type { DeclarationScope } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
 import {
   SNAPSHOT_GRAPH_TYPOLOGY,
   SNAPSHOT_SUFFIX,
   SubstrateSnapshotSchema,
   type SubstrateSnapshot,
   subscriptionKindOf,
-} from "@litlfred/cat-harness/schemas/substrate-snapshot.js";
+} from "@litlfred/cat-harness/schemas/kg/substrate-snapshot.js";
 import type { HarnessTile } from "./harness-tiles.js";
 import { type SubscribedTree, subscribedTrees } from "./subscribed-trees.js";
 

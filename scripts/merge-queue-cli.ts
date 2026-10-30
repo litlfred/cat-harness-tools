@@ -34,7 +34,7 @@
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
-import { MERGE_QUEUE_ENTRY_TAG, MergeQueueEntrySchema, PRIORITY_CLASSES, type MergeQueueEntry } from "@litlfred/cat-harness/schemas/merge-queue.ts";
+import { MERGE_QUEUE_ENTRY_TAG, MergeQueueEntrySchema, PRIORITY_CLASSES, type MergeQueueEntry } from "@litlfred/cat-harness/schemas/sdlc/merge-queue.ts";
 import { PRIORITY_DECISION } from "./merge-queue.ts";
 import { holdInForce, readQueueStore, recordDecision } from "./merge-queue-store.ts";
 

@@ -91,12 +91,12 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { mountScopeFor } from "@litlfred/cat-harness/schemas/remote-mount.js";
-import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { clearCheckoutCache, resolveImplementingPath } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { mountScopeFor } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
+import { instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { clearCheckoutCache, resolveImplementingPath } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { toolsOf } from "../tools/discover.js";
 import { QA_CRITERIA_BY_ID, getCriterionSourceFile } from "../pipeline/qa-criteria-registry.js";
-import { RENDER_TARGETS } from "@litlfred/cat-harness/schemas/render-targets.js";
+import { RENDER_TARGETS } from "@litlfred/cat-harness/schemas/ui/render-targets.js";
 import { evaluate, loadDecisionTable, type DecisionTable } from "../src/workflow/decision-table.js";
 import { workflowFile } from "./known-skills.js";
 import { classify as classifyConflict } from "./merge-conflict-patterns.js";

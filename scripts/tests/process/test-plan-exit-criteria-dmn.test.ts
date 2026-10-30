@@ -5,7 +5,7 @@
  * 1. A fixture plan with its own custom DMN table routes by that table's rules.
  * 2. An unresolvable DMN table yields undetermined/could-not-determine (state: "unknown")
  *    and NEVER silently falls back to the default table.
- * 3. The `test-plan-exit-criteria-resolves` audit criterion in `schemas/kg-qa.ts` is
+ * 3. The `test-plan-exit-criteria-resolves` audit criterion in `schemas/sdlc/kg-qa.ts` is
  *    registered (scope: instance, applies: ["graph"], severity: "major"), vacuity-guarded
  *    (unknown if 0 plans checked), and flags unresolvable DMN tables as major findings.
  */
@@ -16,8 +16,8 @@ import { join, resolve } from "node:path";
 
 import { loadProcessModel, type ProcessModel } from "../../../src/workflow/process-model.js";
 import { complete, enabled, startInstance, type InstanceState } from "../../../src/workflow/instance.js";
-import { TestPlanSchema, type TestPlan } from "@litlfred/cat-harness/schemas/test-plan.js";
-import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import { TestPlanSchema, type TestPlan } from "@litlfred/cat-harness/schemas/sdlc/test-plan.js";
+import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 import {
   auditTestPlanExitCriteria,
 } from "../../test-plan-audit.js";
@@ -25,6 +25,7 @@ import {
   resolvePlanExitCriteriaDmn,
   evaluatePlanExitCriteria,
   completeExitCriteriaGateway,
+  openTrackedBean,
 } from "../../test-plan-execution.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
@@ -175,6 +176,8 @@ describe("per-plan exitCriteria DMN resolution and execution (folio-assistant-4i
       subject: `${planUnderTest.id}@${planUnderTest.version}`,
       bean: "folio-assistant-4iey",
     });
+    // The bean is opened first, in bean-open.bpmn (bean `m8gz`).
+    openTrackedBean(model, s, { exists: true, actor: "tester" });
     for (const step of ["A_Request", "A_ResolvePlan", "A_BindData", "A_Execute", "A_WriteRun", "A_ReExecuteSample"]) {
       expect(at(s)).toEqual([step]);
       complete(model, s, step, { actor: "tester" });
@@ -309,7 +312,7 @@ describe("per-plan exitCriteria DMN resolution and execution (folio-assistant-4i
   // ── 3. test-plan-exit-criteria-resolves audit criterion ───────────────────
 
   describe("kg-audit: test-plan-exit-criteria-resolves criterion", () => {
-    test("criterion is registered in schemas/kg-qa.ts with required metadata", () => {
+    test("criterion is registered in schemas/sdlc/kg-qa.ts with required metadata", () => {
       const criterion = KG_CRITERIA_BY_ID["test-plan-exit-criteria-resolves"];
       expect(criterion).toBeDefined();
       expect(criterion.id).toBe("test-plan-exit-criteria-resolves");

@@ -26,8 +26,8 @@
  */
 import { execFileSync } from "node:child_process";
 
-import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { readEffectiveConfig } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 
 /**
  * Run a git command in `root`, or `undefined` if it fails.
@@ -137,7 +137,7 @@ export const DEFAULT_PUBLISH_REF = "gh-pages";
  * (link style, marker, PDF path patterns) on top of the same block, so there
  * is one file, one key and no second answer to drift from the first.
  *
- * `harness.config.json` is resolved by `schemas/harness-config.ts`, which is
+ * `harness.config.json` is resolved by `schemas/kg/harness-config.ts`, which is
  * already harness-level, so nothing new crosses a boundary to read it.
  */
 export function publishTargets(root: string): {

@@ -113,7 +113,7 @@ describe("runStaging — the exit code is the point", () => {
 
 describe("runStaging — what it writes", () => {
   test("applies the verdict, and the narrative lands as a DRAFT", () => {
-    // Only a human may confirm one (`schemas/narrative.ts`). A script that
+    // Only a human may confirm one (`schemas/content/narrative.ts`). A script that
     // could emit `confirmed` would make an agent's description
     // indistinguishable from an accepted one.
     const f = fixture();

@@ -3,7 +3,7 @@
  * The merge queue's ORDER — live facts in, the reprioritisation table's
  * answer out.
  *
- * Bean `hfag`. The queue STORES decisions (`schemas/merge-queue.ts`); this
+ * Bean `hfag`. The queue STORES decisions (`schemas/sdlc/merge-queue.ts`); this
  * module COMPUTES the facts a decision is made from, at the moment it is
  * made, and hands them to `processes/sdlc/decisions/merge-priority.dmn`. It
  * writes nothing: what the steward acts on is recorded as a queue entry by
@@ -41,7 +41,7 @@ import {
   type MemberFacts,
   type PriorityClass,
   type Readiness,
-} from "@litlfred/cat-harness/schemas/merge-queue.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/merge-queue.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The table, beside the diagram whose gateway reads it. */

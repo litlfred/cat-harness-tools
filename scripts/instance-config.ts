@@ -4,7 +4,7 @@
  * fallback that is reported as LEGACY.
  *
  * @module scripts/instance-config
- * @graphNode none — a reader over `cat-harness/schemas/index-config.ts`; the schema stays there
+ * @graphNode none — a reader over `cat-harness/schemas/kg/index-config.ts`; the schema stays there
  *
  * Owner, bean `ymvt` (2026-10-07, restated 2026-10-14: *"i thought ONLY
  * index.config.json"*): a checkout's root `index.config.json` is the ONE
@@ -25,7 +25,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { importedConfigFilename, inlineOverrides, readIndexConfig } from "@litlfred/cat-harness/schemas/index-config.ts";
+import { importedConfigFilename, inlineOverrides, readIndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.ts";
 
 export interface InstanceConfigRead {
   /** The effective config, raw (keys the schema does not name are kept). Absent when nothing configures the instance. */

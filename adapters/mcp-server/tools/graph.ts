@@ -22,7 +22,7 @@ import {
   graphStats,
   type GraphIndex,
 } from "../../../pipeline/graph-index.ts";
-import { GRAPH_EDGE_TERMS, type GraphEdgeTerm } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { GRAPH_EDGE_TERMS, type GraphEdgeTerm } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 import { graphSearch, formatPath } from "../../../pipeline/graph-search.ts";
 
 /** Tool names this module owns. */

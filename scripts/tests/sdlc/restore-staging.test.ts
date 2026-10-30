@@ -33,7 +33,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 import { describe as describeOutcome, exitCodeFor, restoreStaging, verifyStaging } from "../../restore-staging.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const ID = ["-c", "user.name=t", "-c", "user.email=t@t"];

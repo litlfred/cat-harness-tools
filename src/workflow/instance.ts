@@ -31,13 +31,13 @@
 
 import { isActivity, type ProcessModel, type ProcessNode } from "./process-model.js";
 import { evaluate } from "./decision-table.js";
-import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
-import type { ConventionScope } from "@litlfred/cat-harness/schemas/convention.js";
+import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import type { ConventionScope } from "@litlfred/cat-harness/schemas/process/convention.js";
 import { authorizeTask, describeVerdict, type TaskAuthVerdict } from "./authorize.js";
 import { provActivityFor } from "./prov-record.js";
-import type { ProvActivity } from "@litlfred/cat-harness/schemas/prov.js";
+import type { ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.js";
 import type { AccessContext, Principal } from "../core/access.js";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/input-trace.ts";
+import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
 import {
   validateWorkflowModel,
   validateLaneModelCapabilities,
@@ -148,6 +148,40 @@ export interface InstanceState {
    * line per pass, so a replaced run is not a lost one.
    */
   children?: Record<string, InstanceState>;
+  /**
+   * Steps the engine refused, newest last (bean `v49e`). A refusal used to be
+   * a thrown error and nothing else, so a gate that kept refusing looked, on
+   * disk, exactly like one nobody had tried. `workflow_complete` now appends
+   * one entry per refusal and saves the instance, so the view can show a
+   * refused gate as a state. Capped at {@link REFUSALS_KEPT}; absent on files
+   * written before this was recorded, which is not the same as "never refused".
+   */
+  refusals?: RefusalEntry[];
+}
+
+/** One refused `workflow_complete`: the step asked for, by whom, and the engine's reason. */
+export interface RefusalEntry {
+  at: string;
+  /** The step the caller asked to complete. */
+  node: string;
+  /** Who the caller said it was acting as, when it said. */
+  actor?: string;
+  /** The engine's own message, folded to one line. */
+  reason: string;
+}
+
+/** How many refusals an instance keeps: enough to see a pattern, never the whole file. */
+export const REFUSALS_KEPT = 20;
+
+/**
+ * The instance with one more refusal recorded, oldest dropped past
+ * {@link REFUSALS_KEPT}. The rest of the state is untouched: a refusal moves
+ * nothing, so `updatedAt` stays when the instance last MOVED.
+ */
+export function withRefusal(state: InstanceState, entry: RefusalEntry): InstanceState {
+  const reason = entry.reason.replace(/\s+/g, " ").trim().slice(0, 600);
+  const refusals = [...(state.refusals ?? []), { ...entry, reason }].slice(-REFUSALS_KEPT);
+  return { ...state, refusals };
 }
 
 /**

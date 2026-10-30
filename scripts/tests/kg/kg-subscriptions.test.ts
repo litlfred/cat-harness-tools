@@ -10,7 +10,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
-import { CatHarnessDeclarationSchema } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { CatHarnessDeclarationSchema } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";
 
@@ -89,7 +89,9 @@ describe("subscriptions: the schema", () => {
 });
 
 import { knownSubstrates, render, repoFromUrl, type SubstrateRow } from "../../subscriptions-viz.ts";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 describe("the known-substrates registry (subscriptions-viz)", () => {
   const REPO = resolve(dirname(HARNESS_ROOT));
@@ -100,10 +102,31 @@ describe("the known-substrates registry (subscriptions-viz)", () => {
     expect(ihris?.repository).toBe("litlfred/ihris");
   });
 
-  test("a hand row OVERRIDES a derived one by name (who-iris: planned -> exists)", () => {
-    const who = knownSubstrates(REPO).find((r) => r.name === "who-iris");
-    expect(who?.status).toBe("exists");
-    expect(who?.source).toBe("hand-entered");
+  // Asserted over a synthetic checkout since the harness dropped its
+  // `who-iris` hand row: that instance is mounted in the checkout now, with a
+  // declaration of its own, and a hand row is only for what no declaration
+  // names. The harness may not name a layer above it either.
+  test("a hand row OVERRIDES a derived one by name (planned -> exists)", () => {
+    const root = mkdtempSync(join(tmpdir(), "substrates-"));
+    try {
+      mkdirSync(join(root, ".git"));
+      const instance = (name: string, extra: Record<string, unknown>) => {
+        mkdirSync(join(root, name), { recursive: true });
+        writeFileSync(join(root, name, `${name}.json`), JSON.stringify({ name, version: "0.1.0", repository: `o/${name}`, directories: [], ...extra }));
+      };
+      instance("staged", { livesAt: { repository: "o/host", path: "staged" } });
+      instance("host", {
+        livesAt: { repository: "o/host", path: "." },
+        knownSubstrates: [{ name: "staged", title: "Staged", repository: "o/staged", status: "exists", note: "Repository created; hand row." }],
+      });
+      const rows = knownSubstrates(root);
+      const staged = rows.find((r) => r.name === "staged");
+      expect(staged?.status).toBe("exists");
+      expect(staged?.source).toBe("hand-entered");
+      expect(staged?.repository).toBe("o/staged");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test("repoFromUrl takes only a github repository URL", () => {

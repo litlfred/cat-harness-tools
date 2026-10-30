@@ -4,7 +4,7 @@
  *
  * @module scripts/check-avatar-coverage
  * @covers cat-harness — it reads the instance declaration's graph typologies and asks each for art; the
- *   avatars themselves are code in `schemas/avatars.ts`, as `gen-avatars-css` records
+ *   avatars themselves are code in `schemas/content/avatars.ts`, as `gen-avatars-css` records
  *
  * Owner, 2026-09-19: *"QA sidescares if avatar thems not fully done."*
  *
@@ -23,7 +23,7 @@
  *
  * ## What it checks, and what it deliberately does NOT
  *
- * The trash state is DERIVED from the base glyph (see `schemas/avatars.ts`),
+ * The trash state is DERIVED from the base glyph (see `schemas/content/avatars.ts`),
  * so trash coverage cannot be missing and checking it would be a criterion
  * that can never fail — which reads as coverage while measuring nothing.
  * This asserts the derivation is in place ONCE, and spends its per-kind
@@ -41,13 +41,13 @@
  */
 import { join } from "node:path";
 
-import { allAvatars, AVATARS, GENERIC, hasAvatar } from "@litlfred/cat-harness/schemas/avatars.js";
+import { allAvatars, AVATARS, GENERIC, hasAvatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
 import {
   BASE_GRAPH_TYPOLOGIES,
   defaultGraphTypologies,
   isPublishedGraphTypology,
   readDeclaration,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { renderAvatarsCss } from "./gen-avatars-css.js";
 import {
   buildQaResult,
@@ -120,7 +120,7 @@ export function coverage(root: string = ROOT): Coverage {
     if (hasAvatar(kind)) continue;
     missing.push({
       kind,
-      where: "schemas/avatars.ts",
+      where: "schemas/content/avatars.ts",
       note:
         `no avatar is declared, so this kind renders as the generic question mark` +
         (isPublishedGraphTypology(kind) ? "" : " (an unpublished kind — still shown in the viewer)"),

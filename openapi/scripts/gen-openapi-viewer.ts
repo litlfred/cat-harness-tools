@@ -45,7 +45,7 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 
-import { checkoutRootFor, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { checkoutRootFor, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { OpenApiProvenanceSchema } from "@litlfred/cat-harness/openapi/schemas/openapi.ts";
 
 import {

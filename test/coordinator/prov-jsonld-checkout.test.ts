@@ -17,8 +17,8 @@ import { localLoader } from "../../scripts/publish-verify.ts";
 import {
   addressBook,
   provJsonldDocument,
-} from "@litlfred/cat-harness/schemas/prov-jsonld.ts";
-import type { ProvActivity } from "@litlfred/cat-harness/schemas/prov.ts";
+} from "@litlfred/cat-harness/schemas/kg/prov-jsonld.ts";
+import type { ProvActivity } from "@litlfred/cat-harness/schemas/content/prov.ts";
 
 /** The directory these tests were written in (`cat-harness/schemas/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/schemas");

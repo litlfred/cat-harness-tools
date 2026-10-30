@@ -15,7 +15,7 @@ import { join } from "node:path";
 
 import { afterAll, expect, test } from "bun:test";
 
-import { branchSlug, noteFileName } from "@litlfred/cat-harness/schemas/bean-note.ts";
+import { branchSlug, noteFileName } from "@litlfred/cat-harness/schemas/sdlc/bean-note.ts";
 import { addNote, checkNotes, noteDirs, writeIndex } from "../bean-notes.ts";
 import { classify, resolveGeneratedRegions } from "../merge-conflict-patterns.ts";
 

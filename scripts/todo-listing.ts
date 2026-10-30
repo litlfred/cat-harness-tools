@@ -53,9 +53,9 @@
  * such affordance, so {@link escapeHtml} is applied to every interpolated
  * value without exception, including ones that "cannot" contain markup.
  */
-import type { TodoIndexItem } from "@litlfred/cat-harness/schemas/todo-index.js";
-import { safeHref } from "@litlfred/cat-harness/schemas/safe-url.js";
-import { withInlineCode } from "@litlfred/cat-harness/schemas/inline-code.js";
+import type { TodoIndexItem } from "@litlfred/cat-harness/schemas/sdlc/todo-index.js";
+import { safeHref } from "@litlfred/cat-harness/schemas/ui/safe-url.js";
+import { withInlineCode } from "@litlfred/cat-harness/schemas/content/inline-code.js";
 
 /** How the caller turns a note's attachment into an href it can serve. */
 export interface TodoListingOptions {
@@ -170,7 +170,7 @@ function renderItem(item: TodoIndexItem, opts: TodoListingOptions): string {
   if (item.target !== undefined) {
     // The parts, never the composite: `target` exists precisely so a consumer
     // — this one included — never splits `sec:<page>-<node>` to find out which
-    // page a note is on. See `schemas/todo-index.ts`.
+    // page a note is on. See `schemas/sdlc/todo-index.ts`.
     const { page, node } = item.target;
     // The caller's own composition, still checked: `gen-docs-pages.ts` passes a
     // Liquid `relative_url` call, which `safeHref` reads as a relative
@@ -206,7 +206,7 @@ function renderItem(item: TodoIndexItem, opts: TodoListingOptions): string {
   }
   lines.push(`      </div>`);
 
-  // EVERY href goes through `safeHref` — see `schemas/safe-url.ts`. Escaping
+  // EVERY href goes through `safeHref` — see `schemas/ui/safe-url.ts`. Escaping
   // closes tags and does nothing about a scheme, so an escaper here is the
   // wrong tool that looks like the right one. A refused URL renders as text
   // rather than as a link to nowhere (`pb04`).

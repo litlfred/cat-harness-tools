@@ -1,6 +1,6 @@
 /**
  * The three lane → Role → Skill report entries `kg:audit` writes
- * (implementation spec §5; declared `minor` in cat-harness `schemas/kg-qa.ts`).
+ * (implementation spec §5; declared `minor` in cat-harness `schemas/sdlc/kg-qa.ts`).
  *
  * @module scripts/tests/lane-role-criteria.test
  *
@@ -11,8 +11,8 @@
  * somebody stops reading.
  */
 import { describe, expect, test } from "bun:test";
-import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/kg-qa.ts";
-import type { RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.ts";
+import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.ts";
+import type { RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.ts";
 
 import { legacyBindingFindings, mechanicalRoleUntested, skillsOutsideLaneRole } from "../../lib/lane-role-criteria.ts";
 import { skillEdgesOf } from "../../lib/skill-edges.ts";

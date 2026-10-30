@@ -36,7 +36,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/jsonld.js";
+import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/kg/jsonld.js";
 import { mountRoutes, railStandalonePages, type ForeignSiteRail } from "./mount-instance-docs.js";
 
 

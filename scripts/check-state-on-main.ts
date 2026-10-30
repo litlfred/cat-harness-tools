@@ -9,7 +9,7 @@
  * Arc `fs43`'s plan of record carried a row reading *"`holds: state` ⇒ default
  * `storage.keyedBy: tip`, plus a check that a declared `state` dir on `main`
  * is a finding"*, marked done. It was not done — `grep -c "keyedBy\|storage"
- * cat-harness/schemas/graph-typology-registry.ts` was 0 — and the two halves are
+ * cat-harness/schemas/kg/graph-typology-registry.ts` was 0 — and the two halves are
  * not equally worth doing.
  *
  * **The default half is near-worthless and is not built here.** A kind-level
@@ -87,13 +87,13 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
-import { findDeclarationFile, instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
-import { contentIsOffCheckout } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
+import { findDeclarationFile, instanceRootsIn, nestedDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
+import { contentIsOffCheckout } from "@litlfred/cat-harness/schemas/kg/subgraph-source.ts";
 // The registration side-effect import, same reason `check:declared-dirs` has
 // it: without it a reader's acceptance of this repository's own declaration is
 // an import-order property of the process rather than of the declaration.
-import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
+import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 
 /** Where the recorded debt lives. One file, named in one place. */
 export const BASELINE = "cat-harness-tools/scripts/state-on-main-baseline.json";

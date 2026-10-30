@@ -75,11 +75,12 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { declarationPathIn, instanceDirectoryForGraph, kgQaHomeFor, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/built-at-publish.js";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
-import { KG_QA_DIRNAME, kgQaSidecarPath } from "@litlfred/cat-harness/schemas/kg-qa.js";
-import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.js";
+import { declarationPathIn, instanceDirectoryForGraph, kgQaHomeFor, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { isBuiltAtPublish } from "@litlfred/cat-harness/schemas/kg/built-at-publish.js";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
+import { tileCounts } from "@litlfred/cat-harness/schemas/ui/tile-count.js";
+import { KG_QA_DIRNAME, kgQaSidecarPath } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
+import { visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { discoverTools, toolsOf } from "../tools/discover.ts";
 import { baseDocsDir } from "./compose-docs.js";
@@ -87,7 +88,7 @@ import { kgRoots } from "./known-skills.js";
 import { skillPageHref, skillPagesOf } from "./lib/skill-pages.ts";
 import { qaResultHref, siteLinkKey } from "./qa-result-link.ts";
 import { qaStorageOf } from "./qa-results.ts";
-import { pageParts, renderedByOf, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
+import { pageParts, renderedByOf, tileCountsForPages, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { dirname } from "node:path";
 import { localSiteDir } from "./lib/local-site-dir.ts";
@@ -764,6 +765,22 @@ if (import.meta.main) {
       rmSync(d, { recursive: true });
       console.log(`  ✗ pruned ${d}`);
     }
+    // THE TILE COUNTS (folio-assistant#931, owner's ruling 2026-10-29): each
+    // page's own Tool count, keyed by the tile that opens that page. Build-time
+    // data, like every projection `scanTileCounts` reads, so `--check` does not
+    // compare it.
+    const counted = tileCountsForPages(
+      [
+        { page: relative(REPO, join(site, PAGE)), count: rows.length, unit: ["tool", "tools"] },
+        ...subjects.map((x) => ({ page: relative(REPO, join(site, pageRelPath(REPO, x.name)!)), count: x.rows.length, unit: ["tool", "tools"] as const })),
+      ],
+      REPO,
+      resolve(HARNESS_ROOT),
+    );
+    const countFile = join(site, "assets", "tools", "index.json");
+    mkdirSync(join(countFile, ".."), { recursive: true });
+    writeFileSync(countFile, JSON.stringify(tileCounts(counted), null, 2) + "\n");
+    console.log(`  tile counts: ${Object.keys(counted).length} tile(s) → assets/tools/index.json`);
     const bad = [...new Set(rows.flatMap((r) => r.satisfies))].filter((s) => !known.has(s));
     console.log(`tools viewer: ${rows.length} tool(s) → ${PAGE}`);
     for (const x of subjects) console.log(`  ${x.name}: ${x.rows.length} tool(s) → ${pageRelPath(REPO, x.name)}`);

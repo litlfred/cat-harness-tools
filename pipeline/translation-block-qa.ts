@@ -85,9 +85,9 @@ import type {
   QaCriterionEntry,
   QaReviewer,
   UntaintedDispatch,
-} from "@litlfred/cat-harness/schemas/block-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
 import { parsePo, parsePoEntries } from "./po-inject.ts";
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { poResolveContext, resolvePoSources, type PoResolveContext } from "./po-resolve.ts";
 import { extractMarkdown } from "./pot-extract.ts";
 import { gitFileCommitSha, gitHeadSha, hashFile, sweepActor, walkBlocks } from "./qa-utils.ts";
@@ -100,13 +100,13 @@ import {
   translationAttestationKey,
   writeCriteriaAttestations,
   type PriorOk,
-} from "@litlfred/cat-harness/schemas/qa-attestations.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
 import { sourceLocale, targetLocales } from "./translation-index.ts";
 import { againstOrUsage, judgeSidecarTree, judgeUsage, qaStorageOf, readBaseline, type FreshSidecar } from "../scripts/qa-results.ts";
 import { readQaManifest, type QaStoreOptions } from "../scripts/qa-store.ts";
-import { docsSourceDirFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { docsSourceDirFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
-import type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport } from "@litlfred/cat-harness/schemas/qa-record-shapes.ts";
+import type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport } from "@litlfred/cat-harness/schemas/kg/qa-record-shapes.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/
 export type { TranslationFieldHash, TranslationQaEntry, TranslationBlockQaReport };
 
@@ -345,7 +345,7 @@ export function invariantTokens(text: string): InvariantToken[] {
  *
  * ## What an entry says, and what it deliberately does not
  *
- * `translations/<locale>/glossary.po`, the slot `schemas/translation.ts`
+ * `translations/<locale>/glossary.po`, the slot `schemas/content/translation.ts`
  * already declares ("shared glossary PO (no POT — hand-authored)"). Three
  * shapes, and the third is the one that matters:
  *

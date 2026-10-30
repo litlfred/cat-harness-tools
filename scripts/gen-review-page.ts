@@ -47,7 +47,7 @@
  * ## Choosing how to see a change (bean `d903`)
  *
  * Every changed block has a "Show this change as" selector over the renderers
- * in `schemas/diff-renderers.ts`: a word diff of the source, the block inline
+ * in `schemas/ui/diff-renderers.ts`: a word diff of the source, the block inline
  * as rendered, or the two published pages side by side. Each block opens
  * with its kind's default. A page-level selector overrides every block, and
  * that one choice is remembered for this viewer in `localStorage`. Every read
@@ -101,8 +101,8 @@
  *   content and must not be able to become markup.
  */
 
-import { DIFF_RENDERERS } from "@litlfred/cat-harness/schemas/diff-renderers.js";
-import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/translation.js";
+import { DIFF_RENDERERS } from "@litlfred/cat-harness/schemas/ui/diff-renderers.js";
+import { PUBLISHED_LOCALES } from "@litlfred/cat-harness/schemas/content/translation.js";
 import { cleanRendered, renderFields, renderInline, renderSideBySide, renderVisual, renderWordDiff } from "./review-renderers.js";
 import { computeHeat, heatBucket, renderHeat } from "./review-heat.js";
 import { crumbFor, railOutline, renderMinimap, renderOutline } from "./review-nav.js";
@@ -232,7 +232,7 @@ const SCRIPT = `
   // A ChangeSet whose blocks are not a folio's says where each one is on the
   // site itself: \`page\` (site-relative; "" when the block is on no page,
   // such as an IG's source file) and \`anchor\` (the element id, when it is not
-  // the label). An IG's preview writes them (fhir-harness ig-review-data).
+  // the label). An IG's preview writes them (the FHIR layer's ig-review-data).
   function safePage(p) {
     return /^[A-Za-z0-9._\\/-]+$/.test(p) && p.split("/").every(function (s) { return s && !/^\\.+$/.test(s); });
   }

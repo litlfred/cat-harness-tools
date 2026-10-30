@@ -11,7 +11,7 @@
  */
 import { basename, resolve } from "node:path";
 
-import { orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { workflowFiles } from "../../scripts/known-skills.js";
 import { processDiagrams } from "./process-model.js";
 

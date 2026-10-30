@@ -30,8 +30,8 @@ import { describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { THEMES } from "@litlfred/cat-harness/schemas/themes.js";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { THEMES } from "@litlfred/cat-harness/schemas/ui/themes.js";
 import { declaredContributions } from "../../ensure-landing-sticky.js";
 import { buildPage, buildViz, sheetBody, VIEWER_TOOL, wornBy } from "../../render-theme-sheet.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";

@@ -237,7 +237,7 @@ describe("over the real corpus", () => {
     // the check back into the thing it was written to catch.
     const { kgRoots } = await import("../../scripts/known-skills.ts");
     const { loadCapabilities } = await import("./capabilities.ts");
-    const { repoRootFor } = await import("@litlfred/cat-harness/schemas/cat-harness.ts");
+    const { repoRootFor } = await import("@litlfred/cat-harness/schemas/kg/cat-harness.ts");
     const { skills } = await loadSkillNeeds(kgRoots(INSTANCE));
     const declared = new Set(loadCapabilities(repoRootFor(INSTANCE)).map((c) => c.id));
     expect(declared.size).toBeGreaterThan(5);
@@ -302,7 +302,7 @@ describe("over the real corpus", () => {
   test("the real join runs and produces a verdict per skill", async () => {
     const { kgRoots } = await import("../../scripts/known-skills.ts");
     const { loadCapabilities, probeAll } = await import("./capabilities.ts");
-    const { repoRootFor } = await import("@litlfred/cat-harness/schemas/cat-harness.ts");
+    const { repoRootFor } = await import("@litlfred/cat-harness/schemas/kg/cat-harness.ts");
     const { skills } = await loadSkillNeeds(kgRoots(INSTANCE));
     const c = loadCapabilities(repoRootFor(INSTANCE));
     const rows = allSkillAvailability(skills, probeAll(c), c);

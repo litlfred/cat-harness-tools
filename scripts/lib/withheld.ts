@@ -3,7 +3,7 @@
  *
  * @module scripts/lib/withheld
  *
- * Bean `cw35`. The format is `folio-withheld/v1` (`schemas/withheld.ts`); an
+ * Bean `cw35`. The format is `folio-withheld/v1` (`schemas/content/withheld.ts`); an
  * instance's generator writes it from its own licence data, and EVERY surface
  * that publishes from that directory reads it here — the site mount
  * (`mount-instance-docs.ts`) and the library viewer (`library-graph.ts`,
@@ -15,7 +15,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, relative, sep } from "node:path";
 
-import { WithheldSchema } from "@litlfred/cat-harness/schemas/withheld.js";
+import { WithheldSchema } from "@litlfred/cat-harness/schemas/content/withheld.js";
 
 export const WITHHELD_FILE = "withheld.json";
 

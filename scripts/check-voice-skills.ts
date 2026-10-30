@@ -8,7 +8,7 @@
  *
  * ## The promise this makes good on
  *
- * `schemas/voice-skill.ts` has said, since the day it was written:
+ * `schemas/content/voice-skill.ts` has said, since the day it was written:
  *
  * > **No field serves two of those by restatement.** The instruction body must
  * > not enumerate rules … `check:voice-skills` enforces it.
@@ -67,12 +67,12 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { readVoicesGraph } from "./voices-graph.ts";
-import { loadVoices } from "@litlfred/cat-harness/schemas/voices.ts";
+import { loadVoices } from "@litlfred/cat-harness/schemas/content/voices.ts";
 import {
   directoriesForGraph,
   instanceRootsIn,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.ts";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 
 const ROOT = HARNESS_ROOT;
 

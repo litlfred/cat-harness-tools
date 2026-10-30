@@ -71,9 +71,9 @@
  * produce a false red, not a false green.
  */
 import { dirname } from "node:path";
-import { checkoutRootFor, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
-import { mountScopeFor } from "@litlfred/cat-harness/schemas/remote-mount.ts";
+import { checkoutRootFor, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+import { mountScopeFor } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
 import { TRACKED, type PairIO } from "./input-hash.ts";
 
 export interface ScriptIO {
@@ -144,6 +144,7 @@ const OWN_TASK_IO: Readonly<Record<string, ScriptIO>> = {
   "check:available-locales": READ_ONLY,
   "check:avatar-instances": TREE_READER,
   "check:bean-archive": TREE_READER,
+  "check:bean-calls": TREE_READER,
   "check:bean-blocks": TREE_READER,
   "check:bean-bodies": TREE_READER,
   "check:bean-front-matter": TREE_READER,
@@ -376,12 +377,53 @@ export function collectTaskIo(
         throw new Error(`task "${task}" is declared by both ${prior} and ${instance} — one task, one owner`);
       }
       ownerOf.set(task, instance);
+      // A row that declares only `writes` is about generated files, not about
+      // running the task: it stays out of this table (see `collectTaskWrites`).
+      if (Object.keys(io).every((k) => k === "writes" || k === "because")) continue;
       out[task] = {
         ...(io.inputs === undefined ? {} : { inputs: io.inputs }),
         ...(io.outputs === undefined ? {} : { outputs: io.outputs }),
         ...(io.writer === undefined ? {} : { writer: io.writer }),
         ...(io.afterMerge === undefined ? {} : { afterMerge: io.afterMerge }),
       };
+    }
+  }
+  return out;
+}
+
+/**
+ * The committed files each task WRITES, declared as globs (litlfred/cat-harness#693,
+ * owner 2026-10-29): bare is relative to the declaring instance,
+ * `<instance>:<glob>` names another instance's file. `check:generated-writers`
+ * warns on every matched file that carries no generated marker.
+ *
+ * This layer's own writers are {@link OWN_WRITES}; an instance above declares
+ * its own as `taskIo.<task>.writes`. Kept apart from {@link TASK_IO}, whose
+ * rows decide how a task RUNS: a writer named here gains no `inputs` or
+ * `outputs` claim by being listed.
+ */
+export const OWN_WRITES: Readonly<Record<string, readonly string[]>> = {
+  "schema:docs": ["cat-harness:docs/reference/skills/*.md"],
+  "upload-step:docs": ["cat-harness:docs/reference/upload-step/index.md"],
+  "prov:qaqc": ["cat-harness:docs/prov-qaqc/index.md"],
+};
+
+export interface TaskWrites {
+  task: string;
+  /** The instance root bare globs are relative to. */
+  instance: string;
+  globs: readonly string[];
+}
+
+/** {@link OWN_WRITES} plus every present instance's `taskIo.<task>.writes`. */
+export function collectTaskWrites(repoRoot: string, own: Readonly<Record<string, readonly string[]>> = OWN_WRITES): TaskWrites[] {
+  const toolsRoot = dirname(import.meta.dir);
+  const out: TaskWrites[] = Object.entries(own).map(([task, globs]) => ({ task, instance: toolsRoot, globs }));
+  for (const instance of instanceRootsIn(repoRoot)) {
+    if (mountScopeFor(instance) !== undefined) continue;
+    for (const [task, io] of Object.entries(readDeclaration(instance)?.taskIo ?? {})) {
+      const globs = (io as { writes?: readonly string[] }).writes;
+      if (globs !== undefined) out.push({ task, instance, globs });
     }
   }
   return out;

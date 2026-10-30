@@ -43,26 +43,27 @@ import {
   type IndexConfig,
   type IndexInstance,
   type RemoteSource,
-} from "@litlfred/cat-harness/schemas/index-config.ts";
-import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, conventionalFolioDir, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { checkoutDependentsOf, declaredSubgraph, materialiseDeclaredDirectories, orderedDependencies, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+} from "@litlfred/cat-harness/schemas/kg/index-config.ts";
+import { CAT_HARNESS_DECLARATION_SCHEMA_TAG, conventionalFolioDir, instanceDeclarationFilename, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { checkoutDependentsOf, declaredSubgraph, materialiseDeclaredDirectories, orderedDependencies, subgraphSourceOverrides } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 import {
   instanceStateBranch,
   resolveSubgraphSource,
   type ResolvedSubgraphSource,
   type SubgraphSource,
   type SubgraphSourceOverrides,
-} from "@litlfred/cat-harness/schemas/subgraph-source.ts";
+} from "@litlfred/cat-harness/schemas/kg/subgraph-source.ts";
 import { relative, dirname, join, resolve, sep } from "path";
 import { spawnSync } from "child_process";
 import { BUILTIN_ADAPTERS, type BuiltinAdapterDeclaration } from "../src/builtin-adapters";
 import { REPO_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { reexportLine, vocabularyModulesFor } from "./lib/folio-shim.ts";
-import { contentLayerInstance } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { contentLayerInstance } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { git, remoteState } from "./lib/empty-remote.ts";
 import { formatRemoteSeed, seedRemoteMainIfEmpty } from "./seed-main-if-remote-empty.ts";
 import { parseRemote } from "./pages-bootstrap.ts";
+import { DEFAULT_TODO_GRAPH, DEFAULT_TODO_GRAPH_ROOT, nodeOfKind } from "@litlfred/cat-harness/schemas/sdlc/todo-graph.js";
 import { blockToJsonLd, serialise as serialiseBlockNode } from "../pipeline/gen-block-jsonld.ts";
 
 /** The version a new instance declares beside its `iriBase` (bean folio-assistant-63q4). */
@@ -531,7 +532,7 @@ function instanceConfig(o: MaybeFolio, assistant: string): Record<string, unknow
         adapterModule: adapterModulePath(assistant, o.contentType),
       }),
       dependencies: { folioAssistant: [standsOn(assistant, o.contentType)] },
-      feedbackDir: ".folio-feedback",
+      feedbackDir: `${DEFAULT_TODO_GRAPH_ROOT}/${nodeOfKind(DEFAULT_TODO_GRAPH, "todo-feedback")!.path}`,
       skills: ".claude/skills/local",
       viewer: { dir: `${toolsDir(assistant)}/viewer`, port: 8080 },
       // `blob` rather than `pages`: it is the only link style that resolves
@@ -1281,7 +1282,7 @@ function todosGraph(slug: string): string {
   ) + "\n";
 }
 
-/** The bean graph's declaration, `beans/beans.json` — the shape `schemas/bean-graph.ts` reads. */
+/** The bean graph's declaration, `beans/beans.json` — the shape `schemas/sdlc/bean-graph.ts` reads. */
 function beansGraph(slug: string): string {
   return JSON.stringify(
     {

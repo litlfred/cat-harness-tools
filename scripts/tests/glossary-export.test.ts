@@ -39,7 +39,7 @@ import {
   readLanes,
   type Ledger,
 } from "../glossary-export.ts";
-import { LEDGER_KEY, LedgerSchema } from "@litlfred/cat-harness/schemas/glossary-ledger.ts";
+import { LEDGER_KEY, LedgerSchema } from "@litlfred/cat-harness/schemas/library/glossary-ledger.ts";
 import { placedOut } from "../lib/moved-document.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
@@ -427,9 +427,9 @@ describe("ledger keys and renames", () => {
 // kg-export and fsh-guts-export).
 describe("the vocabulary-mapping tables agree with the document's @context", () => {
   test("every key a table writes expands, in the context, to the table's target + code", async () => {
-    const { vocabMapping } = await import("@litlfred/cat-harness/schemas/vocab-mapping.ts");
+    const { vocabMapping } = await import("@litlfred/cat-harness/schemas/content/vocab-mapping.ts");
     const { expandCurie, STANDARD_PREFIXES } = await import("@litlfred/cat-harness/schemas/vocab-mapping-fhir.ts");
-    const { ownPrefixTable } = await import("@litlfred/cat-harness/schemas/graph-typology-registry.js");
+    const { ownPrefixTable } = await import("@litlfred/cat-harness/schemas/kg/graph-typology-registry.js");
     const prefixes = { ...STANDARD_PREFIXES, ...ownPrefixTable() };
     const ctx = buildGlossary({ today: () => "2026-09-21" }).doc["@context"] as Record<string, unknown>;
     const ctxPrefixes = Object.fromEntries(Object.entries(ctx).filter(([, v]) => typeof v === "string" && /[#/]$/.test(v as string))) as Record<string, string>;

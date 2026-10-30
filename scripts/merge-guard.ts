@@ -131,7 +131,7 @@ import { coverageFor, runsForHead, NOT_EXECUTED, type HeadRunVerdict, type RunRo
 import { classifyResponse, withBackoff } from "../src/core/retry.js";
 import { scanTriggers, type TriggerScan } from "../src/core/workflow-events.js";
 import { detectRepoUrl, ownerRepo } from "../src/core/git-refs.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 // ─── vocabulary ────────────────────────────────────────────────────────────

@@ -50,7 +50,7 @@ import { dirname, join } from "node:path";
 
 import { viewerHtml } from "../kg-viewer.ts";
 import { UI_STRINGS, type LocaleCatalogue } from "../kg-viewer-strings.ts";
-import { artefactStubFor, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { artefactStubFor, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 /** Wrap in guillemets: a translation a reader of English can still check. */

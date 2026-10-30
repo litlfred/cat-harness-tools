@@ -28,11 +28,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 
-import { instanceDirectories, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { checkoutRootFor } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { instanceDirectories, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { checkoutRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import type { z } from "zod";
 
-import { familyBody, nodeFamilyTag, resolveKindValidator, resolveNodeSchemas, stripAnnotations } from "@litlfred/cat-harness/schemas/kind-validator.js";
+import { familyBody, nodeFamilyTag, resolveKindValidator, resolveNodeSchemas, stripAnnotations } from "@litlfred/cat-harness/schemas/kg/kind-validator.js";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -123,8 +123,8 @@ export function owningInstanceRoot(filePath: string, fallback: string): string {
  * - `schemaRoot` — what the kind's unqualified `module#Export` validator refs
  *   resolve against: the instance whose registry DEFINES the kind. The
  *   registry here is `defaultGraphTypologies`, defined in this instance, so its
- *   refs (`schemas/kg-qa.ts#…`) are relative to `cat-harness/`. Resolving them
- *   against `smart-dak/` instead reported "schemas/kg-qa.ts does not exist"
+ *   refs (`schemas/sdlc/kg-qa.ts#…`) are relative to `cat-harness/`. Resolving them
+ *   against `smart-dak/` instead reported "schemas/sdlc/kg-qa.ts does not exist"
  *   for every nested sidecar — the second half of the same refusal.
  *
  * `schemaRoot` defaults to `root`, so a caller validating the registry's own

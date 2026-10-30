@@ -10,7 +10,7 @@ import {
   BLOCK_REFERENCE_RESOLVES_CRITERION,
   type BlockInput,
 } from "../block-reference-resolver.js";
-import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/kg-qa.js";
+import { KG_CRITERIA_BY_ID } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
 
 describe("block-reference-resolves criterion registration", () => {
   test("registered in KG_CRITERIA_BY_ID with expected attributes", () => {

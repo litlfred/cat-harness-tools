@@ -25,7 +25,7 @@
  * ## Where each definition comes from, and why not from here
  *
  * Graph typologies are read from `BASE_GRAPH_TYPOLOGIES`, which already carries a
- * `summary` for each. Restating them in `schemas/vocabulary.ts` would be a
+ * `summary` for each. Restating them in `schemas/content/vocabulary.ts` would be a
  * second answer to one question, free to disagree — the drift this repository
  * keeps paying for. Everything else is glossed in `vocabulary.ts`. A term
  * defined in both is an error, not a preference.
@@ -55,30 +55,30 @@ import {
   isPublishedGraphTypology,
   ownPrefixTable,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
-import "@litlfred/cat-harness/schemas/folio-graph-typology.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
 import {
   LEGACY_FOLIO_NS,
   namespaceForLayer,
   prefixForLayer,
   replacementIri,
   termIri,
-} from "@litlfred/cat-harness/schemas/namespaces.js";
-import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg-node.js";
-import { gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/namespaces.js";
+import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
+import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
-import { discoverBlockKinds } from "@litlfred/cat-harness/schemas/block-kinds.js";
-import { defaultInstancePrefixes } from "@litlfred/cat-harness/schemas/content-context.js";
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.js";
-import { ownDeclaredDirectories } from "@litlfred/cat-harness/schemas/declared-nodes.js";
+import { discoverBlockKinds } from "@litlfred/cat-harness/schemas/content/block-kinds.js";
+import { defaultInstancePrefixes } from "@litlfred/cat-harness/schemas/content/content-context.js";
+import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
+import { ownDeclaredDirectories } from "@litlfred/cat-harness/schemas/kg/declared-nodes.js";
 import {
   CLASS_GLOSSES,
   PROPERTY_GLOSSES,
   TERM_LAYERS,
   type TermGloss,
   type TermLayer,
-} from "@litlfred/cat-harness/schemas/vocabulary.js";
+} from "@litlfred/cat-harness/schemas/content/vocabulary.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -93,7 +93,7 @@ const RDF = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
 const OWL = "http://www.w3.org/2002/07/owl#";
 // DECLARED HERE RATHER THAN IMPORTED, and the duplicate is CHECKED.
 //
-// `schemas/jsonld.ts` also declares these two, but it is `folio-assist-core`
+// `schemas/kg/jsonld.ts` also declares these two, but it is `folio-assist-core`
 // and this module is `agentic-harness` — core depends on the harness, so the
 // import would be a wrong-direction edge and `check:partition` refuses it.
 // That is the rule working: the constant a harness module needs must not be
@@ -118,7 +118,7 @@ const DCTERMS = "http://purl.org/dc/terms/";
 export function vocabularyIri(): string {
   // `<base>/ns/vocabulary.jsonld`, NOT `<base>/ns`.
   //
-  // `schemas/jsonld.ts` publishes the content `@context` at
+  // `schemas/kg/jsonld.ts` publishes the content `@context` at
   // `<base>/ns/content/v1.jsonld`, so `<base>/ns` has to be a DIRECTORY. A
   // static host cannot serve a file and a directory at one path, and the
   // first version of this exporter wrote the union document straight to

@@ -6,7 +6,7 @@
  * Bean `6mk7`: on 2026-10-06 packages.fhir.org was refused, and the agent
  * concluded SUSHI could not run, while `fhir-cache-seed-npm` sat in the Tool
  * graph for exactly that refusal. Nothing led from the symptom to the Tool.
- * This reads every declared Tool's `remedies` (schemas/tool.ts,
+ * This reads every declared Tool's `remedies` (schemas/tools/tool.ts,
  * `ToolRemedySchema`) and answers from them, so the answer is the graph's,
  * not a list kept here.
  *
@@ -17,7 +17,7 @@
  * @graphNode script
  */
 import { tools } from "../tools/discover.js";
-import { remediesFor } from "@litlfred/cat-harness/schemas/tool.js";
+import { remediesFor } from "@litlfred/cat-harness/schemas/tools/tool.js";
 
 const args = process.argv.slice(2);
 const json = args.includes("--json");

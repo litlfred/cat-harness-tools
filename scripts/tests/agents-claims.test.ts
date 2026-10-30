@@ -32,7 +32,7 @@ import {
   normalise,
   resolveModule,
 } from "../check-agents-claims.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const REPO = repoRootFor(resolve(HARNESS_ROOT));
@@ -48,7 +48,7 @@ describe("parsing — a claim must carry a backticked symbol and a shape", () =>
   test("a claim spanning a BLOCKQUOTE line break is still one claim", () => {
     // The claims that went stale were inside `>` blocks; a continuation line
     // carrying `>` is what stopped a naive whitespace match from bridging them.
-    expect(locationClaims(normalise("> `resolveSkillDirs` in\n> `schemas/harness-config.ts` does it\n"))).toHaveLength(1);
+    expect(locationClaims(normalise("> `resolveSkillDirs` in\n> `schemas/kg/harness-config.ts` does it\n"))).toHaveLength(1);
   });
 
   test("coordination without a comma is one claim about two symbols", () => {
@@ -59,9 +59,9 @@ describe("parsing — a claim must carry a backticked symbol and a shape", () =>
 
   test("a COMMA before `and` is a clause boundary, not a list", () => {
     // A real false positive: `DocumentContentAdapter` was swallowed across
-    // ", and" and attributed to `schemas/block-kinds.ts`, which it has
+    // ", and" and attributed to `schemas/content/block-kinds.ts`, which it has
     // nothing to do with. A checker that cries wolf gets switched off.
-    const c = locationClaims(normalise("`DocumentContentAdapter` extends it, and `X` in `schemas/block-kinds.ts`"));
+    const c = locationClaims(normalise("`DocumentContentAdapter` extends it, and `X` in `schemas/content/block-kinds.ts`"));
     expect(c.map((x) => x.symbol)).toEqual(["X"]);
   });
 
@@ -94,7 +94,7 @@ describe("parsing — a claim must carry a backticked symbol and a shape", () =>
 
 describe("resolution", () => {
   test("a module is resolved against each root a path may be written from", () => {
-    expect(resolveModule(REPO, "schemas/cat-harness.ts")).toBeDefined();
+    expect(resolveModule(REPO, "schemas/kg/cat-harness.ts")).toBeDefined();
     expect(resolveModule(REPO, "schemas/no-such-module.ts")).toBeUndefined();
   });
 
@@ -160,7 +160,7 @@ describe("the two false claims from git history — the bean's done-when #3", ()
   });
 
   test("a TRUE location claim about today's tree passes", () => {
-    const { claims, findings } = checkClaims(REPO, "`resolveSkillDirs` in `schemas/harness-config.ts` does it.");
+    const { claims, findings } = checkClaims(REPO, "`resolveSkillDirs` in `schemas/kg/harness-config.ts` does it.");
     expect(claims).toHaveLength(1);
     expect(findings).toEqual([]);
   });

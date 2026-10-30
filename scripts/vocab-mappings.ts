@@ -8,7 +8,7 @@
  *
  * Bean `k74z`, owner 2026-10-02: option 1 of
  * `docs/proposals/vocabulary-mappings-2026-10-02.md`. The shape is
- * `schemas/vocab-mapping.ts`; this is its gate.
+ * `schemas/content/vocab-mapping.ts`; this is its gate.
  *
  *   bun run cat-harness-tools/scripts/vocab-mappings.ts --check
  *
@@ -31,9 +31,9 @@
  */
 import { relative, resolve } from "node:path";
 
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import { STANDARD_PREFIXES, expandCurie, toConceptMap } from "@litlfred/cat-harness/schemas/vocab-mapping-fhir.js";
-import { loadVocabMappings, vocabMappingDirs, type VocabMapping } from "@litlfred/cat-harness/schemas/vocab-mapping.js";
+import { loadVocabMappings, vocabMappingDirs, type VocabMapping } from "@litlfred/cat-harness/schemas/content/vocab-mapping.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 // The HARNESS (70lx B2): this script moved up, and what it reads stayed in cat-harness.

@@ -107,7 +107,7 @@
  * as drift). Every one of them moved a count.
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join, relative, resolve } from "path";
 

@@ -42,8 +42,8 @@ import {
   attestationsHomeFor,
   readAttestationFile,
   type SectionTitleVerdict,
-} from "@litlfred/cat-harness/schemas/qa-attestations.js";
-import { conventionalFolioDir } from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.js";
+import { conventionalFolioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 /** chapter directory → section key → decided verdict. */
 export type VerdictMap = Record<string, Record<string, SectionTitleVerdict>>;

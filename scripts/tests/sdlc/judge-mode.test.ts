@@ -55,7 +55,7 @@ import {
   type Family,
 } from "../../check-harness-state.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
-import { implementingRootFor } from "@litlfred/cat-harness/schemas/harness-config.ts";
+import { implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
 
 // The harness owns the sidecars and baselines; this test moved up in 70lx B2b.
 const INSTANCE_ROOT = HARNESS_ROOT;
@@ -494,7 +494,7 @@ describe("check:avatar-coverage", () => {
     const corrupted = {
       ...c,
       required: [...c.required, "zzz-kind-with-no-art"],
-      missing: [...c.missing, { kind: "zzz-kind-with-no-art", where: "schemas/avatars.ts", note: "planted" }],
+      missing: [...c.missing, { kind: "zzz-kind-with-no-art", where: "schemas/content/avatars.ts", note: "planted" }],
     };
     expect(exitOf(judgeAvatarCoverage(corrupted, true))).toBe(1);
     expect(exitOf(judgeAvatarCoverage(c, trashDerivationPresent()))).toBe(0);

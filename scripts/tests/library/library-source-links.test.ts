@@ -32,7 +32,7 @@ import {
   viewPanelHtml,
 } from "../../gen-library-viz.ts";
 import { entryGraphSitePath } from "../../lib/library-entry-graphs.ts";
-import { libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
+import { libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library/library-iri.ts";
 import type { LibraryGraph } from "../../library-graph.ts";
 import { elsewhereLinks, entryRepoLinks, forgeAt, sourceFileOf, viewableOf, viewKindOf } from "../../lib/library-source.ts";
 import { readEntryDocument } from "../../lib/library-document.ts";
@@ -62,6 +62,13 @@ describe("an entry page's sources are the files the writer publishes", () => {
     expect(at("e1.json")).toBe(entryDataFiles(DATA, "e1").blocks);
     const g = { entries: [{ id: "e1", instance: "inst", dir: "inst/library/e1", avatar }] } as unknown as LibraryGraph;
     expect([...avatarCopies(g, SITE, "/repo").keys()]).toEqual([at("e1.png")]);
+  });
+
+  test("the entry's own subgraph index is linked when published (cat-harness#180)", () => {
+    const sg = join(SITE, "subgraph", "inst", "library", "e1", "index.jsonld");
+    const withSg = entrySources({ site: SITE, dataDir: DATA, shellDir: SHELL, instance: "inst", entry: { id: "e1" }, manifest: false, files: [], subgraph: sg });
+    const link = withSg.find((l) => l.what === "the entry's subgraph (JSON-LD)");
+    expect(link && resolve(SHELL, link.href)).toBe(sg);
   });
 
   test("a file that is not published is not linked", () => {

@@ -34,7 +34,7 @@ import { spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { gitCorpus, gitFiles } from "@litlfred/cat-harness/schemas/git-corpus.ts";
+import { gitCorpus, gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 

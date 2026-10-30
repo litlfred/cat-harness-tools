@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * migrate-bib-verifier.ts — Convert legacy free-text `verified_by` strings
- * in the source ledger (`schemas/bib-attestations.ts`) to the discriminated `Verifier`
+ * in the source ledger (`schemas/library/bib-attestations.ts`) to the discriminated `Verifier`
  * union defined in `folio-assistant/schemas/bib-verification.ts`.
  *
  * The legacy shape was:
@@ -22,7 +22,7 @@
  *   bun run cat-harness-tools/pipeline/migrate-bib-verifier.ts --dry-run
  */
 
-import { readSourceLedger, writeSourceLedger } from "@litlfred/cat-harness/schemas/bib-attestations.ts";
+import { readSourceLedger, writeSourceLedger } from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
 import { findContentRepoRoot } from "./repo-root";
 
 // Was rooted at this file's own location, which is the PLATFORM — but the
@@ -83,7 +83,7 @@ if (import.meta.main) {
 
   // This script once also rewrote `_schema` to a free-text description and
   // dropped `_verified_by_caveat`. The ledger's header is now the constant
-  // `source-ledger/v1` (`schemas/bib-attestations.ts`), and rewriting it would
+  // `source-ledger/v1` (`schemas/library/bib-attestations.ts`), and rewriting it would
   // regress every reader, so the header is left alone.
 
   console.log(`Migrated:           ${migrated}`);

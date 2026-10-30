@@ -24,7 +24,16 @@ import {
   STUCK_AFTER_DAYS,
   stuckStatesOf,
   todosNamedBy,
+  inheritsClosure,
+  workingContextOf,
+  dynamicStateDocument,
+  DYNAMIC_STATE_FILE,
+  DYNAMIC_STATE_SCHEMA,
 } from "../workflow-view.ts";
+import { loadProcessModel } from "../../src/workflow/process-model.js";
+import { REFUSALS_KEPT, withRefusal } from "../../src/workflow/instance.js";
+import type { MemoryNode } from "@litlfred/cat-harness/schemas/memory.js";
+import type { RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 
 const NOW = new Date("2026-10-24T00:00:00Z");
 const daysBefore = (n: number) => new Date(NOW.getTime() - n * 24 * 60 * 60 * 1000).toISOString();
@@ -134,9 +143,34 @@ describe("stuck states are states, from committed data and a given now", () => {
     expect(kinds(inst({ status: "completed", updatedAt: daysBefore(100) }), [bean({ status: "completed" })])).toEqual([]);
   });
 
-  test("a refused gate is not a state: it is not recorded, and says why", () => {
-    expect(GATE_REFUSALS.state).toBe("not-recorded");
-    expect(GATE_REFUSALS.why).toContain("nothing records the refusal");
+  test("a refusal after the instance last moved is a refused gate; one before it is history", () => {
+    const refused = inst({
+      updatedAt: daysBefore(2),
+      refusals: [
+        { at: daysBefore(3), node: "Task_A", reason: "older, before the last move" },
+        { at: daysBefore(1), node: "Task_B", actor: "agent", reason: "Task_B is not enabled" },
+      ],
+    });
+    expect(kinds(refused)).toEqual(["refused-gate"]);
+    const d = stuckStatesOf(refused, [bean()], NOW)[0]!.detail;
+    expect(d).toContain("refused 1 step(s)");
+    expect(d).toContain("`Task_B` as agent: Task_B is not enabled");
+    expect(kinds(inst({ updatedAt: daysBefore(1), refusals: [{ at: daysBefore(2), node: "Task_A", reason: "x" }] }))).toEqual([]);
+  });
+
+  test("an instance with no refusals field says not recorded, never 'never refused'", () => {
+    expect(GATE_REFUSALS.since).toBe("2026-10-29");
+    expect(GATE_REFUSALS.why).toContain("not recorded");
+  });
+
+  test("withRefusal keeps the newest, folds the reason to one line, and moves nothing", () => {
+    let s = inst();
+    for (let i = 0; i < REFUSALS_KEPT + 3; i++) s = withRefusal(s, { at: daysBefore(0), node: `T${i}`, reason: "line one\n  line two" });
+    expect(s.refusals!.length).toBe(REFUSALS_KEPT);
+    expect(s.refusals!.at(-1)!.node).toBe(`T${REFUSALS_KEPT + 2}`);
+    expect(s.refusals![0]!.reason).toBe("line one line two");
+    expect(s.updatedAt).toBe(inst().updatedAt);
+    expect(s.tokens).toEqual(inst().tokens);
   });
 });
 
@@ -225,5 +259,129 @@ describe("the process → instance join the processes viewer links by", () => {
     expect(by.get("Process_P")!.map((l) => `${l.store}/${l.id}`)).toEqual(["s1/z", "s2/b"]);
     expect(by.get("Process_C")!.map((l) => `${l.store}/${l.id}`)).toEqual(["s1/a", "s1/z"]);
     expect(by.get("Process_Q")).toBeUndefined();
+  });
+});
+
+describe("the working context at the token (item 3)", () => {
+  const NS = "https://litlfred.github.io/bootstrap/v0/processes/ns#";
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bootstrap.processes="${NS}" id="D" targetNamespace="https://example.test/wf">
+  <bpmn:import namespace="${NS}" location="https://litlfred.github.io/bootstrap/v0/processes/ns.jsonld" importType="http://www.w3.org/ns/json-ld"/>
+  <bpmn:resource id="reviewer" name="Reviewer"/>
+  <bpmn:process id="Process_P" isExecutable="false">
+    <bpmn:laneSet id="LS">
+      <bpmn:lane id="Lane_R" name="Review" partitionElementRef="reviewer">
+        <bpmn:flowNodeRef>S</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_A</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>E</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="S"/>
+    <bpmn:userTask id="Task_A" name="Review the change">
+      <bpmn:extensionElements><bootstrap.processes:skill ref="step-skill"/></bpmn:extensionElements>
+    </bpmn:userTask>
+    <bpmn:endEvent id="E"/>
+    <bpmn:sequenceFlow id="F1" sourceRef="S" targetRef="Task_A"/>
+    <bpmn:sequenceFlow id="F2" sourceRef="Task_A" targetRef="E"/>
+  </bpmn:process>
+</bpmn:definitions>`;
+  async function model() {
+    const dir = mkdtempSync(join(tmpdir(), "wv-context-"));
+    const file = join(dir, "p.bpmn");
+    writeFileSync(file, xml);
+    try {
+      return await loadProcessModel(file);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  const roles = {
+    name: "test",
+    roles: [
+      { id: "reviewer", title: "Reviewer", skills: ["review"], inherits: ["contributor"] },
+      { id: "contributor", title: "Contributor", skills: ["write"] },
+      { id: "publisher", title: "Publisher", skills: ["publish"] },
+    ],
+  } as unknown as RoleGraph;
+  const mem = (id: string, rs: string[], archived = false) =>
+    ({ id, summary: `about ${id}`, label: "stable", archived, tags: { roles: rs, references: [] } }) as unknown as MemoryNode;
+  const memory = [mem("for-reviewers", ["reviewer"]), mem("inherited", ["contributor"]), mem("elsewhere", ["publisher"]), mem("everyone", []), mem("gone", ["reviewer"], true)];
+
+  test("inherits is closed over, nearest first, each role once", () => {
+    expect(inheritsClosure(roles, "reviewer")).toEqual(["reviewer", "contributor"]);
+    expect(inheritsClosure(undefined, "reviewer")).toEqual(["reviewer"]);
+  });
+
+  test("the step's role, its skills, and the memory its role and inherited roles reach", async () => {
+    const m = await model();
+    const [c] = workingContextOf(m, inst({ processId: "Process_P", tokens: ["Task_A"] }), roles, memory);
+    expect(c!.node).toBe("Task_A");
+    expect(c!.role).toBe("reviewer");
+    expect(c!.memoryRoles).toEqual(["reviewer", "contributor"]);
+    expect(c!.skills).toEqual(["review", "step-skill", "write"]);
+    expect(c!.roleMemory.map((x) => x.id)).toEqual(["for-reviewers", "inherited"]);
+    expect(c!.everyoneMemory).toBe(1);
+  });
+
+  test("no role graph: no role, no invented memory; a completed instance has no context", async () => {
+    const m = await model();
+    const [c] = workingContextOf(m, inst({ processId: "Process_P", tokens: ["Task_A"] }), undefined, memory);
+    expect(c!.role).toBeUndefined();
+    expect(c!.roleMemory).toEqual([]);
+    expect(workingContextOf(m, inst({ status: "completed" }), roles, memory)).toEqual([]);
+  });
+});
+
+describe("the dynamic-state document (bean 6h47)", () => {
+  const doc = () =>
+    dynamicStateDocument(
+      "h",
+      [
+        { store: "s", state: inst({ id: "b", updatedAt: daysBefore(10) }), beans: [bean()], page: "en/h/beans/s/workflows/b/" },
+        { store: "s", state: inst({ id: "a" }), beans: [bean()] },
+      ],
+      NOW,
+      ["other"],
+    );
+
+  test("it is told apart from the stage-1 graph export by type and schema, not only by path", () => {
+    const d = doc();
+    expect(DYNAMIC_STATE_FILE).toBe("state.jsonld");
+    expect(d.type).toBe("cat-harness:DynamicState");
+    expect(d.$schema).toBe(DYNAMIC_STATE_SCHEMA);
+    expect(d.generatedAt).toBe(NOW.toISOString());
+  });
+
+  test("one node per instance, sorted, with the stuck states its page shows", () => {
+    const d = doc();
+    expect(d.graph.map((n) => n.id)).toEqual(["#workflow/s/a", "#workflow/s/b"]);
+    const b = d.graph[1]!;
+    expect(b.tokens).toEqual(["Task_A"]);
+    expect(b.beans).toEqual(["x-1"]);
+    expect(b.page).toBe("en/h/beans/s/workflows/b/");
+    expect(b.stuck.map((x) => x.kind)).toEqual(stuckStatesOf(inst({ id: "b", updatedAt: daysBefore(10) }), [bean()], NOW).map((x) => x.kind));
+    expect(b.stuck.map((x) => x.kind)).toContain("enabled-not-taken");
+  });
+
+  test("an unread store is named, so its instances read as unknown, not none", () => {
+    expect(doc().unreadStores).toEqual(["other"]);
+  });
+
+  test("every key it uses is declared in its context: no undeclared term, no @vocab", async () => {
+    const d = doc() as unknown as Record<string, unknown>;
+    const ctx = d["@context"] as Record<string, unknown>;
+    expect(ctx["@vocab"]).toBeUndefined();
+    const keys = new Set<string>();
+    const walk = (v: unknown) => {
+      if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === "object") for (const [k, x] of Object.entries(v)) { if (k !== "@context") { keys.add(k); walk(x); } }
+    };
+    walk(d);
+    keys.delete("$schema");
+    for (const k of keys) expect(k in ctx || k.startsWith("@")).toBe(true);
+    const jsonld = (await import("jsonld")).default;
+    const expanded = await jsonld.expand(JSON.parse(JSON.stringify(d)), { base: "https://example.org/h/state.jsonld" });
+    expect(JSON.stringify(expanded)).toContain("https://example.org/h/state.jsonld#workflow/s/a");
   });
 });

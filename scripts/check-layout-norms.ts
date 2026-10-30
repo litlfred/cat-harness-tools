@@ -104,8 +104,8 @@ import {
   repoRootFor,
   resolveDirectories,
   subgraphTree,
-} from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
 import {
   buildQaResult,
   concludeJudgement,

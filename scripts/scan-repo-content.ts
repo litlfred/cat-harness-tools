@@ -57,9 +57,9 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { LEGACY_HARNESS_CONFIG } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
-import { CONFIG_SUFFIX, isReservedIndexFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
+import { LEGACY_HARNESS_CONFIG } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
+import { CONFIG_SUFFIX, isReservedIndexFile } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join, relative, resolve, sep } from "node:path";
 

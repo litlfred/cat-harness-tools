@@ -55,9 +55,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { availableParallelism, tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { readRoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
-import { orderedDependencies } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { orderedDependencies } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { knownSkills } from "../known-skills.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
@@ -249,7 +249,7 @@ describe("skill refs resolve across the `needs` chain", () => {
    *
    * `needs` is OPTIONAL in the schema and an absent value is UNDETERMINED —
    * `[]` asserts this instance is the floor, absent is nobody having said
-   * (`schemas/cat-harness.ts`; `schemas/layer-direction.ts` refuses the same
+   * (`schemas/kg/cat-harness.ts`; `schemas/kg/layer-direction.ts` refuses the same
    * collapse for edges). Such an instance cannot have a ref judged dangling:
    * what it reaches was never declared, so the honest answer is `unknown`.
    * The constructed test below proves that mechanism on an instance it builds.

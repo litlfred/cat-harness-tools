@@ -13,7 +13,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { frontMatterOf, resolveEvidence } from "../check-methodology-evidence.ts";
-import { MethodologyFrontMatterSchema, METHODOLOGY_SCHEMA_TAG } from "@litlfred/cat-harness/schemas/methodology.ts";
+import { MethodologyFrontMatterSchema, METHODOLOGY_SCHEMA_TAG } from "@litlfred/cat-harness/schemas/process/methodology.ts";
 import { parse as parseYaml } from "yaml";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 

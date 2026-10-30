@@ -21,7 +21,7 @@
  * wrapper used to `git init` inside the shared `bootstrap/` and
  * `bootstrap-tools/` mounts for its whole run. Meanwhile
  * `check:cat-harness-standalone` read the same tree: `instanceRootsIn`
- * (cat-harness `schemas/instance-roots.ts`) drops a subdirectory with its own
+ * (cat-harness `schemas/kg/instance-roots.ts`) drops a subdirectory with its own
  * `.git` as a foreign checkout, and `closureOf` (`seed-ready.ts`) skips a
  * missing need without a word. So cat-harness was laid out without bootstrap,
  * and its five `render-exemption.test.ts` tests failed in every index that runs

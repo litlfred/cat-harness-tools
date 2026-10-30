@@ -20,7 +20,7 @@
  *
  * ## Why this reader exists at all
  *
- * `schemas/todo.ts`, `schemas/todo-graph.ts` and the `todos` / `todo-items`
+ * `schemas/sdlc/todo.ts`, `schemas/sdlc/todo-graph.ts` and the `todos` / `todo-items`
  * graph typologies were all in place before any todo existed on disk, and
  * `harness.json` did not declare `todos/`. A schema ahead of its graph is
  * harmless; a **declared directory nothing reads** is not — that is the bean
@@ -41,11 +41,11 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 
-import { EMPTY_NOTE_TAGS, KgRefSchema, type ArtefactRef, type KgRef, type NoteTags } from "@litlfred/cat-harness/schemas/carried-note.js";
-import { TODO_SCHEMA_TAG, TodoNodeSchema, type TodoNode } from "@litlfred/cat-harness/schemas/todo.js";
-import { TODO_GRAPH_FILE, parseTodoGraph } from "@litlfred/cat-harness/schemas/todo-graph.js";
-import { deferResolution, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { corpusDirectoryForGraph } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { EMPTY_NOTE_TAGS, KgRefSchema, type ArtefactRef, type KgRef, type NoteTags } from "@litlfred/cat-harness/schemas/kg/carried-note.js";
+import { TODO_SCHEMA_TAG, TodoNodeSchema, type TodoNode } from "@litlfred/cat-harness/schemas/sdlc/todo.js";
+import { TODO_GRAPH_FILE, parseTodoGraph } from "@litlfred/cat-harness/schemas/sdlc/todo-graph.js";
+import { deferResolution, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { corpusDirectoryForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import { graphReadPath } from "./graph-read.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

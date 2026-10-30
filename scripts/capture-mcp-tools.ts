@@ -45,10 +45,7 @@ export interface CapturedTool {
 /** Modules holding `register*` exports that call `server.tool(...)`. */
 const TOOL_MODULES = [
   "src/tools/beans-prime.ts",
-  "src/tools/check-deps.ts",
   "src/tools/folio-init.ts",
-  "src/tools/preferences.ts",
-  "src/tools/preview.ts",
   "src/tools/readme-audit.ts",
   "src/tools/readme-sync.ts",
   "src/tools/skill-fetch.ts",

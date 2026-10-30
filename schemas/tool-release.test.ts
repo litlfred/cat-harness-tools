@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { defaultGraphTypologies, graphLayer, isRenderable, processMayWrite } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/spdx-license-expression.ts";
+import { defaultGraphTypologies, graphLayer, isRenderable, processMayWrite } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/library/spdx-license-expression.ts";
 import {
   TOOL_RELEASE_SCHEMA_TAG,
   ToolReleaseRefSchema,
@@ -11,7 +11,7 @@ import {
   parseToolReleaseRef,
   toolReleaseLicenceProblem,
   toolReleaseRef,
-} from "@litlfred/cat-harness/schemas/tool-release.ts";
+} from "@litlfred/cat-harness/schemas/tools/tool-release.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { dirname } from "node:path";
 

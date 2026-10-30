@@ -10,7 +10,7 @@
  *
  * | form | where | example |
  * |---|---|---|
- * | `tag` | a `@conformsTo <spec-id>` line in a TypeScript/JavaScript doc comment | `schemas/jsonld.ts` |
+ * | `tag` | a `@conformsTo <spec-id>` line in a TypeScript/JavaScript doc comment | `schemas/kg/jsonld.ts` |
  * | `front-matter` | a `conformsTo:` list in a markdown file's front matter | a skill |
  * | `xmlns` | an XML namespace binding to one of the spec's namespaces — the file's own declaration, in its own syntax | every `.bpmn` |
  * | `kind` | a graph typology (or one `$schema` family of it) whose validator or shape module declares the spec | `folio-dublin-core/v1` → `dublin-core.ts` |

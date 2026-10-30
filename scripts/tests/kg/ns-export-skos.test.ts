@@ -5,8 +5,8 @@
  * @graphNode none — a test
  *
  * `skos:` has been bound in the published `@context` since it was written
- * (`schemas/jsonld.ts:551`, and the shipped `ns/content/v1.jsonld`), and
- * `schemas/tabular-csvw.ts` states in prose that this graph "already speaks
+ * (`schemas/kg/jsonld.ts:551`, and the shipped `ns/content/v1.jsonld`), and
+ * `schemas/library/tabular-csvw.ts` states in prose that this graph "already speaks
  * eight published vocabularies — doco, deo, cito, oa, prov, **skos**, dcterms,
  * fhir". Measured while holding the `lqo9` roast, `skos:` was emitted by
  * **zero** nodes. The claim was false, and nothing broke, which is exactly why
@@ -29,7 +29,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { buildVocabulary } from "../../ns-export.ts";
-import { CONTENT_CONTEXT, DCTERMS_NS, SKOS_NS } from "@litlfred/cat-harness/schemas/jsonld.ts";
+import { CONTENT_CONTEXT, DCTERMS_NS, SKOS_NS } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
 
 type Node = Record<string, unknown>;
 interface Doc {
@@ -161,7 +161,7 @@ describe("the folio vocabulary emits SKOS", () => {
   });
 
   test("the locally-declared namespaces EQUAL the ones in jsonld.ts", () => {
-    // `ns-export.ts` is `agentic-harness` and `schemas/jsonld.ts` is
+    // `ns-export.ts` is `agentic-harness` and `schemas/kg/jsonld.ts` is
     // `folio-assist-core`, so importing the constants there would be a
     // wrong-direction edge `check:partition` refuses. They are therefore
     // declared twice — and this is what makes that duplicate a CHECKED one.

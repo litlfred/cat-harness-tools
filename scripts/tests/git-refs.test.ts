@@ -21,7 +21,7 @@ import { join, resolve } from "node:path";
 
 import { DEFAULT_PUBLISH_REF, detectRepoUrl, ownerRepo, publishTargets, publishedPaths, withoutCredentials } from "../../src/core/git-refs.js";
 import { loadReadmeConfig } from "../../pipeline/readme-toc.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
 import { gitFixtureRepo } from "../../test/support/git-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";

@@ -20,8 +20,8 @@ import {
 import { publishedIdentity, publishedInstanceSchemas, scannedInstanceSchemas } from "../kg-export.js";
 import { inAggregate } from "../../test/support/checkout.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
-import { artefactStub, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { isPublished, publishedPath } from "@litlfred/cat-harness/schemas/url-space.js";
+import { artefactStub, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { isPublished, publishedPath } from "@litlfred/cat-harness/schemas/kg/url-space.js";
 import {
   PUBLISHED_ELSEWHERE,
   declaredInstanceStubs,

@@ -22,7 +22,7 @@
  * Beside the entry's manifest, at its path relative to the entry:
  * `<entry>/l1-extraction/recommendations.l1.json` is published at
  * `assets/library/jsonld/<instance>/<entry>/l1-extraction/recommendations.l1.json`.
- * That is the layout `schemas/library-iri.ts` reserved for exactly this — *"the
+ * That is the layout `schemas/library/library-iri.ts` reserved for exactly this — *"the
  * entry's other nodes have an obvious place to be published under the same
  * directory later"* — and it keeps the source layout, so a relative reference
  * between two files of the sub-graph still resolves on the site.
@@ -37,10 +37,10 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { findInstanceRoot, instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/graph-typology-registry.ts";
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/instance-roots.ts";
-import { libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library-iri.ts";
+import { findInstanceRoot, instanceDirectories, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { defaultGraphTypologies, type GraphTypologyRegistry } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
+import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+import { libraryAssetSitePath } from "@litlfred/cat-harness/schemas/library/library-iri.ts";
 
 /** One file of a sub-graph declared inside a library entry. */
 export interface EntryGraphFile {

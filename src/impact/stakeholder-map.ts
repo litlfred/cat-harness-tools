@@ -6,7 +6,7 @@
  * `harness.config.json` and CODEOWNERS".
  *
  * NEITHER SOURCE EXISTS. This repository has no CODEOWNERS file, and
- * `schemas/harness-config.ts` declares no role, owner, maintainer or contact
+ * `schemas/kg/harness-config.ts` declares no role, owner, maintainer or contact
  * field. A tool built on those two would have reported "no stakeholders" for
  * every change, forever, and looked like it worked.
  *
@@ -58,7 +58,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { isSkillMd, kgRoots, skillMdDirs, workflowFiles, corpusScopeFor, roleGraphFor } from "../../scripts/known-skills.js";
 import { join, relative } from "node:path";
 import { loadProcessModel, isActivity, processDiagrams } from "../workflow/process-model.js";
-import { readRoleGraph, roleForLane, type RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { readRoleGraph, roleForLane, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 
 export interface SkillImpact { name: string; path: string }
 export interface LaneImpact {

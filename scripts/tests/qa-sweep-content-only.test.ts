@@ -27,10 +27,10 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { graphLayer, isContentGraph, isContextGraph, isDerivedGraph, isStateGraph, processMayWrite, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { graphLayer, isContentGraph, isContextGraph, isDerivedGraph, isStateGraph, processMayWrite, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 import { walkBlocks } from "../../pipeline/qa-utils.js";
-import {  } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -122,7 +122,7 @@ describe("why the skip needs no 'unknown layer' arm", () => {
     // declaration, and a registered one always has `holds` because the schema
     // requires it. Unreachable defensive code is the `no-runs` defect from
     // bean `lr7h`, one file along.
-    const { readDeclaration } = await import("@litlfred/cat-harness/schemas/cat-harness.js");
+    const { readDeclaration } = await import("@litlfred/cat-harness/schemas/kg/cat-harness.js");
     const root = mkdtempSync(join(tmpdir(), "sweep-scope-unknown-"));
     writeDeclaration(root, JSON.stringify({
         name: "probe",

@@ -22,7 +22,7 @@
 import { describe, test, expect } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import {
   registerDeclaredToolGroups,
@@ -32,6 +32,7 @@ import {
   type ToolGroupDeclaration,
 } from "../src/tool-groups.ts";
 import { tools as harnessTools } from "@litlfred/cat-harness/tools/index.ts";
+import { discoverTools } from "../tools/discover.ts";
 
 /** This instance's root, for the ad-hoc declarations below. */
 const MCP_ROOT = new URL("..", import.meta.url).pathname;
@@ -73,11 +74,17 @@ describe("MCP tool groups", () => {
     // the walk existed.
     const harness = sets.find((s) => s.root === HARNESS.replace(/\/$/, ""));
     expect(harness?.groups.map((g) => g.module).sort()).toEqual(toolGroupsFromNodes(harnessTools()).map((g) => g.module).sort());
-    // And a layer ABOVE the harness, reached only through the tree: sci's
-    // `lean_formal_edges` was a `contributes` tool group until its Tool node
-    // replaced it (bean riit).
+    // And a layer ABOVE the harness, reached only through the tree: exactly
+    // that layer's own Tool nodes' modules, read from its graph rather than
+    // restated here — a hand list went stale the moment bean `bbza` moved
+    // three Tools up to sci. sci's `lean_formal_edges` was a `contributes`
+    // tool group until its Tool node replaced it (bean riit).
     const sci = sets.find((s) => s.instance === "folio-assistant-sci");
-    expect(sci?.groups.map((g) => g.module)).toEqual(["pipeline/formal-edges-mcp.ts"]);
+    expect(sci).toBeDefined();
+    const sciNodes = discoverTools(dirname(sci!.root), undefined, sci!.root);
+    expect(sciNodes.failures).toEqual([]);
+    expect(sci!.groups.map((g) => g.module).sort()).toEqual(toolGroupsFromNodes(sciNodes.tools).map((g) => g.module).sort());
+    expect(sci!.groups.map((g) => g.module)).toContain("pipeline/formal-edges-mcp.ts");
   });
 
   test("a folio that declares nothing still gets the harness's tools", () => {
@@ -117,7 +124,7 @@ describe("MCP tool groups", () => {
     // Different states because the remedies are opposite: fix the module vs
     // install the layer. Collapsing them sends the operator the wrong way.
     const broken: ToolGroupDeclaration[] = [
-      { id: "wrong-export", module: "src/tools/preview.ts", registrar: "registerNoSuchThing", layer: "sci" },
+      { id: "wrong-export", module: "src/tools/readme-audit.ts", registrar: "registerNoSuchThing", layer: "sci" },
     ];
     const [o] = await registerDeclaredToolGroups({}, broken, MCP_ROOT);
     expect(o.state).toBe("failed");
@@ -127,8 +134,8 @@ describe("MCP tool groups", () => {
   test("a registrar that throws is `failed`, and does not abort the rest", async () => {
     const calls: string[] = [];
     const groups: ToolGroupDeclaration[] = [
-      { id: "wrong-export", module: "src/tools/preview.ts", registrar: "registerNoSuchThing", layer: "sci" },
-      { id: "preferences", module: "src/tools/preferences.ts", registrar: "registerPreferenceTools", layer: "cat-harness" },
+      { id: "wrong-export", module: "src/tools/readme-audit.ts", registrar: "registerNoSuchThing", layer: "sci" },
+      { id: "readme-audit", module: "src/tools/readme-audit.ts", registrar: "registerReadmeAuditTools", layer: "cat-harness" },
     ];
     const fake = { tool: (n: string) => calls.push(n), registerTool: (n: string) => calls.push(n) };
     const out = await registerDeclaredToolGroups(fake, groups, MCP_ROOT);

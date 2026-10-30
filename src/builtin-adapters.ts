@@ -64,7 +64,7 @@ import {
   instanceRootsIn,
   repoRootFor,
   type ContentAdapterDeclaration,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -88,7 +88,7 @@ export interface BuiltinAdapterDeclaration {
   extends?: string;
 }
 
-/** Two instances declaring one `contentType`. Not resolved by order — see `schemas/contributions.ts`. */
+/** Two instances declaring one `contentType`. Not resolved by order — see `schemas/content/contributions.ts`. */
 export class AdapterDeclarationCollisionError extends Error {}
 
 /** How many `extends` hops lie beneath this entry — deeper sorts first. */

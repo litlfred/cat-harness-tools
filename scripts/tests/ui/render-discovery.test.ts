@@ -12,8 +12,8 @@
 import { describe, test, expect } from "bun:test";
 
 import { resolveRenderTarget } from "../../../pipeline/render-discovery.ts";
-import { RENDER_TARGETS } from "@litlfred/cat-harness/schemas/render-targets.ts";
-import { ContributionRegistry } from "@litlfred/cat-harness/schemas/contributions.ts";
+import { RENDER_TARGETS } from "@litlfred/cat-harness/schemas/ui/render-targets.ts";
+import { ContributionRegistry } from "@litlfred/cat-harness/schemas/content/contributions.ts";
 
 describe("the built-in targets", () => {
   test("paper renders to LaTeX and IS structurally checked", async () => {

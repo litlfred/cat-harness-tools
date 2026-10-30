@@ -5,7 +5,7 @@
  *
  * The contract is `skills/kg/kg-core/kg-export.md` §"Named subgraphs — one
  * IRI, two files, framed from one graph" (bean `c1m4`), and the schema both
- * files validate against is `schemas/subgraph-manifest.ts`.
+ * files validate against is `schemas/kg/subgraph-manifest.ts`.
  *
  * ## What is a subgraph here
  *
@@ -36,7 +36,7 @@
  *   over its declared directories (bean `ax6r`) — a path outside them falls
  *   to that instance's root.
  * - A Tool node has no source path: it is placed by the folder convention
- *   (`schemas/tool-folders.ts`, `<tools dir>/<id>/<id>.ts`) in its OWN
+ *   (`schemas/tools/tool-folders.ts`, `<tools dir>/<id>/<id>.ts`) in its OWN
  *   instance's `tools` subgraph — `tools/<id>/` when that folder is on disk,
  *   else the `tools/` directory itself.
  * - Everything else — schemas, roles, graph typologies — is a direct member
@@ -88,7 +88,7 @@
  * literal over {@link HEAVY_LITERAL_BYTES} rather than trimming it, because a
  * body that has crept into the graph is a kg-export defect to fix there.
  *
- * For the fields `HEAVY_POINTERS` names (`schemas/subgraph-manifest.ts`), the
+ * For the fields `HEAVY_POINTERS` names (`schemas/kg/subgraph-manifest.ts`), the
  * TARGET is published as a PAYLOAD: one immutable file per distinct body at
  * `docs/payload/sha256/<hex>`, served at `<BASE_URL>/payload/sha256/<hex>`,
  * with its media type in `<hex>.json` beside it. The node carries a `payload`
@@ -129,12 +129,12 @@ import { basename, dirname, extname, join, relative, resolve, sep } from "node:p
 import jsonld from "jsonld";
 import { buildContext, buildExport, graphTypologyId } from "./kg-export.js";
 import { corpusScopeFor, kgDirectories, workflowFiles } from "./known-skills.js";
-import { checkoutRootFor, findInstanceRoot, instanceDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { checkoutRootFor, findInstanceRoot, instanceDirectories, instanceDirectoriesForGraph, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.js";
-import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/namespaces.js";
-import { ownPrefixTable } from "@litlfred/cat-harness/schemas/graph-typology-registry.js";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.js";
+import { propertyIri, termIri } from "@litlfred/cat-harness/schemas/kg/namespaces.js";
+import { ownPrefixTable } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.js";
 import {
   HEAVY_POINTERS,
   PAYLOAD_MEDIA_TYPES,
@@ -149,8 +149,9 @@ import {
   SUBGRAPH_INDEX_FILE,
   SubgraphHydratedSchema,
   SubgraphIndexSchema,
-} from "@litlfred/cat-harness/schemas/subgraph-manifest.js";
+} from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { libraryContextLoader, libraryEntryNodes } from "./lib/library-subgraph-nodes.ts";
 import { readInstanceDecls } from "./gen-instance-contexts.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -510,8 +511,14 @@ export function framedInstances(root: string = ROOT): string[] {
   return [own, ...[...out].sort()];
 }
 
-/** The graph typology whose directories hold Tool nodes (`schemas/tool-folders.ts`). */
+/** The graph typology whose directories hold Tool nodes (`schemas/tools/tool-folders.ts`). */
 const TOOLS_GRAPH = "tools";
+/**
+ * The graph typology whose directories hold library entries (cat-harness#180;
+ * owner, 2026-10-11 and 2026-10-29: each `library/<doc>/` is a subgraph, nested
+ * under its instance's `library` subgraph by the containment rule).
+ */
+const LIBRARY_GRAPH = "library";
 
 /**
  * Every directory this build heads a subgraph tree at: the knowledge-graph
@@ -529,7 +536,7 @@ export function subgraphDirectories(root: string = ROOT): Array<{ id: string; pa
   const out = kgDirectories(root, corpusScopeFor(root)).map((d) => ({ id: d.id, path: d.path, absPath: d.absPath }));
   for (const inst of framedInstances(root)) {
     const ids = new Map(instanceDirectories(inst).map((d) => [resolve(inst, d.path), d.id]));
-    for (const abs of instanceDirectoriesForGraph(inst, TOOLS_GRAPH)) {
+    for (const abs of [...instanceDirectoriesForGraph(inst, TOOLS_GRAPH), ...instanceDirectoriesForGraph(inst, LIBRARY_GRAPH)]) {
       if (!existsSync(abs)) continue;
       const id = ids.get(resolve(abs));
       if (id === undefined) continue; // declared FROM WITHIN another entry: its parent's tree already walks it
@@ -554,7 +561,7 @@ function pathOf(n: Node): string | undefined {
  * a tracked or unignored file, and each of its ancestors — as `rel`-prefixed,
  * `/`-terminated paths in sorted order (parents before children).
  *
- * Asked of git, never of the disk (`schemas/git-corpus.ts`): a walk would mint
+ * Asked of git, never of the disk (`schemas/sdlc/git-corpus.ts`): a walk would mint
  * a subgraph for one machine's ignored residue, and the committed output would
  * then differ by checkout. `undefined` when git cannot answer.
  */
@@ -976,6 +983,8 @@ export async function generateSubgraphs(
   payloadPlan: PayloadPlan;
   payloadFiles: Map<string, Buffer | string>;
   payloadDir: string;
+  /** Library entry files left out of the tree, and why — printed, never fatal. */
+  warnings: string[];
 }> {
   const root = opts.root ?? ROOT;
   const decl = readDeclaration(root);
@@ -994,6 +1003,11 @@ export async function generateSubgraphs(
   const rootOf = new Map<string, string>();
   const payloadPlans: PayloadPlan[] = [];
   const exportProblems: string[] = [];
+  // Library entry files that cannot be read as nodes are WARNINGS, not
+  // problems: they are the entry's own defect (its writer's to fix), and a
+  // publish must not stop over committed data this generator only points at.
+  const warnings: string[] = [];
+  const libraryLoader = libraryContextLoader(checkoutRootFor(root));
   for (const inst of framedInstances(root)) {
     const data = await buildExport({ instanceRoot: inst, scope: "instance" });
     const name = readDeclaration(inst)?.name ?? basename(inst);
@@ -1001,6 +1015,15 @@ export async function generateSubgraphs(
     const own = (data["@graph"] as Node[]).filter((n) => n.deprecated !== true && !rootOf.has(String(n["@id"])));
     for (const n of own) rootOf.set(String(n["@id"]), inst);
     exported.push(...own);
+    // Library entries, which kg-export does not read (cat-harness#180): one
+    // pointer per entry file, placed by its path under the `library` subgraph.
+    const lib = await libraryEntryNodes(inst, libraryLoader);
+    for (const p of lib.problems) warnings.push(`library (${name}): ${p}`);
+    for (const n of lib.nodes as Node[]) {
+      if (rootOf.has(String(n["@id"]))) continue;
+      rootOf.set(String(n["@id"]), inst);
+      exported.push(n);
+    }
     // Payloads first, so every node carries its link into both frames — each
     // against the instance its paths are relative to.
     payloadPlans.push(planPayloads(own, { root: inst, baseUrl }));
@@ -1023,7 +1046,7 @@ export async function generateSubgraphs(
   const files = await renderSubgraphFiles(plan, decl.name, outDir);
   const payloadDir = payloadOutDir(root);
   const payloadFiles = renderPayloadFiles(payloadPlan, payloadDir);
-  return { plan, files, harness: decl.name, outDir, payloadPlan, payloadFiles, payloadDir };
+  return { plan, files, harness: decl.name, outDir, payloadPlan, payloadFiles, payloadDir, warnings };
 }
 
 function listFiles(abs: string): string[] {
@@ -1039,7 +1062,8 @@ function listFiles(abs: string): string[] {
 
 async function main(): Promise<number> {
   const check = process.argv.includes("--check");
-  const { plan, files, outDir, payloadPlan, payloadFiles, payloadDir } = await generateSubgraphs();
+  const { plan, files, outDir, payloadPlan, payloadFiles, payloadDir, warnings } = await generateSubgraphs();
+  for (const w of warnings) console.error(`  ⚠ ${w}`);
 
   if (plan.problems.length > 0) {
     console.error(`gen-subgraph-jsonld: ${plan.problems.length} problem(s) — nothing written:`);

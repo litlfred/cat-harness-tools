@@ -8,7 +8,7 @@
 #
 # and this workflow keeps that pin on the newest (green) commit of `main`,
 # writing the rule's consent, by name, for every pin it moves
-# (`scripts/repin-standing.ts`; the rule is cat-harness's `schemas/mount-trust.ts`).
+# (`scripts/repin-standing.ts`; the rule is cat-harness's `schemas/kg/mount-trust.ts`).
 #
 # A caller (in the site, e.g. `.github/workflows/standing-repin.yml`):
 #

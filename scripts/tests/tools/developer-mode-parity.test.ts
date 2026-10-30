@@ -28,7 +28,7 @@ import {
   MODEL_PROVENANCES,
   PUBLICATION_HOSTS,
   topologyConflicts,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   reasoningTierGte,
   checkModelCapabilities,
@@ -37,8 +37,8 @@ import {
   type ModelConfig,
   type ModelCapabilities,
 } from "../../../src/workflow/model-capabilities.js";
-import { defineTool, type ToolDefinition } from "@litlfred/cat-harness/schemas/tool.js";
-import type { RoleGraph } from "@litlfred/cat-harness/schemas/role-graph.js";
+import { defineTool, type ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.js";
+import type { RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 import { loadProcessModel } from "../../../src/workflow/process-model.js";
 import { startInstance, complete } from "../../../src/workflow/instance.js";
 import { workflowFile } from "../../known-skills.ts";
@@ -60,7 +60,9 @@ describe("MCP-vs-CLI tool parity measurer", () => {
     expect(mcpOnlyToolIds).toContain("workflow-start");
     expect(mcpOnlyToolIds).toContain("workflow-complete");
     expect(mcpOnlyToolIds).toContain("skill-fetch");
-    expect(mcpOnlyToolIds).toContain("paper-preferences");
+    // paper-preferences was here until bean `bbza` moved it to folio-assistant-sci;
+    // this measurer reads the harness's own Tool list.
+    expect(mcpOnlyToolIds).toContain("translation-status");
 
     expect(report.skills.mcpOnly).toContain("process-state");
     expect(report.skills.mcpOnly).toContain("skills-and-tools");

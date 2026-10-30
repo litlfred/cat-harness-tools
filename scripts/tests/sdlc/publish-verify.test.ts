@@ -11,16 +11,16 @@ import { join } from "node:path";
 
 import jsonld from "jsonld";
 
-import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/jsonld.ts";
-import { CAT_HARNESS_NS } from "@litlfred/cat-harness/schemas/namespaces.ts";
+import { CONTENT_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
+import { CAT_HARNESS_NS } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
 import { buildFshGutsExport } from "../../fsh-guts-export";
 import { buildGlossary } from "../../glossary-export";
 import { buildVocabulary } from "../../ns-export";
-import { codeListDirs, loadCodeLists } from "@litlfred/cat-harness/schemas/code-list.ts";
+import { codeListDirs, loadCodeLists } from "@litlfred/cat-harness/schemas/library/code-list.ts";
 import { buildCodeListsDoc } from "../../code-lists";
-import { PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/prov-jsonld.ts";
+import { PROV_JSONLD_CONTEXT_URL } from "@litlfred/cat-harness/schemas/kg/prov-jsonld.ts";
 import { SCOPES_DIR, render } from "../../search-split.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HTML_UNIQUE_IDS, JSONLD_EXPAND, JSONLD_OBJECT_LINKS, JSONLD_OWN_BASE, SEARCH_EXCLUDE_MARKER, SEARCH_INDEX, SEARCH_INDEX_PATH, SEARCH_SCOPES, VERIFIERS, declaredBase, expandFindings, isOurs, localLoader, verify } from "../../publish-verify";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 

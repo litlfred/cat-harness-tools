@@ -70,14 +70,14 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 
-import { repoRootFor, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { repoRootFor, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import {
   VIEWER_NAV_QA_SCHEMA,
   ViewerNavQaSchema,
   type ViewerNavFlag,
   type ViewerNavPage,
   type ViewerNavQa,
-} from "@litlfred/cat-harness/schemas/viewer-nav-qa.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/viewer-nav-qa.ts";
 import { declinesNavbar, isStandalonePage, sitePathForPage } from "./viewer-page.ts";
 import { RAIL_DATA_DIR, expandRail, railDataJson, wantsLinkedRail } from "./lib/harness-rail.ts";
 import { RAIL_SECTION_LABELS } from "./lib/navbar.ts";

@@ -46,7 +46,7 @@ import { Glob } from "bun";
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   declarationStarts,
   splitDeclarations,

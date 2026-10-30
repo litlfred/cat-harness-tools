@@ -35,7 +35,7 @@
  * `docPath` `exportIdentity` gives a foreign instance (bean `dyd3`), with the
  * `.json` alias beside it because Pages serves `.jsonld` as octet-stream. The
  * `<name>/` segment is cat-harness's one URL-space resolver
- * (`schemas/url-space.ts`, bean `nbal`), through {@link instanceSitePath}: the
+ * (`schemas/kg/url-space.ts`, bean `nbal`), through {@link instanceSitePath}: the
  * segment is the instance's NAME, never its stub (owner, 2026-09-20, recorded
  * on bean `cat-tools-sthf`). An instance declaring `"enabled": false` is not
  * planned, so it is not published.
@@ -56,8 +56,8 @@ import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { artefactStub, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { isPublished, publishedPath } from "@litlfred/cat-harness/schemas/url-space.js";
+import { artefactStub, instanceRootsIn, readDeclaration, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { isPublished, publishedPath } from "@litlfred/cat-harness/schemas/kg/url-space.js";
 import { INSTANCE_SCHEMA_DIR } from "./harness-schema-export.js";
 import { stagingFields } from "./staging-stamp.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
@@ -229,7 +229,9 @@ if (import.meta.main) {
   // Dynamic, and only here: `kg-export` imports this module (for
   // `declaresOwnCanonical` and the plan), so a static import back would be a
   // cycle, and `--list` has no use for the exporter's whole import graph.
-  const { scannedInstanceSchemas } = await import("./kg-export.js");
+  const { scannedInstanceSchemas, exportIdentity } = await import("./kg-export.js");
+  // This site's base: where an own-canonical instance's copy is served (#638).
+  const siteBase = exportIdentity(baseUrl ? { baseUrl } : {}).base;
   const staging = stagingFields();
   // The deploy publishes documents, not QA sidecars: those are committed and
   // compared by `kg:export:check`. A temp root keeps this run from writing
@@ -242,6 +244,10 @@ if (import.meta.main) {
       mkdirSync(dirname(doc), { recursive: true });
       const args = ["run", join(TOOLS_ROOT, "scripts", "kg-export.ts"), "--instance", p.path, "--out", doc, "--qa-root", qaRoot];
       if (baseUrl && !p.ownCanonical) args.push("--base-url", baseUrl);
+      // An own-canonical instance mints at its own site, which serves nothing
+      // yet; its subject pages are a copy here, `sameAs` the canonical IRI
+      // (owner, 2026-10-29, litlfred/cat-harness-tools#638 option B).
+      if (p.ownCanonical && siteBase) args.push("--served-at", `${siteBase}/${instanceDocPath(p)}`);
       const r = spawnSync("bun", args, { cwd: REPO, encoding: "utf-8" });
       if (r.status !== 0) {
         failed++;

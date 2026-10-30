@@ -47,7 +47,7 @@ import {
   DEFAULT_BEAN_GRAPH_ROOT,
   nodeOfKind,
   parseBeanGraph,
-} from "@litlfred/cat-harness/schemas/bean-graph.ts";
+} from "@litlfred/cat-harness/schemas/sdlc/bean-graph.ts";
 import { WORKFLOW_DIR } from "../src/workflow/store.js";
 import { graphReadPath } from "./graph-read.ts";
 
@@ -96,7 +96,7 @@ export function checkHarnessDirs(root: string): HarnessDirsReport {
 
   // The bean graph is the DECLARATION. It used to be `harness.config.json`'s
   // `harness` block; moving it here removed one of the three places the same
-  // path was written, rather than adding a fourth. See schemas/bean-graph.ts.
+  // path was written, rather than adding a fourth. See schemas/sdlc/bean-graph.ts.
   const graphPath = join(graphRoot, BEAN_GRAPH_FILE);
   if (existsSync(graphPath)) {
     try {

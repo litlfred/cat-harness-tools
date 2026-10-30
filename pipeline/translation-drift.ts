@@ -40,13 +40,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-import { directoryForGraph, repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { directoryForGraph, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { buildTranslationIndex, siteRoot } from "./translation-index.ts";
 import { sourceForPermalink } from "../scripts/lib/jekyll-permalink.ts";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { PAGE_LOCALE, routesRecordedInSite, visualisersRenderedBy } from "../scripts/viewer-declarations.ts";
-import { visualiserRoute } from "@litlfred/cat-harness/schemas/visualiser-route.ts";
+import { visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.ts";
 
 /** One heading, reduced to what can be compared ACROSS a translation. */
 export interface Heading {

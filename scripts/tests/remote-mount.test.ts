@@ -19,15 +19,15 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { declarationChain } from "@litlfred/cat-harness/schemas/harness-config.ts";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/instance-roots.ts";
-import { RemoteSourceSchema, resolveSubgraphSource } from "@litlfred/cat-harness/schemas/subgraph-source.ts";
-import { MountLockSchema, mountedInstanceRoots } from "@litlfred/cat-harness/schemas/remote-mount.ts";
+import { declarationChain } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+import { RemoteSourceSchema, resolveSubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph-source.ts";
+import { MountLockSchema, mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.ts";
 import { AGENT_SURFACE_GENERATORS, checkRemote, exitCode, mountRemote, planRemote, remoteFanOut, summarise } from "../remote-mount.ts";
-import { IGNORE_BLOCK_BEGIN, IGNORE_BLOCK_END, INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "@litlfred/cat-harness/schemas/index-config.ts";
+import { IGNORE_BLOCK_BEGIN, IGNORE_BLOCK_END, INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "@litlfred/cat-harness/schemas/kg/index-config.ts";
 import { run as replayLocks } from "../mount-from-lock.ts";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/git-corpus.ts";
-import { subgraphIndexPackage } from "@litlfred/cat-harness/schemas/subgraph-manifest.ts";
+import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
+import { subgraphIndexPackage } from "@litlfred/cat-harness/schemas/kg/subgraph-manifest.ts";
 import { packSubgraphIndex } from "../subgraph-index-package.ts";
 
 function git(cwd: string, ...args: string[]): string {
@@ -184,6 +184,62 @@ describe("mount:remote over fixture repositories", () => {
     expect(exitCode(c.state)).toBe(0);
   });
 
+  test("1b. an instance entry left at an older commit than its pin is missing, not mounted (folio-assistant#2682)", () => {
+    const root = downstream({});
+    mountRemote({ instanceRoot: root, urlFor });
+    const file = join(root, "index.lock.json");
+    const lock = JSON.parse(readFileSync(file, "utf-8")) as { mounts: Array<{ harness: string; repository: string }>; instances: Array<{ instance: string; via: string; repository: string; sha: string }> };
+    // What `--seed` left behind: the pin moved, its own instance entry did not.
+    const own = lock.instances.find((i) => lock.mounts.some((m) => m.harness === i.via && m.repository === i.repository))!;
+    own.sha = "f".repeat(40);
+    writeFileSync(file, `${JSON.stringify(lock, null, 2)}\n`);
+    const c = checkRemote({ instanceRoot: root });
+    expect(c.state).toBe("missing");
+    expect(c.reason).toContain(`${own.instance} at ffffffffffff`);
+  });
+
+  test("1c. a concern name expands to the members its kinds declare: processes/sdlc/ and skills/sdlc/ (bean mo75)", () => {
+    const cg = bareRepo(base, "cg", {
+      "cg.json": decl("cg", {
+        directories: [
+          { id: "processes", path: "processes/", graphTypologies: ["processes"] },
+          { id: "skills", path: "skills/", graphTypologies: ["skills"] },
+          { id: "notes", path: "notes/", graphTypologies: ["code"] },
+        ],
+      }),
+      // declared-path-literal: fixture keys of the bare repository this test builds under its temp base; they
+      // name files inside that fixture tree, never this checkout's `processes/` or `skills/`.
+      "processes/processes.json": { $schema: "concern-groups/v1", groups: ["sdlc", "kg"] },
+      "processes/sdlc/a.bpmn": "<definitions/>\n",
+      "processes/kg/b.bpmn": "<definitions/>\n",
+      "skills/skills.json": { $schema: "skill-topics/v1", topics: [{ id: "sdlc", path: "sdlc", title: "SDLC", description: "Delivery." }] },
+      "skills/sdlc/s.md": "# s\n",
+      "notes/n.md": "# n\n",
+    });
+    const map: Record<string, string> = { "o/cg": `file://${cg.bare}` };
+    const cgUrl = (r: string) => map[r] ?? urlFor(r);
+    const root = join(base, `down-${++n}`);
+    mkdirSync(root, { recursive: true });
+    git(root, "init", "-q", "-b", "main");
+    write(root, {
+      "down.json": decl("down", { mountApprovers: ["test"], remoteMounts: [{ harness: "cg", repository: "o/cg", ref: cg.sha, ...consentFor(cg.sha), overrides: { cg: { directories: ["sdlc"] } } }] }),
+    });
+    const r = mountRemote({ instanceRoot: root, urlFor: cgUrl, install: false });
+    expect(r.plan.outcomes.find((o) => o.instance === "cg")!.state).toBe("mounted");
+    expect(existsSync(join(root, "cg/processes/sdlc/a.bpmn"))).toBe(true);
+    expect(existsSync(join(root, "cg/skills/sdlc/s.md"))).toBe(true);
+    expect(existsSync(join(root, "cg/processes/kg"))).toBe(false);
+    expect(existsSync(join(root, "cg/notes"))).toBe(false);
+    expect(readLock(root).instances.find((i) => i.instance === "cg")!.directories.map((d) => d.id).sort()).toEqual(["processes/sdlc", "skills/sdlc"]);
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+    // A code no kind declares is refused like any unknown id.
+    editDecl(root, (d) => {
+      (d.remoteMounts[0]!.overrides as Record<string, { directories: string[] }>).cg = { directories: ["conduct"] };
+    });
+    const bad = planRemote({ instanceRoot: root, urlFor: cgUrl });
+    expect(bad.outcomes.find((o) => o.instance === "cg")!.state).toBe("could-not-determine");
+  });
+
   test("2. code arrives through mounted paths: a cross-instance relative import resolves", async () => {
     const root = downstream({});
     mountRemote({ instanceRoot: root, urlFor });
@@ -264,6 +320,26 @@ describe("mount:remote over fixture repositories", () => {
     expect(r.plan.outcomes.find((o) => o.instance === "core")).toMatchObject({ state: "missing" });
     expect(readFileSync(join(root, "core/mine.txt"), "utf-8")).toBe("local work\n");
     expect(checkRemote({ instanceRoot: root }).state).toBe("missing");
+  });
+
+  test("9b. a target that IS the pinned bytes, with no lock, is adopted; one that differs is refused and named (folio-assistant#2467)", () => {
+    const root = downstream({});
+    mountRemote({ instanceRoot: root, urlFor });
+    rmSync(join(root, "index.lock.json"));
+    const again = mountRemote({ instanceRoot: root, urlFor });
+    const base = again.plan.outcomes.find((o) => o.instance === "base")!;
+    expect(base.state).toBe("mounted");
+    expect(base.detail).toContain("adopted");
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+
+    rmSync(join(root, "index.lock.json"));
+    writeFileSync(join(root, "base/schemas/util.ts"), "export const answer = 41;\n");
+    writeFileSync(join(root, "base/schemas/extra.ts"), "export {};\n");
+    const refused = mountRemote({ instanceRoot: root, urlFor }).plan.outcomes.find((o) => o.instance === "base")!;
+    expect(refused.state).toBe("missing");
+    expect(refused.detail).toContain("differ: `base/schemas/util.ts`");
+    expect(refused.detail).toContain("extra: `base/schemas/extra.ts`");
+    expect(readFileSync(join(root, "base/schemas/util.ts"), "utf-8")).toContain("41");
   });
 
   test("10. a lock for other pins reads stale; an unreadable lock reads could-not-determine", () => {
@@ -654,6 +730,29 @@ describe("index.config.json as the mount declaration (owner, 2026-10-07)", () =>
     expect(c.reason).toContain("index.config.json");
     expect(c.reason).toContain("down.json");
     expect(() => mountRemote({ instanceRoot: root, urlFor })).toThrow(/BOTH/);
+  });
+
+  test("29b. approvers in the index count when the declaration has none; on both, the mount throws (folio-assistant#2389)", () => {
+    const withIndexApprovers = (who: string[]): string => {
+      const root = indexed();
+      write(root, { "down.json": decl("down", { mountApprovers: undefined }) });
+      const cfg = JSON.parse(readFileSync(join(root, "index.config.json"), "utf-8"));
+      cfg.mountApprovers = who;
+      writeFileSync(join(root, "index.config.json"), JSON.stringify(cfg, null, 2));
+      return root;
+    };
+    const ok = withIndexApprovers(["test"]);
+    const r = mountRemote({ instanceRoot: ok, urlFor });
+    expect(r.plan.outcomes.find((o) => o.instance === "core")).toMatchObject({ state: "mounted" });
+    expect(readLock(ok).instances.find((i) => i.instance === "core")!.trust).toMatchObject({ approver: "declared" });
+    expect(checkRemote({ instanceRoot: ok }).state).toBe("mounted");
+
+    const other = withIndexApprovers(["someone-else"]);
+    expect(mountRemote({ instanceRoot: other, urlFor }).plan.outcomes.find((o) => o.instance === "core")).toMatchObject({ state: "refused" });
+
+    const both = withIndexApprovers(["test"]);
+    write(both, { "down.json": decl("down", { mountApprovers: ["test"] }) });
+    expect(() => mountRemote({ instanceRoot: both, urlFor })).toThrow(/mountApprovers in both/);
   });
 
   test("30. a legacy lock is RENAMED onto index.lock.json when the mount rewrites it, never left beside it", () => {
@@ -1226,6 +1325,38 @@ describe("Tools chosen by id, mounted runnable (bean `mo75` G3; owner, 2026-10-2
       expect(r.plan.outcomes.find((o) => o.instance === "impl")!.state).toBe("missing");
       expect(existsSync(join(root, "impl/src"))).toBe(false);
     }
+  });
+
+  test("T5. an instance of ANOTHER entry the closure reaches shrinks to what it needs; an explicit list wins (owner, 2026-10-29, option B)", () => {
+    const two = (implMount: object = {}): string => {
+      const root = join(base, `tdown-${++n}`);
+      mkdirSync(root, { recursive: true });
+      git(root, "init", "-q", "-b", "main");
+      write(root, {
+        "down.json": decl("down", {
+          mountApprovers: ["test"],
+          remoteMounts: [
+            { harness: "def", repository: "o/tl", ref: tl.sha, ...consentFor(tl.sha), overrides: { def: { tools: ["alpha"] } } },
+            { harness: "impl", repository: "o/tl", ref: tl.sha, ...consentFor(tl.sha), ...implMount },
+          ],
+        }),
+      });
+      return root;
+    };
+    const dirs = (root: string, i: string) => readLock(root).instances.find((x) => x.instance === i)!.directories.map((d) => d.id).sort();
+
+    // impl's own entry names no directories: it shrinks to alpha's closure.
+    const shrinks = two();
+    const r = mountRemote({ instanceRoot: shrinks, urlFor: tUrl, install: false });
+    expect(r.plan.outcomes.find((o) => o.instance === "impl")!.state).toBe("mounted");
+    expect(dirs(shrinks, "impl")).toEqual(["impl-scripts", "impl-src"]);
+    expect(existsSync(join(shrinks, "impl/ui"))).toBe(false);
+
+    // An explicit list wins, and then it must bring what the closure needs.
+    const explicit = two({ overrides: { impl: { directories: ["impl-src", "impl-ui"] } } });
+    const e = mountRemote({ instanceRoot: explicit, urlFor: tUrl, install: false });
+    expect(e.plan.outcomes.find((o) => o.instance === "def")!.state).toBe("missing");
+    expect(e.plan.outcomes.find((o) => o.instance === "def")!.detail).toContain("the closure needs `impl`'s `impl-scripts`, which its own mount entry (`impl`) does not bring");
   });
 
   test("T4. `tools` with `hydrated` is refused at plan time: metadata brings no code", () => {

@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 import { exitCodeFor, judgeSecrets, readRepoFiles, secretRefs, type RepoEvidence } from "../secrets-check.ts";
 import { secretsHealthCheck } from "../../test/health/checks.ts";
-import { HealthCheckResultSchema } from "@litlfred/cat-harness/schemas/health-report.ts";
+import { HealthCheckResultSchema } from "@litlfred/cat-harness/schemas/sdlc/health-report.ts";
 
 const NOW = new Date("2026-10-11T00:00:00Z");
 const dirs: string[] = [];

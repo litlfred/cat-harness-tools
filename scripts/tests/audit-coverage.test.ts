@@ -19,9 +19,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { asRecord, census, coverage, coversIn, kindUniverse, scriptsFor } from "../audit-coverage.js";
-import { KG_CRITERIA, KG_SUBJECT_GRAPH_TYPOLOGIES } from "@litlfred/cat-harness/schemas/kg-qa.js";
-import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/cat-harness.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { KG_CRITERIA, KG_SUBJECT_GRAPH_TYPOLOGIES } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
+import { defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -106,6 +106,16 @@ describe("scriptsFor — a gate command to the files it runs", () => {
     expect(scriptsFor("bun run cat docs:x:check", routed)).toEqual([
       "cat-harness-tools/scripts/publish-check.ts",
       "cat-harness-tools/scripts/gen-x.ts",
+    ]);
+  });
+
+  test("through run-script.ts to the layer script it runs (run-gates.py)", () => {
+    const routed = {
+      "libraries:check": "bun run cat-harness-tools/scripts/libraries.ts --check",
+    };
+    expect(scriptsFor("bun cat-harness-tools/scripts/run-script.ts libraries:check", routed)).toEqual([
+      "cat-harness-tools/scripts/run-script.ts",
+      "cat-harness-tools/scripts/libraries.ts",
     ]);
   });
 

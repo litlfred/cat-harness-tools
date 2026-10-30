@@ -26,7 +26,7 @@
  *
  * ## It asks the runtime's own question, and does not re-derive it
  *
- * `instanceThemes` in `schemas/theme-by-ref.ts` is what every generator
+ * `instanceThemes` in `schemas/ui/theme-by-ref.ts` is what every generator
  * resolves a theme reference through. This calls it. A gate that re-derived
  * "which themes does this instance own" would be a second answer, free to
  * disagree with the one the pages are actually rendered from — which is the
@@ -56,14 +56,14 @@
 import {
   instanceRootsIn,
   readDeclaration,
-} from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import {
   explainThemeRefMiss,
   instanceThemes,
   THEMES_GRAPH_TYPOLOGY,
-} from "@litlfred/cat-harness/schemas/theme-by-ref.js";
-import { ResolvedThemeSchema } from "@litlfred/cat-harness/schemas/theme.js";
-import { instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
+} from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
+import { ResolvedThemeSchema } from "@litlfred/cat-harness/schemas/ui/theme.js";
+import { instanceDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 
 interface Finding {
   readonly instance: string;

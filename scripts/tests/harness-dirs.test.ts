@@ -27,7 +27,7 @@ import { dirname, join, resolve } from "node:path";
 import { WORKFLOW_DIR } from "../../src/workflow/store.js";
 import { MOUNT_MARKER_SCHEMA, markerPath } from "../branch-store.ts";
 import { beansYmlPath, checkHarnessDirs } from "../check-harness-dirs.js";
-import { readHarnessConfig, resolveHarnessConfigPath } from "@litlfred/cat-harness/schemas/harness-config.js";
+import { readHarnessConfig, resolveHarnessConfigPath } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
 import {
   createBean,
   findBean,
@@ -36,7 +36,7 @@ import {
   readStoreConfig,
   updateBean,
 } from "../beans-fallback.js";
-import { repoRootFor, declarationPathIn } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor, declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { configNameFor, writeInstanceConfig } from "../../test/support/instance-fixture.js";
 
 // The REPOSITORY root, and it has to be said out loud now: `"..", ".."` from

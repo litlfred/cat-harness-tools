@@ -23,8 +23,8 @@ import { markdownEditLink, repoOf } from "../src/core/edit-links.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from "fs";
 import { join, relative, resolve } from "path";
-import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
-import { instanceDirectories, instanceDirectoryForGraph } from "@litlfred/cat-harness/schemas/cat-harness.js";
+import { repoRootFor, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { instanceDirectories, instanceDirectoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The repository the links name: this checkout's origin, else folio-assistant (bean v433). */

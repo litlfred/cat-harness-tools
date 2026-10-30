@@ -51,7 +51,7 @@ import {
   workflowInstancePage,
   workflowHubPage,
 } from "../state-visualizer.ts";
-import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/cat-harness.ts";
+import { readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 import {
   existingPageDir,
@@ -1488,7 +1488,7 @@ describe("the workflow view: per-instance pages and the store's stuck column (be
       expect(html).toContain('<a href="workflows/crdm--x-ab12/"><code>crdm--x-ab12</code></a>');
       expect(html).toContain("<th>stuck</th>");
       expect(html).toContain("enabled-not-taken");
-      expect(html).toContain("Refused gates: <strong>not-recorded</strong>");
+      expect(html).toContain("is <code>refused-gate</code>");
       expect(html).toContain("Where this store's beans sit in a process — 2 bean(s)");
       expect(html).toContain('<span class="sv-count-v">1</span><span class="sv-count-k">no instance recorded</span>');
       expect(html).toContain("<code>x-cd34</code>");
@@ -1500,6 +1500,26 @@ describe("the workflow view: per-instance pages and the store's stuck column (be
     } finally {
       rmSync(store, { recursive: true, force: true });
     }
+  });
+
+  test("an instance page reads the dynamic-state document when given one (bean 6h47), and says what it was built with", () => {
+    const base = {
+      instance: stale as never,
+      store: "cat-harness",
+      model: { missing: "not loaded", recorded: "" },
+      beans: [bean("x-ab12")] as never,
+      todos: [],
+      now: NOW,
+      drawingFor: () => undefined,
+    };
+    const html = workflowInstancePage({ ...base, stateDocument: "../../../../../state.jsonld" });
+    expect(html).toContain('data-wv-state="../../../../../state.jsonld"');
+    expect(html).toContain(`data-wv-instance="#workflow/cat-harness/${(stale as { id: string }).id}"`);
+    expect(html).toContain("Latest exported state");
+    expect(html).toContain("enabled-not-taken"); // the build-time stuck kinds ride along in data-wv-built
+    expect(html).toContain("[data-wv-state]");
+    // Without one, no section: a page never links a document nobody published.
+    expect(workflowInstancePage(base)).not.toContain("data-wv-state=");
   });
 
   test("an instance page states position, stuck states, the not-recorded gate and a missing diagram in words", () => {
@@ -1521,6 +1541,12 @@ describe("the workflow view: per-instance pages and the store's stuck column (be
     expect(html).toContain("The steps that act on the bean are unknown: the diagram was not found.");
     expect(html).toContain("Todos it names — 1");
     expect(html).toContain("tagged with Process_CRDM");
+    // Bean v49e item 3: a file from before refusals were recorded says so, and
+    // a missing diagram leaves the working context uncomputed, in words.
+    expect(html).toContain("Refused steps — not recorded");
+    expect(html).toContain("Working context at the token");
+    expect(html).toContain("Not computed: the diagram was not found.");
+    expect(html).toContain("is not committed state and is not read here");
     expect(html).toContain("&lt;started&gt;");
     expect(html).toContain("render_with_liquid: false");
     expect(html).toContain(GENERATED_BY);
