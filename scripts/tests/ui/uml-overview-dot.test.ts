@@ -19,6 +19,7 @@ import { instanceDirectoryForGraph, siteDirFor } from "../../../schemas/kg/cat-h
 import { dot, type Section } from "../../gen-uml-overview.ts";
 import { readUmlPalette } from "../../uml-palette.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { siteNotBuilt } from "../../../test/support/checkout.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
 const PALETTE = readUmlPalette(HARNESS);
@@ -118,7 +119,11 @@ describe("dot() draws the overview model", () => {
 describe("every committed DOT is the model its .puml draws", () => {
   const dots = walk(DOT_ROOT, ".dot");
 
-  test("there is a DOT for an overview", () => {
+  // Standing alone the DOTs are not built: `uml:overview` writes them at
+  // publish and `docs/assets/img/uml/overview/` is gitignored (bean w1gy F18).
+  test.skipIf(
+    siteNotBuilt("the overview DOTs gen-uml-overview writes at publish (gitignored)", DOT_ROOT),
+  )("there is a DOT for an overview", () => {
     expect(dots.length).toBeGreaterThan(0);
   });
 

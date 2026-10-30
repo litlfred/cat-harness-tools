@@ -13,7 +13,7 @@ import { differsOnlyInRegions, isInstanceDeclaration, pathClass, sharedDeclarati
 import { parseMemberSpec } from "../../merge-pipeline-git.ts";
 import { makeRepo, readme, type Repo } from "../merge-pipeline-fixture.ts";
 
-const GEN = "cat-harness/docs/en/folio-assistant-core/glossary/index.md"; // `glossary`: take-base
+const GEN = "cat-harness/docs/en/cat-harness/lsi/index.md"; // `glossary` (its literal lsi glob): take-base in every layout, unlike the core glossary route (bean w1gy F18)
 let repo: Repo | undefined;
 afterEach(() => { repo?.cleanup(); repo = undefined; });
 

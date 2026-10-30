@@ -53,7 +53,12 @@ const docsPagesFor = (kind: string): string[] => {
   // the index repository's git, so `ls-files` from the root lists none of
   // cat-harness's pages. `gitCorpus` counts a mount's files as a submodule's
   // were counted, which is what "the checkout's pages" means since the split.
-  const tracked = (gitCorpus(REPO, ["*.md", "*.html"]) ?? []).map((f) => relative(REPO, f));
+  // Standing alone the checkout root holds sibling clones and is no git work
+  // tree, so git cannot answer there; cat-harness's own clone can, and its
+  // pages are the ones asked about (bean w1gy F18).
+  const tracked = (gitCorpus(REPO, ["*.md", "*.html"]) ?? gitCorpus(join(REPO, "cat-harness"), ["*.md", "*.html"]) ?? []).map((f) =>
+    relative(REPO, f),
+  );
   return documentingPages(
     { instance: "cat-harness", id: e.id ?? "", graphTypologies: e.graphTypologies ?? [] },
     docsPages(REPO, tracked),
@@ -165,7 +170,12 @@ describe("the generator writes where the declaration says", () => {
   // read by auto-discovery, with one sub-graph page per instance.
   const { subjects, empty } = toolSubjects(REPO);
 
-  it("and the committed page is current", () => {
+  // Standing alone the page is not built: `tools:viz` writes it at publish and
+  // `tools/` is gitignored (bean w1gy F18).
+  const toolsPage = pageRelPath(REPO);
+  it.skipIf(
+    toolsPage !== undefined && siteNotBuilt("the Tools page `tools:viz` writes at publish (gitignored)", join(DOCS, toolsPage)),
+  )("and the committed page is current", () => {
     // The gate runs this too; asserting it here means a stale page fails the
     // unit suite rather than only the gate, which is where it is noticed first.
     const rel = pageRelPath(REPO)!;

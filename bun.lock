@@ -74,36 +74,6 @@
     "../cat-harness": {
       "name": "@litlfred/cat-harness",
       "version": "0.1.0",
-      "dependencies": {
-        "@anthropic-ai/sdk": "^0.127.0",
-        "@litlfred/bootstrap-tools": "0.1.0",
-        "@unified-latex/unified-latex-util-arguments": "^1.8.4",
-        "@unified-latex/unified-latex-util-parse": "^1.8.4",
-        "@unified-latex/unified-latex-util-print-raw": "^1.8.4",
-        "bpmn-moddle": "^10.2.0",
-        "csl-json": "^0.1.0",
-        "dmn-moddle": "^12.1.0",
-        "fast-xml-parser": "^5.10.1",
-        "glob": "^13.0.6",
-        "jsonld": "8",
-        "liquidjs": "^10.29.0",
-        "lunr": "2.3.9",
-        "mdast-util-directive": "^3.1.0",
-        "mdast-util-gfm-strikethrough": "^2.0.0",
-        "mdast-util-gfm-table": "^2.0.0",
-        "mdast-util-math": "^3.0.0",
-        "micromark-extension-gfm-strikethrough": "^2.1.0",
-        "micromark-extension-gfm-table": "^2.1.1",
-        "oxigraph": "^0.5.11",
-        "remark": "^15.0.1",
-        "remark-directive": "^4.0.0",
-        "remark-gfm": "^4.0.1",
-        "remark-html": "^16.0.1",
-        "remark-math": "^6.0.0",
-        "unist-util-visit": "^5.1.0",
-        "yaml": "^2.9.1",
-        "zod": "^4.6.5",
-      },
       "devDependencies": {
         "@axe-core/playwright": "^4.13.0",
         "@hpcc-js/wasm-graphviz": "1.6.1",
@@ -1169,6 +1139,8 @@
     "@eslint-community/eslint-utils/eslint-visitor-keys": ["eslint-visitor-keys@3.4.3", "", {}, "sha512-wpc+LXeiyiisxPlEkUzU6svyS1frIO3Mgxj1fdy7Pm8Ygzguax2N3Fa/D/ag1WqbOprdI+uY6wMUl8/a2G+iag=="],
 
     "@litlfred/bootstrap-tools/bun-types": ["bun-types@1.4.4", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ=="],
+
+    "@litlfred/cat-harness/bun-types": ["bun-types@1.4.4", "", { "dependencies": { "@types/node": "*", "undici-types": "*" } }, "sha512-yjrJh5oGX7mMPKGd19YXyIjmEuj4G4zNC30bs7PM9Az7NQ3ndF3j6hbeRdvJTRQEhJ/FYQwW0a2moweEi2hMxQ=="],
 
     "@milkdown/core/unified": ["unified@11.0.5", "", { "dependencies": { "@types/unist": "^3.0.0", "bail": "^2.0.0", "devlop": "^1.0.0", "extend": "^3.0.0", "is-plain-obj": "^4.0.0", "trough": "^2.0.0", "vfile": "^6.0.0" } }, "sha512-xKvGhPWw3k84Qjh8bI3ZeJjqnyadK+GEFtazSfZv/rKeTkTjOJho6mFqh2SM96iIcZokxiOpg78GazTSg8+KHA=="],
 

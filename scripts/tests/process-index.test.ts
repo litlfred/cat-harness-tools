@@ -151,8 +151,13 @@ describe("the committed subgraph JSON-LD", () => {
   const { processes, problems } = publishedProcesses(OUT);
   const declared = declaredDiagrams(REPO);
   const framed = framedInstances(HARNESS);
+  // Standing alone the subgraph tree is not built: `subgraph:jsonld` writes it
+  // at publish and `docs/subgraph/` is gitignored, so the walk starts at a
+  // root that is not there (bean w1gy F18).
+  const SUBGRAPH_NOT_BUILT = (): boolean =>
+    siteNotBuilt("the subgraph JSON-LD `subgraph:jsonld` writes at publish (gitignored)", join(OUT, "index.jsonld"));
 
-  test("every file the walk reaches exists and validates", () => {
+  test.skipIf(SUBGRAPH_NOT_BUILT())("every file the walk reaches exists and validates", () => {
     expect(problems).toEqual([]);
   });
   // The committed JSON-LD is generated in the AGGREGATE and frames the higher
@@ -171,7 +176,7 @@ describe("the committed subgraph JSON-LD", () => {
       expect({ p, framed: framed.has(inst) }).toEqual({ p, framed: false });
     }
   });
-  test("bootstrap's diagrams are covered through its OWN subgraphs, linked by `seeAlso` (t8c4)", () => {
+  test.skipIf(SUBGRAPH_NOT_BUILT())("bootstrap's diagrams are covered through its OWN subgraphs, linked by `seeAlso` (t8c4)", () => {
     const { seeAlso } = publishedProcesses(OUT);
     const boot = [...declared].filter(([, inst]) => !framed.has(inst)).map(([p]) => p).sort();
     const { byPath, problems: why } = unframedProcesses(seeAlso, framed, REPO);

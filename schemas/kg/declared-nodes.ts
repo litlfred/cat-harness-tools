@@ -11,7 +11,7 @@
  * @graphNode none — a function library over the declared directories; it defines no schema
  */
 import { readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 import { findDeclarationFile, instanceRootsIn } from "./instance-roots";
 
@@ -40,7 +40,8 @@ export function declaredDirectories(repoRoot: string, graphTypology: string): st
   // ig-metadata-index, the todo kinds), so four tests failed standalone. The
   // fixture is set only when the checkout holds no vocabulary, never in a
   // composed checkout, so there a scan is unchanged.
-  const roots = fixture ? [...ownRoots, ...instanceRootsIn(fixture)] : ownRoots;
+  const ownNames = new Set(ownRoots.map((r) => basename(r)));
+  const roots = fixture ? [...ownRoots, ...instanceRootsIn(fixture).filter((r) => !ownNames.has(basename(r)))] : ownRoots;
   return roots.flatMap((root) => ownDeclaredDirectories(root, graphTypology, repoRoot));
 }
 

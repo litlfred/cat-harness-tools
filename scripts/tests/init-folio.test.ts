@@ -49,7 +49,6 @@ import { nodeOfKind, parseTodoGraph } from "../../schemas/sdlc/todo-graph.js";
 import { defaultGraphTypologies } from "../../schemas/kg/graph-typology-registry.js";
 import { instanceStateBranch } from "../../schemas/kg/subgraph-source.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { notApplicableAlone } from "../../test/support/checkout.ts";
 import { dirname } from "node:path";
 
 /**

@@ -20,10 +20,29 @@ import { CATALOGUE_VISUALISER, classify, declaredRouteGlobs, GLOSSARY_RENDERER, 
 import { repoRootFor, siteDirFor } from "../../../schemas/kg/cat-harness.js";
 import { scriptsOf } from "../../../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { notApplicableAlone, siteNotBuilt } from "../../../test/support/checkout.ts";
 
 /** This instance and the repository it sits in, for the filesystem-driven sweeps. */
 const INSTANCE = resolve(HARNESS_ROOT);
 const REPO = repoRootFor(INSTANCE);
+
+/**
+ * Whether the checkout knows the route of a visualiser a HIGHER instance
+ * declares — its declaration, or the generated page a built site records it
+ * by. Standing alone neither is here: the content core declares the glossary,
+ * a folio declares its catalogue, and their pages are built at publish and
+ * gitignored (bean w1gy F18). A test of the REAL route is then not
+ * applicable, and says which; the fixtures above test the derivation itself.
+ */
+function higherRouteAbsent(pick: (v: { id: string; renderedBy: string }) => boolean, route: string, what: string): boolean {
+  return !declaredRouteGlobs(REPO, pick, "**").includes(`cat-harness/docs/${route}**`) && notApplicableAlone(what);
+}
+const CORE_GLOSSARY_ABSENT = (): boolean =>
+  higherRouteAbsent(
+    (v) => v.renderedBy === GLOSSARY_RENDERER,
+    "folio-assistant-core/glossary/",
+    "the route of folio-assistant-core's `glossary` visualiser — its declaration, or the built page `docs/en/folio-assistant-core/glossary/index.md` that records it",
+  );
 
 /**
  * The leading `---`-delimited front matter of a markdown file, or `""` when it
@@ -131,6 +150,21 @@ describe("generated-page globs come from the declared visualisers, not instance 
     }
   });
 
+  test("standing alone, a page under the page locale records its route too", () => {
+    // The glossary pages moved under the page locale on 2026-10-16
+    // (`<site>/en/<harness>/<visualiser>/`); a record that read only
+    // `<site>/<harness>/<visualiser>/` found none on a current site (w1gy F18).
+    const repo = mkdtempSync(join(tmpdir(), "conflict-routes-locale-"));
+    try {
+      mkdirSync(join(repo, "cat-harness/docs/en/acme/terms"), { recursive: true });
+      writeFileSync(join(repo, "cat-harness/docs/en/acme/terms/index.md"), "---\ngenerated: acme/scripts/glossary-page.ts\n---\nbody\n");
+      const glossary = (v: { renderedBy: string }) => v.renderedBy === GLOSSARY_RENDERER;
+      expect(declaredRouteGlobs(repo, glossary, "**", "en")).toEqual(["cat-harness/docs/en/acme/terms/**"]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
   test("a translated glossary page other than the generated index stays refused", () => {
     const translated = PATTERNS.find((p) => p.id === "translated-glossary")!;
     for (const g of translated.globs) expect(g.endsWith("/index.md")).toBe(true);
@@ -144,11 +178,14 @@ describe("classify", () => {
     expect(classify("cat-harness/test/results/translation-qa/docs/installation.fr.translation-qa.json").pattern?.id).toBe("derived-results");
     expect(classify("cat-harness/test/results/translation-qa/docs/installation.fr.translation-qa.json").strategy).toBe("take-base");
     expect(classify("cat-harness/docs/cat-harness/auto-docs/index/index.html").pattern?.id).toBe("auto-docs");
+    expect(classify("beans/README.md").strategy).toBe("generated-regions");
+  });
+
+  test.skipIf(CORE_GLOSSARY_ABSENT())("the content core's generated glossary is taken, under the page locale and at its old address", () => {
     // The English glossary under the page locale (2026-10-16), and at its old address.
     expect(classify("cat-harness/docs/en/folio-assistant-core/glossary/index.md").pattern?.id).toBe("glossary");
     expect(classify("cat-harness/docs/en/folio-assistant-core/glossary/instance/who-iris/index.md").pattern?.id).toBe("glossary");
     expect(classify("cat-harness/docs/folio-assistant-core/glossary/index.md").pattern?.id).toBe("glossary");
-    expect(classify("beans/README.md").strategy).toBe("generated-regions");
   });
 
   test("the three generated glossary/skill families classify, and their carry-forward neighbours do not", () => {
@@ -230,14 +267,21 @@ describe("classify", () => {
     expect(claimed).toEqual([]);
   });
 
-  test("a page that QUOTES the generated marker is not a subject of it", () => {
-    // Found on this branch's first merge of `main`: the generated body of the
-    // skill documenting `docs-pages` quotes `generated: scripts/gen-docs-pages.ts`
-    // in a code fence, so a whole-file detector counted an 18th page. Its OWN
-    // front matter names gen-skill-docs.ts, and `skill-instructions` — declared
-    // BEFORE `docs-pages`, so it wins the first match — already owns it.
-    const quoting = "cat-harness/docs/reference/skill-instructions/merge-conflict-patterns.md";
+  // Found on this branch's first merge of `main`: the generated body of the
+  // skill documenting `docs-pages` quotes `generated: scripts/gen-docs-pages.ts`
+  // in a code fence, so a whole-file detector counted an 18th page. Its OWN
+  // front matter names gen-skill-docs.ts, and `skill-instructions` — declared
+  // BEFORE `docs-pages`, so it wins the first match — already owns it.
+  const quoting = "cat-harness/docs/reference/skill-instructions/merge-conflict-patterns.md";
+  // Standing alone the page is not built: gen-skill-docs writes it at publish
+  // and `docs/reference/skill-instructions/` is gitignored (bean w1gy F18).
+  test.skipIf(
+    siteNotBuilt("the skill-instructions page gen-skill-docs writes at publish (gitignored)", join(REPO, quoting)),
+  )("the page that QUOTES the generated marker really quotes it", () => {
     expect(readFileSync(join(REPO, quoting), "utf8")).toContain("generated: scripts/gen-docs-pages.ts");
+  });
+
+  test("a page that QUOTES the generated marker is not a subject of it", () => {
     expect(generatedDocsPages()).not.toContain(quoting);
     expect(classify(quoting).pattern?.id).toBe("skill-instructions");
   });
@@ -261,10 +305,13 @@ describe("classify", () => {
     expect(classify("cat-harness/test/results/bootstrap/kg-qa.manifest.json").pattern?.id).toBe("kg-qa-manifest");
   });
 
-  test("translated glossaries and viewer pages are taken; their authored neighbours are not", () => {
+  test.skipIf(CORE_GLOSSARY_ABSENT())("the content core's translated glossaries are taken", () => {
     for (const l of ["ar", "es", "fr", "ru", "zh"]) {
       expect(classify(`cat-harness/docs/${l}/folio-assistant-core/glossary/index.md`).pattern?.id).toBe("translated-glossary");
     }
+  });
+
+  test("viewer pages are taken; their authored neighbours are not", () => {
     expect(classify("cat-harness/docs/cat-harness/external-schemas/index.md").pattern?.id).toBe("viewer-pages");
     expect(classify("cat-harness/docs/cat-harness/processes/index.md").pattern?.id).toBe("viewer-pages");
     expect(classify("cat-harness/docs/cat-harness/processes/merge-base.md").pattern?.id).toBe("viewer-pages");
@@ -337,7 +384,6 @@ describe("classify", () => {
     for (const seg of ["folio", "library", "schemas", "voices"]) {
       expect(classify(`cat-harness/docs/cat-harness/${seg}/index.html`).pattern?.id).toBe("viewer-namespace");
     }
-    expect(classify("cat-harness/docs/who-iris/catalogue/index.html").pattern?.id).toBe("viewer-namespace");
     expect(classify("cat-harness/docs/_includes/generated/navbar-footer.html").pattern?.id).toBe("navbar-include");
     expect(classify("cat-harness/test/results/viewer-nav/viewer-nav.qa.json").pattern?.id).toBe("viewer-nav-qa");
     // The real uploads stay refused, at the root and in any instance.
@@ -346,6 +392,16 @@ describe("classify", () => {
     // Authored neighbours of the new globs stay refused.
     expect(classify("cat-harness/docs/beans/notes.md").strategy).toBe("refuse");
     expect(classify("cat-harness/site-chrome/_includes/head_custom.html").strategy).toBe("refuse");
+  });
+
+  test.skipIf(
+    higherRouteAbsent(
+      (v) => v.id === CATALOGUE_VISUALISER,
+      "who-iris/catalogue/",
+      "the route of who-iris's `catalogue` visualiser — its declaration, or the built page `docs/who-iris/catalogue/index.html` that records it",
+    ),
+  )("a folio's generated catalogue viewer is in the viewer namespace", () => {
+    expect(classify("cat-harness/docs/who-iris/catalogue/index.html").pattern?.id).toBe("viewer-namespace");
   });
 
   test("the standalone baseline is taken from the base; its sibling baseline and its writer are not", () => {
@@ -377,8 +433,11 @@ describe("classify", () => {
 
 describe("plan is all-or-nothing input", () => {
   test("one authored conflict among generated ones is reported as refused", () => {
-    const p = plan(["cat-harness/docs/en/folio-assistant-core/glossary/index.md", "cat-harness/scripts/merge-base.ts"]);
-    expect(p.resolvable.map((c) => c.path)).toEqual(["cat-harness/docs/en/folio-assistant-core/glossary/index.md"]);
+    // A generated page the `glossary` pattern names literally (its lsi
+    // route), so the plan is measured in every layout (bean w1gy F18).
+    const generated = "cat-harness/docs/en/cat-harness/lsi/index.md";
+    const p = plan([generated, "cat-harness/scripts/merge-base.ts"]);
+    expect(p.resolvable.map((c) => c.path)).toEqual([generated]);
     expect(p.refused.map((c) => c.path)).toEqual(["cat-harness/scripts/merge-base.ts"]);
   });
 });

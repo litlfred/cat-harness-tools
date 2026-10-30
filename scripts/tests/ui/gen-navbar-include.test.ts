@@ -159,7 +159,16 @@ describe("the template composes nothing", () => {
 });
 
 describe("the writer is a fixpoint over the real data", () => {
-  test("running it leaves the committed file unchanged", () => {
+  // Standing alone neither side is built: `sync-docs-harness` writes the
+  // `_data/harness.json` the writer reads, `navbar:include` the include it is
+  // compared with, both at publish and both gitignored (bean w1gy F18).
+  test.skipIf(
+    siteNotBuilt(
+      "the `_data/harness.json` the writer reads and the include it compares with, both written at publish (gitignored)",
+      join(SITE, "_data", "harness.json"),
+      INCLUDE,
+    ),
+  )("running it leaves the committed file unchanged", () => {
     // A reader who runs the generator once must get a file that agrees with
     // the corpus. `--check` is what CI runs, so running it here asserts the
     // same equality the gate does — and asserts it against the REAL
