@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { complete, enabled, startInstance, type EnabledActivity } from "./instance.js";
+import { complete, enabled, startInstance, WorkflowError, type EnabledActivity } from "./instance.js";
 import { loadProcessModel } from "./process-model.js";
 import type { RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 
@@ -352,6 +352,67 @@ describe("PROCESS WALK: deterministic task context from the KG (folio-assistant-
       expect(step3.context.carriedBeans).toContain("folio-assistant-3q47");
       expect(step3.context.carriedBeans).toContain("bean-runtime-added");
       expect(step3.context.carriedBeans).toContain("bean-child-step1");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("Tool activities are kept on the step that did them (folio-assistant#875 FR-005, owner option A)", () => {
+  const activity = (plan: string) => ({
+    "@type": "prov:Activity",
+    "@id": "skill-update:skills/x.md@0123456789ab",
+    "prov:startedAtTime": "2026-10-30T13:40:00.000Z",
+    "prov:qualifiedAssociation": { "prov:agent": "authoring-agent", "prov:hadRole": "editor", "prov:hadPlan": plan },
+    "prov:used": ["skills/x.md@sha256:aaaa"],
+    "prov:generated": ["skills/x.md@sha256:bbbb"],
+    "cat-harness:underPolicy": ["policy:test"],
+  });
+
+  async function started() {
+    const { dir, parentPath } = createWorkflowFixtures();
+    const model = await loadProcessModel(parentPath);
+    const state = startInstance(model, { id: "inst-activities", subject: "s", bean: "b" });
+    return { dir, model, state };
+  }
+
+  test("an activity naming this step is recorded on its history entry", async () => {
+    const { dir, model, state } = await started();
+    try {
+      complete(model, state, "Task_Before", { activities: [activity("parent#Task_Before")] });
+      const entry = state.history.find((h) => h.node === "Task_Before")!;
+      expect(entry.activities).toHaveLength(1);
+      expect(entry.activities![0]!["prov:generated"]).toEqual(["skills/x.md@sha256:bbbb"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("no activities, no field: nothing is invented", async () => {
+    const { dir, model, state } = await started();
+    try {
+      complete(model, state, "Task_Before");
+      expect(state.history.find((h) => h.node === "Task_Before")!.activities).toBeUndefined();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("an activity done for another step refuses, and the step is not recorded", async () => {
+    const { dir, model, state } = await started();
+    try {
+      expect(() => complete(model, state, "Task_Before", { activities: [activity("parent#Task_After")] })).toThrow(WorkflowError);
+      expect(state.history.some((h) => h.node === "Task_Before")).toBe(false);
+      expect(state.tokens).toContain("Task_Before");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("something that is not a prov:Activity refuses", async () => {
+    const { dir, model, state } = await started();
+    try {
+      expect(() => complete(model, state, "Task_Before", { activities: [{ note: "trust me" }] })).toThrow(WorkflowError);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
