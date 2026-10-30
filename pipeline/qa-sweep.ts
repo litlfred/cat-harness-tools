@@ -99,6 +99,7 @@ import {
 import { adapterForKind } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
 import { readDeclaredFolioProfile } from "./profile-check";
 import { readActiveVoices } from "@litlfred/cat-harness/schemas/content/voices.ts";
+import { isJsonManifest } from "./json-manifest.ts";
 
 
 // ── CLI parsing ─────────────────────────────────────────────────
@@ -273,8 +274,8 @@ async function run(): Promise<void> {
   let walkRoot = rootAbs;
   let blockRootFilter: string | undefined;
   if (!existsSync(rootAbs) || !statSync(rootAbs).isDirectory()) {
-    const blockRoot = rootAbs.replace(/\.(qa\.json|ts|md|lean)$/, "");
-    if (existsSync(blockRoot + ".ts")) {
+    const blockRoot = rootAbs.replace(/\.(qa\.json|ts|json|md|lean)$/, "");
+    if (existsSync(blockRoot + ".ts") || isJsonManifest(blockRoot + ".json")) {
       walkRoot = dirname(blockRoot);
       blockRootFilter = blockRoot;
     } else if (existsSync(rootAbs)) {

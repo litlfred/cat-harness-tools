@@ -46,6 +46,15 @@ const CONFIG = {
       relation: "folio-of", declaredBy: ["cat-harness"],
     },
   ],
+  // Issue #1719: a harness a subscription reaches and this checkout has not
+  // instantiated (cat-harness subscribes to litlfred/ihris since bean tmo5).
+  subscribed: [
+    {
+      name: "other-kb", title: "Other KB", repository: "litlfred/other-kb", ref: "0123456789abcdef0123456789abcdef01234567",
+      url: "https://github.com/litlfred/other-kb/tree/0123456789abcdef0123456789abcdef01234567",
+      editHref: "https://github.com/litlfred/other-kb", subscription: "other-kb", chosen: false, declaredBy: ["cat-harness"],
+    },
+  ],
   findings: ["`topology`: no skill edits `topology` yet"],
 };
 
@@ -83,7 +92,7 @@ test("the sidebar ⚙ opens the glass on that harness's properties and edit skil
   await expect(edit).toHaveAttribute("aria-label", /Edit C@T Harness's declaration/);
 });
 
-test("Settings reaches the panel; the three groups are there", async ({ page }) => {
+test("Settings reaches the panel; the four groups are there", async ({ page }) => {
   await page.click(".fa-glass-handle");
   await page.click('[data-fa-glass-chrome="glass-settings"]');
   await page.click(".fa-glass-harnesses");
@@ -91,7 +100,35 @@ test("Settings reaches the panel; the three groups are there", async ({ page }) 
   await expect(p.locator('[data-fa-hc-group="instantiated"] h3')).toContainText("(1)");
   await expect(p.locator('[data-fa-hc-group="checkout"] h3')).toContainText("(1)");
   await expect(p.locator('[data-fa-hc-group="associated"] h3')).toContainText("(1)");
+  await expect(p.locator('[data-fa-hc-group="subscribed"] h3')).toContainText("(1)");
   await expect(p.locator(".fa-hc-findings")).toContainText("1 findings");
+});
+
+test("a subscribed harness has its own group, and links to its pin and its own repository, never here", async ({ page }) => {
+  await page.click('[data-fa-harness-config="cat-harness"]');
+  const p = panel(page);
+  await expect(p.locator('[data-fa-hc-group="subscribed"] h3')).toContainText("Subscribed ↗ remote (1)");
+  await p.locator(".fa-hc-item", { hasText: "Other KB" }).click();
+  await expect(p.locator(".fa-hc-actions a", { hasText: "Open at the pin" })).toHaveAttribute(
+    "href",
+    "https://github.com/litlfred/other-kb/tree/0123456789abcdef0123456789abcdef01234567",
+  );
+  await expect(p.locator(".fa-hc-actions a", { hasText: "Its repository" })).toHaveAttribute("href", "https://github.com/litlfred/other-kb");
+  await expect(p).toContainText("not chosen: referenced only");
+  await expect(p).toContainText("not instantiated here");
+});
+
+test("a config with no `subscribed` field (built before #1719) draws an empty group, not an error", async ({ page }) => {
+  await page.route("http://replica.test/assets/harness/config.json", (route) => {
+    const { subscribed: _s, ...old } = CONFIG;
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify(old) });
+  });
+  await page.reload();
+  await page.waitForSelector(".fa-glass-handle", { state: "attached" });
+  await page.click('[data-fa-harness-config="cat-harness"]');
+  const p = panel(page);
+  await expect(p.locator('[data-fa-hc-group="subscribed"] h3')).toContainText("(0)");
+  await expect(p.locator('[data-fa-hc-group="associated"] h3')).toContainText("(1)");
 });
 
 test("an associated harness links to its own site and its own repository, never here", async ({ page }) => {

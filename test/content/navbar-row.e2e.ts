@@ -510,14 +510,16 @@ test.describe("at rest the strip carries marks and nothing else", () => {
 
   test("the folio handle is not in the sidebar, and the avatar still takes its clicks", async ({ page }) => {
     // Owner, 2026-09-27: the handle is back at the top centre, "not on
-    // navbar". Kept as a guard: the avatar must still open and close the bar.
+    // navbar". Kept as a guard: the avatar must still take its clicks. A
+    // click on a CLOSED bar (no hover: dispatched, so the pointer does not
+    // move onto it) pins it open; an open bar's avatar is the home link
+    // (owner, 2026-10-30).
     await load(page, CUSTOM);
     await expect(page.locator(".side-bar .fa-glass-handle")).toHaveCount(0);
     await expect(page.locator("body > .fa-glass-handle")).toHaveCount(1);
-    await page.locator(".side-bar .site-title").click({ timeout: 5000 });
+    await page.locator(".side-bar .site-title").dispatchEvent("click");
     await expect(page.locator("#fa-nav-open")).toBeChecked();
-    await page.locator(".side-bar .site-title").click({ timeout: 5000 });
-    await expect(page.locator("#fa-nav-open")).not.toBeChecked();
+    await expect(page.locator(".side-bar .site-title")).toHaveAttribute("href", /\/$/);
   });
 
   test("NO text region is visible until the bar is opened", async ({ page }) => {

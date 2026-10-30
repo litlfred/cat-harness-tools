@@ -76,12 +76,6 @@ export interface LeanLexerPlugin {
   declarationStarts(stripped: string): LeanDeclStart[];
 }
 
-/** A folio's default chapter profiles — implemented by `_folio-chapter-profiles.qou.ts`. */
-export interface ChapterProfileDefaultsPlugin {
-  /** Configure `chapter-profile-registry-di` with this folio's profiles. */
-  registerDefaults(): void;
-}
-
 /** One issue the LaTeX preflight found. */
 export interface LatexPreflightIssue {
   check: string;
@@ -139,7 +133,6 @@ export interface TabularCsvwPlugin {
 /** Every slot, keyed by the kind string a contributor registers under. */
 export interface PipelinePlugins {
   "lean-lexer": LeanLexerPlugin;
-  "chapter-profile-defaults": ChapterProfileDefaultsPlugin;
   "latex-preflight": LatexPreflightPlugin;
   "lean-coverage": LeanCoveragePlugin;
   "tabular-csvw": TabularCsvwPlugin;
@@ -150,7 +143,6 @@ export type PipelinePluginKind = keyof PipelinePlugins;
 /** The kinds, as data — for reports and for the test that pins the set. */
 export const PIPELINE_PLUGIN_KINDS: readonly PipelinePluginKind[] = [
   "lean-lexer",
-  "chapter-profile-defaults",
   "latex-preflight",
   "lean-coverage",
   "tabular-csvw",
@@ -302,23 +294,6 @@ export function stripLeanComments(src: string): string {
 /** `lean-lexer` slot: declaration starts in comment-stripped Lean source. */
 export function declarationStarts(stripped: string): LeanDeclStart[] {
   return pipelinePlugin("lean-lexer").declarationStarts(stripped);
-}
-
-/**
- * `chapter-profile-defaults` slot: configure the folio's default chapter
- * profiles, IF a dependency supplies them.
- *
- * The one OPTIONAL slot, and on purpose. It runs at module load of
- * `qa-checkers-q-usage.ts`, and "no defaults" is already a documented state
- * of `chapter-profile-registry-di` (unconfigured, which reads as empty and is
- * reported by `chapterProfilesConfigured()`). A folio that does not depend on
- * the science layer, such as the fixture in `q-usage-audit-roots.test.ts`,
- * must still be able to load the checker and get its own "found NO blocks"
- * answer, rather than a load-time throw about a slot it never needed. A
- * contributor that is declared but broken still throws, from the loader.
- */
-export function registerDefaultChapterProfiles(): void {
-  optionalPipelinePlugin("chapter-profile-defaults")?.registerDefaults();
 }
 
 /** `latex-preflight` slot: macro lint over a generated compile unit. */

@@ -451,7 +451,7 @@ jobs:
       - &setup-bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.4
       - &caller
         name: Check out the caller
         if: inputs.mode == 'layer'

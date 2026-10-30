@@ -32,7 +32,7 @@ import {
 } from "../workflow-view.ts";
 import { loadProcessModel } from "../../src/workflow/process-model.js";
 import { REFUSALS_KEPT, withRefusal } from "../../src/workflow/instance.js";
-import type { MemoryNode } from "@litlfred/cat-harness/schemas/memory.js";
+import type { MemoryNode } from "@litlfred/cat-harness/schemas/conduct/memory.js";
 import type { RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
 
 const NOW = new Date("2026-10-24T00:00:00Z");

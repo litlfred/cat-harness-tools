@@ -59,6 +59,7 @@ import { declaredSubgraphNode } from "../scripts/kg-export.ts";
 import { memberOf } from "../scripts/subgraph-node.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { docsSources, sourceSiteNodePath, type DocsSource } from "../scripts/lib/docs-sources.ts";
+import { loadManifestValue, manifestPath } from "./json-manifest.ts";
 
 const INSTANCE_ROOT = join(HARNESS_ROOT);
 const BASE_SRC_DIR = docsSourceDirFor(INSTANCE_ROOT);
@@ -217,12 +218,12 @@ if (flats.length === 0) {
 }
 
 for (const flat of flats) {
-  const manifest = join(SRC_DIR, flat, `${flat}.ts`);
+  const manifest = manifestPath(join(SRC_DIR, flat), flat);
   if (!existsSync(manifest)) {
-    console.error(`  ! ${flat}/ has no ${flat}.ts manifest — skipped`);
+    console.error(`  ! ${flat}/ has no ${flat}.ts or ${flat}.json manifest — skipped`);
     continue;
   }
-  const page = ((await import(manifest)) as { default: WebPage }).default;
+  const page = (await loadManifestValue(manifest)) as WebPage;
 
   emitBoth(join(SRC_DIR, flat, `${flat}.jsonld`), siteNodeSitePath(page.slug), {
     "@context": documentContext(SITE_PAGE_TYPES, { base: DOCS_SITE_BASE }),

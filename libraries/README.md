@@ -4,7 +4,7 @@
 
 # Software libraries
 
-The outside libraries this layer's code imports: one `software-library/1.0.0` node per dependency in `package.json`, with the version and sha512 that `bun.lock` pins, the registry tarball, the SPDX licence read from the installed package, the range, whether it is a dev dependency, the files that import it (`usedBy`) and the `types/*.d.ts` shim that types it (bpmn-moddle, dmn-moddle). GENERATED, never hand-edited: `bun run cat libraries:derive` writes it and `libraries:check` fails on a stale node, an import no node names, and a shim no node names. The kind is cat-harness's (bean `jbvi`, option D: one outside-software core shared with `tool-release`); this layer keeps its own nodes because it pins its own versions.
+The outside libraries this layer's code imports: one `software-library/1.0.0` node per dependency in `package.json`, with the version and sha512 that `bun.lock` pins, the registry tarball, the SPDX licence read from the installed package, the range, whether it is a dev dependency, the files that import it (`usedBy`) and the `types/*.d.ts` shim that types it (bpmn-moddle, dmn-moddle). GENERATED, never hand-edited: `bun run cat libraries:derive` writes it and `libraries:check` fails on a stale node, an import no node names, and a shim no node names. The kind is cat-harness's (bean `jbvi`, option D: one outside-software core shared with `tool-release`); this layer keeps its own nodes because it pins its own versions. `held/<layer>/` holds the nodes of each layer below the kind, which may not name it (bootstrap-tools): `software-library/1.2.0` with `layer` naming the layer it describes, derived at this layer's pins (owner, 2026-10-30, bootstrap-tools#44).
 
 Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-libraries`, holding `software-library`.
 
@@ -20,6 +20,7 @@ Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-
 | [`eslint.library.json`](eslint.library.json) | data |  |
 | [`fast-xml-parser.library.json`](fast-xml-parser.library.json) | data |  |
 | [`glob.library.json`](glob.library.json) | data |  |
+| [`held/`](held/) | _nothing declares what this holds_ | |
 | [`hpcc-js__wasm-graphviz.library.json`](hpcc-js__wasm-graphviz.library.json) | data |  |
 | [`jsonld.library.json`](jsonld.library.json) | data |  |
 | [`liquidjs.library.json`](liquidjs.library.json) | data |  |

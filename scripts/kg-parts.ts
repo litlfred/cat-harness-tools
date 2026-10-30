@@ -42,7 +42,17 @@ import { KG_PART_RECORD_SCHEMA } from "@litlfred/cat-harness/schemas/kg/substrat
  * <snapshot dir>/<subscription>/nested/<subgraph path>/tree/…   a NESTED subgraph's contents
  * <snapshot dir>/<subscription>/nodes/<subgraph path>/nodes.json
  * <snapshot dir>/<subscription>/nodes/<subgraph path>/index.hydrated.jsonld
+ * <snapshot dir>/<subscription>/harnesses/<harness>/<state path>/…   an INSTANTIATED harness's state
  * ```
+ *
+ * `harnesses/` is where `kg:instantiate` (slice 7) writes the state directories
+ * a chosen harness declares. It sits here, not at `<repository root>/<harness>/`
+ * as slice 7 first wrote it, because the root is not a declared directory and
+ * a harness named after a staged instance (a content layer) would land inside that
+ * instance's directory (arc gap G11; owner, 2026-10-30: slice 7 moves to this
+ * layout). Keyed by subscription first, so two subscriptions can never write
+ * into one home. It holds no `materialization.json`: these are the
+ * subscriber's own working bytes, written by a command, never upstream's.
  *
  * `nested/` is the byte copy of a subgraph declared FROM WITHIN another
  * (`skills/voices`, declared in `skills/skills.json`). Owner, 2026-10-24
@@ -78,6 +88,14 @@ export const NESTED_DIR = "nested";
 /** The metadata-mode record beside a fetched `index.hydrated.jsonld`. */
 export const NODES_RECORD_FILE = "nodes.json";
 export const NODES_DIR = "nodes";
+
+/** Where instantiated harnesses' state directories live, one directory per harness (module note). */
+export const HARNESSES_DIR = "harnesses";
+
+/** Where a subscribed harness's local bytes live: `<snapshot dir>/<subscription>/harnesses/<harness>/`. */
+export function harnessHomeOf(snapshotDir: string, subscription: string, harness: string): string {
+  return join(snapshotDir, subscription, HARNESSES_DIR, harness);
+}
 
 /** Where one subgraph's metadata-mode record and `index.hydrated.jsonld` live. */
 export function nodesDirOf(snapshotDir: string, subscription: string, subgraphPath: string): string {
