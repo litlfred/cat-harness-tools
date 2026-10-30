@@ -707,7 +707,7 @@ const PROOF: QaCriterionDefinition[] = [
       "`lean.ref` linking constraints while formalisation is pending.",
     default_severity: "critical",
     depends_on: ["lean"],
-    source_file: "pipeline/qa-checkers-vacuity.ts",
+    checker_contributed: true,
     automated: true,
     applies_to: [
       "theorem",
@@ -1024,7 +1024,7 @@ const PROOF: QaCriterionDefinition[] = [
       "Routes to `lean-proof-vacuity-audit`.",
     default_severity: "critical",
     depends_on: ["lean"],
-    source_file: "pipeline/qa-checkers-vacuity.ts",
+    checker_contributed: true,
     automated: true,
     applies_to: ["definition", "theorem", "lemma", "proposition", "corollary"],
   },
@@ -1071,7 +1071,7 @@ const PROOF: QaCriterionDefinition[] = [
       "Routes to `lean-proof-vacuity-audit`.",
     default_severity: "critical",
     depends_on: ["lean"],
-    source_file: "pipeline/qa-checkers-vacuity.ts",
+    checker_contributed: true,
     automated: true,
     applies_to: ["definition", "theorem", "lemma", "proposition", "corollary"],
   },
@@ -1088,7 +1088,7 @@ const PROOF: QaCriterionDefinition[] = [
       "AST-checked, no agent turn. Routes to `lean-proof-vacuity-audit`.",
     default_severity: "major",
     depends_on: ["lean"],
-    source_file: "pipeline/qa-checkers-vacuity.ts",
+    checker_contributed: true,
     automated: true,
     applies_to: ["definition", "theorem", "lemma", "proposition", "corollary"],
   },
@@ -1141,6 +1141,7 @@ const PROOF: QaCriterionDefinition[] = [
   {
     id: "proof-not-machine-trivial",
     domain: "proof",
+    checker_contributed: true,
     description:
       "ADVISORY, warn-only. A weak CPU-cheap prover (Nazrin-class atomic-tactic " +
       "oracle) did NOT close this goal in <= 3 atomic tactics from cold. When it " +
@@ -2323,7 +2324,7 @@ const RENDER: QaCriterionDefinition[] = [
     // The defect is entirely in the narrative md; ts/lean are irrelevant.
     depends_on: ["md"],
     automated: true,
-    source_file: "pipeline/qa-checkers-render.ts",
+    checker_contributed: true,
   },
 ];
 
@@ -2669,8 +2670,10 @@ export const USES_CHECKER_FILE = "pipeline/qa-checkers-uses.ts";
 // runtime edge bean `zlmp` measured five of. Both criteria now carry
 // `checker_contributed: true`, and `resolveCriterionSource` asks the
 // contribution registry.
-/** Hosts the machine-triviality oracle checker (scaffold). */
-export const TRIVIALITY_CHECKER_FILE = "pipeline/qa-checkers-triviality.ts";
+// `pipeline/qa-checkers-{render,triviality,vacuity}.ts` moved to
+// folio-assistant-sci (bean `saqd` group 6); their six criteria carry
+// `checker_contributed: true` and `resolveCriterionSource` asks the
+// contribution registry.
 
 // The WHO L2 DAK companion checkers were hosted in core as
 // `pipeline/qa-checkers-dak.ts`, named by a `DAK_CHECKER_FILE` constant
@@ -2747,7 +2750,6 @@ export function getCriterionSourceFile(criterionId: string): string {
   if (VOICE_FILE_IDS.has(criterionId)) return VOICE_CHECKER_FILE;
   if (criterionId.startsWith("uses-") || criterionId === "lean-ref-owns-decl")
     return USES_CHECKER_FILE;
-  if (criterionId === "proof-not-machine-trivial") return TRIVIALITY_CHECKER_FILE;
   return EXTENDED_CHECKER_FILE;
 }
 
