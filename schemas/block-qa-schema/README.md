@@ -1,6 +1,6 @@
 # block-qa-schema
 
-> *Part of [folio-assistant](https://github.com/litlfred/folio-assistant). The producing implementation is [`schemas/sdlc/block-qa.ts`](../block-qa.ts); this package is the language-neutral interchange schema for the same two shapes.*
+> *Part of [folio-assistant](https://github.com/litlfred/folio-assistant). The producing implementation is [`schemas/sdlc/block-qa.ts`](../sdlc/block-qa.ts); this package is the language-neutral interchange schema for the same two shapes.*
 
 Cross-language schema for the folio **block-QA sidecar** format. Three artefacts in one package:
 
@@ -15,7 +15,7 @@ All three describe the same two sidecar shapes emitted by the folio QA pipeline 
 - **`<block>.qa.json`** (`$schema: "block-qa/v1"`) — one per content block. Under each QA criterion sits an append-only array of reviewer verdicts (script / agent / human), each pinned to the content hashes it judged so it auto-stales on edit.
 - **`<criterion-id>.script.json`** (`$schema: "qa-script/v1"`) — one per automated criterion, recording the checker's own source hash so a checker bug fix invalidates every verdict it ever wrote, corpus-wide.
 
-The JSON Schema is the authoritative interchange spec; the Pydantic and Zod schemas are hand-maintained mirrors kept in sync with it. The producing implementation lives in-repo at [`schemas/sdlc/block-qa.ts`](../block-qa.ts).
+The JSON Schema is the authoritative interchange spec; the Pydantic and Zod schemas are hand-maintained mirrors kept in sync with it. The producing implementation lives in-repo at [`schemas/sdlc/block-qa.ts`](../sdlc/block-qa.ts).
 
 ## Why a standalone package?
 
