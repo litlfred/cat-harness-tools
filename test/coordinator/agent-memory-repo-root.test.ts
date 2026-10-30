@@ -22,7 +22,7 @@ import {
   MemoryNodeSchema,
   memoryForAgent,
   memoryForRoles,
-} from "@litlfred/cat-harness/schemas/conduct/memory.js";
+} from "../../schemas/conduct/memory.js";
 import {
   AGENT_MEMORY_DIR,
   AGENTS_MD_BYTE_BUDGET,

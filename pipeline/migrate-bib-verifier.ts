@@ -22,7 +22,7 @@
  *   bun run cat-harness-tools/pipeline/migrate-bib-verifier.ts --dry-run
  */
 
-import { readSourceLedger, writeSourceLedger } from "@litlfred/cat-harness/schemas/library/bib-attestations.ts";
+import { readSourceLedger, writeSourceLedger } from "../schemas/library/bib-attestations.ts";
 import { findContentRepoRoot } from "./repo-root";
 
 // Was rooted at this file's own location, which is the PLATFORM — but the

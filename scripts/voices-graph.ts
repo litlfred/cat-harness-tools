@@ -46,7 +46,7 @@ import {
   readDeclaration,
   repoRootFor,
   siblingScopeFor,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+} from "../schemas/kg/cat-harness.ts";
 import {
   loadVoices,
   voiceProvenanceFlags,
@@ -55,7 +55,7 @@ import {
   type VoiceRule,
   VOICES_DECLARATION_FILE,
   voiceFilesIn,
-} from "@litlfred/cat-harness/schemas/content/voices.ts";
+} from "../schemas/content/voices.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** How a rule's citation resolves — the reader's verdict, never the file's claim. */

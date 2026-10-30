@@ -24,8 +24,8 @@ import {
   ContributionCollisionError,
   ContributionRegistry,
   type FolioContribution,
-} from "@litlfred/cat-harness/schemas/content/contributions.ts";
-import { loadContributionsSync } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+} from "../schemas/content/contributions.ts";
+import { loadContributionsSync } from "../schemas/kg/harness-config.ts";
 import { writeDeclaration, writeInstanceConfig } from "../test/support/instance-fixture.js";
 import {
   UnregisteredPipelinePluginError,

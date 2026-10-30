@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { SectionTitleAttestationsSchema } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.js";
+import { SectionTitleAttestationsSchema } from "../../schemas/sdlc/qa-attestations.js";
 import {
   derivedCopyPath,
   legacySidecarPath,

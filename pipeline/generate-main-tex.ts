@@ -20,10 +20,10 @@
  * @module pipeline/generate-main-tex
  */
 
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDir } from "../schemas/kg/cat-harness.js";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
-import type { Paper } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Paper } from "../schemas/types.ts";
 import { escapeLatex } from "./render-latex";
 import { resolveRenderTarget } from "./render-discovery";
 import { findContentRepoRoot, requirePaper } from "./repo-root";

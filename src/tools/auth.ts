@@ -21,7 +21,7 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { decide, unscopedGrants, type RequestScope } from "@litlfred/cat-harness/schemas/content/odrl.js";
+import { decide, unscopedGrants, type RequestScope } from "../../schemas/content/odrl.js";
 import { accessContext, type AccessContext, type Principal } from "../core/access.js";
 import { GITHUB_ROLE_ACTOR, githubPrincipalFor, principalFromGithub, type GithubIdentity } from "../core/github-auth.js";
 import type { AgentHost } from "../core/agent-host.js";

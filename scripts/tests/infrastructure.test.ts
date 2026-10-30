@@ -16,7 +16,7 @@ import { join } from "path";
 import { execSync } from "child_process";
 import { INSTANCE_ROOT, FOLIO_ROOT, hasFolio, REPO_ROOT } from "./helpers";
 import { maskComments } from "../../pipeline/uses-field";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { TOOLS_ROOT } from "../lib/roots.ts";
 
 /** Skip folio-side assertions when no content repo is attached. */

@@ -41,7 +41,7 @@ import { join } from "node:path";
 
 import { afterAll, expect, test } from "bun:test";
 
-import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
+import { gitCorpus } from "../../schemas/sdlc/git-corpus.ts";
 import { gitFiles } from "@litlfred/bootstrap-tools/scripts/git-files.ts";
 
 /** node's `spawnSync` default, restated so the fixture's target is explicit. */

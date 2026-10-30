@@ -18,13 +18,13 @@
  */
 import { join, relative, resolve } from "node:path";
 
-import { CAPABILITIES_DIRNAME } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { CAPABILITIES_DIRNAME } from "../../schemas/process/role-graph.js";
 import {
   checkoutCapabilities,
   overlayCapabilities,
   scenarioLayersBelow,
-} from "@litlfred/cat-harness/schemas/process/scenario-overlay.js";
-import type { KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
+} from "../../schemas/process/scenario-overlay.js";
+import type { KgFinding } from "../../schemas/sdlc/kg-qa.js";
 
 /** Which layers the actors were read over, as `kg-audit` chose for them. */
 export type ActorScope = "checkout" | "needed" | "own";

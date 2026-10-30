@@ -21,7 +21,7 @@ import {
   NoteAnchorSchema,
   notesAt,
   type Related,
-} from "@litlfred/cat-harness/schemas/ui/note-anchor.js";
+} from "./ui/note-anchor.js";
 
 const NOTE = { id: "t1", summary: "s" };
 
@@ -153,7 +153,7 @@ describe("beans carry no anchor — the owner's rule, guarded", () => {
   const BEAN_MODULES = ["schemas/sdlc/bean-graph.ts", "src/workflow/bean-link.ts"];
 
   test.each(BEAN_MODULES)("%s does not reach for an anchor", async (rel) => {
-    const file = Bun.file(rel.startsWith("schemas/") ? join(HARNESS_ROOT, rel) : join(TOOLS_ROOT, rel));
+    const file = Bun.file(join(TOOLS_ROOT, rel));
 
     // Absent is NOT clean. A moved or renamed module would otherwise pass this
     // silently, reporting a rule as guarded when nothing was read at all.

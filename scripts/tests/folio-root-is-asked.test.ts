@@ -35,7 +35,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const INSTANCE = resolve(HARNESS_ROOT);

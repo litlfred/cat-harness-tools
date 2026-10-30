@@ -19,7 +19,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync
 import { tmpdir } from "node:os";
 import { basename, join, relative, resolve } from "node:path";
 
-import { BinaryReleaseSchema } from "@litlfred/cat-harness/schemas/sdlc/binary-release.js";
+import { BinaryReleaseSchema } from "../schemas/sdlc/binary-release.js";
 
 export type GraphViewMode = "unhydrated" | "hydrated" | "both";
 

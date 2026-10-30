@@ -23,8 +23,8 @@ import {
   discoverScriptCheckers,
 } from "../../pipeline/qa-checker-discovery.ts";
 import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry.ts";
-import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
-import { ContributionRegistry, type FolioContribution } from "@litlfred/cat-harness/schemas/content/contributions.ts";
+import { loadContributions } from "../../schemas/kg/harness-config.ts";
+import { ContributionRegistry, type FolioContribution } from "../../schemas/content/contributions.ts";
 import { join } from "node:path";
 
 /** The directory this test was written in (`folio-assistant-sci/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing it reads changed. */

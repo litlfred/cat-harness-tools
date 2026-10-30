@@ -14,7 +14,7 @@
 import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { railStandalonePages } from "../scripts/mount-instance-docs.ts";
 

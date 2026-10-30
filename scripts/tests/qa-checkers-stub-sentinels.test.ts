@@ -4,7 +4,7 @@
  * an unimplemented stub from a genuine decline (folio-assistant-89wq).
  */
 import { describe, test, expect } from "bun:test";
-import type { CheckerResult } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import type { CheckerResult } from "../../schemas/sdlc/block-qa.ts";
 import {
   checkDetanglerNoXChapterFwd,
   checkDetanglerArchimedeanWall,

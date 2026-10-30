@@ -18,7 +18,7 @@ import { join } from "node:path";
 
 import { PINNED_CHROME_FILES, PINNED_DATA_FILES, mountRoutes, pinPlatformChrome, railStandalonePages } from "../mount-instance-docs.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { siteFileFor } from "../../schemas/kg/cat-harness.js";
 import { expandRail, navbarRowJsonOf, railDataJson } from "../lib/harness-rail.ts";
 
 const page = (body: string): string =>

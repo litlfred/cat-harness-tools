@@ -43,8 +43,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, relative, resolve } from "node:path";
 
-import { declarationPathIn, instanceDirectoryForGraph, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { ToolDefinitionSchema, type ToolDefinition } from "@litlfred/cat-harness/schemas/tools/tool.js";
+import { declarationPathIn, instanceDirectoryForGraph, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { ToolDefinitionSchema, type ToolDefinition } from "../schemas/tools/tool.js";
+import { toolsFromFolders } from "../schemas/tools/tool-folders.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { hostSchemaBase } from "../scripts/lib/host-schema.ts";
 
@@ -136,29 +137,37 @@ export function discoverTools(
 
     const mod = join(dir, "index.ts");
     const where = { instance: rel(inst), dir: rel(dir) };
-    if (!existsSync(mod)) {
-      out.failures.push({ ...where, reason: "declares a `tools` graph but has no index.ts to load it from" });
-      continue;
-    }
-
-    let ns: Record<string, unknown>;
-    try {
-      ns = load(mod) as Record<string, unknown>;
-    } catch (e) {
-      out.failures.push({ ...where, reason: `index.ts did not load: ${(e as Error).message}` });
-      continue;
-    }
-    if (typeof ns.tools !== "function") {
-      out.failures.push({ ...where, reason: "index.ts exports no `tools()` function" });
-      continue;
-    }
+    const hostBase = baseUrl ? hostSchemaBase(baseUrl) : baseUrl;
 
     let defs: unknown;
-    try {
-      defs = (ns.tools as (b?: string) => unknown)(baseUrl ? hostSchemaBase(baseUrl) : baseUrl);
-    } catch (e) {
-      out.failures.push({ ...where, reason: `tools() threw: ${(e as Error).message}` });
-      continue;
+    if (!existsSync(mod)) {
+      // A tools directory of data only — `<id>/<id>.json` folders, no loader
+      // module (bean `8lcl`: cat-harness holds no code). Load the folders
+      // directly, against the harness base when no base is given.
+      try {
+        defs = toolsFromFolders(dir, hostBase ?? harnessBase() ?? "");
+      } catch (e) {
+        out.failures.push({ ...where, reason: `tool folders did not load: ${(e as Error).message}` });
+        continue;
+      }
+    } else {
+      let ns: Record<string, unknown>;
+      try {
+        ns = load(mod) as Record<string, unknown>;
+      } catch (e) {
+        out.failures.push({ ...where, reason: `index.ts did not load: ${(e as Error).message}` });
+        continue;
+      }
+      if (typeof ns.tools !== "function") {
+        out.failures.push({ ...where, reason: "index.ts exports no `tools()` function" });
+        continue;
+      }
+      try {
+        defs = (ns.tools as (b?: string) => unknown)(hostBase);
+      } catch (e) {
+        out.failures.push({ ...where, reason: `tools() threw: ${(e as Error).message}` });
+        continue;
+      }
     }
     if (!Array.isArray(defs)) {
       out.failures.push({ ...where, reason: "tools() did not return an array" });

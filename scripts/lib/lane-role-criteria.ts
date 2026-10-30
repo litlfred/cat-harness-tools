@@ -29,8 +29,8 @@
  *   mechanical role is a real role whose skills are its contract; a contract
  *   nothing tests is a promise nobody checks.
  */
-import { findRole, isMechanicalRole, resolveRoleSkills, type RoleDef, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
-import type { KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
+import { findRole, isMechanicalRole, resolveRoleSkills, type RoleDef, type RoleGraph } from "../../schemas/process/role-graph.js";
+import type { KgFinding } from "../../schemas/sdlc/kg-qa.js";
 import type { LaneDef, ProcessNode } from "../../src/workflow/process-model.ts";
 import type { SkillEdges } from "./skill-edges.ts";
 

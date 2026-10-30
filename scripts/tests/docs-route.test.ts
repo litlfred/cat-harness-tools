@@ -20,8 +20,8 @@ import { join, resolve } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
+import { siteDirFor } from "../../schemas/kg/cat-harness.js";
+import { isDirectoryReadme } from "../../schemas/kg/kg-node.js";
 import { builtDocsRoute, docsRouteFor } from "../docs-route.ts";
 import {
   pagePermalink,

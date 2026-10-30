@@ -104,7 +104,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { siteDirFor } from "../schemas/kg/cat-harness.ts";
 
 import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.ts";
@@ -122,8 +122,8 @@ import {
   SITE_PUBLISHER_SLOT_PREFIX,
 } from "./site-publisher.ts";
 import { decide, readTip } from "./staging-push-gate.ts";
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
-import { readIndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.ts";
+import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
+import { readIndexConfig } from "../schemas/kg/index-config.ts";
 import { buildInstanceSite, recipeFromConfig, siteFields, type SiteRecipe } from "./build-instance-site.ts";
 
 /** Files one Artifact publish may carry, the page included (the Artifact tool's limit is 255; one is the page). */

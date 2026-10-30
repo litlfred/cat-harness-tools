@@ -32,7 +32,7 @@ import {
   normalise,
   resolveModule,
 } from "../check-agents-claims.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const REPO = repoRootFor(resolve(HARNESS_ROOT));

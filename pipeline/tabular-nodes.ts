@@ -40,8 +40,8 @@
  *
  * @module pipeline/tabular-nodes
  */
-import { documentContext } from "@litlfred/cat-harness/schemas/content/content-context.ts";
-import { termCurie } from "@litlfred/cat-harness/schemas/kg/namespaces.ts";
+import { documentContext } from "../schemas/content/content-context.ts";
+import { termCurie } from "../schemas/kg/namespaces.ts";
 
 /** All a manifest needs to know, from either record. */
 export interface TabularShape {

@@ -58,8 +58,8 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, 
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { built, declaredPlan } from "./derive-at-publish.ts";
 import { readInstances } from "./check-import-direction.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";

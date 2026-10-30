@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 
 import { checkTools, knownSkills } from "../../scripts/check-tools.js";
 import { tools } from "../../tools/discover.js";
-import { danglingRemedies, networkToolsWithoutRemedies, remediesFor } from "@litlfred/cat-harness/schemas/tools/tool.js";
+import { danglingRemedies, networkToolsWithoutRemedies, remediesFor } from "../../schemas/tools/tool.js";
 
 /**
  * The Tool audit, run ONCE at module scope.

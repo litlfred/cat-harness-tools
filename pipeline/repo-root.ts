@@ -31,7 +31,7 @@
 // gate failed to say so — the same silence this repository keeps paying for.
 // It is moot now rather than fixed: #840 made the registration automatic, so
 // there is no longer a command that can forget it (bean `z9ax`).
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { folioDir } from "../schemas/kg/cat-harness.js";
 import { existsSync, readdirSync, statSync } from "fs";
 import { dirname, join, resolve } from "path";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";

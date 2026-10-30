@@ -13,11 +13,11 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 
-import { attestationPath, blockAttestationKey, readCriteriaAttestations } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
+import { attestationPath, blockAttestationKey, readCriteriaAttestations } from "../../schemas/sdlc/qa-attestations.ts";
 
-import { COMPANION_ROLES, untaintedPartitionDefects } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import { COMPANION_ROLES, untaintedPartitionDefects } from "../../schemas/sdlc/block-qa.ts";
 import { ROUNDTRIP_DISPATCH, TRANSLATION_ARTEFACTS } from "../../pipeline/translation-block-qa.ts";
-import type { UntaintedDispatch } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import type { UntaintedDispatch } from "../../schemas/sdlc/block-qa.ts";
 import {
   couldNotDispatchEntry,
   isCouldNotDispatch,
@@ -26,7 +26,7 @@ import {
   recordUntainted,
   untaintedEntries,
 } from "../../pipeline/untainted-verification.ts";
-import type { QaCriterionEntry } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+import type { QaCriterionEntry } from "../../schemas/sdlc/block-qa.ts";
 
 const SOUND: UntaintedDispatch = {
   // The checker reads the formalisation; the adjudicator reads the prose

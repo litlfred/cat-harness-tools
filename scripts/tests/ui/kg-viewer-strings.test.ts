@@ -37,7 +37,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { directoryForGraph, deferResolution} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { directoryForGraph, deferResolution} from "../../../schemas/kg/cat-harness.js";
 
 import { parsePoEntries } from "../../../pipeline/po-inject.ts";
 import {

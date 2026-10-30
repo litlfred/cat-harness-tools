@@ -55,30 +55,30 @@ import {
   isPublishedGraphTypology,
   ownPrefixTable,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
+} from "../schemas/kg/cat-harness.js";
+import "../schemas/kg/folio-graph-typology.js";
 import {
   LEGACY_FOLIO_NS,
   namespaceForLayer,
   prefixForLayer,
   replacementIri,
   termIri,
-} from "@litlfred/cat-harness/schemas/kg/namespaces.js";
-import { REGISTRY_GROUPS } from "@litlfred/cat-harness/schemas/kg/kg-node.js";
-import { gitFiles } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
-import { siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/namespaces.js";
+import { REGISTRY_GROUPS } from "../schemas/kg/kg-node.js";
+import { gitFiles } from "../schemas/sdlc/git-corpus.ts";
+import { siteDirFor } from "../schemas/kg/cat-harness.js";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
-import { discoverBlockKinds } from "@litlfred/cat-harness/schemas/content/block-kinds.js";
-import { defaultInstancePrefixes } from "@litlfred/cat-harness/schemas/content/content-context.js";
-import { findDeclarationFile, instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
-import { ownDeclaredDirectories } from "@litlfred/cat-harness/schemas/kg/declared-nodes.js";
+import { discoverBlockKinds } from "../schemas/content/block-kinds.js";
+import { defaultInstancePrefixes } from "../schemas/content/content-context.js";
+import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { ownDeclaredDirectories } from "../schemas/kg/declared-nodes.js";
 import {
   CLASS_GLOSSES,
   PROPERTY_GLOSSES,
   TERM_LAYERS,
   type TermGloss,
   type TermLayer,
-} from "@litlfred/cat-harness/schemas/content/vocabulary.js";
+} from "../schemas/content/vocabulary.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

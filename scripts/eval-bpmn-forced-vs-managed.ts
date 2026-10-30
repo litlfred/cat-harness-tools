@@ -39,14 +39,14 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { readRoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { directoryForGraph } from "../schemas/kg/cat-harness.ts";
+import { readRoleGraph } from "../schemas/process/role-graph.js";
 import {
   buildTestRun,
   hashesReproduce,
   type TestCase,
   type TestRun,
-} from "@litlfred/cat-harness/schemas/sdlc/test-run.ts";
+} from "../schemas/sdlc/test-run.ts";
 import { loadProcessModel } from "../src/workflow/process-model.js";
 import {
   runForcedCase,
@@ -64,7 +64,7 @@ import { assertBenchmarkOutputPath } from "./benchmark-guard.ts";
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const TOOLS_ROOT = resolve(SCRIPT_DIR, "..");
 export const HARNESS_ROOT = dirname(
-  dirname(dirname(fileURLToPath(import.meta.resolve("@litlfred/cat-harness/schemas/kg/cat-harness.ts")))),
+  dirname(dirname(fileURLToPath(import.meta.resolve("../schemas/kg/cat-harness.ts")))),
 );
 
 export const DEFAULT_BENCHMARK_OUT_DIR = join(

@@ -19,7 +19,7 @@ import {
   type VoiceReview,
 } from "../../skill-voice-review.ts";
 
-import { checkoutRootFor, instanceRootsIn, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { checkoutRootFor, instanceRootsIn, repoRootFor } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

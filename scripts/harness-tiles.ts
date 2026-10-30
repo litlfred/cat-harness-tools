@@ -62,11 +62,11 @@
 import { existsSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { BLANK_AVATAR, GENERIC, avatarFor, hasAvatar } from "@litlfred/cat-harness/schemas/content/avatars.js";
-import { hexHue, resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
-import { PLATFORM_THEME_OWNER, themeByRef } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
-import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { flattenDependencies } from "@litlfred/cat-harness/schemas/kg/dependency-order.js";
+import { BLANK_AVATAR, GENERIC, avatarFor, hasAvatar } from "../schemas/content/avatars.js";
+import { hexHue, resolveThemeBackdrop } from "../schemas/ui/theme.js";
+import { PLATFORM_THEME_OWNER, themeByRef } from "../schemas/ui/theme-by-ref.js";
+import { instantiatedHarnessNames } from "../schemas/kg/harness-config.js";
+import { flattenDependencies } from "../schemas/kg/dependency-order.js";
 import {
   type CatHarnessDeclaration,
   type NavbarIcon,
@@ -81,9 +81,9 @@ import {
   defaultGraphTypologies,
   instanceDirectories,
   nestedDirectories,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/cat-harness.js";
 import { declaredVisualisers, existingPageDir, pageParts, withViewers } from "./viewer-declarations.js";
-import { aliasRoute, visualiserRoute } from "@litlfred/cat-harness/schemas/kg/visualiser-route.js";
+import { aliasRoute, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { subscribedHarnesses, subscribedTile } from "./subscribed-harnesses.js";
 import { labelVisualisations, nameInstanceRoot } from "./lib/nav-label.js";
 import type { HarnessMark } from "./lib/harness-mark.js";

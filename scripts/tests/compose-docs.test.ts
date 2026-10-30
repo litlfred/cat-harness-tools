@@ -47,7 +47,7 @@ import {
   type ComposedInstance,
 } from "../compose-docs.ts";
 import { clearDeclaredVisualisers, PAGE_LOCALE } from "../viewer-declarations.ts";
-import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import {  } from "../../schemas/kg/cat-harness.js";
 import { parse as parseYaml } from "yaml";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";

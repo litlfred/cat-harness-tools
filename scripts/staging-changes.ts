@@ -68,7 +68,7 @@ import {
   type RenderedFile,
   type RenderedImpact,
   type RenderedRole,
-} from "@litlfred/cat-harness/schemas/ui/rendered-impact.ts";
+} from "../schemas/ui/rendered-impact.ts";
 
 export const STAGING_CHANGES_TAG = "staging-changes/v1" as const;
 

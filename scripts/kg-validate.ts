@@ -28,11 +28,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 
-import { instanceDirectories, instanceRootsIn, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { checkoutRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { instanceDirectories, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor } from "../schemas/kg/harness-config.js";
 import type { z } from "zod";
 
-import { familyBody, nodeFamilyTag, resolveKindValidator, resolveNodeSchemas, stripAnnotations } from "@litlfred/cat-harness/schemas/kg/kind-validator.js";
+import { familyBody, nodeFamilyTag, resolveKindValidator, resolveNodeSchemas, stripAnnotations } from "../schemas/kg/kind-validator.js";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

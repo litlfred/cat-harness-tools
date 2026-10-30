@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, posix } from "node:path";
 import { deflateRawSync } from "node:zlib";
-import { ArchimateConfigSchema, layerOf, modelXmlOf, parseArchimate, readArchimate, zipEntry } from "@litlfred/cat-harness/archimate/schemas/archimate.ts";
+import { ArchimateConfigSchema, layerOf, modelXmlOf, parseArchimate, readArchimate, zipEntry } from "../schemas/archimate.ts";
 import { renderViewSvg, wrap } from "./render-view.ts";
 import { checkCommitted } from "./check-archimate.ts";
 import { PAGE_CONFIG_ID, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";

@@ -60,11 +60,11 @@
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
-import { DOCS_SITE_BASE } from "@litlfred/cat-harness/schemas/kg/jsonld.ts";
+import { DOCS_SITE_BASE } from "../../schemas/kg/jsonld.ts";
 import { escHtml, thinPageConfigOf, thinPageHtml } from "../../scripts/thin-page.ts";
-import { OpenApiDocumentSchema, OpenApiProvenanceSchema, operationsOf, type OpenApiOperation } from "@litlfred/cat-harness/openapi/schemas/openapi.ts";
+import { OpenApiDocumentSchema, OpenApiProvenanceSchema, operationsOf, type OpenApiOperation } from "../schemas/openapi.ts";
 import { CONFIG_FILE, localDirOf, openapiDir, readConfig } from "./ingest-openapi.ts";
-import { findDeclarationFile } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 
 /** The config-block id every page written here carries — how a run recognises its own output. */

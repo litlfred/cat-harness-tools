@@ -20,7 +20,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { gitCorpus } from "@litlfred/cat-harness/schemas/sdlc/git-corpus.ts";
+import { gitCorpus } from "../../schemas/sdlc/git-corpus.ts";
 import { gitFiles } from "@litlfred/bootstrap-tools/scripts/git-files.ts";
 
 describe("a >1 MiB git listing is answered", () => {

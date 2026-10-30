@@ -42,7 +42,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../schemas/kg/cat-harness.js";
 
 import {
   CLOSED_STATUSES,

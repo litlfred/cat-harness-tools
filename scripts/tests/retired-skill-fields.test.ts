@@ -30,7 +30,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { Glob } from "bun";
 
-import { fshGutsDirectory } from "@litlfred/cat-harness/schemas/kg/fsh-guts.js";
+import { fshGutsDirectory } from "../../schemas/kg/fsh-guts.js";
 import { kgRoots } from "../known-skills.js";
 import { notApplicableAlone } from "../../test/support/checkout.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";

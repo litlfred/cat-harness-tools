@@ -33,7 +33,7 @@ import {
 import type {
   QaCriterionEntry,
   QaReviewerKind,
-} from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+} from "../../schemas/sdlc/block-qa.ts";
 
 // ── fixture builders ─────────────────────────────────────────────
 

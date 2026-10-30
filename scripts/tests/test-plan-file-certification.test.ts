@@ -14,7 +14,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { readCertificationAttestations } from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
+import { readCertificationAttestations } from "../../schemas/sdlc/qa-attestations.ts";
 import { fileSignedCertification, type FileCertificationInput } from "../test-plan-execution.ts";
 
 const dirs: string[] = [];

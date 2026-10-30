@@ -71,7 +71,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
-import { declarationPathIn } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { declarationPathIn } from "../schemas/kg/cat-harness.js";
 
 const REPO = resolve(import.meta.dir, "..", "..");
 

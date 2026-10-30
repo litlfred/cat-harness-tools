@@ -25,7 +25,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { importedConfigFilename, inlineOverrides, readIndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.ts";
+import { importedConfigFilename, inlineOverrides, readIndexConfig } from "../schemas/kg/index-config.ts";
 
 export interface InstanceConfigRead {
   /** The effective config, raw (keys the schema does not name are kept). Absent when nothing configures the instance. */
