@@ -150,7 +150,7 @@ describe("there is exactly one declaration pattern", () => {
     expect(patternFiles()).not.toContain("cat-harness-tools/pipeline/qa-checkers-q-usage.ts");
   });
 
-  test("FIVE other modules still carry their own, and the list may only shrink", () => {
+  test("TWO other modules here still carry their own, and the list may only shrink", () => {
     // FOUND BY THIS TEST, not by the bean: `bqrg` said the declaration
     // splitter had "at least two" implementations. It has EIGHT sites across
     // seven files, and every extra one is missing a keyword the union has:
@@ -171,6 +171,11 @@ describe("there is exactly one declaration pattern", () => {
     // should not conclude the rule was broken; nothing about the inventory
     // changed except which file holds one of the rows.
     //
+    // 🛑 Three rows MOVED to `folio-assistant-sci/pipeline/` (bean `saqd`
+    // group 2: `conjectural-propagation-audit`, `generate-lean-stubs`,
+    // `proof-narrative-lean-equiv-sweep`) and are pinned in
+    // `folio-assistant-sci/scripts/tests/lean-decl-starts-are-shared.test.ts`.
+    //
     // `axiom` and `opaque` are the two that cost 243 declarations in the
     // corpus sweep, and three of the five miss one or both.
     //
@@ -180,14 +185,11 @@ describe("there is exactly one declaration pattern", () => {
     // exactly the "cleanup becomes a silent re-scoring" the bean warns about.
     //
     // Asserted by FILE rather than by line, so an unrelated edit above a
-    // pattern does not fail this. The list may only shrink: a sixth file fails
+    // pattern does not fail this. The list may only shrink: a fourth file fails
     // here, and converging one lets somebody delete a row.
     expect(patternFiles()).toEqual([
-      "cat-harness-tools/pipeline/conjectural-propagation-audit.ts",
-      "cat-harness-tools/pipeline/generate-lean-stubs.ts",
       "cat-harness-tools/pipeline/lean-formal-ref.ts",
       "cat-harness-tools/pipeline/lean-lexer.ts",
-      "cat-harness-tools/pipeline/proof-narrative-lean-equiv-sweep.ts",
       "cat-harness-tools/scripts/lean-coverage.ts",
     ]);
   });
