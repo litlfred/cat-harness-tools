@@ -102,7 +102,7 @@ jobs:
           token: ${{ secrets.repin-token || github.token }}
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.4
       - name: Compose the tools at ${{ inputs.tools-ref }}
         env:
           REF: ${{ inputs.tools-ref }}
