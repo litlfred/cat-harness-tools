@@ -36,15 +36,15 @@ import {
   ADAPTER_BLOCK_KINDS,
   CONTENT_ADAPTERS,
   adapterForKind,
-} from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
-import { criterionAdapters, incompatibleCompanions } from "@litlfred/cat-harness/schemas/sdlc/block-qa.ts";
+} from "../../schemas/content/block-kinds.ts";
+import { criterionAdapters, incompatibleCompanions } from "../../schemas/sdlc/block-qa.ts";
 import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry";
-import { loadContributions } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { loadContributions } from "../../schemas/kg/harness-config.ts";
 import {
   ContributionRegistry,
   composedKindOwner,
   type FolioContribution,
-} from "@litlfred/cat-harness/schemas/content/contributions.ts";
+} from "../../schemas/content/contributions.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 

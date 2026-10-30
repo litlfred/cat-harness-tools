@@ -27,7 +27,7 @@ import {
   GraphTypologyRegistry,
   resolveCoveragePath,
   siteDirFor,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+} from "../../schemas/kg/cat-harness.ts";
 
 /**
  * The REAL repository's audit, made once per root and shared by every test

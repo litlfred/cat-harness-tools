@@ -164,7 +164,7 @@
  *   is about the pair
  */
 
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../schemas/kg/cat-harness.js";
 
 import { OPEN_STATUSES, readBeanStore, type BeanFile } from "./bean-store-read.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.

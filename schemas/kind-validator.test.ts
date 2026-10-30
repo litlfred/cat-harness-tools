@@ -17,8 +17,8 @@ import {
   isZodSchema,
   parseValidatorRef,
   resolveKindValidator,
-} from "@litlfred/cat-harness/schemas/kg/kind-validator.ts";
-import { GraphTypologyRegistry, type GraphTypologyDef } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+} from "./kg/kind-validator.ts";
+import { GraphTypologyRegistry, type GraphTypologyDef } from "./kg/cat-harness.ts";
 
 const INSTANCE = HARNESS_ROOT;
 
@@ -178,7 +178,7 @@ describe("per-family node schemas (bean rdkm)", () => {
   const HARNESS = HARNESS_ROOT;
 
   test("qa names every family, and each resolves to a schema, a shape, or a recorded absence", async () => {
-    const { resolveNodeSchemas } = await import("@litlfred/cat-harness/schemas/kg/kind-validator.ts");
+    const { resolveNodeSchemas } = await import("./kg/kind-validator.ts");
     const fams = await resolveNodeSchemas("qa", HARNESS);
     expect(fams.map((f) => f.tag).sort()).toEqual([
       "block-qa/v1", "folio-detangle-sidecar/v1", "folio-lsi-index/v1", "folio-qa-index/v1",
@@ -210,7 +210,7 @@ describe("per-family node schemas (bean rdkm)", () => {
   });
 
   test("a shape is read from source, fields and optionality included", async () => {
-    const { readShape } = await import("@litlfred/cat-harness/schemas/kg/kind-validator.ts");
+    const { readShape } = await import("./kg/kind-validator.ts");
     const dir = mkdtempSync(join(tmpdir(), "shape-"));
     writeFileSync(join(dir, "m.ts"), "export interface Thing { id: string; note?: number }\n");
     const r = readShape(dir, "m.ts#Thing");
@@ -233,7 +233,7 @@ describe("per-family node schemas (bean rdkm)", () => {
     // `main`), so it is created for the fixture and removed after if so.
     const { validatePath } = await import("../scripts/kg-validate.ts");
     const { existsSync } = await import("node:fs");
-    const { KG_QA_SCHEMA, tally } = await import("@litlfred/cat-harness/schemas/sdlc/kg-qa.ts");
+    const { KG_QA_SCHEMA, tally } = await import("./sdlc/kg-qa.ts");
     const results = join(HARNESS, "test", "results");
     const hadResults = existsSync(results);
     const dir = join(results, `.kind-validator-fixture-${process.pid}`);
@@ -261,9 +261,10 @@ describe("per-family node schemas (bean rdkm)", () => {
 
 describe("instance-qualified references (bean quda)", () => {
   test("`name:module#Export` resolves through the instance that declares the name", async () => {
-    const { parseValidatorRef, rootOf } = await import("@litlfred/cat-harness/schemas/kg/kind-validator.ts");
+    const { parseValidatorRef, rootOf } = await import("./kg/kind-validator.ts");
     expect(parseValidatorRef("folio-assistant-core:schemas/catalogue.ts#CatalogueSchema")).toEqual({
       instance: "folio-assistant-core",
+      // declared-path-literal: test input — a fixed path the test passes in, not one read from a declaration
       module: "schemas/catalogue.ts",
       exportName: "CatalogueSchema",
     });
@@ -274,12 +275,12 @@ describe("instance-qualified references (bean quda)", () => {
   });
 
   test("an escaping path is still refused — the name is the only way out", async () => {
-    const { parseValidatorRef } = await import("@litlfred/cat-harness/schemas/kg/kind-validator.ts");
+    const { parseValidatorRef } = await import("./kg/kind-validator.ts");
     expect(() => parseValidatorRef("../folio-assistant-core/schemas/catalogue.ts#CatalogueSchema")).toThrow();
   });
 
   test("top-level `_` annotations are dropped before a node is checked", async () => {
-    const { stripAnnotations } = await import("@litlfred/cat-harness/schemas/kg/kind-validator.ts");
+    const { stripAnnotations } = await import("./kg/kind-validator.ts");
     expect(stripAnnotations({ _comment: "x", a: 1, b: { _keep: 2 } })).toEqual({ a: 1, b: { _keep: 2 } });
     expect(stripAnnotations([1])).toEqual([1]);
   });

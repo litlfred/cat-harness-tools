@@ -35,9 +35,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { findDeclarationFile, sourceLinks, type CatHarnessDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { instantiatedHarnessNames } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { PROPERTY_SKILLS, type DeclarationProperty } from "@litlfred/cat-harness/schemas/kg/property-skills.js";
+import { findDeclarationFile, sourceLinks, type CatHarnessDeclaration } from "../schemas/kg/cat-harness.js";
+import { instantiatedHarnessNames } from "../schemas/kg/harness-config.js";
+import { PROPERTY_SKILLS, type DeclarationProperty } from "../schemas/kg/property-skills.js";
 import { readSnapshot } from "./subscribed-harnesses.js";
 
 export interface PanelSkill {

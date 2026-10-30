@@ -7,7 +7,7 @@
  *
  * @module scripts/lib/translation-meta
  */
-import { readHarnessConfig, TranslationConfigSchema } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { readHarnessConfig, TranslationConfigSchema } from "../../schemas/kg/harness-config.ts";
 
 /**
  * The instance's declared translation config, with the SCHEMA's defaults (the

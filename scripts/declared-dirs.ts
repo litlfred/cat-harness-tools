@@ -33,7 +33,7 @@
  */
 import { relative, sep } from "node:path";
 
-import { directoriesForGraph, repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { directoriesForGraph, repoRootFor } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 if (import.meta.main) {

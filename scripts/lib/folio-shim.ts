@@ -2,8 +2,8 @@
  * A folio's builders shim: which vocabulary modules it re-exports.
  *
  * Every block manifest imports its builders from `folio/schema/builders.ts`,
- * which `init-folio` writes as a re-export of cat-harness's
- * `schemas/builders`. Since the owner's ruling of 2026-10-22 a layer above
+ * which `init-folio` writes as a re-export of cat-harness-tools'
+ * `schemas/builders` (cat-harness's until bean `8lcl` moved the code). Since the owner's ruling of 2026-10-22 a layer above
  * cat-harness types its own kinds in a vocabulary module
  * (`@litlfred/cat-harness/schemas/content/vocabulary-modules.ts`), and its builders
  * (`theorem`, `definition`, …) are that module's, not cat-harness's. So the shim
@@ -18,8 +18,8 @@
  */
 import { dirname, relative } from "node:path";
 
-import { CONTENT_PROFILES, type ContentProfile, PROFILE_BLOCK_KINDS } from "@litlfred/cat-harness/schemas/content/block-kinds.ts";
-import { vocabularies } from "@litlfred/cat-harness/schemas/content/vocabulary-modules.ts";
+import { CONTENT_PROFILES, type ContentProfile, PROFILE_BLOCK_KINDS } from "../../schemas/content/block-kinds.ts";
+import { vocabularies } from "../../schemas/content/vocabulary-modules.ts";
 
 import { HARNESS_ROOT } from "./roots.ts";
 
@@ -45,11 +45,13 @@ export function reexportLine(assistant: string, module: string): string {
 
 /**
  * The `assistant` path a shim was written with, read off its cat-harness
- * re-export (`export * from "../../<assistant>/cat-harness/schemas/builders"`),
+ * re-export (`export * from "../../<assistant>/cat-harness-tools/schemas/builders"`,
+ * or `cat-harness/` in a shim written before bean `8lcl`),
  * or `undefined` when it has none.
  */
 export function shimAssistant(shim: string): string | undefined {
-  return /export \* from "\.\.\/\.\.\/(.+)\/cat-harness\/schemas\/builders(?:\.ts)?";/.exec(shim)?.[1];
+  // `cat-harness-tools/` since bean `8lcl`; `cat-harness/` in a shim written before it.
+  return /export \* from "\.\.\/\.\.\/(.+)\/cat-harness(?:-tools)?\/schemas\/builders(?:\.ts)?";/.exec(shim)?.[1];
 }
 
 /** The re-export lines `shim` lacks for a folio of `contentType`. */

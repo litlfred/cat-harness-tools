@@ -32,7 +32,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { directoryForGraph } from "../../../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 
 const root = resolve(HARNESS_ROOT);

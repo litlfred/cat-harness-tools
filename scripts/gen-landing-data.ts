@@ -36,21 +36,21 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { resolveLandingInstance } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
-import { instanceRootNamed } from "@litlfred/cat-harness/schemas/kg/instance-roots.js";
-import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
+import { resolveLandingInstance } from "../schemas/kg/harness-config.js";
+import { instanceRootNamed } from "../schemas/kg/instance-roots.js";
+import { mountedInstanceRoots } from "../schemas/kg/remote-mount.js";
 import {
   checkoutRootFor,
   publishedAssetPath,
   readDeclaration,
   siteDirFor,
   sourceLinks,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/cat-harness.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
-import { resolveThemeBackdrop } from "@litlfred/cat-harness/schemas/ui/theme.js";
-import { themeByRef } from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
+import { resolveThemeBackdrop } from "../schemas/ui/theme.js";
+import { themeByRef } from "../schemas/ui/theme-by-ref.js";
 import { readLandingStickies } from "./ensure-landing-sticky.js";
-import { isExternalLink } from "@litlfred/cat-harness/schemas/content/landing-sticky.js";
+import { isExternalLink } from "../schemas/content/landing-sticky.js";
 import { publishedHref } from "./lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 

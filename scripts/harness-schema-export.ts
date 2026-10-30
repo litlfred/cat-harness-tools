@@ -36,7 +36,7 @@
 import { writeFileSync, mkdirSync, readFileSync, readdirSync, existsSync } from "node:fs";
 import { basename, dirname, join, posix, relative } from "node:path";
 import type { z } from "zod";
-import { namedJsonSchema, toJsonSchema } from "@litlfred/cat-harness/schemas/kg/to-json-schema.ts";
+import { namedJsonSchema, toJsonSchema } from "../schemas/kg/to-json-schema.ts";
 
 import {
   CatHarnessDeclarationSchema,
@@ -45,13 +45,13 @@ import {
   readDeclaration,
   renderingPath,
   repoRootFor,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { isZodSchema } from "@litlfred/cat-harness/schemas/kg/kind-validator.js";
+} from "../schemas/kg/cat-harness.js";
+import { isZodSchema } from "../schemas/kg/kind-validator.js";
 import { tools } from "../tools/discover.js";
-import { ToolDefinitionSchema } from "@litlfred/cat-harness/schemas/tools/tool.js";
-import { TOOL_TYPES, toolTypeDocumentIri, toolTypePath, type ToolTypeName } from "@litlfred/cat-harness/schemas/tools/tool-types.js";
+import { ToolDefinitionSchema } from "../schemas/tools/tool.js";
+import { TOOL_TYPES, toolTypeDocumentIri, toolTypePath, type ToolTypeName } from "../schemas/tools/tool-types.js";
 import { stagingFields } from "./staging-stamp.js";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { withConcernGroupDirs } from "./concern-groups.ts";
 import { hostSchemaBase, hostSchemaPath, legacyHostSchemaPath, movedSchema } from "./lib/host-schema.ts";
 
@@ -463,7 +463,11 @@ export function artefactDeclarationDrift(produced: readonly string[]): {
     if (d.producedBy === SELF_INVOCATION && !producedSet.has(artefact) && !movedFrom.has(artefact)) {
       unproduced.push({ artefact, tool: d.tool });
     }
-    if (!existsSync(join(ROOT, d.source))) {
+    // The harness declares, the tools layer implements: a source is looked for
+    // in the declaring instance, then in the one that implements it — the
+    // same rule `check:tools` applies to `invoke.*.module` (bean `8lcl` moved
+    // the harness's schema modules to the tools layer).
+    if (!existsSync(join(ROOT, d.source)) && !existsSync(join(TOOLS_ROOT, d.source))) {
       missingSource.push({ artefact, tool: d.tool, source: d.source });
     }
   }

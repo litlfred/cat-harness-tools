@@ -36,16 +36,16 @@ import { dirname, join, relative, resolve } from "node:path";
 import {
   getChecklistForKind,
   type AdversarialContentKind,
-} from "@litlfred/cat-harness/schemas/sdlc/adversarial-checklist.js";
+} from "../schemas/sdlc/adversarial-checklist.js";
 import {
   AdversarialFindingSchema,
   type AdversarialFinding,
   type AdversarialReview,
-} from "@litlfred/cat-harness/schemas/sdlc/red-flag.js";
-import { KG_QA_SCHEMA, type KgQaReport, type KgSubjectKind } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
+} from "../schemas/sdlc/red-flag.js";
+import { KG_QA_SCHEMA, type KgQaReport, type KgSubjectKind } from "../schemas/sdlc/kg-qa.js";
 import { NOT_DISCLOSED } from "@litlfred/bootstrap-tools/schemas/model-registry.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { implementingRootFor } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { implementingRootFor } from "../schemas/kg/harness-config.ts";
 import { declaredDirectory } from "./lib/local-site-dir.ts";
 
 const ROOT = resolve(HARNESS_ROOT);

@@ -41,7 +41,7 @@ import {
   translationAttestationKey,
   writeCriteriaAttestations as writeAttestations,
   type CriteriaMap,
-} from "@litlfred/cat-harness/schemas/sdlc/qa-attestations.ts";
+} from "../../schemas/sdlc/qa-attestations.ts";
 import { mergeWithAttestations } from "../../pipeline/translation-block-qa";
 import { writeDeclaration } from "../../test/support/instance-fixture";
 

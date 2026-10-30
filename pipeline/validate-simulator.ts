@@ -45,7 +45,7 @@
 import { existsSync } from "fs";
 import { isAbsolute, relative, resolve } from "path";
 
-import type { Block, ValidationIssue } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Block, ValidationIssue } from "../schemas/types.ts";
 
 /** A simulator block, narrowed without importing the union's every member. */
 interface SimulatorLike {

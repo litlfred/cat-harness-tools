@@ -24,8 +24,8 @@ import {
   ContributionCollisionError,
   ContributionRegistry,
   type FolioContribution,
-} from "@litlfred/cat-harness/schemas/content/contributions.ts";
-import { loadContributionsSync } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+} from "../schemas/content/contributions.ts";
+import { loadContributionsSync } from "../schemas/kg/harness-config.ts";
 import { writeDeclaration, writeInstanceConfig } from "../test/support/instance-fixture.js";
 import {
   UnregisteredPipelinePluginError,
@@ -261,11 +261,7 @@ describe("this repository", () => {
     // Sci-bound leaves that still sit here and import a slot filler directly.
     // That edge is sci → sci, so it is fine; they move together. The move PR
     // empties this list, because the files leave this directory.
-    const sciBoundHere = new Set([
-      "lean-atlas-ingest.ts",
-      "qa-checkers-vacuity.ts",
-      "lean-signature.ts",
-    ]);
+    const sciBoundHere = new Set<string>([]);
     const offenders: string[] = [];
     for (const f of readdirSync(import.meta.dir)) {
       if (!f.endsWith(".ts") || f.endsWith(".test.ts")) continue;

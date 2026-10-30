@@ -22,7 +22,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { sweepOrphans, KG_QA_RESULTS_DIR } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
+import { sweepOrphans, KG_QA_RESULTS_DIR } from "../../../schemas/sdlc/kg-qa.js";
 
 
 const roots: string[] = [];

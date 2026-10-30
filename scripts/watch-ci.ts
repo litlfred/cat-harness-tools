@@ -51,7 +51,7 @@ import {
   type HeadMergeState,
   type OwedSummary,
 } from "../src/workflow/check-verdict.js";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { repoRootFor } from "../schemas/kg/cat-harness.js";
 // The owed-workflow reconciliation and the merge probe are IMPORTED, never
 // reimplemented — see `verdictForCommit`'s docblock for the two designs that
 // duplicated them before this landed (#1646). `check:head-has-run` owns these.

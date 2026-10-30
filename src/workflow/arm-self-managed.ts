@@ -18,7 +18,7 @@
  * @module folio-assistant/workflow/arm-self-managed
  */
 
-import { resolveRoleSkills, roleForLane, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { resolveRoleSkills, roleForLane, type RoleGraph } from "../../schemas/process/role-graph.js";
 import type { ProcessModel } from "./process-model.js";
 import { evaluate } from "./decision-table.js";
 import type { ArmCaseMetrics, ArmSummaryMetrics, BankCase } from "./arm-forced.js";

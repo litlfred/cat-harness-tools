@@ -23,7 +23,7 @@
  *
  * Prints the stub and nothing else, so `STUB=$(bun run …)` captures it cleanly.
  */
-import { artefactStub, readDeclaration } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { artefactStub, readDeclaration } from "../schemas/kg/cat-harness.js";
 
 const root = process.argv[2] ?? "./cat-harness";
 const decl = readDeclaration(root);

@@ -93,20 +93,20 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
-import { AttributionSchema } from "@litlfred/cat-harness/schemas/content/attribution.ts";
+import { AttributionSchema } from "../schemas/content/attribution.ts";
 import {
   DESCRIBABLE_ROLES,
   ImagesSidecarSchema,
   SETTLED_BY_COMPUTATION,
   requiresInspection,
   type ImageRole,
-} from "@litlfred/cat-harness/schemas/content/document-image.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+} from "../schemas/content/document-image.ts";
+import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 import {
   VECTOR_FIGURES_FILE,
   VectorFiguresSidecarSchema,
   isVectorFigureId,
-} from "@litlfred/cat-harness/schemas/content/vector-figure.ts";
+} from "../schemas/content/vector-figure.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
 

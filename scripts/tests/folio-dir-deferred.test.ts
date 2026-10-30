@@ -16,7 +16,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
-import { folioDir, folioDirDeferred } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { folioDir, folioDirDeferred } from "../../schemas/kg/cat-harness.ts";
 
 // Every root is removed after its test. A leaked `<dir>/<dir>.json` holding
 // "{ not json" is a broken DECLARATION to anything that scans the temp

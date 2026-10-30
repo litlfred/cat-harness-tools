@@ -7,7 +7,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { sectionLabels } from "./validate";
-import type { Chapter } from "@litlfred/cat-harness/schemas/types.ts";
+import type { Chapter } from "../schemas/types.ts";
 
 describe("sectionLabels", () => {
   test("collects labels at every depth, in document order", () => {

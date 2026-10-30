@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { test, expect, type Page } from "@playwright/test";
 import { AxeBuilder } from "@axe-core/playwright";
 
-import { instanceRootsIn, readDeclaration, siteDirFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
+import { instanceRootsIn, readDeclaration, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { serveThemed, type Scheme } from "../support/themed-page.ts";
 import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
 import { declaredPageUrl } from "../support/site-pages.ts";

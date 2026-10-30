@@ -93,8 +93,8 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
 
-import { defaultGraphTypologies, ownDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { instanceRootsIn } from "@litlfred/cat-harness/schemas/kg/instance-roots.ts";
+import { defaultGraphTypologies, ownDirectories } from "../schemas/kg/cat-harness.js";
+import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
 import {
   HELD_DIR,
   LIBRARY_FILE_SUFFIX,
@@ -104,9 +104,9 @@ import {
   librarySchemaTag,
   vendoredLibraryFileName,
   type SoftwareLibrary,
-} from "@litlfred/cat-harness/schemas/library/software-library.ts";
-import { parseOutsideSoftwareRef } from "@litlfred/cat-harness/schemas/library/outside-software.ts";
-import { loadSpdxLicenseList } from "@litlfred/cat-harness/schemas/library/spdx-license-expression.ts";
+} from "../schemas/library/software-library.ts";
+import { parseOutsideSoftwareRef } from "../schemas/library/outside-software.ts";
+import { loadSpdxLicenseList } from "../schemas/library/spdx-license-expression.ts";
 
 /** The graph typology a `libraries/` directory is declared with. */
 export const LIBRARY_KIND = "software-library";

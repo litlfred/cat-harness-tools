@@ -60,9 +60,9 @@ import {
   showsOn,
   TILE_SURFACES,
   visualisationsOf,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+} from "../schemas/kg/cat-harness.js";
 import { tileLabel } from "./lib/nav-label.js";
-import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies } from "@litlfred/cat-harness/schemas/kg/graph-typology-registry.ts";
+import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.ts";
 
 /** Where a tile may appear. A visualisation that says nothing appears on every surface. */
 export type TileSurface = CatHarnessTileSurface;

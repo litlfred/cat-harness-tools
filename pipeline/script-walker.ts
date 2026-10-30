@@ -24,7 +24,7 @@ import {
 } from "fs";
 import { createHash } from "crypto";
 import { join, relative, basename, extname, dirname } from "path";
-import type { ScriptLanguage } from "@litlfred/cat-harness/schemas/sdlc/script-qa.ts";
+import type { ScriptLanguage } from "../schemas/sdlc/script-qa.ts";
 
 export interface ScriptTarget {
   /** Absolute path on disk. */

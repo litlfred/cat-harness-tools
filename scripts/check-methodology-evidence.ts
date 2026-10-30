@@ -64,7 +64,7 @@ import {
   MethodologyFrontMatterSchema,
   METHODOLOGY_SCHEMA_TAG,
   type MethodologyFrontMatter,
-} from "@litlfred/cat-harness/schemas/process/methodology.ts";
+} from "../schemas/process/methodology.ts";
 import {
   buildQaResult,
   concludeJudgement,
@@ -75,8 +75,8 @@ import {
   type Judgement,
   type QaResult,
 } from "./qa-results.ts";
-import { isDirectoryReadme } from "@litlfred/cat-harness/schemas/kg/kg-node.ts";
-import { corpusDirectoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.js";
+import { isDirectoryReadme } from "../schemas/kg/kg-node.ts";
+import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { isSkillMd, skillMdDirs } from "./known-skills.ts";
 

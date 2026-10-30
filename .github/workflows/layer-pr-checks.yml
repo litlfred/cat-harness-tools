@@ -82,7 +82,7 @@
 # Main's answer, once found, is RESTORED by prepare-base and handed to
 # compare as a run artifact (cat-harness-tools#926). It used to be only looked
 # up there and restored by compare, after the head shards, with
-# `fail-on-cache-miss`; on smart-base#216 (run 41064407930) that was two hours
+# `fail-on-cache-miss`; on https://github.com/litlfred/smart-base/pull/216 (run 41064407930) that was two hours
 # later, the entry had been evicted, and the gate failed without judging
 # anything. An artifact lives as long as the run. Should the restore or the
 # hand-off fail, prepare-base computes main's side itself, as on a miss.
@@ -122,6 +122,25 @@
 #   jobs:
 #     checks:
 #       uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@main
+#
+# Post-merge QA of main (owner, 2026-10-30, "Both"): a push to main runs
+# main's whole gate set and tests (the base side, above), and keeps main's
+# answer for the PRs based on that commit. It also says whether main ITSELF
+# is green (`main-verdict.py`), as this workflow's `main-verdict` and
+# `main-failures` outputs. A caller's second job hands them to
+# `layer-main-qa.yml`, which keeps one `main-red` issue open while main is
+# red and closes it when main is green (it needs `issues: write`, which this
+# workflow does not ask for):
+#
+#   main-qa:
+#     needs: checks
+#     if: ${{ !cancelled() && github.event_name == 'push' }}
+#     permissions: { contents: read, issues: write, actions: read }
+#     uses: litlfred/cat-harness-tools/.github/workflows/layer-main-qa.yml@main
+#     with:
+#       verdict: ${{ needs.checks.outputs.main-verdict }}
+#       failures: ${{ needs.checks.outputs.main-failures }}
+#       checks-result: ${{ needs.checks.result }}
 #
 # Draft PRs (owner, 2026-10-23, "1y"; bean `dft1`): with `draft-fast-tier:
 # true`, a DRAFT pull request runs the fast tier only. prepare-head mounts the
@@ -229,15 +248,31 @@ on:
         required: false
         type: boolean
         default: false
+    # Post-merge QA (owner, 2026-10-30, "Both"): on a push to main, whether
+    # main ITSELF is green, for the caller's `layer-main-qa.yml` job, which
+    # opens, updates or closes the one `main-red` issue. Empty on a PR.
+    outputs:
+      main-verdict:
+        description: "A push to main only: green, red or unknown, main's own tests and gates (main-verdict.py)."
+        value: ${{ jobs.compare.outputs.main-verdict }}
+      main-failures:
+        description: "A push to main only: what is red on main, as one line of JSON."
+        value: ${{ jobs.compare.outputs.main-failures }}
 
 permissions:
   contents: read
 
 # One run per PR (or ref), the newest. The group is this workflow's own, so it
-# never collides with a group a caller may still declare.
+# never collides with a group a caller may still declare. Only a PR's runs
+# cancel each other (owner, 2026-10-30, "Both"): a push to main is never
+# cancelled by the next one, because each main's run stores the answer that
+# the PRs based on THAT commit are judged against (cat-harness-tools#930). A
+# run of a PR that is closed or merged is cancelled by the `closed` event,
+# here for a caller that triggers on it, and for every workflow on the head
+# branch by `layer-cancel-on-close.yml`.
 concurrency:
   group: layer-pr-checks-${{ github.repository }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # The instance, once: the input when given, else (layer mode) the calling
 # repository's name, which is the instance's name for every layer.
@@ -1340,6 +1375,9 @@ jobs:
     needs: [prepare-head, prepare-base, run]
     if: ${{ !cancelled() && github.event.action != 'closed' }}
     runs-on: ubuntu-latest
+    outputs:
+      main-verdict: ${{ steps.main-verdict.outputs.verdict }}
+      main-failures: ${{ steps.main-verdict.outputs.failures }}
     steps:
       - name: Does this PR change only the caller's own pins?
         id: pins-only
@@ -1387,8 +1425,9 @@ jobs:
             echo "::error::the two sides were pinned to different commits, or one was not prepared: could not determine"
             exit 2
           fi
+      # A push always: main's own verdict (below) reads main-verdict.py.
       - uses: actions/checkout@v7
-        if: steps.pins-only.outputs.only != 'true'
+        if: steps.pins-only.outputs.only != 'true' || github.event_name == 'push'
         with:
           repository: litlfred/cat-harness-tools
           ref: ${{ github.event_name == 'push' && needs.prepare-base.outputs.tools || needs.prepare-head.outputs.tools }}
@@ -1539,6 +1578,27 @@ jobs:
         with:
           path: ${{ runner.temp }}/timings
           key: layer-pr-checks-timings-v1-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+      # Main's own verdict, on a push (post-merge QA; owner, 2026-10-30,
+      # "Both"): from this run's joined base side, or, when this push ran
+      # nothing because main's answer for exactly these inputs was already
+      # kept, from that answer. Never compared with anything; the caller's
+      # `layer-main-qa.yml` job reports it. No answer to read: unknown.
+      - name: Main's kept answer (a push that joined nothing)
+        if: ${{ !cancelled() && github.event_name == 'push' && steps.join.outcome != 'success' && needs.prepare-base.outputs.key != '' }}
+        continue-on-error: true
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/base-results
+          key: ${{ needs.prepare-base.outputs.key }}
+      - name: Main's own verdict (a push)
+        id: main-verdict
+        if: ${{ !cancelled() && github.event_name == 'push' }}
+        env:
+          JOINED: ${{ steps.join.outcome == 'success' }}
+        run: |
+          dir="$RUNNER_TEMP/base-results"
+          [ "$JOINED" = "true" ] && dir=merged/base
+          python3 .github/scripts/layer-pr-checks/main-verdict.py "$dir"
       - name: Tests
         id: tests
         if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push'

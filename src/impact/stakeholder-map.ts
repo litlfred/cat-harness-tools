@@ -58,7 +58,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { isSkillMd, kgRoots, skillMdDirs, workflowFiles, corpusScopeFor, roleGraphFor } from "../../scripts/known-skills.js";
 import { join, relative } from "node:path";
 import { loadProcessModel, isActivity, processDiagrams } from "../workflow/process-model.js";
-import { readRoleGraph, roleForLane, type RoleGraph } from "@litlfred/cat-harness/schemas/process/role-graph.js";
+import { readRoleGraph, roleForLane, type RoleGraph } from "../../schemas/process/role-graph.js";
 
 export interface SkillImpact { name: string; path: string }
 export interface LaneImpact {

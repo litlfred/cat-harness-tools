@@ -56,18 +56,25 @@ import { dirname, join } from "node:path";
 
 import { CACHE_FILE, FileDigests, cacheEnabled, trackedTreeDigest } from "./input-hash.ts";
 import { movedInventory } from "./qa-verify-moved.ts";
-import { inputSiteReached } from "@litlfred/cat-harness/schemas/sdlc/input-trace.ts";
+import { INDEX_CONFIG_FILENAME } from "../schemas/kg/instance-roots.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 import { GATES_WORKFLOW } from "./lib/gates-workflow.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
 
 /** Where the stamp lives, beside the input-hash cache. `build/` is git-ignored. */
 export const STAMP_PATH = join(dirname(CACHE_FILE), "qa-working-copy.json");
 
-/** The commands that ARE the working copy — the same two CI runs, in order. */
+/**
+ * The commands that ARE the working copy — the bootstrap export and `qa:refresh`
+ * that CI runs, plus `glossary:page` so the glossary anchors `uml:overview`
+ * reads exist on disk in a content root where `skill:register` is skipped as
+ * `readsState` (bean `rn24`, `cat-harness-tools#281`).
+ */
 export const WORKING_COPY_STEPS: readonly (readonly string[])[] = [
   // input-site: inert #fde1a412 — an OUTPUT path the working-copy build writes, never reads
   ["bun", "run", "cat-harness-tools/scripts/kg-export.ts", "--instance", "./bootstrap", "--out", "build/bootstrap-kg-export.jsonld"],
   ["bun", "run", "cat", "qa:refresh"],
+  ["bun", "run", "cat", "glossary:page"],
 ];
 
 export interface Stamp {
@@ -193,23 +200,15 @@ export const BUILDING_ENV = "QA_WORKING_COPY_BUILDING";
 /**
  * Why `repoRoot` cannot build the QA working copy at all, or null when it can.
  *
- * A root without the gates workflow is a CONTENT root (a document folio such
- * as smart-ra, an IG index, a layer repository). Until cat-harness-tools#281
- * `qa:refresh` there ended in ENOENT on the workflow (smart-ra#66, run
- * 38714163952); now `audit:coverage` reads the root's own gate set and the
- * writers that do not apply are reported as not applicable, but the copy
- * still ends INCOMPLETE where the root has content gaps (measured in smart-ra
- * 2026-10-15: `check:l1-complete`, `check:wireframes`). A generator that read
- * it would exit 2 at every publish over gaps that are not its own, so it stays
- * not applicable there until the root's qa:refresh is COMPLETE. The same rule
- * `run-gates.py` applies to `uml:overview:check` and `readme:subgraphs:check`
- * (`PREREQUISITE_FILES`), stated once for every generator that reads the copy.
- * The folio-assistant index has the workflow, so this never fires there.
+ * Both the harness index (`GATES_WORKFLOW`) and a content index
+ * (`INDEX_CONFIG_FILENAME`) declare a root gate set for `qa:refresh` to measure
+ * against (`cat-harness-tools#281`, bean `rn24`). A standalone layer checkout
+ * carries neither, so it has no root gate set to build the copy from.
  */
 export function workingCopyUnbuildable(repoRoot: string): string | null {
-  return existsSync(join(repoRoot, GATES_WORKFLOW))
+  return existsSync(join(repoRoot, GATES_WORKFLOW)) || existsSync(join(repoRoot, INDEX_CONFIG_FILENAME))
     ? null
-    : `${GATES_WORKFLOW} is absent, so this is a content root: qa:refresh measures it against its own gate set, and the copy stays INCOMPLETE while the root has content gaps of its own (cat-harness-tools#281)`;
+    : `neither ${GATES_WORKFLOW} nor ${INDEX_CONFIG_FILENAME} is at the root (a standalone layer checkout), so no root gate set is declared for qa:refresh to build the QA working copy against`;
 }
 
 /**

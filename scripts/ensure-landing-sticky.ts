@@ -72,20 +72,20 @@ import {
   readDeclaration,
   rootForScope,
   declarationPathIn,
-} from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { mountedInstanceRoots } from "@litlfred/cat-harness/schemas/kg/remote-mount.js";
+} from "../schemas/kg/cat-harness.js";
+import { mountedInstanceRoots } from "../schemas/kg/remote-mount.js";
 import {
   LandingStickySchema,
   stickyFromContribution,
   type LandingSticky,
-} from "@litlfred/cat-harness/schemas/content/landing-sticky.js";
-import { portableSegment } from "@litlfred/cat-harness/schemas/kg/portable-path.ts";
+} from "../schemas/content/landing-sticky.js";
+import { portableSegment } from "../schemas/kg/portable-path.ts";
 import {
   StickyContributionSchema,
   composeContributions,
   readerText,
   type DeclaredContribution,
-} from "@litlfred/cat-harness/schemas/content/sticky-contribution.js";
+} from "../schemas/content/sticky-contribution.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The graph typology, and the conventional directory an instance keeps it in. */

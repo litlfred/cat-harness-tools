@@ -88,6 +88,16 @@ describe("the QA working copy's readers decline only where it cannot be built", 
     }
   });
 
+  test("a content index (index.config.json present, bean rn24): buildable, so the writer runs and its failures count", () => {
+    const s = scratch();
+    try {
+      writeFileSync(join(s.dir, "index.config.json"), "{}\n");
+      expect(workingCopyUnbuildable(s.dir)).toBeNull();
+    } finally {
+      s.cleanup();
+    }
+  });
+
   test("requireCurrentWorkingCopy exits 78 with its reason in a root without the workflow, before building anything", () => {
     const s = scratch();
     try {

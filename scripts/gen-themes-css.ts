@@ -41,16 +41,16 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { readDeclaration, repoRootFor, siteDirFor, siteFileFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import { pageThemeCssVars, themeCssVars, type ResolvedTheme } from "@litlfred/cat-harness/schemas/ui/theme.js";
+import { readDeclaration, repoRootFor, siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.js";
+import { pageThemeCssVars, themeCssVars, type ResolvedTheme } from "../schemas/ui/theme.js";
 import {
   explainStickyThemeConflict,
   instanceStickyThemes,
   instanceWebpageThemes,
   type OwnedStickyTheme,
   type OwnedWebpageTheme,
-} from "@litlfred/cat-harness/schemas/ui/theme-by-ref.js";
-import { DEFAULT_THEME_ID, THEMES } from "@litlfred/cat-harness/schemas/ui/themes.js";
+} from "../schemas/ui/theme-by-ref.js";
+import { DEFAULT_THEME_ID, THEMES } from "../schemas/ui/themes.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**

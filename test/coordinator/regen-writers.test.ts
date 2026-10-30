@@ -39,8 +39,8 @@ import { dirname, join } from "node:path";
 import { regenPass, writerFor, type Runner } from "../../scripts/regen-after-merge.ts";
 import { chromiumExecutable } from "../../scripts/bpmn-render.ts";
 import { builtAtPublishOf } from "../../scripts/mount-from-lock.ts";
-import { repoRootFor } from "@litlfred/cat-harness/schemas/kg/cat-harness.ts";
-import { scriptsOf } from "@litlfred/cat-harness/schemas/sdlc/script-table.ts";
+import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
+import { scriptsOf } from "../../schemas/sdlc/script-table.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");

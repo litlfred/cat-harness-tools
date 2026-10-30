@@ -25,7 +25,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { corpusDirectoriesForGraph as directoriesForGraph } from "@litlfred/cat-harness/schemas/kg/harness-config.ts";
+import { corpusDirectoriesForGraph as directoriesForGraph } from "../../schemas/kg/harness-config.ts";
 import {
   NARRATIVE_STATES,
   NOT_AUTHORED,
@@ -34,7 +34,7 @@ import {
   STATES_WITH_TEXT,
   awaitsConfirmation,
   isConfirmed,
-} from "@litlfred/cat-harness/schemas/content/narrative.ts";
+} from "../../schemas/content/narrative.ts";
 import {
   NARRATIVE_BEARING,
   atATerminal,
@@ -43,7 +43,7 @@ import {
   queue,
   reviewer,
 } from "../narratives.ts";
-import {  } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import {  } from "../../schemas/kg/cat-harness.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 

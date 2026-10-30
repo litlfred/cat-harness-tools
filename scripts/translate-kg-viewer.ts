@@ -46,7 +46,7 @@ import { formatPot, potQuote } from "../pipeline/pot-extract.js";
 import { parsePo, parsePoEntries } from "../pipeline/po-inject.js";
 import type { PoEntry } from "../pipeline/po-inject.js";
 import type { PotEntry } from "../pipeline/pot-extract.js";
-import { directoryForGraph } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import { directoryForGraph } from "../schemas/kg/cat-harness.js";
 import {
   STRINGS_SOURCE,
   UI_STRINGS,
@@ -54,7 +54,7 @@ import {
   potEntries,
 } from "./kg-viewer-strings.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
-import { TranslationNodeSchema } from "@litlfred/cat-harness/schemas/content/translation.ts";
+import { TranslationNodeSchema } from "../schemas/content/translation.ts";
 
 /** The `$schema` of a TranslationNode manifest written as JSON (bean `y9r6`). */
 export const TRANSLATION_NODE_SCHEMA = "translation-node/v1";

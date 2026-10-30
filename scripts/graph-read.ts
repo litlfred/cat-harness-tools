@@ -63,9 +63,9 @@
 import { existsSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
-import { instanceRootsIn, resolveDirectories } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
-import "@litlfred/cat-harness/schemas/kg/folio-graph-typology.js";
-import { resolveSubgraphSource, type ResolvedSubgraphSource } from "@litlfred/cat-harness/schemas/kg/subgraph-source.js";
+import { instanceRootsIn, resolveDirectories } from "../schemas/kg/cat-harness.js";
+import "../schemas/kg/folio-graph-typology.js";
+import { resolveSubgraphSource, type ResolvedSubgraphSource } from "../schemas/kg/subgraph-source.js";
 import { absenceAt } from "./branch-store.ts";
 import { routePresence, tipPresence } from "./check-declared-dirs.ts";
 

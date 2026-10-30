@@ -23,7 +23,7 @@ import { join } from "node:path";
 
 import { analyse, classify } from "../repo-partition.ts";
 import type { TodoRef, MacroDef } from "../../src/types.ts";
-import type { FeedbackItem, PaperMacro } from "@litlfred/cat-harness/schemas/types.ts";
+import type { FeedbackItem, PaperMacro } from "../../schemas/types.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 // `src/types.ts` moved to this layer (70lx); the content vocabulary stayed in the harness.

@@ -18,8 +18,8 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
-import type { KgCriterionEntry, KgFinding } from "@litlfred/cat-harness/schemas/sdlc/kg-qa.js";
-import { folioDir } from "@litlfred/cat-harness/schemas/kg/cat-harness.js";
+import type { KgCriterionEntry, KgFinding } from "../schemas/sdlc/kg-qa.js";
+import { folioDir } from "../schemas/kg/cat-harness.js";
 import { fileDeclaresName } from "../pipeline/lean-lexer.ts";
 
 export type LeanRefClassification = "built" | "sibling_only" | "dangling" | "unknown";
