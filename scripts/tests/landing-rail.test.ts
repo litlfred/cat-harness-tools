@@ -38,6 +38,9 @@ function railOf(root: string, rel: string): { shared: RailShared; toRoot: string
   return { shared, toRoot: p!.toRoot };
 }
 
+/** The landing is smart-base, whose declaration labels its row "SMART Base"; only a composed checkout holds it. */
+const NO_SMART_BASE = notApplicableAlone("smart-base, the harness this site lands on, whose declaration names its Harnesses row");
+
 describe.skipIf(THEMES_CSS_NOT_BUILT)("a site that only LANDS on a harness: the rail is the site's, not the landing's", () => {
   // The landing's graph whose page this fixture site holds, read from the same data the rail reads:
   // one the landing DECLARES, since the rail lists no other. A closure without
