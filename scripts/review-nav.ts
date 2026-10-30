@@ -17,7 +17,8 @@
  * would be a tab stop, and a keyboard or switch user could not get past it.
  * So the minimap is a roving-tabindex list:
  * - one cell is reachable with Tab;
- * - Up and Down move between cells, and Home and End go to either end;
+ * - Up/Down (and Left/Right) move between cells in reading order, and Home
+ *   and End go to either end;
  * - Enter or Space (the cell is a native button) jumps to the block.
  * Every cell is labelled in words ("prose:dose: changed, 2 open comments, QA
  * failing"), and its visible glyphs repeat that, so colour is never the only
@@ -206,7 +207,7 @@ export interface BlockMark {
 }
 
 /**
- * The whole document as one column of cells, in outline order. Darker means
+ * The whole document as small wrapping squares, in outline order. Darker means
  * more reasons to look (a change, open comments, a QA failure); glyphs and
  * the label say which.
  */
@@ -224,7 +225,7 @@ export function renderMinimap(
   box.appendChild(h);
   const help = doc.createElement("p");
   help.className = "muted";
-  help.textContent = "One cell per block, in order. Up and Down move, Enter jumps. Δ changed, + added, ● open comments, ! QA failing.";
+  help.textContent = "One square per block, in reading order. Arrow keys move, Enter jumps. Filled squares need a look: Δ changed, + added, ● open comments, ! QA failing.";
   box.appendChild(help);
   const ol = doc.createElement("ol");
   ol.setAttribute("aria-labelledby", "minimap-h");
@@ -259,8 +260,8 @@ export function renderMinimap(
     const i = cells.indexOf(e.target as HTMLButtonElement);
     if (i < 0) return;
     let j = -1;
-    if (e.key === "ArrowDown") j = Math.min(cells.length - 1, i + 1);
-    else if (e.key === "ArrowUp") j = Math.max(0, i - 1);
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") j = Math.min(cells.length - 1, i + 1);
+    else if (e.key === "ArrowUp" || e.key === "ArrowLeft") j = Math.max(0, i - 1);
     else if (e.key === "Home") j = 0;
     else if (e.key === "End") j = cells.length - 1;
     if (j < 0) return;
