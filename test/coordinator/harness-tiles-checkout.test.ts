@@ -37,3 +37,17 @@ describe("an instance's OWN theme tones its tile (bean v8n5)", () => {
     expect(who.findings.join(" ")).not.toContain("not installed");
   });
 });
+
+describe("a site sub-graph links where its index.md is PUBLISHED (fa#2739)", () => {
+  // cat-harness's `docs/start/index.md` is served at `/docs/cat-harness/start/`
+  // by the site's permalink defaults. The tile linked its source path,
+  // `/start/`, and nothing is served there.
+  const REPO = join(ORIGIN_DIR, "..", "..", "..");
+  const tiles = harnessTiles(REPO, join(REPO, "cat-harness"), ["cat-harness"]);
+
+  test("the Doc group row opens the published start page", () => {
+    const cat = tiles.find((t) => t.name === "cat-harness")!;
+    const group = (cat.visualisations ?? []).find((v) => v.kind === "doc-group");
+    expect(group?.path).toBe("/docs/cat-harness/start/");
+  });
+});

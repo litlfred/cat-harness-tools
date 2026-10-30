@@ -105,6 +105,27 @@ export function readDocumentKinds(repoRoot: string): { kinds: KindEntry[]; dirs:
   return { kinds, dirs };
 }
 
+/**
+ * Every SUBJECT page and the kinds it shows (fa#2739).
+ *
+ * A subject is every instance that DECLARES a document-kinds directory, not
+ * only one that declares a kind: the harness tiles link `<route>/<instance>/`
+ * for each declared directory, so an instance whose directory holds only a
+ * coverage report (an IG realising its base layer's kind) or nothing yet
+ * still gets its page. Until then smart-trust and smart-immunizations were
+ * linked from the home page and never drawn. A subject's page shows the kinds
+ * it declares and the kinds it reports coverage of.
+ */
+export function subjectEntries(
+  kinds: readonly KindEntry[],
+  dirs: readonly { instance: string }[],
+): Map<string, KindEntry[]> {
+  const subjects = [...new Set([...dirs.map((d) => d.instance), ...kinds.map((k) => k.instance)])].sort();
+  return new Map(
+    subjects.map((s) => [s, kinds.filter((k) => k.instance === s || k.coverage.some((c) => c.subject === s))]),
+  );
+}
+
 const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 function sourceText(src: { ref: string; locator?: string; note?: string }): string {
@@ -229,7 +250,7 @@ ${subjectNavCss("dk-page")}
 <h1 id="dk-title">${esc(title)}</h1>
 ${subjectNav({ subjects, current: scope, cls: "dk-page" })}
 <p class="m">A document kind is a named structure of sections that a document authored with a harness follows: <b>fixed</b> (exactly these sections) or <b>semi-fixed</b> (these required, others allowed). Every kind and section names its sources.</p>
-${entries.length === 0 ? '<p class="m">No document kinds are declared.</p>' : entries.map(kindCard).join("\n")}
+${entries.length === 0 ? `<p class="m">${scope ? `${esc(scope)} declares a document-kinds directory, and it holds no kind or coverage report yet.` : "No document kinds are declared."}</p>` : entries.map(kindCard).join("\n")}
 </div>`,
   });
 }
@@ -238,7 +259,7 @@ let stale = 0;
 
 if (import.meta.main) {
   const repoRoot = repoRootFor(ROOT);
-  const { kinds } = readDocumentKinds(repoRoot);
+  const { kinds, dirs } = readDocumentKinds(repoRoot);
   const handler = readDeclaration(ROOT)?.name;
   if (!handler) {
     console.log("  · this instance declares no name — no handler segment to publish under");
@@ -259,14 +280,12 @@ if (import.meta.main) {
   // navigation and there is no rail to inject.
   const emitPage = makeEmit({ check, onStale: () => { stale++; } });
 
-  const subjects = [...new Set(kinds.map((k) => k.instance))].sort();
+  const bySubject = subjectEntries(kinds, dirs);
+  const subjects = [...bySubject.keys()];
   emitPage(join(pageDir, "index.html"), withRenderedByFrontMatter(pageHtml(kinds, undefined, subjects), VIEWER_TOOL));
-  for (const subject of subjects) {
+  for (const [subject, entries] of bySubject) {
     const sub = viewerPlacement(site, `${route}/${subject}`, GRAPH);
-    emitPage(
-      join(sub.pageDir, "index.html"),
-      withRenderedByFrontMatter(pageHtml(kinds.filter((k) => k.instance === subject), subject, subjects), VIEWER_TOOL),
-    );
+    emitPage(join(sub.pageDir, "index.html"), withRenderedByFrontMatter(pageHtml(entries, subject, subjects), VIEWER_TOOL));
   }
   const { owned, foreign } = orphanSubjectPages(pageDir, subjects);
   for (const name of foreign) console.error(`  ! ${join(pageDir, name)} is not a subject and does not identify itself — left in place`);

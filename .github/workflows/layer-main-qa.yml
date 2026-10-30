@@ -1,0 +1,91 @@
+# Post-merge QA of main, as ONE reusable workflow (owner, 2026-10-30,
+# approved "Both" on the card "Add auto-cancel and post-merge main QA to every
+# layer's CI?": "each merge to main gets a full QA run that files an issue
+# when it is red").
+#
+# It runs no gate. Main's gates and tests are run by the caller's own gate
+# workflow on its push to main: for a layer, `layer-pr-checks.yml`, whose push
+# run computes main's whole side (and keeps it as the answer the PRs based on
+# that commit are judged against) and hands main's own verdict on as its
+# `main-verdict` and `main-failures` outputs; for the index, its gate
+# workflow's conclusion. This only keeps ONE issue labelled `main-red` in step
+# with that verdict (`.github/scripts/layer-main-qa/report.py`):
+#   - red: the open issue is updated, or one is opened, naming the failing
+#     gates, tests and jobs and the commits since the last green main (the
+#     newest successful push run of the gate workflow on main). This job is
+#     then red too.
+#   - green: the open issue is closed.
+#   - the gate run was cancelled, or main's answer could not be read: nothing
+#     is touched.
+# Only the NEWEST main reports: this job's concurrency cancels an older
+# main's report in favour of the newer one, and a report whose commit is no
+# longer main's head leaves the issue to the newer push. The gate runs
+# themselves are never cancelled on main (each keeps its main's answer).
+#
+# A layer calls it as the second job of its checks workflow (see the header
+# of layer-pr-checks.yml); the index from a `workflow_run` of its gates.
+
+name: Post-merge QA of main
+
+on:
+  workflow_call:
+    inputs:
+      verdict:
+        description: "green, red or unknown (layer-pr-checks' main-verdict); empty: the gate run's conclusion decides."
+        required: false
+        type: string
+        default: ""
+      failures:
+        description: "What is red on main, one line of JSON (layer-pr-checks' main-failures); empty: the failed jobs only."
+        required: false
+        type: string
+        default: ""
+      checks-result:
+        description: "The gate job's result as the caller saw it (needs.<job>.result); empty when not applicable."
+        required: false
+        type: string
+        default: ""
+      gate-run-id:
+        description: "The workflow run that judged main; empty means this run."
+        required: false
+        type: string
+        default: ""
+      sha:
+        description: "The commit of main that was judged; empty means github.sha."
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  issues: write
+  actions: read
+
+jobs:
+  report:
+    name: Post-merge QA of main
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    concurrency:
+      group: layer-main-qa-${{ github.repository }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: litlfred/cat-harness-tools
+          ref: main
+          sparse-checkout: .github/scripts/layer-main-qa
+          path: qa
+      - name: Keep the main-red issue in step with main's verdict
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERDICT: ${{ inputs.verdict }}
+          FAILURES: ${{ inputs.failures }}
+          CHECKS_RESULT: ${{ inputs.checks-result }}
+          GATE_RUN_ID: ${{ inputs.gate-run-id != '' && inputs.gate-run-id || github.run_id }}
+          SHA: ${{ inputs.sha != '' && inputs.sha || github.sha }}
+        run: python3 -I qa/.github/scripts/layer-main-qa/report.py

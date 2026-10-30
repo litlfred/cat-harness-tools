@@ -263,7 +263,6 @@ describe("this repository", () => {
     // empties this list, because the files leave this directory.
     const sciBoundHere = new Set([
       "lean-atlas-ingest.ts",
-      "qa-checkers-vacuity.ts",
       "lean-signature.ts",
     ]);
     const offenders: string[] = [];
