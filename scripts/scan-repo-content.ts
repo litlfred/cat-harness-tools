@@ -48,9 +48,10 @@
  *
  * The fourth section, `markers`, answers a different question from the three
  * buckets: not "where would this file go" but "what in this repository could
- * a harness be told to pay attention to". Owner, 2026-10-30: *"a harness can
- * point to a repo, but doesnt want to automatically slurp up all content in a
- * repo. harness declares what it pays attention to in the repo."*
+ * a harness be told to pay attention to". Owner, 2026-10-30T12:41Z, verbatim:
+ * *"a harness can point to a repo, but doesnt want to automatically slurpo up
+ * all content in a repo. harness desclares what it it pays attention to in the
+ * repo."*
  *
  * So for each content marker found — `sushi-config.yaml`, a legacy
  * `dak.json`, `.bpmn` processes, a beans store, `library/`, Lean, folio
@@ -70,6 +71,11 @@
  *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir] --json      # facts
  *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir] --markers   # markers only:
  *     "what else could this harness declare?" on an instance that already exists
+ *   bun run cat-harness-tools/scripts/scan-repo-content.ts [dir] --markers --json   # markers only, as facts
+ *   bun run cat scan:repo [dir] [--markers] [--json]                          # the same, from an instance root
+ *
+ * `--json` with `--markers` prints the {@link MarkerScan} of
+ * `lib/content-markers.ts`; without it, the whole scan, `markers` included.
  *
  * @module scripts/scan-repo-content
  */

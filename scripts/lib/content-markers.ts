@@ -5,9 +5,9 @@
  *
  * ## Declare, don't slurp
  *
- * Owner, 2026-10-30: *"a harness can point to a repo, but doesnt want to
- * automatically slurp up all content in a repo. harness declares what it pays
- * attention to in the repo."* So this module FINDS and SUGGESTS; it never
+ * Owner, 2026-10-30T12:41Z, verbatim: *"a harness can point to a repo, but
+ * doesnt want to automatically slurpo up all content in a repo. harness
+ * desclares what it it pays attention to in the repo."* So this module FINDS and SUGGESTS; it never
  * writes `index.config.json` or a declaration. Every finding carries the
  * snippet that would declare it, and the person picks
  * (`getting-started.bpmn` `Task_ChooseHarnessed`, `repo-conversion.md` §2a).
@@ -31,10 +31,13 @@
  * That much is the {@link EVIDENCE} table below: a short, explicit list, each
  * row naming the id it suggests, so a reader can disagree with one row.
  *
- * TODO(ig): `contentTypes.ig` is being registered by fhir-harness (an
- * `include` list of paths such as `sushi-config.yaml` and `input/fsh/`). Until
- * that lands the `ig` row is a hint; once the type is registered with its own
- * evidence, read it from the registry and delete the row.
+ * `ig` is registered by fhir-harness (`schemas/ig-content-type.ts`,
+ * litlfred/fhir-harness#194), whose `include` list is what the snippet
+ * proposes. This toolset does not load fhir-harness, so in a plain scan the
+ * `ig` row is a hint with a note saying where the type lives; in a process
+ * that has loaded fhir-harness it reads `source: "registry"`. The row stays
+ * either way: the registry says what the section is, not which files are
+ * evidence for it.
  *
  * ## Three states for "declared", never two
  *
@@ -226,7 +229,7 @@ export const EVIDENCE: readonly Evidence[] = [
       if (files.includes("ig.ini")) out.push("ig.ini");
       return out;
     },
-    note: "`ig` is not registered yet (fhir-harness is adding it); the snippet follows its proposed `include` list.",
+    note: "`ig` is registered by fhir-harness (schemas/ig-content-type.ts), which this scan did not load; the snippet follows that type's `include` list. Its IG readers read only what `include` lists.",
   },
   {
     id: "dak",
