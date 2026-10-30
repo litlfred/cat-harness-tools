@@ -56,6 +56,9 @@ export function isInternal(value: string): boolean {
   if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return false;
   // Unrendered Liquid, and a script's template literal caught by the attribute pattern.
   if (value.includes("{{") || value.includes("{%") || value.includes("${")) return false;
+  // A script's string concatenation caught by the attribute pattern:
+  // `'<a href="' + esc(r.page) + '">'` yields the value `' + esc(r.page) + '`.
+  if (/'\s*\+|\+\s*'/.test(value)) return false;
   return true;
 }
 

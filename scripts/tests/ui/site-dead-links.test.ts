@@ -24,7 +24,7 @@ function site(files: Record<string, string>): string {
 
 describe("which links are checked", () => {
   it("skips external, anchor, Liquid and script-template values", () => {
-    for (const v of ["https://x.org/a", "mailto:a@b", "#top", "//cdn/x.js", "{{ '/a' | relative_url }}", "viewer/${a.url}"]) {
+    for (const v of ["https://x.org/a", "mailto:a@b", "#top", "//cdn/x.js", "{{ '/a' | relative_url }}", "viewer/${a.url}", "' + esc(SITE_HREF + r.page) + '", "' + escape(v) + '"]) {
       expect(isInternal(v)).toBe(false);
     }
     expect(isInternal("../a/b.html")).toBe(true);
