@@ -62,7 +62,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.ts";
 import { loadProcessModel, processDiagrams, type ProcessModel, type ProcessNode } from "../src/workflow/process-model.ts";
-import { belowOf } from "./declarations-retag.ts";
+import { belowHarness } from "./lib/needs-reach.ts";
 import { workflowFiles } from "./known-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -219,7 +219,7 @@ export function placementOf(sources: readonly string[], repoRoot: string, harnes
     .sort((a, b) => b.root.length - a.root.length);
   const needs = new Map(instances.map((i) => [i.decl.name!, (i.decl.needs ?? []) as readonly string[]] as const));
   const harness = readDeclaration(harnessRoot)?.name;
-  const below = harness ? belowOf(harness, needs) : new Set<string>();
+  const below = harness ? belowHarness(harness, needs) : new Set<string>();
   const out = new Map<string, Placement>();
   for (const src of sources) {
     const abs = resolve(src);

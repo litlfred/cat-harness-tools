@@ -60,6 +60,7 @@ import {
   visualiserPageDir,
   visualiserPageRef,
 } from "../viewer-declarations.ts";
+import { siteNotBuilt } from "../../test/support/checkout.ts";
 
 const ROOT = HARNESS_ROOT;
 const SITE = join(ROOT, siteDirFor(ROOT));
@@ -89,6 +90,17 @@ const upFrom = (graph: string) => "../".repeat(relative(SITE, pageDir(graph)).sp
 const read = (graph: string) =>
   readFileSync(join(pageDir(graph), "index.html"), "utf-8");
 const has = (graph: string) => existsSync(join(pageDir(graph), "index.html"));
+/**
+ * Standing alone, whether a dashboard page a test reads is unbuilt. The pages
+ * are written by `state:visualizer` at publish and gitignored, so a fresh
+ * clone has none (bean `folio-assistant-w1gy` F18); in the composed checkout
+ * this is always false and the test runs.
+ */
+const dashboardsNotBuilt = (...graphs: string[]): boolean =>
+  siteNotBuilt(
+    `the ${graphs.join(", ")} dashboard page${graphs.length > 1 ? "s" : ""} \`state:visualizer\` writes at publish (gitignored)`,
+    ...graphs.map((g) => join(pageDir(g), "index.html")),
+  );
 
 describe("the route is the policy, not this generator's choice", () => {
   test("the visualiser is AT its declared route, `<harness>/<visualiser>/`, one per declared visualiser", () => {
@@ -126,7 +138,7 @@ describe("the route is the policy, not this generator's choice", () => {
 });
 
 describe("each page reads the projection that already exists", () => {
-  test("relative to itself, at the depth its own route implies", () => {
+  test.skipIf(dashboardsNotBuilt("beans"))("relative to itself, at the depth its own route implies", () => {
     // `beans` is a THEMED page (#2418): `fa-beans-src` is the layout's own,
     // through `relative_url`. The no-JS fallback still links the projection,
     // relative to the page.
@@ -144,7 +156,7 @@ describe("each page reads the projection that already exists", () => {
     expect(existsSync(join(SITE, "assets", "todos", "index.json"))).toBe(true);
   });
 
-  test("a graph page names only its own graph", () => {
+  test.skipIf(dashboardsNotBuilt("beans", "todos"))("a graph page names only its own graph", () => {
     // Asserted on the META TAG, not the bare string: the renderer is INLINED
     // into every page and its source names both metas, because querying for
     // them is its job. An earlier draft asserted the string and failed on the
@@ -164,7 +176,7 @@ describe("each page reads the projection that already exists", () => {
 });
 
 describe("what a page may claim", () => {
-  test("a graph with no projection says so instead of rendering zeros", () => {
+  test.skipIf(dashboardsNotBuilt("issue-marks"))("a graph with no projection says so instead of rendering zeros", () => {
     // `qa` was the example here until 2026-09-21, when bean `py74` gave it a
     // projection. `issue-marks` (2 files) is the one this repository has
     // DECIDED is too thin to earn a dashboard, so it is the stable example
@@ -181,7 +193,7 @@ describe("what a page may claim", () => {
     expect(/<meta name="fa-(beans|todo)-src"/.test(html)).toBe(false);
   });
 
-  test("every page carries the registry, so the set is navigable from any of them", () => {
+  test.skipIf(dashboardsNotBuilt("beans", "qa", "health", "uploads"))("every page carries the registry, so the set is navigable from any of them", () => {
     // There is no index above these: `<base>/` is the documentation site's.
     // The way across is on each page, which is what makes them registered
     // sub-visualisations rather than six unrelated pages.
@@ -199,7 +211,7 @@ describe("what a page may claim", () => {
     expect(read("beans")).toContain('href="../todos/"');
   });
 
-  test("a page never links to itself", () => {
+  test.skipIf(dashboardsNotBuilt("beans", "todos"))("a page never links to itself", () => {
     // A link to here is a control that does nothing, and a reader who clicks
     // it learns only that it did nothing. The current row is plain text.
     expect(read("beans")).not.toContain('href="../beans/"');
@@ -225,7 +237,7 @@ describe("what a page may claim", () => {
     }
   });
 
-  test("the beans page is THEMED, so it carries the site's top band (#2418)", () => {
+  test.skipIf(dashboardsNotBuilt("beans"))("the beans page is THEMED, so it carries the site's top band (#2418)", () => {
     const html = read("beans");
     // The band (language, search, Folio) is built by docs-ui.js, which only a
     // layout page loads. A doctype shell with its own head has no band.
@@ -236,7 +248,7 @@ describe("what a page may claim", () => {
     expect(html).toContain("State graphs this harness declares");
   });
 
-  test("the todos page is the landing's sticky panel, open, on a themed page (#1906)", () => {
+  test.skipIf(dashboardsNotBuilt("todos"))("the todos page is the landing's sticky panel, open, on a themed page (#1906)", () => {
     const html = read("todos");
     // Themed: Jekyll front matter on the default layout, so the site chrome,
     // docs-ui.js and the no-JS floor come from the layout — not a doctype
@@ -263,7 +275,7 @@ describe("what a page may claim", () => {
     expect(index).toContain("{% include landing.html %}");
   });
 
-  test("every page carries the do-not-hand-edit notice", () => {
+  test.skipIf(dashboardsNotBuilt("beans", "todos", "qa"))("every page carries the do-not-hand-edit notice", () => {
     for (const id of ["beans", "todos", "qa"]) {
       expect(read(id)).toContain("Do not hand-edit");
     }
@@ -277,13 +289,13 @@ describe("no projection here is not the same as nothing renders this", () => {
   // `assets/library/index.json`, because it is one dataset with `library/` and
   // two projections over it would be two answers to "how many are queued".
 
-  test("a graph whose declaration names a visualiser says so, and links to it", () => {
+  test.skipIf(dashboardsNotBuilt("uploads"))("a graph whose declaration names a visualiser says so, and links to it", () => {
     const html = read("uploads");
     expect(html).toContain("rendered elsewhere");
     expect(html).not.toContain("nothing publishes a projection for it yet");
   });
 
-  test("the link is a real directory under this site, not a fabricated path", () => {
+  test.skipIf(dashboardsNotBuilt("uploads"))("the link is a real directory under this site, not a fabricated path", () => {
     // Asserted by RESOLVING it, not by matching the string. The declared value
     // is repo-root relative and the page is two levels into the site, so a
     // plausible-looking href is exactly the defect that would survive a
@@ -295,7 +307,7 @@ describe("no projection here is not the same as nothing renders this", () => {
     expect(existsSync(join(target, "index.html"))).toBe(true);
   });
 
-  test("it is labelled with the URL a reader sees, never the repo path", () => {
+  test.skipIf(dashboardsNotBuilt("uploads"))("it is labelled with the URL a reader sees, never the repo path", () => {
     // The declared value is `cat-harness/docs/...`, which is correct on disk
     // and meaningless in an address bar.
     const label = /rendered elsewhere[\s\S]*?<a [^>]*>([^<]+)<\/a>/.exec(read("uploads"))?.[1];
@@ -304,7 +316,7 @@ describe("no projection here is not the same as nothing renders this", () => {
     expect(label).not.toContain("docs/");
   });
 
-  test("and the graph that page renders really is the one being pointed at", () => {
+  test.skipIf(dashboardsNotBuilt("uploads"))("and the graph that page renders really is the one being pointed at", () => {
     // Falsification the other way: if the target stopped carrying queue data,
     // "rendered elsewhere" would be a link to a page that does not render it.
     const href = /rendered elsewhere[\s\S]*?href="([^"]+)"/.exec(read("uploads"))![1]!;
@@ -312,7 +324,7 @@ describe("no projection here is not the same as nothing renders this", () => {
     expect(target).toContain("uningested");
   });
 
-  test("a graph with NO declared visualiser still says nothing renders it", () => {
+  test.skipIf(dashboardsNotBuilt("issue-marks"))("a graph with NO declared visualiser still says nothing renders it", () => {
     // The other direction, and the reason this change is scoped rather than a
     // blanket rewrite: these declare no visualiser, so their pages were right
     // and must not move. `qa` was in this list until 2026-09-21 and left it by
@@ -325,7 +337,7 @@ describe("no projection here is not the same as nothing renders this", () => {
     }
   });
 
-  test("health and attestations point at this instance's own per-instance page (bean folio-assistant-1nu0)", () => {
+  test.skipIf(dashboardsNotBuilt("health", "attestations"))("health and attestations point at this instance's own per-instance page (bean folio-assistant-1nu0)", () => {
     for (const id of ["health", "attestations"]) {
       const html = read(id);
       expect(html).toContain("rendered elsewhere");
@@ -334,7 +346,7 @@ describe("no projection here is not the same as nothing renders this", () => {
     }
   });
 
-  test("no page claims a visualiser that is not there", () => {
+  test.skipIf(dashboardsNotBuilt("beans", "todos", "qa", "health", "issue-marks", "uploads"))("no page claims a visualiser that is not there", () => {
     // `unresolved` fires on nothing today — 27 of 27 coverage paths resolve —
     // so this asserts the CORPUS is clean rather than that the state works.
     // The state itself is exercised in the unit test below, because a test
@@ -513,7 +525,7 @@ describe("a declared description is escaped BEFORE its code spans are made", () 
     expect(describeText("`open and never closed")).toBe("`open and never closed");
   });
 
-  test("the corpus renders with no literal backtick left in a registry row", () => {
+  test.skipIf(dashboardsNotBuilt("beans", "todos", "qa", "health", "issue-marks", "uploads"))("the corpus renders with no literal backtick left in a registry row", () => {
     // The end-to-end half: whatever the declarations say today, no dashboard
     // shows a raw backtick in the descriptions it lists.
     for (const id of ["beans", "todos", "qa", "health", "issue-marks", "uploads"]) {
@@ -618,7 +630,7 @@ describe("the renderer is chosen by the projection's `$schema`, not by the graph
   // that rendered nothing — worse than honestly saying `declared`, which is
   // the defect `flh4` already paid for one state over.
 
-  test("the qa page mounts NO work-plan container and declares no src meta", () => {
+  test.skipIf(dashboardsNotBuilt("qa"))("the qa page mounts NO work-plan container and declares no src meta", () => {
     const html = read("qa");
     expect(/<div class="fa-workplan" data-fa-workplan>/.test(html)).toBe(false);
     // The bare strings appear in the INLINED renderer's own source, which
@@ -627,7 +639,7 @@ describe("the renderer is chosen by the projection's `$schema`, not by the graph
     expect(/<meta name="fa-(beans|todo)-src"/.test(html)).toBe(false);
   });
 
-  test("beans and todos still get theirs, so the dispatch did not simply stop working", () => {
+  test.skipIf(dashboardsNotBuilt("beans", "todos"))("beans and todos still get theirs, so the dispatch did not simply stop working", () => {
     // Themed (#2418): the work-plan container, asked for beans only.
     expect(read("beans")).toContain('data-fa-workplan-only="beans"');
     // The todo projection still gets ITS renderer — the sticky board, by way
@@ -638,14 +650,14 @@ describe("the renderer is chosen by the projection's `$schema`, not by the graph
     expect(todos).not.toContain("has no renderer for");
   });
 
-  test("the qa page renders one panel per family, server-side", () => {
+  test.skipIf(dashboardsNotBuilt("qa"))("the qa page renders one panel per family, server-side", () => {
     const html = read("qa");
     for (const fam of ["kg-qa/v1", "qa-witness/v1", "block-qa/v1"]) {
       expect(html).toContain(`<code>${fam}</code>`);
     }
   });
 
-  test("and SAYS there is no total, rather than leaving its absence to be noticed", () => {
+  test.skipIf(dashboardsNotBuilt("qa"))("and SAYS there is no total, rather than leaving its absence to be noticed", () => {
     // The ruling is that no cross-family number exists. A reader who finds
     // none and is told nothing will assume the page is unfinished.
     const html = read("qa");
@@ -656,7 +668,7 @@ describe("the renderer is chosen by the projection's `$schema`, not by the graph
     expect(html).toContain("<code>warn</code>");
   });
 
-  test("both third states are printed even at zero", () => {
+  test.skipIf(dashboardsNotBuilt("qa"))("both third states are printed even at zero", () => {
     // A count that appears only when non-zero cannot be told from one nobody
     // measured — which is the whole reason this graph had no projection.
     const html = read("qa");
@@ -671,13 +683,13 @@ describe("the bucket counts are a KPI row, not nested panels", () => {
   // label and an integer carried the same visual weight as the panel
   // containing them, and nine of them filled half the page.
 
-  test("each count is a stat tile with a value and a label", () => {
+  test.skipIf(dashboardsNotBuilt("qa"))("each count is a stat tile with a value and a label", () => {
     const html = read("qa");
     expect(html).toContain('<ul class="sv-counts">');
     expect(html).toMatch(/<li class="sv-count"><span class="sv-count-v">\d+<\/span><span class="sv-count-k">/);
   });
 
-  test("a count is never a `.sv-item`, which is the registry's card", () => {
+  test.skipIf(dashboardsNotBuilt("qa"))("a count is never a `.sv-item`, which is the registry's card", () => {
     // The regression this guards: reusing `.sv-item` here is what made a
     // bucket look like a peer of the family that contains it.
     const panels = read("qa").split(/<h2 class="sv-h2"[^>]*>State graphs/)[0] ?? "";
@@ -685,7 +697,7 @@ describe("the bucket counts are a KPI row, not nested panels", () => {
     expect(panels).not.toContain('<li class="sv-item">');
   });
 
-  test("no bucket carries a status colour", () => {
+  test.skipIf(dashboardsNotBuilt("qa"))("no bucket carries a status colour", () => {
     // fail/pass/warn are status words and the status palette is right for them
     // in general. Here it would assert a shared scale across families that
     // deliberately have none — one has `warn`, the other has no concept of it.
@@ -709,7 +721,7 @@ describe("the e2e spec's copy of the marker agrees with the generator's — bean
     expect(spec).toContain(`const MARKER = ${JSON.stringify(GENERATED_BY)};`);
   });
 
-  test("and the marker is really in the pages, so neither copy is hypothetical", () => {
+  test.skipIf(dashboardsNotBuilt("qa"))("and the marker is really in the pages, so neither copy is hypothetical", () => {
     // Guards the case where both copies agree and both are wrong.
     expect(read("qa")).toContain(GENERATED_BY);
   });

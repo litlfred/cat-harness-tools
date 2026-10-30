@@ -20,7 +20,7 @@ import {
   PROV_JSONLD_CONTEXT_URL,
   type AddressBook,
 } from "./kg/prov-jsonld.ts";
-import type { ProvActivity } from "./content/prov.ts";
+import { agreementDistribution, grantCredential, stampProvDecisionRecord, type ProvActivity } from "./content/prov.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { dirname } from "node:path";
 
@@ -161,5 +161,41 @@ describe("processHolding — the process a task belongs to", () => {
     expect(processHolding(xml, "T2")).toBe("B");
     expect(processHolding(xml, "nope")).toBeUndefined();
     expect(processHolding(xml, "P1")).toBeUndefined();
+  });
+});
+
+describe("decision records cite agreement and grant with standard terms (bean yy40)", () => {
+  const DCAT = "http://www.w3.org/ns/dcat#";
+  const SPDX = "http://spdx.org/rdf/terms#";
+  const CRED = "https://www.w3.org/2018/credentials#";
+  const RDFS = "http://www.w3.org/2000/01/rdf-schema#";
+  const none: AddressBook = { resolve: () => ({ unaddressed: "test" }) };
+
+  test("the agreement is a prov:used dcat:Distribution with spdx:checksum, the grant a VC; the hash chain is labelled a local extension", async () => {
+    const rec = stampProvDecisionRecord({
+      ...activity("owner", "authoring-agent", "code-change-review#T"),
+      "prov:used": [
+        agreementDistribution("https://example.org/dsa/v1#pdf", "a".repeat(64)),
+        grantCredential("urn:uuid:7f1c2a52-6d1e-4b8e-9b0e-0c4b2b5d1a01"),
+      ],
+    });
+    const { document } = provJsonldDocument("t--x", [rec], none);
+    const nodes = await expanded(document);
+    const act = nodes.find((n) => String(n["@id"]).endsWith("t--x#1"))!;
+    const used = act[`${P}used`] as Record<string, unknown>[];
+    const dist = used.find((u) => u["@id"] === "https://example.org/dsa/v1#pdf")!;
+    expect(dist["@type"]).toEqual([`${P}Entity`, `${DCAT}Distribution`]);
+    const sum = (dist[`${SPDX}checksum`] as Record<string, unknown>[])[0]!;
+    expect(sum[`${SPDX}algorithm`]).toEqual([{ "@id": `${SPDX}checksumAlgorithm_sha256` }]);
+    expect(sum[`${SPDX}checksumValue`]).toEqual([{ "@value": "a".repeat(64), "@type": "http://www.w3.org/2001/XMLSchema#hexBinary" }]);
+    const vc = used.find((u) => u["@id"] === "urn:uuid:7f1c2a52-6d1e-4b8e-9b0e-0c4b2b5d1a01")!;
+    expect(vc["@type"]).toEqual([`${P}Entity`, `${CRED}VerifiableCredential`]);
+    // No agreement/grant term of our own anywhere in the expanded record
+    expect(Object.keys(act).filter((k) => /agreement|grant/i.test(k))).toEqual([]);
+    // Each hash-chain term is described in the graph as a local extension
+    for (const term of ["previousHash", "recordHash"]) {
+      const prop = nodes.find((n) => typeof n["@id"] === "string" && (n["@id"] as string).endsWith(term))!;
+      expect(String((prop[`${RDFS}comment`] as { "@value": string }[])[0]!["@value"])).toMatch(/^Local extension/);
+    }
   });
 });

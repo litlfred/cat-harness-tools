@@ -18,14 +18,29 @@
  * | `prov:qualifiedAssociation.prov:hadPlan` | the BPMN task: `<process>#<task id>` |
  * | `prov:actedOnBehalfOf` | the person an agent worked for |
  * | `prov:used` / `prov:generated` | the graph nodes read and written |
+ * | `prov:used` → `dcat:Distribution` + `spdx:checksum` | the DSA agreement text the decision was made under (DCAT 3) |
+ * | `prov:used` → `cred:VerifiableCredential` | the grant, by its W3C VC Data Model 2.0 credential `id` (DSA B5) |
  * | `cat-harness:underPolicy` | the ODRL policy (or policies) it acted under |
- * | `cat-harness:agreement` | the DSA Agreement URL/IRI + SHA-256 digest (and optional grant id) |
- * | `cat-harness:grant` | optional grant identifier (DSA B5) |
- * | `cat-harness:previousHash` | SHA-256 hex digest of the preceding record in the chain (`null` at genesis) |
- * | `cat-harness:recordHash` | SHA-256 hex digest of this record's canonical JSON |
+ * | `cat-harness:previousHash` | **local extension**: SHA-256 hex digest of the preceding record in the chain (`null` at genesis) |
+ * | `cat-harness:recordHash` | **local extension**: SHA-256 hex digest of this record's canonical JSON |
  *
  * `hadPlan` is PROV-O's own term for "the plan an agent followed". A BPMN task
  * is exactly that, so no new term is minted for it.
+ *
+ * **The agreement and the grant are cited with existing open terms, not ours**
+ * (owner card 2026-10-30 19:16Z, bean `yy40`). A decision record names the
+ * agreement as a `prov:used` entity whose `@id` is the DCAT 3 `dcat:Distribution`
+ * of the agreement's legal text, carrying that text's `spdx:checksum`
+ * (`spdx:algorithm` + `spdx:checksumValue`, the property DCAT 3 gives
+ * `dcat:Distribution`).
+ * The grant is a further `prov:used` entity whose `@id` is the W3C VC Data
+ * Model 2.0 credential `id`. No agreement or grant fields of our own remain.
+ *
+ * **The hash chain is a local extension.** No open standard defines a
+ * hash-chained PROV log, so `cat-harness:previousHash` and
+ * `cat-harness:recordHash` stay in the `cat-harness:` namespace and are
+ * described as such ({@link PROV_LOCAL_EXTENSION_TERMS}), in this module, in
+ * the PROV-JSONLD emitted by `prov-jsonld.ts`, and nowhere passed off as PROV.
  *
  * @module schemas/prov
  * @graphNode schema
@@ -49,27 +64,156 @@ export const PLAN_REF = /^[a-z0-9][a-z0-9-]*#[A-Za-z_][A-Za-z0-9_.-]*$/;
 /** Lowercase 64-character hex SHA-256 digest. */
 export const SHA256_HEX = /^[0-9a-f]{64}$/;
 
-/** Absolute URI/IRI scheme pattern for agreement URLs/IRIs. */
-export const AGREEMENT_URI = /^[a-z][a-z0-9+.-]*:\S+$/i;
+/** Absolute URI/IRI (has a scheme): what a DCAT distribution or a VC `id` must be. */
+export const ABSOLUTE_IRI = /^[a-z][a-z0-9+.-]*:\S+$/i;
 
 export const Sha256HexSchema = z
   .string()
   .regex(SHA256_HEX, "sha256 must be a 64-character lowercase hex digest");
 
+/** Namespaces of the standard terms a decision record cites with. */
+export const DCAT_NS = "http://www.w3.org/ns/dcat#" as const;
+export const SPDX_NS = "http://spdx.org/rdf/terms#" as const;
+/** W3C VC Data Model 2.0 vocabulary (`https://www.w3.org/2018/credentials#`). */
+export const CRED_NS = "https://www.w3.org/2018/credentials#" as const;
+
 /**
- * Citation of a computable Data Sharing Agreement (DSA B3/B4, bean `3z44`):
- * the agreement's URL/IRI, its SHA-256 digest, and an optional grant id (once
- * B5 exists).
+ * The SPDX checksum algorithms accepted, as the SPDX individuals DCAT 3 names
+ * (`spdx:checksumAlgorithm_sha256`, …), each with its hex digest length.
  */
-export const ProvAgreementRefSchema = z
+export const SPDX_CHECKSUM_ALGORITHMS = {
+  "spdx:checksumAlgorithm_sha256": 64,
+  "spdx:checksumAlgorithm_sha512": 128,
+} as const;
+
+export type SpdxChecksumAlgorithm = keyof typeof SPDX_CHECKSUM_ALGORITHMS;
+
+/**
+ * `spdx:Checksum`, as DCAT 3 uses it on a `dcat:Distribution`
+ * (`spdx:checksum` → `spdx:algorithm` + `spdx:checksumValue`, a lowercase
+ * `xsd:hexBinary`). No field of ours.
+ */
+export const SpdxChecksumSchema = z
   .object({
-    url: z.string().regex(AGREEMENT_URI, "agreement url must be an absolute URI/IRI"),
-    sha256: Sha256HexSchema,
-    grant: z.string().min(1).optional(),
+    "@type": z.literal("spdx:Checksum").optional(),
+    "spdx:algorithm": z.enum(
+      Object.keys(SPDX_CHECKSUM_ALGORITHMS) as [SpdxChecksumAlgorithm, ...SpdxChecksumAlgorithm[]],
+    ),
+    "spdx:checksumValue": z.string().regex(/^[0-9a-f]+$/, "spdx:checksumValue is lowercase hex"),
+  })
+  .strict()
+  .refine((c) => c["spdx:checksumValue"].length === SPDX_CHECKSUM_ALGORITHMS[c["spdx:algorithm"]], {
+    message: "spdx:checksumValue length does not match spdx:algorithm",
+    path: ["spdx:checksumValue"],
+  });
+
+export type SpdxChecksum = z.infer<typeof SpdxChecksumSchema>;
+
+/**
+ * The agreement a decision was made under, as a `prov:used` entity (DSA B4,
+ * bean `yy40`): its `@id` is the DCAT 3 `dcat:Distribution` of the agreement's
+ * legal text — the same distribution the B3 `dsa` kind records and the ODRL
+ * Agreement's `dcterms:source` names — and it carries that text's
+ * `spdx:checksum`. `dcat:downloadURL` is optional, for when the distribution
+ * IRI is not itself where the bytes are fetched from.
+ */
+export const ProvAgreementDistributionSchema = z
+  .object({
+    "@id": z.string().regex(ABSOLUTE_IRI, "the agreement distribution @id must be an absolute IRI"),
+    "@type": z.tuple([z.literal("prov:Entity"), z.literal("dcat:Distribution")]),
+    "spdx:checksum": SpdxChecksumSchema,
+    "dcat:downloadURL": z.string().regex(ABSOLUTE_IRI).optional(),
   })
   .strict();
 
-export type ProvAgreementRef = z.infer<typeof ProvAgreementRefSchema>;
+export type ProvAgreementDistribution = z.infer<typeof ProvAgreementDistributionSchema>;
+
+/**
+ * The grant a decision was made under, as a `prov:used` entity (DSA B5): its
+ * `@id` is the W3C VC Data Model 2.0 credential `id`. Nothing else of the
+ * credential is restated; the verified VC is the record of its fields.
+ */
+export const ProvGrantCredentialSchema = z
+  .object({
+    "@id": z.string().regex(ABSOLUTE_IRI, "a VC 2.0 credential id is a URL"),
+    "@type": z.tuple([z.literal("prov:Entity"), z.literal("cred:VerifiableCredential")]),
+  })
+  .strict();
+
+export type ProvGrantCredential = z.infer<typeof ProvGrantCredentialSchema>;
+
+/**
+ * One `prov:used` value: a graph-node reference (the string form every other
+ * writer uses), or a described entity — the agreement's distribution or the
+ * grant's credential.
+ */
+export const ProvUsedSchema = z.union([
+  z.string().min(1),
+  ProvAgreementDistributionSchema,
+  ProvGrantCredentialSchema,
+]);
+
+export type ProvUsed = z.infer<typeof ProvUsedSchema>;
+
+/** Build the `prov:used` entity citing an agreement's DCAT distribution and its SHA-256. */
+export function agreementDistribution(
+  distribution: string,
+  sha256: string,
+  downloadURL?: string,
+): ProvAgreementDistribution {
+  return ProvAgreementDistributionSchema.parse({
+    "@id": distribution,
+    "@type": ["prov:Entity", "dcat:Distribution"],
+    "spdx:checksum": {
+      "@type": "spdx:Checksum",
+      "spdx:algorithm": "spdx:checksumAlgorithm_sha256",
+      "spdx:checksumValue": sha256,
+    },
+    ...(downloadURL ? { "dcat:downloadURL": downloadURL } : {}),
+  });
+}
+
+/** Build the `prov:used` entity citing a grant by its VC 2.0 credential `id`. */
+export function grantCredential(credentialId: string): ProvGrantCredential {
+  return ProvGrantCredentialSchema.parse({
+    "@id": credentialId,
+    "@type": ["prov:Entity", "cred:VerifiableCredential"],
+  });
+}
+
+function usedOf(rec: Record<string, unknown>): unknown[] {
+  const u = rec["prov:used"];
+  return Array.isArray(u) ? u : [];
+}
+
+/** The agreement distributions a record's `prov:used` cites. */
+export function agreementsCited(rec: Record<string, unknown>): ProvAgreementDistribution[] {
+  return usedOf(rec).flatMap((u) => {
+    const r = ProvAgreementDistributionSchema.safeParse(u);
+    return r.success ? [r.data] : [];
+  });
+}
+
+/** The grant credentials a record's `prov:used` cites. */
+export function grantsCited(rec: Record<string, unknown>): ProvGrantCredential[] {
+  return usedOf(rec).flatMap((u) => {
+    const r = ProvGrantCredentialSchema.safeParse(u);
+    return r.success ? [r.data] : [];
+  });
+}
+
+/**
+ * The two terms of the hash-chained log, which are a **local extension**: no
+ * open standard defines a hash-chained PROV log (W3C PROV-O, PROV-JSONLD, DCAT
+ * 3 and VC 2.0 have nothing for it). They stay in the `cat-harness:` namespace,
+ * and `prov-jsonld.ts` describes each as such in every document that uses it.
+ */
+export const PROV_LOCAL_EXTENSION_TERMS = {
+  "cat-harness:previousHash":
+    "Local extension (no open standard defines a hash-chained PROV log): the SHA-256 hex digest of the preceding record in the log, or null at genesis.",
+  "cat-harness:recordHash":
+    "Local extension (no open standard defines a hash-chained PROV log): the SHA-256 hex digest of this record's canonical JSON, cat-harness:recordHash omitted.",
+} as const;
 
 /**
  * Citation of an IHE PCF / FHIR R4 `Consent` resource (`id` + `versionId`,
@@ -176,7 +320,12 @@ const ProvActivityObjectSchema = z
     "prov:endedAtTime": Iso.optional(),
     "prov:qualifiedAssociation": ProvAssociationSchema,
     "prov:actedOnBehalfOf": z.string().min(1).optional(),
-    "prov:used": z.array(z.string().min(1)).optional(),
+    /**
+     * What the run read: graph-node references, and — on a decision record —
+     * the agreement's DCAT distribution ({@link ProvAgreementDistributionSchema})
+     * and the grant's VC 2.0 credential ({@link ProvGrantCredentialSchema}).
+     */
+    "prov:used": z.array(ProvUsedSchema).optional(),
     "prov:generated": z.array(z.string().min(1)).optional(),
     /**
      * The ODRL policy uid(s) the run was under. Required: a run under no policy
@@ -186,17 +335,6 @@ const ProvActivityObjectSchema = z
      * the verdict was computed against.
      */
     "cat-harness:underPolicy": z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),
-    /**
-     * The Data Sharing Agreement (URL + SHA-256 digest, and optional grant id)
-     * cited by a decision record (DSA B4, bean `3z44`). Required on
-     * {@link ProvDecisionRecordSchema}; optional on general task activities.
-     */
-    "cat-harness:agreement": ProvAgreementRefSchema.optional(),
-    /**
-     * Optional grant identifier (DSA B5) when a decision was made under an
-     * issued grant.
-     */
-    "cat-harness:grant": z.string().min(1).optional(),
     /**
      * The IHE PCF / FHIR R4 `Consent` (`id` + `versionId`) cited when a
      * decision is consent-based (PCF8, bean `2egb`). Required whenever the
@@ -211,11 +349,13 @@ const ProvActivityObjectSchema = z
      */
     "cat-harness:consentBased": z.boolean().optional(),
     /**
+     * **Local extension** (no open standard defines a hash-chained PROV log):
      * SHA-256 hex digest of the preceding record in the hash-chained log, or
      * `null` for the first (genesis) record in a chain.
      */
     "cat-harness:previousHash": Sha256HexSchema.nullable().optional(),
     /**
+     * **Local extension** (no open standard defines a hash-chained PROV log):
      * SHA-256 hex digest of this record's canonical JSON (excluding
      * `cat-harness:recordHash` and including `cat-harness:previousHash`).
      */
@@ -260,16 +400,22 @@ export const ProvActivitySchema = ProvActivityObjectSchema.refine(
 
 export type ProvActivity = z.infer<typeof ProvActivitySchema>;
 
+const CITES_AGREEMENT = {
+  message:
+    "every decision record must cite its agreement as a prov:used dcat:Distribution with spdx:checksum",
+  path: ["prov:used"],
+};
+
 /**
  * A PROV decision record under a computable Data Sharing Agreement (DSA B4,
- * bean `3z44`): every decision record names its agreement (URL + SHA-256
- * digest, and optional grant id) and carries its hash-chain fields
- * (`cat-harness:previousHash` and `cat-harness:recordHash`). When the decision
- * is consent-based (PCF8, bean `2egb`), it must also name its Consent
- * (`cat-harness:consent` with `id` + `versionId`).
+ * beans `3z44`, `yy40`): every decision record cites its agreement as a
+ * `prov:used` `dcat:Distribution` with `spdx:checksum` (and may cite its grant
+ * as a `prov:used` VC 2.0 credential), and carries the hash-chain fields
+ * (`cat-harness:previousHash` and `cat-harness:recordHash`, a local
+ * extension). When the decision is consent-based (PCF8, bean `2egb`), it must
+ * also name its Consent (`cat-harness:consent` with `id` + `versionId`).
  */
 export const ProvDecisionRecordSchema = ProvActivityObjectSchema.extend({
-  "cat-harness:agreement": ProvAgreementRefSchema,
   "cat-harness:previousHash": Sha256HexSchema.nullable(),
   "cat-harness:recordHash": Sha256HexSchema,
 })
@@ -278,6 +424,7 @@ export const ProvDecisionRecordSchema = ProvActivityObjectSchema.extend({
     message: "endedAtTime is before startedAtTime",
     path: ["prov:endedAtTime"],
   })
+  .refine((a) => agreementsCited(a).length > 0, CITES_AGREEMENT)
   .refine(
     (a) =>
       !isConsentBasedRecord(a as unknown as Record<string, unknown>) ||
@@ -295,12 +442,11 @@ export const ProvDecisionRecordSchema = ProvActivityObjectSchema.extend({
 export type ProvDecisionRecord = z.infer<typeof ProvDecisionRecordSchema>;
 
 /**
- * A consent-based PROV decision record (PCF8, bean `2egb`): requires both
- * `cat-harness:agreement` (`url` + `sha256`) and `cat-harness:consent`
- * (`id` + `versionId`), plus the hash-chain fields.
+ * A consent-based PROV decision record (PCF8, bean `2egb`): requires both the
+ * agreement citation (`prov:used` `dcat:Distribution` + `spdx:checksum`) and
+ * `cat-harness:consent` (`id` + `versionId`), plus the hash-chain fields.
  */
 export const ProvConsentDecisionRecordSchema = ProvActivityObjectSchema.extend({
-  "cat-harness:agreement": ProvAgreementRefSchema,
   "cat-harness:consent": ProvConsentRefSchema,
   "cat-harness:previousHash": Sha256HexSchema.nullable(),
   "cat-harness:recordHash": Sha256HexSchema,
@@ -310,6 +456,7 @@ export const ProvConsentDecisionRecordSchema = ProvActivityObjectSchema.extend({
     message: "endedAtTime is before startedAtTime",
     path: ["prov:endedAtTime"],
   })
+  .refine((a) => agreementsCited(a).length > 0, CITES_AGREEMENT)
   .refine((a) => a["cat-harness:recordHash"] === computeProvRecordHash(a), {
     message: "cat-harness:recordHash does not match the canonical SHA-256 digest of the record",
     path: ["cat-harness:recordHash"],
@@ -351,7 +498,7 @@ export function stampProvRecord(
 }
 
 /**
- * Stamp a PROV decision record (requiring `cat-harness:agreement`) with
+ * Stamp a PROV decision record (requiring a `prov:used` agreement distribution) with
  * `cat-harness:previousHash` and `cat-harness:recordHash` and validate it
  * against {@link ProvDecisionRecordSchema}.
  */
@@ -420,9 +567,9 @@ export interface ProvChainError {
 
 export interface ProvChainVerifyOptions {
   /**
-   * Whether every record in the chain must cite a `cat-harness:agreement`
-   * (URL + SHA-256 digest). Defaults to `true` (every decision record names its
-   * agreement and hash).
+   * Whether every record in the chain must cite its agreement (a `prov:used`
+   * `dcat:Distribution` with `spdx:checksum`). Defaults to `true` (every
+   * decision record names its agreement and hash).
    */
   requireAgreement?: boolean;
   /**
@@ -465,7 +612,8 @@ export interface ProvChainVerification {
  *
  * 1. Every record validates against {@link ProvDecisionRecordSchema} (when
  *    `requireAgreement` is `true`, the default) or {@link ProvActivitySchema},
- *    naming its agreement (URL + SHA-256) and hash (`cat-harness:recordHash`).
+ *    citing its agreement (`prov:used` `dcat:Distribution` + `spdx:checksum`)
+ *    and hash (`cat-harness:recordHash`).
  * 2. Every record's `cat-harness:recordHash` equals
  *    {@link computeProvRecordHash} over the record's canonical JSON — so
  *    editing any field of any past record fails with `hash-mismatch`.
@@ -498,12 +646,12 @@ export function verifyProvHashChain(
     const rec = raw as Record<string, unknown>;
     const id = typeof rec["@id"] === "string" ? rec["@id"] : undefined;
 
-    if (requireAgreement && rec["cat-harness:agreement"] === undefined) {
+    if (requireAgreement && agreementsCited(rec).length === 0) {
       errors.push({
         index: i,
         id,
         kind: "missing-agreement",
-        detail: `record[${i}] (${id ?? "unidentified"}) does not name a cat-harness:agreement (url + sha256)`,
+        detail: `record[${i}] (${id ?? "unidentified"}) does not cite its agreement (prov:used dcat:Distribution with spdx:checksum)`,
       });
     }
 

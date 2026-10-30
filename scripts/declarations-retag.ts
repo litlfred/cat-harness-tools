@@ -24,8 +24,9 @@
  * their tags land through PRs to those repositories, so `--check` there names
  * each one rather than passing.
  *
- * Not tagged: the instances the harness is composed ON TOP of — everything
- * cat-harness transitively `needs` (bootstrap, bootstrap-tools). Their own rule
+ * Not tagged: the instances the harness is composed ON TOP of — every instance
+ * that does not reach cat-harness through `needs` (bootstrap, bootstrap-tools;
+ * `scripts/lib/needs-reach.ts`, the rule `libraries.ts` uses). Their own rule
  * is that nothing in them refers to a harness, and a `cat-harness-…` tag would
  * be the first such reference. They are read with the same schema, which keeps
  * `$schema` optional; this script reports them as below the harness and leaves
@@ -49,6 +50,7 @@ import {
 import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.ts";
 import { acceptsSchemaTag } from "../schemas/kg/node-kind.ts";
 
+import { belowHarness } from "./lib/needs-reach.ts";
 import { HARNESS_NAME, HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The command a person runs to fix what `--check` finds, named once. */
@@ -117,33 +119,40 @@ function nameAndNeeds(text: string): { name: string; needs: string[] } | undefin
   }
 }
 
-/** Every instance `of` transitively needs, by name, over the declarations given. */
-export function belowOf(of: string, declared: ReadonlyMap<string, readonly string[]>): Set<string> {
-  const below = new Set<string>();
-  const todo = [...(declared.get(of) ?? [])];
-  while (todo.length > 0) {
-    const n = todo.pop()!;
-    if (below.has(n)) continue;
-    below.add(n);
-    todo.push(...(declared.get(n) ?? []));
+/** The `needs` each declaration in `roots` states, by instance name. */
+export function needsOfRoots(roots: readonly string[]): Map<string, string[]> {
+  const declared = new Map<string, string[]>();
+  for (const root of roots) {
+    const name = findDeclarationFile(root);
+    const d = name === undefined ? undefined : nameAndNeeds(readFileSync(join(root, name), "utf-8"));
+    if (d) declared.set(d.name, d.needs);
   }
-  return below;
+  return declared;
 }
 
-/** Retag the declaration in each of `roots`. `write: false` changes nothing. */
-export function retagDeclarations(roots: readonly string[], base: string, opts: { write: boolean }): DeclarationsReport {
+/**
+ * Retag the declaration in each of `roots`. `write: false` changes nothing.
+ * `needs` is the graph that says which instances are below the harness; by
+ * default the one `roots` declare, and with `--instance` the whole checkout's,
+ * so that one instance is judged by the layers around it.
+ */
+export function retagDeclarations(
+  roots: readonly string[],
+  base: string,
+  opts: { write: boolean; needs?: ReadonlyMap<string, readonly string[]> },
+): DeclarationsReport {
   const report: DeclarationsReport = { files: 0, below: [], tagged: 0, added: [], foreign: [], unparseable: [] };
   const found = roots.flatMap((root) => {
     const name = findDeclarationFile(root);
     return name === undefined ? [] : [{ path: join(root, name), name }];
   });
   const texts = new Map(found.map((f) => [f.path, readFileSync(f.path, "utf-8")]));
-  const declared = new Map<string, string[]>();
+  const declared = new Map<string, readonly string[]>(opts.needs ?? []);
   for (const t of texts.values()) {
     const d = nameAndNeeds(t);
     if (d) declared.set(d.name, d.needs);
   }
-  const below = belowOf(HARNESS_NAME, declared);
+  const below = belowHarness(HARNESS_NAME, declared);
   for (const { path, name } of found) {
     const shown = relative(base, path) || name;
     const before = texts.get(path)!;
@@ -190,7 +199,7 @@ function main(argv: readonly string[]): void {
     process.exit(2);
   }
 
-  const r = retagDeclarations(roots, base, { write: !check });
+  const r = retagDeclarations(roots, base, { write: !check, needs: needsOfRoots(instanceRootsIn(base)) });
   for (const f of r.foreign) {
     console.error(`::error::declarations-retag: ${f.file} carries \`$schema: ${f.tag}\`, which ${CAT_HARNESS_DECLARATION_SCHEMA_TAG} does not accept. Left as it is`);
   }

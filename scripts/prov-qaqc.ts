@@ -54,7 +54,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 
 import { instanceRootsIn, repoRootFor, siteDirFor } from "../schemas/kg/cat-harness.js";
 import { addressBook, provJsonldDocument, type AddressBook, type SubjectMinter } from "../schemas/kg/prov-jsonld.js";
-import { ProvActivitySchema, ProvConsentRefSchema, isConsentBasedRecord, isConsentPolicyUid, verifyProvHashChain, type ProvActivity } from "../schemas/content/prov.js";
+import { ProvActivitySchema, ProvConsentRefSchema, agreementsCited, isConsentBasedRecord, isConsentPolicyUid, verifyProvHashChain, type ProvActivity } from "../schemas/content/prov.js";
 import { actorsDir, laneBinding, type RoleGraph } from "../schemas/process/role-graph.js";
 import { loadAccessContext, type AccessContext, type Principal } from "../src/core/access.js";
 import { authorizeTask, type TaskAuthVerdict } from "../src/workflow/authorize.js";
@@ -299,10 +299,10 @@ export function reportInstance(
     (a) =>
       a["cat-harness:recordHash"] !== undefined ||
       a["cat-harness:previousHash"] !== undefined ||
-      a["cat-harness:agreement"] !== undefined,
+      agreementsCited(a).length > 0,
   );
   if (hasChainedOrAgreement) {
-    const requireAgreement = activities.some((a) => a["cat-harness:agreement"] !== undefined);
+    const requireAgreement = activities.some((a) => agreementsCited(a).length > 0);
     const chainCheck = verifyProvHashChain(activities, { requireAgreement, consentPolicyUids });
     if (!chainCheck.valid) {
       for (const err of chainCheck.errors) {

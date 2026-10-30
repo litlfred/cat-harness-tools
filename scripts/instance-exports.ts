@@ -146,7 +146,7 @@ export function instanceDocPath(d: { name: string; stub: string }): string {
  *
  * The host's lists are published by `glossary-export` beside its glossary
  * (`<stub>/<stub>-code-lists.jsonld`); no other instance's were published at
- * all, so a concept IRI into, say, folio-assistant-core's
+ * all, so a concept IRI into, say, the content core's
  * `grade-recommendation-strength` named a document nobody wrote. Only the
  * instance's own directories are read: a dependency's lists are that
  * dependency's document.

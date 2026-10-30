@@ -553,9 +553,9 @@ const WALL: QaCriterionDefinition[] = [
 // fixed-q0, …) and cross-checks the detected regime vector against
 // the chapter's narrative-expected profile. The rules stay here; the
 // checkers are the science layer's (bean saqd, 2026-10-30):
-// `folio-assistant-sci/pipeline/qa-checkers-q-usage.ts`, contributed through
+// https://github.com/litlfred/folio-assistant-sci/blob/main/pipeline/qa-checkers-q-usage.ts, contributed through
 // its `qa-checkers/q-usage-*.json` nodes and run on their own by
-// `folio-assistant-sci/pipeline/q-usage-audit.ts`. See `checker_contributed`.
+// https://github.com/litlfred/folio-assistant-sci/blob/main/pipeline/q-usage-audit.ts. See `checker_contributed`.
 // Chapter profiles stay in `chapter-profile-registry-di.ts`.
 
 const Q_USAGE: QaCriterionDefinition[] = [
