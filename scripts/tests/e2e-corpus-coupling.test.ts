@@ -261,10 +261,10 @@ describe("the real e2e specs", () => {
     // recognised and every other assertion here passes over nothing. Since
     // bean `cxcn` both read committed fixtures, which still carry a QA-doc
     // name through the helpers, so they are still found.
-    const readers = specs.filter((s) => touchesCorpus(s.src)).map((s) => s.file);
-    expect(readers).toContain("qa-badge.e2e.ts");
-    for (const f of ["qa-panel.e2e.ts", "qa-badge.e2e.ts"]) {
-      expect(specs.find((s) => s.file === f)!.src).toContain("test/support/fixtures/qa-e2e/");
+    const readers = specs.filter((s) => touchesCorpus(s.src)).map((s) => s.file.replace(/\\/g, "/"));
+    expect(readers).toContain("sdlc/qa-badge.e2e.ts");
+    for (const f of ["sdlc/qa-panel.e2e.ts", "sdlc/qa-badge.e2e.ts"]) {
+      expect(specs.find((s) => s.file.replace(/\\/g, "/") === f)!.src).toContain("test/support/fixtures/qa-e2e/");
     }
   });
 

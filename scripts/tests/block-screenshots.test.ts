@@ -1,4 +1,4 @@
-/** The visual diff Tool's pure parts (bean 0rxe). The browser run is in cat-harness/test/block-screenshots.e2e.ts. */
+/** The visual diff Tool's pure parts (bean 0rxe). The browser run is in cat-harness-tools/test/content/block-screenshots.e2e.ts. */
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
