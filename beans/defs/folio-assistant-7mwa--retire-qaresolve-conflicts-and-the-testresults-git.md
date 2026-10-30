@@ -6,7 +6,7 @@ status: todo
 type: task
 priority: normal
 created_at: 2026-10-01T08:00:46Z
-updated_at: 2026-10-30T18:40:00Z
+updated_at: 2026-10-30T19:45:00Z
 parent: folio-assistant-3fva
 blocked_by:
     - folio-assistant-tfqf
@@ -46,3 +46,5 @@ _2026-10-30T18:40:00Z_ — Completed the `folio_init` / `qa-sweep.yml` template 
 - Updated `templates/document/github/workflows/qa-sweep.yml` (`permissions: contents: write` and a `Publish QA verdicts to qa-reports` step publishing `pr/<n>/<sha>` on same-repo PRs and `main/<sha>` on `main`/dispatch via `qa-store.ts publish --ref "$QA_REF" --root test/results`, matching `qa-sweep-nightly.yml` and `folio-staging.yml`) and pinned both workflows in `scripts/tests/init-folio.test.ts`. Combined with `5qy8` (`init-folio.ts` `.gitignore` ignoring `test/results/` and `AGENTS.md` documenting `qa-reports`), a freshly initialised folio now publishes to its own `qa-reports` branch (Done-when box 2 ticked).
 - Updated `JUDGE_CHECKS` in `scripts/regen-after-merge.ts` and `JUDGE_GATES` in `scripts/tests/sdlc/judge-gates-against.test.ts` to cover all 13 `--against main` judge-mode gates from `oqe3` (including `lsi:skills:check` and `kg:detangle:check`).
 - Remaining G-class sites (`qa-resolve-conflicts.ts`, `qa-resolve-conflicts.test.ts`, `.gitattributes`, `gitattributes.test.ts`, and the `regen-after-merge.ts` writer overrides pinned by `regen-after-merge.test.ts`) stay until `cat-harness/test/results` is removed from `litlfred/cat-harness` `main` (and per the owner's 2026-10-23 ruling on `-merge` in `gitattributes.test.ts`). Removed `folio-assistant-oqe3` from `blocked_by` and deduplicated the repeated notes.
+
+_2026-10-30T19:45:00Z_ — litlfred/cat-harness-tools#949 merged as `6414778` (owner card 19:40Z): qa-sweep now publishes to qa-reports. Still open: no gate or test references a committed `test/results` file. Session https://claude.ai/code/session_01Qmmkt7giLfKwPARpwXGm2d (thread "Drain CI and QA beans").

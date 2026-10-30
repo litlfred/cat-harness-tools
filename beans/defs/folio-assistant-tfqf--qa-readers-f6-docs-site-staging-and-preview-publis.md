@@ -6,7 +6,7 @@ status: todo
 type: task
 priority: high
 created_at: 2026-10-01T08:47:14Z
-updated_at: 2026-10-30T18:40:00Z
+updated_at: 2026-10-30T19:45:00Z
 parent: folio-assistant-3fva
 ---
 
@@ -102,3 +102,5 @@ These notes were only in this copy. The newer copy from the bean branch is above
 The claimed work is NOT all on main: the unticked Done-when boxes above are what remains, and the ticked ones are what landed. Back to todo so the claim does not mislead a sibling session. Nothing was deleted.
 
 _2026-10-30T18:40:00Z_ — Implemented and tested the 2026-10-23 precedence rule in `scripts/qa-site-assets.ts` (`decideSource` and `cmdFetch`) and `scripts/tests/ui/qa-site-assets.test.ts`: on a `main` build, an exact `main/<sha>` hit (index 0, holding a corpus) now wins over a still-committed checkout corpus and replaces `test/results` before `gen-docs-pages.ts` runs, while PR previews (`pr/...`), fallback refs (`index > 0`), and floating refs (`--ref main`) continue to let a committed checkout win. Deduplicated the repeated copy-sync blocks below. The first Done-when box (`badges and the heat map render identically from the branch`) remains open until `cat-harness/test/results` is removed from `cat-harness` `main`.
+
+_2026-10-30T19:45:00Z_ — litlfred/cat-harness-tools#949 merged as `6414778` (owner card 19:40Z): main builds prefer the exact `main/<sha>` qa-reports hit. Still open: the before/after screenshots box, which needs a re-pin of folio-assistant past `6414778` and a docs build. Session https://claude.ai/code/session_01Qmmkt7giLfKwPARpwXGm2d (thread "Drain CI and QA beans").
