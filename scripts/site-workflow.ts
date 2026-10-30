@@ -24,6 +24,11 @@
  * `--check` resolves without running anything; `check:tools` asks the same
  * question of every role a repository declares.
  *
+ * Any other `--name value` pair is a workflow input, passed as
+ * `-f name=value` with `-` read as `_` (`--cleanup-slug x` is the
+ * `cleanup_slug` input of `feature-staging.yml`). The agent path takes none
+ * of them, and refuses them rather than dropping them.
+ *
  * Usage:
  *   bun run cat site:workflow <publish|stage> [--repo .] [--branch B] [--check]
  */
@@ -64,6 +69,24 @@ export function siteRoute(repo: string, role: SiteRole, branch?: string): SiteRo
   return existsSync(path) ? { kind: "workflow", file } : { kind: "missing", file, why: `site.workflows.${role} names ${file}, and there is no ${path}` };
 }
 
+/** `--name value` pairs other than the script's own, as workflow inputs (`name` with `-` as `_`). */
+export function workflowInputs(args: readonly string[]): Record<string, string> {
+  const own = new Set(["--repo", "--branch"]);
+  const out: Record<string, string> = {};
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!;
+    if (a === "--check") continue;
+    if (own.has(a)) {
+      i++;
+      continue;
+    }
+    if (a.startsWith("--") && i + 1 < args.length) {
+      out[a.slice(2).replace(/-/g, "_")] = args[++i]!;
+    }
+  }
+  return out;
+}
+
 /** Every role a repository DECLARES whose workflow file is missing. Undeclared roles are not findings. */
 export function missingSiteWorkflows(repo: string): string[] {
   return SITE_ROLES.flatMap((role) => {
@@ -90,10 +113,15 @@ if (import.meta.main) {
     console.error(`✗ site:workflow ${role}: ${route.why}`);
     process.exit(1);
   }
+  const inputs = workflowInputs(process.argv.slice(3));
+  if (route.kind === "agent-run" && Object.keys(inputs).length > 0) {
+    console.error(`✗ site:workflow ${role}: this repository is agent-run, and stage-local takes no ${Object.keys(inputs).join(", ")}`);
+    process.exit(1);
+  }
   const argv =
     route.kind === "agent-run"
       ? route.argv
-      : ["gh", "workflow", "run", route.file, ...(branch ? ["--ref", branch] : [])];
+      : ["gh", "workflow", "run", route.file, ...(branch ? ["--ref", branch] : []), ...Object.entries(inputs).flatMap(([k, v]) => ["-f", `${k}=${v}`])];
   console.log(`site:workflow ${role}: ${argv.join(" ")}`);
   if (process.argv.includes("--check")) process.exit(0);
   const run = spawnSync(argv[0]!, argv.slice(1), { stdio: "inherit", cwd: repo });

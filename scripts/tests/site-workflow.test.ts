@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { missingSiteWorkflows, siteRoute } from "../site-workflow.ts";
+import { missingSiteWorkflows, siteRoute, workflowInputs } from "../site-workflow.ts";
 
 function repo(site: Record<string, unknown> | undefined, workflows: string[] = []): string {
   const root = mkdtempSync(join(tmpdir(), "site-workflow-"));
@@ -39,5 +39,11 @@ describe("siteRoute", () => {
     const root = repo(undefined, ["docs-site.yml"]);
     expect(siteRoute(root, "publish").kind).toBe("undeclared");
     expect(missingSiteWorkflows(root)).toEqual([]);
+  });
+});
+
+describe("workflowInputs", () => {
+  it("passes other flags as workflow inputs, dash read as underscore", () => {
+    expect(workflowInputs(["--repo", ".", "--branch", "b", "--cleanup-slug", "x", "--check"])).toEqual({ cleanup_slug: "x" });
   });
 });
