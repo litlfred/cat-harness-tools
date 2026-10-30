@@ -48,7 +48,7 @@ import { KG_PART_RECORD_SCHEMA } from "@litlfred/cat-harness/schemas/kg/substrat
  * `harnesses/` is where `kg:instantiate` (slice 7) writes the state directories
  * a chosen harness declares. It sits here, not at `<repository root>/<harness>/`
  * as slice 7 first wrote it, because the root is not a declared directory and
- * a harness named after a staged instance (`who-iris`) would land inside that
+ * a harness named after a staged instance (a content layer) would land inside that
  * instance's directory (arc gap G11; owner, 2026-10-30: slice 7 moves to this
  * layout). Keyed by subscription first, so two subscriptions can never write
  * into one home. It holds no `materialization.json`: these are the

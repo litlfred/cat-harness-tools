@@ -55,7 +55,7 @@
  * Slice 7 first wrote them under `<instantiation root>/<harness>/`. That was
  * arc gap G11, settled by the owner on 2026-10-30 (bean `tmo5`): the root is
  * not a declared directory, and a harness named after a staged instance
- * (`who-iris`) would write into that instance's directory. The harness has no
+ * (say, a content layer staged at the root) would write into that instance's directory. The harness has no
  * local declaration (its declaration is the snapshot, on purpose: see
  * `schemas/kg/substrate-snapshot.ts`), and no scanner reads its home as an
  * instance because it carries none.
