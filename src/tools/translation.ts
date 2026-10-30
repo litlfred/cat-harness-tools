@@ -21,7 +21,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { createHash } from "crypto";
 
-import { extractMarkdown, formatPot, type PotEntry } from "../../pipeline/pot-extract.js";
+import { extractMarkdown, extractFromManifest, formatPot, type PotEntry } from "../../pipeline/pot-extract.js";
 import { parsePo, injectMarkdown } from "../../pipeline/po-inject.js";
 /**
  * The declared `translation-sources` graph — where a translator's `.pot` and
@@ -67,31 +67,48 @@ export function registerTranslationTools(server: McpServer, repoRoot: string): v
         return { content: [{ type: "text" as const, text: `❌ Path not found: ${inputPath}` }] };
       }
 
-      // Collect .md files
+      // Collect .md and .ts manifest files (G4: extractFromManifest wired into pipeline)
       const mdFiles: string[] = [];
+      const tsFiles: string[] = [];
       const stat = Bun.file(absPath);
       if ((await stat.exists()) && inputPath.endsWith(".md")) {
         mdFiles.push(absPath);
+        const siblingTs = absPath.replace(/\.md$/, ".ts");
+        if (existsSync(siblingTs)) tsFiles.push(siblingTs);
+      } else if ((await stat.exists()) && inputPath.endsWith(".ts")) {
+        tsFiles.push(absPath);
       } else if (existsSync(absPath)) {
-        // Directory — find all .md files
+        // Directory — find all .md and .ts manifest files
         const walkDir = (dir: string) => {
           for (const entry of readdirSync(dir, { withFileTypes: true })) {
             if (entry.isDirectory() && !entry.name.startsWith(".")) {
               walkDir(join(dir, entry.name));
             } else if (entry.name.endsWith(".md")) {
               mdFiles.push(join(dir, entry.name));
+            } else if (
+              entry.name.endsWith(".ts") &&
+              !entry.name.endsWith(".test.ts") &&
+              !entry.name.endsWith(".d.ts")
+            ) {
+              tsFiles.push(join(dir, entry.name));
             }
           }
         };
         walkDir(absPath);
       }
 
-      if (mdFiles.length === 0) {
-        return { content: [{ type: "text" as const, text: `No .md files found in ${inputPath}` }] };
+      if (mdFiles.length === 0 && tsFiles.length === 0) {
+        return { content: [{ type: "text" as const, text: `No .md or .ts files found in ${inputPath}` }] };
       }
 
-      // Extract all entries
+      // Extract all entries (manifest metadata first, then markdown narrative)
       const allEntries: PotEntry[] = [];
+      for (const file of tsFiles) {
+        const tsContent = readFileSync(file, "utf-8");
+        const relPath = relative(repoRoot, file);
+        const entries = extractFromManifest(tsContent, relPath);
+        allEntries.push(...entries);
+      }
       for (const file of mdFiles) {
         const md = readFileSync(file, "utf-8");
         const relPath = relative(repoRoot, file);
@@ -100,7 +117,7 @@ export function registerTranslationTools(server: McpServer, repoRoot: string): v
       }
 
       // Write POT
-      const name = basename(inputPath, ".md");
+      const name = basename(inputPath).replace(/\.(md|ts)$/, "");
       const outDir = join(translationsRoot(repoRoot), locale);
       mkdirSync(outDir, { recursive: true });
       const potPath = join(outDir, `${name}.pot`);
@@ -424,7 +441,18 @@ export function registerTranslationTools(server: McpServer, repoRoot: string): v
         const sourcePath = join(repoRoot, source);
         if (existsSync(sourcePath)) {
           const sourceContent = readFileSync(sourcePath, "utf-8");
-          const currentEntries = extractMarkdown(sourceContent, source);
+          const currentEntries: PotEntry[] = [];
+          if (source.endsWith(".ts")) {
+            currentEntries.push(...extractFromManifest(sourceContent, source));
+          } else {
+            const siblingTs = sourcePath.replace(/\.md$/, ".ts");
+            if (existsSync(siblingTs)) {
+              currentEntries.push(
+                ...extractFromManifest(readFileSync(siblingTs, "utf-8"), source.replace(/\.md$/, ".ts")),
+              );
+            }
+            currentEntries.push(...extractMarkdown(sourceContent, source));
+          }
           const currentIds = new Set(currentEntries.map((e) => e.msgid));
 
           // Check for new strings not in POT
