@@ -11,6 +11,11 @@ describe("check:content-code-free", () => {
     for (const f of ["a.json", "b.md", "c.html", "d.css", "e.yml", "f.ts.md"]) expect(isCode(f)).toBe(false);
   });
 
+  test("shipped browser assets are not code; build plugins are", () => {
+    for (const f of ["site-chrome/assets/js/navbar.js", "site-chrome/_includes/mermaid_config.js", "docs/assets/js/vendor/sqlite-wasm/index.mjs"]) expect(isCode(f)).toBe(false);
+    for (const f of ["site-chrome/_plugins/fa-root-relative.rb", "docs/assets/x.ts", "tools/x.js"]) expect(isCode(f)).toBe(true);
+  });
+
   test("an unlisted file is added; a listed file that is gone is only reported", () => {
     const j = judge(["schemas/a.ts", "tools/new.ts"], ["schemas/a.ts", "skills/old.ts"]);
     expect(j.added).toEqual(["tools/new.ts"]);
