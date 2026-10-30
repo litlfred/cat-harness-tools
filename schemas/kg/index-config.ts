@@ -180,6 +180,22 @@ export const IndexSiteSchema = z
      * it", so a reader says which one it found rather than assuming.
      */
     agentRun: z.boolean().optional(),
+    /**
+     * The workflow files that publish this repository's site and stage a
+     * preview of it, by file name under `.github/workflows/`. The
+     * `pages-publish` and `feature-staging` Tools run them through
+     * `bun run cat site:workflow publish|stage`, so a Tool names no
+     * repository's file (owner, 2026-10-30, "Make them generic"). An
+     * agent-run repository declares none: `stage-local.ts` is its path.
+     * `check:tools` fails when a file named here does not exist.
+     */
+    workflows: z
+      .object({
+        publish: z.string().regex(/^[\w.-]+\.ya?ml$/, "a workflow file name under .github/workflows/").optional(),
+        stage: z.string().regex(/^[\w.-]+\.ya?ml$/, "a workflow file name under .github/workflows/").optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

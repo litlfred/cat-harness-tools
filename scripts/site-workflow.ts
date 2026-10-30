@@ -36,7 +36,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { readIndexConfig } from "@litlfred/cat-harness/schemas/kg/index-config.ts";
+import { readIndexConfig } from "../schemas/kg/index-config.js";
 
 export const SITE_ROLES = ["publish", "stage"] as const;
 export type SiteRole = (typeof SITE_ROLES)[number];
@@ -54,7 +54,7 @@ export function siteRoute(repo: string, role: SiteRole, branch?: string): SiteRo
   const r = readIndexConfig(resolve(repo));
   if (r.state === "absent") return { kind: "undeclared", why: `${r.file} does not exist` };
   if (r.state === "unreadable") return { kind: "undeclared", why: `${r.file} is ${r.why}` };
-  const site = r.config.site as { agentRun?: boolean; workflows?: Partial<Record<SiteRole, string>> } | undefined;
+  const site = r.config.site;
   if (site?.agentRun === true) {
     const argv = ["bun", "run", STAGE_LOCAL, "--repo", repo];
     if (role === "publish") argv.push("--main");
