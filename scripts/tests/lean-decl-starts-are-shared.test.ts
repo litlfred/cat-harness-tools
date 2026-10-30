@@ -185,12 +185,11 @@ describe("there is exactly one declaration pattern", () => {
     // exactly the "cleanup becomes a silent re-scoring" the bean warns about.
     //
     // Asserted by FILE rather than by line, so an unrelated edit above a
-    // pattern does not fail this. The list may only shrink: a fourth file fails
+    // pattern does not fail this. The list may only shrink: a third file fails
     // here, and converging one lets somebody delete a row.
     expect(patternFiles()).toEqual([
       "cat-harness-tools/pipeline/lean-formal-ref.ts",
       "cat-harness-tools/pipeline/lean-lexer.ts",
-      "cat-harness-tools/scripts/lean-coverage.ts",
     ]);
   });
 

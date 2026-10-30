@@ -102,8 +102,9 @@ describe("the folio root is asked for, not spelled", () => {
     // (bean `70lx`, owner ruling), out of what this scans. 39 → 36 in bean
     // `saqd` as maths pipeline audits (`language-trap-audit`,
     // `conjectural-propagation-audit`, `proof-narrative-lean-equiv-sweep`)
-    // moved UP to folio-assistant-sci. A move is not the regression this floor
-    // exists to catch, so the floor follows it.
-    expect(callers.length).toBeGreaterThan(34);
+    // moved UP to folio-assistant-sci, and 36 → 32 in `saqd` group 5 as the
+    // plugin-slot and Tool target scripts followed them. A move is not the
+    // regression this floor exists to catch, so the floor follows it.
+    expect(callers.length).toBeGreaterThan(31);
   });
 });

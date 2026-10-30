@@ -18,7 +18,6 @@
     "pipeline/trivial-skeleton-audit.ts",
     "scripts/audit-wiring-migrate.ts",
     "scripts/audit-wiring.ts",
-    "scripts/lean-audit.ts",
     "scripts/lean-witness.ts",
     "scripts/migrate-computation-paths.ts"
   ]
