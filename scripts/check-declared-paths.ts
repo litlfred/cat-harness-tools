@@ -251,6 +251,18 @@ export function absentResultDirs(root: string): string[] {
     .filter((abs) => !existsSync(abs));
 }
 
+/**
+ * Declared `qa` / `health` directories whose record lives on a branch
+ * (`storage`), absolute. Even after one writer creates part of the working
+ * copy on disk, any other recorded witness under the directory is still off
+ * `main` and cannot be verified from the working tree alone (bean `7mwa`).
+ */
+export function storedResultDirs(root: string): string[] {
+  return resolveDirectories([{ name: "(local)", root, own: true }])
+    .filter((d) => (d.graphTypologies ?? []).some((k) => RESULT_KINDS.has(k)) && d.storage !== undefined)
+    .map((d) => d.absPath);
+}
+
 /** Is `literal` (relative to `root`) inside one of `absent`? */
 export function underAbsentResults(root: string, literal: string, absent: readonly string[]): boolean {
   const abs = join(root, literal);
@@ -717,7 +729,7 @@ if (import.meta.main) {
   // is the normal case. See `witnessesOf`.
   // A recorded witness whose literal sits under an ABSENT results tree is not
   // lost and not new debt: this checkout cannot answer for it (bean `c8uq`).
-  const absentResults = absentResultDirs(root);
+  const absentResults = [...new Set([...absentResultDirs(root), ...storedResultDirs(root)])];
   const priorWitnesses = new Set(prior.resolves ?? []);
   const isUnverifiable = (r: Site) =>
     priorWitnesses.has(`${r.file}::${r.literal}`) && underAbsentResults(root, r.literal, absentResults);

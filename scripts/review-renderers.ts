@@ -310,6 +310,8 @@ export function renderSideBySide(
     } else if (side === "base") {
       h.appendChild(doc.createTextNode(" \u00b7 published site"));
     }
+    // One line; the whole of it on hover.
+    h.title = h.textContent || "";
     return h;
   };
   const pane = (side: "base" | "head", href: string | null) => {
@@ -326,6 +328,20 @@ export function renderSideBySide(
       f.src = href;
       f.title = (side === "base" ? o.beforeName || "Main" : "This preview") + ": " + href;
       f.loading = "lazy";
+      // The heading above already says this is the preview, and which build
+      // (owner, 2026-10-31): the framed page's own green banner is hidden, and
+      // the space it held is given back. Same origin, so the frame is ours to style.
+      if (side === "head") {
+        f.addEventListener("load", () => {
+          try {
+            const d = f.contentDocument;
+            if (!d || !d.head) return;
+            const st = d.createElement("style");
+            st.textContent = "[data-fa-staging-banner]{display:none!important}:root{--fa-staging-offset:0px!important}";
+            d.head.appendChild(st);
+          } catch { /* another origin: the banner stays */ }
+        });
+      }
       const mark = o.mark;
       if (mark) {
         const runs = (o.runs && o.runs[side]) || [];

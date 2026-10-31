@@ -69,7 +69,7 @@
  *   bun run cat-harness-tools/scripts/gen-processes-viz.ts
  *   bun run cat-harness-tools/scripts/gen-processes-viz.ts --check
  */
-import { linkProse } from "./lib/link-prose.ts";
+import { escapeAngles, linkProse } from "./lib/link-prose.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
@@ -935,7 +935,7 @@ export function processPage(
       (n) => (skillPages.has(n) ? `${up()}reference/skill-instructions/${n}.html` : undefined),
     );
     r.unlinked.forEach(unlinked);
-    return r.text;
+    return escapeAngles(r.text);
   };
   const skill = (s: string): string =>
     skillPages.has(s) ? `[\`${s}\`](${up()}reference/skill-instructions/${s}.html)` : `\`${s}\``;

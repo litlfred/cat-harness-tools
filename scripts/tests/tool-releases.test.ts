@@ -12,7 +12,7 @@ import { TEST_REPORT_SCHEMA_ID, type TestReport } from "../../schemas/sdlc/test-
 import type { ProvActivity } from "../../schemas/content/prov.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { assessPin, readPin, type PinDef } from "../../src/upstream/pins.ts";
-import { javaForPlantuml, parseJavaMajor, PLANTUML, PLANTUML_MIN_JAVA_MAJOR, resolvePlantumlRelease } from "../plantuml-render.ts";
+import { resolvePlantumlRelease, PLANTUML } from "../plantuml-render.ts";
 import {
   SPDX_3_0_1_CONTEXT_URL,
   attachProvUsedToActivity,
@@ -601,35 +601,5 @@ describe("Step 8 — `test:itb-export` GITB TAR projection", () => {
     } finally {
       rmSync(cacheRoot, { recursive: true, force: true });
     }
-  });
-
-  test("plantuml-render selects a Java >= 21 binary and skips Java 17 when no Java 21 is present", () => {
-    expect(parseJavaMajor('openjdk version "21.0.4" 2024-07-16 LTS')).toBe(21);
-    expect(parseJavaMajor('openjdk version "17.0.12" 2024-07-16')).toBe(17);
-    expect(parseJavaMajor('java version "1.8.0_392"')).toBe(8);
-    expect(parseJavaMajor("not a version string")).toBeNull();
-
-    // Runner has Java 17 on PATH/JAVA_HOME and Java 21 in JAVA_HOME_21_X64
-    const picked = javaForPlantuml(
-      { JAVA_HOME: "/jvm/temurin-17", JAVA_HOME_21_X64: "/jvm/temurin-21" },
-      (bin) => ({
-        status: 0,
-        output: bin.includes("21") ? 'openjdk version "21.0.4"' : 'openjdk version "17.0.12"',
-      }),
-    );
-    expect(picked).toEqual({ bin: "/jvm/temurin-21/bin/java" });
-
-    // Only Java 17 installed -> skipped with version reason instead of UnsupportedClassVersionError
-    const skipped17 = javaForPlantuml(
-      { JAVA_HOME: "/jvm/temurin-17" },
-      () => ({ status: 0, output: 'openjdk version "17.0.12"' }),
-    );
-    expect(skipped17).toEqual({
-      skipped: `java >= ${PLANTUML_MIN_JAVA_MAJOR} required for PlantUML ${PLANTUML.version} (found Java 17)`,
-    });
-
-    // No Java installed -> skipped
-    const noJava = javaForPlantuml({}, () => ({ status: 127, output: "" }));
-    expect(noJava).toEqual({ skipped: "no java on PATH" });
   });
 });

@@ -699,10 +699,12 @@ function toRepoPath(path: string, repoRoot: string): string {
  * A `.json` file that does not parse is `corrupt`, not a hit with bad text.
  */
 export function readQa(ref: string, path: string, opts: QaStoreOptions = {}): QaFileRead {
-  const s = snapshot(ref, opts);
-  if (s.state !== "hit") return s;
+  // The path is checked BEFORE the snapshot: a path outside the checkout is a
+  // usage error whatever the store holds, and the snapshot can fetch.
   const { store, repoRoot } = openStore(opts);
   const rel = toRepoPath(path, repoRoot);
+  const s = snapshot(ref, opts);
+  if (s.state !== "hit") return s;
   const fail = contentsOf(s.snap, store);
   if (fail) return fail;
   const buf = s.snap.contents!.get(rel);
@@ -724,10 +726,10 @@ export function readQa(ref: string, path: string, opts: QaStoreOptions = {}): Qa
  * empty directory and an empty map would read as "examined, nothing found".
  */
 export function readQaTree(ref: string, prefix: string, opts: QaStoreOptions = {}): QaTreeRead {
-  const s = snapshot(ref, opts);
-  if (s.state !== "hit") return s;
   const { store, repoRoot } = openStore(opts);
   const rel = toRepoPath(prefix, repoRoot);
+  const s = snapshot(ref, opts);
+  if (s.state !== "hit") return s;
   const fail = contentsOf(s.snap, store);
   if (fail) return fail;
   const files = new Map<string, string>();

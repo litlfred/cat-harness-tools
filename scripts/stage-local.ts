@@ -108,6 +108,7 @@ import { siteDirFor } from "../schemas/kg/cat-harness.ts";
 
 import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.ts";
+import { closedIssue } from "./review-brief.ts";
 import { MANIFEST, RESERVED } from "./publish-main-site.ts";
 import {
   declaredSitePublishers,
@@ -300,7 +301,7 @@ export function slugOf(branch: string): string | undefined {
 }
 
 /** Files a preview's data steps write that are not a site on their own (the workflow's list). */
-const DATA_ONLY = /^(changeset\.json|changeset-text\.json|changeset-structure\.json|rendered-impact\.json|rendered-measured\.json|blocks\.json|block-qa\.json|review-comments\.json|visual-diff\.json|visual)$/;
+const DATA_ONLY = /^(review-brief\.json|changeset\.json|changeset-text\.json|changeset-structure\.json|rendered-impact\.json|rendered-measured\.json|blocks\.json|block-qa\.json|review-comments\.json|visual-diff\.json|visual)$/;
 
 /** True when the build wrote at least one file that is a page, not only data (bean `oisv`). */
 export function builtSomething(siteDir: string): boolean {
@@ -1054,6 +1055,31 @@ export function previewData(
     // declared-path-literal: site.build previews publish to gh-pages, as the plan says.
     ...((mp) => (mp ? ["--main-pages", mp] : []))(mainPagesFile(repo, "gh-pages", log)),
   ]);
+  if (f.pr !== undefined) writeReviewBrief(site, f.owner, f.name, f.pr, log);
+}
+
+/**
+ * The review page's "What to expect" pane reads the PR and its issue live;
+ * this is its fallback copy, taken now (cat-harness-tools#1153). Best effort:
+ * no `gh`, or no network, just means no copy, said in the log.
+ */
+export function writeReviewBrief(site: string, owner: string, name: string, pr: number, log: (s: string) => void): void {
+  const api = (path: string): Record<string, unknown> | null => {
+    const r = spawnSync("gh", ["api", `repos/${owner}/${name}/${path}`], { encoding: "utf-8" });
+    try { return r.status === 0 ? JSON.parse(r.stdout) : null; } catch { return null; }
+  };
+  const p = api(`pulls/${pr}`);
+  if (!p) { log("· review brief: could not read the PR with gh, so the review page reads it live only"); return; }
+  const body = typeof p.body === "string" ? p.body : "";
+  const n = closedIssue(body);
+  const i = n ? api(`issues/${n}`) : null;
+  const brief = {
+    fetchedAt: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
+    pr: { number: pr, title: String(p.title ?? ""), body, url: String(p.html_url ?? "") },
+    issue: n ? { number: n, title: String(i?.title ?? ""), url: String(i?.html_url ?? `https://github.com/${owner}/${name}/issues/${n}`) } : null,
+  };
+  writeFileSync(join(site, "review-brief.json"), JSON.stringify(brief, null, 2) + "\n");
+  log(`· review brief: PR #${pr}${n ? ` and issue #${n}` : ""} copied to review-brief.json`);
 }
 
 const USAGE = `usage: stage-local.ts [--repo DIR] [--branch B] [--base B] [--run-url URL] [--main] [--plan | --dry-run | --artifact DIR] [--workflow-source DIR] [--publisher KIND] [--bare-ig]

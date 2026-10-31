@@ -166,7 +166,7 @@ class RenderingHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
 
 def create_server(
     dir_path: str,
-    port: int = 4000,
+    port: int = 4007,
     host: str = "127.0.0.1",
 ) -> http.server.ThreadingHTTPServer:
     """Create and bind a ThreadingHTTPServer serving dir_path."""
@@ -203,8 +203,8 @@ def main(argv: list[str] | None = None) -> int:
         "--port",
         dest="port",
         type=int,
-        default=4000,
-        help="port to bind (default 4000; 0 binds a free port)",
+        default=4007,
+        help="port to bind (default 4007; 0 binds a free port)",
     )
     parser.add_argument(
         "--host",
