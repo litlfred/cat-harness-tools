@@ -1,0 +1,103 @@
+import { describe, expect, it } from "bun:test";
+import { parseArchimate } from "../schemas/archimate.ts";
+import { isAllowed, isPlaceholder, metamodelDot, metamodelMermaid, metamodelOf, relationshipTable } from "../schemas/metamodel.ts";
+import { parseArchiTable, tableJson } from "./import-archi-relationships.ts";
+import { report } from "./archimate-metamodel.ts";
+
+/**
+ * A model with: a real serving and access (both allowed), one serving
+ * ArchiMate does not allow (a data object serving a goal), and a hand-drawn
+ * metamodel corner: two placeholders, "Goal" and "Application Component (MS)",
+ * joined by a specialization.
+ */
+const XML = `<?xml version="1.0" encoding="UTF-8"?>
+<archimate:model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:archimate="http://www.archimatetool.com/archimate" name="Tiny" id="id-model" version="5.0.0">
+  <folder name="Elements" id="id-f1" type="application">
+    <element xsi:type="archimate:ApplicationComponent" name="Registry" id="id-a"/>
+    <element xsi:type="archimate:ApplicationService" name="Lookup" id="id-b"/>
+    <element xsi:type="archimate:DataObject" name="Record" id="id-c"/>
+    <element xsi:type="archimate:Goal" name="Trusted records" id="id-d"/>
+    <element xsi:type="archimate:Goal" name="Goal" id="id-p1"/>
+    <element xsi:type="archimate:ApplicationComponent" name="Application Component (MS)" id="id-p2"/>
+    <element xsi:type="archimate:Grouping" name="Grouping" id="id-g"/>
+  </folder>
+  <folder name="Relations" id="id-f2" type="relations">
+    <element xsi:type="archimate:ServingRelationship" id="id-r1" source="id-b" target="id-a"/>
+    <element xsi:type="archimate:AccessRelationship" id="id-r2" source="id-a" target="id-c" accessType="1"/>
+    <element xsi:type="archimate:ServingRelationship" id="id-r3" source="id-c" target="id-d"/>
+    <element xsi:type="archimate:SpecializationRelationship" id="id-r4" source="id-p2" target="id-a"/>
+    <element xsi:type="archimate:AggregationRelationship" id="id-r5" source="id-g" target="id-a"/>
+  </folder>
+</archimate:model>`;
+
+describe("the relationship table", () => {
+  const t = relationshipTable();
+
+  it("is ArchiMate 3.2 as Archi holds it, with its source and licence", () => {
+    expect(t.archimateVersion).toBe("3.2");
+    expect(t.source.license).toBe("MIT");
+    expect(t.keys.r).toBe("RealizationRelationship");
+  });
+
+  it("allows, refuses, and does not guess", () => {
+    expect(isAllowed(t, "ApplicationService", "Serving", "ApplicationComponent")).toBe(true);
+    expect(isAllowed(t, "ApplicationService", "ServingRelationship", "ApplicationComponent")).toBe(true);
+    expect(isAllowed(t, "DataObject", "Serving", "Goal")).toBe(false);
+    expect(isAllowed(t, "NotAType", "Serving", "Goal")).toBeUndefined();
+  });
+
+  it("is written by the importer from Archi's XML, one row per source type", () => {
+    const keys = `<relationshipskeys version="1.0"><key char="o" relationship="AssociationRelationship" /><key char="v" relationship="ServingRelationship" /></relationshipskeys>`;
+    const rels = `<relationships version="3.2">\n<source concept="A">\n<target concept="B" relations="ov" />\n</source>\n<source concept="B">\n<target concept="A" relations="o" />\n</source>\n</relationships>`;
+    const src = { repository: "r", commit: "c", path: "p", license: "MIT", copyright: "x" };
+    const parsed = parseArchiTable(rels, keys, src);
+    expect(parsed.allowed).toEqual({ A: { B: "ov" }, B: { A: "o" } });
+    expect(JSON.parse(tableJson(parsed))).toEqual(parsed);
+    expect(tableJson(parsed)).toContain(`    "A": {"B":"ov"}`);
+    expect(() => parseArchiTable(rels.replace(`"ov"`, `"oq"`), keys, src)).toThrow(/unknown key letter "q"/);
+  });
+});
+
+describe("the metamodel in use", () => {
+  const model = parseArchimate(XML);
+  const mm = metamodelOf(model, "1.0.0");
+
+  it("names placeholders by their own type, never a default-named grouping", () => {
+    expect(isPlaceholder({ type: "Goal", name: "Goal" })).toBe(true);
+    expect(isPlaceholder({ type: "ApplicationComponent", name: "application component (MS)" })).toBe(true);
+    expect(isPlaceholder({ type: "Goal", name: "Trusted records" })).toBe(false);
+    expect(isPlaceholder({ type: "Grouping", name: "Grouping" })).toBe(false);
+    expect(mm.placeholders.map((e) => e.id)).toEqual(["id-p1", "id-p2"]);
+    expect(mm.placeholderRelationships).toEqual(["id-r4"]);
+  });
+
+  it("counts types and patterns without the placeholders, and checks each pattern", () => {
+    expect(mm.types.find((t) => t.type === "ApplicationComponent")!.elements).toBe(1);
+    expect(mm.types.find((t) => t.type === "Goal")!.elements).toBe(1);
+    const key = (p: { source: string; relationship: string; target: string }) => `${p.source} ${p.relationship} ${p.target}`;
+    expect(mm.patterns.map((p) => [key(p), p.count, p.allowed])).toEqual([
+      ["ApplicationComponent Access DataObject", 1, true],
+      ["ApplicationService Serving ApplicationComponent", 1, true],
+      ["DataObject Serving Goal", 1, false],
+      ["Grouping Aggregation ApplicationComponent", 1, true],
+    ]);
+    expect(mm.notAllowed).toBe(1);
+  });
+
+  it("draws the same result as DOT and Mermaid, a refused pattern in red", () => {
+    const dot = metamodelDot(mm);
+    expect(dot).toContain(`"DataObject" -> "Goal" [label="✗ serves ×1"`);
+    expect(dot).toContain(`color="#c0392b"`);
+    expect(dot).toContain(`"ApplicationService" -> "ApplicationComponent" [label="serves ×1", arrowhead=vee]`);
+    const mmd = metamodelMermaid(mm);
+    expect(mmd.startsWith("classDiagram\n")).toBe(true);
+    expect(mmd).toContain("ApplicationComponent ..> DataObject : accesses ×1");
+  });
+
+  it("reports in plain text, the refusal first", () => {
+    const text = report(mm);
+    expect(text).toContain("✗ 1 relationship(s) in 1 pattern(s) ArchiMate does not allow");
+    expect(text).toContain("Data Object serves Goal ×1: id-r3");
+    expect(text).toContain("2 placeholder element(s)");
+  });
+});

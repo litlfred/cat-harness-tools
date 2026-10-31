@@ -651,6 +651,7 @@
     "kg:retrieve:npm": "bun run cat-harness-tools/scripts/kg-retrieve-npm.ts",
     "archimate:validate": "bun run cat-harness-tools/archimate/scripts/check-archimate.ts",
     "archimate:pages": "bun run cat-harness-tools/archimate/scripts/gen-archimate-pages.ts",
+    "archimate:metamodel": "bun run cat-harness-tools/archimate/scripts/archimate-metamodel.ts",
     "rail:standalone-pages": "bun run cat-harness-tools/scripts/rail-standalone-pages.ts",
     "stage:local": "bun run cat-harness-tools/scripts/stage-local.ts",
     "site:workflow": "bun run cat-harness-tools/scripts/site-workflow.ts",
