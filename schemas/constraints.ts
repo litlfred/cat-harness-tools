@@ -25,7 +25,6 @@ import { NarrativeSlotSchema } from "./content/narrative.ts";
 // the package registry — moved to `skill-package.ts`, which is the harness's
 // own and carries no content-model dependency. Re-exported here so every
 // existing importer is unaffected; new harness code imports it directly.
-export type * from "./kg/skill-package.js";
 export {
   ACTOR_KINDS,
   ActorDefinitionSchema,
@@ -59,6 +58,35 @@ export {
   SkillSchemaRefSchema,
   SystemUnderTestFacetSchema,
   sutRefFor,
+} from "./kg/skill-package.js";
+export type {
+  ActorDefinition,
+  ActorKind,
+  CapabilityDefinition,
+  CapabilityDetection,
+  Conformance,
+  DegradationStrategy,
+  DependencyKind,
+  DockerRequirements,
+  HookCommand,
+  HookEvent,
+  IdentitySource,
+  LifecycleStage,
+  RemotePackageRef,
+  RemoteSyncConfig,
+  RemoteSyncStrategy,
+  Requirement,
+  RequirementStatement,
+  RequirementStatementRef,
+  RoleAssignment,
+  SessionHook,
+  SkillCapabilityRef,
+  SkillDefinition,
+  SkillDependency,
+  SkillPackageManifest,
+  SkillPackageRef,
+  SkillRegistry,
+  SystemUnderTestFacet,
 } from "./kg/skill-package.js";
 
 

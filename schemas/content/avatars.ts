@@ -362,10 +362,15 @@ export const AVATARS: Readonly<Record<string, Avatar>> = {
     tone: 216,
     reads: "a sealed envelope, pinned — another Knowledge Graph's declaration, kept byte for byte at the commit it was subscribed at",
   },
+  // The other half of `subscriptions/` (owner, 2026-10-30, bean `w1gy` finding
+  // 1, option C): the subscriber's OWN working state, one home per subscribed
+  // harness. A house with an open door, because each harness gets a home here
+  // and its processes write into it. `tone: 214` sits beside the snapshot's 216,
+  // since the two directories were one before the split.
   "subscribed-harnesses": {
-    glyph: "M3 7h14v11H3zM3 7l7 6 7-6M8 14h4v4H8z",
-    tone: 218,
-    reads: "an envelope opening onto a working directory — the state homes instantiated from a Knowledge Graph subscription",
+    glyph: "M3 11l9-7 9 7M5 9.5V20h14V9.5M10 20v-6h4v6",
+    tone: 214,
+    reads: "a house with its door open — the home each subscribed harness writes its state into",
   },
   // A LIST OF ENTRIES, each a short code tag beside a longer line: a code and
   // what it means, which is the whole of a code list. Deliberately not the

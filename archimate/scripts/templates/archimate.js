@@ -48,10 +48,14 @@
   }
 
   // Hrefs, relative to the page that is drawing.
+  // A view's or an element's page is at its slug where the model gives one
+  // (`slugs`, from the instance's slug ledger), else at its id.
   var root = cfg.kind === "model" ? "./" : "../../";
-  function elHref(id) { return root + "elements/" + encodeURIComponent(id) + "/"; }
+  var slugs = {};
+  function seg(id) { return encodeURIComponent(Object.prototype.hasOwnProperty.call(slugs, id) ? slugs[id] : id); }
+  function elHref(id) { return root + "elements/" + seg(id) + "/"; }
   function relHref(id) { return root + "relationships/" + encodeURIComponent(id) + "/"; }
-  function viewHref(id) { return root + "views/" + encodeURIComponent(id) + "/"; }
+  function viewHref(id) { return root + "views/" + seg(id) + "/"; }
 
   function index(m) {
     var ix = { el: {}, rel: {}, view: {}, out: {}, inc: {} };
@@ -183,6 +187,7 @@
   kg.pending++;
   getJson(cfg.model)
     .then(function (m) {
+      slugs = m.slugs || {};
       var parts = draw(m);
       host.textContent = "";
       parts.forEach(function (p) { if (p) host.appendChild(p); });

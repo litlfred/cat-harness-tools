@@ -47,7 +47,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { HARNESS_SUBGRAPH_DECLARATION_FILE, declaredNodeFiles } from "./declared-nodes";
+import { HARNESS_SUBGRAPH_DECLARATION_FILE, declaredNodeFiles, type InstanceFilter } from "./declared-nodes";
 import { GraphTypologyNodeSchema, kindDefOf } from "./graph-typology-node";
 import { ValidatorNodeSchema, type ValidatorNode } from "./validator-node";
 import { instanceNamespaceOf, namespaceForLayer, NS_PREFIXES, OWN_NAMESPACE_VALUES } from "./namespaces";
@@ -1201,7 +1201,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   },
   "external-schema": {
     description:
-      "the specifications this instance depends on (`external-schemas/`) — one record per specification, pinning the EDITION in use, with the operative terms DERIVED from the corpus rather than hand-listed. `content`, and the call goes against the obvious reading: a process DOES write these files (`external-schemas.ts --write` refreshes `terms[]`), which sounds like `state`, but the axis asks what the graph IS and the subject matter here is a DECISION — which specifications we depend on, at which edition, and what each term operatively means. `derived` would be destructive: it says \"regenerate it\", and regenerating a deleted record recovers neither the authored edition, nor the `usedBy` blast radius, nor a line of the `operative` prose. UNDECLARED until 2026-09-22, which is `dh4f` inverted — a held directory nothing declares, so every consumer fanning out over declared directories skipped a registry pinning four external namespaces. Governed by [`vocabulary-authority`](vocabulary-authority.md) and [`schema-management`](schema-management.md).",
+      "the specifications this instance depends on (`external-schemas/`) — one record per specification, pinning the EDITION in use, with the operative terms DERIVED from the corpus rather than hand-listed. `content`, and the call goes against the obvious reading: a process DOES write these files (`external-schemas.ts --write` refreshes `terms[]`), which sounds like `state`, but the axis asks what the graph IS and the subject matter here is a DECISION — which specifications we depend on, at which edition, and what each term operatively means. `derived` would be destructive: it says \"regenerate it\", and regenerating a deleted record recovers neither the authored edition, nor the `usedBy` blast radius, nor a line of the `operative` prose. UNDECLARED until 2026-09-22, which is `dh4f` inverted — a held directory nothing declares, so every consumer fanning out over declared directories skipped a registry pinning four external namespaces. Governed by [`vocabulary-authority`](../kg-core/vocabulary-authority.md) and [`schema-management`](../kg-core/schema-management.md).",
     title: "External schemas",
     perInstance: true,
     renderable: false,
@@ -1267,7 +1267,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // through the `vocab-map` Tool; nothing writes them.
   "vocab-mapping": {
     description:
-      "vocabulary mapping tables (`vocab-mappings/`) — one `folio-vocab-mapping/v1` table per source content type and target node, saying which source field becomes which target predicate and with what relationship. Shaped like a FHIR ConceptMap: an existing ConceptMap is representable here, and a table can be produced as one with every loss reported (the FHIR IG layer's `schemas/vocab-mapping-fhir.ts`). `content`, by the `code-list` argument: which predicate a field becomes, and which of two is authoritative, is a DECISION. Generators READ these through the `vocab-map` Tool; nothing writes them. Owner, 2026-10-02 (bean `k74z`). Governed by [`vocabulary-authority`](vocabulary-authority.md).",
+      "vocabulary mapping tables (`vocab-mappings/`) — one `folio-vocab-mapping/v1` table per source content type and target node, saying which source field becomes which target predicate and with what relationship. Shaped like a FHIR ConceptMap: an existing ConceptMap is representable here, and a table can be produced as one with every loss reported (the FHIR IG layer's `schemas/vocab-mapping-fhir.ts`). `content`, by the `code-list` argument: which predicate a field becomes, and which of two is authoritative, is a DECISION. Generators READ these through the `vocab-map` Tool; nothing writes them. Owner, 2026-10-02 (bean `k74z`). Governed by [`vocabulary-authority`](../kg-core/vocabulary-authority.md).",
     renderable: false,
     holds: "content",
     // declared-path-literal: this table IS the declaration, as on `health`.
@@ -1296,6 +1296,9 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "http://json-schema.org/draft-07/schema#": { external: "JSON Schema draft-07" },
       "https://json-schema.org/draft/2020-12/schema": { external: "JSON Schema 2020-12" },
       "folio-source-descriptor/v1": {},
+      // ArchiMate's relationship table, `archimate/schemas/archimate-relationships.json`
+      // (cat-harness-tools#1064): data the metamodel check reads, held beside its schema.
+      "archimate-relationship-table/v1": {},
     },
     // bootstrap's own sentence, read rather than restated (bean r3gy, D1).
     summary: BOOTSTRAP_GRAPH_TYPOLOGIES["schemas"],
@@ -3177,6 +3180,8 @@ export class GraphTypologyRegistry {
   private shadowedKinds: Array<{ kind: string; kept: string; shadowed: string }> = [];
   /** The checkouts, in precedence order, whose `typologies/` graphs are loaded on first use. */
   private readonly declaredUnder: readonly string[];
+  /** Which instances of those checkouts are read; every one when omitted. */
+  private readonly include: InstanceFilter | undefined;
 
   /**
    * @param seed the kinds this layer lists in code
@@ -3188,11 +3193,17 @@ export class GraphTypologyRegistry {
    *   is SHADOWED (see {@link shadowed}), because the earlier checkout is the
    *   one being read (`defaultGraphTypologies` puts the checkout under
    *   inspection first).
+   * @param options.include which instances of those checkouts are read — a
+   *   registry whose answers must not depend on what else is mounted (the
+   *   harness's own kinds, for `kind:json-schemas`, bean `8lcl`) names them.
+   *   Omitted, every instance is.
    */
   constructor(
     seed: Readonly<Record<string, GraphTypologyDef>> = BASE_GRAPH_TYPOLOGIES,
     declaredUnder?: string | readonly string[],
+    options: { include?: InstanceFilter } = {},
   ) {
+    this.include = options.include;
     for (const [k, v] of Object.entries(seed)) this.kinds.set(k, v);
     const roots = declaredUnder === undefined ? [] : typeof declaredUnder === "string" ? [declaredUnder] : declaredUnder;
     this.declaredUnder = [...new Set(roots.map((r) => resolve(r)))];
@@ -3224,7 +3235,7 @@ export class GraphTypologyRegistry {
     const kindRoot = new Map<string, number>();
     const validatorRoot = new Map<string, number>();
     this.declaredUnder.forEach((root, at) => {
-      for (const { file, node } of declaredKindNodes(root)) {
+      for (const { file, node } of declaredKindNodes(root, this.include)) {
         const prior = this.declaredIn.get(node.kind);
         if (prior === file) continue;
         const priorAt = kindRoot.get(node.kind);
@@ -3242,7 +3253,7 @@ export class GraphTypologyRegistry {
         this.declaredIn.set(node.kind, file);
         kindRoot.set(node.kind, at);
       }
-      for (const v of declaredValidatorNodes(root)) {
+      for (const v of declaredValidatorNodes(root, this.include)) {
         const key = `${v.node.validates.kind}\u0000${v.node.validates.family ?? ""}`;
         const prior = this.validatorNodes.get(key);
         const priorAt = validatorRoot.get(key);
@@ -3348,8 +3359,11 @@ export class GraphTypologyRegistry {
  * the declaration's Zod schema lives in `cat-harness.ts`, which imports this
  * module.
  */
-export function declaredKindNodes(repoRoot: string): { file: string; node: ReturnType<typeof GraphTypologyNodeSchema.parse> }[] {
-  return declaredNodeFiles(repoRoot, "typologies").map(({ file, raw }) => {
+export function declaredKindNodes(
+  repoRoot: string,
+  include?: InstanceFilter,
+): { file: string; node: ReturnType<typeof GraphTypologyNodeSchema.parse> }[] {
+  return declaredNodeFiles(repoRoot, "typologies", include).map(({ file, raw }) => {
     const parsed = GraphTypologyNodeSchema.safeParse(raw);
     if (!parsed.success) throw new Error(`${file} is not a folio-graph-typology/v1 node: ${parsed.error.message}`);
     return { file, node: parsed.data };
@@ -3357,8 +3371,8 @@ export function declaredKindNodes(repoRoot: string): { file: string; node: Retur
 }
 
 /** Every `folio-validator/v1` node in every declared `validators/` graph (bean riit). */
-export function declaredValidatorNodes(repoRoot: string): { file: string; node: ValidatorNode }[] {
-  return declaredNodeFiles(repoRoot, "validators").map(({ file, raw }) => {
+export function declaredValidatorNodes(repoRoot: string, include?: InstanceFilter): { file: string; node: ValidatorNode }[] {
+  return declaredNodeFiles(repoRoot, "validators", include).map(({ file, raw }) => {
     const parsed = ValidatorNodeSchema.safeParse(raw);
     if (!parsed.success) throw new Error(`${file} is not a folio-validator/v1 node: ${parsed.error.message}`);
     return { file, node: parsed.data };

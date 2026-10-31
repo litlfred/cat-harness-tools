@@ -38,7 +38,8 @@ const KIND = "basic-cdn-site";
 /** The directory on the branch that holds one preview per slug (the `site` declaration's own word). */
 const STAGING = "STAGING";
 
-export interface RouteRow { route: string; pages: number; files: number }
+/** One route's counts, and whether it holds an `index.html` a link to `<route>/` can land on. */
+export interface RouteRow { route: string; pages: number; files: number; index: boolean }
 export type SiteRead =
   | { state: "present"; tip: string; routes: RouteRow[]; previews: RouteRow[]; rootFiles: number }
   | { state: "empty"; reason: string }
@@ -51,9 +52,10 @@ export function summariseTree(paths: readonly string[]): { routes: RouteRow[]; p
   const previews = new Map<string, RouteRow>();
   let rootFiles = 0;
   const bump = (m: Map<string, RouteRow>, route: string, p: string): void => {
-    const r = m.get(route) ?? { route, pages: 0, files: 0 };
+    const r = m.get(route) ?? { route, pages: 0, files: 0, index: false };
     r.files++;
     if (p.endsWith(".html")) r.pages++;
+    if (p === `${route}/index.html`) r.index = true;
     m.set(route, r);
   };
   for (const p of paths) {
@@ -90,7 +92,9 @@ export function readSiteBranch(repoRoot: string, branch: string): { remote: stri
 const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 function table(rows: readonly RouteRow[], up: string, head: string): string {
-  const body = rows.map((r) => `<tr><td><a href="${esc(up + r.route)}/"><code>${esc(r.route)}/</code></a></td><td>${r.pages}</td><td>${r.files}</td></tr>`).join("\n");
+  // A route with no index.html answers nothing at `<route>/`, so it is named, not linked.
+  const cell = (r: RouteRow): string => (r.index ? `<a href="${esc(up + r.route)}/"><code>${esc(r.route)}/</code></a>` : `<code>${esc(r.route)}/</code>`);
+  const body = rows.map((r) => `<tr><td>${cell(r)}</td><td>${r.pages}</td><td>${r.files}</td></tr>`).join("\n");
   return `<div class="clip"><table><thead><tr><th>${head}</th><th>Pages</th><th>Files</th></tr></thead><tbody>\n${body}\n</tbody></table></div>`;
 }
 

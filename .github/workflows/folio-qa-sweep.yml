@@ -40,7 +40,7 @@ jobs:
     env:
       FOLIO: ${{ inputs.folio }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Preflight — the folio must hold a document
         run: |
@@ -126,7 +126,7 @@ jobs:
 
       - name: Upload sweep + staleness logs
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: qa-sweep-logs
           path: |

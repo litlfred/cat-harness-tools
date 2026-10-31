@@ -8,7 +8,6 @@
  * @module cat-harness/schemas/merge-review
  * @graphNode schema
  */
-export type * from "./merge-queue.ts";
 export {
   AgenticPromotionCriteriaSchema,
   BeanIdSchema,
@@ -37,4 +36,23 @@ export {
   calculateWouldHaveBlockedMetrics,
   evaluateAgenticPromotion,
   releaseCovers,
+} from "./merge-queue.ts";
+export type {
+  AgenticPromotionCriteria,
+  Ejection,
+  Hold,
+  HumanVerdict,
+  MemberFacts,
+  MergeQueueEntry,
+  Placement,
+  PriorityClass,
+  PromotionEvaluationResult,
+  QueueStatus,
+  Readiness,
+  Release,
+  ReleaseAuthority,
+  TrainMemberEvidence,
+  WouldHaveBlockedFinding,
+  WouldHaveBlockedMetrics,
+  WouldHaveBlockedRecord,
 } from "./merge-queue.ts";

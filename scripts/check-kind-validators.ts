@@ -51,6 +51,7 @@ import { ContributionRegistry } from "../schemas/content/contributions.js";
 import { loadContributionsSync } from "../schemas/kg/harness-config.js";
 import { resolveSubgraphSource } from "../schemas/kg/subgraph-source.js";
 import { graphReadPath } from "./graph-read.ts";
+import { ownedOutside, typologyOwner } from "../schemas/kg/node-kind-index.js";
 
 /** The INSTANCE root — this file lives at `<instance>/scripts/`. */
 const instanceRoot = HARNESS_ROOT;
@@ -77,6 +78,13 @@ export interface ValidatorSweep {
    * true.
    */
   contradictory: string[];
+  /**
+   * A kind owned by an instance this checkout does not hold (`ownedOutside`),
+   * with that owner: its validator is that layer's to declare and its gate's to
+   * judge, so it is in none of the states above. Standalone these are the
+   * fixture's kinds (bean `w1gy`); in a composed checkout it is empty.
+   */
+  elsewhere: { kind: string; owner: string }[];
 }
 
 /** Code in another repository: it cannot declare a validator node in this one. */
@@ -104,8 +112,13 @@ export function authoredValidatorStrings(): { kind: string; family?: string; ref
 }
 
 export async function sweep(root: string): Promise<ValidatorSweep> {
-  const out: ValidatorSweep = { resolved: [], notApplicable: [], undeclared: [], unresolvable: [], contradictory: [] };
+  const out: ValidatorSweep = { resolved: [], notApplicable: [], undeclared: [], unresolvable: [], contradictory: [], elsewhere: [] };
   for (const kind of defaultGraphTypologies.names()) {
+    // Another layer's kind is left to that layer (bean `w1gy`).
+    if (ownedOutside(defaultGraphTypologies, kind, join(root, ".."))) {
+      out.elsewhere.push({ kind, owner: typologyOwner(defaultGraphTypologies, kind)! });
+      continue;
+    }
     const def = defaultGraphTypologies.get(kind);
     const na = def?.validatorNotApplicable;
     // The contradiction first, because everything below would otherwise pick a
@@ -253,12 +266,12 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
       declaredDirs.push({ abs: join(inst, e.path).replace(/\/+$/, ""), kinds: e.graphTypologies as readonly string[] });
     }
   }
-  const innermostKinds = (file: string): readonly string[] | undefined => {
+  const innermostDeclared = (file: string): { abs: string; kinds: readonly string[] } | undefined => {
     let best: { abs: string; kinds: readonly string[] } | undefined;
     for (const d of declaredDirs) {
       if (file.startsWith(`${d.abs}/`) && (best === undefined || d.abs.length > best.abs.length)) best = d;
     }
-    return best?.kinds;
+    return best;
   };
   // A NESTED kind: it names its `$schema` families and no instance declares a
   // directory of it, so its nodes sit inside a parent kind's directory (the
@@ -359,8 +372,22 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
         const optIn = (node as { $schema?: unknown }).$schema === undefined || file.endsWith(".jsonld");
         if (optIn && !byTag.has(tag) && !nested.has(tag)) continue;
         // Under a more specific declared directory of other kinds: theirs.
-        const inner = innermostKinds(file);
-        if (inner !== undefined && !inner.includes(kind)) continue;
+        // MORE SPECIFIC than the directory being read, that is. `declaredDirs`
+        // holds instance-level entries only, so a directory this kind is
+        // declared at FROM WITHIN (`beans/beans.json`'s `workflows`, which
+        // `directoryEntriesForGraph` resolves) is not in it, and the innermost
+        // entry it finds for `beans/workflows/x.json` is the ENCLOSING
+        // `beans/`. Asking only "is that entry of my kind?" then dropped every
+        // `workflow-state` node from its own sweep, and `require-all` called
+        // the kind EXAMINED NOTHING over the node it had just been handed
+        // (bean `8lcl`, folio-assistant#2812). An enclosing directory never
+        // takes a node away from the kind declared nearer to it; only a deeper
+        // one does, which is the #2529 case this guard exists for. The node
+        // still counts for `beans` too: `beans/` is read as a whole, and its
+        // family map names the child families for exactly that reason.
+        const inner = innermostDeclared(file);
+        const reading = dir.replace(/\/+$/, "");
+        if (inner !== undefined && !inner.kinds.includes(kind) && inner.abs.startsWith(`${reading}/`)) continue;
         const own = byTag.get(tag);
         const via = own === undefined ? nested.get(tag) : undefined;
         const fam = own ?? via?.fam;
@@ -478,6 +505,7 @@ async function main(): Promise<number> {
   // check the claim — the reason names a file format or an absent subject, so
   // "not applicable" cannot become the polite way to launder a real gap.
   for (const n of r.notApplicable) console.log(`  · ${n.kind} — no runtime validator applies: ${n.reason}`);
+  for (const e of r.elsewhere) console.log(`  · ${e.kind} — owned by ${e.owner}, which this checkout does not hold: judged there`);
 
   if (r.contradictory.length > 0) {
     console.log(

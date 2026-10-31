@@ -193,7 +193,6 @@ export function unparseableConfigsIn(dir: string): string[] {
 // to trigger core's registration — and the cost was paid by every caller, as
 // an import-order dependency nobody could see. See that module's header, and
 // the import at the foot of this file.
-export type * from "./graph-typology-registry.js";
 export {
   BASE_GRAPH_TYPOLOGIES,
   DECLARED_BY,
@@ -213,6 +212,13 @@ export {
   ownNamespaceValues,
   ownPrefixTable,
   resolveGraphTypology,
+} from "./graph-typology-registry.js";
+export type {
+  DeclaringInstance,
+  GraphLayer,
+  GraphTypology,
+  GraphTypologyDef,
+  NodeSchemaRef,
 } from "./graph-typology-registry.js";
 // ...and imported as well as re-exported, because the predicates below
 // (`isRenderable`, `graphLayer`, the layer tests) stayed in this module and

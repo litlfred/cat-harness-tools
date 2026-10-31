@@ -36,6 +36,32 @@
  * `check:kind-validators` does: a schema that accepts everything would read as
  * coverage.
  *
+ * ## The same output whatever is mounted beside the harness
+ *
+ * Bean `8lcl`, folio-assistant#2812: run in a full folio-assistant mount, this
+ * generator wrote four files differently from the harness on its own, so the
+ * committed files could never match downstream. Two things leaked in from the
+ * layers above:
+ *
+ * - **Validator nodes.** A higher instance may answer a harness kind's family
+ *   from its own `validators/` graph — core does for `uploads`'
+ *   `folio-intake/v1`, `folio-extraction/v1` and `folio-dublin-core/v1`. The
+ *   shared registry joins every mounted instance's nodes, so the document grew
+ *   three `$defs` in a mount. Here the kinds are read from a PRIVATE registry
+ *   ({@link harnessRegistry}) that loads the `typologies/` and `validators/`
+ *   graphs of the harness and of what it `needs`, transitively, and of no other
+ *   instance ({@link harnessInstances}). A family a higher layer answers is
+ *   that layer's to publish.
+ * - **Discovered enums.** `BLOCK_KINDS` is read at import from every mounted
+ *   `block-kinds/` graph, so `appliesTo` was `{ "not": {} }` standalone and the
+ *   core's and science layer's kinds in a mount. Neither is the harness's: the
+ *   vocabulary is open, extended by the layers above, so a schema in a
+ *   {@link DISCOVERED_VOCABULARIES} entry is written as the open type
+ *   `{ "type": "string" }` ({@link body}).
+ *
+ * `scripts/tests/gen-kind-json-schemas.test.ts` mounts a synthetic higher
+ * instance contributing both and asserts the output does not move.
+ *
  * ## The `$id` is the file's path
  *
  * `<iriBase>v<major>/<path in cat-harness>`, minted by bootstrap-tools'
@@ -47,24 +73,26 @@
  *   bun run cat kind:json-schemas          # write
  *   bun run cat kind:json-schemas:check    # fail if a kind lacks its file, a file is stale, or an `$id` is not its path
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { z } from "zod";
 
 import { releaseIri, releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
 
-import { readDeclaration } from "../schemas/kg/cat-harness.js";
+import { readDeclaration, siblingScopeFor } from "../schemas/kg/cat-harness.js";
+import { DISCOVERED_VOCABULARIES } from "../schemas/kg/discovered-vocabulary.js";
 import {
   BASE_GRAPH_TYPOLOGIES,
   declaringInstanceOf,
-  defaultGraphTypologies,
+  GraphTypologyRegistry,
   kindTitle,
 } from "../schemas/kg/graph-typology-registry.js";
 import {
   moduleRootOf,
   resolveKindValidator,
   resolveNodeSchemas,
+  rootOf,
   type ValidatorRef,
 } from "../schemas/kg/kind-validator.js";
 import { HARNESS_NAME, HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
@@ -102,16 +130,88 @@ export function declaredSchemasDir(root: string = HARNESS_ROOT): string {
   return join(root, entry.path);
 }
 
+function canonicalPath(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return p;
+  }
+}
+
+/**
+ * The instance roots this generator may read: the harness and every instance
+ * it `needs`, transitively — never a layer above it. A needed instance that is
+ * not mounted THROWS: generating without it would write a different document,
+ * which is the defect this list exists to end.
+ */
+export function harnessInstances(harnessRoot: string = HARNESS_ROOT): string[] {
+  const out = new Map<string, string>(); // name → root
+  const queue: [string, string][] = [[HARNESS_NAME, harnessRoot]];
+  while (queue.length) {
+    const [name, root] = queue.shift()!;
+    if (out.has(name)) continue;
+    out.set(name, root);
+    for (const need of readDeclaration(root)?.needs ?? []) {
+      if (out.has(need)) continue;
+      const found = rootOf(need, harnessRoot);
+      if (found === undefined) {
+        throw new Error(`${name} needs ${need}, which is not mounted beside ${harnessRoot} — the harness's schemas cannot be generated without it`);
+      }
+      queue.push([need, found]);
+    }
+  }
+  return [...out.values()];
+}
+
+/**
+ * A registry of the harness's kinds as the harness and what it needs declare
+ * them — the base layer's code list plus the `typologies/` and `validators/`
+ * graphs of {@link harnessInstances} — whatever else is mounted beside it.
+ * `scopes` are the checkouts scanned for them; an instance in a scope that is
+ * not in `instances` is not read.
+ */
+export function harnessRegistry(
+  instances: readonly string[] = harnessInstances(),
+  scopes: readonly string[] = [...new Set(instances.map((r) => siblingScopeFor(r)))],
+): GraphTypologyRegistry {
+  const allowed = new Set(instances.map(canonicalPath));
+  return new GraphTypologyRegistry(BASE_GRAPH_TYPOLOGIES, scopes, { include: (root) => allowed.has(canonicalPath(root)) });
+}
+
+let shared: GraphTypologyRegistry | undefined;
+/** {@link harnessRegistry} over the harness this run serves, built once. */
+function defaultHarnessRegistry(): GraphTypologyRegistry {
+  return (shared ??= harnessRegistry());
+}
+
 /** The harness's own kinds: the code list and its `typologies/` nodes, sorted. */
-export function harnessKinds(): string[] {
-  return defaultGraphTypologies
+export function harnessKinds(registry: GraphTypologyRegistry = defaultHarnessRegistry()): string[] {
+  return registry
     .names()
-    .filter((k) => k in BASE_GRAPH_TYPOLOGIES || declaringInstanceOf(defaultGraphTypologies.get(k))?.name === HARNESS_NAME)
+    .filter((k) => k in BASE_GRAPH_TYPOLOGIES || declaringInstanceOf(registry.get(k))?.name === HARNESS_NAME)
     .sort();
 }
 
-function body(schema: z.ZodType): Record<string, unknown> {
-  const out = z.toJSONSchema(schema, { io: "input", reused: "inline" }) as Record<string, unknown>;
+/**
+ * One Zod schema as JSON Schema. A {@link DISCOVERED_VOCABULARIES} enum is
+ * written as the open type: its members are the mounted composition's, not
+ * the schema's, so listing them would make the file depend on what was
+ * mounted — and with the harness alone the enum is empty, which converts to
+ * `{ "not": {} }` and rejects every value a higher layer declares.
+ */
+export function body(schema: z.ZodType): Record<string, unknown> {
+  const out = z.toJSONSchema(schema, {
+    io: "input",
+    reused: "inline",
+    override: (ctx) => {
+      const discovered = DISCOVERED_VOCABULARIES.get(ctx.zodSchema);
+      if (!discovered) return;
+      const js = ctx.jsonSchema as Record<string, unknown>;
+      for (const k of Object.keys(js)) delete js[k];
+      js.type = "string";
+      js.description = `One of the values the \`${discovered.graph}\` graphs of the composition declare — an open vocabulary, extended by the layers above the harness, so not enumerated here.`;
+    },
+  }) as Record<string, unknown>;
   delete out.$schema;
   return out;
 }
@@ -122,12 +222,16 @@ function heldHere(ref: ValidatorRef): boolean {
 }
 
 /** Render one kind's document, or say why it has none. */
-export async function renderKind(kind: string, schemasDir: string): Promise<KindDocument> {
-  const def = defaultGraphTypologies.get(kind);
+export async function renderKind(
+  kind: string,
+  schemasDir: string,
+  registry: GraphTypologyRegistry = defaultHarnessRegistry(),
+): Promise<KindDocument> {
+  const def = registry.get(kind);
   if (def?.validatorNotApplicable) return { kind, none: `no runtime validator applies: ${def.validatorNotApplicable}` };
 
-  const kv = await resolveKindValidator(kind, HARNESS_ROOT);
-  const families = await resolveNodeSchemas(kind, HARNESS_ROOT);
+  const kv = await resolveKindValidator(kind, HARNESS_ROOT, registry);
+  const families = await resolveNodeSchemas(kind, HARNESS_ROOT, registry);
 
   const defs: [string, Record<string, unknown>][] = [];
   const external: string[] = [];
@@ -181,7 +285,7 @@ export async function renderKind(kind: string, schemasDir: string): Promise<Kind
     $schema: DIALECT,
     $id: id,
     _generated: `${WRITER} of cat-harness-tools — do not hand-edit; change the Zod and run \`bun run cat kind:json-schemas\``,
-    title: kindTitle(kind),
+    title: kindTitle(kind, registry),
     description: def?.summary ?? kind,
   };
   if (notes.length) doc.$comment = notes.join(" ");

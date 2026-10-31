@@ -15,6 +15,7 @@ import { join, extname, resolve } from "path";
 import type { ContentAdapter } from "./types.js";
 import { GitHelper } from "./core/git.js";
 import { log, logDebug } from "./core/logging.js";
+import { bindHostname, refuseMcp, trustedRequest } from "./core/gateway-trust.js";
 import { registerServedToolGroups } from "./tool-groups.js";
 import { registerSkillPrompts } from "./tools/skill-prompts.js";
 import {
@@ -314,9 +315,11 @@ export class FolioServer {
     await this.mcpServer.connect(transport);
 
     const viewerPort = parseInt(process.env.VIEWER_PORT || String(this.config.viewerPort ?? 3200), 10);
+    const hostname = bindHostname();
     Bun.serve({
       port: viewerPort,
-      fetch: async (req) => this.handleRequest(req),
+      hostname,
+      fetch: async (req) => this.handleRequest(trustedRequest(req, hostname)),
     });
 
     log("init", `MCP server started (stdio, repo: ${this.config.repoRoot})`);
@@ -348,14 +351,17 @@ export class FolioServer {
     });
     await this.mcpServer.connect(httpTransport);
 
+    const hostname = bindHostname();
     Bun.serve({
       port,
+      hostname,
       fetch: async (req) => {
         const url = new URL(req.url);
         if (url.pathname === "/mcp") {
-          return httpTransport.handleRequest(req);
+          // Only the auth-gateway's requests reach the tools (see core/gateway-trust.ts).
+          return refuseMcp(req, hostname) ?? httpTransport.handleRequest(req);
         }
-        return this.handleRequest(req);
+        return this.handleRequest(trustedRequest(req, hostname));
       },
     });
 

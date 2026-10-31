@@ -66,6 +66,7 @@
  *   destination with two names, on a template that prints a kind word, or on
  *   a committed sidecar that is stale or absent. This is the gate CI runs.
  */
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { RAIL_DATA_DIR, expandRail, railDataJson } from "./lib/harness-rail.ts";
 import { join, relative, resolve, sep } from "node:path";

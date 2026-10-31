@@ -97,6 +97,11 @@ def body_for(sha, run, failures, jobs, green, checks_result):
         lines += [f"### Failing tests ({failures.get('test_count', len(tests))})", ""]
         lines += [f"- `{t}`" for t in tests]
         lines.append("")
+    if failures.get("declared"):
+        lines += [f"Only the gates this layer declares in `.github/main-qa-gates.json` are judged; "
+                  f"{failures.get('not_judged_count', 0)} red gate(s) outside it are not, and "
+                  f"{failures.get('passing_undeclared_count', 0)} passing gate(s) could be added. "
+                  f"The run's summary lists them.", ""]
     if failures.get("error"):
         lines += [f"Main's answer: {failures['error']}", ""]
     if jobs:

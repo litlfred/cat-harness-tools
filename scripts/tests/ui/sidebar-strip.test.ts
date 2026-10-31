@@ -245,9 +245,10 @@ describe("the controls live inside the sidebar now", () => {
 
   it("the control that remains has an accessible name — this is navigation", () => {
     // With the ☰ and [x] gone (#1757), the one control is the theme's avatar
-    // link, and `docs-ui.js` names it by what a click does.
+    // link, and `docs-ui.js` names it by what a click does: open the bar, or,
+    // once it is open, go home (owner, 2026-10-30, cat-harness-tools#910).
     const js = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/js/docs-ui.js")), "utf8");
-    expect(js).toContain('avatar.title = box.checked ? "Close navigation" : "Open navigation"');
+    expect(js).toContain('avatar.title = box.checked ? "Go to the landing page" : "Open navigation, or go to the landing page once it is open"');
     expect(js).toContain('avatar.setAttribute("aria-expanded"');
   });
 });

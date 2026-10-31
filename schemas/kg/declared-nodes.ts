@@ -28,8 +28,16 @@ import { findDeclarationFile, instanceRootsIn } from "./instance-roots";
  */
 const FIXTURE_ENV = "FOLIO_FIXTURE_CHECKOUT";
 
+/**
+ * Which instances of a checkout a scan reads: given an instance root, whether
+ * its declared directories count. Omitted, every instance does. A generator
+ * whose output must not depend on what else is mounted beside it (bean `8lcl`:
+ * the harness's published JSON Schemas) passes the instances it may read.
+ */
+export type InstanceFilter = (instanceRoot: string) => boolean;
+
 /** Every directory declared with `graphTypology`, across the instances of a checkout (absolute paths, declaration order). */
-export function declaredDirectories(repoRoot: string, graphTypology: string): string[] {
+export function declaredDirectories(repoRoot: string, graphTypology: string, include?: InstanceFilter): string[] {
   // input-site: env-unset FOLIO_FIXTURE_CHECKOUT #d3ac43d3 — a test-only override naming a checkout OUTSIDE the tree
   const fixture = process.env[FIXTURE_ENV];
   const ownRoots = instanceRootsIn(repoRoot);
@@ -42,7 +50,7 @@ export function declaredDirectories(repoRoot: string, graphTypology: string): st
   // composed checkout, so there a scan is unchanged.
   const ownNames = new Set(ownRoots.map((r) => basename(r)));
   const roots = fixture ? [...ownRoots, ...instanceRootsIn(fixture).filter((r) => !ownNames.has(basename(r)))] : ownRoots;
-  return roots.flatMap((root) => ownDeclaredDirectories(root, graphTypology, repoRoot));
+  return roots.filter((root) => include === undefined || include(root)).flatMap((root) => ownDeclaredDirectories(root, graphTypology, repoRoot));
 }
 
 /** The directories ONE instance declares with `graphTypology` (absolute paths). `repository`-scoped paths resolve against `repoRoot`. */
@@ -92,9 +100,13 @@ export function ownDeclaredDirectories(root: string, graphTypology: string, repo
 export const HARNESS_SUBGRAPH_DECLARATION_FILE = "graph.json";
 
 /** `{ file, raw }` for every `*.json` in every directory declared with `graphTypology`, files sorted. */
-export function declaredNodeFiles(repoRoot: string, graphTypology: string): { file: string; raw: unknown }[] {
+export function declaredNodeFiles(
+  repoRoot: string,
+  graphTypology: string,
+  include?: InstanceFilter,
+): { file: string; raw: unknown }[] {
   const out: { file: string; raw: unknown }[] = [];
-  for (const dir of declaredDirectories(repoRoot, graphTypology)) {
+  for (const dir of declaredDirectories(repoRoot, graphTypology, include)) {
     let files: string[];
     try {
       files = readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
