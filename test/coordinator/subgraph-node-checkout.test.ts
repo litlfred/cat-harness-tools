@@ -16,6 +16,7 @@ import { join } from "node:path";
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { declaredSubgraphNode } from "../../scripts/kg-export.ts";
 import { subgraphPublicationFindings } from "../../scripts/subgraph-node.ts";
+import { siteNotBuilt } from "../support/checkout.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -28,7 +29,8 @@ const PUBLISHED: ReadonlyArray<{ id: string; file: string }> = [{ id: "todos", f
 
 describe("every adopting publisher follows the pattern", () => {
   for (const { id, file } of PUBLISHED) {
-    test(`${id}: ${file.slice(ROOT.length + 1)}`, () => {
+    // The document is written at publish and gitignored (bean w1gy F18).
+    test.skipIf(siteNotBuilt(`the ${id} document \`docs:pages\` writes at publish (gitignored)`, file))(`${id}: ${file.slice(ROOT.length + 1)}`, () => {
       const declared = declaredSubgraphNode(ROOT, id);
       expect(declared).toBeDefined();
       const doc = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;

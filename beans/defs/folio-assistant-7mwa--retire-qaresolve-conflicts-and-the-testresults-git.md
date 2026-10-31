@@ -2,11 +2,11 @@
 # folio-assistant-7mwa
 $schema: bean/1.0.0
 title: Retire qa:resolve-conflicts and the test/results .gitattributes entries; move the 14 per-instance test/results dirs and the folio_init template
-status: completed
+status: todo
 type: task
 priority: normal
 created_at: 2026-10-01T08:00:46Z
-updated_at: 2026-10-31T09:30:00Z
+updated_at: 2026-10-31T14:35:00Z
 parent: folio-assistant-3fva
 ---
 
@@ -17,7 +17,7 @@ There is nothing left to conflict, so `qa:resolve-conflicts` (`520m`) and the `o
 The per-instance `test/results/` dirs (`folio-assistant-sci`, `fhir-harness`, `smart-*`, `who-*`, `agent-skills`, `large-datasets`, `folio-assistant-core`) gain `storage`. The `folio_init` / `qa-sweep` template writes it, and `qou` (`s3p2`, 3,653 verdicts) becomes the first downstream consumer. That is a separate repo, and it needs the author's go.
 
 ## Done when
-- [x] no gate or test references a committed `test/results` file
+- [ ] no gate or test references a committed `test/results` file
 - [x] a freshly initialised folio publishes to its own qa-reports branch
 
 
@@ -58,3 +58,13 @@ _2026-10-31T09:30:00Z_ — Unblocked (`folio-assistant-tfqf` completed) and comp
   4. `scripts/tests/adversarial-checklist.test.ts`: test `adversarialCoverageByGraph` against a scratch root populated by `executeBackfillBatch` and assert `validStates` on `coverage(REPO)` rows without requiring committed `cat-harness/test/results/kg-qa/` sidecars on disk.
   5. `scripts/tests/library/ingest-and-l1.test.ts`: check per-entry `sidecarRootFor` against `resolveQaLocation` so stored `qa` directories assert `"unknown"` and overlay instances without a stored `qa` directory (`smart-trust-phw`) assert `"absent"`; nest `mkdtempSync` fixtures inside a parent temp directory so `corpusDirectoriesForGraph` does not scan `tmpdir()`.
   6. `scripts/tests/ui/nav-names.test.ts`: compute `railedCount()` via `audit(SITE, REPO).totals.railed` from `scripts/check-viewer-nav.ts` instead of reading `cat-harness/test/results/viewer-nav/viewer-nav.qa.json` from disk.
+
+_2026-10-31T14:35:00Z_: cat-harness no longer commits `test/results`. litlfred/cat-harness#857 (161b243) removed it, after litlfred/cat-harness-tools#1143 (5d30589) on owner card A at 14:06Z. #1143 also made `kg-validate-nested-instances` check an absent `qa` home against the store, and dropped four declared-path witnesses that are test vectors or convention constants.
+
+Box 1 is still open, because folio-assistant-core and fhir-harness still commit `test/results` (the store lists 63 core kg-qa sidecars). These sites stay until those instances stop committing (the per-instance `storage` step):
+- `qa:resolve-conflicts`, which `merge-base.ts` still routes `**/test/results/kg-qa/**` to;
+- `merge-train.ts` `keepTrackedIgnored` / `checkTestResultsDrops`;
+- the `regen-after-merge.ts` writer overrides, which need checking gate by gate;
+- `gitattributes.test.ts` `oxka`/`eqxp`, kept by the owner on 2026-10-23.
+
+Retiring `qa:resolve-conflicts` also needs a note in cat-harness's `prepare-merge` skill. The blocker on tfqf now covers only the screenshot box. Session https://claude.ai/code/session_01Qmmkt9MhQCZs54m2YPoyXp.

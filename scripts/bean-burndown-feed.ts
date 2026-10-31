@@ -37,6 +37,8 @@
  * times.
  */
 import { spawnSync } from "node:child_process";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import { CLOSED_STATUSES } from "./bean-store-read.ts";
 import { burndown, type Snapshot } from "./epic-burndown.ts";
@@ -131,9 +133,27 @@ export function historyRef(branch: string): string {
  * `origin` when the store is in this repository and from `web` otherwise.
  * Returns the local ref, or why it could not.
  */
+/** The tip `state:mount` mounted for `branch` in `root`, when a marker records it. */
+export function mountedTipFor(root: string, branch: string): string | undefined {
+  const r = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-path", "branch-mounts"], { cwd: root, encoding: "utf-8" });
+  if (r.status !== 0) return undefined;
+  const dir = r.stdout.trim();
+  if (!existsSync(dir)) return undefined;
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith(".json")) continue;
+    try {
+      const m = JSON.parse(readFileSync(join(dir, name), "utf-8")) as { branch?: string; tip?: string };
+      if (m.branch === branch && typeof m.tip === "string" && /^[0-9a-f]{40}$/.test(m.tip)) return m.tip;
+    } catch {
+      // unreadable marker is ignored
+    }
+  }
+  return undefined;
+}
+
 export function fetchBeanHistory(
   root: string,
-  opts: { branch: string; web: string; repoWeb: string; days: number; now?: Date },
+  opts: { branch: string; web: string; repoWeb: string; days: number; now?: Date; tip?: string },
 ): { ref: string } | { reason: string } {
   const now = opts.now ?? new Date();
   const since = new Date(now.getTime() - opts.days * 86_400_000).toISOString().slice(0, 10);
@@ -145,5 +165,9 @@ export function fetchBeanHistory(
     { cwd: root, encoding: "utf-8" },
   );
   if (r.status !== 0) return { reason: `could not fetch ${opts.branch} from ${remote}: ${r.stderr.trim() || `exit ${r.status}`}` };
+  const pinned = opts.tip ?? mountedTipFor(root, opts.branch);
+  if (pinned && spawnSync("git", ["cat-file", "-e", `${pinned}^{commit}`], { cwd: root }).status === 0) {
+    spawnSync("git", ["update-ref", ref, pinned], { cwd: root });
+  }
   return { ref };
 }

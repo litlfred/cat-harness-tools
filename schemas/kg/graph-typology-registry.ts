@@ -2197,6 +2197,13 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // labels-only reading gets the nouns right and the relations wrong, so
       // a reader has to be able to tell the two apart.
       "folio-figure-descriptions/v1": {},
+      // A figure transcribed as data on its entry's `figure-data/` (owner,
+      // 2026-10-31, "B in who-iris"): the DIIG phases chart and the SMART
+      // Guidelines approach chart, one file per published version. Their
+      // shapes are with the generators that draw them, in a layer above this
+      // one, so they are routed here and validated there.
+      "diig-phases-figure/v1": {},
+      "smart-guidelines-approach-figure/v1": {},
       // Agent summaries of prose blocks, beside the blocks rather than in
       // them — the blocks stay verbatim and `ingested` (owner, 2026-09-24).
       // The semantic half of its QA is `block-summaries` in check-l1-complete.
@@ -3174,6 +3181,9 @@ export class GraphTypologyRegistry {
   private declaredIn = new Map<string, string>();
   /** Validator nodes, keyed `kind\u0000family`, kept so a kind registered LATER (core's `folio`) is joined too. */
   private validatorNodes = new Map<string, { file: string; node: ValidatorNode }>();
+  private kindRoot = new Map<string, number>();
+  private validatorRoot = new Map<string, number>();
+  private scannedRoots: string[] = [];
   private loaded = false;
 
   /** Kinds a LATER checkout also declares and an earlier one already answered — reported, never silently merged. */
@@ -3231,40 +3241,64 @@ export class GraphTypologyRegistry {
   private ensureDeclared(): void {
     if (this.loaded || this.declaredUnder.length === 0) return;
     this.loaded = true;
-    // Which checkout (by precedence index) answered each kind / validator key.
-    const kindRoot = new Map<string, number>();
-    const validatorRoot = new Map<string, number>();
-    this.declaredUnder.forEach((root, at) => {
-      for (const { file, node } of declaredKindNodes(root, this.include)) {
-        const prior = this.declaredIn.get(node.kind);
-        if (prior === file) continue;
-        const priorAt = kindRoot.get(node.kind);
-        if (prior !== undefined && priorAt !== undefined && priorAt < at) {
-          this.shadowedKinds.push({ kind: node.kind, kept: prior, shadowed: file });
-          continue;
-        }
-        if (prior !== undefined || this.kinds.has(node.kind)) {
-          throw new GraphTypologyConflictError(node.kind, `declared by ${prior ?? "the base layer's code"} and by ${file}`);
-        }
-        const def = kindDefOf(node) as GraphTypologyDef & WithDeclarer;
-        const by = declaringInstanceFor(file);
-        if (by !== undefined) def[DECLARED_BY] = by;
-        this.kinds.set(node.kind, def);
-        this.declaredIn.set(node.kind, file);
-        kindRoot.set(node.kind, at);
+    for (const root of this.declaredUnder) this.loadCheckoutRoot(root);
+  }
+
+  /**
+   * Ensure declared `typologies/` and `validators/` from `repoRoot` are loaded
+   * when this is an unfiltered checkout-backed registry (bean `cat-tools-g7ls`,
+   * owner card 2026-10-31 "A. Fix the loader").
+   *
+   * When `readDeclaration` reads an instance from a checkout outside
+   * {@link declaredUnder} — e.g. a host or sibling checkout reached from a
+   * standalone run, or a multi-instance test fixture — every discovered
+   * instance's `typologies/` in that checkout (such as `folio-assistant-core`'s
+   * `glossary` for `fhir-harness.json`) is registered before any declaration in
+   * it is validated. No-op on a bare or filtered registry.
+   */
+  ensureCheckout(repoRoot: string): void {
+    if (this.declaredUnder.length === 0 || this.include !== undefined) return;
+    const abs = resolve(repoRoot);
+    if (this.scannedRoots.includes(abs)) return;
+    if (instanceRootsIn(abs).length === 0) return;
+    this.ensureDeclared();
+    this.loadCheckoutRoot(abs);
+  }
+
+  private loadCheckoutRoot(root: string): void {
+    const abs = resolve(root);
+    if (this.scannedRoots.includes(abs)) return;
+    const at = this.scannedRoots.length;
+    this.scannedRoots.push(abs);
+    for (const { file, node } of declaredKindNodes(abs, this.include)) {
+      const prior = this.declaredIn.get(node.kind);
+      if (prior === file) continue;
+      const priorAt = this.kindRoot.get(node.kind);
+      if (prior !== undefined && priorAt !== undefined && priorAt < at) {
+        this.shadowedKinds.push({ kind: node.kind, kept: prior, shadowed: file });
+        continue;
       }
-      for (const v of declaredValidatorNodes(root, this.include)) {
-        const key = `${v.node.validates.kind}\u0000${v.node.validates.family ?? ""}`;
-        const prior = this.validatorNodes.get(key);
-        const priorAt = validatorRoot.get(key);
-        if (prior && priorAt !== undefined && priorAt < at && prior.file !== v.file) continue;
-        if (prior && prior.file !== v.file) {
-          throw new Error(`two validators for ${describeValidator(v.node)}: ${prior.file} and ${v.file}. One family, one validator.`);
-        }
-        this.validatorNodes.set(key, v);
-        validatorRoot.set(key, at);
+      if (prior !== undefined || this.kinds.has(node.kind)) {
+        throw new GraphTypologyConflictError(node.kind, `declared by ${prior ?? "the base layer's code"} and by ${file}`);
       }
-    });
+      const def = kindDefOf(node) as GraphTypologyDef & WithDeclarer;
+      const by = declaringInstanceFor(file);
+      if (by !== undefined) def[DECLARED_BY] = by;
+      this.kinds.set(node.kind, def);
+      this.declaredIn.set(node.kind, file);
+      this.kindRoot.set(node.kind, at);
+    }
+    for (const v of declaredValidatorNodes(abs, this.include)) {
+      const key = `${v.node.validates.kind}\u0000${v.node.validates.family ?? ""}`;
+      const prior = this.validatorNodes.get(key);
+      const priorAt = this.validatorRoot.get(key);
+      if (prior && priorAt !== undefined && priorAt < at && prior.file !== v.file) continue;
+      if (prior && prior.file !== v.file) {
+        throw new Error(`two validators for ${describeValidator(v.node)}: ${prior.file} and ${v.file}. One family, one validator.`);
+      }
+      this.validatorNodes.set(key, v);
+      this.validatorRoot.set(key, at);
+    }
     // A validator naming a kind not registered YET is joined by `register`
     // (core registers `folio` in code after load); one naming no kind at all
     // is `check:kind-validators`' finding.
