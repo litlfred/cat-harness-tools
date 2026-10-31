@@ -106,6 +106,7 @@ import { againstOrUsage, buildQaResult, qaResultPath, qaResultState, writeQaResu
 import { resolveQaLocation, type QaLocation } from "./qa-store.ts";
 import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "../schemas/library/referenced-source.ts";
 import { corpusDirectoriesForGraph, instanceConfigFor } from "../schemas/kg/harness-config.js";
+import { instanceDirectoryForGraph } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { entrySubgraphDirs, nonEntryDirs } from "./lib/library-entry-graphs.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.ts";
@@ -1771,7 +1772,13 @@ export function sidecarRootFor(
 ): string {
   for (const lib of libs) {
     const entry = join(lib, slug);
-    if (existsSync(entry)) return instanceConfigFor(entry)?.root ?? root;
+    if (existsSync(entry)) {
+      const owner = instanceConfigFor(entry)?.root;
+      if (owner && (owner === root || instanceDirectoryForGraph(owner, "qa") !== undefined)) {
+        return owner;
+      }
+      return owner ? (instanceDirectoryForGraph(root, "qa") !== undefined ? root : resolve(HARNESS_ROOT)) : root;
+    }
   }
   return root;
 }

@@ -86,7 +86,7 @@ export function schemeOwner(
     const o = ownerOfPath(repo, defining, owners);
     return o ? { owner: o } : { error: `its source ${defining} is in no instance` };
   }
-  if (g.source && !/^[a-z][a-z0-9+.-]*:\/\//i.test(g.source)) return { owner: declaredBy };
+  if (g.source && !/^[a-z][a-z0-9+.-]*:\/\//i.test(g.source) && !/\s/.test(g.source)) return { owner: declaredBy };
   const held = new Set<string>();
   for (const t of g.terms) {
     const path = repoPathOf(t.source, repo);

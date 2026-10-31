@@ -975,13 +975,19 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     reason: "reconciles the `gh-pages` working tree against the open PRs' previews; needs that branch checked out",
   },
   {
+    // Added by folio-assistant#2843 in `feature-staging.yml`: rewrites the
+    // `gh-pages` checkout in place (`pages/STAGING/<slug>/` -> `_staging-blob/`
+    // + `_staging-manifest/<slug>.json`) and writes `pages/404.html` and
+    // `pages/_worker.js` right before the staging commit/push. Its four modes
+    // (`apply`, `GC`, `write-404`, `verify`) — content-addressed deduplication,
+    // manifest emission, and the fallback worker and root 404 — are covered by
+    // `staging-share.test.ts` in `bun test`.
     match: "staging-share.ts",
     kind: "ci-only",
     reason:
-      "prunes a staging preview on `gh-pages` to the files that differ from the live site and writes its " +
-      "service-worker fallback (`staging-sw.js`); that `gh-pages` checkout exists only in CI. Its rules — " +
-      "normalisation of preview HTML, byte-for-byte asset comparison, the fallback worker and root 404 — are " +
-      "covered by `staging-share.test.ts` in `bun test`",
+      "deduplicates the built `pages/STAGING/<slug>/` tree in the `gh-pages` checkout before the staging push; " +
+      "all four modes (`apply`, `GC`, `write-404`, `verify`) — content-addressed deduplication, manifest " +
+      "emission, and the fallback worker and root 404 — are covered by `staging-share.test.ts` in `bun test`",
   },
   {
     match: "staging-cleanup-preflight.ts",

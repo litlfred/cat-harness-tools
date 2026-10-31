@@ -81,6 +81,7 @@ describe("qa-attestations/v1", () => {
       "requirement-signoff",
       "certification",
       "section-title",
+      "adversarial-review",
     ]);
     expect(QaAttestationsSchema.safeParse({ ...file(), family: "lsi" }).success).toBe(false);
   });
