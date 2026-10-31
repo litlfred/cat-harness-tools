@@ -31,3 +31,15 @@ describe("tanglesOf", () => {
     expect(tanglesOf(v)).toEqual([]);
   });
 });
+
+describe("viewOf", () => {
+  it("finds a view by id, by page slug, or by name", async () => {
+    const { viewOf } = await import("./archimate-crossings.ts");
+    const v = { id: "id-v1", name: "1. Central Health Workforce Registry", properties: [], folder: [], nodes: [], connections: [] };
+    const model = { id: "m", name: "M", properties: [], elements: [], relationships: [], views: [v] };
+    expect(viewOf(model, "id-v1")).toBe(v);
+    expect(viewOf(model, "1-central-health-workforce-registry")).toBe(v);
+    expect(viewOf(model, "1. Central Health Workforce Registry")).toBe(v);
+    expect(viewOf(model, "nope")).toBeUndefined();
+  });
+});

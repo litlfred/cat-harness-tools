@@ -12,7 +12,7 @@
  * is; this lowers it, so an author does not do by hand what a search can do.
  *
  * Usage:
- *   bun run cat-harness-tools/archimate/scripts/archimate-detangle.ts --model <file.archimate> [--view <id or name>] [--routes-only] [--apply] [--json]
+ *   bun run cat-harness-tools/archimate/scripts/archimate-detangle.ts --model <file.archimate> [--view <id or page slug>] [--routes-only] [--apply] [--json]
  *
  * Without `--apply` it only reports, per view, the tangles now and after,
  * and what it would change. With `--apply` it writes the model back in place.
@@ -406,7 +406,7 @@ function arg(name: string): string | undefined {
 if (import.meta.main) {
   const file = arg("model");
   if (!file) {
-    console.error("usage: archimate-detangle.ts --model <file.archimate> [--view <id or name>] [--routes-only] [--apply] [--json]");
+    console.error("usage: archimate-detangle.ts --model <file.archimate> [--view <id or page slug>] [--routes-only] [--apply] [--json]");
     process.exit(2);
   }
   const path = resolve(file);
