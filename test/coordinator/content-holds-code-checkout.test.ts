@@ -23,7 +23,7 @@ const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
 describe("contentInstanceCode — this checkout", () => {
   // Owner ruling 2026-10-01: a QA WARNING, not a failure — but one that still
   // NAMES every file. Bean `eayu`.
-  test("who-iris is a QA warning, naming its eleven IRIS-specific code files", () => {
+  test("who-iris is a QA warning, naming its IRIS-specific code files", () => {
     expect(KG_CRITERIA_BY_ID["content-instance-holds-code"]?.severity).toBe("minor");
     const v = contentInstanceCode(join(REPO, "who-iris"));
     expect(v.state).toBe("judged");
@@ -34,9 +34,18 @@ describe("contentInstanceCode — this checkout", () => {
       "platform.ts",
       "scripts/build-iris-oxigraph.ts",
       "scripts/gen-iris-pages.ts",
+      // The IRIS CDN exporter (who-iris#103) and the cover fetch and
+      // preview renderer, all IRIS-specific, and the exporter's test.
+      "scripts/iris-cdn/bag.ts",
+      "scripts/iris-cdn/rest-feed.ts",
+      "scripts/iris-cdn/run.ts",
+      "scripts/iris-cdn/signing.ts",
+      "scripts/iris-covers/fetch-referenced-pdfs.py",
+      "scripts/iris-covers/render-previews.py",
       "scripts/iris-oxigraph-search.ts",
       "scripts/tests/catalogue-links.test.ts",
       "scripts/tests/gen-iris-pages.test.ts",
+      "scripts/tests/iris-cdn.test.ts",
       "scripts/tests/iris-oxigraph.test.ts",
       // The untainted round-trip translation report over who-iris's own
       // catalogues (bean `folio-assistant-ktt2`), and its test.

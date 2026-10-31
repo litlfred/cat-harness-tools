@@ -60,10 +60,11 @@ describe("every declared graph reaches the navbar, linked or not", () => {
     // FIFTEEN with `health`, which joined when who-iris declared its own
     // repository health report (`test/health/results/`; owner, 2026-10-10:
     // "All repos need health check"). Same reason again.
-    // SEVENTEEN with `processes` and `software-library`, which joined when
+    // EIGHTEEN with `processes` and `software-library`, which joined when
     // who-iris declared the IRIS CDN exporter's BPMN and its library node
-    // (who-iris#103, 2026-10-30). Same reason again.
-    expect(kinds()).toEqual(["catalogue", "code", "docs", "folio", "glossary", "health", "library", "processes", "qa", "schemas", "skills", "software-library", "themes", "tools", "translation-sources", "uploads", "voices"].map(K));
+    // (who-iris#103, 2026-10-30), and `scenarios`, the roles those BPMN
+    // lanes bind (folio-assistant#2781). Same reason again.
+    expect(kinds()).toEqual(["catalogue", "code", "docs", "folio", "glossary", "health", "library", "processes", "qa", "scenarios", "schemas", "skills", "software-library", "themes", "tools", "translation-sources", "uploads", "voices"].map(K));
   });
 
   it("links exactly the kinds it was told are published", () => {
@@ -91,6 +92,8 @@ describe("every declared graph reaches the navbar, linked or not", () => {
       // per-instance graph page. Declared-and-unrendered is the state this
       // assertion keeps visible.
       "qa",
+      // `scenarios`: the roles the IRIS CDN lanes bind, no page passed in here.
+      "scenarios",
       // `schemas` (who-iris/sources/, bean `j7ql`) publishes no page either.
       "schemas",
       "skills",
