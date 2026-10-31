@@ -64,7 +64,7 @@ import {
   readdirSync,
   writeFileSync,
 } from "node:fs";
-import { isAbsolute, join, relative, resolve, basename } from "node:path";
+import { isAbsolute, join, relative, resolve, basename, dirname } from "node:path";
 import { z } from "zod";
 import { acceptsSchemaTag, nodeKind } from "./node-kind";
 import { RepoFullNameSchema, type RepoFullName } from "./repo-full-name.js";
@@ -4976,7 +4976,7 @@ function parseDeclarationText(p: string, text: string, registry: GraphTypologyRe
   } catch (e) {
     throw new Error(`${p} is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
   }
-  const parsed = CatHarnessDeclarationSchema.safeParse(stripJsonLd(raw, registry));
+  const parsed = CatHarnessDeclarationSchema.safeParse(stripJsonLd(raw, registry, dirname(p)));
   if (!parsed.success) {
     // ── The one failure worth naming, because it is the one that arrives by
     //    MERGE rather than by editing ───────────────────────────────────────
@@ -4999,6 +4999,15 @@ function parseDeclarationText(p: string, text: string, registry: GraphTypologyRe
   // by the time the declaration is read, not what existed at module load.
   for (const dir of parsed.data.directories) {
     for (const g of dir.graphTypologies) {
+      if (!registry.has(g)) {
+        // Register kinds from every discovered instance's `typologies/` in the
+        // declaration's checkout before refusing an unknown kind (bean
+        // `cat-tools-g7ls`, owner card 2026-10-31 "A. Fix the loader"). Done
+        // lazily on `!registry.has(g)` so reading a fixture declaration whose
+        // kinds are already registered does not scan temporary test directories
+        // into `defaultGraphTypologies`.
+        registry.ensureCheckout(checkoutRootFor(dirname(p)));
+      }
       if (!registry.has(g)) {
         throw new Error(
           `${p}: directory "${dir.id}" declares unknown graph typology "${g}". ` +
@@ -5055,7 +5064,7 @@ function parseDeclarationText(p: string, text: string, registry: GraphTypologyRe
  * the graph projection stays derivable — the same split as
  * `schemas/kg/jsonld.ts` draws for blocks.
  */
-function stripJsonLd(raw: unknown, registry: GraphTypologyRegistry): unknown {
+function stripJsonLd(raw: unknown, registry: GraphTypologyRegistry, instanceRoot?: string): unknown {
   if (typeof raw !== "object" || raw === null) return raw;
   const o = { ...(raw as Record<string, unknown>) };
   delete o["@context"];
@@ -5073,7 +5082,12 @@ function stripJsonLd(raw: unknown, registry: GraphTypologyRegistry): unknown {
         const iris = Array.isArray(e.holdsGraph) ? e.holdsGraph : [e.holdsGraph];
         const kinds = iris
           .filter((t): t is string => typeof t === "string")
-          .map((t) => registry.forIri(t))
+          .map((t) => {
+            const hit = registry.forIri(t);
+            if (hit !== undefined || instanceRoot === undefined) return hit;
+            registry.ensureCheckout(checkoutRootFor(instanceRoot));
+            return registry.forIri(t);
+          })
           .filter((k): k is string => k !== undefined);
         if (kinds.length > 0) e.graphTypologies = kinds;
       }
