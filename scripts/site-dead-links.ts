@@ -202,6 +202,15 @@ export interface Repoint {
  */
 const CARRIED = new Set(["STAGING", "_render-log"]);
 
+/**
+ * Whether `rel` lies under a carried directory. A link INTO one is not this
+ * build's to judge either: the deploy lays the carried tree back after the
+ * check, so it is absent from the built site the check reads.
+ */
+export function carried(rel: string): boolean {
+  return CARRIED.has(rel.split("/")[0]!);
+}
+
 /** Every HTML page under `site` that this build wrote, site-relative. */
 export function sitePages(site: string): string[] {
   const out: string[] = [];
@@ -268,7 +277,7 @@ export function checkSite(opts: {
     const next = html.replace(ATTR, (whole, attr: string, value: string) => {
       if (!isInternal(value)) return whole;
       const target = targetOf(page, value, opts.basePath);
-      if (target === undefined || served(opts.site, target)) return whole;
+      if (target === undefined || served(opts.site, target) || carried(target)) return whole;
       if (opts.fix) {
         const r = repointFor(opts.site, page, target, opts.resolveSource);
         if (r) {
