@@ -26,6 +26,7 @@
  * | `label-overlap` | two drawn labels intersect (e.g. "Satisfied with changes?" over "No") |
  * | `label-on-edge` | a label sits on a flow that is not its own |
  * | `label-on-shape` | a label covers a task, event or gateway that is not its own |
+ * | `header-overflow` | a pool or lane name spills out of its 30-wide header strip |
  * | `text-overflow` | a task's name spills out of its box (16px text in a box drawn for 12px) |
  * | `edge-diagonal` | a flow runs at a slant (owner, 2026-10-31: *"straight angled arrows ugly"*) |
  * | `edge-crossing` | two flows cross |
@@ -83,6 +84,8 @@ export interface DrawnLabels {
   edges?: { id: string; points: Pt[] }[];
   /** The text drawn inside each shape, keyed by shape id (bootstrap-tools `DrawnLayout.texts`). */
   texts?: (Box & { id: string })[];
+  /** Pool and lane names as laid out in their 30-wide header strips (bootstrap-tools `DrawnLayout.headers`). */
+  headers?: { id: string; width: number; height: number; room: number }[];
 }
 
 /** Width of the name strip bpmn-js draws down the left of a horizontal pool or lane. */
@@ -428,13 +431,33 @@ export function textOverflow(di: DiLayout, drawn?: DrawnLabels): { id: string; b
   return out;
 }
 
+/** The header strip bpmn-js gives a pool's or lane's name, across. */
+const STRIP = 30;
+/** One line of a header name: bootstrap-tools `HEADER_STYLE`, 13px at 1.05. */
+const HEADER_LINE = 13 * 1.05;
+
+/**
+ * Pool and lane names that spill out of their strip, with the height the
+ * lane (or pool) needs for the name to fit in the lines the strip holds.
+ */
+export function headerOverflow(drawn?: DrawnLabels): { id: string; room: number; need: number }[] {
+  const fit = Math.max(1, Math.floor(STRIP / HEADER_LINE));
+  return (drawn?.headers ?? [])
+    .filter((h) => h.height > STRIP + 1)
+    .map((h) => ({ id: h.id, room: h.room, need: Math.ceil((Math.ceil(h.height / HEADER_LINE) * h.width) / fit + 2 * TEXT_PAD) }));
+}
+
 /**
  * Resize shapes about their centres (never smaller), then make each lane tall
  * enough for what it holds, moving the lanes below it down, and re-route
  * every flow that touches a resized shape at right angles. Pools grow with
  * their lanes. Used by `bpmn:detangle --write` for {@link textOverflow}.
  */
-export function resizeShapes(xml: string, sizes: ReadonlyMap<string, { width: number; height: number }>): string {
+export function resizeShapes(
+  xml: string,
+  sizes: ReadonlyMap<string, { width: number; height: number }>,
+  laneMin: ReadonlyMap<string, number> = new Map(),
+): string {
   const di0 = readDi(xml);
   const lane = laneOf(di0);
   const shapes = new Map(di0.shapes);
@@ -483,6 +506,13 @@ export function resizeShapes(xml: string, sizes: ReadonlyMap<string, { width: nu
       if (y < top + MARGIN) y = top + MARGIN;
       shapes.set(id, { ...b, y });
       bottom = Math.max(bottom, y + b.height + MARGIN);
+    }
+    // A lane at least as tall as its name needs, the extra split above and below its shapes.
+    const min = laneMin.get(l) ?? 0;
+    if (bottom - top < min) {
+      const extra = min - (bottom - top);
+      for (const [id, b] of shapes) if (lane.get(id) === l) shapes.set(id, { ...b, y: b.y + extra / 2 });
+      bottom = top + min;
     }
     shiftOf.set(l, shift);
     lanes.set(l, { ...b0, y: top, height: bottom - top, width: b0.width + widen });
@@ -553,6 +583,7 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
     "label-on-edge": [],
     "label-on-shape": [],
     "text-overflow": [],
+    "header-overflow": [],
     "edge-diagonal": [],
     "edge-crossing": [],
     "lane-order": [],
@@ -606,6 +637,13 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
     }
   }
 
+  for (const h of headerOverflow(drawn)) {
+    out["header-overflow"]!.push({
+      where: h.id,
+      detail: `the name of ${q(di.names.get(h.id) ?? h.id)} needs about ${Math.round(h.need)} of height to fit its header strip in two lines; ` +
+        `it has ${Math.round(h.room)}. Make the lane taller (\`bpmn:detangle --write\` does it) or the name shorter.`,
+    });
+  }
   for (const o of textOverflow(di, drawn)) {
     out["text-overflow"]!.push({
       where: o.id,

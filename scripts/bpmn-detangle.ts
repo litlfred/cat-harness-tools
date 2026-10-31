@@ -30,7 +30,7 @@
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { applyLaneOrder, bestLaneOrder, crossings, diagramFit, readDi, resizeShapes, straightenFlows, textOverflow, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
+import { applyLaneOrder, bestLaneOrder, crossings, diagramFit, headerOverflow, laneOrder, readDi, resizeShapes, straightenFlows, textOverflow, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
 
 type Draw = (xml: string) => Promise<DrawnLabels | undefined>;
 
@@ -107,6 +107,28 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
       xml = resizeShapes(xml, sizes);
       writeFileSync(file, xml);
       console.log(`✓ ${shown}: ${over.length} box(es) made ${pass} for their text (${over.map((o) => o.id).join(", ")})`);
+    }
+  }
+  if (write && renderer) {
+    // Pool and lane names that spill out of their header strip: grow the
+    // lane (for a pool, its last lane) until the name fits.
+    const over = headerOverflow(await renderer.draw(xml).catch(() => undefined));
+    if (over.length > 0) {
+      const di = readDi(xml);
+      const order = laneOrder(di);
+      const min = new Map<string, number>();
+      for (const h of over) {
+        if (di.lanes.has(h.id)) min.set(h.id, Math.max(min.get(h.id) ?? 0, h.need));
+        else if (di.pools.has(h.id) && order.length > 0) {
+          const last = order.at(-1)!;
+          const lh = di.lanes.get(last)!.height;
+          min.set(last, Math.max(min.get(last) ?? 0, lh + (h.need - h.room)));
+        }
+      }
+      // A one-lane pool: the pool's own need and the lane's are the same lane.
+      xml = resizeShapes(xml, new Map(), min);
+      writeFileSync(file, xml);
+      console.log(`✓ ${shown}: ${over.length} pool/lane name(s) given room (${over.map((h) => h.id).join(", ")})`);
     }
   }
   const drawn = renderer ? await renderer.draw(xml).catch(() => undefined) : undefined;
