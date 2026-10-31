@@ -10,6 +10,7 @@ import {
   diagramFit,
   FIT_WIDTH,
   laneOrder,
+  placeLabels,
   readDi,
   segmentHitsBox,
   segmentsCross,
@@ -181,5 +182,31 @@ describe("slanted flows", () => {
       [["ab", "A", "B", [[100, 30], [300, 230]]]],
     );
     expect(straightenFlows(blocked).fixed).toEqual([]);
+  });
+});
+
+describe("labels on arrows and lane lines (owner, 2026-10-31: \"need to check for text on arrows\")", () => {
+  // A start event whose name hangs below it, over the flow leaving it and
+  // across the line into the next lane: the case the owner circled.
+  const xml = bpmn(LANES.slice(0, 2), [["A", 100, 30, 36, 36, [73, 70, 90, 54]], ["B", 60, 130, 120, 60]], [["F", "A", "B", [[118, 66], [118, 130]]]]);
+  test("a label over the flow leaving its own event, and across a lane line, is reported", () => {
+    const f = diagramFit(xml);
+    expect(f["label-on-edge"]!.map((x) => x.where)).toContain("A/F");
+    expect(f["label-on-lane-line"]!.map((x) => x.where)).toContain("A/L1");
+  });
+  test("--write moves it to a clear place inside its lane, and the check is then clean", () => {
+    const { xml: next, moved } = placeLabels(xml, { labels: [{ id: "A", text: "A", x: 73, y: 70, width: 90, height: 54 }] });
+    expect(moved).toEqual(["A"]);
+    const label = readDi(next).shapes.get("A")!.label!;
+    expect(label.y).toBeGreaterThanOrEqual(0);
+    expect(label.y + label.height).toBeLessThanOrEqual(100);
+    const f = diagramFit(next);
+    expect(f["label-on-edge"]).toEqual([]);
+    expect(f["label-on-lane-line"]).toEqual([]);
+    expect(f["label-on-shape"]).toEqual([]);
+  });
+  test("a label already clear is left where it is", () => {
+    const clear = bpmn(LANES.slice(0, 2), [["A", 100, 30, 36, 36, [140, 30, 60, 36]], ["B", 60, 130, 120, 60]], [["F", "A", "B", [[118, 66], [118, 130]]]]);
+    expect(placeLabels(clear, { labels: [{ id: "A", text: "A", x: 140, y: 30, width: 60, height: 36 }] }).moved).toEqual([]);
   });
 });
