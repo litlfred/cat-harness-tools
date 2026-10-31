@@ -235,7 +235,11 @@ describe("the QA catches ABSENCE — and can actually fail", () => {
   test("a declared stub names the skill it would satisfy", () => {
     // A Tool that satisfies nothing is a mechanism with no stated capability.
     // Checked over whatever is stubbed now, which may be nothing.
-    for (const t of tools().filter((x) => stubbedTools(tools()).has(x.id))) {
+    // Read the tools once: `tools()` reads every Tool folder, and calling it
+    // inside the filter read them all again per tool, past the 5 s timeout.
+    const all = tools();
+    const stubbed = stubbedTools(all);
+    for (const t of all.filter((x) => stubbed.has(x.id))) {
       expect(t.satisfies?.length ?? 0, t.id).toBeGreaterThan(0);
     }
   });
