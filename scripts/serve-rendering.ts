@@ -63,11 +63,12 @@
  *
  * @module scripts/serve-rendering
  */
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { siteDirFor } from "../schemas/kg/cat-harness.js";
-import { createRenderingHandler, type Mount } from "./lib/rendering-handler";
+import { declarationPathIn, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { createRenderingHandler, type IriBase, type Mount } from "./lib/rendering-handler";
+import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /** The default port: a prime near 4000 that leaves 4000 to `jekyll serve`. */
 export const DEFAULT_PORT = 4007;
@@ -83,6 +84,10 @@ export interface ServeOptions {
   hostname?: string;
   /** Redirect `localhost` / `[::1]` requests to the bound loopback IP. */
   canonicalHost?: string;
+  /** Published bases to rewrite to the local origin (Phase 2). */
+  iriBases?: readonly IriBase[];
+  /** `false` serves bytes as published. Default true. */
+  rewrite?: boolean;
 }
 
 // `resolveWithin` now lives in `src/core/safe-path.ts` and is re-exported here
@@ -116,6 +121,8 @@ export function serveRendering(opts: ServeOptions): ReturnType<typeof Bun.serve>
   const fetch = createRenderingHandler({
     mounts: mountsOf(opts),
     canonicalHost: opts.canonicalHost,
+    iriBases: opts.iriBases,
+    rewrite: opts.rewrite,
     // `undefined` from the declaration is the third state: defer to Bun's
     // inference for an ordinary asset rather than asserting a type the
     // declaration never made. Only a DECLARED type overrides.
@@ -136,6 +143,36 @@ export function nextPrimePort(port: number): number | undefined {
     return true;
   };
   for (let n = port + 1; n <= 65535; n++) if (prime(n)) return n;
+  return undefined;
+}
+
+/**
+ * The published bases for a set of mounts: `<origin><prefix>` for every
+ * prefixed mount, then any given explicitly. A root mount gets no automatic
+ * base, since `<origin>/` would claim every repo on the host.
+ */
+export function iriBasesFor(mounts: readonly Mount[], origin: string | undefined, extra: readonly IriBase[] = []): IriBase[] {
+  const o = origin?.replace(/\/+$/, "");
+  const auto = o ? mounts.filter((m) => m.prefix.replace(/\/+$/, "") !== "").map((m) => ({ from: `${o}${m.prefix.replace(/\/+$/, "")}`, prefix: m.prefix.replace(/\/+$/, "") })) : [];
+  return [...auto, ...extra];
+}
+
+/**
+ * The origin IRIs are published under, read from a declaration's
+ * `canonicalUrl` (the working instance first, then the harness). Undefined
+ * when neither declares one, and then nothing is rewritten unless asked.
+ */
+export function declaredIriOrigin(dirs: readonly string[] = [process.cwd(), HARNESS_ROOT]): string | undefined {
+  for (const dir of dirs) {
+    try {
+      const p = declarationPathIn(dir);
+      if (!p || !existsSync(p)) continue;
+      const url = (JSON.parse(readFileSync(p, "utf-8")) as { canonicalUrl?: string }).canonicalUrl;
+      if (url) return new URL(url).origin;
+    } catch {
+      // Unreadable or not a URL: try the next.
+    }
+  }
   return undefined;
 }
 
@@ -188,6 +225,9 @@ if (import.meta.main) {
         `  --dir    directory to serve at / (default: the declared site root, else .)\n` +
         `  --mount  serve <dir> under /<repo>, as GitHub Pages lays sites out; repeatable\n` +
         `  --port   port to bind (default ${DEFAULT_PORT})\n` +
+        `  --iri-origin <url>       where IRIs are published (default: the declared canonicalUrl's origin)\n` +
+        `  --iri /<prefix>=<base>   also rewrite <base> to the local /<prefix>; repeatable\n` +
+        `  --no-rewrite             serve bytes as published (for signature and digest checks)\n` +
         `  --host   interface (default 127.0.0.1 — loopback, deliberately)\n`,
     );
     process.exit(0);
@@ -197,6 +237,13 @@ if (import.meta.main) {
   const dir = flag("--dir") ?? (mounts.length ? undefined : defaultDir());
   const hostname = flag("--host") ?? "127.0.0.1";
   const port = Number(flag("--port") ?? DEFAULT_PORT);
+  const rewrite = !argv.includes("--no-rewrite");
+  const iriOrigin = flag("--iri-origin") ?? declaredIriOrigin();
+  const extra = flags("--iri").map((a) => {
+    const m = parseMount(a);
+    return { prefix: m.prefix, from: m.dir };
+  });
+  const iriBases = iriBasesFor(mounts, iriOrigin, extra);
   let server: ReturnType<typeof Bun.serve>;
   try {
     server = serveRendering({
@@ -205,6 +252,8 @@ if (import.meta.main) {
       port,
       hostname,
       canonicalHost: hostname === "127.0.0.1" ? "127.0.0.1" : undefined,
+      iriBases,
+      rewrite,
     });
   } catch (e) {
     const code = (e as { code?: string }).code;
@@ -238,4 +287,7 @@ if (import.meta.main) {
   const base = `http://${server.hostname}:${server.port}`;
   if (dir !== undefined) console.log(`serving ${resolve(dir)} at ${base}/`);
   for (const m of mounts) console.log(`serving ${resolve(m.dir)} at ${base}${m.prefix.replace(/\/$/, "")}/`);
+  if (!rewrite) console.log("IRIs: not rewritten (--no-rewrite); links to published IRIs open the live site");
+  else if (iriBases.length === 0) console.log("IRIs: not rewritten (no --iri-origin and no declared canonicalUrl)");
+  else for (const b of iriBases) console.log(`IRIs: ${b.from}/… → ${base}${b.prefix}/…`);
 }
