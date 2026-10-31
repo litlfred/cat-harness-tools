@@ -323,6 +323,13 @@ function calls(text: string): Call[] | { undetermined: string } {
     const pid = Number(m[1]);
     const body = m[2]!;
     if (body.startsWith("+++") || body.startsWith("---")) continue; // exit and signal notes
+    const detached = /^(.*?)\s*<detached \.\.\.>$/.exec(body);
+    if (detached !== null) {
+      if (detached[1] !== "" && detached[1] !== "???(" && !detached[1]!.startsWith("<...")) {
+        done.push({ index: index++, line: `${detached[1]!}) = ?`, pid });
+      }
+      continue;
+    }
     const resumed = /^<\.\.\. (\w+) resumed>(.*)$/.exec(body);
     if (resumed !== null) {
       const p = pending.get(pid);
@@ -516,6 +523,13 @@ export function pathState(root: string, rel: string, digests: FileDigests): stri
 }
 
 function statState(abs: string, rel: string, digests: FileDigests): string {
+  if (rel === ".git" || rel.endsWith("/.git")) {
+    try {
+      if (statSync(abs).isDirectory()) return "dir";
+    } catch {
+      /* fall through */
+    }
+  }
   let names: string[] | undefined;
   try {
     names = readdirSync(abs).sort();
@@ -663,6 +677,7 @@ function summary(line: string): void {
 }
 
 function straceWorks(): boolean {
+  if (Bun.which("strace") === null) return false;
   const r = Bun.spawnSync(["strace", "-f", "-qq", "-o", "/dev/null", "true"], { stdout: "ignore", stderr: "ignore" });
   return r.exitCode === 0;
 }
@@ -693,8 +708,29 @@ export const RUNNER = ["bun", "run", "cat"] as const;
  */
 export function recordRun(o: ConeRunOpts): { code: number; note: string } {
   const stdio = o.stdio ?? "inherit";
+  // When `runner` is omitted, run the resolved command directly via `sh -c`
+  // (as `run-script.ts` does) instead of spawning `bun run cat <script>` under
+  // `strace`: `run-script.ts` calls `scriptTable(REPO)` -> `instanceRootsIn(REPO)`
+  // to look up the script name `main()` already resolved in `o.scripts`, which
+  // polluted every traced check's read set with every instance directory and
+  // declaration in the checkout (cat-harness-tools#634).
+  const scriptCmd = o.scripts[o.script];
+  const cmdArgs =
+    o.runner !== undefined
+      ? [...o.runner, o.script]
+      : scriptCmd !== undefined
+        ? ["sh", "-c", scriptCmd]
+        : [...RUNNER, o.script];
+  const cmdEnv = (base: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
+    o.runner === undefined && scriptCmd !== undefined
+      ? {
+          ...base,
+          PATH: `${join(o.root, "node_modules", ".bin")}${base.PATH ? `:${base.PATH}` : ""}`,
+          npm_lifecycle_event: o.script,
+        }
+      : base;
   const plain = (why: string) => {
-    const r = Bun.spawnSync([...(o.runner ?? RUNNER), o.script], { cwd: o.root, stdin: stdio, stdout: stdio, stderr: stdio });
+    const r = Bun.spawnSync(cmdArgs, { cwd: o.root, stdin: stdio, stdout: stdio, stderr: stdio, env: cmdEnv(process.env) });
     return { code: r.exitCode ?? 1, note: `not traced — ${why}` };
   };
   let before: Fingerprint;
@@ -706,18 +742,18 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
   if ("undetermined" in before) return plain(before.undetermined);
   const trace = openTrace(o.root);
   const log = join(tmpdir(), `ci-cone-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.strace`);
-  const r = Bun.spawnSync(["strace", ...STRACE_ARGS, "-o", log, ...(o.runner ?? RUNNER), o.script], {
+  const r = Bun.spawnSync(["strace", ...STRACE_ARGS, "-o", log, ...cmdArgs], {
     cwd: o.root,
     stdin: stdio,
     stdout: stdio,
     stderr: stdio,
-    env: trace.env,
+    env: cmdEnv(trace.env),
   });
   let code = r.exitCode ?? 1;
   if (code !== 0) {
     // The verdict must be the check's, never the tracer's. A traced run that
     // failed is asked again, untraced, and THAT exit status is the answer.
-    const again = Bun.spawnSync([...(o.runner ?? RUNNER), o.script], { cwd: o.root, stdin: stdio, stdout: stdio, stderr: stdio });
+    const again = Bun.spawnSync(cmdArgs, { cwd: o.root, stdin: stdio, stdout: stdio, stderr: stdio, env: cmdEnv(process.env) });
     code = again.exitCode ?? 1;
     rmSync(log, { force: true });
     return { code, note: `not recorded — the traced run exited ${r.exitCode ?? r.signalCode}; re-run untraced, which exited ${code}` };
