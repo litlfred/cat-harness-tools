@@ -60,7 +60,10 @@ describe("every declared graph reaches the navbar, linked or not", () => {
     // FIFTEEN with `health`, which joined when who-iris declared its own
     // repository health report (`test/health/results/`; owner, 2026-10-10:
     // "All repos need health check"). Same reason again.
-    expect(kinds()).toEqual(["catalogue", "code", "docs", "folio", "glossary", "health", "library", "qa", "schemas", "skills", "themes", "tools", "translation-sources", "uploads", "voices"].map(K));
+    // SEVENTEEN with `processes` and `software-library`, which joined when
+    // who-iris declared the IRIS CDN exporter's BPMN and its library node
+    // (who-iris#103, 2026-10-30). Same reason again.
+    expect(kinds()).toEqual(["catalogue", "code", "docs", "folio", "glossary", "health", "library", "processes", "qa", "schemas", "skills", "software-library", "themes", "tools", "translation-sources", "uploads", "voices"].map(K));
   });
 
   it("links exactly the kinds it was told are published", () => {
@@ -81,6 +84,8 @@ describe("every declared graph reaches the navbar, linked or not", () => {
       // `health` (2026-10-10) is a state-branch report with no page passed in here.
       "health",
       "library",
+      // `processes` (who-iris#103): the IRIS CDN exporter's BPMN, no page passed in here.
+      "processes",
       // `qa` is declared and publishes no page, like `code` above: the audit
       // writes sidecars, and the viewer for them is the QA index rather than a
       // per-instance graph page. Declared-and-unrendered is the state this
@@ -89,6 +94,8 @@ describe("every declared graph reaches the navbar, linked or not", () => {
       // `schemas` (who-iris/sources/, bean `j7ql`) publishes no page either.
       "schemas",
       "skills",
+      // `software-library` (who-iris#103): the exporter's library node, no page passed in here.
+      "software-library",
       "themes",
       // `tools`: who-iris's own Tool graph (2026-10-09) publishes no page.
       "tools",
