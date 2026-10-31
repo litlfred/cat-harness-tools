@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 
@@ -227,26 +228,14 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
 
 describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", () => {
   it("adversarialCoverageByGraph reports reviewed for kinds with reviewed sidecars", () => {
-    // With `test/results/` on `qa-reports` (bean 7mwa), write reviewed tool
-    // and skill sidecars into a scratch root so this test does not depend on
-    // committed `test/results/kg-qa/` files in the checkout.
-    const scratch = mkdtempSync(join(tmpdir(), "adv-cov-"));
-    try {
-      const candidates = rankCandidateNodes(gatherCandidateNodes(ROOT), ROOT);
-      const toolNode = candidates.find((c) => c.kind === "tool")!;
-      const skillNode = candidates.find((c) => c.kind === "skill")!;
-      const batch = [toolNode, skillNode].map((n) => ({
-        ...n,
-        sidecarPath: join(scratch, relative(ROOT, n.sidecarPath)),
-      }));
-      executeBackfillBatch(batch, { repoRoot: ROOT, limit: 2 });
-      const advMap = adversarialCoverageByGraph( scratch, scratch);
-      expect(advMap.get("tools")).toBe("reviewed");
-      expect(advMap.get("skills")).toBe("reviewed");
-    } finally {
-      rmSync(scratch, { recursive: true, force: true });
-    }
-  });
+    const advMap = adversarialCoverageByGraph(REPO, ROOT);
+    // `schemas` is not asserted: its one adversarially reviewed sidecar,
+    // `schemas/kg-qa`, was removed as dead with the owner's authorisation
+    // (cat-harness 4f72623f), so no schemas review is left to restore
+    // (cat-harness d37c20c4). The two that were restored are asserted.
+    expect(advMap.get("tools")).toBe("reviewed");
+    expect(advMap.get("skills")).toBe("reviewed");
+  }, 30_000);
 
   it("KindCoverage rows include adversarial column with valid states", () => {
     const { rows } = coverage(REPO);
@@ -258,14 +247,12 @@ describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", (
     }
 
     const toolsRow = rows.find((r) => r.kind === "tools");
-    expect(toolsRow).toBeDefined();
-    expect(validStates.has(toolsRow!.adversarial)).toBe(true);
+    expect(toolsRow?.adversarial).toBe("reviewed");
 
     // `schemas`: see the test above — no reviewed schemas sidecar is left.
 
     const skillsRow = rows.find((r) => r.kind === "skills");
-    expect(skillsRow).toBeDefined();
-    expect(validStates.has(skillsRow!.adversarial)).toBe(true);
+    expect(skillsRow?.adversarial).toBe("reviewed");
 
     const docsRow = rows.find((r) => r.kind === "docs");
     expect(docsRow?.adversarial).toBe("never");
@@ -285,5 +272,55 @@ describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", (
     expect(record).not.toHaveProperty("files");
     expect(record).not.toHaveProperty("sidecars");
     expect(record.hasFiles).toBe(true);
+  });
+});
+
+describe("Adversarial reviews in the attestation store (D2 (a), cat-harness#857)", () => {
+  const review = {
+    reviewer: { by: "agent", session: "session_test", model: NOT_DISCLOSED },
+    author_sessions: [],
+    skill_hash: "hash:adversarial-checklist:v1",
+    at: "2026-10-31T00:00:00.000Z",
+    coverage: { files_total: 1, files_reviewed: 1, skipped: [] },
+    result: "pass",
+    flags: [],
+    findings: [],
+  };
+  const withStore = (pinned: (current: string) => string, fn: (root: string) => void): void => {
+    const root = mkdtempSync(join(tmpdir(), "adv-store-"));
+    try {
+      mkdirSync(join(root, "skills"), { recursive: true });
+      writeFileSync(join(root, "skills", "s.md"), "# a skill\n");
+      const current = createHash("sha256").update(readFileSync(join(root, "skills", "s.md"))).digest("hex").slice(0, 12);
+      const file = join(root, "test", "attestations", "adversarial-review", "skills", "s.attestations.json");
+      mkdirSync(join(file, ".."), { recursive: true });
+      writeFileSync(
+        file,
+        JSON.stringify({
+          $schema: "qa-attestations/v1",
+          family: "adversarial-review",
+          subject: { kind: "skill", id: "s", path: "skills/s.md" },
+          adversarial_reviews: [review],
+          source_hash: pinned(current),
+        }),
+      );
+      // No `test/results/` at all: the derived tree is not committed.
+      expect(existsSync(join(root, "test", "results"))).toBe(false);
+      fn(root);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+
+  it("counts a committed review as reviewed when its pinned hash is current", () => {
+    withStore((c) => c, (root) => {
+      expect(adversarialCoverageByGraph(root, root).get("skills")).toBe("reviewed");
+    });
+  });
+
+  it("counts a committed review as stale when the subject changed since", () => {
+    withStore(() => "000000000000", (root) => {
+      expect(adversarialCoverageByGraph(root, root).get("skills")).toBe("stale");
+    });
   });
 });
