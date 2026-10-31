@@ -391,8 +391,10 @@ export function metamodelBody(
     (mm.placeholders.length ? ` ${mm.placeholders.length} placeholder element(s), named after their own type, are left out (listed at the end).` : "") +
     `</p>` +
     (link.drawn
-      ? `<div class="am-figure"><object type="image/svg+xml" data="${escHtml(link.data("metamodel.svg"))}" aria-label="Metamodel in use, drawn"></object></div>`
+      ? `<div class="am-figure"><object type="image/svg+xml" style="width:100%;height:auto" data="${escHtml(link.data("metamodel.svg"))}" aria-label="Metamodel in use, drawn"></object></div>`
       : `<p>This build drew no picture; the same diagram is below as Graphviz DOT and Mermaid.</p>`) +
+    `<p>To keep the picture readable, relationships between the same two types share one line, a type's relationships to itself are written in its box, ` +
+    `and <em>associated with</em> (which says nothing about how two things relate), groupings and junctions are left out. The tables below list everything.</p>` +
     `<p>The same diagram as <a href="${escHtml(link.data("metamodel.dot"))}">Graphviz DOT</a>, a <a href="${escHtml(link.data("metamodel.mmd"))}">Mermaid class diagram</a>, ` +
     `and <a href="${escHtml(link.data("metamodel.json"))}">JSON</a>.</p>` +
     `<h2>Element types</h2><table class="am-props"><thead><tr><th>Type</th><th>Layer</th><th>Elements</th></tr></thead><tbody>` +

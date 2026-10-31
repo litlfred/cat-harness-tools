@@ -94,6 +94,32 @@ describe("the metamodel in use", () => {
     expect(mmd).toContain("ApplicationComponent ..> DataObject : accesses ×1");
   });
 
+  it("keeps the picture readable: one line per pair, self-relationships in the box, no associations or groupings", () => {
+    const p = (source: string, relationship: string, target: string, count = 1, allowed: boolean | undefined = true) =>
+      ({ source, relationship, target, count, allowed, relationships: [] });
+    const dense = {
+      ...mm,
+      types: [
+        { type: "Goal", layer: "Motivation" as const, elements: 3 },
+        { type: "Capability", layer: "Strategy" as const, elements: 2 },
+      ],
+      patterns: [
+        p("Capability", "Influence", "Goal", 21),
+        p("Capability", "Realization", "Goal", 2),
+        p("Goal", "Aggregation", "Goal", 13),
+        p("Capability", "Association", "Goal", 4),
+        p("Grouping", "Aggregation", "Goal"),
+      ],
+    };
+    const dot = metamodelDot(dense);
+    expect(dot.match(/"Capability" -> "Goal"/g)!.length).toBe(1);
+    expect(dot).toContain(`label="influences ×21\nrealises ×2", arrowhead=vee`);
+    expect(dot).toContain(`(to itself: aggregates ×13)`);
+    expect(dot).not.toContain("associated with");
+    expect(dot).not.toContain(`"Grouping"`);
+    expect(metamodelDot(dense, { associations: true })).toContain("associated with ×4");
+  });
+
   it("reports in plain text, the refusal first", () => {
     const text = report(mm);
     expect(text).toContain("✗ 1 relationship(s) in 1 pattern(s) ArchiMate does not allow");

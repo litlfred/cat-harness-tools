@@ -202,40 +202,71 @@ const LAYER_ORDER: ArchimateLayer[] = ["Motivation", "Strategy", "Business", "Ap
 const dq = (s: string): string => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
 /**
- * The metamodel as Graphviz DOT: one box per type, grouped by layer, one line
- * per pattern labelled with its verb and count. A pattern ArchiMate does not
- * allow is drawn red and marked ✗.
+ * The metamodel as Graphviz DOT: one box per type, grouped by ArchiMate layer
+ * (motivation on top, technology at the bottom).
+ *
+ * Owner, 2026-10-31, of the first drawing (one line per pattern, 73 on
+ * smart-ra 0.2.0): "so many dense arrows! whats going on? no grouping?". So
+ * the picture is kept readable, and the tables beside it stay complete:
+ *
+ * - patterns between the same two types share ONE line, labelled with each
+ *   relationship and its count;
+ * - a type's relationships to itself ("Goal aggregates Goal") are written in
+ *   its box, not drawn as loops;
+ * - `associated with`, the one relationship that says nothing about how two
+ *   things relate, is left out unless `associations` is set.
+ *
+ * A pattern ArchiMate does not allow is always drawn, red and marked ✗.
  */
-export function metamodelDot(mm: Metamodel): string {
-  const used = new Set<string>([...mm.types.map((t) => t.type), ...mm.patterns.flatMap((p) => [p.source, p.target])]);
+export function metamodelDot(mm: Metamodel, opts: { associations?: boolean } = {}): string {
+  const shown = mm.patterns.filter((p) => opts.associations || relKind(p.relationship) !== "Association" || p.allowed === false);
+  const used = new Set<string>([...mm.types.map((t) => t.type), ...shown.flatMap((p) => [p.source, p.target])]);
   const count = new Map(mm.types.map((t) => [t.type, t.elements]));
   const byLayer = new Map<ArchimateLayer, string[]>();
-  for (const t of [...used].filter((t) => t !== "Relationship").sort()) {
+  // Groupings and junctions are how a view is drawn, not what the architecture holds.
+  for (const t of [...used].filter((t) => t !== "Relationship" && t !== "Grouping" && t !== "Junction").sort()) {
     const l = layerOf(t);
     byLayer.set(l, [...(byLayer.get(l) ?? []), t]);
   }
+  const label = (p: MetamodelPattern): string => `${p.allowed === false ? "✗ " : ""}${verbOf(p.relationship)} ×${p.count}`;
+  // Self-relationships go in the box; the rest are grouped by ordered pair.
+  const selfOf = new Map<string, string[]>();
+  const pairs = new Map<string, MetamodelPattern[]>();
+  for (const p of shown) {
+    if ([p.source, p.target].some((t) => t === "Grouping" || t === "Junction")) continue;
+    if (p.source === p.target) selfOf.set(p.source, [...(selfOf.get(p.source) ?? []), label(p)]);
+    else pairs.set(`${p.source}\u0000${p.target}`, [...(pairs.get(`${p.source}\u0000${p.target}`) ?? []), p]);
+  }
   const lines = [
     `digraph ${dq(`${mm.name} — metamodel in use`)} {`,
-    // ArchiMate's own stacking: motivation on top, technology at the bottom.
-    // Each layer is one rank, and the ranks are drawn bottom-up, so that the
-    // lines that run up the layers (realises, serves, influences) point up.
-    `  graph [rankdir=TB, newrank=true, fontname="Helvetica", fontsize=11, nodesep=0.45, ranksep=1.1];`,
-    `  node [shape=box, style="filled", fontname="Helvetica", fontsize=11, margin="0.12,0.06"];`,
-    `  edge [fontname="Helvetica", fontsize=9, color="#444444", fontcolor="#333333"];`,
+    // Each layer is one rank (rank=same), stacked by heavy invisible lines,
+    // so the picture reads layer by layer as an ArchiMate layered view does;
+    // the pattern lines still order the boxes within a layer, which is what
+    // keeps them short.
+    `  graph [rankdir=TB, newrank=true, fontname="Helvetica", fontsize=11, nodesep=0.6, ranksep=1.3];`,
+    `  node [shape=box, style="filled", fontname="Helvetica", fontsize=11, margin="0.14,0.08"];`,
+    `  edge [fontname="Helvetica", fontsize=9, color="#555555", fontcolor="#333333"];`,
   ];
   const layers = LAYER_ORDER.filter((l) => byLayer.has(l));
   layers.forEach((layer, i) => {
     const types = byLayer.get(layer)!;
-    lines.push(`  subgraph cluster_${i} {`, `    label=${dq(layer)}; labeljust=l; style="rounded,dashed"; color="#999999"; fontcolor="#666666";`, `    rank=same;`);
-    for (const t of types) lines.push(`    ${dq(t)} [label=${dq(`${typeName(t)}\n${count.get(t) ?? 0} element(s)`)}, fillcolor=${dq(LAYER_FILL[layer])}];`);
+    lines.push(`  subgraph cluster_${i} {`, `    label=${dq(layer)}; labeljust=l; style="rounded,filled"; fillcolor="#f7f7f7"; color="#bbbbbb"; fontcolor="#666666";`, `    rank=same;`);
+    for (const t of types) {
+      const self = selfOf.get(t);
+      const text = `${typeName(t)}\n${count.get(t) ?? 0} element(s)${self ? `\n(to itself: ${self.join(", ")})` : ""}`;
+      lines.push(`    ${dq(t)} [label=${dq(text)}, fillcolor=${dq(LAYER_FILL[layer])}];`);
+    }
     lines.push(`  }`);
   });
-  for (let i = 1; i < layers.length; i++) lines.push(`  ${dq(byLayer.get(layers[i])![0])} -> ${dq(byLayer.get(layers[i - 1])![0])} [style=invis, weight=10];`);
+  for (let i = 1; i < layers.length; i++) lines.push(`  ${dq(byLayer.get(layers[i - 1])![0])} -> ${dq(byLayer.get(layers[i])![0])} [style=invis, constraint=true, weight=10];`);
   if (used.has("Relationship")) lines.push(`  "Relationship" [label="(a relationship)", shape=plaintext, style=""];`);
-  for (const p of mm.patterns) {
-    const bad = p.allowed === false;
-    const label = `${bad ? "✗ " : ""}${verbOf(p.relationship)} ×${p.count}`;
-    lines.push(`  ${dq(p.source)} -> ${dq(p.target)} [label=${dq(label)}, ${DOT_EDGE[relKind(p.relationship)] ?? ""}${bad ? `, color="#c0392b", fontcolor="#c0392b", penwidth=2` : ""}];`);
+  for (const ps of pairs.values()) {
+    const bad = ps.some((p) => p.allowed === false);
+    const kinds = new Set(ps.map((p) => relKind(p.relationship)));
+    const style = kinds.size === 1 ? DOT_EDGE[[...kinds][0]] ?? "" : "arrowhead=vee";
+    lines.push(
+      `  ${dq(ps[0].source)} -> ${dq(ps[0].target)} [label=${dq(ps.map(label).join("\n"))}, ${style}${bad ? `, color="#c0392b", fontcolor="#c0392b", penwidth=2` : ""}];`,
+    );
   }
   lines.push(`}`);
   return `${lines.join("\n")}\n`;
