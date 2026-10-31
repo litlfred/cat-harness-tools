@@ -362,6 +362,11 @@ export const AVATARS: Readonly<Record<string, Avatar>> = {
     tone: 216,
     reads: "a sealed envelope, pinned — another Knowledge Graph's declaration, kept byte for byte at the commit it was subscribed at",
   },
+  "subscribed-harnesses": {
+    glyph: "M3 7h14v11H3zM3 7l7 6 7-6M8 14h4v4H8z",
+    tone: 218,
+    reads: "an envelope opening onto a working directory — the state homes instantiated from a Knowledge Graph subscription",
+  },
   // A LIST OF ENTRIES, each a short code tag beside a longer line: a code and
   // what it means, which is the whole of a code list. Deliberately not the
   // glossary's book — a book is looked up; a code list is CHOSEN from, closed,

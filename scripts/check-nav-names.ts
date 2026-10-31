@@ -388,8 +388,11 @@ export function navNamesQaResult(r: NavNamesResult): QaResult {
 
 if (import.meta.main) {
   const siteAbs = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
-  const r = checkNavNames(REPO_ROOT, siteAbs);
   const check = process.argv.includes("--check");
+  if (!check && !existsSync(join(siteAbs, "_data", "harness.json"))) {
+    spawnSync("bun", ["run", "cat", "docs:harness"], { cwd: REPO_ROOT, stdio: "inherit" });
+  }
+  const r = checkNavNames(REPO_ROOT, siteAbs);
 
   if (r.undetermined) {
     console.error(`UNDETERMINED: ${r.undetermined}.`);

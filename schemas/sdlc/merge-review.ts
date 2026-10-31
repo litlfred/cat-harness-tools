@@ -8,4 +8,33 @@
  * @module cat-harness/schemas/merge-review
  * @graphNode schema
  */
-export * from "./merge-queue.ts";
+export type * from "./merge-queue.ts";
+export {
+  AgenticPromotionCriteriaSchema,
+  BeanIdSchema,
+  DEFAULT_AGENTIC_PROMOTION_CRITERIA,
+  EjectionSchema,
+  FORBIDDEN_FACT_KEYS,
+  HUMAN_VERDICTS,
+  HoldSchema,
+  HumanVerdictSchema,
+  MERGE_QUEUE_ENTRY_TAG,
+  MemberFactsSchema,
+  MergeQueueEntrySchema,
+  PRIORITY_CLASSES,
+  PlacementSchema,
+  PriorityClassSchema,
+  QUEUE_STATUSES,
+  QueueStatusSchema,
+  READINESS,
+  ReleaseAuthoritySchema,
+  ReleaseSchema,
+  TrainMemberEvidenceSchema,
+  WOULD_HAVE_BLOCKED_TAG,
+  WouldHaveBlockedFindingSchema,
+  WouldHaveBlockedMetricsSchema,
+  WouldHaveBlockedRecordSchema,
+  calculateWouldHaveBlockedMetrics,
+  evaluateAgenticPromotion,
+  releaseCovers,
+} from "./merge-queue.ts";
