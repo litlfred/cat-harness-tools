@@ -28,7 +28,7 @@ import { instanceDirectoriesForGraph } from "../../schemas/kg/cat-harness.js";
 import { instanceContextUrl } from "../../schemas/kg/jsonld.js";
 import { generateInstanceContexts, readInstanceDecls } from "../gen-instance-contexts.ts";
 import { localLoader } from "../publish-verify.ts";
-import { nonEntryDirs } from "./library-entry-graphs.ts";
+import { libraryEntryDirs, nonEntryDirs } from "./library-entry-graphs.ts";
 
 type Node = Record<string, unknown>;
 export type Loader = (url: string) => Promise<{ contextUrl: null; documentUrl: string; document: unknown }>;
@@ -93,8 +93,9 @@ export async function libraryEntryNodes(inst: string, loader: Loader): Promise<{
   for (const lib of instanceDirectoriesForGraph(inst, "library")) {
     if (!existsSync(lib) || !statSync(lib).isDirectory()) continue;
     const skip = nonEntryDirs(lib);
-    for (const e of readdirSync(lib, { withFileTypes: true }).filter((x) => x.isDirectory()).map((x) => x.name).sort()) {
-      const entry = resolve(lib, e);
+    // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`).
+    for (const { slug: e, dir } of libraryEntryDirs(lib)) {
+      const entry = resolve(dir);
       if (skip.has(entry) || !existsSync(join(entry, "manifest.jsonld"))) continue;
       for (const file of jsonldFiles(entry)) {
         const rel = relative(inst, file).split("\\").join("/");

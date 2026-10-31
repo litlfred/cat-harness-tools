@@ -28,7 +28,7 @@
  * both draft and confirm would be one `--yes` away from the failure the whole
  * state machine exists to prevent.
  */
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { NarrativeSchema, NarrativeSlotSchema, REJECTION_REASONS, narrativesOfSlot, type Narrative } from "../schemas/content/narrative.ts";
@@ -39,6 +39,7 @@ import { FIGURE_DESCRIPTIONS_FILE } from "../schemas/content/figure-description.
 import { entryItems } from "./summaries.ts";
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { libraryEntryDirs } from "./lib/library-entry-graphs.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -260,8 +261,9 @@ export function queue(root = ROOT): QueueItem[] {
   // Every entry's bearing files, then the library-level ones, per library.
   const files: { f: string; dir: string; slug: string; name: string }[] = [];
   for (const lib of libs) {
-    for (const slug of readdirSync(lib).sort()) {
-      for (const name of NARRATIVE_BEARING) files.push({ f: join(lib, slug, name), dir: join(lib, slug), slug, name });
+    // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`).
+    for (const { slug, dir } of libraryEntryDirs(lib)) {
+      for (const name of NARRATIVE_BEARING) files.push({ f: join(dir, name), dir, slug, name });
     }
     for (const name of LIBRARY_NARRATIVE_BEARING) files.push({ f: join(lib, name), dir: lib, slug: "", name });
   }
