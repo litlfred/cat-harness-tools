@@ -32,9 +32,11 @@ import {
   TableSchema,
 } from "../../schemas/constraints.ts";
 import { join } from "path";
-import { HARNESS_ROOT } from "../lib/roots.ts";
+import { TOOLS_ROOT } from "../lib/roots.ts";
 
-const ROOT = join(HARNESS_ROOT);
+// Both files are this layer's own: `schemas/types.ts` moved here from the
+// harness in `8lcl`, beside the `constraints.ts` imported above.
+const ROOT = join(TOOLS_ROOT);
 const tsSrc = readFileSync(join(ROOT, "schemas", "types.ts"), "utf-8");
 const zodSrc = readFileSync(join(ROOT, "schemas", "constraints.ts"), "utf-8");
 

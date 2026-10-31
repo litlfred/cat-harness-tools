@@ -19,6 +19,7 @@ import { join } from "node:path";
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { declaredSubgraphNode } from "../../scripts/kg-export.ts";
 import { subgraphPublicationFindings } from "../../scripts/subgraph-node.ts";
+import { siteNotBuilt } from "../support/checkout.ts";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below
@@ -29,8 +30,12 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 const ROOT = join(ORIGIN_DIR, "..", "..");
 const SITE = join(ROOT, siteDirFor(ROOT));
 
-describe("what is published", () => {
-  const graph = JSON.parse(readFileSync(join(SITE, "todos.jsonld"), "utf8")) as Record<string, unknown>;
+/** The todo graph is written at publish and gitignored (bean w1gy F18). */
+const NOT_BUILT = siteNotBuilt("the todo graph `docs:pages` writes at publish (gitignored)", join(SITE, "todos.jsonld"));
+
+describe.skipIf(NOT_BUILT)("what is published", () => {
+  // `describe.skipIf` still runs this body, so nothing is read when it skips.
+  const graph = (NOT_BUILT ? {} : JSON.parse(readFileSync(join(SITE, "todos.jsonld"), "utf8"))) as Record<string, unknown>;
 
   test("its container is the declared todos Subgraph node, and every todo is a member of it", () => {
     const declared = declaredSubgraphNode(ROOT, "todos");

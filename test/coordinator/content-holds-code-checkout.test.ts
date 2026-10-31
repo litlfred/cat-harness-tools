@@ -10,10 +10,12 @@
  * changed.
  */
 import { describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { contentCodeFindings, contentInstanceCode } from "../../scripts/content-holds-code.ts";
 import { KG_CRITERIA_BY_ID } from "../../schemas/sdlc/kg-qa.ts";
+import { notApplicableAlone } from "../support/checkout.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -23,7 +25,9 @@ const REPO = resolve(ORIGIN_DIR, "..", "..", "..");
 describe("contentInstanceCode — this checkout", () => {
   // Owner ruling 2026-10-01: a QA WARNING, not a failure — but one that still
   // NAMES every file. Bean `eayu`.
-  test("who-iris is a QA warning, naming its IRIS-specific code files", () => {
+  // who-iris is a content instance above the harness, held only by the composed checkout.
+  const noIris = !existsSync(join(REPO, "who-iris")) && notApplicableAlone("who-iris's checkout, whose code files this names (a higher instance)");
+  test.skipIf(noIris)("who-iris is a QA warning, naming its IRIS-specific code files", () => {
     expect(KG_CRITERIA_BY_ID["content-instance-holds-code"]?.severity).toBe("minor");
     const v = contentInstanceCode(join(REPO, "who-iris"));
     expect(v.state).toBe("judged");

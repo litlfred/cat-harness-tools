@@ -24,7 +24,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { GraphExportSchema } from "@litlfred/bootstrap-tools/schemas/graph-export.ts";
-import { exportGraph } from "@litlfred/bootstrap-tools/scripts/export-graph.ts";
+import { exportGraph, subjectBase } from "@litlfred/bootstrap-tools/scripts/export-graph.ts";
 import { isSkillMd } from "../known-skills.js";
 import {
   repoRootFor,
@@ -107,9 +107,21 @@ describe("what it contains, read against the disk", () => {
   });
 });
 
-/** Node ids of one `@type`, reduced to the fragment stem, sorted. */
+/**
+ * Node ids of one `@type`, reduced to the id after their kind segment, sorted.
+ *
+ * A subject is a PATH beside the document, `<doc dir>/<kind>/<id>`, not a
+ * `#<kind>/<id>` fragment of it (bootstrap-tools#52, cat-harness-tools#958).
+ * Read against `subjectBase`, the exporter's own answer to where that
+ * directory is; an id outside it is thrown on rather than reduced to nonsense.
+ */
 function idsOfType(doc: Record<string, unknown>, type: string): string[] {
   const graph = (doc["@graph"] ?? []) as Array<Record<string, unknown>>;
+  const base = subjectBase(String(doc["@id"]));
+  const stem = (iri: string): string => {
+    if (base === "" || !iri.startsWith(base)) throw new Error(`${iri} is not a subject path under ${base || "(no base)"}`);
+    return iri.slice(base.length).split("/").slice(1).join("/");
+  };
   return graph
     .filter((n) => {
       const t = n["@type"];
@@ -118,7 +130,7 @@ function idsOfType(doc: Record<string, unknown>, type: string): string[] {
       // name rather than a suffix, so `ProcessNode` does not answer for `Process`.
       return ts.some((x) => x === `bootstrap:${type}`);
     })
-    .map((n) => String(n["@id"]).split("#")[1]!.split("/").slice(1).join("/"))
+    .map((n) => stem(String(n["@id"])))
     .sort();
 }
 
