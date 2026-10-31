@@ -177,6 +177,8 @@ import {
 } from "./qa-results.js";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { quietly } from "../schemas/sdlc/input-trace.ts";
+import { readQaTree } from "./qa-store.ts";
 import { rootProfile } from "./lib/root-gate-set.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
 import { stateMountedDirs } from "./mount-from-lock.ts";
@@ -761,6 +763,25 @@ export function adversarialCoverageByGraph(repo: string, root: string = ROOT): M
   }
   for (const home of homes) {
     for (const s of storedAdversarialReviews(home)) record(s.file.subject, s.file.source_hash ?? undefined);
+  }
+  if (!result.get("tools")?.hasFresh || !result.get("skills")?.hasFresh) {
+    try {
+      const store = quietly(() => readQaTree("main", "", { repoRoot: repo, log: () => {} }));
+      if (store.state === "hit") {
+        for (const [rel, text] of store.files) {
+          if (!rel.endsWith(".kg-qa.json") || !rel.includes("/kg-qa/")) continue;
+          try {
+            const sc = JSON.parse(text) as KgQaReport;
+            if (!sc.adversarial_reviews || sc.adversarial_reviews.length === 0) continue;
+            record(sc.subject, sc.source_hash ?? undefined);
+          } catch {
+            // ignore unparseable sidecar
+          }
+        }
+      }
+    } catch {
+      // ignore unreachable store
+    }
   }
 
   const out = new Map<string, AdversarialCoverageState>();

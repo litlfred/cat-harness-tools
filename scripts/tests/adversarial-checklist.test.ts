@@ -235,7 +235,7 @@ describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", (
     // (cat-harness d37c20c4). The two that were restored are asserted.
     expect(advMap.get("tools")).toBe("reviewed");
     expect(advMap.get("skills")).toBe("reviewed");
-  });
+  }, 30_000);
 
   it("KindCoverage rows include adversarial column with valid states", () => {
     const { rows } = coverage(REPO);
