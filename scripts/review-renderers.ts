@@ -137,32 +137,214 @@ export function renderInline(
   return box;
 }
 
-/** The two published pages next to each other, each scrolled to the block. */
-export function renderSideBySide(doc: Document, before: string | null, after: string | null): HTMLElement {
+/**
+ * Where each side's changes sit in its rendered text, for side by side.
+ *
+ * Each run is one changed stretch (`del` on main, `ins` on the preview) with
+ * up to 40 characters of the text just before it on the same side. The
+ * context is what finds the right "core" when the word also occurs earlier in
+ * the block.
+ */
+export function changeRuns(ops: Array<{ op: string; text: string }>): {
+  base: Array<{ before: string; text: string }>;
+  head: Array<{ before: string; text: string }>;
+} {
+  const out = { base: [] as Array<{ before: string; text: string }>, head: [] as Array<{ before: string; text: string }> };
+  let base = "";
+  let head = "";
+  for (const o of ops) {
+    if (o.op === "same") { base += o.text; head += o.text; }
+    else if (o.op === "del") { if (o.text.trim()) out.base.push({ before: base.slice(-40), text: o.text }); base += o.text; }
+    else if (o.op === "ins") { if (o.text.trim()) out.head.push({ before: head.slice(-40), text: o.text }); head += o.text; }
+  }
+  return out;
+}
+
+/**
+ * Inside one side's frame: hide the staging banner (the pane's own header
+ * says which side it is), mark each changed run, and scroll the frame so the
+ * first mark sits a third of the way down. Returns how many runs it marked.
+ *
+ * Text is matched on letters and digits only, lower-cased, so whitespace,
+ * punctuation and table cell borders cannot make a rendered page and the
+ * diff's text disagree. A run is looked for with its context first, then on
+ * its own, and always after the previous run, inside the block's own element
+ * when the page has it. A frame from another origin cannot be read: it stays
+ * at the block's anchor, as before, and this returns 0.
+ */
+export function markInFrame(
+  f: HTMLIFrameElement,
+  runs: Array<{ before: string; text: string }>,
+  cls: string,
+): number {
+  let d: Document | null = null;
+  try { d = f.contentDocument; } catch { return 0; }
+  if (!d || !d.body) return 0;
+  const w = d.defaultView!;
+  if (!d.getElementById("fa-review-frame-style")) {
+    const st = d.createElement("style");
+    st.id = "fa-review-frame-style";
+    st.textContent =
+      "[data-fa-staging-banner]{display:none!important}html{padding-top:0!important}" +
+      ".side-bar,.fa-nav{top:0!important}" +
+      "mark.fa-change-base{background:#fbdada;color:#5c0b0b;outline:2px solid #c0392b}" +
+      "mark.fa-change-head{background:#d7f5dc;color:#0b3d17;outline:2px solid #2e7d32}";
+    (d.head || d.body).appendChild(st);
+  }
+  const scrollTo = (m: Element) => {
+    // On the frame's own window: scrollIntoView would scroll the review page too.
+    const r = m.getBoundingClientRect();
+    w.scrollTo(0, Math.max(0, r.top + w.scrollY - w.innerHeight / 3));
+  };
+  const had = d.querySelectorAll("mark." + cls);
+  if (had.length) { scrollTo(had[0]!); return had.length; }
+  if (!runs.length) return 0;
+  const ok = /[\p{L}\p{N}]/u;
+  const norm = (t: string) => Array.from(t).filter((c) => ok.test(c)).map((c) => c.toLowerCase()[0]).join("");
+  let id = "";
+  try { id = decodeURIComponent((w.location.hash || "").slice(1)); } catch { /* no anchor, then */ }
+  const block = id ? d.getElementById(id) : null;
+  const tryIn = (root: Element): Array<[Text, number, number]> => {
+    const chars: string[] = [];
+    const where: Array<[Text, number]> = [];
+    const walker = d!.createTreeWalker(root, 4 /* NodeFilter.SHOW_TEXT */);
+    for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+      const p = n.parentElement;
+      if (!p || p.closest("script,style,noscript,[data-fa-staging-banner]")) continue;
+      for (let i = 0; i < n.data.length; i++) {
+        const c = n.data[i]!;
+        if (ok.test(c)) { chars.push(c.toLowerCase()[0]!); where.push([n, i]); }
+      }
+    }
+    const s = chars.join("");
+    const segs: Array<[Text, number, number]> = [];
+    let from = 0;
+    for (const r of runs) {
+      const t = norm(r.text);
+      if (!t) continue;
+      const ctx = norm(r.before);
+      let at = ctx ? s.indexOf(ctx + t, from) : -1;
+      if (at >= 0) at += ctx.length;
+      else at = s.indexOf(t, from);
+      if (at < 0) continue;
+      from = at + t.length;
+      // One segment per text node the run spans.
+      for (let k = at; k < at + t.length; ) {
+        const node = where[k]![0];
+        const s0 = where[k]![1];
+        let e = s0;
+        while (k < at + t.length && where[k]![0] === node) { e = where[k]![1]; k++; }
+        segs.push([node, s0, e + 1]);
+      }
+    }
+    return segs;
+  };
+  let segs = block ? tryIn(block) : [];
+  if (!segs.length) segs = tryIn(d.body);
+  if (!segs.length) return 0;
+  // Later offsets first within a node, so splitting keeps earlier ones valid.
+  const marks: HTMLElement[] = [];
+  segs.slice().reverse().forEach(([node, s0, e]) => {
+    node.splitText(e);
+    const mid = node.splitText(s0);
+    const m = d!.createElement("mark");
+    m.className = cls;
+    mid.replaceWith(m);
+    m.appendChild(mid);
+    marks.unshift(m);
+  });
+  scrollTo(marks[0]!);
+  return marks.length;
+}
+
+/**
+ * The two published pages next to each other, each scrolled to the block,
+ * and to its first change when the diff found one.
+ *
+ * Each pane has its own header: grey for the before side, green for this
+ * preview with its branch, commit, PR and build log, so the green staging
+ * banner inside the frame is hidden rather than repeated.
+ */
+export function renderSideBySide(
+  doc: Document,
+  before: string | null,
+  after: string | null,
+  opts?: {
+    beforeName?: string;
+    facts?: { branch?: string; sha?: string; pr?: string; prUrl?: string; branchUrl?: string; runUrl?: string } | null;
+    runs?: { base: Array<{ before: string; text: string }>; head: Array<{ before: string; text: string }> } | null;
+    mark?: ((f: HTMLIFrameElement, runs: Array<{ before: string; text: string }>, cls: string) => number) | null;
+  },
+): HTMLElement {
+  const o = opts || {};
   const box = doc.createElement("div");
   box.className = "diff diff-sbs";
-  const pane = (title: string, href: string | null) => {
-    const col = doc.createElement("div");
+  const link = (text: string, href: string | undefined) => {
+    if (!href || !/^https?:/i.test(href)) { const c = doc.createElement("code"); c.textContent = text; return c; }
+    const a = doc.createElement("a");
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = text;
+    return a;
+  };
+  const header = (side: "base" | "head") => {
     const h = doc.createElement("div");
-    h.className = "muted";
-    h.textContent = title;
-    col.appendChild(h);
+    h.className = "sbs-head sbs-side-" + side;
+    const b = doc.createElement("b");
+    b.textContent = side === "base" ? (o.beforeName && o.beforeName !== "main" ? o.beforeName : "Main") : "This preview";
+    h.appendChild(b);
+    const f = o.facts;
+    if (side === "head" && f) {
+      const add = (label: string, node: Node) => {
+        h.appendChild(doc.createTextNode(" \u00b7 " + label));
+        h.appendChild(node);
+      };
+      if (f.branch) add("", link(f.branch, f.branchUrl));
+      if (f.sha) {
+        const m = (f.branchUrl || "").match(/^(https:\/\/github\.com\/[^/]+\/[^/]+)\//);
+        add("commit ", link(f.sha, m ? m[1] + "/commit/" + f.sha : undefined));
+      }
+      if (f.pr && f.pr !== "n/a") add("", link("PR #" + f.pr, f.prUrl));
+      if (f.runUrl) add("", link("build log", f.runUrl));
+    } else if (side === "base") {
+      h.appendChild(doc.createTextNode(" \u00b7 published site"));
+    }
+    return h;
+  };
+  const pane = (side: "base" | "head", href: string | null) => {
+    const col = doc.createElement("div");
+    col.className = "sbs-pane";
+    col.appendChild(header(side));
     if (href === null) {
       const p = doc.createElement("p");
       p.className = "muted";
-      p.textContent = title === "Main" ? "Not on main: this block is new." : "Not on this preview: this block was removed.";
+      p.textContent = side === "base" ? "Not on " + (o.beforeName || "main") + ": this block is new." : "Not on this preview: this block was removed.";
       col.appendChild(p);
     } else {
       const f = doc.createElement("iframe");
       f.src = href;
-      f.title = title + ": " + href;
+      f.title = (side === "base" ? o.beforeName || "Main" : "This preview") + ": " + href;
       f.loading = "lazy";
+      const mark = o.mark;
+      if (mark) {
+        const runs = (o.runs && o.runs[side]) || [];
+        const cls = "fa-change-" + side;
+        // Pages finish laying out (the rail, figures) after load, and their
+        // own anchor scroll runs then too: try again a little later.
+        f.addEventListener("load", () => {
+          let tries = 0;
+          const go = () => { if (mark(f, runs, cls) === 0 && runs.length && ++tries < 4) setTimeout(go, 400 * tries); };
+          go();
+          setTimeout(() => mark(f, runs, cls), 1200);
+        });
+      }
       col.appendChild(f);
     }
     return col;
   };
-  box.appendChild(pane("Main", before));
-  box.appendChild(pane("This preview", after));
+  box.appendChild(pane("base", before));
+  box.appendChild(pane("head", after));
   return box;
 }
 
