@@ -38,6 +38,22 @@ describe("parseTrace in collect mode — a writer's reads and writes", () => {
     const r = parseTrace(`10 openat(AT_FDCWD</work/repo>, "x", O_WRONLY|O_CREAT, 0644) = 3</work/repo/x>`, ROOT);
     expect("undetermined" in r).toBe(true);
   });
+
+  test("a failed mkdir (-1 EEXIST) on an already-read directory does not mark the directory as rewritten, and <detached ...> lines parse", () => {
+    const r = collect([
+      `10 newfstatat(AT_FDCWD</work/repo>, "smart-base/docs", {st_mode=S_IFDIR|0755}, 0) = 0`,
+      `10 mkdir("/work/repo/smart-base/docs", 0777) = -1 EEXIST (File exists)`,
+      `10 openat(AT_FDCWD</work/repo>, "smart-base/docs/index.md", O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0666) = 4</work/repo/smart-base/docs/index.md>`,
+      `11 openat(AT_FDCWD</work/repo>, "in/extra.json", O_RDONLY <detached ...>`,
+      `12 ???( <detached ...>`,
+    ]);
+    expect(r).toEqual({
+      paths: ["in/extra.json", "smart-base/docs"],
+      git: [],
+      writes: ["smart-base/docs/index.md"],
+      absentBefore: [],
+    });
+  });
 });
 
 describe("writerRecordOf and decideWriter", () => {

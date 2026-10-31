@@ -331,6 +331,12 @@ function calls(text: string): Call[] | { undetermined: string } {
       done.push({ index: p.index, line: p.head + resumed[2]!, pid });
       continue;
     }
+    const detached = /^(.*?)\s*<detached \.\.\.>$/.exec(body);
+    if (detached !== null) {
+      const head = detached[1]!.trim();
+      if (head !== "" && !head.startsWith("???")) done.push({ index: index++, line: `${head}) = ?`, pid });
+      continue;
+    }
     const unfinished = /^(.*?)\s*<unfinished \.\.\.>$/.exec(body);
     if (unfinished !== null) {
       pending.set(pid, { index: index++, head: unfinished[1]! });
@@ -438,8 +444,12 @@ export function parseTrace(text: string, root: string, opts: { writes?: "refuse"
       if (rel === undefined || excluded(rel, gitPids.has(c.pid))) continue;
       if (write) writes.push(`${c.name} ${rel || "."}`);
       else paths.add(rel);
-      if (opts.writes === "collect" && !first.has(rel)) first.set(rel, write ? "write" : /^-1 ENOENT\b/.test(c.ret) ? "absent" : "read");
-      if (opts.writes === "collect" && write) wrote.add(rel);
+      const effectiveWrite = write && !/^-1\b/.test(c.ret);
+      if (opts.writes === "collect" && !first.has(rel)) {
+        if (effectiveWrite) first.set(rel, "write");
+        else if (!write) first.set(rel, /^-1 ENOENT\b/.test(c.ret) ? "absent" : "read");
+      }
+      if (opts.writes === "collect" && effectiveWrite) wrote.add(rel);
     }
   }
   if (opts.writes === "collect") {

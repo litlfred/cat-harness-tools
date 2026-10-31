@@ -139,7 +139,13 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
 
 // ── End to end, under a real strace ────────────────────────────────────────
 
-const HAS_STRACE = Bun.spawnSync(["strace", "-f", "-qq", "-o", "/dev/null", "true"], { stdout: "ignore", stderr: "ignore" }).exitCode === 0;
+const HAS_STRACE = (() => {
+  try {
+    return Bun.spawnSync(["strace", "-f", "-qq", "-o", "/dev/null", "true"], { stdout: "ignore", stderr: "ignore" }).exitCode === 0;
+  } catch {
+    return false;
+  }
+})();
 
 describe.skipIf(!HAS_STRACE)("the falsifiers, under a real strace (skipped where strace cannot run)", () => {
   let root: string;
