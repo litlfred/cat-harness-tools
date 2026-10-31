@@ -389,16 +389,22 @@ describe("the STAGING build does not bake a per-run stamp into the footer", () =
     expect((client.match(/fetch\(/g) ?? []).length).toBe(2);
   });
 
-  test("the MAIN site still stamps — there is one copy and nothing to dedup", () => {
+  test("the MAIN site no longer bakes it either: the browser fills it from build.json", () => {
     // `footer_custom.html`'s own comment: without a stamp "a stale browser
-    // cache and a deploy that has not run look identical". Removing it
-    // everywhere would fix the storage problem by destroying the signal.
+    // cache and a deploy that has not run look identical". The stamp stays;
+    // only the moment it is bound moved, on the live site too (owner,
+    // 2026-10-31, folio-assistant#2837): baked in, it changed every page on
+    // every deploy, so no preview could share the live site's unchanged
+    // pages (`staging-share.ts`). `docs-site.yml` writes the same facts to
+    // `build.json`, and cat-harness's `docs-ui.js` fills the footer from it.
     const main = readFileSync(
       join(repoRootFor(resolve(HARNESS_ROOT)), ".github", "workflows", "docs-site.yml"),
       "utf-8",
     );
-    expect(main).toContain("short_sha:");
-    expect(main).toContain("built_at:");
+    const code = main.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
+    for (const key of ["short_sha:", "built_at:", "run_url:"]) expect(code).not.toContain(`echo "${key}`);
+    expect(code).toContain("build.json");
+    expect(code).toMatch(/runUrl: \$runUrl/);
   });
 });
 
