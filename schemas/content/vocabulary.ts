@@ -454,13 +454,6 @@ export const PROPERTY_GLOSSES: Readonly<Record<string, TermGloss>> = {
       "declares, at the level of one participant; absent means undeclared, " +
       "which is not `internet`.",
   },
-  systemUnderTest: {
-    gloss:
-      "Which kind of system a test-plan actor exercises, and the version a " +
-      "run records when it knows nothing more specific: `{ kind, version }`. " +
-      "Only an agent or a machine carries it. Its reach is the actor's own " +
-      "`reach`, not restated here.",
-  },
   hasSkill: { gloss: "A skill this role carries." },
   // The one declared exemption: `judgementOnly` says the role acts but no
   // procedure yields its answer, so `activity-names-skill` is `n/a`. Its
