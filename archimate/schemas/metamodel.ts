@@ -199,7 +199,7 @@ const LAYER_FILL: Record<ArchimateLayer, string> = {
 };
 
 /** ArchiMate's layers, top to bottom, as a layered view stacks them. */
-const LAYER_ORDER: ArchimateLayer[] = ["Motivation", "Strategy", "Business", "Application", "Technology", "Physical", "Implementation & Migration", "Other"];
+export const LAYER_ORDER: ArchimateLayer[] = ["Motivation", "Strategy", "Business", "Application", "Technology", "Physical", "Implementation & Migration", "Other"];
 
 const dq = (s: string): string => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
@@ -264,7 +264,7 @@ export function metamodelDot(
     for (const t of types) {
       const self = selfOf.get(t);
       const text = `${typeName(t)}\n${count.get(t) ?? 0} element(s)${self ? `\n(to itself: ${self.join(", ")})` : ""}`;
-      lines.push(`    ${dq(t)} [label=${dq(text)}, fillcolor=${dq(LAYER_FILL[layer])}${link(opts.href?.type(t), `${typeName(t)}: its elements`)}];`);
+      lines.push(`    ${dq(t)} [label=${dq(text)}, class=${dq(`mm-layer-${layerSlug(layer)}`)}, fillcolor=${dq(LAYER_FILL[layer])}${link(opts.href?.type(t), `${typeName(t)}: its elements`)}];`);
     }
     lines.push(`  }`);
   });
@@ -274,14 +274,41 @@ export function metamodelDot(
     const bad = ps.some((p) => p.allowed === false);
     const kinds = new Set(ps.map((p) => relKind(p.relationship)));
     const style = kinds.size === 1 ? DOT_EDGE[[...kinds][0]] ?? "" : "arrowhead=vee";
+    // Classes the page's filters read: each category the line carries, and the layers at its ends.
+    const cls = [
+      ...new Set(ps.map((p) => `mm-cat-${categoryOf(p.relationship)}`)),
+      `mm-from-${layerSlug(layerOf(ps[0].source))}`,
+      `mm-to-${layerSlug(layerOf(ps[0].target))}`,
+    ].join(" ");
     lines.push(
-      `  ${dq(ps[0].source)} -> ${dq(ps[0].target)} [label=${dq(ps.map(label).join("\n"))}, ${style}${bad ? `, color="#c0392b", fontcolor="#c0392b", penwidth=2` : ""}` +
+      `  ${dq(ps[0].source)} -> ${dq(ps[0].target)} [label=${dq(ps.map(label).join("\n"))}, class=${dq(cls)}, ${style}${bad ? `, color="#c0392b", fontcolor="#c0392b", penwidth=2` : ""}` +
         `${link(opts.href?.pair(ps[0].source, ps[0].target), `${typeName(ps[0].source)} → ${typeName(ps[0].target)}: its relationships`)}];`,
     );
   }
   lines.push(`}`);
   return `${lines.join("\n")}\n`;
 }
+
+/**
+ * ArchiMate 3.2 §5's own grouping of the relationships: what the page's
+ * filters are by. Specialization is in none of the three.
+ */
+export const RELATIONSHIP_CATEGORY: Record<string, "structural" | "dependency" | "dynamic" | "other"> = {
+  Composition: "structural",
+  Aggregation: "structural",
+  Assignment: "structural",
+  Realization: "structural",
+  Serving: "dependency",
+  Access: "dependency",
+  Influence: "dependency",
+  Association: "dependency",
+  Triggering: "dynamic",
+  Flow: "dynamic",
+  Specialization: "other",
+};
+export const categoryOf = (relationship: string): string => RELATIONSHIP_CATEGORY[relKind(relationship)] ?? "other";
+/** A layer as a class-name word: `Implementation & Migration` → `implementation-migration`. */
+export const layerSlug = (layer: string): string => layer.toLowerCase().replace(/[^a-z]+/g, "-").replace(/^-|-$/g, "");
 
 /** The page anchor of a type's section and of a pair's first pattern row. */
 export const typeAnchor = (type: string): string => `type-${type}`;

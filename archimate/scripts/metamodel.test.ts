@@ -88,7 +88,7 @@ describe("the metamodel in use", () => {
     const dot = metamodelDot(mm);
     expect(dot).toContain(`"DataObject" -> "Goal" [label="✗ serves ×1"`);
     expect(dot).toContain(`color="#c0392b"`);
-    expect(dot).toContain(`"ApplicationService" -> "ApplicationComponent" [label="serves ×1", arrowhead=vee]`);
+    expect(dot).toContain(`"ApplicationService" -> "ApplicationComponent" [label="serves ×1", class="mm-cat-dependency mm-from-application mm-to-application", arrowhead=vee]`);
     const mmd = metamodelMermaid(mm);
     expect(mmd.startsWith("classDiagram\n")).toBe(true);
     expect(mmd).toContain("ApplicationComponent ..> DataObject : accesses ×1");
@@ -113,7 +113,8 @@ describe("the metamodel in use", () => {
     };
     const dot = metamodelDot(dense);
     expect(dot.match(/"Capability" -> "Goal"/g)!.length).toBe(1);
-    expect(dot).toContain(`label="influences ×21\nrealises ×2", arrowhead=vee`);
+    expect(dot).toContain(`label="influences ×21\nrealises ×2", class="mm-cat-dependency mm-cat-structural mm-from-strategy mm-to-motivation", arrowhead=vee`);
+    expect(dot).toContain(`class="mm-layer-motivation"`);
     expect(dot).toContain(`(to itself: aggregates ×13)`);
     expect(dot).not.toContain("associated with");
     expect(dot).not.toContain(`"Grouping"`);

@@ -73,7 +73,7 @@ import { readArchimate, type ArchimateModel } from "../schemas/archimate.ts";
 import { renderViewSvg, typeLabel } from "./render-view.ts";
 import { CONFIG_FILE, archimateDir, localDirOf, readConfig } from "./check-archimate.ts";
 import { planSlugs } from "../schemas/slugs.ts";
-import { metamodelDot, metamodelMermaid, metamodelOf, pairAnchor, typeAnchor, typeName, verbOf, type Metamodel } from "../schemas/metamodel.ts";
+import { LAYER_ORDER, categoryOf, layerSlug, metamodelDot, metamodelMermaid, metamodelOf, pairAnchor, typeAnchor, typeName, verbOf, type Metamodel } from "../schemas/metamodel.ts";
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { darkRules } from "../../scripts/lib/scheme-css.ts";
 import { pageParts, withRenderedBy } from "../../scripts/viewer-declarations.ts";
@@ -375,6 +375,35 @@ export function pagesFor(
 }
 
 /**
+ * Checkboxes over the drawing: ArchiMate's relationship categories, and the
+ * layers. They hide boxes and lines by the classes `metamodelDot` gives them,
+ * in the browser, so they work on a static host. A line shows while any of
+ * its categories is ticked and both its ends' layers are.
+ */
+function filterBar(mm: Metamodel): string {
+  const present = new Set(mm.patterns.filter((p) => p.source !== p.target).map((p) => categoryOf(p.relationship)));
+  const cats = ["structural", "dependency", "dynamic", "other"].filter((c) => present.has(c));
+  const held = new Set(mm.types.map((t) => t.layer));
+  const layers = LAYER_ORDER.filter((l) => l !== "Other" && held.has(l));
+  const box = (kind: string, value: string, label: string) =>
+    `<label style="margin-right:.8rem"><input type="checkbox" checked data-mm-${kind}="${escHtml(value)}"> ${escHtml(label)}</label>`;
+  return (
+    `<form class="am-filters" style="margin:.5rem 0" onsubmit="return false">` +
+    `<div><strong>Relationships:</strong> ${cats.map((c) => box("cat", c, c)).join("")}</div>` +
+    `<div><strong>Layers:</strong> ${layers.map((l) => box("layer", layerSlug(l), l)).join("")}</div></form>` +
+    `<script>(function(){var f=document.currentScript.previousElementSibling;` +
+    `function on(k){var r={};f.querySelectorAll("[data-mm-"+k+"]").forEach(function(i){r[i.getAttribute("data-mm-"+k)]=i.checked;});return r;}` +
+    `function has(e,p){for(var i=0;i<e.classList.length;i++)if(e.classList[i].indexOf(p)===0)return e.classList[i].slice(p.length);}` +
+    `function apply(){var o=document.querySelector(".am-figure object"),d=o&&o.contentDocument;if(!d)return;var c=on("cat"),l=on("layer");` +
+    `d.querySelectorAll("g.node").forEach(function(n){var y=has(n,"mm-layer-");n.style.display=y&&l[y]===false?"none":"";});` +
+    `d.querySelectorAll("g.edge").forEach(function(e){var cs=[].filter.call(e.classList,function(x){return x.indexOf("mm-cat-")===0;});` +
+    `if(!cs.length)return;var any=cs.some(function(x){return c[x.slice(7)]!==false;});` +
+    `var a=has(e,"mm-from-"),b=has(e,"mm-to-");e.style.display=any&&l[a]!==false&&l[b]!==false?"":"none";});}` +
+    `f.addEventListener("change",apply);var o=document.querySelector(".am-figure object");if(o)o.addEventListener("load",apply);apply();})();</script>`
+  );
+}
+
+/**
  * The body of the "Metamodel in use" page. Everything on it is computed at
  * build time, so the loader has nothing to draw (`kind: "metamodel"` is not
  * one of its kinds). Links: `data` to the model's data directory, `element`
@@ -402,6 +431,7 @@ export function metamodelBody(
     `<p>${bad.length ? `✗ ${mm.notAllowed} relationship(s) follow ${bad.length} pattern(s) ArchiMate does not allow (red below).` : "✓ Every relationship follows a pattern ArchiMate allows."}` +
     (mm.placeholders.length ? ` ${mm.placeholders.length} placeholder element(s), named after their own type, are left out (listed at the end).` : "") +
     `</p>` +
+    (link.drawn ? `<p>Click a box to see its elements, or a line to see its relationships.</p>${filterBar(mm)}` : "") +
     (link.drawn
       ? `<div class="am-figure"><object type="image/svg+xml" style="width:100%;height:auto" data="${escHtml(link.data("metamodel.svg"))}" aria-label="Metamodel in use, drawn"></object></div>`
       : `<p>This build drew no picture; the same diagram is below as Graphviz DOT and Mermaid.</p>`) +
@@ -409,7 +439,6 @@ export function metamodelBody(
     `and <em>associated with</em> (which says nothing about how two things relate), groupings and junctions are left out. The tables below list everything.</p>` +
     `<p>The same diagram as <a href="${escHtml(link.data("metamodel.dot"))}">Graphviz DOT</a>, a <a href="${escHtml(link.data("metamodel.mmd"))}">Mermaid class diagram</a>, ` +
     `and <a href="${escHtml(link.data("metamodel.json"))}">JSON</a>.</p>` +
-    `<p>Click a box to see its elements, or a line to see its relationships.</p>` +
     `<h2>Element types</h2><table class="am-props"><thead><tr><th>Type</th><th>Layer</th><th>Elements</th></tr></thead><tbody>` +
     mm.types
       .map(
