@@ -25,7 +25,7 @@
     {
       "id": "cat-harness-tools-validators",
       "path": "validators/",
-      "description": "The validators this layer's code provides, one folio-validator/v1 node each naming the graph typology and $schema family it checks (bean riit), as cat-harness and folio-assistant-core declare theirs. The first is `dynamic-state.json`, for the `cat-harness-dynamic-state/v1` document `writeDynamicState` writes: its family is listed in the docs typology here, so its node is here too and both land in one change.",
+      "description": "The validators this layer's code provides, one folio-validator/v1 node each naming the graph typology and $schema family it checks (bean riit), as cat-harness and the layers above it declare theirs. The first is `dynamic-state.json`, for the `cat-harness-dynamic-state/v1` document `writeDynamicState` writes: its family is listed in the docs typology here, so its node is here too and both land in one change.",
       "graphTypologies": [
         "validators"
       ]
