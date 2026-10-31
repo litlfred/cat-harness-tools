@@ -13,7 +13,9 @@ import type { GitHelper } from "../core/git.js";
 import { log, logDebug } from "../core/logging.js";
 import { spawnSync } from "child_process";
 import type { MountedRoute, RouteDeps } from "../route-groups.js";
+import { refuseBranchName, refuseCheckoutRequest } from "../core/http-guard.js";
 
+/** Read-only GETs only. The checkout POST sends no CORS header (see core/http-guard.ts). */
 const CORS = { "Access-Control-Allow-Origin": "*" };
 
 export function handleBranchGet(url: URL, gitHelper: GitHelper): Response | null {
@@ -60,12 +62,18 @@ export function handleBranchGet(url: URL, gitHelper: GitHelper): Response | null
 export async function handleBranchPost(url: URL, req: Request, gitHelper: GitHelper): Promise<Response | null> {
   if (url.pathname !== "/api/git/checkout") return null;
 
+  // Authorised and JSON-only: this route rewrites the working tree.
+  const refused = refuseCheckoutRequest(req);
+  if (refused) return refused;
+
   try {
     const body = (await req.json()) as {
-      branch: string;
+      branch: unknown;
       action?: "switch" | "stash" | "commit" | "discard";
     };
-    const targetBranch = body.branch;
+    const badBranch = refuseBranchName(body.branch);
+    if (badBranch) return badBranch;
+    const targetBranch = body.branch as string;
     const action = body.action || "switch";
     const fromBranch = gitHelper.currentBranch();
     const repoRoot = gitHelper["repoRoot"];
@@ -84,7 +92,7 @@ export async function handleBranchPost(url: URL, req: Request, gitHelper: GitHel
         if (stash.status !== 0) {
           return Response.json(
             { error: `Stash failed: ${stash.stderr.toString()}` },
-            { status: 500, headers: CORS },
+            { status: 500 },
           );
         }
       } else if (action === "commit") {
@@ -96,7 +104,7 @@ export async function handleBranchPost(url: URL, req: Request, gitHelper: GitHel
         if (commit.status !== 0) {
           return Response.json(
             { error: `Commit failed: ${commit.stderr.toString()}` },
-            { status: 500, headers: CORS },
+            { status: 500 },
           );
         }
       } else if (action === "discard") {
@@ -110,23 +118,23 @@ export async function handleBranchPost(url: URL, req: Request, gitHelper: GitHel
             branch: fromBranch,
             changes: st.stdout.toString().trim().split("\n").filter(Boolean),
           },
-          { status: 409, headers: CORS },
+          { status: 409 },
         );
       }
     }
 
-    const co = spawnSync("git", ["checkout", targetBranch], { cwd: repoRoot, stdio: "pipe" });
+    const co = spawnSync("git", ["checkout", targetBranch, "--"], { cwd: repoRoot, stdio: "pipe" });
     if (co.status !== 0) {
       return Response.json(
         { error: `Checkout failed: ${co.stderr.toString()}` },
-        { status: 500, headers: CORS },
+        { status: 500 },
       );
     }
 
     log("git", `checkout: ok — now on ${gitHelper.currentBranch()}`);
-    return Response.json({ ok: true, branch: gitHelper.currentBranch() }, { headers: CORS });
+    return Response.json({ ok: true, branch: gitHelper.currentBranch() });
   } catch (e) {
-    return Response.json({ error: String(e) }, { status: 500, headers: CORS });
+    return Response.json({ error: String(e) }, { status: 500 });
   }
 }
 

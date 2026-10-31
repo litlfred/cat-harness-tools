@@ -129,7 +129,7 @@ describe("kinds are reported, never graded", () => {
         join(dir, "acme", "acme.json"),
         JSON.stringify({ name: "acme", version: "0.1.0", directories: [{ id: "acme-themes", path: "themes/", graphTypologies: ["themes"] }] }),
       );
-      const themeTs = JSON.stringify(join(REPO, "cat-harness", "schemas", "theme.ts"));
+      const themeTs = JSON.stringify(join(REPO, "cat-harness-tools", "schemas", "ui", "theme.ts"));
       writeFileSync(
         join(dir, "acme", "themes", "themes.ts"),
         `import { ResolvedThemeSchema } from ${themeTs};\nexport const INSTANCE_THEMES = [ResolvedThemeSchema.parse({ $schema: "folio-theme/v1", kind: "webpage", id: "acme-web", name: "Acme", palette: { surface: "#ffffff", ink: "#111111", edge: "#cccccc", accent: "#aa0000" }, layouts: { laptop: { minWidth: "1000px", padding: "1rem", fontScale: 1 }, mobile: { minWidth: "100%", padding: "1rem", fontScale: 1 }, card: { minWidth: "200px", padding: "1rem", fontScale: 1 } } })];\n`,

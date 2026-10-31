@@ -9,7 +9,9 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { resolve } from "node:path";
 import { executeNamedQuery } from "../../scripts/nquads-query.js";
+import { realPathWithin } from "../core/safe-path.js";
 
 export function registerNQuadsQueryTools(server: McpServer): void {
   server.tool(
@@ -27,6 +29,13 @@ export function registerNQuadsQueryTools(server: McpServer): void {
       limit: z.number().int().positive().optional().describe("Maximum number of rows to return"),
     },
     async ({ dataset, query_name, bindings, format, limit }) => {
+      // `dataset` is a tool argument: read only inside the working tree.
+      if (realPathWithin(process.cwd(), resolve(process.cwd(), dataset)) === undefined) {
+        return {
+          content: [{ type: "text" as const, text: `Refused: dataset '${dataset}' is not an existing path inside the repository.` }],
+          isError: true,
+        };
+      }
       try {
         const res = await executeNamedQuery({
           dataset,
