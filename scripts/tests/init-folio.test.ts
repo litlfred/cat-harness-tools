@@ -91,6 +91,9 @@ function scaffoldConfig(dir: string): Record<string, unknown> {
  */
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
 
+/** This layer's own root: where its reusable workflows (`.github/workflows/folio-*.yml`) are. */
+const TOOLS_ROOT = resolve(import.meta.dir, "../..");
+
 /**
  * A paper folio's templates include the `paper` profile, which a layer ABOVE
  * this one holds (folio-assistant-sci, move M11). A checkout without it has no
@@ -340,7 +343,7 @@ describe("what gets written", () => {
  * the four Lean ones (and what they call) for a paper folio only.
  */
 describe("workflow templates (52dz)", () => {
-  const GENERIC = ["qa-sweep.yml", "qa-sweep-nightly.yml", "section-title-audit.yml"];
+  const GENERIC = ["qa-sweep.yml", "qa-sweep-nightly.yml", "section-title-audit.yml", "site-publish.yml"];
   const LEAN = ["blueprint.yml", "lean-build.yml", "lean-build-sidecar.yml", "lean_ci.yml"];
   const LEAN_SUPPORT = [
     ".github/actions/lake-cache-restore/action.yml",
@@ -410,14 +413,12 @@ describe("workflow templates (52dz)", () => {
         expect(body.toLowerCase(), `${f} names qou`).not.toContain("qou");
         expect([...body.matchAll(TEMPLATE_PLACEHOLDER_RE)].map((m) => m[0]), `${f} placeholders`).toEqual([]);
       }
-      // ...and the substitution happened: the platform path the caller chose
-      // is the one the QA sweep runs from.
-      expect(readFileSync(join(d, ".github/workflows/qa-sweep.yml"), "utf-8")).toContain(
-        "vendor/fa/cat-harness-tools/pipeline/qa-sweep.ts",
-      );
+      // ...and the substitution happened: the folio the caller sweeps is the
+      // scaffold's content root.
+      expect(readFileSync(join(d, ".github/workflows/qa-sweep.yml"), "utf-8")).toContain('folio: "folio"');
       // GitHub's own `${{ … }}` expressions survive substitution untouched.
       expect(readFileSync(join(d, ".github/workflows/qa-sweep-nightly.yml"), "utf-8")).toContain(
-        "${{ github.run_id }}",
+        "${{ inputs.axes }}",
       );
     }
   });
@@ -436,8 +437,15 @@ describe("workflow templates (52dz)", () => {
         if (!existsSync(abs) || statSync(abs).isDirectory()) continue;
         for (const m of readFileSync(abs, "utf-8").matchAll(/vendor\/fa\/([\w./-]+?\.(?:ts|py|sh|bat|mjs))\b/g)) named.add(m[1]!);
       }
+      // The document workflows are thin callers: what they run is the
+      // reusable workflow they name, which must exist in this repository.
+      for (const f of r.created) {
+        const abs = join(d, f);
+        if (!existsSync(abs) || statSync(abs).isDirectory()) continue;
+        for (const m of readFileSync(abs, "utf-8").matchAll(/litlfred\/cat-harness-tools\/(\.github\/workflows\/[\w.-]+\.yml)@/g)) named.add(m[1]!);
+      }
       expect(named.size, `${contentType}: no platform path found to check`).toBeGreaterThan(0);
-      const missing = [...named].filter((p) => !existsSync(join(REPO_ROOT, p)));
+      const missing = [...named].filter((p) => !existsSync(join(p.startsWith(".github/") ? TOOLS_ROOT : REPO_ROOT, p)));
       expect(missing, `${contentType} names platform files that do not exist`).toEqual([]);
     }
   });
@@ -455,7 +463,9 @@ describe("workflow templates (52dz)", () => {
       const raw = readFileSync(join(d, ".github/workflows", wf), "utf-8");
       const doc = parseYaml(raw) as { permissions?: Record<string, string> };
       expect(doc.permissions?.contents, `${wf} permissions.contents`).toBe("write");
-      expect(raw, `${wf} publishes via qa-store.ts`).toContain("cat-harness-tools/scripts/qa-store.ts\" publish");
+      expect(raw, `${wf} calls the reusable QA workflow`).toMatch(/uses: litlfred\/cat-harness-tools\/\.github\/workflows\/folio-qa-sweep(-nightly)?\.yml@main/);
+      const reusable = readFileSync(join(TOOLS_ROOT, ".github/workflows", `folio-${wf}`), "utf-8");
+      expect(reusable, `folio-${wf} publishes via qa-store.ts`).toContain("scripts/qa-store.ts\" publish");
     }
   });
 
