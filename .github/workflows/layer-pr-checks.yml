@@ -260,6 +260,16 @@ on:
         required: false
         type: boolean
         default: true
+      quick-paths:
+        description: "Path prefixes in the calling repository, space-separated (a directory ends in `/`). A PR whose every changed file starts with one of them takes the quick lane: the PR side is mounted, installed and typechecked, `quick-test` runs, and nothing else (no main side, no shards, no derive:publish, no gates). Empty: no quick lane."
+        required: false
+        type: string
+        default: ""
+      quick-test:
+        description: "What `bun test` runs in the quick lane, relative to the instance's directory (run from the root as `./<instance>/<quick-test>`, as the shards run tests). Required when quick-paths is set."
+        required: false
+        type: string
+        default: ""
     # Post-merge QA (owner, 2026-10-30, "Both"): on a push to main, whether
     # main ITSELF is green, for the caller's `layer-main-qa.yml` job, which
     # opens, updates or closes the one `main-red` issue. Empty on a PR.
@@ -312,6 +322,8 @@ jobs:
       tools: ${{ steps.pins.outputs.tools }}
       shards: ${{ steps.shards.outputs.list }}
       skip: ${{ steps.lock-only.outputs.skip }}
+      quick: ${{ steps.quick.outputs.quick }}
+      quick-test: ${{ steps.quick-test.outcome }}
       typecheck: ${{ steps.tsc.outcome }}
     steps:
       # The shard matrix, [1..gate-shards], once, so `run` and `compare` agree
@@ -537,6 +549,33 @@ jobs:
             fi
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
+      # The quick lane (bean qkln; owner 2026-10-31, Q-CI1 A): a PR that
+      # touches only `quick-paths` runs only `quick-test`, about 2 minutes
+      # instead of the full ~30. Never on a push: main always runs in full.
+      - &quick
+        name: Does this PR change only the quick-lane paths?
+        id: quick
+        if: inputs.mode == 'layer' && inputs.quick-paths != '' && github.event_name == 'pull_request'
+        env:
+          PATHS: ${{ inputs.quick-paths }}
+          TEST: ${{ inputs.quick-test }}
+        run: |
+          set -euo pipefail
+          quick=false
+          if [ -z "$TEST" ]; then echo "::error::quick-paths is set but quick-test is empty"; exit 2; fi
+          if git -C src rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            changed="$(git -C src diff --name-only 'HEAD^1' HEAD)"
+            if [ -n "$changed" ]; then
+              quick=true
+              while IFS= read -r f; do
+                hit=false
+                for p in $PATHS; do case "$f" in "$p"*) hit=true; break;; esac; done
+                if [ "$hit" != true ]; then quick=false; echo "not quick: $f is outside quick-paths"; break; fi
+              done <<<"$changed"
+            fi
+            [ "$quick" = true ] && { echo "quick lane: every changed file is under: $PATHS"; echo "$changed"; }
+          fi
+          echo "quick=$quick" >> "$GITHUB_OUTPUT"
       - &caller-base
         name: Base side of the caller
         # Not on a push, for the same reason as the root's base side above.
@@ -684,7 +723,7 @@ jobs:
         name: Install Chromium, for the checks that draw through a browser
         # Not on a draft under `draft-fast-tier`: only derive:publish and the
         # gates draw, and a draft runs neither (owner, 2026-10-23, "1y").
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         # `render:bpmn` and the `*:processes:render:check` gates draw BPMN with
         # bpmn-js in Chromium (folio-assistant's B1 test job installs it for
         # the same reason). The index's OWN Playwright installs it, so the
@@ -701,7 +740,7 @@ jobs:
           fi
       - &state-mount
         name: Mount every graph kept on a branch, and build the IG pages
-        if: steps.skip-prep.outputs.hit != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && steps.quick.outputs.quick != 'true'
         # Every branch-kept graph the declarations name (beans, todos,
         # fsh-guts, health, issue-marks, marks, ...), as the index's own CI
         # mounts them with `state:mount`, but through `mountState` directly:
@@ -764,7 +803,7 @@ jobs:
         # fatal: recorded, and judged by the compare job against main.
         # Part of the full tier: skipped on a draft under `draft-fast-tier`,
         # with the shard hand-off steps below.
-        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         working-directory: fa
         run: |
           python3 ../ci/.github/scripts/layer-pr-checks/run-root-gates.py . \
@@ -776,7 +815,7 @@ jobs:
         # keyed by each writer's inputs and script closure (#409), so a stale
         # entry is a key defect, which the derive log's "reused" lines show.
         # Saved per side and run; restored from the newest of this repository.
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: fa/build/derive-cache
@@ -809,7 +848,7 @@ jobs:
         # Not on a draft under `draft-fast-tier` (owner, 2026-10-23, "1y"):
         # only the tests and gates read these pages, and a draft runs neither.
         # The typecheck does not read them. A ready_for_review run builds them.
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         # B1 (owner, 2026-10-14; cat-harness#194, cb280cd): the pages an
         # instance declares `builtAtPublish` are no longer committed, and
         # `bun run cat derive:publish` builds them over the mounts, as
@@ -938,6 +977,14 @@ jobs:
         working-directory: fa/${{ inputs.mode == 'layer' && env.INSTANCE || '.' }}
         run: |
           if [ -f tsconfig.json ]; then bunx tsc --noEmit -p tsconfig.json; else echo "no tsconfig.json: nothing to typecheck"; fi
+      - name: Quick-lane tests
+        id: quick-test
+        if: steps.quick.outputs.quick == 'true'
+        continue-on-error: true
+        working-directory: fa
+        env:
+          TEST: ${{ inputs.quick-test }}
+        run: bun test "./$INSTANCE/$TEST"
       - name: Directory READMEs (QA report, never a gate)
         # Owner, 2026-10-16: "QA report, but not gate". A layer's own PR is
         # told when its directory READMEs are stale, as a warning and in the
@@ -975,7 +1022,7 @@ jobs:
           exit 0
       - &timings-restore
         name: The gate seconds the last run of this repository recorded
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/timings
@@ -984,7 +1031,7 @@ jobs:
             layer-pr-checks-timings-v1-${{ github.repository }}-
       - &snapshot-save
         name: Hand this side's prepared root to its shards
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/prepared"
@@ -997,7 +1044,7 @@ jobs:
           ls -la "$RUNNER_TEMP/prepared"
       - &upload-prepared
         name: Upload this side's prepared root
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: prepared-${{ env.SIDE }}
@@ -1051,6 +1098,7 @@ jobs:
       - *setup-bun
       - *caller
       - *lock-only
+      - *quick
       - *caller-base
       # The base side is main, and main's answer does not depend on the PR
       # (bean cis2). It is cached under what it is computed FROM: the index
@@ -1213,11 +1261,12 @@ jobs:
         env:
           PUSH: ${{ github.event_name == 'push' }}
           PINS_ONLY: ${{ steps.lock-only.outputs.skip == 'true' }}
+          QUICK: ${{ steps.quick.outputs.quick == 'true' }}
           BASE_HIT: ${{ steps.base-hit.outputs.hit == 'true' }}
           CONE_HIT: ${{ steps.cone-lookup.outputs.cache-hit == 'true' }}
         run: |
           hit=false
-          if [ "$PINS_ONLY" = "true" ]; then hit=true
+          if [ "$PINS_ONLY" = "true" ] || [ "$QUICK" = "true" ]; then hit=true
           elif [ "$PUSH" = "true" ]; then { [ "$BASE_HIT" = "true" ] && [ "$CONE_HIT" = "true" ]; } && hit=true
           elif [ "$BASE_HIT" = "true" ]; then hit=true
           fi
@@ -1260,7 +1309,7 @@ jobs:
     if: >-
       !cancelled() && needs.prepare-base.result == 'success' && (
         (github.event_name == 'push' && needs.prepare-base.outputs.prepared == 'true') ||
-        (github.event_name != 'push' && needs.prepare-head.result == 'success' && needs.prepare-head.outputs.skip != 'true'))
+        (github.event_name != 'push' && needs.prepare-head.result == 'success' && needs.prepare-head.outputs.skip != 'true' && needs.prepare-head.outputs.quick != 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 150
     strategy:
@@ -1457,6 +1506,7 @@ jobs:
           PUSH: ${{ github.event_name == 'push' }}
           PREPARED: ${{ needs.prepare-base.outputs.prepared }}
           DRAFT: ${{ inputs.draft-fast-tier && github.event.pull_request.draft == true }}
+          QUICK: ${{ needs.prepare-head.outputs.quick == 'true' }}
         run: |
           if [ "$PUSH" = "true" ]; then
             if [ "$PREPARED" = "true" ]; then
@@ -1471,6 +1521,11 @@ jobs:
             msg="This PR changes only the caller's own pins (index.lock.json, index.config.json). Layer mode mounts the folio-assistant index's lock, never the caller's, so the tests and gates would judge nothing it changed: nothing was run."
             echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
             echo "only=true" >> "$GITHUB_OUTPUT"
+          elif [ "$QUICK" = "true" ]; then
+            msg="quick lane: this PR changes only \`${{ inputs.quick-paths }}\`, so only \`bun test ${{ inputs.quick-test }}\` and the typecheck ran (no main side, shards, derive:publish or gates)."
+            echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            echo "only=true" >> "$GITHUB_OUTPUT"
+            echo "quick=true" >> "$GITHUB_OUTPUT"
           elif [ "$DRAFT" = "true" ]; then
             msg="draft: full tier skipped. This draft PR was prepared and typechecked only; the tests, the gates and the comparison with main run when it is marked ready for review."
             echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
@@ -1697,6 +1752,19 @@ jobs:
         run: |
           echo "::error::tests: ${{ steps.tests.outcome }}, gates: ${{ steps.gates.outcome }}, typecheck: ${{ needs.prepare-head.outputs.typecheck }} — see the step summary"
           exit 1
+      # The quick lane is judged here: its tests and the typecheck. A PR side
+      # that could not be prepared is red, never a pass.
+      - name: Quick-lane verdict
+        if: steps.pins-only.outputs.quick == 'true'
+        env:
+          PREPARED: ${{ needs.prepare-head.result }}
+          TESTS: ${{ needs.prepare-head.outputs.quick-test }}
+          TYPECHECK: ${{ needs.prepare-head.outputs.typecheck }}
+        run: |
+          echo "quick lane: prepare-head $PREPARED, tests ${TESTS:-not run}, typecheck ${TYPECHECK:-not run}" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$PREPARED" = "success" ] || { echo "::error::quick lane: the PR side could not be prepared ($PREPARED)"; exit 1; }
+          [ "$TESTS" = "success" ] || { echo "::error::quick lane: tests ${TESTS:-not run}"; exit 1; }
+          [ "$TYPECHECK" != "failure" ] || { echo "::error::quick lane: typecheck failed"; exit 1; }
       # A draft under `draft-fast-tier`: the fast tier is judged here. A PR
       # side that could not be prepared is red, never a pass. So is a failed
       # typecheck.
