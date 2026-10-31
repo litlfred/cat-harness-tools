@@ -61,7 +61,7 @@ export interface WriterRecord {
   base: string;
   /** `clean` when the input-site audit cleared the writer's closure; otherwise why not, and the record is evidence, not proof. */
   audit: string;
-  /** Every path it touched inside the checkout and did not write, with its state after the run (`absent` for one it probed and then created). */
+  /** Every path it touched inside the checkout and did not write, with its state after the run. */
   reads: Record<string, string>;
   /** Every git command it ran, and what that command answered after the run. */
   git: Record<string, string>;
@@ -171,10 +171,10 @@ export function writerRecordOf(a: {
   if ("undetermined" in a.after || a.after.hash !== a.before.hash) return { none: "its script, imports or audited environment moved while it ran" };
   if (a.reached !== undefined) return { none: `the run reached a traced input site (${a.reached})` };
   if ("undetermined" in a.reads) return { none: a.reads.undetermined };
-  const absent = new Set(a.reads.absentBefore ?? []);
+  // A path it probed absent and then created is its own output, never an
+  // input: a skipped writer's outputs are put back from the published site.
   const reads: Record<string, string> = {};
   for (const p of a.reads.paths) reads[p] = pathState(a.root, p, a.digests);
-  for (const p of absent) reads[p] = "absent";
   const outputs: Record<string, string> = {};
   for (const p of a.reads.writes ?? []) {
     const s = pathState(a.root, p, a.digests);
@@ -234,4 +234,60 @@ export function decideWriter(
     proof,
     why: `reads unchanged since ${rec.sha.slice(0, 12)} (${Object.keys(rec.reads).length} paths, ${Object.keys(rec.outputs).length} outputs)${proof ? "" : `; evidence only, the audit did not clear it: ${rec.audit}`}`,
   };
+}
+
+/** One writer, judged after a full build: could it have been skipped, and would that have been right? */
+export type WriterVerdict =
+  | { writer: string; verdict: "rerun"; why: string }
+  | { writer: string; verdict: "skip-safe"; proof: boolean; outputs: number }
+  | { writer: string; verdict: "skip-unsafe"; proof: boolean; differs: string[] };
+
+/**
+ * The dry run of the rerun-and-measure switch for writers. After a FULL
+ * build, every writer the previous deploy recorded is asked {@link
+ * decideWriter} against the checkout as it stands (its predecessors' fresh
+ * outputs included). One that could have been skipped is then checked: each
+ * output its record names must be what this build wrote, and no file this
+ * build wrote under its declared outputs may be missing from the record. A
+ * `skip-unsafe` writer is one the switch would have served stale.
+ */
+export function verifyWriters(o: {
+  prev: WriterRecords | undefined;
+  writers: readonly string[];
+  base: (writer: string) => WriterBase;
+  root: string;
+  digests: FileDigests;
+  /** Every file under the writer's declared outputs now, repo-relative. */
+  filesNow: (writer: string) => string[];
+  git?: (root: string, c: GitCall) => string;
+}): WriterVerdict[] {
+  return o.writers.map((w): WriterVerdict => {
+    const d = decideWriter(o.prev, w, o.base(w), o.root, o.digests, o.git);
+    if (!d.skip) return { writer: w, verdict: "rerun", why: d.why };
+    const rec = o.prev!.writers[w]!;
+    const differs: string[] = [];
+    for (const [p, state] of Object.entries(rec.outputs)) if (pathState(o.root, p, o.digests) !== state) differs.push(p);
+    for (const p of o.filesNow(w)) if (!(p in rec.outputs)) differs.push(`${p} (not in the record)`);
+    return differs.length
+      ? { writer: w, verdict: "skip-unsafe", proof: d.proof, differs: differs.sort() }
+      : { writer: w, verdict: "skip-safe", proof: d.proof, outputs: Object.keys(rec.outputs).length };
+  });
+}
+
+/** The step summary for {@link verifyWriters}: unsafe first, bounded. */
+export function verifySummary(v: readonly WriterVerdict[], prevSha?: string): string {
+  const unsafe = v.filter((x) => x.verdict === "skip-unsafe");
+  const safe = v.filter((x) => x.verdict === "skip-safe");
+  const rerun = v.filter((x) => x.verdict === "rerun");
+  const lines = [
+    "### Writers, rerun and measure — dry run (bean `fwtz`, option B)",
+    "",
+    `**${unsafe.length ? "unsafe" : "safe"}**${prevSha ? ` · records from ${prevSha.slice(0, 12)}` : ""} · could skip ${safe.length + unsafe.length} of ${v.length} · would have been stale ${unsafe.length} · must rerun ${rerun.length}`,
+    "",
+  ];
+  for (const x of unsafe) if (x.verdict === "skip-unsafe") lines.push(`- \`${x.writer}\` would have been STALE${x.proof ? "" : " (evidence record)"}: ${x.differs.slice(0, 5).map((p) => `\`${p}\``).join(", ")}${x.differs.length > 5 ? ` … ${x.differs.length - 5} more` : ""}`);
+  for (const x of safe) if (x.verdict === "skip-safe") lines.push(`- \`${x.writer}\` could skip: ${x.outputs} output(s) matched${x.proof ? " (proof)" : " (evidence)"}`);
+  for (const x of rerun.slice(0, 20)) if (x.verdict === "rerun") lines.push(`- \`${x.writer}\` reruns: ${x.why}`);
+  if (rerun.length > 20) lines.push(`- … ${rerun.length - 20} more rerun`);
+  return lines.join("\n") + "\n";
 }

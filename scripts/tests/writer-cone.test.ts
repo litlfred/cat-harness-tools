@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 import { parseTrace } from "../ci-cone.ts";
 import { FileDigests } from "../input-hash.ts";
-import { decideWriter, emptyRecords, tracedArgv, writerRecordOf } from "../writer-cone.ts";
+import { decideWriter, emptyRecords, tracedArgv, verifySummary, verifyWriters, writerRecordOf } from "../writer-cone.ts";
 
 const ROOT = "/work/repo";
 
@@ -61,8 +61,8 @@ describe("writerRecordOf and decideWriter", () => {
         digests: new FileDigests(root),
       });
       if ("none" in rec) throw new Error(rec.none);
-      expect(Object.keys(rec.reads).sort()).toEqual(["in/a.txt", "later"]);
-      expect(rec.reads["later"]).toBe("absent");
+      // A path it probed absent and created is its own output, not an input.
+      expect(Object.keys(rec.reads)).toEqual(["in/a.txt"]);
       expect(Object.keys(rec.outputs)).toEqual(["out/o.json"]);
 
       const records = emptyRecords("abc123");
@@ -77,8 +77,16 @@ describe("writerRecordOf and decideWriter", () => {
       writeFileSync(join(root, "in/a.txt"), "two");
       expect(decideWriter(records, "w", fp, root, new FileDigests(root))).toEqual({ skip: false, why: "in/a.txt changed" });
       writeFileSync(join(root, "in/a.txt"), "one");
-      writeFileSync(join(root, "later"), "now here");
-      expect(decideWriter(records, "w", fp, root, new FileDigests(root))).toEqual({ skip: false, why: "later changed" });
+
+      // verifyWriters: a skippable writer whose fresh output matches is safe; one that differs is unsafe.
+      const v = (files: string[]) => verifyWriters({ prev: records, writers: ["w", "x"], base: () => fp, root, digests: new FileDigests(root), filesNow: (w) => (w === "w" ? files : []) });
+      expect(v(["out/o.json"])).toEqual([
+        { writer: "w", verdict: "skip-safe", proof: true, outputs: 1 },
+        { writer: "x", verdict: "rerun", why: "the deploy at abc123 recorded nothing for it" },
+      ]);
+      writeFileSync(join(root, "out/o.json"), '{"changed":1}');
+      expect(v(["out/o.json", "out/new.json"])[0]).toEqual({ writer: "w", verdict: "skip-unsafe", proof: true, differs: ["out/new.json (not in the record)", "out/o.json"] });
+      expect(verifySummary(v(["out/o.json"]), "abc123")).toContain("**unsafe**");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
