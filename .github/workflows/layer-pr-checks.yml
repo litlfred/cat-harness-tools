@@ -142,6 +142,13 @@
 #       failures: ${{ needs.checks.outputs.main-failures }}
 #       checks-result: ${{ needs.checks.result }}
 #
+# A layer's root runs the gates of every layer below it as well, and many of
+# those cannot apply there. A caller names the gates it judges in its own
+# `.github/main-qa-gates.json`, `{"judged": ["<layer>:*", "graph:<layer>:*"]}`
+# (fnmatch patterns): only those make main red. The others are listed in the
+# run's summary, the red ones as not judged and the passing ones as gates to
+# add. No file: every gate is judged (owner, 2026-10-31).
+#
 # Draft PRs (owner, 2026-10-23, "1y"; bean `dft1`): with `draft-fast-tier:
 # true`, a DRAFT pull request runs the fast tier only. prepare-head mounts the
 # PR side and typechecks, without derive:publish or Chromium; prepare-base, the shards and the index's own gates are
@@ -1610,6 +1617,17 @@ jobs:
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ needs.prepare-base.outputs.key }}
+      # The gates this layer judges (owner, 2026-10-31, "Layers declare their
+      # gates"): the caller's own `.github/main-qa-gates.json` at the pushed
+      # commit. A layer's root also runs the gates of the layers below it,
+      # and many cannot apply there. No file: every gate is judged.
+      - name: The gates this layer declares (a push)
+        if: ${{ !cancelled() && github.event_name == 'push' }}
+        uses: actions/checkout@v7
+        with:
+          path: caller-declared
+          sparse-checkout: .github/main-qa-gates.json
+          sparse-checkout-cone-mode: false
       - name: Main's own verdict (a push)
         id: main-verdict
         if: ${{ !cancelled() && github.event_name == 'push' }}
@@ -1618,7 +1636,7 @@ jobs:
         run: |
           dir="$RUNNER_TEMP/base-results"
           [ "$JOINED" = "true" ] && dir=merged/base
-          python3 .github/scripts/layer-pr-checks/main-verdict.py "$dir"
+          python3 .github/scripts/layer-pr-checks/main-verdict.py "$dir" caller-declared/.github/main-qa-gates.json
       - name: Tests
         id: tests
         if: steps.pins-only.outputs.only != 'true' && github.event_name != 'push'
