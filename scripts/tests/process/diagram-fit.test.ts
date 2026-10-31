@@ -8,6 +8,7 @@ import {
   bestLaneOrder,
   crossings,
   diagramFit,
+  edgesThroughShapes,
   FIT_WIDTH,
   laneOrder,
   placeLabels,
@@ -208,5 +209,26 @@ describe("labels on arrows and lane lines (owner, 2026-10-31: \"need to check fo
   test("a label already clear is left where it is", () => {
     const clear = bpmn(LANES.slice(0, 2), [["A", 100, 30, 36, 36, [140, 30, 60, 36]], ["B", 60, 130, 120, 60]], [["F", "A", "B", [[118, 66], [118, 130]]]]);
     expect(placeLabels(clear, { labels: [{ id: "A", text: "A", x: 140, y: 30, width: 60, height: 36 }] }).moved).toEqual([]);
+  });
+});
+
+describe("flows through boxes", () => {
+  test("a flow drawn through a step it does not touch is reported", () => {
+    const xml = bpmn(LANES, [["A", 50, 120, 100, 60], ["B", 200, 120, 100, 60], ["C", 350, 120, 100, 60]],
+      [["F", "A", "C", [[150, 150], [350, 150]]]]);
+    expect(edgesThroughShapes(readDi(xml))).toEqual([["F", "B"]]);
+    expect(diagramFit(xml)["edge-through-shape"]!.map((f) => f.where)).toEqual(["F/B"]);
+  });
+
+  test("a lane swap keeps a loop-back flow's bends rather than drawing it through the lane's steps", () => {
+    // D (lane One) loops back to A (lane Two) over the top of B and C.
+    const xml = bpmn(LANES,
+      [["A", 50, 120, 100, 60], ["B", 200, 120, 100, 60], ["C", 350, 120, 100, 60], ["D", 350, 20, 100, 60]],
+      [["F", "D", "A", [[350, 50], [30, 50], [30, 150], [50, 150]]]]);
+    const next = applyLaneOrder(xml, ["L2", "L1", "L3"]);
+    const di = readDi(next);
+    expect(laneOrder(di)).toEqual(["L2", "L1", "L3"]);
+    expect(edgesThroughShapes(di)).toEqual([]);
+    expect(di.edges.get("F")!.points).toEqual([{ x: 350, y: 150 }, { x: 30, y: 150 }, { x: 30, y: 50 }, { x: 50, y: 50 }]);
   });
 });

@@ -32,7 +32,7 @@
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { applyLaneOrder, bestLaneOrder, crossings, diagramFit, headerOverflow, laneOrder, placeLabels, readDi, resizeShapes, straightenFlows, textOverflow, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
+import { applyLaneOrder, bestLaneOrder, crossings, diagonalEdges, diagramFit, edgesThroughShapes, headerOverflow, laneOrder, placeLabels, readDi, resizeShapes, straightenFlows, textOverflow, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
 
 type Draw = (xml: string) => Promise<DrawnLabels | undefined>;
 
@@ -76,19 +76,30 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
   let xml = readFileSync(file, "utf8");
   if (!/<(?:\w+:)?process\b/.test(xml)) continue;
   const shown = relative(process.cwd(), file);
+  // What the layout fixes must not make worse: flows through boxes, flows
+  // crossing, slanted flows. If together they do, the file keeps its layout
+  // and only its labels are moved.
+  const original = xml;
+  const harm = (x: string): number[] => {
+    const di = readDi(x);
+    return [edgesThroughShapes(di).length, crossings(di).length, diagonalEdges(di).length];
+  };
+  const harmBefore = harm(xml);
   if (fix) {
     const before = readDi(xml);
     const best = bestLaneOrder(before);
     if (best.cost < best.current) {
       const next = applyLaneOrder(xml, best.order);
       const was = crossings(before).length, now = crossings(readDi(next)).length;
-      // A swap that shortens the lane trips but adds crossings is not a detangle.
-      if (now <= was) {
+      const thruWas = edgesThroughShapes(before).length, thruNow = edgesThroughShapes(readDi(next)).length;
+      // A swap that shortens the lane trips but adds crossings, or draws a
+      // flow through a box, is not a detangle.
+      if (now <= was && thruNow <= thruWas) {
         writeFileSync(file, next);
         xml = next;
         console.log(`✓ ${shown}: lanes reordered, lane crossings ${best.current} → ${best.cost}, flow crossings ${was} → ${now}`);
       } else {
-        console.log(`· ${shown}: a lane swap would add flow crossings (${was} → ${now}); left as it is`);
+        console.log(`· ${shown}: a lane swap would add flow crossings (${was} → ${now}) or flows through boxes (${thruWas} → ${thruNow}); left as it is`);
       }
     }
   }
@@ -109,9 +120,18 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
       const sizes = new Map(over.map((o) => [o.id, pass === "wider"
         ? { width: Math.max(o.box.width, Math.min(o.box.width + 40, 180)), height: o.box.height }
         : { width: o.box.width, height: Math.max(o.box.height, o.need.height) }]));
+      // A box that grows over a flow it does not own stays as it is: the
+      // author moves the flow or shortens the name.
+      const thru = (x: string): Set<string> => new Set(edgesThroughShapes(readDi(x)).map(([e, sh]) => `${e}/${sh}`));
+      const was = thru(xml);
+      for (const id of [...sizes.keys()]) {
+        const one = resizeShapes(xml, new Map([[id, sizes.get(id)!]]));
+        if ([...thru(one)].some((k) => !was.has(k))) sizes.delete(id);
+      }
+      if (sizes.size === 0) break;
       xml = resizeShapes(xml, sizes);
       writeFileSync(file, xml);
-      console.log(`✓ ${shown}: ${over.length} box(es) made ${pass} for their text (${over.map((o) => o.id).join(", ")})`);
+      console.log(`✓ ${shown}: ${sizes.size} box(es) made ${pass} for their text (${[...sizes.keys()].join(", ")})`);
     }
   }
   if (fix && renderer) {
@@ -134,6 +154,15 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
       xml = resizeShapes(xml, new Map(), min);
       writeFileSync(file, xml);
       console.log(`✓ ${shown}: ${over.length} pool/lane name(s) given room (${over.map((h) => h.id).join(", ")})`);
+    }
+  }
+  if (fix && xml !== original) {
+    const now = harm(xml);
+    if (now.some((n, i) => n > harmBefore[i]!)) {
+      xml = original;
+      writeFileSync(file, xml);
+      console.log(`· ${shown}: the layout fixes would add flows through boxes, crossings or slants ` +
+        `(${harmBefore.join("/")} → ${now.join("/")}); layout left as it is, labels only`);
     }
   }
   if (write && renderer) {
