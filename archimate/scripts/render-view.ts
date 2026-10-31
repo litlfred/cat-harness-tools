@@ -45,7 +45,7 @@
  * Every string from the model is escaped: the model is its authors', and a
  * name is text, never markup.
  */
-import type { ArchimateElement, ArchimateLayer, ArchimateModel, ArchimateRelationship, ArchimateView, ArchimateViewNode } from "../schemas/archimate.ts";
+import type { ArchimateElement, ArchimateLayer, ArchimateModel, ArchimateRelationship, ArchimateView, ArchimateViewConnection, ArchimateViewNode } from "../schemas/archimate.ts";
 
 /** Archi's default fill per layer. */
 export const LAYER_FILL: Record<ArchimateLayer, string> = {
@@ -133,7 +133,7 @@ function textBlock(lines: string[], cx: number, top: number, cls: string): strin
   );
 }
 
-type Pt = { x: number; y: number };
+export type Pt = { x: number; y: number };
 const centre = (n: ArchimateViewNode): Pt => ({ x: n.x + n.w / 2, y: n.y + n.h / 2 });
 
 /** Where the segment from a box's centre towards `p` leaves the box. */
@@ -224,7 +224,6 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
   const elements = new Map(model.elements.map((e) => [e.id, e]));
   const relationships = new Map(model.relationships.map((r) => [r.id, r]));
   const views = new Map(model.views.map((v) => [v.id, v]));
-  const nodes = new Map(view.nodes.map((n) => [n.id, n]));
 
   const pad = 20;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -237,17 +236,13 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
   }
   const out: string[] = [];
   // What the view uses, for its key: only what a reader can see on it.
+  const nodes = new Map(view.nodes.map((n) => [n.id, n]));
   const used = { layers: new Set<ArchimateLayer>(), shapes: new Set<Shape>(), relationships: new Set<string>(), groups: false, notes: false, nested: false, viewRefs: false };
   if (!Number.isFinite(minX)) {
     minX = 0; minY = 0; maxX = 360; maxY = 60;
     out.push(`<text class="av-note" x="180" y="34" text-anchor="middle">This view is empty: the model draws nothing on it.</text>`);
   }
 
-  /** Whether `inner` is drawn inside `outer`, at any depth. */
-  const within = (inner: string, outer: string): boolean => {
-    for (let p = nodes.get(inner)?.parent, seen = 0; p && seen < 64; p = nodes.get(p)?.parent, seen++) if (p === outer) return true;
-    return false;
-  };
   for (const n of view.nodes) {
     if (n.parent && nodes.get(n.parent)?.kind === "element" && n.kind === "element") used.nested = true;
     if (n.kind === "group") {
@@ -300,8 +295,68 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
     }
   }
 
-  // Lines over boxes. A connection may end on another connection (a relationship
-  // on a relationship): that end is the other line's midpoint, unclipped.
+  // Lines over boxes, each along its route (`routeConnections`).
+  for (const { connection: c, pts, half } of routeConnections(view)) {
+    for (const p of pts) grow(p.x, p.y);
+    const r = c.relationship ? relationships.get(c.relationship) : undefined;
+    if (r) used.relationships.add(r.type);
+    const st = lineStyle(r);
+    const d = `M${pts.map((p) => `${round(p.x)} ${round(p.y)}`).join(" L")}`;
+    const line =
+      `<path d="${d}" fill="none" stroke="#333" stroke-width="1.2"${st.dash ? ` stroke-dasharray="${st.dash}"` : ""}` +
+      `${st.start ? ` marker-start="url(#${st.start})"` : ""}${st.end ? ` marker-end="url(#${st.end})"` : ""}/>` +
+      // A wide transparent twin, so a thin line is easy to point at.
+      `<path d="${d}" fill="none" stroke="transparent" stroke-width="8"/>`;
+    const label = [r?.name, r?.type === "Influence" ? r.strength : undefined].filter(Boolean).join(" ");
+    const text = label ? `<text class="av-rel" x="${round(half.x)}" y="${round(half.y - 3)}" text-anchor="middle">${esc(label)}</text>` : "";
+    const title = r ? `<title>${esc(typeLabel(r.type))}${r.name ? `: ${esc(r.name)}` : ""}</title>` : "";
+    out.push(r && opts.relationshipHref ? `<a href="${esc(opts.relationshipHref(r.id))}" target="_top">${title}${line}${text}</a>` : `<g>${title}${line}${text}</g>`);
+  }
+
+  if (opts.legend !== false && Number.isFinite(maxY)) {
+    const key = legendSvg(used, minX, maxY + 28);
+    if (key.h > 0) {
+      out.push(key.svg);
+      grow(minX + key.w, maxY + 28 + key.h);
+    }
+  }
+
+  const vx = Math.floor(minX - pad);
+  const vy = Math.floor(minY - pad);
+  const vw = Math.ceil(maxX - minX + 2 * pad);
+  const vh = Math.ceil(maxY - minY + 2 * pad);
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx} ${vy} ${vw} ${vh}" width="${vw}" height="${vh}" role="img" aria-labelledby="av-title">` +
+    `<title id="av-title">${esc(view.name)} — ${esc(model.name)}</title>${STYLE}${MARKERS}` +
+    `<rect x="${vx}" y="${vy}" width="${vw}" height="${vh}" fill="#fff"/>` +
+    out.join("\n") +
+    `</svg>\n`
+  );
+}
+
+/** A connection as drawn: the points of its line, ends clipped to the boxes, and its midpoint. */
+export interface RoutedConnection {
+  connection: ArchimateViewConnection;
+  pts: Pt[];
+  half: Pt;
+}
+
+/**
+ * Every connection of a view along the route it is drawn with: Archi's
+ * bendpoints where they are current, else straight, with lines that share
+ * both ends set side by side. A connection may end on another connection (a
+ * relationship on a relationship): that end is the other line's midpoint,
+ * unclipped. A line between a box and one drawn inside it is not routed, as
+ * the nesting shows it. One routing, shared by the drawing and by the
+ * crossing count (`archimate-crossings.ts`), so what is counted is what is drawn.
+ */
+export function routeConnections(view: ArchimateView): RoutedConnection[] {
+  const nodes = new Map(view.nodes.map((n) => [n.id, n]));
+  const within = (inner: string, outer: string): boolean => {
+    for (let p = nodes.get(inner)?.parent, seen = 0; p && seen < 64; p = nodes.get(p)?.parent, seen++) if (p === outer) return true;
+    return false;
+  };
+  const routed: RoutedConnection[] = [];
   const mid = new Map<string, Pt>();
   const ends = (id: string): { at: Pt; node?: ArchimateViewNode } | undefined => {
     const n = nodes.get(id);
@@ -354,42 +409,10 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
       }
       const half = pts.length % 2 === 1 ? pts[(pts.length - 1) / 2]! : { x: (pts[pts.length / 2 - 1]!.x + pts[pts.length / 2]!.x) / 2, y: (pts[pts.length / 2 - 1]!.y + pts[pts.length / 2]!.y) / 2 };
       mid.set(c.id, half);
-      for (const p of pts) grow(p.x, p.y);
-      const r = c.relationship ? relationships.get(c.relationship) : undefined;
-    if (r) used.relationships.add(r.type);
-      const st = lineStyle(r);
-      const d = `M${pts.map((p) => `${round(p.x)} ${round(p.y)}`).join(" L")}`;
-      const line =
-        `<path d="${d}" fill="none" stroke="#333" stroke-width="1.2"${st.dash ? ` stroke-dasharray="${st.dash}"` : ""}` +
-        `${st.start ? ` marker-start="url(#${st.start})"` : ""}${st.end ? ` marker-end="url(#${st.end})"` : ""}/>` +
-        // A wide transparent twin, so a thin line is easy to point at.
-        `<path d="${d}" fill="none" stroke="transparent" stroke-width="8"/>`;
-      const label = [r?.name, r?.type === "Influence" ? r.strength : undefined].filter(Boolean).join(" ");
-      const text = label ? `<text class="av-rel" x="${round(half.x)}" y="${round(half.y - 3)}" text-anchor="middle">${esc(label)}</text>` : "";
-      const title = r ? `<title>${esc(typeLabel(r.type))}${r.name ? `: ${esc(r.name)}` : ""}</title>` : "";
-      out.push(r && opts.relationshipHref ? `<a href="${esc(opts.relationshipHref(r.id))}" target="_top">${title}${line}${text}</a>` : `<g>${title}${line}${text}</g>`);
+      routed.push({ connection: c, pts, half });
     }
   }
-
-  if (opts.legend !== false && Number.isFinite(maxY)) {
-    const key = legendSvg(used, minX, maxY + 28);
-    if (key.h > 0) {
-      out.push(key.svg);
-      grow(minX + key.w, maxY + 28 + key.h);
-    }
-  }
-
-  const vx = Math.floor(minX - pad);
-  const vy = Math.floor(minY - pad);
-  const vw = Math.ceil(maxX - minX + 2 * pad);
-  const vh = Math.ceil(maxY - minY + 2 * pad);
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx} ${vy} ${vw} ${vh}" width="${vw}" height="${vh}" role="img" aria-labelledby="av-title">` +
-    `<title id="av-title">${esc(view.name)} — ${esc(model.name)}</title>${STYLE}${MARKERS}` +
-    `<rect x="${vx}" y="${vy}" width="${vw}" height="${vh}" fill="#fff"/>` +
-    out.join("\n") +
-    `</svg>\n`
-  );
+  return routed;
 }
 
 // ── The key ──────────────────────────────────────────────────────────────

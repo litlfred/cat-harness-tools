@@ -55,6 +55,12 @@ describe("--fix repoints what has one answer and reports the rest", () => {
     expect(r.dead.map((d) => d.target)).toEqual(["nowhere.html"]);
   });
 
+  it("a link into a carried directory is not judged: the deploy lays that tree back after the check", () => {
+    const root = site({ "en/h/site/index.html": '<a href="../../../STAGING/pr-1/">p</a><a href="../../../_render-log/">l</a><a href="../../../gone/">g</a>' });
+    const r = checkSite({ site: root, basePath: "", fix: false, resolveSource: () => undefined });
+    expect(r.dead.map((d) => d.target)).toEqual(["gone/"]);
+  });
+
   it("a source file goes to GitHub at the pinned commit", () => {
     const idx = tailIndex(["cat-harness/skills/sdlc/crdm/crdm-detect.md", "cat-harness/AGENTS.md", "smart-base/AGENTS.md"]);
     const file = sourceFor("docs/skills/sdlc/crdm/crdm-detect.md", idx)!;

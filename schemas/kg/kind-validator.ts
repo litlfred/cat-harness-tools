@@ -316,8 +316,21 @@ export function rootOf(instance: string | undefined, instanceRoot: string): stri
     rootsByName.set(repo, byName);
   }
   if (declaresInstance(readOwnDeclaration(instanceRoot), instance)) return instanceRoot;
-  return byName.get(instance);
+  const found = byName.get(instance);
+  if (found !== undefined) return found;
+  // The layer running this code is always present, whatever the checkout
+  // around the resolving instance holds. cat-harness declares kinds whose
+  // validators live here (`cat-harness-tools:scripts/gen-slice-sqlite.ts#…`),
+  // and when the harness is its own checkout `siblingScopeFor` searches no
+  // siblings (ruling `68k7`), so the name was unresolvable standalone though
+  // the export exists (bean `w1gy`). Only the running layer's own name: this
+  // is not a sibling search.
+  if (declaresInstance(readOwnDeclaration(OWN_ROOT), instance)) return OWN_ROOT;
+  return undefined;
 }
+
+/** The root of the layer this module belongs to: `schemas/kg/` → its instance root. */
+const OWN_ROOT = resolve(import.meta.dir, "..", "..");
 
 function readOwnDeclaration(root: string): { name?: string; repository?: string } | undefined {
   try {
