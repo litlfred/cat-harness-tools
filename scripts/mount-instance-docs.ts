@@ -109,6 +109,7 @@ import { WITHHELD_FILE, withheldFilter, withheldPaths } from "./lib/withheld.js"
 import { instanceDirectories, declarationPathIn, readDeclaration, siteDirFor, siteFileFor, visualisationsOf } from "../schemas/kg/cat-harness.js";
 import { declinesNavbar, type NavItem } from "./lib/harness-rail.js";
 import { injectRailOnce } from "./lib/rail-once.js";
+import { withIgRenderRow } from "./lib/ig-render-row.ts";
 import { type ForeignScope, foreignScopeFor, scopeNavbarRow, siteHref } from "./lib/foreign-site-scope.ts";
 import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
 import { graphTypologyRowDecor } from "./lib/graph-typology-nav.js";
@@ -1540,11 +1541,20 @@ export function railStandalonePages(
           // The folio's OWN mark is on its own site when it is the checkout's root (gap 4).
           const markRoot = foreign && ownsCheckout(foreign.instance) ? toRoot : linkRoot;
           const homeLabel = foreign ? foreign.homeLabel : named.site;
-          const harnesses = landed
+          const listed = landed
             ? [{ label: homeLabel ?? named.harness ?? owner, href: `${toRoot}/` }, ...(instanceHarnesses(built, foreign!.instance!, linkRoot, undefined) ?? [])]
             : foreign?.instance
               ? instanceHarnesses(built, foreign.instance, linkRoot, `${toRoot}/`, markRoot)
               : instantiatedHarnesses(built, linkRoot);
+          // A FHIR IG rendered on this site gets a `[fhir]` row to its index
+          // page, right after its harness's row (owner, 2026-10-31).
+          const harnesses = withIgRenderRow(listed, {
+            siteAbs,
+            owner,
+            ownerLabel: landed ? (homeLabel ?? named.harness ?? owner) : named.harness,
+            atRoot: foreign !== undefined || owner === instanceName,
+            toRoot,
+          });
           // The landing's mark is not this site's: a site with no instance of its own draws none.
           const mark = landed ? undefined : instanceMark(built, owner, foreign?.instance === owner ? markRoot : linkRoot);
           return { named, linkRoot, links, homeLabel, harnesses, mark };
