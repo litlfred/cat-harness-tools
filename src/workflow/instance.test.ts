@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { complete, enabled, startInstance, WorkflowError, type EnabledActivity } from "./instance.js";
+import { complete, enabled, informedByStep, startInstance, WorkflowError, type EnabledActivity } from "./instance.js";
+import type { ProvActivity } from "../../schemas/content/prov.js";
 import { loadProcessModel } from "./process-model.js";
 import type { RoleGraph } from "../../schemas/process/role-graph.js";
 
@@ -409,6 +410,18 @@ describe("Tool activities are kept on the step that did them (folio-assistant#87
     }
   });
 
+  test("a step with no prov activity of its own: no prov:wasInformedBy is invented (bean w1gy)", async () => {
+    const { dir, model, state } = await started();
+    try {
+      complete(model, state, "Task_Before", { activities: [activity("parent#Task_Before")] });
+      const entry = state.history.find((h) => h.node === "Task_Before")!;
+      expect(entry.prov).toBeUndefined();
+      expect("prov:wasInformedBy" in entry.activities![0]!).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("something that is not a prov:Activity refuses", async () => {
     const { dir, model, state } = await started();
     try {
@@ -416,5 +429,38 @@ describe("Tool activities are kept on the step that did them (folio-assistant#87
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("informedByStep — a Tool activity is linked to its step's prov:Activity (bean w1gy, folio-assistant#875 FR-005)", () => {
+  const tool = (extra: Record<string, unknown> = {}): ProvActivity =>
+    ({
+      "@type": "prov:Activity",
+      "@id": "skill-update:skills/x.md@0123456789ab",
+      "prov:startedAtTime": "2026-10-30T13:40:00.000Z",
+      "prov:qualifiedAssociation": { "prov:agent": "authoring-agent", "prov:hadRole": "editor", "prov:hadPlan": "p#T" },
+      "cat-harness:underPolicy": ["policy:test"],
+      ...extra,
+    }) as ProvActivity;
+  const step = { ...tool(), "@id": "inst#0" } as ProvActivity;
+
+  test("the step's @id is written when the step has its own activity", () => {
+    expect(informedByStep([tool()], step)[0]!["prov:wasInformedBy"]).toBe("inst#0");
+  });
+
+  test("no step activity, or one without an @id: nothing is added", () => {
+    expect("prov:wasInformedBy" in informedByStep([tool()], undefined)[0]!).toBe(false);
+    expect("prov:wasInformedBy" in informedByStep([tool()], { ...step, "@id": "" } as ProvActivity)[0]!).toBe(false);
+  });
+
+  test("a value the Tool supplied is kept, the step's added beside it", () => {
+    expect(informedByStep([tool({ "prov:wasInformedBy": "other#1" })], step)[0]!["prov:wasInformedBy"]).toEqual(["other#1", "inst#0"]);
+    expect(informedByStep([tool({ "prov:wasInformedBy": ["a#1", "b#2"] })], step)[0]!["prov:wasInformedBy"]).toEqual(["a#1", "b#2", "inst#0"]);
+    expect(informedByStep([tool({ "prov:wasInformedBy": "inst#0" })], step)[0]!["prov:wasInformedBy"]).toBe("inst#0");
+  });
+
+  test("a hash-sealed Tool activity is left as it was", () => {
+    const sealed = tool({ "cat-harness:previousHash": null, "cat-harness:recordHash": "a".repeat(64) });
+    expect(informedByStep([sealed], step)[0]).toBe(sealed);
   });
 });

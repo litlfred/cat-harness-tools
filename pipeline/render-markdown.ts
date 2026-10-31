@@ -139,6 +139,40 @@ function blockTitle(block: Block): string | undefined {
   return "title" in block && typeof block.title === "string" ? block.title : undefined;
 }
 
+/** Kinds whose source publication numbers them ("Fig. 6", "Table 2"). */
+const NUMBERED_KINDS = new Set(["figure", "diagram", "table"]);
+
+/**
+ * The number a caption starts with, and the caption without it.
+ *
+ * Ingested figures keep their source number in the caption (`Fig. 1. Product
+ * master data`, `Fig 1.`, `Figure 2.13:`, `Table 3.`). Until 2026-10-31 the
+ * heading printed a bare `**Figure.**` and the number survived only in the
+ * italic caption under the image, so a reader could not see or cite "Figure 1"
+ * where the block starts (owner, dth-pc preview). A caption that names several
+ * figures (`Fig. 26. ...; Fig. 27. ...`) keeps its full text and the heading
+ * takes the range. No number is invented: a caption with none returns null.
+ */
+export function captionNumber(caption: string): { number: string; rest: string } | null {
+  const m = /^\s*(?:Fig\.?|Figure|Table|Tbl\.?)\s*(\d+(?:\.\d+)*)\s*[.:]?\s*/i.exec(caption);
+  if (!m) return null;
+  const all = [...caption.matchAll(/\b(?:Fig\.?|Figure|Table)\s*(\d+(?:\.\d+)*)/gi)].map((x) => x[1]!);
+  const distinct = [...new Set(all)];
+  if (distinct.length > 1) return { number: `${distinct[0]}\u2013${distinct[distinct.length - 1]}`, rest: caption.trim() };
+  return { number: m[1]!, rest: caption.slice(m[0].length).trim() };
+}
+
+/**
+ * A link to the block's own anchor, drawn with the theme's `#svg-link` icon
+ * like every heading's, so a figure or table can be linked to and copied the
+ * way a section can. Its own class, not `anchor-heading`: that class is the
+ * theme's, positioned for headings, and its text is what
+ * `check-inline-scripts.ts` treats as a rewrite signature.
+ */
+function blockAnchorLink(label: string, what: string): string {
+  return `<a href="#${label}" class="block-anchor" aria-label="Link to ${what}" title="Link to ${what}"><svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><use xlink:href="#svg-link"></use></svg></a>`;
+}
+
 /**
  * Render one block: an optional anchor, a bolded kind heading, then the body
  * verbatim.
@@ -168,8 +202,15 @@ export function renderBlockMarkdown(
   if (opts.anchors !== false && label) lines.push(`<a id="${label}"></a>`);
 
   const title = blockTitle(block);
+  const caption =
+    "caption" in block && typeof block.caption === "string" && block.caption.trim() !== ""
+      ? block.caption
+      : undefined;
+  const numbered = heading && NUMBERED_KINDS.has(block.kind) && caption ? captionNumber(caption) : null;
   if (heading) {
-    lines.push(title ? `**${heading}.** *${title}*` : `**${heading}.**`);
+    const name = numbered ? `${heading} ${numbered.number}` : heading;
+    const link = opts.anchors !== false && label && NUMBERED_KINDS.has(block.kind) ? ` ${blockAnchorLink(label, name)}` : "";
+    lines.push((title ? `**${name}.** *${title}*` : `**${name}.**`) + link);
     lines.push("");
   } else if (title) {
     // A kind with no heading is `prose`, and unheaded prose is the whole
@@ -189,14 +230,12 @@ export function renderBlockMarkdown(
   const body = resolveLiquidValues(mdContent).trim();
   if (body) lines.push(body);
 
-  if (
-    "caption" in block &&
-    typeof block.caption === "string" &&
-    block.caption.trim() !== "" &&
-    block.caption !== title
-  ) {
+  if (caption && caption !== title) {
+    // A numbered heading already says "Figure 1", so the caption drops its
+    // own "Fig. 1." rather than print the number twice.
+    const shown = numbered && numbered.rest ? numbered.rest : caption;
     if (body) lines.push("");
-    lines.push(`*${block.caption}*`);
+    lines.push(`*${shown}*`);
   }
 
   return lines.join("\n");

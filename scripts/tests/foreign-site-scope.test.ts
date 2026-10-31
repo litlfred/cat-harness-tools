@@ -55,7 +55,7 @@ import { navbarRowJsonOf } from "../lib/harness-rail.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
-import { notApplicableAlone, siteNotBuilt } from "../../test/support/checkout.ts";
+import { notApplicableAlone, qaResultDirsIn, restoringTracked, siteNotBuilt } from "../../test/support/checkout.ts";
 import { ensureThemesCss } from "../../test/support/themes-css.ts";
 import { declaredPlan, runWriter, writersOf } from "../derive-at-publish.ts";
 
@@ -137,13 +137,18 @@ try {
       `foreign-site-scope: built nothing — expected a builtAtPublish entry for each of ${[...READS].join(", ")}; found ${READ_PLAN.map((a) => `${a.instance}/${a.path}`).join(", ") || "none"}`,
     );
   } else {
-    for (const w of writersOf(READ_PLAN)) {
-      const o = runWriter(["bun", "run", "cat", w], REPO);
-      if (o.kind !== "ran") {
-        console.warn(`foreign-site-scope: the publish-time writer \`${w}\` did not build what this file reads (${JSON.stringify(o)}; is the state mounted? \`bun run cat state:mount\`)`);
-        break;
+    // `docs:pages` also re-derives the committed QA witnesses under every
+    // instance's `test/results/`: they are put back as they were, so this
+    // build leaves no tracked file changed (bean w1gy F24).
+    restoringTracked(qaResultDirsIn(REPO), () => {
+      for (const w of writersOf(READ_PLAN)) {
+        const o = runWriter(["bun", "run", "cat", w], REPO);
+        if (o.kind !== "ran") {
+          console.warn(`foreign-site-scope: the publish-time writer \`${w}\` did not build what this file reads (${JSON.stringify(o)}; is the state mounted? \`bun run cat state:mount\`)`);
+          break;
+        }
       }
-    }
+    });
   }
 } catch (e) {
   console.warn(`foreign-site-scope: built nothing — could not read the publish plan: ${(e as Error).message}`);
@@ -304,10 +309,18 @@ describe("the rule, one row per case", () => {
   });
 });
 
-describe("smart-trust, against the platform's real harness data", () => {
-  const data = JSON.parse(readFileSync(PLATFORM_DATA, "utf-8")) as Record<string, unknown>;
-  const scope = foreignScopeFor(REPO, { instance: "smart-trust", platformBase: BASE, title: "WHO SMART Trust" });
-  const out = scopeHarnessData(data, scope) as {
+// smart-trust is a higher instance a standalone checkout does not hold, and
+// the platform's harness data is built at publish and gitignored (bean w1gy
+// F18). Either absent, there is no real data to scope.
+const NO_REAL_DATA =
+  (!existsSync(SMART_TRUST) && notApplicableAlone("smart-trust's checkout, whose rail scope the platform's data is scoped to (a higher instance)")) ||
+  siteNotBuilt("the platform's harness data `docs:harness` writes at publish (gitignored)", PLATFORM_DATA);
+describe.skipIf(NO_REAL_DATA)("smart-trust, against the platform's real harness data", () => {
+  // `describe.skipIf` still runs this body, so nothing is read when it skips.
+  const data = (NO_REAL_DATA ? {} : JSON.parse(readFileSync(PLATFORM_DATA, "utf-8"))) as Record<string, unknown>;
+  const out = (NO_REAL_DATA
+    ? {}
+    : scopeHarnessData(data, foreignScopeFor(REPO, { instance: "smart-trust", platformBase: BASE, title: "WHO SMART Trust" }))) as {
     title: string;
     tiles: { id: string; href?: string; count?: number }[];
     navbar: { hrefs: Record<string, string>; notes: Record<string, string> };

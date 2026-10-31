@@ -40,6 +40,7 @@ import { join, resolve } from "node:path";
 
 import { baseDocsDir } from "../../compose-docs.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { notApplicableAlone, siteNotBuilt } from "../../../test/support/checkout.ts";
 import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
@@ -55,14 +56,21 @@ interface Harness {
   visualisations?: { kind: string; path?: string }[];
 }
 
-const data = JSON.parse(readFileSync(HARNESS, "utf-8")) as { harnesses?: Harness[] };
+/** The harness report is written at publish and gitignored (bean w1gy F18). */
+const NOT_BUILT = siteNotBuilt("the harness data `docs:harness` writes at publish (gitignored)", HARNESS);
+/** Instances above the harness, which a standalone checkout does not hold. */
+const absentAbove = (names: string[]): boolean =>
+  names.some((n) => !existsSync(join(REPO, n))) &&
+  notApplicableAlone(`${names.join(" and ")}, the higher instance(s) whose report entries this reads`);
+
+const data = (NOT_BUILT ? {} : JSON.parse(readFileSync(HARNESS, "utf-8"))) as { harnesses?: Harness[] };
 const harnesses = data.harnesses ?? [];
 
 const findingsOf = (h: Harness): string[] => h.findings ?? [];
 const unbuilt = (h: Harness) => findingsOf(h).find((f) => f.includes("no published viewer"));
 const undiscovered = (h: Harness) => findingsOf(h).find((f) => f.includes("not at a conventional path"));
 
-describe("the harness report distinguishes unbuilt from undiscovered", () => {
+describe.skipIf(NOT_BUILT)("the harness report distinguishes unbuilt from undiscovered", () => {
   it("has harnesses to report on", () => {
     // Vacuity guard: every assertion below iterates this list.
     expect(harnesses.length).toBeGreaterThan(0);
@@ -142,7 +150,7 @@ describe("the harness report distinguishes unbuilt from undiscovered", () => {
  * honest whatever the count is, which is a different property and one that
  * still has to hold the moment somebody re-opens this case.
  */
-describe("no viewer is built and unreachable", () => {
+describe.skipIf(NOT_BUILT)("no viewer is built and unreachable", () => {
   it("no harness carries an undiscovered-viewer finding", () => {
     const offenders = harnesses
       .filter((h) => undiscovered(h) !== undefined)
@@ -158,7 +166,8 @@ describe("no viewer is built and unreachable", () => {
   });
 });
 
-describe("who-iris/catalogue — the case that exposed it, now closed", () => {
+const NO_IRIS = NOT_BUILT || absentAbove(["who-iris"]);
+describe.skipIf(NO_IRIS)("who-iris/catalogue — the case that exposed it, now closed", () => {
   /* FOUND BY `name`, NOT BY `title`, and the difference cost a red gate.
    *
    * This looked up `title === "who-iris"` and stopped matching on 2026-09-22,
@@ -202,7 +211,8 @@ describe("who-iris/catalogue — the case that exposed it, now closed", () => {
   });
 });
 
-describe("fhir-artifact-index — a viewer inside a COMPOSED directory is linked", () => {
+const NO_IGS = NOT_BUILT || absentAbove(["smart-trust", "smart-base"]);
+describe.skipIf(NO_IGS)("fhir-artifact-index — a viewer inside a COMPOSED directory is linked", () => {
   /* Stage C of the smart-* separation (#1767). `gen-ig-pages` writes each IG
    * instance's artefact index to `<instance>/docs/index.md`, which
    * `compose-docs` publishes at `/<instance>/`. That ref is instance-relative,

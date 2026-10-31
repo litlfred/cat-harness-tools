@@ -347,6 +347,15 @@ export function provJsonldDocument(
             }),
           }
         : {}),
+      // Another activity, by its `@id` — written as a link for the same reason.
+      ...(a["prov:wasInformedBy"] !== undefined
+        ? {
+            "prov:wasInformedBy": (Array.isArray(a["prov:wasInformedBy"])
+              ? a["prov:wasInformedBy"]
+              : [a["prov:wasInformedBy"]]
+            ).map((id) => ({ "@id": id })),
+          }
+        : {}),
       "cat-harness:underPolicy": a["cat-harness:underPolicy"],
       ...(a["cat-harness:consent"] ? { "cat-harness:consent": a["cat-harness:consent"] } : {}),
       ...(a["cat-harness:consentBased"] !== undefined ? { "cat-harness:consentBased": a["cat-harness:consentBased"] } : {}),
