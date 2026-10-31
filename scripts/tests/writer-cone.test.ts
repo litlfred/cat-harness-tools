@@ -43,9 +43,21 @@ describe("parseTrace in collect mode — a writer's reads and writes", () => {
     expect(r).toEqual({ paths: ["smart-base/docs"], git: [], writes: ["smart-base/docs/p.md"], absentBefore: [] });
   });
 
-  test("a call strace lost as a thread detached names nothing, and is passed over", () => {
-    const r = collect([`10 openat(AT_FDCWD</work/repo>, "a.md", O_RDONLY|O_CLOEXEC) = 3</work/repo/a.md>`, `11 ???( <detached ...>`]);
-    expect(r).toEqual({ paths: ["a.md"], git: [], writes: [], absentBefore: [] });
+  test("a call strace lost as a thread detached names nothing, and a named one keeps its arguments", () => {
+    const r = collect([
+      `10 openat(AT_FDCWD</work/repo>, "a.md", O_RDONLY|O_CLOEXEC) = 3</work/repo/a.md>`,
+      `11 ???( <detached ...>`,
+      `12 ???( <unfinished ...>`,
+      `12 <... ??? resumed> <detached ...>`,
+      `15 ???( <unfinished ...>`,
+      `15 <... ??? resumed>) = ?`,
+      `16 <... futex resumed> <detached ...>`,
+      `17 <detached ...>`,
+      `13 clone3({flags=CLONE_VM|CLONE_FS}, 88 <detached ...>`,
+      `14 openat(AT_FDCWD</work/repo>, "b.md", O_RDONLY|O_CLOEXEC <unfinished ...>`,
+      `14 <... openat resumed> <detached ...>`,
+    ]);
+    expect(r).toEqual({ paths: ["a.md", "b.md"], git: [], writes: [], absentBefore: [] });
   });
 
   test("git run with an absolute -C at the root is replayed from the root", () => {

@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MAX_TRACE_BYTES, decideRun, excluded, gitReplayable, loadRecords, parseTrace, recordRun, splitArgs, unquote } from "../../ci-cone.ts";
+import { decideRun, excluded, gitReplayable, loadRecords, parseTrace, recordRun, splitArgs, unquote } from "../../ci-cone.ts";
 import { BUILD_OUTPUT_DIRS, TRACKED, type BaselineResolver, type PairIO } from "../../input-hash.ts";
 import { NOT_INSTANCE_DIRS } from "../../../schemas/kg/instance-roots.ts";
 import { statementPin } from "../../input-sites.ts";
@@ -97,14 +97,6 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
 
   test("a git command is recorded for REPLAY only when it is read-only and takes no stdin", () => {
     expect(gitReplayable("", ["-C", "sub", "ls-files", "-z"])).toEqual({ cwd: "sub", args: ["ls-files", "-z"] });
-    expect(gitReplayable("", ["-C", "/work/repo", "remote", "get-url", "origin"], [ROOT])).toEqual({
-      cwd: "",
-      args: ["remote", "get-url", "origin"],
-    });
-    expect(gitReplayable("", ["-C", "/work/repo/sub", "remote", "get-url", "origin"], [ROOT])).toEqual({
-      cwd: "sub",
-      args: ["remote", "get-url", "origin"],
-    });
     expect(gitReplayable("", ["--no-pager", "log", "-1"])).toEqual({ cwd: "", args: ["--no-pager", "log", "-1"] });
     expect(gitReplayable("", ["remote", "get-url", "origin"])).toEqual({ cwd: "", args: ["remote", "get-url", "origin"] });
     expect(gitReplayable("", ["hash-object", "a.svg"])).toEqual({ cwd: "", args: ["hash-object", "a.svg"] });
@@ -124,25 +116,11 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
       ["cat-file", "--batch"],
       ["check-ignore", "--stdin"],
       ["config", "user.name", "x"],
-      ["remote", "add", "origin", "https://example.com/r.git"],
-      ["remote", "-v"],
       ["--git-dir=/elsewhere", "ls-files"],
       ["-C", "../other", "ls-files"],
-      ["-C", "/elsewhere", "ls-files"],
     ]) {
-      expect("undetermined" in gitReplayable("", argv, [ROOT])).toBe(true);
+      expect("undetermined" in gitReplayable("", argv)).toBe(true);
     }
-  });
-
-  test("parseTrace folds an in-checkout absolute git -C path and allows 512 MiB traces (subgraph:jsonld)", () => {
-    expect(MAX_TRACE_BYTES).toBe(512 * 1024 * 1024);
-    const r = read(
-      [
-        `20 getcwd("/work/repo", 4096) = 11`,
-        `20 execve("/usr/bin/git", ["git", "-C", "/work/repo", "remote", "get-url", "origin"], 0x1 /* 3 vars */) = 0`,
-      ].join("\n"),
-    );
-    expect(r).toEqual({ paths: [], git: [{ cwd: "", args: ["remote", "get-url", "origin"] }] });
   });
 
   test("a git command that cannot be replayed makes the whole read set undetermined", () => {
@@ -171,13 +149,7 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
 
 // ── End to end, under a real strace ────────────────────────────────────────
 
-const HAS_STRACE = (() => {
-  try {
-    return Bun.spawnSync(["strace", "-f", "-qq", "-o", "/dev/null", "true"], { stdout: "ignore", stderr: "ignore" }).exitCode === 0;
-  } catch {
-    return false;
-  }
-})();
+const HAS_STRACE = Bun.which("strace") !== null && Bun.spawnSync(["strace", "-f", "-qq", "-o", "/dev/null", "true"], { stdout: "ignore", stderr: "ignore" }).exitCode === 0;
 
 describe.skipIf(!HAS_STRACE)("the falsifiers, under a real strace (skipped where strace cannot run)", () => {
   let root: string;

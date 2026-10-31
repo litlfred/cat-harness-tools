@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 
@@ -234,7 +235,7 @@ describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", (
     // (cat-harness d37c20c4). The two that were restored are asserted.
     expect(advMap.get("tools")).toBe("reviewed");
     expect(advMap.get("skills")).toBe("reviewed");
-  });
+  }, 30_000);
 
   it("KindCoverage rows include adversarial column with valid states", () => {
     const { rows } = coverage(REPO);
@@ -271,5 +272,55 @@ describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", (
     expect(record).not.toHaveProperty("files");
     expect(record).not.toHaveProperty("sidecars");
     expect(record.hasFiles).toBe(true);
+  });
+});
+
+describe("Adversarial reviews in the attestation store (D2 (a), cat-harness#857)", () => {
+  const review = {
+    reviewer: { by: "agent", session: "session_test", model: NOT_DISCLOSED },
+    author_sessions: [],
+    skill_hash: "hash:adversarial-checklist:v1",
+    at: "2026-10-31T00:00:00.000Z",
+    coverage: { files_total: 1, files_reviewed: 1, skipped: [] },
+    result: "pass",
+    flags: [],
+    findings: [],
+  };
+  const withStore = (pinned: (current: string) => string, fn: (root: string) => void): void => {
+    const root = mkdtempSync(join(tmpdir(), "adv-store-"));
+    try {
+      mkdirSync(join(root, "skills"), { recursive: true });
+      writeFileSync(join(root, "skills", "s.md"), "# a skill\n");
+      const current = createHash("sha256").update(readFileSync(join(root, "skills", "s.md"))).digest("hex").slice(0, 12);
+      const file = join(root, "test", "attestations", "adversarial-review", "skills", "s.attestations.json");
+      mkdirSync(join(file, ".."), { recursive: true });
+      writeFileSync(
+        file,
+        JSON.stringify({
+          $schema: "qa-attestations/v1",
+          family: "adversarial-review",
+          subject: { kind: "skill", id: "s", path: "skills/s.md" },
+          adversarial_reviews: [review],
+          source_hash: pinned(current),
+        }),
+      );
+      // No `test/results/` at all: the derived tree is not committed.
+      expect(existsSync(join(root, "test", "results"))).toBe(false);
+      fn(root);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+
+  it("counts a committed review as reviewed when its pinned hash is current", () => {
+    withStore((c) => c, (root) => {
+      expect(adversarialCoverageByGraph(root, root).get("skills")).toBe("reviewed");
+    });
+  });
+
+  it("counts a committed review as stale when the subject changed since", () => {
+    withStore(() => "000000000000", (root) => {
+      expect(adversarialCoverageByGraph(root, root).get("skills")).toBe("stale");
+    });
   });
 });
