@@ -11,6 +11,7 @@
  * Usage:
  *   bun run cat bpmn:detangle <file.bpmn|dir>...           # report
  *   bun run cat bpmn:detangle <file.bpmn> --write          # also apply the best lane order
+ *   bun run cat bpmn:detangle <file.bpmn|dir>... --write --labels-only  # only move labels
  *   bun run cat bpmn:detangle <file.bpmn|dir>... --check   # exit 1 on any finding
  *   bun run cat bpmn:detangle <file.bpmn|dir>... --di-only # skip the browser
  *
@@ -54,6 +55,9 @@ async function openDraw(): Promise<{ draw: Draw; close: () => Promise<void> } | 
 
 const args = process.argv.slice(2);
 const write = args.includes("--write");
+// Move labels only: no lane, flow or box changes, so the diff is labels alone.
+const labelsOnly = args.includes("--labels-only");
+const fix = write && !labelsOnly;
 const check = args.includes("--check");
 const paths = args.filter((a) => !a.startsWith("--"));
 if (paths.length === 0) {
@@ -72,7 +76,7 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
   let xml = readFileSync(file, "utf8");
   if (!/<(?:\w+:)?process\b/.test(xml)) continue;
   const shown = relative(process.cwd(), file);
-  if (write) {
+  if (fix) {
     const before = readDi(xml);
     const best = bestLaneOrder(before);
     if (best.cost < best.current) {
@@ -88,7 +92,7 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
       }
     }
   }
-  if (write) {
+  if (fix) {
     const { xml: next, fixed } = straightenFlows(xml);
     if (fixed.length > 0) {
       writeFileSync(file, next);
@@ -96,7 +100,7 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
       console.log(`✓ ${shown}: ${fixed.length} slanted flow(s) routed at right angles (${fixed.join(", ")})`);
     }
   }
-  if (write && renderer) {
+  if (fix && renderer) {
     // Text that spills out of its box: first widen it (wrapping fewer
     // lines), then measure again and make it tall enough.
     for (const pass of ["wider", "taller"] as const) {
@@ -110,7 +114,7 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
       console.log(`✓ ${shown}: ${over.length} box(es) made ${pass} for their text (${over.map((o) => o.id).join(", ")})`);
     }
   }
-  if (write && renderer) {
+  if (fix && renderer) {
     // Pool and lane names that spill out of their header strip: grow the
     // lane (for a pool, its last lane) until the name fits.
     const over = headerOverflow(await renderer.draw(xml).catch(() => undefined));
