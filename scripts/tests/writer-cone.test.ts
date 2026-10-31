@@ -41,7 +41,7 @@ describe("parseTrace in collect mode — a writer's reads and writes", () => {
 });
 
 describe("writerRecordOf and decideWriter", () => {
-  const fp = { hash: "base1" } as const;
+  const fp = { hash: "base1", audit: "clean" } as const;
 
   test("records reads with their state and outputs, then skips only while every read matches", () => {
     const root = mkdtempSync(join(tmpdir(), "writer-cone-"));
@@ -67,8 +67,13 @@ describe("writerRecordOf and decideWriter", () => {
 
       const records = emptyRecords("abc123");
       records.writers["w"] = rec;
-      expect(decideWriter(records, "w", fp, root, new FileDigests(root)).skip).toBe(true);
-      expect(decideWriter(records, "w", { hash: "other" }, root, new FileDigests(root))).toEqual({ skip: false, why: "its script, imports, audited environment or tools changed" });
+      const yes = decideWriter(records, "w", fp, root, new FileDigests(root));
+      expect(yes.skip && yes.proof).toBe(true);
+      records.writers["w"] = { ...rec, audit: "unannotated env site" };
+      const ev = decideWriter(records, "w", fp, root, new FileDigests(root));
+      expect(ev.skip && !ev.proof && ev.why.includes("evidence only")).toBe(true);
+      records.writers["w"] = rec;
+      expect(decideWriter(records, "w", { hash: "other", audit: "clean" }, root, new FileDigests(root))).toEqual({ skip: false, why: "its script, imports, audited environment or tools changed" });
       writeFileSync(join(root, "in/a.txt"), "two");
       expect(decideWriter(records, "w", fp, root, new FileDigests(root))).toEqual({ skip: false, why: "in/a.txt changed" });
       writeFileSync(join(root, "in/a.txt"), "one");
@@ -83,7 +88,7 @@ describe("writerRecordOf and decideWriter", () => {
     const base = { sha: "s", ran: true, before: fp, after: fp, reads: { paths: [], git: [] }, reached: undefined, root: ROOT, digests: new FileDigests(ROOT) };
     expect(writerRecordOf({ ...base, ran: false })).toEqual({ none: "the writer did not succeed" });
     expect(writerRecordOf({ ...base, reached: "network" })).toEqual({ none: "the run reached a traced input site (network)" });
-    expect(writerRecordOf({ ...base, after: { hash: "moved" } })).toEqual({ none: "its script, imports or audited environment moved while it ran" });
+    expect(writerRecordOf({ ...base, after: { hash: "moved", audit: "clean" } })).toEqual({ none: "its script, imports or audited environment moved while it ran" });
     expect(writerRecordOf({ ...base, reads: { undetermined: "why" } })).toEqual({ none: "why" });
   });
 

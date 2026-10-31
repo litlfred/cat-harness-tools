@@ -38,11 +38,12 @@
  * which writers could have been skipped, and the dry run can check that
  * answer against what the full build wrote.
  */
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { gitKey, gitState, MAX_TRACE_BYTES, parseTrace, pathState, STRACE_ARGS, TRACER_VERSION, type GitCall, type ReadSet } from "./ci-cone.ts";
-import { fingerprint, FileDigests, type Fingerprint } from "./input-hash.ts";
+import { fingerprint, FileDigests, toolsLine } from "./input-hash.ts";
 
 /** Bump when the record's meaning changes; a record from another version is ignored, so every writer runs. */
 export const WRITER_RECORD_VERSION = 1;
@@ -56,8 +57,10 @@ export const WRITER_RECORD_ENV = "CAT_WRITER_RECORD";
 export interface WriterRecord {
   /** The main commit whose deploy recorded it. */
   sha: string;
-  /** The fingerprint WITHOUT the tree: script closure, audited environment, tool versions. */
+  /** The fingerprint WITHOUT the tree: script closure, audited environment, tool versions ({@link writerBase}). */
   base: string;
+  /** `clean` when the input-site audit cleared the writer's closure; otherwise why not, and the record is evidence, not proof. */
+  audit: string;
   /** Every path it touched inside the checkout and did not write, with its state after the run (`absent` for one it probed and then created). */
   reads: Record<string, string>;
   /** Every git command it ran, and what that command answered after the run. */
@@ -97,17 +100,40 @@ export function saveWriterRecords(root: string, records: WriterRecords): void {
   writeFileSync(path, `${JSON.stringify(records, null, 1)}\n`);
 }
 
+/** What a writer record is keyed on besides its reads, or why nothing can be. */
+export type WriterBase = { hash: string; audit: string } | { undetermined: string };
+
 /**
- * The fingerprint a writer record is keyed on: the script, its imports, the
- * audited environment and the tools, with NO tree input, because the recorded
- * reads stand in for the tree (`ci-cone.ts` `coneFingerprint`).
+ * The key a writer record is keyed on besides its reads: the input-hash
+ * fingerprint WITHOUT the tree (script closure, audited environment, tools),
+ * as `ci-cone.ts` `coneFingerprint` does, when the input-site audit clears
+ * the closure (`audit: "clean"`).
+ *
+ * Measured 2026-10-31: none of the 46 publish-time writers clears the audit
+ * today (unannotated env, clock and spawn sites in shared modules), so that
+ * alone would record nothing. The trace still sees every source file the run
+ * loads, since they sit in the checkout, so "same code" is in the recorded
+ * reads either way. What only the audit can vouch for is the environment, the
+ * clock and the network. So a writer that fails the audit is keyed on the tools,
+ * its script line and `bun.lock` (packages are not traced), and its record says
+ * why (`audit`). Such a record is EVIDENCE for the dry run to test against the
+ * full build, never proof on its own.
  */
-export function writerBase(root: string, scripts: Readonly<Record<string, string>>, writer: string, digests: FileDigests): Fingerprint {
+export function writerBase(root: string, scripts: Readonly<Record<string, string>>, writer: string, digests: FileDigests): WriterBase {
+  let why: string;
   try {
-    return fingerprint(root, scripts, [writer], { inputs: [] }, digests, undefined, { treeReplayed: true });
+    const fp = fingerprint(root, scripts, [writer], { inputs: [] }, digests, undefined, { treeReplayed: true });
+    if ("hash" in fp) return { hash: fp.hash, audit: "clean" };
+    why = fp.undetermined;
   } catch (e) {
-    return { undetermined: (e as Error).message };
+    why = (e as Error).message;
   }
+  const command = scripts[writer];
+  if (command === undefined) return { undetermined: `\`${writer}\` is not a package script` };
+  const h = createHash("sha256");
+  h.update(`writer-cone weak base v1\n${toolsLine()}script ${writer} = ${command}\n`);
+  if (existsSync(join(root, "bun.lock"))) h.update(`bun.lock\0${digests.digest("bun.lock")}\n`);
+  return { hash: h.digest("hex"), audit: why };
 }
 
 /** `argv`, run under the tracer, writing its trace to `log`. */
@@ -131,8 +157,8 @@ export function readTraceFile(log: string, root: string): ReadSet {
 export function writerRecordOf(a: {
   sha: string;
   ran: boolean;
-  before: Fingerprint;
-  after: Fingerprint;
+  before: WriterBase;
+  after: WriterBase;
   reads: ReadSet;
   reached: string | undefined;
   root: string;
@@ -156,10 +182,11 @@ export function writerRecordOf(a: {
   }
   const git: Record<string, string> = {};
   for (const c of a.reads.git) git[gitKey(c)] = (a.git ?? gitState)(a.root, c);
-  return { sha: a.sha, base: a.before.hash, reads, git, outputs };
+  return { sha: a.sha, base: a.before.hash, audit: a.before.audit, reads, git, outputs };
 }
 
-export type WriterDecision = { skip: true; sha: string; why: string } | { skip: false; why: string };
+/** `proof`: the record's audit was clean, so the skip rests on the argument above; otherwise it is evidence the dry run must confirm. */
+export type WriterDecision = { skip: true; sha: string; proof: boolean; why: string } | { skip: false; why: string };
 
 /**
  * Whether `writer` could be skipped now: its fingerprint and the state of
@@ -171,7 +198,7 @@ export type WriterDecision = { skip: true; sha: string; why: string } | { skip: 
 export function decideWriter(
   records: WriterRecords | undefined,
   writer: string,
-  base: Fingerprint,
+  base: WriterBase,
   root: string,
   digests: FileDigests,
   git: (root: string, c: GitCall) => string = gitState,
@@ -179,7 +206,7 @@ export function decideWriter(
   if (records === undefined) return { skip: false, why: "no writer records from a full deploy" };
   const rec = records.writers[writer];
   if (rec === undefined) return { skip: false, why: records.unrecorded[writer] ? `not recorded: ${records.unrecorded[writer]}` : `the deploy at ${records.sha.slice(0, 12)} recorded nothing for it` };
-  if ("undetermined" in base) return { skip: false, why: `fingerprint undetermined: ${base.undetermined}` };
+  if ("undetermined" in base) return { skip: false, why: `no key: ${base.undetermined}` };
   if (base.hash !== rec.base) return { skip: false, why: "its script, imports, audited environment or tools changed" };
   for (const [p, state] of Object.entries(rec.reads)) {
     let now: string;
@@ -200,5 +227,11 @@ export function decideWriter(
     }
     if (git(root, call) !== state) return { skip: false, why: `git ${call.args.join(" ")} answers differently` };
   }
-  return { skip: true, sha: rec.sha, why: `reads unchanged since ${rec.sha.slice(0, 12)} (${Object.keys(rec.reads).length} paths, ${Object.keys(rec.outputs).length} outputs)` };
+  const proof = rec.audit === "clean";
+  return {
+    skip: true,
+    sha: rec.sha,
+    proof,
+    why: `reads unchanged since ${rec.sha.slice(0, 12)} (${Object.keys(rec.reads).length} paths, ${Object.keys(rec.outputs).length} outputs)${proof ? "" : `; evidence only, the audit did not clear it: ${rec.audit}`}`,
+  };
 }
