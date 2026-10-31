@@ -88,6 +88,7 @@ import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 
 import { checkInlineScripts } from "./check-inline-scripts.ts";
+import { shellQuote } from "./run-script.ts";
 import { chromeLayers, writeForwardingPages } from "./compose-docs.ts";
 import { ownsScript, writerCommand } from "./lib/script-command.ts";
 import { built, declaredPlan, runWriter, writersOf, type DeclaredArtefact, type WriterOutcome } from "./derive-at-publish.ts";
@@ -195,7 +196,7 @@ export const STEP_ENV = { baseurl: "FOLIO_SITE_BASEURL", upstreamPages: "FOLIO_S
  */
 export function stepCommand(root: string, name: string): string {
   if (!SCRIPT_NAME.test(name)) throw new Error(`${JSON.stringify(name)} is not a package script name`);
-  return ownsScript(root, name) ? `bun run ${name}` : `bun run ${JSON.stringify(join(import.meta.dir, "run-script.ts"))} ${name}`;
+  return ownsScript(root, name) ? `bun run ${name}` : `bun run ${shellQuote(join(import.meta.dir, "run-script.ts"))} ${name}`;
 }
 
 /**
@@ -582,7 +583,7 @@ function capture(cmd: string, cwd: string): string {
  * 3.10 run under a Jekyll-4 bundle dies on `Sass.load_paths` (sass-embedded).
  */
 function jekyllExe(gemDir: string): string {
-  const gemfile = JSON.stringify(join(gemDir, "Gemfile"));
+  const gemfile = shellQuote(join(gemDir, "Gemfile"));
   const bundled = capture(
     `BUNDLE_GEMFILE=${gemfile} bundle exec ruby -e 'print Gem.bin_path("jekyll", "jekyll")' 2>/dev/null || true`,
     gemDir,
@@ -692,8 +693,14 @@ export function publishedRoot(remote: string, branch: string, exclude: readonly 
   mkdirSync(tree);
   if (spawnSync("git", ["init", "-q", "--bare", git]).status !== 0) return undefined;
   if (spawnSync("git", ["-C", git, "fetch", "-q", "--depth", "1", remote, branch], { stdio: ["ignore", "ignore", "ignore"] }).status !== 0) return undefined;
-  const ex = exclude.map((e) => JSON.stringify(`:(exclude)${e}`)).join(" ");
-  run(`read the published root of ${branch}`, `git -C ${JSON.stringify(git)} archive FETCH_HEAD -- . ${ex} | tar -x -C ${JSON.stringify(tree)}`, dir);
+  // argv, not a shell string: `exclude` comes from layer declarations, and a
+  // mounted remote layer is a trust boundary (bean `cat-tools-j4sh`).
+  console.log(`▶ read the published root of ${branch}`);
+  const tar = join(dir, "root.tar");
+  const archive = spawnSync("git", ["-C", git, "archive", "-o", tar, "FETCH_HEAD", "--", ".", ...exclude.map((e) => `:(exclude)${e}`)], { stdio: "inherit" });
+  if (archive.status !== 0) throw new Error(`read the published root of ${branch} failed (git archive exit ${archive.status})`);
+  const untar = spawnSync("tar", ["-x", "-f", tar, "-C", tree], { stdio: "inherit" });
+  if (untar.status !== 0) throw new Error(`read the published root of ${branch} failed (tar exit ${untar.status})`);
   return tree;
 }
 
@@ -723,7 +730,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     // mount, and the workspace links into the others, before the script that re-lays them
     // could start from it: "Module not found" for any downstream mounting cat-harness-tools
     // at its root (litlfred/aai-programme, 2026-10-20).
-    run("mount the pinned closure, replacing edited mounts", `bun run ${JSON.stringify(join(import.meta.dir, "remote-mount.ts"))} --fresh`, root);
+    run("mount the pinned closure, replacing edited mounts", `bun run ${shellQuote(join(import.meta.dir, "remote-mount.ts"))} --fresh`, root);
   } else {
     if (o.fresh) {
       const lockPath = join(root, "index.lock.json");
@@ -732,16 +739,16 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
         : [];
       for (const p of paths) {
         if (p === "" || p === "." || p.startsWith("/") || p.split("/").includes("..")) throw new Error(`lock path ${JSON.stringify(p)} is not a subdirectory of the checkout`);
-        if (capture(`git ls-files -- ${JSON.stringify(p)} | head -1`, root) !== "") throw new Error(`${p} holds files the checkout tracks; --fresh removes only mounts`);
+        if (capture(`git ls-files -- ${shellQuote(p)} | head -1`, root) !== "") throw new Error(`${p} holds files the checkout tracks; --fresh removes only mounts`);
         rmSync(join(root, p), { recursive: true, force: true });
       }
       console.log(`▶ fresh: removed ${paths.length} mount path(s) the lock names`);
     }
-    if (o.mount) run("mount the pinned closure", `bun run ${JSON.stringify(join(import.meta.dir, "remote-mount.ts"))}`, root);
+    if (o.mount) run("mount the pinned closure", `bun run ${shellQuote(join(import.meta.dir, "remote-mount.ts"))}`, root);
   }
   const mounted = lockedMountPaths(root);
   const ownPackage = existsSync(join(root, "package.json"));
-  run("install", [...(ownPackage ? ["bun install --no-save >/dev/null"] : ["true"]), ...mounted.filter((p) => existsSync(join(root, p, "package.json"))).map((p) => `(cd ${JSON.stringify(p)} && bun install --no-save >/dev/null)`)].join(" && "), root);
+  run("install", [...(ownPackage ? ["bun install --no-save >/dev/null"] : ["true"]), ...mounted.filter((p) => existsSync(join(root, p, "package.json"))).map((p) => `(cd ${shellQuote(p)} && bun install --no-save >/dev/null)`)].join(" && "), root);
 
   // The work directory exists before the first step: a pre step may leave its output there
   // (an IG's artefact index, read by a later step), as folio-site.yml's steps use $RUNNER_TEMP.
@@ -763,19 +770,19 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   // IG that lands on it: put the pinned bytes back afterwards, failed build or not, so
   // every mount stays as the lock pins it.
   const restoreHarnessData = pinGeneratedData(root, mounted);
-  const s = JSON.stringify(site);
+  const s = shellQuote(site);
   const writeVisualisers = o.writeVisualisers ?? writeMissingVisualisers;
   try {
     const has = PROFILE_STEPS[o.profile ?? "folio"];
     if (has.has("sync")) run("sync docs harness", `bun run ${TOOLS}/sync-docs-harness.ts`, root);
     if (has.has("landing")) run("landing data", `bun run ${TOOLS}/gen-landing-data.ts`, root);
-    const scope = `--instance ${JSON.stringify(o.instance)} --title ${JSON.stringify(title)} --link-root ${JSON.stringify(o.linkRoot)}`;
+    const scope = `--instance ${shellQuote(o.instance)} --title ${shellQuote(title)} --link-root ${shellQuote(o.linkRoot)}`;
     // Before the chrome is composed: what it links that only a publish-time writer builds.
     buildChrome(root);
-    run("chrome", `bun run ${TOOLS}/compose-docs.ts --out ${JSON.stringify(docs)} ${shellFlags(o.profile)} ${scope}`, root);
-    run("navbar", `bun run ${TOOLS}/gen-navbar-include.ts ${scope} --out ${JSON.stringify(join(docs, "_includes/generated/navbar-footer.html"))}`, root);
+    run("chrome", `bun run ${TOOLS}/compose-docs.ts --out ${shellQuote(docs)} ${shellFlags(o.profile)} ${scope}`, root);
+    run("navbar", `bun run ${TOOLS}/gen-navbar-include.ts ${scope} --out ${shellQuote(join(docs, "_includes/generated/navbar-footer.html"))}`, root);
     if (o.home) copyFileSync(join(root, o.home), join(docs, "index.md"));
-    for (const s of o.sourceSteps) run(`source: ${s}`, `${stepCommand(root, s)} ${JSON.stringify(docs)}`, root, env);
+    for (const s of o.sourceSteps) run(`source: ${s}`, `${stepCommand(root, s)} ${shellQuote(docs)}`, root, env);
     // Every declared visualiser page the site owes (its own instance and every one it needs),
     // written by the writer its Tool declares, into the site source — the pages a recipe
     // step already wrote are not written twice ({@link writeMissingVisualisers}). A writer
@@ -800,17 +807,17 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     run("bundle install", "bundle install >/dev/null", gemDir);
     run(
       "jekyll",
-      `BUNDLE_GEMFILE=${JSON.stringify(join(gemDir, "Gemfile"))} bundle exec ${jekyllExe(gemDir)} build --source ${JSON.stringify(docs)} --destination ${JSON.stringify(site)} --config ${JSON.stringify(join(out, "build-config.yml"))},${JSON.stringify(join(out, "override.yml"))}`,
+      `BUNDLE_GEMFILE=${shellQuote(join(gemDir, "Gemfile"))} bundle exec ${jekyllExe(gemDir)} build --source ${shellQuote(docs)} --destination ${shellQuote(site)} --config ${shellQuote(join(out, "build-config.yml"))},${shellQuote(join(out, "override.yml"))}`,
       gemDir,
     );
 
     for (const st of o.siteSteps ?? []) run(`site: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
     if (has.has("mount")) run("mount instance docs", `bun run ${TOOLS}/mount-instance-docs.ts --site ${s}`, root);
-    if (has.has("pdf")) run("pdf viewer", `bun run ${TOOLS}/pdf-viewer.ts --site ${s} --allow "https://cdn.jsdelivr.net/gh/${gh.owner}/" --allow "https://raw.githubusercontent.com/${gh.owner}/"`, root);
+    if (has.has("pdf")) run("pdf viewer", `bun run ${TOOLS}/pdf-viewer.ts --site ${s} --allow ${shellQuote(`https://cdn.jsdelivr.net/gh/${gh.owner}/`)} --allow ${shellQuote(`https://raw.githubusercontent.com/${gh.owner}/`)}`, root);
     if (has.has("suggest")) run("suggest editor", `bun run ${TOOLS}/suggest-editor.ts --site ${s}`, root);
     if (has.has("lang")) run("html lang", `bun run ${TOOLS}/set-html-lang.ts --site ${s}`, root);
     if (has.has("lookup")) run("identifier lookup", `bun run ${TOOLS}/publish-id-lookup.ts --site ${s}`, root);
-    run("rail on every page", `bun run ${TOOLS}/rail-standalone-pages.ts --site ${s} --built cat-harness --theme-source ${JSON.stringify(docs)} --foreign-site --home-label ${JSON.stringify(title)} --instance ${JSON.stringify(o.instance)}${o.identity ? " --landing" : ""}`, root);
+    run("rail on every page", `bun run ${TOOLS}/rail-standalone-pages.ts --site ${s} --built cat-harness --theme-source ${shellQuote(docs)} --foreign-site --home-label ${shellQuote(title)} --instance ${shellQuote(o.instance)}${o.identity ? " --landing" : ""}`, root);
     for (const st of o.finalSteps ?? []) run(`final: ${st}`, `${stepCommand(root, st)} ${s}`, root, env);
     // The forwarding pages at the old addresses (folio-assistant#2527). The
     // chrome step composes with `--shell`, which writes none, so a visualiser

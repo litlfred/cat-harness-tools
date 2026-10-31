@@ -2,11 +2,11 @@
 # cat-tools-g7ls
 $schema: bean/1.0.0
 title: 'STANDALONE LOAD ERRORS: ~250 cat-harness-tools tests fail to load standalone because fhir-harness.json declares the "glossary" kind that only folio-assistant-core registers'
-status: todo
+status: done
 type: bug
 priority: normal
 created_at: 2026-10-31T01:40:00Z
-updated_at: 2026-10-31T01:40:00Z
+updated_at: 2026-10-31T08:30:00Z
 parent: folio-assistant-1xhc
 ---
 
@@ -36,8 +36,22 @@ Reproduce first, in the composed standalone layout (`probeStandalone`, `scripts/
 
 ## Done when
 
-- [ ] the cause is reproduced in the composed standalone layout, and named
-- [ ] the standalone run on main shows no `unknown graph typology "glossary"` load error
-- [ ] no test is skipped and no baseline entry is added to get there
+- [x] the cause is reproduced in the composed standalone layout, and named
+- [x] the standalone run on main shows no `unknown graph typology "glossary"` load error
+- [x] no test is skipped and no baseline entry is added to get there
 
 Session https://claude.ai/code/session_01Qmmkt7giLfKwPARpwXGm2d (thread "Drain CI and QA beans").
+
+## Reproduced cause and fix (2026-10-31)
+
+- **Reproduced cause (`probeStandalone`, `scripts/seed-ready.ts`):**
+  1. `probeStandalone` copies the git-tracked files of `cat-harness-tools` and its `needs` closure (`cat-harness`, `bootstrap-tools`, `bootstrap`) into a scratch directory `<ws>` as sibling git repositories and symlinks the host index's `<index>/node_modules` to `<ws>/node_modules`.
+  2. `defaultGraphTypologies` (`schemas/kg/graph-typology-registry.ts`) computes `defaultTypologyRoots()` from `process.cwd()` (`<ws>/cat-harness-tools`) and `import.meta.url` (`<ws>/cat-harness-tools/schemas/kg`), so its initial `declaredUnder` is `[<ws>/cat-harness-tools, <ws>]` (which contains only the closure, not `folio-assistant-core`).
+  3. Meanwhile, `harnessRoot()` (`schemas/harness-root.ts`) tried `@litlfred/cat-harness/cat-harness.json` before the sibling `../cat-harness`. Through the symlink `<ws>/node_modules/@litlfred/cat-harness -> <index>/cat-harness`, `harnessRoot()` resolved to `<index>/cat-harness` outside the closure:
+     - `schemas/test-fixture-preload.ts` checked `instanceRootsIn(repoRootFor(harnessRoot()))` = `instanceRootsIn(<index>)`, saw `folio-assistant-core`, `folio-assistant-sci`, and `fhir-harness` in `<index>`, and did not set `FOLIO_FIXTURE_CHECKOUT`.
+     - `schemas/library/translation-tools.ts` (`CONTENT_TYPE_TRANSLATIONS`, evaluated at module import) called `collectContentTypeTranslations(checkoutRootFor(harnessRoot()))` = `collectContentTypeTranslations(<index>)`, which walked `instanceRootsIn(<index>)` and called `readDeclaration("<index>/fhir-harness")`.
+     - `readDeclaration("<index>/fhir-harness")` validated `fhir-harness.json` against `defaultGraphTypologies`, which had only scanned `<ws>` and never scanned `<index>`'s `typologies/` graphs (where `<index>/folio-assistant-core/typologies/glossary.json` sits right beside `<index>/fhir-harness`), throwing `fhir-harness.json: directory "glossary" declares unknown graph typology "glossary"` across 39 test files (~250 tests).
+- **Fix:**
+  1. **Loader (`schemas/kg/graph-typology-registry.ts`, `schemas/kg/cat-harness.ts`, `schemas/kg/graph-typology-node.test.ts`):** Added `GraphTypologyRegistry.ensureCheckout(repoRoot)` and called `registry.ensureCheckout(checkoutRootFor(instanceRoot))` in `readDeclaration` before validating directory kinds, so on any unfiltered checkout-backed registry, kinds and validators from every discovered instance's `typologies/` and `validators/` in the declaration's checkout are registered before any declaration in that checkout is validated (owner ruling "A. Fix the loader").
+  2. **Harness root (`schemas/harness-root.ts`, `schemas/harness-root.test.ts`):** Try the sibling `../cat-harness` before `@litlfred/cat-harness`, so in `probeStandalone` `harnessRoot()` resolves to `<ws>/cat-harness` inside the closure rather than escaping via the linked `node_modules` into the host index.
+  3. **Standalone judge (`.github/scripts/compare-standalone.py`):** Key `<file> > (load-time error) <msg>` by `(file, "(load-time error)")` in `file_and_test` so a file that already failed at load time on `main` and reaches a subsequent top-level throw once the `glossary` import error is fixed is paired with its existing load-time failure on `main`.

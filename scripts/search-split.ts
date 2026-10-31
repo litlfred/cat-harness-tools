@@ -39,8 +39,18 @@
  * `search-index` verifier judges it as before. This writes NEXT to it:
  * `assets/js/search/manifest.json` and one `assets/js/search/<scope>.json` per
  * scope, each in the theme's own entry shape so the theme's loader reads any
- * of them unchanged. Entry keys are kept from the source, so an entry's id is
- * the same in its scope as in the whole.
+ * of them unchanged.
+ *
+ * ## Stable entry ids — the cone
+ *
+ * The theme keys its entries by a running number (`"0"`, `"1"`, …), so one
+ * page added near the top renumbers every entry after it, and every scope
+ * file changes though its pages did not: one new page rewrote all of
+ * `assets/js/search/*.json`. The scope files therefore key each entry by a
+ * hash of its URL ({@link stableKeys}), so a page change touches only its own
+ * scope's files and the manifest. The client only ever looks an entry up by
+ * the ref its own index returns, so the key is opaque to it; "search
+ * everywhere" loads the theme's whole index with the theme's own keys.
  *
  * ## Prebuilt indexes — bean `lrzn`
  *
@@ -205,8 +215,8 @@ export function sectionOfPath(path: string): string | undefined {
 }
 
 /**
- * Partition the index by scope. Keys are kept, so an entry's id is the same
- * in its scope as in the whole; every entry lands in exactly one scope.
+ * Partition the index by scope. Keys are the source's here ({@link render}
+ * re-keys them by URL); every entry lands in exactly one scope.
  */
 export function split(
   index: Readonly<Record<string, SearchEntry>>,
@@ -316,10 +326,45 @@ export function buildIndex(entries: Readonly<Record<string, SearchEntry>>): unkn
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
+/** Hex digits of the URL hash an entry is keyed by: 48 bits, so ~12k entries collide with odds near 1 in 4 million. */
+export const STABLE_KEY_HEX = 12;
+
+/**
+ * The key each entry gets in its scope file, by its source key: the first
+ * {@link STABLE_KEY_HEX} hex digits of the sha256 of its `relUrl` (the theme
+ * gives a page and each of its headings their own `relUrl`, `#anchor`
+ * included). An entry with no `relUrl` hashes its `url`, else its source key.
+ * Two entries that land on one key — the same URL twice, or a hash collision —
+ * keep the first in source order and give the rest `-2`, `-3`, …, so keys stay
+ * unique across all scopes, as `search-scopes` checks.
+ */
+export function stableKeys(index: Readonly<Record<string, SearchEntry>>): Map<string, string> {
+  const out = new Map<string, string>();
+  const used = new Set<string>();
+  for (const [key, entry] of Object.entries(index)) {
+    const basis = typeof entry.relUrl === "string" ? entry.relUrl : typeof entry.url === "string" ? `url:${entry.url}` : `key:${key}`;
+    const base = sha256(basis).slice(0, STABLE_KEY_HEX);
+    let k = base;
+    for (let n = 2; used.has(k); n++) k = `${base}-${n}`;
+    used.add(k);
+    out.set(key, k);
+  }
+  return out;
+}
+
+/** The same entries, in the same order, under their stable keys. */
+function rekey(entries: Readonly<Record<string, SearchEntry>>, keys: ReadonlyMap<string, string>): Record<string, SearchEntry> {
+  const out: Record<string, SearchEntry> = {};
+  for (const [key, entry] of Object.entries(entries)) out[keys.get(key)!] = entry;
+  return out;
+}
+
 /**
  * Every file the split writes, keyed by site-relative path, manifest last.
  * Deterministic: scopes are ordered by id and each body is the source's own
- * entries in the source's order, so the same index always yields the same bytes.
+ * entries in the source's order under their {@link stableKeys}, so the same
+ * index always yields the same bytes, and a scope whose entries did not
+ * change keeps its bytes when other scopes' pages come and go.
  */
 export function render(
   sourceText: string,
@@ -333,7 +378,10 @@ export function render(
   const files = new Map<string, string>();
   const scopes: ManifestScope[] = [];
   const parts = [...split(index, instances, locales, sectionBudget).values()].sort((a, b) => a.scope.id.localeCompare(b.scope.id));
-  for (const { scope, entries } of parts) {
+  const keys = stableKeys(index);
+  for (const part of parts) {
+    const scope = part.scope;
+    const entries = rekey(part.entries, keys);
     const path = `${SCOPES_DIR}/${scope.id}.json`;
     const body = JSON.stringify(entries);
     files.set(path, body);

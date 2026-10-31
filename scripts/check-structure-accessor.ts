@@ -56,7 +56,7 @@ export const GATE = "check:structure-accessor";
 // this gate exempts, compared against git's corpus listing, not directories
 // any declaration resolves.
 export const ALLOWED: Readonly<Record<string, string>> = {
-  "cat-harness/schemas/content/document-structure.ts": "the accessor itself: it defines STRUCTURE_FILENAME",
+  "cat-harness-tools/schemas/content/document-structure.ts": "the accessor itself: it defines STRUCTURE_FILENAME",
 };
 
 /**

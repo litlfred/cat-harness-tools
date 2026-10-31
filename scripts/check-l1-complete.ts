@@ -547,7 +547,11 @@ export function declaredFigureCaptions(sectionsDir: string): Map<string, string 
   // ONE pattern, two captures. `(\.[ \t]+(\S.*))?` is the caption and is
   // optional, which is what makes a mention and a caption the same match with
   // different groups rather than two regexes that must be kept in step.
-  const FIGURE = /^[ \t]*(?:Fig\.|Figure)[ \t]*(\d+(?:\.\d+)*)(?:\.[ \t]+(\S.*))?/gm;
+  // `Fig\.?`: the dot after `Fig` is optional, because `9789240101197-eng`
+  // writes `Fig 1. Public health supply chain ...`; requiring it hid nine of
+  // that handbook's figures from this check (the same fix as `CAPTION` in
+  // pdf-vector-labels.py).
+  const FIGURE = /^[ \t]*(?:Fig\.?|Figure)[ \t]*(\d+(?:\.\d+)*)(?:\.[ \t]+(\S.*))?/gm;
   for (const f of files.sort()) {
     let body: string;
     try {

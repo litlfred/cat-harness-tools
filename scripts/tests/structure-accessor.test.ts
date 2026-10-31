@@ -50,7 +50,8 @@ describe("the real corpus", () => {
 
   test("this layer's own list names no file of an instance above it", () => {
     // Item 6b (owner, 2026-10-16): a layer above declares its own entries.
-    for (const f of Object.keys(ALLOWED)) expect(f.startsWith("cat-harness/") ? "" : f).toBe("");
+    // Its own files and cat-harness's, below it; the accessor moved here in 8lcl.
+    for (const f of Object.keys(ALLOWED)) expect(/^cat-harness(-tools)?\//.test(f) ? "" : f).toBe("");
   });
 });
 

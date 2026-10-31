@@ -41,6 +41,7 @@ import { chromiumExecutable } from "../../scripts/bpmn-render.ts";
 import { builtAtPublishOf } from "../../scripts/mount-from-lock.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { scriptsOf } from "../../schemas/sdlc/script-table.ts";
+import { noRootManifest } from "../support/checkout.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -137,8 +138,10 @@ const CASES: Case[] = [
 
 describe("every writer regen pairs for these gates turns a STALED artefact's check green (bean i1q7)", () => {
   const browser = hasBrowser();
+  // Every check and writer runs as `bun run cat <script>` from the checkout root.
+  const noCatAlias = noRootManifest(REPO, "the `cat` alias every check and writer here runs through");
   for (const c of CASES) {
-    test.skipIf(c.needsBrowser === true && !browser)(
+    test.skipIf(noCatAlias || (c.needsBrowser === true && !browser))(
       `${c.check}: red on a staled artefact, green after regen runs \`${writerFor(SCRIPTS, c.check) ?? "(none)"}\``,
       async () => {
         const writer = writerFor(SCRIPTS, c.check);

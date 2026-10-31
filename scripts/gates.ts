@@ -757,6 +757,20 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     reason: "takes `--site ./_site`: it resolves links in the BUILT site, which Jekyll produces in CI",
   },
   {
+    match: "harness:state --out ./_site",
+    kind: "ci-only",
+    reason:
+      "writes one state file per harness into the BUILT site (bean `supn`); it judges nothing, and " +
+      "`harness:state --json` prints the same answer in a checkout",
+  },
+  {
+    match: "site-dead-links.ts",
+    kind: "ci-only",
+    reason:
+      "takes `--site ./_site`: it finds and repoints dead links in the BUILT site (folio-assistant#2741), " +
+      "which Jekyll produces in CI; its logic is covered in a checkout by site-dead-links.test.ts",
+  },
+  {
     match: "publish-verify.ts",
     kind: "ci-only",
     reason:

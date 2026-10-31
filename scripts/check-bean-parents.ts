@@ -62,7 +62,8 @@ import { resolve } from "node:path";
 // consumer of the store — which is how two of them can disagree about what a
 // bean is while both look correct in review. `scripts/beans.ts` is now the
 // single answer; this check keeps only the RULE.
-import { OPEN_STATUSES, beanDefsDir, readBeans } from "./beans.ts";
+import { OPEN_STATUSES, beanDefsDir, readBeans, readStoreBeans, type BeanNode } from "./beans.ts";
+import { beanStores } from "./unlinked-beans.ts";
 
 // Re-exported because it was exported from here before the reader existed, and
 // a consumer outside this repository would break on the move.
@@ -185,7 +186,12 @@ export function checkBeanParents(root: string): BeanParentsReport {
   const beans = readBeans(root);
   if (beans === null) return { store: null, open: 0, problems: [], outstanding: [], stale: [] };
 
-  const byId = new Map(beans.map((b) => [b.id, b]));
+  // A parent may live in another store: since cat-harness-tools#459 each bean
+  // has one home, and a layer's epic is held by that layer. The checked set
+  // stays this checkout's own open beans; only the lookup widens.
+  const byId = new Map<string, BeanNode>();
+  for (const store of beanStores(root)) for (const b of readStoreBeans(store, root) ?? []) byId.set(b.id, b);
+  for (const b of beans) byId.set(b.id, b);
   /* EVERY open bean, roots included — `itka`, issue #941.
    *
    * This filtered `ROOT_TYPES` out here, which made the epic-under-epic rule

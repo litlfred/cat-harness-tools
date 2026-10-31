@@ -17,6 +17,17 @@ describe("check:content-code-free", () => {
     for (const f of ["docs/assets/x.ts", "tools/x.js"]) expect(isCode(f)).toBe(true);
   });
 
+  test("a page built at publish ships its script in an assets/ folder beside it, and that is not code", () => {
+    // folio-assistant#2781: the OpenAPI viewer's page, built under docs/en/.
+    // declared-path-literal: test inputs to the path classifier, not reads
+    expect(isCode("docs/en/cat-harness/openapi/smart-trust/assets/openapi.js")).toBe(false);
+    expect(isCode("docs/fr/x/assets/a.mjs")).toBe(false);
+    // Only a script in an assets/ folder, and only under a built language tree.
+    expect(isCode("docs/en/cat-harness/openapi/smart-trust/openapi.js")).toBe(true);
+    expect(isCode("docs/source/x/assets/a.js")).toBe(true);
+    expect(isCode("docs/en/x/assets/a.ts")).toBe(true);
+  });
+
   test("the folio file-list renderer and the Jekyll plugins are kept by rule", () => {
     // declared-path-literal: test inputs to the path classifier, not reads
     for (const f of ["folio-render/file-list.ts", "folio-render/file-list.test.ts", "site-chrome/_plugins/fa-root-relative.rb", "docs/_plugins/liquid-undefined-warn.rb"]) expect(isCode(f)).toBe(false);

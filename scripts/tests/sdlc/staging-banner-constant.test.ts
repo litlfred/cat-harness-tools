@@ -133,7 +133,10 @@ describe("a failed fetch still says PREVIEW — the third-state rule", () => {
     // the catch path emptied, because the not-under-STAGING branch carries a
     // message of its own — found by ratcheting this very test, which stayed
     // green while the browser test went red.
-    const m = FRAGMENT.match(/\.catch\(function\(\)\{([^}]*)\}\)/);
+    // The catch of the `staging.json` fetch, not the first catch in the
+    // fragment: the live staleness check (#1076) has its own, which is
+    // silent on purpose, since a failed GitHub request must not guess.
+    const m = FRAGMENT.match(/fetch\(r\+'staging\.json'[\s\S]*?\.catch\(function\(\)\{([^}]*)\}\)/);
     expect(m).not.toBe(null);
     expect(m![1]).toContain("build details unavailable");
   });
@@ -380,20 +383,28 @@ describe("the STAGING build does not bake a per-run stamp into the footer", () =
     // with the call deleted. Fourth variant of this trap in this one change:
     // the assertion must name what distinguishes the two, not what they share.
     expect(client).toMatch(/stamp\(f\);/);
-    // From the same one fetch, not a second request.
-    expect((client.match(/fetch\(/g) ?? []).length).toBe(1);
+    // From the same one fetch of `staging.json`, not a second request. The
+    // other fetch in the client is the staleness check against GitHub (#1076).
+    expect((client.match(/fetch\(r\+'staging\.json'/g) ?? []).length).toBe(1);
+    expect((client.match(/fetch\(/g) ?? []).length).toBe(2);
   });
 
-  test("the MAIN site still stamps — there is one copy and nothing to dedup", () => {
+  test("the MAIN site no longer bakes it either: the browser fills it from build.json", () => {
     // `footer_custom.html`'s own comment: without a stamp "a stale browser
-    // cache and a deploy that has not run look identical". Removing it
-    // everywhere would fix the storage problem by destroying the signal.
+    // cache and a deploy that has not run look identical". The stamp stays;
+    // only the moment it is bound moved, on the live site too (owner,
+    // 2026-10-31, folio-assistant#2837): baked in, it changed every page on
+    // every deploy, so no preview could share the live site's unchanged
+    // pages (`staging-share.ts`). `docs-site.yml` writes the same facts to
+    // `build.json`, and cat-harness's `docs-ui.js` fills the footer from it.
     const main = readFileSync(
       join(repoRootFor(resolve(HARNESS_ROOT)), ".github", "workflows", "docs-site.yml"),
       "utf-8",
     );
-    expect(main).toContain("short_sha:");
-    expect(main).toContain("built_at:");
+    const code = main.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
+    for (const key of ["short_sha:", "built_at:", "run_url:"]) expect(code).not.toContain(`echo "${key}`);
+    expect(code).toContain("build.json");
+    expect(code).toMatch(/runUrl: \$runUrl/);
   });
 });
 
@@ -431,18 +442,32 @@ describe("the THIRD per-build source: TypeDoc's source links", () => {
     "utf-8",
   );
 
-  /** The TypeDoc invocation, comments stripped. */
+  /**
+   * The TypeDoc step's `with:` block, comments stripped. Both workflows call
+   * one shared action, `.github/actions/typedoc-api` (fa#2739), so the
+   * revision a build pins is the `git-revision` input it passes, and the
+   * action's script turns that into `--gitRevision` only when it is set.
+   */
   function typedocCall(yml: string): string {
-    const m = yml.match(/npx --yes typedoc[\s\S]*?(?=\n\n|\n      - name:)/);
-    if (!m) throw new Error("no typedoc invocation");
+    const m = yml.match(/uses: \.\/\.github\/actions\/typedoc-api\n[\s\S]*?(?=\n\n|\n      - name:)/);
+    if (!m) throw new Error("no typedoc-api step");
     return m[0]
       .split("\n")
       .filter((l) => !/^\s*#/.test(l))
       .join("\n");
   }
+  const ACTION_SCRIPT = readFileSync(
+    join(repoRootFor(resolve(HARNESS_ROOT)), ".github", "actions", "typedoc-api", "typedoc.sh"),
+    "utf-8",
+  );
+
+  test("the shared action passes --gitRevision only when a revision is given", () => {
+    expect(ACTION_SCRIPT).toMatch(/\[ -n "\$\{REV:-\}" \] && rev=\(--gitRevision "\$REV"\)/);
+    expect(ACTION_SCRIPT).toContain('"${rev[@]}"');
+  });
 
   test("the staging build pins source links to the branch, not the commit", () => {
-    expect(typedocCall(WORKFLOW)).toMatch(/--gitRevision\s+"\$STAGING_BRANCH"/);
+    expect(typedocCall(WORKFLOW)).toMatch(/git-revision:\s+\$\{\{\s*steps\.slug\.outputs\.branch\s*\}\}/);
   });
 
   test("the MAIN site does not — a published link should freeze its commit", () => {
@@ -450,6 +475,6 @@ describe("the THIRD per-build source: TypeDoc's source links", () => {
     // the published site, nothing to deduplicate, and a source link that
     // follows a moving branch is worth less there than one that names the
     // commit it documented.
-    expect(typedocCall(MAIN)).not.toContain("--gitRevision");
+    expect(typedocCall(MAIN)).not.toContain("git-revision");
   });
 });
