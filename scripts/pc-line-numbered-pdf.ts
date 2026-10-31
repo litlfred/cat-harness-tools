@@ -222,6 +222,15 @@ export async function render(o: { html: string; out: string; root: string; title
     if (!found) throw new Error(`${o.html}: no element matches --root ${o.root}`);
     await page.addStyleTag({ content: printCss(o.title) });
     await page.evaluate(() => document.fonts.ready);
+    // A figure that did not load would print as a broken icon in a draft the
+    // public cites. Load every image now, and refuse the PDF if any failed.
+    const broken = await page.evaluate(async () => {
+      const imgs = Array.from(document.images);
+      imgs.forEach((i) => (i.loading = "eager"));
+      await Promise.all(imgs.map((i) => (i.complete ? null : new Promise((r) => { i.onload = i.onerror = r; }))));
+      return imgs.filter((i) => i.naturalWidth === 0).map((i) => i.getAttribute("src") ?? "(no src)");
+    });
+    if (broken.length) throw new Error(`${broken.length} image(s) did not load (first: ${broken.slice(0, 5).join(", ")}); not releasing a PDF with broken figures`);
     const got = await page.evaluate(numberLines, { numbered: NUMBERED, excluded: EXCLUDED });
     mkdirSync(dirname(resolve(o.out)), { recursive: true });
     await page.pdf({
