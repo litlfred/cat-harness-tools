@@ -16,5 +16,5 @@ RED FLAG category: `security`. Severity: minor. Rule: `scz-value-never-becomes-p
 
 ## Done when
 
-- [ ] reproduce is parsed into an argv against a declared table of producers (as `run-script.ts` does for script names), or the run gets an empty environment plus an allowlist.
-- [ ] A test with a witness whose reproduce is `touch /tmp/x; true` shows it refused.
+- [x] reproduce is parsed into an argv against a declared table of producers (as `run-script.ts` does for script names), or the run gets an empty environment plus an allowlist.
+- [x] A test with a witness whose reproduce is `touch /tmp/x; true` shows it refused.
