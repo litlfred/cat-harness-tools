@@ -65,8 +65,9 @@ export function ownerOfPath(repo: string, path: string, owners: readonly Instanc
  *    A relative path the repository does not hold (a mount that does not
  *    carry it: dth-pc mounts only dth-sc's `glossary/`, so dth-sc's
  *    `folio/dth-sc` is absent there) still names a path in the declaring
- *    instance, so the scheme is `declaredBy`'s. Only a URL `source` says
- *    nothing about the owner.
+ *    instance, so the scheme is `declaredBy`'s. A URL or a prose sentence
+ *    (`dcterms:source`, e.g. `"Skills of bootstrap"` on an extracted scheme
+ *    stored in core's `glossary/generated/`) says nothing about the owner.
  * 2. Otherwise the one instance whose root holds every term's `source`.
  * 3. No repository source at all: `declaredBy`, the instance whose directory
  *    holds the file.
@@ -86,7 +87,7 @@ export function schemeOwner(
     const o = ownerOfPath(repo, defining, owners);
     return o ? { owner: o } : { error: `its source ${defining} is in no instance` };
   }
-  if (g.source && !/^[a-z][a-z0-9+.-]*:\/\//i.test(g.source)) return { owner: declaredBy };
+  if (g.source && !/^[a-z][a-z0-9+.-]*:\/\//i.test(g.source) && !/\s/.test(g.source)) return { owner: declaredBy };
   const held = new Set<string>();
   for (const t of g.terms) {
     const path = repoPathOf(t.source, repo);
