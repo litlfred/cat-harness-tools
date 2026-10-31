@@ -826,7 +826,8 @@ jobs:
       # Bean fwtz (owner 2026-10-31: "cache the page build", keyed on input
       # content, so changed inputs rebuild). The writer cache above keys on
       # statically derived inputs and reused 0 of 41 writers on
-      # folio-assistant-core#444. Writer records are traced instead: a push to
+      # https://github.com/litlfred/folio-assistant-core/pull/444. Writer records
+      # are traced instead: a push to
       # main records what each writer read and wrote; a PR skips a writer whose
       # every recorded read is unchanged and puts back what it wrote.
       - &writer-cone
