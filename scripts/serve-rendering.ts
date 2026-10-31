@@ -41,68 +41,66 @@
  *   the third state, kept as one.
  *
  * ```sh
- * bun run cat-harness-tools/scripts/serve-rendering.ts --dir <site> --port 4000
+ * bun run cat-harness-tools/scripts/serve-rendering.ts --dir <site> --port 4007
+ * ```
+ *
+ * ## Several sites at once (local server Phase 1, 2026-10-31)
+ *
+ * `--mount /<repo>=<dir>` (repeatable) serves each built site under its own
+ * prefix on one origin, as GitHub Pages does, so root-relative links and IRI
+ * paths line up. The request logic lives in `lib/rendering-handler.ts`,
+ * written against web-standard `Request`/`Response` only so a Node launcher
+ * can reuse it; this file is the Bun launcher.
+ *
+ * Default port **4007** (owner, 2026-10-31: a prime near 4000, which is
+ * `jekyll serve`'s default and so clashed with it). Default host 127.0.0.1;
+ * with the CLI, `localhost` and `[::1]` requests are redirected there so
+ * browser state is never split across two origins.
+ *
+ * ```sh
+ * bun run cat-harness-tools/scripts/serve-rendering.ts --mount /folio-assistant=../gh-pages/folio-assistant --mount /dth-pc=../dth-pc-pages
  * ```
  *
  * @module scripts/serve-rendering
  */
-import { existsSync, realpathSync, statSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 
-import { renderingMediaType, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { siteDirFor } from "../schemas/kg/cat-harness.js";
+import { createRenderingHandler, type Mount } from "./lib/rendering-handler";
+
+/** The default port: a prime near 4000 that leaves 4000 to `jekyll serve`. */
+export const DEFAULT_PORT = 4007;
 
 export interface ServeOptions {
-  /** Directory to serve. */
-  dir: string;
+  /** Directory to serve at `/`. Optional when `mounts` are given. */
+  dir?: string;
+  /** More sites, each under its own prefix (`/<repo>`). */
+  mounts?: readonly Mount[];
   /** Port; 0 asks the OS for a free one, which is what the tests use. */
   port?: number;
   /** Host interface. Loopback by default — see `serveRendering`. */
   hostname?: string;
+  /** Redirect `localhost` / `[::1]` requests to the bound loopback IP. */
+  canonicalHost?: string;
 }
 
 // `resolveWithin` now lives in `src/core/safe-path.ts` and is re-exported here
 // so this module's existing importers and tests keep working. It moved because
 // three HTTP handlers in the MCP server hand-rolled `join(base, external)`
 // while the correct helper sat in this one script — bean `6bhf`.
-import { resolveWithin } from "../src/core/safe-path";
-export { resolveWithin };
+// `resolveFile` moved to `lib/rendering-handler.ts` with the rest of the
+// portable request logic, and is re-exported for the same reason.
+export { resolveWithin } from "../src/core/safe-path";
+export { resolveFile } from "./lib/rendering-handler";
 
-/**
- * The file a request resolves to, applying the directory-index rule and the
- * containment check that needs the filesystem.
- *
- * **The real path is what is compared, so a symlink cannot escape.** Found by
- * this module's own test, which pointed a link inside the root at a file
- * outside it and got **200** from the first version: `resolve()` is string
- * arithmetic, so the lexical check above sees a clean path and the escape
- * happens entirely in the filesystem. Serving a directory means serving
- * whatever links are in it, and on a `self-sovereign` deployment — the
- * topology that most wants this server — that directory sits next to data
- * nobody intends to publish.
- *
- * Returns `undefined` when nothing is there, so the caller owns the 404 — a
- * resolver that invented an error response would be two things.
- */
-export function resolveFile(root: string, urlPath: string): string | undefined {
-  const target = resolveWithin(root, urlPath);
-  if (!target || !existsSync(target)) return undefined;
-
-  const base = realpathSync(resolve(root));
-  let real: string;
-  try {
-    real = realpathSync(target);
-  } catch {
-    // A broken symlink: `existsSync` followed it and found nothing to point
-    // at. Not servable, and not an error worth distinguishing from absent.
-    return undefined;
-  }
-  if (real !== base && !real.startsWith(base + sep)) return undefined;
-
-  if (statSync(real).isDirectory()) {
-    const index = join(real, "index.html");
-    return existsSync(index) ? index : undefined;
-  }
-  return real;
+/** Every mount the options name: `dir` at `/`, then the prefixed ones. */
+export function mountsOf(opts: ServeOptions): Mount[] {
+  const mounts: Mount[] = [];
+  if (opts.dir !== undefined) mounts.push({ prefix: "/", dir: opts.dir });
+  mounts.push(...(opts.mounts ?? []));
+  if (mounts.length === 0) throw new Error("serve-rendering: nothing to serve (give --dir or --mount)");
+  return mounts;
 }
 
 /**
@@ -115,29 +113,44 @@ export function resolveFile(root: string, urlPath: string): string | undefined {
  * `outward facing: no` by definition. Exposing it is opt-in via `hostname`.
  */
 export function serveRendering(opts: ServeOptions): ReturnType<typeof Bun.serve> {
-  const root = resolve(opts.dir);
-  if (!existsSync(root)) throw new Error(`serve-rendering: no such directory: ${root}`);
-
-  return Bun.serve({
-    port: opts.port ?? 4000,
-    hostname: opts.hostname ?? "127.0.0.1",
-    fetch(req) {
-      const { pathname } = new URL(req.url);
-      const file = resolveFile(root, pathname);
-      if (!file) return new Response("Not found\n", { status: 404 });
-
-      const declared = renderingMediaType(file);
-      const body = Bun.file(file);
-      // `declared` absent is the third state: defer to Bun's inference for an
-      // ordinary asset rather than asserting a type the declaration never
-      // made. Only a DECLARED type overrides.
-      return new Response(body, declared ? { headers: { "Content-Type": declared } } : undefined);
-    },
+  const fetch = createRenderingHandler({
+    mounts: mountsOf(opts),
+    canonicalHost: opts.canonicalHost,
+    // `undefined` from the declaration is the third state: defer to Bun's
+    // inference for an ordinary asset rather than asserting a type the
+    // declaration never made. Only a DECLARED type overrides.
+    inferType: (file) => Bun.file(file).type || undefined,
+    openBody: (file) => Bun.file(file),
   });
+  return Bun.serve({ port: opts.port ?? DEFAULT_PORT, hostname: opts.hostname ?? "127.0.0.1", fetch });
 }
 
 /**
- * The directory to serve when `--dir` is not given.
+ * The next prime above `port`, to suggest when it is taken. Ports stay prime
+ * by the same choice that picked 4007; 65535 is the ceiling.
+ */
+export function nextPrimePort(port: number): number | undefined {
+  const prime = (n: number): boolean => {
+    if (n < 2) return false;
+    for (let d = 2; d * d <= n; d++) if (n % d === 0) return false;
+    return true;
+  };
+  for (let n = port + 1; n <= 65535; n++) if (prime(n)) return n;
+  return undefined;
+}
+
+/**
+ * Parse `--mount /<prefix>=<dir>`. The prefix is checked again, segment by
+ * segment, when the handler is built.
+ */
+export function parseMount(arg: string): Mount {
+  const eq = arg.indexOf("=");
+  if (eq <= 0 || eq === arg.length - 1) throw new Error(`serve-rendering: --mount wants /<prefix>=<dir>, got: ${arg}`);
+  return { prefix: arg.slice(0, eq), dir: arg.slice(eq + 1) };
+}
+
+/**
+ * The directory to serve when neither `--dir` nor `--mount` is given.
  *
  * **The site root is `siteDirFor`'s answer, never a literal.** The first draft
  * of this file wrote `docs/_site`, which was wrong twice over: hardcoded, and
@@ -145,12 +158,10 @@ export function serveRendering(opts: ServeOptions): ReturnType<typeof Bun.serve>
  * build moved to `docs/<stub>` for the repo split. `site-dir-single-answer`
  * (bean `x4a6`) landed on `main` while this was in review and caught it.
  *
- * `siteDirFor` **throws** when the declaration cannot be read, because a site
- * root guessed wrong writes pages into a directory nothing serves. Here the
- * stakes are lower — nothing is written, and the caller sees the resolved
- * path printed — so an unreadable declaration falls back to the working
- * directory rather than refusing to start. That is not a guess dressed as an
- * answer: the path is echoed on the first line of output.
+ * `siteDirFor` **throws** when the declaration cannot be read. Here nothing is
+ * written, and the caller sees the resolved path printed, so an unreadable
+ * declaration falls back to the working directory rather than refusing to
+ * start.
  */
 function defaultDir(): string {
   try {
@@ -168,25 +179,63 @@ if (import.meta.main) {
     const i = argv.indexOf(name);
     return i >= 0 ? argv[i + 1] : undefined;
   };
+  const flags = (name: string): string[] => argv.flatMap((a, i) => (a === name && argv[i + 1] !== undefined ? [argv[i + 1]] : []));
 
   if (argv.includes("--help") || argv.includes("-h")) {
     console.log(
       `Serve an instance's renderings with their declared media types.\n\n` +
-        `  bun run cat-harness-tools/scripts/serve-rendering.ts [--dir <path>] [--port <n>] [--host <iface>]\n\n` +
-        `  --dir   directory to serve (default: the declared site root, else .)\n` +
-        `  --port  port to bind (default 4000)\n` +
-        `  --host  interface (default 127.0.0.1 — loopback, deliberately)\n`,
+        `  bun run cat-harness-tools/scripts/serve-rendering.ts [--dir <path>] [--mount /<repo>=<dir>]... [--port <n>] [--host <iface>]\n\n` +
+        `  --dir    directory to serve at / (default: the declared site root, else .)\n` +
+        `  --mount  serve <dir> under /<repo>, as GitHub Pages lays sites out; repeatable\n` +
+        `  --port   port to bind (default ${DEFAULT_PORT})\n` +
+        `  --host   interface (default 127.0.0.1 — loopback, deliberately)\n`,
     );
     process.exit(0);
   }
 
-  const dir = flag("--dir") ?? defaultDir();
-  const server = serveRendering({
-    dir,
-    port: Number(flag("--port") ?? 4000),
-    hostname: flag("--host"),
-  });
-  // Always print the RESOLVED directory, so the default is never a silent
-  // guess even when it was inferred.
-  console.log(`serving ${resolve(dir)} at http://${server.hostname}:${server.port}`);
+  const mounts = flags("--mount").map(parseMount);
+  const dir = flag("--dir") ?? (mounts.length ? undefined : defaultDir());
+  const hostname = flag("--host") ?? "127.0.0.1";
+  const port = Number(flag("--port") ?? DEFAULT_PORT);
+  let server: ReturnType<typeof Bun.serve>;
+  try {
+    server = serveRendering({
+      dir,
+      mounts,
+      port,
+      hostname,
+      canonicalHost: hostname === "127.0.0.1" ? "127.0.0.1" : undefined,
+    });
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (code === "EADDRINUSE") {
+      const next = nextPrimePort(port);
+      console.error(`serve-rendering: port ${port} is in use.${next ? ` Try --port ${next}.` : ""}`);
+      process.exit(1);
+    }
+    throw e;
+  }
+
+  // `localhost` may resolve to ::1 first. A listener there that only
+  // redirects to 127.0.0.1 keeps those browsers on the one origin. Best
+  // effort: a machine with no IPv6 loopback simply skips it.
+  if (hostname === "127.0.0.1") {
+    try {
+      Bun.serve({
+        port: server.port,
+        hostname: "::1",
+        fetch: (req) => {
+          const u = new URL(req.url);
+          return Response.redirect(`http://127.0.0.1:${server.port}${u.pathname}${u.search}`, 308);
+        },
+      });
+    } catch {
+      // No IPv6 loopback, or the port is taken there. Nothing to redirect.
+    }
+  }
+
+  // Always print the RESOLVED directories, so a default is never a silent guess.
+  const base = `http://${server.hostname}:${server.port}`;
+  if (dir !== undefined) console.log(`serving ${resolve(dir)} at ${base}/`);
+  for (const m of mounts) console.log(`serving ${resolve(m.dir)} at ${base}${m.prefix.replace(/\/$/, "")}/`);
 }
