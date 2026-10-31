@@ -346,11 +346,14 @@ function calls(text: string): Call[] | { undetermined: string } {
     // not even read the syscall number (`???`), nothing it could name is left;
     // when it already printed the call's arguments, `<detached ...>` closes
     // them without a return value, the same as an `<unfinished ...>` at exit.
-    if (/^(\?\?\?\(\s*<(?:detached|unfinished)|<\.\.\. \?\?\? resumed>\s*<detached) \.\.\.>$/.test(body)) continue;
+    if (body.startsWith("???(") || body.startsWith("<... ??? resumed>")) continue;
     const resumed = /^<\.\.\. (\w+) resumed>(.*)$/.exec(body);
     if (resumed !== null) {
       const p = pending.get(pid);
-      if (p === undefined) return { undetermined: `pid ${pid}: a resumed ${resumed[1]} with no start` };
+      if (p === undefined) {
+        if (/\s*<detached \.\.\.>$/.test(resumed[2]!) || (!(resumed[1]! in SYSCALLS) && !PROCESS_CALLS.has(resumed[1]!))) continue;
+        return { undetermined: `pid ${pid}: a resumed ${resumed[1]} with no start` };
+      }
       pending.delete(pid);
       const rest = resumed[2]!.replace(/\s*<detached \.\.\.>$/, ") = ?");
       done.push({ index: p.index, line: p.head + rest, pid });
@@ -363,7 +366,8 @@ function calls(text: string): Call[] | { undetermined: string } {
     }
     const detached = /^(.*?)\s*<detached \.\.\.>$/.exec(body);
     if (detached !== null) {
-      done.push({ index: index++, line: `${detached[1]!}) = ?`, pid });
+      const head = detached[1]!.trim();
+      if (head !== "") done.push({ index: index++, line: /\)\s+=\s+/.test(head) ? head : `${head}) = ?`, pid });
       continue;
     }
     done.push({ index: index++, line: body, pid });
