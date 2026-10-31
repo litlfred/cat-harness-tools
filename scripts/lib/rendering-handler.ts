@@ -29,11 +29,26 @@
  * that names `localhost` or `[::1]` is redirected to the canonical host on the
  * same port, so a browser only ever stores state for one of them.
  *
- * Issue: litlfred/cat-harness-tools#1163 (local server Phase 1).
+ * ## IRIs open the local copy (Phase 2)
+ *
+ * Every litlfred IRI is "Pages origin + `/<repo>/` + path". With `iriBases`
+ * set, a text response has each published base replaced by the local one
+ * (`https://litlfred.github.io/<repo>` → `http://127.0.0.1:4007/<repo>`) as it
+ * is served. Files on disk are never changed. Only whole path segments
+ * match, so `/dth` never rewrites `/dth-pc`. A base with no mount is left
+ * alone, so a repo that is not local still links to the live site.
+ * Rewriting changes bytes, so signature and digest checks must run with
+ * `rewrite: false`; a rewritten response says so in `X-Rendering-Rewritten`.
+ *
+ * Content negotiation: on Pages an extensionless IRI only ever answers HTML.
+ * Locally, `Accept: application/ld+json` on such a path serves its
+ * `.jsonld` sibling (or `index.jsonld`) when there is one.
+ *
+ * Issues: litlfred/cat-harness-tools#1163 (Phase 1), #1166 (Phase 2).
  *
  * @module scripts/lib/rendering-handler
  */
-import { createReadStream, existsSync, realpathSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 
@@ -56,6 +71,66 @@ export interface HandlerOptions {
   inferType?: (file: string) => string | undefined;
   /** The runtime's best way to send a file. Defaults to a Node read stream. */
   openBody?: (file: string) => BodyInit;
+  /** Published bases to rewrite to the local origin, each tied to a mount prefix. */
+  iriBases?: readonly IriBase[];
+  /** `false` serves bytes as published even when `iriBases` are set. Default true. */
+  rewrite?: boolean;
+}
+
+/** A published base (`https://host/path`, no trailing slash) and the mount it lives under. */
+export interface IriBase {
+  from: string;
+  prefix: string;
+}
+
+/** Media types whose bodies are text and may carry IRIs. */
+function isTextType(type: string | undefined): boolean {
+  if (!type) return false;
+  const t = type.split(";")[0].trim().toLowerCase();
+  return (
+    t.startsWith("text/") ||
+    /^application\/([\w.+-]+\+)?(json|xml)$/.test(t) ||
+    /^application\/(ld\+json|schema\+json|javascript|ecmascript|n-triples|n-quads|trig|turtle|sparql-query)$/.test(t) ||
+    t === "image/svg+xml"
+  );
+}
+
+/** Above this a body is sent as published rather than read into memory. */
+export const REWRITE_MAX_BYTES = 64 * 1024 * 1024;
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Build the rewriter for one local origin. Longest base first, so a nested
+ * mount's base wins over its parent's. A base matches only when followed by
+ * a path, query, fragment or delimiter, never by more of a segment.
+ */
+export function iriRewriter(bases: readonly IriBase[], localOrigin: string): (text: string) => string {
+  const rules = [...bases]
+    .map((b) => ({ from: b.from.replace(/\/+$/, ""), to: `${localOrigin}${b.prefix === "/" ? "" : b.prefix}` }))
+    .sort((a, b) => b.from.length - a.from.length);
+  if (rules.length === 0) return (s) => s;
+  const re = new RegExp(`(${rules.map((r) => escapeRegExp(r.from)).join("|")})(?=[/?#"'<>\\s)\\]},;&]|$)`, "g");
+  const to = new Map(rules.map((r) => [r.from, r.to]));
+  return (text) => text.replace(re, (m) => to.get(m) ?? m);
+}
+
+/** True when the client asks for JSON-LD ahead of HTML. */
+function wantsJsonLd(accept: string | null): boolean {
+  if (!accept) return false;
+  const q = (type: string): number => {
+    for (const part of accept.split(",")) {
+      const [t, ...params] = part.trim().split(";");
+      if (t.trim().toLowerCase() !== type) continue;
+      const qp = params.map((s) => s.trim()).find((s) => s.startsWith("q="));
+      return qp ? Number(qp.slice(2)) || 0 : 1;
+    }
+    return 0;
+  };
+  const ld = q("application/ld+json");
+  return ld > 0 && ld >= q("text/html");
 }
 
 /** Hosts that are loopback under another name, and so another origin. */
@@ -156,13 +231,26 @@ export function createRenderingHandler(opts: HandlerOptions): (req: Request) => 
     if (!existsSync(m.dir)) throw new Error(`serve-rendering: no such directory: ${m.dir}`);
   }
   const openBody = opts.openBody ?? defaultBody;
+  const bases = opts.rewrite === false ? [] : (opts.iriBases ?? []);
+  const rewriters = new Map<string, (text: string) => string>();
+  const rewriterFor = (origin: string): ((text: string) => string) => {
+    let r = rewriters.get(origin);
+    if (!r) rewriters.set(origin, (r = iriRewriter(bases, origin)));
+    return r;
+  };
 
-  const send = (file: string, status: number, head: boolean): Response => {
+  const send = (file: string, status: number, head: boolean, origin: string, negotiated: boolean): Response => {
     const type = renderingMediaType(file) ?? opts.inferType?.(file);
-    return new Response(head ? null : openBody(file), {
-      status,
-      headers: type ? { "Content-Type": type } : undefined,
-    });
+    const headers: Record<string, string> = {};
+    if (type) headers["Content-Type"] = type;
+    if (negotiated) headers.Vary = "Accept";
+    if (bases.length > 0 && isTextType(type) && statSync(file).size <= REWRITE_MAX_BYTES) {
+      const text = readFileSync(file, "utf-8");
+      const out = rewriterFor(origin)(text);
+      if (out !== text) headers["X-Rendering-Rewritten"] = "iri";
+      return new Response(head ? null : out, { status, headers });
+    }
+    return new Response(head ? null : openBody(file), { status, headers });
   };
 
   return (req: Request): Response => {
@@ -193,11 +281,19 @@ export function createRenderingHandler(opts: HandlerOptions): (req: Request) => 
       }
     }
 
+    // An extensionless path is the IRI form. Offer its JSON-LD to a client
+    // that asks for it; everyone else gets what Pages would serve.
+    const extensionless = !/\.[^/]+$/.test(rest);
+    if (extensionless && wantsJsonLd(req.headers.get("accept"))) {
+      const ld = rest.endsWith("/") ? resolveFile(mount.dir, `${rest}index.jsonld`) : (resolveFile(mount.dir, `${rest}.jsonld`) ?? resolveFile(mount.dir, `${rest}/index.jsonld`));
+      if (ld) return send(ld, 200, head, url.origin, true);
+    }
+
     const file = resolveFile(mount.dir, rest) ?? (rest.endsWith("/") ? undefined : resolveFile(mount.dir, `${rest}.html`));
-    if (file) return send(file, 200, head);
+    if (file) return send(file, 200, head, url.origin, extensionless);
 
     const notFound = resolveFile(mount.dir, "/404.html");
-    if (notFound) return send(notFound, 404, head);
+    if (notFound) return send(notFound, 404, head, url.origin, false);
     return new Response("Not found\n", { status: 404 });
   };
 }
