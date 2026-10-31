@@ -111,6 +111,9 @@ export const KG_QA_MANIFEST_SCHEMA = "kg-qa-manifest/v1";
  * declaration agree today; if one ever moves its `qa` directory, this is the
  * line that has to learn to ask.
  */
+// declared-path-literal: the convention base case `qa-witness.ts` joins to a repository root it holds
+// without an instance (above). The file is written by `kg:audit` into the `qa` working copy, which is
+// not committed: it is published to the declared `storage` branch (bean `7mwa`, cat-harness#857).
 export const KG_QA_MANIFEST_PATH = "test/results/kg-qa.manifest.json";
 
 /**

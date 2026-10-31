@@ -17,6 +17,8 @@ const G = "https://github.com/litlfred/folio-assistant";
 
 describe("judgeBlobMainPath", () => {
   test("the owner's dead link: an instance-relative test/results path", () => {
+    // declared-path-literal: a test vector for judgeBlobMainPath, a pure string judge; the path is the
+    // dead link the owner reported, and whether a working copy holds it is not what is asserted (bean `7mwa`).
     expect(judgeBlobMainPath("test/results/translation-qa/docs/index.ar.translation-qa.json", DIRS)).toContain("instance-relative");
   });
   test("a stored directory's file addressed on main", () => {
