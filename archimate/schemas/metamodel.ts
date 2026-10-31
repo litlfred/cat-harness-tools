@@ -27,6 +27,7 @@
  * `archimate-pages`), and as a Mermaid class diagram.
  */
 import { readFileSync } from "node:fs";
+import { z } from "zod";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { layerOf, type ArchimateLayer, type ArchimateModel } from "./archimate.ts";
@@ -34,21 +35,33 @@ import { layerOf, type ArchimateLayer, type ArchimateModel } from "./archimate.t
 /** The committed table, beside this module. */
 export const TABLE_FILE = join(dirname(fileURLToPath(import.meta.url)), "archimate-relationships.json");
 
-export interface RelationshipTable {
-  $schema: "archimate-relationship-table/v1";
-  /** The ArchiMate version the table encodes (Archi's `<relationships version>`). */
-  archimateVersion: string;
-  source: { repository: string; commit: string; path: string; license: string; copyright: string };
-  /** Key letter → Archi relationship type, e.g. `r` → `RealizationRelationship`. */
-  keys: Record<string, string>;
-  /** Source type → target type → the key letters allowed between them. */
-  allowed: Record<string, Record<string, string>>;
-}
+/**
+ * The table's `$schema` family. Its validator node is cat-harness's
+ * `validators/archimate-relationship-table.json`, on the `schemas` kind.
+ */
+export const RELATIONSHIP_TABLE_TAG = "archimate-relationship-table/v1";
+
+/** ArchiMate's relationship table as Archi holds it, written by `import-archi-relationships.ts`. */
+export const RelationshipTableSchema = z
+  .object({
+    $schema: z.literal(RELATIONSHIP_TABLE_TAG),
+    /** The ArchiMate version the table encodes (Archi's `<relationships version>`). */
+    archimateVersion: z.string().min(1),
+    source: z
+      .object({ repository: z.string().url(), commit: z.string().regex(/^[0-9a-f]{40}$/), path: z.string().min(1), license: z.string().min(1), copyright: z.string().min(1) })
+      .strict(),
+    /** Key letter → Archi relationship type, e.g. `r` → `RealizationRelationship`. */
+    keys: z.record(z.string().regex(/^[a-z]$/), z.string().regex(/Relationship$/)),
+    /** Source type → target type → the key letters allowed between them. */
+    allowed: z.record(z.string().min(1), z.record(z.string().min(1), z.string().regex(/^[a-z]*$/))),
+  })
+  .strict();
+export type RelationshipTable = z.infer<typeof RelationshipTableSchema>;
 
 let cached: RelationshipTable | undefined;
 /** The committed relationship table. */
 export function relationshipTable(): RelationshipTable {
-  return (cached ??= JSON.parse(readFileSync(TABLE_FILE, "utf8")) as RelationshipTable);
+  return (cached ??= RelationshipTableSchema.parse(JSON.parse(readFileSync(TABLE_FILE, "utf8"))));
 }
 
 /**

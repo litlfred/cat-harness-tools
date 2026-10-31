@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { parseArchimate } from "../schemas/archimate.ts";
-import { isAllowed, isPlaceholder, metamodelDot, metamodelMermaid, metamodelOf, relationshipTable, type Metamodel, type MetamodelPattern } from "../schemas/metamodel.ts";
+import { RelationshipTableSchema, isAllowed, isPlaceholder, metamodelDot, metamodelMermaid, metamodelOf, relationshipTable, type Metamodel, type MetamodelPattern } from "../schemas/metamodel.ts";
 import { parseArchiTable, tableJson } from "./import-archi-relationships.ts";
 import { report } from "./archimate-metamodel.ts";
 
@@ -37,6 +37,11 @@ describe("the relationship table", () => {
     expect(t.archimateVersion).toBe("3.2");
     expect(t.source.license).toBe("MIT");
     expect(t.keys.r).toBe("RealizationRelationship");
+  });
+
+  it("is checked by its own schema, the validator of its $schema family", () => {
+    expect(RelationshipTableSchema.safeParse(t).success).toBe(true);
+    expect(RelationshipTableSchema.safeParse({ ...t, keys: { r: "Realization" } }).success).toBe(false);
   });
 
   it("allows, refuses, and does not guess", () => {
