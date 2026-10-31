@@ -1057,6 +1057,11 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // docs/payload/sha256/ (bean `f233`), written by gen-subgraph-jsonld.
       // Its validator is the node `validators/payload-sidecar.json`.
       "cat-harness-payload/v1": { generated: true },
+      // GENERATOR OUTPUT: the dynamic-state document `<site>/<harness>/state.jsonld`,
+      // written whole by `writeDynamicState` (render stage 3 and the state
+      // visualiser). It names the bean stores it read, so it is not prose.
+      // Its validator is the node `cat-harness-tools/validators/dynamic-state.json`.
+      "cat-harness-dynamic-state/v1": { generated: true },
     },
     summary:
       "Documentation ABOUT the knowledge graph — how the harness works, what its " +
@@ -2198,7 +2203,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // a reader has to be able to tell the two apart.
       "folio-figure-descriptions/v1": {},
       // A figure transcribed as data on its entry's `figure-data/` (owner,
-      // 2026-10-31, "B in the catalogue instance"): the DIIG phases chart and the SMART
+      // 2026-10-31, option B: in the library entry): the DIIG phases chart and the SMART
       // Guidelines approach chart, one file per published version. Their
       // shapes are with the generators that draw them, in a layer above this
       // one, so they are routed here and validated there.

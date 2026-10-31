@@ -464,6 +464,9 @@ if (import.meta.main) {
   const recordOn = env[WRITER_RECORD_ENV] === "1" && straceWorks();
   // input-site: inert #a3e7d915 — the commit names the record; it is not an input of any writer
   const records = emptyRecords(env.GITHUB_SHA ?? "local");
+  // Files each writer read and then rewrote, kept as its inputs (see parseTrace's rewriteAsInput).
+  const rewrittenBy = new Map<string, string[]>();
+  const declaredOutput = underOutputs(allOutputs);
   // Previews skip a writer whose recorded reads all match, and put back the
   // outputs the recording run kept (owner 2026-10-31 14:32Z: "dont wait for
   // clean deploys to skip. we can fix aftermath"). Never while recording.
@@ -491,12 +494,13 @@ if (import.meta.main) {
         return first.outcome.kind === "skipped" ? first : await runWriterAsync(["bun", "run", "cat", w], REPO_ROOT, jobs > 1, writerEnv);
       }
       const digests = new FileDigests(REPO_ROOT);
+      let readSet: ReturnType<typeof readTraceFile> = { undetermined: "not read" };
       const rec = writerRecordOf({
         sha: records.sha,
         ran: true,
         before,
         after: writerBase(REPO_ROOT, recScripts, w, digests),
-        reads: readTraceFile(traceLog, REPO_ROOT, underOutputs(byWriter.get(w) ?? [])),
+        reads: (readSet = readTraceFile(traceLog, REPO_ROOT, underOutputs(byWriter.get(w) ?? []), (rel) => !declaredOutput(rel))),
         reached: trace.reached([], STRACE_SEES),
         root: REPO_ROOT,
         digests,
@@ -504,6 +508,7 @@ if (import.meta.main) {
       if ("none" in rec) records.unrecorded[w] = rec.none;
       else {
         records.writers[w] = rec;
+        if ("rewritten" in readSet && readSet.rewritten) rewrittenBy.set(w, readSet.rewritten);
         // Keep what it wrote, so a preview that skips it can put it back.
         const keep = nestedForeign(w, byWriter);
         commitStaged(outDir, w, records.sha, stageOutputs(outDir, w, records.sha, REPO_ROOT, byWriter.get(w) ?? [], keep));
@@ -551,6 +556,17 @@ if (import.meta.main) {
   };
   const outcomes = await schedule(writers, edges, jobs, runOne);
   if (recordOn) {
+    // A file a writer rewrote is kept as its input only when no other writer
+    // wrote it too: otherwise its state after the run says nothing about what
+    // this writer read.
+    for (const [w, paths] of rewrittenBy) {
+      const other = paths.find((p) =>
+        Object.entries(records.writers).some(([x, r]) => x !== w && p in r.outputs) ||
+        [...rewrittenBy].some(([x, ps]) => x !== w && ps.includes(p)));
+      if (other === undefined) continue;
+      delete records.writers[w];
+      records.unrecorded[w] = `the writer rewrites ${other}, which another writer also writes`;
+    }
     saveWriterRecords(REPO_ROOT, records);
     const un = Object.entries(records.unrecorded);
     console.log(`  writer records: ${Object.keys(records.writers).length} recorded, ${un.length} not (${WRITER_RECORD_FILE})`);
