@@ -145,7 +145,7 @@ import {
 } from "./derive-cache.ts";
 import { openTrace } from "../schemas/sdlc/input-trace.ts";
 import { BUILDING_ENV, STAMP_PATH, workingCopyState } from "./qa-working-copy.ts";
-import { emptyRecords, readTraceFile, saveWriterRecords, STRACE_SEES, tracedArgv, writerBase, writerRecordOf, WRITER_RECORD_ENV, WRITER_RECORD_FILE } from "./writer-cone.ts";
+import { emptyRecords, readTraceFile, saveWriterRecords, STRACE_SEES, tracedArgv, underOutputs, writerBase, writerRecordOf, WRITER_RECORD_ENV, WRITER_RECORD_FILE } from "./writer-cone.ts";
 
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
 
@@ -474,7 +474,7 @@ if (import.meta.main) {
         ran: true,
         before,
         after: writerBase(REPO_ROOT, recScripts, w, digests),
-        reads: readTraceFile(traceLog, REPO_ROOT),
+        reads: readTraceFile(traceLog, REPO_ROOT, underOutputs(byWriter.get(w) ?? [])),
         reached: trace.reached([], STRACE_SEES),
         root: REPO_ROOT,
         digests,

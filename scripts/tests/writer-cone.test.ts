@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 import { parseTrace } from "../ci-cone.ts";
 import { FileDigests } from "../input-hash.ts";
-import { decideWriter, emptyRecords, tracedArgv, verifySummary, verifyWriters, writerRecordOf } from "../writer-cone.ts";
+import { decideWriter, emptyRecords, tracedArgv, underOutputs, verifySummary, verifyWriters, writerRecordOf } from "../writer-cone.ts";
 
 const ROOT = "/work/repo";
 
@@ -54,6 +54,21 @@ describe("parseTrace in collect mode — a writer's reads and writes", () => {
       `20 execve("/usr/bin/git", ["git", "-C", "/work/repo", "remote", "get-url", "origin"], 0x1 /* 3 vars */) = 0`,
     ]);
     expect(r).toEqual({ paths: [], git: [{ cwd: "", args: ["remote", "get-url", "origin"] }], writes: [], absentBefore: [] });
+  });
+
+  test("re-reading its own declared output before rewriting it is not an input; anything else still refuses", () => {
+    const lines = [
+      `10 openat(AT_FDCWD</work/repo>, "docs/out/index.html", O_RDONLY|O_CLOEXEC) = 3</work/repo/docs/out/index.html>`,
+      `10 openat(AT_FDCWD</work/repo>, "docs/out/index.html", O_WRONLY|O_TRUNC|O_CLOEXEC) = 4</work/repo/docs/out/index.html>`,
+    ];
+    const own = underOutputs(["docs/out/"]);
+    expect(parseTrace(lines.join("\n"), ROOT, { writes: "collect", ownOutput: own })).toEqual({ paths: [], git: [], writes: ["docs/out/index.html"], absentBefore: [] });
+    expect(parseTrace(lines.join("\n"), ROOT, { writes: "collect", ownOutput: underOutputs(["docs/other/", "docs/out"]) })).toEqual({
+      undetermined: "the writer reads docs/out/index.html and then rewrites it",
+    });
+    expect(underOutputs(["a/b/", "c.json"])("a/b")).toBe(true);
+    expect(underOutputs(["a/b/", "c.json"])("a/bc")).toBe(false);
+    expect(underOutputs(["a/b/", "c.json"])("c.json")).toBe(true);
   });
 
   test("the default still refuses any write (checks are unchanged)", () => {

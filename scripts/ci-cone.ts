@@ -119,6 +119,14 @@ export const RECORD_FILE = join(CONE_DIR, "records.json");
 export const MAX_PATHS = 20000;
 
 /**
+ * The same bound for a WRITER's record (`collect` mode). Site generators walk
+ * whole trees: library:viz touched 35,554 paths and external-schemas:viz
+ * 49,518 (writer-records run 41205872016). A record is kept beside the build,
+ * not in every check's cone file, so it can carry more.
+ */
+export const MAX_WRITER_PATHS = 200000;
+
+/**
  * A trace file larger than this is not parsed: the check is recorded as
  * undetermined. Measured 2026-10-07: `kg:audit:all:check` spawns a process
  * per instance, and parsing its whole trace in memory aborted the recorder
@@ -385,7 +393,15 @@ function calls(text: string): Call[] | { undetermined: string } {
  * enumerated. `root` is the checkout; paths outside it are left out (see the
  * module comment for why, and for the other exclusions).
  */
-export function parseTrace(text: string, root: string, opts: { writes?: "refuse" | "collect" } = {}): ReadSet {
+export function parseTrace(
+  text: string,
+  root: string,
+  opts: {
+    writes?: "refuse" | "collect";
+    /** `collect` mode: the writer's DECLARED outputs. Re-reading one before rewriting it (write-if-changed) is not an input. */
+    ownOutput?: (rel: string) => boolean;
+  } = {},
+): ReadSet {
   const parsed = calls(text);
   if ("undetermined" in parsed) return parsed;
   const roots = [...new Set([resolve(root), safeRealpath(root)])];
@@ -486,11 +502,14 @@ export function parseTrace(text: string, root: string, opts: { writes?: "refuse"
     const absentBefore: string[] = [];
     for (const rel of wrote) {
       const f = first.get(rel);
-      if (f === "read") return { undetermined: `the writer reads ${rel || "."} and then rewrites it` };
+      // Its own declared output, read back before it is rewritten: the run
+      // compares with, or extends, what it last wrote. A skip puts exactly
+      // that back, and the dry run checks every output after a full build.
+      if (f === "read" && !opts.ownOutput?.(rel)) return { undetermined: `the writer reads ${rel || "."} and then rewrites it` };
       paths.delete(rel);
       if (f === "absent") absentBefore.push(rel);
     }
-    if (paths.size > MAX_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_PATHS}` };
+    if (paths.size > MAX_WRITER_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_WRITER_PATHS}` };
     return { paths: [...paths].sort(), git: [...git.values()], writes: [...wrote].sort(), absentBefore: absentBefore.sort() };
   }
   if (writes.length > 0) return { undetermined: `the check writes inside the checkout (${writes.slice(0, 3).join(", ")})` };

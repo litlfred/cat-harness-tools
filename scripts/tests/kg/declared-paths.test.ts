@@ -213,6 +213,8 @@ describe("a witness under an ABSENT results tree is unknown, not lost (bean `c8u
   test("only a literal INSIDE an absent results directory qualifies", () => {
     const root = join("/", "r");
     const absent = [join(root, "test", "results"), join(root, "test", "health", "results") + "/"];
+    // declared-path-literal: test vectors under the fixture root `/r`, never this checkout's; what they
+    // name in a real instance is the qa working copy, which is not committed (bean `7mwa`).
     expect(underAbsentResults(root, "test/results/kg-qa.manifest.json", absent)).toBe(true);
     expect(underAbsentResults(root, "test/health/results/example.health-report.json", absent)).toBe(true);
     // A sibling whose name merely STARTS with the directory's is not inside it.
