@@ -185,7 +185,7 @@ describe("several checkouts, in precedence order (kg-separation lesson 6)", () =
   });
   test("readDeclaration registers typologies from the declaration's checkout before validating (bean cat-tools-g7ls)", () => {
     const closure = checkout({ "cat-harness": [] });
-    const outside = checkout({ "folio-assistant-core": [node("glossary", "content")] });
+    const outside = checkout({ "folio-assistant-core": [node("g7ls-contributed", "content")] });
     const consumer = join(outside, "fhir-harness");
     mkdirSync(consumer, { recursive: true });
     writeFileSync(
@@ -193,16 +193,16 @@ describe("several checkouts, in precedence order (kg-separation lesson 6)", () =
       JSON.stringify({
         name: "fhir-harness",
         needs: ["folio-assistant-core"],
-        directories: [{ id: "fhir-glossary", path: "glossary/", graphTypologies: ["glossary"] }],
+        directories: [{ id: "fhir-glossary", path: "glossary/", graphTypologies: ["g7ls-contributed"] }],
       }),
     );
     const r = new GraphTypologyRegistry(BASE_GRAPH_TYPOLOGIES, [closure]);
-    expect(r.has("glossary")).toBe(false);
+    expect(r.has("g7ls-contributed")).toBe(false);
     const decl = readDeclaration(consumer, r);
     expect(decl?.name).toBe("fhir-harness");
-    expect(r.has("glossary")).toBe(true);
+    expect(r.has("g7ls-contributed")).toBe(true);
     // A bare registry (no declared checkout) stays isolated and still refuses unknown kinds.
     const bare = new GraphTypologyRegistry(BASE_GRAPH_TYPOLOGIES);
-    expect(() => readDeclaration(consumer, bare)).toThrow(/unknown graph typology "glossary"/);
+    expect(() => readDeclaration(consumer, bare)).toThrow(/unknown graph typology "g7ls-contributed"/);
   });
 });
