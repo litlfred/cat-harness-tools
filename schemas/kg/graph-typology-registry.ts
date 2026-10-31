@@ -47,7 +47,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { HARNESS_SUBGRAPH_DECLARATION_FILE, declaredNodeFiles } from "./declared-nodes";
+import { HARNESS_SUBGRAPH_DECLARATION_FILE, declaredNodeFiles, type InstanceFilter } from "./declared-nodes";
 import { GraphTypologyNodeSchema, kindDefOf } from "./graph-typology-node";
 import { ValidatorNodeSchema, type ValidatorNode } from "./validator-node";
 import { instanceNamespaceOf, namespaceForLayer, NS_PREFIXES, OWN_NAMESPACE_VALUES } from "./namespaces";
@@ -3177,6 +3177,8 @@ export class GraphTypologyRegistry {
   private shadowedKinds: Array<{ kind: string; kept: string; shadowed: string }> = [];
   /** The checkouts, in precedence order, whose `typologies/` graphs are loaded on first use. */
   private readonly declaredUnder: readonly string[];
+  /** Which instances of those checkouts are read; every one when omitted. */
+  private readonly include: InstanceFilter | undefined;
 
   /**
    * @param seed the kinds this layer lists in code
@@ -3188,11 +3190,17 @@ export class GraphTypologyRegistry {
    *   is SHADOWED (see {@link shadowed}), because the earlier checkout is the
    *   one being read (`defaultGraphTypologies` puts the checkout under
    *   inspection first).
+   * @param options.include which instances of those checkouts are read — a
+   *   registry whose answers must not depend on what else is mounted (the
+   *   harness's own kinds, for `kind:json-schemas`, bean `8lcl`) names them.
+   *   Omitted, every instance is.
    */
   constructor(
     seed: Readonly<Record<string, GraphTypologyDef>> = BASE_GRAPH_TYPOLOGIES,
     declaredUnder?: string | readonly string[],
+    options: { include?: InstanceFilter } = {},
   ) {
+    this.include = options.include;
     for (const [k, v] of Object.entries(seed)) this.kinds.set(k, v);
     const roots = declaredUnder === undefined ? [] : typeof declaredUnder === "string" ? [declaredUnder] : declaredUnder;
     this.declaredUnder = [...new Set(roots.map((r) => resolve(r)))];
@@ -3224,7 +3232,7 @@ export class GraphTypologyRegistry {
     const kindRoot = new Map<string, number>();
     const validatorRoot = new Map<string, number>();
     this.declaredUnder.forEach((root, at) => {
-      for (const { file, node } of declaredKindNodes(root)) {
+      for (const { file, node } of declaredKindNodes(root, this.include)) {
         const prior = this.declaredIn.get(node.kind);
         if (prior === file) continue;
         const priorAt = kindRoot.get(node.kind);
@@ -3242,7 +3250,7 @@ export class GraphTypologyRegistry {
         this.declaredIn.set(node.kind, file);
         kindRoot.set(node.kind, at);
       }
-      for (const v of declaredValidatorNodes(root)) {
+      for (const v of declaredValidatorNodes(root, this.include)) {
         const key = `${v.node.validates.kind}\u0000${v.node.validates.family ?? ""}`;
         const prior = this.validatorNodes.get(key);
         const priorAt = validatorRoot.get(key);
@@ -3348,8 +3356,11 @@ export class GraphTypologyRegistry {
  * the declaration's Zod schema lives in `cat-harness.ts`, which imports this
  * module.
  */
-export function declaredKindNodes(repoRoot: string): { file: string; node: ReturnType<typeof GraphTypologyNodeSchema.parse> }[] {
-  return declaredNodeFiles(repoRoot, "typologies").map(({ file, raw }) => {
+export function declaredKindNodes(
+  repoRoot: string,
+  include?: InstanceFilter,
+): { file: string; node: ReturnType<typeof GraphTypologyNodeSchema.parse> }[] {
+  return declaredNodeFiles(repoRoot, "typologies", include).map(({ file, raw }) => {
     const parsed = GraphTypologyNodeSchema.safeParse(raw);
     if (!parsed.success) throw new Error(`${file} is not a folio-graph-typology/v1 node: ${parsed.error.message}`);
     return { file, node: parsed.data };
@@ -3357,8 +3368,8 @@ export function declaredKindNodes(repoRoot: string): { file: string; node: Retur
 }
 
 /** Every `folio-validator/v1` node in every declared `validators/` graph (bean riit). */
-export function declaredValidatorNodes(repoRoot: string): { file: string; node: ValidatorNode }[] {
-  return declaredNodeFiles(repoRoot, "validators").map(({ file, raw }) => {
+export function declaredValidatorNodes(repoRoot: string, include?: InstanceFilter): { file: string; node: ValidatorNode }[] {
+  return declaredNodeFiles(repoRoot, "validators", include).map(({ file, raw }) => {
     const parsed = ValidatorNodeSchema.safeParse(raw);
     if (!parsed.success) throw new Error(`${file} is not a folio-validator/v1 node: ${parsed.error.message}`);
     return { file, node: parsed.data };
