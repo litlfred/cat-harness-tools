@@ -246,7 +246,7 @@ export interface GraphTypologyDef {
    * kind, which the navbar folds) says this. `check:subgraphs` routes such a
    * kind's unresolved links to `siteResolved`, as it does a renderable
    * graph's, and the kind's owner judges them from the page that shows them
-   * (fhir-harness's `check:ig-annex-links`). Absent means no.
+   * (an IG harness's annex-links check). Absent means no.
    */
   shownOnPublishedPages?: true;
   /**
@@ -2198,7 +2198,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // a reader has to be able to tell the two apart.
       "folio-figure-descriptions/v1": {},
       // A figure transcribed as data on its entry's `figure-data/` (owner,
-      // 2026-10-31, "B in who-iris"): the DIIG phases chart and the SMART
+      // 2026-10-31, "B in the catalogue instance"): the DIIG phases chart and the SMART
       // Guidelines approach chart, one file per published version. Their
       // shapes are with the generators that draw them, in a layer above this
       // one, so they are routed here and validated there.
@@ -3252,8 +3252,8 @@ export class GraphTypologyRegistry {
    * When `readDeclaration` reads an instance from a checkout outside
    * {@link declaredUnder} — e.g. a host or sibling checkout reached from a
    * standalone run, or a multi-instance test fixture — every discovered
-   * instance's `typologies/` in that checkout (such as `folio-assistant-core`'s
-   * `glossary` for `fhir-harness.json`) is registered before any declaration in
+   * instance's `typologies/` in that checkout (such as a document layer's
+   * `glossary` for an IG harness's declaration) is registered before any declaration in
    * it is validated. No-op on a bare or filtered registry.
    */
   ensureCheckout(repoRoot: string): void {
