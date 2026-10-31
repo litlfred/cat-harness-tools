@@ -1125,19 +1125,32 @@ jobs:
           # PR restores the newest under the prefix, not this exact key: a
           # record is checked path by path, so an older main's still serves.
           echo "cone=layer-pr-checks-cone-v1-${GITHUB_REPOSITORY}-$hash" >> "$GITHUB_OUTPUT"
+      # A fresh fork's main has neither `index.lock.json` nor `index.config.json`
+      # until its first harness PR merges (dth-sc#1, cat-harness-tools#1139).
+      # Treat main's answer as empty (0 tests, 0 gates) and hand it to compare
+      # through `base-answer`, so the base side is not mounted or run and the PR
+      # side's shards run and are judged against the empty baseline.
+      - name: Does the base side have a harness?
+        id: base-harness
+        env:
+          OWN_SHA: ${{ steps.base-key.outputs.own-sha }}
+        run: >-
+          python3 ci/.github/scripts/layer-pr-checks/empty-baseline.py check
+          fa "$RUNNER_TEMP/base-results" "$OWN_SHA"
       # Restored here, not only looked up: compare runs after the head
       # shards, hours later on a busy day, and the entry may be evicted by
       # then (cat-harness-tools#926). What is restored goes to compare as an
       # artifact (below).
       - name: Is main's answer already known?
         id: base-lookup
+        if: steps.base-harness.outputs.empty != 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ steps.base-key.outputs.key }}
       - name: Are this main's cone records already kept? (a push)
         id: cone-lookup
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && steps.base-harness.outputs.empty != 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/cone
@@ -1153,6 +1166,7 @@ jobs:
       - name: Has a run on main stored an answer for this PR's base?
         id: stored-lookup
         if: >-
+          steps.base-harness.outputs.empty != 'true' &&
           steps.base-lookup.outputs.cache-hit != 'true' && github.event_name != 'push' &&
           inputs.reuse-stored-main && github.run_attempt == '1'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
@@ -1165,8 +1179,10 @@ jobs:
       - name: Hand main's answer to the compare job
         id: base-answer
         if: >-
-          github.event_name != 'push' &&
-          (steps.base-lookup.outputs.cache-hit == 'true' || steps.stored-lookup.outputs.cache-matched-key != '')
+          github.event_name != 'push' && (
+            steps.base-harness.outputs.empty == 'true' ||
+            steps.base-lookup.outputs.cache-hit == 'true' ||
+            steps.stored-lookup.outputs.cache-matched-key != '')
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
@@ -1180,6 +1196,7 @@ jobs:
       - name: Skip the base side when it is
         id: base-hit
         env:
+          EMPTY: ${{ steps.base-harness.outputs.empty == 'true' }}
           EXACT: ${{ steps.base-lookup.outputs.cache-hit == 'true' }}
           KEY: ${{ steps.base-key.outputs.key }}
           STORED: ${{ steps.stored-lookup.outputs.cache-matched-key }}
@@ -1189,7 +1206,9 @@ jobs:
         run: |
           set -euo pipefail
           hit=false; key=""; tier=""
-          if [ "$EXACT" = "true" ]; then
+          if [ "$EMPTY" = "true" ]; then
+            key="empty"; tier="no-harness"
+          elif [ "$EXACT" = "true" ]; then
             key="$KEY"; tier=exact
           elif [ -n "$STORED" ]; then
             key="$STORED"; tier="this PR's main"
@@ -1197,7 +1216,7 @@ jobs:
           if [ "$PUSH" = "true" ]; then
             # main's own run judges nothing and reads no answer: "kept" is all
             # it asks, to skip work that is already kept (below).
-            [ "$EXACT" = "true" ] && hit=true
+            { [ "$EMPTY" = "true" ] || [ "$EXACT" = "true" ]; } && hit=true
           elif [ -n "$key" ]; then
             # Restored AND handed to compare, with both halves of the answer:
             # only then is main's side not computed. Anything less is a miss,
@@ -1221,11 +1240,12 @@ jobs:
           PUSH: ${{ github.event_name == 'push' }}
           PINS_ONLY: ${{ steps.lock-only.outputs.skip == 'true' }}
           QUICK: ${{ steps.quick.outputs.quick == 'true' }}
+          EMPTY: ${{ steps.base-harness.outputs.empty == 'true' }}
           BASE_HIT: ${{ steps.base-hit.outputs.hit == 'true' }}
           CONE_HIT: ${{ steps.cone-lookup.outputs.cache-hit == 'true' }}
         run: |
           hit=false
-          if [ "$PINS_ONLY" = "true" ] || [ "$QUICK" = "true" ]; then hit=true
+          if [ "$PINS_ONLY" = "true" ] || [ "$QUICK" = "true" ] || [ "$EMPTY" = "true" ]; then hit=true
           elif [ "$PUSH" = "true" ]; then { [ "$BASE_HIT" = "true" ] && [ "$CONE_HIT" = "true" ]; } && hit=true
           elif [ "$BASE_HIT" = "true" ]; then hit=true
           fi
@@ -1533,34 +1553,9 @@ jobs:
         env:
           TIER: ${{ needs.prepare-base.outputs.stored-tier }}
           KEY: ${{ needs.prepare-base.outputs.stored-key }}
-        run: |
-          python3 - "$RUNNER_TEMP/base-results/from.json" "$TIER" "$KEY" <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
-          import json, sys
-          from datetime import datetime, timezone
-          path, tier, key = sys.argv[1:4]
-          try:
-              f = json.load(open(path))
-          except (OSError, ValueError):
-              f = {}
-          print("### Main's side: stored, not recomputed\n")
-          if tier == "exact":
-              print("Main's answer for exactly these inputs was cached; the base side was not run again.")
-          else:
-              print(f"Main's answer for these exact inputs was not cached, so this PR is judged against the answer stored for **{tier}**, and main was not recomputed.")
-          if f:
-              age = ""
-              try:
-                  at = datetime.fromisoformat(f["pinned_at"].replace("Z", "+00:00"))
-                  age = f", {int((datetime.now(timezone.utc) - at).total_seconds() // 3600)} h ago"
-              except (KeyError, ValueError):
-                  pass
-              print(f"\n- main: `{f.get('main', '?')}`, pinned at {f.get('pinned_at', '?')}{age}")
-              print(f"- index: `{f.get('index') or 'the caller'}`; run: {f.get('run', '?')}")
-          else:
-              print(f"\n- stored before its provenance was kept: `{key}`")
-          if tier != "exact":
-              print("\nIt is the answer for this PR's own base commit; a failure that reached it after that run through the index, a lower layer or a branch-kept graph shows here as new. If a NEW failure below is not this PR's, re-run **all** jobs: a second attempt recomputes main exactly.")
-          PY
+        run: >-
+          python3 .github/scripts/layer-pr-checks/empty-baseline.py summary
+          "$RUNNER_TEMP/base-results/from.json" "$TIER" "$KEY"
       - name: Join each side's shards
         id: join
         if: steps.pins-only.outputs.only != 'true'
