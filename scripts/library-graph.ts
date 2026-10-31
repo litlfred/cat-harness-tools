@@ -98,7 +98,7 @@ import { ingestRungOf, type IngestRung } from "../pipeline/gen-library-jsonld.ts
 import { pagesOf, readStructure, STRUCTURE_FILENAME } from "../schemas/content/document-structure.ts";
 import { corpusDirectoriesForGraph, rootInstanceName } from "../schemas/kg/harness-config.js";
 import { ReferencedSourceSchema } from "../schemas/library/referenced-source.ts";
-import { entryGraphFiles, entryGraphSitePath, nonEntryDirs } from "./lib/library-entry-graphs.ts";
+import { entryGraphFiles, entryGraphSitePath, libraryEntryDirs, libraryOfEntry, nonEntryDirs } from "./lib/library-entry-graphs.ts";
 import { noteAbsent, splitDeclared } from "./lib/declared-presence.ts";
 import { displayNarrative } from "./lib/narrative-display.ts";
 import { narrativeFor } from "../schemas/content/narrative.ts";
@@ -771,7 +771,8 @@ function catalogueTitles(instanceRoot: string): Map<string, string> {
 function intakeTitle(intake: { title?: string; item?: string; record?: string }, dir: string): string {
   if (intake.title) return intake.title;
   if (intake.item) {
-    const instanceRoot = dirname(dirname(dir));
+    // entry → its library (past a concern group, bean `6fez`) → the instance.
+    const instanceRoot = dirname(libraryOfEntry(dir));
     for (const cat of directoriesForGraph(instanceRoot, "catalogue")) {
       const nodes = join(cat, "nodes");
       if (!existsSync(nodes)) continue;
@@ -827,9 +828,8 @@ export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRoo
   for (const libDir of presence.present.sort()) {
     const instance = instanceOf(libDir, repoRoot);
     const notEntries = nonEntryDirs(libDir);
-    for (const slug of readdirSync(libDir).sort()) {
-      const dir = join(libDir, slug);
-      if (!statSync(dir).isDirectory()) continue;
+    // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`).
+    for (const { slug, dir } of libraryEntryDirs(libDir)) {
       // Another kind's directory kept in the library is not an entry.
       if (notEntries.has(dir.replace(/[/\\]+$/, ""))) continue;
       const has = (f: string): boolean => existsSync(join(dir, f));
@@ -948,7 +948,7 @@ export function readLibraryGraph(roots: string[], repoRoot: string = checkoutRoo
             const by = { ...(w.gates ? { gates: w.gates } : {}), ...(w.record ? { record: w.record } : {}) };
             return { withheld: w.reason, ...(Object.keys(by).length ? { withheldBy: by } : {}) };
           }
-          const avatar = avatarOf(libDir, instance, slug, images, repoRoot, sourceFile);
+          const avatar = avatarOf(dirname(dir), instance, slug, images, repoRoot, sourceFile);
           return avatar ? { avatar } : {};
         })(),
       });

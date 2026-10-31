@@ -109,6 +109,7 @@ import {
 } from "../schemas/content/vector-figure.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
+import { libraryEntryDir } from "./lib/library-entry-graphs.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -447,7 +448,9 @@ function run(): number {
       // Resolved against the library the verdict file is IN, not searched
       // across all of them: a verdict belongs to its own library, and looking
       // elsewhere would let one library's judgement rewrite another's sidecar.
-      const path = join(libDir, docId, "images.json");
+      // The entry wherever it is filed in that library (bean `6fez`).
+      const entryDir = libraryEntryDir(libDir, docId) ?? join(libDir, docId);
+      const path = join(entryDir, "images.json");
       if (!existsSync(path)) {
         console.error(`✗ ${docId}: no images.json — run scripts/pdf-images.py first`);
         bad++;
@@ -455,9 +458,9 @@ function run(): number {
       }
       const who = attributionFor(verdicts, docId);
       const { text, result } = applyTo(readFileSync(path, "utf-8"), docVerdicts, who.by, who.at);
-      const vector = applyVectorIn(join(libDir, docId), docVerdicts, who.by, who.at, true);
+      const vector = applyVectorIn(entryDir, docVerdicts, who.by, who.at, true);
       if (!check) writeFileSync(path, text, "utf-8");
-      if (!check && !vector?.orphaned.length) applyVectorIn(join(libDir, docId), docVerdicts, who.by, who.at, false);
+      if (!check && !vector?.orphaned.length) applyVectorIn(entryDir, docVerdicts, who.by, who.at, false);
       results.push({ docId, ...result, applied: result.applied + (vector?.applied ?? 0), orphaned: [...result.orphaned, ...(vector?.orphaned ?? [])] });
       // Reported, not counted toward the failure — see "Vector figures are
       // judged HERE too" in the header.

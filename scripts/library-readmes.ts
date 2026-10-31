@@ -31,6 +31,7 @@ import { Liquid } from "liquidjs";
 
 import { splice } from "@litlfred/bootstrap-tools/scripts/subgraph-readmes.ts";
 import { checkoutRootFor, directoriesForGraph, instanceRootsIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
+import { libraryEntryDirs } from "./lib/library-entry-graphs.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -103,16 +104,17 @@ export async function plan(repo = REPO): Promise<{ writes: Map<string, string>; 
     for (const lib of directoriesForGraph(instance, "library")) {
       if (seen.has(lib) || !existsSync(lib)) continue;
       seen.add(lib);
-      for (const slug of readdirSync(lib).sort()) {
-        const dir = join(lib, slug);
-        if (!statSync(dir).isDirectory()) continue;
+      // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`):
+      // a filed entry is one level deeper, so its link up to the library is too.
+      for (const { dir, rel } of libraryEntryDirs(lib)) {
+        const up = "../".repeat(rel.split("/").length);
         const item = itemFacts(dir);
         if (item === undefined) continue;
         const libId = repo === instance ? join(readDeclaration(instance)?.name ?? "", relative(repo, lib)) : relative(repo, lib);
         const region = await liquid.renderFile("library-item", {
           item,
           counts: { sections: countIn(dir, "sections"), blocks: countIn(dir, "blocks"), images: countIn(dir, "images") },
-          library: { id: libId, readme: existsSync(join(lib, "README.md")) ? "../README.md" : "../" },
+          library: { id: libId, readme: existsSync(join(lib, "README.md")) ? `${up}README.md` : up },
         });
         const out = join(dir, "README.md");
         const existing = existsSync(out) ? readFileSync(out, "utf-8") : undefined;
