@@ -277,17 +277,26 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
   // directory of it, so its nodes sit inside a parent kind's directory (the
   // IG artefact JSON-LD that gen-ig-pages writes under an `ig-pages` docs
   // root). Its families route from the parent's sweep and count as its own.
-  const nested = new Map<string, { kind: string; fam: Awaited<ReturnType<typeof resolveNodeSchemas>>[number] }>();
+  type RoutedFamily = Awaited<ReturnType<typeof resolveNodeSchemas>>[number] | { tag: string; state: "unvalidated" };
+  const nested = new Map<string, { kind: string; fam: RoutedFamily }>();
   for (const kind of defaultGraphTypologies.names()) {
-    if (!defaultGraphTypologies.get(kind)!.nodeSchemas || declaredDirs.some((d) => d.kinds.includes(kind))) continue;
+    const def = defaultGraphTypologies.get(kind)!;
+    if (!def.nodeSchemas || declaredDirs.some((d) => d.kinds.includes(kind))) continue;
     for (const fam of await resolveNodeSchemas(kind, root)) if (!nested.has(fam.tag)) nested.set(fam.tag, { kind, fam });
+    for (const tag of Object.keys(def.nodeSchemas)) if (!nested.has(tag)) nested.set(tag, { kind, fam: { tag, state: "unvalidated" } });
   }
   const routed = new Map<string, Pick<FamilySweep, "counts" | "invalid">>();
   for (const kind of defaultGraphTypologies.names()) {
     const def = defaultGraphTypologies.get(kind)!;
     if (!def.nodeSchemas) continue;
     const fams = await resolveNodeSchemas(kind, root);
-    const byTag = new Map(fams.map((f) => [f.tag, f]));
+    const byTag = new Map<string, RoutedFamily>(fams.map((f) => [f.tag, f]));
+    // A family declared with `{}` in `nodeSchemas` and joined to no validator
+    // in this checkout (e.g. `diig-phases-figure/v1` and
+    // `smart-guidelines-approach-figure/v1`, baselined as unkinded in
+    // `node-kinds.baseline.json`) is still a family the typology names:
+    // routed here as `unvalidated`, never reported as `unmapped`.
+    for (const tag of Object.keys(def.nodeSchemas)) if (!byTag.has(tag)) byTag.set(tag, { tag, state: "unvalidated" });
     const s: FamilySweep = { kind, counts: {}, unmapped: [], unresolvable: [], invalid: [], projected: [] };
     for (const f of fams) if (f.state === "unresolvable") s.unresolvable.push({ tag: f.tag, reason: f.reason });
     const repoRoot = join(root, "..");
@@ -445,7 +454,9 @@ async function main(): Promise<number> {
           ? `  ✓ ${tag}: ${c.parsed}/${c.checked} parse`
           : c.state === "external"
               ? `  · ${tag}: ${c.nodes} node(s), an external specification — named, not run here`
-              : `  · ${tag}: ${c.nodes} node(s), a TypeScript shape, not runnable — could not determine`,
+              : c.state === "unvalidated"
+                  ? `  · ${tag}: ${c.nodes} node(s), routed here, no validator in this checkout — could not determine`
+                  : `  · ${tag}: ${c.nodes} node(s), a TypeScript shape, not runnable — could not determine`,
       );
     }
     if (f.onFamily && Object.keys(f.counts).length === 0) {

@@ -26,7 +26,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { absentResultDirs, isTestFile, newWitnesses, relocatedWitnesses, scanDeclaredPaths, underAbsentResults, underBuiltAtPublish, witnessesOf } from "../../check-declared-paths.js";
+import { absentResultDirs, isTestFile, newWitnesses, relocatedWitnesses, scanDeclaredPaths, storedResultDirs, underAbsentResults, underBuiltAtPublish, witnessesOf } from "../../check-declared-paths.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../../lib/roots.ts";
 
 const root = resolve(HARNESS_ROOT);
@@ -39,7 +39,7 @@ const scan = scanDeclaredPaths(root);
  * the same way so the test does not assert on the committed QA corpus being
  * present (bean `cxcn`, reader audit F7). Unverifiable, never "resolves".
  */
-const absentResults = absentResultDirs(root);
+const absentResults = [...new Set([...absentResultDirs(root), ...storedResultDirs(root)])];
 const recordedWitnesses = new Set(
   (JSON.parse(readFileSync(join(TOOLS_ROOT, "scripts", "declared-path-baseline.json"), "utf-8")) as { resolves?: string[] }).resolves ?? [],
 );

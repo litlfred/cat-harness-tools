@@ -183,6 +183,7 @@ NEEDS_INPUT_SCRIPTS = {
     "check:duplicate-ids": "needs a built site directory; bare, it prints its usage and exits 2",
     "check:escaped-markup": "needs a built site directory (or --source <dir>); bare, it prints its usage and exits 2",
     "check:maintained-artefacts": "needs a built site directory; bare, it prints its usage and exits 2",
+    "ingest:ig-chrome:check": "needs --layer <dir> checkouts of each fhir.template in the chain; bare, it prints could not determine and exits 2",
     "wireframe:check": "needs --use, --topic and --surface; bare, a usage error and exit 2",
 }
 # The `PREREQUISITE_FILES` skip for `uml:overview:check` and

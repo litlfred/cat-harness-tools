@@ -228,7 +228,23 @@ export async function renderSvgs(
 ): Promise<{ rendered: number; skipped: string | null }> {
   const todo = staleJobs(jobs);
   if (todo.length === 0) return { rendered: 0, skipped: null };
-  if (spawnSync("java", ["-version"]).status !== 0) return { rendered: 0, skipped: "no java on PATH" };
+  const java = await (async (): Promise<string> => {
+    try {
+      const loaded = loadToolReleases(await toolReleaseDirs(HARNESS_ROOT), HARNESS_ROOT);
+      const rel = loaded.releases.find((r) => r.release.name === "plantuml")?.release;
+      const major = (rel?.runtimes ?? []).map((r) => /^temurin-jre@(\d+)\./.exec(r.release)?.[1]).find(Boolean);
+      if (major) {
+        for (const suffix of ["X64", "ARM64"]) {
+          const home = process.env[`JAVA_HOME_${major}_${suffix}`];
+          if (home && existsSync(join(home, "bin", "java"))) return join(home, "bin", "java");
+        }
+      }
+    } catch {
+      // Fall back to `java` on PATH when no runtime declaration is readable.
+    }
+    return "java";
+  })();
+  if (spawnSync(java, ["-version"]).status !== 0) return { rendered: 0, skipped: "no java on PATH" };
   const jar = await plantumlJar();
   if (!jar) return { rendered: 0, skipped: `could not fetch ${PLANTUML.url}` };
 
@@ -239,7 +255,7 @@ export async function renderSvgs(
       writeFileSync(f, text.replace(/^@startuml .*$/m, `@startuml u${i}`));
       return f;
     });
-    const run = spawnSync("java", ["-jar", jar, "-charset", "UTF-8", "-tsvg", "-o", work, ...inputs], { encoding: "utf8" });
+    const run = spawnSync(java, ["-jar", jar, "-charset", "UTF-8", "-tsvg", "-o", work, ...inputs], { encoding: "utf8" });
     if (run.status !== 0) throw new Error(`PlantUML failed (${run.status}): ${run.stderr}`);
     todo.forEach(({ source: p, text, svg: target }, i) => {
       const out = join(work, `u${i}.svg`);

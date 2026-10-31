@@ -477,6 +477,17 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
   // publish-time outputs is told apart from a stale one after the repair pass.
   // Watch both `p.writer` and `p.check`: checks routed through `publish-check.ts <writer>`
   // execute `<writer>` on disk inside the check call itself.
+  if (
+    opts.runner === undefined &&
+    existsSync(join(repoRoot, "smart-base")) &&
+    !existsSync(join(repoRoot, "smart-base", "fhir-artifact-index", "index.json"))
+  ) {
+    spawnSync("bun", ["run", "cat", "ig-index:build"], {
+      cwd: repoRoot,
+      encoding: "utf-8",
+      env: { ...process.env, [BUILDING_ENV]: "1" },
+    });
+  }
   const decls = opts.tracker === undefined && opts.runner === undefined ? publishTimeDeclarations(repoRoot) : [];
   const tracker = opts.tracker ?? (opts.runner === undefined ? treeMoveTracker(repoRoot, decls, opts.instance) : undefined);
   const moves = new Map<string, WriterMoves>();
