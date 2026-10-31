@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 import { parseTrace } from "../ci-cone.ts";
 import { FileDigests } from "../input-hash.ts";
-import { decideWriter, emptyRecords, tracedArgv, underOutputs, verifySummary, verifyWriters, writerRecordOf } from "../writer-cone.ts";
+import { decideWriter, emptyRecords, snapshotPaths, tracedArgv, underOutputs, verifySummary, verifyWriters, writerRecordOf } from "../writer-cone.ts";
 
 const ROOT = "/work/repo";
 
@@ -176,5 +176,18 @@ describe("writerRecordOf and decideWriter", () => {
   test("tracedArgv wraps the writer in strace", () => {
     expect(tracedArgv(["bun", "run", "cat", "w"], "/tmp/l").slice(-6)).toEqual(["-o", "/tmp/l", "bun", "run", "cat", "w"]);
     expect(tracedArgv(["x"], "/tmp/l")[0]).toBe("strace");
+  });
+});
+
+describe("snapshotPaths (what a skip puts back)", () => {
+  const own = ["site/a/", "out.json"];
+  const others = ["site/b/"];
+  test("adds every file the run wrote outside its declared outputs", () => {
+    const r = snapshotPaths(own, ["site/a/x.html", "out.json", "build/extra.json"], underOutputs(own), underOutputs([...own, ...others]));
+    expect(r).toEqual({ paths: ["site/a/", "out.json", "build/extra.json"] });
+  });
+  test("refuses a write into another writer's declared output", () => {
+    const r = snapshotPaths(own, ["site/b/y.html"], underOutputs(own), underOutputs([...own, ...others]));
+    expect("none" in r && r.none).toContain("site/b/y.html");
   });
 });

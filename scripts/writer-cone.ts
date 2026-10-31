@@ -206,6 +206,25 @@ export function writerRecordOf(a: {
   return { sha: a.sha, base: a.before.hash, audit: a.before.audit, reads, git, outputs };
 }
 
+/**
+ * What a skipped writer must have put back: its declared outputs and every
+ * file its traced run actually wrote outside them. A write into another
+ * writer's declared outputs cannot be put back without clobbering that writer,
+ * so the writer is not recorded (bean fwtz; owner 2026-10-31 21:45Z: "rerun
+ * only the scripts whose inputs moved, and publish what they actually wrote").
+ */
+export function snapshotPaths(
+  declared: readonly string[],
+  written: readonly string[],
+  ownDeclared: (rel: string) => boolean,
+  anyDeclared: (rel: string) => boolean,
+): { paths: string[] } | { none: string } {
+  const extra = written.filter((p) => !ownDeclared(p)).sort();
+  const foreign = extra.find((p) => anyDeclared(p));
+  if (foreign !== undefined) return { none: `the writer wrote ${foreign}, which another writer declares as its output` };
+  return { paths: [...declared, ...extra] };
+}
+
 /** `proof`: the record's audit was clean, so the skip rests on the argument above; otherwise it is evidence the dry run must confirm. */
 export type WriterDecision = { skip: true; sha: string; proof: boolean; why: string } | { skip: false; why: string };
 
