@@ -12,7 +12,7 @@
  * change to a view, and a change does not add tangles.
  *
  * Usage:
- *   bun run cat-harness-tools/archimate/scripts/archimate-crossings.ts --model <file.archimate> [--view <id or name>] [--json]
+ *   bun run cat-harness-tools/archimate/scripts/archimate-crossings.ts --model <file.archimate> [--view <id or page slug>] [--json]
  *   bun run cat-harness-tools/archimate/scripts/archimate-crossings.ts --model <file> --view <id> --max <n>   # gate: exit 1 above n
  *
  * The lines are the ones `render-view.ts` draws (`routeConnections`), so what
@@ -27,6 +27,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { readArchimate, type ArchimateModel, type ArchimateView, type ArchimateViewNode } from "../schemas/archimate.ts";
+import { planSlugs } from "../schemas/slugs.ts";
 import { routeConnections, type Pt, type RoutedConnection } from "./render-view.ts";
 
 export interface Tangle {
@@ -115,9 +116,17 @@ export function tanglesOf(view: ArchimateView, routed: RoutedConnection[] = rout
   return out;
 }
 
-/** The view a `--view` argument names: by id, else by exact name. */
+/**
+ * The view a `--view` argument names: by Archi id, by its page slug
+ * (`slugs.ts`, e.g. `1-central-health-workforce-registry`), else by exact
+ * name. The Tool definitions declare it a `Slug`, so an id or a slug is what
+ * a caller passes; the name is for an author at a shell.
+ */
 export function viewOf(model: ArchimateModel, key: string): ArchimateView | undefined {
-  return model.views.find((v) => v.id === key) ?? model.views.find((v) => v.name === key);
+  const byId = model.views.find((v) => v.id === key);
+  if (byId) return byId;
+  const slugs = planSlugs(model);
+  return model.views.find((v) => slugs.get(v.id) === key) ?? model.views.find((v) => v.name === key);
 }
 
 function arg(name: string): string | undefined {
@@ -128,7 +137,7 @@ function arg(name: string): string | undefined {
 if (import.meta.main) {
   const file = arg("model");
   if (!file) {
-    console.error("usage: archimate-crossings.ts --model <file.archimate> [--view <id or name>] [--max <n>] [--json]");
+    console.error("usage: archimate-crossings.ts --model <file.archimate> [--view <id or page slug>] [--max <n>] [--json]");
     process.exit(2);
   }
   const model = readArchimate(readFileSync(resolve(file)));
