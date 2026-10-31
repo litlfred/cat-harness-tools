@@ -327,7 +327,7 @@ jobs:
           echo "list=[${list}]" >> "$GITHUB_OUTPUT"
       - &judging-scripts
         name: The judging scripts
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: litlfred/cat-harness-tools
           ref: ${{ inputs.tools-ref }}
@@ -344,7 +344,7 @@ jobs:
       # re-run is a new attempt and so a new time: it judges main as it is.
       - &pin-restore
         id: pin-restore
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
@@ -355,7 +355,7 @@ jobs:
         if: >-
           steps.pin-restore.outputs.cache-hit != 'true' && github.event_name != 'push' &&
           inputs.pin-to-main-record && github.run_attempt == '1'
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/cone
           key: layer-pr-checks-cone-v1-${{ github.repository }}-none-${{ github.run_id }}
@@ -417,13 +417,13 @@ jobs:
       - &pin-save
         if: steps.pin-restore.outputs.cache-hit != 'true'
         continue-on-error: true  # the other side saved first: read its time below
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
       - &pin-reread
         if: steps.pin-restore.outputs.cache-hit != 'true'
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
@@ -457,7 +457,7 @@ jobs:
           { echo "at=$at"; echo "layers-at=$layers_at"; echo "index=$index"; echo "tools=$tools"; } >> "$GITHUB_OUTPUT"
       - &checkout-index
         name: Check out the root (the folio-assistant index, or the caller in index mode)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ inputs.mode == 'index' && github.repository || 'litlfred/folio-assistant' }}
           # Index mode: the PR's merge commit on both sides; the base side then
@@ -500,13 +500,13 @@ jobs:
           fi
           git log -1 --format='base side: %h %s'
       - &setup-bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.4
       - &caller
         name: Check out the caller
         if: inputs.mode == 'layer'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: src
           fetch-depth: 2
@@ -562,7 +562,7 @@ jobs:
       - &mount-cache
         name: Cache remote mounts (bean cis1)
         if: steps.skip-prep.outputs.hit != 'true'
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: /home/runner/.cache/cat-mount
           key: cat-mount-v1-${{ hashFiles('fa/index.lock.json') }}
@@ -772,7 +772,7 @@ jobs:
         # entry is a key defect, which the derive log's "reused" lines show.
         # Saved per side and run; restored from the newest of this repository.
         if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: fa/build/derive-cache
           key: derive-cache-v1-${{ github.repository }}-${{ env.SIDE }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -935,7 +935,7 @@ jobs:
       - &timings-restore
         name: The gate seconds the last run of this repository recorded
         if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/timings
           key: layer-pr-checks-timings-v1-${{ github.repository }}-${{ github.run_id }}
@@ -957,7 +957,7 @@ jobs:
       - &upload-prepared
         name: Upload this side's prepared root
         if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: prepared-${{ env.SIDE }}
           path: ${{ runner.temp }}/prepared
@@ -1083,14 +1083,14 @@ jobs:
       # artifact (below).
       - name: Is main's answer already known?
         id: base-lookup
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ steps.base-key.outputs.key }}
       - name: Are this main's cone records already kept? (a push)
         id: cone-lookup
         if: github.event_name == 'push'
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/cone
           key: ${{ steps.base-key.outputs.cone }}
@@ -1107,7 +1107,7 @@ jobs:
         if: >-
           steps.base-lookup.outputs.cache-hit != 'true' && github.event_name != 'push' &&
           inputs.reuse-stored-main && github.run_attempt == '1'
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ steps.base-key.outputs.key }}
@@ -1120,7 +1120,7 @@ jobs:
           github.event_name != 'push' &&
           (steps.base-lookup.outputs.cache-hit == 'true' || steps.stored-lookup.outputs.cache-matched-key != '')
         continue-on-error: true
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: base-answer
           path: |
@@ -1232,14 +1232,14 @@ jobs:
       - id: skip-prep
         run: echo "hit=false" >> "$GITHUB_OUTPUT"
       - name: The judging scripts, at the commit this run pinned
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: litlfred/cat-harness-tools
           ref: ${{ matrix.side == 'base' && needs.prepare-base.outputs.tools || needs.prepare-head.outputs.tools }}
           path: ci
           sparse-checkout: .github/scripts/layer-pr-checks
       - name: Check out the root, at the commit this run pinned
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ inputs.mode == 'index' && github.repository || 'litlfred/folio-assistant' }}
           ref: ${{ inputs.mode == 'index' && (github.event_name == 'push' && github.sha || github.ref) || (matrix.side == 'base' && needs.prepare-base.outputs.index || needs.prepare-head.outputs.index) }}
@@ -1250,7 +1250,7 @@ jobs:
       - *mount-cache
       - *mount
       - name: Fetch what this side's prepare job built
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: prepared-${{ matrix.side }}
           path: ${{ runner.temp }}/prepared
@@ -1273,7 +1273,7 @@ jobs:
       # as before the cone.
       - name: The CI cone's records from the caller's main
         id: cone-restore
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/cone
           key: layer-pr-checks-cone-v1-${{ github.repository }}-none-${{ github.run_id }}
@@ -1375,7 +1375,7 @@ jobs:
           ROOT_GATES=""
           [ "$MODE" = "layer" ] && ROOT_GATES="--record $RUNNER_TEMP/root-gates.json"
           python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json" $ROOT_GATES
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: results-${{ matrix.side }}-${{ matrix.shard }}
           if-no-files-found: error
@@ -1453,13 +1453,13 @@ jobs:
             exit 2
           fi
       # A push always: main's own verdict (below) reads main-verdict.py.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: steps.pins-only.outputs.only != 'true' || github.event_name == 'push'
         with:
           repository: litlfred/cat-harness-tools
           ref: ${{ github.event_name == 'push' && needs.prepare-base.outputs.tools || needs.prepare-head.outputs.tools }}
           sparse-checkout: .github/scripts/layer-pr-checks
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         if: steps.pins-only.outputs.only != 'true'
         with:
           path: results
@@ -1469,7 +1469,7 @@ jobs:
       # while the head shards run. `cached` is true only when it was handed.
       - name: Main's answer, cached or stored (bean cis2)
         if: steps.pins-only.outputs.only != 'true' && needs.prepare-base.outputs.cached == 'true' && github.event_name != 'push'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: base-answer
           path: ${{ runner.temp }}/base-results
@@ -1555,7 +1555,7 @@ jobs:
       - name: Keep main's answer for the next run (bean cis2)
         if: steps.join.outcome == 'success' && needs.prepare-base.outputs.cached != 'true'
         continue-on-error: true
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ needs.prepare-base.outputs.key }}
@@ -1566,7 +1566,7 @@ jobs:
       - name: The pins main's side was mounted at (a push)
         if: steps.join.outcome == 'success' && github.event_name == 'push'
         continue-on-error: true
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
@@ -1594,14 +1594,14 @@ jobs:
       - name: Keep the CI cone's records for the PRs (a push)
         if: steps.cone.outputs.kept == 'true'
         continue-on-error: true
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/cone
           key: ${{ needs.prepare-base.outputs.cone }}
       - name: Keep the gate seconds, to balance the next run's shards
         if: steps.join.outcome == 'success'
         continue-on-error: true
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/timings
           key: layer-pr-checks-timings-v1-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -1613,7 +1613,7 @@ jobs:
       - name: Main's kept answer (a push that joined nothing)
         if: ${{ !cancelled() && github.event_name == 'push' && steps.join.outcome != 'success' && needs.prepare-base.outputs.key != '' }}
         continue-on-error: true
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ needs.prepare-base.outputs.key }}
@@ -1623,7 +1623,7 @@ jobs:
       # and many cannot apply there. No file: every gate is judged.
       - name: The gates this layer declares (a push)
         if: ${{ !cancelled() && github.event_name == 'push' }}
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: caller-declared
           sparse-checkout: .github/main-qa-gates.json

@@ -24,5 +24,5 @@ Also noted, lower risk: every cat-harness caller workflow uses `litlfred/cat-har
 
 ## Done when
 
-- [ ] `bun run cat actions:pin` applied to these workflows, with `# <ref>` comments.
-- [ ] `security:gate` action-sha-pinning passes in both repos.
+- [x] `bun run cat actions:pin` applied to these workflows, with `# <ref>` comments. (tools: this PR, plus the `mount-layers` composite action by hand; cat-harness: its own PR)
+- [x] `security:gate` action-sha-pinning passes in both repos. (measured 2026-10-31 on both branches)
