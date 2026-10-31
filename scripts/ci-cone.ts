@@ -330,7 +330,7 @@ function calls(text: string): Call[] | { undetermined: string } {
       }
       continue;
     }
-    const resumed = /^<\.\.\. (\w+) resumed>(.*)$/.exec(body);
+    const resumed = /^<\.\.\. (\w+|\?\?\?) resumed>(.*)$/.exec(body);
     if (resumed !== null) {
       const p = pending.get(pid);
       if (p === undefined) return { undetermined: `pid ${pid}: a resumed ${resumed[1]} with no start` };
@@ -351,6 +351,7 @@ function calls(text: string): Call[] | { undetermined: string } {
   done.sort((a, b) => a.index - b.index);
   const out: Call[] = [];
   for (const d of done) {
+    if (d.line.startsWith("???(")) continue;
     const m = /^(\w+)\((.*)\)\s+=\s+(.*)$/.exec(d.line);
     if (m === null) return { undetermined: `unparsed trace line: ${d.line.slice(0, 160)}` };
     out.push({ pid: d.pid, name: m[1]!, args: splitArgs(m[2]!), ret: m[3]! });
