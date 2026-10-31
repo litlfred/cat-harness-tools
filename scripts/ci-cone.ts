@@ -490,6 +490,9 @@ export function parseTrace(
       paths.delete(rel);
       if (f === "absent") absentBefore.push(rel);
     }
+    // What it reads inside its own declared outputs is what it last wrote, and
+    // a skip restores exactly that: not an input.
+    if (opts.ownOutput !== undefined) for (const p of [...paths]) if (opts.ownOutput(p)) paths.delete(p);
     if (paths.size > MAX_WRITER_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_WRITER_PATHS}` };
     return { paths: [...paths].sort(), git: [...git.values()], writes: [...wrote].sort(), absentBefore: absentBefore.sort() };
   }
