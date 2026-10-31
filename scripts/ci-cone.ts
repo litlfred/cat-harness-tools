@@ -342,20 +342,28 @@ function calls(text: string): Call[] | { undetermined: string } {
     const pid = Number(m[1]);
     const body = m[2]!;
     if (body.startsWith("+++") || body.startsWith("---")) continue; // exit and signal notes
-    // strace lost a thread mid-syscall as its process exited, and cannot name
-    // the call. Nothing it could name is left, so there is nothing to read.
-    if (/^\?\?\?\( <detached \.\.\.>$/.test(body)) continue;
+    // strace lost a thread mid-syscall as its process exited. When it could
+    // not even read the syscall number (`???`), nothing it could name is left;
+    // when it already printed the call's arguments, `<detached ...>` closes
+    // them without a return value, the same as an `<unfinished ...>` at exit.
+    if (/^(\?\?\?\(\s*<(?:detached|unfinished)|<\.\.\. \?\?\? resumed>\s*<detached) \.\.\.>$/.test(body)) continue;
     const resumed = /^<\.\.\. (\w+) resumed>(.*)$/.exec(body);
     if (resumed !== null) {
       const p = pending.get(pid);
       if (p === undefined) return { undetermined: `pid ${pid}: a resumed ${resumed[1]} with no start` };
       pending.delete(pid);
-      done.push({ index: p.index, line: p.head + resumed[2]!, pid });
+      const rest = resumed[2]!.replace(/\s*<detached \.\.\.>$/, ") = ?");
+      done.push({ index: p.index, line: p.head + rest, pid });
       continue;
     }
     const unfinished = /^(.*?)\s*<unfinished \.\.\.>$/.exec(body);
     if (unfinished !== null) {
       pending.set(pid, { index: index++, head: unfinished[1]! });
+      continue;
+    }
+    const detached = /^(.*?)\s*<detached \.\.\.>$/.exec(body);
+    if (detached !== null) {
+      done.push({ index: index++, line: `${detached[1]!}) = ?`, pid });
       continue;
     }
     done.push({ index: index++, line: body, pid });
