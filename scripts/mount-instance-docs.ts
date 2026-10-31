@@ -148,6 +148,27 @@ function arg(name: string, fallback?: string): string | undefined {
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 }
 
+/**
+ * The files a served directory would write that `dest` already holds,
+ * `/`-separated and relative to the directory, sorted. A file `filter`
+ * withholds is not written, so it cannot clash. A directory that exists on
+ * both sides is not a clash: only a file answers a URL.
+ */
+export function servedClashes(src: string, dest: string, filter: (path: string) => boolean = () => true): string[] {
+  if (!existsSync(dest)) return [];
+  const out: string[] = [];
+  const walk = (rel: string): void => {
+    for (const e of readdirSync(join(src, rel), { withFileTypes: true })) {
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (!filter(join(src, r))) continue;
+      if (e.isDirectory()) walk(r);
+      else if (existsSync(join(dest, r))) out.push(r);
+    }
+  };
+  walk("");
+  return out.sort();
+}
+
 function countFiles(dir: string): number {
   let n = 0;
   for (const e of readdirSync(dir, { withFileTypes: true })) {
@@ -2403,24 +2424,28 @@ async function main(): Promise<number> {
   }
 
   // SERVED DIRECTORIES — data, published verbatim for pages to fetch (bean
-  // `680p`). After the mounts and before the redirects, and REFUSED over
-  // anything already published: two sources answering at one URL is the
-  // defect the walk rule exists to prevent.
+  // `680p`). After the mounts and before the redirects, and REFUSED over any
+  // FILE already published: two sources answering at one URL is the defect
+  // the walk rule exists to prevent. Other files at the same route stay, so a
+  // page the site already serves there (an IG's vendored Swagger UI beside its
+  // OpenAPI documents) and the served files answer different URLs.
   const servedProblems: string[] = [];
   const servedDone: { route: string; files: number }[] = [];
   for (const sv of servedDirectories()) {
     const dest = join(siteAbs, sv.route);
-    if (existsSync(dest)) {
-      servedProblems.push(`/${sv.route}/ is declared served, but the site already publishes something there`);
-      continue;
-    }
     if (!existsSync(sv.dir)) {
       servedProblems.push(`/${sv.route}/ is declared served, but ${sv.dir.slice(REPO.length + 1)} does not exist`);
       continue;
     }
     const withheld = withheldPaths(sv.dir);
     const src = realpathSync(sv.dir);
-    cpSync(src, dest, { recursive: true, filter: withheldFilter(src, withheld) });
+    const filter = withheldFilter(src, withheld);
+    const clashes = servedClashes(src, dest, filter);
+    if (clashes.length) {
+      servedProblems.push(`/${sv.route}/ is declared served, but the site already publishes ${clashes.length} of its file(s): ${clashes.slice(0, 5).join(", ")}${clashes.length > 5 ? ", …" : ""}`);
+      continue;
+    }
+    cpSync(src, dest, { recursive: true, filter });
     servedDone.push({ route: sv.route, files: countFiles(dest) });
   }
 

@@ -30,6 +30,7 @@ import {
   igSiteRoots,
   instanceRoute,
   mountable,
+  servedClashes,
   servedDirectories,
   WITHHELD_FILE,
   publishedAsset,
@@ -468,5 +469,24 @@ describe("the URL space: several instances, each under its own name — bean cat
     expect([...new Set(found.map((m) => m.name))].sort()).toEqual(["alpha", "beta"]);
     expect(withRoutes(found).candidates.map((c) => c.route).sort()).toEqual(["alpha", "beta", "docs/alpha", "fhir-artifact-index/beta", "library/beta"]);
     expect(servedDirectories(declaredEntries(repo)).map((x) => x.route)).toEqual(["beta/artifact-index"]);
+  });
+});
+
+describe("a served directory is refused over a FILE the site holds, not over its route", () => {
+  it("names only the files both sides hold, skipping withheld ones", () => {
+    const d = mkdtempSync(join(tmpdir(), "served-clash-"));
+    const src = join(d, "src");
+    const dest = join(d, "site", "inst", "openapi");
+    mkdirSync(join(src, "sub"), { recursive: true });
+    mkdirSync(join(dest, "sub"), { recursive: true });
+    writeFileSync(join(src, "api.openapi.json"), "{}");
+    writeFileSync(join(src, "sub", "op.json"), "{}");
+    writeFileSync(join(src, "secret.json"), "{}");
+    writeFileSync(join(dest, "index.html"), "<html>swagger</html>");
+    expect(servedClashes(src, dest)).toEqual([]);
+    writeFileSync(join(dest, "sub", "op.json"), "{}");
+    writeFileSync(join(dest, "secret.json"), "{}");
+    expect(servedClashes(src, dest, (p) => !p.endsWith("secret.json"))).toEqual(["sub/op.json"]);
+    expect(servedClashes(src, join(d, "absent"))).toEqual([]);
   });
 });
