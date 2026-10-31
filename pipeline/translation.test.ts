@@ -755,15 +755,18 @@ describe("injectMarkdown preserves document structure", () => {
         if (!existsSync(po)) continue;
         pairs++;
         const result = injectMarkdown(source, parsePo(readFileSync(po, "utf-8")));
+        expect(result.changed).toBe(true);
         expect(blanks(result.translated)).toBe(blanks(source));
         if (result.translated.split("\n").length < source.split("\n").length) collapsed++;
       }
     }
     // Anti-vacuity, both ways: the loop must have run, and it must have actually
-    // collapsed something on every pair rather than passing by doing nothing.
-    // 55 since moves M6–M8 took pages, and their catalogues, up a layer.
+    // collapsed wrapped lines across the corpus rather than passing by doing nothing.
+    // 55 pairs since moves M6–M8 took pages, and their catalogues, up a layer;
+    // 50 collapse since 683afc26 obsoleted the pre-G3 code-span msgids on
+    // start/contributing (whose remaining active msgids are single-line headings).
     expect(pairs).toBeGreaterThanOrEqual(55);
-    expect(collapsed).toBe(pairs);
+    expect(collapsed).toBeGreaterThanOrEqual(50);
   });
 });
 
