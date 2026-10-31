@@ -54,7 +54,7 @@ import { createHash } from "node:crypto";
 import { parse as parseYaml } from "yaml";
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import { contractFile, contractRefProblem, skillContracts } from "./skill-contracts.js";
-import { checkTestRuns, testRunFiles } from "./test-run-conformance.js";
+import { checkTestRuns, testRunFiles, type RunFinding } from "./test-run-conformance.js";
 import { BUILDING_ENV } from "./qa-working-copy.ts";
 import { auditCertifications, auditTestPlans, jsonFilesUnder, auditTestPlanExitCriteria } from "./test-plan-audit.js";
 import { processArrowFindings, schemaArrowFindings } from "./arrow-direction.js";
@@ -161,7 +161,8 @@ import {
   neededActors,
   neededPolicies,
 } from "../schemas/process/scenario-overlay.js";
-import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, REPO_ROOT as WORKSPACE_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { computedWhere, computeTestRuns } from "./test-run-compute.ts";
 import { legacyBindingFindings, mechanicalRoleUntested, skillsOutsideLaneRole } from "./lib/lane-role-criteria.ts";
 import { skillEdgeIndex } from "./lib/skill-edges.ts";
 import { type ActorScope, declaredCapabilityIds, unresolvedActorCapabilities } from "./lib/actor-capabilities.ts";
@@ -1898,12 +1899,33 @@ function testRunCriteria(skills: Set<string>): Record<string, KgCriterionEntry> 
     (d) => d.id === "qa" && d.own && d.scope !== "repository" && d.declaredBy !== "(default)",
   );
   if (!r.looked && qaDeclared) {
+    // Neither the checkout nor a readable store holds the runs. A repository
+    // that mounts this instance cannot read its store (it lives on another
+    // repository), so compute them: each run's writer is declared, and one
+    // marked `testRunOutEnv` writes only into a temporary directory, so
+    // judge mode still writes nothing (cat-harness-tools#1191).
+    const computed = WORKSPACE_ROOT ? computeTestRuns(resultsDir, WORKSPACE_ROOT) : { reason: "no workspace holds both layers" };
+    if ("dir" in computed) {
+      try {
+        const c = checkTestRuns(root, computed.dir, skills, undefined, { determined: true });
+        const rel = relative(root, resultsDir);
+        const rename = (fs: RunFinding[]): RunFinding[] => fs.map((f) => ({ ...f, where: computedWhere(f.where, rel) }));
+        const any = c.runs > 0;
+        return {
+          "test-run-skill-resolves": entry(rename(c.unresolved), any),
+          "test-run-conforms": entry(rename(c.nonconforming), any),
+          "test-run-checkable": entry(rename(c.unchecked), any),
+        };
+      } finally {
+        computed.done();
+      }
+    }
     // A declared results directory that is absent says nothing about whether
     // runs exist — since 5hox it is derived and may not be computed or fetched
     // yet. `n/a` would be the false pass audit C5 names (bean `2gst`).
     const unknown = (): KgCriterionEntry => ({
       result: "unknown",
-      findings: [{ where: "—", detail: "the QA results directory is absent, so recorded test runs could not be read. Compute it (`bun run cat qa:refresh`) or fetch it (`bun run cat qa:fetch`)." }],
+      findings: [{ where: "—", detail: `the QA results directory is absent, so recorded test runs could not be read, and they could not be computed here (${computed.reason}). Compute it (\`bun run cat qa:refresh\`) or fetch it (\`bun run cat qa:fetch\`).` }],
     });
     return { "test-run-skill-resolves": unknown(), "test-run-conforms": unknown(), "test-run-checkable": unknown() };
   }
