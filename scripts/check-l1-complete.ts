@@ -266,6 +266,10 @@ export const ENTRY_SIDECARS: readonly string[] = [
   // `volume-separation.py propose` (cat-harness-tools#132). Proposed, never
   // applied: a person confirms a span before it becomes an entry.
   "separation-proposal.json",
+  // A scanned entry's advisory formula-region bounding boxes, written by
+  // `pdf-formula-regions.py` (cat-harness-tools#131, bean `f0hv`). Advisory,
+  // never transcribed and never gated.
+  "formula-regions.json",
   // The two review-anchor arms of the document adapter (`docx-structure.py`,
   // `pdf-line-map.py`): the .docx's own structure and the PDF's page/line map,
   // written beside `structure.json` so a public comment citing "page 12, line
