@@ -124,7 +124,7 @@ export const MAX_PATHS = 20000;
  * per instance, and parsing its whole trace in memory aborted the recorder
  * (exit 134) after the check itself had passed.
  */
-export const MAX_TRACE_BYTES = 256 * 1024 * 1024;
+export const MAX_TRACE_BYTES = 512 * 1024 * 1024;
 
 /** What `strace` traces: every path-taking syscall, `getcwd`, and process creation for the cwd of each child. */
 export const STRACE_ARGS = ["-f", "-qq", "-y", "-s", "65536", "-e", "trace=%file,getcwd,clone,clone3,fork,vfork", "-e", "signal=none"] as const;
@@ -145,7 +145,7 @@ export type ReadSet = { paths: string[]; git: GitCall[]; writes?: string[]; abse
  */
 const GIT_READ_ONLY = new Set([
   "ls-files", "ls-tree", "rev-parse", "cat-file", "show", "log", "rev-list", "merge-base", "for-each-ref",
-  "show-ref", "describe", "name-rev", "diff", "diff-tree", "check-ignore", "config", "grep", "version",
+  "show-ref", "describe", "name-rev", "diff", "diff-tree", "check-ignore", "config", "remote", "grep", "version",
 ]);
 
 /**
@@ -153,7 +153,7 @@ const GIT_READ_ONLY = new Set([
  * options are `-C <dir>` (folded into the cwd), `-c <k=v>`, `--no-pager` and
  * `--no-optional-locks`; anything else before the subcommand is refused.
  */
-export function gitReplayable(cwd: string, argv: readonly string[]): GitCall | { undetermined: string } {
+export function gitReplayable(cwd: string, argv: readonly string[], roots: readonly string[] = []): GitCall | { undetermined: string } {
   let dir = cwd;
   let i = 0;
   const args: string[] = [];
@@ -162,7 +162,13 @@ export function gitReplayable(cwd: string, argv: readonly string[]): GitCall | {
     if (a === "-C") {
       const next = argv[++i];
       if (next === undefined) return { undetermined: "git -C with no directory" };
-      dir = normalize(join(dir === "" ? "." : dir, next)).replace(/^\.$/, "");
+      if (next.startsWith("/")) {
+        const rel = repoRelative(roots, normalize(next).replace(/(.)\/+$/, "$1"));
+        if (rel === undefined) return { undetermined: `git -C outside the checkout (${next})` };
+        dir = rel;
+      } else {
+        dir = normalize(join(dir === "" ? "." : dir, next)).replace(/^\.$/, "");
+      }
       continue;
     }
     if (a === "-c") {
@@ -184,6 +190,7 @@ export function gitReplayable(cwd: string, argv: readonly string[]): GitCall | {
   if (!GIT_READ_ONLY.has(sub)) return { undetermined: `git ${sub} is not a read-only command the cone replays` };
   if (rest.some((a) => /^--(stdin|batch|output|ext-diff|textconv|edit)/.test(a))) return { undetermined: `git ${sub} ${rest.join(" ")} reads stdin, writes or runs a helper` };
   if (sub === "config" && !rest.some((a) => /^(--get|--get-all|--get-regexp|--list|-l)$/.test(a))) return { undetermined: "git config without a read flag" };
+  if (sub === "remote" && rest[0] !== "get-url") return { undetermined: "git remote without get-url" };
   if (dir.startsWith("..") || dir.startsWith("/")) return { undetermined: `git -C outside the checkout (${dir})` };
   return { cwd: dir, args: [...args, sub, ...rest] };
 }
@@ -315,7 +322,11 @@ function calls(text: string): Call[] | { undetermined: string } {
   const pending = new Map<number, { index: number; head: string }>();
   const done: { index: number; line: string; pid: number }[] = [];
   let index = 0;
-  for (const raw of text.split("\n")) {
+  let pos = 0;
+  while (pos <= text.length) {
+    const nl = text.indexOf("\n", pos);
+    const raw = nl === -1 ? text.slice(pos) : text.slice(pos, nl);
+    pos = nl === -1 ? text.length + 1 : nl + 1;
     const line = raw.trimEnd();
     if (line === "") continue;
     const m = /^(\d+)\s+(.*)$/.exec(line);
@@ -432,7 +443,7 @@ export function parseTrace(text: string, root: string, opts: { writes?: "refuse"
         if (argv === undefined) return { undetermined: `a git command line strace did not print whole (${(c.args[1] ?? "").slice(0, 80)})` };
         const where = me.dir === undefined ? undefined : repoRelative(roots, me.dir);
         if (where === undefined) return { undetermined: `git ${argv.slice(1).join(" ")} ran outside the checkout, or where the trace does not say` };
-        const call = gitReplayable(where, argv.slice(1));
+        const call = gitReplayable(where, argv.slice(1), roots);
         if ("undetermined" in call) return call;
         git.set(JSON.stringify(call), call);
       }
