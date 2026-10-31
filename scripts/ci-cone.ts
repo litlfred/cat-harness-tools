@@ -132,7 +132,7 @@ export const MAX_WRITER_PATHS = 200000;
  * per instance, and parsing its whole trace in memory aborted the recorder
  * (exit 134) after the check itself had passed.
  */
-export const MAX_TRACE_BYTES = 256 * 1024 * 1024;
+export const MAX_TRACE_BYTES = 512 * 1024 * 1024;
 
 /** What `strace` traces: every path-taking syscall, `getcwd`, and process creation for the cwd of each child. */
 export const STRACE_ARGS = ["-f", "-qq", "-y", "-s", "65536", "-e", "trace=%file,getcwd,clone,clone3,fork,vfork", "-e", "signal=none"] as const;
@@ -163,7 +163,12 @@ const GIT_READ_ONLY = new Set([
  * options are `-C <dir>` (folded into the cwd), `-c <k=v>`, `--no-pager` and
  * `--no-optional-locks`; anything else before the subcommand is refused.
  */
-export function gitReplayable(cwd: string, argv: readonly string[], rel?: (abs: string) => string | undefined): GitCall | { undetermined: string } {
+export function gitReplayable(
+  cwd: string,
+  argv: readonly string[],
+  relOrRoots?: ((abs: string) => string | undefined) | readonly string[],
+): GitCall | { undetermined: string } {
+  const rel = typeof relOrRoots === "function" ? relOrRoots : Array.isArray(relOrRoots) ? (abs: string) => repoRelative(relOrRoots, abs) : undefined;
   let dir = cwd;
   let i = 0;
   const args: string[] = [];
@@ -334,7 +339,11 @@ function calls(text: string): Call[] | { undetermined: string } {
   const pending = new Map<number, { index: number; head: string }>();
   const done: { index: number; line: string; pid: number }[] = [];
   let index = 0;
-  for (const raw of text.split("\n")) {
+  let pos = 0;
+  while (pos <= text.length) {
+    const nl = text.indexOf("\n", pos);
+    const raw = nl === -1 ? text.slice(pos) : text.slice(pos, nl);
+    pos = nl === -1 ? text.length + 1 : nl + 1;
     const line = raw.trimEnd();
     if (line === "") continue;
     const m = /^(\d+)\s+(.*)$/.exec(line);
@@ -351,6 +360,12 @@ function calls(text: string): Call[] | { undetermined: string } {
       if (p === undefined) return { undetermined: `pid ${pid}: a resumed ${resumed[1]} with no start` };
       pending.delete(pid);
       done.push({ index: p.index, line: p.head + resumed[2]!, pid });
+      continue;
+    }
+    const detached = /^(.*?)\s*<detached \.\.\.>$/.exec(body);
+    if (detached !== null) {
+      const head = detached[1]!.trim();
+      if (head !== "" && !head.startsWith("???")) done.push({ index: index++, line: `${head}) = ?`, pid });
       continue;
     }
     const unfinished = /^(.*?)\s*<unfinished \.\.\.>$/.exec(body);
@@ -471,8 +486,12 @@ export function parseTrace(
       if (rel === undefined || excluded(rel, gitPids.has(c.pid))) continue;
       if (write) writes.push(`${c.name} ${rel || "."}`);
       else paths.add(rel);
-      if (opts.writes === "collect" && !first.has(rel)) first.set(rel, write ? "write" : /^-1 ENOENT\b/.test(c.ret) ? "absent" : "read");
-      if (opts.writes === "collect" && write) wrote.add(rel);
+      const effectiveWrite = write && !/^-1\b/.test(c.ret);
+      if (opts.writes === "collect" && !first.has(rel)) {
+        if (effectiveWrite) first.set(rel, "write");
+        else if (!write) first.set(rel, /^-1 ENOENT\b/.test(c.ret) ? "absent" : "read");
+      }
+      if (opts.writes === "collect" && effectiveWrite) wrote.add(rel);
     }
   }
   if (opts.writes === "collect") {

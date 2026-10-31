@@ -23,6 +23,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as builders from "../schemas/builders.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 import { webpage } from "../schemas/ui/webpage.ts";
 
 /** The `$schema` value that marks a JSON file as a manifest. */
@@ -126,5 +127,7 @@ export function manifestRoot(path: string): string {
  */
 export async function loadManifestValue(path: string): Promise<unknown> {
   if (path.endsWith(".json")) return evaluateJsonManifest(path);
+  // input-site: traced #39e1173c — a legacy .ts manifest loaded by path when no .json manifest exists
+  inputSiteReached("json-manifest: computed load");
   return ((await import(path)) as { default?: unknown }).default;
 }

@@ -7,12 +7,14 @@
  * this file possible: checking every rendered link against the pages it names.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, basename, sep } from "node:path";
 
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { workflowFiles } from "../known-skills.js";
 import { processDiagrams } from "../../src/workflow/process-model.js";
+import { TRACE_ENV, openTrace } from "../../schemas/sdlc/input-trace.ts";
 import { checkoutProcessPresentations, processTarget, type Presentation } from "../process-presentations.js";
 import { sourceForPermalink } from "../lib/jekyll-permalink.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -58,12 +60,23 @@ describe("processTarget — where a subprocess box lands", () => {
 });
 
 describe("this repository, right now", () => {
-  test("the index is not empty — a check over nothing is not a check", async () => {
+  test("the index is not empty — and reading .json page manifests reaches no traced input site", async () => {
     // The checkout's index, not one instance's: a page that presents this
     // instance's process may be authored in an instance above it, and then
     // its address carries that instance's name (`lib/docs-sources.ts`).
-    const idx = await checkoutProcessPresentations(ROOT);
-    expect(idx.size).toBeGreaterThan(0);
+    const scratch = mkdtempSync(join(tmpdir(), "proc-pres-trace-"));
+    const trace = openTrace(scratch);
+    const prev = process.env[TRACE_ENV];
+    process.env[TRACE_ENV] = trace.env[TRACE_ENV];
+    try {
+      const idx = await checkoutProcessPresentations(ROOT);
+      expect(idx.size).toBeGreaterThan(0);
+      expect(trace.reached()).toBeUndefined();
+    } finally {
+      if (prev === undefined) delete process.env[TRACE_ENV];
+      else process.env[TRACE_ENV] = prev;
+      rmSync(scratch, { recursive: true, force: true });
+    }
   });
 
   test.skipIf(NO_CORE_DOCS)("a process presented by an instance above is addressed under that instance", async () => {

@@ -144,6 +144,7 @@ import {
   writerKey,
 } from "./derive-cache.ts";
 import { openTrace } from "../schemas/sdlc/input-trace.ts";
+import { BUILDING_ENV, STAMP_PATH, workingCopyState } from "./qa-working-copy.ts";
 import {
   decideWriter,
   emptyRecords,
@@ -453,6 +454,11 @@ if (import.meta.main) {
   if (treeBefore !== undefined) digests.tree = treeBefore;
   const base = new Map<string, Fingerprint>(cacheOn.on ? writers.map((w) => [w, writerFingerprint(REPO_ROOT, scripts, w, digests)] as const) : []);
   const staged = new Map<string, { key: string; path: string }>();
+  // When qa:working-copy already stamped a current QA copy before derive:publish
+  // ran, tell child writers (uml:overview) so they do not re-hash the untracked
+  // tree or spawn git hash-object --stdin-paths inside strace.
+  const qaCurrent = existsSync(join(REPO_ROOT, STAMP_PATH)) && workingCopyState(REPO_ROOT).state === "current";
+  const writerEnv: Record<string, string | undefined> = qaCurrent ? { ...env, [BUILDING_ENV]: "1" } : env;
   // ── Bean fwtz, option B: record what each writer read and wrote (skips nothing) ──
   // input-site: inert #5f0c2a71 — the switch decides whether writers run traced, never what they write
   const recordOn = env[WRITER_RECORD_ENV] === "1" && straceWorks();
@@ -476,12 +482,13 @@ if (import.meta.main) {
     const trace = openTrace(REPO_ROOT);
     // input-site: inert #fd4c3e00 — a scratch file for the trace, removed before this returns
     const traceLog = join(tmpdir(), `writer-cone-${process.pid}-${w.replace(/[^\w.-]/g, "_")}.strace`);
-    const first = await runWriterAsync(tracedArgv(["bun", "run", "cat", w], traceLog), REPO_ROOT, jobs > 1, trace.env);
+    const tracedEnv = qaCurrent ? { ...trace.env, [BUILDING_ENV]: "1" } : trace.env;
+    const first = await runWriterAsync(tracedArgv(["bun", "run", "cat", w], traceLog), REPO_ROOT, jobs > 1, tracedEnv);
     try {
       if (first.outcome.kind !== "ran") {
         records.unrecorded[w] = `the traced run ${first.outcome.kind === "failed" ? `exited ${first.outcome.exit}` : "was skipped"}`;
         trace.reached();
-        return first.outcome.kind === "skipped" ? first : await runWriterAsync(["bun", "run", "cat", w], REPO_ROOT, jobs > 1);
+        return first.outcome.kind === "skipped" ? first : await runWriterAsync(["bun", "run", "cat", w], REPO_ROOT, jobs > 1, writerEnv);
       }
       const digests = new FileDigests(REPO_ROOT);
       const rec = writerRecordOf({
@@ -536,7 +543,7 @@ if (import.meta.main) {
     } else if (fp !== undefined) {
       why = `inputs could not be determined: ${fp.undetermined}`;
     }
-    const { outcome, log } = recordOn ? await runRecorded(w) : await runWriterAsync(["bun", "run", "cat", w], REPO_ROOT, jobs > 1);
+    const { outcome, log } = recordOn ? await runRecorded(w) : await runWriterAsync(["bun", "run", "cat", w], REPO_ROOT, jobs > 1, writerEnv);
     if (jobs > 1) process.stdout.write(`── ${w} ──\n${log}${log.endsWith("\n") || log === "" ? "" : "\n"}`);
     console.log(`  ran ${w} (${why})`);
     if (outcome.kind === "ran" && key !== undefined) staged.set(w, { key, path: stageOutputs(cacheDir, w, key, REPO_ROOT, byWriter.get(w) ?? [], keep) });
