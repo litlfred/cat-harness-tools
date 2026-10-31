@@ -19,7 +19,7 @@ import { buildVocabulary } from "../../ns-export";
 import { codeListDirs, loadCodeLists } from "../../../schemas/library/code-list.ts";
 import { buildCodeListsDoc } from "../../code-lists";
 import { PROV_JSONLD_CONTEXT_URL } from "../../../schemas/kg/prov-jsonld.ts";
-import { SCOPES_DIR, render } from "../../search-split.ts";
+import { SCOPES_DIR, render, stableKeys } from "../../search-split.ts";
 import { siteDirFor } from "../../../schemas/kg/cat-harness.ts";
 import { HTML_UNIQUE_IDS, JSONLD_EXPAND, JSONLD_OBJECT_LINKS, JSONLD_OWN_BASE, SEARCH_EXCLUDE_MARKER, SEARCH_INDEX, SEARCH_INDEX_PATH, SEARCH_SCOPES, VERIFIERS, declaredBase, expandFindings, isOurs, localLoader, verify } from "../../publish-verify";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
@@ -383,7 +383,12 @@ describe("the search-scopes verifier — bean m7mn", () => {
 
   test("an entry in two scopes, or one missing from all, does not partition", async () => {
     const scopeFile = (_f: Record<string, unknown>, id: string) => `${SCOPES_DIR}/${id}.json`;
-    expect(await details((f) => { f[scopeFile(f, "smart-trust")] = JSON.stringify({ 0: { relUrl: "/" }, 1: { relUrl: "/smart-trust/a.html" } }); })).toContain("entry 0 is in both");
+    // Scope files key entries by URL hash (stableKeys), not the theme's running number.
+    const key = stableKeys(INDEX);
+    const both = await details((f) => {
+      f[scopeFile(f, "smart-trust")] = JSON.stringify({ [key.get("0")!]: { relUrl: "/" }, [key.get("1")!]: { relUrl: "/smart-trust/a.html" } });
+    });
+    expect(both).toContain(`entry ${key.get("0")!} is in both`);
     const short = await details((f) => { f[scopeFile(f, "locale-fr")] = "{}"; });
     expect(short).toContain("the manifest says 1");
     expect(short).toContain("do not partition it");
@@ -419,7 +424,10 @@ describe("the search-scopes verifier — bean m7mn", () => {
     const msg = async (edit: (f: Record<string, unknown>) => void) => (await prebuilt(edit)).results[0]!.findings.map((x) => x.detail).join("\n");
     expect((await prebuilt(() => {})).exit).toBe(0);
     // Another scope's index under this scope's name: one ref missing, one foreign.
-    expect(await msg((f) => { f[at("smart-trust")] = f[at("locale-fr")]; })).toContain("prebuilt index of smart-trust does not cover its entries: 1 missing (1), 1 not in the scope (2)");
+    const key = stableKeys(INDEXED);
+    expect(await msg((f) => { f[at("smart-trust")] = f[at("locale-fr")]; })).toContain(
+      `prebuilt index of smart-trust does not cover its entries: 1 missing (${key.get("1")!}), 1 not in the scope (${key.get("2")!})`,
+    );
     expect(await msg((f) => { f[at("smart-trust")] = "{"; })).toContain("prebuilt index of smart-trust unreadable");
     const fields = await msg((f) => {
       const idx = JSON.parse(f[at("smart-trust")] as string) as { fields: string[] };
