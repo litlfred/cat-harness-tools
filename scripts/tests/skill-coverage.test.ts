@@ -46,6 +46,7 @@ import { buildExport } from "../kg-export.js";
 import { isPublishedSkill, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { ownElementPattern } from "../../schemas/kg/namespaces.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { siteNotBuilt } from "../../test/support/checkout.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -68,6 +69,9 @@ const ROOT = resolve(HARNESS_ROOT);
  */
 const EXPORTED = await buildExport({ baseUrl: "https://example.invalid/fa" });
 const PUBLISHED = join(ROOT, siteDirFor(ROOT), "reference/skill-instructions");
+/** The published reference pages are written at publish and gitignored (bean w1gy F18). */
+const NOT_PUBLISHED = (): boolean =>
+  siteNotBuilt("the skill reference pages `skills:docs` writes at publish (gitignored)", PUBLISHED);
 
 /**
  * Packages under `skills/` that hold at least one SKILL `.md`, read from disk.
@@ -140,7 +144,7 @@ describe("skill coverage", () => {
     expect([...nodes].filter((n) => !known.has(n)).sort()).toEqual([]);
   });
 
-  test("every skill in a `skills/` package has a published reference page", () => {
+  test.skipIf(NOT_PUBLISHED())("every skill in a `skills/` package has a published reference page", () => {
     // Scoped to `skills/` packages deliberately: `.claude/skills/local/`
     // publishes under a `local-` prefix and `src/skills` under its own
     // category, both already covered by `gen-skill-docs --check`. What was
@@ -160,7 +164,7 @@ describe("skill coverage", () => {
     expect(missing).toEqual([]);
   });
 
-  test("a skill named by a BPMN diagram resolves and is published", () => {
+  test.skipIf(NOT_PUBLISHED())("a skill named by a BPMN diagram resolves and is published", () => {
     // The consequence that made the docs gap worth fixing rather than noting:
     // `workflow_next` hands an agent a skill ref, and four of the twelve
     // unpublished ones were named by real diagrams.

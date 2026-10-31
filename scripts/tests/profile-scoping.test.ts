@@ -28,7 +28,7 @@
  *    because a tool could not read its configuration.
  */
 import { describe, test, expect, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, appendFileSync, readFileSync } from "fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { spawnSync } from "child_process";
@@ -41,7 +41,8 @@ import {
 import { CONTENT_PROFILES, CONTENT_ADAPTERS } from "../../schemas/content/block-kinds.ts";
 import { QA_CRITERIA_REGISTRY } from "../../pipeline/qa-criteria-registry";
 import { readDeclaredFolioProfile, readFolioProfile } from "../../pipeline/profile-check";
-import { initFolio } from "../init-folio";
+import { initFolio, templatesDirs } from "../init-folio";
+import { notApplicableAlone } from "../../test/support/checkout.js";
 import { writeInstanceConfig } from "../../test/support/instance-fixture.js";
 import { TOOLS_ROOT } from "../lib/roots.ts";
 
@@ -315,7 +316,22 @@ function sweepOnce(
 }
 
 const DOCUMENT_SWEEP = sweepOnce("document");
-const PAPER_SWEEP = sweepOnce("paper");
+/**
+ * A paper folio's templates include the `paper` profile, which a layer ABOVE
+ * this one holds (folio-assistant-sci, move M11): standing alone there is no
+ * paper folio to scaffold, so its sweep is not applicable (bean w1gy F18), as
+ * in `init-folio.test.ts`. A templates lookup that throws guards nothing.
+ */
+const NO_PAPER_PROFILE = ((): boolean => {
+  let held: boolean;
+  try {
+    held = templatesDirs().some((d) => existsSync(join(d, "paper")));
+  } catch {
+    return false;
+  }
+  return !held && notApplicableAlone("the `paper` folio-template profile, which folio-assistant-sci (a higher instance) holds");
+})();
+const PAPER_SWEEP = NO_PAPER_PROFILE ? { out: {} as Record<string, string> } : sweepOnce("paper");
 const CORRUPTED_SWEEP = sweepOnce("document", true);
 
 describe("the sweep's profile gate, end to end", () => {
@@ -355,7 +371,7 @@ describe("the sweep's profile gate, end to end", () => {
     expect(excluded * 4).toBeLessThan(Object.keys(out).length);
   });
 
-  test("the same criterion runs in a paper folio — the gate is profile-driven", () => {
+  test.skipIf(NO_PAPER_PROFILE)("the same criterion runs in a paper folio — the gate is profile-driven", () => {
     // Without this, a criterion that had simply stopped working everywhere
     // would pass the document-folio assertion above.
     const out = PAPER_SWEEP.out;

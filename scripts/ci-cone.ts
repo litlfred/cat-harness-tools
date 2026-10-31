@@ -136,7 +136,7 @@ export interface GitCall {
   args: string[];
 }
 
-export type ReadSet = { paths: string[]; git: GitCall[] } | { undetermined: string };
+export type ReadSet = { paths: string[]; git: GitCall[]; writes?: string[]; absentBefore?: string[] } | { undetermined: string };
 
 /**
  * Git subcommands the cone may REPLAY on a PR to ask git's view of the tree
@@ -146,6 +146,8 @@ export type ReadSet = { paths: string[]; git: GitCall[] } | { undetermined: stri
 const GIT_READ_ONLY = new Set([
   "ls-files", "ls-tree", "rev-parse", "cat-file", "show", "log", "rev-list", "merge-base", "for-each-ref",
   "show-ref", "describe", "name-rev", "diff", "diff-tree", "check-ignore", "config", "grep", "version",
+  // Read-only only in the forms let through below: `remote get-url`, `hash-object` without -w.
+  "remote", "hash-object",
 ]);
 
 /**
@@ -153,7 +155,7 @@ const GIT_READ_ONLY = new Set([
  * options are `-C <dir>` (folded into the cwd), `-c <k=v>`, `--no-pager` and
  * `--no-optional-locks`; anything else before the subcommand is refused.
  */
-export function gitReplayable(cwd: string, argv: readonly string[]): GitCall | { undetermined: string } {
+export function gitReplayable(cwd: string, argv: readonly string[], rel?: (abs: string) => string | undefined): GitCall | { undetermined: string } {
   let dir = cwd;
   let i = 0;
   const args: string[] = [];
@@ -162,6 +164,13 @@ export function gitReplayable(cwd: string, argv: readonly string[]): GitCall | {
     if (a === "-C") {
       const next = argv[++i];
       if (next === undefined) return { undetermined: "git -C with no directory" };
+      if (next.startsWith("/")) {
+        // An absolute -C (src/core/git-refs.ts passes the root): repo-relative, or refused.
+        const r = rel?.(normalize(next).replace(/(.)\/+$/, "$1"));
+        if (r === undefined) return { undetermined: `git -C outside the checkout (${next})` };
+        dir = r;
+        continue;
+      }
       dir = normalize(join(dir === "" ? "." : dir, next)).replace(/^\.$/, "");
       continue;
     }
@@ -184,6 +193,8 @@ export function gitReplayable(cwd: string, argv: readonly string[]): GitCall | {
   if (!GIT_READ_ONLY.has(sub)) return { undetermined: `git ${sub} is not a read-only command the cone replays` };
   if (rest.some((a) => /^--(stdin|batch|output|ext-diff|textconv|edit)/.test(a))) return { undetermined: `git ${sub} ${rest.join(" ")} reads stdin, writes or runs a helper` };
   if (sub === "config" && !rest.some((a) => /^(--get|--get-all|--get-regexp|--list|-l)$/.test(a))) return { undetermined: "git config without a read flag" };
+  if (sub === "remote" && rest[0] !== "get-url") return { undetermined: `git remote ${rest[0] ?? ""} is not a read-only command the cone replays` };
+  if (sub === "hash-object" && rest.includes("-w")) return { undetermined: "git hash-object -w writes an object" };
   if (dir.startsWith("..") || dir.startsWith("/")) return { undetermined: `git -C outside the checkout (${dir})` };
   return { cwd: dir, args: [...args, sub, ...rest] };
 }
@@ -323,6 +334,9 @@ function calls(text: string): Call[] | { undetermined: string } {
     const pid = Number(m[1]);
     const body = m[2]!;
     if (body.startsWith("+++") || body.startsWith("---")) continue; // exit and signal notes
+    // strace lost a thread mid-syscall as its process exited; if it cannot name
+    // the call (`???(`), nothing it could name is left, while a named call that
+    // detached mid-call still carries its arguments.
     const detached = /^(.*?)\s*<detached \.\.\.>$/.exec(body);
     if (detached !== null) {
       if (detached[1] !== "" && detached[1] !== "???(" && !detached[1]!.startsWith("<...")) {
@@ -364,7 +378,7 @@ function calls(text: string): Call[] | { undetermined: string } {
  * enumerated. `root` is the checkout; paths outside it are left out (see the
  * module comment for why, and for the other exclusions).
  */
-export function parseTrace(text: string, root: string): ReadSet {
+export function parseTrace(text: string, root: string, opts: { writes?: "refuse" | "collect" } = {}): ReadSet {
   const parsed = calls(text);
   if ("undetermined" in parsed) return parsed;
   const roots = [...new Set([resolve(root), safeRealpath(root)])];
@@ -383,6 +397,9 @@ export function parseTrace(text: string, root: string): ReadSet {
   const paths = new Set<string>();
   const git = new Map<string, GitCall>();
   const writes: string[] = [];
+  /** `collect` mode: paths the run wrote, and the first access to each path ("read" / "absent" / "write"). */
+  const wrote = new Set<string>();
+  const first = new Map<string, "read" | "absent" | "write">();
   for (const c of parsed) {
     const me = cell(c.pid);
     for (const a of c.args) {
@@ -410,6 +427,9 @@ export function parseTrace(text: string, root: string): ReadSet {
       return { undetermined: `unclassified syscall ${c.name}` };
     }
     let write = spec.write === true || (spec.write === "flags" && c.args.some((a) => WRITE_FLAGS.test(a)));
+    // A WRITER's write that failed changed nothing: `mkdir -p` meeting a
+    // directory that exists (EEXIST) only learnt that it exists. It is a probe.
+    if (write && opts.writes === "collect" && /^-1 [A-Z]/.test(c.ret)) write = false;
     for (const [fdIndex, pathIndex] of spec.paths) {
       const raw = c.args[pathIndex];
       if (raw === undefined || raw === "NULL") continue;
@@ -431,7 +451,7 @@ export function parseTrace(text: string, root: string): ReadSet {
         if (argv === undefined) return { undetermined: `a git command line strace did not print whole (${(c.args[1] ?? "").slice(0, 80)})` };
         const where = me.dir === undefined ? undefined : repoRelative(roots, me.dir);
         if (where === undefined) return { undetermined: `git ${argv.slice(1).join(" ")} ran outside the checkout, or where the trace does not say` };
-        const call = gitReplayable(where, argv.slice(1));
+        const call = gitReplayable(where, argv.slice(1), (abs) => repoRelative(roots, abs));
         if ("undetermined" in call) return call;
         git.set(JSON.stringify(call), call);
       }
@@ -443,7 +463,24 @@ export function parseTrace(text: string, root: string): ReadSet {
       if (rel === undefined || excluded(rel, gitPids.has(c.pid))) continue;
       if (write) writes.push(`${c.name} ${rel || "."}`);
       else paths.add(rel);
+      if (opts.writes === "collect" && !first.has(rel)) first.set(rel, write ? "write" : /^-1 ENOENT\b/.test(c.ret) ? "absent" : "read");
+      if (opts.writes === "collect" && write) wrote.add(rel);
     }
+  }
+  if (opts.writes === "collect") {
+    // A WRITER: what it wrote is its output, not its input. A path it first saw
+    // absent and then created was absent before the run, which is a fact the
+    // next run can check. A path it read while it existed and then rewrote is
+    // an input nobody can replay (its prior content is gone), so it refuses.
+    const absentBefore: string[] = [];
+    for (const rel of wrote) {
+      const f = first.get(rel);
+      if (f === "read") return { undetermined: `the writer reads ${rel || "."} and then rewrites it` };
+      paths.delete(rel);
+      if (f === "absent") absentBefore.push(rel);
+    }
+    if (paths.size > MAX_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_PATHS}` };
+    return { paths: [...paths].sort(), git: [...git.values()], writes: [...wrote].sort(), absentBefore: absentBefore.sort() };
   }
   if (writes.length > 0) return { undetermined: `the check writes inside the checkout (${writes.slice(0, 3).join(", ")})` };
   if (paths.size > MAX_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_PATHS}` };
