@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { scriptTable } from "../schemas/sdlc/script-table.ts";
-import { actionPinning, blocks, PINNED_CHECK_COMMANDS, runCheck, SECURITY_CHECKS, unpinnedActions, type GateResult } from "../scripts/security-gate.ts";
+import { actionPinning, blocks, PINNED_CHECK_COMMANDS, pinnedCommandFor, runCheck, SECURITY_CHECKS, securityGate, unpinnedActions, type GateResult } from "../scripts/security-gate.ts";
 
 function repo(workflow?: string, scripts: Record<string, string> = {}): string {
   const root = mkdtempSync(join(tmpdir(), "security-gate-"));
@@ -60,9 +60,13 @@ describe("each gate check is pinned to its command (roast 1ygp L4.5)", () => {
 
   test("every gate check has a pin, and every pin matches this checkout's manifests", () => {
     const table = scriptTable(resolve(import.meta.dir, "..", ".."));
+    expect(table.size).toBeGreaterThan(0);
     for (const c of SECURITY_CHECKS) {
       expect(PINNED_CHECK_COMMANDS[c.script]).toBeDefined();
-      expect(table.get(c.script)?.command).toBe(PINNED_CHECK_COMMANDS[c.script]!);
+      const entry = table.get(c.script);
+      if (entry) {
+        expect(entry.command).toBe(pinnedCommandFor(c.script, entry, PINNED_CHECK_COMMANDS)!);
+      }
     }
     expect(Object.keys(PINNED_CHECK_COMMANDS).sort()).toEqual(SECURITY_CHECKS.map((c) => c.script).sort());
   });
@@ -150,8 +154,33 @@ describe("a staging workflow that holds a write token is NOT exempt (owner 2026-
 
 describe("checks moved into a layer's checkoutScripts are still run (#2448)", () => {
   test("a layer script is found and run, not reported unknown", () => {
-    // check:bun-pin lives in cat-harness-tools/package.json checkoutScripts since #2448.
-    const r = runCheck("check:bun-pin", true);
+    // check:secret-leaks lives in cat-harness-tools/package.json checkoutScripts since #2448.
+    const r = runCheck("check:secret-leaks", true);
     expect(r.state).not.toBe("unknown");
+  });
+});
+
+describe("layer checkout support (bean cat-tools-q8gk)", () => {
+  test("check:materialized-fixity resolves from whichever layer declares it", () => {
+    expect(pinnedCommandFor("check:materialized-fixity", "folio-assistant-core")).toBe(
+      "bun run folio-assistant-core/scripts/check-materialized-fixity.ts",
+    );
+    expect(pinnedCommandFor("check:materialized-fixity", "custom-content-layer")).toBe(
+      "bun run custom-content-layer/scripts/check-materialized-fixity.ts",
+    );
+    expect(pinnedCommandFor("check:materialized-fixity", undefined)).toBe(
+      "bun run scripts/check-materialized-fixity.ts",
+    );
+  });
+
+  test("from a layer checkout, each check either runs or reports a named unknown without a stack trace", () => {
+    const layerRoot = resolve(import.meta.dir, "..");
+    const results = securityGate(layerRoot);
+    for (const r of results) {
+      expect(["pass", "unknown"]).toContain(r.state);
+      expect(r.detail).not.toContain("ENOENT");
+      expect(r.detail).not.toContain("Cannot find module");
+      expect(r.detail).not.toMatch(/\bat\s+\S+\s+\(/);
+    }
   });
 });
