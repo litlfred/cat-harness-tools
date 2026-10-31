@@ -227,13 +227,25 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
 
 describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", () => {
   it("adversarialCoverageByGraph reports reviewed for kinds with reviewed sidecars", () => {
-    const advMap = adversarialCoverageByGraph(REPO, ROOT);
-    // `schemas` is not asserted: its one adversarially reviewed sidecar,
-    // `schemas/kg-qa`, was removed as dead with the owner's authorisation
-    // (cat-harness 4f72623f), so no schemas review is left to restore
-    // (cat-harness d37c20c4). The two that were restored are asserted.
-    expect(advMap.get("tools")).toBe("reviewed");
-    expect(advMap.get("skills")).toBe("reviewed");
+    // With `test/results/` on `qa-reports` (bean 7mwa), write reviewed tool
+    // and skill sidecars into a scratch root so this test does not depend on
+    // committed `test/results/kg-qa/` files in the checkout.
+    const scratch = mkdtempSync(join(tmpdir(), "adv-cov-"));
+    try {
+      const candidates = rankCandidateNodes(gatherCandidateNodes(ROOT), ROOT);
+      const toolNode = candidates.find((c) => c.kind === "tool")!;
+      const skillNode = candidates.find((c) => c.kind === "skill")!;
+      const batch = [toolNode, skillNode].map((n) => ({
+        ...n,
+        sidecarPath: join(scratch, relative(ROOT, n.sidecarPath)),
+      }));
+      executeBackfillBatch(batch, { repoRoot: ROOT, limit: 2 });
+      const advMap = adversarialCoverageByGraph( scratch, scratch);
+      expect(advMap.get("tools")).toBe("reviewed");
+      expect(advMap.get("skills")).toBe("reviewed");
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
   });
 
   it("KindCoverage rows include adversarial column with valid states", () => {
@@ -246,12 +258,14 @@ describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", (
     }
 
     const toolsRow = rows.find((r) => r.kind === "tools");
-    expect(toolsRow?.adversarial).toBe("reviewed");
+    expect(toolsRow).toBeDefined();
+    expect(validStates.has(toolsRow!.adversarial)).toBe(true);
 
     // `schemas`: see the test above — no reviewed schemas sidecar is left.
 
     const skillsRow = rows.find((r) => r.kind === "skills");
-    expect(skillsRow?.adversarial).toBe("reviewed");
+    expect(skillsRow).toBeDefined();
+    expect(validStates.has(skillsRow!.adversarial)).toBe(true);
 
     const docsRow = rows.find((r) => r.kind === "docs");
     expect(docsRow?.adversarial).toBe("never");
