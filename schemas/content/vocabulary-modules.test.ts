@@ -6,7 +6,14 @@ import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 
 import { BlockBaseSchema, BlockSchema, CONSTRAINT_RULES, typedBlockKinds } from "../constraints.ts";
-import { allConstraintRules, allTypedBlockKinds, blockSchemaFor, readVocabulary, vocabularies } from "./vocabulary-modules.ts";
+import {
+  allConstraintContextContributors,
+  allConstraintRules,
+  allTypedBlockKinds,
+  blockSchemaFor,
+  readVocabulary,
+  vocabularies,
+} from "./vocabulary-modules.ts";
 
 const Widget = BlockBaseSchema.extend({ kind: z.literal("widget"), size: z.number() });
 const rule = { id: "widget-size", description: "a widget is small", appliesTo: ["widget"], check: () => null };
@@ -24,6 +31,13 @@ describe("readVocabulary holds a module to the contract", () => {
     expect(() => readVocabulary("gadgets", "g.ts", { blockSchemas: [Widget] }, [])).toThrow(/types kind "widget", which no block-kind node of "gadgets" declares/);
     expect(() => readVocabulary("gadgets", "g.ts", { blockSchemas: [Widget, Widget] }, ["widget"])).toThrow(/twice/);
     expect(() => readVocabulary("gadgets", "g.ts", { blockSchemas: [z.object({ kind: z.string() })] }, ["widget"])).toThrow(/literal `kind`/);
+    expect(() => readVocabulary("gadgets", "g.ts", { blockSchemas: [Widget], constraintContext: {} }, ["widget"])).toThrow(/`constraintContext` that is not a function/);
+  });
+
+  test("a module's constraint context contributor is carried, and is absent when it has none (bean saqd)", () => {
+    const constraintContext = () => () => ({ widgetSize: 1 });
+    expect(readVocabulary("gadgets", "g.ts", { blockSchemas: [Widget], constraintContext }, ["widget"]).constraintContext).toBe(constraintContext);
+    expect(readVocabulary("gadgets", "g.ts", { blockSchemas: [Widget] }, ["widget"]).constraintContext).toBeUndefined();
   });
 });
 
@@ -45,5 +59,10 @@ describe("composition, in whatever checkout this runs", () => {
     const ids = allConstraintRules().map((r) => r.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const r of CONSTRAINT_RULES) expect(ids).toContain(r.id);
+  });
+
+  test("every module's constraint context contributor is composed, and only those", () => {
+    const expected = vocabularies().flatMap((v) => (v.constraintContext ? [v.constraintContext] : []));
+    expect(allConstraintContextContributors()).toEqual(expected);
   });
 });

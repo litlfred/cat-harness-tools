@@ -1679,11 +1679,11 @@ interface LoadedRequirement {
   };
 }
 
-function readRequirements(): LoadedRequirement[] {
-  if (!existsSync(REQUIREMENT_DIR)) return [];
+function readRequirements(dir: string = REQUIREMENT_DIR): LoadedRequirement[] {
+  if (!existsSync(dir)) return [];
   const out: LoadedRequirement[] = [];
-  for (const f of readdirSync(REQUIREMENT_DIR).filter((f) => f.endsWith(".json")).sort()) {
-    const p = join(REQUIREMENT_DIR, f);
+  for (const f of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
+    const p = join(dir, f);
     try {
       const raw = JSON.parse(readFileSync(p, "utf-8")) as LoadedRequirement["raw"];
       out.push({ id: raw.id ?? f.slice(0, -5), file: f, path: p, raw });
@@ -1988,13 +1988,40 @@ function readSatisfiers(): Satisfier[] {
   return out;
 }
 
+/**
+ * The requirement ids a `derivedFrom` in this instance may name: its own, plus
+ * those of every instance it declares `needs` on, transitively (bean `w1gy`,
+ * owner option A, 2026-10-30).
+ *
+ * The same widening {@link resolvableSkills} and `resolvableRoleIds` make, and
+ * that actors get through `neededActors`: a requirement may specialise one a
+ * lower layer declares — fhir-harness's `req:fhir-validation` derives from
+ * cat-harness's `req:content-lifecycle` — and that is not a dangling ref.
+ * Subjecthood does not widen: only this instance's own requirements are
+ * audited, so a dependency's are read for their ids alone.
+ */
+function resolvableRequirementIds(own: LoadedRequirement[]): Set<string> {
+  const out = new Set(own.map((r) => r.id));
+  for (const dep of orderedDependencies(root)) {
+    try {
+      // declared-path-literal: the convention fallback, at the call site, as
+      // `REQUIREMENT_DIR` is the own instance's `skills/requirements`.
+      for (const r of readRequirements(join(ownDirectoryById(dep.rootPath, "skills", "skills"), "requirements"))) out.add(r.id);
+    } catch {
+      // A dependency's unreadable requirement is that instance's own audit's
+      // finding; one broken dependency must not block every dependent.
+    }
+  }
+  return out;
+}
+
 function auditRequirements(
   reqs: LoadedRequirement[],
   actors: LoadedActor[],
   satisfiers: Satisfier[],
 ): KgQaReport[] {
   const actorIds = new Set(actors.map((a) => a.id));
-  const reqIds = new Set(reqs.map((r) => r.id));
+  const reqIds = resolvableRequirementIds(reqs);
 
   return reqs.map((r) => {
     const mine = satisfiers.filter((s) => s.ref.startsWith(`${r.id}#`)).sort((x, y) => (x.ref + x.from).localeCompare(y.ref + y.from));
@@ -2026,7 +2053,7 @@ function auditRequirements(
     }
     const badParents = (r.raw.derivedFrom ?? [])
       .filter((d) => !reqIds.has(d))
-      .map((d) => ({ where: r.id, detail: `derives from "${d}", which is not a declared requirement.` }));
+      .map((d) => ({ where: r.id, detail: `derives from "${d}", which is declared in no requirement of this instance or anything it \`needs\`.` }));
 
     const criteria: Record<string, KgCriterionEntry> = {
       "requirement-statement-satisfied": entry(unsatisfied, (r.raw.statements ?? []).length > 0),

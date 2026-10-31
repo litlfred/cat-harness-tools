@@ -88,6 +88,9 @@ export function themeSearchHtml(placeholder = "Search this site"): string {
   );
 }
 
+/** The marker `publish-verify` reads for a page left out of the search index on purpose. */
+export const SEARCH_EXCLUDE_META = '<meta name="fa-search-exclude" content="true">';
+
 export interface SiteBarOptions {
   /** Back to the site's root from this page: `.`, `..`, … */
   toRoot: string;
@@ -131,7 +134,11 @@ export function withSiteBar(html: string, o: SiteBarOptions): string {
     out = out.slice(0, at) + bar + out.slice(at);
     if (box) {
       const scripts = o.search!.map((s) => `<script src="${esc(o.toRoot)}/${esc(s)}" defer></script>`).join("");
-      out = beforeHeadEnd(out, scripts);
+      // A page without the theme (TypeDoc's api/, a mounted instance's own
+      // HTML) gets the box but is never in the theme's index, which only
+      // Jekyll builds. The marker says so, so publish-verify's search-index
+      // counts it as excluded on purpose, not as a gap in the index.
+      out = beforeHeadEnd(out, SEARCH_EXCLUDE_META + scripts);
     }
   }
   if (!out.includes(PAGE_LAYOUT_MARK)) out = beforeHeadEnd(out, pageLayoutTags(`${o.toRoot}/`));

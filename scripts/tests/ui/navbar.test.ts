@@ -33,7 +33,7 @@ import {
 } from "../../lib/navbar.js";
 import { NAVBAR_LINKED, NAVBAR_ROW_CSS, NAVBAR_ROW_INLINE, NAVBAR_ROW_JS, declinesNavbar, expandRail, injectRail, railDataJson, railPageOf, wantsLinkedRail, railModel, withNavbarRow } from "../../lib/harness-rail.js";
 import { injectRailOnce } from "../../lib/rail-once.js";
-import { NAVBAR_CSS, documentIndexOf, visualiserLabelOf } from "../../lib/navbar.js";
+import { NAVBAR_CSS, documentIndexOf, numberedHeading, visualiserLabelOf } from "../../lib/navbar.js";
 import { thinPageHtml } from "../../thin-page.js";
 import {
   BEGIN,
@@ -570,6 +570,27 @@ describe("the geometry is stated ONCE — `sjic`", () => {
 
 describe("the document index — `documentIndexOf`", () => {
   const page = (body: string) => `<html><body>${body}</body></html>`;
+
+  it("gives a heading's NUMBER to the mark and keeps only the title as the label — owner 2026-10-30", () => {
+    // "lots of waste in navbar dont spell out Chapter 1".
+    const g = documentIndexOf(
+      page(`<h2 id="a">About this draft</h2><h2 id="c1">Chapter 1. Why registries matter</h2><h3 id="s">7.1 Identity management</h3><h2 id="x">Annex 9: Glossary</h2>`),
+    )!;
+    expect(g.items.map((i) => [i.icon, i.label])).toEqual([
+      [undefined, "About this draft"],
+      ["1", "Why registries matter"],
+      ["9", "Glossary"],
+    ]);
+    expect(g.items[1]!.children?.map((i) => [i.icon, i.label])).toEqual([["7.1", "Identity management"]]);
+  });
+
+  it("numberedHeading leaves a heading with no number, or nothing but a number, alone", () => {
+    expect(numberedHeading("Introduction")).toEqual({ label: "Introduction" });
+    expect(numberedHeading("Chapter 3")).toEqual({ label: "Chapter 3" });
+    expect(numberedHeading("2024 in review")).toEqual({ label: "2024 in review" });
+    expect(numberedHeading("Appendix A Data elements")).toEqual({ icon: "A", label: "Data elements" });
+    expect(numberedHeading("1.1.1 What is a reference architecture?")).toEqual({ label: "1.1.1 What is a reference architecture?" });
+  });
 
   it("takes h2 and h3 that carry an id, nesting the h3s", () => {
     const g = documentIndexOf(

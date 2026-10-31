@@ -6,7 +6,7 @@
  * success record the subscription and a cached snapshot of what was judged.
  *
  * @module cat-harness/scripts/kg-subscribe
- * @covers cat-harness, substrate-snapshot
+ * @covers cat-harness, substrate-snapshot, subscribed-harnesses
  *
  * Issue #1719, epic bean `fnx4`, slice 4 of
  * `docs/proposals/kg-subscriptions.md`. The other two verbs, materialise and
@@ -133,7 +133,10 @@
  * snapshot at its pin, each snapshot's digest is over its bytes and its
  * summary is what re-judging those bytes gives, every chosen part is one the
  * substrate offers, and no snapshot is orphaned ({@link checkSubscriptions}).
- * It is what JUDGES the `substrate-snapshot` kind rather than merely typing it.
+ * It is what JUDGES the `substrate-snapshot` kind rather than merely typing it,
+ * and the `subscribed-harnesses` kind too: every home there belongs to a
+ * subscription that chose that harness, and none is left in the snapshot
+ * directory's old `harnesses/` layout ({@link checkHarnessHomes}).
  *
  * Usage:
  *   bun run cat kg:subscribe <owner/repo>@<40-char-sha> [--upstream-path <dir>] [--name <instance>]
@@ -160,6 +163,7 @@ import {
 } from "../schemas/kg/cat-harness.js";
 import { RepoFullNameSchema } from "../schemas/kg/repo-full-name.js";
 import {
+  HARNESS_STATE_GRAPH_TYPOLOGY,
   SNAPSHOT_GRAPH_TYPOLOGY,
   SNAPSHOT_SUFFIX,
   SUBSTRATE_SNAPSHOT_SCHEMA,
@@ -168,7 +172,7 @@ import {
   type SubstrateSnapshot,
   subscriptionKindOf,
 } from "../schemas/kg/substrate-snapshot.js";
-import { HARNESSES_DIR, NESTED_DIR, NODES_DIR, NODES_RECORD_FILE, PART_RECORD_FILE, type PartView, safeRelPath, viewOf } from "./kg-parts.js";
+import { NESTED_DIR, NODES_DIR, NODES_RECORD_FILE, PART_RECORD_FILE, type PartView, safeRelPath, viewOf } from "./kg-parts.js";
 import { git, pinnedRef, shallowFetch } from "./sync-remote-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -573,8 +577,12 @@ function recordedName(snapshotDir: string, id: string): string | undefined {
 
 /** The instance's declared `substrate-snapshot` directory, resolved; `undefined` when it declares none. */
 export function snapshotDirOf(instanceRoot: string, raw: Record<string, unknown>): string | undefined {
+  return declaredDirOf(instanceRoot, raw, SNAPSHOT_GRAPH_TYPOLOGY);
+}
+
+function declaredDirOf(instanceRoot: string, raw: Record<string, unknown>, typology: string): string | undefined {
   const dirs = (raw["directories"] ?? []) as { path: string; graphTypologies?: string[]; scope?: "repository" }[];
-  const d = dirs.find((x) => (x.graphTypologies ?? []).includes(SNAPSHOT_GRAPH_TYPOLOGY));
+  const d = dirs.find((x) => (x.graphTypologies ?? []).includes(typology));
   return d ? resolve(rootForScope(instanceRoot, d.scope), d.path) : undefined;
 }
 
@@ -783,6 +791,52 @@ export function checkSubscriptions(instanceRoot: string): string[] {
       if (!seen.has(f)) out.push(`${relative(instanceRoot, join(dir, f))}: a snapshot no subscription names — orphaned`);
     }
   }
+  out.push(...checkHarnessHomes(instanceRoot, raw, subs, dir));
+  return out;
+}
+
+/**
+ * The `subscribed-harnesses` directory, judged (owner, 2026-10-30, bean `w1gy`
+ * finding 1, option C). Findings, each a sentence:
+ *
+ * - a home left in the snapshot directory's old layout
+ *   (`<snapshot dir>/<subscription>/harnesses/`), which made a read-only
+ *   directory hold the subscriber's working state;
+ * - a home `<subscription>/<harness>/` whose subscription is gone or did not
+ *   choose that harness — orphaned state nobody's config reads;
+ * - a file where only homes belong (anything but the generated `README.md`).
+ */
+export function checkHarnessHomes(instanceRoot: string, raw: Record<string, unknown>, subs: readonly Subscription[], snapshotDir: string): string[] {
+  const out: string[] = [];
+  const rel = (p: string): string => relative(instanceRoot, p).split("\\").join("/");
+  for (const s of subs) {
+    const old = join(snapshotDir, s.id, "harnesses");
+    if (existsSync(old)) {
+      out.push(`${rel(old)}/: instantiated-harness state in the read-only snapshot directory — move it to the \`${HARNESS_STATE_GRAPH_TYPOLOGY}\` directory (\`git mv\` to \`<state dir>/${s.id}/<harness>/\`)`);
+    }
+  }
+  const stateDir = declaredDirOf(instanceRoot, raw, HARNESS_STATE_GRAPH_TYPOLOGY);
+  if (!stateDir || !existsSync(stateDir)) return out;
+  const chosen = new Map(subs.map((s) => [s.id, new Set(s.harnesses ?? [])]));
+  for (const e of readdirSync(stateDir, { withFileTypes: true })) {
+    if (e.name.startsWith(".") || (e.isFile() && e.name === "README.md")) continue;
+    const p = join(stateDir, e.name);
+    if (!e.isDirectory() || lstatSync(p).isSymbolicLink()) {
+      out.push(`${rel(p)}: not a subscription's directory — only \`<subscription>/<harness>/\` homes belong here`);
+      continue;
+    }
+    const harnesses = chosen.get(e.name);
+    if (!harnesses) {
+      out.push(`${rel(p)}/: state for subscription \`${e.name}\`, which this instance does not declare — orphaned`);
+      continue;
+    }
+    for (const h of readdirSync(p, { withFileTypes: true })) {
+      if (h.name.startsWith(".")) continue;
+      const hp = join(p, h.name);
+      if (!h.isDirectory() || lstatSync(hp).isSymbolicLink()) out.push(`${rel(hp)}: not a harness home — only \`<harness>/\` directories belong here`);
+      else if (!harnesses.has(h.name)) out.push(`${rel(hp)}/: state for harness \`${h.name}\`, which subscription \`${e.name}\` did not choose — orphaned`);
+    }
+  }
   return out;
 }
 
@@ -792,27 +846,25 @@ export function checkSubscriptions(instanceRoot: string): string[] {
 // subscribed trees (`subscribed-trees.ts`, harness) can share it: this module
 // is classified core, and the harness may not import core. Re-exported here
 // so every existing importer keeps its path.
-export { PART_RECORD_FILE, PART_TREE, NESTED_DIR, NODES_RECORD_FILE, NODES_DIR, HARNESSES_DIR, harnessHomeOf, nodesDirOf, partDirOf, safeRelPath, treeEntries, sha256File, treeDigest, viewOf } from "./kg-parts.js";
+export { PART_RECORD_FILE, PART_TREE, NESTED_DIR, NODES_RECORD_FILE, NODES_DIR, harnessHomeOf, nodesDirOf, partDirOf, safeRelPath, treeEntries, sha256File, treeDigest, viewOf } from "./kg-parts.js";
 export type { KgPart, PartView } from "./kg-parts.js";
 
 /**
  * Every part record under one subscription's directory, and every STRAY: a
  * file, or a part directory with no record — bytes nobody accounts for.
- * `strays` are relative to the snapshot directory. `homes` are the
- * instantiated harnesses' state homes under `harnesses/` (slice 7, G11),
- * absolute: the subscriber's own working bytes, so never a stray, and never a
- * part either, because nothing upstream is recorded there.
+ * `strays` are relative to the snapshot directory. An instantiated harness's
+ * state is not here (it is in the `subscribed-harnesses` directory, bean
+ * `w1gy` finding 1), so a `harnesses/` left by the old layout is a stray.
  */
 export function partRecordsIn(
   snapshotDir: string,
   subscription: string,
-): { parts: PartView[]; strays: string[]; nodes: string[]; homes: string[] } {
+): { parts: PartView[]; strays: string[]; nodes: string[] } {
   const base = join(snapshotDir, subscription);
   const parts: PartView[] = [];
   const strays: string[] = [];
   const nodes: string[] = [];
-  const homes: string[] = [];
-  if (!existsSync(base)) return { parts, strays, nodes, homes };
+  if (!existsSync(base)) return { parts, strays, nodes };
   const rel = (p: string): string => relative(snapshotDir, p).split("\\").join("/");
   for (const e of readdirSync(base, { withFileTypes: true })) {
     const p = join(base, e.name);
@@ -849,16 +901,9 @@ export function partRecordsIn(
         }
       };
       walk(p);
-    } else if (e.name === HARNESSES_DIR && e.isDirectory()) {
-      // One directory per instantiated harness; a file directly here is nobody's.
-      for (const h of readdirSync(p, { withFileTypes: true })) {
-        const hd = join(p, h.name);
-        if (h.isDirectory() && !lstatSync(hd).isSymbolicLink()) homes.push(hd);
-        else strays.push(rel(hd));
-      }
     } else strays.push(rel(p));
   }
-  return { parts: parts.sort((a, b) => a.dir.localeCompare(b.dir)), strays: strays.sort(), nodes: nodes.sort(), homes: homes.sort() };
+  return { parts: parts.sort((a, b) => a.dir.localeCompare(b.dir)), strays: strays.sort(), nodes: nodes.sort() };
 }
 
 function flag(argv: string[], name: string): string | undefined {

@@ -1627,7 +1627,12 @@ if (import.meta.main) {
     console.log("  · no schemas directory is declared — nothing to publish");
     process.exit(0);
   }
-  const seg = basename(own);
+  // The projection's directory is the graph typology (`viewerPlacement`'s
+  // `kind`), not the declared directory's name. Since cat-harness#794 its
+  // `ns/` also declares the `schemas` graph and sorts before `schemas/`, so
+  // `basename(own)` gave `assets/ns/` and left the declared
+  // `assets/schemas/index.json` unbuilt (folio-assistant#2772).
+  const seg = "schemas";
 
   // ── Rule 1: a HANDLER rendering a kind's assets ────────────────────────
   //

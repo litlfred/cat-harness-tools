@@ -42,17 +42,16 @@ import { KG_PART_RECORD_SCHEMA } from "../schemas/kg/substrate-snapshot.js";
  * <snapshot dir>/<subscription>/nested/<subgraph path>/tree/…   a NESTED subgraph's contents
  * <snapshot dir>/<subscription>/nodes/<subgraph path>/nodes.json
  * <snapshot dir>/<subscription>/nodes/<subgraph path>/index.hydrated.jsonld
- * <snapshot dir>/<subscription>/harnesses/<harness>/<state path>/…   an INSTANTIATED harness's state
  * ```
  *
- * `harnesses/` is where `kg:instantiate` (slice 7) writes the state directories
- * a chosen harness declares. It sits here, not at `<repository root>/<harness>/`
- * as slice 7 first wrote it, because the root is not a declared directory and
- * a harness named after a staged instance (a content layer) would land inside that
- * instance's directory (arc gap G11; owner, 2026-10-30: slice 7 moves to this
- * layout). Keyed by subscription first, so two subscriptions can never write
- * into one home. It holds no `materialization.json`: these are the
- * subscriber's own working bytes, written by a command, never upstream's.
+ * An INSTANTIATED harness's state is NOT here. `kg:instantiate` (slice 7)
+ * writes it to the subscriber's `subscribed-harnesses` directory instead, at
+ * `<state dir>/<subscription>/<harness>/` ({@link harnessHomeOf}). It sat here
+ * under `<subscription>/harnesses/` for a few hours (arc gap G11), which made
+ * this directory both upstream's read-only bytes and the subscriber's working
+ * state, so it could not answer `readOnly` (owner, 2026-10-30, bean `w1gy`
+ * finding 1, option C: "split the directory"). A `harnesses/` found here now
+ * is a stray, which is how the old layout is reported rather than read.
  *
  * `nested/` is the byte copy of a subgraph declared FROM WITHIN another
  * (`skills/voices`, declared in `skills/skills.json`). Owner, 2026-10-24
@@ -89,12 +88,15 @@ export const NESTED_DIR = "nested";
 export const NODES_RECORD_FILE = "nodes.json";
 export const NODES_DIR = "nodes";
 
-/** Where instantiated harnesses' state directories live, one directory per harness (module note). */
-export const HARNESSES_DIR = "harnesses";
-
-/** Where a subscribed harness's local bytes live: `<snapshot dir>/<subscription>/harnesses/<harness>/`. */
-export function harnessHomeOf(snapshotDir: string, subscription: string, harness: string): string {
-  return join(snapshotDir, subscription, HARNESSES_DIR, harness);
+/**
+ * Where a subscribed harness's local state lives: `<state dir>/<subscription>/<harness>/`.
+ * `stateDir` is the subscriber's declared `subscribed-harnesses` directory
+ * (`harnessStateDirFor` in `subscribed-harnesses.ts`), never the snapshot
+ * directory. Keyed by subscription first, so two subscriptions can never write
+ * into one home.
+ */
+export function harnessHomeOf(stateDir: string, subscription: string, harness: string): string {
+  return join(stateDir, subscription, harness);
 }
 
 /** Where one subgraph's metadata-mode record and `index.hydrated.jsonld` live. */

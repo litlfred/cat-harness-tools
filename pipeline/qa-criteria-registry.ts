@@ -381,6 +381,8 @@ const FIT: QaCriterionDefinition[] = [
 const FRAMEWORK: QaCriterionDefinition[] = [
   {
     id: "framework-canonical",
+    // The checker is the science layer's (bean saqd, row 9). See `checker_contributed`.
+    checker_contributed: true,
     domain: "framework",
     description:
       "Uses current canonical math framework, not deprecated notation. " +
@@ -431,6 +433,8 @@ const FRAMEWORK: QaCriterionDefinition[] = [
 const WALL: QaCriterionDefinition[] = [
   {
     id: "wall-side-correct",
+    // The checker is the science layer's (bean saqd, row 9). See `checker_contributed`.
+    checker_contributed: true,
     domain: "wall",
     description:
       "Block (`.lean` body) is on the correct side of the substrate-to-" +
@@ -465,6 +469,8 @@ const WALL: QaCriterionDefinition[] = [
   },
   {
     id: "wall-base-ring-minimal",
+    // The checker is the science layer's (bean saqd, row 9). See `checker_contributed`.
+    checker_contributed: true,
     domain: "wall",
     description:
       "Advisory (§7c base-ring minimality). Flags **algebraic-side** Lean " +
@@ -2751,15 +2757,12 @@ const VOICE_FILE_IDS = new Set<string>([
   "voice-editorializing",
   "voice-ai-slop",
   "voice-scholarly-default",
-  "framework-canonical",
-  "wall-side-correct",
   // Added 2026-09-18 — all six dispatch from qa-checkers-voice.ts and were
   // silently hashing qa-checkers-extended.ts.
   "voice-probe-narrative",
   "voice-agent-speak",
   "voice-author-notes-pollution",
   "voice-status-section",
-  "wall-base-ring-minimal",
   "cite-named-theorem",
 ]);
 

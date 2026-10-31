@@ -144,7 +144,6 @@ describe("source-ledger-index reads split references", () => {
       allLabels: new Set<string>(),
       allRefIds: allIds,
       fileExists: () => true,
-      lakeTreeContainsBasename: () => false,
     } as unknown as Parameters<typeof citesRule.check>[1];
     expect(citesRule.check({ kind: "theorem", label: "thm:x", cites: ["knuth1984", "garoufalidis2004"] } as never, ctx)).toBeNull();
     expect(citesRule.check({ kind: "theorem", label: "thm:x", cites: ["missing2099"] } as never, ctx)).toContain("missing2099");

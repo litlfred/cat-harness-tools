@@ -1,6 +1,6 @@
 /**
  * The `mathpaper` vocabulary's own code: the seven formal-claim block kinds'
- * types, schemas, builders and constraint rules.
+ * types, schemas, builders, constraint rules and the constraint context they read.
  *
  * `content-adapters/mathpaper.json` names this module as its `vocabulary`, and
  * cat-harness's `schemas/content/vocabulary-modules.ts` loads it. The kinds were typed
@@ -16,11 +16,14 @@
  * @module folio-assistant-sci/schemas/mathpaper-vocabulary
  * @graphNode schema
  */
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { z } from "zod";
 
 import {
   BlockBaseSchema,
   ComputationSchema,
+  type ConstraintContext,
   type ConstraintRule,
   LeanRefSchema,
   labelForKind,
@@ -234,6 +237,69 @@ export function proof(data: Omit<ProofBlock, "kind">): ProofBlock {
 /** The vocabulary's builders, by name: what a folio's builders shim re-exports. */
 export const builders = { definition, theorem, lemma, proposition, corollary, conjecture, proof };
 
+// ── Constraint context ────────────────────────────────────────────
+
+/**
+ * What this vocabulary's rules read beyond cat-harness's generic
+ * {@link ConstraintContext}: the block's sibling `.lean` and a basename lookup
+ * under a Lake package root. Supplied by {@link constraintContext}, which
+ * `pipeline/validate.ts` composes through `vocabulary-modules.ts` (bean `saqd`,
+ * row `pipeline/validate.ts`); it built both itself until then.
+ */
+export interface MathpaperConstraintContext extends ConstraintContext {
+  /** Basename lookup under a Lake package root (for the `lean.ref` fallback). */
+  lakeTreeContainsBasename?: (lakeRoot: string, basename: string) => boolean;
+  /** Lean sibling stub content (for the §3b-cond kind check), if the file exists. */
+  leanContent?: string;
+}
+
+/**
+ * This vocabulary's contribution to each block's constraint context, moved
+ * unchanged from `pipeline/validate.ts`'s phase 2. Called once per validation
+ * run (so the Lake-tree scan is cached for the run), then once per block.
+ *
+ * `LEAN_PACKAGES.lakeRoot` is CONTENT-repo-relative, so it is resolved against
+ * the folio's `repoRoot` — not against `import.meta.dir`, which lands in the
+ * platform's own tree when the folio embeds it as a symlink. With that old
+ * computation the scan found a Lake tree that does not exist, so
+ * `lean-file-exists`'s basename fallback never found anything.
+ */
+export function constraintContext(run: {
+  repoRoot: string;
+}): (block: { rootName: string; dir: string }) => Pick<MathpaperConstraintContext, "lakeTreeContainsBasename" | "leanContent"> {
+  // Per-lake-tree basename cache, populated lazily. The cluster-migration
+  // pattern allows a `.lean` path to differ from its `lean.ref` decl prefix,
+  // so `lean-file-exists` falls back to a basename scan of the package tree.
+  const lakeTreeBasenameCache = new Map<string, Set<string>>();
+  function lakeTreeContainsBasename(lakeRoot: string, basename: string): boolean {
+    const absRoot = resolve(run.repoRoot, lakeRoot);
+    let cached = lakeTreeBasenameCache.get(absRoot);
+    if (!cached) {
+      cached = new Set<string>();
+      try {
+        const stack: string[] = [absRoot];
+        while (stack.length) {
+          const dir = stack.pop()!;
+          for (const entry of readdirSync(dir, { withFileTypes: true })) {
+            if (entry.name === "node_modules" || entry.name === ".git" || entry.name === ".lake" || entry.name === "build") continue;
+            const full = join(dir, entry.name);
+            if (entry.isDirectory()) stack.push(full);
+            else if (entry.isFile() && entry.name.endsWith(".lean")) cached.add(entry.name);
+          }
+        }
+      } catch {
+        // Lake root missing — leave the set empty (constraint will fail downstream).
+      }
+      lakeTreeBasenameCache.set(absRoot, cached);
+    }
+    return cached.has(basename);
+  }
+  return ({ rootName, dir }) => {
+    const leanPath = join(dir, `${rootName}.lean`);
+    return { lakeTreeContainsBasename, leanContent: existsSync(leanPath) ? readFileSync(leanPath, "utf-8") : undefined };
+  };
+}
+
 // ── Constraint rules ──────────────────────────────────────────────
 
 /**
@@ -273,7 +339,7 @@ export const constraintRules: ConstraintRule[] = [
           for (const candidate of [...res.candidatePaths, ...(res.fallbackPaths ?? [])]) {
             if (ctx.fileExists(candidate)) return null;
           }
-          if (res.treeRoot && ctx.lakeTreeContainsBasename?.(res.treeRoot, res.basename)) return null;
+          if (res.treeRoot && (ctx as MathpaperConstraintContext).lakeTreeContainsBasename?.(res.treeRoot, res.basename)) return null;
         }
       }
 
@@ -303,12 +369,13 @@ export const constraintRules: ConstraintRule[] = [
       "sorry-as-conjecture class instance per CLAUDE.md §3b-cond.",
     appliesTo: ["proposition", "theorem", "lemma", "corollary"],
     check: (block, ctx) => {
-      if (!ctx.leanContent) return null;
+      const leanContent = (ctx as MathpaperConstraintContext).leanContent;
+      if (!leanContent) return null;
       // Match the §3b-cond stub signature. Any of these three signals is
       // sufficient on its own; the generator-emitted phrase "conjectural
       // sibling stub" is the most reliable marker.
       const signals = [/\bconjectural sibling stub\b/, /\bsorry\s*=\s*conjecture\b/, /\*\*CONJECTURE\.\*\*/];
-      const hit = signals.find((re) => re.test(ctx.leanContent!));
+      const hit = signals.find((re) => re.test(leanContent));
       if (!hit) return null;
       return (
         `Kind mismatch: ${block.label} declares ${block.kind}() but the ` +

@@ -148,7 +148,6 @@ describe("cites-resolve actually fires now", () => {
     rootName: "b", dir: "/tmp", allLabels: new Set<string>(),
     allRefIds: new Set(["knuth1984"]),
     fileExists: () => true,
-    lakeTreeContainsBasename: () => false,
   } as unknown as Parameters<typeof rule.check>[1];
 
   test("catches a bad citation key on a `table` block", () => {
