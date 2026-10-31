@@ -86,6 +86,20 @@ describe("parseTrace in collect mode — a writer's reads and writes", () => {
     expect(underOutputs(["a/b/", "c.json"])("c.json")).toBe(true);
   });
 
+  test("a rewritten file nobody declares is kept as an input, with its state after the run", () => {
+    const lines = [
+      `10 openat(AT_FDCWD</work/repo>, "docs/todo/index.html", O_RDONLY|O_CLOEXEC) = 3</work/repo/docs/todo/index.html>`,
+      `10 openat(AT_FDCWD</work/repo>, "docs/todo/index.html", O_WRONLY|O_TRUNC|O_CLOEXEC) = 4</work/repo/docs/todo/index.html>`,
+      `10 openat(AT_FDCWD</work/repo>, "docs/new.html", O_WRONLY|O_CREAT|O_TRUNC, 0644) = 5</work/repo/docs/new.html>`,
+    ];
+    const r = parseTrace(lines.join("\n"), ROOT, { writes: "collect", rewriteAsInput: (rel) => rel !== "docs/declared.html" });
+    expect(r).toEqual({ paths: ["docs/todo/index.html"], git: [], writes: ["docs/new.html"], absentBefore: [], rewritten: ["docs/todo/index.html"] });
+    // Declared by some writer: still refused.
+    expect(parseTrace(lines.join("\n"), ROOT, { writes: "collect", rewriteAsInput: (rel) => rel !== "docs/todo/index.html" })).toEqual({
+      undetermined: "the writer reads docs/todo/index.html and then rewrites it",
+    });
+  });
+
   test("the default still refuses any write (checks are unchanged)", () => {
     const r = parseTrace(`10 openat(AT_FDCWD</work/repo>, "x", O_WRONLY|O_CREAT, 0644) = 3</work/repo/x>`, ROOT);
     expect("undetermined" in r).toBe(true);

@@ -163,11 +163,11 @@ export function tracedArgv(argv: readonly string[], log: string): string[] {
 }
 
 /** The trace at `log` as a read set, or why it cannot be one. */
-export function readTraceFile(log: string, root: string, ownOutput?: (rel: string) => boolean): ReadSet {
+export function readTraceFile(log: string, root: string, ownOutput?: (rel: string) => boolean, rewriteAsInput?: (rel: string) => boolean): ReadSet {
   if (!existsSync(log)) return { undetermined: "no trace was written" };
   const size = statSync(log).size;
   if (size > MAX_TRACE_BYTES) return { undetermined: `the trace is ${size} bytes, more than ${MAX_TRACE_BYTES}` };
-  return parseTrace(readFileSync(log, "utf-8"), root, { writes: "collect", ownOutput });
+  return parseTrace(readFileSync(log, "utf-8"), root, { writes: "collect", ownOutput, rewriteAsInput });
 }
 
 /**

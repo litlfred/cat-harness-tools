@@ -144,7 +144,7 @@ export interface GitCall {
   args: string[];
 }
 
-export type ReadSet = { paths: string[]; git: GitCall[]; writes?: string[]; absentBefore?: string[] } | { undetermined: string };
+export type ReadSet = { paths: string[]; git: GitCall[]; writes?: string[]; absentBefore?: string[]; rewritten?: string[] } | { undetermined: string };
 
 /**
  * Git subcommands the cone may REPLAY on a PR to ask git's view of the tree
@@ -397,6 +397,13 @@ export function parseTrace(
     writes?: "refuse" | "collect";
     /** `collect` mode: the writer's DECLARED outputs. Re-reading one before rewriting it (write-if-changed) is not an input. */
     ownOutput?: (rel: string) => boolean;
+    /**
+     * A path the writer read and then rewrote that no writer declares and no
+     * earlier writer wrote: it is kept as an input, with its state AFTER the
+     * run. A later run skips only when the path already holds what this run
+     * left there, so a rewrite that changed it makes the next run rerun.
+     */
+    rewriteAsInput?: (rel: string) => boolean;
   } = {},
 ): ReadSet {
   const parsed = calls(text);
@@ -498,7 +505,10 @@ export function parseTrace(
       // Its own declared output, read back before it is rewritten: the run
       // compares with, or extends, what it last wrote. A skip puts exactly
       // that back, and the dry run checks every output after a full build.
-      if (f === "read" && !opts.ownOutput?.(rel)) return { undetermined: `the writer reads ${rel || "."} and then rewrites it` };
+      if (f === "read" && !opts.ownOutput?.(rel)) {
+        if (opts.rewriteAsInput?.(rel)) continue;
+        return { undetermined: `the writer reads ${rel || "."} and then rewrites it` };
+      }
       paths.delete(rel);
       if (f === "absent") absentBefore.push(rel);
     }
@@ -506,7 +516,9 @@ export function parseTrace(
     // a skip restores exactly that: not an input.
     if (opts.ownOutput !== undefined) for (const p of [...paths]) if (opts.ownOutput(p)) paths.delete(p);
     if (paths.size > MAX_WRITER_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_WRITER_PATHS}` };
-    return { paths: [...paths].sort(), git: [...git.values()], writes: [...wrote].sort(), absentBefore: absentBefore.sort() };
+    const rewritten = [...wrote].filter((rel) => first.get(rel) === "read" && !opts.ownOutput?.(rel));
+    const kept = [...wrote].filter((rel) => !rewritten.includes(rel));
+    return { paths: [...paths].sort(), git: [...git.values()], writes: kept.sort(), absentBefore: absentBefore.sort(), ...(rewritten.length ? { rewritten: rewritten.sort() } : {}) };
   }
   if (writes.length > 0) return { undetermined: `the check writes inside the checkout (${writes.slice(0, 3).join(", ")})` };
   if (paths.size > MAX_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_PATHS}` };
