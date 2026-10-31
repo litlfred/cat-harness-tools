@@ -20,15 +20,17 @@
  * on "No". Without a browser, or with `--di-only`, only labels the file
  * places itself are checked, and the report says so.
  *
- * `--write` changes ONLY the lane order (and re-routes the flows between lanes
- * as elbows): moving steps and labels is the author's judgement, so it is
- * reported, never guessed. Re-render and look at the result.
+ * `--write` makes boxes big enough for their text (wider, then taller,
+ * growing the lane), changes the lane order (re-routing the flows between lanes as
+ * elbows) and re-routes slanted flows at right angles (owner, 2026-10-31:
+ * *"straight angled arrows ugly"*). Moving steps and labels is the author's
+ * judgement, so it is reported, never guessed. Re-render and look.
  *
  * @module scripts/bpmn-detangle
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { applyLaneOrder, bestLaneOrder, crossings, diagramFit, readDi, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
+import { applyLaneOrder, bestLaneOrder, crossings, diagramFit, readDi, resizeShapes, straightenFlows, textOverflow, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
 
 type Draw = (xml: string) => Promise<DrawnLabels | undefined>;
 
@@ -83,6 +85,28 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
       } else {
         console.log(`· ${shown}: a lane swap would add flow crossings (${was} → ${now}); left as it is`);
       }
+    }
+  }
+  if (write) {
+    const { xml: next, fixed } = straightenFlows(xml);
+    if (fixed.length > 0) {
+      writeFileSync(file, next);
+      xml = next;
+      console.log(`✓ ${shown}: ${fixed.length} slanted flow(s) routed at right angles (${fixed.join(", ")})`);
+    }
+  }
+  if (write && renderer) {
+    // Text that spills out of its box: first widen it (wrapping fewer
+    // lines), then measure again and make it tall enough.
+    for (const pass of ["wider", "taller"] as const) {
+      const over = textOverflow(readDi(xml), await renderer.draw(xml).catch(() => undefined));
+      if (over.length === 0) break;
+      const sizes = new Map(over.map((o) => [o.id, pass === "wider"
+        ? { width: Math.max(o.box.width, Math.min(o.box.width + 40, 180)), height: o.box.height }
+        : { width: o.box.width, height: Math.max(o.box.height, o.need.height) }]));
+      xml = resizeShapes(xml, sizes);
+      writeFileSync(file, xml);
+      console.log(`✓ ${shown}: ${over.length} box(es) made ${pass} for their text (${over.map((o) => o.id).join(", ")})`);
     }
   }
   const drawn = renderer ? await renderer.draw(xml).catch(() => undefined) : undefined;
