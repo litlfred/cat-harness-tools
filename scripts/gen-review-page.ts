@@ -182,7 +182,7 @@ const STYLE = `
   .diff-fields th, .diff-fields td { border: 1px solid var(--rule); padding: .25rem .4rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
   .diff-fields td:last-child { white-space: nowrap; font-weight: 600; }
   .diff-sbs iframe { width: 100%; height: 22rem; border: 1px solid var(--rule); border-radius: 0 0 .3rem .3rem; background: #fff; display: block; }
-  .sbs-head { padding: .35rem .6rem; border-radius: .3rem .3rem 0 0; font-size: .9rem; color: #fff; overflow-wrap: anywhere; }
+  .sbs-head { padding: .2rem .6rem; border-radius: .3rem .3rem 0 0; font-size: .85rem; line-height: 1.4; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sbs-side-base { background: #5f6368; }
   .sbs-side-head { background: #4F6F52; }
   .sbs-head a, .sbs-head code { color: #fff; }
