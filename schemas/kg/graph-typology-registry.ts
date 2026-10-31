@@ -1060,6 +1060,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // GENERATOR OUTPUT: the dynamic-state document `<site>/<harness>/state.jsonld`,
       // written whole by `writeDynamicState` (render stage 3 and the state
       // visualiser). It names the bean stores it read, so it is not prose.
+      // Its validator is the node `cat-harness-tools/validators/dynamic-state.json`.
       "cat-harness-dynamic-state/v1": { generated: true },
     },
     summary:

@@ -75,10 +75,13 @@
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 
+import { z } from "zod";
+
 import { inspect as inspectBlock } from "./check-bean-blocks.ts";
 import { beanFindings, type BeanNode } from "./beans.ts";
 import { memoryForRoles, type MemoryNode } from "../schemas/conduct/memory.js";
 import { findRole, type RoleGraph } from "../schemas/process/role-graph.js";
+import { nodeKind } from "../schemas/kg/node-kind.js";
 import { enabled, INSTANCE_SCHEMA, type HistoryEntry, type InstanceState } from "../src/workflow/instance.js";
 import type { ProcessModel } from "../src/workflow/process-model.js";
 
@@ -588,6 +591,36 @@ export interface DynamicStateDocument {
   unreadStores: string[];
   graph: DynamicStateInstance[];
 }
+
+/**
+ * The node kind of the document above, so the docs typology's
+ * `cat-harness-dynamic-state/v1` family names a validator rather than joining
+ * the unkinded baseline. It checks what {@link dynamicStateDocument} writes;
+ * the `@context` is the generator's own and is checked only as an object.
+ */
+const DynamicStateInstanceSchema = z.object({
+  id: z.string(),
+  type: z.literal("cat-harness:WorkflowInstance"),
+  store: z.string(),
+  process: z.string(),
+  status: z.string(),
+  tokens: z.array(z.string()),
+  lastMoved: z.string().optional(),
+  beans: z.array(z.string()),
+  children: z.array(z.object({ process: z.string(), status: z.string(), tokens: z.array(z.string()) })),
+  stuck: z.array(z.object({ kind: z.string(), detail: z.string() })),
+  page: z.string().optional(),
+});
+export const DynamicStateKind = nodeKind(DYNAMIC_STATE_SCHEMA, [], {
+  "@context": z.record(z.string(), z.unknown()),
+  $schema: z.literal(DYNAMIC_STATE_SCHEMA),
+  id: z.string(),
+  type: z.literal("cat-harness:DynamicState"),
+  harness: z.string(),
+  generatedAt: z.string(),
+  unreadStores: z.array(z.string()),
+  graph: z.array(DynamicStateInstanceSchema),
+});
 
 /** The published document: one node per instance, sorted by store then id. */
 export function dynamicStateDocument(

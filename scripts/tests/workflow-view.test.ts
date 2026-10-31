@@ -29,6 +29,7 @@ import {
   dynamicStateDocument,
   DYNAMIC_STATE_FILE,
   DYNAMIC_STATE_SCHEMA,
+  DynamicStateKind,
 } from "../workflow-view.ts";
 import { loadProcessModel } from "../../src/workflow/process-model.js";
 import { REFUSALS_KEPT, withRefusal } from "../../src/workflow/instance.js";
@@ -362,6 +363,12 @@ describe("the dynamic-state document (bean 6h47)", () => {
     expect(b.page).toBe("en/h/beans/s/workflows/b/");
     expect(b.stuck.map((x) => x.kind)).toEqual(stuckStatesOf(inst({ id: "b", updatedAt: daysBefore(10) }), [bean()], NOW).map((x) => x.kind));
     expect(b.stuck.map((x) => x.kind)).toContain("enabled-not-taken");
+  });
+
+  test("what it writes is a node of the kind its docs family names, and a wrong type is refused", () => {
+    const written = JSON.parse(JSON.stringify(doc()));
+    expect(DynamicStateKind.schema.safeParse(written).success).toBe(true);
+    expect(DynamicStateKind.schema.safeParse({ ...written, type: "cat-harness:WorkflowInstance" }).success).toBe(false);
   });
 
   test("an unread store is named, so its instances read as unknown, not none", () => {
