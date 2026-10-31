@@ -278,6 +278,60 @@ export const PANEL_SCRIPT = `(function () {
       panel.appendChild(el("div", "pt-none", "Lane role: " + t.binding + "."));
     }
   }
+  // THE MARKERS FOLLOW THE DRAWING, not the box around it. The site's figure
+  // viewer (docs-ui.js) swaps the <img> for an inlined <svg>, puts a toolbar
+  // above it, and zooms and pans it inside a scroll box. Positioned against
+  // this block, every marker and link drifted off its shape (owner,
+  // 2026-10-31: "misaligned"). So the layer is laid over wherever the drawing
+  // is actually drawn, and re-laid whenever that can change.
+  var layer = root.querySelector(".pt-layer"), queued = false;
+  function art() {
+    var c = root.querySelectorAll("img, svg");
+    for (var i = 0; i < c.length; i++) {
+      var e = c[i];
+      if (e.closest(".pt-layer, .pt-panel, .fa-figure-tools")) continue;
+      if (e.parentElement && e.parentElement.closest("svg")) continue;
+      return e;
+    }
+    return null;
+  }
+  function place() {
+    queued = false;
+    var a = art();
+    if (!layer || !a) return;
+    var r = root.getBoundingClientRect(), b = a.getBoundingClientRect();
+    var x = b.left - r.left, y = b.top - r.top, w = b.width, h = b.height, vw = 0, vh = 0;
+    if (a.tagName.toLowerCase() === "img") { vw = a.naturalWidth; vh = a.naturalHeight; }
+    else { var vb = (a.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number); vw = vb[2]; vh = vb[3]; }
+    // An SVG keeps its aspect inside a box of another shape (xMidYMid meet).
+    if (vw > 0 && vh > 0 && w > 0 && h > 0) {
+      var k = vw / vh;
+      if (w / h > k) { var nw = h * k; x += (w - nw) / 2; w = nw; } else { var nh = w / k; y += (h - nh) / 2; h = nh; }
+    }
+    layer.style.left = x + "px"; layer.style.top = y + "px"; layer.style.width = w + "px"; layer.style.height = h + "px";
+    // Zoomed in, the drawing scrolls inside its box: markers past the edge are hidden with it.
+    var sc = a.parentElement;
+    while (sc && sc !== root && !(sc.scrollWidth > sc.clientWidth + 1 || sc.scrollHeight > sc.clientHeight + 1)) sc = sc.parentElement;
+    if (sc && sc !== root) {
+      var s = sc.getBoundingClientRect(), L = r.left + x, T = r.top + y;
+      layer.style.clipPath = "inset(" + Math.max(0, s.top - T) + "px " + Math.max(0, L + w - s.right) + "px " +
+        Math.max(0, T + h - s.bottom) + "px " + Math.max(0, s.left - L) + "px)";
+    } else layer.style.clipPath = "";
+    if (open) at(open);
+  }
+  function schedule() { if (!queued) { queued = true; requestAnimationFrame(place); } }
+  if (window.ResizeObserver) new ResizeObserver(schedule).observe(root);
+  if (window.MutationObserver) new MutationObserver(function (ms) {
+    for (var i = 0; i < ms.length; i++) if (!layer || !layer.contains(ms[i].target)) { schedule(); return; }
+  }).observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class", "viewBox"] });
+  root.addEventListener("scroll", schedule, true);
+  root.addEventListener("load", schedule, true);
+  window.addEventListener("resize", schedule);
+  schedule();
+  function at(b) {
+    var r = root.getBoundingClientRect(), m = b.getBoundingClientRect();
+    panel.style.left = (m.left + m.width / 2 - r.left) + "px"; panel.style.top = (m.top + m.height / 2 - r.top) + "px";
+  }
   function hide() { panel.hidden = true; if (open) open.setAttribute("aria-expanded", "false"); open = null; }
   root.addEventListener("click", function (ev) {
     var b = ev.target.closest && ev.target.closest(".pt-mark");
@@ -285,7 +339,7 @@ export const PANEL_SCRIPT = `(function () {
     if (open === b) { hide(); return; }
     if (open) open.setAttribute("aria-expanded", "false");
     open = b; b.setAttribute("aria-expanded", "true");
-    panel.style.left = b.style.left; panel.style.top = b.style.top;
+    at(b);
     panel.hidden = false; panel.textContent = "Loading\\u2026";
     load().then(function (j) {
       var t = j.tasks[b.getAttribute("data-task")];
@@ -306,6 +360,9 @@ export const PANEL_CSS = [
   // A call activity's shape is a link to the process it calls (owner,
   // 2026-10-31: "i thought i would be able click to follow to a subprocess").
   // Under the ⓘ, which stays the way to the details.
+  // The layer is laid over the drawing by the client; with no script it is the whole block.
+  ".pt-layer{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:2}",
+  ".pt-layer>*{pointer-events:auto}",
   ".pt-go{position:absolute;display:block;border-radius:8px;cursor:pointer}",
   ".pt-go:hover,.pt-go:focus-visible{outline:2px solid #1f6feb;outline-offset:1px;background:rgba(31,111,235,.07)}",
   ".pt-mark{z-index:1}",
@@ -337,6 +394,7 @@ export function diagramBlock(opts: { img: string; alt: string; markers: readonly
   L.push(`<style>${PANEL_CSS}</style>`);
   L.push(`<div class="pt-diagram" data-panel="${escAttr(opts.panelHref)}">`);
   L.push(`<img src="${escAttr(opts.img)}" alt="${escAttr(opts.alt)}">`);
+  L.push(`<div class="pt-layer">`);
   for (const m of opts.markers) {
     if (m.href && m.box) {
       L.push(
@@ -349,6 +407,7 @@ export function diagramBlock(opts: { img: string; alt: string; markers: readonly
         `aria-expanded="false" aria-label="About step: ${escAttr(m.name)}" title="About: ${escAttr(m.name)}">i</button>`,
     );
   }
+  L.push(`</div>`);
   L.push(`<div class="pt-panel" role="dialog" aria-label="Task details" hidden></div>`);
   L.push(`</div>`);
   L.push(`<script>${PANEL_SCRIPT}</script>`);

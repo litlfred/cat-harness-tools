@@ -84,6 +84,9 @@ describe("the page block", () => {
     }).join("\n");
     expect(html).toContain('<a class="pt-go" href="sub.html" style="left:10%;top:20%;width:15%;height:12%"');
     expect(html.match(/class="pt-go"/g)?.length).toBe(1);
+    // Markers and links sit in the layer the client lays over the drawing.
+    expect(html.indexOf('<div class="pt-layer">')).toBeLessThan(html.indexOf('class="pt-go"'));
+    expect(html.indexOf('class="pt-mark"')).toBeLessThan(html.indexOf('class="pt-panel"'));
     // The ⓘ is still there for both, so the details stay one click away.
     expect(html).toContain('data-task="C1"');
     expect(html).toContain('data-task="T1"');
