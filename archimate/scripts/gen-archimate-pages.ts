@@ -39,14 +39,19 @@
  * | `<m>/` | the model's page: views, and elements by layer |
  * | `<m>/model.json` | the model, normalised — what the loader draws from |
  * | `<m>/views/<v>.svg` | the view, drawn (`render-view.ts`) |
- * | `<m>/views/<v>.jsonld`, `.json`, `<m>/views/<v>/` | a view's node and page |
- * | `<m>/elements/<e>.jsonld`, `.json`, `<m>/elements/<e>/` | an element's node and page |
+ * | `<m>/views/<v>.jsonld`, `.json`, `<m>/views/<slug>/` | a view's node and page |
+ * | `<m>/elements/<e>.jsonld`, `.json`, `<m>/elements/<slug>/` | an element's node and page |
  * | `<m>/relationships/<r>.jsonld`, `.json`, `<m>/relationships/<r>/` | a relationship's node and page |
  * | `index.html` | every model the graph holds |
  * | `assets/archimate.js`, `assets/archimate.css` | the one shared loader and its style |
  *
  * Ids are Archi's own (`schemas/archimate.ts` §"Ids are the model's own"), so
  * an element keeps its IRI across a model's versions wherever Archi kept its id.
+ *
+ * A view's or an element's PAGE is at a readable slug worked out from its
+ * name each build (`schemas/slugs.ts`), `<m>/views/<slug>/`, while its node
+ * keeps the id IRI. Nothing redirects from the old id paths: a clean break
+ * (owner, cat-harness-tools#1054).
  *
  * ## Vocabularies — borrowed, not minted
  *
@@ -66,6 +71,7 @@ import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
 import { readArchimate, type ArchimateModel } from "../schemas/archimate.ts";
 import { renderViewSvg, typeLabel } from "./render-view.ts";
 import { CONFIG_FILE, archimateDir, localDirOf, readConfig } from "./check-archimate.ts";
+import { planSlugs } from "../schemas/slugs.ts";
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { darkRules } from "../../scripts/lib/scheme-css.ts";
 import { pageParts, withRenderedBy } from "../../scripts/viewer-declarations.ts";
@@ -203,6 +209,9 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
     const elIri = (id: string) => `${base}${m}/elements/${id}.jsonld`;
     const relIri = (id: string) => `${base}${m}/relationships/${id}.jsonld`;
     const elements = new Map(model.elements.map((e) => [e.id, e]));
+    const slugOf = planSlugs(model);
+    // The path segment of a view's or an element's page: its slug, else its id.
+    const seg = (id: string): string => slugOf.get(id) ?? id;
 
     json(m, {
       "@context": CONTEXT,
@@ -215,13 +224,13 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
       "schema:contentUrl": `${base}${cm.file.split("/").map(encodeURIComponent).join("/")}`,
       "schema:hasPart": model.views.map((v) => ({ "@id": viewIri(v.id), "@type": "archimate:Diagram", "schema:name": v.name })),
     });
-    files.push({ path: `${m}/model.json`, content: `${JSON.stringify(normalisedFor(model, cm.file))}\n` });
+    files.push({ path: `${m}/model.json`, content: `${JSON.stringify(normalisedFor(model, cm.file, slugOf))}\n` });
     // The rail's left-hand section for this model's pages: the model, then its
     // views (`visualiserNavDeclaration`, the one writer of the format the
     // navbar pass reads). Relative to the page, so it holds in a preview.
     const nav = (toModel: string): string =>
       visualiserNavDeclaration([
-        { label: title, href: toModel, items: model.views.map((v) => ({ label: v.name || "(unnamed view)", href: `${toModel}views/${v.id}/` })) },
+        { label: title, href: toModel, items: model.views.map((v) => ({ label: v.name || "(unnamed view)", href: `${toModel}views/${seg(v.id)}/` })) },
         { label: "ArchiMate models", href: `${toModel}../` },
       ]);
     files.push(page(`${m}/index.html`, 1, title, toData(m, `../${m}.jsonld`), { kind: "model", node: toData(m, `../${m}.jsonld`), model: toData(m, "./model.json") },
@@ -250,12 +259,12 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
       files.push({
         path: `${m}/views/${v.id}.svg`,
         content: renderViewSvg(model, v, {
-          elementHref: (id) => toPage(vd, `../elements/${id}/`),
+          elementHref: (id) => toPage(vd, `../elements/${seg(id)}/`),
           relationshipHref: (id) => toPage(vd, `../relationships/${id}/`),
-          viewHref: (id) => toPage(vd, `./${id}/`),
+          viewHref: (id) => toPage(vd, `./${seg(id)}/`),
         }),
       });
-      const vp = `${m}/views/${v.id}`;
+      const vp = `${m}/views/${seg(v.id)}`;
       files.push(page(`${vp}/index.html`, 3, `${v.name} — ${title}`, toData(vp, `../${v.id}.jsonld`),
         { kind: "view", node: toData(vp, `../${v.id}.jsonld`), model: toData(vp, "../../model.json"), id: v.id, svg: toData(vp, `../${v.id}.svg`) },
         `<main class="am am-wide"><p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(v.name)}</h1>` +
@@ -273,7 +282,7 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
         "schema:category": e.layer,
         "dcterms:isPartOf": modelIri,
       });
-      const ep = `${m}/elements/${e.id}`;
+      const ep = `${m}/elements/${seg(e.id)}`;
       files.push(page(`${ep}/index.html`, 3, `${e.name || typeLabel(e.type)} — ${title}`, toData(ep, `../${e.id}.jsonld`),
         { kind: "element", node: toData(ep, `../${e.id}.jsonld`), model: toData(ep, "../../model.json"), id: e.id },
         `<main class="am"><p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(e.name || "(unnamed)")}</h1>` +
@@ -299,6 +308,7 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
         `<main class="am"><p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(r.name || typeLabel(r.type))}</h1>` +
           `<p class="am-kind">${escHtml(typeLabel(r.type))} relationship</p><div class="am-body" aria-live="polite"><p>Loading the relationship…</p></div></main>`));
     }
+
   }
 
   files.push(stamp({
@@ -361,7 +371,7 @@ function thinPage(
  * geometry (the SVG carries that), plus which views show each element and
  * relationship — computed once here rather than in every reader's browser.
  */
-export function normalisedFor(model: ArchimateModel, file: string) {
+export function normalisedFor(model: ArchimateModel, file: string, slugOf?: Map<string, string>) {
   const inViews: Record<string, string[]> = {};
   for (const v of model.views) {
     const seen = new Set<string>();
@@ -386,6 +396,8 @@ export function normalisedFor(model: ArchimateModel, file: string) {
       folder: v.folder,
     })),
     inViews,
+    // Each view's and element's page segment where it is not its id (`schemas/slugs.ts`).
+    ...(slugOf && slugOf.size ? { slugs: Object.fromEntries(slugOf) } : {}),
   };
 }
 

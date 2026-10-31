@@ -169,6 +169,8 @@ export interface ArchimateView {
   name: string;
   viewpoint?: string;
   documentation?: string;
+  /** The view's own properties — a `slug` one chooses its page path (`slugs.ts`). */
+  properties: ArchimateProperty[];
   folder: string[];
   nodes: ArchimateViewNode[];
   connections: ArchimateViewConnection[];
@@ -332,6 +334,7 @@ function readView(e: X, id: string, folder: string[], documentation: string | un
     name: String(e["@name"] ?? ""),
     ...(str(e["@viewpoint"]) ? { viewpoint: str(e["@viewpoint"]) } : {}),
     ...(documentation ? { documentation } : {}),
+    properties: props(e),
     folder,
     nodes: [],
     connections: [],

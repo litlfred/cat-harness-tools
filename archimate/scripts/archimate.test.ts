@@ -276,8 +276,8 @@ describe("an instance", () => {
         const m = /<script type="application\/json" data-fa-visualiser-nav>(.*?)<\/script>/.exec(files.find((f) => f.path === path)!.content);
         return JSON.parse(m![1]!);
       };
-      expect(navOf("1.0.0/index.html")[0].items).toEqual([{ label: "Overview", href: "./views/id-v1/" }]);
-      expect(navOf("1.0.0/views/id-v1/index.html")[0]).toMatchObject({ href: "../../", items: [{ href: "../../views/id-v1/" }] });
+      expect(navOf("1.0.0/index.html")[0].items).toEqual([{ label: "Overview", href: "./views/overview/" }]);
+      expect(navOf("1.0.0/views/overview/index.html")[0]).toMatchObject({ href: "../../", items: [{ href: "../../views/overview/" }] });
       expect(navOf("index.html")[0].items).toEqual([{ label: "Tiny <RA>", href: "1.0.0/" }]);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -311,12 +311,12 @@ describe("an instance", () => {
         for (const r of refs) expect({ from: at(f), ref: r, ok: resolves(at(f), r) }).toEqual({ from: at(f), ref: r, ok: true });
       }
       // The page reaches the model in the data tree, not beside itself.
-      const view = files.find((f) => f.path === "1.0.0/views/id-v1/index.html")!;
+      const view = files.find((f) => f.path === "1.0.0/views/overview/index.html")!;
       expect(thinPageConfigOf(view.content, PAGE_CONFIG_ID)!.model).toBe("../../../../../../archimate/1.0.0/model.json");
       // In the graph (no site), nothing changes: pages beside their data, and no route to name.
       const inGraph = pagesFor(root);
       expect(inGraph.pageRoot).toBe("archimate");
-      expect(inGraph.files.find((f) => f.path === "1.0.0/views/id-v1.svg")!.content).toContain('href="../elements/id-a/"');
+      expect(inGraph.files.find((f) => f.path === "1.0.0/views/id-v1.svg")!.content).toContain('href="../elements/registry-script/"');
       expect(inGraph.files.filter((f) => f.page).map((f) => renderedByOf(f.content)).filter(Boolean)).toEqual([]);
     } finally {
       rmSync(root, { recursive: true, force: true });
