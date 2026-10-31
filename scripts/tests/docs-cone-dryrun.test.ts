@@ -229,6 +229,45 @@ describe("measureDeploy", () => {
     );
   });
 
+  test("instance graph export commit stamps and state-visualizer build timestamps are stamps; graph/token changes are not", () => {
+    const kg = (at: string, sha: string, commitAt: string, nodes: number) =>
+      JSON.stringify({
+        generatedAt: at,
+        sourceCommit: `https://github.com/litlfred/folio-assistant/commit/${sha}`,
+        sourceCommitSha: sha,
+        sourceCommitAt: commitAt,
+        counts: { nodes },
+      });
+    const sha1 = "1783b00e32494dc2385797dc517699cfe31107f0";
+    const sha2 = "7c9a579eeb8de6e4001ec5ca0f7519f64b2c5c3f";
+    expect(stampedHash("smart-base/smart-base.json", Buffer.from(kg("2026-10-31T01:19:49.631Z", sha1, "2026-10-31T00:46:23Z", 42)))).toBe(
+      stampedHash("smart-base/smart-base.json", Buffer.from(kg("2026-10-31T02:08:48.133Z", sha2, "2026-10-31T03:44:16+01:00", 42))),
+    );
+    expect(stampedHash("smart-base/smart-base.json", Buffer.from(kg("2026-10-31T01:19:49.631Z", sha1, "2026-10-31T00:46:23Z", 42)))).not.toBe(
+      stampedHash("smart-base/smart-base.json", Buffer.from(kg("2026-10-31T02:08:48.133Z", sha2, "2026-10-31T01:47:58Z", 43))),
+    );
+
+    const boot = (at: string, sha: string, title: string) =>
+      JSON.stringify({ title, generatedAtTime: at, wasDerivedFrom: `git:${sha}` });
+    expect(stampedHash("bootstrap/bootstrap.jsonld", Buffer.from(boot("2026-10-31T01:19:33.488Z", sha1, "Bootstrap")))).toBe(
+      stampedHash("bootstrap/bootstrap.jsonld", Buffer.from(boot("2026-10-31T02:08:31.887Z", sha2, "Bootstrap"))),
+    );
+    expect(stampedHash("bootstrap/bootstrap.jsonld", Buffer.from(boot("2026-10-31T01:19:33.488Z", sha1, "Bootstrap")))).not.toBe(
+      stampedHash("bootstrap/bootstrap.jsonld", Buffer.from(boot("2026-10-31T02:08:31.887Z", sha2, "Other"))),
+    );
+
+    const wf = (at: string, status: string) =>
+      `<p class="sv-sub">ages measured at ${at} (when this page was built) against a 7-day threshold.</p>` +
+      `<p class="sv-sub">Measured at ${at}, when this page was built; a token unmoved...</p>` +
+      `<section data-wv-built="{&quot;at&quot;:&quot;${at}&quot;,&quot;status&quot;:&quot;${status}&quot;}"></section>`;
+    expect(stampedHash("en/cat-harness/beans/cat-harness/workflows/x/index.html", Buffer.from(wf("2026-10-31T03:03:12.208Z", "completed")))).toBe(
+      stampedHash("en/cat-harness/beans/cat-harness/workflows/x/index.html", Buffer.from(wf("2026-10-31T03:45:37.683Z", "completed"))),
+    );
+    expect(stampedHash("en/cat-harness/beans/cat-harness/workflows/x/index.html", Buffer.from(wf("2026-10-31T03:03:12.208Z", "completed")))).not.toBe(
+      stampedHash("en/cat-harness/beans/cat-harness/workflows/x/index.html", Buffer.from(wf("2026-10-31T03:45:37.683Z", "running"))),
+    );
+  });
+
   test("compares the main site only: other previews, the render log and build.json are left out", () => {
     const before = site("m-before", {
       "a.html": page("x", "aaa", "1"),

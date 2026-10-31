@@ -23,6 +23,7 @@ import { spawnSync } from "node:child_process";
 
 import { readQaGraph } from "../../pipeline/qa-graph-index.ts";
 import { directoryForGraph, siteDirFor } from "../../schemas/kg/cat-harness.ts";
+import { qaResultDirsIn, restoringTracked } from "../support/checkout.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing it reads changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -32,7 +33,10 @@ const QA_ASSET_DIR = join(INSTANCE_ROOT, "test", "results", "witnesses");
 const QA_INDEX_PATH = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "assets", "qa", "index.json");
 
 describe("gen-docs-pages orphan sweep and QA projection order (bean 0kbt)", () => {
-  test("published QA count matches the post-sweep tree, not the tree it started from, and consecutive runs are idempotent", () => {
+  // The generator re-derives the committed witnesses under every instance's
+  // `test/results/`; they are put back as they were afterwards, so the test
+  // leaves no tracked file changed (bean w1gy F24).
+  test("published QA count matches the post-sweep tree, not the tree it started from, and consecutive runs are idempotent", () => restoringTracked(qaResultDirsIn(REPO_ROOT), () => {
     const orphanDir = join(QA_ASSET_DIR, "test-orphan-0kbt");
     const orphanPath = join(orphanDir, "orphan.kg.json");
 
@@ -93,5 +97,5 @@ describe("gen-docs-pages orphan sweep and QA projection order (bean 0kbt)", () =
     } finally {
       rmSync(orphanDir, { recursive: true, force: true });
     }
-  }, 30000);
+  }), 30000);
 });
