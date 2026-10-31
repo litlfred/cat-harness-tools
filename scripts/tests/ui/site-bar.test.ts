@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 
 import { expandRail, railDataJson } from "../../lib/harness-rail.ts";
 import { RAIL_SECTION_LABELS, bodyTag, injectNavbar } from "../../lib/navbar.ts";
-import { elementEnd, hasPageBar, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "../../lib/site-bar.ts";
+import { SEARCH_EXCLUDE_META, elementEnd, hasPageBar, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "../../lib/site-bar.ts";
 import { railStandalonePages } from "../../mount-instance-docs.ts";
 import { PAGE_LAYOUT_CSS_FILE, PAGE_LAYOUT_JS_FILE } from "../../page-layout.ts";
 import { firstPaintSchemeScript } from "../../lib/scheme-css.ts";
@@ -74,6 +74,11 @@ describe("withSiteBar", () => {
     expect(out).toContain('<script src="./assets/js/just-the-docs.js" defer></script>');
     const bare = withSiteBar(page, { toRoot: ".", title: "folio-assistant" });
     expect(bare).not.toContain('id="search-input"');
+    // Never in the theme's index, so marked as left out of search on purpose;
+    // a theme page, which IS indexed, is not marked.
+    expect(out).toContain(SEARCH_EXCLUDE_META);
+    expect(bare).not.toContain(SEARCH_EXCLUDE_META);
+    expect(withSiteBar(stripThemeSidebar(THEME_PAGE("Guide")), { toRoot: "..", title: "x" })).not.toContain(SEARCH_EXCLUDE_META);
   });
   test("an IG page keeps its own bar", () => {
     const ig = `<html><head></head><body><div class="ig-topbar fa-page-bar">IG</div></body></html>`;
