@@ -52,7 +52,7 @@ const RETIRED: Record<string, string> = {
   // Inside the DECLARED trashcan, never a spelled `fsh-guts/` (bean `gz47`):
   // the trashcan is moving to its own branch (`9c7h`).
   roles: join(relative(resolve(ROOT, ".."), fshGutsDirectory(resolve(ROOT, ".."))), "retired", "skill-definition-roles.md"),
-  schemaRefs: "cat-harness/schemas/conduct/assistant-types.ts",
+  schemaRefs: "cat-harness-tools/schemas/conduct/assistant-types.ts",
 };
 
 function skillDefinitionFiles(): string[] {

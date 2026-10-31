@@ -252,7 +252,7 @@ describe("asset and rendering: two resources, two IRIs (owner, 2026-10-02)", () 
     // A referenced entry the smart-trust instance renders, at its declared root.
     expect(byKey.get("smart-base/smart-trust")?.view).toBe("/smart-trust/");
     // An ingested PDF: rendered by the library viewer, at its own entry page.
-    expect(byKey.get("smart-base/who-rhr-1806-eng")?.view).toBe(`/${ROUTE}/smart-base/who-rhr-1806-eng/`);
+    expect(byKey.get("who-iris/who-rhr-1806-eng")?.view).toBe(`/${ROUTE}/who-iris/who-rhr-1806-eng/`);
     for (const e of index.entries) {
       expect(e.view, `${e.instance}/${e.id}`).toBeDefined();
       // Every view is a page that exists on the site, or an instance root route.

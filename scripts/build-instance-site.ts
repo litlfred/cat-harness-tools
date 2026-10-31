@@ -88,9 +88,9 @@ import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 
 import { checkInlineScripts } from "./check-inline-scripts.ts";
+import { shellQuote } from "./run-script.ts";
 import { chromeLayers, writeForwardingPages } from "./compose-docs.ts";
 import { ownsScript, writerCommand } from "./lib/script-command.ts";
-import { shellQuote } from "./run-script.ts";
 import { built, declaredPlan, runWriter, writersOf, type DeclaredArtefact, type WriterOutcome } from "./derive-at-publish.ts";
 import { describeFeatures, droppedByRuling, type DroppedByRuling, parityShortfall, siteFeatures } from "./site-parity.ts";
 
@@ -693,8 +693,14 @@ export function publishedRoot(remote: string, branch: string, exclude: readonly 
   mkdirSync(tree);
   if (spawnSync("git", ["init", "-q", "--bare", git]).status !== 0) return undefined;
   if (spawnSync("git", ["-C", git, "fetch", "-q", "--depth", "1", remote, branch], { stdio: ["ignore", "ignore", "ignore"] }).status !== 0) return undefined;
-  const ex = exclude.map((e) => shellQuote(`:(exclude)${e}`)).join(" ");
-  run(`read the published root of ${branch}`, `git -C ${shellQuote(git)} archive FETCH_HEAD -- . ${ex} | tar -x -C ${shellQuote(tree)}`, dir);
+  // argv, not a shell string: `exclude` comes from layer declarations, and a
+  // mounted remote layer is a trust boundary (bean `cat-tools-j4sh`).
+  console.log(`▶ read the published root of ${branch}`);
+  const tar = join(dir, "root.tar");
+  const archive = spawnSync("git", ["-C", git, "archive", "-o", tar, "FETCH_HEAD", "--", ".", ...exclude.map((e) => `:(exclude)${e}`)], { stdio: "inherit" });
+  if (archive.status !== 0) throw new Error(`read the published root of ${branch} failed (git archive exit ${archive.status})`);
+  const untar = spawnSync("tar", ["-x", "-f", tar, "-C", tree], { stdio: "inherit" });
+  if (untar.status !== 0) throw new Error(`read the published root of ${branch} failed (tar exit ${untar.status})`);
   return tree;
 }
 

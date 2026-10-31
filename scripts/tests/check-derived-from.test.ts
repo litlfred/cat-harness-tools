@@ -157,9 +157,12 @@ describe("writer", () => {
     ]);
   });
   it.skipIf(!HAS_IGS)("this checkout's IG page sets name gen-ig-pages as their writer", () => {
-    const pages = readTree().flatMap((i) => i.dirs.filter((d) => d.id === `${i.name}-docs` && d.writer).map((d) => d.writer));
-    expect(pages).toHaveLength(2);
-    for (const w of pages) expect(w).toContain("fhir-harness/scripts/gen-ig-pages.ts");
+    const tree = readTree();
+    const pages = tree.flatMap((i) => i.dirs.filter((d) => d.id === `${i.name}-docs` && d.writer).map((d) => ({ ig: i.name, writer: d.writer })));
+    // Every IG this checkout mounts (smart-trust-phw joined smart-base and
+    // smart-trust), so the count is not fixed; the two named ones must be there.
+    for (const ig of ["smart-base", "smart-trust"]) expect(pages.map((p) => p.ig)).toContain(ig);
+    for (const p of pages) expect(p.writer).toContain("fhir-harness/scripts/gen-ig-pages.ts");
   });
 });
 

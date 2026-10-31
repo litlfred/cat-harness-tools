@@ -18,6 +18,8 @@
  *    when they differ. A witness computed under other versions is not a
  *    reproduction test, and running it anyway would report version drift as a
  *    defect in the producer;
+ *    `reproduce` is parsed into an argv and run without a shell, with a
+ *    minimal environment ({@link producerEnv}); see {@link parseReproduce};
  * 3. checks the COMMITTED tree out into a scratch `git worktree`, sparse to the
  *    directories the run needs, and runs the producer there. Whatever the
  *    producer writes lands in the scratch tree, so the folio's own checkout is
@@ -34,7 +36,7 @@
  * |---|---|
  * | `pass` | the producer ran cleanly and wrote the same witness |
  * | `fail` | it ran cleanly and wrote a DIFFERENT witness; the differing paths are listed |
- * | `unknown` | it could not be decided: environment mismatch before or after the run, a stale witness (its `scriptHash` is not the current script's), a `scriptFile` that resolves to no unique file, no reproduce command, a non-zero exit, a timeout, or no witness written |
+ * | `unknown` | it could not be decided: environment mismatch before or after the run, a stale witness (its `scriptHash` is not the current script's), a `scriptFile` that resolves to no unique file, no reproduce command, a reproduce that is not a known producer form (refused, never run), a non-zero exit, a timeout, or no witness written |
  *
  * A non-zero exit is `unknown`, never `fail`, because folio producers refuse
  * by design (a precision floor not met, a guard raised) and explain it on
@@ -136,23 +138,6 @@ function git(cwd: string, ...args: string[]) {
 }
 
 /**
- * Declared table of producer interpreters `witness:parity` may invoke (bean
- * `cat-tools-w7tx`). A witness is data committed in a pull request, so
- * `invocation.reproduce` is parsed into an argv against this table and never
- * handed to `bash -c`.
- */
-export const PRODUCER_ALLOWLIST: ReadonlySet<string> = new Set(["python3", "python", "bun", "sage"]);
-
-/** Interpreter flags that execute inline program text rather than a tracked script file. */
-const INLINE_CODE_FLAGS = /^-(?:c|e|m)|^--eval(?:=|$)/;
-
-/** Pre-script interpreter flags that take no argument and may precede the script path. */
-const INTERPRETER_FLAGS = new Set(["-u", "-O", "-OO", "-B", "-s", "-S", "-E", "-I"]);
-
-/** Environment variables forwarded to a producer run; credentials in `process.env` never cross into the child. */
-export const PRODUCER_ENV_ALLOWLIST = ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "SOURCE_DATE_EPOCH"] as const;
-
-/**
  * Where a witness's `scriptFile` lives at HEAD.
  *
  * Producers record it inconsistently: a repository-relative path, or a bare
@@ -174,53 +159,52 @@ export function resolveScript(root: string, witnessRel: string, scriptFile: stri
   return hits.length === 1 ? hits[0] : undefined;
 }
 
+/** A word a producer command may carry: no quoting, globbing, `$`, `;`, `|` or redirection. */
+const PLAIN_WORD = /^[A-Za-z0-9_\-./:=@%+,]+$/;
+
+/** Environment keys the producer inherits. Everything else, secrets included, is dropped. */
+export const PRODUCER_ENV_KEYS = ["PATH", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "TZ", "TMPDIR", "VIRTUAL_ENV", "PYTHONPATH"] as const;
+
+/** The minimal environment a producer runs with. */
+export function producerEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const out: Record<string, string> = { PYTHONDONTWRITEBYTECODE: "1" };
+  for (const k of PRODUCER_ENV_KEYS) if (typeof env[k] === "string") out[k] = env[k]!;
+  return out;
+}
+
 /**
- * Parse a witness's `invocation.reproduce` string into a direct `argv` against
- * {@link PRODUCER_ALLOWLIST} and a tracked script at `HEAD` (bean `cat-tools-w7tx`).
- * Refuses shell syntax, unlisted executables, inline code flags (`-c`, `-e`, `-m`),
- * and untracked script targets.
+ * `invocation.reproduce` as an argv, or a reason it is refused.
+ *
+ * The witness is committed DATA, so its reproduce string is never handed to a
+ * shell (security review 2026-10-31, bean `cat-tools-w7tx`). Only the two
+ * producer forms in use are accepted, split on spaces, every word plain:
+ *
+ * - `python3 [-u] <tracked .py> [args…]`
+ * - `bun run <script name or .ts file> [args…]`
+ *
+ * Anything else is refused, never rewritten into something that would run.
  */
 export function parseReproduce(
   reproduce: string,
-  root: string,
-  witnessRel: string,
-  scriptFile?: string,
-): { argv: string[]; script: string } | { reason: string } {
-  const trimmed = reproduce.trim();
-  if (!trimmed) return { reason: "empty invocation.reproduce" };
-  if (/[;&|<>`$\\\r\n(){}[\]*?~#'"]/.test(trimmed)) {
-    return { reason: `invocation.reproduce refused: contains shell syntax or quoting (${JSON.stringify(trimmed.slice(0, 80))})` };
-  }
-  const tokens = trimmed.split(/\s+/);
-  const exe = tokens[0]!;
-  if (!PRODUCER_ALLOWLIST.has(exe)) {
-    return { reason: `invocation.reproduce refused: executable \`${exe}\` is not in the allowed producer table (${[...PRODUCER_ALLOWLIST].join(", ")})` };
-  }
-  for (const tok of tokens.slice(1)) {
-    if (INLINE_CODE_FLAGS.test(tok)) {
-      return { reason: `invocation.reproduce refused: flag \`${tok}\` executes inline code rather than a tracked script` };
+  isTracked: (path: string) => boolean,
+): { argv: string[] } | { refused: string } {
+  const words = reproduce.trim().split(/ +/);
+  const bad = words.find((w) => !PLAIN_WORD.test(w));
+  if (bad !== undefined) return { refused: `reproduce has a word that is not plain (\`${bad}\`); shell syntax is not run` };
+  const [cmd, ...rest] = words;
+  if (cmd === "python3" || cmd === "python") {
+    const args = rest[0] === "-u" ? rest.slice(1) : rest;
+    const script = args[0];
+    if (!script || !script.endsWith(".py") || script.startsWith("-") || script.startsWith("/") || script.split("/").includes("..")) {
+      return { refused: "reproduce must name a repository .py file after python3 [-u]" };
     }
+    if (!isTracked(script)) return { refused: `reproduce names \`${script}\`, which is not tracked at HEAD` };
+    return { argv: [cmd, ...rest] };
   }
-  let idx = 1;
-  if (exe === "bun" && tokens[idx] === "run") idx++;
-  while (idx < tokens.length && INTERPRETER_FLAGS.has(tokens[idx]!)) idx++;
-  const scriptTok = tokens[idx];
-  if (!scriptTok || scriptTok.startsWith("-")) {
-    return { reason: "invocation.reproduce refused: names no producer script file" };
+  if (cmd === "bun" && rest[0] === "run" && rest[1] && !rest[1].startsWith("-")) {
+    return { argv: [cmd, ...rest] };
   }
-  const resolved = resolveScript(root, witnessRel, scriptTok);
-  if (!resolved) {
-    return { reason: `invocation.reproduce refused: script \`${scriptTok}\` resolves to no unique tracked file at HEAD` };
-  }
-  if (scriptFile) {
-    const expected = resolveScript(root, witnessRel, scriptFile);
-    if (expected && expected !== resolved) {
-      return { reason: `invocation.reproduce refused: script \`${resolved}\` does not match scriptFile \`${expected}\`` };
-    }
-  }
-  const argv = [...tokens];
-  argv[idx] = resolved;
-  return { argv, script: resolved };
+  return { refused: "reproduce is not a known producer form (python3 [-u] <script.py> …, bun run <script> …)" };
 }
 
 /** Run one witness's producer in a scratch worktree and compare. */
@@ -244,8 +228,16 @@ export function checkParity(
   if (scriptFile && !script && typeof inv?.reproduce !== "string") {
     return { witness: rel, verdict: "unknown", reason: `scriptFile \`${scriptFile}\` resolves to no unique file at HEAD` };
   }
-  const reproduce = typeof inv?.reproduce === "string" ? inv.reproduce : script ? `python3 -u ${script}` : undefined;
-  if (!reproduce) return { witness: rel, verdict: "unknown", reason: "no invocation.reproduce and no scriptFile" };
+  let producer: string[];
+  if (typeof inv?.reproduce === "string") {
+    const parsed = parseReproduce(inv.reproduce, (p) => git(root, "cat-file", "-e", `HEAD:${p}`).status === 0);
+    if ("refused" in parsed) return { witness: rel, verdict: "unknown", reason: `refused: ${parsed.refused}` };
+    producer = parsed.argv;
+  } else if (script) {
+    producer = ["python3", "-u", script];
+  } else {
+    return { witness: rel, verdict: "unknown", reason: "no invocation.reproduce and no scriptFile" };
+  }
 
   const mismatch = environmentMismatch(w.environment);
   if (mismatch.length && !opts.force) {
@@ -257,13 +249,8 @@ export function checkParity(
     };
   }
 
-  const parsed = parseReproduce(reproduce, root, rel, scriptFile);
-  if (!("argv" in parsed)) {
-    return { witness: rel, verdict: "unknown", reason: parsed.reason };
-  }
-
   const top = (p: string) => p.split("/")[0]!;
-  const dirs = new Set(opts.dirs ?? [top(rel), ...(parsed.script.includes("/") ? [top(parsed.script)] : []), "tools", "scripts"]);
+  const dirs = new Set(opts.dirs ?? [top(rel), ...(scriptFile?.includes("/") ? [top(scriptFile)] : []), "tools", "scripts"]);
   const scratch = mkdtempSync(join(tmpdir(), "witness-parity-"));
   const wt = join(scratch, "tree");
   try {
@@ -274,16 +261,12 @@ export function checkParity(
     git(wt, "sparse-checkout", "set", "--cone", ...present);
     if (git(wt, "checkout", "-q").status !== 0) return { witness: rel, verdict: "unknown", reason: "scratch checkout failed" };
 
-    const env: Record<string, string> = { PYTHONDONTWRITEBYTECODE: "1" };
-    for (const k of PRODUCER_ENV_ALLOWLIST) {
-      if (typeof process.env[k] === "string") env[k] = process.env[k]!;
-    }
-    const [exe, ...args] = parsed.argv;
-    const run = spawnSync(exe!, args, {
+    const [cmd, ...args] = producer;
+    const run = spawnSync(cmd!, args, {
       cwd: wt,
       encoding: "utf8",
       timeout: (opts.timeoutS ?? 300) * 1000,
-      env,
+      env: producerEnv(),
     });
     if (run.error && (run.error as NodeJS.ErrnoException).code === "ETIMEDOUT") {
       return { witness: rel, verdict: "unknown", reason: `producer did not finish within ${opts.timeoutS ?? 300}s` };
