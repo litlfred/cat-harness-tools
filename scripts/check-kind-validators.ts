@@ -266,12 +266,12 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
       declaredDirs.push({ abs: join(inst, e.path).replace(/\/+$/, ""), kinds: e.graphTypologies as readonly string[] });
     }
   }
-  const innermostKinds = (file: string): readonly string[] | undefined => {
+  const innermostDeclared = (file: string): { abs: string; kinds: readonly string[] } | undefined => {
     let best: { abs: string; kinds: readonly string[] } | undefined;
     for (const d of declaredDirs) {
       if (file.startsWith(`${d.abs}/`) && (best === undefined || d.abs.length > best.abs.length)) best = d;
     }
-    return best?.kinds;
+    return best;
   };
   // A NESTED kind: it names its `$schema` families and no instance declares a
   // directory of it, so its nodes sit inside a parent kind's directory (the
@@ -372,8 +372,22 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
         const optIn = (node as { $schema?: unknown }).$schema === undefined || file.endsWith(".jsonld");
         if (optIn && !byTag.has(tag) && !nested.has(tag)) continue;
         // Under a more specific declared directory of other kinds: theirs.
-        const inner = innermostKinds(file);
-        if (inner !== undefined && !inner.includes(kind)) continue;
+        // MORE SPECIFIC than the directory being read, that is. `declaredDirs`
+        // holds instance-level entries only, so a directory this kind is
+        // declared at FROM WITHIN (`beans/beans.json`'s `workflows`, which
+        // `directoryEntriesForGraph` resolves) is not in it, and the innermost
+        // entry it finds for `beans/workflows/x.json` is the ENCLOSING
+        // `beans/`. Asking only "is that entry of my kind?" then dropped every
+        // `workflow-state` node from its own sweep, and `require-all` called
+        // the kind EXAMINED NOTHING over the node it had just been handed
+        // (bean `8lcl`, folio-assistant#2812). An enclosing directory never
+        // takes a node away from the kind declared nearer to it; only a deeper
+        // one does, which is the #2529 case this guard exists for. The node
+        // still counts for `beans` too: `beans/` is read as a whole, and its
+        // family map names the child families for exactly that reason.
+        const inner = innermostDeclared(file);
+        const reading = dir.replace(/\/+$/, "");
+        if (inner !== undefined && !inner.kinds.includes(kind) && inner.abs.startsWith(`${reading}/`)) continue;
         const own = byTag.get(tag);
         const via = own === undefined ? nested.get(tag) : undefined;
         const fam = own ?? via?.fam;
