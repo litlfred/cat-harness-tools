@@ -26,9 +26,22 @@ def layer_relative(key, layer):
     return key if at < 0 else key[at + len(layer) + 2:]
 
 
+LOAD_ERROR_MARK = "(load-time error)"
+
+
 def file_and_test(key):
-    """A failure key split as (file name without its directory, test path)."""
+    """A failure key split as (file name without its directory, test path).
+
+    A file that fails at module evaluation records only its first top-level
+    exception (`<file> > (load-time error) <msg>`). When a PR fixes an earlier
+    import error and unmasks a later top-level throw in a file that ALREADY
+    failed to load on main (bean `cat-tools-g7ls`), both sides still fail to
+    load that file; keying load-time errors by `(file, LOAD_ERROR_MARK)` pairs
+    them without excusing a load error in a file that loaded on main.
+    """
     file, _, rest = key.partition(" > ")
+    if rest == LOAD_ERROR_MARK or rest.startswith(LOAD_ERROR_MARK + " "):
+        rest = LOAD_ERROR_MARK
     return os.path.basename(file), rest
 
 

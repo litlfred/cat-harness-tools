@@ -4941,6 +4941,10 @@ export function readDeclaration(
 ): CatHarnessDeclaration | undefined {
   const file = findDeclarationFile(instanceRoot);
   if (file === undefined) return undefined;
+  // Register kinds from every discovered instance's `typologies/` in the
+  // declaration's checkout before validating its directories (bean
+  // `cat-tools-g7ls`, owner card 2026-10-31 "A. Fix the loader").
+  registry.ensureCheckout(checkoutRootFor(instanceRoot));
   const p = join(instanceRoot, file);
   let text: string;
   try {

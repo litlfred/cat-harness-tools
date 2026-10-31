@@ -8,7 +8,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { GraphTypologyNodeSchema } from "./graph-typology-node";
-import { GraphTypologyRegistry, defaultTypologyRoots } from "./graph-typology-registry";
+import { readDeclaration } from "./cat-harness";
+import { BASE_GRAPH_TYPOLOGIES, GraphTypologyRegistry, defaultTypologyRoots } from "./graph-typology-registry";
 
 const made: string[] = [];
 afterAll(() => {
@@ -181,5 +182,27 @@ describe("several checkouts, in precedence order (kg-separation lesson 6)", () =
     const empty = mkdtempSync(join(tmpdir(), "no-instance-"));
     made.push(empty);
     expect(defaultTypologyRoots({}, empty, moduleDir)).toEqual([own]);
+  });
+  test("readDeclaration registers typologies from the declaration's checkout before validating (bean cat-tools-g7ls)", () => {
+    const closure = checkout({ "cat-harness": [] });
+    const outside = checkout({ "folio-assistant-core": [node("glossary", "content")] });
+    const consumer = join(outside, "fhir-harness");
+    mkdirSync(consumer, { recursive: true });
+    writeFileSync(
+      join(consumer, "fhir-harness.json"),
+      JSON.stringify({
+        name: "fhir-harness",
+        needs: ["folio-assistant-core"],
+        directories: [{ id: "fhir-glossary", path: "glossary/", graphTypologies: ["glossary"] }],
+      }),
+    );
+    const r = new GraphTypologyRegistry(BASE_GRAPH_TYPOLOGIES, [closure]);
+    expect(r.has("glossary")).toBe(false);
+    const decl = readDeclaration(consumer, r);
+    expect(decl?.name).toBe("fhir-harness");
+    expect(r.has("glossary")).toBe(true);
+    // A bare registry (no declared checkout) stays isolated and still refuses unknown kinds.
+    const bare = new GraphTypologyRegistry(BASE_GRAPH_TYPOLOGIES);
+    expect(() => readDeclaration(consumer, bare)).toThrow(/unknown graph typology "glossary"/);
   });
 });
