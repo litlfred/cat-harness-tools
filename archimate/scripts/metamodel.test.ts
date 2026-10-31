@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { parseArchimate } from "../schemas/archimate.ts";
-import { isAllowed, isPlaceholder, metamodelDot, metamodelMermaid, metamodelOf, relationshipTable } from "../schemas/metamodel.ts";
+import { isAllowed, isPlaceholder, metamodelDot, metamodelMermaid, metamodelOf, relationshipTable, type Metamodel, type MetamodelPattern } from "../schemas/metamodel.ts";
 import { parseArchiTable, tableJson } from "./import-archi-relationships.ts";
 import { report } from "./archimate-metamodel.ts";
 
@@ -95,13 +95,13 @@ describe("the metamodel in use", () => {
   });
 
   it("keeps the picture readable: one line per pair, self-relationships in the box, no associations or groupings", () => {
-    const p = (source: string, relationship: string, target: string, count = 1, allowed: boolean | undefined = true) =>
+    const p = (source: string, relationship: string, target: string, count = 1, allowed: boolean | undefined = true): MetamodelPattern =>
       ({ source, relationship, target, count, allowed, relationships: [] });
-    const dense = {
+    const dense: Metamodel = {
       ...mm,
       types: [
-        { type: "Goal", layer: "Motivation" as const, elements: 3 },
-        { type: "Capability", layer: "Strategy" as const, elements: 2 },
+        { type: "Goal", layer: "Motivation", elements: 3, ids: [] },
+        { type: "Capability", layer: "Strategy", elements: 2, ids: [] },
       ],
       patterns: [
         p("Capability", "Influence", "Goal", 21),
