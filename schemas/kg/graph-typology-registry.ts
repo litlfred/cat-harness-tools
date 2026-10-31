@@ -1296,6 +1296,9 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "http://json-schema.org/draft-07/schema#": { external: "JSON Schema draft-07" },
       "https://json-schema.org/draft/2020-12/schema": { external: "JSON Schema 2020-12" },
       "folio-source-descriptor/v1": {},
+      // ArchiMate's relationship table, `archimate/schemas/archimate-relationships.json`
+      // (cat-harness-tools#1064): data the metamodel check reads, held beside its schema.
+      "archimate-relationship-table/v1": {},
     },
     // bootstrap's own sentence, read rather than restated (bean r3gy, D1).
     summary: BOOTSTRAP_GRAPH_TYPOLOGIES["schemas"],
