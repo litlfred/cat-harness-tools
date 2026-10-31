@@ -48,11 +48,10 @@
  * Ids are Archi's own (`schemas/archimate.ts` §"Ids are the model's own"), so
  * an element keeps its IRI across a model's versions wherever Archi kept its id.
  *
- * Where the instance commits a slug ledger (`schemas/slugs.ts`), a view's or
- * an element's PAGE is at its readable slug, `<m>/views/<slug>/`, while its
- * node keeps the id IRI. `<m>/views/<v>/` and every slug the object had
- * before are one-file redirects to the page. With no ledger, `<slug>` is the
- * id and nothing redirects.
+ * A view's or an element's PAGE is at a readable slug worked out from its
+ * name each build (`schemas/slugs.ts`), `<m>/views/<slug>/`, while its node
+ * keeps the id IRI. Nothing redirects from the old id paths: a clean break
+ * (owner, cat-harness-tools#1054).
  *
  * ## Vocabularies — borrowed, not minted
  *
@@ -71,7 +70,8 @@ import { visualiserNavDeclaration, type VisualiserNavEntry } from "../../scripts
 import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
 import { readArchimate, type ArchimateModel } from "../schemas/archimate.ts";
 import { renderViewSvg, typeLabel } from "./render-view.ts";
-import { CONFIG_FILE, archimateDir, localDirOf, readConfig, slugPlans } from "./check-archimate.ts";
+import { CONFIG_FILE, archimateDir, localDirOf, readConfig } from "./check-archimate.ts";
+import { planSlugs } from "../schemas/slugs.ts";
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { darkRules } from "../../scripts/lib/scheme-css.ts";
 import { pageParts, withRenderedBy } from "../../scripts/viewer-declarations.ts";
@@ -198,7 +198,6 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
     files.push({ path: `${path}.jsonld`, content: text }, { path: `${path}.json`, content: text });
   };
   const listed: Array<{ id: string; title: string; views: number; elements: number }> = [];
-  const { plans } = slugPlans(instanceRoot);
 
   for (const cm of config.models) {
     const model = readArchimate(readFileSync(join(dir, cm.file)));
@@ -210,9 +209,9 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
     const elIri = (id: string) => `${base}${m}/elements/${id}.jsonld`;
     const relIri = (id: string) => `${base}${m}/relationships/${id}.jsonld`;
     const elements = new Map(model.elements.map((e) => [e.id, e]));
-    const plan = plans.get(m);
+    const slugOf = planSlugs(model);
     // The path segment of a view's or an element's page: its slug, else its id.
-    const seg = (id: string): string => plan?.slugOf.get(id) ?? id;
+    const seg = (id: string): string => slugOf.get(id) ?? id;
 
     json(m, {
       "@context": CONTEXT,
@@ -225,7 +224,7 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
       "schema:contentUrl": `${base}${cm.file.split("/").map(encodeURIComponent).join("/")}`,
       "schema:hasPart": model.views.map((v) => ({ "@id": viewIri(v.id), "@type": "archimate:Diagram", "schema:name": v.name })),
     });
-    files.push({ path: `${m}/model.json`, content: `${JSON.stringify(normalisedFor(model, cm.file, plan?.slugOf))}\n` });
+    files.push({ path: `${m}/model.json`, content: `${JSON.stringify(normalisedFor(model, cm.file, slugOf))}\n` });
     // The rail's left-hand section for this model's pages: the model, then its
     // views (`visualiserNavDeclaration`, the one writer of the format the
     // navbar pass reads). Relative to the page, so it holds in a preview.
@@ -310,17 +309,6 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
           `<p class="am-kind">${escHtml(typeLabel(r.type))} relationship</p><div class="am-body" aria-live="polite"><p>Loading the relationship…</p></div></main>`));
     }
 
-    // The id path, and every slug an object had before, land on its page.
-    // Objects that have left the model are skipped: they have no page.
-    for (const kind of ["views", "elements"] as const) {
-      for (const o of kind === "views" ? model.views : model.elements) {
-        const slug = plan?.slugOf.get(o.id);
-        if (slug === undefined) continue;
-        for (const from of [o.id, ...(plan!.ledger[kind]?.[o.id]?.aliases ?? [])]) {
-          files.push(stamp(redirectPage(`${m}/${kind}/${from}/index.html`, `../${slug}/`, o.name)));
-        }
-      }
-    }
   }
 
   files.push(stamp({
@@ -342,26 +330,6 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
     { path: STYLE, content: readFileSync(join(TEMPLATES, "archimate.css"), "utf8") + darkRules(":root { color-scheme: dark; }") + "\n" },
   );
   return { graphPath, pageRoot, files };
-}
-
-/**
- * A one-file redirect: a meta refresh, a canonical link and a visible link,
- * as `redirectHtml` in `mount-instance-docs.ts` writes, plus this
- * generator's config block so a run recognises it as its own.
- */
-function redirectPage(path: string, to: string, name: string): Written {
-  const t = escHtml(to);
-  const label = escHtml(name || "the page");
-  return {
-    path,
-    page: true,
-    content:
-      `<!doctype html>\n<html lang="en"><head><meta charset="utf-8">` +
-      `<meta http-equiv="refresh" content="0; url=${t}"><link rel="canonical" href="${t}"><meta name="robots" content="noindex">` +
-      `<title>${label}</title>` +
-      `<script type="application/json" id="${PAGE_CONFIG_ID}">${JSON.stringify({ kind: "redirect", to }).replace(/</g, "\\u003c")}</script></head>\n` +
-      `<body><p>Moved to <a href="${t}">${label}</a>.</p></body></html>\n`,
-  };
 }
 
 /**

@@ -1,94 +1,42 @@
 /**
- * Readable page paths for ArchiMate views and elements, pinned in a committed
- * ledger so a path never moves under a reader.
+ * Readable page paths for ArchiMate views and elements.
  *
  * @module cat-harness/archimate/schemas/slugs
  * @covers archimate
  *
  * Owner, 2026-10-30, of `…/views/id-007936f8c2424b96ad1893ef0ff66059/`:
- * *"do we need to use such ugly IDs … why not nicer slug IRIs?"*
+ * *"do we need to use such ugly IDs … why not nicer slug IRIs?"*; then, of
+ * the designs offered (cat-harness-tools#1054), *"B. clean break ok"*.
  *
  * ## The id stays the IRI; the slug is where the page is
  *
  * A node's `@id` is still `<m>/views/<archi id>.jsonld`: Archi's ids are what
- * the RA mapper keys on, and an IRI that moved on a rename would need a
- * tombstone each time. Only the PAGE moves, to `<m>/views/<slug>/`, and the
- * page at `<m>/views/<archi id>/` becomes a one-file redirect to it, so every
- * id link ever shared still lands. Relationships are almost all unnamed
- * (smart-ra 0.2.0: 6 of 284 named), so they keep their id paths.
+ * the RA mapper keys on. Only the PAGE is at a slug, `<m>/views/<slug>/`.
+ * Relationships are almost all unnamed (smart-ra 0.2.0: 6 of 284), so their
+ * pages stay at their ids.
  *
- * ## Pinned, so a path never moves silently
+ * ## Worked out on every build, and a clean break
  *
- * `cat-archimate.slugs.json`, beside `cat-archimate.config.json`, holds each
- * object's slug and every slug it had before. {@link planSlugs} keeps what the
- * ledger says unless the name changed:
+ * Slugs come from the names each build ({@link planSlugs}); nothing is
+ * committed and nothing redirects. The page at an old id path is gone, and a
+ * rename moves a page. That is the trade the owner chose: the id IRI is the
+ * permanent identifier, the page path is for reading.
  *
- * - a renamed object moves to its new slug, and the old one is kept as an
- *   ALIAS, which is written as a redirect page, so the old path still lands;
- * - a slug, once claimed, is never handed to another object — not while the
- *   object is in the model, and not after it has gone — so a path never comes
- *   to mean something else;
- * - on a clash the first claimant keeps the plain slug and a later one gets
- *   `-<first hex of its id>`, so adding an element never moves another's page.
- *
- * An author can choose a slug in Archi with a `slug` property on the view or
- * element. It must be lower-case words joined by `-`; anything else is
- * refused, because a rewritten slug is a path nobody chose.
- *
- * A model with no ledger keeps id paths: slugs are opt-in per instance, and
- * `archimate-slugs.ts --instance <dir>` writes the first ledger.
+ * - A slug is the name in lower-case words joined by `-`, cut at a word break
+ *   at {@link SLUG_MAX}.
+ * - An author can choose one in Archi with a `slug` property on the view or
+ *   element. It must be lower-case words joined by `-`; two objects choosing
+ *   the same one is refused, because a rewritten slug is a path nobody chose.
+ * - On a clash, the object first in the model keeps the plain slug and each
+ *   later one gets `-<first hex of its id>`.
+ * - An object with no readable name keeps its id as its path.
  */
-import { z } from "zod";
 import type { ArchimateModel, ArchimateProperty } from "./archimate.ts";
-
-export const SLUG_LEDGER_FILE = "cat-archimate.slugs.json";
-export const SLUG_LEDGER_SCHEMA_TAG = "cat-archimate-slugs/v1";
 
 /** Lower-case words of letters and digits joined by single dashes. */
 export const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 /** A derived slug is cut at a word break at or below this length. */
 export const SLUG_MAX = 60;
-/** The kinds that get slugs, as the path segment their pages are under. */
-export const SLUG_KINDS = ["views", "elements"] as const;
-export type SlugKind = (typeof SLUG_KINDS)[number];
-
-const SlugEntrySchema = z
-  .object({
-    slug: z.string().regex(SLUG),
-    /** Slugs this object had before, newest last. Each is a redirect to {@link slug}. */
-    aliases: z.array(z.string().regex(SLUG)).optional(),
-  })
-  .strict();
-export type SlugEntry = z.infer<typeof SlugEntrySchema>;
-
-const KindLedgerSchema = z.record(z.string(), SlugEntrySchema);
-const ModelLedgerSchema = z.object({ views: KindLedgerSchema.optional(), elements: KindLedgerSchema.optional() }).strict();
-export type ModelLedger = z.infer<typeof ModelLedgerSchema>;
-
-export const SlugLedgerSchema = z
-  .object({
-    $schema: z.literal(SLUG_LEDGER_SCHEMA_TAG),
-    /** Keyed by the model id in `cat-archimate.config.json`, then by kind, then by Archi id. */
-    models: z.record(z.string(), ModelLedgerSchema),
-  })
-  .strict()
-  .superRefine((l, ctx) => {
-    // One slug, one object: a slug or alias claimed twice in a kind is a path
-    // that would mean two things.
-    for (const [m, ml] of Object.entries(l.models)) {
-      for (const kind of SLUG_KINDS) {
-        const owner = new Map<string, string>();
-        for (const [id, e] of Object.entries(ml[kind] ?? {})) {
-          for (const s of [e.slug, ...(e.aliases ?? [])]) {
-            const prev = owner.get(s);
-            if (prev !== undefined && prev !== id) ctx.addIssue({ code: "custom", path: ["models", m, kind, id], message: `slug "${s}" is also claimed by ${prev}` });
-            owner.set(s, id);
-          }
-        }
-      }
-    }
-  });
-export type SlugLedger = z.infer<typeof SlugLedgerSchema>;
 
 /**
  * A name as a slug: accents dropped, lower case, every run of other
@@ -129,76 +77,44 @@ function idTail(id: string, n: number): string {
   return (t || "x").slice(0, n);
 }
 
-/** What {@link planSlugs} decided for one model. */
-export interface SlugPlan {
-  /** The model's ledger as it should be committed. */
-  ledger: ModelLedger;
-  /** The slug of each object that has one, by Archi id (views and elements together; ids are unique in a model). */
-  slugOf: Map<string, string>;
-}
-
 /**
- * The slugs of one model's views and elements, from what the ledger already
- * pins (see the module doc). Pure: the same model and ledger give the same
- * plan, so a build and a check agree.
+ * The page slug of each view and element of a model that has one, by Archi
+ * id (ids are unique across kinds in a model). Views and elements are slugged
+ * separately, as their pages are in separate directories. Pure: the same
+ * model always gives the same slugs.
  */
-export function planSlugs(model: ArchimateModel, pinned: ModelLedger | undefined): SlugPlan {
-  const ledger: ModelLedger = {};
+export function planSlugs(model: ArchimateModel): Map<string, string> {
   const slugOf = new Map<string, string>();
-  const objects: Record<SlugKind, Array<{ id: string; name: string; properties?: ArchimateProperty[]; what: string }>> = {
-    views: model.views.map((v) => ({ id: v.id, name: v.name, properties: v.properties, what: `view "${v.name}" (${v.id})` })),
-    elements: model.elements.map((e) => ({ id: e.id, name: e.name, properties: e.properties, what: `element "${e.name}" (${e.id})` })),
-  };
-  const allIds = new Set([...model.views, ...model.elements, ...model.relationships].map((o) => o.id));
-  for (const kind of SLUG_KINDS) {
-    const before = pinned?.[kind] ?? {};
-    const after: Record<string, SlugEntry> = {};
-    // Every slug ever claimed in this kind, by whom — gone objects included.
+  const ids = new Set([...model.views, ...model.elements, ...model.relationships].map((o) => o.id));
+  const kinds = [
+    model.views.map((v) => ({ id: v.id, name: v.name, properties: v.properties, what: `view "${v.name}" (${v.id})` })),
+    model.elements.map((e) => ({ id: e.id, name: e.name, properties: e.properties, what: `element "${e.name}" (${e.id})` })),
+  ];
+  for (const objects of kinds) {
     const owner = new Map<string, string>();
-    for (const [id, e] of Object.entries(before)) for (const s of [e.slug, ...(e.aliases ?? [])]) owner.set(s, id);
-    const free = (s: string, id: string) => !allIds.has(s) && (owner.get(s) ?? id) === id;
-    const claim = (s: string, id: string) => owner.set(s, id);
-
-    // Objects the ledger already knows go first, so a newcomer can never take
-    // a slug from one of them; then the rest, in the model's own order.
-    const known = objects[kind].filter((o) => before[o.id] !== undefined);
-    const fresh = objects[kind].filter((o) => before[o.id] === undefined);
-    for (const o of [...known, ...fresh]) {
-      const chosen = chosenSlug(o.properties, o.what);
-      if (chosen !== undefined && !free(chosen, o.id)) {
-        throw new Error(`${o.what}: its \`slug\` property "${chosen}" is already claimed by ${owner.get(chosen) ?? "an object id"}`);
-      }
-      const want = chosen ?? slugify(o.name);
-      const prev = before[o.id];
-      let slug: string | undefined;
-      if (want === undefined) slug = prev?.slug;
-      // Already pinned to this name, or to its clash form while the plain
-      // slug is still someone else's: nothing moves.
-      else if (prev !== undefined && (prev.slug === want || (prev.slug.startsWith(`${want}-`) && !free(want, o.id)))) slug = prev.slug;
-      else if (free(want, o.id)) slug = want;
-      else for (let n = 4; slug === undefined; n++) {
+    const free = (s: string) => !ids.has(s) && !owner.has(s);
+    // Chosen slugs first, so a derived one never takes what an author chose.
+    const chosen = objects.map((o) => chosenSlug(o.properties, o.what));
+    objects.forEach((o, i) => {
+      const c = chosen[i];
+      if (c === undefined) return;
+      if (!free(c)) throw new Error(`${o.what}: its \`slug\` property "${c}" is also chosen by ${owner.get(c) ?? "an object id"}`);
+      owner.set(c, o.id);
+      slugOf.set(o.id, c);
+    });
+    objects.forEach((o, i) => {
+      if (chosen[i] !== undefined) return;
+      const want = slugify(o.name);
+      if (want === undefined) return;
+      let slug = free(want) ? want : undefined;
+      for (let n = 4; slug === undefined; n++) {
         const c = `${want}-${idTail(o.id, n)}`;
-        if (free(c, o.id)) slug = c;
+        if (free(c)) slug = c;
         else if (n > 40) throw new Error(`${o.what}: no free slug for "${want}"`);
       }
-      if (slug === undefined) continue;
-      claim(slug, o.id);
-      const aliases = [...(prev?.aliases ?? []), ...(prev && prev.slug !== slug ? [prev.slug] : [])].filter((a) => a !== slug);
-      after[o.id] = { slug, ...(aliases.length ? { aliases } : {}) };
+      owner.set(slug, o.id);
       slugOf.set(o.id, slug);
-    }
-    // Objects that have left the model keep their entry: their slugs stay
-    // claimed, so no later object is ever given a path that meant something else.
-    for (const [id, e] of Object.entries(before)) if (after[id] === undefined) after[id] = e;
-    if (Object.keys(after).length) ledger[kind] = sortKeys(after);
+    });
   }
-  return { ledger, slugOf };
-}
-
-const sortKeys = <T>(o: Record<string, T>): Record<string, T> =>
-  Object.fromEntries(Object.entries(o).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
-
-/** The ledger's text, as committed: stable key order, two-space indent, trailing newline. */
-export function ledgerText(l: SlugLedger): string {
-  return `${JSON.stringify({ $schema: l.$schema, models: sortKeys(l.models) }, null, 2)}\n`;
+  return slugOf;
 }

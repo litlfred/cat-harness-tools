@@ -17,9 +17,8 @@
  * model nobody publishes, and saying so is the point.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { ArchimateConfigSchema, readArchimate, type ArchimateConfig } from "../schemas/archimate.ts";
-import { SLUG_LEDGER_FILE, SLUG_LEDGER_SCHEMA_TAG, SlugLedgerSchema, ledgerText, planSlugs, type SlugLedger, type SlugPlan } from "../schemas/slugs.ts";
 import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
 
 export const CONFIG_FILE = "cat-archimate.config.json";
@@ -73,43 +72,6 @@ export function archimateDir(instanceRoot: string, config: ArchimateConfig): str
   return join(instanceRoot, entry.path);
 }
 
-/** Where the instance's slug ledger is, or would be: beside its config. */
-export function ledgerPath(instanceRoot: string): string {
-  return join(dirname(configPath(instanceRoot) ?? join(instanceRoot, CONFIG_FILE)), SLUG_LEDGER_FILE);
-}
-
-/** The committed slug ledger, parsed; `undefined` when the instance has none (its pages keep id paths). */
-export function readLedger(instanceRoot: string): SlugLedger | undefined {
-  const p = ledgerPath(instanceRoot);
-  if (!existsSync(p)) return undefined;
-  const r = SlugLedgerSchema.safeParse(JSON.parse(readFileSync(p, "utf8")));
-  if (!r.success) throw new Error(`${p}: ${r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
-  return r.data;
-}
-
-/**
- * The slugs of every configured model, planned from the committed ledger
- * (`slugs.ts`, {@link planSlugs}), and the ledger as it should then read.
- * `start` plans from an empty ledger where none is committed — how the first
- * one is written; otherwise an instance with no ledger gets no slugs.
- */
-export function slugPlans(instanceRoot: string, opts: { start?: boolean } = {}): { ledger?: SlugLedger; plans: Map<string, SlugPlan> } {
-  const committed = readLedger(instanceRoot) ?? (opts.start ? { $schema: SLUG_LEDGER_SCHEMA_TAG, models: {} } : undefined);
-  const plans = new Map<string, SlugPlan>();
-  if (committed === undefined) return { plans };
-  const config = readConfig(instanceRoot);
-  const dir = archimateDir(instanceRoot, config);
-  const models = { ...committed.models };
-  for (const m of config.models) {
-    const file = join(dir, m.file);
-    if (!existsSync(file)) continue;
-    const plan = planSlugs(readArchimate(readFileSync(file)), committed.models[m.id]);
-    plans.set(m.id, plan);
-    models[m.id] = plan.ledger;
-  }
-  return { ledger: { $schema: SLUG_LEDGER_SCHEMA_TAG, models }, plans };
-}
-
 /** The archimate directory, instance-relative and in POSIX form — the graph's path under the instance's site. */
 export const localDirOf = (instanceRoot: string, dir: string): string => relative(instanceRoot, dir).split("\\").join("/");
 
@@ -151,18 +113,6 @@ export function checkCommitted(instanceRoot: string): string[] {
     }
   };
   if (existsSync(dir)) walk(dir);
-  // A committed ledger must already say what a build would pin: a page's path
-  // is decided in review, not by whichever build ran first.
-  if (problems.length === 0 && existsSync(ledgerPath(instanceRoot))) {
-    try {
-      const { ledger } = slugPlans(instanceRoot);
-      if (ledger && ledgerText(ledger) !== readFileSync(ledgerPath(instanceRoot), "utf8")) {
-        problems.push(`${localDirOf(instanceRoot, ledgerPath(instanceRoot))}: out of date — run archimate-slugs.ts --instance ${relative(process.cwd(), instanceRoot) || "."}`);
-      }
-    } catch (e) {
-      problems.push((e as Error).message);
-    }
-  }
   return problems;
 }
 
