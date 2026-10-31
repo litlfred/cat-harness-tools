@@ -6,7 +6,7 @@ import { deflateRawSync } from "node:zlib";
 import { ArchimateConfigSchema, layerOf, modelXmlOf, parseArchimate, readArchimate, zipEntry } from "../schemas/archimate.ts";
 import { renderViewSvg, wrap } from "./render-view.ts";
 import { checkCommitted } from "./check-archimate.ts";
-import { PAGE_CONFIG_ID, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
+import { PAGE_CONFIG_ID, figureTargets, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
 import { thinPageConfigOf } from "../../scripts/thin-page.ts";
 import { renderedByOf } from "../../scripts/viewer-declarations.ts";
 
@@ -260,6 +260,13 @@ describe("an instance", () => {
       expect(page.content).toContain("drawn in the document as Figure 1 (<code>folio/f-1.md</code>)");
       const node = JSON.parse(files.find((f) => f.path === "1.0.0/views/id-v1.jsonld")!.content);
       expect(node["schema:subjectOf"][0]).toEqual({ "schema:name": "Figure 1", "schema:url": "https://example.org/tiny/folio/f-1.md" });
+      // What a document site needs to draw the figure live: the SVG and the page, site-relative.
+      const site = pagesFor(root, { site: true });
+      const [t] = figureTargets(root);
+      expect(t).toMatchObject({ block: "folio/f-1.md", label: "Figure 1", view: "id-v1", viewName: "Overview" });
+      expect(site.files.map((f) => sitePathOf(site, f))).toContain(t.svg);
+      expect(site.files.map((f) => sitePathOf(site, f))).toContain(`${t.page}index.html`);
+      expect(figureTargets(root)).toHaveLength(1);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
