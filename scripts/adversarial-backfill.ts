@@ -19,6 +19,12 @@
  * Findings stay in `kg-qa/v1` sidecars under `test/results/kg-qa/`.
  * **No bean per finding** (beans are not sidecars).
  *
+ * A review is a judgement no generator reproduces (owner, 2026-10-14), and
+ * the derived tree is not committed (cat-harness#857). So each review is ALSO
+ * appended to the subject's committed attestation file
+ * (`test/attestations/adversarial-review/…`, ruling D2 (a)), written
+ * before the sidecar, and a node counts as reviewed when either holds one.
+ *
  * ## Cost measurement
  *
  * Wall-clock execution time and token usage are measured per node and reported,
@@ -47,6 +53,15 @@ import { NOT_DISCLOSED } from "@litlfred/bootstrap-tools/schemas/model-registry.
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { implementingRootFor } from "../schemas/kg/harness-config.ts";
 import { declaredDirectory } from "./lib/local-site-dir.ts";
+import { repoRootFor } from "../schemas/kg/cat-harness.ts";
+import {
+  ADVERSARIAL_REVIEW_FAMILY,
+  QA_ATTESTATIONS_SCHEMA,
+  adversarialAttestationFor,
+  readAttestationFile,
+  serialiseAttestations,
+  type AdversarialReviewAttestations,
+} from "../schemas/sdlc/qa-attestations.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -126,6 +141,31 @@ export function resolveSidecarPath(node: { id: string; kind: AdversarialContentK
 }
 
 /**
+ * The committed attestation file for a sidecar path, or `undefined` when the
+ * path is under no instance's `kg-qa/` tree (a scratch tree, as in the tests).
+ */
+export function reviewAttestationPath(sidecarPath: string, repoRoot: string = ROOT): { file: string; storeRoot: string } | undefined {
+  try {
+    return adversarialAttestationFor(sidecarPath, repoRootFor(repoRoot), repoRoot);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The review state the attestation store records for a sidecar's subject:
+ * `undefined` when it holds no adversarial review.
+ */
+function storedReviewState(sidecarPath: string, srcHash: string, repoRoot: string): { isStale: boolean } | undefined {
+  const at = reviewAttestationPath(sidecarPath, repoRoot);
+  if (at === undefined) return undefined;
+  const read = readAttestationFile(at.file, at.storeRoot);
+  if (read.state !== "hit" || read.file.family !== ADVERSARIAL_REVIEW_FAMILY) return undefined;
+  const pinned = read.file.source_hash;
+  return { isStale: srcHash !== "" && pinned !== null && pinned !== srcHash };
+}
+
+/**
  * Gather candidate nodes across tools, schemas, skills, and processes.
  */
 export function gatherCandidateNodes(repoRoot: string = ROOT): CandidateNode[] {
@@ -154,6 +194,13 @@ export function gatherCandidateNodes(repoRoot: string = ROOT): CandidateNode[] {
         }
       } catch {
         // ignore parse error
+      }
+    }
+    if (!hasReview) {
+      const stored = storedReviewState(scPath, srcHash, repoRoot);
+      if (stored !== undefined) {
+        hasReview = true;
+        isStale = stored.isStale;
       }
     }
 
@@ -232,6 +279,13 @@ export function gatherCandidateNodes(repoRoot: string = ROOT): CandidateNode[] {
             isStale = sc.source_hash !== srcHash;
           }
         } catch {}
+      }
+      if (!hasReview) {
+        const stored = storedReviewState(scPath, srcHash, repoRoot);
+        if (stored !== undefined) {
+          hasReview = true;
+          isStale = stored.isStale;
+        }
       }
 
       candidates.push({
@@ -382,6 +436,29 @@ export function executeBackfillBatch(
 
     // Cost estimate: a flat blended rate (about $3/M input, $15/M output, so ~$0.000006/token), not any one model's price list
     const costUsd = Number((tokens * 0.000006).toFixed(6));
+
+    // The committed half first, so a run that stops between the two leaves
+    // the review in both places or in the store, never in neither.
+    const at = reviewAttestationPath(node.sidecarPath, repoRoot);
+    if (at !== undefined) {
+      const read = readAttestationFile(at.file, at.storeRoot);
+      if (read.state === "corrupt" || read.state === "unknown") {
+        throw new Error(`${relative(repoRoot, at.file)} is ${read.state} (${read.reason}): refusing to record a review over it`);
+      }
+      if (read.state === "hit" && read.file.family !== ADVERSARIAL_REVIEW_FAMILY) {
+        throw new Error(`${relative(repoRoot, at.file)} is a ${read.file.family} file: refusing to record a review over it`);
+      }
+      const prior = read.state === "hit" ? (read.file as AdversarialReviewAttestations) : undefined;
+      const next: AdversarialReviewAttestations = {
+        $schema: QA_ATTESTATIONS_SCHEMA,
+        family: ADVERSARIAL_REVIEW_FAMILY,
+        subject: prior?.subject ?? { kind: node.kind, id: node.id, path: node.path },
+        adversarial_reviews: [...(prior?.adversarial_reviews ?? []), review],
+        source_hash: node.sourceHash,
+      };
+      mkdirSync(dirname(at.file), { recursive: true });
+      writeFileSync(at.file, serialiseAttestations(next));
+    }
 
     // Update or create sidecar
     const scDir = dirname(node.sidecarPath);
