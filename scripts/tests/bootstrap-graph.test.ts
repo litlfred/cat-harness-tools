@@ -40,8 +40,9 @@ const ROOT = resolve(HARNESS_ROOT);
 const CAT_BOOTSTRAP = join(repoRootFor(ROOT), "bootstrap");
 const STUB = artefactStub(readDeclaration(CAT_BOOTSTRAP)!);
 /** The document as the site build makes it: `@id` = base + the `--out` file name. */
+const DOC_DIR = `https://example.org/${STUB}/`;
 const build = (provenance = false) =>
-  exportGraph(CAT_BOOTSTRAP, { docIri: `https://example.org/${STUB}/${STUB}.jsonld`, provenance });
+  exportGraph(CAT_BOOTSTRAP, { docIri: `${DOC_DIR}${STUB}.jsonld`, provenance });
 
 describe("what it contains, read against the disk", () => {
   test("every skill bootstrap holds is in the graph", () => {
@@ -118,7 +119,9 @@ function idsOfType(doc: Record<string, unknown>, type: string): string[] {
       // name rather than a suffix, so `ProcessNode` does not answer for `Process`.
       return ts.some((x) => x === `bootstrap:${type}`);
     })
-    .map((n) => String(n["@id"]).split("#")[1]!.split("/").slice(1).join("/"))
+    // Subject IRIs are path-style, `<doc dir>/<kind>/<id>` (bootstrap-tools#52),
+    // not `<doc>#<kind>/<id>`: drop the document's directory, then the kind.
+    .map((n) => String(n["@id"]).slice(DOC_DIR.length).split("/").slice(1).join("/"))
     .sort();
 }
 
