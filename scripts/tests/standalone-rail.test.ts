@@ -11,14 +11,15 @@
  * the predicate, since the predicate is three `startsWith` calls and the risk
  * is not that it computes wrongly — it is that the caller forgets a family.
  */
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { PINNED_CHROME_FILES, PINNED_DATA_FILES, mountRoutes, pinPlatformChrome, railStandalonePages } from "../mount-instance-docs.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { siteNotBuilt } from "../../test/support/checkout.ts";
+import { siteNotBuilt, STANDALONE } from "../../test/support/checkout.ts";
+import { ensureThemesCss } from "../../test/support/themes-css.ts";
 import { siteDirFor, siteFileFor } from "../../schemas/kg/cat-harness.js";
 import { expandRail, navbarRowJsonOf, railDataJson } from "../lib/harness-rail.ts";
 
@@ -268,6 +269,9 @@ describe("the mount routes are ASKED for, not guessed", () => {
 });
 
 describe.skipIf(FOLIO_CHROME_NOT_BUILT())("a FOLIO's site (folio-staging.yml): platform links point at the platform's site", () => {
+  beforeAll(() => {
+    if (!STANDALONE) ensureThemesCss(HARNESS_ROOT);
+  });
   // Measured 2026-10-05 on litlfred/smart-ra: a document folio's pages carried
   // no navbar at all, and re-basing the platform's graphs against the FOLIO's
   // root would have made every one of them a 404 on the folio's Pages site.

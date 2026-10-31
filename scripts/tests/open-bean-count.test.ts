@@ -6,7 +6,7 @@
  * holds the single definition every Beans badge now takes, and holds the
  * two committed projections the badges read to it.
  */
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -14,7 +14,7 @@ import { OPEN_BEANS_UNIT, OPEN_STATUSES, openBeanCount } from "../bean-store-rea
 import { readTileCounts } from "../../schemas/ui/tile-count.ts";
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { siteNotBuilt } from "../../test/support/checkout.ts";
+import { ensureDocsPages, siteNotBuilt } from "../../test/support/checkout.ts";
 
 const INSTANCE = join(HARNESS_ROOT);
 const SITE = join(INSTANCE, siteDirFor(INSTANCE));
@@ -34,6 +34,9 @@ describe("openBeanCount", () => {
 });
 
 describe("the two projections every Beans badge reads agree", () => {
+  beforeAll(() => {
+    ensureDocsPages(INSTANCE);
+  }, 180_000);
   // Standing alone, neither is built: `docs:pages` writes both at publish from
   // the composed bean store, and `assets/beans/` is gitignored (bean w1gy F18).
   const notBuilt = (...rels: string[]): boolean =>
