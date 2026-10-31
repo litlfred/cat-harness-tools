@@ -73,6 +73,49 @@ describe("complete() writes the activity as it records the step", () => {
   });
 });
 
+describe("a Tool activity on a step is informed by the step's own activity (bean w1gy, folio-assistant#875 FR-005)", () => {
+  const toolActivity = (plan: string, extra: Record<string, unknown> = {}) => ({
+    "@type": "prov:Activity",
+    "@id": "skill-update:skills/x.md@0123456789ab",
+    "prov:startedAtTime": "2026-10-30T13:40:00.000Z",
+    "prov:qualifiedAssociation": { "prov:agent": "authoring-agent", "prov:hadRole": "editor", "prov:hadPlan": plan },
+    "prov:generated": ["skills/x.md@sha256:bbbb"],
+    "cat-harness:underPolicy": ["policy:test"],
+    ...extra,
+  });
+
+  test("the Tool activity names the step's prov:Activity in prov:wasInformedBy, and still parses", async () => {
+    const { model, state, node } = await firstRoledStep();
+    const next = complete(model, state, node.id, {
+      authz: { ctx: CTX, principal: GITHUB, target: "block-1", mode: "strict" },
+      activities: [toolActivity(`crdm-requirements#${node.id}`)],
+    });
+    const entry = next.history.at(-1)!;
+    expect(entry.prov?.["@id"]).toBeTruthy();
+    const tool = entry.activities![0]!;
+    expect(tool["prov:wasInformedBy"]).toBe(entry.prov!["@id"]);
+    expect(ProvActivitySchema.safeParse(tool).success).toBe(true);
+  });
+
+  test("no step activity: the Tool activity is recorded with no link", async () => {
+    const { model, state, node } = await firstRoledStep();
+    const next = complete(model, state, node.id, { activities: [toolActivity(`crdm-requirements#${node.id}`)] });
+    const entry = next.history.at(-1)!;
+    expect(entry.prov).toBeUndefined();
+    expect(entry.activities![0]!["prov:wasInformedBy"]).toBeUndefined();
+  });
+
+  test("a prov:wasInformedBy the Tool supplied is kept and the step's added beside it", async () => {
+    const { model, state, node } = await firstRoledStep();
+    const next = complete(model, state, node.id, {
+      authz: { ctx: CTX, principal: GITHUB, target: "block-1", mode: "strict" },
+      activities: [toolActivity(`crdm-requirements#${node.id}`, { "prov:wasInformedBy": "upstream#7" })],
+    });
+    const entry = next.history.at(-1)!;
+    expect(entry.activities![0]!["prov:wasInformedBy"]).toEqual(["upstream#7", entry.prov!["@id"]]);
+  });
+});
+
 describe("provActivityFor invents nothing", () => {
   const verdict = (over: Partial<TaskAuthVerdict>): TaskAuthVerdict => ({
     allowed: true,

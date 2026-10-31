@@ -114,6 +114,15 @@ describe("prov:used — catalogue items linked at their Handle (owner 2026-10-01
   });
 });
 
+describe("prov:wasInformedBy — a link to another activity (bean w1gy)", () => {
+  test("each value is emitted as an @id link and expands to the PROV-O property", async () => {
+    const stub: AddressBook = { resolve: () => ({ iri: "https://example.org/x" }) };
+    const a = { ...activity("owner", "authoring-agent", "code-change-review#T"), "prov:wasInformedBy": ["https://example.org/step/0"] } as ProvActivity;
+    const act = (await expanded(provJsonldDocument("t--i", [a], stub).document)).find((n) => (n["@type"] as string[] | undefined)?.includes(`${P}Activity`))!;
+    expect(act[`${P}wasInformedBy`]).toEqual([{ "@id": "https://example.org/step/0" }]);
+  });
+});
+
 describe("the context is named, never fetched", () => {
   test("documents reference the published URL and carry @base in their OWN context", () => {
     const stub: AddressBook = { resolve: () => ({ iri: "https://example.org/x" }) };
