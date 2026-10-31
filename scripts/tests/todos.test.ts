@@ -13,15 +13,18 @@
  * stacks) live in `test/todos-repo-root.test.ts`
  * (bean `ho66`): standing alone, cat-harness has no such root to read.
  */
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { ROOT } from "../todos.js";
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
-import { siteNotBuilt } from "../../test/support/checkout.ts";
+import { ensureDocsPages, siteNotBuilt } from "../../test/support/checkout.ts";
 
 describe("the published process hierarchy", () => {
+  beforeAll(() => {
+    ensureDocsPages(ROOT);
+  }, 180_000);
   const INDEX = join(ROOT, siteDirFor(ROOT), "assets/todos/index.json");
   // Standing alone the index is not built: `docs:pages` writes it at publish,
   // and it is gitignored (bean w1gy F18).
