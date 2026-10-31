@@ -69,6 +69,13 @@ export interface Marker {
   name: string;
   left: number;
   top: number;
+  /** The whole shape, in percent of the drawn diagram: the click target when the step links somewhere. */
+  box?: { left: number; top: number; width: number; height: number };
+  /**
+   * Where a click on the SHAPE goes: for a call activity, the called
+   * process's page. Absent → the shape is not a link and only the ⓘ opens.
+   */
+  href?: string;
 }
 
 /** A linkable name in the panel. `href` absent → shown as code, never as a guessed link. */
@@ -166,7 +173,13 @@ export function markersFor(
     const left = ((b.x + b.width - viewBox.x) / viewBox.width) * 100;
     const top = ((b.y - viewBox.y) / viewBox.height) * 100;
     if (left < 0 || left > 100 || top < 0 || top > 100) continue;
-    out.push({ id: t.id, name: t.name, left: round(left), top: round(top) });
+    const box = {
+      left: round(((b.x - viewBox.x) / viewBox.width) * 100),
+      top: round(top),
+      width: round((b.width / viewBox.width) * 100),
+      height: round((b.height / viewBox.height) * 100),
+    };
+    out.push({ id: t.id, name: t.name, left: round(left), top: round(top), box });
   }
   return out;
 }
@@ -290,6 +303,12 @@ export const PANEL_CSS = [
   ".pt-mark{position:absolute;transform:translate(-50%,-50%);width:1.35em;height:1.35em;padding:0;border-radius:50%;" +
     "border:1px solid #1f6feb;background:#fff;color:#1f6feb;font:bold 0.8em/1 sans-serif;cursor:pointer;" +
     "display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(0,0,0,.25)}",
+  // A call activity's shape is a link to the process it calls (owner,
+  // 2026-10-31: "i thought i would be able click to follow to a subprocess").
+  // Under the ⓘ, which stays the way to the details.
+  ".pt-go{position:absolute;display:block;border-radius:8px;cursor:pointer}",
+  ".pt-go:hover,.pt-go:focus-visible{outline:2px solid #1f6feb;outline-offset:1px;background:rgba(31,111,235,.07)}",
+  ".pt-mark{z-index:1}",
   ".pt-mark:hover,.pt-mark[aria-expanded=true]{background:#1f6feb;color:#fff}",
   ".pt-mark:focus-visible{outline:2px solid #1f6feb;outline-offset:2px}",
   ".pt-panel{position:absolute;z-index:5;margin:0.9em 0 0 -0.6em;max-width:min(26em,90vw);min-width:14em;padding:0.6em 0.7em;" +
@@ -319,6 +338,12 @@ export function diagramBlock(opts: { img: string; alt: string; markers: readonly
   L.push(`<div class="pt-diagram" data-panel="${escAttr(opts.panelHref)}">`);
   L.push(`<img src="${escAttr(opts.img)}" alt="${escAttr(opts.alt)}">`);
   for (const m of opts.markers) {
+    if (m.href && m.box) {
+      L.push(
+        `<a class="pt-go" href="${escAttr(m.href)}" style="left:${m.box.left}%;top:${m.box.top}%;width:${m.box.width}%;height:${m.box.height}%" ` +
+          `aria-label="Open subprocess: ${escAttr(m.name)}" title="Open subprocess: ${escAttr(m.name)}"></a>`,
+      );
+    }
     L.push(
       `<button type="button" class="pt-mark" data-task="${escAttr(m.id)}" style="left:${m.left}%;top:${m.top}%" ` +
         `aria-expanded="false" aria-label="About step: ${escAttr(m.name)}" title="About: ${escAttr(m.name)}">i</button>`,

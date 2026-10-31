@@ -983,7 +983,12 @@ export function processPage(
       ...diagramBlock({
         img: `${up()}assets/img/workflows/${row.stem}.svg`,
         alt: `BPMN diagram: ${row.name}`,
-        markers: row.markers ?? [],
+        // A call activity's shape opens the process it calls; its ⓘ still opens the panel.
+        markers: (row.markers ?? []).map((m) => {
+          const ce = row.steps.find((st) => st.id === m.id)?.calledElement;
+          const called = ce ? byId.get(ce) : undefined;
+          return called ? { ...m, href: `${called.stem}.html` } : m;
+        }),
         panelHref: panelFile(row.stem),
       }),
     );

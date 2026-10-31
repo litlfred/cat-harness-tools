@@ -50,7 +50,7 @@ describe("marker placement", () => {
     const bounds = await diagramBounds(BPMN);
     expect(bounds.get("T1")).toEqual({ x: 200, y: 100, width: 100, height: 80 });
     const m = markersFor([{ id: "T1", name: "One" }, { id: "T2", name: "Two" }], bounds, { x: 100, y: 50, width: 400, height: 200 });
-    expect(m).toEqual([{ id: "T1", name: "One", left: 50, top: 25 }]);
+    expect(m).toEqual([{ id: "T1", name: "One", left: 50, top: 25, box: { left: 25, top: 25, width: 25, height: 40 } }]);
   });
 });
 
@@ -69,6 +69,24 @@ describe("the page block", () => {
     expect(PANEL_SCRIPT).not.toMatch(/\{\{|\{%/);
     // Values go in as text, never as markup.
     expect(PANEL_SCRIPT).not.toContain("innerHTML");
+  });
+
+  test("a call activity's shape links to the called process; a plain task's does not", () => {
+    const box = { left: 10, top: 20, width: 15, height: 12 };
+    const html = diagramBlock({
+      img: "a.svg",
+      alt: "x",
+      markers: [
+        { id: "C1", name: "Call", left: 25, top: 20, box, href: "sub.html" },
+        { id: "T1", name: "Task", left: 50, top: 25, box },
+      ],
+      panelHref: "p.tasks.json",
+    }).join("\n");
+    expect(html).toContain('<a class="pt-go" href="sub.html" style="left:10%;top:20%;width:15%;height:12%"');
+    expect(html.match(/class="pt-go"/g)?.length).toBe(1);
+    // The ⓘ is still there for both, so the details stay one click away.
+    expect(html).toContain('data-task="C1"');
+    expect(html).toContain('data-task="T1"');
   });
 
   test("no markers → the plain image it always was", () => {
