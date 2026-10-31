@@ -216,7 +216,7 @@ export const VECTOR_FIGURES_DIR = "figures";
  * (the DIIG phases chart, the SMART Guidelines approach chart). The render in
  * `figures/` stays as the evidence; this is the one source each redrawing
  * reads, so a chart printed in several handbooks is transcribed once per
- * published version (owner, 2026-10-31, "B in who-iris").
+ * published version (owner, 2026-10-31, option B: in the library entry).
  */
 export const FIGURE_DATA_DIR = "figure-data";
 
