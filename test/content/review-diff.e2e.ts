@@ -140,6 +140,27 @@ test.describe("review page: selectable diff renderers (d903)", () => {
     }
   });
 
+  test("inline marks a link added around words that did not change (owner, 2026-10-31)", async ({ page }) => {
+    await open(page);
+    const out = await page.evaluate(() => {
+      const w = window as unknown as Record<string, (...a: unknown[]) => unknown>;
+      const box = w.renderInline(document, "<p>data and digital infrastructure here</p>", '<p>data and <a href="g#di">digital infrastructure</a> here</p>', w.wordDiff, w.cleanRendered) as HTMLElement;
+      const same = w.renderInline(document, '<p>see <a href="g#di">term</a></p>', '<p>see <a href="g#di">term</a></p>', w.wordDiff, w.cleanRendered) as HTMLElement;
+      return { added: box.querySelector("a ins.diff-link-added")?.textContent, same: same.querySelectorAll("ins").length };
+    });
+    expect(out).toEqual({ added: "digital infrastructure", same: 0 });
+  });
+
+  test("the review brief draws a link inside bold (a comment number linked to its row)", async ({ page }) => {
+    await open(page);
+    const html = await page.evaluate(() => {
+      const p = document.createElement("p");
+      (window as unknown as Record<string, (...a: unknown[]) => void>).briefInline(document, p, "**No. [136](https://x.io/pc/#PC-0137):** Accepted.");
+      return p.innerHTML;
+    });
+    expect(html).toBe('<strong>No. <a href="https://x.io/pc/#PC-0137" rel="noopener">136</a>:</strong> Accepted.');
+  });
+
   test("typing j inside a selector does not navigate", async ({ page }) => {
     await open(page);
     const before = await page.textContent("#status");
