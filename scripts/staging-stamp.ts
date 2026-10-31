@@ -32,6 +32,8 @@
  * @module scripts/staging-stamp
  */
 
+import { termIri } from "../schemas/kg/namespaces.js";
+
 /**
  * Build identity as it appears in a stamped document.
  *
@@ -84,4 +86,40 @@ export function stagingFields(
 ): Record<string, StagingStamp> {
   const s = stagingStamp(env);
   return s ? { [STAGING_KEY]: s } : {};
+}
+
+/**
+ * The `@context` term a stamped JSON-LD document needs for its `staging` key.
+ * Without it a JSON-LD processor drops the key, and `publish-verify`'s
+ * `jsonld-expand` reports `invalid property (staging)`. Scoped (JSON-LD 1.1
+ * §4.1.8), so `branch`, `sha`, `pr` and `run` mean this only inside `staging`.
+ */
+export function stagingContextTerm(): Record<string, unknown> {
+  return {
+    "@id": termIri("staging"),
+    "@context": {
+      branch: termIri("stagingBranch"),
+      sha: termIri("stagingSha"),
+      pr: termIri("stagingRef"),
+      run: termIri("stagingRun"),
+    },
+  };
+}
+
+/**
+ * `doc` with `stagingFields()` added, and, when a stamp is added and `doc` has
+ * an object `@context`, the `staging` term declared in that context.
+ */
+export function withStaging(
+  doc: Record<string, unknown>,
+  fields: Record<string, StagingStamp> = stagingFields(),
+): Record<string, unknown> {
+  if (!(STAGING_KEY in fields)) return doc;
+  const ctx = doc["@context"];
+  const isObj = ctx !== null && typeof ctx === "object" && !Array.isArray(ctx);
+  return {
+    ...doc,
+    ...(isObj ? { "@context": { ...(ctx as Record<string, unknown>), [STAGING_KEY]: stagingContextTerm() } } : {}),
+    ...fields,
+  };
 }
