@@ -108,12 +108,14 @@
  * @module schemas/qa-attestations
  * @graphNode schema
  */
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 import { z } from "zod";
 
 import { SignOffSchema } from "@litlfred/bootstrap-tools/schemas/requirement-set.ts";
+
+import { AdversarialReviewSchema } from "./red-flag";
 
 import {
   artefactStub,
@@ -148,6 +150,7 @@ export const ATTESTATION_FAMILIES = [
   "requirement-signoff",
   "certification",
   "section-title",
+  "adversarial-review",
 ] as const;
 export type AttestationFamily = (typeof ATTESTATION_FAMILIES)[number];
 
@@ -573,6 +576,35 @@ export const SectionTitleAttestationsSchema = QaAttestationsBaseSchema.extend({
 export type SectionTitleAttestations = z.infer<typeof SectionTitleAttestationsSchema>;
 
 /**
+ * ## The `adversarial-review` family (bean `lvlv`; cat-harness#857)
+ *
+ * The `AdversarialReview` records `adversarial-backfill` or a reviewer
+ * appends about a tool, schema, skill or process, kept verbatim. The owner
+ * ruled them judgements on 2026-10-14 ("carry adversarial reviews forward and
+ * restore the lost ones", cat-harness d37c20c4). Until this family they sat
+ * only inside the derived `kg-qa/v1` sidecar, so removing `test/results/` from
+ * main (cat-harness#857) took the last two with it and no generator could
+ * write them again; under D2 (a) they belong here.
+ *
+ * A family of its own rather than an array in the `kg-qa` file: `kg-audit`
+ * and `qa:attestations:migrate` own that file and rewrite it from the
+ * judgements THEY carry, so a field they do not know would be dropped on the
+ * next save. The mirror is the `kg-qa` one ({@link adversarialAttestationFor}).
+ *
+ * `source_hash` is the subject's source hash (sha256, first 12 hex) the
+ * reviews are pinned to — the same field and meaning as the sidecar's — so a
+ * reader tells a fresh review from a stale one without the derived tree.
+ */
+export const ADVERSARIAL_REVIEW_FAMILY = "adversarial-review" as const;
+
+export const AdversarialReviewAttestationsSchema = QaAttestationsBaseSchema.extend({
+  family: z.literal(ADVERSARIAL_REVIEW_FAMILY),
+  adversarial_reviews: z.array(AdversarialReviewSchema).min(1),
+  source_hash: z.string().min(1).nullable(),
+}).strict();
+export type AdversarialReviewAttestations = z.infer<typeof AdversarialReviewAttestationsSchema>;
+
+/**
  * Every `qa-attestations/v1` file. A union on `family` so `kg_validate` and
  * the registry have ONE validator per `$schema`.
  */
@@ -585,6 +617,7 @@ export const QaAttestationsSchema = z.discriminatedUnion("family", [
   RequirementSignoffAttestationsSchema,
   CertificationAttestationsSchema,
   SectionTitleAttestationsSchema,
+  AdversarialReviewAttestationsSchema,
 ]);
 export type QaAttestations = z.infer<typeof QaAttestationsSchema>;
 
@@ -787,6 +820,62 @@ export function kgAttestationFor(
     file: attestationPathFor(abs, tree.kgTree, tree.attHome, "kg-qa", KG_QA_SIDECAR_SUFFIX),
     storeRoot: tree.storeRoot,
   };
+}
+
+/**
+ * The `adversarial-review` attestation file for a kg-qa sidecar path — the
+ * `kg-qa` mirror under the family's own directory — or `undefined` when the
+ * path is under no instance's `kg-qa/` tree.
+ */
+export function adversarialAttestationFor(
+  sidecarAbs: string,
+  repoRoot: string,
+  hostRoot: string,
+): { file: string; storeRoot: string } | undefined {
+  const abs = resolve(sidecarAbs);
+  const tree = kgAttestationTrees(repoRoot, hostRoot)
+    .filter((t) => abs.startsWith(`${t.kgTree}${sep}`))
+    .sort((a, b) => b.kgTree.length - a.kgTree.length)[0];
+  if (tree === undefined) return undefined;
+  return {
+    file: attestationPathFor(abs, tree.kgTree, tree.attHome, ADVERSARIAL_REVIEW_FAMILY, KG_QA_SIDECAR_SUFFIX),
+    storeRoot: tree.storeRoot,
+  };
+}
+
+/** One subject's adversarial reviews as the store holds them. */
+export interface StoredAdversarialReviews {
+  /** Absolute path of the attestation file. */
+  path: string;
+  file: AdversarialReviewAttestations;
+}
+
+/**
+ * Every `adversarial-review` attestation file under `attHome`. Only `hit`
+ * files are returned: one that does not parse or validate is not a review
+ * anybody can read, and the `attestations` kind validator reports it.
+ */
+export function storedAdversarialReviews(attHome: string): StoredAdversarialReviews[] {
+  const out: StoredAdversarialReviews[] = [];
+  const tree = join(attHome, ADVERSARIAL_REVIEW_FAMILY);
+  const walk = (dir: string): void => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const abs = join(dir, e.name);
+      if (e.isDirectory()) walk(abs);
+      else if (e.name.endsWith(ATTESTATIONS_SUFFIX)) {
+        const read = readAttestationFile(abs, attHome);
+        if (read.state === "hit" && read.file.family === ADVERSARIAL_REVIEW_FAMILY) out.push({ path: abs, file: read.file });
+      }
+    }
+  };
+  if (existsSync(tree)) walk(tree);
+  return out.sort((a, b) => (a.path < b.path ? -1 : 1));
 }
 
 /** The kg-qa judgement arrays, in the order the pre-split sidecar carried them. */
