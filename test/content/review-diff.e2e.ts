@@ -12,6 +12,15 @@ import { reviewPageHtml } from "../../scripts/gen-review-page.ts";
 const ORIGIN = "http://review.test";
 const at = (file: string, kind: string, index: number) => ({ file, kind, section: "doc/ch::sec:one", index });
 
+/** A published page: a staging banner, a tall section, then the block. */
+function page(title: string, block: string): string {
+  return (
+    `<!doctype html><html><body><div data-fa-staging-banner style="position:fixed;top:0">FEATURE BRANCH</div>` +
+    `<h1>${title}</h1><div style="height:3000px">Give 5 mg</div><section id="prose:dose">${block}</section>` +
+    `<div style="height:3000px"></div></body></html>`
+  );
+}
+
 const FILES: Record<string, { type: string; body: string }> = {
   "/preview/review/": { type: "text/html", body: reviewPageHtml() },
   "/preview/staging.json": {
@@ -46,8 +55,8 @@ const FILES: Record<string, { type: string; body: string }> = {
       },
     }),
   },
-  "/main/doc/index.html": { type: "text/html", body: "<h1>main</h1>" },
-  "/preview/doc/index.html": { type: "text/html", body: "<h1>preview</h1>" },
+  "/main/doc/index.html": { type: "text/html", body: page("main", "<p>Give 5 mg daily.</p>") },
+  "/preview/doc/index.html": { type: "text/html", body: page("preview", "<p>Give <strong>10 mg</strong> daily.</p>") },
 };
 
 async function open(page: Page): Promise<void> {
@@ -106,6 +115,25 @@ test.describe("review page: selectable diff renderers (d903)", () => {
     await expect(frames).toHaveCount(2);
     expect(await frames.nth(0).getAttribute("src")).toBe("/main/doc/index.html#prose%3Adose");
     await expect(page.locator("li").nth(2)).toContainText("Not on main: this block is new.");
+  });
+
+  test("side by side: each pane scrolls to its change and marks it, under its own header", async ({ page }) => {
+    await open(page);
+    await page.selectOption("#view", "side-by-side");
+    const li = page.locator("li").first();
+    await expect(li.locator(".sbs-side-base")).toContainText("Main");
+    const head = li.locator(".sbs-side-head");
+    await expect(head).toContainText("This preview");
+    await expect(head).toContainText("edit/dosing");
+    await expect(head.getByRole("link", { name: "PR #7" })).toHaveAttribute("href", "https://example.org/pull/7");
+    for (const [i, cls, text] of [[0, "fa-change-base", "5"], [1, "fa-change-head", "10"]] as const) {
+      const frame = li.frameLocator("iframe").nth(i);
+      // The "5" inside the block, not the decoy above it.
+      await expect(frame.locator(`#prose\\:dose mark.${cls}`)).toHaveText(text);
+      await expect(frame.locator("[data-fa-staging-banner]")).toBeHidden();
+      const y = await li.locator("iframe").nth(i).evaluate((f: HTMLIFrameElement) => f.contentWindow!.scrollY);
+      expect(y).toBeGreaterThan(2500);
+    }
   });
 
   test("typing j inside a selector does not navigate", async ({ page }) => {
