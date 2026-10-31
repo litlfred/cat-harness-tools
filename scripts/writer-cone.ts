@@ -50,6 +50,10 @@ export const WRITER_RECORD_VERSION = 1;
 // input-site: inert #f12d34f1 — names the build-output directory the records live in; no writer reads it
 export const WRITER_CONE_DIR = join("build", "writer-cone");
 export const WRITER_RECORD_FILE = join(WRITER_CONE_DIR, "records.json");
+/** Each recorded writer's outputs, in `derive-cache.ts` entries keyed by the recording commit. */
+export const WRITER_OUTPUTS_DIR = join(WRITER_CONE_DIR, "outputs");
+/** `1`: skip a writer whose records match, putting back its recorded outputs (previews; owner 2026-10-31 14:32Z). */
+export const WRITER_SKIP_ENV = "CAT_WRITER_SKIP";
 /** Turns recording on in `derive:publish`. */
 export const WRITER_RECORD_ENV = "CAT_WRITER_RECORD";
 
@@ -146,17 +150,24 @@ export function writerBase(root: string, scripts: Readonly<Record<string, string
  */
 export const STRACE_SEES: readonly string[] = ["git-refs: git", "process-presentations: computed load"];
 
+/** Whether `rel` is one of `outputs` (repo-relative; a directory ends in `/`) or inside one. */
+export function underOutputs(outputs: readonly string[]): (rel: string) => boolean {
+  const dirs = outputs.filter((o) => o.endsWith("/")).map((o) => o.slice(0, -1));
+  const files = new Set(outputs.filter((o) => !o.endsWith("/")));
+  return (rel) => files.has(rel) || dirs.some((d) => rel === d || rel.startsWith(`${d}/`));
+}
+
 /** `argv`, run under the tracer, writing its trace to `log`. */
 export function tracedArgv(argv: readonly string[], log: string): string[] {
   return ["strace", ...STRACE_ARGS, "-o", log, ...argv];
 }
 
 /** The trace at `log` as a read set, or why it cannot be one. */
-export function readTraceFile(log: string, root: string): ReadSet {
+export function readTraceFile(log: string, root: string, ownOutput?: (rel: string) => boolean): ReadSet {
   if (!existsSync(log)) return { undetermined: "no trace was written" };
   const size = statSync(log).size;
   if (size > MAX_TRACE_BYTES) return { undetermined: `the trace is ${size} bytes, more than ${MAX_TRACE_BYTES}` };
-  return parseTrace(readFileSync(log, "utf-8"), root, { writes: "collect" });
+  return parseTrace(readFileSync(log, "utf-8"), root, { writes: "collect", ownOutput });
 }
 
 /**

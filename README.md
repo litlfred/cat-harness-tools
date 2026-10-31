@@ -47,10 +47,25 @@ mkdir work && cd work
 git clone https://github.com/litlfred/cat-harness
 git clone https://github.com/litlfred/bootstrap-tools
 git clone https://github.com/litlfred/cat-harness-tools
+(cd bootstrap-tools && bun install)
+(cd cat-harness && bun install)
 cd cat-harness-tools
 bun install
 bun test scripts/tests/sdlc/stage-local-publisher.test.ts
 ```
+
+Run `bun install` in **every** sibling, not only this one (owner, 2026-10-31,
+QA finding F21). This repository's install hoists the siblings' dependencies
+into its own `node_modules`, but Bun and `tsc` load a sibling's files from
+their real path, `../bootstrap-tools/…`, and look for `zod` from there. With
+no `node_modules` of its own, bootstrap-tools finds nothing and every test
+fails in the preload. A folio-assistant index and CI do not hit this, because
+they put a `node_modules` above the siblings.
+
+Each sibling then has its own copy of `zod`, so the copies must be the same
+version: two versions make `tsc` reject a schema from one layer passed to the
+other (`ZodType` is not assignable to `ZodType`). Keep `zod` at one version
+across the layers, and bump it in all of them together.
 
 `main` of `cat-harness` is the right sibling, since this repository's `main`
 tracks it (see `.github/workflows/pr-tests.yml`). Inside a folio-assistant
