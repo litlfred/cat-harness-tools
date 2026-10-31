@@ -27,7 +27,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { readArchimate, type ArchimateModel, type ArchimateView, type ArchimateViewNode } from "../schemas/archimate.ts";
-import { routeConnections, type Pt } from "./render-view.ts";
+import { routeConnections, type Pt, type RoutedConnection } from "./render-view.ts";
 
 export interface Tangle {
   kind: "crossing" | "through-box";
@@ -75,15 +75,14 @@ function through(a: Pt, b: Pt, n: ArchimateViewNode): Pt | undefined {
   return { x: a.x + t * dx, y: a.y + t * dy };
 }
 
-/** Every tangle in a view, as drawn. */
-export function tanglesOf(view: ArchimateView): Tangle[] {
+/** Every tangle in a view, as drawn. `routed` defaults to the view's own routing; a caller that already has it passes it in. */
+export function tanglesOf(view: ArchimateView, routed: RoutedConnection[] = routeConnections(view)): Tangle[] {
   const nodes = new Map(view.nodes.map((n) => [n.id, n]));
   const ancestors = (id: string): Set<string> => {
     const out = new Set<string>([id]);
     for (let p = nodes.get(id)?.parent, seen = 0; p && seen < 64; p = nodes.get(p)?.parent, seen++) out.add(p);
     return out;
   };
-  const routed = routeConnections(view);
   const segs = (pts: Pt[]) => pts.slice(1).map((p, i) => [pts[i]!, p] as const);
   const out: Tangle[] = [];
   for (let i = 0; i < routed.length; i++) {
