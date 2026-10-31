@@ -73,7 +73,14 @@ SCHEMA = "folio-vector-labels/v1"
 # because `9789240093362-eng` captions read `Fig. 13\t Example decision-support
 # logic matrix` with a TAB and no period, and requiring the period dropped 14
 # of its 15 figure pages.
-CAPTION = re.compile(r"^[ \t]*(?:Fig\.|Figure)[ \t]*\d+(?:\.\d+)*\b")
+#
+# The dot after `Fig` is optional too: `9789240101197-eng` (the supply chain
+# handbook) captions read `Fig 1. Public health supply chain partners ...`, and
+# requiring `Fig.` silently dropped nine of its figure pages (Figs. 1-4, 6-9,
+# 12), so the folio built from it had no blocks for them. `Fig` must still be
+# followed by a number, so `Figure`, `Figs` and words like `Fight` never match
+# through this branch.
+CAPTION = re.compile(r"^[ \t]*(?:Fig\.?|Figure)[ \t]*\d+(?:\.\d+)*\b")
 
 # A dot leader: two periods separated by nothing but space. This is the whole
 # table-of-contents guard and it needs no page-level rule -- checked against
