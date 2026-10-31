@@ -37,6 +37,7 @@ import {
   wrapShapeInLink,
 } from "@litlfred/bootstrap-tools/scripts/render-bpmn.ts";
 import { checkXmlComments } from "./xml-comment-check";
+import { diagramFit, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
 import {
   siteDirFor,
   repoRootFor,
@@ -244,7 +245,7 @@ async function emit(out: string, text: string): Promise<void> {
 
 for (const file of sources) {
   const xml = await readFile(file, "utf8");
-  let rendered: { svg: string; warnings: string[] };
+  let rendered: { svg: string; warnings: string[]; layout?: DrawnLabels };
   try {
     rendered = await renderer.render(xml);
   } catch (err: unknown) {
@@ -255,6 +256,16 @@ for (const file of sources) {
   }
 
   const { svg, warnings } = rendered;
+
+  // Readable at 100%, and untangled (owner, 2026-10-31: "QA on too wide/too
+  // tall bpms?", "add as QA and author check"). Reported, never failed: most
+  // diagrams predate the budget, and the fix is an author's layout call. The
+  // same report, with the lane-swap fix, is `bun run cat bpmn:detangle`.
+  const fit = Object.entries(diagramFit(xml, rendered.layout)).filter(([, fs]) => fs.length > 0);
+  if (fit.length > 0) {
+    const n = fit.reduce((t, [, fs]) => t + fs.length, 0);
+    console.warn(`⚠ ${relative(ROOT, file)}: ${n} readability finding(s): ${fit.map(([k, fs]) => `${k} ×${fs.length}`).join(", ")}`);
+  }
 
   if (warnings.length > 0) {
     console.error(`✗ ${file}: ${warnings.length} import warning(s)`);
