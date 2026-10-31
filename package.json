@@ -561,6 +561,7 @@
     "schema:graph": "bun run cat-harness-tools/scripts/schema-graph.ts",
     "schema:viz": "bun run cat-harness-tools/scripts/gen-schema-viz.ts",
     "schema:viz:check": "bun run cat-harness-tools/scripts/gen-schema-viz.ts --check",
+    "serve:local": "bun run cat-harness-tools/scripts/serve-local.ts",
     "serve:rendering": "bun run cat-harness-tools/scripts/serve-rendering.ts",
     "serve:rendering:py": "python3 cat-harness-tools/scripts/serve-rendering.py",
     "sessions": "bun run cat-harness-tools/scripts/sibling-sessions.ts",
