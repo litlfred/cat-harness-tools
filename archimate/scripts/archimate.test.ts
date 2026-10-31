@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, posix } from "node:path";
 import { deflateRawSync } from "node:zlib";
-import { ArchimateConfigSchema, layerOf, modelXmlOf, parseArchimate, readArchimate, zipEntry } from "../schemas/archimate.ts";
+import { ARCHIMATE_MODEL_TAG, ArchimateConfigSchema, ArchimateModelSchema, layerOf, modelXmlOf, parseArchimate, readArchimate, zipEntry } from "../schemas/archimate.ts";
 import { renderViewSvg, wrap } from "./render-view.ts";
 import { checkCommitted } from "./check-archimate.ts";
 import { PAGE_CONFIG_ID, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
@@ -79,6 +79,13 @@ function zipOf(name: string, data: Buffer, deflate: boolean): Buffer {
 }
 
 describe("reading a model", () => {
+  it("reads into the derived family archimate-model/v1, which its own schema checks", () => {
+    const model = parseArchimate(XML);
+    expect(ARCHIMATE_MODEL_TAG).toBe("archimate-model/v1");
+    expect(ArchimateModelSchema.safeParse(model).success).toBe(true);
+    expect(ArchimateModelSchema.safeParse({ ...model, elements: [{ ...model.elements[0], layer: "Nowhere" }] }).success).toBe(false);
+  });
+
   const m = parseArchimate(XML);
 
   it("reads elements with their layer, documentation, properties and folder", () => {
