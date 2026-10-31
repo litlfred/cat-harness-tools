@@ -31,6 +31,7 @@
  * | `text-overflow` | a task's name spills out of its box (16px text in a box drawn for 12px) |
  * | `edge-diagonal` | a flow runs at a slant (owner, 2026-10-31: *"straight angled arrows ugly"*) |
  * | `edge-crossing` | two flows cross |
+ * | `edge-through-shape` | a flow is drawn through a task, event or gateway that is neither its source nor its target |
  * | `lane-order` | another order of the lanes makes the cross-lane flows shorter |
  *
  * Label positions come from where bpmn-js DREW them (`DrawnLayout`), because
@@ -204,6 +205,30 @@ export function crossings(di: DiLayout): [string, string][] {
   return out;
 }
 
+/** Does `outer` hold all of `inner`? (An expanded subprocess holds its own steps.) */
+const holds = (outer: Box, inner: Box): boolean =>
+  outer.x <= inner.x && outer.y <= inner.y && outer.x + outer.width >= inner.x + inner.width && outer.y + outer.height >= inner.y + inner.height;
+
+/**
+ * Every flow drawn through a shape it does not start or end at, as
+ * `[flow, shape]`. A shape that holds the flow's source or target (the
+ * expanded subprocess the flow runs inside) or overlaps it (the task a
+ * boundary event sits on) is not counted.
+ */
+export function edgesThroughShapes(di: DiLayout): [string, string][] {
+  const out: [string, string][] = [];
+  for (const [eid, e] of di.edges) {
+    const f = di.flows.get(eid);
+    const src = f && di.shapes.get(f.source), tgt = f && di.shapes.get(f.target);
+    for (const [sid, b] of di.shapes) {
+      if (f && (sid === f.source || sid === f.target)) continue;
+      if ([src, tgt].some((x) => x && (holds(b, x) || boxesOverlap(b, x, 0)))) continue;
+      if (segments(e.points).some(([p, q]) => segmentHitsBox(p, q, b, 2))) out.push([eid, sid]);
+    }
+  }
+  return out;
+}
+
 // ── Lane order ───────────────────────────────────────────────────────────
 
 /** Which lane each shape sits in, by its centre. */
@@ -283,9 +308,11 @@ const fmt = (n: number): string => String(Math.round(n * 100) / 100);
 
 /**
  * Move every lane to its place in `order`, keeping each lane's height. Shapes
- * and same-lane flows move with their lane; a flow between two lanes is
- * re-routed as one elbow (out of the source's top or bottom, along to the
- * target's side), since its old bends were drawn for the old order. A
+ * and same-lane flows move with their lane; a flow between two lanes keeps
+ * its bends, each moving with the lane it lies in. Only when that route now
+ * runs through a box is it re-routed, by the first of a few right-angled
+ * routes that runs through none (a flow that loops back along a lane went
+ * straight through every step in it when it was always re-routed). A
  * cross-lane flow's label bounds are dropped so bpmn-js places it beside the
  * new route rather than where the old route was.
  */
@@ -306,6 +333,17 @@ export function applyLaneOrder(xml: string, order: readonly string[]): string {
     const b = di.shapes.get(id);
     if (!b) return undefined;
     return { ...b, y: b.y + (dy.get(lane.get(id) ?? "") ?? 0) };
+  };
+  const laneAtY = (y: number): string | undefined =>
+    current.find((l) => { const b = di.lanes.get(l)!; return y >= b.y && y <= b.y + b.height; }) ??
+    (y < top ? current[0] : current.at(-1));
+  const after = new Map([...di.shapes.keys()].map((sid) => [sid, moved(sid)!] as const));
+  const blocked = (route: Pt[], source: string, target: string): boolean => {
+    const src = after.get(source), tgt = after.get(target);
+    return [...after].some(([sid, b]) =>
+      sid !== source && sid !== target &&
+      ![src, tgt].some((x) => x && (holds(b, x) || boxesOverlap(b, x, 0))) &&
+      segments(route).some(([p, q]) => segmentHitsBox(p, q, b, 2)));
   };
 
   let plane = firstPlane(xml);
@@ -330,7 +368,17 @@ export function applyLaneOrder(xml: string, order: readonly string[]): string {
     if (!s || !t) return all;
     const indent = /\n(\s*)<(?:\w+:)?waypoint/.exec(body)?.[1] ?? "        ";
     const prefix = /<(\w+:)?waypoint/.exec(body)?.[1] ?? "di:";
-    const pts = elbow(s, t);
+    // Keep the author's bends: each waypoint moves with the lane it lies in,
+    // its ends with their shapes. A horizontal run stays in one lane and a
+    // vertical one keeps its x, so the route stays at right angles. Only if
+    // that now runs through a box is a fresh route tried.
+    const old = di.edges.get(id)?.points ?? [];
+    const kept = old.map((p, i) => ({
+      x: p.x,
+      y: p.y + (dy.get((i === 0 ? ls : i === old.length - 1 ? lt : laneAtY(p.y)) ?? "") ?? 0),
+    }));
+    const clear = (route: Pt[]): boolean => route.length >= 2 && !blocked(route, f.source, f.target);
+    const pts = [kept, elbow(s, t), orthogonalRoute(s, t), elbow(t, s).reverse()].find(clear) ?? (kept.length >= 2 ? kept : elbow(s, t));
     const wps = pts.map((p) => `\n${indent}<${prefix}waypoint x="${fmt(p.x)}" y="${fmt(p.y)}" />`).join("");
     const closeIndent = /\n(\s*)$/.exec(body)?.[1] ?? "      ";
     return `${open}${wps}\n${closeIndent}${close}`;
@@ -522,6 +570,59 @@ export function resizeShapes(
   const touched = new Set([...sizes.keys()]);
   for (const [id, b] of shapes) if (b.y !== di0.shapes.get(id)!.y || b.x !== di0.shapes.get(id)!.x) touched.add(id);
 
+  // Where an old coordinate lands now. A function of the coordinate alone,
+  // so points that shared an x (or a y) still do, and a right-angled route
+  // stays right-angled. x moves with the column it lies in (or the nearest
+  // one to its left); y with the lane it lies in.
+  const olds = [...di0.shapes].filter(([sid]) => shapes.has(sid));
+  const mapX = (x: number): number => {
+    const inCol = olds.find(([, o]) => x >= o.x && x <= o.x + o.width);
+    if (inCol) {
+      const [sid, o] = inCol, n = shapes.get(sid)!;
+      return x + (n.x + n.width / 2) - (o.x + o.width / 2);
+    }
+    let best: [string, Box] | undefined;
+    for (const e of olds) if (e[1].x + e[1].width < x && (!best || e[1].x + e[1].width > best[1].x + best[1].width)) best = e;
+    if (!best) return x;
+    const n = shapes.get(best[0])!;
+    return x + (n.x + n.width) - (best[1].x + best[1].width);
+  };
+  const mapY = (y: number): number => {
+    const l = order.find((k) => { const b = di0.lanes.get(k)!; return y >= b.y && y <= b.y + b.height; });
+    return y + (l ? shiftOf.get(l) ?? 0 : y < (di0.lanes.get(order[0] ?? "")?.y ?? 0) ? 0 : shift);
+  };
+  // An end that sat on a side of its shape stays on that side.
+  const snap = (p: Pt, o: Box | undefined, n: Box): Pt => {
+    if (!o) return p;
+    const E = 1.5;
+    if (Math.abs(p.x - o.x) < E) return { ...p, x: n.x };
+    if (Math.abs(p.x - (o.x + o.width)) < E) return { ...p, x: n.x + n.width };
+    if (Math.abs(p.y - o.y) < E) return { ...p, y: n.y };
+    if (Math.abs(p.y - (o.y + o.height)) < E) return { ...p, y: n.y + n.height };
+    return p;
+  };
+  const onEdge = (p: Pt, b: Box): boolean => {
+    const E = 1.5, inX = p.x >= b.x - E && p.x <= b.x + b.width + E, inY = p.y >= b.y - E && p.y <= b.y + b.height + E;
+    return (inY && (Math.abs(p.x - b.x) < E || Math.abs(p.x - b.x - b.width) < E)) ||
+      (inX && (Math.abs(p.y - b.y) < E || Math.abs(p.y - b.y - b.height) < E)) ||
+      (inX && inY);
+  };
+  const movedRoute = (pts: Pt[], so: Box | undefined, sn: Box, to: Box | undefined, tn: Box): Pt[] | undefined => {
+    if (pts.length < 2) return undefined;
+    const m = pts.map((p) => ({ x: mapX(p.x), y: mapY(p.y) }));
+    const first = snap(pts[0]!, so, sn), last = snap(pts.at(-1)!, to, tn);
+    if (first !== pts[0]) m[0] = first.x !== pts[0]!.x ? { x: first.x, y: m[0]!.y } : { x: m[0]!.x, y: first.y };
+    if (last !== pts.at(-1)) m[m.length - 1] = last.x !== pts.at(-1)!.x ? { x: last.x, y: m.at(-1)!.y } : { x: m.at(-1)!.x, y: last.y };
+    return onEdge(m[0]!, sn) && onEdge(m.at(-1)!, tn) ? m : undefined;
+  };
+  const routeBlocked = (route: Pt[], source: string, target: string): boolean => {
+    const src = shapes.get(source), tgt = shapes.get(target);
+    return [...shapes].some(([sid, b]) =>
+      sid !== source && sid !== target &&
+      ![src, tgt].some((x) => x && (holds(b, x) || boxesOverlap(b, x, 0))) &&
+      segments(route).some(([p, q]) => segmentHitsBox(p, q, b, 2)));
+  };
+
   let plane = firstPlane(xml);
   const original = plane;
   const setBounds = (body: string, b: Box): string =>
@@ -552,7 +653,13 @@ export function resizeShapes(
       const indent = /\n(\s*)<(?:\w+:)?waypoint/.exec(body)?.[1] ?? "        ";
       const prefix = /<(\w+:)?waypoint/.exec(body)?.[1] ?? "di:";
       const closeIndent = /\n(\s*)$/.exec(body)?.[1] ?? "      ";
-      return `${open}${orthogonalRoute(s, t).map((p) => `\n${indent}<${prefix}waypoint x="${fmt(p.x)}" y="${fmt(p.y)}" />`).join("")}\n${closeIndent}${close}`;
+      // Keep the author's bends where they still run clear; else the first
+      // right-angled route that does. Re-routing every touched flow drew a
+      // loop-back flow straight through the steps of its lane.
+      const kept = movedRoute(di0.edges.get(id)?.points ?? [], di0.shapes.get(f.source), s, di0.shapes.get(f.target), t);
+      const clear = (r: Pt[] | undefined): r is Pt[] => !!r && r.length >= 2 && !routeBlocked(r, f.source, f.target);
+      const route = [kept, orthogonalRoute(s, t), elbow(s, t), elbow(t, s).reverse()].find(clear) ?? orthogonalRoute(s, t);
+      return `${open}${route.map((p) => `\n${indent}<${prefix}waypoint x="${fmt(p.x)}" y="${fmt(p.y)}" />`).join("")}\n${closeIndent}${close}`;
     }
     const d = shiftOf.get(lane.get(f.source) ?? "") ?? 0;
     if (!d) return all;
@@ -696,6 +803,7 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
     "header-overflow": [],
     "edge-diagonal": [],
     "edge-crossing": [],
+    "edge-through-shape": [],
     "lane-order": [],
   };
   const ext = extent(di);
@@ -781,6 +889,12 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
   }
   for (const [a, b] of crossings(di)) {
     out["edge-crossing"]!.push({ where: `${a}×${b}`, detail: `flows ${a} and ${b} cross. Re-route one around the other, move a step, or swap lanes (\`bpmn:detangle\`).` });
+  }
+  for (const [eid, sid] of edgesThroughShapes(di)) {
+    out["edge-through-shape"]!.push({
+      where: `${eid}/${sid}`,
+      detail: `flow ${eid} is drawn through ${q(di.names.get(sid) ?? sid)}, which it neither leaves nor enters. Route it around the box.`,
+    });
   }
   const best = bestLaneOrder(di);
   if (best.cost < best.current) {
