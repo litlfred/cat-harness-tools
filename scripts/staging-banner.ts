@@ -455,7 +455,11 @@ export type Injection = "injected" | "already" | "no-body";
  * second pass over a tree is a no-op rather than a doubled banner.
  */
 export function injectInto(html: string): { html: string; outcome: Injection } {
-  if (html.includes("data-fa-staging-banner")) return { html, outcome: "already" };
+  // The banner ELEMENT, not the bare word: the review page names the attribute
+  // in its own CSS and script (to hide the banner inside its preview frames),
+  // and a plain substring test took that for a banner and left the page
+  // without one (owner, 2026-10-31: "what happened to staging bar at top?").
+  if (/<[a-z][a-z0-9-]*\s[^>]*data-fa-staging-banner[\s=>]/i.test(html)) return { html, outcome: "already" };
   const at = bodyInsertionPoint(html);
   if (at < 0) return { html, outcome: "no-body" };
   return { html: html.slice(0, at) + FRAGMENT + html.slice(at), outcome: "injected" };
