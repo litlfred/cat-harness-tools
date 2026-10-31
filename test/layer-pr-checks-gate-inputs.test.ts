@@ -87,6 +87,12 @@ describe("run-gates.py gate inputs", () => {
     expect(kind).toBe("live-state");
     expect(why).toContain("live state");
   });
+
+  test("ingest:ig-chrome:check is skipped as needs-input because it requires external --layer template checkouts (smart-base#239)", () => {
+    const [kind, why] = py("run-gates.py", `m.skip_reason(".", "ingest:ig-chrome:check")`) as [string, string];
+    expect(kind).toBe("needs-input");
+    expect(why).toContain("--layer");
+  });
 });
 
 describe("root-cat-script.py", () => {
