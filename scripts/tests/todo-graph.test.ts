@@ -35,10 +35,23 @@ import { TODO_PAGE_CONFIG_ID, isTodoPage, todoPageHtml } from "../todo-page.ts";
 import { renderTodoListing } from "../todo-listing.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { docsSources, siteNodeOf } from "../lib/docs-sources.ts";
+import { siteNotBuilt } from "../../test/support/checkout.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
-const INDEX = TodoIndexSchema.parse(JSON.parse(readFileSync(join(SITE, "assets/todos/index.json"), "utf8")));
+/**
+ * The todo index and the todo graph are written at publish and gitignored
+ * (bean w1gy F18). Not built, "what is published" has nothing to read: its
+ * index is empty, so it makes no per-todo tests, and its graph test skips.
+ */
+const NOT_BUILT = siteNotBuilt(
+  "the todo index and graph `docs:pages` writes at publish (gitignored)",
+  join(SITE, "assets/todos/index.json"),
+  join(SITE, "todos.jsonld"),
+);
+const INDEX = NOT_BUILT
+  ? { items: [] as TodoIndexItem[] }
+  : TodoIndexSchema.parse(JSON.parse(readFileSync(join(SITE, "assets/todos/index.json"), "utf8")));
 
 const ITEM: TodoIndexItem = {
   id: "a-todo",
@@ -164,9 +177,9 @@ describe("the no-JS floor", () => {
 });
 
 describe("what is published", () => {
-  const graph = JSON.parse(readFileSync(join(SITE, "todos.jsonld"), "utf8")) as Record<string, unknown>;
+  const graph = (NOT_BUILT ? {} : JSON.parse(readFileSync(join(SITE, "todos.jsonld"), "utf8"))) as Record<string, unknown>;
 
-  test("the graph, as .jsonld and .json, names every todo in the index", () => {
+  test.skipIf(NOT_BUILT)("the graph, as .jsonld and .json, names every todo in the index", () => {
     expect(readFileSync(join(SITE, "todos.json"), "utf8")).toBe(readFileSync(join(SITE, "todos.jsonld"), "utf8"));
     expect(graph["hasPart"]).toEqual(INDEX.items.map((i) => todoIri(i.id)));
   });

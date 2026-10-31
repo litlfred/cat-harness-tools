@@ -33,6 +33,7 @@ import { dirname, join, resolve } from "node:path";
 import { checkGraphs, proseGraphs } from "../../lsi.ts";
 import { clearQaCache } from "../../qa-store.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { notApplicableAlone } from "../../../test/support/checkout.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const NOGPG = ["-c", "commit.gpgsign=false", "-c", "user.name=t", "-c", "user.email=t@t"];
@@ -106,8 +107,18 @@ describe("lsi check over a stored index directory", () => {
   }, 60_000);
 });
 
+/**
+ * `kg-detangle` runs over the checkout that holds the harness, `REPO`, and
+ * judges against that checkout's stored tree. The composed checkout is a git
+ * work tree there; side-by-side clones have none above them (w1gy F11, the
+ * sibling root), so there is no checkout to detangle or to hold unchanged.
+ */
+const NO_CHECKOUT_AT_REPO =
+  spawnSync("git", ["-C", REPO, "rev-parse", "--show-toplevel"], { encoding: "utf-8" }).stdout.trim() !== REPO &&
+  notApplicableAlone(`a git checkout at ${REPO}, the composed root kg-detangle runs over (clones side by side have none)`);
+
 describe("kg:detangle:check over a stored detangle tree", () => {
-  test(
+  test.skipIf(NO_CHECKOUT_AT_REPO)(
     "computes, never fails on a stale stored copy, reports a missing baseline as UNKNOWN, and writes nothing",
     () => {
       const before = gitStatus();

@@ -34,9 +34,12 @@ import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 
 import { indexSummary, orphanPages, twinsInCheckout, unpublishedTwins } from "../gen-skill-docs.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { siteNotBuilt } from "../../test/support/checkout.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
 const GENERATED = join(HARNESS, siteDirFor(HARNESS), "reference", "skill-instructions");
+/** The generated pages are written at publish and gitignored (bean w1gy F18). */
+const NOT_GENERATED = siteNotBuilt("the skill reference pages `skills:docs` writes at publish (gitignored)", GENERATED);
 
 /** Every inline markdown link target on a page, anchors and titles stripped. */
 function linkTargets(body: string): string[] {
@@ -55,7 +58,7 @@ function relativeTarget(t: string): boolean {
   return !/^[a-z][a-z0-9+.-]*:/i.test(t);
 }
 
-describe("generated skill instruction pages", () => {
+describe.skipIf(NOT_GENERATED)("generated skill instruction pages", () => {
   const pages = existsSync(GENERATED)
     ? readdirSync(GENERATED).filter((f) => f.endsWith(".md"))
     : [];
@@ -166,7 +169,7 @@ describe("orphanPages", () => {
     ]);
   });
 
-  test("it is DISCRIMINATING over the real output directory", () => {
+  test.skipIf(NOT_GENERATED)("it is DISCRIMINATING over the real output directory", () => {
     // The vacuity control. `orphanPages(onDisk, [])` over the live tree must
     // name essentially all of it; a guard that returned `[]` unconditionally
     // would pass every assertion above this one's absence.
