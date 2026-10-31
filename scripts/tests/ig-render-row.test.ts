@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 
-import { IG_RENDER_LABEL, igRenderDir, withIgRenderRow } from "../lib/ig-render-row.ts";
+import { IG_RENDER_GLYPH, IG_RENDER_LABEL, IG_RENDER_TONE, igRenderDir, withIgRenderRow } from "../lib/ig-render-row.ts";
 
 function site(files: string[]): string {
   const root = mkdtempSync(join(tmpdir(), "ig-render-row-"));
@@ -50,17 +50,25 @@ describe("the row", () => {
   it("goes right after the owner's row and links the render's index.html", () => {
     const out = withIgRenderRow(rows, { siteAbs: site(["index.html", "toc.html"]), owner: "acme", ownerLabel: "Acme IG", atRoot: true, toRoot: ".." });
     expect(out!.map((r) => r.label)).toEqual(["SMART Base", "Acme IG", IG_RENDER_LABEL, "FHIR IG Harness"]);
-    expect(out![2]).toEqual({ label: "[fhir]", href: "../index.html" });
+    expect(out![2]).toEqual({ label: "[fhir]", href: "../index.html", glyphPath: IG_RENDER_GLYPH, tone: IG_RENDER_TONE });
   });
 
   it("goes first when no row carries the owner's label", () => {
     const out = withIgRenderRow(rows, { siteAbs: site(["acme/ig/index.html", "acme/ig/toc.html"]), owner: "acme", atRoot: false, toRoot: "." });
-    expect(out![0]).toEqual({ label: "[fhir]", href: "./acme/ig/index.html" });
+    expect(out![0]).toMatchObject({ label: "[fhir]", href: "./acme/ig/index.html" });
   });
 
   it("is absent when the site renders no IG for the owner", () => {
     const out = withIgRenderRow(rows, { siteAbs: site(["index.html"]), owner: "acme", ownerLabel: "Acme IG", atRoot: true, toRoot: "." });
     expect(out).toEqual(rows);
+  });
+
+  it("wears the flame mark, a 24x24 path the rail strokes", () => {
+    const out = withIgRenderRow(rows, { siteAbs: site(["index.html", "toc.html"]), owner: "acme", ownerLabel: "Acme IG", atRoot: true, toRoot: "." });
+    const row = out!.find((r) => r.label === IG_RENDER_LABEL)!;
+    expect(row.glyphPath).toBe(IG_RENDER_GLYPH);
+    expect(row.glyphPath).toMatch(/^M[\d.\s a-zA-Z-]+z.*z$/);
+    expect(row.tone).toBe(IG_RENDER_TONE);
   });
 
   it("is added once", () => {
