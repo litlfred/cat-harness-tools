@@ -92,6 +92,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { RENDER_LOG_DIR } from "../schemas/ui/render-log.ts";
+import { PC_PREFIX } from "./publish-main-site.ts";
 
 /** Where the previews live on the publish branch. */
 export const STAGING_PREFIX = "STAGING";
@@ -134,8 +135,12 @@ export const SLUG_PATTERN = /^[A-Za-z0-9._-]+$/;
  * same rule — `skills/ui/ui-core/render-logging.md` for the first, and bean
  * `6pfo`'s retired-record store for the next. Adding one should be a row here,
  * not a third code path that can disagree with the other two.
+ *
+ * The third tenant is `PC/`, the frozen public comment releases
+ * (`pc-release.ts`): the public cited their lines, so a deploy must never
+ * drop one.
  */
-export const CARRIED_PREFIXES: readonly string[] = [RENDER_LOG_DIR, `${STAGING_PREFIX}/${RETIRED_DIR}`];
+export const CARRIED_PREFIXES: readonly string[] = [RENDER_LOG_DIR, `${STAGING_PREFIX}/${RETIRED_DIR}`, PC_PREFIX];
 
 export interface RestoreOptions {
   /** Git working directory the commands run in. */

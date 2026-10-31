@@ -102,6 +102,8 @@ function publish(bare: string, siteDir: string, opts: { keepFiles: boolean }): s
 const BRANCH = { branch: "gh-pages", prefix: "STAGING" };
 /** No fixture below seeds a retired record unless it says so. */
 const RETIRED_ABSENT = { prefix: "STAGING/_retired", state: "absent" } as const;
+/** Nor a public comment release (`pc-release.ts`). */
+const PC_ABSENT = { prefix: "PC", state: "absent" } as const;
 
 describe("a full-replace deploy with the restore in front of it", () => {
   /** The state of the branch before any of this: one live page, one about to be deleted, two previews. */
@@ -340,7 +342,7 @@ describe("the render log is carried UNCONDITIONALLY — the property previews do
 
     const restored = restoreStaging({ repo, remote: bare, site: built, ...BRANCH });
     expect(restored.state).toBe("empty");
-    expect(restored.carried).toEqual([{ prefix: "_render-log", state: "carried" }, RETIRED_ABSENT]);
+    expect(restored.carried).toEqual([{ prefix: "_render-log", state: "carried" }, RETIRED_ABSENT, PC_ABSENT]);
 
     const after = publish(bare, built, { keepFiles: false });
     expect(after).toContain(LOG);
@@ -378,7 +380,7 @@ describe("the render log is carried UNCONDITIONALLY — the property previews do
 
     const restored = restoreStaging({ repo, remote: bare, site: built, ...BRANCH });
     expect(restored.state).toBe("restored");
-    expect(restored.carried).toEqual([{ prefix: "_render-log", state: "absent" }, RETIRED_ABSENT]);
+    expect(restored.carried).toEqual([{ prefix: "_render-log", state: "absent" }, RETIRED_ABSENT, PC_ABSENT]);
     expect(exitCodeFor(restored)).toBe(0);
   });
 
@@ -465,7 +467,7 @@ describe("the verifier checks the CARRIED prefixes, not only the previews", () =
     const built = site({ "index.html": "<p>new home</p>" });
 
     const restored = restoreStaging({ repo, remote: bare, site: built, ...BRANCH });
-    expect(restored.carried).toEqual([{ prefix: "_render-log", state: "carried" }, RETIRED_ABSENT]);
+    expect(restored.carried).toEqual([{ prefix: "_render-log", state: "carried" }, RETIRED_ABSENT, PC_ABSENT]);
     publish(bare, built, { keepFiles: false });
 
     const v = verifyStaging({ repo, remote: bare, site: built, ...BRANCH }, [], ["_render-log"]);
@@ -481,7 +483,7 @@ describe("the verifier checks the CARRIED prefixes, not only the previews", () =
     const built = site({ "index.html": "<p>new home</p>" });
 
     const restored = restoreStaging({ repo, remote: bare, site: built, ...BRANCH });
-    expect(restored.carried).toEqual([{ prefix: "_render-log", state: "absent" }, RETIRED_ABSENT]);
+    expect(restored.carried).toEqual([{ prefix: "_render-log", state: "absent" }, RETIRED_ABSENT, PC_ABSENT]);
     publish(bare, built, { keepFiles: false });
 
     // Only the `carried` ones are passed, so this list is empty.
