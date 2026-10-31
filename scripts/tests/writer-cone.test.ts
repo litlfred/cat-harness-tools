@@ -34,6 +34,28 @@ describe("parseTrace in collect mode — a writer's reads and writes", () => {
     expect(r).toEqual({ undetermined: "the writer reads site/out/index.json and then rewrites it" });
   });
 
+  test("a write that failed is a probe: mkdir -p meeting an existing directory does not rewrite it", () => {
+    const r = collect([
+      `10 newfstatat(AT_FDCWD</work/repo>, "smart-base/docs", {st_mode=S_IFDIR|0755}, 0) = 0`,
+      `10 mkdir("/work/repo/smart-base/docs", 0777) = -1 EEXIST (File exists)`,
+      `10 openat(AT_FDCWD</work/repo>, "smart-base/docs/p.md", O_WRONLY|O_CREAT|O_TRUNC|O_CLOEXEC, 0666) = 4</work/repo/smart-base/docs/p.md>`,
+    ]);
+    expect(r).toEqual({ paths: ["smart-base/docs"], git: [], writes: ["smart-base/docs/p.md"], absentBefore: [] });
+  });
+
+  test("a call strace lost as a thread detached names nothing, and is passed over", () => {
+    const r = collect([`10 openat(AT_FDCWD</work/repo>, "a.md", O_RDONLY|O_CLOEXEC) = 3</work/repo/a.md>`, `11 ???( <detached ...>`]);
+    expect(r).toEqual({ paths: ["a.md"], git: [], writes: [], absentBefore: [] });
+  });
+
+  test("git run with an absolute -C at the root is replayed from the root", () => {
+    const r = collect([
+      `20 getcwd("/work/repo", 4096) = 11`,
+      `20 execve("/usr/bin/git", ["git", "-C", "/work/repo", "remote", "get-url", "origin"], 0x1 /* 3 vars */) = 0`,
+    ]);
+    expect(r).toEqual({ paths: [], git: [{ cwd: "", args: ["remote", "get-url", "origin"] }], writes: [], absentBefore: [] });
+  });
+
   test("the default still refuses any write (checks are unchanged)", () => {
     const r = parseTrace(`10 openat(AT_FDCWD</work/repo>, "x", O_WRONLY|O_CREAT, 0644) = 3</work/repo/x>`, ROOT);
     expect("undetermined" in r).toBe(true);

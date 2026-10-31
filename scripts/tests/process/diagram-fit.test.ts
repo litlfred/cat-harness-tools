@@ -13,6 +13,7 @@ import {
   readDi,
   segmentHitsBox,
   segmentsCross,
+  straightenFlows,
 } from "../../../src/workflow/diagram-fit";
 
 type S = [id: string, x: number, y: number, w: number, h: number, label?: [number, number, number, number]];
@@ -149,5 +150,36 @@ describe("crossings", () => {
       ],
     );
     expect(crossings(readDi(xml))).toEqual([["up", "back"]]);
+  });
+});
+
+describe("slanted flows", () => {
+  // dth-pc PC-BP-01: Step 2 (lane One) → Step 3 (lane Two) → Step 4 (lane One), each one straight slant.
+  const xml = bpmn(
+    [["L1", "One", 0, 150], ["L2", "Two", 150, 150]],
+    [["S2", 450, 90, 140, 80], ["S3", 640, 230, 140, 80], ["S4", 830, 90, 140, 80]],
+    [
+      ["f2", "S2", "S3", [[590, 130], [640, 270]]],
+      ["f3", "S3", "S4", [[780, 270], [830, 130]]],
+    ],
+    1100,
+  );
+  test("are reported", () => {
+    expect(diagramFit(xml)["edge-diagonal"]!.map((f) => f.where)).toEqual(["f2", "f3"]);
+  });
+  test("are re-routed at right angles through the gap, from side to side", () => {
+    const { xml: next, fixed } = straightenFlows(xml);
+    expect(fixed).toEqual(["f2", "f3"]);
+    const di = readDi(next);
+    expect(diagramFit(next)["edge-diagonal"]).toEqual([]);
+    expect(di.edges.get("f2")!.points).toEqual([{ x: 590, y: 130 }, { x: 615, y: 130 }, { x: 615, y: 270 }, { x: 640, y: 270 }]);
+  });
+  test("a route through another shape is left for the author", () => {
+    const blocked = bpmn(
+      [["L1", "One", 0, 300]],
+      [["A", 0, 0, 100, 60], ["B", 300, 200, 100, 60], ["X", 140, 20, 30, 260]],
+      [["ab", "A", "B", [[100, 30], [300, 230]]]],
+    );
+    expect(straightenFlows(blocked).fixed).toEqual([]);
   });
 });

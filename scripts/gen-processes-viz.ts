@@ -69,6 +69,7 @@
  *   bun run cat-harness-tools/scripts/gen-processes-viz.ts
  *   bun run cat-harness-tools/scripts/gen-processes-viz.ts --check
  */
+import { linkProse } from "./lib/link-prose.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
@@ -923,8 +924,19 @@ export function processPage(
   skillPages: ReadonlySet<string>,
   presentedOn: readonly Presentation[] = [],
   instances: InstancesRead = NO_INSTANCES,
+  unlinked: (ref: string) => void = () => {},
 ): string {
   const byId = new Map(rows.map((r) => [r.id, r]));
+  // Process ids and skill names in authored prose become links (owner, 2026-10-31).
+  const prose = (t: string): string => {
+    const r = linkProse(
+      t,
+      (id) => (byId.get(id) ? `${byId.get(id)!.stem}.html` : undefined),
+      (n) => (skillPages.has(n) ? `${up()}reference/skill-instructions/${n}.html` : undefined),
+    );
+    r.unlinked.forEach(unlinked);
+    return r.text;
+  };
   const skill = (s: string): string =>
     skillPages.has(s) ? `[\`${s}\`](${up()}reference/skill-instructions/${s}.html)` : `\`${s}\``;
   const proc = (r: ProcessRow): string => `[${esc(r.name)}](${r.stem}.html)`;
@@ -948,7 +960,7 @@ export function processPage(
    * `<br>` renders as a gap that looks like a mistake.
    */
   const cell = (s: string | undefined): string =>
-    s ? esc(s).replace(/\n+/g, "<br>") : "—";
+    s ? esc(prose(s)).replace(/\n+/g, "<br>") : "—";
   const callers = rows.filter((r) => r.stem !== row.stem && r.steps.some((st) => st.calledElement === row.id));
   const namers = rows.filter(
     (r) => r.stem !== row.stem && r.steps.some((st) => st.calledElement === undefined && st.skills.includes(row.stem)),
@@ -973,7 +985,7 @@ export function processPage(
   L.push("");
   L.push(`\`${row.id}\` · ${row.enforcement}${row.enforcementDeclared ? "" : " (defaulted)"} · ${row.activities} step(s)`);
   L.push("");
-  L.push(row.documentation ?? "_This process carries no `<bpmn:documentation>`._");
+  L.push(row.documentation ? prose(row.documentation) : "_This process carries no `<bpmn:documentation>`._");
   L.push("");
   if (row.svg) {
     // With markers, the diagram carries the ⓘ task panel (owner, 2026-10-16:
@@ -983,7 +995,12 @@ export function processPage(
       ...diagramBlock({
         img: `${up()}assets/img/workflows/${row.stem}.svg`,
         alt: `BPMN diagram: ${row.name}`,
-        markers: row.markers ?? [],
+        // A call activity's shape opens the process it calls; its ⓘ still opens the panel.
+        markers: (row.markers ?? []).map((m) => {
+          const ce = row.steps.find((st) => st.id === m.id)?.calledElement;
+          const called = ce ? byId.get(ce) : undefined;
+          return called ? { ...m, href: `${called.stem}.html` } : m;
+        }),
         panelHref: panelFile(row.stem),
       }),
     );
@@ -1150,7 +1167,13 @@ if (import.meta.main) {
   const pages = new Map<string, string>([[out, html]]);
   const ctx = panelContext(REPO, skillPages);
   for (const r of rows.filter((x) => x.loadError === undefined)) {
-    pages.set(join(dirname(out), `${r.stem}.md`), processPage(r, rows, skillPages, presented.get(r.file), instances));
+    const refs = new Set<string>();
+    pages.set(join(dirname(out), `${r.stem}.md`), processPage(r, rows, skillPages, presented.get(r.file), instances, (x) => refs.add(x)));
+    // QA (owner, 2026-10-31): a reference the prose makes that no page can
+    // answer is reported, never left as silent plain text.
+    for (const x of refs) {
+      console.error(`⚠ ${r.file}: documentation names ${x.startsWith("skill:") ? `skill \`${x.slice(6)}\`, which has no instruction page` : `\`${x}\`, which no loaded diagram declares`}`);
+    }
     // The ⓘ panel's data, fetched by the page only when a marker is opened.
     if (r.markers) pages.set(join(dirname(out), panelFile(r.stem)), `${JSON.stringify(taskPanelData(r, rows, ctx), null, 1)}\n`);
   }

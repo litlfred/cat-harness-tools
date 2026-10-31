@@ -106,7 +106,17 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
       args: ["remote", "get-url", "origin"],
     });
     expect(gitReplayable("", ["--no-pager", "log", "-1"])).toEqual({ cwd: "", args: ["--no-pager", "log", "-1"] });
+    expect(gitReplayable("", ["remote", "get-url", "origin"])).toEqual({ cwd: "", args: ["remote", "get-url", "origin"] });
+    expect(gitReplayable("", ["hash-object", "a.svg"])).toEqual({ cwd: "", args: ["hash-object", "a.svg"] });
+    // An absolute -C (src/core/git-refs.ts passes the root) is made repo-relative, or refused.
+    const rel = (abs: string) => (abs === "/work/repo" ? "" : abs.startsWith("/work/repo/") ? abs.slice(11) : undefined);
+    expect(gitReplayable("", ["-C", "/work/repo", "ls-tree", "-r", "gh-pages"], rel)).toEqual({ cwd: "", args: ["ls-tree", "-r", "gh-pages"] });
+    expect(gitReplayable("", ["-C", "/work/repo/sub/", "log"], rel)).toEqual({ cwd: "sub", args: ["log"] });
     for (const argv of [
+      ["remote", "add", "x", "y"],
+      ["remote", "set-url", "origin", "y"],
+      ["hash-object", "-w", "a.svg"],
+      ["-C", "/elsewhere", "ls-files"],
       ["fetch", "origin"],
       ["add", "-A"],
       ["status", "--porcelain"],
