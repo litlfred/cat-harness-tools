@@ -467,6 +467,7 @@ if (import.meta.main) {
   const skipOn = env[WRITER_SKIP_ENV] === "1" && !recordOn;
   const prevRecords = skipOn ? loadWriterRecords(REPO_ROOT) : undefined;
   const outDir = join(REPO_ROOT, WRITER_OUTPUTS_DIR);
+  const decideDigests = new FileDigests(REPO_ROOT);
   const recScripts = recordOn || skipOn ? (cacheOn.on ? scripts : scriptsOf(REPO_ROOT)) : {};
   if (env[WRITER_RECORD_ENV] === "1" && !recordOn) console.log("  writer records: OFF (strace does not run here)");
   if (skipOn) console.log(`  writer skip: ON (${prevRecords ? `records of ${prevRecords.sha.slice(0, 12)}, ${Object.keys(prevRecords.writers).length} writer(s)` : "no records: every writer runs"})`);
@@ -516,15 +517,23 @@ if (import.meta.main) {
   };
   const runOne = async (w: string): Promise<WriterOutcome> => {
     const keep = nestedForeign(w, byWriter);
+    // Seconds per writer, so a slow one can be named from a published log (bean fwtz).
+    const t0 = performance.now();
+    const secs = () => `${((performance.now() - t0) / 1000).toFixed(1)}s`;
     if (skipOn && prevRecords !== undefined) {
-      const fresh = new FileDigests(REPO_ROOT);
+      // One file-digest memo for every decision: it is keyed on size and
+      // mtime, so a file a predecessor rewrote is hashed again, and a fresh
+      // memo per writer re-hashed every recorded read once per writer. Only
+      // git's view of the tree is asked again for each writer.
+      const fresh = decideDigests;
+      fresh.tree = undefined;
       const d = decideWriter(prevRecords, w, writerBase(REPO_ROOT, recScripts, w, fresh), REPO_ROOT, fresh);
       if (d.skip && hasEntry(outDir, w, prevRecords.sha) && restoreOutputs(outDir, w, prevRecords.sha, REPO_ROOT, keep)) {
         reused.set(w, prevRecords.sha);
-        console.log(`  skipped ${w}: ${d.why}; put back its outputs from ${prevRecords.sha.slice(0, 12)}${d.proof ? "" : " (evidence, not proof)"}`);
+        console.log(`  skipped ${w}: ${d.why}; put back its outputs from ${prevRecords.sha.slice(0, 12)}${d.proof ? "" : " (evidence, not proof)"} [${secs()}]`);
         return { kind: "ran" };
       }
-      console.log(`  ${w} runs: ${d.skip ? "its recorded outputs are not here" : d.why}`);
+      console.log(`  ${w} runs: ${d.skip ? "its recorded outputs are not here" : d.why} [decided in ${secs()}]`);
     }
     const fp = base.get(w);
     let key: string | undefined;
@@ -543,7 +552,7 @@ if (import.meta.main) {
     }
     const { outcome, log } = recordOn ? await runRecorded(w) : await runWriterAsync(["bun", "run", "cat", w], REPO_ROOT, jobs > 1);
     if (jobs > 1) process.stdout.write(`── ${w} ──\n${log}${log.endsWith("\n") || log === "" ? "" : "\n"}`);
-    console.log(`  ran ${w} (${why})`);
+    console.log(`  ran ${w} (${why}) [${secs()}]`);
     if (outcome.kind === "ran" && key !== undefined) staged.set(w, { key, path: stageOutputs(cacheDir, w, key, REPO_ROOT, byWriter.get(w) ?? [], keep) });
     return outcome;
   };
