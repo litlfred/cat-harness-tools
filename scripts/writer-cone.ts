@@ -136,6 +136,16 @@ export function writerBase(root: string, scripts: Readonly<Record<string, string
   return { hash: h.digest("hex"), audit: why };
 }
 
+/**
+ * `traced` input-site lines whose every read a writer run under strace sees
+ * for itself, inside the checkout: `git-refs` spawns git, whose command line
+ * `gitReplayable` judges and the next run replays; `process-presentations`
+ * loads a manifest file by path, which is an `openat` like any other. A site
+ * that reads outside the checkout (a branch store, the beans CLI, the
+ * network) is not here: strace leaves those paths out of a read set.
+ */
+export const STRACE_SEES: readonly string[] = ["git-refs: git", "process-presentations: computed load"];
+
 /** `argv`, run under the tracer, writing its trace to `log`. */
 export function tracedArgv(argv: readonly string[], log: string): string[] {
   return ["strace", ...STRACE_ARGS, "-o", log, ...argv];

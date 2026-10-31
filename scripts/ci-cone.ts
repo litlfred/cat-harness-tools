@@ -146,6 +146,8 @@ export type ReadSet = { paths: string[]; git: GitCall[]; writes?: string[]; abse
 const GIT_READ_ONLY = new Set([
   "ls-files", "ls-tree", "rev-parse", "cat-file", "show", "log", "rev-list", "merge-base", "for-each-ref",
   "show-ref", "describe", "name-rev", "diff", "diff-tree", "check-ignore", "config", "grep", "version",
+  // Read-only only in the forms let through below: `remote get-url`, `hash-object` without -w.
+  "remote", "hash-object",
 ]);
 
 /**
@@ -153,7 +155,7 @@ const GIT_READ_ONLY = new Set([
  * options are `-C <dir>` (folded into the cwd), `-c <k=v>`, `--no-pager` and
  * `--no-optional-locks`; anything else before the subcommand is refused.
  */
-export function gitReplayable(cwd: string, argv: readonly string[]): GitCall | { undetermined: string } {
+export function gitReplayable(cwd: string, argv: readonly string[], rel?: (abs: string) => string | undefined): GitCall | { undetermined: string } {
   let dir = cwd;
   let i = 0;
   const args: string[] = [];
@@ -162,6 +164,13 @@ export function gitReplayable(cwd: string, argv: readonly string[]): GitCall | {
     if (a === "-C") {
       const next = argv[++i];
       if (next === undefined) return { undetermined: "git -C with no directory" };
+      if (next.startsWith("/")) {
+        // An absolute -C (src/core/git-refs.ts passes the root): repo-relative, or refused.
+        const r = rel?.(normalize(next).replace(/(.)\/+$/, "$1"));
+        if (r === undefined) return { undetermined: `git -C outside the checkout (${next})` };
+        dir = r;
+        continue;
+      }
       dir = normalize(join(dir === "" ? "." : dir, next)).replace(/^\.$/, "");
       continue;
     }
@@ -184,6 +193,8 @@ export function gitReplayable(cwd: string, argv: readonly string[]): GitCall | {
   if (!GIT_READ_ONLY.has(sub)) return { undetermined: `git ${sub} is not a read-only command the cone replays` };
   if (rest.some((a) => /^--(stdin|batch|output|ext-diff|textconv|edit)/.test(a))) return { undetermined: `git ${sub} ${rest.join(" ")} reads stdin, writes or runs a helper` };
   if (sub === "config" && !rest.some((a) => /^(--get|--get-all|--get-regexp|--list|-l)$/.test(a))) return { undetermined: "git config without a read flag" };
+  if (sub === "remote" && rest[0] !== "get-url") return { undetermined: `git remote ${rest[0] ?? ""} is not a read-only command the cone replays` };
+  if (sub === "hash-object" && rest.includes("-w")) return { undetermined: "git hash-object -w writes an object" };
   if (dir.startsWith("..") || dir.startsWith("/")) return { undetermined: `git -C outside the checkout (${dir})` };
   return { cwd: dir, args: [...args, sub, ...rest] };
 }
@@ -323,6 +334,9 @@ function calls(text: string): Call[] | { undetermined: string } {
     const pid = Number(m[1]);
     const body = m[2]!;
     if (body.startsWith("+++") || body.startsWith("---")) continue; // exit and signal notes
+    // strace lost a thread mid-syscall as its process exited, and cannot name
+    // the call. Nothing it could name is left, so there is nothing to read.
+    if (/^\?\?\?\( <detached \.\.\.>$/.test(body)) continue;
     const resumed = /^<\.\.\. (\w+) resumed>(.*)$/.exec(body);
     if (resumed !== null) {
       const p = pending.get(pid);
@@ -405,6 +419,9 @@ export function parseTrace(text: string, root: string, opts: { writes?: "refuse"
       return { undetermined: `unclassified syscall ${c.name}` };
     }
     let write = spec.write === true || (spec.write === "flags" && c.args.some((a) => WRITE_FLAGS.test(a)));
+    // A WRITER's write that failed changed nothing: `mkdir -p` meeting a
+    // directory that exists (EEXIST) only learnt that it exists. It is a probe.
+    if (write && opts.writes === "collect" && /^-1 [A-Z]/.test(c.ret)) write = false;
     for (const [fdIndex, pathIndex] of spec.paths) {
       const raw = c.args[pathIndex];
       if (raw === undefined || raw === "NULL") continue;
@@ -426,7 +443,7 @@ export function parseTrace(text: string, root: string, opts: { writes?: "refuse"
         if (argv === undefined) return { undetermined: `a git command line strace did not print whole (${(c.args[1] ?? "").slice(0, 80)})` };
         const where = me.dir === undefined ? undefined : repoRelative(roots, me.dir);
         if (where === undefined) return { undetermined: `git ${argv.slice(1).join(" ")} ran outside the checkout, or where the trace does not say` };
-        const call = gitReplayable(where, argv.slice(1));
+        const call = gitReplayable(where, argv.slice(1), (abs) => repoRelative(roots, abs));
         if ("undetermined" in call) return call;
         git.set(JSON.stringify(call), call);
       }
