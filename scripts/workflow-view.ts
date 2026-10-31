@@ -533,6 +533,9 @@ export function dynamicStateContext(): Record<string, unknown> {
     id: "@id",
     type: "@type",
     graph: "@graph",
+    // The schema tag, as schemas/kg/jsonld.ts maps it: without a term a
+    // processor drops it (publish-verify jsonld-expand: invalid property).
+    $schema: { "@id": "http://purl.org/dc/terms/conformsTo" },
     generatedAt: { "@id": `${PROV_NS}generatedAtTime`, "@type": `${XSD_NS}dateTime` },
     harness: { "@id": `${CAT_NS}harness` },
     store: { "@id": `${CAT_NS}beanStore` },
