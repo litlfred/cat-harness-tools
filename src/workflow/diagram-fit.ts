@@ -8,13 +8,13 @@
  *
  * ## The budget is arithmetic, not taste
  *
- * The renderer draws text at 14px in diagram units (bootstrap-tools
+ * The renderer draws text at 16px in diagram units (bootstrap-tools
  * `TEXT_STYLE`). A page shows a diagram at most as wide as its band: about
  * 1200 CSS px once the nav rail is subtracted on a 1440px screen. A diagram
  * `W` units wide is shown at scale `min(1, 1200 / W)`, so its text reads at
- * `14 × 1200 / W` px. Keeping that at 12px or more gives `W ≤ 1400`.
+ * `16 × 1200 / W` px. 1400 keeps it near 14px (owner: "font a bit bigger").
  * Height: about 760px of a 900px viewport is left once the page's header and
- * the figure toolbar are drawn, so `H ≤ 760 × 14 / 12 ≈ 900`. A taller
+ * the figure toolbar are drawn; 900 keeps a diagram on about one screen. A taller
  * diagram still reads, but needs scrolling to see its decisions together.
  * Change {@link FIT_WIDTH} and `TEXT_STYLE` together.
  *
@@ -39,7 +39,9 @@
  * @module cat-harness-tools/src/workflow/diagram-fit
  */
 
-/** Widest a diagram may be drawn and still read at 12px in a 1200px band. */
+/** The renderer's text size inside shapes (bootstrap-tools `TEXT_STYLE`). */
+export const TEXT_PX = 16;
+/** Widest a diagram may be drawn and still read at about 14px in a 1200px band. */
 export const FIT_WIDTH = 1400;
 /** Tallest a diagram may be drawn and still be seen whole on one screen. */
 export const FIT_HEIGHT = 900;
@@ -367,7 +369,7 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
   if (ext && ext.width > FIT_WIDTH) {
     out["diagram-too-wide"]!.push({
       where: "diagram",
-      detail: `${Math.round(ext.width)} wide, budget ${FIT_WIDTH}: text shows at ${(14 * 1200 / ext.width).toFixed(1)}px in a 1200px band. ` +
+      detail: `${Math.round(ext.width)} wide, budget ${FIT_WIDTH}: text shows at ${(TEXT_PX * 1200 / ext.width).toFixed(1)}px in a 1200px band. ` +
         `Close the gaps between columns, stack steps of different lanes in one column, or split by phase.`,
     });
   }
