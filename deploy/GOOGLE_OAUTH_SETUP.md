@@ -119,15 +119,18 @@ User visits folio.OWNER.org
 | `GITHUB_OAUTH_CLIENT_SECRET` | GitHub Secrets + server `.env` | Repo admins, server root |
 | `COOKIE_SECRET` | Server `.env` only | Server root (HMAC signing key) |
 | `FOLIO_API_TOKEN` | Server `.env` only | Server root |
+| `FOLIO_GATEWAY_SECRET` | Server `.env` only | Server root (gateway → folio-assistant; 32+ chars, e.g. `openssl rand -hex 32`) |
 | `HETZNER_API_TOKEN` | GitHub Secrets only | Repo admins |
 
 ### Threat model
 
 - Session cookies are HMAC-signed (SHA-256) with `COOKIE_SECRET` — cannot be forged.
 - Cookies are `HttpOnly; Secure; SameSite=Lax` — no XSS or CSRF exposure.
-- CSRF state tokens are checked on OAuth callbacks (in-memory, 10-min TTL).
-- Whitelist files are checked on every request (no caching).
-- Bearer token bypass only works for `/mcp` endpoint.
+- CSRF state tokens are checked on OAuth callbacks (in-memory, 10-min TTL) and must match an HttpOnly state cookie set on the browser that started the login.
+- Google logins must have a verified email.
+- Whitelist files are checked at login. A session keeps its role until it expires (`SESSION_MAX_AGE`); removing someone from a whitelist does not end a session they already hold.
+- Bearer token bypass only works for `/mcp` endpoint, and the gateway checks the token. Caddy sends every `/mcp` request to the gateway.
+- folio-assistant serves `/mcp`, and trusts `X-User-*` headers, only on requests carrying `FOLIO_GATEWAY_SECRET`. The gateway drops any `X-User-*` header a client sends.
 - GitHub Secrets are encrypted at rest, masked in logs.
 - Cloud-init secrets are not persisted after execution.
 - `.env` on server is root-only, never committed.
