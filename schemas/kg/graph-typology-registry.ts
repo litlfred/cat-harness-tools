@@ -2197,6 +2197,13 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // labels-only reading gets the nouns right and the relations wrong, so
       // a reader has to be able to tell the two apart.
       "folio-figure-descriptions/v1": {},
+      // A figure transcribed as data on its entry's `figure-data/` (owner,
+      // 2026-10-31, "B in the catalogue instance"): the DIIG phases chart and the SMART
+      // Guidelines approach chart, one file per published version. Their
+      // shapes are with the generators that draw them, in a layer above this
+      // one, so they are routed here and validated there.
+      "diig-phases-figure/v1": {},
+      "smart-guidelines-approach-figure/v1": {},
       // Agent summaries of prose blocks, beside the blocks rather than in
       // them — the blocks stay verbatim and `ingested` (owner, 2026-09-24).
       // The semantic half of its QA is `block-summaries` in check-l1-complete.

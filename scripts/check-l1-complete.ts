@@ -79,6 +79,7 @@ import { DESCRIBABLE_ROLES, ImagesSidecarSchema } from "../schemas/content/docum
 import { VECTOR_LABELS_FILE, VectorLabelsSidecarSchema } from "../schemas/content/vector-labels.ts";
 import {
   VECTOR_FIGURES_DIR,
+  FIGURE_DATA_DIR,
   VECTOR_FIGURES_FILE,
   VectorFiguresSidecarSchema,
 } from "../schemas/content/vector-figure.ts";
@@ -219,7 +220,8 @@ export type EntryKind = "paged" | "tabular" | "archive" | "referenced" | "record
 // counterpart of `sections/` (`pipeline/tabular-nodes.ts`, written by
 // gen-library-jsonld under its `GROUPING_DIRS`).
 // `transcript/` is a recording's transcripts, one file per language (bean `1r0p`).
-export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "blocks", "images", "ocr", VECTOR_FIGURES_DIR, TRANSCRIPT_DIR];
+// `figure-data/` is a figure transcribed as data for a redrawing (owner, 2026-10-31).
+export const ENTRY_DIRECTORIES: readonly string[] = ["sections", "sheets", "blocks", "images", "ocr", VECTOR_FIGURES_DIR, FIGURE_DATA_DIR, TRANSCRIPT_DIR];
 
 /** Sidecars an entry may carry beyond {@link KIND_SIDECAR}'s kind markers. */
 export const ENTRY_SIDECARS: readonly string[] = [
