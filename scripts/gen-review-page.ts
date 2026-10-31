@@ -103,7 +103,7 @@
 
 import { DIFF_RENDERERS } from "../schemas/ui/diff-renderers.js";
 import { PUBLISHED_LOCALES } from "../schemas/content/translation.js";
-import { changeRuns, cleanRendered, markInFrame, renderFields, renderInline, renderSideBySide, renderVisual, renderWordDiff } from "./review-renderers.js";
+import { changeRuns, cleanRendered, FRAME_CHROME_CSS, markInFrame, renderFields, renderInline, renderSideBySide, renderVisual, renderWordDiff } from "./review-renderers.js";
 import { computeHeat, heatBucket, renderHeat } from "./review-heat.js";
 import { crumbFor, railOutline, renderMinimap, renderOutline } from "./review-nav.js";
 import { measuredModel, renderedModel, renderMeasured, renderRendered } from "./review-rendered.js";
@@ -688,7 +688,7 @@ const SCRIPT = `
             before: before,
             after: after,
             beforeName: beforeName,
-            facts: st && st.branch ? st : null,
+            facts: st && st.branch ? Object.assign({}, st, { baseSha: cs.base && cs.base.commit ? String(cs.base.commit) : "" }) : null,
           });
           li.appendChild(v.row);
           li.appendChild(v.panel);
@@ -889,6 +889,7 @@ var cleanRendered = ${cleanRendered.toString()};
 var renderWordDiff = ${renderWordDiff.toString()};
 var renderInline = ${renderInline.toString()};
 var renderFields = ${renderFields.toString()};
+var FRAME_CHROME_CSS = ${JSON.stringify(FRAME_CHROME_CSS)};
 var renderSideBySide = ${renderSideBySide.toString()};
 var changeRuns = ${changeRuns.toString()};
 var markInFrame = ${markInFrame.toString()};

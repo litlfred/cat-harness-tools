@@ -205,6 +205,13 @@ describe("injection mechanics carried over from the bash version", () => {
     expect(twice.html).toBe(once);
     expect(twice.outcome).toBe("already");
   });
+
+  test("a page that only NAMES the attribute (the review page's CSS) still gets the banner", () => {
+    const page = `<html><head><style>[data-fa-staging-banner]{display:none}</style></head><body><script>q("[data-fa-staging-banner]")</script>x</body></html>`;
+    const r = injectInto(page);
+    expect(r.outcome).toBe("injected");
+    expect(injectInto(r.html).outcome).toBe("already");
+  });
 });
 
 /* ── A COMMENT ABOUT THE BANNER BROKE THE BANNER ──────────────────────────

@@ -133,6 +133,22 @@ export function renderInline(
   });
   // Removed text with no head text at all to sit beside.
   for (const [, text] of dels) { const d = doc.createElement("del"); d.textContent = text; head.appendChild(d); }
+  // A link added around words that were already there changes no text, so the
+  // text diff above cannot see it; the word diff of the source shows it green.
+  // Mark such a link as added too (owner, 2026-10-31: "no green on first, but
+  // is on second"). A link is new when main has no link with the same target
+  // and the same words.
+  const key = (a: Element) => (a.getAttribute("href") || "") + "\u0001" + (a.textContent || "").trim();
+  const had = new Set(baseHtml === null ? [] : Array.from(clean(doc, baseHtml).querySelectorAll("a[href]")).map(key));
+  head.querySelectorAll("a[href]").forEach((a) => {
+    if (had.has(key(a)) || !(a.textContent || "").trim()) return;
+    if (a.querySelector("ins") && (a.textContent || "") === Array.from(a.querySelectorAll("ins")).map((e) => e.textContent).join("")) return;
+    const e = doc.createElement("ins");
+    e.className = "diff-link-added";
+    e.title = "link added";
+    while (a.firstChild) e.appendChild(a.firstChild);
+    a.appendChild(e);
+  });
   while (head.firstChild) box.appendChild(head.firstChild);
   return box;
 }
@@ -265,13 +281,18 @@ export function markInFrame(
  * preview with its branch, commit, PR and build log, so the green staging
  * banner inside the frame is hidden rather than repeated.
  */
+/** What the side-by-side panes hide in each framed page: the staging banner and the left rails. */
+export const FRAME_CHROME_CSS =
+  "[data-fa-staging-banner]{display:none!important}:root{--fa-staging-offset:0px!important}html{padding-top:0!important}" +
+  "nav.fa-nav,.fa-nav,.side-bar{display:none!important}body{padding-left:0!important}.main{margin-left:0!important;max-width:none!important}";
+
 export function renderSideBySide(
   doc: Document,
   before: string | null,
   after: string | null,
   opts?: {
     beforeName?: string;
-    facts?: { branch?: string; sha?: string; pr?: string; prUrl?: string; branchUrl?: string; runUrl?: string } | null;
+    facts?: { branch?: string; sha?: string; pr?: string; prUrl?: string; branchUrl?: string; runUrl?: string; baseSha?: string } | null;
     runs?: { base: Array<{ before: string; text: string }>; head: Array<{ before: string; text: string }> } | null;
     mark?: ((f: HTMLIFrameElement, runs: Array<{ before: string; text: string }>, cls: string) => number) | null;
   },
@@ -309,6 +330,11 @@ export function renderSideBySide(
       if (f.runUrl) add("", link("build log", f.runUrl));
     } else if (side === "base") {
       h.appendChild(doc.createTextNode(" \u00b7 published site"));
+      // Main's commit, beside the preview's, as the staging bar would give it
+      // (owner, 2026-10-31: "current sha of main and of feature branch").
+      const sha = f && /^[0-9a-f]{7,40}$/i.test(f.baseSha || "") ? f.baseSha!.slice(0, 7) : "";
+      const m = ((f && f.branchUrl) || "").match(/^(https:\/\/github\.com\/[^/]+\/[^/]+)\//);
+      if (sha) { h.appendChild(doc.createTextNode(" \u00b7 commit ")); h.appendChild(link(sha, m ? m[1] + "/commit/" + f!.baseSha : undefined)); }
     }
     // One line; the whole of it on hover.
     h.title = h.textContent || "";
@@ -328,20 +354,20 @@ export function renderSideBySide(
       f.src = href;
       f.title = (side === "base" ? o.beforeName || "Main" : "This preview") + ": " + href;
       f.loading = "lazy";
-      // The heading above already says this is the preview, and which build
-      // (owner, 2026-10-31): the framed page's own green banner is hidden, and
-      // the space it held is given back. Same origin, so the frame is ours to style.
-      if (side === "head") {
-        f.addEventListener("load", () => {
-          try {
-            const d = f.contentDocument;
-            if (!d || !d.head) return;
-            const st = d.createElement("style");
-            st.textContent = "[data-fa-staging-banner]{display:none!important}:root{--fa-staging-offset:0px!important}";
-            d.head.appendChild(st);
-          } catch { /* another origin: the banner stays */ }
-        });
-      }
+      // The heading above already says which page and which build (owner,
+      // 2026-10-31): in both panes the framed page's green banner and its left
+      // navigation rail are hidden, and the space they held is given back, so
+      // the two pages sit level with nothing but the text. Same origin, so the
+      // frame is ours to style.
+      f.addEventListener("load", () => {
+        try {
+          const d = f.contentDocument;
+          if (!d || !d.head) return;
+          const st = d.createElement("style");
+          st.textContent = FRAME_CHROME_CSS;
+          d.head.appendChild(st);
+        } catch { /* another origin: the page stays as it is */ }
+      });
       const mark = o.mark;
       if (mark) {
         const runs = (o.runs && o.runs[side]) || [];

@@ -15,7 +15,7 @@ const at = (file: string, kind: string, index: number) => ({ file, kind, section
 /** A published page: a staging banner, a tall section, then the block. */
 function page(title: string, block: string): string {
   return (
-    `<!doctype html><html><body><div data-fa-staging-banner style="position:fixed;top:0">FEATURE BRANCH</div>` +
+    `<!doctype html><html><body><div data-fa-staging-banner style="position:fixed;top:0">FEATURE BRANCH</div><nav class="fa-nav">rail</nav>` +
     `<h1>${title}</h1><div style="height:3000px">Give 5 mg</div><section id="prose:dose">${block}</section>` +
     `<div style="height:3000px"></div></body></html>`
   );
@@ -32,7 +32,7 @@ const FILES: Record<string, { type: string; body: string }> = {
     body: JSON.stringify({
       $schema: "folio-changeset/v1",
       folio: "folio",
-      base: { ref: "origin/main", commit: "a" },
+      base: { ref: "origin/main", commit: "abcdef1234567890abcdef1234567890abcdef12" },
       head: { ref: "worktree", commit: null },
       summary: { added: 1, removed: 0, changed: 2, unchanged: 0, renamed: 0, prose: 1, manifest: 1, moved: 0 },
       changes: [
@@ -77,7 +77,7 @@ test.describe("review page: selectable diff renderers (d903)", () => {
 
   test("inline keeps the head's markup and marks the change in place", async ({ page }) => {
     await open(page);
-    const first = page.locator("li").first();
+    const first = page.locator("#changes li").first();
     await expect(first.locator(".diff-inline strong ins")).toHaveText("10");
     await expect(first.locator(".diff-inline del")).toHaveText("5");
   });
@@ -90,7 +90,7 @@ test.describe("review page: selectable diff renderers (d903)", () => {
 
   test("a renderer that cannot run is listed, disabled, with the reason", async ({ page }) => {
     await open(page);
-    const table = page.locator("li").nth(1).locator("select option", { hasText: "Word diff" });
+    const table = page.locator("#changes li").nth(1).locator("select option", { hasText: "Word diff" });
     await expect(table).toBeDisabled();
     await expect(table).toContainText("unavailable: no prose on either side");
   });
@@ -99,10 +99,10 @@ test.describe("review page: selectable diff renderers (d903)", () => {
     await open(page);
     await page.selectOption("#view", "word");
     // "mg" is unchanged, so the source diff is two insertions around it.
-    await expect(page.locator("li").first().locator(".diff-word ins")).toHaveText(["**10", "**"]);
-    await expect(page.locator("li").first().locator(".diff-word del")).toHaveText(["5"]);
+    await expect(page.locator("#changes li").first().locator(".diff-word ins")).toHaveText(["**10", "**"]);
+    await expect(page.locator("#changes li").first().locator(".diff-word del")).toHaveText(["5"]);
     // The table has no prose, so it falls back to a renderer that can run.
-    expect(await page.locator("li").nth(1).locator("select").inputValue()).toBe("side-by-side");
+    expect(await page.locator("#changes li").nth(1).locator("select").inputValue()).toBe("side-by-side");
     await page.reload();
     await page.waitForFunction(() => !document.getElementById("status")!.textContent!.startsWith("Loading"));
     expect(await page.inputValue("#view")).toBe("word");
@@ -111,17 +111,19 @@ test.describe("review page: selectable diff renderers (d903)", () => {
   test("side by side: both pages at the block, and an added block says it is not on main", async ({ page }) => {
     await open(page);
     await page.selectOption("#view", "side-by-side");
-    const frames = page.locator("li").first().locator("iframe");
+    const frames = page.locator("#changes li").first().locator("iframe");
     await expect(frames).toHaveCount(2);
     expect(await frames.nth(0).getAttribute("src")).toBe("/main/doc/index.html#prose%3Adose");
-    await expect(page.locator("li").nth(2)).toContainText("Not on main: this block is new.");
+    await expect(page.locator("#changes li").nth(2)).toContainText("Not on main: this block is new.");
   });
 
   test("side by side: each pane scrolls to its change and marks it, under its own header", async ({ page }) => {
     await open(page);
     await page.selectOption("#view", "side-by-side");
-    const li = page.locator("li").first();
+    const li = page.locator("#changes li").first();
     await expect(li.locator(".sbs-side-base")).toContainText("Main");
+    // Main's commit beside the preview's (owner, 2026-10-31).
+    await expect(li.locator(".sbs-side-base")).toContainText("commit abcdef1");
     const head = li.locator(".sbs-side-head");
     await expect(head).toContainText("This preview");
     await expect(head).toContainText("edit/dosing");
@@ -131,9 +133,32 @@ test.describe("review page: selectable diff renderers (d903)", () => {
       // The "5" inside the block, not the decoy above it.
       await expect(frame.locator(`#prose\\:dose mark.${cls}`)).toHaveText(text);
       await expect(frame.locator("[data-fa-staging-banner]")).toBeHidden();
+      // Neither pane keeps the page's left rail (owner, 2026-10-31).
+      await expect(frame.locator("nav.fa-nav")).toBeHidden();
       const y = await li.locator("iframe").nth(i).evaluate((f: HTMLIFrameElement) => f.contentWindow!.scrollY);
       expect(y).toBeGreaterThan(2500);
     }
+  });
+
+  test("inline marks a link added around words that did not change (owner, 2026-10-31)", async ({ page }) => {
+    await open(page);
+    const out = await page.evaluate(() => {
+      const w = window as unknown as Record<string, (...a: unknown[]) => unknown>;
+      const box = w.renderInline(document, "<p>data and digital infrastructure here</p>", '<p>data and <a href="g#di">digital infrastructure</a> here</p>', w.wordDiff, w.cleanRendered) as HTMLElement;
+      const same = w.renderInline(document, '<p>see <a href="g#di">term</a></p>', '<p>see <a href="g#di">term</a></p>', w.wordDiff, w.cleanRendered) as HTMLElement;
+      return { added: box.querySelector("a ins.diff-link-added")?.textContent, same: same.querySelectorAll("ins").length };
+    });
+    expect(out).toEqual({ added: "digital infrastructure", same: 0 });
+  });
+
+  test("the review brief draws a link inside bold (a comment number linked to its row)", async ({ page }) => {
+    await open(page);
+    const html = await page.evaluate(() => {
+      const p = document.createElement("p");
+      (window as unknown as Record<string, (...a: unknown[]) => void>).briefInline(document, p, "**No. [136](https://x.io/pc/#PC-0137):** Accepted.");
+      return p.innerHTML;
+    });
+    expect(html).toBe('<strong>No. <a href="https://x.io/pc/#PC-0137" rel="noopener">136</a>:</strong> Accepted.');
   });
 
   test("typing j inside a selector does not navigate", async ({ page }) => {
