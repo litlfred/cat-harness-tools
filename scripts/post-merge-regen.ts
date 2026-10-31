@@ -94,7 +94,7 @@ export function postMergePairs<P extends { check: string }>(pairs: readonly P[])
 export interface PublishTimeDeclaration {
   /** Absolute. */
   root: string;
-  builtAtPublish: readonly Pick<BuiltAtPublish, "path">[];
+  builtAtPublish: readonly (Pick<BuiltAtPublish, "path"> & Partial<Pick<BuiltAtPublish, "writer">>)[];
 }
 
 /** Every instance under `repoRoot` that declares `builtAtPublish` (bean `p7mb`). */
@@ -109,6 +109,22 @@ export function publishTimeDeclarations(repoRoot: string): PublishTimeDeclaratio
     }
     return list.length > 0 ? [{ root: resolve(root), builtAtPublish: list }] : [];
   });
+}
+
+/** Writers whose outputs other checks read, so they run before the repair pass. */
+export const PREREQUISITE_WRITERS: readonly string[] = ["ig-index:build"];
+
+/**
+ * The prerequisite writers that some declaring instance needs run: one of
+ * its `builtAtPublish` entries names the writer and its path is absent.
+ */
+export function missingPrerequisiteWriters(decls: readonly PublishTimeDeclaration[]): string[] {
+  const out = new Set<string>();
+  for (const d of decls)
+    for (const e of d.builtAtPublish)
+      for (const w of e.writer ?? [])
+        if (PREREQUISITE_WRITERS.includes(w) && !existsSync(join(d.root, e.path))) out.add(w);
+  return [...out];
 }
 
 /**
@@ -477,18 +493,20 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
   // publish-time outputs is told apart from a stale one after the repair pass.
   // Watch both `p.writer` and `p.check`: checks routed through `publish-check.ts <writer>`
   // execute `<writer>` on disk inside the check call itself.
-  if (
-    opts.runner === undefined &&
-    existsSync(join(repoRoot, "smart-base")) &&
-    !existsSync(join(repoRoot, "smart-base", "fhir-artifact-index", "index.json"))
-  ) {
-    spawnSync("bun", ["run", "cat", "ig-index:build"], {
-      cwd: repoRoot,
-      encoding: "utf-8",
-      env: { ...process.env, [BUILDING_ENV]: "1" },
-    });
-  }
   const decls = opts.tracker === undefined && opts.runner === undefined ? publishTimeDeclarations(repoRoot) : [];
+  // An IG's artefact index is read by the checks below, and it is built at
+  // publish rather than committed. Build it first when an instance that
+  // declares it lacks it. Which instances those are is read from their
+  // declarations, so this layer names none of them (it sits below them).
+  if (opts.runner === undefined) {
+    for (const w of missingPrerequisiteWriters(decls.length > 0 ? decls : publishTimeDeclarations(repoRoot))) {
+      spawnSync("bun", ["run", "cat", w], {
+        cwd: repoRoot,
+        encoding: "utf-8",
+        env: { ...process.env, [BUILDING_ENV]: "1" },
+      });
+    }
+  }
   const tracker = opts.tracker ?? (opts.runner === undefined ? treeMoveTracker(repoRoot, decls, opts.instance) : undefined);
   const moves = new Map<string, WriterMoves>();
   const scriptToWriter = new Map<string, string>();
