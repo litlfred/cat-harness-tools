@@ -12,7 +12,8 @@
  * 60 s timeout.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { defaultGraphTypologies, readDeclaration } from "../../schemas/kg/cat-harness.ts";
@@ -77,4 +78,22 @@ describe("each instance's baseline, on this checkout", () => {
     const failing = layers.filter((l) => l.fresh.length > 0).map((l) => [l.instance, l.fresh]);
     expect(failing).toEqual([[owner(victim.typology)!, [unkindedKey(added)]]]);
   }, SLOW);
+});
+
+describe("a mounted layer's baseline is its own repository's", () => {
+  test("readBaselines marks an instance a lock laid down as mounted, and the checkout's own as not", () => {
+    const root = mkdtempSync(join(tmpdir(), "node-kinds-mounted-"));
+    try {
+      for (const name of ["lower", "own"]) {
+        mkdirSync(join(root, name));
+        writeFileSync(join(root, name, `${name}.json`), JSON.stringify({ name }));
+      }
+      writeFileSync(join(root, "index.lock.json"), JSON.stringify({ instances: [{ path: "lower/" }] }));
+      const by = new Map(readBaselines(root).map((d) => [d.instance, d] as const));
+      expect(by.get("lower")?.mounted).toBe(true);
+      expect(by.get("own")?.mounted).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
