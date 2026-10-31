@@ -20,17 +20,18 @@
  * on "No". Without a browser, or with `--di-only`, only labels the file
  * places itself are checked, and the report says so.
  *
- * `--write` makes boxes big enough for their text (wider, then taller,
+ * `--write` moves labels off flows, shapes, other labels and lane lines,
+ * makes boxes big enough for their text (wider, then taller,
  * growing the lane), changes the lane order (re-routing the flows between lanes as
  * elbows) and re-routes slanted flows at right angles (owner, 2026-10-31:
- * *"straight angled arrows ugly"*). Moving steps and labels is the author's
+ * *"straight angled arrows ugly"*). Moving steps is the author's
  * judgement, so it is reported, never guessed. Re-render and look.
  *
  * @module scripts/bpmn-detangle
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { applyLaneOrder, bestLaneOrder, crossings, diagramFit, headerOverflow, laneOrder, readDi, resizeShapes, straightenFlows, textOverflow, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
+import { applyLaneOrder, bestLaneOrder, crossings, diagramFit, headerOverflow, laneOrder, placeLabels, readDi, resizeShapes, straightenFlows, textOverflow, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
 
 type Draw = (xml: string) => Promise<DrawnLabels | undefined>;
 
@@ -129,6 +130,19 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
       xml = resizeShapes(xml, new Map(), min);
       writeFileSync(file, xml);
       console.log(`✓ ${shown}: ${over.length} pool/lane name(s) given room (${over.map((h) => h.id).join(", ")})`);
+    }
+  }
+  if (write && renderer) {
+    // Labels on flows, shapes, other labels or lane lines go to the nearest
+    // clear place. Moving one can free or block another, so a few passes.
+    for (let pass = 0; pass < 3; pass++) {
+      const seen = await renderer.draw(xml).catch(() => undefined);
+      if (!seen) break;
+      const { xml: next, moved } = placeLabels(xml, seen);
+      if (moved.length === 0) break;
+      xml = next;
+      writeFileSync(file, xml);
+      console.log(`✓ ${shown}: ${moved.length} label(s) moved clear (${moved.join(", ")})`);
     }
   }
   const drawn = renderer ? await renderer.draw(xml).catch(() => undefined) : undefined;

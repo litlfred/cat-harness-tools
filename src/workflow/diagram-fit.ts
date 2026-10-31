@@ -24,8 +24,9 @@
  * |---|---|
  * | `diagram-too-wide` · `diagram-too-tall` | the DI extent, against the budget above |
  * | `label-overlap` | two drawn labels intersect (e.g. "Satisfied with changes?" over "No") |
- * | `label-on-edge` | a label sits on a flow that is not its own |
+ * | `label-on-edge` | a label sits on a flow, its own included |
  * | `label-on-shape` | a label covers a task, event or gateway that is not its own |
+ * | `label-on-lane-line` | a label is drawn across the line between two lanes, or a pool's edge |
  * | `header-overflow` | a pool or lane name spills out of its 30-wide header strip |
  * | `text-overflow` | a task's name spills out of its box (16px text in a box drawn for 12px) |
  * | `edge-diagonal` | a flow runs at a slant (owner, 2026-10-31: *"straight angled arrows ugly"*) |
@@ -560,6 +561,114 @@ export function resizeShapes(
   return xml.replace(original, plane);
 }
 
+// ── Labels clear of everything ──────────────────────────────────────────
+
+/** The top and bottom edge of every lane and pool, keyed by lane or pool id. */
+function laneLines(di: DiLayout): [string, [Pt, Pt]][] {
+  const out: [string, [Pt, Pt]][] = [];
+  for (const [id, b] of [...di.lanes, ...di.pools]) {
+    out.push([id, [{ x: b.x, y: b.y }, { x: b.x + b.width, y: b.y }]]);
+    out.push([id, [{ x: b.x, y: b.y + b.height }, { x: b.x + b.width, y: b.y + b.height }]]);
+  }
+  return out;
+}
+
+/** Space kept between a label and what it names. */
+const LABEL_GAP = 4;
+
+/** Where a label may go, nearest first: around its shape, or beside each run of its flow. */
+function labelCandidates(di: DiLayout, id: string, w: number, h: number): Box[] {
+  const s = di.shapes.get(id);
+  const at = (x: number, y: number): Box => ({ x, y, width: w, height: h });
+  if (s) {
+    const cx = s.x + s.width / 2, cy = s.y + s.height / 2, g = LABEL_GAP;
+    const below = s.y + s.height + g, above = s.y - h - g, right = s.x + s.width + g, left = s.x - w - g;
+    return [
+      at(cx - w / 2, below), at(cx - w / 2, above), at(right, cy - h / 2), at(left, cy - h / 2),
+      at(right, below), at(left, below), at(right, above), at(left, above),
+      at(right, s.y + s.height - h), at(left, s.y + s.height - h), at(right, s.y), at(left, s.y),
+    ];
+  }
+  const e = di.edges.get(id);
+  if (!e) return [];
+  const out: Box[] = [];
+  for (const [p, r] of segments(e.points)) {
+    const len = Math.hypot(r.x - p.x, r.y - p.y);
+    for (const t of [0.5, 0.25, 0.75]) {
+      const m = { x: p.x + (r.x - p.x) * t, y: p.y + (r.y - p.y) * t };
+      if (p.y === r.y && len >= 20) out.push(at(m.x - w / 2, m.y - h - 3), at(m.x - w / 2, m.y + 3));
+      else if (p.x === r.x && len >= 20) out.push(at(m.x + 4, m.y - h / 2), at(m.x - w - 4, m.y - h / 2));
+    }
+    // Hugging the start of a run, where a gateway's answers usually sit.
+    if (p.y === r.y) out.push(at(Math.min(p.x, r.x) + 6, p.y - h - 3), at(Math.max(p.x, r.x) - w - 6, p.y - h - 3));
+    if (p.x === r.x) out.push(at(p.x + 4, Math.min(p.y, r.y) + 4), at(p.x + 4, Math.max(p.y, r.y) - h - 4));
+  }
+  // A run too short to hold its label: the four corners where the flow
+  // leaves its source, then where it meets its target.
+  for (const p of [e.points[0], e.points.at(-1)]) {
+    if (p) out.push(at(p.x + 4, p.y - h - 3), at(p.x + 4, p.y + 3), at(p.x - w - 4, p.y - h - 3), at(p.x - w - 4, p.y + 3));
+  }
+  return out;
+}
+
+/**
+ * Move every label that sits on a flow, a shape, another label, a lane line
+ * or a name strip to the nearest place where it touches none of them, and
+ * write that place as its `BPMNLabel` bounds. Sizes are the drawn ones, so a
+ * drawing is needed; a label with nowhere clear to go is left where it is
+ * and the check still reports it. Owner, 2026-10-31: *"need to check for
+ * text on arrows"*.
+ */
+export function placeLabels(xml: string, drawn: DrawnLabels): { xml: string; moved: string[] } {
+  const di = readDi(xml);
+  const lane = laneOf(di);
+  const labels = labelBoxes(di, drawn);
+  const placed = new Map(labels.map((l) => [l.id, l.box]));
+  const edgePts = drawn.edges ? new Map(drawn.edges.map((e) => [e.id, e.points])) : new Map([...di.edges].map(([id, e]) => [id, e.points]));
+  const lines = laneLines(di);
+  const strips = [...di.pools.values(), ...di.lanes.values()].map((h) => ({ x: h.x, y: h.y, width: HEADER, height: h.height }));
+  const area = extent(di);
+  const clear = (id: string, b: Box): boolean => {
+    if (area && (b.x < area.x || b.y < area.y || b.x + b.width > area.x + area.width || b.y + b.height > area.y + area.height)) return false;
+    const home = lane.get(id) && di.lanes.get(lane.get(id)!);
+    if (home && !(b.y >= home.y && b.y + b.height <= home.y + home.height)) return false;
+    for (const [oid, ob] of placed) if (oid !== id && boxesOverlap(b, ob)) return false;
+    for (const s of di.shapes.values()) if (boxesOverlap(b, s)) return false;
+    for (const pts of edgePts.values()) if (segments(pts).some(([p, r]) => segmentHitsBox(p, r, b, 2))) return false;
+    for (const [, [p, r]] of lines) if (segmentHitsBox(p, r, b, 2)) return false;
+    for (const st of strips) if (boxesOverlap(b, st)) return false;
+    return true;
+  };
+  const moves = new Map<string, Box>();
+  for (const l of labels) {
+    if (clear(l.id, l.box)) continue;
+    // bpmn-js wraps an outside label at its DI width (90 when there is
+    // none), so the box written keeps that width and the text's height.
+    const own = di.shapes.get(l.id)?.label ?? di.edges.get(l.id)?.label;
+    const w = Math.max(l.box.width, own?.width ?? 90);
+    const to = labelCandidates(di, l.id, w, l.box.height).find((c) => clear(l.id, c));
+    if (!to) continue;
+    placed.set(l.id, to);
+    moves.set(l.id, to);
+  }
+  if (moves.size === 0) return { xml, moved: [] };
+  const plane = firstPlane(xml);
+  const bounds = (tag: string, b: Box): string => `<${tag} x="${fmt(b.x)}" y="${fmt(b.y)}" width="${fmt(b.width)}" height="${fmt(b.height)}" />`;
+  const next = plane.replace(/(<((?:\w+:)?)(BPMNShape|BPMNEdge)\b([^>]*)>)([\s\S]*?)(<\/(?:\w+:)?(?:BPMNShape|BPMNEdge)>)/g,
+    (all, open: string, pre: string, _k: string, attrs: string, body: string, close: string) => {
+      const b = moves.get(attr(attrs, "bpmnElement") ?? "");
+      if (!b) return all;
+      const dc = /<(\w+:)?Bounds\b/.exec(body)?.[1] ?? "dc:";
+      const label = `<${pre}BPMNLabel>${bounds(`${dc}Bounds`, b)}</${pre}BPMNLabel>`;
+      // An existing label element, with or without bounds, is replaced whole.
+      const had = /<(?:\w+:)?BPMNLabel\b(?:[^>]*\/>|[\s\S]*?<\/(?:\w+:)?BPMNLabel>)/;
+      if (had.test(body)) return open + body.replace(had, label) + close;
+      const indent = /\n(\s*)<\/[^>]*>$/.exec(body + close)?.[1] ?? "      ";
+      return `${open}${body.replace(/\s*$/, "")}\n${indent}  ${label}\n${indent}${close}`;
+    });
+  return { xml: xml.replace(plane, next), moved: [...moves.keys()] };
+}
+
 // ── The checks ───────────────────────────────────────────────────────────
 
 /** Label boxes: drawn ones when given, else the DI's own `BPMNLabel` bounds. */
@@ -582,6 +691,7 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
     "label-overlap": [],
     "label-on-edge": [],
     "label-on-shape": [],
+    "label-on-lane-line": [],
     "text-overflow": [],
     "header-overflow": [],
     "edge-diagonal": [],
@@ -617,9 +727,9 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
   const edgePts = drawn?.edges ? new Map(drawn.edges.map((e) => [e.id, e.points])) : new Map([...di.edges].map(([id, e]) => [id, e.points]));
   for (const l of labels) {
     for (const [eid, pts] of edgePts) {
-      if (eid === l.id) continue;
+      // Its own flow too: a label drawn over its own arrow hides both.
       if (segments(pts).some(([p, r]) => segmentHitsBox(p, r, l.box, 2))) {
-        out["label-on-edge"]!.push({ where: `${l.id}/${eid}`, detail: `label ${q(l.text)} sits on flow ${eid}. Move the label off the line.` });
+        out["label-on-edge"]!.push({ where: `${l.id}/${eid}`, detail: `label ${q(l.text)} sits on flow ${eid}. Move the label off the line (\`bpmn:detangle --write\` does it).` });
       }
     }
     // The name strip down the left of a horizontal pool or lane is drawn text too.
@@ -633,6 +743,18 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
     for (const [sid, s] of di.shapes) {
       if (boxesOverlap(l.box, s)) {
         out["label-on-shape"]!.push({ where: `${l.id}/${sid}`, detail: `label ${q(l.text)} covers ${q(di.names.get(sid) ?? sid)}.` });
+      }
+    }
+  }
+
+  for (const l of labels) {
+    for (const [lid, line] of laneLines(di)) {
+      if (segmentHitsBox(line[0], line[1], l.box, 2)) {
+        out["label-on-lane-line"]!.push({
+          where: `${l.id}/${lid}`,
+          detail: `label ${q(l.text)} is drawn across the edge of ${q(di.names.get(lid) ?? lid)}. Move it inside one lane (\`bpmn:detangle --write\` does it).`,
+        });
+        break;
       }
     }
   }
