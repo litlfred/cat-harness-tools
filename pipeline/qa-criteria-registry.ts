@@ -1225,7 +1225,8 @@ const PROOF: QaCriterionDefinition[] = [
     default_severity: "minor",
     depends_on: ["md"],
     automated: true,
-    profiles: ["document"],
+    // No `profiles`: a paper's acronyms belong in its glossary too, and a
+    // document-only opt-out is refused (profile-scoping.test.ts).
   },
   {
     id: "proof-compile-cost",
