@@ -56,20 +56,20 @@ const SNIPPET = (() => {
 })();
 
 /**
- * just-the-docs' own theme switch, copied from the theme's shipped
- * `just-the-docs.js` (v0.12.0, as deployed on `gh-pages`): it swaps the FIRST
- * stylesheet's href. Copied rather than stubbed as a no-op, because the swap
- * is the mechanism under test.
+ * just-the-docs' theme switch, READ from this site's copy of the theme's
+ * `just-the-docs.js` between its `fa-theme-switch` markers (cat-harness#820),
+ * so this spec runs the functions the site ships. The gem's own version
+ * rewrote the first stylesheet's href, which left the page unstyled while the
+ * new file loaded; the shipped one loads it beside the old.
  */
-const JTD = `window.jtd = window.jtd || {};
-jtd.getTheme = function() {
-  var cssFileHref = document.querySelector('[rel="stylesheet"]').getAttribute('href');
-  return cssFileHref.substring(cssFileHref.lastIndexOf('-') + 1, cssFileHref.length - 4);
-};
-jtd.setTheme = function(theme) {
-  var cssFile = document.querySelector('[rel="stylesheet"]');
-  cssFile.setAttribute('href', '/assets/css/just-the-docs-' + theme + '.css');
-};`;
+const JTD_SRC = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/just-the-docs.js")), "utf8");
+const THEME_SWITCH = (() => {
+  const a = JTD_SRC.indexOf("// fa-theme-switch:begin");
+  const b = JTD_SRC.indexOf("// fa-theme-switch:end");
+  if (a < 0 || b < a) throw new Error("just-the-docs.js has no fa-theme-switch block");
+  return JTD_SRC.slice(a, b).replace(/\{\{\s*"assets\/css\/just-the-docs-"\s*\|\s*relative_url\s*\}\}/g, "/assets/css/just-the-docs-");
+})();
+const JTD = `window.jtd = window.jtd || {};\n${THEME_SWITCH}`;
 
 /** The theme's head, in the theme's order: its stylesheet, its script, then head_custom. */
 const PAGE = `<!doctype html><html lang="en-US"><head><meta charset="UTF-8">
@@ -90,7 +90,7 @@ const LIGHT_CSS = "body { background-color: #ffffff; color: #5c5962; }";
 
 type Hold = { release: () => void };
 
-async function serve(page: Page, opts: { holdBundle?: boolean; holdDarkSheet?: boolean } = {}): Promise<Hold> {
+async function serve(page: Page, opts: { holdBundle?: boolean; holdDarkSheet?: boolean; holdLightSheet?: boolean } = {}): Promise<Hold> {
   let release!: () => void;
   const released = new Promise<void>((r) => { release = r; });
   await page.route("http://replica.test/**", async (route: Route) => {
@@ -108,7 +108,10 @@ async function serve(page: Page, opts: { holdBundle?: boolean; holdDarkSheet?: b
       if (opts.holdDarkSheet) await new Promise(() => {});
       return route.fulfill({ contentType: "text/css", body: DARK_CSS });
     }
-    if (p === "/assets/css/just-the-docs-light.css") return route.fulfill({ contentType: "text/css", body: LIGHT_CSS });
+    if (p === "/assets/css/just-the-docs-light.css") {
+      if (opts.holdLightSheet) await released;
+      return route.fulfill({ contentType: "text/css", body: LIGHT_CSS });
+    }
     return route.fulfill({ status: 404, body: "" });
   });
   return { release };
@@ -200,6 +203,29 @@ test.describe("the first paint follows the reader, else the OS, else light — n
     await expect.poll(async () => isLight(await ground(page))).toBe(true);
     expect(isLight(await htmlBg(page))).toBe(true);
     await expect(page.locator(".fa-scheme-mini")).toHaveAttribute("aria-pressed", "false");
+    await ctx.close();
+  });
+
+  test("a light reader is never UNSTYLED while the light sheet loads (cat-harness#820)", async ({ browser }) => {
+    // Owner, 2026-10-31: "whenever a page loads fresh a giant blue letter
+    // flashes". The swap left no theme sheet until the light file arrived, so
+    // the page painted with browser defaults. Held in flight here: the dark
+    // sheet must still be painting, and only one sheet may remain after.
+    const ctx = await browser.newContext({ colorScheme: "dark" });
+    await ctx.addInitScript(() => { try { localStorage.setItem("fa-color-scheme", "light"); } catch { /* */ } });
+    const page = await ctx.newPage();
+    const hold = await serve(page, { holdLightSheet: true });
+    await page.goto("http://replica.test/page.html", { waitUntil: "commit" });
+    await page.waitForSelector("#t", { state: "attached" });
+    const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    // Opaque AND dark: with no theme sheet, body's background is transparent.
+    expect(bg !== "rgba(0, 0, 0, 0)" && isDark(bg), `body background while the light sheet loads was ${bg}`).toBe(true);
+    expect(await page.evaluate(() => (window as unknown as { jtd: { getTheme(): string } }).jtd.getTheme())).toBe("light");
+    hold.release();
+    await expect.poll(async () => isLight(await ground(page))).toBe(true);
+    const sheets = await page.evaluate(() =>
+      [...document.querySelectorAll('link[rel="stylesheet"]')].map((l) => l.getAttribute("href")).filter((h) => /just-the-docs-/.test(h || "")));
+    expect(sheets).toEqual(["/assets/css/just-the-docs-light.css"]);
     await ctx.close();
   });
 
