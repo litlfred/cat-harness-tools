@@ -316,3 +316,27 @@ describe("a file must say what it did NOT ask", () => {
     ).toBe(true);
   });
 });
+
+describe("schemeOwner — prose dcterms:source vs unmounted relative path (#1134)", () => {
+  test("an unmounted relative path source falls back to declaredBy, while prose falls through to term sources", async () => {
+    const { schemeOwner } = await import("../lib/scheme-owner.ts");
+    const repo = process.cwd();
+    const owners = [{ root: repo, name: "cat-harness-tools" }];
+    expect(
+      schemeOwner(
+        repo,
+        { source: "folio/dth-sc", terms: [{ id: "t", source: "scripts/check-term-mapping.ts" }] },
+        "dth-sc",
+        owners,
+      ),
+    ).toEqual({ owner: "dth-sc" });
+    expect(
+      schemeOwner(
+        repo,
+        { source: "Tools of cat-harness-tools", terms: [{ id: "t", source: "scripts/check-term-mapping.ts" }] },
+        "folio-assistant-core",
+        owners,
+      ),
+    ).toEqual({ owner: "cat-harness-tools" });
+  });
+});
