@@ -232,3 +232,23 @@ describe("flows through boxes", () => {
     expect(di.edges.get("F")!.points).toEqual([{ x: 350, y: 150 }, { x: 30, y: 150 }, { x: 30, y: 50 }, { x: 50, y: 50 }]);
   });
 });
+
+describe("reading the DI", () => {
+  test("a shape whose BPMNLabel comes before its own Bounds is still read, label and all", () => {
+    const xml = `<?xml version="1.0"?><bpmn:definitions><bpmn:process id="P"><bpmn:exclusiveGateway id="G" name="Done?"/></bpmn:process>
+  <bpmndi:BPMNDiagram><bpmndi:BPMNPlane bpmnElement="P">
+      <bpmndi:BPMNShape bpmnElement="G"><bpmndi:BPMNLabel><dc:Bounds x="10" y="70" width="90" height="20"/></bpmndi:BPMNLabel><dc:Bounds x="30" y="10" width="50" height="50"/></bpmndi:BPMNShape>
+  </bpmndi:BPMNPlane></bpmndi:BPMNDiagram></bpmn:definitions>`;
+    const g = readDi(xml).shapes.get("G");
+    expect(g).toEqual({ x: 30, y: 10, width: 50, height: 50, label: { x: 10, y: 70, width: 90, height: 20 } });
+  });
+});
+
+describe("steps on top of each other", () => {
+  test("two steps drawn over each other are reported; apart they are not", () => {
+    const over = bpmn(LANES, [["A", 50, 120, 100, 60], ["B", 120, 130, 100, 60]], []);
+    expect(diagramFit(over)["shape-overlap"]!.map((f) => f.where)).toEqual(["A+B"]);
+    const apart = bpmn(LANES, [["A", 50, 120, 100, 60], ["B", 200, 120, 100, 60]], []);
+    expect(diagramFit(apart)["shape-overlap"]).toEqual([]);
+  });
+});
