@@ -50,6 +50,10 @@ export const WRITER_RECORD_VERSION = 1;
 // input-site: inert #f12d34f1 — names the build-output directory the records live in; no writer reads it
 export const WRITER_CONE_DIR = join("build", "writer-cone");
 export const WRITER_RECORD_FILE = join(WRITER_CONE_DIR, "records.json");
+/** Each recorded writer's outputs, in `derive-cache.ts` entries keyed by the recording commit. */
+export const WRITER_OUTPUTS_DIR = join(WRITER_CONE_DIR, "outputs");
+/** `1`: skip a writer whose records match, putting back its recorded outputs (previews; owner 2026-10-31 14:32Z). */
+export const WRITER_SKIP_ENV = "CAT_WRITER_SKIP";
 /** Turns recording on in `derive:publish`. */
 export const WRITER_RECORD_ENV = "CAT_WRITER_RECORD";
 

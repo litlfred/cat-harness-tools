@@ -145,7 +145,22 @@ import {
 } from "./derive-cache.ts";
 import { openTrace } from "../schemas/sdlc/input-trace.ts";
 import { BUILDING_ENV, STAMP_PATH, workingCopyState } from "./qa-working-copy.ts";
-import { emptyRecords, readTraceFile, saveWriterRecords, STRACE_SEES, tracedArgv, underOutputs, writerBase, writerRecordOf, WRITER_RECORD_ENV, WRITER_RECORD_FILE } from "./writer-cone.ts";
+import {
+  decideWriter,
+  emptyRecords,
+  loadWriterRecords,
+  readTraceFile,
+  saveWriterRecords,
+  STRACE_SEES,
+  tracedArgv,
+  underOutputs,
+  writerBase,
+  writerRecordOf,
+  WRITER_OUTPUTS_DIR,
+  WRITER_RECORD_ENV,
+  WRITER_RECORD_FILE,
+  WRITER_SKIP_ENV,
+} from "./writer-cone.ts";
 
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
 
@@ -449,8 +464,15 @@ if (import.meta.main) {
   const recordOn = env[WRITER_RECORD_ENV] === "1" && straceWorks();
   // input-site: inert #a3e7d915 — the commit names the record; it is not an input of any writer
   const records = emptyRecords(env.GITHUB_SHA ?? "local");
-  const recScripts = recordOn ? (cacheOn.on ? scripts : scriptsOf(REPO_ROOT)) : {};
+  // Previews skip a writer whose recorded reads all match, and put back the
+  // outputs the recording run kept (owner 2026-10-31 14:32Z: "dont wait for
+  // clean deploys to skip. we can fix aftermath"). Never while recording.
+  const skipOn = env[WRITER_SKIP_ENV] === "1" && !recordOn;
+  const prevRecords = skipOn ? loadWriterRecords(REPO_ROOT) : undefined;
+  const outDir = join(REPO_ROOT, WRITER_OUTPUTS_DIR);
+  const recScripts = recordOn || skipOn ? (cacheOn.on ? scripts : scriptsOf(REPO_ROOT)) : {};
   if (env[WRITER_RECORD_ENV] === "1" && !recordOn) console.log("  writer records: OFF (strace does not run here)");
+  if (skipOn) console.log(`  writer skip: ON (${prevRecords ? `records of ${prevRecords.sha.slice(0, 12)}, ${Object.keys(prevRecords.writers).length} writer(s)` : "no records: every writer runs"})`);
   console.log(
     `  ${jobs} job(s); reuse ${cacheOn.on ? `ON (${cacheDir}${treeBefore && "undetermined" in treeBefore ? `; tree undetermined: ${treeBefore.undetermined}` : ""})` : `OFF (${cacheOn.why})`}`,
   );
@@ -480,7 +502,12 @@ if (import.meta.main) {
         digests,
       });
       if ("none" in rec) records.unrecorded[w] = rec.none;
-      else records.writers[w] = rec;
+      else {
+        records.writers[w] = rec;
+        // Keep what it wrote, so a preview that skips it can put it back.
+        const keep = nestedForeign(w, byWriter);
+        commitStaged(outDir, w, records.sha, stageOutputs(outDir, w, records.sha, REPO_ROOT, byWriter.get(w) ?? [], keep));
+      }
     } catch (e) {
       // Recording is never allowed to change the writer's outcome.
       records.unrecorded[w] = (e as Error).message;
@@ -491,6 +518,16 @@ if (import.meta.main) {
   };
   const runOne = async (w: string): Promise<WriterOutcome> => {
     const keep = nestedForeign(w, byWriter);
+    if (skipOn && prevRecords !== undefined) {
+      const fresh = new FileDigests(REPO_ROOT);
+      const d = decideWriter(prevRecords, w, writerBase(REPO_ROOT, recScripts, w, fresh), REPO_ROOT, fresh);
+      if (d.skip && hasEntry(outDir, w, prevRecords.sha) && restoreOutputs(outDir, w, prevRecords.sha, REPO_ROOT, keep)) {
+        reused.set(w, prevRecords.sha);
+        console.log(`  skipped ${w}: ${d.why}; put back its outputs from ${prevRecords.sha.slice(0, 12)}${d.proof ? "" : " (evidence, not proof)"}`);
+        return { kind: "ran" };
+      }
+      console.log(`  ${w} runs: ${d.skip ? "its recorded outputs are not here" : d.why}`);
+    }
     const fp = base.get(w);
     let key: string | undefined;
     let why = cacheOn.on ? "" : "reuse off";
