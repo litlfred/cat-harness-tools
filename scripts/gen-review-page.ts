@@ -389,7 +389,9 @@ const SCRIPT = `
   }
 
   // ── Diff renderers (bean d903) ─────────────────────────────────
-  var VIEW_KEY = "folio-review:view";
+  // v2 (owner, 2026-10-31, "default to inline"): a page-level choice made
+  // before, such as Side by side, is not carried over to override the new default.
+  var VIEW_KEY = "folio-review:view:v2";
   function loadView() { try { return window.localStorage.getItem(VIEW_KEY) || ""; } catch (e) { return ""; } }
   function saveView(v) { try { window.localStorage.setItem(VIEW_KEY, v); } catch (e) { /* the defaults, then */ } }
   function defaultFor(kind, structured) {
