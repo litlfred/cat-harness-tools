@@ -150,6 +150,7 @@ import {
   loadWriterRecords,
   readTraceFile,
   saveWriterRecords,
+  snapshotPaths,
   STRACE_SEES,
   tracedArgv,
   underOutputs,
@@ -499,13 +500,15 @@ if (import.meta.main) {
         root: REPO_ROOT,
         digests,
       });
-      if ("none" in rec) records.unrecorded[w] = rec.none;
-      else {
+      const own = byWriter.get(w) ?? [];
+      const snap = "none" in rec ? rec : snapshotPaths(own, Object.keys(rec.outputs), underOutputs(own), declaredOutput);
+      if ("none" in snap) records.unrecorded[w] = snap.none;
+      else if (!("none" in rec)) {
         records.writers[w] = rec;
         if ("rewritten" in readSet && readSet.rewritten) rewrittenBy.set(w, readSet.rewritten);
-        // Keep what it wrote, so a preview that skips it can put it back.
+        // Keep what it actually wrote, declared or not, so a preview that skips it puts all of it back.
         const keep = nestedForeign(w, byWriter);
-        commitStaged(outDir, w, records.sha, stageOutputs(outDir, w, records.sha, REPO_ROOT, byWriter.get(w) ?? [], keep));
+        commitStaged(outDir, w, records.sha, stageOutputs(outDir, w, records.sha, REPO_ROOT, snap.paths, keep));
       }
     } catch (e) {
       // Recording is never allowed to change the writer's outcome.
