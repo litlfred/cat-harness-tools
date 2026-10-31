@@ -57,3 +57,21 @@ tracks it (see `.github/workflows/pr-tests.yml`). Inside a folio-assistant
 index, or a folio with its layers mounted, the same globs match the mounted
 directories and nothing needs cloning. Tests that read other instances (the
 index's workflows, `bootstrap/`, content folios) still need that full mount.
+
+### Running the checkout scripts beside it
+
+The `checkoutScripts` (every `check:` and `:check` among them) are spelled
+`bun run cat-harness-tools/scripts/…` and run from the directory that holds
+the layers, as in a composed index (owner, 2026-10-30, bean `w1gy` F11). For a
+plain directory of clones, add `bootstrap` beside the three above and write a
+minimal root into that directory — an `index.config.json` naming the four as
+local instances, and a `package.json` with the `cat` alias:
+
+```sh
+git clone https://github.com/litlfred/bootstrap
+bun cat-harness-tools/scripts/sibling-root.ts   # never overwrites; --force does
+bun run cat check:import-direction
+```
+
+It is not a folio-assistant index: checks that read the index's own files,
+other instances or a built site still need one.
