@@ -210,6 +210,15 @@ export type VectorFiguresSidecar = z.infer<typeof VectorFiguresSidecarSchema>;
 export const VECTOR_FIGURES_FILE = "vector-figures.json";
 /** Where the renders land inside the entry. */
 export const VECTOR_FIGURES_DIR = "figures";
+/**
+ * Where a figure's TRANSCRIBED DATA lands inside the entry: one JSON file per
+ * figure that a folio redraws from data instead of reprinting the render
+ * (the DIIG phases chart, the SMART Guidelines approach chart). The render in
+ * `figures/` stays as the evidence; this is the one source each redrawing
+ * reads, so a chart printed in several handbooks is transcribed once per
+ * published version (owner, 2026-10-31, "B in who-iris").
+ */
+export const FIGURE_DATA_DIR = "figure-data";
 
 /** Is this verdict id a vector figure's rather than a raster image's? */
 export function isVectorFigureId(id: string): boolean {
