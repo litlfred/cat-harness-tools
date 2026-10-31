@@ -226,7 +226,7 @@ export async function nodeKindIndex(
     // The implementing instance when the module is code that moved out of the declaring one (bean 8lcl).
     const base = moduleRootOf(ref, instanceRoot);
     if (base === undefined) return { declaredBy: ref.instance ?? "", reason: "unresolvable" };
-    const declaredBy = ref.instance ?? readDeclaration(instanceRoot, registry)?.name ?? "";
+    const declaredBy = ref.instance ?? readDeclaration(instanceRoot)?.name ?? "";
     const abs = resolve(join(base, ref.module));
     if (!existsSync(abs)) return { declaredBy, reason: "unresolvable" };
     let mod: Record<string, unknown>;
@@ -351,7 +351,7 @@ export function typologyOwner(registry: GraphTypologyRegistry, typology: string)
   // For a typology an instance root declares directly the two agree.
   const nearest = findInstanceRoot(dirname(abs));
   const owner = nearest !== undefined && (resolve(nearest) + "/").startsWith(resolve(root) + "/") ? nearest : root;
-  return readDeclaration(owner, registry)?.name;
+  return readDeclaration(owner)?.name;
 }
 
 /**
@@ -366,18 +366,18 @@ export function typologyOwner(registry: GraphTypologyRegistry, typology: string)
 export function ownedOutside(registry: GraphTypologyRegistry, typology: string, checkout: string): boolean {
   const owner = typologyOwner(registry, typology);
   if (owner === undefined) return false;
-  return !checkoutNames(checkout, registry).has(owner);
+  return !checkoutNames(checkout).has(owner);
 }
 
 const namesByCheckout = new Map<string, Set<string>>();
-function checkoutNames(checkout: string, registry: GraphTypologyRegistry): Set<string> {
+function checkoutNames(checkout: string): Set<string> {
   const key = resolve(checkout);
   let names = namesByCheckout.get(key);
   if (!names) {
     names = new Set();
     for (const r of instanceRootsIn(key)) {
       try {
-        const name = readDeclaration(r, registry)?.name;
+        const name = readDeclaration(r)?.name;
         if (name) names.add(name);
       } catch {
         // an unreadable declaration names nothing
