@@ -9,7 +9,11 @@
 # Auth roles:
 #   Google OAuth → viewer (read + feedback)
 #   GitHub OAuth → collaborator (edit + branches) or owner (commit to main)
-#   Bearer token → direct API access (bypasses OAuth)
+#   Bearer token → /mcp access, checked by the auth-gateway (bypasses OAuth)
+#
+# FOLIO_GATEWAY_SECRET (32+ chars, in .env) is shared by auth-gateway and
+# folio-assistant: folio-assistant refuses /mcp, and ignores X-User-* headers,
+# on any request that does not carry it.
 #
 # Usage:
 #   ./deploy/generate-config.sh --folio   # create .env + Caddyfile
@@ -39,7 +43,11 @@ services:
     restart: unless-stopped
     environment:
       - FOLIO_API_TOKEN=${FOLIO_API_TOKEN}
+      - FOLIO_GATEWAY_SECRET=${FOLIO_GATEWAY_SECRET:?set FOLIO_GATEWAY_SECRET in deploy/.env}
       - MCP_PORT=${MCP_INTERNAL_PORT:-8080}
+      # Listen on the container network so the gateway can reach it (the
+      # default is 127.0.0.1). Only `expose`d, never published.
+      - FOLIO_BIND_HOST=0.0.0.0
     expose:
       - "${MCP_INTERNAL_PORT:-8080}"
     # Shared scratch workspace for exchanging computation inputs/outputs with
@@ -92,7 +100,8 @@ services:
       - FOLIO_DOMAIN=${FOLIO_DOMAIN}
       - COOKIE_SECRET=${COOKIE_SECRET}
       - FOLIO_API_TOKEN=${FOLIO_API_TOKEN}
-      - PAPER_ASSISTANT_UPSTREAM=http://folio-assistant:${MCP_INTERNAL_PORT:-8080}
+      - FOLIO_UPSTREAM=http://folio-assistant:${MCP_INTERNAL_PORT:-8080}
+      - FOLIO_GATEWAY_SECRET=${FOLIO_GATEWAY_SECRET:?set FOLIO_GATEWAY_SECRET in deploy/.env}
       - VIEWER_ROOT=/var/www/viewer
       - OWNER_USERNAME=${OWNER_USERNAME:-OWNER}
       - SESSION_MAX_AGE=${SESSION_MAX_AGE:-86400}
