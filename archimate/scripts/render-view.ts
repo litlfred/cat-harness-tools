@@ -103,7 +103,8 @@ export function wrap(text: string, width: number, maxLines: number): string[] {
 }
 
 /** How an element's box is outlined: square, rounded, a pill, or a clipped corner. */
-function shapeOf(e: ArchimateElement | undefined): "rect" | "round" | "pill" | "clipped" | "junction" {
+type Shape = "rect" | "round" | "pill" | "clipped" | "junction";
+function shapeOf(e: ArchimateElement | undefined): Shape {
   if (!e) return "rect";
   if (e.type === "Junction") return "junction";
   if (e.layer === "Motivation") return "clipped";
@@ -200,6 +201,9 @@ const STYLE = `<style>
 .av-type{font:italic 8px system-ui,sans-serif;fill:#555}
 .av-group{font:600 ${FONT}px system-ui,sans-serif;fill:#333}
 .av-note{font:${FONT - 1}px system-ui,sans-serif;fill:#222}
+.av-key{font:11px system-ui,sans-serif;fill:#222}
+.av-keyh{font:600 11px system-ui,sans-serif;fill:#333}
+.av-keyt{font:700 13px system-ui,sans-serif;fill:#111}
 .av-rel{font:9px system-ui,sans-serif;fill:#333;paint-order:stroke;stroke:#fff;stroke-width:3px}
 a:hover rect,a:hover polygon,a:focus rect,a:focus polygon{stroke:#06c;stroke-width:2.5}
 </style>`;
@@ -211,6 +215,8 @@ export interface RenderOptions {
   relationshipHref?: (relationshipId: string) => string;
   /** The href a view-reference box links to. */
   viewHref?: (viewId: string) => string;
+  /** Draw a key below the view: what each colour, shape and line used in it means (`legendSvg`). Default true. */
+  legend?: boolean;
 }
 
 /** One view as a standalone SVG document. */
@@ -230,6 +236,8 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
     grow(n.x + n.w, n.y + n.h);
   }
   const out: string[] = [];
+  // What the view uses, for its key: only what a reader can see on it.
+  const used = { layers: new Set<ArchimateLayer>(), shapes: new Set<Shape>(), relationships: new Set<string>(), groups: false, notes: false, nested: false, viewRefs: false };
   if (!Number.isFinite(minX)) {
     minX = 0; minY = 0; maxX = 360; maxY = 60;
     out.push(`<text class="av-note" x="180" y="34" text-anchor="middle">This view is empty: the model draws nothing on it.</text>`);
@@ -241,7 +249,9 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
     return false;
   };
   for (const n of view.nodes) {
+    if (n.parent && nodes.get(n.parent)?.kind === "element" && n.kind === "element") used.nested = true;
     if (n.kind === "group") {
+      used.groups = true;
       const fill = n.fill ?? "#f2f2f2";
       out.push(
         `<g class="av-g"><rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" fill="${esc(fill)}" fill-opacity=".55" stroke="#888"/>` +
@@ -249,6 +259,7 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
           `<text class="av-group" x="${n.x + 6}" y="${n.y + FONT + 3}">${esc(wrap(n.text ?? "", n.w - 12, 1)[0] ?? "")}</text></g>`,
       );
     } else if (n.kind === "note") {
+      used.notes = true;
       const f = 10;
       const pts = [[n.x, n.y], [n.x + n.w - f, n.y], [n.x + n.w, n.y + f], [n.x + n.w, n.y + n.h], [n.x, n.y + n.h]];
       const lines = wrap(n.text ?? "", n.w - 12, Math.max(1, Math.floor((n.h - 8) / LINE_H)));
@@ -259,6 +270,7 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
           `</text></g>`,
       );
     } else if (n.kind === "view-ref") {
+      used.viewRefs = true;
       const v = views.get(n.ref ?? "");
       const label = v?.name ?? "(missing view)";
       const shape = `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" fill="#dcdcdc" stroke="#555"/>` + textBlock(wrap(label, n.w - 10, 3), n.x + n.w / 2, n.y + 6, "av-name");
@@ -270,6 +282,10 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
         const c = centre(n);
         out.push(`<circle cx="${c.x}" cy="${c.y}" r="${Math.min(n.w, n.h) / 2}" fill="#000"/>`);
         continue;
+      }
+      if (e) {
+        used.layers.add(e.layer);
+        used.shapes.add(shape);
       }
       const fill = e ? n.fill ?? LAYER_FILL[e.layer] : "url(#missing)";
       const name = e ? e.name : "(element missing from the model)";
@@ -340,6 +356,7 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
       mid.set(c.id, half);
       for (const p of pts) grow(p.x, p.y);
       const r = c.relationship ? relationships.get(c.relationship) : undefined;
+    if (r) used.relationships.add(r.type);
       const st = lineStyle(r);
       const d = `M${pts.map((p) => `${round(p.x)} ${round(p.y)}`).join(" L")}`;
       const line =
@@ -354,6 +371,14 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
     }
   }
 
+  if (opts.legend !== false && Number.isFinite(maxY)) {
+    const key = legendSvg(used, minX, maxY + 28);
+    if (key.h > 0) {
+      out.push(key.svg);
+      grow(minX + key.w, maxY + 28 + key.h);
+    }
+  }
+
   const vx = Math.floor(minX - pad);
   const vy = Math.floor(minY - pad);
   const vw = Math.ceil(maxX - minX + 2 * pad);
@@ -365,6 +390,114 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
     out.join("\n") +
     `</svg>\n`
   );
+}
+
+// ── The key ──────────────────────────────────────────────────────────────
+//
+// Owner, 2026-10-31: "what do various arrows mean? we need legend … also
+// what do colors mean … and shapes? … need to assume that most readers not
+// familiar with archimate conventions nor our house rules." So every view
+// carries its own key, in plain words, listing only what it uses.
+
+/** What each layer's colour says, for a reader who has never seen ArchiMate. */
+export const LAYER_MEANING: Record<ArchimateLayer, string> = {
+  Motivation: "Why: who cares (stakeholders), and the drivers, goals, outcomes, values and requirements",
+  Strategy: "Strategy: what the organisation is able to do (capabilities) and with what (resources, value streams)",
+  Business: "Business: people, roles and organisations, the processes they carry out and the information they use",
+  Application: "Software: systems and their parts, the services they offer, and the data they hold",
+  Technology: "Technology: the devices, platforms and networks the software runs on",
+  Physical: "Physical: equipment, facilities and materials",
+  "Implementation & Migration": "Change: work packages, deliverables and the stages of a transition",
+  Other: "Other: groupings, locations and junctions",
+};
+/** What each box shape says. */
+export const SHAPE_MEANING: Record<Exclude<Shape, "junction">, string> = {
+  rect: "Square corners: something that exists, such as a system, a role, or a piece of data",
+  round: "Rounded corners: something done or an ability, such as a capability, process or function",
+  pill: "Rounded ends: a service, offered for others to use",
+  clipped: "Cut corners: a reason or aim, such as a stakeholder, goal, outcome or value",
+};
+/** What each kind of line says, read from the line's start to its end. */
+export const RELATIONSHIP_MEANING: Record<string, string> = {
+  Composition: "is made up of (the end is a part that cannot exist without the start)",
+  Aggregation: "groups (the end is a part that can also exist on its own)",
+  Assignment: "is assigned to, or carries out",
+  Realization: "makes real, or achieves",
+  Serving: "serves (provides what the end needs)",
+  Access: "reads or writes data (the arrow shows which way the data goes)",
+  Influence: "influences, or contributes to",
+  Triggering: "triggers (happens first, and starts the end)",
+  Flow: "passes something, such as information, to",
+  Specialization: "is a kind of",
+  Association: "is related to (no more specific meaning)",
+};
+const RELATIONSHIP_ORDER = ["Realization", "Serving", "Assignment", "Composition", "Aggregation", "Access", "Flow", "Triggering", "Influence", "Specialization", "Association"];
+const LAYER_ORDER: ArchimateLayer[] = ["Motivation", "Strategy", "Business", "Application", "Technology", "Physical", "Implementation & Migration", "Other"];
+
+/**
+ * The key for one view: a heading, then one row per colour, shape and kind
+ * of line the view uses, each in plain words. Drawn at (x, y); returns its
+ * size so the drawing can grow to hold it.
+ */
+export function legendSvg(
+  used: { layers: Set<ArchimateLayer>; shapes: Set<Shape>; relationships: Set<string>; groups: boolean; notes: boolean; nested: boolean; viewRefs: boolean },
+  x: number,
+  y: number,
+): { svg: string; w: number; h: number } {
+  const rows: string[] = [];
+  const ROW = 20, SW = 44, W = 640;
+  let cy = y + 30;
+  const text = (t: string) => `<text class="av-key" x="${x + SW + 14}" y="${cy + 4}">${esc(t)}</text>`;
+  const head = (t: string) => { rows.push(`<text class="av-keyh" x="${x}" y="${cy + 4}">${esc(t)}</text>`); cy += ROW; };
+  const layers = LAYER_ORDER.filter((l) => used.layers.has(l));
+  if (layers.length) {
+    head("Colour: which part of the architecture a box belongs to");
+    for (const l of layers) {
+      rows.push(`<rect x="${x}" y="${cy - 7}" width="${SW}" height="14" fill="${LAYER_FILL[l]}" stroke="${outlineOf(LAYER_FILL[l])}"/>` + text(LAYER_MEANING[l]));
+      cy += ROW;
+    }
+  }
+  const shapes = (["clipped", "round", "pill", "rect"] as const).filter((sh) => used.shapes.has(sh));
+  if (shapes.length) {
+    head("Shape: what kind of thing a box is (its small italic label names the exact kind)");
+    for (const sh of shapes) {
+      // Taller than a colour swatch, so the corners can be told apart.
+      cy += 4;
+      rows.push(box({ id: "", kind: "element", x, y: cy - 12, w: SW, h: 24 }, sh, "#fff", ` stroke="#555"`) + text(SHAPE_MEANING[sh]));
+      cy += ROW + 6;
+    }
+  }
+  const extras: Array<[(cy: number) => string, string]> = [];
+  if (used.nested) extras.push([(c) => `<rect x="${x}" y="${c - 9}" width="${SW}" height="18" fill="#fff" stroke="#555"/><rect x="${x + 10}" y="${c - 4}" width="${SW - 20}" height="9" fill="#fff" stroke="#555"/>`, "A box inside another box: a part of it"]);
+  if (used.groups) extras.push([(c) => `<rect x="${x}" y="${c - 7}" width="${SW}" height="14" fill="#f2f2f2" stroke="#888"/>`, "Grey band: a grouping for layout only; it adds no meaning"]);
+  if (used.notes) extras.push([(c) => `<polygon points="${x},${c - 7} ${x + SW - 6},${c - 7} ${x + SW},${c - 1} ${x + SW},${c + 7} ${x},${c + 7}" fill="#fff" stroke="#888"/>`, "Note: a comment from the authors"]);
+  if (used.viewRefs) extras.push([(c) => `<rect x="${x}" y="${c - 7}" width="${SW}" height="14" fill="#dcdcdc" stroke="#555"/>`, "Dark grey box: a link to another view"]);
+  if (extras.length) head("Other marks");
+  for (const [sw, t] of extras) {
+    rows.push(sw(cy) + text(t));
+    cy += ROW;
+  }
+  const rels = RELATIONSHIP_ORDER.filter((r) => used.relationships.has(r));
+  if (rels.length) {
+    head("Line: how two boxes are related, read from where the line starts to where it ends");
+    for (const r of rels) {
+      const st = lineStyle({ type: r } as ArchimateRelationship);
+      rows.push(
+        `<path d="M${x + 10} ${cy} L${x + SW - 2} ${cy}" fill="none" stroke="#333" stroke-width="1.2"${st.dash ? ` stroke-dasharray="${st.dash}"` : ""}` +
+          `${st.start ? ` marker-start="url(#${st.start})"` : ""}${st.end ? ` marker-end="url(#${st.end})"` : ""}/>` +
+          text(`${typeLabel(r)}: ${RELATIONSHIP_MEANING[r] ?? ""}`),
+      );
+      cy += ROW;
+    }
+  }
+  if (!rows.length) return { svg: "", w: 0, h: 0 };
+  const h = cy - y + 4;
+  return {
+    svg: `<g class="av-legend"><rect x="${x - 10}" y="${y}" width="${W + 20}" height="${h}" fill="#fafafa" stroke="#bbb"/>` +
+      `<text class="av-keyt" x="${x}" y="${y + 18}">Key</text>${rows.join("")}</g>`,
+    w: W + 10,
+    h,
+  };
 }
 
 const round = (n: number): number => Math.round(n * 10) / 10;

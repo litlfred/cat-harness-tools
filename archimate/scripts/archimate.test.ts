@@ -179,6 +179,21 @@ describe("drawing a view", () => {
     expect(new Set(paths).size).toBe(paths.length);
   });
 
+  it("draws a key listing only the colours, shapes and lines the view uses, in plain words", () => {
+    const key = svg.slice(svg.indexOf('<g class="av-legend">'));
+    expect(key).toContain(">Key</text>");
+    expect(key).toContain("Software: systems");
+    expect(key).toContain("Serving: serves");
+    expect(key).toContain("Access: reads or writes data");
+    expect(key).toContain("Grey band: a grouping");
+    expect(key).toContain("Note: a comment");
+    // Nothing the view does not draw.
+    expect(key).not.toContain("Influence");
+    expect(key).not.toContain("Why: who cares");
+    // The drawing grows to hold it, and it can be left off.
+    expect(renderViewSvg(m, m.views[0]!, { legend: false })).not.toContain("av-legend");
+  });
+
   it("says a view with nothing on it is empty, rather than drawing an empty frame", () => {
     const empty = parseArchimate(XML.replace(/<element xsi:type="archimate:ArchimateDiagramModel"[\s\S]*?<\/element>/, '<element xsi:type="archimate:ArchimateDiagramModel" name="Default View" id="id-v0"/>'));
     expect(renderViewSvg(empty, empty.views[0]!)).toContain("This view is empty");
