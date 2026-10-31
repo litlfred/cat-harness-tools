@@ -16,8 +16,12 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
+import { createHash } from "node:crypto";
+
 import {
   MANIFEST_SCHEMA,
+  STABLE_KEY_HEX,
+  stableKeys,
   PLATFORM,
   SCOPES_DIR,
   SOURCE_PATH,
@@ -101,6 +105,28 @@ describe("render", () => {
   test("deterministic: the same index gives the same bytes", () => {
     const again = render(text, INSTANCES, LOCALES);
     expect([...again.entries()]).toEqual([...files.entries()]);
+  });
+
+  test("scope files key entries by URL hash, unique across scopes", () => {
+    const keys = manifest.scopes.flatMap((s) => Object.keys(JSON.parse(files.get(s.path)!)));
+    expect(new Set(keys).size).toBe(6);
+    for (const k of keys) expect(k).toMatch(new RegExp(`^[0-9a-f]{${STABLE_KEY_HEX}}(-\\d+)?$`));
+    expect(stableKeys(INDEX).get("1")).toBe(createHash("sha256").update("/smart-trust/index.html").digest("hex").slice(0, STABLE_KEY_HEX));
+  });
+
+  test("the same URL twice gets distinct keys, first in source order keeps the bare hash", () => {
+    const k = stableKeys({ a: { relUrl: "/x" }, b: { relUrl: "/x" }, c: { relUrl: "/x" } });
+    const base = k.get("a")!;
+    expect([k.get("b"), k.get("c")]).toEqual([`${base}-2`, `${base}-3`]);
+  });
+
+  test("a page added to one scope leaves every other scope's files byte for byte", () => {
+    // The theme numbers entries in order: a new platform page at the front shifts every key after it.
+    const shifted: Record<string, unknown> = { "0": { title: "New", relUrl: "/new.html" } };
+    Object.values(INDEX).forEach((e, i) => (shifted[String(i + 1)] = e));
+    const after = render(JSON.stringify(shifted), INSTANCES, LOCALES);
+    const changed = [...after.keys()].filter((p) => after.get(p) !== files.get(p)).sort();
+    expect(changed).toEqual([`${SCOPES_DIR}/_platform.json`, `${SCOPES_DIR}/manifest.json`]);
   });
 
   test("the source hash changes with the source", () => {

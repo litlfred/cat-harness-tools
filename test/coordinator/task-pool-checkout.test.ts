@@ -12,14 +12,17 @@ import { join } from "node:path";
 
 import { TASK_IO } from "../../scripts/task-io.ts";
 import { scriptsOf } from "../../schemas/sdlc/script-table.ts";
+import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
+import { noRootManifest } from "../support/checkout.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
+const REPO = repoRootFor(join(ORIGIN_DIR, "..", ".."));
+
 describe("task-io declarations", () => {
-  test("every declared script exists in package.json", async () => {
-    const { repoRootFor } = await import("../../schemas/kg/cat-harness.ts");
-    const pkg = { scripts: scriptsOf(repoRootFor(join(ORIGIN_DIR, "..", ".."))) };
+  test.skipIf(noRootManifest(REPO, "the scripts it declares, which task-io names"))("every declared script exists in package.json", () => {
+    const pkg = { scripts: scriptsOf(REPO) };
     for (const name of Object.keys(TASK_IO)) expect(pkg.scripts[name], `${name} is not a script`).toBeDefined();
   });
 });

@@ -233,10 +233,22 @@ export const DEPLOY_STAMPS: ReadonlyArray<readonly [RegExp, string]> = [
   // into their witness entries, and `qa-site-assets` links the sidecars under `main/<head>`.
   [/("at":\s*)"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z"(,\s*"sha":\s*)"[0-9a-f]{40}"/g, '$1""$2""'],
   [/\bmain\/[0-9a-f]{40}\b/g, "main/<sha>"],
+  // Instance graph exports (`instance-exports.ts`, `kg-export.ts`, and
+  // `bootstrap-tools/scripts/export-graph.ts`) stamp the index checkout's
+  // HEAD commit on every deploy even for instances whose own pin and files
+  // did not move.
+  [/"sourceCommit":\s*"[^"]*\/commit\/[0-9a-f]{40}"/g, '"sourceCommit":""'],
+  [/"sourceCommitSha":\s*"[0-9a-f]{40}"/g, '"sourceCommitSha":""'],
+  [/"sourceCommitAt":\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})"/g, '"sourceCommitAt":""'],
+  [/"wasDerivedFrom":\s*"git:[0-9a-f]{40}"/g, '"wasDerivedFrom":"git:"'],
+  // `state-visualizer.ts` stamps the build's wall-clock `now` into each
+  // workflow page's stuck-age lead and `data-wv-built` attribute.
+  [/\b([Mm]easured at )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z((?:,\s+|\s+)\(?when this page was built\)?)/g, "$1<built>$2"],
+  [/(&quot;at&quot;:&quot;)\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z(&quot;)/g, "$1$2"],
 ];
 
-/** Files every deploy rewrites whole: compared by neither side. */
-export const ALWAYS_REWRITTEN = /^(build\.json|\.nojekyll)$/;
+/** Files every deploy rewrites whole: compared by neither side (the writer records of bean fwtz option B among them). */
+export const ALWAYS_REWRITTEN = /^(build\.json|\.nojekyll|writer-cone\/records\.json)$/;
 
 /** On the publish root, not the main site: other previews, the render log, git. */
 export const NOT_THE_MAIN_SITE = /^(STAGING|_render-log|\.git)(\/|$)/;

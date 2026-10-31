@@ -41,6 +41,7 @@ import { join, resolve } from "node:path";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { dirname } from "node:path";
 import { siteFileFor } from "../../../schemas/kg/cat-harness.js";
+import { siteNotBuilt } from "../../../test/support/checkout.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const read = (p: string) => readFileSync(join(REPO, p), "utf-8");
@@ -54,7 +55,10 @@ const css = read("cat-harness/site-chrome/assets/css/docs-ui.css");
  * it here would assert over a file with no controls in it and pass by being
  * blind. The markup moved; the question this file asks did not.
  */
-const inside = read("cat-harness/docs/_includes/generated/navbar-footer.html");
+const INSIDE = "cat-harness/docs/_includes/generated/navbar-footer.html";
+/** The generated include is written at publish and gitignored (bean w1gy F18). */
+const INSIDE_NOT_BUILT = siteNotBuilt("the generated sidebar include `navbar:include` writes at publish (gitignored)", join(REPO, INSIDE));
+const inside = INSIDE_NOT_BUILT ? "" : read(INSIDE);
 /** Inside `.main` — which should carry none of them any more. */
 const outside = read("cat-harness/site-chrome/_includes/footer_custom.html");
 
@@ -209,7 +213,7 @@ describe("three ways in, one way back", () => {
 });
 
 describe("the controls live inside the sidebar now", () => {
-  it("the checkbox is in the sidebar's own include, and no ☰ or [x] (#1757)", () => {
+  it.skipIf(INSIDE_NOT_BUILT)("the checkbox is in the sidebar's own include, and no ☰ or [x] (#1757)", () => {
     // There were three controls: the checkbox, the `☰` (`fa-nav-head`) and the
     // `[x]` (`fa-nav-close`). The owner asked for the last two to go — they
     // duplicated the avatar, which `docs-ui.js` makes toggle this checkbox.
@@ -225,7 +229,7 @@ describe("the controls live inside the sidebar now", () => {
     expect(outside).not.toContain("fa-nav");
   });
 
-  it("no label drives the checkbox from the include — the avatar does", () => {
+  it.skipIf(INSIDE_NOT_BUILT)("no label drives the checkbox from the include — the avatar does", () => {
     // PER RENDERED VARIANT. The generated include carries the canonical and
     // staging renderings behind one Liquid conditional.
     const variants = inside.split("{%- else -%}");

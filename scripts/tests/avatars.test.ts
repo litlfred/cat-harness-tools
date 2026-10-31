@@ -16,10 +16,14 @@ import { BASE_GRAPH_TYPOLOGIES, defaultGraphTypologies, instanceRootsIn, readDec
 import { avatarsCssPath, renderAvatarsCss } from "../gen-avatars-css.ts";
 import { coverage, requiredKinds, trashDerivationPresent } from "../check-avatar-coverage.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { notApplicableAlone, siteNotBuilt } from "../../test/support/checkout.ts";
 
 // The harness, whose avatars.css this reads; the test moved up in 70lx B2b.
 const ROOT = HARNESS_ROOT;
-const CSS = readFileSync(join(ROOT, avatarsCssPath(ROOT)), "utf8");
+const CSS_PATH = join(ROOT, avatarsCssPath(ROOT));
+// `gen-avatars-css` writes it at publish and `.gitignore` keeps it out of a clone.
+const CSS_NOT_BUILT = siteNotBuilt("the avatar stylesheet `gen-avatars-css` writes at publish (gitignored)", CSS_PATH);
+const CSS = CSS_NOT_BUILT ? "" : readFileSync(CSS_PATH, "utf8");
 
 describe("the registry", () => {
   test("it is not empty — the guard every count below needs", () => {
@@ -73,7 +77,7 @@ describe("the registry", () => {
   });
 });
 
-describe("the generated stylesheet", () => {
+describe.skipIf(CSS_NOT_BUILT)("the generated stylesheet", () => {
   test("it is current — an edited node that was never regenerated fails here", () => {
     expect(CSS).toBe(renderAvatarsCss());
   });
@@ -185,6 +189,14 @@ describe("coverage is a QA axis, not a promise", () => {
     const orphaned = coverage(ROOT).orphaned;
     expect(orphaned).toContain("bootstrap");
     expect(orphaned).not.toContain("folio-assistant-core");
+  });
+
+  // The avatar now lives on folio-assistant-core's own declaration (sod4 #4),
+  // so it resolves only where that higher instance is composed.
+  const NO_CORE =
+    !instanceRootsIn(resolve(ROOT, "..")).some((r) => readDeclaration(r)?.name === "folio-assistant-core") &&
+    notApplicableAlone("folio-assistant-core, whose declaration carries its avatar (an instance above the harness)");
+  test.skipIf(NO_CORE)("and `folio-assistant-core` resolves to its own avatar, not the question mark", () => {
     expect(avatarFor("folio-assistant-core")).not.toBe(GENERIC);
   });
 
