@@ -136,7 +136,7 @@ import {
   type InstanceSchemaExport,
   type ZodSchemaScan,
 } from "./harness-schema-export.js";
-import { stagingFields } from "./staging-stamp.js";
+import { stagingContextTerm, stagingFields } from "./staging-stamp.js";
 import {
   QA_RESULTS_DIR,
   buildQaResult,
@@ -691,15 +691,7 @@ export function buildContext(): Record<string, unknown> {
     // `sha`, `pr` and `run` are words a graph node could plausibly use for
     // something else, and a global term would silently give that other use
     // this meaning. Scoped, they mean this only inside `staging`.
-    staging: {
-      "@id": termIri("staging"),
-      "@context": {
-        branch: termIri("stagingBranch"),
-        sha: termIri("stagingSha"),
-        pr: termIri("stagingRef"),
-        run: termIri("stagingRun"),
-      },
-    },
+    staging: stagingContextTerm(),
     // What a staging preview's graph changed against the graph `main`
     // publishes — written by `scripts/kg-changed-assets.ts` after the export,
     // on a PREVIEW document only (owner, 2026-10-14). The `dependsOn` /
