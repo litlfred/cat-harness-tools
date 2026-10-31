@@ -80,6 +80,12 @@ describe("page-layout.js", () => {
     expect(js).toMatch(/if \(reader \|\|/);
   });
 
+  it("jumps instantly, never with the theme's smooth scroll, which chased a page still drawing (dth-hrh, 2026-10-31)", () => {
+    expect(js).toContain('s.scrollBehavior = "auto"');
+    // Every jump it makes goes through that.
+    expect(js.match(/scrollIntoView\(|scrollTo\(/g)?.length).toBe(js.match(/instantly\(function \(\) \{ (t\.scrollIntoView|window\.scrollTo)\(/g)?.length);
+  });
+
   it("re-places a full-width bar when the rail opens: body's border box, the rail, and the padding transition (owner, 2026-10-15)", () => {
     // A body whose max-width fixes its content box does not resize when the
     // open rail widens its padding, so the content box alone is not enough.
