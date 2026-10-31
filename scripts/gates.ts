@@ -975,6 +975,15 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     reason: "reconciles the `gh-pages` working tree against the open PRs' previews; needs that branch checked out",
   },
   {
+    match: "staging-share.ts",
+    kind: "ci-only",
+    reason:
+      "prunes a staging preview on `gh-pages` to the files that differ from the live site and writes its " +
+      "service-worker fallback (`staging-sw.js`); that `gh-pages` checkout exists only in CI. Its rules — " +
+      "normalisation of preview HTML, byte-for-byte asset comparison, the fallback worker and root 404 — are " +
+      "covered by `staging-share.test.ts` in `bun test`",
+  },
+  {
     match: "staging-cleanup-preflight.ts",
     kind: "ci-only",
     reason: "takes a deploy slug off the event payload; there is no event locally",
