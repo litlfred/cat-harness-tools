@@ -247,8 +247,8 @@ export const DEPLOY_STAMPS: ReadonlyArray<readonly [RegExp, string]> = [
   [/(&quot;at&quot;:&quot;)\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z(&quot;)/g, "$1$2"],
 ];
 
-/** Files every deploy rewrites whole: compared by neither side. */
-export const ALWAYS_REWRITTEN = /^(build\.json|\.nojekyll)$/;
+/** Files every deploy rewrites whole: compared by neither side (the writer records of bean fwtz option B among them). */
+export const ALWAYS_REWRITTEN = /^(build\.json|\.nojekyll|writer-cone\/records\.json)$/;
 
 /** On the publish root, not the main site: other previews, the render log, git. */
 export const NOT_THE_MAIN_SITE = /^(STAGING|_render-log|\.git)(\/|$)/;
