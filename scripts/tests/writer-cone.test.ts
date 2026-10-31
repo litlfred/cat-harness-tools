@@ -66,6 +66,9 @@ describe("parseTrace in collect mode — a writer's reads and writes", () => {
     expect(parseTrace(lines.join("\n"), ROOT, { writes: "collect", ownOutput: underOutputs(["docs/other/", "docs/out"]) })).toEqual({
       undetermined: "the writer reads docs/out/index.html and then rewrites it",
     });
+    // A plain read inside its own outputs is not an input either: a skip restores it.
+    const probe = [`10 newfstatat(AT_FDCWD</work/repo>, "docs/out", {st_mode=S_IFDIR|0755}, 0) = 0`, `10 openat(AT_FDCWD</work/repo>, "src/a.md", O_RDONLY) = 3</work/repo/src/a.md>`];
+    expect(parseTrace(probe.join("\n"), ROOT, { writes: "collect", ownOutput: own })).toEqual({ paths: ["src/a.md"], git: [], writes: [], absentBefore: [] });
     expect(underOutputs(["a/b/", "c.json"])("a/b")).toBe(true);
     expect(underOutputs(["a/b/", "c.json"])("a/bc")).toBe(false);
     expect(underOutputs(["a/b/", "c.json"])("c.json")).toBe(true);
