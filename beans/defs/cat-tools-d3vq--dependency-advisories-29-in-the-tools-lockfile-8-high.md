@@ -26,5 +26,5 @@ Also: `check:dependency-advisories` reports UNDETERMINED from a layer checkout, 
 
 ## Done when
 
-- [ ] `bun audit fix` within ranges, zod to 4.6.6+, and a jsonld path that does not pull undici 5 (override, or a pinned document loader).
-- [ ] `bun audit` shows no high advisories.
+- [x] `bun audit fix` within ranges, zod to 4.6.6+, and a jsonld path that does not pull undici 5 (override, or a pinned document loader).
+- [x] `bun audit` shows no high advisories. (29 → 3: 0 high, 2 moderate, 1 low; the 3 left need a major bump)

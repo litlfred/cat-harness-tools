@@ -88,7 +88,7 @@
     "remark-math": "^6.0.0",
     "unist-util-visit": "^5.1.0",
     "yaml": "^2.9.1",
-    "zod": "^4.6.5"
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
@@ -105,6 +105,9 @@
     "typescript": "6.0.3",
     "typescript-eslint": "^8.66.0",
     "typescript7": "npm:typescript@^7.0.2"
+  },
+  "overrides": {
+    "undici": "^6.29.1"
   },
   "checkoutScripts": {
     "auth:login": "bun run cat-harness-tools/scripts/auth-login.ts",
