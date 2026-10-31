@@ -136,7 +136,7 @@ export interface GitCall {
   args: string[];
 }
 
-export type ReadSet = { paths: string[]; git: GitCall[] } | { undetermined: string };
+export type ReadSet = { paths: string[]; git: GitCall[]; writes?: string[]; absentBefore?: string[] } | { undetermined: string };
 
 /**
  * Git subcommands the cone may REPLAY on a PR to ask git's view of the tree
@@ -356,7 +356,7 @@ function calls(text: string): Call[] | { undetermined: string } {
  * enumerated. `root` is the checkout; paths outside it are left out (see the
  * module comment for why, and for the other exclusions).
  */
-export function parseTrace(text: string, root: string): ReadSet {
+export function parseTrace(text: string, root: string, opts: { writes?: "refuse" | "collect" } = {}): ReadSet {
   const parsed = calls(text);
   if ("undetermined" in parsed) return parsed;
   const roots = [...new Set([resolve(root), safeRealpath(root)])];
@@ -375,6 +375,9 @@ export function parseTrace(text: string, root: string): ReadSet {
   const paths = new Set<string>();
   const git = new Map<string, GitCall>();
   const writes: string[] = [];
+  /** `collect` mode: paths the run wrote, and the first access to each path ("read" / "absent" / "write"). */
+  const wrote = new Set<string>();
+  const first = new Map<string, "read" | "absent" | "write">();
   for (const c of parsed) {
     const me = cell(c.pid);
     for (const a of c.args) {
@@ -435,7 +438,24 @@ export function parseTrace(text: string, root: string): ReadSet {
       if (rel === undefined || excluded(rel, gitPids.has(c.pid))) continue;
       if (write) writes.push(`${c.name} ${rel || "."}`);
       else paths.add(rel);
+      if (opts.writes === "collect" && !first.has(rel)) first.set(rel, write ? "write" : /^-1 ENOENT\b/.test(c.ret) ? "absent" : "read");
+      if (opts.writes === "collect" && write) wrote.add(rel);
     }
+  }
+  if (opts.writes === "collect") {
+    // A WRITER: what it wrote is its output, not its input. A path it first saw
+    // absent and then created was absent before the run, which is a fact the
+    // next run can check. A path it read while it existed and then rewrote is
+    // an input nobody can replay (its prior content is gone), so it refuses.
+    const absentBefore: string[] = [];
+    for (const rel of wrote) {
+      const f = first.get(rel);
+      if (f === "read") return { undetermined: `the writer reads ${rel || "."} and then rewrites it` };
+      paths.delete(rel);
+      if (f === "absent") absentBefore.push(rel);
+    }
+    if (paths.size > MAX_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_PATHS}` };
+    return { paths: [...paths].sort(), git: [...git.values()], writes: [...wrote].sort(), absentBefore: absentBefore.sort() };
   }
   if (writes.length > 0) return { undetermined: `the check writes inside the checkout (${writes.slice(0, 3).join(", ")})` };
   if (paths.size > MAX_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_PATHS}` };

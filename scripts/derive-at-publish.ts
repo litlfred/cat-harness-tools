@@ -143,6 +143,8 @@ import {
   stageOutputs,
   writerKey,
 } from "./derive-cache.ts";
+import { openTrace } from "../schemas/sdlc/input-trace.ts";
+import { emptyRecords, readTraceFile, saveWriterRecords, tracedArgv, writerBase, writerRecordOf, WRITER_RECORD_ENV, WRITER_RECORD_FILE } from "./writer-cone.ts";
 
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
 
@@ -297,6 +299,13 @@ export function built(a: Pick<DeclaredArtefact, "abs" | "path">): boolean {
   return statSync(a.abs).isDirectory() && walk(a.abs);
 }
 
+/** Whether `strace` runs here (writer records need it). */
+export function straceWorks(): boolean {
+  // input-site: inert #50824495 — probes for the tracer; its answer only turns recording on or off
+  const r = spawnSync("strace", ["-f", "-qq", "-o", "/dev/null", "true"], { stdio: "ignore" });
+  return r.status === 0;
+}
+
 /** What one writer did: ran, failed with an exit, or declined this root with a reason. */
 export type WriterOutcome = { kind: "ran" } | { kind: "failed"; exit: number | null } | { kind: "skipped"; why: string };
 
@@ -326,14 +335,15 @@ export function runWriter(argv: readonly string[], cwd: string): WriterOutcome {
  * unordered run side by side. `buffer`: collect the writer's output and hand
  * it back, so parallel writers' logs come out whole rather than interleaved.
  */
-export function runWriterAsync(argv: readonly string[], cwd: string, buffer: boolean): Promise<{ outcome: WriterOutcome; log: string }> {
+// input-site: inert #8d7029a5 — the environment handed on to a writer by default; the writer's own reads are its own sites
+export function runWriterAsync(argv: readonly string[], cwd: string, buffer: boolean, env: Record<string, string | undefined> = process.env): Promise<{ outcome: WriterOutcome; log: string }> {
   // input-site: inert #d24ef100 — a temp dir for the writer's reason, removed before this resolves
   const dir = mkdtempSync(join(tmpdir(), "derive-publish-"));
   const file = join(dir, "not-applicable.txt");
   return new Promise((done) => {
     let log = "";
-    // input-site: inert #7d277848 — hands the environment on to a writer, plus the path it writes its reason to
-    const child = spawn(argv[0]!, argv.slice(1), { cwd, stdio: buffer ? ["ignore", "pipe", "pipe"] : "inherit", env: { ...process.env, [NOT_APPLICABLE_REASON_ENV]: file } });
+    // input-site: inert #8cc2849c — hands the environment on to a writer, plus the path it writes its reason to
+    const child = spawn(argv[0]!, argv.slice(1), { cwd, stdio: buffer ? ["ignore", "pipe", "pipe"] : "inherit", env: { ...env, [NOT_APPLICABLE_REASON_ENV]: file } });
     child.stdout?.on("data", (d: Buffer) => (log += d.toString()));
     child.stderr?.on("data", (d: Buffer) => (log += d.toString()));
     const finish = (status: number | null) => {
@@ -428,9 +438,50 @@ if (import.meta.main) {
   if (treeBefore !== undefined) digests.tree = treeBefore;
   const base = new Map<string, Fingerprint>(cacheOn.on ? writers.map((w) => [w, writerFingerprint(REPO_ROOT, scripts, w, digests)] as const) : []);
   const staged = new Map<string, { key: string; path: string }>();
+  // ── Bean fwtz, option B: record what each writer read and wrote (skips nothing) ──
+  // input-site: inert #5f0c2a71 — the switch decides whether writers run traced, never what they write
+  const recordOn = env[WRITER_RECORD_ENV] === "1" && straceWorks();
+  // input-site: inert #a3e7d915 — the commit names the record; it is not an input of any writer
+  const records = emptyRecords(env.GITHUB_SHA ?? "local");
+  const recScripts = recordOn ? (cacheOn.on ? scripts : scriptsOf(REPO_ROOT)) : {};
+  if (env[WRITER_RECORD_ENV] === "1" && !recordOn) console.log("  writer records: OFF (strace does not run here)");
   console.log(
     `  ${jobs} job(s); reuse ${cacheOn.on ? `ON (${cacheDir}${treeBefore && "undetermined" in treeBefore ? `; tree undetermined: ${treeBefore.undetermined}` : ""})` : `OFF (${cacheOn.why})`}`,
   );
+  /** Run `w` traced and record it; the outcome is always the writer's own (a failed traced run is asked again untraced). */
+  const runRecorded = async (w: string): Promise<{ outcome: WriterOutcome; log: string }> => {
+    const before = writerBase(REPO_ROOT, recScripts, w, new FileDigests(REPO_ROOT));
+    const trace = openTrace(REPO_ROOT);
+    // input-site: inert #fd4c3e00 — a scratch file for the trace, removed before this returns
+    const traceLog = join(tmpdir(), `writer-cone-${process.pid}-${w.replace(/[^\w.-]/g, "_")}.strace`);
+    const first = await runWriterAsync(tracedArgv(["bun", "run", "cat", w], traceLog), REPO_ROOT, jobs > 1, trace.env);
+    try {
+      if (first.outcome.kind !== "ran") {
+        records.unrecorded[w] = `the traced run ${first.outcome.kind === "failed" ? `exited ${first.outcome.exit}` : "was skipped"}`;
+        trace.reached();
+        return first.outcome.kind === "skipped" ? first : await runWriterAsync(["bun", "run", "cat", w], REPO_ROOT, jobs > 1);
+      }
+      const digests = new FileDigests(REPO_ROOT);
+      const rec = writerRecordOf({
+        sha: records.sha,
+        ran: true,
+        before,
+        after: writerBase(REPO_ROOT, recScripts, w, digests),
+        reads: readTraceFile(traceLog, REPO_ROOT),
+        reached: trace.reached(),
+        root: REPO_ROOT,
+        digests,
+      });
+      if ("none" in rec) records.unrecorded[w] = rec.none;
+      else records.writers[w] = rec;
+    } catch (e) {
+      // Recording is never allowed to change the writer's outcome.
+      records.unrecorded[w] = (e as Error).message;
+    } finally {
+      rmSync(traceLog, { force: true });
+    }
+    return first;
+  };
   const runOne = async (w: string): Promise<WriterOutcome> => {
     const keep = nestedForeign(w, byWriter);
     const fp = base.get(w);
@@ -448,13 +499,19 @@ if (import.meta.main) {
     } else if (fp !== undefined) {
       why = `inputs could not be determined: ${fp.undetermined}`;
     }
-    const { outcome, log } = await runWriterAsync(["bun", "run", "cat", w], REPO_ROOT, jobs > 1);
+    const { outcome, log } = recordOn ? await runRecorded(w) : await runWriterAsync(["bun", "run", "cat", w], REPO_ROOT, jobs > 1);
     if (jobs > 1) process.stdout.write(`── ${w} ──\n${log}${log.endsWith("\n") || log === "" ? "" : "\n"}`);
     console.log(`  ran ${w} (${why})`);
     if (outcome.kind === "ran" && key !== undefined) staged.set(w, { key, path: stageOutputs(cacheDir, w, key, REPO_ROOT, byWriter.get(w) ?? [], keep) });
     return outcome;
   };
   const outcomes = await schedule(writers, edges, jobs, runOne);
+  if (recordOn) {
+    saveWriterRecords(REPO_ROOT, records);
+    const un = Object.entries(records.unrecorded);
+    console.log(`  writer records: ${Object.keys(records.writers).length} recorded, ${un.length} not (${WRITER_RECORD_FILE})`);
+    for (const [w, why] of un) console.log(`    not recorded: ${w} — ${why}`);
+  }
   for (const w of writers) {
     const o = outcomes.get(w)!;
     if (o.kind === "failed") {
