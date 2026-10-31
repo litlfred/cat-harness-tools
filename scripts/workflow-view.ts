@@ -595,6 +595,14 @@ export function dynamicStateDocument(
   inputs: readonly DynamicStateInput[],
   now: Date,
   unreadStores: readonly string[] = [],
+  /**
+   * The address the document is published at, when known. Given, it becomes
+   * the document's `@id` and its context's `@base`, so the relative instance
+   * ids below resolve under a processor that is not told where the file came
+   * from (publish-verify's jsonld-expand). Absent, the ids stay relative and
+   * resolve against wherever the file is fetched from, as before.
+   */
+  docIri?: string,
 ): DynamicStateDocument {
   const graph = inputs
     .map((i): DynamicStateInstance => {
@@ -617,9 +625,9 @@ export function dynamicStateDocument(
     })
     .sort((a, b) => a.store.localeCompare(b.store) || a.id.localeCompare(b.id));
   return {
-    "@context": dynamicStateContext(),
+    "@context": docIri ? { ...dynamicStateContext(), "@base": docIri } : dynamicStateContext(),
     $schema: DYNAMIC_STATE_SCHEMA,
-    id: "",
+    id: docIri ?? "",
     type: "cat-harness:DynamicState",
     harness,
     generatedAt: now.toISOString(),

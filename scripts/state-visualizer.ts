@@ -1757,7 +1757,11 @@ export async function writeDynamicState(
   opts: { root?: string; now?: Date } = {},
 ): Promise<{ doc: DynamicStateDocument; unread: string[]; out: string }> {
   const { harness, inputs, unread } = await dynamicStateInputs(opts.root ?? ROOT);
-  const doc = dynamicStateDocument(harness, inputs, opts.now ?? new Date(), unread);
+  // Published at `<canonicalUrl>/<harness>/state.jsonld`, the same place
+  // `dynamicStateTarget` writes it under the site root.
+  const canonical = readDeclaration(opts.root ?? ROOT)?.canonicalUrl;
+  const docIri = canonical ? `${canonical.replace(/\/+$/, "")}/${harness}/${DYNAMIC_STATE_FILE}` : undefined;
+  const doc = dynamicStateDocument(harness, inputs, opts.now ?? new Date(), unread, docIri);
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(doc, null, 2) + "\n");
   return { doc, unread, out };

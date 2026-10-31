@@ -368,6 +368,16 @@ describe("the dynamic-state document (bean 6h47)", () => {
     expect(doc().unreadStores).toEqual(["other"]);
   });
 
+  test("given its published address, the document states it as @id and @base; the instance ids stay relative", () => {
+    const at = "https://example.org/site/h/state.jsonld";
+    const d = dynamicStateDocument("h", [{ store: "s", state: inst({ id: "a" }), beans: [bean()] }], NOW, [], at);
+    expect(d.id).toBe(at);
+    expect(d["@context"]["@base"]).toBe(at);
+    expect(d.graph.map((n) => n.id)).toEqual(["#workflow/s/a"]);
+    expect(doc().id).toBe("");
+    expect(doc()["@context"]["@base"]).toBeUndefined();
+  });
+
   test("every key it uses is declared in its context: no undeclared term, no @vocab", async () => {
     const d = doc() as unknown as Record<string, unknown>;
     const ctx = d["@context"] as Record<string, unknown>;
