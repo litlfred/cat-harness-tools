@@ -133,6 +133,22 @@ export function renderInline(
   });
   // Removed text with no head text at all to sit beside.
   for (const [, text] of dels) { const d = doc.createElement("del"); d.textContent = text; head.appendChild(d); }
+  // A link added around words that were already there changes no text, so the
+  // text diff above cannot see it; the word diff of the source shows it green.
+  // Mark such a link as added too (owner, 2026-10-31: "no green on first, but
+  // is on second"). A link is new when main has no link with the same target
+  // and the same words.
+  const key = (a: Element) => (a.getAttribute("href") || "") + "\u0001" + (a.textContent || "").trim();
+  const had = new Set(baseHtml === null ? [] : Array.from(clean(doc, baseHtml).querySelectorAll("a[href]")).map(key));
+  head.querySelectorAll("a[href]").forEach((a) => {
+    if (had.has(key(a)) || !(a.textContent || "").trim()) return;
+    if (a.querySelector("ins") && (a.textContent || "") === Array.from(a.querySelectorAll("ins")).map((e) => e.textContent).join("")) return;
+    const e = doc.createElement("ins");
+    e.className = "diff-link-added";
+    e.title = "link added";
+    while (a.firstChild) e.appendChild(a.firstChild);
+    a.appendChild(e);
+  });
   while (head.firstChild) box.appendChild(head.firstChild);
   return box;
 }
