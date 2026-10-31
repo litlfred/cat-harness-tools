@@ -222,13 +222,67 @@ export function staleJobs(jobs: RenderJob[]): RenderJob[] {
  * because PlantUML names its output after `@startuml <name>`, not after the
  * file.
  */
+/**
+ * PlantUML 1.2026.9 bundles Eclipse ELK classes compiled for Java 21 (class
+ * file version 65.0) and declares `temurin-jre@21.0.4+7` in its tool-release
+ * manifest.
+ */
+export const PLANTUML_MIN_JAVA_MAJOR = 21;
+
+/** Extract the major Java version from `java -version` output, or null. */
+export function parseJavaMajor(versionOutput: string): number | null {
+  const m = /version\s+"(\d+)(?:\.(\d+))?/.exec(versionOutput);
+  if (!m) return null;
+  const first = Number.parseInt(m[1]!, 10);
+  if (first === 1 && m[2] !== undefined) {
+    return Number.parseInt(m[2], 10);
+  }
+  return Number.isNaN(first) ? null : first;
+}
+
+/**
+ * Find a `java` binary with major version >= {@link PLANTUML_MIN_JAVA_MAJOR}.
+ * Checks `JAVA_HOME_21_X64`, `JAVA_HOME_21_ARM64`, `JAVA_HOME`, and `"java"` on
+ * `PATH` so runners whose default `JAVA_HOME` is Java 17 still pick up a
+ * pre-installed Java 21 toolchain when available.
+ */
+export function javaForPlantuml(
+  env: NodeJS.ProcessEnv = process.env,
+  probe: (bin: string) => { status: number | null; output: string } = (bin) => {
+    const r = spawnSync(bin, ["-version"], { encoding: "utf8" });
+    return { status: r.status, output: `${r.stderr ?? ""}\n${r.stdout ?? ""}` };
+  },
+): { bin: string } | { skipped: string } {
+  const homes = [env.JAVA_HOME_21_X64, env.JAVA_HOME_21_ARM64, env.JAVA_HOME].filter(
+    (h): h is string => typeof h === "string" && h.length > 0,
+  );
+  const candidates = [...new Set([...homes.map((h) => join(h, "bin", "java")), "java"])];
+  let foundMajor: number | null = null;
+  for (const bin of candidates) {
+    const res = probe(bin);
+    if (res.status !== 0) continue;
+    const major = parseJavaMajor(res.output);
+    if (major !== null && major >= PLANTUML_MIN_JAVA_MAJOR) {
+      return { bin };
+    }
+    if (major !== null && (foundMajor === null || major > foundMajor)) {
+      foundMajor = major;
+    }
+  }
+  if (foundMajor !== null) {
+    return { skipped: `java >= ${PLANTUML_MIN_JAVA_MAJOR} required for PlantUML ${PLANTUML.version} (found Java ${foundMajor})` };
+  }
+  return { skipped: "no java on PATH" };
+}
+
 export async function renderSvgs(
   jobs: RenderJob[],
   who: { repo: string; generator: string },
 ): Promise<{ rendered: number; skipped: string | null }> {
   const todo = staleJobs(jobs);
   if (todo.length === 0) return { rendered: 0, skipped: null };
-  if (spawnSync("java", ["-version"]).status !== 0) return { rendered: 0, skipped: "no java on PATH" };
+  const java = javaForPlantuml();
+  if ("skipped" in java) return { rendered: 0, skipped: java.skipped };
   const jar = await plantumlJar();
   if (!jar) return { rendered: 0, skipped: `could not fetch ${PLANTUML.url}` };
 
@@ -239,7 +293,7 @@ export async function renderSvgs(
       writeFileSync(f, text.replace(/^@startuml .*$/m, `@startuml u${i}`));
       return f;
     });
-    const run = spawnSync("java", ["-jar", jar, "-charset", "UTF-8", "-tsvg", "-o", work, ...inputs], { encoding: "utf8" });
+    const run = spawnSync(java.bin, ["-jar", jar, "-charset", "UTF-8", "-tsvg", "-o", work, ...inputs], { encoding: "utf8" });
     if (run.status !== 0) throw new Error(`PlantUML failed (${run.status}): ${run.stderr}`);
     todo.forEach(({ source: p, text, svg: target }, i) => {
       const out = join(work, `u${i}.svg`);
