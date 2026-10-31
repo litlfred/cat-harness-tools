@@ -263,6 +263,27 @@ describe("every subject loads: its own .jsonld and page", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+  test("a page sits in the site's content column, follows the site's light/dark switch, and names its parent (owner, 2026-10-31)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "subject-page-"));
+    try {
+      writeSubjectDocuments(published, join(dir, "folio-assistant-core.jsonld"));
+      const step = readFileSync(join(dir, "process/P/node/T.html"), "utf-8");
+      const P = makeIri(DOC, "process", "P");
+      // The content column `page-layout.css` styles beside the rail, not a bare body.
+      expect(step).toContain('<main class="fa-page-main">');
+      // Dark by the reader's pick as well as the OS: `data-fa-scheme`, not the media query alone.
+      expect(step).toContain(':root[data-fa-scheme="dark"]');
+      expect(step).not.toMatch(/@media \(prefers-color-scheme: dark\) \{ :root \{/);
+      // The parent process by its NAME, linked, at the top and in its row; the IRI under it.
+      expect(step).toContain(`<p>Part of <a href="${P}">P</a></p>`);
+      expect(step).toContain(`<a href="${P}">P</a><br><span class="iri muted">${P}</span>`);
+      // A node with no name in the graph keeps its IRI as the link text, and it wraps.
+      const lane = readFileSync(join(dir, "process/P/lane/L.html"), "utf-8");
+      expect(lane).not.toContain("<p>Part of");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("the diagram page a subject links to", () => {
