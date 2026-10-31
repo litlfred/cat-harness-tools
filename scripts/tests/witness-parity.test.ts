@@ -1,15 +1,15 @@
 /**
  * `witness:parity`: the comparison, the environment check, and the three
- * verdicts end to end against a throwaway git repository whose "producers" are
- * one-line shell commands, so the test needs git and bash but no Python stack.
+ * verdicts end to end against a throwaway git repository whose producers are
+ * tracked scripts invoked as direct argv (never `bash -c`).
  */
 import { describe, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stripEphemeral } from "../../schemas/computation-witness.ts";
-import { checkParity, diffPaths, environmentMismatch, resolveScript } from "../witness-parity.ts";
+import { checkParity, diffPaths, environmentMismatch, parseReproduce, resolveScript } from "../witness-parity.ts";
 
 describe("stripEphemeral", () => {
   it("removes run-specific fields at every depth and keeps the rest", () => {
@@ -42,14 +42,16 @@ describe("environmentMismatch", () => {
 });
 
 describe("checkParity", () => {
+  const COPY_SCRIPT = "import shutil\nshutil.copy('computations/out.json', 'computations/w.witness.json')\n";
   /** A repo whose producer writes `out` to `computations/w.witness.json`. */
-  function repo(witness: object, producerOut: string) {
+  function repo(witness: object, producerOut: string, scriptBody = COPY_SCRIPT) {
     const root = mkdtempSync(join(tmpdir(), "witness-parity-"));
     const g = (...a: string[]) => spawnSync("git", a, { cwd: root, encoding: "utf8" });
     g("init", "-q");
     g("config", "user.email", "t@t");
     g("config", "user.name", "t");
     mkdirSync(join(root, "computations"));
+    writeFileSync(join(root, "computations", "p.py"), scriptBody);
     writeFileSync(join(root, "computations", "w.witness.json"), JSON.stringify(witness));
     writeFileSync(join(root, "computations", "out.json"), producerOut);
     g("add", "-A");
@@ -57,10 +59,10 @@ describe("checkParity", () => {
     return { root, cleanup: () => rmSync(root, { recursive: true, force: true }) };
   }
   const base = { scriptFile: "computations/p.py", data: { x: 1 } };
-  const run = (cmd: string) => ({ ...base, invocation: { reproduce: cmd } });
+  const run = (cmd = "python3 -u computations/p.py") => ({ ...base, invocation: { reproduce: cmd } });
 
   it("passes when the producer rewrites the same witness, run-specific fields aside", () => {
-    const w = run("cp computations/out.json computations/w.witness.json");
+    const w = run();
     const t = repo({ ...w, computedAt: "old" }, JSON.stringify({ ...w, computedAt: "new", durationMs: 9 }));
     try {
       const r = checkParity(t.root, "computations/w.witness.json");
@@ -71,7 +73,7 @@ describe("checkParity", () => {
   });
 
   it("fails, naming the path, when the producer writes a different value", () => {
-    const w = run("cp computations/out.json computations/w.witness.json");
+    const w = run();
     const t = repo(w, JSON.stringify({ ...w, data: { x: 2 } }));
     try {
       const r = checkParity(t.root, "computations/w.witness.json");
@@ -83,8 +85,8 @@ describe("checkParity", () => {
   });
 
   it("is unknown, not fail, when the producer exits non-zero", () => {
-    const w = run("echo 'refusing: precision floor not met'; exit 3");
-    const t = repo(w, "{}");
+    const w = run();
+    const t = repo(w, "{}", "import sys\nprint('refusing: precision floor not met')\nsys.exit(3)\n");
     try {
       const r = checkParity(t.root, "computations/w.witness.json");
       expect(r.verdict).toBe("unknown");
@@ -108,7 +110,7 @@ describe("checkParity", () => {
   });
 
   it("is unknown when the re-run records a different environment, e.g. another native build", () => {
-    const w = { ...run("cp computations/out.json computations/w.witness.json"), environment: { ext_build: "aaa" } };
+    const w = { ...run(), environment: { ext_build: "aaa" } };
     const t = repo(w, JSON.stringify({ ...w, environment: { ext_build: "bbb" }, data: { x: 1.0000001 } }));
     try {
       const r = checkParity(t.root, "computations/w.witness.json");
@@ -120,7 +122,7 @@ describe("checkParity", () => {
   });
 
   it("is unknown, not fail, when the witness was written by another version of its script", () => {
-    const w = { ...run("cp computations/out.json computations/w.witness.json"), scriptHash: "aaa" };
+    const w = { ...run(), scriptHash: "aaa" };
     const t = repo(w, JSON.stringify({ ...w, scriptHash: "bbb", data: { x: 2 } }));
     try {
       const r = checkParity(t.root, "computations/w.witness.json");
@@ -132,8 +134,8 @@ describe("checkParity", () => {
   });
 
   it("leaves the folio's own checkout untouched", () => {
-    const w = run("echo changed > computations/w.witness.json");
-    const t = repo(w, "{}");
+    const w = run();
+    const t = repo(w, JSON.stringify({ ...w, data: { x: 99 } }));
     try {
       const before = readFileSync(join(t.root, "computations", "w.witness.json"), "utf8");
       checkParity(t.root, "computations/w.witness.json");
@@ -143,6 +145,50 @@ describe("checkParity", () => {
       const wl = spawnSync("git", ["worktree", "list"], { cwd: t.root, encoding: "utf8" });
       expect(wl.stdout.trim().split("\n")).toHaveLength(1);
     } finally {
+      t.cleanup();
+    }
+  });
+
+  it("refuses a witness whose reproduce is 'touch /tmp/x; true' without executing it (bean cat-tools-w7tx)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "w7tx-marker-"));
+    const marker = join(dir, "pwned");
+    const w = run(`touch ${marker}; true`);
+    const t = repo(w, "{}");
+    try {
+      const r = checkParity(t.root, "computations/w.witness.json");
+      expect(r.verdict).toBe("unknown");
+      expect(r.reason).toContain("refused");
+      expect(existsSync(marker)).toBe(false);
+    } finally {
+      t.cleanup();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses unlisted executables, inline code flags (-c), and strips non-allowlisted environment variables (bean cat-tools-w7tx)", () => {
+    const w = { ...run(), data: { secret: "absent" } };
+    const t = repo(
+      w,
+      "{}",
+      "import json, os, pathlib\np = pathlib.Path('computations/w.witness.json')\nd = json.loads(p.read_text())\nd['data'] = {'secret': os.environ.get('WITNESS_SECRET_TEST', 'absent')}\np.write_text(json.dumps(d))\n",
+    );
+    try {
+      expect(parseReproduce("bash computations/p.py", t.root, "computations/w.witness.json")).toEqual({
+        reason: expect.stringContaining("not in the allowed producer table"),
+      });
+      expect(parseReproduce("python3 -c import_os", t.root, "computations/w.witness.json")).toEqual({
+        reason: expect.stringContaining("executes inline code"),
+      });
+      expect(parseReproduce("python3 computations/missing.py", t.root, "computations/w.witness.json")).toEqual({
+        reason: expect.stringContaining("resolves to no unique tracked file"),
+      });
+
+      process.env.WITNESS_SECRET_TEST = "leaked-token";
+      const r = checkParity(t.root, "computations/w.witness.json");
+      // The producer sees "absent" for WITNESS_SECRET_TEST because non-allowlisted env vars are stripped.
+      expect(r.verdict).toBe("pass");
+    } finally {
+      delete process.env.WITNESS_SECRET_TEST;
       t.cleanup();
     }
   });

@@ -136,6 +136,23 @@ function git(cwd: string, ...args: string[]) {
 }
 
 /**
+ * Declared table of producer interpreters `witness:parity` may invoke (bean
+ * `cat-tools-w7tx`). A witness is data committed in a pull request, so
+ * `invocation.reproduce` is parsed into an argv against this table and never
+ * handed to `bash -c`.
+ */
+export const PRODUCER_ALLOWLIST: ReadonlySet<string> = new Set(["python3", "python", "bun", "sage"]);
+
+/** Interpreter flags that execute inline program text rather than a tracked script file. */
+const INLINE_CODE_FLAGS = /^-(?:c|e|m)|^--eval(?:=|$)/;
+
+/** Pre-script interpreter flags that take no argument and may precede the script path. */
+const INTERPRETER_FLAGS = new Set(["-u", "-O", "-OO", "-B", "-s", "-S", "-E", "-I"]);
+
+/** Environment variables forwarded to a producer run; credentials in `process.env` never cross into the child. */
+export const PRODUCER_ENV_ALLOWLIST = ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "SOURCE_DATE_EPOCH"] as const;
+
+/**
  * Where a witness's `scriptFile` lives at HEAD.
  *
  * Producers record it inconsistently: a repository-relative path, or a bare
@@ -155,6 +172,55 @@ export function resolveScript(root: string, witnessRel: string, scriptFile: stri
     .stdout.split("\n")
     .filter((p) => p && basename(p) === scriptFile);
   return hits.length === 1 ? hits[0] : undefined;
+}
+
+/**
+ * Parse a witness's `invocation.reproduce` string into a direct `argv` against
+ * {@link PRODUCER_ALLOWLIST} and a tracked script at `HEAD` (bean `cat-tools-w7tx`).
+ * Refuses shell syntax, unlisted executables, inline code flags (`-c`, `-e`, `-m`),
+ * and untracked script targets.
+ */
+export function parseReproduce(
+  reproduce: string,
+  root: string,
+  witnessRel: string,
+  scriptFile?: string,
+): { argv: string[]; script: string } | { reason: string } {
+  const trimmed = reproduce.trim();
+  if (!trimmed) return { reason: "empty invocation.reproduce" };
+  if (/[;&|<>`$\\\r\n(){}[\]*?~#'"]/.test(trimmed)) {
+    return { reason: `invocation.reproduce refused: contains shell syntax or quoting (${JSON.stringify(trimmed.slice(0, 80))})` };
+  }
+  const tokens = trimmed.split(/\s+/);
+  const exe = tokens[0]!;
+  if (!PRODUCER_ALLOWLIST.has(exe)) {
+    return { reason: `invocation.reproduce refused: executable \`${exe}\` is not in the allowed producer table (${[...PRODUCER_ALLOWLIST].join(", ")})` };
+  }
+  for (const tok of tokens.slice(1)) {
+    if (INLINE_CODE_FLAGS.test(tok)) {
+      return { reason: `invocation.reproduce refused: flag \`${tok}\` executes inline code rather than a tracked script` };
+    }
+  }
+  let idx = 1;
+  if (exe === "bun" && tokens[idx] === "run") idx++;
+  while (idx < tokens.length && INTERPRETER_FLAGS.has(tokens[idx]!)) idx++;
+  const scriptTok = tokens[idx];
+  if (!scriptTok || scriptTok.startsWith("-")) {
+    return { reason: "invocation.reproduce refused: names no producer script file" };
+  }
+  const resolved = resolveScript(root, witnessRel, scriptTok);
+  if (!resolved) {
+    return { reason: `invocation.reproduce refused: script \`${scriptTok}\` resolves to no unique tracked file at HEAD` };
+  }
+  if (scriptFile) {
+    const expected = resolveScript(root, witnessRel, scriptFile);
+    if (expected && expected !== resolved) {
+      return { reason: `invocation.reproduce refused: script \`${resolved}\` does not match scriptFile \`${expected}\`` };
+    }
+  }
+  const argv = [...tokens];
+  argv[idx] = resolved;
+  return { argv, script: resolved };
 }
 
 /** Run one witness's producer in a scratch worktree and compare. */
@@ -191,8 +257,13 @@ export function checkParity(
     };
   }
 
+  const parsed = parseReproduce(reproduce, root, rel, scriptFile);
+  if (!("argv" in parsed)) {
+    return { witness: rel, verdict: "unknown", reason: parsed.reason };
+  }
+
   const top = (p: string) => p.split("/")[0]!;
-  const dirs = new Set(opts.dirs ?? [top(rel), ...(scriptFile?.includes("/") ? [top(scriptFile)] : []), "tools", "scripts"]);
+  const dirs = new Set(opts.dirs ?? [top(rel), ...(parsed.script.includes("/") ? [top(parsed.script)] : []), "tools", "scripts"]);
   const scratch = mkdtempSync(join(tmpdir(), "witness-parity-"));
   const wt = join(scratch, "tree");
   try {
@@ -203,11 +274,16 @@ export function checkParity(
     git(wt, "sparse-checkout", "set", "--cone", ...present);
     if (git(wt, "checkout", "-q").status !== 0) return { witness: rel, verdict: "unknown", reason: "scratch checkout failed" };
 
-    const run = spawnSync("bash", ["-c", reproduce], {
+    const env: Record<string, string> = { PYTHONDONTWRITEBYTECODE: "1" };
+    for (const k of PRODUCER_ENV_ALLOWLIST) {
+      if (typeof process.env[k] === "string") env[k] = process.env[k]!;
+    }
+    const [exe, ...args] = parsed.argv;
+    const run = spawnSync(exe!, args, {
       cwd: wt,
       encoding: "utf8",
       timeout: (opts.timeoutS ?? 300) * 1000,
-      env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+      env,
     });
     if (run.error && (run.error as NodeJS.ErrnoException).code === "ETIMEDOUT") {
       return { witness: rel, verdict: "unknown", reason: `producer did not finish within ${opts.timeoutS ?? 300}s` };

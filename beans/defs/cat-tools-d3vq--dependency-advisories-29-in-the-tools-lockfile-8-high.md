@@ -2,11 +2,11 @@
 # cat-tools-d3vq
 $schema: bean/1.0.0
 title: 'DEPENDENCY ADVISORIES: bun audit reports 29 in the cat-harness-tools lockfile (8 high), including an undici TLS validation bypass under jsonld'
-status: todo
+status: completed
 type: bug
 priority: high
 created_at: 2026-10-31T04:05:00Z
-updated_at: 2026-10-31T04:05:00Z
+updated_at: 2026-10-31T08:50:00Z
 parent: cat-tools-sr31
 ---
 
@@ -26,5 +26,5 @@ Also: `check:dependency-advisories` reports UNDETERMINED from a layer checkout, 
 
 ## Done when
 
-- [ ] `bun audit fix` within ranges, zod to 4.6.6+, and a jsonld path that does not pull undici 5 (override, or a pinned document loader).
-- [ ] `bun audit` shows no high advisories.
+- [x] `bun audit fix` within ranges, zod to 4.6.6+, and a jsonld path that does not pull undici 5 (override, or a pinned document loader).
+- [x] `bun audit` shows no high advisories.

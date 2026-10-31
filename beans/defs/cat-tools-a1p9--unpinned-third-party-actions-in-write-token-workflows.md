@@ -2,11 +2,11 @@
 # cat-tools-a1p9
 $schema: bean/1.0.0
 title: 'UNPINNED ACTIONS IN WRITE-TOKEN WORKFLOWS: both release-npm.yml files and the folio-qa-sweep workflows run third-party actions by tag with contents: write and NPM_TOKEN'
-status: todo
+status: completed
 type: bug
 priority: high
 created_at: 2026-10-31T04:05:00Z
-updated_at: 2026-10-31T04:05:00Z
+updated_at: 2026-10-31T08:50:00Z
 parent: cat-tools-sr31
 ---
 
@@ -24,5 +24,5 @@ Also noted, lower risk: every cat-harness caller workflow uses `litlfred/cat-har
 
 ## Done when
 
-- [ ] `bun run cat actions:pin` applied to these workflows, with `# <ref>` comments.
-- [ ] `security:gate` action-sha-pinning passes in both repos.
+- [x] `bun run cat actions:pin` applied to these workflows, with `# <ref>` comments.
+- [x] `security:gate` action-sha-pinning passes in both repos.

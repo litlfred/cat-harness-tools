@@ -27,7 +27,7 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: litlfred/cat-harness-tools/.github/actions/mount-layers@main
       - name: Machine review — titles + structure (hard gate)
         run: bun run "$FA_TOOLS/pipeline/qa-section-title-audit.ts"

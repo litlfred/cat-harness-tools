@@ -20,11 +20,25 @@
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 
-import { scriptTable } from "../schemas/sdlc/script-table.ts";
-import { HARNESS_ROOT } from "./lib/roots.ts";
-import { dirname } from "node:path";
+import { existsSync } from "node:fs";
 
-const REPO = resolve(dirname(HARNESS_ROOT));
+import { scriptTable } from "../schemas/sdlc/script-table.ts";
+
+function repoRoot(): string {
+  const toolsRoot = resolve(import.meta.dir, "..");
+  const parentRoot = resolve(import.meta.dir, "..", "..");
+  if (
+    existsSync(join(parentRoot, "cat-harness", "cat-harness.json")) ||
+    existsSync(join(parentRoot, "index.config.json")) ||
+    existsSync(join(parentRoot, "package.json"))
+  ) {
+    return parentRoot;
+  }
+  if (existsSync(join(toolsRoot, "package.json"))) {
+    return toolsRoot;
+  }
+  return parentRoot;
+}
 
 /** POSIX single-quote an argument for `sh -c`. */
 export function shellQuote(arg: string): string {
@@ -33,6 +47,15 @@ export function shellQuote(arg: string): string {
 
 if (import.meta.main) {
   const [name, ...args] = process.argv.slice(2);
+  const cwd = process.cwd();
+  let REPO = repoRoot();
+  if (name !== undefined && name !== "--list") {
+    try {
+      if (scriptTable(cwd).has(name)) REPO = cwd;
+    } catch {
+      // Fall back to REPO.
+    }
+  }
   const table = scriptTable(REPO);
   if (name === undefined || name === "--list") {
     for (const e of [...table.values()].sort((a, b) => a.name.localeCompare(b.name))) console.log(`${e.name}\t${e.manifest}`);
@@ -51,7 +74,15 @@ if (import.meta.main) {
     console.error(`bun run cat: no script "${name}" in any declared manifest.${near.length ? ` Did you mean: ${near.join(", ")}?` : ""}`);
     process.exit(2);
   }
-  const command = [entry.command, ...args.map(shellQuote)].join(" ");
+  let baseCommand = entry.command;
+  const prefixMatch = /^bun run ([A-Za-z0-9._-]+)\/(.+)$/.exec(baseCommand);
+  if (prefixMatch) {
+    const [, layerDir, rest] = prefixMatch;
+    if (!existsSync(join(REPO, layerDir!)) && existsSync(join(REPO, rest!.split(/\s+/)[0]!))) {
+      baseCommand = `bun run ${rest}`;
+    }
+  }
+  const command = [baseCommand, ...args.map(shellQuote)].join(" ");
   const r = spawnSync("sh", ["-c", command], {
     cwd: REPO,
     stdio: "inherit",
