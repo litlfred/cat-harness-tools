@@ -175,7 +175,7 @@ export function outsideInstances(paths: readonly string[], roots: readonly strin
  * copy of it here. Calling it a COMMITTED artefact that moved is false, and
  * the old remedy ("run the writer and commit it") cannot work: committing it
  * upstream does not mount it (folio-assistant#2781, where `check-l1-complete`
- * wrote smart-trust-phw's `test/results/library-qa/`, a path phw does not
+ * wrote a trust IG's `test/results/library-qa/`, a path that IG does not
  * declare). An instance the lock does not list (this checkout's own) is not a
  * mount and is left to {@link ignoredBy}.
  */
