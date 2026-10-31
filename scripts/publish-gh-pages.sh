@@ -89,6 +89,11 @@ for attempt in 1 2 3; do
     exit "$rc"
   fi
 
+  # Payload blobs this build drops but an older preview may still borrow
+  # (staging-share.ts) are carried over from the branch being replaced, until
+  # those previews rotate off (keep-shared-payloads.ts, bean fwtz Q-S2-2).
+  bun run cat-harness-tools/scripts/keep-shared-payloads.ts --site "$SITE" --pages "$PAGES_DIR"
+
   git -C "$PAGES_DIR" rm -r --ignore-unmatch -q '*'
   # `/.` copies the CONTENTS including dotfiles — `.nojekyll` is one, and
   # without it GitHub runs Jekyll over the published tree.
