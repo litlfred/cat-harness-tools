@@ -61,8 +61,13 @@ import { join, relative } from "node:path";
 import { FRAGMENT } from "./staging-banner.ts";
 import { stripSeo } from "./strip-preview-seo.ts";
 
-/** Files a preview always keeps: they describe this preview, or serve it. */
-export const NEVER_SHARED = new Set(["staging.json", "shared.json", "staging-sw.js", "404.html", "build.json"]);
+/**
+ * Files a preview always keeps: they describe this preview, or serve it. The
+ * root `index.html` too: it is the page the PR comment links to, the page
+ * that installs the worker on a first visit, and the file `staging-review`
+ * lists to tell that a preview was published.
+ */
+export const NEVER_SHARED = new Set(["index.html", "staging.json", "shared.json", "staging-sw.js", "404.html", "build.json"]);
 
 const META_STAGING = /<meta name="fa-staging" content="[^"]*">/g;
 const META_SEARCH = /<meta name="fa-search-index" content="([^"]*)">/g;

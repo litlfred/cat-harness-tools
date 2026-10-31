@@ -39,6 +39,8 @@ describe("what counts as the live site's copy", () => {
   });
   test("the preview's own facts are never shared", () => {
     expect(sameAsLive("staging.json", Buffer.from("{}"), Buffer.from("{}"), "s1")).toBe(false);
+    expect(sameAsLive("index.html", Buffer.from(PREVIEW), Buffer.from(LIVE), "s1")).toBe(false);
+    expect(sameAsLive("en/index.html", Buffer.from(PREVIEW), Buffer.from(LIVE), "s1")).toBe(true);
   });
 });
 
