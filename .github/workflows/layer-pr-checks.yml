@@ -255,6 +255,11 @@ on:
         required: false
         type: boolean
         default: false
+      writer-skip:
+        description: "Skip a derive:publish writer whose recorded reads are unchanged, putting back what it wrote (bean fwtz). A push to the caller's main records each writer under strace; a PR restores the newest record and skips. Off: every writer runs."
+        required: false
+        type: boolean
+        default: true
       quick-paths:
         description: "Path prefixes in the calling repository, space-separated (a directory ends in `/`). A PR whose every changed file starts with one of them takes the quick lane: the PR side is mounted, installed and typechecked, `quick-test` runs, and nothing else (no main side, no shards, no derive:publish, no gates). Empty: no quick lane."
         required: false
@@ -818,6 +823,26 @@ jobs:
           restore-keys: |
             derive-cache-v1-${{ github.repository }}-${{ env.SIDE }}-
             derive-cache-v1-${{ github.repository }}-
+      # Bean fwtz (owner 2026-10-31: "cache the page build", keyed on input
+      # content, so changed inputs rebuild). The writer cache above keys on
+      # statically derived inputs and reused 0 of 41 writers on
+      # folio-assistant-core#444. Writer records are traced instead: a push to
+      # main records what each writer read and wrote; a PR skips a writer whose
+      # every recorded read is unchanged and puts back what it wrote.
+      - &writer-cone
+        name: Restore main's derive:publish writer records (bean fwtz)
+        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: fa/build/writer-cone
+          key: writer-cone-v1-${{ github.repository }}-${{ github.event.pull_request.base.sha }}
+          restore-keys: writer-cone-v1-${{ github.repository }}-
+      - &strace
+        name: strace, to record the writers (a push to main)
+        if: inputs.writer-skip && github.event_name == 'push' && steps.skip-prep.outputs.hit != 'true'
+        run: |
+          if command -v strace >/dev/null; then strace -V | head -1; exit 0; fi
+          sudo apt-get update -qq && sudo apt-get install -y -qq strace && strace -V | head -1
       - &derive
         name: Build the publish-time pages (derive:publish), on this side
         # Not on a draft under `draft-fast-tier` (owner, 2026-10-23, "1y"):
@@ -844,6 +869,8 @@ jobs:
         # only: derive:publish and its writers call `bun run cat <writer>`,
         # which there would run /usr/bin/cat. package.json is restored before
         # the tests and gates, so they judge the checkout as committed.
+        env:
+          WRITER_SKIP: ${{ inputs.writer-skip }}
         working-directory: fa
         run: |
           set -uo pipefail
@@ -899,8 +926,15 @@ jobs:
           # Reuse on (cat-harness-tools#400): derive:publish keeps reuse off under
           # CI unless a cache directory is named.
           export CAT_DERIVE_CACHE_DIR="$PWD/build/derive-cache"
+          # Writer records (bean fwtz): recorded on a push, used on a PR.
+          if [ "$WRITER_SKIP" = "true" ]; then
+            if [ "${{ github.event_name }}" = "push" ]; then export CAT_WRITER_RECORD=1
+            elif [ -f build/writer-cone/records.json ]; then export CAT_WRITER_SKIP=1
+            else echo "writer skip: no records restored, every writer runs"; fi
+          fi
           bun run cat derive:publish 2>&1 | tee "$log" || code=$?
           echo "derive cache: $(grep -c '^  reused ' "$log" || true) writer(s) reused, $(grep -c '^  ran ' "$log" || true) ran"
+          echo "writer skip: $(grep -c '^  skipped .*put back its outputs' "$log" || true) writer(s) skipped, $(grep -Ec '^  [^ ]+ runs: ' "$log" || true) ran"
           if [ -n "$injected" ]; then cp "$RUNNER_TEMP/package.json.orig" package.json; fi
           # A root that is not the folio-assistant index (no
           # code-quality-gates.yml: a folio, an IG repository) mounts fewer
@@ -926,6 +960,13 @@ jobs:
           json.dump({"publish:derive:publish": {"command": "bun run cat derive:publish", "exit": int(sys.argv[2]), "tail": tail}}, open(sys.argv[1], "w"), indent=1)
           PY
           fi
+      - &writer-cone-save
+        name: Keep main's writer records (bean fwtz)
+        if: inputs.writer-skip && github.event_name == 'push' && steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: fa/build/writer-cone
+          key: writer-cone-v1-${{ github.repository }}-${{ github.sha }}
       # The typecheck, once, here: it was its own job, a third machine and
       # a third wait for one `tsc` (cat-harness-tools#397). Its outcome goes
       # to the compare job, which fails on it, so the shards still run.
@@ -1241,7 +1282,10 @@ jobs:
       - *state-mount
       - *root-gates
       - *derive-cache
+      - *writer-cone
+      - *strace
       - *derive
+      - *writer-cone-save
       - *timings-restore
       - *snapshot-save
       - *upload-prepared
