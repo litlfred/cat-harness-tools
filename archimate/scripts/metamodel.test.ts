@@ -118,6 +118,10 @@ describe("the metamodel in use", () => {
     expect(dot).not.toContain("associated with");
     expect(dot).not.toContain(`"Grouping"`);
     expect(metamodelDot(dense, { associations: true })).toContain("associated with ×4");
+    const linked = metamodelDot(dense, { href: { type: (t) => `page/#type-${t}`, pair: (a, b) => `page/#pattern-${a}-${b}` } });
+    expect(linked).toContain(`URL="page/#type-Goal", target="_top"`);
+    expect(linked).toContain(`URL="page/#pattern-Capability-Goal", target="_top"`);
+    expect(dot).not.toContain("URL=");
   });
 
   it("reports in plain text, the refusal first", () => {

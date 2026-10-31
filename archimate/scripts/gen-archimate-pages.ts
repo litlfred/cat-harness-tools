@@ -73,7 +73,7 @@ import { readArchimate, type ArchimateModel } from "../schemas/archimate.ts";
 import { renderViewSvg, typeLabel } from "./render-view.ts";
 import { CONFIG_FILE, archimateDir, localDirOf, readConfig } from "./check-archimate.ts";
 import { planSlugs } from "../schemas/slugs.ts";
-import { metamodelDot, metamodelMermaid, metamodelOf, typeName, verbOf, type Metamodel } from "../schemas/metamodel.ts";
+import { metamodelDot, metamodelMermaid, metamodelOf, pairAnchor, typeAnchor, typeName, verbOf, type Metamodel } from "../schemas/metamodel.ts";
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { darkRules } from "../../scripts/lib/scheme-css.ts";
 import { pageParts, withRenderedBy } from "../../scripts/viewer-declarations.ts";
@@ -252,7 +252,12 @@ export function pagesFor(
 
     // The metamodel the model uses, derived, never drawn (Tool `archimate-metamodel`).
     const mm = metamodelOf(model, m);
-    const mmDot = metamodelDot(mm);
+    // Every box and line opens its section of the metamodel page: the
+    // drawing is data (`<m>/`), the page is at the declared route.
+    const mmPage = `${toPage(m, "metamodel")}${site ? "" : "/"}`;
+    const mmDot = metamodelDot(mm, {
+      href: { type: (t) => `${mmPage}#${typeAnchor(t)}`, pair: (a, b) => `${mmPage}#${pairAnchor(a, b)}` },
+    });
     files.push(
       { path: `${m}/metamodel.json`, content: `${JSON.stringify(mm, null, 2)}\n` },
       { path: `${m}/metamodel.dot`, content: mmDot },
@@ -267,6 +272,7 @@ export function pagesFor(
         data: (rel) => toData(mp, `../${rel}`),
         element: (id) => `../elements/${seg(id)}/`,
         relationship: (id) => `../relationships/${id}/`,
+        nameOf: (id) => elements.get(id)?.name ?? id,
         drawn,
       }), nav("../")));
 
@@ -377,7 +383,13 @@ export function pagesFor(
 export function metamodelBody(
   mm: Metamodel,
   title: string,
-  link: { data: (rel: string) => string; element: (id: string) => string; relationship: (id: string) => string; drawn: boolean },
+  link: {
+    data: (rel: string) => string;
+    element: (id: string) => string;
+    relationship: (id: string) => string;
+    nameOf: (id: string) => string;
+    drawn: boolean;
+  },
 ): string {
   const verdict = (a: boolean | undefined): string => (a === true ? "✓ allowed" : a === false ? "✗ not allowed" : "? not in the table");
   const bad = mm.patterns.filter((p) => p.allowed === false);
@@ -397,14 +409,23 @@ export function metamodelBody(
     `and <em>associated with</em> (which says nothing about how two things relate), groupings and junctions are left out. The tables below list everything.</p>` +
     `<p>The same diagram as <a href="${escHtml(link.data("metamodel.dot"))}">Graphviz DOT</a>, a <a href="${escHtml(link.data("metamodel.mmd"))}">Mermaid class diagram</a>, ` +
     `and <a href="${escHtml(link.data("metamodel.json"))}">JSON</a>.</p>` +
+    `<p>Click a box to see its elements, or a line to see its relationships.</p>` +
     `<h2>Element types</h2><table class="am-props"><thead><tr><th>Type</th><th>Layer</th><th>Elements</th></tr></thead><tbody>` +
-    mm.types.map((t) => `<tr><td>${escHtml(typeName(t.type))}</td><td>${escHtml(t.layer)}</td><td>${t.elements}</td></tr>`).join("") +
+    mm.types
+      .map(
+        (t) =>
+          `<tr id="${escHtml(typeAnchor(t.type))}"><td>${escHtml(typeName(t.type))}</td><td>${escHtml(t.layer)}</td><td><details><summary>${t.elements}</summary><ul class="am-els">` +
+          t.ids.map((id) => `<li><a href="${escHtml(link.element(id))}">${escHtml(link.nameOf(id) || "(unnamed)")}</a></li>`).join("") +
+          `</ul></details></td></tr>`,
+      )
+      .join("") +
     `</tbody></table>` +
     `<h2>Relationship patterns</h2><table class="am-props"><thead><tr><th>Source</th><th>Relationship</th><th>Target</th><th>Count</th><th>ArchiMate ${escHtml(mm.archimateVersion)}</th><th>Relationships</th></tr></thead><tbody>` +
     mm.patterns
       .map(
-        (p) =>
-          `<tr${p.allowed === false ? ` style="color:#c0392b"` : ""}><td>${escHtml(typeName(p.source))}</td><td>${escHtml(verbOf(p.relationship))}</td><td>${escHtml(typeName(p.target))}</td>` +
+        (p, i) =>
+          `<tr${mm.patterns.findIndex((q) => q.source === p.source && q.target === p.target) === i ? ` id="${escHtml(pairAnchor(p.source, p.target))}"` : ""}` +
+          `${p.allowed === false ? ` style="color:#c0392b"` : ""}><td>${escHtml(typeName(p.source))}</td><td>${escHtml(verbOf(p.relationship))}</td><td>${escHtml(typeName(p.target))}</td>` +
           `<td>${p.count}</td><td>${verdict(p.allowed)}</td><td>${rels(p.relationships)}</td></tr>`,
       )
       .join("") +
@@ -417,6 +438,9 @@ export function metamodelBody(
         `</ul>`
       : "") +
     `<p class="am-type">Relationship table: ArchiMate ${escHtml(mm.archimateVersion)} Appendix B as Archi holds it (MIT).</p>` +
+    // A click on a box lands on its row: open the row's element list.
+    `<script>(function(){function o(){var t=location.hash&&document.getElementById(decodeURIComponent(location.hash.slice(1)));` +
+    `var d=t&&t.querySelector("details");if(d)d.open=true;}addEventListener("hashchange",o);o();})();</script>` +
     `</main>`
   );
 }

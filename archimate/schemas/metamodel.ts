@@ -85,6 +85,8 @@ export interface MetamodelType {
   layer: ArchimateLayer;
   /** Elements of this type, placeholders not counted. */
   elements: number;
+  /** Their ids, in model order: what a reader opens from the type's box. */
+  ids: string[];
 }
 
 export interface MetamodelPattern {
@@ -119,8 +121,8 @@ export function metamodelOf(model: ArchimateModel, modelId: string, table: Relat
   const relIds = new Set(model.relationships.map((r) => r.id));
   const placeholders = model.elements.filter(isPlaceholder);
   const ph = new Set(placeholders.map((e) => e.id));
-  const typeCount = new Map<string, number>();
-  for (const e of model.elements) if (!ph.has(e.id)) typeCount.set(e.type, (typeCount.get(e.type) ?? 0) + 1);
+  const typeIds = new Map<string, string[]>();
+  for (const e of model.elements) if (!ph.has(e.id)) typeIds.set(e.type, [...(typeIds.get(e.type) ?? []), e.id]);
   const typeOfEnd = (id: string): string | undefined => elements.get(id)?.type ?? (relIds.has(id) ? "Relationship" : undefined);
   const patterns = new Map<string, MetamodelPattern>();
   const placeholderRelationships: string[] = [];
@@ -146,7 +148,7 @@ export function metamodelOf(model: ArchimateModel, modelId: string, table: Relat
     model: modelId,
     name: model.name,
     archimateVersion: table.archimateVersion,
-    types: [...typeCount].map(([type, n]) => ({ type, layer: layerOf(type), elements: n })).sort(byCount((t) => t.type)),
+    types: [...typeIds].map(([type, ids]) => ({ type, layer: layerOf(type), elements: ids.length, ids })).sort(byCount((t) => t.type)),
     patterns: list,
     placeholders: placeholders.map((e) => ({ id: e.id, type: e.type, name: e.name })),
     placeholderRelationships,
@@ -218,7 +220,15 @@ const dq = (s: string): string => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\
  *
  * A pattern ArchiMate does not allow is always drawn, red and marked ✗.
  */
-export function metamodelDot(mm: Metamodel, opts: { associations?: boolean } = {}): string {
+export function metamodelDot(
+  mm: Metamodel,
+  opts: {
+    associations?: boolean;
+    /** Where a box and a line go when clicked: the page's section for that type or pair. Absent, nothing links. */
+    href?: { type: (type: string) => string; pair: (source: string, target: string) => string };
+  } = {},
+): string {
+  const link = (url: string | undefined, tip: string): string => (url ? `, URL=${dq(url)}, target="_top", tooltip=${dq(tip)}` : "");
   const shown = mm.patterns.filter((p) => opts.associations || relKind(p.relationship) !== "Association" || p.allowed === false);
   const used = new Set<string>([...mm.types.map((t) => t.type), ...shown.flatMap((p) => [p.source, p.target])]);
   const count = new Map(mm.types.map((t) => [t.type, t.elements]));
@@ -254,7 +264,7 @@ export function metamodelDot(mm: Metamodel, opts: { associations?: boolean } = {
     for (const t of types) {
       const self = selfOf.get(t);
       const text = `${typeName(t)}\n${count.get(t) ?? 0} element(s)${self ? `\n(to itself: ${self.join(", ")})` : ""}`;
-      lines.push(`    ${dq(t)} [label=${dq(text)}, fillcolor=${dq(LAYER_FILL[layer])}];`);
+      lines.push(`    ${dq(t)} [label=${dq(text)}, fillcolor=${dq(LAYER_FILL[layer])}${link(opts.href?.type(t), `${typeName(t)}: its elements`)}];`);
     }
     lines.push(`  }`);
   });
@@ -265,12 +275,17 @@ export function metamodelDot(mm: Metamodel, opts: { associations?: boolean } = {
     const kinds = new Set(ps.map((p) => relKind(p.relationship)));
     const style = kinds.size === 1 ? DOT_EDGE[[...kinds][0]] ?? "" : "arrowhead=vee";
     lines.push(
-      `  ${dq(ps[0].source)} -> ${dq(ps[0].target)} [label=${dq(ps.map(label).join("\n"))}, ${style}${bad ? `, color="#c0392b", fontcolor="#c0392b", penwidth=2` : ""}];`,
+      `  ${dq(ps[0].source)} -> ${dq(ps[0].target)} [label=${dq(ps.map(label).join("\n"))}, ${style}${bad ? `, color="#c0392b", fontcolor="#c0392b", penwidth=2` : ""}` +
+        `${link(opts.href?.pair(ps[0].source, ps[0].target), `${typeName(ps[0].source)} → ${typeName(ps[0].target)}: its relationships`)}];`,
     );
   }
   lines.push(`}`);
   return `${lines.join("\n")}\n`;
 }
+
+/** The page anchor of a type's section and of a pair's first pattern row. */
+export const typeAnchor = (type: string): string => `type-${type}`;
+export const pairAnchor = (source: string, target: string): string => `pattern-${source}-${target}`;
 
 /** Mermaid's class-diagram arrow for each relationship, source on the left. */
 const MERMAID_ARROW: Record<string, string> = {
