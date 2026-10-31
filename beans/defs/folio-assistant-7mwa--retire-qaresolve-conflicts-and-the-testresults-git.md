@@ -50,3 +50,13 @@ _2026-10-30T18:40:00Z_ — Completed the `folio_init` / `qa-sweep.yml` template 
 _2026-10-30T19:45:00Z_ — litlfred/cat-harness-tools#949 merged as `6414778` (owner card 19:40Z): qa-sweep now publishes to qa-reports. Still open: no gate or test references a committed `test/results` file. Session https://claude.ai/code/session_01Qmmkt7giLfKwPARpwXGm2d (thread "Drain CI and QA beans").
 
 _2026-10-31T01:15:00Z_ — Box 1 checked on `cat-harness-tools` `main`: not done. `scripts/qa-resolve-conflicts.ts` and its test still exist, and about 30 files under `schemas/`, `pipeline/`, `src/tools/` and three `folio-qa-sweep*`/`folio-section-title-audit` workflows still name `test/results`. This is real work, still blocked by `tfqf`. Session https://claude.ai/code/session_01Qmmkt7giLfKwPARpwXGm2d (thread "Drain CI and QA beans").
+
+_2026-10-31T14:35:00Z_: cat-harness no longer commits `test/results`. litlfred/cat-harness#857 (161b243) removed it, after litlfred/cat-harness-tools#1143 (5d30589) on owner card A at 14:06Z. #1143 also made `kg-validate-nested-instances` check an absent `qa` home against the store, and dropped four declared-path witnesses that are test vectors or convention constants.
+
+Box 1 is still open, because folio-assistant-core and fhir-harness still commit `test/results` (the store lists 63 core kg-qa sidecars). These sites stay until those instances stop committing (the per-instance `storage` step):
+- `qa:resolve-conflicts`, which `merge-base.ts` still routes `**/test/results/kg-qa/**` to;
+- `merge-train.ts` `keepTrackedIgnored` / `checkTestResultsDrops`;
+- the `regen-after-merge.ts` writer overrides, which need checking gate by gate;
+- `gitattributes.test.ts` `oxka`/`eqxp`, kept by the owner on 2026-10-23.
+
+Retiring `qa:resolve-conflicts` also needs a note in cat-harness's `prepare-merge` skill. The blocker on tfqf now covers only the screenshot box. Session https://claude.ai/code/session_01Qmmkt9MhQCZs54m2YPoyXp.

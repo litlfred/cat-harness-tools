@@ -98,7 +98,10 @@ while IFS=$'\t' read -r id event sha url; do
   [ -n "$id" ] || continue
   jobs=$(gh api "repos/$REPO/actions/runs/$id/jobs?per_page=100" \
     --jq '.jobs[] | [.name, (.conclusion // ""), .check_run_url] | @tsv' 2>/dev/null) || { checked+=" $id(jobs unreadable)"; continue; }
-  ok=$(printf '%s\n' "$jobs" | awk -F'\t' -v re="$SKIPPABLE" '$1 ~ re && $2 == "success"' | wc -l)
+  # The regex goes in through the environment, not `-v`: awk processes
+  # backslash escapes in a `-v` value, and gawk turns `\+` into a bare `+`,
+  # so the end-to-end job names stopped matching there (mawk keeps it).
+  ok=$(printf '%s\n' "$jobs" | SKIPPABLE_RE="$SKIPPABLE" awk -F'\t' '$1 ~ ENVIRON["SKIPPABLE_RE"] && $2 == "success"' | wc -l)
   if [ "$ok" -ne "$EXPECTED_SKIPPABLE" ]; then checked+=" $id($ok/$EXPECTED_SKIPPABLE skippable jobs succeeded)"; continue; fi
   case "$event" in
     pull_request)

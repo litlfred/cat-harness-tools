@@ -103,7 +103,7 @@
 
 import { DIFF_RENDERERS } from "../schemas/ui/diff-renderers.js";
 import { PUBLISHED_LOCALES } from "../schemas/content/translation.js";
-import { cleanRendered, renderFields, renderInline, renderSideBySide, renderVisual, renderWordDiff } from "./review-renderers.js";
+import { changeRuns, cleanRendered, markInFrame, renderFields, renderInline, renderSideBySide, renderVisual, renderWordDiff } from "./review-renderers.js";
 import { computeHeat, heatBucket, renderHeat } from "./review-heat.js";
 import { crumbFor, railOutline, renderMinimap, renderOutline } from "./review-nav.js";
 import { measuredModel, renderedModel, renderMeasured, renderRendered } from "./review-rendered.js";
@@ -180,7 +180,12 @@ const STYLE = `
   .diff-fields caption { text-align: left; font-weight: 600; padding: .25rem 0; }
   .diff-fields th, .diff-fields td { border: 1px solid var(--rule); padding: .25rem .4rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
   .diff-fields td:last-child { white-space: nowrap; font-weight: 600; }
-  .diff-sbs iframe { width: 100%; height: 22rem; border: 1px solid var(--rule); border-radius: .3rem; background: #fff; }
+  .diff-sbs iframe { width: 100%; height: 22rem; border: 1px solid var(--rule); border-radius: 0 0 .3rem .3rem; background: #fff; display: block; }
+  .sbs-head { padding: .35rem .6rem; border-radius: .3rem .3rem 0 0; font-size: .9rem; color: #fff; overflow-wrap: anywhere; }
+  .sbs-side-base { background: #5f6368; }
+  .sbs-side-head { background: #4F6F52; }
+  .sbs-head a, .sbs-head code { color: #fff; }
+  .sbs-head code { background: rgba(0,0,0,.25); padding: 0 .25rem; border-radius: .2rem; }
   @media (max-width: 40rem) { .diff-sbs { grid-template-columns: 1fr; } }
   /* Visual diff (0rxe): pictures on a white card, since they are screenshots
      of light pages; the mode buttons are native radios, one click each. */
@@ -410,7 +415,15 @@ const SCRIPT = `
     } else if (id === "inline") {
       out = renderInline(document, base ? base.html : null, head ? head.html : null, wordDiff, cleanRendered);
     } else if (id === "side-by-side") {
-      out = renderSideBySide(document, ctx.before, ctx.after);
+      // The rendered text of each side, diffed, says where each pane scrolls to.
+      var runs = null;
+      if (base || head) {
+        var bt = base ? cleanRendered(document, base.html).textContent || "" : "";
+        var ht = head ? cleanRendered(document, head.html).textContent || "" : "";
+        var sops = wordDiff(bt, ht);
+        if (sops) runs = changeRuns(sops);
+      }
+      out = renderSideBySide(document, ctx.before, ctx.after, { beforeName: ctx.beforeName, facts: ctx.facts, runs: runs, mark: markInFrame });
     } else if (id === "visual") {
       out = renderVisual(document, ctx.visual, ROOT, "vis-" + panel.id);
     } else if (id === "fields") {
@@ -627,6 +640,8 @@ const SCRIPT = `
             structure: structureFile && structureFile.blocks ? structureFile.blocks[c.label] || null : null,
             before: before,
             after: after,
+            beforeName: beforeName,
+            facts: st && st.branch ? st : null,
           });
           li.appendChild(v.row);
           li.appendChild(v.panel);
@@ -824,6 +839,8 @@ var renderWordDiff = ${renderWordDiff.toString()};
 var renderInline = ${renderInline.toString()};
 var renderFields = ${renderFields.toString()};
 var renderSideBySide = ${renderSideBySide.toString()};
+var changeRuns = ${changeRuns.toString()};
+var markInFrame = ${markInFrame.toString()};
 var renderVisual = ${renderVisual.toString()};
 var computeHeat = ${computeHeat.toString()};
 var heatBucket = ${heatBucket.toString()};
