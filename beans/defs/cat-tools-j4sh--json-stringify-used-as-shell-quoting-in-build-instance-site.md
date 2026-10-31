@@ -18,5 +18,5 @@ RED FLAG category: `security`. Severity: minor. Rule: `scz-value-never-becomes-p
 
 ## Done when
 
-- [ ] Use argv (`spawnSync("git", [...])` piped to tar) or `shellQuote`.
-- [ ] A test with an exclude of `$(touch /tmp/x)` shows nothing runs.
+- [x] Use argv (`spawnSync("git", [...])` piped to tar) or `shellQuote`.
+- [x] A test with an exclude of `$(touch /tmp/x)` shows nothing runs.

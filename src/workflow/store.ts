@@ -16,6 +16,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { INSTANCE_SCHEMA, type InstanceState } from "./instance.js";
+import { joinSegments } from "../core/safe-path.js";
 // `src/` may import `scripts/`; the reverse is what the layering forbids.
 import { resolveBeanGraphNode } from "../../scripts/beans.ts";
 
@@ -83,8 +84,13 @@ export function clearWorkflowDirCache(): void {
   dirCache.clear();
 }
 
-const pathFor = (repoRoot: string, id: string): string =>
-  join(workflowDir(repoRoot), `${id}.json`);
+/**
+ * The state file for `id`, or `undefined` when `id` is not one path segment.
+ * `id` reaches here from an MCP tool argument, so `../x` is refused rather
+ * than read (security review 2026-10-31).
+ */
+const pathFor = (repoRoot: string, id: string): string | undefined =>
+  typeof id === "string" ? joinSegments(workflowDir(repoRoot), `${id}.json`) : undefined;
 
 /**
  * Instance ids are derived from the subject, not random: re-running a step for
@@ -103,7 +109,7 @@ export function instanceId(processId: string, subject: string): string {
 
 export function loadInstance(repoRoot: string, id: string): InstanceState | undefined {
   const p = pathFor(repoRoot, id);
-  if (!existsSync(p)) return undefined;
+  if (p === undefined || !existsSync(p)) return undefined;
   return JSON.parse(readFileSync(p, "utf-8")) as InstanceState;
 }
 
@@ -155,6 +161,7 @@ export function saveInstance(repoRoot: string, state: InstanceState): string {
   const dir = workflowDir(repoRoot);
   mkdirSync(dir, { recursive: true });
   const p = pathFor(repoRoot, state.id);
+  if (p === undefined) throw new Error(`instance id '${state.id}' is not one path segment`);
   // `$schema` FIRST, and written on every save rather than only on create, so
   // a file from before the tag existed gains it the next time it is touched.
   // The bean graph says a directory holds `workflow-state` and leaves
