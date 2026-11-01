@@ -51,7 +51,7 @@
  * found by nothing until the next push, and that run builds in full as usual.
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
