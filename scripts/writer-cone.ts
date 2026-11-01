@@ -225,6 +225,18 @@ export function snapshotPaths(
   return { paths: [...declared, ...extra] };
 }
 
+/** How many changed reads {@link changedWhy} names before it only counts. */
+export const CHANGED_SHOWN = 8;
+
+/** `a changed`, or `a changed (+3 more: b, c, d)`: the first changed read keeps its old wording. */
+export function changedWhy(changed: readonly string[]): string {
+  const [first, ...rest] = changed;
+  if (rest.length === 0) return `${first} changed`;
+  const shown = rest.slice(0, CHANGED_SHOWN - 1);
+  const more = rest.length - shown.length;
+  return `${first} changed (+${rest.length} more: ${shown.join(", ")}${more > 0 ? `, and ${more} others` : ""})`;
+}
+
 /** `proof`: the record's audit was clean, so the skip rests on the argument above; otherwise it is evidence the dry run must confirm. */
 export type WriterDecision =
   | { skip: true; sha: string; proof: boolean; why: string }
@@ -253,6 +265,9 @@ export function decideWriter(
   if (rec === undefined) return { skip: false, why: records.unrecorded[writer] ? `not recorded: ${records.unrecorded[writer]}` : `the deploy at ${records.sha.slice(0, 12)} recorded nothing for it` };
   if ("undetermined" in base) return { skip: false, why: `no key: ${base.undetermined}` };
   if (base.hash !== rec.base) return { skip: false, why: "its script, imports, audited environment or tools changed", cause: { kind: "script" } };
+  // Every changed read, not only the first: the first is often the checkout's
+  // own listing (`.`), which hid what else moved (bean fwtz, S-CI3).
+  const changed: string[] = [];
   for (const [p, state] of Object.entries(rec.reads)) {
     let now: string;
     try {
@@ -260,8 +275,9 @@ export function decideWriter(
     } catch (e) {
       return { skip: false, why: `could not read ${p}: ${(e as Error).message}` };
     }
-    if (now !== state) return { skip: false, why: `${p || "."} changed`, cause: { kind: "path", path: p } };
+    if (now !== state) changed.push(p);
   }
+  if (changed.length > 0) return { skip: false, why: changedWhy(changed.map((p) => p || ".")), cause: { kind: "path", path: changed[0]! } };
   for (const [key, state] of Object.entries(rec.git)) {
     let call: GitCall;
     try {

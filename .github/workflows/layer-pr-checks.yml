@@ -498,6 +498,7 @@ jobs:
           path: fa
       - &base-root
         name: Base side of the root (index mode)
+        id: base-root
         # Not on a push: the pushed commit IS main's side, and a merge
         # commit's first parent would be the main before it.
         if: inputs.mode == 'index' && env.SIDE == 'base' && github.event_name != 'push'
@@ -509,12 +510,25 @@ jobs:
           # exactly. Anything else (workflow_dispatch): the default branch's tip.
           set -euo pipefail
           cd "$DIR"
+          pr="$(git rev-parse HEAD)"
           if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
             git checkout -q --detach 'HEAD^1'
           else
             git fetch -q --depth 1 origin "$DEFAULT_BRANCH"
             git checkout -q --detach FETCH_HEAD
           fi
+          # The first harness PR (owner, 2026-11-01 09:22Z, smart-ips-pilgrimage#7):
+          # main has no index.lock.json yet, because this PR adds it, so main
+          # cannot be mounted. Main is then no baseline at all, and the PR is
+          # judged against itself: it is green unless its own tests or gates
+          # cannot run, and the summary says it set the first baseline.
+          first=false
+          if [ ! -f index.lock.json ]; then
+            first=true
+            git checkout -q --detach "$pr"
+            echo "::notice::first harness PR: main has no index.lock.json, so main's side is this PR's own tree (it sets the first baseline)"
+          fi
+          echo "first-setup=$first" >> "$GITHUB_OUTPUT"
           git log -1 --format='base side: %h %s'
       - &setup-bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -1084,6 +1098,9 @@ jobs:
       # Whether this job built main's side for its shards. The `run` job reads
       # it on a push, where there is no PR side to wait for.
       prepared: ${{ steps.skip-prep.outputs.hit != 'true' }}
+      # True on the first harness PR: main had no lock, so main's side is
+      # the PR's own tree (see the base-root step).
+      first-setup: ${{ steps.base-root.outputs.first-setup == 'true' }}
     steps:
       # The same matrix as prepare-head's; a push has no prepare-head.
       - *shards
@@ -1293,8 +1310,8 @@ jobs:
 
   # Main's writer records (bean fwtz), on their own machine beside the base
   # side: tracing every derive:publish writer under strace took the base
-  # side's preparation from ~10 to 56 minutes (folio-assistant-core run
-  # 41251751682). PRs read only the records this job saves, so nothing waits
+  # side's preparation from ~10 to 56 minutes (run
+  # https://github.com/litlfred/folio-assistant-core/actions/runs/41251751682). PRs read only the records this job saves, so nothing waits
   # on it but the run's own end.
   record-writers:
     name: Record main's page-build scripts (bean fwtz)
@@ -1647,6 +1664,14 @@ jobs:
           if tier != "exact":
               print("\nIt is the answer for this PR's own base commit; a failure that reached it after that run through the index, a lower layer or a branch-kept graph shows here as new. If a NEW failure below is not this PR's, re-run **all** jobs: a second attempt recomputes main exactly.")
           PY
+      - name: Say that this is the first harness PR
+        if: steps.pins-only.outputs.only != 'true' && needs.prepare-base.outputs.first-setup == 'true'
+        run: |
+          {
+            echo "### First harness PR: no baseline on main"
+            echo
+            echo "Main has no \`index.lock.json\` yet, because this PR adds it, so main cannot be mounted. Main's side was computed from this PR's own tree: nothing below can be new, and every failing gate is listed as the baseline this PR sets. Later PRs are judged against main as usual."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Join each side's shards
         id: join
         if: steps.pins-only.outputs.only != 'true'

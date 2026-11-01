@@ -1143,6 +1143,78 @@ export const KG_CRITERIA: readonly KgCriterionDefinition[] = [
       "(`bpmn-processes`). `n/a` for a diagram with no DI.",
   },
   {
+    id: "diagram-too-wide",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "The drawing is wider than 1400px, so at 100% it does not fit a screen and text shrinks when scaled. Split the process or tighten spacing (`bpmn:detangle --write`). " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "diagram-too-tall",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "The drawing is taller than 900px, so at 100% it does not fit a screen. Split the process or tighten lanes. " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "label-overlap",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "Two labels overlap, so neither can be read. Move one (`bpmn:detangle --write` places labels). " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "label-on-edge",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "A label sits on a sequence flow, so the line runs through the text. Move the label off the line. " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "label-on-shape",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "A label covers a shape or runs into its name. Move the label clear of the box. " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "label-on-lane-line",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "A label crosses a lane or pool boundary, so it reads as if it belongs to two lanes. Keep it inside its lane. " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "shape-overlap",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "Two flow nodes are drawn on top of each other. Move one. " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "lane-order",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "Another lane order gives fewer lane jumps. Swap lanes (`bpmn:detangle --write` tries every order). " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
     id: "prose-reviewed-since-code-changed",
     applies: ["process", "skill"],
     scope: "instance",

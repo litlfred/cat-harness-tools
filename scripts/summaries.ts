@@ -38,7 +38,7 @@
  *
  * @module scripts/summaries
  */
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, posix, relative, resolve } from "node:path";
 
 import { AttributionSchema, type Attribution } from "../schemas/content/attribution.ts";
@@ -62,6 +62,7 @@ import { declarationPathIn, readDeclaration, repoRootFor } from "../schemas/kg/c
 import { specimenSections } from "../schemas/content/section-verdicts.ts";
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { libraryEntryDir, libraryEntryDirs, libraryOfEntry } from "./lib/library-entry-graphs.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -120,7 +121,8 @@ export function entryItems(entryDir: string, sidecar = readSidecar(entryDir)): S
   if (!existsSync(blocksDir)) return [];
   const byBlock = new Map((sidecar?.summaries ?? []).map((s) => [s.block, s]));
   const entry = basename(entryDir);
-  const specimens = specimenSections(dirname(entryDir));
+  // The library's verdicts, past a concern group when the entry is filed (bean `6fez`).
+  const specimens = specimenSections(libraryOfEntry(entryDir));
   const out: SummaryItem[] = [];
   for (const f of readdirSync(blocksDir).sort()) {
     if (!f.endsWith(".jsonld")) continue;
@@ -185,7 +187,9 @@ export function heldLibraries(root = ROOT): string[] {
       if (entry?.summaries === "held") held.push(abs);
       // Per-entry holds (bean `j7ql`): the same answer for one document as
       // `held` gives for the whole directory.
-      for (const slug of entry?.heldEntries ?? []) held.push(join(abs, slug));
+      // A held slug is held wherever it is filed (bean `6fez`); one not on
+      // disk keeps its flat path, so the hold is never silently dropped.
+      for (const slug of entry?.heldEntries ?? []) held.push(libraryEntryDir(abs, slug) ?? join(abs, slug));
       break;
     }
   }
@@ -203,10 +207,10 @@ export function entryDirs(root = ROOT): string[] {
   // EVERY declared library, not the first. A drain that sees one library
   // reports a backlog that is short by the rest, with no sign that it is.
   for (const lib of corpusDirectoriesForGraph(root, "library").filter((d) => existsSync(d) && !held.has(resolve(d))).sort()) {
-    for (const slug of readdirSync(lib).sort()) {
-      const dir = join(lib, slug);
+    // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`).
+    for (const { dir } of libraryEntryDirs(lib)) {
       if (held.has(resolve(dir))) continue;
-      if (statSync(dir).isDirectory()) out.push(dir);
+      out.push(dir);
     }
   }
   return out;

@@ -136,6 +136,7 @@ import { globalTaskSharedFindings } from "./lib/global-task-criteria.ts";
 import { loadProcessModel, loadGlobalTasks, isGlobalTasksFile, isActivity, isDecision, indistinctBranches, type ProcessModel } from "../src/workflow/process-model.js";
 import { reachability } from "../src/workflow/reachability.js";
 import { diagramQuality, readLayout, LAYOUT_CRITERIA } from "../src/workflow/diagram-quality.js";
+import { diagramFit, FIT_CRITERIA } from "../src/workflow/diagram-fit.js";
 import { raciBreaches, raciRowsOf, type RaciBreachKind } from "./raci-chart.js";
 import { loadDecisionTable, possibleOutcomes } from "../src/workflow/decision-table.js";
 import {
@@ -1172,6 +1173,9 @@ function qualityCriteria(m: ProcessModel, xml: string): Record<string, KgCriteri
   for (const [id, findings] of Object.entries(q)) {
     out[id] = entry(findings, !LAYOUT_CRITERIA.has(id) || drawn);
   }
+  // Readable at 100% (issue #1116): text size, labels clear of lines and boxes, lane order.
+  const fit = diagramFit(xml);
+  for (const id of FIT_CRITERIA) out[id] = entry(fit[id] ?? [], drawn);
   return out;
 }
 
@@ -3243,11 +3247,12 @@ for (const r of reports) {
   written.add(resolve(p));
   // Never overwrite a sidecar whose judgements could not be moved.
   if (attUnknown.has(r)) continue;
-  const text = serialise(withPriorAdversarialReviews(r, p));
   if (check) {
-    const current = existsSync(p) ? readFileSync(p, "utf-8") : undefined;
-    if (current !== text) stale.push(relative(root, p));
+    if (!existsSync(p) || readFileSync(p, "utf-8") !== serialise(withPriorAdversarialReviews(r, p))) {
+      stale.push(relative(root, p));
+    }
   } else {
+    const text = serialise(withPriorAdversarialReviews(r, p));
     mkdirSync(join(p, ".."), { recursive: true });
     writeFileSync(p, text);
   }

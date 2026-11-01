@@ -69,7 +69,7 @@
  * @covers library, uploads
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { basename, dirname, join, resolve } from "path";
 import { typesForKind } from "../schemas/kg/jsonld.ts";
 import {
@@ -107,6 +107,7 @@ import {
   type LibraryTitleSource,
 } from "./library-title.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { libraryEntryDirs } from "../scripts/lib/library-entry-graphs.ts";
 
 /** A resolved manifest title and where it came from (issue #1794). */
 export interface ManifestTitle {
@@ -1122,15 +1123,11 @@ async function run(): Promise<number> {
   const docs: Array<{ docId: string; dir: string }> = [];
   const seen = new Map<string, string>();
   for (const libraryDir of libraryDirs) {
-    for (const d of readdirSync(libraryDir).sort()) {
+    // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`):
+    // the slug is the docId either way, so ids do not move with the entry.
+    for (const { slug: d, dir } of libraryEntryDirs(libraryDir)) {
       if (d.startsWith(".")) continue;
       if (only && d !== only) continue;
-      const dir = join(libraryDir, d);
-      try {
-        if (!statSync(dir).isDirectory()) continue;
-      } catch {
-        continue;
-      }
       const prior = seen.get(d);
       if (prior !== undefined) {
         console.error(
