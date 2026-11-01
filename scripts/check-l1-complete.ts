@@ -108,7 +108,7 @@ import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "../schemas/
 import { corpusDirectoriesForGraph, instanceConfigFor } from "../schemas/kg/harness-config.js";
 import { instanceDirectoryForGraph } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { entrySubgraphDirs, libraryEntryDirs, nonEntryDirs } from "./lib/library-entry-graphs.ts";
+import { entrySubgraphDirs, libraryEntryDir, libraryEntryDirs, nonEntryDirs } from "./lib/library-entry-graphs.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.ts";
 
 export type State = "met" | "unmet" | "not-derivable";
@@ -1775,7 +1775,9 @@ export function sidecarRootFor(
   libs: readonly string[] = corpusDirectoriesForGraph(root, "library"),
 ): string {
   for (const lib of libs) {
-    const entry = join(lib, slug);
+    // Flat or filed in a concern group (bean `6fez`): a filed entry is not at
+    // `<lib>/<slug>`, and missing it would write its sidecar to the wrong root.
+    const entry = libraryEntryDir(lib, slug) ?? join(lib, slug);
     if (existsSync(entry)) {
       const owner = instanceConfigFor(entry)?.root;
       if (owner && (owner === root || instanceDirectoryForGraph(owner, "qa") !== undefined)) {
