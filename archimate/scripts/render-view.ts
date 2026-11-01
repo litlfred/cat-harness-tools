@@ -503,10 +503,13 @@ export function legendSvg(
   poster = false,
 ): { svg: string; w: number; h: number } {
   const rows: string[] = [];
-  const ROW = 20, SW = 44, W = 640;
+  const ROW = 20, SW = 44, CHAR = 6.2;
+  // The key is as wide as its longest line, so no line runs past the frame.
+  let W = 640;
   let cy = y + 30;
-  const text = (t: string) => `<text class="av-key" x="${x + SW + 14}" y="${cy + 4}">${esc(t)}</text>`;
-  const head = (t: string) => { rows.push(`<text class="av-keyh" x="${x}" y="${cy + 4}">${esc(t)}</text>`); cy += ROW; };
+  const fit = (left: number, t: string) => { W = Math.max(W, Math.ceil(left + t.length * CHAR)); };
+  const text = (t: string) => { fit(SW + 14, t); return `<text class="av-key" x="${x + SW + 14}" y="${cy + 4}">${esc(t)}</text>`; };
+  const head = (t: string) => { fit(0, t); rows.push(`<text class="av-keyh" x="${x}" y="${cy + 4}">${esc(t)}</text>`); cy += ROW; };
   const layers = LAYER_ORDER.filter((l) => used.layers.has(l));
   if (layers.length) {
     head("Colour: which part of the architecture a box belongs to");
