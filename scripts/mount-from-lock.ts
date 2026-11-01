@@ -149,6 +149,8 @@ export function stateMountedDirs(root: string): string[] {
   for (const n of readdirSync(dir)) {
     if (!n.endsWith(".json")) continue;
     try {
+      // Only `$schema` and `into` are used: a recorded writer is keyed on where the mount lives, not on the marker's tip and blobs.
+      reportLocationRead(join(dir, n));
       const m = JSON.parse(readFileSync(join(dir, n), "utf-8")) as { $schema?: unknown; into?: unknown };
       if (m.$schema === "branch-mount/v1" && typeof m.into === "string") {
         const abs = resolve(root, m.into);
@@ -160,6 +162,17 @@ export function stateMountedDirs(root: string): string[] {
     }
   }
   return out;
+}
+
+/**
+ * `projectedRead(abs, "mount-location")` from `schemas/sdlc/read-projections.ts`,
+ * restated for the reason the header gives (this file imports only `node:*`).
+ * `read-projections.test.ts` holds the two to the same line.
+ */
+export function reportLocationRead(abs: string): void {
+  // input-site: inert #7cd4c7ec — names the trace file of the recording run; what is written there is never part of an answer
+  const trace = process.env["INPUT_HASH_TRACE"];
+  if (trace) appendFileSync(trace, `projected mount-location ${abs}\n`);
 }
 
 /** `files` (relative to `dir`) minus any under one of `skip` (absolute directories). */

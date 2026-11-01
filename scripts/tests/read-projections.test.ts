@@ -13,7 +13,8 @@ import { parseTrace, STRACE_ARGS } from "../ci-cone.ts";
 import { FileDigests } from "../input-hash.ts";
 import { decideWriter, emptyRecords, projectedReadsOf, projectionFor, writerRecordOf } from "../writer-cone.ts";
 import { openTrace } from "../../schemas/sdlc/input-trace.ts";
-import { PROJECTIONS, projectedReads, projectedState } from "../../schemas/sdlc/read-projections.ts";
+import { PROJECTIONS, projectedRead, projectedReads, projectedState } from "../../schemas/sdlc/read-projections.ts";
+import { reportLocationRead } from "../mount-from-lock.ts";
 
 const HAS_STRACE = Bun.which("strace") !== null && Bun.spawnSync(["strace", "-f", "-qq", "-o", "/dev/null", "true"], { stdout: "ignore", stderr: "ignore" }).exitCode === 0;
 
@@ -134,6 +135,25 @@ describe.skipIf(!HAS_STRACE)("the real readers, under a real strace", () => {
       expect(reads.opened?.["build/qa-refresh.json"]).toBe(1);
       expect(projectionFor("build/qa-refresh.json", reads, projected)).toBe("declaration-name");
     } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("mount-from-lock's restated report", () => {
+  test("writes the same line projectedRead does", () => {
+    const root = mkdtempSync(join(tmpdir(), "read-proj-mfl-"));
+    const trace = join(root, "trace.log");
+    const prev = process.env["INPUT_HASH_TRACE"];
+    try {
+      process.env["INPUT_HASH_TRACE"] = trace;
+      reportLocationRead("/r/.git/branch-mounts/beans.json");
+      projectedRead("/r/.git/branch-mounts/beans.json", "mount-location");
+      const [a, b] = readFileSync(trace, "utf-8").split("\n");
+      expect(a).toBe(b);
+    } finally {
+      if (prev === undefined) delete process.env["INPUT_HASH_TRACE"];
+      else process.env["INPUT_HASH_TRACE"] = prev;
       rmSync(root, { recursive: true, force: true });
     }
   });
