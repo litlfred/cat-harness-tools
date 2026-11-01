@@ -114,7 +114,7 @@
  * ```
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -146,6 +146,11 @@ import {
 import { openTrace } from "../schemas/sdlc/input-trace.ts";
 import {
   decideWriter,
+  churnReport,
+  renderChurn,
+  WRITER_CHURN_FILE,
+  type ChurnEntry,
+  type ChurnCause,
   emptyRecords,
   loadWriterRecords,
   readTraceFile,
@@ -518,8 +523,12 @@ if (import.meta.main) {
     }
     return first;
   };
+  // What each writer did and why, for the churn report (skip mode only: without records there is nothing to compare).
+  const churn: ChurnEntry[] = [];
   const runOne = async (w: string): Promise<WriterOutcome> => {
     const keep = nestedForeign(w, byWriter);
+    let cause: ChurnCause | undefined;
+    let ranWhy = "";
     // Seconds per writer, so a slow one can be named from a published log (bean fwtz).
     const t0 = performance.now();
     const secs = () => `${((performance.now() - t0) / 1000).toFixed(1)}s`;
@@ -534,9 +543,12 @@ if (import.meta.main) {
       if (d.skip && hasEntry(outDir, w, prevRecords.sha) && restoreOutputs(outDir, w, prevRecords.sha, REPO_ROOT, keep)) {
         reused.set(w, prevRecords.sha);
         console.log(`  skipped ${w}: ${d.why}; put back its outputs from ${prevRecords.sha.slice(0, 12)}${d.proof ? "" : " (evidence, not proof)"} [${secs()}]`);
+        churn.push({ writer: w, did: "skipped", why: d.why, seconds: (performance.now() - t0) / 1000 });
         return { kind: "ran" };
       }
-      console.log(`  ${w} runs: ${d.skip ? "its recorded outputs are not here" : d.why} [decided in ${secs()}]`);
+      ranWhy = d.skip ? "its recorded outputs are not here" : d.why;
+      if (!d.skip) cause = d.cause;
+      console.log(`  ${w} runs: ${ranWhy} [decided in ${secs()}]`);
     }
     const fp = base.get(w);
     let key: string | undefined;
@@ -547,6 +559,7 @@ if (import.meta.main) {
       if (hasEntry(cacheDir, w, key) && restoreOutputs(cacheDir, w, key, REPO_ROOT, keep)) {
         reused.set(w, key);
         console.log(`  reused ${w} (inputs unchanged since ${key.slice(0, 12)}${fp.wholeTree ? ", keyed on the whole tree" : ""})`);
+        if (skipOn) churn.push({ writer: w, did: "reused", why: ranWhy, cause, seconds: (performance.now() - t0) / 1000 });
         return { kind: "ran" };
       }
       why = `no result recorded for ${key.slice(0, 12)}`;
@@ -556,6 +569,7 @@ if (import.meta.main) {
     const { outcome, log } = recordOn ? await runRecorded(w) : await runWriterAsync(["bun", "run", "cat", w], REPO_ROOT, jobs > 1);
     if (jobs > 1) process.stdout.write(`── ${w} ──\n${log}${log.endsWith("\n") || log === "" ? "" : "\n"}`);
     console.log(`  ran ${w} (${why}) [${secs()}]`);
+    if (skipOn) churn.push({ writer: w, did: "ran", why: ranWhy, cause, seconds: (performance.now() - t0) / 1000 });
     if (outcome.kind === "ran" && key !== undefined) staged.set(w, { key, path: stageOutputs(cacheDir, w, key, REPO_ROOT, byWriter.get(w) ?? [], keep) });
     return outcome;
   };
@@ -577,6 +591,7 @@ if (import.meta.main) {
     console.log(`  writer records: ${Object.keys(records.writers).length} recorded, ${un.length} not (${WRITER_RECORD_FILE})`);
     for (const [w, why] of un) console.log(`    not recorded: ${w} — ${why}`);
   }
+  if (skipOn) writeChurn(prevRecords?.sha ?? "none", churn, (p) => writerOfPath(p, prevRecords, byWriter));
   for (const w of writers) {
     const o = outcomes.get(w)!;
     if (o.kind === "failed") {
@@ -616,4 +631,28 @@ if (import.meta.main) {
     process.exit(1);
   }
   console.log(`  ✓ ${judged.length} declared artefact(s) built or reused${reused.size ? ` (${reused.size} writer(s) reused: ${[...reused.keys()].join(", ")})` : ""}${notHere.length ? `, ${notHere.length} skipped (their writer does not apply to this root)` : ""}`);
+}
+
+/** The writer that wrote `path`: by the previous build's records, else by declared outputs. */
+export function writerOfPath(
+  path: string,
+  prev: { writers: Record<string, { outputs: Record<string, string> }> } | undefined,
+  byWriter: ReadonlyMap<string, readonly string[]>,
+): string | undefined {
+  for (const [w, r] of Object.entries(prev?.writers ?? {})) if (path in r.outputs) return w;
+  for (const [w, outs] of byWriter) if (underOutputs([...outs])(path)) return w;
+  return undefined;
+}
+
+/** Write the churn report beside the records, and to the job summary when there is one. */
+function writeChurn(against: string, entries: readonly ChurnEntry[], writerOf: (p: string) => string | undefined): void {
+  const report = churnReport(entries, against, writerOf);
+  const file = join(REPO_ROOT, WRITER_CHURN_FILE);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, JSON.stringify(report, null, 2) + "\n");
+  const md = renderChurn(report);
+  console.log(md);
+  // input-site: inert #7c1e04b2 — the job summary is where the report is shown, never an input of a writer
+  const summary = process.env.GITHUB_STEP_SUMMARY;
+  if (summary) appendFileSync(summary, md);
 }
