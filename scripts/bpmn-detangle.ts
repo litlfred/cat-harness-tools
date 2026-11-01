@@ -22,8 +22,8 @@
  * places itself are checked, and the report says so.
  *
  * `--write` moves labels off flows, shapes, other labels and lane lines,
- * makes boxes big enough for their text (wider, then taller,
- * growing the lane), changes the lane order (re-routing the flows between lanes as
+ * draws every task box at one square size (`TASK_SIZE`, growing the lane;
+ * a name that does not fit is shortened, never given a bigger box), changes the lane order (re-routing the flows between lanes as
  * elbows) and re-routes slanted flows at right angles (owner, 2026-10-31:
  * *"straight angled arrows ugly"*). Moving steps is the author's
  * judgement, so it is reported, never guessed. Re-render and look.
@@ -32,7 +32,7 @@
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { applyLaneOrder, bestLaneOrder, crossings, diagonalEdges, diagramFit, edgesThroughShapes, headerOverflow, laneOrder, placeLabels, readDi, resizeShapes, straightenFlows, textOverflow, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
+import { applyLaneOrder, bestLaneOrder, crossings, diagonalEdges, diagramFit, edgesThroughShapes, fixTaskSize, headerOverflow, laneOrder, placeLabels, readDi, resizeShapes, straightenFlows, TASK_SIZE, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
 
 type Draw = (xml: string) => Promise<DrawnLabels | undefined>;
 
@@ -111,27 +111,17 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
       console.log(`✓ ${shown}: ${fixed.length} slanted flow(s) routed at right angles (${fixed.join(", ")})`);
     }
   }
-  if (fix && renderer) {
-    // Text that spills out of its box: first widen it (wrapping fewer
-    // lines), then measure again and make it tall enough.
-    for (const pass of ["wider", "taller"] as const) {
-      const over = textOverflow(readDi(xml), await renderer.draw(xml).catch(() => undefined));
-      if (over.length === 0) break;
-      const sizes = new Map(over.map((o) => [o.id, pass === "wider"
-        ? { width: Math.max(o.box.width, Math.min(o.box.width + 40, 180)), height: o.box.height }
-        : { width: o.box.width, height: Math.max(o.box.height, o.need.height) }]));
-      // A box that grows over a flow it does not own stays as it is: the
-      // author moves the flow or shortens the name.
-      const thru = (x: string): Set<string> => new Set(edgesThroughShapes(readDi(x)).map(([e, sh]) => `${e}/${sh}`));
-      const was = thru(xml);
-      for (const id of [...sizes.keys()]) {
-        const one = resizeShapes(xml, new Map([[id, sizes.get(id)!]]));
-        if ([...thru(one)].some((k) => !was.has(k))) sizes.delete(id);
-      }
-      if (sizes.size === 0) break;
-      xml = resizeShapes(xml, sizes);
-      writeFileSync(file, xml);
-      console.log(`✓ ${shown}: ${sizes.size} box(es) made ${pass} for their text (${[...sizes.keys()].join(", ")})`);
+  if (fix) {
+    // Every task box one size, square (TASK_SIZE): a box never grows to fit
+    // its name, the name is shortened (owner, 2026-11-01).
+    const { xml: next, fixed } = fixTaskSize(xml);
+    const thru = (x: string): number => edgesThroughShapes(readDi(x)).length;
+    if (fixed.length > 0 && thru(next) <= thru(xml)) {
+      writeFileSync(file, next);
+      xml = next;
+      console.log(`✓ ${shown}: ${fixed.length} task(s) drawn at ${TASK_SIZE.width} × ${TASK_SIZE.height}`);
+    } else if (fixed.length > 0) {
+      console.log(`· ${shown}: ${fixed.length} task(s) not at ${TASK_SIZE.width} × ${TASK_SIZE.height}, but resizing them draws a flow through a box; left as they are`);
     }
   }
   if (fix && renderer) {

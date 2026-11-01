@@ -494,6 +494,48 @@ const MARKER_KINDS = new Set(["callActivity", "subProcess", "adHocSubProcess", "
 const ICON = 22;
 const MARKER = 18;
 
+/**
+ * The one size every task box is drawn at: square, so a name sits clear of
+ * the type icon and the [+] marker without the box growing to fit it (owner,
+ * 2026-11-01: *"i want the boxes to be fixed size. just make them
+ * taller/square"*, *"square tasks with icons as before"*). A name that does
+ * not fit is shortened; the box is not made bigger.
+ */
+export const TASK_SIZE = { width: 120, height: 120 } as const;
+
+/** Kinds drawn as a task box. */
+const ACTIVITY_KINDS = new Set(["task", ...ICON_KINDS, ...MARKER_KINDS]);
+
+/**
+ * The task boxes not at {@link TASK_SIZE}. An expanded sub-process
+ * (`isExpanded="true"`) holds other shapes, so it keeps its size.
+ */
+export function offSizeTasks(xml: string): string[] {
+  const di = readDi(xml);
+  const expanded = new Set([...xml.matchAll(/<(?:\w+:)?BPMNShape\b[^>]*>/g)]
+    .filter((m) => /\sisExpanded="true"/.test(m[0]))
+    .map((m) => /\sbpmnElement="([^"]+)"/.exec(m[0])?.[1] ?? ""));
+  return [...di.shapes].filter(([id, b]) => ACTIVITY_KINDS.has(di.kinds?.get(id) ?? "") && !expanded.has(id) &&
+    (b.width !== TASK_SIZE.width || b.height !== TASK_SIZE.height)).map(([id]) => id);
+}
+
+/**
+ * Draw every task box at {@link TASK_SIZE}, about its centre (smaller boxes
+ * grow, bigger ones shrink), then let {@link resizeShapes} make room in the
+ * columns and lanes and re-route the flows that touch them.
+ */
+export function fixTaskSize(xml: string): { xml: string; fixed: string[] } {
+  const ids = new Set(offSizeTasks(xml));
+  if (ids.size === 0) return { xml, fixed: [] };
+  const next = xml.replace(/(<(?:\w+:)?BPMNShape\b[^>]*\sbpmnElement="([^"]+)"[^>]*>\s*<(?:\w+:)?Bounds\s)x="([\d.-]+)"\s+y="([\d.-]+)"\s+width="([\d.]+)"\s+height="([\d.]+)"/g,
+    (all, pre: string, id: string, xs: string, ys: string, ws: string, hs: string) => {
+      if (!ids.has(id)) return all;
+      const [x, y, w, h] = [xs, ys, ws, hs].map(Number) as [number, number, number, number];
+      return `${pre}x="${x + (w - TASK_SIZE.width) / 2}" y="${y + (h - TASK_SIZE.height) / 2}" width="${TASK_SIZE.width}" height="${TASK_SIZE.height}"`;
+    });
+  return { xml: resizeShapes(next, new Map([...ids].map((id) => [id, { ...TASK_SIZE }]))), fixed: [...ids] };
+}
+
 /** Shapes whose drawn text runs outside them, or under their icon or marker, with the size the text needs. */
 export function textOverflow(di: DiLayout, drawn?: DrawnLabels): { id: string; box: Box; need: Box }[] {
   const out: { id: string; box: Box; need: Box }[] = [];
@@ -960,7 +1002,7 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
     out["text-overflow"]!.push({
       where: o.id,
       detail: `the name of ${q(di.names.get(o.id) ?? o.id)} needs about ${Math.round(o.need.width)} × ${Math.round(o.need.height)}, its box is ` +
-        `${Math.round(o.box.width)} × ${Math.round(o.box.height)}. Make the box bigger (\`bpmn:detangle --write\` does it) or the name shorter.`,
+        `${Math.round(o.box.width)} × ${Math.round(o.box.height)}. Every task is a fixed ${TASK_SIZE.width} × ${TASK_SIZE.height} (\`bpmn:detangle --write\` sets it); a name that spills from that is shortened.`,
     });
   }
   for (const id of diagonalEdges(di)) {
