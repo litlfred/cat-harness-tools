@@ -111,3 +111,8 @@ export const SessionSweepSchema = z
     untrailered: z.number().int(),
   })
   .describe("The sessions that committed in a window, read from Claude-Session trailers.");
+
+/** `bean_query` with `format: json` (`QueryResultRow[]`): one object per SPARQL solution, bean IRIs shortened to ids. */
+export const BeanQueryRowsSchema = z
+  .array(z.record(z.string(), z.string()))
+  .describe("The rows a bean SPARQL query returned, each variable to its value; bean IRIs are shortened to bean ids.");
