@@ -86,6 +86,24 @@ const isGroup = (t: Tree): boolean => t.el?.type === "Grouping" || t.node.kind =
 const prop = (e: ArchimateElement | undefined, k: string): string | undefined => e?.properties.find((p) => p.key === k)?.value;
 const nameOf = (t: Tree): string => t.el?.name ?? t.node.text ?? "";
 
+/**
+ * Whether a view reads as a poster: no lines, at least three top-level
+ * groupings stacked down its left edge, and nearly every box inside one. Views with lines keep their
+ * drawn layout (`render-view.ts`), since a poster would drop the lines.
+ */
+export function posterFits(model: ArchimateModel, view: ArchimateView): boolean {
+  if (view.connections.length) return false;
+  const els = new Map(model.elements.map((e) => [e.id, e]));
+  const byId = new Map(view.nodes.map((n) => [n.id, n]));
+  const grouping = (n: ArchimateViewNode) => n.kind === "group" || (n.kind === "element" && els.get(n.ref ?? "")?.type === "Grouping");
+  const tops = view.nodes.filter((n) => !n.parent && grouping(n));
+  const boxes = view.nodes.filter((n) => n.kind === "element" && !grouping(n));
+  const inside = boxes.filter((n) => n.parent && byId.has(n.parent)).length;
+  const left = Math.min(...tops.map((n) => n.x));
+  const stacked = tops.filter((n) => n.x <= left + 20).length;
+  return stacked >= 3 && boxes.length > 0 && inside >= 0.9 * boxes.length;
+}
+
 export function renderPosterSvg(model: ArchimateModel, view: ArchimateView, opts: PosterOptions = {}): string {
   const NOTE = opts.noteProperty ?? "figureNote";
   const STAR = opts.starProperty ?? "star";
@@ -134,7 +152,7 @@ export function renderPosterSvg(model: ArchimateModel, view: ArchimateView, opts
     const { title, body, star } = cardLines(t, w);
     const fill = fillOfType(t.el?.type ?? "");
     const href = t.el && opts.elementHref ? opts.elementHref(t.el.id) : undefined;
-    if (href) out.push(`<a href="${esc(href)}">`);
+    if (href) out.push(`<a href="${esc(href)}" target="_top">`);
     R(x, y, w, h, fill, outlineOf(fill), 6, 1.3);
     let ty = y + 17;
     for (const l of title) {
