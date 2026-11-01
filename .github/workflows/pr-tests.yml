@@ -96,7 +96,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: pr-checks-${{ github.ref }}
+  # Keyed by the PR number on a PR event, never by `github.ref`: on a
+  # `closed` event GitHub sets the ref to the BASE branch, so the closing
+  # run of a merged PR joined main's group and cancelled main's push run,
+  # the one that records main's answer (run 41322304221, the merge of #1266).
+  group: pr-checks-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
   # A push to main is never cancelled while it runs; a newer push waiting
   # behind it replaces an older waiting one, so the newest main is recorded.
   cancel-in-progress: ${{ github.event_name != 'push' }}
