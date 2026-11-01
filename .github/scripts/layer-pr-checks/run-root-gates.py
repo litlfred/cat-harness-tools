@@ -34,6 +34,7 @@ would read as a pass.
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -87,16 +88,18 @@ def diagnostics(text, root):
 
 
 def run(root, name, script):
-    command = f"bun run cat {script}"
+    # An argument list, not a shell string: the script name comes from a
+    # package.json in the tree under test (security audit V5).
+    command = ["bun", "run", "cat", *shlex.split(script)]
     start = time.monotonic()
     try:
-        p = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True, timeout=TIMEOUT_S)
+        p = subprocess.run(command, cwd=root, capture_output=True, text=True, timeout=TIMEOUT_S)
         code, text = p.returncode, (p.stdout or "") + (p.stderr or "")
     except subprocess.TimeoutExpired as e:
         out = e.stdout.decode(errors="replace") if isinstance(e.stdout, bytes) else (e.stdout or "")
         code, text = 2, out + f"\ntimed out after {TIMEOUT_S} s: could not determine"
     seconds = round(time.monotonic() - start, 1)
-    return name, {"command": command, "exit": code, "tail": text[-1500:], "seconds": seconds,
+    return name, {"command": shlex.join(command), "exit": code, "tail": text[-1500:], "seconds": seconds,
                   "diagnostics": diagnostics(text, root)}, text
 
 
