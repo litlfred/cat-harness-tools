@@ -124,6 +124,7 @@ import { readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { flattenDependencies } from "../schemas/kg/dependency-order.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
+import { buildTypeOf, isIndexWriter } from "./lib/build-type.ts";
 import { dirname } from "node:path";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { FileDigests, TRACKED, fingerprint, trackedTreeDigest, type Fingerprint } from "./input-hash.ts";
@@ -191,6 +192,8 @@ export interface DeclaredArtefact {
   reads?: readonly string[];
   /** The kinds of the declared directory this entry fills (`directory`), so a reader of those kinds is ordered after it. */
   fills?: readonly string[];
+  /** A whole-corpus index: a `preview` build puts back main's copy rather than running its writer (`lib/build-type.ts`). */
+  index?: true;
 }
 
 /**
@@ -218,7 +221,7 @@ export function declaredPlan(repoRoot = REPO_ROOT, cause?: "checkout" | "state")
     if (root === undefined) continue;
     const decl = readDeclaration(root) as
       | {
-          builtAtPublish?: Array<{ path: string; writer: string[]; because: "checkout" | "state"; reads?: string[]; directory?: string }>;
+          builtAtPublish?: Array<{ path: string; writer: string[]; because: "checkout" | "state"; reads?: string[]; directory?: string; index?: true }>;
           directories?: Array<{ id?: string; graphTypologies?: string[]; kinds?: string[] }>;
         }
       | undefined;
@@ -234,6 +237,7 @@ export function declaredPlan(repoRoot = REPO_ROOT, cause?: "checkout" | "state")
         because: e.because,
         ...(e.reads?.length ? { reads: e.reads } : {}),
         ...(fills.length ? { fills } : {}),
+        ...(e.index === true ? { index: true as const } : {}),
       });
     }
   }
@@ -471,11 +475,21 @@ if (import.meta.main) {
   // outputs the recording run kept (owner 2026-10-31 14:32Z: "dont wait for
   // clean deploys to skip. we can fix aftermath"). Never while recording.
   const skipOn = env[WRITER_SKIP_ENV] === "1" && !recordOn;
-  const prevRecords = skipOn ? loadWriterRecords(REPO_ROOT) : undefined;
+  // A PREVIEW build does not rebuild a whole-corpus index: it puts back main's
+  // copy from the same recording the skip reads (owner 2026-11-01, "preview" =
+  // no reindex, only changes). A full build, and a recording run, run them.
+  const bt = buildTypeOf(env);
+  if ("refused" in bt) {
+    console.log(`::error::derive:publish: ${bt.refused}`);
+    process.exit(2);
+  }
+  const borrowOn = bt.type === "preview" && !recordOn;
+  const prevRecords = skipOn || borrowOn ? loadWriterRecords(REPO_ROOT) : undefined;
   const outDir = join(REPO_ROOT, WRITER_OUTPUTS_DIR);
   const decideDigests = new FileDigests(REPO_ROOT);
   const recScripts = recordOn || skipOn ? (cacheOn.on ? scripts : scriptsOf(REPO_ROOT)) : {};
   if (env[WRITER_RECORD_ENV] === "1" && !recordOn) console.log("  writer records: OFF (strace does not run here)");
+  console.log(`  build type: ${bt.type} (${bt.why})${borrowOn ? `; indexes from main: ${prevRecords ? prevRecords.sha.slice(0, 12) : "no recording here, so they are built"}` : ""}`);
   if (skipOn) console.log(`  writer skip: ON (${prevRecords ? `records of ${prevRecords.sha.slice(0, 12)}, ${Object.keys(prevRecords.writers).length} writer(s)` : "no records: every writer runs"})`);
   console.log(
     `  ${jobs} job(s); reuse ${cacheOn.on ? `ON (${cacheDir}${treeBefore && "undetermined" in treeBefore ? `; tree undetermined: ${treeBefore.undetermined}` : ""})` : `OFF (${cacheOn.why})`}`,
@@ -532,6 +546,14 @@ if (import.meta.main) {
     // Seconds per writer, so a slow one can be named from a published log (bean fwtz).
     const t0 = performance.now();
     const secs = () => `${((performance.now() - t0) / 1000).toFixed(1)}s`;
+    if (borrowOn && prevRecords !== undefined && isIndexWriter(w, declared)) {
+      if (hasEntry(outDir, w, prevRecords.sha) && restoreOutputs(outDir, w, prevRecords.sha, REPO_ROOT, keep)) {
+        reused.set(w, prevRecords.sha);
+        console.log(`  borrowed ${w}: a preview build does not reindex; put back main's copy from ${prevRecords.sha.slice(0, 12)} [${secs()}]`);
+        return { kind: "ran" };
+      }
+      console.log(`  ${w} runs: an index, but main's recording holds no copy of it [decided in ${secs()}]`);
+    }
     if (skipOn && prevRecords !== undefined) {
       // One file-digest memo for every decision: it is keyed on size and
       // mtime, so a file a predecessor rewrote is hashed again, and a fresh
@@ -570,6 +592,12 @@ if (import.meta.main) {
     if (jobs > 1) process.stdout.write(`── ${w} ──\n${log}${log.endsWith("\n") || log === "" ? "" : "\n"}`);
     console.log(`  ran ${w} (${why}) [${secs()}]`);
     if (skipOn) churn.push({ writer: w, did: "ran", why: ranWhy, cause, seconds: (performance.now() - t0) / 1000 });
+    // An index whose run could not be recorded still keeps its outputs, so a
+    // preview can borrow them: borrowing needs main's bytes, not its reads.
+    if (recordOn && outcome.kind === "ran" && isIndexWriter(w, declared) && !hasEntry(outDir, w, records.sha)) {
+      commitStaged(outDir, w, records.sha, stageOutputs(outDir, w, records.sha, REPO_ROOT, byWriter.get(w) ?? [], keep));
+      console.log(`  kept ${w}'s outputs for previews to borrow (an index${records.unrecorded[w] ? `; not recorded: ${records.unrecorded[w]}` : ""})`);
+    }
     if (outcome.kind === "ran" && key !== undefined) staged.set(w, { key, path: stageOutputs(cacheDir, w, key, REPO_ROOT, byWriter.get(w) ?? [], keep) });
     return outcome;
   };
