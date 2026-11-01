@@ -2,11 +2,11 @@
 # folio-assistant-fs43
 $schema: bean/1.0.0
 title: 'ARC: state graphs on a declared ''state'' branch — beans, workflow instances, todos, issue-marks off main; ''which ref holds this graph'' becomes a declaration'
-status: in-progress
+status: completed
 type: epic
 priority: normal
 created_at: 2026-10-02T10:57:54Z
-updated_at: 2026-10-21T19:15:00Z
+updated_at: 2026-11-01T21:50:00Z
 parent: folio-assistant-rwmf
 ---
 
@@ -23,3 +23,5 @@ Generalises arc 3fva (qa-reports branch, issue #1763, PRs #1764/#1801) — share
 - [x] gh-pages and lake-cache declared with the same field
 
 _2026-10-21T19:15:00Z_ — Progress update: all 5/5 `Done when` boxes are satisfied on `main` (`2h76`, `1j3q`, `5akx`, `nij4` for `storage` schema & `state-store.ts`; `0tg5`, `89cl`, `h8ig`, `doy3` for state-branch readers/writers; `p3ny` for removing tracked `beans/`/`todos/`/`fsh-guts/` from `main`; `rva2`, `lehh`, `9io2` for `gh-pages` and `lake-cache` `storage` declarations). Epic stays `in-progress` while children `32f6`, `oycs`, and `fwtz` remain open.
+
+_2026-11-01T21:50:00Z_ — Closed: all 5 `Done when` boxes were already ticked on 2026-10-21, and all 39 child beans are `completed` (none open), across the folio-assistant and cat-harness-tools stores. The three children the 10-21 note was waiting on are done or moved: `32f6` and `oycs` are `completed`, and `fwtz` (docs-site rebuild on a bean-branch move) is now parented under `1xhc`, where the cone-deploy work carries it. Closed for the MVP freeze (epic folio-assistant#2894), thread "Stabilize platform state and CI", https://claude.ai/code/session_01Qmmkt7MDaBjNz44vg9ZzbR.
