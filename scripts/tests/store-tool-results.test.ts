@@ -17,8 +17,12 @@ import type { ClaimCheck } from "../bean-claim-check.ts";
 import type { Queue } from "../drain-queue.ts";
 import type { Lookup } from "../lib/bean-drain.ts";
 import type { SessionSweep } from "../sibling-sessions.ts";
+import type { QueryResultRow } from "../beans-query.ts";
+import { harnessStates } from "../harness-state.ts";
+import { HarnessStatesSchema } from "../../schemas/sdlc/harness-state.ts";
 import {
   BeanClaimCheckSchema,
+  BeanQueryRowsSchema,
   DrainQueueSchema,
   OpenWorkLookupSchema,
   SessionSweepSchema,
@@ -32,6 +36,8 @@ agree<Same<z.infer<typeof BeanClaimCheckSchema>, ClaimCheck>>(true);
 agree<Same<z.infer<typeof DrainQueueSchema>, Queue>>(true);
 agree<Same<z.infer<typeof OpenWorkLookupSchema>, Lookup>>(true);
 agree<Same<z.infer<typeof SessionSweepSchema>, SessionSweep>>(true);
+agree<Same<z.infer<typeof BeanQueryRowsSchema>, QueryResultRow[]>>(true);
+agree<Same<z.infer<typeof HarnessStatesSchema>, Awaited<ReturnType<typeof harnessStates>>>>(true);
 
 const lookup: Lookup = {
   query: { kind: "bean", value: "folio-assistant-f1e1" },
@@ -42,7 +48,7 @@ const lookup: Lookup = {
 
 describe("the store tools' results", () => {
   test("are published as shared tool types", () => {
-    for (const n of ["BeanClaimCheck", "DrainQueue", "OpenWorkLookup", "SessionSweep"]) expect(n in TOOL_TYPES).toBe(true);
+    for (const n of ["BeanClaimCheck", "DrainQueue", "OpenWorkLookup", "SessionSweep", "BeanQueryRows", "HarnessStates"]) expect(n in TOOL_TYPES).toBe(true);
   });
 
   test("a claim check parses, and an unknown state is refused", () => {
@@ -66,5 +72,28 @@ describe("the store tools' results", () => {
   test("a session sweep parses", () => {
     const s: SessionSweep = { since: "1 day ago", commitsScanned: 3, sessions: [], untrailered: 3 };
     expect(SessionSweepSchema.parse(s)).toEqual(s);
+  });
+
+  test("bean query rows parse, and a non-string value is refused", () => {
+    const rows: QueryResultRow[] = [{ id: "f1e1", status: "todo" }];
+    expect(BeanQueryRowsSchema.parse(rows)).toEqual(rows);
+    expect(BeanQueryRowsSchema.safeParse([{ id: 1 }]).success).toBe(false);
+  });
+
+  test("harness states parse, and an unknown step state is refused", () => {
+    const st = {
+      $schema: "folio-harness-state/v1" as const,
+      harness: "cat-harness",
+      initialization: {
+        position: "3 of 5",
+        next: { step: "mount", action: "bun run cat mount" },
+        counts: { done: 3, "not-done": 1, "could-not-determine": 1, stated: 0 },
+        steps: [{ id: "mount", namedBy: "bootstrap", what: "Mount", state: "not-done" as const, detail: "" }],
+      },
+      health: { badges: [{ id: "initialization" as const, state: "finding" as const, label: "3 of 5" }] },
+    };
+    expect(HarnessStatesSchema.parse([st])).toEqual([st]);
+    const bad = { ...st, initialization: { ...st.initialization, steps: [{ ...st.initialization.steps[0], state: "maybe" }] } };
+    expect(HarnessStatesSchema.safeParse([bad]).success).toBe(false);
   });
 });

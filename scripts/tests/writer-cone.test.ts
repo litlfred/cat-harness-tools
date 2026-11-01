@@ -100,6 +100,18 @@ describe("parseTrace in collect mode — a writer's reads and writes", () => {
     });
   });
 
+  test("a directory it listed (getdents64) is marked listed; one it only opened is not (tools#1265)", () => {
+    const r = collect([
+      `10 openat(AT_FDCWD</work/repo>, "/work/repo/data", O_RDONLY|O_CLOEXEC|O_DIRECTORY) = 5</work/repo/data>`,
+      `10 getdents64(5</work/repo/data>, 0x7ffe /* 4 entries */, 8192) = 96`,
+      `10 getdents64(5</work/repo/data>, 0x7ffe /* 0 entries */, 8192) = 0`,
+      `10 openat(AT_FDCWD</work/repo>, "/work/repo/opened", O_RDONLY|O_CLOEXEC|O_DIRECTORY) = 6</work/repo/opened>`,
+      `10 openat(6</work/repo/opened>, "k.json", O_RDONLY|O_CLOEXEC) = 7</work/repo/opened/k.json>`,
+      `10 getdents64(9</usr/lib>, 0x7ffe /* 4 entries */, 8192) = 96`,
+    ]);
+    expect(r).toEqual({ paths: ["data", "opened", "opened/k.json"], git: [], listed: ["data"], writes: [], absentBefore: [] });
+  });
+
   test("the default still refuses any write (checks are unchanged)", () => {
     const r = parseTrace(`10 openat(AT_FDCWD</work/repo>, "x", O_WRONLY|O_CREAT, 0644) = 3</work/repo/x>`, ROOT);
     expect("undetermined" in r).toBe(true);
@@ -164,6 +176,31 @@ describe("writerRecordOf and decideWriter", () => {
     expect(writerRecordOf({ ...base, reached: "network" })).toEqual({ none: "the run reached a traced input site (network)" });
     expect(writerRecordOf({ ...base, after: { hash: "moved", audit: "clean" } })).toEqual({ none: "its script, imports or audited environment moved while it ran" });
     expect(writerRecordOf({ ...base, reads: { undetermined: "why" } })).toEqual({ none: "why" });
+  });
+
+  test("a directory only opened is recorded as \"dir\": a new entry keeps the skip, a listed one's new entry does not (tools#1265)", () => {
+    const root = mkdtempSync(join(tmpdir(), "writer-cone-"));
+    try {
+      mkdirSync(join(root, "opened"));
+      mkdirSync(join(root, "listed"));
+      const reads = { paths: ["listed", "opened"], git: [], listed: ["listed"], writes: [], absentBefore: [] };
+      const rec = writerRecordOf({ sha: "abc123", ran: true, before: fp, after: fp, reads, reached: undefined, root, digests: new FileDigests(root) });
+      if ("none" in rec) throw new Error(rec.none);
+      expect(rec.reads["opened"]).toBe("dir");
+      expect(rec.reads["listed"]).toStartWith("dir ");
+      const records = emptyRecords("abc123");
+      records.writers["w"] = rec;
+      writeFileSync(join(root, "opened/new.txt"), "x");
+      expect(decideWriter(records, "w", fp, root, new FileDigests(root)).skip).toBe(true);
+      writeFileSync(join(root, "listed/new.txt"), "x");
+      expect(decideWriter(records, "w", fp, root, new FileDigests(root))).toEqual({ skip: false, why: "listed changed", cause: { kind: "path", path: "listed" } });
+      rmSync(join(root, "listed/new.txt"));
+      rmSync(join(root, "opened"), { recursive: true });
+      writeFileSync(join(root, "opened"), "a file now");
+      expect(decideWriter(records, "w", fp, root, new FileDigests(root))).toEqual({ skip: false, why: "opened changed", cause: { kind: "path", path: "opened" } });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test("no records, or an unrecorded writer, always runs", () => {

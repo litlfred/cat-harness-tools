@@ -94,9 +94,54 @@ export const ArchimateConfigFigureSchema = z
      * the view's elements, `by-eye` when a person compared the two pictures.
      */
     basis: z.enum(["same-elements", "by-eye"]),
+    /**
+     * Where `archimate-blocks` writes the view as SVG, relative to the
+     * instance root, so the block can show the model's own drawing instead of
+     * a picture of it. Absent, the figure is only linked to the view.
+     */
+    svg: z
+      .string()
+      .regex(/\.svg$/, "an .svg file")
+      .refine((f) => !f.startsWith("/") && !f.split("/").includes(".."), "relative to the instance root, without `..`")
+      .optional(),
   })
   .strict();
 export type ArchimateConfigFigure = z.infer<typeof ArchimateConfigFigureSchema>;
+
+/** What an `archimate-blocks` table is drawn from. */
+export const ARCHIMATE_TABLE_KINDS = ["relationship-types", "relationship-rules"] as const;
+
+/**
+ * A table in the instance's document that is drawn from data, never typed:
+ * `archimate-blocks` rewrites the table in `block` and leaves the caption and
+ * anything after the table alone. `--check` fails when the block and the data
+ * disagree, so the table cannot drift.
+ *
+ * - `relationship-rules`: the rules file's `rules`, one row each (source,
+ *   relationship, target, note).
+ * - `relationship-types`: the rules file's `relationships` that carry a
+ *   `meaning`, one row each (icon, name, meaning).
+ */
+export const ArchimateConfigTableSchema = z
+  .object({
+    /** The document block holding the table, relative to the instance root. */
+    block: z
+      .string()
+      .regex(/\.md$/, "a document block, a .md file")
+      .refine((f) => !f.startsWith("/") && !f.split("/").includes(".."), "relative to the instance root, without `..`"),
+    /** What the document calls it, e.g. `Table 3.3`. */
+    label: z.string().min(1),
+    kind: z.enum(ARCHIMATE_TABLE_KINDS),
+    /** The `archimate-relationship-rules/v1` file, relative to the archimate directory. */
+    rules: z
+      .string()
+      .regex(/\.json$/, "a .json file")
+      .refine((f) => !f.startsWith("/") && !f.split("/").includes(".."), "relative to the archimate directory, without `..`"),
+    /** The model whose relationships are checked against the rules (`archimate-blocks --check`). */
+    model: z.string().regex(SEGMENT).optional(),
+  })
+  .strict();
+export type ArchimateConfigTable = z.infer<typeof ArchimateConfigTableSchema>;
 
 export const ArchimateConfigSchema = z
   .object({
@@ -106,6 +151,8 @@ export const ArchimateConfigSchema = z
     models: z.array(ArchimateConfigModelSchema).min(1),
     /** The document's figures that are views of these models. */
     figures: z.array(ArchimateConfigFigureSchema).optional(),
+    /** The document's tables that are drawn from data (`archimate-blocks`). */
+    tables: z.array(ArchimateConfigTableSchema).optional(),
   })
   .strict()
   .superRefine((c, ctx) => {
@@ -119,6 +166,11 @@ export const ArchimateConfigSchema = z
       if (!seen.has(f.model)) ctx.addIssue({ code: "custom", path: ["figures", i, "model"], message: `figure "${f.label}" names model "${f.model}", which \`models\` does not declare` });
       if (blocks.has(f.block)) ctx.addIssue({ code: "custom", path: ["figures", i, "block"], message: `block ${f.block} is mapped twice` });
       blocks.add(f.block);
+    }
+    for (const [i, t] of (c.tables ?? []).entries()) {
+      if (t.model !== undefined && !seen.has(t.model)) ctx.addIssue({ code: "custom", path: ["tables", i, "model"], message: `table "${t.label}" names model "${t.model}", which \`models\` does not declare` });
+      if (blocks.has(t.block)) ctx.addIssue({ code: "custom", path: ["tables", i, "block"], message: `block ${t.block} is mapped twice` });
+      blocks.add(t.block);
     }
   });
 export type ArchimateConfig = z.infer<typeof ArchimateConfigSchema>;

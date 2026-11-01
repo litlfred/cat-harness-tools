@@ -64,6 +64,7 @@
     "scripts/partition/instance-rules.ts::schemas/process/scenario-overlay.ts",
     "scripts/partition/instance-rules.ts::schemas/sdlc/bean-graph.ts",
     "scripts/partition/instance-rules.ts::schemas/sdlc/git-corpus.ts",
+    "scripts/partition/instance-rules.ts::schemas/sdlc/harness-state.ts",
     "scripts/partition/instance-rules.ts::schemas/sdlc/health-report.ts",
     "scripts/partition/instance-rules.ts::schemas/sdlc/input-trace.ts",
     "scripts/partition/instance-rules.ts::schemas/sdlc/kg-qa.ts",
