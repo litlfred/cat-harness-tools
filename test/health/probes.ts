@@ -1099,19 +1099,26 @@ export function probeSpecialBranches(o: SpecialBranchProbeOptions): Probe<Specia
       if (listed.code !== 0) {
         return { state: "unknown", reason: `git ls-tree -r -l ${ref} exited ${listed.code}: ${listed.err.trim()}` };
       }
+      // UNIQUE blob bytes: git stores one copy of a blob however many paths
+      // name it, so this is what the branch costs a clone. Summing every path
+      // counted qa-reports' shared verdict files once per sha (7.98 GB summed,
+      // folio-assistant#860; owner chose this measure, Q-FAD-3 A).
       let bytes = 0;
       let files = 0;
+      const seen = new Set<string>();
       for (const line of listed.out.split("\n")) {
-        const m = /^\S+\s+blob\s+\S+\s+(\d+)\t/.exec(line);
+        const m = /^\S+\s+blob\s+(\S+)\s+(\d+)\t/.exec(line);
         if (!m) continue;
-        bytes += Number(m[1]);
         files += 1;
+        if (seen.has(m[1])) continue;
+        seen.add(m[1]);
+        bytes += Number(m[2]);
       }
       branches.push({ ref, bytes, files });
     }
     rows.push({ id: row.id, name: row.name, shape: row.shape, budget: row.budget, state: "measured", resolved, branches });
   }
-  return { state: "ok", value: { rows, command: `git ls-remote --heads ${o.remote}; git fetch --depth=1 + git ls-tree -r -l <tip> per budgeted branch` } };
+  return { state: "ok", value: { rows, command: `git ls-remote --heads ${o.remote}; git fetch --depth=1 + git ls-tree -r -l <tip> per budgeted branch (unique blobs summed)` } };
 }
 
 /** Gather everything the registry needs. Never throws; every failure is a `reason`. */
