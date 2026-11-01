@@ -392,6 +392,7 @@ export const RULES: Rule[] = [
       "schemas/tools/tool-run.ts",                 // a downstream Tool's run record (bean `fq5u`)
       "schemas/content/withheld.ts",                 // what an instance must not publish — read by the harness mount (bean `mkao`)
       "schemas/tools/tool-types.ts",               // the Tool I/O type vocabulary
+      "schemas/tools/store-tool-results.ts",       // typed results of the data store tools, part of the Tool I/O vocabulary (#1259)
       "schemas/tools/tool-id.ts",                  // a Tool's id — imported by `tool.ts` and `remote-mount.ts` (cat-harness#581)
       "schemas/kg/repo-full-name.ts",           // `owner/name` — a Tool type AND the declaration's repository (bean `6rmv`)
       "schemas/kg/instance-repositories.ts",    // the derived owner/repo ↔ instance map (bean `6rmv`)
