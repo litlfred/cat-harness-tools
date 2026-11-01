@@ -175,12 +175,12 @@ describe("the comment carries the signature of what it reports", () => {
   test("the salient lines are normalised, sorted and bounded", () => {
     const log = [
       "  ✓ x.md  [glossary: take-base]",
-      "merge-base: ABORTED, tree restored — qa:resolve-conflicts left 1 sidecar(s) conflicted",
+      "merge-base: ABORTED, tree restored — 1 conflict(s) need a person (✗ above)",
       "    ✗ check:x STILL fails",
       "resolved 0123456789abcdef in 12.5s",
     ].join("\n");
     expect(salientLines(log)).toEqual([
-      "merge-base: ABORTED, tree restored — qa:resolve-conflicts left 1 sidecar(s) conflicted",
+      "merge-base: ABORTED, tree restored — 1 conflict(s) need a person (✗ above)",
       "✗ check:x STILL fails",
     ]);
     // A sha or a duration in the line would make every run differ from every
