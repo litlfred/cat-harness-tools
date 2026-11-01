@@ -17,7 +17,6 @@
   "usedBy": [
     "scripts/bench-id-lookup.ts",
     "scripts/bpmn-render.ts",
-    "scripts/pc-line-numbered-pdf.ts",
     "scripts/regen-after-merge.ts",
     "scripts/render-wait.ts",
     "scripts/wireframe-check.mjs",
