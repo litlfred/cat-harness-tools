@@ -879,6 +879,34 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     // bootstrap's own sentence, read rather than restated (bean r3gy, D1).
     summary: BOOTSTRAP_GRAPH_TYPOLOGIES["processes"],
   },
+  // ── BPMN that describes work, rather than running it (owner, 2026-11-01,
+  // Q-SUBG-3) ─────────────────────────────────────────────────────────────
+  "business-processes": {
+    // A sub-graph of `processes` for display only (Q-SUBG-6 A): the navbar
+    // folds it under Processes. `within` carries no inheritance, so the
+    // engine's reading of `processes` does not reach it.
+    within: "processes",
+    tileIcon: "processes",
+    // NOT `kgContent`: that would make every instance declaring one a HARNESS
+    // (`kg-subscribe`'s rule: a harness kind holds Skills, Roles or
+    // Processes the engine runs), and the engine's corpus walk would reach it.
+    // A DAK's diagrams are content about work, like `folio`.
+    anyLayer: true,
+    description:
+      "BPMN diagrams that DESCRIBE how people and organisations work, as content: a guideline's or an " +
+      "implementation guide's business processes (a DAK's, for example). The processes viewer draws them " +
+      "beside the `processes` kind, and nothing runs them: the engine and its gates read `processes` only, " +
+      "so a diagram here keeps its source's own ids and may use BPMN the interpreter does not implement " +
+      "(message events, timers, multi-instance calls).",
+    title: "Business processes",
+    renderable: false,
+    holds: "content",
+    schema: "external-schemas/omg-bpmn-2.0.json",
+    validatorNotApplicable:
+      "its nodes are `.bpmn` files — XML, which a Zod schema cannot parse; `xml-comment-check` grades them, " +
+      "and the processes viewer reports any that will not load.",
+    summary: "BPMN that describes work as content (a guideline's business processes), drawn by the processes viewer and never run.",
+  },
   scenarios: {
     kgContent: true,
     anyLayer: true,

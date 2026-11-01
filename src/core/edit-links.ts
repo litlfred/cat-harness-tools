@@ -967,6 +967,121 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   });
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => addSuggest());
   else addSuggest();
+  // ── The block panel: icons on each block, one slide-out pane per icon ──
+  //
+  // Owner, 2026-11-01 (Q-STY-2): only icons show beside a block; each opens
+  // its own pane from the right edge. ✎ "Help improve this section" holds the
+  // block's own links (moved in while open, so their facts and handlers stay
+  // theirs) with a line on what each does. Another layer adds a pane with
+  // window.faBlockPanel.pane(id, { icon, title, render(label, body) }) and
+  // its icon with .icon(box, id, count).
+  const panes = { edit: { icon: "\u270e", title: "Help improve this section" } };
+  const EXPLAIN = {
+    suggest: ["\u270d Suggest a change", "Propose new wording in an editor. It is sent as a GitHub issue with your change, and the editors decide on it."],
+    feedback: ["\ud83d\udce3 Give feedback", "Raise a question, concern or error without proposing text. Opens a GitHub issue that names this section."],
+    edit: ["\u270e Edit the source", "For editors: change the text yourself on GitHub. The edit becomes a pull request, reviewed before it is published."],
+  };
+  const ORDER = ["suggest", "feedback", "edit"];
+  let panel = null, home = null, moved = null, state = null;
+  const titleOf = (box) => {
+    if (box.dataset.sec) return box.dataset.sec;
+    for (let n = box; n && n !== document.body; n = n.previousElementSibling || n.parentElement)
+      if (/^H[1-6]$/.test(n.tagName)) return n.textContent.trim();
+    return box.dataset.block || "";
+  };
+  const restore = () => { if (moved && home) home.parentNode.insertBefore(moved, home); if (home) home.remove(); moved = home = null; };
+  const close = () => {
+    if (!panel) return;
+    restore();
+    panel.classList.remove("open");
+    document.querySelectorAll('.ba-ic[aria-expanded="true"]').forEach((b) => b.setAttribute("aria-expanded", "false"));
+    if (state && state.from && state.from.isConnected) state.from.focus();
+    state = null;
+  };
+  const open = (box, id, from) => {
+    if (!panel) {
+      panel = el("aside", { className: "fa-block-panel", tabIndex: -1 });
+      panel.setAttribute("aria-label", "Section panel");
+      document.body.append(panel);
+    }
+    restore();
+    const label = box.dataset.block || "";
+    state = { box: box, id: id, from: from };
+    document.querySelectorAll('.ba-ic[aria-expanded="true"]').forEach((b) => b.setAttribute("aria-expanded", "false"));
+    box.querySelectorAll(".ba-ic").forEach((b) => b.setAttribute("aria-expanded", String(b.dataset.pane === id)));
+    const tabs = el("div", { className: "bp-tabs" });
+    for (const b of box.querySelectorAll(".ba-ic")) {
+      const t = b.cloneNode(true);
+      t.setAttribute("aria-expanded", String(b.dataset.pane === id));
+      t.onclick = (e) => { e.stopPropagation(); open(box, b.dataset.pane, from); };
+      tabs.append(t);
+    }
+    const x = el("button", { className: "bp-x", type: "button", textContent: "\u2715", title: "Close (Esc)" });
+    x.onclick = close;
+    const p = panes[id] || { title: id };
+    const body = el("div", { className: "bp-body" });
+    panel.replaceChildren(x, tabs, el("h3", { textContent: p.title }), el("div", { className: "bp-sub", textContent: titleOf(box) }), body);
+    if (id === "edit") {
+      fill(box);
+      ready(box);
+      for (const a of box.querySelectorAll(":scope > a[data-fa-link]")) {
+        const e = EXPLAIN[a.dataset.faLink];
+        if (!e || a.dataset.bpDone) continue;
+        a.dataset.bpDone = "1";
+        a.replaceChildren(el("b", { textContent: e[0] }), el("small", { textContent: e[1] }));
+      }
+      const links = Array.from(box.querySelectorAll(":scope > a[data-fa-link]"));
+      links.sort((a, b) => ORDER.indexOf(a.dataset.faLink) - ORDER.indexOf(b.dataset.faLink)).forEach((a) => box.append(a));
+      box.querySelectorAll(":scope > .ba-existing").forEach((s) => box.append(s));
+      home = el("span", { hidden: true });
+      box.parentNode.insertBefore(home, box);
+      moved = box;
+      body.append(box);
+    } else if (p.render) p.render(label, body);
+    panel.classList.add("open");
+    panel.focus({ preventScroll: true });
+  };
+  const icon = (box, id, count) => {
+    if (box.querySelector('.ba-ic[data-pane="' + id + '"]')) return;
+    const p = panes[id] || {};
+    const b = el("button", { className: "ba-ic", type: "button", title: (p.title || id) + (count ? " (" + count + ")" : "") });
+    b.dataset.pane = id;
+    b.setAttribute("aria-expanded", "false");
+    b.append(el("span", { textContent: p.icon || "\u2022" }));
+    if (count) b.append(el("b", { className: "ba-n", textContent: String(count) }));
+    // ✎ last; every other pane's icon above it.
+    if (id === "edit") box.append(b);
+    else box.insertBefore(b, box.querySelector('.ba-ic[data-pane="edit"]') || box.firstChild);
+  };
+  const icons = (root) => {
+    const r = root || document;
+    if (!r || typeof r.querySelectorAll !== "function") return;
+    for (const box of r.querySelectorAll(".block-actions")) if (box.querySelector("a[data-fa-link]")) icon(box, "edit");
+  };
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest && e.target.closest(".ba-ic");
+    if (b && !(panel && panel.contains(b))) {
+      e.preventDefault();
+      const box = b.closest(".block-actions");
+      if (state && state.box === box && state.id === b.dataset.pane) close();
+      else if (box) open(box, b.dataset.pane, b);
+      return;
+    }
+    if (panel && panel.classList.contains("open") && !panel.contains(e.target) && !e.target.closest(".fa-suggest, dialog")) close();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && panel && panel.classList.contains("open") && !document.querySelector("dialog[open]")) close(); });
+  if (typeof document.documentElement === "object" && document.documentElement && document.documentElement.classList) {
+    document.documentElement.classList.add("fa-bp");
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => icons());
+    else icons();
+  }
+  window.faBlockPanel = {
+    pane: (id, p) => { panes[id] = p; },
+    icon: icon,
+    icons: icons,
+    open: (label, id) => { const box = document.querySelector('.block-actions[data-block="' + CSS.escape(label) + '"]'); if (box) open(box, id || "edit"); },
+    close: close,
+  };
   window.faEditLinks = { urls: faBlockUrls, fill: fill, configure: configure };
   // Both the link reached and the host it sits in: a pointer that lands
   // straight on a compact host's link (no gap crossed) or keyboard focus on it
@@ -1033,12 +1148,46 @@ ${EDIT_LINKS_RUNTIME}
 </script>`;
 }
 
+/**
+ * The block panel (owner, 2026-11-01, Q-STY-2): a block shows only icons on
+ * its right, greyed until hover; each icon slides out its own pane from the
+ * right edge. ✎ is "Help improve this section" (suggest, feedback, edit, each
+ * explained); other layers add panes (public comments: 💬). Only once the
+ * runtime has run (html.fa-bp) are the plain links hidden, so a page without
+ * JavaScript keeps them.
+ */
+export const BLOCK_PANEL_CSS = `
+html.fa-bp .block-actions { display:flex; flex-direction:column; gap:4px; align-items:flex-end; font-size:.8rem; opacity:.3; }
+html.fa-bp .block-actions:hover, html.fa-bp .block-actions:focus-within, html.fa-bp *:hover > .block-actions, html.fa-bp p:hover + .block-actions { opacity:1; }
+html.fa-bp .block-actions > a, html.fa-bp .block-actions > .ba-existing { display:none; }
+.ba-ic { position:relative; width:28px; height:28px; padding:0; border:1px solid #8885; border-radius:7px; background:color-mix(in srgb, currentColor 5%, transparent); color:inherit; font-size:14px; line-height:1; cursor:pointer; }
+.ba-ic:hover, .ba-ic:focus-visible, .ba-ic[aria-expanded="true"] { border-color:var(--link,#0b5cad); }
+.ba-ic[aria-expanded="true"] { background:var(--link,#0b5cad); color:#fff; }
+.ba-ic .ba-n { position:absolute; top:-6px; right:-8px; min-width:1.1em; padding:1px 4px; border-radius:8px; background:#b35900; color:#fff; font:700 10px/1.2 sans-serif; }
+.fa-block-panel { position:fixed; top:0; right:0; bottom:0; z-index:2147482000; width:min(380px,92vw); overflow-y:auto; box-sizing:border-box; padding:14px 18px;
+  background:var(--body-background-color,#fff); color:var(--body-text-color,inherit); border-left:1px solid #8886; box-shadow:-8px 0 24px #0003;
+  font-size:.88rem; line-height:1.45; transform:translateX(105%); transition:transform .16s ease; }
+.fa-block-panel.open { transform:none; }
+@media (prefers-reduced-motion:reduce) { .fa-block-panel { transition:none; } }
+.fa-block-panel .bp-tabs { display:flex; gap:6px; margin:0 2rem .6rem 0; }
+.fa-block-panel .bp-x { position:absolute; top:10px; right:12px; border:0; background:none; color:inherit; font-size:18px; cursor:pointer; opacity:.7; }
+.fa-block-panel h3 { margin:.2rem 0 .1rem; font-size:1rem; }
+.fa-block-panel .bp-sub { opacity:.7; font-size:.8rem; margin-bottom:.6rem; }
+html.fa-bp .fa-block-panel .block-actions { float:none; display:block; opacity:1; white-space:normal; font-size:inherit; margin:0; }
+html.fa-bp .fa-block-panel .block-actions > a { display:block; margin:.5rem 0; padding:.55rem .7rem; border:1px solid #8885; border-radius:8px; text-decoration:none; }
+.fa-block-panel .block-actions > a:hover { border-color:var(--link,#0b5cad); }
+.fa-block-panel .block-actions > a small { display:block; margin-top:.15rem; color:var(--body-text-color,#555); opacity:.85; font-size:.8rem; }
+.fa-block-panel .block-actions > .ba-existing { display:block; margin:.5rem 0; }
+html.fa-bp .fa-block-panel .block-actions > .ba-existing { display:block; }
+.fa-block-panel .block-actions > .ba-ic { display:none; }
+`;
+
 export const BLOCK_ACTIONS_CSS = `
 .block-actions { float:right; font-size:.75rem; margin-left:.6rem; opacity:.55; white-space:nowrap; }
 .block-actions:hover, .block-actions:focus-within { opacity:1; }
 .block-actions a { text-decoration:none; margin-left:.5rem; }
 .block-actions .ba-existing { margin-left:.5rem; }
-`;
+${BLOCK_PANEL_CSS}`;
 
 /**
  * Insert each block's links right after its anchor (`<a id="<label>"></a>`,
