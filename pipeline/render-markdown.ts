@@ -40,7 +40,7 @@ import { isSectionRef } from "../adapters/manifest-entries";
 import { kindHeading } from "../schemas/content/translation.ts";
 import { mergePoSources, poResolveContext, resolvePoSources } from "./po-resolve";
 import { injectMarkdown, parsePo, translateBlockFields, translateManifestText } from "./po-inject";
-import { dmnRefusalNote, placeDmnTable, renderDmnFile } from "./render-dmn-table";
+import { dmnRefusalNote, placeDmnTable, renderDmnFile, type BlockRef, type BlockRefs } from "./render-dmn-table";
 
 // ── Block headers ────────────────────────────────────────────────
 
@@ -363,18 +363,29 @@ export function renderChapterMarkdown(
  * not a build error: the refusal is about the content, and the DMN checks
  * (`dmn:report`) are where a layer chooses to make that a failure.
  */
+function dmnCompanion(block: Block, chDir: string, rootName: string): string | undefined {
+  const rec = block as unknown as { meta?: { dmnFile?: unknown } };
+  const named = typeof rec.meta?.dmnFile === "string" ? rec.meta.dmnFile : undefined;
+  const dmnPath = join(chDir, named ?? `${rootName}.dmn`);
+  return named || existsSync(dmnPath) ? dmnPath : undefined;
+}
+
+function hasDmnCompanion(block: Block, chDir: string, rootName: string): boolean {
+  return dmnCompanion(block, chDir, rootName) !== undefined;
+}
+
 async function blockDmnTable(
   block: Block,
   chDir: string,
   rootName: string,
   issues: MarkdownBuildResult["issues"],
+  refs: BlockRefs,
 ): Promise<string | undefined> {
-  const rec = block as unknown as { decisionId?: unknown; meta?: { dmnFile?: unknown } };
-  const named = typeof rec.meta?.dmnFile === "string" ? rec.meta.dmnFile : undefined;
-  const dmnPath = join(chDir, named ?? `${rootName}.dmn`);
-  if (!named && !existsSync(dmnPath)) return undefined;
+  const dmnPath = dmnCompanion(block, chDir, rootName);
+  if (!dmnPath) return undefined;
+  const rec = block as unknown as { decisionId?: unknown };
   const decisionId = typeof rec.decisionId === "string" ? rec.decisionId : undefined;
-  const r = await renderDmnFile(dmnPath, decisionId);
+  const r = await renderDmnFile(dmnPath, decisionId, { refs });
   if (r.ok) return r.html;
   issues.push({ level: "warn", message: `Decision table not drawn for ${rootName}: ${r.reason}` });
   return dmnRefusalNote(r.reason);
@@ -418,6 +429,8 @@ export async function buildDocumentMarkdown(
   const blocks = new Map<string, LoadedBlockEntry>();
   const chapterSlugs: string[] = [];
   const rendered: string[] = [];
+  const chapterRenders: (() => string)[] = [];
+  const dmnPending: { rootName: string; chDir: string }[] = [];
 
   const locale = opts.locale;
   const shouldResolvePo = Boolean(locale && locale !== "en");
@@ -521,11 +534,11 @@ export async function buildDocumentMarkdown(
         try {
           const block = (await import(tsPath)).default as Block;
           const mdContent = existsSync(mdPath) ? readFileSync(mdPath, "utf-8") : "";
-          const dmnTable = await blockDmnTable(block, chDir, rootName, issues);
-          if (!mdContent.trim() && !dmnTable) {
+          if (!mdContent.trim() && !hasDmnCompanion(block, chDir, rootName)) {
             issues.push({ level: "warn", message: `Block has no narrative body: ${mdPath}` });
           }
-          blocks.set(rootName, { block, mdContent, ...(dmnTable ? { dmnTable } : {}) });
+          blocks.set(rootName, { block, mdContent });
+          dmnPending.push({ rootName, chDir });
         } catch (e) {
           issues.push({
             level: "error",
@@ -535,7 +548,7 @@ export async function buildDocumentMarkdown(
       }
     }
 
-    rendered.push(
+    chapterRenders.push(() =>
       renderChapterMarkdown(chapter, blocks, {
         baseHeadingLevel: 2,
         ...opts,
@@ -544,6 +557,20 @@ export async function buildDocumentMarkdown(
       }),
     );
   }
+
+  // Decision tables are drawn once every block is loaded, so a label in a
+  // table can link to a block in any chapter, shown by its title.
+  const refs = new Map<string, BlockRef>();
+  for (const { block } of blocks.values()) {
+    const label = blockLabel(block);
+    if (label) refs.set(label, { title: blockTitle(block), href: `#${label}` });
+  }
+  for (const { rootName, chDir } of dmnPending) {
+    const entry = blocks.get(rootName)!;
+    const dmnTable = await blockDmnTable(entry.block, chDir, rootName, issues, refs);
+    if (dmnTable) entry.dmnTable = dmnTable;
+  }
+  for (const render of chapterRenders) rendered.push(render());
 
   return {
     markdown: rendered.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n",

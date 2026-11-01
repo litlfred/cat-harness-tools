@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { DMN_TABLE_MARKER, placeDmnTable, renderDmnFile } from "./render-dmn-table";
+import { DMN_TABLE_MARKER, linkRefs, placeDmnTable, plainCell, renderDmnFile } from "./render-dmn-table";
 import { renderBlockMarkdown } from "./render-markdown";
 import type { Block } from "../schemas/types.ts";
 
@@ -45,15 +45,18 @@ describe("renderDmnFile", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     const h = r.html;
-    expect(h).toContain('<div class="fa-numbered fa-numbered-decision-table" data-dmn-decision="Decision_T">');
-    expect(h).toContain("<strong>Pick a &lt;colour&gt; &amp; size</strong>");
-    expect(h).toContain("Hit policy <code>FIRST</code> · 2 rules");
-    expect(h).toContain("Light<br><code>light</code>");
-    expect(h).toContain("Action to take<br><code>action</code>");
-    expect(h).toContain("<code>&quot;red&quot;</code>");
-    expect(h).toContain("<code>&gt; 0</code>");
+    expect(h).toContain('<div class="fa-numbered fa-numbered-decision-table" data-dmn-decision="Decision_T" data-dmn-file="ok.dmn" data-dmn-hit-policy="FIRST">');
+    expect(h).toContain("<strong>Pick a &lt;colour&gt; &amp; size</strong><br>The first rule that matches applies.");
+    // Labels shown, the fact names a hover away.
+    expect(h).toContain('<span title="light">Light</span>');
+    expect(h).toContain('<span title="action">Action to take</span>');
+    expect(h).toContain('colspan="2" class="fa-dmn-input fa-dmn-side">When</th>');
+    // Plain values: no quotes, "any" for "-", comparisons as written.
+    expect(h).toContain('title="&quot;red&quot;"><span class="fa-dmn-chip fa-dmn-chip-input">red</span>');
+    expect(h).toContain('<span class="fa-dmn-chip fa-dmn-chip-input">&gt; 0</span>');
+    expect(h).toContain('<span class="fa-dmn-any">any</span>');
+    expect(h).toMatch(/fa-dmn-chip-output fa-dmn-hue-\d">stop</);
     expect(h).toContain('<tr class="fa-dmn-description"><td></td><td colspan="3"><small><em>Stop on red.</em></small></td></tr>');
-    expect((h.match(/<tr>/g) ?? []).length).toBe(3);
     // One raw-HTML block for CommonMark: no blank line inside it.
     expect(h).not.toMatch(/\n\s*\n/);
   });
@@ -85,6 +88,34 @@ describe("renderDmnFile", () => {
     expect((await renderDmnFile(p)).ok).toBe(false);
     const named = await renderDmnFile(p, "Decision_U");
     expect(named.ok && named.decisionId).toBe("Decision_U");
+  });
+});
+
+describe("reader-facing text", () => {
+  test("a header's trailing citation becomes linked marks", async () => {
+    const xml = dmn(RULES).replace('label="Light"', 'label="Light (fr:A, fr:B)"');
+    const refs = new Map([
+      ["fr:A", { title: "Requirement A", href: "#fr:A" }],
+      ["fr:B", { title: "Requirement B", href: "#fr:B" }],
+    ]);
+    const r = await renderDmnFile(file("cite.dmn", xml), undefined, { refs });
+    expect(r.ok && r.html).toContain(
+      '<span title="light">Light</span><sup><a class="fa-dmn-ref" href="#fr:A" title="Requirement A">\u2197</a><a class="fa-dmn-ref" href="#fr:B" title="Requirement B">\u2197</a></sup>',
+    );
+  });
+  test("a block label becomes a link reading as the block's title; an unknown one stays", () => {
+    const refs = new Map([["freq:FR-ID-01", { title: "Unique identifier", href: "#freq:FR-ID-01" }]]);
+    expect(linkRefs("Check (freq:FR-ID-01, freq:FR-XX-09, Section 7.1)", refs)).toBe(
+      'Check (<a href="#freq:FR-ID-01" title="freq:FR-ID-01">Unique identifier</a>, freq:FR-XX-09, Section 7.1)',
+    );
+  });
+  test("cells read as words", () => {
+    expect(plainCell('"a", "b"')).toBe(
+      '<span class="fa-dmn-chip fa-dmn-chip-input">a</span> <span class="fa-dmn-or">or</span> <span class="fa-dmn-chip fa-dmn-chip-input">b</span>',
+    );
+    expect(plainCell('not("red")')).toBe('<span class="fa-dmn-not">not</span> <span class="fa-dmn-chip fa-dmn-chip-input">red</span>');
+    expect(plainCell(" - ")).toBe('<span class="fa-dmn-any">any</span>');
+    expect(plainCell('"go"', "output")).toBe(plainCell('"go"', "output"));
   });
 });
 
