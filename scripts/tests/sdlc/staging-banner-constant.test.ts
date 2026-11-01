@@ -313,6 +313,23 @@ describe("the banner goes in the BODY, not in a comment that mentions one", () =
     expect(out.noBody).toEqual(["bad.html"]);
     rmSync(dir, { recursive: true, force: true });
   });
+
+  test("a bodiless meta-refresh stub is counted as a redirect, not a page with no banner", () => {
+    const dir = mkdtempSync(join(tmpdir(), "fa-staging-rd-"));
+    writeFileSync(
+      join(dir, "stub.html"),
+      '<!doctype html>\n<meta charset="utf-8">\n<title>Catalogue</title>\n<meta http-equiv="refresh" content="0; url=../../catalogue/">\n<link rel="canonical" href="../../catalogue/">\n',
+    );
+    writeFileSync(join(dir, "bad.html"), "<html><head></head></html>");
+    const out = run(dir, {
+      branch: "b", sha: "s", built: "t", pr: "1",
+      prUrl: "u", branchUrl: "u", issue: null, issueUrl: null,
+      runUrl: "u", mainSite: "m", mainPagesKnown: false, newPages: [],
+    });
+    expect(out.redirects).toBe(1);
+    expect(out.noBody).toEqual(["bad.html"]);
+    rmSync(dir, { recursive: true, force: true });
+  });
 });
 
 describe("newPages is the SHORT list, and absent is not empty", () => {
