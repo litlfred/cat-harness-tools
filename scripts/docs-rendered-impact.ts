@@ -129,16 +129,20 @@ export interface SiteIndex {
   includers: Map<string, string[]>;
   /** `site.data` path read -> composed paths that read it. */
   dataReaders: Map<string, string[]>;
+  /** Composed asset path hashed by `| fa_asset_version` -> composed paths that hash it. */
+  assetReaders?: Map<string, string[]>;
   /** Include names the theme defines; undefined when the theme cannot be read, which makes every include site-wide. */
   themeIncludes?: Set<string>;
 }
 
 const DATA_REF = /site\.data\.([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*)/g;
 const INCLUDE = /\{%-?\s*include\s+([^\s%{}]+)/g;
+const ASSET_VERSION = /['"]\/?([^'"\s|]+)['"]\s*\|\s*fa_asset_version\b/g;
 
 /** Index composed sources (composed path, text). */
 export function indexSite(files: Iterable<[string, string]>, themeIncludes?: Set<string>): SiteIndex {
-  const ix: SiteIndex = { pages: new Map(), includers: new Map(), dataReaders: new Map(), ...(themeIncludes ? { themeIncludes } : {}) };
+  const assetReaders = new Map<string, string[]>();
+  const ix: SiteIndex = { pages: new Map(), includers: new Map(), dataReaders: new Map(), assetReaders, ...(themeIncludes ? { themeIncludes } : {}) };
   const push = (m: Map<string, string[]>, k: string, v: string) => {
     const l = m.get(k) ?? [];
     if (!l.includes(v)) l.push(v);
@@ -151,6 +155,7 @@ export function indexSite(files: Iterable<[string, string]>, themeIncludes?: Set
     }
     for (const m of text.matchAll(INCLUDE)) push(ix.includers, m[1]!, rel);
     for (const m of text.matchAll(DATA_REF)) push(ix.dataReaders, m[1]!, rel);
+    for (const m of text.matchAll(ASSET_VERSION)) push(assetReaders, m[1]!, rel);
   }
   return ix;
 }
@@ -252,6 +257,16 @@ export function docsRenderedImpact(o: DocsImpactOptions): RenderedImpact {
       add({ path: `${pre}${p}`, change, role: /\.html$/i.test(p) ? "content" : "data", via: [f] });
     } else {
       add({ path: `${pre}${rel}`, change, role: /\.html$/i.test(rel) ? "content" : "data", via: [f] });
+      const ix = o.index();
+      const by = ix.assetReaders?.get(rel) ?? [];
+      if (by.length) {
+        const reach = reachedPages(by, ix);
+        if (reach === "all") {
+          undetermined.push({ input: f, reason: `${rel} is hashed by fa_asset_version in a layout, a theme include, or an include nothing in the tree calls: can change any page`, scope: "all" });
+        } else {
+          for (const p of reach) add({ path: `${pre}${p}`, change: "changed", role: /\.html$/i.test(p) ? "content" : "data", via: [f, `fa_asset_version:${rel}`] });
+        }
+      }
     }
   }
   if ([...files.values()].some((f) => f.role === "content")) add({ path: `${pre}${SEARCH_INDEX}`, change: "changed", role: "index", via: [] });

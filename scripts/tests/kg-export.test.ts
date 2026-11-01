@@ -654,6 +654,16 @@ describe("source provenance — what the graph was generated FROM", () => {
       expect(ctx[k]).toBeDefined();
     }
   });
+
+  test("provenance: false skips source provenance for @graph-only callers (slice:sqlite, subgraph:jsonld)", async () => {
+    const d = await buildExport({ instanceRoot: resolve(HARNESS_ROOT, "..", "bootstrap"), scope: "instance", provenance: false });
+    expect(d.sourceCommit).toBeUndefined();
+    expect(d.sourceCommitSha).toBeUndefined();
+    expect(d.sourceCommitAt).toBeUndefined();
+    expect(d.sourceTreeDirty).toBeUndefined();
+    expect(d.sourceCommitUnavailable).toBeUndefined();
+    expect(d["@graph"].length).toBeGreaterThan(0);
+  });
 });
 
 describe("every self-URL the export publishes resolves to something published", () => {

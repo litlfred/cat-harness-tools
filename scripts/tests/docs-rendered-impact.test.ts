@@ -81,6 +81,26 @@ describe("docsRenderedImpact", () => {
     expect(paths(docsRenderedImpact(opts(["cat-harness/site-chrome/assets/css/docs-ui.css"])))).toEqual(["data:assets/css/docs-ui.css"]);
   });
 
+  test("an asset hashed by fa_asset_version reaches the pages or theme includes that hash it", () => {
+    const withVersionedAssets = indexSite(
+      [
+        ...tree,
+        ["guides/styled.md", "---\ntitle: Styled\n---\n<link href=\"{{ '/assets/css/page.css' | fa_asset_version }}\">"],
+        ["_includes/head_custom.html", "<script src=\"{{ '/assets/js/docs-ui.js' | relative_url }}?v={{ '/assets/js/docs-ui.js' | fa_asset_version }}\"></script>"],
+      ],
+      theme,
+    );
+    const pageScoped = docsRenderedImpact(opts(["cat-harness/docs/assets/css/page.css"], { index: () => withVersionedAssets }));
+    expect(paths(pageScoped)).toEqual(["data:assets/css/page.css", `index:${SEARCH_INDEX}`, "content:guides/styled.html"]);
+    expect(pageScoped.undetermined).toEqual([]);
+
+    const siteWide = docsRenderedImpact(opts(["cat-harness/site-chrome/assets/js/docs-ui.js"], { index: () => withVersionedAssets }));
+    expect(paths(siteWide)).toEqual(["data:assets/js/docs-ui.js"]);
+    expect(siteWide.undetermined).toEqual([
+      expect.objectContaining({ input: "cat-harness/site-chrome/assets/js/docs-ui.js", scope: "all" }),
+    ]);
+  });
+
   test("an include reaches the pages that include it, through other includes", () => {
     const i = docsRenderedImpact(opts(["cat-harness/docs/_includes/harness_details.html"]));
     expect(paths(i)).toEqual([`index:${SEARCH_INDEX}`, "content:harnesses.html"]);
