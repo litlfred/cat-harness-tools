@@ -214,6 +214,17 @@ export function renderBlockMarkdown(
       ? block.caption
       : undefined;
   const numbered = heading && NUMBERED_KINDS.has(block.kind) && caption ? captionNumber(caption) : null;
+  // Every other headed kind (requirements, personas, scenarios, data
+  // elements, definitions, remarks…) is a structured block: a light card with
+  // a small kind label, an id chip and a compact metadata row (owner,
+  // 2026-11-01: "structured content in the narrative doesnt really appear
+  // so. needs _light_ styling", "make more condensed", "look at all the
+  // structured assets"). Rendering only; the source text is unchanged.
+  if (heading && !NUMBERED_KINDS.has(block.kind)) {
+    const prose = resolveLiquidValues(mdContent).trim();
+    const body = entry.dmnTable ? placeDmnTable(prose, entry.dmnTable) : prose;
+    return structuredBlockMarkdown(block, heading, title, caption, body, lines);
+  }
   if (heading) {
     const name = numbered ? `${heading} ${numbered.number}` : heading;
     const link = opts.anchors !== false && label && NUMBERED_KINDS.has(block.kind) ? ` ${blockAnchorLink(label, name)}` : "";
@@ -257,6 +268,91 @@ export function renderBlockMarkdown(
   // at most 66% of the width, "also applies to tables"). The blank lines keep
   // the inside Markdown for CommonMark, and `markdown="1"` does it for kramdown.
   return [`<div class="fa-numbered fa-numbered-${block.kind}" markdown="1">`, "", ...lines, "", "</div>"].join("\n");
+}
+
+/** The block's own identifier, when its fields carry one (`FR-AN-01`, `NFR-01`). */
+function blockId(block: Block): string | undefined {
+  const meta = "meta" in block && block.meta && typeof block.meta === "object" ? (block.meta as Record<string, unknown>) : {};
+  for (const k of ["requirementId", "id"]) {
+    const v = meta[k];
+    if (typeof v === "string" && v.trim() !== "") return v.trim();
+  }
+  return undefined;
+}
+
+const escHtml = (s: string): string => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Text with Markdown emphasis and a trailing ellipsis or period removed, for comparing a title to the body. */
+const plain = (s: string): string => s.replace(/[*_`]/g, "").replace(/(\u2026|\.\.\.|\.)\s*$/, "").trim().toLowerCase();
+
+/** A paragraph that is a metadata line: it opens with an italic `*Label:*`. */
+const META_LINE = /^\*[^*\n]{1,40}:\*/;
+
+/** A paragraph that is not plain text: a list, table, heading, HTML, quote, image, fence or display math. */
+const BLOCK_START = /^(?:[-*+] |\d+[.)] |[|#<>!]|```|~~~|\$\$| {4})/;
+
+/**
+ * A structured block as a light card: `<kind label> <id chip> title`, run into
+ * the body's first paragraph when the body opens with the id, then the body,
+ * with trailing `*Label:* …` paragraphs set as a compact metadata row.
+ *
+ * The body says its id again in bold (`**FR-AN-01.** Standard reports…`), and
+ * an ingested title is often the body's first sentence cut short. Both are
+ * dropped from the HEADING, never from the body, so nothing the author wrote
+ * is lost and nothing is said twice.
+ */
+function structuredBlockMarkdown(
+  block: Block,
+  heading: string,
+  title: string | undefined,
+  caption: string | undefined,
+  body: string,
+  lines: string[],
+): string {
+  const id = blockId(block);
+  const head = [`<span class="fa-block-kind">${escHtml(heading)}</span>`];
+  if (id) head.push(`<span class="fa-block-id">${escHtml(id)}</span>`);
+
+  // Only the first paragraph and the trailing metadata lines are touched; the
+  // rest of the body is kept byte for byte (a fenced block may hold blank lines).
+  let rest = body;
+  const cutFirst = (): string => {
+    const end = rest.search(/\n\s*\n/);
+    const first = end < 0 ? rest : rest.slice(0, end);
+    rest = end < 0 ? "" : rest.slice(end).replace(/^\s+/, "");
+    return first;
+  };
+  let runIn: string | undefined;
+  const named = title ?? caption;
+  const idHead = id ? new RegExp(`^\\*\\*${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:\\.\\*\\*\\s*|\\s+(.+?)\\*\\*)`).exec(rest) : null;
+  if (idHead) {
+    // "**FR-AN-01.** text" -> "text"; "**NFR-01 Security.** text" -> "**Security.** text".
+    const first = cutFirst();
+    runIn = idHead[1] !== undefined ? `**${idHead[1]}**${first.slice(idHead[0].length)}` : first.slice(idHead[0].length);
+  } else if (rest && !BLOCK_START.test(rest)) {
+    // A first paragraph of plain text runs in after the heading, as a paper's
+    // run-in heads do, so the block opens on one line.
+    runIn = cutFirst();
+  }
+  // The title is left off the heading when the run-in text already opens with it
+  // (an ingested title is often the body's first words, or its bold lead).
+  const said = runIn !== undefined && !!named && plain(runIn).startsWith(plain(named));
+  if (named && !said) head.push(`**${named.replace(/\.\s*$/, "")}.**`);
+
+  const meta: string[] = [];
+  for (;;) {
+    const cut = rest.search(/\n\s*\n(?![\s\S]*\n\s*\n)/);
+    const last = cut < 0 ? rest : rest.slice(cut).trim();
+    if (!last || !META_LINE.test(last)) break;
+    meta.unshift(last);
+    rest = cut < 0 ? "" : rest.slice(0, cut).trimEnd();
+  }
+
+  lines.push(runIn !== undefined && runIn !== "" ? `${head.join(" ")} ${runIn}` : head.join(" "));
+  if (rest) lines.push("", rest);
+  if (caption && title && caption !== title) lines.push("", `*${caption}*`);
+  if (meta.length > 0) lines.push("", `<div class="fa-block-meta" markdown="1">`, "", meta.join("\n\n"), "", "</div>");
+  return [`<div class="fa-block fa-block-${block.kind}" markdown="1">`, "", ...lines, "", "</div>"].join("\n");
 }
 
 /**
