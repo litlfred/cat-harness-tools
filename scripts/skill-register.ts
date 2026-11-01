@@ -520,6 +520,15 @@ export interface Step {
    * `derive:publish` runs this writer itself, after `uml:overview`, so in a
    * PREVIEW's build of the QA working copy it is not run here as well (owner
    * card Q-CONE-2 B, 2026-11-01: "no double builds"). See {@link stepsToRun}.
+   *
+   * Only a writer whose outputs NO later step of the QA working copy reads may
+   * carry it, or a preview's QA would judge main's stale copy of them. Traced
+   * 2026-11-01 over the 15 `qa:refresh` steps after `skill:register`: nothing
+   * opens what `skills:docs` or `lsi:viz` write, while `auto-docs.json` (a
+   * declaration file the graph walk reads), `docs/subgraph/`, `docs/payload/`
+   * and the glossary's SKOS files are read by `kg:export`, `audit:coverage`,
+   * `check:reference-direction` and eight more. So `auto:docs`,
+   * `subgraph:jsonld` and `glossary:page` still run here.
    */
   readonly builtAtPublish?: true;
 }
@@ -552,13 +561,11 @@ export const STEPS: readonly Step[] = [
   },
   {
     write: ["glossary:page"],
-    builtAtPublish: true,
     verify: ["check:glossary"],
     because: "the glossary page and its SKOS projection",
   },
   {
     write: ["auto:docs"],
-    builtAtPublish: true,
     verify: ["auto:docs:check"],
     because: "the generated docs index",
   },
@@ -593,7 +600,6 @@ export const STEPS: readonly Step[] = [
   },
   {
     write: ["subgraph:jsonld"],
-    builtAtPublish: true,
     verify: ["subgraph:jsonld:check"],
     because:
       "a skill's BODY is a content-addressed payload its subgraph index points at, so editing it moves the hash " +
