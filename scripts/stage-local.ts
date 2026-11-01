@@ -82,6 +82,11 @@
  *    checked non-empty before anything is deleted (bean `oisv`), and the
  *    render log gets its entry (`render-log.ts`).
  *
+ * A preview also carries its build record, `_build-record.json`
+ * ({@link writePreviewRecord}): the tree it was built from and a hash of every
+ * file. CI rebuilds that tree in full afterwards, off the critical path, and
+ * replaces the preview when anything differs (folio-assistant#2881).
+ *
  * Not run: the QA sweep, block screenshots, review-comment ingestion and the
  * PR comment. The banner names the preview as built locally so a reviewer is
  * not told those exist.
@@ -126,6 +131,7 @@ import { decide, readTip } from "./staging-push-gate.ts";
 import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 import { readIndexConfig } from "../schemas/kg/index-config.ts";
 import { buildInstanceSite, recipeFromConfig, siteFields, type SiteRecipe } from "./build-instance-site.ts";
+import { makeRecord, RECORD_FILE } from "./preview-record.ts";
 
 /** Files one Artifact publish may carry, the page included (the Artifact tool's limit is 255; one is the page). */
 export const ARTIFACT_MAX_FILES = 254;
@@ -817,6 +823,8 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
     ]);
   }
 
+  if (target === "preview") writePreviewRecord(repo, site, { slug, sha, base, log });
+
   if (o.artifact) return done({ bundle: writeArtifact(site, o.artifact, platform, { slug, branch, sha }, log) });
 
   const compose = target === "main"
@@ -915,7 +923,10 @@ export async function stageDeclared(
     ...(d.recipe.profile ? { profile: d.recipe.profile } : {}),
     ...(d.recipe.links ? { links: d.recipe.links } : {}),
     ...(d.recipe.coverage ? { coverage: d.recipe.coverage } : {}),
-    ...(target === "preview" ? { staging: branch, beforePublish: (site: string) => previewData(repo, { instance: d.instance, branch, sha, base, owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}), ...(pr ? { pr } : {}) }, site, log) } : {}),
+    ...(target === "preview" ? { staging: branch, beforePublish: (site: string) => {
+      previewData(repo, { instance: d.instance, branch, sha, base, owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}), ...(pr ? { pr } : {}) }, site, log);
+      writePreviewRecord(repo, site, { slug: branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, ""), sha, base, log });
+    } } : {}),
     mount: true,
     fresh: false,
     publish,
@@ -923,6 +934,26 @@ export async function stageDeclared(
     remote,
   });
   return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: publish, site: r.site };
+}
+
+/**
+ * Every agent-built preview carries its build record (`preview-record.ts`,
+ * folio-assistant#2881): the tree it was built from and a hash of every file,
+ * so CI can rebuild the same tree in full afterwards and replace the preview
+ * if anything differs (owner, 2026-11-01, Q-SPD-9 B and Q-SPD-9b A). Written
+ * last, after every step that changes the site, and never for the main site,
+ * which stays CI-built.
+ */
+export function writePreviewRecord(repo: string, site: string, o: { slug: string; sha: string; base: string; log: (s: string) => void }): void {
+  let baseSha: string | undefined;
+  try {
+    baseSha = git(repo, ["rev-parse", `origin/${o.base}`]);
+  } catch {
+    baseSha = undefined;
+  }
+  const r = makeRecord({ site, repo, slug: o.slug, builder: "agent", head: o.sha, ...(baseSha ? { base: baseSha } : {}) });
+  writeFileSync(join(site, RECORD_FILE), JSON.stringify(r, null, 1) + "\n");
+  o.log(`· build record: ${Object.keys(r.files).length} file(s), tree ${r.tree.slice(0, 12)} → ${RECORD_FILE} (CI rebuilds this tree and replaces the preview if it differs)`);
 }
 
 /**

@@ -68,7 +68,7 @@ import { readRetained } from "./keep-shared-payloads.ts";
  * that installs the worker on a first visit, and the file `staging-review`
  * lists to tell that a preview was published.
  */
-export const NEVER_SHARED = new Set(["index.html", "staging.json", "shared.json", "staging-sw.js", "404.html", "build.json"]);
+export const NEVER_SHARED = new Set(["index.html", "staging.json", "shared.json", "staging-sw.js", "404.html", "build.json", "_build-record.json"]);
 
 const META_STAGING = /<meta name="fa-staging" content="[^"]*">/g;
 const META_SEARCH = /<meta name="fa-search-index" content="([^"]*)">/g;
