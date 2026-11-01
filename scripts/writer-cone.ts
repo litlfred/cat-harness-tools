@@ -42,7 +42,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { gitKey, gitState, MAX_TRACE_BYTES, parseTrace, pathState, STRACE_ARGS, TRACER_VERSION, type GitCall, type ReadSet } from "./ci-cone.ts";
+import { gitKey, gitState, MAX_TRACE_BYTES, parseTrace, pathState, readState, stateLike, STRACE_ARGS, TRACER_VERSION, type GitCall, type ReadSet } from "./ci-cone.ts";
 import { fingerprint, FileDigests, toolsLine } from "./input-hash.ts";
 
 /** Bump when the record's meaning changes; a record from another version is ignored, so every writer runs. */
@@ -195,7 +195,8 @@ export function writerRecordOf(a: {
   // A path it probed absent and then created is its own output, never an
   // input: a skipped writer's outputs are put back from the published site.
   const reads: Record<string, string> = {};
-  for (const p of a.reads.paths) reads[p] = pathState(a.root, p, a.digests);
+  const listed = new Set(a.reads.listed ?? []);
+  for (const p of a.reads.paths) reads[p] = readState(a.root, p, a.digests, listed);
   const outputs: Record<string, string> = {};
   for (const p of a.reads.writes ?? []) {
     const s = pathState(a.root, p, a.digests);
@@ -271,7 +272,7 @@ export function decideWriter(
   for (const [p, state] of Object.entries(rec.reads)) {
     let now: string;
     try {
-      now = pathState(root, p, digests);
+      now = stateLike(root, p, digests, state);
     } catch (e) {
       return { skip: false, why: `could not read ${p}: ${(e as Error).message}` };
     }
