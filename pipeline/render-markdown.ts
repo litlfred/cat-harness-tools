@@ -238,7 +238,13 @@ export function renderBlockMarkdown(
     lines.push(`*${shown}*`);
   }
 
-  return lines.join("\n");
+  if (!NUMBERED_KINDS.has(block.kind)) return lines.join("\n");
+  // Figures, diagrams and tables sit in one frame each, so every document
+  // site styles them the same way (owner, 2026-11-01: "consistent style
+  // across all document like things"; figures centred, titles centred and
+  // at most 66% of the width, "also applies to tables"). The blank lines keep
+  // the inside Markdown for CommonMark, and `markdown="1"` does it for kramdown.
+  return [`<div class="fa-numbered fa-numbered-${block.kind}" markdown="1">`, "", ...lines, "", "</div>"].join("\n");
 }
 
 /**
