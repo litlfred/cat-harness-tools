@@ -3,7 +3,7 @@ import { parseArchimate } from "../schemas/archimate.ts";
 import { fillOfType, layerClass, LAYER_FILL, TABLE_CSS } from "./figure-theme.ts";
 import { noteItems, posterFits, renderPosterSvg, wrapWords } from "./render-poster.ts";
 import { LAYER_FILL as VIEW_FILL, renderViewSvg } from "./render-view.ts";
-import { bandColours } from "./figure-theme.ts";
+import { bandColours, HANDBOOK } from "./figure-theme.ts";
 
 /** Two bands (goals, components with a panel), a side column, a frame of two stacked bands. */
 const XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -131,5 +131,15 @@ describe("poster theme on drawn views", () => {
     const plain = renderViewSvg(m, view, { theme: "plain" });
     expect(plain).not.toContain("Drawn from the ArchiMate model");
     expect(plain).not.toContain(bandColours(LAYER_FILL.Motivation).header);
+  });
+  it("draws the handbook look on request: teal outlines, no layer fills, no colour key", () => {
+    const hb = renderViewSvg(m, view, { theme: "handbook" });
+    expect(hb).toContain(HANDBOOK.teal);
+    expect(hb).toContain(HANDBOOK.page);
+    expect(hb).not.toContain(`fill="${LAYER_FILL.Motivation}"`);
+    expect(hb).not.toContain(bandColours(LAYER_FILL.Motivation).header);
+    expect(hb).not.toContain("Colour: which part of the architecture");
+    expect(hb).not.toContain('class="av-type"');
+    expect(hb).toContain("Drawn from the ArchiMate model");
   });
 });
