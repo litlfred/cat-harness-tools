@@ -1293,8 +1293,8 @@ jobs:
 
   # Main's writer records (bean fwtz), on their own machine beside the base
   # side: tracing every derive:publish writer under strace took the base
-  # side's preparation from ~10 to 56 minutes (folio-assistant-core run
-  # 41251751682). PRs read only the records this job saves, so nothing waits
+  # side's preparation from ~10 to 56 minutes (run
+  # https://github.com/litlfred/folio-assistant-core/actions/runs/41251751682). PRs read only the records this job saves, so nothing waits
   # on it but the run's own end.
   record-writers:
     name: Record main's page-build scripts (bean fwtz)
