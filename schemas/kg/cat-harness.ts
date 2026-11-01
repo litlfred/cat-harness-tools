@@ -1915,7 +1915,7 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
   /**
    * Entry slugs of a `library` the owner asked to hold that no methodology
    * cites YET. The platform library holds only sources its methodologies cite
-   * (`library-ref.test.ts` in folio-assistant-core); a source ingested ahead
+   * (`library-ref.test.ts` in the content core); a source ingested ahead
    * of the methodology text that will cite it is listed here, by name, until
    * it is cited and leaves the list. Unlike {@link heldEntries} this does NOT
    * hold the entry's summaries back: its blocks still drain. Listed, never
