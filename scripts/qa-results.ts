@@ -892,6 +892,9 @@ export interface FreshSidecar {
 }
 
 /** What {@link judgeSidecarTree} decided. */
+/** At most this many failing findings are repeated at the end of a judge's output. */
+const TAIL_SHOWN = 5;
+
 export interface TreeVerdict {
   judgement: Judgement;
   exit: number;
@@ -1043,6 +1046,18 @@ export function judgeSidecarTree(args: {
   const judgement = judgementOf({ failing, undetermined: args.undetermined !== undefined });
   const detail = [args.detail, args.undetermined].filter(Boolean).join(" — ") || undefined;
   const exit = concludeJudgement({ gate: args.gate, judgement, detail, unknowns });
+  // Last, on stderr: the CI gate summary keeps only an output's TAIL, which
+  // without this held the verdict and not the findings behind it — a red gate
+  // whose reason could not be read from the run (cat-harness-tools#1191).
+  if (exit !== 0 && failing > 0) {
+    const gating: [string, unknown[]][] = Object.keys(added).length > 0
+      ? Object.entries(added)
+      : args.fresh.filter((s) => s.findings.length > 0).map((s) => [s.path, s.findings]);
+    const shown = gating.flatMap(([p, entries]) => entries.map((e) => [p, e] as const));
+    console.error(`  failing the gate (${shown.length}):`);
+    for (const [p, e] of shown.slice(0, TAIL_SHOWN)) console.error(`    · ${label(p)}: ${JSON.stringify(e).slice(0, 400)}`);
+    if (shown.length > TAIL_SHOWN) console.error(`    …and ${shown.length - TAIL_SHOWN} more`);
+  }
   return {
     judgement,
     exit,

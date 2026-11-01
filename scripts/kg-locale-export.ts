@@ -112,6 +112,7 @@ import { readHarnessConfig } from "../schemas/kg/harness-config.js";
 import { localeDirIn, repoRootFor, translationsHomeFor } from "../schemas/kg/cat-harness.js";
 import { buildExport, exportIdentity, publishedDocument, undeclaredRootTerms } from "./kg-export.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { STAGING_KEY } from "./staging-stamp.js";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -409,9 +410,21 @@ export async function buildLocaleExports(opts: {
   instanceRoot?: string;
   baseUrl?: string;
   allLocales?: boolean;
+  /**
+   * The core document `kg-export.ts` has just written for the same instance,
+   * base URL and scope (`--core <path>`), read instead of built again — bean
+   * fwtz, the KG step: rebuilding it was this script's whole 19 s on `main`,
+   * on runs that then wrote nothing. Its staging stamp is set aside, since the
+   * built document never carries one. Refused when its `@id` is not the one
+   * this run would publish, so a stale or foreign file cannot stand in.
+   */
+  core?: Record<string, unknown>;
 } = {}): Promise<LocaleBuild> {
   const instanceRoot = resolve(opts.instanceRoot ?? ROOT);
   const id = exportIdentity({ baseUrl: opts.baseUrl, instanceRoot: opts.instanceRoot });
+  if (opts.core !== undefined && opts.core["@id"] !== id.docIri) {
+    throw new Error(`--core holds ${String(opts.core["@id"])}, not ${id.docIri}: not this run's core document`);
+  }
   // `publishedDocument`, NOT the raw export — these documents are PUBLISHED,
   // so they carry what the core publishes and not what it computes. The four
   // fields it strips (`undeclaredTerms`, `undeclaredSchemaModules`,
@@ -425,7 +438,7 @@ export async function buildLocaleExports(opts: {
   // documents — 16 of its 20 findings, and the deploy skipped with them. The
   // core was correct throughout: `kg-export.ts` was the function's only
   // caller, so the projection existed and this path went around it.
-  const core = publishedDocument(
+  const core = opts.core !== undefined ? withoutStagingStamp(opts.core) : publishedDocument(
     // `scope: "instance"` — the document `kg-export` publishes for the host,
     // tombstones included (bean `4ak5` item 2); a locale variant translates
     // that document, so it must not hold nodes the original no longer does.
@@ -481,6 +494,12 @@ export async function buildLocaleExports(opts: {
   return { stub: id.stub, sourceLanguage, locales: reports, docs, coreProblems, idDrift, rootUndeclared };
 }
 
+/** A written core document as `buildExport` returned it: no staging stamp. */
+function withoutStagingStamp(doc: Record<string, unknown>): Record<string, unknown> {
+  const { [STAGING_KEY]: _stamp, ...rest } = doc;
+  return rest;
+}
+
 /** `<stub>.<locale>.jsonld`, beside the core document. */
 export function localeDocPath(stub: string, locale: string): string {
   return `${stub}.${locale}.jsonld`;
@@ -498,7 +517,9 @@ if (import.meta.main) {
   const allLocales = argv.includes("--all-locales");
   const outDir = arg("--out-dir") ?? join(repoRootFor(ROOT), "_kg");
 
-  const build = await buildLocaleExports({ instanceRoot, baseUrl, allLocales });
+  const corePath = arg("--core");
+  const core = corePath !== undefined ? (JSON.parse(readFileSync(corePath, "utf-8")) as Record<string, unknown>) : undefined;
+  const build = await buildLocaleExports({ instanceRoot, baseUrl, allLocales, ...(core ? { core } : {}) });
 
   console.log(`${build.stub} graph per locale — source language ${build.sourceLanguage}`);
   if (build.locales.length === 0) {

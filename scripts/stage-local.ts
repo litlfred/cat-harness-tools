@@ -897,7 +897,10 @@ export async function stageDeclared(
     log(`guard       the build is measured against the published root (site-parity.ts: theme side bar and search, icon row, rail, top-level directories, folio-build.json); a shortfall refuses the publish${publish ? "" : " (said, not refused, as nothing is published)"}`);
   }
   if (o.plan) return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: false };
-  const pr = target === "preview" ? await openPrFor(owner, name, branch, log) : undefined;
+  const open = target === "preview" ? await openPrFor(owner, name, branch, log) : undefined;
+  const pr = open?.number;
+  const base = previewBase({ ...(o.base ? { base: o.base } : {}), ...(open ? { prBase: open.base } : {}), ...(defaultBranch ? { defaultBranch } : {}) });
+  if (target === "preview") log(`· review compares against origin/${base}${o.base ? " (--base)" : open ? ` (PR #${open.number}'s base)` : " (the default branch)"}`);
   const r = await buildInstanceSite({
     root: repo,
     instance: d.instance,
@@ -912,7 +915,7 @@ export async function stageDeclared(
     ...(d.recipe.profile ? { profile: d.recipe.profile } : {}),
     ...(d.recipe.links ? { links: d.recipe.links } : {}),
     ...(d.recipe.coverage ? { coverage: d.recipe.coverage } : {}),
-    ...(target === "preview" ? { staging: branch, beforePublish: (site: string) => previewData(repo, { instance: d.instance, branch, sha, base: defaultBranch ?? "main", owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}), ...(pr ? { pr } : {}) }, site, log) } : {}),
+    ...(target === "preview" ? { staging: branch, beforePublish: (site: string) => previewData(repo, { instance: d.instance, branch, sha, base, owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}), ...(pr ? { pr } : {}) }, site, log) } : {}),
     mount: true,
     fresh: false,
     publish,
@@ -923,13 +926,24 @@ export async function stageDeclared(
 }
 
 /**
- * The open pull request whose head is `branch`, or `undefined`, said in the
+ * The branch a preview's review page compares against. A pull request is
+ * reviewed against the branch it merges into, so a change set stacked on an
+ * unmerged baseline shows only its own change, not the whole baseline. In
+ * order: `--base`, the open PR's base, the default branch, `main`.
+ */
+export function previewBase(o: { base?: string; prBase?: string; defaultBranch?: string }): string {
+  return o.base || o.prBase || o.defaultBranch || "main";
+}
+
+/**
+ * The open pull request whose head is `branch` (its number and the branch it
+ * merges into), or `undefined`, said in the
  * log. A preview's review comments are the tagged comments on that PR (bean
  * 423d), and the workflow is handed its number by the event; a local build has
  * to ask. A lookup that fails (no network, a rate limit) costs the preview its
  * comments, not its publish.
  */
-export async function openPrFor(owner: string, name: string, branch: string, log: (s: string) => void): Promise<number | undefined> {
+export async function openPrFor(owner: string, name: string, branch: string, log: (s: string) => void): Promise<{ number: number; base: string } | undefined> {
   const q = `https://api.github.com/repos/${owner}/${name}/pulls?state=open&head=${encodeURIComponent(`${owner}:${branch}`)}`;
   try {
     const token = process.env.GITHUB_TOKEN;
@@ -938,9 +952,10 @@ export async function openPrFor(owner: string, name: string, branch: string, log
       log(`· no PR looked up for ${branch} (GitHub answered ${r.status}): no review comments on this preview`);
       return undefined;
     }
-    const prs = (await r.json()) as { number: number }[];
+    const prs = (await r.json()) as { number: number; base?: { ref?: string } }[];
     if (!prs.length) log(`· ${branch} has no open pull request: no review comments on this preview`);
-    return prs[0]?.number;
+    const p = prs[0];
+    return p ? { number: p.number, base: p.base?.ref ?? "" } : undefined;
   } catch (e) {
     log(`· no PR looked up for ${branch} (${(e as Error).message}): no review comments on this preview`);
     return undefined;
