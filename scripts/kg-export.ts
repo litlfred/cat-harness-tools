@@ -4056,13 +4056,19 @@ export function writeSubjectDocuments(
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
     written.push(file);
+    // The page embeds the document WITHOUT the staging stamp (bean g196,
+    // owner 2026-11-01, Q-S1-1 A). A preview's banner already names its build
+    // from `staging.json`, and a stamp in every page made each rebuild of one
+    // preview rewrite every subject page. The `.jsonld` above keeps it: data
+    // has no banner, so it says in-band which build it came from.
+    const pageView = Object.fromEntries(Object.entries(doc).filter(([k]) => !(k in stamp)));
     const page = join(dir, `${stem}.html`);
-    writeFileSync(page, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, pageDoc, diagram));
+    writeFileSync(page, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, pageDoc, diagram));
     written.push(page);
     if (parentStems.has(stem)) {
       const index = join(dir, stem, "index.html");
       mkdirSync(dirname(index), { recursive: true });
-      writeFileSync(index, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc, diagram));
+      writeFileSync(index, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc, diagram));
       written.push(index);
     }
   }

@@ -204,6 +204,27 @@ describe("every subject loads: its own .jsonld and page", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+  test("a preview's stamp is in each subject's .jsonld but not in its page (bean g196, Q-S1-1 A)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "subject-stamp-"));
+    const keep = { GITHUB_SHA: process.env.GITHUB_SHA, KG_BRANCH: process.env.KG_BRANCH, GITHUB_RUN_ID: process.env.GITHUB_RUN_ID };
+    try {
+      Object.assign(process.env, { GITHUB_SHA: "feedc0de1234", KG_BRANCH: "feat/x", GITHUB_RUN_ID: "4242" });
+      const stamped = { ...published, staging: { branch: "feat/x", sha: "feedc0de1234", pr: "1/merge", run: "4242" } };
+      writeSubjectDocuments(stamped, join(dir, "folio-assistant-core.jsonld"));
+      const data = JSON.parse(readFileSync(join(dir, "process/P/node/T.jsonld"), "utf-8"));
+      expect(data.staging.sha).toBe("feedc0de1234");
+      for (const f of ["process/P/node/T.html", "process/P.html", "process/P/index.html"]) {
+        const page = readFileSync(join(dir, f), "utf-8");
+        expect(page).not.toContain("feedc0de1234");
+        expect(page).not.toContain('"staging"');
+        // Positive control: the page still embeds its document.
+        expect(page).toContain('"partOf"');
+      }
+    } finally {
+      for (const [k, v] of Object.entries(keep)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
   test("served somewhere its IRI does not name: a copy here, sameAs the canonical subject document (#638 option B)", () => {
     const dir = mkdtempSync(join(tmpdir(), "subject-copy-"));
     try {
