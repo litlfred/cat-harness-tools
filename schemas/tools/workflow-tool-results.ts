@@ -11,6 +11,7 @@
  * each schema equal to the engine's own TypeScript type, so the two cannot
  * drift apart.
  *
+ * @graphNode schema
  * @module cat-harness-tools/schemas/tools/workflow-tool-results
  */
 import { z } from "zod";

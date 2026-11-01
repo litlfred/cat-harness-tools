@@ -6,6 +6,7 @@
  * Was cat-harness `tools/lib.ts`; it moved here with the schemas (bean
  * `8lcl`), since the harness holds no code.
  *
+ * @graphNode none — helpers the Tool folders share; no schema
  * @module schemas/tools/tool-helpers
  */
 import { existsSync, readFileSync } from "node:fs";

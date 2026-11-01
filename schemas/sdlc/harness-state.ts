@@ -5,6 +5,7 @@
  * (`tool-types.ts`) can name it as the `HarnessStates` result type
  * without importing a script (issue litlfred/cat-harness-tools#1259, group 1).
  *
+ * @graphNode schema
  * @module cat-harness-tools/schemas/sdlc/harness-state
  */
 import { z } from "zod";
