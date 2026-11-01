@@ -468,7 +468,12 @@ export async function replay(o: ReplayOptions): Promise<{ steps: number; ran: nu
             if (!runScript(interpolate(sub.run, sctx), sub.shell, subCwd, { ...subEnv, GITHUB_ACTION_PATH: dir }, `${label} › ${sub.name ?? "step"}`)) { ok = false; break; }
           }
         } else {
+          // Reported as skipped, as it was: a later `if` that asks whether this
+          // step succeeded (the hand-off to the batched publisher asks it of
+          // the artifact upload) must not be told it did.
           o.log(`  (skipped: ${USES.find((x) => x.match.test(s.uses!))?.why})`);
+          if (s.id) stepState[s.id] = { outputs: {}, outcome: "skipped", conclusion: "skipped" };
+          continue;
         }
       }
       const coe = s["continue-on-error"] === true || s["continue-on-error"] === "true";
