@@ -826,18 +826,31 @@ def fold_skill_register(root, runner, gates):
 # took 510 s alone, the floor of every PR run once the shards were balanced.
 # Part i of n runs `<script> --part i/n`: slice i of the layer's test files
 # (check-standalone.ts, "In parts"), so together the parts run every test file
-# once. A pin whose check-standalone.ts has no `--part` ignores the flag and
-# runs the whole layer in each part: slower, never less checked, and the two
-# sides still compare part by part under the same names.
+# once. A side whose pinned check-standalone.ts has no `--part` keeps the
+# gate whole: there the flag would be ignored and each part would run the
+# whole layer, four times the work (`supports_parts`).
 SPLIT_GATES = {"check:cat-harness-tools-standalone": 4}
+CHECK_STANDALONE_TS = os.path.join("cat-harness-tools", "scripts", "check-standalone.ts")
 
 
-def split_gates(gates, runner, timings=None, alone=None, table=None):
+def supports_parts(root):
+    """Whether this side's check-standalone.ts takes `--part`."""
+    try:
+        with open(os.path.join(root, CHECK_STANDALONE_TS)) as f:
+            return '"--part"' in f.read()
+    except OSError:
+        return False
+
+
+def split_gates(gates, runner, timings=None, alone=None, table=None, root=None):
     """`gates` with each SPLIT_GATES gate replaced, in place, by its parts:
     `<name>#i/n` running `<command> --part i/n`. A part inherits `alone`, and
     until it has a timing of its own, the whole gate's seconds over n. Returns
-    the new gates dict; `timings` and `alone` are updated in place."""
+    the new gates dict; `timings` and `alone` are updated in place. With
+    `root` given and no `--part` in its check-standalone.ts, nothing is split."""
     table = SPLIT_GATES if table is None else table
+    if root is not None and not supports_parts(root):
+        return dict(gates)
     out = {}
     for name, command in gates.items():
         script = command[len(runner) + 1:] if runner and command.startswith(f"{runner} ") else None
@@ -883,7 +896,7 @@ def main():
         if os.environ.get("GATE_SHARD", "").strip():
             timings = read_timings(os.environ.get("GATE_TIMINGS"))
             alone = tree_snapshotting(args[0]) if timings else set()
-            gates = split_gates(gates, runner, timings, alone)
+            gates = split_gates(gates, runner, timings, alone, root=args[0])
             listed["gates"] = {k: gates[k] for k in shard_names(list(gates), shard, shards, timings, alone, gate_jobs())}
             listed["skipped"] = skipped if shard == 1 else {}
             listed["shard"] = {"shard": shard, "of": shards, "total": len(gates)}
@@ -901,7 +914,7 @@ def main():
     os.environ.setdefault("CAT_SKILL_REGISTER_VERIFIED_BY_GATES", verified_by_gates(gates))
     timings = read_timings(os.environ.get("GATE_TIMINGS"))
     alone = tree_snapshotting(root)
-    gates = split_gates(gates, runner, timings, alone)
+    gates = split_gates(gates, runner, timings, alone, root=root)
     total = len(gates)
     gates = {k: gates[k] for k in shard_names(list(gates), shard, shards, timings, alone, gate_jobs())}
     if shard != 1:
