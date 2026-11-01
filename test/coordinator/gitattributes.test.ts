@@ -30,6 +30,18 @@
  * instance"): what it reads belongs to the whole checkout, which the root
  * instance declares, not to any one layer — so cat-harness-tools stays green
  * standing alone too.
+ *
+ * ## The `test/results/` entries are retired (bean `7mwa`)
+ *
+ * cat-harness (cat-harness#857) and folio-assistant-core
+ * (folio-assistant-core#482) no longer commit `test/results/`: the derived
+ * verdicts live on the `qa-reports` store, keyed by commit. A path that is not
+ * committed cannot conflict, so the `oxka` entry for
+ * `audit-coverage.qa-results.json`, the `eqxp` entry for the `lsi-index` run
+ * record, the two refused `eqxp` candidates and the "no glob over the results
+ * tree" rule are gone from here (owner, 2026-11-01: "A. Retire in that tools
+ * PR"). What stays is what is still committed: the generated pages marked
+ * `-merge`, and the attestation store and `harness.json`, which must not be.
  */
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
@@ -49,7 +61,7 @@ function mergeAttr(path: string): string {
 }
 
 describe(".gitattributes exists and is read by git", () => {
-  test("the three high-churn generated files are marked", () => {
+  test("the high-churn generated files are marked", () => {
     expect(existsSync(ATTRS)).toBe(true);
     for (const p of [
       // The English glossary page under the page locale since 2026-10-16
@@ -57,14 +69,9 @@ describe(".gitattributes exists and is read by git", () => {
       "cat-harness/docs/en/folio-assistant-core/glossary/index.md",
       "cat-harness/docs/folio-assistant-core/glossary/index.md",
       "cat-harness/docs/cat-harness/auto-docs/index/index.html",
-      "cat-harness/test/results/audit-coverage.qa-results.json",
       // Added 2026-09-27, bean `5gqn`. Rewritten whole by `gen-docs-pages.ts`; reads
       // nothing back and is gated by `docs:pages:check`.
       "cat-harness/docs/assets/beans/index.json",
-      // Added 2026-10-01, bean `eqxp`. Producer `writeToolRun` composes the
-      // body from its argument and reads the existing file only to skip a
-      // pointless write.
-      "cat-harness/test/results/tool-runs/lsi-index/cat-harness/skills.tool-run.json",
     ]) {
       // Asked of GIT, not matched against the file's text: a pattern that looks
       // right and does not apply is the failure mode this guards.
@@ -73,17 +80,15 @@ describe(".gitattributes exists and is read by git", () => {
   });
 });
 
-describe("a sidecar whose producer reads it back is NOT marked", () => {
-  test("`kg-qa` sidecars stay textually mergeable", () => {
-    // `readAttestations(sidecarPath(r))` in `kg-audit.ts` is the fact. If that
-    // ever stops being true this test should be revisited deliberately, not
-    // deleted because it became inconvenient.
+describe("a file whose producer reads it back is NOT marked", () => {
+  test("the attestation store stays textually mergeable", () => {
+    // `readAttestations` in `kg-audit.ts` is the fact. If that ever stops
+    // being true this test should be revisited deliberately, not deleted
+    // because it became inconvenient.
     const audit = readFileSync(join(REPO, "cat-harness-tools", "scripts", "kg-audit.ts"), "utf-8");
-    expect(audit, "kg-audit no longer reads its sidecars back — re-examine this rule").toContain("readAttestations");
+    expect(audit, "kg-audit no longer reads its attestations back — re-examine this rule").toContain("readAttestations");
     for (const p of [
-      "cat-harness/test/results/kg-qa/processes/adjudication.kg-qa.json",
-      "cat-harness/test/results/kg-qa/skills/kg/kg-core/audit-coverage.kg-qa.json",
-      // The judgement half itself (bean `2gst`) — the file that must never be `-merge`.
+      // The judgement half (bean `2gst`) — the file that must never be `-merge`.
       "cat-harness/test/attestations/kg-qa/processes/ci-health-watch.attestations.json",
     ]) {
       expect(mergeAttr(p), `${p} is marked -merge, which would discard an attestation`).not.toBe("unset");
@@ -100,81 +105,22 @@ describe("a sidecar whose producer reads it back is NOT marked", () => {
       "cat-harness/docs/_data/harness.json is marked -merge, but sync-docs-harness carries previous state forward",
     ).not.toBe("unset");
   });
-
-  test("no pattern globs the whole results tree", () => {
-    // The obvious widening: 840 generated files under one directory. Refused by
-    // text as well as by behaviour, because a future glob might match nothing
-    // today and everything after a relocation.
-    const text = readFileSync(ATTRS, "utf-8");
-    for (const line of text.split("\n")) {
-      if (line.trim().startsWith("#") || !line.includes("-merge")) continue;
-      const pattern = line.trim().split(/\s+/)[0]!;
-      expect(
-        /^cat-harness\/test\/results\/\*|^cat-harness\/test\/results\/\*\*/.test(pattern),
-        `"${pattern}" globs the results tree, where sidecars carry attestations`,
-      ).toBe(false);
-    }
-  });
 });
 
 describe("every -merge path is gated in CI", () => {
   test("a wrong resolution reddens rather than ships", () => {
     // This is what makes the whole entry safe rather than clever. The files
-    // are covered by `check:glossary`, `auto:docs:check`,
-    // `audit:coverage:require-all`, `docs:pages:check` and `lsi:skills:check`,
-    // so taking the wrong side cannot ship.
+    // are covered by `check:glossary`, `auto:docs:check` and
+    // `docs:pages:check`, so taking the wrong side cannot ship. (The gates of
+    // the retired `test/results/` entries, `audit:coverage:require-all` and
+    // `lsi:skills:check`, guarded files nobody commits now; bean `7mwa`.)
     const wf = readFileSync(join(REPO, ".github", "workflows", "code-quality-gates.yml"), "utf-8");
     for (const gate of [
       "check:glossary",
       "auto:docs:check",
-      "audit:coverage:require-all",
       "docs:pages:check",
-      "lsi:skills:check",
     ]) {
       expect(wf, `${gate} is not in CI, so a -merge path it covers is unguarded`).toContain(gate);
     }
-  });
-});
-
-/**
- * Two files that pass the carry-forward test and FAIL the gate test.
- *
- * Bean `eqxp`, 2026-10-01. Both were cleared on the producer question — read
- * each one, neither carries anything forward — and both were then refused,
- * because being safe to overwrite is only half of it. `oxka`'s entry is safe
- * *because* a wrong resolution reddens; without that it is a way to lose work
- * quietly.
- *
- * Measured by corrupting each committed file and running its gate:
- *
- *   · `skill-register.qa-results.json` — `producer.script_hash` and a family
- *     summary corrupted. `skill:register:check` exited **0**, and 66 tests
- *     across `skill-register.test.ts` and `qa-results.test.ts` passed.
- *   · `skills.lsi.json` — `fingerprint` corrupted. `lsi:skills:check` exited
- *     **0**. That gate reads the RUN RECORD's `inputFingerprint` (corrupting
- *     which does exit 1) and never validates the sidecar's own contents.
- *
- * This test is here so the next agent reaching for them has to overturn a
- * measurement rather than an opinion.
- */
-describe("a generated file whose gate does NOT redden is not marked", () => {
-  test("the two refused candidates stay textually mergeable", () => {
-    for (const p of [
-      "cat-harness/test/results/skill-register.qa-results.json",
-      "cat-harness/test/results/lsi/cat-harness/skills.lsi.json",
-    ]) {
-      expect(
-        mergeAttr(p),
-        `${p} is marked -merge, but no gate reddens on a wrong resolution of it — see this block`,
-      ).not.toBe("unset");
-    }
-  });
-
-  test("the gate that DOES cover the newly marked run record is named in CI", () => {
-    // The asymmetry is the point: the run record is guarded, its sibling
-    // sidecar is not, and they sit two directories apart.
-    const wf = readFileSync(join(REPO, ".github", "workflows", "code-quality-gates.yml"), "utf-8");
-    expect(wf).toContain("lsi:skills:check");
-    expect(mergeAttr("cat-harness/test/results/tool-runs/lsi-index/cat-harness/skills.tool-run.json")).toBe("unset");
   });
 });
