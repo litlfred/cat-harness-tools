@@ -19,7 +19,7 @@
  *
  * ## Why it is installed at BUILD time and never committed
  *
- * The pruned viewer is ~12 MB (404 files at v6.4.299, measured). Committed, it is clone weight every checkout
+ * The pruned viewer is ~12 MB (407 files at v6.5.438, measured). Committed, it is clone weight every checkout
  * pays forever and a vendored tree nobody reviews. Installed by
  * {@link install} into `_site/` from a release whose SHA-256 is written
  * below, it costs the site and nothing else, and the pin is one line that
@@ -29,7 +29,7 @@
  *
  * The PDFs these pages show are served from a CDN, not from Pages. The
  * generic viewer refuses a cross-origin `?file=` with *"file origin does not
- * match viewer's"* — measured in `web/viewer.mjs` at v6.4.299,
+ * match viewer's"* — measured in `web/viewer.mjs` at v6.4.299 and v6.5.438,
  * `validateFileURL`. That refusal exists so a hosted viewer cannot be pointed
  * at an arbitrary document and lend it the host's address. So the shim
  * {@link openShim} opens `?src=` ONLY when it starts with a prefix the BUILD
@@ -57,10 +57,10 @@ import { spawnSync } from "child_process";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 /** The pinned pdf.js release. `upstream-pins.json` reads this line by pattern. */
-export const PDFJS_VERSION = "6.4.299";
+export const PDFJS_VERSION = "6.5.438";
 
 /**
- * SHA-256 of `pdfjs-<version>-legacy-dist.zip`, measured 2026-10-04. A
+ * SHA-256 of `pdfjs-<version>-legacy-dist.zip`, measured 2026-11-01 (v6.5.438). A
  * mismatch refuses the install.
  *
  * **The LEGACY build, on purpose.** The modern build calls
@@ -69,7 +69,7 @@ export const PDFJS_VERSION = "6.4.299";
  * during startup and never opened the document. The legacy build carries its
  * polyfills, so a reader one browser release behind still gets a viewer.
  */
-export const PDFJS_SHA256 = "c894bce53b2f4c3e13141e088c89cc051a1f7118ba4a2c02ec058798ae1303d1";
+export const PDFJS_SHA256 = "55138aa33b5f1f6f68809895338b947f395f344eb6381d424b2420d6daa6a844";
 
 export const PDFJS_ZIP_URL = `https://github.com/mozilla/pdf.js/releases/download/v${PDFJS_VERSION}/pdfjs-${PDFJS_VERSION}-legacy-dist.zip`;
 
@@ -149,7 +149,7 @@ export function openShim(allow: readonly string[]): string {
   }
   // pdf.js dispatches this on PARENT.document when the frame is same-origin
   // with its host page, and on its own document otherwise — measured at
-  // v6.4.299, \`webViewerLoad\`. An embed on this site is exactly the
+  // v6.4.299 and v6.5.438, \`webViewerLoad\`. An embed on this site is exactly the
   // same-origin case, so listening on \`document\` alone never fires.
   var done = false;
   function onLoaded(e) {

@@ -475,22 +475,35 @@ export function injectInto(html: string): { html: string; outcome: Injection } {
 export function run(
   site: string,
   facts: StagingFacts,
-): { injected: number; skipped: number; noBody: string[] } {
+): { injected: number; skipped: number; noBody: string[]; redirects: number } {
   writeFileSync(join(site, "staging.json"), JSON.stringify(facts, null, 2) + "\n");
   let injected = 0;
   let skipped = 0;
+  let redirects = 0;
   const noBody: string[] = [];
   for (const f of htmlFiles(site)) {
     const before = readFileSync(f, "utf-8");
     const { html: after, outcome } = injectInto(before);
-    if (outcome === "no-body") noBody.push(relative(site, f));
+    // A bodiless redirect stub is never shown: the browser leaves it at once
+    // for the page it names, which carries its own banner. Counted, not failed
+    // (who-iris/catalogue/index.html, 2026-11-01).
+    if (outcome === "no-body" && isRedirectStub(before)) redirects++;
+    else if (outcome === "no-body") noBody.push(relative(site, f));
     else if (outcome === "already") skipped++;
     else {
       writeFileSync(f, after);
       injected++;
     }
   }
-  return { injected, skipped, noBody };
+  return { injected, skipped, noBody, redirects };
+}
+
+/**
+ * An immediate `<meta http-equiv="refresh" content="0; url=…">` with no
+ * real `<body>`: a forwarding stub, not a page a reader sees.
+ */
+export function isRedirectStub(html: string): boolean {
+  return /<meta\s[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*content\s*=\s*["']?\s*0\s*[;,]\s*url\s*=/i.test(html);
 }
 
 function flag(name: string): string | undefined {
@@ -557,7 +570,7 @@ if (import.meta.main) {
     newPages,
   };
 
-  const { injected, skipped, noBody } = run(site, facts);
+  const { injected, skipped, noBody, redirects } = run(site, facts);
   console.log(
     mainPagesKnown
       ? `Read the publish ref; ${newPages.length} page(s) have no counterpart on main`
@@ -566,6 +579,7 @@ if (import.meta.main) {
   console.log(
     `Injected the constant staging banner into ${injected} HTML file(s)` +
       (skipped ? ` (${skipped} already carried it)` : "") +
+      (redirects ? `, skipped ${redirects} redirect stub(s)` : "") +
       ` and wrote staging.json`,
   );
 

@@ -45,7 +45,7 @@ export function rootProfile(root: string): RootProfile {
 }
 
 /** Why `run-gates.py` does not run a declared gate (its `skip_reason` kinds, and `input-absent`). */
-export type SkipKind = "live-state" | "needs-input" | "prerequisite" | "input-absent";
+export type SkipKind = "live-state" | "needs-input" | "runner-state" | "layer-mode" | "prerequisite" | "input-absent";
 
 export interface RootGateSet {
   /** The root's own instances. */

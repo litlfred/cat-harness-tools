@@ -94,9 +94,54 @@ export const ArchimateConfigFigureSchema = z
      * the view's elements, `by-eye` when a person compared the two pictures.
      */
     basis: z.enum(["same-elements", "by-eye"]),
+    /**
+     * Where `archimate-blocks` writes the view as SVG, relative to the
+     * instance root, so the block can show the model's own drawing instead of
+     * a picture of it. Absent, the figure is only linked to the view.
+     */
+    svg: z
+      .string()
+      .regex(/\.svg$/, "an .svg file")
+      .refine((f) => !f.startsWith("/") && !f.split("/").includes(".."), "relative to the instance root, without `..`")
+      .optional(),
   })
   .strict();
 export type ArchimateConfigFigure = z.infer<typeof ArchimateConfigFigureSchema>;
+
+/** What an `archimate-blocks` table is drawn from. */
+export const ARCHIMATE_TABLE_KINDS = ["relationship-types", "relationship-rules"] as const;
+
+/**
+ * A table in the instance's document that is drawn from data, never typed:
+ * `archimate-blocks` rewrites the table in `block` and leaves the caption and
+ * anything after the table alone. `--check` fails when the block and the data
+ * disagree, so the table cannot drift.
+ *
+ * - `relationship-rules`: the rules file's `rules`, one row each (source,
+ *   relationship, target, note).
+ * - `relationship-types`: the rules file's `relationships` that carry a
+ *   `meaning`, one row each (icon, name, meaning).
+ */
+export const ArchimateConfigTableSchema = z
+  .object({
+    /** The document block holding the table, relative to the instance root. */
+    block: z
+      .string()
+      .regex(/\.md$/, "a document block, a .md file")
+      .refine((f) => !f.startsWith("/") && !f.split("/").includes(".."), "relative to the instance root, without `..`"),
+    /** What the document calls it, e.g. `Table 3.3`. */
+    label: z.string().min(1),
+    kind: z.enum(ARCHIMATE_TABLE_KINDS),
+    /** The `archimate-relationship-rules/v1` file, relative to the archimate directory. */
+    rules: z
+      .string()
+      .regex(/\.json$/, "a .json file")
+      .refine((f) => !f.startsWith("/") && !f.split("/").includes(".."), "relative to the archimate directory, without `..`"),
+    /** The model whose relationships are checked against the rules (`archimate-blocks --check`). */
+    model: z.string().regex(SEGMENT).optional(),
+  })
+  .strict();
+export type ArchimateConfigTable = z.infer<typeof ArchimateConfigTableSchema>;
 
 export const ArchimateConfigSchema = z
   .object({
@@ -106,6 +151,21 @@ export const ArchimateConfigSchema = z
     models: z.array(ArchimateConfigModelSchema).min(1),
     /** The document's figures that are views of these models. */
     figures: z.array(ArchimateConfigFigureSchema).optional(),
+    /** The document's tables that are drawn from data (`archimate-blocks`). */
+    tables: z.array(ArchimateConfigTableSchema).optional(),
+    /**
+     * How banded views are drawn as posters (`render-poster.ts`): the element
+     * property holding a card's short text, the property that stars a card,
+     * and the words for a star. Absent, the poster defaults apply.
+     */
+    poster: z
+      .object({
+        noteProperty: z.string().min(1).optional(),
+        starProperty: z.string().min(1).optional(),
+        starLabel: z.string().min(1).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((c, ctx) => {
@@ -119,6 +179,11 @@ export const ArchimateConfigSchema = z
       if (!seen.has(f.model)) ctx.addIssue({ code: "custom", path: ["figures", i, "model"], message: `figure "${f.label}" names model "${f.model}", which \`models\` does not declare` });
       if (blocks.has(f.block)) ctx.addIssue({ code: "custom", path: ["figures", i, "block"], message: `block ${f.block} is mapped twice` });
       blocks.add(f.block);
+    }
+    for (const [i, t] of (c.tables ?? []).entries()) {
+      if (t.model !== undefined && !seen.has(t.model)) ctx.addIssue({ code: "custom", path: ["tables", i, "model"], message: `table "${t.label}" names model "${t.model}", which \`models\` does not declare` });
+      if (blocks.has(t.block)) ctx.addIssue({ code: "custom", path: ["tables", i, "block"], message: `block ${t.block} is mapped twice` });
+      blocks.add(t.block);
     }
   });
 export type ArchimateConfig = z.infer<typeof ArchimateConfigSchema>;
@@ -142,88 +207,126 @@ export function layerOf(type: string): ArchimateLayer {
 }
 
 // ── The normalised model ─────────────────────────────────────────────────
+//
+// What `readArchimate` reads a model into, as Zod: the family
+// `archimate-model/v1`, which no file carries. It is DERIVED, held only in
+// memory from an `.archimate` file, and registered (`derived: true` on the
+// `archimate` kind) so the harness UML overview draws Model, Element,
+// Relationship and View from it (owner, 2026-10-31: "rather derived"; smart-ra#166 D2).
 
-export interface ArchimateProperty {
-  key: string;
-  value: string;
-}
-export interface ArchimateElement {
-  id: string;
-  /** The ArchiMate type without Archi's prefix: `ApplicationComponent`. */
-  type: string;
-  name: string;
-  layer: ArchimateLayer;
-  documentation?: string;
-  properties: ArchimateProperty[];
-  /** The folder path it is filed under in the model tree. */
-  folder: string[];
-}
-export interface ArchimateRelationship {
-  id: string;
-  /** The relationship type without prefix or suffix: `Composition`, `Serving`. */
-  type: string;
-  source: string;
-  target: string;
-  name?: string;
-  documentation?: string;
-  /** Access only: `write` (Archi's default), `read`, `access` or `readwrite`. */
-  accessType?: "write" | "read" | "access" | "readwrite";
-  /** Association only. */
-  directed?: boolean;
-  /** Influence only: the strength, e.g. `+` or `--`. */
-  strength?: string;
-  properties: ArchimateProperty[];
-}
+/** The family the normalised model is registered under. Its validator node is cat-harness's `archimate/validators/archimate-model.json`. */
+export const ARCHIMATE_MODEL_TAG = "archimate-model/v1";
+
+export const ArchimatePropertySchema = z.object({ key: z.string(), value: z.string() }).strict().describe("Property");
+export type ArchimateProperty = z.infer<typeof ArchimatePropertySchema>;
+
+export const ArchimateElementSchema = z
+  .object({
+    id: z.string().min(1),
+    /** The ArchiMate type without Archi's prefix: `ApplicationComponent`. */
+    type: z.string().min(1),
+    name: z.string(),
+    layer: z.enum(ARCHIMATE_LAYERS),
+    documentation: z.string().optional(),
+    properties: z.array(ArchimatePropertySchema),
+    /** The folder path it is filed under in the model tree. */
+    folder: z.array(z.string()),
+  })
+  .strict()
+  .describe("Element");
+export type ArchimateElement = z.infer<typeof ArchimateElementSchema>;
+
+export const ArchimateRelationshipSchema = z
+  .object({
+    id: z.string().min(1),
+    /** The relationship type without prefix or suffix: `Composition`, `Serving`. */
+    type: z.string().min(1),
+    /** An element's id, or another relationship's. */
+    source: z.string().min(1),
+    target: z.string().min(1),
+    name: z.string().optional(),
+    documentation: z.string().optional(),
+    /** Access only: `write` (Archi's default), `read`, `access` or `readwrite`. */
+    accessType: z.enum(["write", "read", "access", "readwrite"]).optional(),
+    /** Association only. */
+    directed: z.boolean().optional(),
+    /** Influence only: the strength, e.g. `+` or `--`. */
+    strength: z.string().optional(),
+    properties: z.array(ArchimatePropertySchema),
+  })
+  .strict()
+  .describe("Relationship");
+export type ArchimateRelationship = z.infer<typeof ArchimateRelationshipSchema>;
+
 /** A box on a diagram, its bounds absolute. */
-export interface ArchimateViewNode {
-  id: string;
-  kind: "element" | "group" | "note" | "view-ref";
-  /** The element it shows (`element`), or the view it refers to (`view-ref`). */
-  ref?: string;
-  /** A group's label, or a note's text. */
-  text?: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  /** The diagram object it is drawn inside, if any. */
-  parent?: string;
-  fill?: string;
-  /** Archi's `type="1"`: the element drawn as its figure's alternate. */
-  alternate?: boolean;
-}
+export const ArchimateViewNodeSchema = z
+  .object({
+    id: z.string().min(1),
+    kind: z.enum(["element", "group", "note", "view-ref"]),
+    /** The element it shows (`element`), or the view it refers to (`view-ref`). */
+    ref: z.string().optional(),
+    /** A group's label, or a note's text. */
+    text: z.string().optional(),
+    x: z.number(),
+    y: z.number(),
+    w: z.number(),
+    h: z.number(),
+    /** The diagram object it is drawn inside, if any. */
+    parent: z.string().optional(),
+    fill: z.string().optional(),
+    /** Archi's `type="1"`: the element drawn as its figure's alternate. */
+    alternate: z.boolean().optional(),
+  })
+  .strict()
+  .describe("ViewNode");
+export type ArchimateViewNode = z.infer<typeof ArchimateViewNodeSchema>;
+
 /** A line on a diagram. Its ends are diagram ids — a node's, or another connection's. */
-export interface ArchimateViewConnection {
-  id: string;
-  /** The relationship it shows; absent for a plain line between a note and a box. */
-  relationship?: string;
-  source: string;
-  target: string;
-  /** Archi's relative bendpoints: offsets from the source's and the target's centres. */
-  bendpoints: Array<{ startX: number; startY: number; endX: number; endY: number }>;
-}
-export interface ArchimateView {
-  id: string;
-  name: string;
-  viewpoint?: string;
-  documentation?: string;
-  /** The view's own properties — a `slug` one chooses its page path (`slugs.ts`). */
-  properties: ArchimateProperty[];
-  folder: string[];
-  nodes: ArchimateViewNode[];
-  connections: ArchimateViewConnection[];
-}
-export interface ArchimateModel {
-  id: string;
-  name: string;
-  /** Archi's model `version` attribute — the tool's file version, not the model's. */
-  archiVersion?: string;
-  documentation?: string;
-  properties: ArchimateProperty[];
-  elements: ArchimateElement[];
-  relationships: ArchimateRelationship[];
-  views: ArchimateView[];
-}
+export const ArchimateViewConnectionSchema = z
+  .object({
+    id: z.string().min(1),
+    /** The relationship it shows; absent for a plain line between a note and a box. */
+    relationship: z.string().optional(),
+    source: z.string().min(1),
+    target: z.string().min(1),
+    /** Archi's relative bendpoints: offsets from the source's and the target's centres. */
+    bendpoints: z.array(z.object({ startX: z.number(), startY: z.number(), endX: z.number(), endY: z.number() }).strict()),
+  })
+  .strict()
+  .describe("ViewConnection");
+export type ArchimateViewConnection = z.infer<typeof ArchimateViewConnectionSchema>;
+
+export const ArchimateViewSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string(),
+    viewpoint: z.string().optional(),
+    documentation: z.string().optional(),
+    /** The view's own properties — a `slug` one chooses its page path (`slugs.ts`). */
+    properties: z.array(ArchimatePropertySchema),
+    folder: z.array(z.string()),
+    nodes: z.array(ArchimateViewNodeSchema),
+    connections: z.array(ArchimateViewConnectionSchema),
+  })
+  .strict()
+  .describe("View");
+export type ArchimateView = z.infer<typeof ArchimateViewSchema>;
+
+export const ArchimateModelSchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string(),
+    /** Archi's model `version` attribute — the tool's file version, not the model's. */
+    archiVersion: z.string().optional(),
+    documentation: z.string().optional(),
+    properties: z.array(ArchimatePropertySchema),
+    elements: z.array(ArchimateElementSchema),
+    relationships: z.array(ArchimateRelationshipSchema),
+    views: z.array(ArchimateViewSchema),
+  })
+  .strict()
+  .describe("Model");
+export type ArchimateModel = z.infer<typeof ArchimateModelSchema>;
 
 // ── Reading the bytes ────────────────────────────────────────────────────
 

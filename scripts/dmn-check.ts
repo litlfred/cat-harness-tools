@@ -93,6 +93,8 @@ export async function checkDmn(
 
   for (const [id, where] of seen) {
     if (where.length < 2) continue;
+    // declared-path-literal: the folio content root, the same root the table
+    // check above keys on; the copy inside the folio is the one kept.
     const keep = where.find((w) => w.startsWith("folio/") || w.startsWith("folio\\"));
     for (const w of where) {
       if (w === keep) continue;

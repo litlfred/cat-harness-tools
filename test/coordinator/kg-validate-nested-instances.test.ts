@@ -79,7 +79,7 @@ const isKgQaFile = (rel: string, home: string): boolean =>
  * every reader reads. Nothing is written into the checkout. `storeState` says
  * why the store gave nothing, so an empty sweep names its cause.
  */
-function sidecarsByInstance(): { byInstance: Map<string, Sidecar[]>; storeState: string } {
+function readSidecars(): { byInstance: Map<string, Sidecar[]>; storeState: string } {
   const out = new Map<string, Sidecar[]>();
   const absent: Array<{ key: string; home: string }> = [];
   for (const inst of instanceRootsIn(REPO)) {
@@ -98,7 +98,11 @@ function sidecarsByInstance(): { byInstance: Map<string, Sidecar[]>; storeState:
         if (f.endsWith(".kg-qa.json")) files.push({ path: join(tree, f) });
       }
     }
+    // A home that holds no kg-audit sidecar is read from the store too: another
+    // writer (any test that leaves a sidecar in `test/results/`) can create the
+    // directory without putting a kg-qa file in it.
     if (files.length) out.set(key, files);
+    else absent.push({ key, home: relative(REPO, home).split("\\").join("/") });
   }
   if (absent.length === 0) return { byInstance: out, storeState: "not read: every qa home is in the working copy" };
   // The store is reached the way every reader reaches it: the checkout's
@@ -121,6 +125,12 @@ function sidecarsByInstance(): { byInstance: Map<string, Sidecar[]>; storeState:
     if (files.length) out.set(key, files);
   }
   return { byInstance: out, storeState: `read ${read.key}` };
+}
+
+/** Read once per run: the store read is slow, and two tests share it. */
+let sidecarsRead: ReturnType<typeof readSidecars> | undefined;
+function sidecarsByInstance(): ReturnType<typeof readSidecars> {
+  return (sidecarsRead ??= readSidecars());
 }
 
 describe("kg:validate over nested instances (bean `676g`)", () => {
@@ -151,14 +161,22 @@ describe("kg:validate over nested instances (bean `676g`)", () => {
     // `folio-assistant-core` commits its own — the same relative path, in an
     // instance that is nested, is not the auditor, and does not define the
     // `qa` kind — which is everything the falsifier needs.
+    //
+    // Since bean `7mwa` the core no longer commits test/results/ either, so the
+    // sidecar is read where the sweep below reads it: on disk, or from the
+    // qa-reports store.
     const NESTED = "folio-assistant-core";
     const nested = join(REPO, NESTED, "test/results/kg-qa/scenarios/kg.kg-qa.json");
-    expect(existsSync(nested), "fixture sidecar moved — pick another nested one").toBe(true);
-    expect((await validatePath(nested, HARNESS)).state).toBe("undetermined");
+    const { byInstance, storeState } = sidecarsByInstance();
+    const found = (byInstance.get(NESTED) ?? []).find((f) => resolve(f.path) === resolve(nested));
+    expect(found, `fixture sidecar moved — pick another nested one (qa-reports store: ${storeState})`).toBeDefined();
+    const check = (root: string, schemaRoot?: string) =>
+      found!.text === undefined ? validatePath(nested, root, schemaRoot) : validateText(nested, found!.text, root, schemaRoot);
+    expect((await check(HARNESS)).state).toBe("undetermined");
     // ...and a nested owner with the nested root as SCHEMA root is the second half.
-    expect((await validatePath(nested, join(REPO, NESTED))).state).toBe("undetermined");
-    expect((await validatePath(nested, join(REPO, NESTED), HARNESS)).state).toBe("valid");
-  });
+    expect((await check(join(REPO, NESTED))).state).toBe("undetermined");
+    expect((await check(join(REPO, NESTED), HARNESS)).state).toBe("valid");
+  }, 120_000); // the store read is the sweep's, and as slow
 
   test("every committed kg-audit sidecar, in every instance, validates", async () => {
     const { byInstance, storeState } = sidecarsByInstance();

@@ -392,6 +392,10 @@ export const RULES: Rule[] = [
       "schemas/tools/tool-run.ts",                 // a downstream Tool's run record (bean `fq5u`)
       "schemas/content/withheld.ts",                 // what an instance must not publish — read by the harness mount (bean `mkao`)
       "schemas/tools/tool-types.ts",               // the Tool I/O type vocabulary
+      "schemas/tools/store-tool-results.ts",       // typed results of the data store tools, part of the Tool I/O vocabulary (#1259)
+      "schemas/tools/workflow-tool-results.ts",    // typed results of the workflow engine tools, Tool I/O types (#1259)
+      "schemas/sdlc/harness-state.ts",            // a harness's published state, the HarnessStates Tool I/O type (#1259)
+      "schemas/sdlc/gates-report.ts",             // the gates and check:merged reports, Tool I/O types (#1259)
       "schemas/tools/tool-id.ts",                  // a Tool's id — imported by `tool.ts` and `remote-mount.ts` (cat-harness#581)
       "schemas/kg/repo-full-name.ts",           // `owner/name` — a Tool type AND the declaration's repository (bean `6rmv`)
       "schemas/kg/instance-repositories.ts",    // the derived owner/repo ↔ instance map (bean `6rmv`)
@@ -415,6 +419,7 @@ export const RULES: Rule[] = [
       "schemas/library/outside-software.ts",         // declared-path-literal: a partition plan names modules by path. What a release is OF, with its licence
       "schemas/library/spdx-license-expression.ts",  // declared-path-literal: a partition plan names modules by path. The licence check outside-software runs
       "schemas/content/pinned-terminology.ts",       // declared-path-literal: a partition plan names modules by path. The pinned list shape the licence check reads (bean `7wou`)
+      "schemas/sdlc/read-projections.ts",         // declared-path-literal: a partition plan names modules by path. Projected reads (#1291): instance discovery and the declaration walks report how they use a file
 
       "schemas/kg/property-skills.ts",          // declaration key → its edit skills (issue #1146)
       "schemas/kg/dependency-order.ts",         // the ONE resolve-then-walk: flatten, ancestors, conflicts (bean `a1lq`)

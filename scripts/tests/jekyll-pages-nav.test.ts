@@ -193,3 +193,35 @@ describe("xka5 — order within a level is alphabetical in the reader's locale",
     expect(pageLangOf("<!doctype html><html><head></head><body></body></html>")).toBe("en");
   });
 });
+
+describe("#1261 — Bibliography: … and Tools — … pages fold under one parent", () => {
+  const FAMILY = {
+    "index.md": fm({ title: "Home" }),
+    "bib/w3c.md": fm({ title: "Bibliography: library/w3c" }),
+    "bib/who.md": fm({ title: "Bibliography: library/who" }),
+    "glossary.md": fm({ title: "Glossary" }),
+    "tools/index.md": fm({ title: "Tools" }),
+    "tools/ch.md": fm({ title: "Tools — cat-harness" }),
+    "tools/iris.md": fm({ title: "Tools — who-iris" }),
+    "notes.md": fm({ title: "Note: alone" }),
+  };
+  const { items } = pagesNav(jekyllNavPages(site(FAMILY)), { prefix: "..", here: "/tools/iris.html" });
+  test("one Bibliography and one Tools row; a family of one stays flat", () => {
+    expect(items.map((i) => i.label)).toEqual(["Bibliography", "Glossary", "Home", "Note: alone", "Tools"]);
+  });
+  test("with no Bibliography page, the parent is a label-only fold", () => {
+    const bib = items.find((i) => i.label === "Bibliography")!;
+    expect(bib.href).toBeUndefined();
+    expect(bib.fold).toBe("2 pages");
+    expect(bib.children!.map((i) => [i.label, i.depth, i.href])).toEqual([
+      ["library/w3c", 1, "../bib/w3c.html"],
+      ["library/who", 1, "../bib/who.html"],
+    ]);
+  });
+  test("the Tools page is the parent and keeps its link; the current page stays current inside", () => {
+    const tools = items.find((i) => i.label === "Tools")!;
+    expect(tools.href).toBe("../tools/");
+    expect(tools.children!.map((i) => i.label)).toEqual(["cat-harness", "who-iris"]);
+    expect(tools.children![1]!.current).toBe(true);
+  });
+});

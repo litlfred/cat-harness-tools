@@ -36,6 +36,7 @@ import { buildTermMatrix, keywordsOf, tokenize, type Keyword } from "../pipeline
 import { readStructure } from "../schemas/content/document-structure.ts";
 import { KEYWORDS_FILE, KEYWORDS_SCHEMA_ID, type KeywordsFile, type ScoredKeyword } from "../schemas/library/library-keywords.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { libraryEntryDir, libraryOfEntry } from "./lib/library-entry-graphs.ts";
 export { KEYWORDS_FILE };
 import type { PdfStructure } from "../schemas/ui/pdf-structure.ts";
 import { readLibraryGraph } from "./library-graph.ts";
@@ -65,8 +66,9 @@ export function libraryKeywords(libRoot: string, repoRoot = ROOT): Map<string, K
   // Column indices per entry, and per section id.
   const bySlug = new Map<string, { cols: number[]; sections: Map<string, number> }>();
   units.forEach((u, j) => {
-    const rel = relative(libRel, u.id).split("/");      // <slug>/sections/<id>.md
-    const slug = rel[0];
+    // [<group>/]<slug>/sections/<id>.md — filed in a concern group or not (bean `6fez`).
+    const rel = relative(libRel, u.id).split("/");
+    const slug = rel[rel.length - 3];
     const sid = rel[rel.length - 1].replace(/\.md$/, "");
     const e = bySlug.get(slug) ?? { cols: [] as number[], sections: new Map<string, number>() };
     e.cols.push(j);
@@ -76,7 +78,7 @@ export function libraryKeywords(libRoot: string, repoRoot = ROOT): Map<string, K
   for (const [slug, e] of bySlug) {
     // Headings through the shared accessor (bean rkqp). No structure, or
     // one that will not read, means no heading evidence — never no keywords.
-    const read = readStructure(join(libRoot, slug));
+    const read = readStructure(libraryEntryDir(libRoot, slug) ?? join(libRoot, slug));
     const structure = "reason" in read ? undefined : read;
     const titleOf = new Map<string, string>((structure?.sections ?? []).map((s) => [s.id, s.title]));
     const raw = structure?.variant === "pdf" ? (structure.raw as PdfStructure) : undefined;
@@ -107,14 +109,17 @@ if (import.meta.main) {
   const check = process.argv.includes("--check");
   // Discovery starts from the cat-harness declaration, as gen-library-viz does.
   const g = readLibraryGraph([join(ROOT, "cat-harness"), ROOT], ROOT);
-  const roots = new Set((g?.entries ?? []).map((e) => dirname(join(ROOT, e.dir))));
+  // The LIBRARY each entry is in, not its parent: a filed entry's parent is a
+  // concern group (bean `6fez`), and weighting keywords over one group alone
+  // would change every entry's scores.
+  const roots = new Set((g?.entries ?? []).map((e) => libraryOfEntry(join(ROOT, e.dir))));
   let stale = 0;
   let written = 0;
   let entries = 0;
   for (const root of [...roots].sort()) {
     for (const [slug, kf] of libraryKeywords(root)) {
       entries++;
-      const path = join(root, slug, KEYWORDS_FILE);
+      const path = join(libraryEntryDir(root, slug) ?? join(root, slug), KEYWORDS_FILE);
       const text = JSON.stringify(kf, null, 2) + "\n";
       const same = existsSync(path) && readFileSync(path, "utf8") === text;
       if (same) continue;

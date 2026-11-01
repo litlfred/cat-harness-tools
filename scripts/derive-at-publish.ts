@@ -154,6 +154,7 @@ import {
   type ChurnCause,
   emptyRecords,
   loadWriterRecords,
+  projectedReadsOf,
   readTraceFile,
   saveWriterRecords,
   snapshotPaths,
@@ -508,16 +509,19 @@ if (import.meta.main) {
         return first.outcome.kind === "skipped" ? first : await runWriterAsync(["bun", "run", "cat", w], REPO_ROOT, jobs > 1);
       }
       const digests = new FileDigests(REPO_ROOT);
-      let readSet: ReturnType<typeof readTraceFile> = { undetermined: "not read" };
+      const reached = trace.reached([], STRACE_SEES);
+      const projected = projectedReadsOf(trace.projected(), REPO_ROOT);
+      const readSet = readTraceFile(traceLog, REPO_ROOT, underOutputs(byWriter.get(w) ?? []), (rel) => !declaredOutput(rel), new Set(projected.keys()));
       const rec = writerRecordOf({
         sha: records.sha,
         ran: true,
         before,
         after: writerBase(REPO_ROOT, recScripts, w, digests),
-        reads: (readSet = readTraceFile(traceLog, REPO_ROOT, underOutputs(byWriter.get(w) ?? []), (rel) => !declaredOutput(rel))),
-        reached: trace.reached([], STRACE_SEES),
+        reads: readSet,
+        reached,
         root: REPO_ROOT,
         digests,
+        projected,
       });
       const own = byWriter.get(w) ?? [];
       const snap = "none" in rec ? rec : snapshotPaths(own, Object.keys(rec.outputs), underOutputs(own), declaredOutput);

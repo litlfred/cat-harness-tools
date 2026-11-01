@@ -176,7 +176,10 @@ describe("GUARD 3 — the workflow checks the VALUE, in every job that builds a 
       .filter(([, j]) => (j.steps ?? []).some((s) => /""\|\.\|\.\.(?:\|\*\/\*)?\|_retired\)/.test(s.run ?? "")))
       .map(([n]) => n)
       .sort();
-    expect(refusing).toEqual(["cleanup", "cleanup-dispatch", "stage"]);
+    // The three that write or delete must refuse it. A job that only READS a
+    // path built from the slug may refuse it too (conflict-gate's agent-build
+    // check, folio-assistant#2881): a guard added is not a defect.
+    expect(refusing).toEqual(expect.arrayContaining(["cleanup", "cleanup-dispatch", "stage"]));
   });
 
   test("every `rm -rf` on a slug is in a job whose slug was checked", () => {

@@ -16,8 +16,10 @@
   "licenceSource": "the installed package's own package.json (`license`)",
   "usedBy": [
     "archimate/schemas/archimate.ts",
+    "archimate/schemas/diagrams.ts",
     "schemas/external-registry-contract.test.ts",
     "scripts/tests/report.ts",
-    "src/core/feedback.ts"
+    "src/core/feedback.ts",
+    "src/workflow/diagram-quality.ts"
   ]
 }

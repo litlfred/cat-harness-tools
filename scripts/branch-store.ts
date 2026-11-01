@@ -114,6 +114,7 @@ import "../schemas/kg/folio-graph-typology.js";
 import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.js";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
+import { projectedRead } from "../schemas/sdlc/read-projections.ts";
 import { githubUrlFor, type UrlFor } from "./remote-tree.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
 
@@ -1269,7 +1270,17 @@ export function markerPath(repoRoot: string, key: string): string {
   return join(worktreeGitDir(repoRoot), "branch-mounts", `${key}.json`);
 }
 
-function readMarkerFile(p: string): MountMarker {
+/**
+ * Why a marker is read: `location` when the caller uses only where the mount
+ * lives ({@link MountMarker}'s `$schema`, `id`, `key`, `path` and `into`), which
+ * a recorded writer is then keyed on instead of the whole marker
+ * (`read-projections.ts`: the marker lists a blob per file, so it moves with
+ * every edit to the mount).
+ */
+export type MarkerUse = "location";
+
+function readMarkerFile(p: string, use?: MarkerUse): MountMarker {
+  if (use === "location") projectedRead(p, "mount-location");
   const m = JSON.parse(readFileSync(p, "utf-8")) as MountMarker;
   if (m.$schema !== MOUNT_MARKER_SCHEMA) throw new BranchStoreUsageError(`${p} is not a ${MOUNT_MARKER_SCHEMA} marker`);
   return m;
@@ -1282,10 +1293,10 @@ function readMarkerFile(p: string): MountMarker {
  * caller holding only the id still finds it while it is the only one mounted).
  * Several is ambiguous and refused, never resolved by picking one.
  */
-export function readMarker(repoRoot: string, key: string): MountMarker | undefined {
+export function readMarker(repoRoot: string, key: string, use?: MarkerUse): MountMarker | undefined {
   const p = markerPath(repoRoot, key);
-  if (existsSync(p)) return readMarkerFile(p);
-  const same = allMarkers(repoRoot).filter(({ marker }) => marker.id === key);
+  if (existsSync(p)) return readMarkerFile(p, use);
+  const same = allMarkers(repoRoot, use).filter(({ marker }) => marker.id === key);
   if (same.length > 1) {
     throw new BranchStoreUsageError(`${same.length} mounts have id ${key} (${same.map(({ file }) => file).join(", ")}); name one by its key`);
   }
@@ -1293,13 +1304,13 @@ export function readMarker(repoRoot: string, key: string): MountMarker | undefin
 }
 
 /** Every readable marker in this worktree, with the key it is filed under. Unreadable ones are skipped. */
-function allMarkers(repoRoot: string): Array<{ file: string; marker: MountMarker }> {
+function allMarkers(repoRoot: string, use?: MarkerUse): Array<{ file: string; marker: MountMarker }> {
   const dir = dirname(markerPath(repoRoot, "x"));
   if (!existsSync(dir)) return [];
   const out: Array<{ file: string; marker: MountMarker }> = [];
   for (const n of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
     try {
-      out.push({ file: n.slice(0, -".json".length), marker: readMarkerFile(join(dir, n)) });
+      out.push({ file: n.slice(0, -".json".length), marker: readMarkerFile(join(dir, n), use) });
     } catch {
       // Not ours to judge here: `readMarker` by its name reports it.
     }
@@ -1325,9 +1336,9 @@ export function markerFor(repoRoot: string, loc: Pick<TipLocation, "id" | "key" 
 }
 
 /** The marker of whatever is mounted for the declared, repository-relative `path`, under any key. */
-export function markerAtPath(repoRoot: string, path: string): MountMarker | undefined {
+export function markerAtPath(repoRoot: string, path: string, use?: MarkerUse): MountMarker | undefined {
   const want = path.replace(/^\/+|\/+$/g, "");
-  return allMarkers(repoRoot).find(({ marker }) => marker.path === want)?.marker;
+  return allMarkers(repoRoot, use).find(({ marker }) => marker.path === want)?.marker;
 }
 
 /**
@@ -1804,7 +1815,8 @@ export function contentAt(id: string, repoRoot: string = gitTopLevel()): Content
       if (!at) return { state: "present", dir, via: "checkout" };
       // By PATH first: an id several instances declare is filed under
       // `<instance>.<id>`, and only the path says which of them this is.
-      const m = markerAtPath(repoRoot, repoRelative(repoRoot, d.absPath)) ?? readMarker(repoRoot, id);
+      // Only where the mount lives is used: `resolveMarkerInto` reads `id`, `key` and `into`.
+      const m = markerAtPath(repoRoot, repoRelative(repoRoot, d.absPath), "location") ?? readMarker(repoRoot, id, "location");
       if (m) {
         const resolved = resolveMarkerInto(repoRoot, m);
         if (resolved.ok) return { state: "present", dir: resolved.abs, via: "mount" };

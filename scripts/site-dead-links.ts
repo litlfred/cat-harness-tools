@@ -60,13 +60,20 @@ export const TRANSLATED_LOCALES: ReadonlySet<string> = new Set(UN_LOCALES.filter
 const SKIP_DIRS = new Set([".git", "node_modules", "_site", "_docs", ".jekyll-cache", ".bundle", "vendor"]);
 
 const ATTR = /\s(href|src)="([^"]*)"/g;
+/**
+ * Non-markup spans (`<script>`, `<style>`, `<code>`, `<pre>`) matched ahead of
+ * `ATTR` so escaped HTML examples (`<code>&lt;img src="x.svg"&gt;</code>`) and
+ * script template strings (`<a href="/api/pdf">`) are not read as links, while
+ * `<script src="…">` on the opening tag still is.
+ */
+const NON_LINK_OR_ATTR = /<(style|code|pre)\b[^>]*>[\s\S]*?<\/\1>|<script\b([^>]*)>([\s\S]*?)<\/script>|\s(href|src)="([^"]*)"/gi;
 
 /** A link this check owns: internal, and not an anchor, a script URL or unrendered Liquid. */
 export function isInternal(value: string): boolean {
   if (value === "" || value.startsWith("#") || value.startsWith("//")) return false;
   if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return false;
-  // Unrendered Liquid, and a script's template literal caught by the attribute pattern.
-  if (value.includes("{{") || value.includes("{%") || value.includes("${")) return false;
+  // Unrendered Liquid, a script's template literal, or a prose ellipsis placeholder (`[id](…)`).
+  if (value.includes("{{") || value.includes("{%") || value.includes("${") || value.includes("…")) return false;
   // A script's string concatenation caught by the attribute pattern:
   // `'<a href="' + esc(r.page) + '">'` yields the value `' + esc(r.page) + '`.
   if (/'\s*\+|\+\s*'/.test(value)) return false;
@@ -241,14 +248,36 @@ export function repointFor(
   target: string,
   resolveSource: (rel: string) => string | undefined,
 ): { to: string; why: Repoint["why"] } | undefined {
+  // A directory link (`architecture/`) whose section page is published as a
+  // sibling `.html` (`architecture.html`, as `readme:subgraphs` tables write it).
+  if (target.endsWith("/")) {
+    const flat = `${target.replace(/\/+$/, "")}.html`;
+    if (served(site, flat)) {
+      return { to: posix.relative(posix.dirname(page), flat) || posix.basename(flat), why: "locale" };
+    }
+  }
   const plain = withoutLocale(target);
   if (plain !== undefined && served(site, plain)) {
     const rel = posix.relative(posix.dirname(page), plain) || ".";
     return { to: target.endsWith("/") && !rel.endsWith("/") ? `${rel}/` : rel, why: "locale" };
   }
+  // declared-path-literal: `docs/` here is the PUBLISHED SITE's URL layout,
+  // not the harness's declared `docs` directory, so no declaration answers it.
+  // A page published under `docs/<instance>/<chapter>/…` sits in `<instance>/docs/<chapter>/…`
+  // in its checkout (the outer two segments reversed by the permalink rule), so a
+  // `../../<tail>` link that landed at `docs/<tail>` addressed `<instance>/<tail>`.
+  const inst = /^docs\/([^/]+)\//.exec(page)?.[1];
+  const instScoped =
+    inst !== undefined && target.startsWith("docs/") && !target.startsWith(`docs/${inst}/`)
+      ? `${inst}/${target.slice("docs/".length)}`
+      : undefined;
   // A missing translation of a page the site does not publish at all: its
   // source, in the language it was written in.
-  for (const candidate of plain === undefined ? [target] : [target, plain]) {
+  const candidates = [
+    ...(plain === undefined ? [target] : [target, plain]),
+    ...(instScoped === undefined ? [] : [instScoped]),
+  ];
+  for (const candidate of candidates) {
     const url = resolveSource(candidate);
     if (url !== undefined) return { to: url, why: "source" };
   }
@@ -282,7 +311,7 @@ export function checkSite(opts: {
     const file = join(opts.site, page);
     const html = readFileSync(file, "utf-8");
     let changed = false;
-    const next = html.replace(ATTR, (whole, attr: string, value: string) => {
+    const visitAttr = (whole: string, attr: string, value: string): string => {
       if (!isInternal(value)) return whole;
       const target = targetOf(page, value, opts.basePath);
       if (target === undefined || served(opts.site, target) || carried(target)) return whole;
@@ -297,7 +326,17 @@ export function checkSite(opts: {
       }
       dead.push({ page, value, target });
       return whole;
-    });
+    };
+    const next = html.replace(
+      NON_LINK_OR_ATTR,
+      (whole, _skipTag: string | undefined, scriptAttrs: string | undefined, scriptBody: string | undefined, attr: string | undefined, value: string | undefined) => {
+        if (attr !== undefined && value !== undefined) return visitAttr(whole, attr, value);
+        if (scriptAttrs !== undefined) {
+          return `<script${scriptAttrs.replace(ATTR, visitAttr)}>${scriptBody ?? ""}</script>`;
+        }
+        return whole;
+      },
+    );
     if (changed) writeFileSync(file, next);
   }
   return { dead, repointed, pages: pages.length };

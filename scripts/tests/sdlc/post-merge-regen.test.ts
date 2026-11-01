@@ -14,8 +14,10 @@ import {
   builtAtPublishIn,
   checkPostMergeRegen,
   FIXITY_CHECKS,
+  inTargetScope,
   missingPrerequisiteWriters,
   postMergePairs,
+  publishTimeDeclarations,
   resolveRepoRoot,
   treeMoveTracker,
   type GhExecutor,
@@ -740,6 +742,93 @@ describe("builtAtPublish outputs are never stale (bean folio-assistant-p7mb)", (
       expect(report.status).toBe("unrepaired");
       expect(report.unrepairedChecks).toEqual(["broken:check"]);
       expect(writerCalls).toBe(1);
+    } finally {
+      done();
+    }
+  });
+  test("publishTimeDeclarations includes off-checkout storage directories (e.g. test/results/ on qa-reports)", () => {
+    const decls = publishTimeDeclarations(REPO);
+    expect(builtAtPublishIn("cat-harness/test/results/check.qa-results.json", decls, REPO)).toBe(true);
+    expect(builtAtPublishIn("cat-harness/site/index.html", decls, REPO)).toBe(true);
+    expect(builtAtPublishIn("cat-harness/README.md", decls, REPO)).toBe(false);
+  });
+
+  test("index scoping (bean ksek): in an index checkout with remote mounts, writers that only touch remote mounts are classified as builtAtPublishChecks and open no PR", async () => {
+    const { repo, decls, done } = scratch();
+    try {
+      mkdirSync(join(repo, "mounted-layer"), { recursive: true });
+      writeFileSync(join(repo, "mounted-layer/layer.txt"), "before\n");
+      writeFileSync(join(repo, "README.md"), "index-readme\n");
+      writeFileSync(
+        join(repo, "index.lock.json"),
+        JSON.stringify({
+          $schema: "cat-harness-mount-lock/v1",
+          mounts: [
+            {
+              harness: "mounted-layer",
+              repository: "litlfred/mounted-layer",
+              ref: "0000000000000000000000000000000000000001",
+            },
+          ],
+          instances: [
+            {
+              instance: "mounted-layer",
+              repository: "litlfred/mounted-layer",
+              sha: "0000000000000000000000000000000000000001",
+              upstreamRoot: "",
+              path: "mounted-layer",
+              via: "mounted-layer",
+              pinnedBy: "declared",
+              declaration: {
+                file: "mounted-layer.json",
+                sha256: "0000000000000000000000000000000000000000000000000000000000000001",
+              },
+              directories: [
+                {
+                  id: "*",
+                  path: "mounted-layer",
+                  upstreamPath: ".",
+                  treeDigest: "0000000000000000000000000000000000000000000000000000000000000002",
+                  files: 1,
+                },
+              ],
+            },
+          ],
+        }),
+      );
+
+      const scope = inTargetScope(repo);
+      expect(scope("mounted-layer/layer.txt")).toBe(false);
+      expect(scope("README.md")).toBe(true);
+
+      let layerRepaired = false;
+      const runner: Runner = (script) => {
+        if (script === "kind:register:check") return layerRepaired;
+        if (script === "kind:register") {
+          writeFileSync(join(repo, "mounted-layer/layer.txt"), "after\n");
+          layerRepaired = true;
+          return true;
+        }
+        return true;
+      };
+
+      const report = await checkPostMergeRegen({
+        repoRoot: repo,
+        pairs: [{ check: "kind:register:check", writer: "kind:register" }],
+        runner,
+        tracker: treeMoveTracker(repo, decls),
+        git: quietGit([]),
+        gh: noPr,
+        createPr: true,
+      });
+
+      expect(report.status).toBe("clean");
+      expect(report.staleChecks).toEqual([]);
+      expect(report.repairedChecks).toEqual([]);
+      expect(report.builtAtPublishChecks).toEqual(["kind:register:check"]);
+      expect(report.changedFiles).toEqual([]);
+      expect(report.prOpened).toBe(false);
+      expect(report.exitCode).toBe(0);
     } finally {
       done();
     }

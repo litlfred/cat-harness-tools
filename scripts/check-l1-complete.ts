@@ -108,7 +108,7 @@ import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "../schemas/
 import { corpusDirectoriesForGraph, instanceConfigFor } from "../schemas/kg/harness-config.js";
 import { instanceDirectoryForGraph } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { entrySubgraphDirs, nonEntryDirs } from "./lib/library-entry-graphs.ts";
+import { entrySubgraphDirs, libraryEntryDirs, nonEntryDirs } from "./lib/library-entry-graphs.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.ts";
 
 export type State = "met" | "unmet" | "not-derivable";
@@ -1677,21 +1677,21 @@ export function checkAll(root: string): EntryReport[] | undefined {
   noteAbsent(presence.absent, "a library");
   for (const lib of presence.present) {
     const others = nonEntryDirs(lib);
-    for (const d of readdirSync(lib).sort()) {
-      if (!statSync(join(lib, d)).isDirectory()) continue;
+    // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`).
+    for (const { slug: d, dir } of libraryEntryDirs(lib)) {
       // Another kind's directory kept in the library is not an entry.
-      if (others.has(join(lib, d))) continue;
+      if (others.has(dir)) continue;
       const prior = seen.get(d);
       if (prior !== undefined) {
         throw new Error(
-          `slug "${d}" appears in two libraries — ${prior} and ${join(lib, d)}. ` +
+          `slug "${d}" appears in two libraries — ${prior} and ${dir}. ` +
             `The committed verdict is keyed on the slug alone, so one would silently ` +
             `overwrite the other. Rename one.`,
         );
       }
-      seen.set(d, join(lib, d));
+      seen.set(d, dir);
       out.push({
-        ...checkEntry(join(lib, d)),
+        ...checkEntry(dir),
         library: libs.length > 1 ? relative(root, lib) : undefined,
       });
     }

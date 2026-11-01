@@ -103,6 +103,16 @@ export const ScriptNameSchema = z
   .describe("A package script name");
 
 import { RepoFullNameSchema } from "../kg/repo-full-name.js";
+import { BeanClaimCheckSchema, BeanQueryRowsSchema, DrainQueueSchema, OpenWorkLookupSchema, SessionSweepSchema } from "./store-tool-results.js";
+import { HarnessStatesSchema } from "../sdlc/harness-state.js";
+import { GatesReportTypeSchema, MergedGatesReportTypeSchema } from "../sdlc/gates-report.js";
+import {
+  WorkflowCompletionSchema,
+  WorkflowGateAnswerSchema,
+  WorkflowListingSchema,
+  WorkflowPositionSchema,
+  WorkflowStartedSchema,
+} from "./workflow-tool-results.js";
 export { RepoFullNameSchema };
 
 /** A pull/merge request number. */
@@ -792,6 +802,20 @@ export const TOOL_TYPES = {
   Port: PortSchema,
   DecisionFacts: DecisionFactsSchema,
   ProvActivity: ProvActivitySchema,
+  // The data store tools' typed results (owner, 2026-11-01, Q-DS-10 A).
+  BeanClaimCheck: BeanClaimCheckSchema,
+  DrainQueue: DrainQueueSchema,
+  OpenWorkLookup: OpenWorkLookupSchema,
+  SessionSweep: SessionSweepSchema,
+  BeanQueryRows: BeanQueryRowsSchema,
+  HarnessStates: HarnessStatesSchema,
+  WorkflowListing: WorkflowListingSchema,
+  WorkflowStarted: WorkflowStartedSchema,
+  WorkflowPosition: WorkflowPositionSchema,
+  WorkflowGateAnswer: WorkflowGateAnswerSchema,
+  WorkflowCompletion: WorkflowCompletionSchema,
+  GatesReport: GatesReportTypeSchema,
+  MergedGatesReport: MergedGatesReportTypeSchema,
 } as const;
 
 export type ToolTypeName = keyof typeof TOOL_TYPES;

@@ -131,7 +131,8 @@
     var out = [];
     if (v.viewpoint) out.push(el("p", { class: "am-type" }, ["Viewpoint: " + typeLabel(v.viewpoint)]));
     if (v.documentation) out.push(text(v.documentation));
-    out.push(el("div", { class: "am-figure" }, [
+    // A `bpmn-figure`, so docs-ui.js gives it the zoom, pan, full-width and copy controls every other figure has.
+    out.push(el("figure", { class: "bpmn-figure am-figure" }, [
       el("object", { data: cfg.svg, type: "image/svg+xml", "aria-label": v.name }, [el("a", { href: cfg.svg }, ["The drawing of " + v.name])]),
     ]));
     var shown = Object.keys(m.inViews).filter(function (id) { return ix.el[id] && m.inViews[id].indexOf(v.id) >= 0; });

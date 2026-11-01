@@ -495,6 +495,24 @@ const ICON = 22;
 const MARKER = 18;
 
 /**
+ * Pairs of steps drawn on top of each other. A boundary event on its task,
+ * and a step inside the sub-process that holds it, do not count.
+ */
+export function shapeOverlaps(di: DiLayout): [string, string][] {
+  const out: [string, string][] = [];
+  const ids = [...di.shapes.keys()];
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      const a = di.shapes.get(ids[i]!)!, c = di.shapes.get(ids[j]!)!;
+      if (holds(a, c) || holds(c, a)) continue;
+      if ([ids[i]!, ids[j]!].some((x) => di.kinds?.get(x) === "boundaryEvent")) continue;
+      if (boxesOverlap(a, c, 2)) out.push([ids[i]!, ids[j]!]);
+    }
+  }
+  return out;
+}
+
+/**
  * The one size every task box is drawn at: square, so a name sits clear of
  * the type icon and the [+] marker without the box growing to fit it (owner,
  * 2026-11-01: *"i want the boxes to be fixed size. just make them
@@ -522,10 +540,11 @@ export function offSizeTasks(xml: string): string[] {
 /**
  * Draw every task box at {@link TASK_SIZE}, about its centre (smaller boxes
  * grow, bigger ones shrink), then let {@link resizeShapes} make room in the
- * columns and lanes and re-route the flows that touch them.
+ * columns and lanes and re-route the flows that touch them. `only` limits it
+ * to those tasks.
  */
-export function fixTaskSize(xml: string): { xml: string; fixed: string[] } {
-  const ids = new Set(offSizeTasks(xml));
+export function fixTaskSize(xml: string, only?: ReadonlySet<string>): { xml: string; fixed: string[] } {
+  const ids = new Set(offSizeTasks(xml).filter((id) => !only || only.has(id)));
   if (ids.size === 0) return { xml, fixed: [] };
   const next = xml.replace(/(<(?:\w+:)?BPMNShape\b[^>]*\sbpmnElement="([^"]+)"[^>]*>\s*<(?:\w+:)?Bounds\s)x="([\d.-]+)"\s+y="([\d.-]+)"\s+width="([\d.]+)"\s+height="([\d.]+)"/g,
     (all, pre: string, id: string, xs: string, ys: string, ws: string, hs: string) => {
@@ -1014,16 +1033,8 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
   for (const [a, b] of crossings(di)) {
     out["edge-crossing"]!.push({ where: `${a}×${b}`, detail: `flows ${a} and ${b} cross. Re-route one around the other, move a step, or swap lanes (\`bpmn:detangle\`).` });
   }
-  const ids = [...di.shapes.keys()];
-  for (let i = 0; i < ids.length; i++) {
-    for (let j = i + 1; j < ids.length; j++) {
-      const a = di.shapes.get(ids[i]!)!, c = di.shapes.get(ids[j]!)!;
-      if (holds(a, c) || holds(c, a)) continue;
-      if ([ids[i]!, ids[j]!].some((x) => di.kinds?.get(x) === "boundaryEvent")) continue;
-      if (boxesOverlap(a, c, 2)) {
-        out["shape-overlap"]!.push({ where: `${ids[i]}+${ids[j]}`, detail: `${q(di.names.get(ids[i]!) ?? ids[i]!)} and ${q(di.names.get(ids[j]!) ?? ids[j]!)} are drawn on top of each other. Move one.` });
-      }
-    }
+  for (const [a, b] of shapeOverlaps(di)) {
+    out["shape-overlap"]!.push({ where: `${a}+${b}`, detail: `${q(di.names.get(a) ?? a)} and ${q(di.names.get(b) ?? b)} are drawn on top of each other. Move one.` });
   }
   for (const [eid, sid] of edgesThroughShapes(di)) {
     out["edge-through-shape"]!.push({

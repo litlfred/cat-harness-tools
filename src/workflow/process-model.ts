@@ -48,6 +48,12 @@ const ACTIVITY_TYPES = [
   "bpmn:Task",
   "bpmn:UserTask",
   "bpmn:ServiceTask",
+  // A send or receive task is a performed step whose work is a message: the
+  // walk is exactly a Task's (one token in, one out). Who may fulfil it is not
+  // constrained, as for `bpmn:Task` (`fulfilmentKindsForBpmnType`). A DAK's
+  // business processes use both (smart-trust onboarding, 2026-11-01).
+  "bpmn:SendTask",
+  "bpmn:ReceiveTask",
   "bpmn:CallActivity",
 ] as const;
 
@@ -59,6 +65,42 @@ const SUPPORTED = new Set<string>([
   "bpmn:SequenceFlow",
   ...ACTIVITY_TYPES,
 ]);
+
+/**
+ * Elements that hold data rather than being steps: a store (`dataStoreReference`,
+ * pointing at a `bpmn:dataStore`) and a document passed between steps
+ * (`dataObjectReference` and its `dataObject`).
+ *
+ * Read, not refused, and never walked. A store is not a lane (owner,
+ * 2026-11-01, Q-BR-3 A): the work plan, a corpus or an activity log is a
+ * `dataStoreReference`, and the steps that read or write it say so with data
+ * associations. Leaving one out of the walk omits no step, because it is not
+ * one; what it says is kept on {@link ProcessModel.dataStores} and on each
+ * step's {@link ProcessNode.reads} and {@link ProcessNode.writes}.
+ */
+const DATA_TYPES = new Set<string>(["bpmn:DataStoreReference", "bpmn:DataObjectReference", "bpmn:DataObject"]);
+
+/**
+ * One store or data object drawn in a process.
+ *
+ * `store` is the id of the `bpmn:dataStore` the reference points at, which is
+ * the store's Role id (`work-plan`, `corpus`, `log`, `session-record`, …), the
+ * same id a lane's `partitionElementRef` uses. It may be declared in the same
+ * file or in an instance's shared stores file; when it is declared nowhere in
+ * this file, moddle leaves the reference unset and the id comes from the
+ * tolerated warning, exactly as for a lane (`partitionTolerated`).
+ */
+export interface DataStoreUse {
+  /** The reference's own id in this diagram. */
+  id: string;
+  /** `bpmn:DataStoreReference` or `bpmn:DataObjectReference`. */
+  type: string;
+  name?: string;
+  /** The store id (a data store reference's `dataStoreRef`); absent for a data object. */
+  store?: string;
+  /** False when the store is not declared as a `bpmn:dataStore` in this file. */
+  storeDeclared?: boolean;
+}
 
 export type NodeKind = "start" | "end" | "activity" | "exclusive" | "parallel";
 
@@ -340,6 +382,14 @@ export interface ProcessNode {
   /** True when `<cat-harness.processes:bean/>` marks this step as touching the work plan. */
   touchesWorkPlan: boolean;
   /**
+   * What this step reads, from its `dataInputAssociation`s whose source is a
+   * data store or data object: the store id for a store, the reference id for
+   * a data object. Empty when it reads nothing drawn.
+   */
+  reads: string[];
+  /** What this step writes, from its `dataOutputAssociation`s, named as in {@link reads}. */
+  writes: string[];
+  /**
    * `op` on `<cat-harness.processes:bean/>`: what this step does to the bean — `claim`, `note`
    * or `resolve`. Absent means the step touches the plan in some way the tools
    * do not perform automatically.
@@ -442,8 +492,16 @@ export function holdsProcess(xml: string): boolean {
  * 2026-10-20, "a1").
  */
 export function isGlobalTasksFile(xml: string): boolean {
-  return !holdsProcess(xml) && new RegExp(GLOBAL_TASK_ELEMENT.source).test(xml);
+  return !holdsProcess(xml) && (new RegExp(GLOBAL_TASK_ELEMENT.source).test(xml) || DATA_STORE_ELEMENT.test(xml));
 }
+
+/**
+ * A global `bpmn:dataStore`: a store declared once for an instance, which
+ * processes point at with a `dataStoreReference` (owner, 2026-11-01, Q-DS-3 A).
+ * A file of them and no process is shared like a global-tasks file, and may be
+ * the same file.
+ */
+export const DATA_STORE_ELEMENT = /<(?:[\w.-]+:)?dataStore\b[^>]*?\sid="([^"]+)"/;
 
 /**
  * The `.bpmn` files among `files` that hold a process: every one but a
@@ -613,9 +671,37 @@ export interface Precondition {
  */
 export type PreconditionVerdict = "satisfied" | "unsatisfied" | "could-not-determine";
 
+/**
+ * An element a VIEW load read past: a BPMN type the interpreter does not
+ * run, kept so a viewer names it rather than dropping it silently.
+ */
+export interface NotRunElement {
+  id: string;
+  type: string;
+  name?: string;
+  /** For a boundary event, the activity it sits on. */
+  attachedTo?: string;
+}
+
+/**
+ * How {@link loadProcessModel} reads a diagram. `view: true` is for a viewer
+ * that DRAWS a process and runs nothing (`gen-processes-viz.ts`): an element
+ * type the interpreter does not run is listed on {@link ProcessModel.notRun},
+ * with the sequence flows that touch it, instead of refusing the file. The
+ * engine never loads in view mode, so it still refuses to run such a diagram.
+ */
+export interface LoadOptions {
+  view?: boolean;
+}
+
 export interface ProcessModel {
   /** `bpmn:process/@id`, e.g. `Process_Editing`. */
   id: string;
+  /**
+   * Present only on a view load ({@link LoadOptions}) that met elements the
+   * interpreter does not run: what the diagram shows that a run would not do.
+   */
+  notRun?: NotRunElement[];
   name: string;
   /** File this was read from, for error messages and provenance. */
   source: string;
@@ -679,6 +765,11 @@ export interface ProcessModel {
    * are performed in; it is not itself a Role (owner, 2026-10-16).
    */
   lanes: LaneDef[];
+  /**
+   * The stores and data objects drawn in the process, in document order. A
+   * store is drawn, not given a lane (owner, 2026-11-01, Q-BR-3 A).
+   */
+  dataStores: DataStoreUse[];
   /** Every start event, in document order. */
   startNodes: string[];
   /**
@@ -1253,11 +1344,18 @@ interface ModdleElement {
   ioSpecification?: { dataInputs?: { id: string; name?: string }[] };
   /** A call's `dataInputAssociation`s: an `assignment` gives a declared input its value. */
   dataInputAssociations?: {
-    targetRef?: { id?: string };
-    /** A process input this association passes on, in a process that declares inputs. */
+    /**
+     * A process input this association passes on (in a process that declares
+     * inputs), or a data store or data object it reads rather than assigning a value.
+     */
     sourceRef?: { id?: string }[];
+    targetRef?: { id?: string };
     assignment?: { from?: { body?: string }; to?: { body?: string } }[];
   }[];
+  /** A step's `dataOutputAssociation`s: each writes to the data store or data object it targets. */
+  dataOutputAssociations?: { id?: string; targetRef?: { id?: string } }[];
+  /** A data store reference's `dataStoreRef`, resolved by moddle when the file declares the store. */
+  dataStoreRef?: { id?: string };
   sourceRef?: { id: string };
   targetRef?: { id: string };
   flowElements?: ModdleElement[];
@@ -1711,14 +1809,20 @@ function callInputs(
   const nameOf = new Map((call.ioSpecification?.dataInputs ?? []).map((d) => [d.id, d.name ?? d.id]));
   const given: Record<string, string> = {};
   for (const a of call.dataInputAssociations ?? []) {
+    const source = a.sourceRef?.[0]?.id;
     const target = a.targetRef?.id;
+    if (a.sourceRef?.length && (source === undefined || !processInputs.has(source))) {
+      // An input of the call that names a source which is no input of this process.
+      if (processInputs.size && target !== undefined && nameOf.has(target) && !a.assignment?.length) {
+        throw new UnsupportedBpmn(`${where}: input "${nameOf.get(target)}" passes on ${source ?? "nothing"}, which is not an input this process declares`);
+      }
+      // A read from a drawn store is not an input assignment (`dataOf` below).
+      continue;
+    }
     const name = target === undefined ? undefined : nameOf.get(target);
     if (name === undefined) throw new UnsupportedBpmn(`${where}: a dataInputAssociation targets ${target ?? "nothing"}, which is not one of the call's own dataInputs`);
-    const source = a.sourceRef?.[0]?.id;
     if (source !== undefined) {
-      const passed = processInputs.get(source);
-      if (passed === undefined) throw new UnsupportedBpmn(`${where}: input "${name}" passes on ${source}, which is not an input this process declares`);
-      given[name] = `{${passed}}`;
+      given[name] = `{${processInputs.get(source)!}}`;
       continue;
     }
     const value = a.assignment?.[0]?.from?.body;
@@ -1793,14 +1897,23 @@ function asSharedStep(
 export function partitionTolerated(raw: readonly unknown[]): {
   warnings: unknown[];
   unresolvedPartitions: Map<string, string>;
+  /** Data store reference id → the store id it names but this file does not declare. */
+  unresolvedDataStores: Map<string, string>;
 } {
   const warnings: unknown[] = [];
   const unresolvedPartitions = new Map<string, string>();
+  const unresolvedDataStores = new Map<string, string>();
   for (const w of raw) {
     const ww = w as { message?: string; property?: string; value?: unknown; element?: { $type?: string; id?: string } };
     const unresolved = typeof ww.message === "string" && ww.message.startsWith("unresolved reference");
     if (unresolved && ww.property === "bpmn:partitionElementRef" && ww.element?.$type === "bpmn:Lane" && typeof ww.value === "string") {
       if (ww.element.id) unresolvedPartitions.set(ww.element.id, ww.value);
+      continue;
+    }
+    // A store declared once for the instance, not in this file: the same
+    // tolerance a lane's role gets, for the same reason (owner, 2026-11-01).
+    if (unresolved && ww.property === "bpmn:dataStoreRef" && ww.element?.$type === "bpmn:DataStoreReference" && typeof ww.value === "string") {
+      if (ww.element.id) unresolvedDataStores.set(ww.element.id, ww.value);
       continue;
     }
     if (
@@ -1814,7 +1927,7 @@ export function partitionTolerated(raw: readonly unknown[]): {
     }
     warnings.push(w);
   }
-  return { warnings, unresolvedPartitions };
+  return { warnings, unresolvedPartitions, unresolvedDataStores };
 }
 
 export async function loadProcessModel(
@@ -1828,10 +1941,11 @@ export async function loadProcessModel(
    * load, so a test that rewrites a fixture still sees its own disk.
    */
   homes: Map<string, { own?: Map<string, string>; dep?: Map<string, string>; globals?: Map<string, string> }> = new Map(),
+  opts: LoadOptions = {},
 ): Promise<ProcessModel> {
   const parsed = await sharedModdle.fromXML(readFileSync(bpmnPath, "utf-8"));
   const { rootElement } = parsed;
-  const { warnings, unresolvedPartitions } = partitionTolerated(parsed.warnings);
+  const { warnings, unresolvedPartitions, unresolvedDataStores } = partitionTolerated(parsed.warnings);
   normaliseOwnExtensions(rootElement);
   if (warnings.length > 0) {
     throw new UnsupportedBpmn(
@@ -1843,7 +1957,7 @@ export async function loadProcessModel(
   const defs = rootElement as unknown as ModdleElement;
   const proc = (defs.rootElements ?? []).find((e) => e.$type === "bpmn:Process");
   if (!proc) {
-    if ((defs.rootElements ?? []).some((e) => e.$type in GLOBAL_TASK_TYPES)) {
+    if ((defs.rootElements ?? []).some((e) => e.$type in GLOBAL_TASK_TYPES || e.$type === "bpmn:DataStore")) {
       throw new GlobalTasksFile(
         `${basename(bpmnPath)}: holds no bpmn:Process — it is a layer's shared global tasks, read through the ` +
           `call activities that call them (isGlobalTasksFile)`,
@@ -1861,12 +1975,69 @@ export async function loadProcessModel(
   // Interrupting the main path is not modelled here: the engine has no token
   // to cancel until it does, and claiming it would be a guess.
   const eventSubOf = new Map<string, string>();
-  const elements = (proc.flowElements ?? []).flatMap((e) => {
+  const allElements = (proc.flowElements ?? []).flatMap((e) => {
     if (e.$type !== "bpmn:SubProcess" || !(e as { triggeredByEvent?: boolean }).triggeredByEvent) return [e];
     const inner = e.flowElements ?? [];
     for (const c of inner) eventSubOf.set(c.id, e.id);
     return inner;
   });
+  // Stores and data objects are read here and never walked (DATA_TYPES).
+  const walked = allElements.filter((e) => !DATA_TYPES.has(e.$type));
+  // A VIEW load lists what the interpreter does not run, and the flows that
+  // touch it, instead of refusing; a run load refuses below, as it always did.
+  const notRunEls = opts.view ? walked.filter((e) => !SUPPORTED.has(e.$type)) : [];
+  const notRunIds = new Set(notRunEls.map((e) => e.id));
+  const elements = walked.filter(
+    (e) =>
+      !notRunIds.has(e.id) &&
+      !(e.$type === "bpmn:SequenceFlow" && (notRunIds.has(e.sourceRef?.id ?? "") || notRunIds.has(e.targetRef?.id ?? ""))),
+  );
+  const notRun: NotRunElement[] = notRunEls.map((e) => {
+    const on = (e as { attachedToRef?: { id?: string } }).attachedToRef?.id;
+    return { id: e.id, type: e.$type, ...(cleanName(e.name) ? { name: cleanName(e.name) } : {}), ...(on ? { attachedTo: on } : {}) };
+  });
+  const dataStores: DataStoreUse[] = allElements
+    .filter((e) => e.$type === "bpmn:DataStoreReference" || e.$type === "bpmn:DataObjectReference")
+    .map((e) => {
+      const unresolvedStore = unresolvedDataStores.get(e.id);
+      const store = e.$type === "bpmn:DataStoreReference" ? (e.dataStoreRef?.id ?? unresolvedStore) : undefined;
+      return {
+        id: e.id,
+        type: e.$type,
+        ...(cleanName(e.name) ? { name: cleanName(e.name) } : {}),
+        ...(store !== undefined ? { store, storeDeclared: e.dataStoreRef?.id !== undefined } : {}),
+      };
+    });
+  const dataNameOf = new Map(dataStores.map((d) => [d.id, d.store ?? d.id]));
+  // A reference with no dataStoreRef names no store: refused, because the
+  // store is the one fact the drawing exists to say.
+  const unnamed = dataStores.filter((d) => d.type === "bpmn:DataStoreReference" && d.store === undefined);
+  if (unnamed.length) {
+    throw new UnsupportedBpmn(
+      `${basename(bpmnPath)}: data store reference(s) ${unnamed.map((d) => d.id).join(", ")} name no store. ` +
+        `Give each a dataStoreRef: the store's Role id, e.g. dataStoreRef="work-plan".`,
+    );
+  }
+  const dataOf = (el: ModdleElement, dir: "reads" | "writes"): string[] => {
+    const ends =
+      dir === "reads"
+        ? (el.dataInputAssociations ?? [])
+            .flatMap((a) => (a.sourceRef ?? []).map((r) => r.id))
+            // A process input passed on to a step is not a store read (callInputs).
+            .filter((id) => id === undefined || !processInputs.has(id))
+        : (el.dataOutputAssociations ?? []).map((a) => a.targetRef?.id);
+    return ends.map((id) => {
+      const name = id === undefined ? undefined : dataNameOf.get(id);
+      if (name === undefined) {
+        throw new UnsupportedBpmn(
+          processInputs.size && dir === "reads"
+            ? `${basename(bpmnPath)}: ${el.id} passes on ${id ?? "nothing"}, which is not an input this process declares, nor a data store or data object drawn in it`
+            : `${basename(bpmnPath)}: ${el.id} ${dir} ${id ?? "nothing"}, which is not a data store or data object drawn in this process`,
+        );
+      }
+      return name;
+    });
+  };
 
   // Refuse before building anything, so the error names every offender at once
   // rather than one per re-run.
@@ -2038,6 +2209,8 @@ export async function loadProcessModel(
         adjudicationDefersOf(el, adjudicationDeclOf(ext, el.id), fulfilmentOf(ext, el.id)) ||
         undefined,
       touchesWorkPlan: ext.some((v) => v.$type === "folio:bean"),
+      reads: dataOf(raw, "reads"),
+      writes: dataOf(raw, "writes"),
       workPlanOp: readWorkPlanOp(el.id, ext),
       beanRef: (ext.find((v) => v.$type === "folio:bean" && (v.ref || v.id || v.bean))?.ref ??
         ext.find((v) => v.$type === "folio:bean" && (v.ref || v.id || v.bean))?.id ??
@@ -2298,7 +2471,7 @@ export async function loadProcessModel(
       (here.own ??= ownInstanceProcessIndex(dirname(bpmnPath))).get(node.calledElement) ??
       (here.dep ??= dependencyProcessIndex(dirname(bpmnPath))).get(node.calledElement);
     if (!home) continue;
-    const child = await loadProcessModel(home, path, homes);
+    const child = await loadProcessModel(home, path, homes, opts);
     const call = callEls.get(node.id);
     const declared = child.inputs ?? [];
     if (call && (declared.length || call.dataInputAssociations?.length)) {
@@ -2314,6 +2487,7 @@ export async function loadProcessModel(
 
   return {
     id: proc.id,
+    ...(notRun.length > 0 ? { notRun } : {}),
     name: cleanName(proc.name) || proc.id,
     source: bpmnPath,
     dir: dirname(bpmnPath),
@@ -2325,6 +2499,7 @@ export async function loadProcessModel(
     nodes,
     flows,
     lanes,
+    dataStores,
     startNodes,
     decisions,
     children,

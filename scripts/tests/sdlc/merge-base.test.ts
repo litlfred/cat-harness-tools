@@ -15,7 +15,6 @@ import { join, relative, resolve } from "node:path";
 import { droppedInMerge, droppedLine, droppedPaths, ownedTreeAction, plan, refusable, resolutionFailure, resolveGitlink, stageGitlink, takeBase, takeBaseAction, takeOwnedTree, unmergedStages } from "../../merge-base.js";
 import { pathClass } from "../../merge-pipeline-paths.ts";
 import { parseLog } from "../../merge-main-comment.js";
-import { plan as qaPlan } from "../../qa-resolve-conflicts.ts";
 import { CATALOGUE_VISUALISER, classify, declaredRouteGlobs, GLOSSARY_RENDERER, PATTERNS, resolveGeneratedRegions } from "../../merge-conflict-patterns.js";
 import { repoRootFor, siteDirFor } from "../../../schemas/kg/cat-harness.js";
 import { scriptsOf } from "../../../schemas/sdlc/script-table.ts";
@@ -292,13 +291,16 @@ describe("classify", () => {
     expect(classify("cat-harness/docs/assets/library/index.json").pattern?.id).toBe("site-data");
   });
 
-  test("a kg-qa sidecar is delegated, not taken: it may carry an attestation", () => {
-    // Order matters: it is ALSO under test/results, and must not fall through
-    // to a take-base family that would drop a recorded adjudication.
-    expect(classify("cat-harness/test/results/kg-qa/skills/x.kg-qa.json").strategy).toBe("qa-sidecar");
+  test("a kg-qa sidecar is taken; the attestation store beside it is refused (bean 7mwa)", () => {
+    // `qa:resolve-conflicts` and its `qa-sidecar` strategy were retired once
+    // cat-harness and folio-assistant-core stopped committing test/results/.
+    // The judgement half moved to test/attestations/ (bean 2gst), and that
+    // tree must never be taken.
+    expect(classify("cat-harness/test/results/kg-qa/skills/x.kg-qa.json").pattern?.id).toBe("derived-results");
+    expect(classify("cat-harness/test/attestations/kg-qa/processes/x.attestations.json").strategy).toBe("refuse");
   });
 
-  test("a kg-qa MANIFEST is taken, though the sidecars it indexes are delegated", () => {
+  test("a kg-qa MANIFEST is taken, like the sidecars it indexes", () => {
     // It holds the auditor's script hash and nothing else; found by replaying
     // real merges, where one refused on these files alone.
     expect(classify("fhir-harness/test/results/kg-qa.manifest.json").pattern?.id).toBe("kg-qa-manifest");
@@ -548,7 +550,7 @@ describe("take-base when one side deleted the file", () => {
   test("an already-resolved path (no stages) is left alone, never deleted — bean vsv7", () => {
     expect(takeBaseAction(new Set())).toBe("resolved");
     // Both sides changed the file; an earlier step resolved and staged it, as
-    // `qa:resolve-conflicts` does before the take-base loop runs.
+    // `qa:resolve-conflicts` did before bean 7mwa retired it.
     const d = mk("theirs");
     writeFileSync(join(d, "gen.html"), "resolved earlier\n");
     execFileSync("git", ["add", "--", "gen.html"], { cwd: d });
@@ -605,18 +607,6 @@ describe("modify/delete on DECLARED paths: generated resolves, authored refuses 
     } finally {
       rmSync(d, { recursive: true, force: true });
     }
-  });
-});
-
-describe("qa sidecars of a NESTED instance are in scope", () => {
-  // Measured 2026-10-02 on #1822: a who-iris kg-qa sidecar was classified
-  // `qa-sidecar` here and then "left alone — outside the declared qa graph"
-  // by the resolver, which knew only the root instance's directory.
-  test("plan accepts every declared qa directory, not only the first", () => {
-    const dirs = ["cat-harness/test/results/", "who-iris/test/results/"];
-    const [o] = qaPlan("/nonexistent", dirs, ["unrelated/x.json"]);
-    expect(o!.action).toBe("skip");
-    expect(o!.reason).toContain("who-iris/test/results/");
   });
 });
 
@@ -716,7 +706,7 @@ describe("a gitignored-but-tracked file through a merge and its regeneration (8j
   test("the #1898 shape: a path an earlier step resolved is `git rm`ed, regen rewrites it, and `add -A` never restages it", () => {
     const { dir, g } = ignoredTrackedMerge();
     try {
-      // `qa:resolve-conflicts` resolves and stages the path first...
+      // An earlier step (`qa:resolve-conflicts`, before bean 7mwa) resolves and stages the path first...
       g("checkout", "--ours", "--", "results/x.json");
       g("add", "-f", "--", "results/x.json");
       // ...then the pre-vsv7 take-base read "no stages" as "the base deleted it".

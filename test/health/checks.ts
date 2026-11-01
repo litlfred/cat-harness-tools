@@ -49,7 +49,7 @@ import type {
   HealthThreshold,
   PagesServingObservation,
 } from "../../schemas/sdlc/health-report.ts";
-import { MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
+import { isPreviewName, MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
 import {
   EXPIRY_BASIS,
   EXPIRY_URGENT_DAYS,
@@ -985,7 +985,13 @@ export function stagingOrphanCheck(ctx: HealthContext): HealthCheckResult {
   // that would silence it is exactly how a three-state value gets treated as
   // a two-state one.
   const openHeads = ctx.openPrHeads.value;
-  const judged = ev.previews.map((preview) => ({
+  // `STAGING/_retired/` is the retired-record store (bean `6pfo`), and other
+  // `_`/dot names are reserved: none is a preview, so none has a branch or a
+  // pull request to claim it. Judging them would name the record store an
+  // orphan every day (folio-assistant#860). The same rule `staging-rotate.ts`
+  // uses, so rotation and this check agree on what a preview is. Their bytes
+  // still count in `staging-preview-size`: Pages publishes them.
+  const judged = ev.previews.filter((preview) => isPreviewName(preview.slug)).map((preview) => ({
     preview,
     liveness: previewLiveness(preview.slug, openHeads, branches, ctx.now),
   }));

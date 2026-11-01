@@ -171,8 +171,38 @@ LIVE_STATE_SCRIPTS = {
     "check:merged",
     "check:prs-have-runs",
     "check:quiet-claims",
+    "health:check",
     "post-merge:regen:check",
+    "secrets:check",
 }
+# Gates that judge the MACHINE they run on, not the checkout: a CI runner
+# installs only what the gates need, so on it they report every other tool as
+# missing (folio-assistant-core#287, run 41309041686).
+RUNNER_STATE_SCRIPTS = {
+    "software:check": "judges the software installed on the machine it runs on; a CI runner is not a workstation",
+}
+# Gates that cannot determine anything in LAYER mode (`MODE=layer`), where the
+# caller is swapped into the index without its .git and the layers are mounted
+# at their own tips rather than at the index's lock (folio-assistant-core#287).
+# The index's own run, where both hold, runs them.
+LAYER_MODE_SCRIPTS = {
+    "book:check": "reads bootstrap's COMMITTED tree (git ls-files --cached), and a mount in the index is never committed, so it sees no README",
+    "check:draft-beans": "reads the root's default branch, and layer mode swaps the caller in without its .git",
+    "check:standalone": "rehearses bootstrap-tools standing alone, which only its own checkout can; in the index the copy's git init fails",
+    "mount:lock:check": "compares the mounts with the index's lock, and layer mode mounts each layer at its own tip, not at the lock",
+    "mount:remote:check": "compares the mounts with the index's lock, and layer mode mounts each layer at its own tip, not at the lock",
+    "readme-sections:check": "reads the COMMITTED tree (git ls-files --cached), and a mount in the index is never committed, so every section reads empty",
+    "readmes:check": "reads the COMMITTED tree (git ls-files --cached), and a mount in the index is never committed, so every directory reads empty",
+}
+# `check:<layer>-standalone` rehearses <layer> with only its own closure laid
+# out beside it, so in another layer's index nothing the caller holds reaches
+# it: its answer is a function of the lower layers' pins and the runner. That
+# layer's own CI judges it (pr-tests.yml "Standalone (no new failures)"), so in
+# LAYER mode it runs only when the caller IS that layer (smart-ra#213, where
+# tools' list churned on every re-pin; cat-harness-tools#1299).
+STANDALONE_GATE = re.compile(r"^check:(.+)-standalone$")
+
+
 # Gates that judge an INPUT this runner never supplies: run bare, each prints
 # its usage and exits 2 ("could not determine") on base and head alike, so it
 # judges nothing about the PR -- and where base exits 1 for another reason,
@@ -182,8 +212,12 @@ LIVE_STATE_SCRIPTS = {
 NEEDS_INPUT_SCRIPTS = {
     "check:duplicate-ids": "needs a built site directory; bare, it prints its usage and exits 2",
     "check:escaped-markup": "needs a built site directory (or --source <dir>); bare, it prints its usage and exits 2",
+    "check:qa-corpus": "needs one of --dir <tree>, --ref <ref> or --github; bare, it prints its usage and exits 2",
+    "check:session-staleness": "reads a session's state as JSON on stdin; bare, it reads nothing and cannot determine",
     "check:maintained-artefacts": "needs a built site directory; bare, it prints its usage and exits 2",
+    "folio:shim:check": "needs a folio root with a folio/schema/builders.ts shim; the index root has none, so it cannot determine",
     "ingest:ig-chrome:check": "needs --layer <dir> checkouts of each fhir.template in the chain; bare, it prints could not determine and exits 2",
+    "publish:check": "needs the name of a package script that writes; bare, it exits 2",
     "wireframe:check": "needs --use, --topic and --surface; bare, a usage error and exit 2",
 }
 # The `PREREQUISITE_FILES` skip for `uml:overview:check` and
@@ -255,12 +289,23 @@ def gate_args(script, env=None):
     return fn(os.environ if env is None else env) if fn else ([], None)
 
 
-def skip_reason(root, script):
-    """(kind, why) a declared gate cannot determine anything in this run, or (None, None) to run it."""
+def skip_reason(root, script, env=None, own=None):
+    """(kind, why) a declared gate cannot determine anything in this run, or (None, None) to run it.
+
+    `own` is the caller's own instances; None means unknown, and then no
+    standalone gate is skipped."""
     if script in LIVE_STATE_SCRIPTS:
         return "live-state", "judges the remote's live state, not the checkout"
     if script in NEEDS_INPUT_SCRIPTS:
         return "needs-input", NEEDS_INPUT_SCRIPTS[script]
+    if script in RUNNER_STATE_SCRIPTS:
+        return "runner-state", RUNNER_STATE_SCRIPTS[script]
+    if script in LAYER_MODE_SCRIPTS and (os.environ if env is None else env).get("MODE") == "layer":
+        return "layer-mode", LAYER_MODE_SCRIPTS[script]
+    m = STANDALONE_GATE.match(script)
+    if m and own is not None and m.group(1) not in own and (os.environ if env is None else env).get("MODE") == "layer":
+        return "layer-mode", (f"rehearses {m.group(1)} with only its own closure, which holds nothing of this caller; "
+                              f"{m.group(1)}'s own CI judges it")
     return None, None
 
 
@@ -331,7 +376,7 @@ def script_runner(root):
     return "bun cat-harness-tools/scripts/run-script.ts"
 
 
-def declared_gates(root, name, path, runner, env=None):
+def declared_gates(root, name, path, runner, env=None, own=None):
     """(gate name -> command, gate name -> (command, skip reason, skip kind))."""
     pkg = read_json(os.path.join(root, path, "package.json")) or {}
     scripts = {**pkg.get("scripts", {}), **pkg.get("checkoutScripts", {})}
@@ -345,7 +390,7 @@ def declared_gates(root, name, path, runner, env=None):
         command = " ".join([runner, s, *(shlex.quote(a) for a in extra or [])])
         kind = "input-absent" if why else None
         if not why:
-            kind, why = skip_reason(root, s)
+            kind, why = skip_reason(root, s, env, own)
         if why:
             skipped[f"{name}:{s}"] = (command, why, kind)
         else:
@@ -738,7 +783,7 @@ def derive(root, given, tmp, env=None):
     Returns (own, harness, runner, gates, skipped): gate name -> command for
     the gates this runner runs, and gate name -> {command, skipped, kind} for
     the declared ones it does not. `kind` says why: `live-state`,
-    `needs-input`, `prerequisite`, or `input-absent` (a SUPPLIED_INPUTS gate
+    `needs-input`, `runner-state`, `layer-mode`, `prerequisite`, or `input-absent` (a SUPPLIED_INPUTS gate
     on a side that holds no such input -- CI runs it where the input exists).
 
     `--list` prints this as JSON, and it is what `gates.ts` `loadGates` reads
@@ -767,7 +812,7 @@ def derive(root, given, tmp, env=None):
         gates[f"{owner}:{script}"] = command
     skipped = {}
     for n in harness:
-        run_these, skip_these = declared_gates(root, n, known[n], runner, env)
+        run_these, skip_these = declared_gates(root, n, known[n], runner, env, own)
         for gname, command in run_these.items():
             if command in seen_scripts:
                 continue  # one script, run once, named by the first instance that declares it
@@ -821,6 +866,63 @@ def fold_skill_register(root, runner, gates):
     gates[name] = residual
 
 
+# Gates run as parts, each in its own shard (S-CI6, 2026-11-01). On
+# folio-assistant-core run 41287467368 `check:cat-harness-tools-standalone`
+# took 510 s alone, the floor of every PR run once the shards were balanced.
+# Part i of n runs `<script> --part i/n`: slice i of the layer's test files
+# (check-standalone.ts, "In parts"), so together the parts run every test file
+# once. A side whose pinned check-standalone.ts has no `--part` keeps the
+# gate whole: there the flag would be ignored and each part would run the
+# whole layer, four times the work (`supports_parts`).
+SPLIT_GATES = {"check:cat-harness-tools-standalone": 4}
+CHECK_STANDALONE_TS = os.path.join("cat-harness-tools", "scripts", "check-standalone.ts")
+
+
+def supports_parts(root):
+    """Whether this side's check-standalone.ts takes `--part`."""
+    try:
+        with open(os.path.join(root, CHECK_STANDALONE_TS)) as f:
+            return '"--part"' in f.read()
+    except OSError:
+        return False
+
+
+def split_gates(gates, runner, timings=None, alone=None, table=None, root=None):
+    """`gates` with each SPLIT_GATES gate replaced, in place, by its parts:
+    `<name>#i/n` running `<command> --part i/n`. A part inherits `alone`, and
+    until it has a timing of its own, the whole gate's seconds over n. Returns
+    the new gates dict; `timings` and `alone` are updated in place. With
+    `root` given and no `--part` in its check-standalone.ts, nothing is split."""
+    table = SPLIT_GATES if table is None else table
+    if root is not None and not supports_parts(root):
+        return dict(gates)
+    out = {}
+    for name, command in gates.items():
+        script = command[len(runner) + 1:] if runner and command.startswith(f"{runner} ") else None
+        n = table.get(script) if script else None
+        if not n or n < 2:
+            out[name] = command
+            continue
+        for i in range(1, n + 1):
+            part = f"{name}#{i}/{n}"
+            out[part] = f"{command} --part {i}/{n}"
+            if timings is not None and part not in timings and name in timings:
+                timings[part] = timings[name] / n
+            if alone is not None and name in alone:
+                alone.add(part)
+    return out
+
+
+def verified_by_gates(gates):
+    """The scripts this side's gates run, for skill-register.ts
+    (`CAT_SKILL_REGISTER_VERIFIED_BY_GATES`): the chain checks it may leave to
+    them. The derive:publish step already sets it (owner, 2026-10-23, option
+    A); a gate such as `uml:overview:check` builds the same QA working copy in
+    a shard, whose `skill:register` re-ran nine checks the gate set runs
+    anyway (fa#2867). Every one is still judged by its own gate."""
+    return ",".join(sorted({k.split(":", 1)[1] for k in gates if ":" in k}))
+
+
 def main():
     args = sys.argv[1:]
     given = [args[i + 1] for i, a in enumerate(args) if a == "--instance" and i + 1 < len(args)]
@@ -839,6 +941,7 @@ def main():
         if os.environ.get("GATE_SHARD", "").strip():
             timings = read_timings(os.environ.get("GATE_TIMINGS"))
             alone = tree_snapshotting(args[0]) if timings else set()
+            gates = split_gates(gates, runner, timings, alone, root=args[0])
             listed["gates"] = {k: gates[k] for k in shard_names(list(gates), shard, shards, timings, alone, gate_jobs())}
             listed["skipped"] = skipped if shard == 1 else {}
             listed["shard"] = {"shard": shard, "of": shards, "total": len(gates)}
@@ -853,9 +956,11 @@ def main():
     print(f"own: {', '.join(own)}; dependency harness: {', '.join(harness)}", flush=True)
     print(f"script runner: {runner}", flush=True)
     skipped = {k: {"command": v["command"], "skipped": v["skipped"]} for k, v in skipped.items()}
-    total = len(gates)
+    os.environ.setdefault("CAT_SKILL_REGISTER_VERIFIED_BY_GATES", verified_by_gates(gates))
     timings = read_timings(os.environ.get("GATE_TIMINGS"))
     alone = tree_snapshotting(root)
+    gates = split_gates(gates, runner, timings, alone, root=root)
+    total = len(gates)
     gates = {k: gates[k] for k in shard_names(list(gates), shard, shards, timings, alone, gate_jobs())}
     if shard != 1:
         skipped, records = {}, []  # shard 1 carries them, so a merged side holds each once
