@@ -47,26 +47,9 @@
  */
 import type { ArchimateElement, ArchimateLayer, ArchimateModel, ArchimateRelationship, ArchimateView, ArchimateViewConnection, ArchimateViewNode } from "../schemas/archimate.ts";
 
-/** Archi's default fill per layer. */
-export const LAYER_FILL: Record<ArchimateLayer, string> = {
-  Strategy: "#f5deaa",
-  Business: "#ffffb5",
-  Application: "#b5ffff",
-  Technology: "#c9e7b7",
-  Physical: "#c9e7b7",
-  Motivation: "#ccccff",
-  "Implementation & Migration": "#ffe0e0",
-  Other: "#ffffff",
-};
-
-/** Archi's default outline: the fill, darkened — not black. */
-export function outlineOf(fill: string): string {
-  const m = /^#([0-9a-f]{6})$/i.exec(fill);
-  if (!m) return "#555";
-  const n = parseInt(m[1]!, 16);
-  const d = (c: number) => Math.round(c * 0.55).toString(16).padStart(2, "0");
-  return `#${d(n >> 16)}${d((n >> 8) & 255)}${d(n & 255)}`;
-}
+// The layer colours and outlines are the shared figure theme's (figure-theme.ts).
+import { LAYER_FILL, outlineOf } from "./figure-theme.ts";
+export { LAYER_FILL, outlineOf };
 
 const esc = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
