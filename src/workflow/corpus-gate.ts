@@ -112,6 +112,17 @@ export interface CorpusGateOptions {
   labelFor: LabelForPath;
 }
 
+/** The platform's record of `id`, or `undefined` when its store cannot be read here. */
+function platformInstance(platformRoot: string, id: string): ReturnType<typeof loadInstance> {
+  try {
+    return loadInstance(platformRoot, id);
+  } catch (e) {
+    // Only an unreachable store; a malformed record is still an error.
+    if (String(e).includes("cannot resolve the workflow instance directory")) return undefined;
+    throw e;
+  }
+}
+
 /**
  * Check every changed content file against the editing process.
  *
@@ -165,7 +176,13 @@ export async function checkCorpusGate(
     if (seen.has(ts)) continue;
 
     const id = instanceId(model.id, label);
-    const state = loadInstance(opts.platformRoot, id) ?? loadInstance(repoRoot, id);
+    // The repository's own store first: it is where the editing workflow for
+    // its own blocks is recorded. The platform's store is a fallback, and in a
+    // layer's CI it is often kept on an unmounted branch
+    // (`cat/cat-harness/beans`), where reading it throws. An unreachable
+    // platform store then counts as "no record there", which still fails
+    // closed: the block is refused unless the repository has the record.
+    const state = loadInstance(repoRoot, id) ?? platformInstance(opts.platformRoot, id);
     if (!state) {
       seen.set(ts, {
         file,
