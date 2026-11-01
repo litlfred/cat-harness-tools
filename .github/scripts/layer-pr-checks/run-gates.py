@@ -194,6 +194,15 @@ LAYER_MODE_SCRIPTS = {
     "readme-sections:check": "reads the COMMITTED tree (git ls-files --cached), and a mount in the index is never committed, so every section reads empty",
     "readmes:check": "reads the COMMITTED tree (git ls-files --cached), and a mount in the index is never committed, so every directory reads empty",
 }
+# `check:<layer>-standalone` rehearses <layer> with only its own closure laid
+# out beside it, so in another layer's index nothing the caller holds reaches
+# it: its answer is a function of the lower layers' pins and the runner. That
+# layer's own CI judges it (pr-tests.yml "Standalone (no new failures)"), so in
+# LAYER mode it runs only when the caller IS that layer (smart-ra#213, where
+# tools' list churned on every re-pin; cat-harness-tools#1299).
+STANDALONE_GATE = re.compile(r"^check:(.+)-standalone$")
+
+
 # Gates that judge an INPUT this runner never supplies: run bare, each prints
 # its usage and exits 2 ("could not determine") on base and head alike, so it
 # judges nothing about the PR -- and where base exits 1 for another reason,
@@ -280,8 +289,11 @@ def gate_args(script, env=None):
     return fn(os.environ if env is None else env) if fn else ([], None)
 
 
-def skip_reason(root, script, env=None):
-    """(kind, why) a declared gate cannot determine anything in this run, or (None, None) to run it."""
+def skip_reason(root, script, env=None, own=None):
+    """(kind, why) a declared gate cannot determine anything in this run, or (None, None) to run it.
+
+    `own` is the caller's own instances; None means unknown, and then no
+    standalone gate is skipped."""
     if script in LIVE_STATE_SCRIPTS:
         return "live-state", "judges the remote's live state, not the checkout"
     if script in NEEDS_INPUT_SCRIPTS:
@@ -290,6 +302,10 @@ def skip_reason(root, script, env=None):
         return "runner-state", RUNNER_STATE_SCRIPTS[script]
     if script in LAYER_MODE_SCRIPTS and (os.environ if env is None else env).get("MODE") == "layer":
         return "layer-mode", LAYER_MODE_SCRIPTS[script]
+    m = STANDALONE_GATE.match(script)
+    if m and own is not None and m.group(1) not in own and (os.environ if env is None else env).get("MODE") == "layer":
+        return "layer-mode", (f"rehearses {m.group(1)} with only its own closure, which holds nothing of this caller; "
+                              f"{m.group(1)}'s own CI judges it")
     return None, None
 
 
@@ -360,7 +376,7 @@ def script_runner(root):
     return "bun cat-harness-tools/scripts/run-script.ts"
 
 
-def declared_gates(root, name, path, runner, env=None):
+def declared_gates(root, name, path, runner, env=None, own=None):
     """(gate name -> command, gate name -> (command, skip reason, skip kind))."""
     pkg = read_json(os.path.join(root, path, "package.json")) or {}
     scripts = {**pkg.get("scripts", {}), **pkg.get("checkoutScripts", {})}
@@ -374,7 +390,7 @@ def declared_gates(root, name, path, runner, env=None):
         command = " ".join([runner, s, *(shlex.quote(a) for a in extra or [])])
         kind = "input-absent" if why else None
         if not why:
-            kind, why = skip_reason(root, s, env)
+            kind, why = skip_reason(root, s, env, own)
         if why:
             skipped[f"{name}:{s}"] = (command, why, kind)
         else:
@@ -796,7 +812,7 @@ def derive(root, given, tmp, env=None):
         gates[f"{owner}:{script}"] = command
     skipped = {}
     for n in harness:
-        run_these, skip_these = declared_gates(root, n, known[n], runner, env)
+        run_these, skip_these = declared_gates(root, n, known[n], runner, env, own)
         for gname, command in run_these.items():
             if command in seen_scripts:
                 continue  # one script, run once, named by the first instance that declares it
