@@ -98,6 +98,20 @@ import type { ProcessModel } from "../src/workflow/process-model.js";
  */
 export const STUCK_AFTER_DAYS = 7;
 
+/**
+ * The start of `d`'s UTC day: the reference time a page build measures ages
+ * against. Ages are counted in days, so a day loses nothing, and every build on
+ * the same day writes the same bytes (cat-harness-tools#1230).
+ */
+export function startOfUtcDay(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+/** `YYYY-MM-DD`, the UTC day of `d`. */
+export function dayOf(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** What the view can say about refused gates, for an instance that records none. */
