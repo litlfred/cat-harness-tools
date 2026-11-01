@@ -279,6 +279,18 @@ function ghJson(path: string): unknown {
   return r.status === 0 ? JSON.parse(r.stdout) : undefined;
 }
 
+/** The GitHub repositories the checkout's index config mounts instances from. */
+export function instanceRepos(repo: string): string[] {
+  const r = readIndexConfig(repo);
+  if (!("config" in r)) return [];
+  const out = new Set<string>();
+  for (const i of (r.config as { instances?: Array<{ source?: { remote?: { repository?: string } } }> }).instances ?? []) {
+    const name = i.source?.remote?.repository;
+    if (name && /^[\w.-]+\/[\w.-]+$/.test(name)) out.add(name);
+  }
+  return [...out].sort();
+}
+
 /** JAVA_HOME_<n>_X64, as GitHub's images set them, from the JVMs this container has. */
 export function javaHomes(dir = "/usr/lib/jvm"): Record<string, string> {
   const out: Record<string, string> = {};
@@ -311,6 +323,16 @@ export async function replay(o: ReplayOptions): Promise<{ steps: number; ran: nu
     o.log(`  · ${s.name ?? s.id ?? what}${s.if !== undefined ? ` [if ${String(s.if).replace(/\s+/g, " ").slice(0, 80)}]` : ""} — ${what}`);
   }
   if (o.plan) return { steps: steps.length, ran: 0, failed: [] };
+
+  // The build reads every mounted instance's repository through the GitHub
+  // API (its releases, for the IG indexes). A runner's token reads any public
+  // repository; an agent session's often reads only the repositories attached
+  // to it. Found on the first trial replay (2026-11-01): derive:publish failed
+  // after 14 min on a 403 for the IG repositories' releases. Said up front,
+  // not refused: not every instance's API is read, and which are is the
+  // build's business, not this file's.
+  const unreachable = instanceRepos(repo).filter((r) => spawnSync("gh", ["api", `repos/${r}`, "--silent"], { encoding: "utf-8" }).status !== 0);
+  if (unreachable.length) o.log(`⚠ the GitHub API does not answer for ${unreachable.join(", ")} from this session. If a step fails on a 403, attach those repositories and run again (the IG repositories' releases are read by derive:publish).`);
 
   const wt = mkdtempSync(join(tmpdir(), "stage-replay-"));
   git(repo, ["worktree", "add", "-q", "--detach", wt, head]);
@@ -425,8 +447,12 @@ export async function replay(o: ReplayOptions): Promise<{ steps: number; ran: nu
           if (rv.status !== 0) throw new Error(`${label}: no ruby on PATH; install Ruby ${withs["ruby-version"] ?? ""} to replay the Jekyll build`);
           if (withs["ruby-version"] && !rv.stdout.startsWith(String(withs["ruby-version"]))) o.log(`  ⚠ ruby ${rv.stdout} here; the workflow asks for ${withs["ruby-version"]}`);
           if (withs["bundler-cache"] === "true") {
+            // As setup-ruby does it: the bundle in vendor/bundle beside the
+            // Gemfile, so `bundle exec` finds its executables there and not
+            // in whatever the container's gem home happens to hold.
             const dir = resolve(wt, withs["working-directory"] ?? ".");
-            ok = spawnSync("bundle", ["install"], { cwd: dir, stdio: "inherit", env }).status === 0;
+            ok = spawnSync("bundle", ["config", "set", "--local", "path", "vendor/bundle"], { cwd: dir, stdio: "inherit", env }).status === 0
+              && spawnSync("bundle", ["install"], { cwd: dir, stdio: "inherit", env }).status === 0;
           }
         } else if (kind === "local") {
           const dir = resolve(wt, s.uses);
