@@ -1288,6 +1288,11 @@ function up(repo = REPO): string {
  * (#1168 B7a-2) — every instance's declared processes directories, because
  * every instance's diagrams are on it.
  */
+/** The scope of the top index page: one "By subgraph" row per sub-graph page. */
+export function indexScope(rows: readonly ProcessRow[]): PageScope {
+  return { subjects: subgraphPages(rows).map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` })) };
+}
+
 export function publishedIndex(
   rows: Parameters<typeof page>[0],
   repo = REPO,
@@ -1295,7 +1300,9 @@ export function publishedIndex(
   // Read by default, as `skillPages` is: the committed instances are an input
   // of the page, so a caller that omits them gets the page the generator writes.
   instances: InstancesRead = instancesRead(workflowInstanceLinks()),
-  scope: PageScope = {},
+  // Defaults to the index page, with its "By subgraph" table, so a caller that
+  // omits it gets the page the generator writes (the committed-page check).
+  scope: PageScope = indexScope(rows),
 ): string {
   return withRenderedByFrontMatter(page(rows, skillPages, instances, scope), VIEWER_TOOL);
 }
@@ -1324,9 +1331,7 @@ if (import.meta.main) {
   // pages, read from the committed instance files the state visualiser draws.
   const instances = instancesRead(workflowInstanceLinks());
   const subs = subgraphPages(rows);
-  const html = publishedIndex(rows, REPO, skillPages, instances, {
-    subjects: subs.map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` })),
-  });
+  const html = publishedIndex(rows, REPO, skillPages, instances, indexScope(rows));
   // Which page sections present each diagram, keyed repository-relative so it
   // matches `row.file` — a page spells its source relative to its OWN instance.
   const presented = new Map<string, Presentation[]>();
