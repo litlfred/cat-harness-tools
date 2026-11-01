@@ -111,34 +111,37 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
       console.log(`✓ ${shown}: ${fixed.length} slanted flow(s) routed at right angles (${fixed.join(", ")})`);
     }
   }
-  if (fix) {
-    // Every task box one size, square (TASK_SIZE): a box never grows to fit
-    // its name, the name is shortened (owner, 2026-11-01).
-    // Whole file first; when that draws a flow through a box, take the tasks
-    // one at a time and keep each that does not, so one crowded corner does
-    // not leave the whole diagram at its old sizes.
-    const thru = (x: string): number => edgesThroughShapes(readDi(x)).length;
-    const base = thru(xml);
-    let { xml: next, fixed } = fixTaskSize(xml);
-    if (fixed.length > 0 && thru(next) > base) {
-      const kept: string[] = [];
-      next = xml;
-      for (const id of fixed) {
-        const one = fixTaskSize(next, new Set([id]));
-        if (one.fixed.length > 0 && thru(one.xml) <= base) {
-          next = one.xml;
-          kept.push(id);
-        }
+  // Every task box one size, square (TASK_SIZE): a box never grows to fit
+  // its name, the name is shortened (owner, 2026-11-01). Whole file first;
+  // when that makes the layout worse (a flow through a box, a crossing, a
+  // slant), the tasks one at a time, keeping each that does not.
+  const worse = (x: string, than: number[]): boolean => harm(x).some((n, i) => n > than[i]!);
+  const square = (from: string): { xml: string; fixed: string[]; left: number } => {
+    const base = harm(from);
+    const all = fixTaskSize(from);
+    if (all.fixed.length === 0 || !worse(all.xml, base)) return { ...all, left: 0 };
+    let next = from;
+    const kept: string[] = [];
+    for (const id of all.fixed) {
+      const one = fixTaskSize(next, new Set([id]));
+      if (one.fixed.length > 0 && !worse(one.xml, base)) {
+        next = one.xml;
+        kept.push(id);
       }
-      const left = fixed.length - kept.length;
-      if (left > 0) console.log(`· ${shown}: ${left} task(s) left off ${TASK_SIZE.width} × ${TASK_SIZE.height}: resizing them draws a flow through a box (move the step or the flow)`);
-      fixed = kept;
     }
-    if (fixed.length > 0) {
-      writeFileSync(file, next);
-      xml = next;
-      console.log(`✓ ${shown}: ${fixed.length} task(s) drawn at ${TASK_SIZE.width} × ${TASK_SIZE.height}`);
+    return { xml: next, fixed: kept, left: all.fixed.length - kept.length };
+  };
+  const squared = (r: { fixed: string[]; left: number }): void => {
+    if (r.left > 0) console.log(`· ${shown}: ${r.left} task(s) left off ${TASK_SIZE.width} × ${TASK_SIZE.height}: resizing them would draw a flow through a box, a crossing or a slant (move the step or the flow)`);
+    if (r.fixed.length > 0) console.log(`✓ ${shown}: ${r.fixed.length} task(s) drawn at ${TASK_SIZE.width} × ${TASK_SIZE.height}`);
+  };
+  if (fix) {
+    const r = square(xml);
+    if (r.fixed.length > 0) {
+      writeFileSync(file, r.xml);
+      xml = r.xml;
     }
+    squared(r);
   }
   if (fix && renderer) {
     // Pool and lane names that spill out of their header strip: grow the
@@ -165,10 +168,13 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
   if (fix && xml !== original) {
     const now = harm(xml);
     if (now.some((n, i) => n > harmBefore[i]!)) {
-      xml = original;
+      // Keep the square tasks alone, when they on their own do no harm: the
+      // other fixes are what tipped it.
+      const r = square(original);
+      xml = r.fixed.length > 0 && !worse(r.xml, harmBefore) ? r.xml : original;
       writeFileSync(file, xml);
       console.log(`· ${shown}: the layout fixes would add flows through boxes, crossings or slants ` +
-        `(${harmBefore.join("/")} → ${now.join("/")}); layout left as it is, labels only`);
+        `(${harmBefore.join("/")} → ${now.join("/")}); layout left as it is${xml === original ? "" : ", but for the square tasks"}, labels only`);
     }
   }
   if (write && renderer) {
