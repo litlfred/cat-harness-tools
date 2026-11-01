@@ -114,14 +114,30 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
   if (fix) {
     // Every task box one size, square (TASK_SIZE): a box never grows to fit
     // its name, the name is shortened (owner, 2026-11-01).
-    const { xml: next, fixed } = fixTaskSize(xml);
+    // Whole file first; when that draws a flow through a box, take the tasks
+    // one at a time and keep each that does not, so one crowded corner does
+    // not leave the whole diagram at its old sizes.
     const thru = (x: string): number => edgesThroughShapes(readDi(x)).length;
-    if (fixed.length > 0 && thru(next) <= thru(xml)) {
+    const base = thru(xml);
+    let { xml: next, fixed } = fixTaskSize(xml);
+    if (fixed.length > 0 && thru(next) > base) {
+      const kept: string[] = [];
+      next = xml;
+      for (const id of fixed) {
+        const one = fixTaskSize(next, new Set([id]));
+        if (one.fixed.length > 0 && thru(one.xml) <= base) {
+          next = one.xml;
+          kept.push(id);
+        }
+      }
+      const left = fixed.length - kept.length;
+      if (left > 0) console.log(`· ${shown}: ${left} task(s) left off ${TASK_SIZE.width} × ${TASK_SIZE.height}: resizing them draws a flow through a box (move the step or the flow)`);
+      fixed = kept;
+    }
+    if (fixed.length > 0) {
       writeFileSync(file, next);
       xml = next;
       console.log(`✓ ${shown}: ${fixed.length} task(s) drawn at ${TASK_SIZE.width} × ${TASK_SIZE.height}`);
-    } else if (fixed.length > 0) {
-      console.log(`· ${shown}: ${fixed.length} task(s) not at ${TASK_SIZE.width} × ${TASK_SIZE.height}, but resizing them draws a flow through a box; left as they are`);
     }
   }
   if (fix && renderer) {

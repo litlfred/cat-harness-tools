@@ -522,10 +522,11 @@ export function offSizeTasks(xml: string): string[] {
 /**
  * Draw every task box at {@link TASK_SIZE}, about its centre (smaller boxes
  * grow, bigger ones shrink), then let {@link resizeShapes} make room in the
- * columns and lanes and re-route the flows that touch them.
+ * columns and lanes and re-route the flows that touch them. `only` limits it
+ * to those tasks.
  */
-export function fixTaskSize(xml: string): { xml: string; fixed: string[] } {
-  const ids = new Set(offSizeTasks(xml));
+export function fixTaskSize(xml: string, only?: ReadonlySet<string>): { xml: string; fixed: string[] } {
+  const ids = new Set(offSizeTasks(xml).filter((id) => !only || only.has(id)));
   if (ids.size === 0) return { xml, fixed: [] };
   const next = xml.replace(/(<(?:\w+:)?BPMNShape\b[^>]*\sbpmnElement="([^"]+)"[^>]*>\s*<(?:\w+:)?Bounds\s)x="([\d.-]+)"\s+y="([\d.-]+)"\s+width="([\d.]+)"\s+height="([\d.]+)"/g,
     (all, pre: string, id: string, xs: string, ys: string, ws: string, hs: string) => {

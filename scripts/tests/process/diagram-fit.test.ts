@@ -276,6 +276,13 @@ describe("tasks are one square size (TASK_SIZE)", () => {
     expect(fixTaskSize(xml).fixed).toEqual([]);
   });
 
+  test("only: resizes just the tasks named", () => {
+    const xml = bpmn([["L1", "One", 0, 200]], [["A", 50, 50, 160, 80], ["B", 300, 60, 100, 60]], []);
+    const { xml: next, fixed } = fixTaskSize(xml, new Set(["B"]));
+    expect(fixed).toEqual(["B"]);
+    expect(offSizeTasks(next)).toEqual(["A"]);
+  });
+
   test("a diagram already at TASK_SIZE is left byte for byte", () => {
     const xml = bpmn([["L1", "One", 0, 200]], [["A", 50, 40, TASK_SIZE.width, TASK_SIZE.height]], []);
     expect(fixTaskSize(xml).xml).toBe(xml);
