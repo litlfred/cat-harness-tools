@@ -238,13 +238,23 @@ export function metamodelDot(
   mm: Metamodel,
   opts: {
     associations?: boolean;
+    /**
+     * Only these relationship categories (`categoryOf`), and only the types
+     * their lines touch, so Graphviz lays the filtered picture out afresh
+     * instead of the page hiding lines in the full one. Absent, all of them.
+     */
+    categories?: readonly string[];
     /** Where a box and a line go when clicked: the page's section for that type or pair. Absent, nothing links. */
     href?: { type: (type: string) => string; pair: (source: string, target: string) => string };
   } = {},
 ): string {
   const link = (url: string | undefined, tip: string): string => (url ? `, URL=${dq(url)}, target="_top", tooltip=${dq(tip)}` : "");
-  const shown = mm.patterns.filter((p) => opts.associations || relKind(p.relationship) !== "Association" || p.allowed === false);
-  const used = new Set<string>([...mm.types.map((t) => t.type), ...shown.flatMap((p) => [p.source, p.target])]);
+  const cats = opts.categories === undefined ? undefined : new Set(opts.categories);
+  const shown = mm.patterns.filter(
+    (p) => (opts.associations || relKind(p.relationship) !== "Association" || p.allowed === false) && (cats === undefined || cats.has(categoryOf(p.relationship))),
+  );
+  // Filtered, a type with no line of those categories is left out, so it takes no room.
+  const used = new Set<string>([...(cats === undefined ? mm.types.map((t) => t.type) : []), ...shown.filter((p) => ![p.source, p.target].some((t) => t === "Grouping" || t === "Junction")).flatMap((p) => [p.source, p.target])]);
   const count = new Map(mm.types.map((t) => [t.type, t.elements]));
   const byLayer = new Map<ArchimateLayer, string[]>();
   // Groupings and junctions are how a view is drawn, not what the architecture holds.
@@ -274,7 +284,7 @@ export function metamodelDot(
   const layers = LAYER_ORDER.filter((l) => byLayer.has(l));
   layers.forEach((layer, i) => {
     const types = byLayer.get(layer)!;
-    lines.push(`  subgraph cluster_${i} {`, `    label=${dq(layer)}; labeljust=l; style="rounded,filled"; fillcolor="#f7f7f7"; color="#bbbbbb"; fontcolor="#666666";`, `    rank=same;`);
+    lines.push(`  subgraph cluster_${i} {`, `    label=${dq(layer)}; class=${dq(`mm-layer-${layerSlug(layer)}`)}; labeljust=l; style="rounded,filled"; fillcolor="#f7f7f7"; color="#bbbbbb"; fontcolor="#666666";`, `    rank=same;`);
     for (const t of types) {
       const self = selfOf.get(t);
       const text = `${typeName(t)}\n${count.get(t) ?? 0} element(s)${self ? `\n(to itself: ${self.join(", ")})` : ""}`;
@@ -353,3 +363,24 @@ export function metamodelMermaid(mm: Metamodel): string {
   }
   return `${lines.join("\n")}\n`;
 }
+
+/** The relationship categories the drawing has lines of, in ArchiMate's order. */
+export function drawnCategories(mm: Metamodel): string[] {
+  const present = new Set(mm.patterns.filter((p) => p.source !== p.target).map((p) => categoryOf(p.relationship)));
+  return ["structural", "dependency", "dynamic", "other"].filter((c) => present.has(c));
+}
+
+/**
+ * Every proper, non-empty set of the drawn categories, each to be laid out on
+ * its own (the full set is `metamodel.svg`). Four categories give at most 14.
+ */
+export function categorySubsets(mm: Metamodel): string[][] {
+  const all = drawnCategories(mm);
+  const out: string[][] = [];
+  for (let bits = 1; bits < (1 << all.length) - 1; bits++) out.push(all.filter((_, i) => bits & (1 << i)));
+  return out;
+}
+
+/** The file a set of categories is drawn to: `metamodel.svg` for all of them, else `metamodel.<cats>.svg`. */
+export const metamodelSvgName = (cats: readonly string[], all: readonly string[]): string =>
+  cats.length === all.length ? "metamodel.svg" : `metamodel.${all.filter((c) => cats.includes(c)).join("-")}.svg`;
