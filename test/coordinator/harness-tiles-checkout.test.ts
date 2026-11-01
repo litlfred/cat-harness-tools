@@ -51,3 +51,36 @@ describe("a site sub-graph links where its index.md is PUBLISHED (fa#2739)", () 
     expect(group?.path).toBe("/docs/cat-harness/start/");
   });
 });
+
+describe("each harness carries its page ground (bean yj32, owner Q-DEP-2 A)", () => {
+  // The owner, 2026-11-01: a harness's theme art goes "behind every docs page".
+  // Over THIS checkout, because the subject is the real theme-to-image join:
+  // cat-harness's own sticky names `grumpy-cyborg-agents`, whose role it
+  // declares in all three crops.
+  const REPO = join(ORIGIN_DIR, "..", "..", "..");
+  const tiles = harnessTiles(REPO, join(REPO, "cat-harness"), ["cat-harness", "folio-assistant-core", "bootstrap"]);
+  const ground = (name: string) => tiles.find((t) => t.name === name)?.pageGround;
+
+  test("the site owner's ground is the fallback, never a `/` scope", () => {
+    const g = ground("cat-harness")!;
+    expect(g.siteDefault).toBe(true);
+    expect(g.scopes).not.toContain("/");
+    expect(g.scopes).toContain("/cat-harness/");
+  });
+
+  test("a ground is all three crops or none", () => {
+    for (const t of tiles) {
+      const art = t.pageGround?.art;
+      if (art === undefined) continue;
+      expect(Object.keys(art).sort()).toEqual(["card", "laptop", "mobile"]);
+      for (const src of Object.values(art)) expect(src.startsWith("/")).toBe(true);
+    }
+  });
+
+  test("the content core's ground is its own theme's art, not the platform's", () => {
+    const core = ground("folio-assistant-core")?.art;
+    const cat = ground("cat-harness")?.art;
+    expect(core).toBeDefined();
+    expect(core!.laptop).not.toBe(cat?.laptop);
+  });
+});
