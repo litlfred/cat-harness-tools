@@ -151,6 +151,29 @@ test.describe("review page: selectable diff renderers (d903)", () => {
     expect(out).toEqual({ added: "digital infrastructure", same: 0 });
   });
 
+  test("a swapped figure shows before and after, each from its own page's directory", async ({ page }) => {
+    await open(page);
+    const out = await page.evaluate(() => {
+      const w = window as unknown as Record<string, (...a: unknown[]) => unknown>;
+      const clean = (dir: string) => (d: Document, h: string) => w.cleanRendered(d, h, dir);
+      const box = w.imageChange(document, '<p><img src="media/old.png" alt="Figure"></p>', '<p><img src="media/new.svg" alt="Figure"></p>', clean("/main/doc/"), clean("../doc/")) as HTMLElement | null;
+      const same = w.imageChange(document, '<p><img src="media/a.svg"></p>', '<p><img src="media/a.svg"></p>', clean("x/"), clean("y/"));
+      const abs = (w.cleanRendered(document, '<p><img src="https://x.io/a.png"><a href="#s">s</a></p>', "../doc/") as HTMLElement).innerHTML;
+      return {
+        caps: Array.from(box?.querySelectorAll("figcaption") ?? []).map((c) => c.textContent),
+        srcs: Array.from(box?.querySelectorAll("img") ?? []).map((i) => i.getAttribute("src")),
+        same,
+        abs,
+      };
+    });
+    expect(out).toEqual({
+      caps: ["Before", "After"],
+      srcs: ["/main/doc/media/old.png", "../doc/media/new.svg"],
+      same: null,
+      abs: '<p><img src="https://x.io/a.png"><a href="#s">s</a></p>',
+    });
+  });
+
   test("the review brief draws a link inside bold (a comment number linked to its row)", async ({ page }) => {
     await open(page);
     const html = await page.evaluate(() => {
