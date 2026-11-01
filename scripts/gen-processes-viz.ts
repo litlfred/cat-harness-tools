@@ -372,7 +372,7 @@ function instanceRoots(repo: string): string[] {
     if (declarationPathIn(dir)) out.push(dir);
   }
   out.sort();
-  // An instance at the checkout ROOT (an IG repository such as smart-trust,
+  // An instance at the checkout ROOT (an IG repository, with
   // its layers mounted below it) holds diagrams too. Without it, the site's
   // own instance was the one instance its processes page never listed.
   if (declarationPathIn(repo)) out.unshift(repo);
@@ -1398,8 +1398,8 @@ if (import.meta.main) {
     }
   }
   const pages = new Map<string, string>([[out, html]]);
-  // One page per sub-graph (owner, 2026-11-01: "show process in the subgraph
-  // smart-trust only"), as `tools`, `library` and `beans` already have.
+  // One page per sub-graph (owner, 2026-11-01: show a sub-graph's processes
+  // on its own page), as `tools`, `library` and `beans` already have.
   for (const x of subs) {
     const sub = pageRelPath(REPO, x.name);
     if (sub !== undefined) pages.set(join(into ?? baseDocsDir(REPO), sub), publishedIndex(x.rows, REPO, skillPages, instances, { instance: x.name }));
