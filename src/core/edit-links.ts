@@ -1160,7 +1160,6 @@ export const BLOCK_PANEL_CSS = `
 html.fa-bp .block-actions { display:flex; flex-direction:column; gap:4px; align-items:flex-end; font-size:.8rem; opacity:.3; }
 html.fa-bp .block-actions:hover, html.fa-bp .block-actions:focus-within, html.fa-bp *:hover > .block-actions, html.fa-bp p:hover + .block-actions { opacity:1; }
 html.fa-bp .block-actions > a, html.fa-bp .block-actions > .ba-existing { display:none; }
-@media (min-width:1100px) { html.fa-bp .block-actions { margin-right:-44px; } }
 .ba-ic { position:relative; width:28px; height:28px; padding:0; border:1px solid #8885; border-radius:7px; background:color-mix(in srgb, currentColor 5%, transparent); color:inherit; font-size:14px; line-height:1; cursor:pointer; }
 .ba-ic:hover, .ba-ic:focus-visible, .ba-ic[aria-expanded="true"] { border-color:var(--link,#0b5cad); }
 .ba-ic[aria-expanded="true"] { background:var(--link,#0b5cad); color:#fff; }
