@@ -887,7 +887,10 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     // engine's reading of `processes` does not reach it.
     within: "processes",
     tileIcon: "processes",
-    kgContent: true,
+    // NOT `kgContent`: that would make every instance declaring one a HARNESS
+    // (`kg-subscribe`'s rule: a harness kind holds Skills, Roles or
+    // Processes the engine runs), and the engine's corpus walk would reach it.
+    // A DAK's diagrams are content about work, like `folio`.
     anyLayer: true,
     description:
       "BPMN diagrams that DESCRIBE how people and organisations work, as content: a guideline's or an " +
