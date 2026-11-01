@@ -49,7 +49,10 @@ const NAMED = new RegExp(
     "globalTask|globalUserTask|globalScriptTask|globalManualTask|globalBusinessRuleTask|" +
     "startEvent|endEvent|intermediateCatchEvent|intermediateThrowEvent|boundaryEvent|" +
     "exclusiveGateway|parallelGateway|inclusiveGateway|eventBasedGateway|" +
-    "sequenceFlow|participant|collaboration)\\b[^>]*?\\sname=\"([^\"]*)\"",
+    "sequenceFlow|participant|collaboration|" +
+    // Stores are drawn as data stores, not lanes (owner, 2026-11-01, Q-BR-3 A),
+    // and a reader sees their names on the diagram.
+    "dataStore|dataStoreReference|dataObjectReference)\\b[^>]*?\\sname=\"([^\"]*)\"",
   "g",
 );
 
