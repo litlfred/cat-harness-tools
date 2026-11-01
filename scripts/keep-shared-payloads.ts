@@ -8,7 +8,7 @@
  * replaced into the site about to be published; it judges no graph
  *
  * ```sh
- * bun run cat-harness-tools/scripts/keep-shared-payloads.ts --site _site --pages pages
+ * bun run cat-harness-tools/scripts/keep-shared-payloads.ts --site _site --pages pages --state <run state dir>
  * ```
  *
  * ## Why
@@ -33,7 +33,7 @@
  * costs a broken page. `staging-share.ts` never lets a preview borrow a
  * retained blob, so a newer preview never depends on one.
  */
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 /** Where content-addressed payloads live, relative to the site root. */
@@ -111,6 +111,43 @@ export function planKeep(before: ReadonlySet<string>, after: ReadonlySet<string>
   return { version: 1, kept };
 }
 
+/** Where a run records the build's own payload set, so a retry can tell it from what an earlier attempt carried over. */
+export const ATTEMPT_FILE = "keep-shared-payloads.json";
+
+/**
+ * One publish attempt. `publish-gh-pages.sh` retries a rejected push with the
+ * SAME `site`, so the first attempt records which payloads the build itself
+ * wrote (in `state`, outside the published tree), and every later attempt
+ * first takes back what an earlier one carried over, and its record, before
+ * planning against the branch as it is now. Without that, a carried blob would
+ * read as the build's own on a retry and lose its retention entry.
+ */
+export function keepSharedPayloads(site: string, pages: string, state: string, now: string): { dropped: number; kept: string[] } {
+  const record = join(state, ATTEMPT_FILE);
+  let built: Set<string>;
+  if (existsSync(record)) {
+    built = new Set((JSON.parse(readFileSync(record, "utf-8")) as { built: string[] }).built);
+    for (const p of payloadFiles(site)) if (!built.has(p)) rmSync(join(site, p), { force: true });
+    rmSync(join(site, RETAINED_FILE), { force: true });
+  } else {
+    built = payloadFiles(site);
+    mkdirSync(state, { recursive: true });
+    writeFileSync(record, `${JSON.stringify({ built: [...built].sort() })}\n`);
+  }
+  const before = payloadFiles(pages);
+  const plan = planKeep(before, built, readRetained(pages), sharingPreviews(site), now);
+  const kept = Object.keys(plan.kept);
+  for (const p of kept) {
+    mkdirSync(dirname(join(site, p)), { recursive: true });
+    copyFileSync(join(pages, p), join(site, p));
+  }
+  if (kept.length || existsSync(join(pages, RETAINED_FILE))) {
+    mkdirSync(dirname(join(site, RETAINED_FILE)), { recursive: true });
+    writeFileSync(join(site, RETAINED_FILE), `${JSON.stringify(plan, null, 1)}\n`);
+  }
+  return { dropped: [...before].filter((p) => !built.has(p)).length, kept };
+}
+
 function flag(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 ? process.argv[i + 1] : undefined;
@@ -119,22 +156,11 @@ function flag(name: string): string | undefined {
 if (import.meta.main) {
   const site = flag("site");
   const pages = flag("pages");
-  if (!site || !pages) {
-    console.error("usage: keep-shared-payloads.ts --site <site about to publish> --pages <gh-pages checkout being replaced>");
+  const state = flag("state");
+  if (!site || !pages || !state) {
+    console.error("usage: keep-shared-payloads.ts --site <site about to publish> --pages <gh-pages checkout being replaced> --state <run state dir>");
     process.exit(2);
   }
-  const before = payloadFiles(pages);
-  const after = payloadFiles(site);
-  const plan = planKeep(before, after, readRetained(pages), sharingPreviews(site), new Date().toISOString());
-  const paths = Object.keys(plan.kept);
-  for (const p of paths) {
-    mkdirSync(dirname(join(site, p)), { recursive: true });
-    copyFileSync(join(pages, p), join(site, p));
-  }
-  if (paths.length || existsSync(join(pages, RETAINED_FILE))) {
-    mkdirSync(dirname(join(site, RETAINED_FILE)), { recursive: true });
-    writeFileSync(join(site, RETAINED_FILE), `${JSON.stringify(plan, null, 1)}\n`);
-  }
-  const dropped = [...before].filter((p) => !after.has(p)).length;
-  console.log(`keep-shared-payloads: ${dropped} payload file(s) dropped by this build; ${paths.length} kept for older previews`);
+  const r = keepSharedPayloads(site, pages, state, new Date().toISOString());
+  console.log(`keep-shared-payloads: ${r.dropped} payload file(s) dropped by this build; ${r.kept.length} kept for older previews`);
 }

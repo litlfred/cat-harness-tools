@@ -3,10 +3,10 @@
  * older preview may still borrow it (bean fwtz, Q-S2-2).
  */
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { payloadFiles, planKeep, readRetained, sharingPreviews } from "../../keep-shared-payloads.ts";
+import { keepSharedPayloads, payloadFiles, planKeep, readRetained, sharingPreviews } from "../../keep-shared-payloads.ts";
 import { planShare } from "../../staging-share.ts";
 
 function tree(files: Record<string, string>): string {
@@ -65,5 +65,33 @@ describe("reading the trees", () => {
     const live = tree({ [A]: "a", [B]: "b", "payload/retained.json": JSON.stringify({ version: 1, kept: { [A]: "2026-10-31T00:00:00Z" } }) });
     const preview = tree({ [A]: "a", [B]: "b" });
     expect(planShare(live, preview, "s1").shared).toEqual([B]);
+  });
+});
+
+describe("a retried publish (same site, newer branch)", () => {
+  test("a blob carried on the first attempt is not read as the build's own on the second", () => {
+    const pages = tree({ [A]: "a", [B]: "b" });
+    const site = tree({ [B]: "b", "STAGING/old/shared.json": "{}", "STAGING/old/.staged-at": "2026-10-31T00:00:00Z" });
+    const state = mkdtempSync(join(tmpdir(), "keep-state-"));
+    const first = keepSharedPayloads(site, pages, state, "2026-11-01T00:00:00.000Z");
+    expect(first.kept).toEqual([A]);
+    // The push lost a race; the branch the retry reads now carries the first attempt's record.
+    const pages2 = tree({ [A]: "a", [B]: "b", "payload/retained.json": JSON.stringify({ version: 1, kept: { [A]: "2026-11-01T00:00:00.000Z" } }) });
+    const second = keepSharedPayloads(site, pages2, state, "2026-11-01T00:05:00.000Z");
+    expect(second.kept).toEqual([A]);
+    expect(readRetained(site).kept).toEqual({ [A]: "2026-11-01T00:00:00.000Z" });
+  });
+
+  test("a retry that keeps nothing takes back the first attempt's carried blob and record", () => {
+    const pages = tree({ [A]: "a" });
+    const site = tree({ "STAGING/old/shared.json": "{}", "STAGING/old/.staged-at": "2026-10-31T00:00:00Z" });
+    const state = mkdtempSync(join(tmpdir(), "keep-state-"));
+    keepSharedPayloads(site, pages, state, "2026-11-01T00:00:00.000Z");
+    expect(existsSync(join(site, A))).toBe(true);
+    rmSync(join(site, "STAGING/old"), { recursive: true });
+    const second = keepSharedPayloads(site, tree({}), state, "2026-11-01T00:05:00.000Z");
+    expect(second.kept).toEqual([]);
+    expect(existsSync(join(site, A))).toBe(false);
+    expect(existsSync(join(site, "payload/retained.json"))).toBe(false);
   });
 });
