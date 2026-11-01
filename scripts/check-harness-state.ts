@@ -55,7 +55,7 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 import { directoriesForGraph, instanceRootsIn, repoRootFor } from "../schemas/kg/cat-harness.js";
 // The producer's OWN hash, not a re-derivation. See `healthProducerCurrent`.
@@ -203,7 +203,59 @@ function nodesOf(kind: string, ext: string): string[] {
  * a check that cannot pass is indistinguishable from a corpus that cannot be
  * fixed — which is worse than no check, because somebody eventually deletes it.
  */
-export function healthProducerCurrent(opts: { against?: string } = {}): Family {
+/**
+ * How long a report written by an OLD producer is still accepted: one daily
+ * `health` cycle plus slack. Owner, 2026-11-01 (Q-FAD-6 A): any edit to the
+ * checker moved the hash for every stored report at once, so the re-pin that
+ * brought the edit in was the PR this check blocked, and every repository had
+ * to re-run before any could re-pin. The daily run rewrites the report at the
+ * new producer within a day; past that, a mismatch is a real finding.
+ */
+export const HEALTH_PRODUCER_GRACE_HOURS = 26;
+
+/**
+ * Is a report under `root` this repository's OWN, rather than one a mounted
+ * instance carries? Only the own report is judged here: each other report is
+ * written at its repository's own tools pin and judged by that repository's
+ * own CI, which is the only place its producer is known (Q-FAD-6 A).
+ */
+export function isOwnHealthReport(path: string, repo: string, instanceRoots: readonly string[]): boolean {
+  const p = resolve(path);
+  const r = resolve(repo);
+  return !instanceRoots.some((root) => {
+    const i = resolve(root);
+    return i !== r && (p === i || p.startsWith(i + sep));
+  });
+}
+
+/** The finding for one report, or `undefined` when it is current or still in its grace period. Pure. */
+export function judgeHealthReport(
+  text: string,
+  accepted: readonly string[],
+  now: Date,
+): { detail: string } | undefined {
+  let node: { producer?: { script?: string; script_hash?: string }; updated_at?: string };
+  try {
+    node = JSON.parse(text) as typeof node;
+  } catch (e) {
+    return { detail: `does not parse as JSON: ${String(e)}` };
+  }
+  const script = node.producer?.script;
+  const recorded = node.producer?.script_hash;
+  if (!script || !recorded) return { detail: "records no producer, so it cannot be told from a result nobody produced" };
+  if (accepted.includes(recorded)) return undefined;
+  const written = Date.parse(node.updated_at ?? "");
+  const ageHours = (now.getTime() - written) / 3_600_000;
+  if (!Number.isNaN(written) && ageHours >= 0 && ageHours <= HEALTH_PRODUCER_GRACE_HOURS) return undefined;
+  return {
+    detail:
+      `written by \`${script}\` at ${recorded}${Number.isNaN(written) ? " (no readable updated_at)" : `, ${Math.round(ageHours)} h ago`}; ` +
+      `the checker is now ${accepted[0]}. Past the ${HEALTH_PRODUCER_GRACE_HOURS} h grace the daily run should have rewritten it: ` +
+      "re-run `bun run cat health`, or the remedies in it are the old producer's.",
+  };
+}
+
+export function healthProducerCurrent(opts: { against?: string; now?: Date } = {}): Family {
   const f: Family = {
     id: "health-result-is-from-the-current-producer",
     summary:
@@ -213,7 +265,10 @@ export function healthProducerCurrent(opts: { against?: string } = {}): Family {
     examined: 0,
     findings: [],
   };
-  const local = nodesOf("health", ".json");
+  const roots = instanceRootsIn(REPO);
+  const allLocal = nodesOf("health", ".json");
+  // Mounted instances' reports are left to their own repositories (Q-FAD-6 A).
+  const local = allLocal.filter((p) => isOwnHealthReport(p, REPO, roots));
   // ── Where the report is: here, or on the `qa-reports` branch (bean `0dav`) ──
   //
   // A result in the checkout is judged as it always was. With none here and a
@@ -279,26 +334,10 @@ export function healthProducerCurrent(opts: { against?: string } = {}): Family {
     f.stored = `qa-reports:${opts.against} holds no health report under the declared directories`;
     return f;
   }
+  const now = opts.now ?? new Date();
   for (const r of results) {
-    let node: { producer?: { script?: string; script_hash?: string } };
-    try {
-      node = JSON.parse(r.text()) as typeof node;
-    } catch (e) {
-      f.findings.push({ where: r.where, detail: `does not parse as JSON: ${String(e)}` });
-      continue;
-    }
-    const script = node.producer?.script;
-    const recorded = node.producer?.script_hash;
-    if (!script || !recorded) {
-      f.findings.push({ where: r.where, detail: "records no producer, so it cannot be told from a result nobody produced" });
-      continue;
-    }
-    if (recorded !== current && recorded !== preRelocation) {
-      f.findings.push({
-        where: r.where,
-        detail: `written by \`${script}\` at ${recorded}; the checker is now ${current}. Re-run \`bun run cat health\` and commit, or the remedies in it are the old producer's.`,
-      });
-    }
+    const finding = judgeHealthReport(r.text(), [current, preRelocation], now);
+    if (finding) f.findings.push({ where: r.where, ...finding });
   }
   return f;
 }
