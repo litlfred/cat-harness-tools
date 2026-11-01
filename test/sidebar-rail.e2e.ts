@@ -152,7 +152,7 @@ function railedPage(): string {
     instance: "cat-harness",
     hrefs: "resolved",
     openControl: "input",
-    root: { label: "Home", href: "/" },
+    headHref: "/",
     folders: HARNESS.navbar?.folders ?? [],
   });
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -359,8 +359,8 @@ test.describe("on desktop opening the rail shrinks content width so they do not 
     expect(closedContent.width - openContent.width).toBeCloseTo(openRail.width - closedRail.width, 1);
     await captureScreenshot(page, "rail-1280-open.png");
 
-    // Close restores width
-    await page.locator(".fa-nav-head-toggle").dispatchEvent("click");
+    // Close restores width (an open bar shows .fa-nav-head-toggle on hover, so a real click closes it without leaving :focus-visible)
+    await page.locator(".fa-nav-head-toggle").click();
     await expect(page.locator("#fa-nav-open")).not.toBeChecked();
     await page.mouse.move(1270, 790);
     await page.waitForTimeout(300);

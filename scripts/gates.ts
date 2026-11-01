@@ -982,7 +982,7 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     // (`apply`, `GC`, `write-404`, `verify`) — content-addressed deduplication,
     // manifest emission, and the fallback worker and root 404 — are covered by
     // `staging-share.test.ts` in `bun test`.
-    match: "staging-share.ts apply",
+    match: "staging-share.ts",
     kind: "ci-only",
     reason:
       "deduplicates the built `pages/STAGING/<slug>/` tree in the `gh-pages` checkout before the staging push; " +

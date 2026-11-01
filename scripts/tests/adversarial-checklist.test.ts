@@ -132,6 +132,7 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
     ]);
   });
 
+  // Walks the whole repository for fan-in, so it runs near the 5s default on CI (5.2s on #1227); same budget as the coverage walks below.
   it("ranks the 5 critical gate-path nodes first in risk ranking", () => {
     const candidates = gatherCandidateNodes(ROOT);
     expect(candidates.length).toBeGreaterThanOrEqual(5);
@@ -147,7 +148,7 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
       "merge-conflict-patterns",
       "kg-qa",
     ]);
-  });
+  }, 30_000);
 
   it("reviews a node adversarially producing valid AdversarialReview", () => {
     const testNode = {
@@ -189,6 +190,7 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
     expect(review.result).toBe("pass");
   });
 
+  // Walks the whole repository for fan-in, so it runs near the 5s default on CI (5.2s on #1227); same budget as the coverage walks below.
   it("executes backfill batch writing to sidecars and NEVER creates beans", () => {
     const beansDir = join(ROOT, "beans", "defs");
     const beanFilesBefore = existsSync(beansDir) ? readdirSync(beansDir) : [];
@@ -223,7 +225,7 @@ describe("Adversarial Backfill & Risk-Ranking (scripts/adversarial-backfill.ts)"
     // Verify NO new beans were created in beans/defs/
     const beanFilesAfter = existsSync(beansDir) ? readdirSync(beansDir) : [];
     expect(beanFilesAfter.length).toBe(beanFilesBefore.length);
-  });
+  }, 30_000);
 });
 
 describe("Audit Coverage Adversarial Integration (scripts/audit-coverage.ts)", () => {

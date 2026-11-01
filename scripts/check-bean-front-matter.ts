@@ -100,6 +100,7 @@ import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 
 import { repoRootFor } from "../schemas/kg/cat-harness.js";
+import { BeanStatusSchema } from "../schemas/tools/tool-types.ts";
 import {
   beanDefsDir,
   readBeanStore,
@@ -170,7 +171,17 @@ export type DefectKind =
    * issue citing the id is ambiguous. Baselined only at what the store held
    * when this landed ({@link DUPLICATE_ID_BASELINE}), so a NEW one fails.
    */
-  | "duplicate-id";
+  | "duplicate-id"
+  /**
+   * `status:` is missing or not in {@link BeanStatusSchema} (`draft`, `todo`,
+   * `in-progress`, `completed`, `scrapped`).
+   *
+   * `cat-tools-g7ls` was committed with `status: done` (#1089): valid YAML, so
+   * `parseYaml` accepted it, while `beans` refuses it, neither `OPEN_STATUSES`
+   * nor `CLOSED_STATUSES` contains it, and `milestoneRollup` counts it as
+   * `unclassified`.
+   */
+  | "invalid-status";
 
 /**
  * Which duplicated keys have an answer that is NOT the owner's to give.
@@ -407,6 +418,20 @@ export function checkBeanFrontMatter(root: string): FrontMatterReport {
   for (const b of files) {
     try {
       parseYaml(b.frontMatter);
+      if (!BeanStatusSchema.safeParse(b.status).success) {
+        const lines = b.frontMatter.split(/\r?\n/);
+        const idx = lines.findIndex((l) => /^status:[ \t]*/.test(l));
+        defects.push({
+          kind: "invalid-status",
+          id: b.id,
+          file: b.archived ? join("archive", b.file) : b.file,
+          line: idx >= 0 ? idx + 2 : null,
+          message: b.status
+            ? `status ${JSON.stringify(b.status)} is not in BeanStatusSchema (${BeanStatusSchema.options.join(", ")})`
+            : `missing status (must be one of ${BeanStatusSchema.options.join(", ")})`,
+          baselined: false,
+        });
+      }
       continue;
     } catch (strict) {
       // The discriminator: would the loader `beans` itself uses accept this?
@@ -553,11 +578,16 @@ function main(): void {
   const outstanding = report.defects.filter((d) => d.kind === "duplicate-key" && d.baselined);
   const duplicateIds = report.defects.filter((d) => d.kind === "duplicate-id" && !d.baselined);
   const outstandingIds = report.defects.filter((d) => d.kind === "duplicate-id" && d.baselined);
+  const invalidStatuses = report.defects.filter((d) => d.kind === "invalid-status");
 
   const at = (d: FrontMatterDefect): string => (d.line === null ? "" : `:${d.line}`);
 
   const failing =
-    unparseable.length > 0 || newDuplicates.length > 0 || unfenced.length > 0 || duplicateIds.length > 0;
+    unparseable.length > 0 ||
+    newDuplicates.length > 0 ||
+    unfenced.length > 0 ||
+    duplicateIds.length > 0 ||
+    invalidStatuses.length > 0;
   if (!failing) {
     console.log(
       "  ✓ no NEW defect — every bean's front matter loads, so `beans list`, `roadmap` " +
@@ -573,6 +603,9 @@ function main(): void {
   }
   for (const d of unparseable) {
     console.error(`  ✗ ${d.file}${at(d)} [${d.id}] UNPARSEABLE: ${d.message}`);
+  }
+  for (const d of invalidStatuses) {
+    console.error(`  ✗ ${d.file}${at(d)} [${d.id}] INVALID STATUS: ${d.message}`);
   }
   for (const d of duplicateIds) {
     console.error(`  ✗ ${d.file} [${d.id}] DUPLICATE ID: ${d.message}`);
