@@ -78,7 +78,7 @@ import { baseDocsDir } from "./compose-docs.js";
 import { skillPagesOf } from "./lib/skill-pages.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { workflowFiles, kgRoots } from "./known-skills.js";
-import { loadProcessModel, isActivity, isDecision, branchesOf, isGlobalTasksFile } from "../src/workflow/process-model.js";
+import { loadProcessModel, isActivity, isDecision, branchesOf, isGlobalTasksFile, type NotRunElement } from "../src/workflow/process-model.js";
 import {
   laneBinding,
   readRoleGraph,
@@ -173,6 +173,13 @@ export interface ProcessRow {
   markers?: Marker[];
   /** Set when the diagram would not load at all. Reported, never silently dropped. */
   loadError?: string;
+  /**
+   * What the diagram draws that the interpreter does not run (a boundary
+   * timer, an intermediate event): read past by a VIEW load, so the page is
+   * drawn, and named on it so nothing is dropped silently (owner, 2026-11-01,
+   * Q-SUBG-2 B). The engine still refuses to run such a diagram.
+   */
+  notRun?: NotRunElement[];
   /** Basename without `.bpmn` — the page name and the SVG name. */
   stem: string;
   /** `<bpmn:documentation>` on the process element. */
@@ -354,7 +361,8 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
     if (isGlobalTasksFile(xml)) continue;
     const declared = ownElementPattern(xml, "policy", String.raw`[^>]*\benforcement\s*=`, "").test(xml);
     try {
-      const m = await loadProcessModel(abs);
+      // A VIEW load: this page draws a process and runs nothing (Q-SUBG-2 B).
+      const m = await loadProcessModel(abs, [], new Map(), { view: true });
       const nodes = [...m.nodes.values()];
       const acts = nodes.filter(isActivity);
       const markers = svg ? await taskMarkers(xml, readFileSync(svgRel, "utf-8"), acts) : [];
@@ -382,6 +390,7 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
         ...(svg ? { svg } : {}),
         ...(markers.length > 0 ? { markers } : {}),
         stem: basename(abs, ".bpmn"),
+        ...(m.notRun ? { notRun: m.notRun } : {}),
         ...(m.documentation ? { documentation: m.documentation } : {}),
         laneDetails: m.lanes.map((l) => laneDetail(l, acts, roleGraph)),
         steps: acts.map((n) => ({
@@ -807,6 +816,16 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
 
   L.push("## Findings");
   L.push("");
+  const notRunRows = ok.filter((r) => r.notRun && r.notRun.length > 0);
+  if (notRunRows.length > 0) {
+    L.push(
+      `**${notRunRows.length} diagram(s) draw elements the engine does not run.** Each has its page, with the ` +
+        "elements listed; `workflow_start` refuses to run them.",
+    );
+    L.push("");
+    for (const r of notRunRows) L.push(`- \`${esc(r.file)}\` — ${uniq(r.notRun!.map((n) => `\`${n.type}\``)).join(", ")}`);
+    L.push("");
+  }
   if (broken.length > 0) {
     L.push(`**${broken.length} diagram(s) would not load.** Reported rather than omitted — a`);
     L.push("dropped file shrinks every denominator above and reads as one that does not exist.");
@@ -986,6 +1005,22 @@ export function processPage(
   L.push(`\`${row.id}\` · ${row.enforcement}${row.enforcementDeclared ? "" : " (defaulted)"} · ${row.activities} step(s)`);
   L.push("");
   L.push(row.documentation ? prose(row.documentation) : "_This process carries no `<bpmn:documentation>`._");
+  if (row.notRun && row.notRun.length > 0) {
+    L.push("");
+    L.push("{: .warning }");
+    L.push(
+      `> **Not run by the engine.** This diagram draws ${row.notRun.length} element(s) the process interpreter does not ` +
+        "implement. They are shown on the diagram and listed here, but `workflow_start` refuses to run this process until " +
+        "the interpreter supports them.",
+    );
+    L.push("");
+    L.push("| element | type | on |");
+    L.push("|---|---|---|");
+    const nameOf = new Map(row.steps.map((st) => [st.id, st.name]));
+    for (const n of row.notRun) {
+      L.push(`| ${esc(n.name ?? n.id)} | \`${n.type}\` | ${n.attachedTo ? esc(nameOf.get(n.attachedTo) ?? n.attachedTo) : "—"} |`);
+    }
+  }
   L.push("");
   if (row.svg) {
     // With markers, the diagram carries the ⓘ task panel (owner, 2026-10-16:

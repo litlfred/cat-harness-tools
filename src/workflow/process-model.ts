@@ -48,6 +48,12 @@ const ACTIVITY_TYPES = [
   "bpmn:Task",
   "bpmn:UserTask",
   "bpmn:ServiceTask",
+  // A send or receive task is a performed step whose work is a message: the
+  // walk is exactly a Task's (one token in, one out). Who may fulfil it is not
+  // constrained, as for `bpmn:Task` (`fulfilmentKindsForBpmnType`). A DAK's
+  // business processes use both (smart-trust onboarding, 2026-11-01).
+  "bpmn:SendTask",
+  "bpmn:ReceiveTask",
   "bpmn:CallActivity",
 ] as const;
 
@@ -665,9 +671,37 @@ export interface Precondition {
  */
 export type PreconditionVerdict = "satisfied" | "unsatisfied" | "could-not-determine";
 
+/**
+ * An element a VIEW load read past: a BPMN type the interpreter does not
+ * run, kept so a viewer names it rather than dropping it silently.
+ */
+export interface NotRunElement {
+  id: string;
+  type: string;
+  name?: string;
+  /** For a boundary event, the activity it sits on. */
+  attachedTo?: string;
+}
+
+/**
+ * How {@link loadProcessModel} reads a diagram. `view: true` is for a viewer
+ * that DRAWS a process and runs nothing (`gen-processes-viz.ts`): an element
+ * type the interpreter does not run is listed on {@link ProcessModel.notRun},
+ * with the sequence flows that touch it, instead of refusing the file. The
+ * engine never loads in view mode, so it still refuses to run such a diagram.
+ */
+export interface LoadOptions {
+  view?: boolean;
+}
+
 export interface ProcessModel {
   /** `bpmn:process/@id`, e.g. `Process_Editing`. */
   id: string;
+  /**
+   * Present only on a view load ({@link LoadOptions}) that met elements the
+   * interpreter does not run: what the diagram shows that a run would not do.
+   */
+  notRun?: NotRunElement[];
   name: string;
   /** File this was read from, for error messages and provenance. */
   source: string;
@@ -1843,6 +1877,7 @@ export async function loadProcessModel(
    * load, so a test that rewrites a fixture still sees its own disk.
    */
   homes: Map<string, { own?: Map<string, string>; dep?: Map<string, string>; globals?: Map<string, string> }> = new Map(),
+  opts: LoadOptions = {},
 ): Promise<ProcessModel> {
   const parsed = await sharedModdle.fromXML(readFileSync(bpmnPath, "utf-8"));
   const { rootElement } = parsed;
@@ -1883,7 +1918,20 @@ export async function loadProcessModel(
     return inner;
   });
   // Stores and data objects are read here and never walked (DATA_TYPES).
-  const elements = allElements.filter((e) => !DATA_TYPES.has(e.$type));
+  const walked = allElements.filter((e) => !DATA_TYPES.has(e.$type));
+  // A VIEW load lists what the interpreter does not run, and the flows that
+  // touch it, instead of refusing; a run load refuses below, as it always did.
+  const notRunEls = opts.view ? walked.filter((e) => !SUPPORTED.has(e.$type)) : [];
+  const notRunIds = new Set(notRunEls.map((e) => e.id));
+  const elements = walked.filter(
+    (e) =>
+      !notRunIds.has(e.id) &&
+      !(e.$type === "bpmn:SequenceFlow" && (notRunIds.has(e.sourceRef?.id ?? "") || notRunIds.has(e.targetRef?.id ?? ""))),
+  );
+  const notRun: NotRunElement[] = notRunEls.map((e) => {
+    const on = (e as { attachedToRef?: { id?: string } }).attachedToRef?.id;
+    return { id: e.id, type: e.$type, ...(cleanName(e.name) ? { name: cleanName(e.name) } : {}), ...(on ? { attachedTo: on } : {}) };
+  });
   const dataStores: DataStoreUse[] = allElements
     .filter((e) => e.$type === "bpmn:DataStoreReference" || e.$type === "bpmn:DataObjectReference")
     .map((e) => {
@@ -2348,13 +2396,14 @@ export async function loadProcessModel(
       (here.own ??= ownInstanceProcessIndex(dirname(bpmnPath))).get(node.calledElement) ??
       (here.dep ??= dependencyProcessIndex(dirname(bpmnPath))).get(node.calledElement);
     if (!home) continue;
-    const child = await loadProcessModel(home, path, homes);
+    const child = await loadProcessModel(home, path, homes, opts);
     children.set(node.id, child);
     checkAcceptedCodes(node, child, bpmnPath);
   }
 
   return {
     id: proc.id,
+    ...(notRun.length > 0 ? { notRun } : {}),
     name: cleanName(proc.name) || proc.id,
     source: bpmnPath,
     dir: dirname(bpmnPath),
