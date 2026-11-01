@@ -98,7 +98,11 @@ function readSidecars(): { byInstance: Map<string, Sidecar[]>; storeState: strin
         if (f.endsWith(".kg-qa.json")) files.push({ path: join(tree, f) });
       }
     }
+    // A home that holds no kg-audit sidecar is read from the store too: another
+    // writer (any test that leaves a sidecar in `test/results/`) can create the
+    // directory without putting a kg-qa file in it.
     if (files.length) out.set(key, files);
+    else absent.push({ key, home: relative(REPO, home).split("\\").join("/") });
   }
   if (absent.length === 0) return { byInstance: out, storeState: "not read: every qa home is in the working copy" };
   // The store is reached the way every reader reaches it: the checkout's

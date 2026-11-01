@@ -582,6 +582,7 @@
     "mount:remote": "bun run cat-harness-tools/scripts/remote-mount.ts",
     "mount:remote:check": "bun run cat-harness-tools/scripts/remote-mount.ts --check",
     "mount:repin:standing": "bun run cat-harness-tools/scripts/repin-standing.ts",
+    "mount:repin:cone": "bun run cat-harness-tools/scripts/repin-cone.ts",
     "state:visualizer": "bun run cat-harness-tools/scripts/state-visualizer.ts",
     "survey:owed": "bun run cat-harness-tools/scripts/survey.ts",
     "survey:publish": "bun run cat-harness-tools/scripts/survey.ts --publish",

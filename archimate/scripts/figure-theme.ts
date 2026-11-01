@@ -38,6 +38,27 @@ export function outlineOf(fill: string): string {
   return `#${d(n >> 16)}${d((n >> 8) & 255)}${d(n & 255)}`;
 }
 
+/** `hex` mixed with white: `f` = 0 is the colour, 1 is white. */
+export function tint(hex: string, f: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1]!, 16);
+  const c = (v: number) => Math.round(v + (255 - v) * f).toString(16).padStart(2, "0");
+  return `#${c(n >> 16)}${c((n >> 8) & 255)}${c(n & 255)}`;
+}
+
+/** `hex` darkened: `f` = 1 is the colour, 0 is black. */
+export function shade(hex: string, f: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1]!, 16);
+  const c = (v: number) => Math.round(v * f).toString(16).padStart(2, "0");
+  return `#${c(n >> 16)}${c((n >> 8) & 255)}${c(n & 255)}`;
+}
+
+/** A band of a poster in one layer's hue: a pale ground, and a deep header strip for white type. */
+export const bandColours = (fill: string) => ({ ground: tint(fill, 0.4), stroke: shade(fill, 0.62), header: shade(fill, 0.42) });
+
 /** The fill of an element type's box. */
 export const fillOfType = (type: string): string => LAYER_FILL[layerOf(type)];
 

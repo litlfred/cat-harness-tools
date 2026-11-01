@@ -93,6 +93,18 @@ export const EXEMPT: readonly Exemption[] = [
     script: "restore-staging",
     reason: "restores the previews a deploy would otherwise overwrite; a preview has none to restore",
   },
+  {
+    script: "docs-cone-dryrun",
+    reason:
+      "a DRY RUN of the deploy's page cone (bean fwtz): it writes no page, only its verdict into " +
+      "the deploy's build.json, so a preview that skips it serves exactly the same site",
+  },
+  {
+    script: "writer-cone-verify",
+    reason:
+      "a DRY RUN that judges the deploy's writers against the records writer-records.yml kept " +
+      "after the last deploy (bean fwtz); it writes no page, and a preview has no deploy to compare",
+  },
 ] as const;
 
 export interface Invocation {

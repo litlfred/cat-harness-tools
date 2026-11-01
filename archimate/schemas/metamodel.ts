@@ -2,6 +2,7 @@
  * The metamodel a model actually uses, derived from the model and checked
  * against ArchiMate's relationship table. Never drawn by hand.
  *
+ * @graphNode schema
  * @module cat-harness/archimate/schemas/metamodel
  * @conformsTo opengroup-archimate-3.0
  * @covers archimate

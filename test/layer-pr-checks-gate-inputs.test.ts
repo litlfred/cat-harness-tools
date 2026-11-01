@@ -93,6 +93,27 @@ describe("run-gates.py gate inputs", () => {
     expect(kind).toBe("needs-input");
     expect(why).toContain("--layer");
   });
+
+  test("software:check judges the runner, not the checkout (folio-assistant-core#287)", () => {
+    const [kind, why] = py("run-gates.py", `m.skip_reason(".", "software:check", {})`) as [string, string];
+    expect(kind).toBe("runner-state");
+    expect(why).toContain("machine");
+  });
+
+  test("the lock and default-branch gates are skipped in layer mode only (folio-assistant-core#287)", () => {
+    for (const s of ["mount:lock:check", "mount:remote:check", "check:draft-beans", "readmes:check", "readme-sections:check", "book:check", "check:standalone"]) {
+      const [kind] = py("run-gates.py", `m.skip_reason(".", ${JSON.stringify(s)}, {"MODE": "layer"})`) as [string, string];
+      expect(kind).toBe("layer-mode");
+      expect(py("run-gates.py", `m.skip_reason(".", ${JSON.stringify(s)}, {"MODE": "index"})`)).toEqual([null, null]);
+    }
+  });
+
+  test("the bare-usage gates are skipped as needs-input (folio-assistant-core#287)", () => {
+    for (const s of ["check:qa-corpus", "check:session-staleness", "folio:shim:check", "publish:check"]) {
+      const [kind] = py("run-gates.py", `m.skip_reason(".", ${JSON.stringify(s)}, {})`) as [string, string];
+      expect(kind).toBe("needs-input");
+    }
+  });
 });
 
 describe("root-cat-script.py", () => {

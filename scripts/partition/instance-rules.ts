@@ -393,8 +393,10 @@ export const RULES: Rule[] = [
       "schemas/content/withheld.ts",                 // what an instance must not publish — read by the harness mount (bean `mkao`)
       "schemas/tools/tool-types.ts",               // the Tool I/O type vocabulary
       "schemas/tools/store-tool-results.ts",       // typed results of the data store tools, part of the Tool I/O vocabulary (#1259)
+      "schemas/tools/workflow-tool-results.ts",    // typed results of the workflow engine tools, Tool I/O types (#1259)
       "schemas/sdlc/harness-state.ts",            // a harness's published state, the HarnessStates Tool I/O type (#1259)
       "schemas/sdlc/read-projections.ts",         // declared-path-literal: a partition plan names modules by path. Projected reads (#1291): instance discovery and the declaration walks report how they use a file
+      "schemas/sdlc/gates-report.ts",             // the gates and check:merged reports, Tool I/O types (#1259)
       "schemas/tools/tool-id.ts",                  // a Tool's id — imported by `tool.ts` and `remote-mount.ts` (cat-harness#581)
       "schemas/kg/repo-full-name.ts",           // `owner/name` — a Tool type AND the declaration's repository (bean `6rmv`)
       "schemas/kg/instance-repositories.ts",    // the derived owner/repo ↔ instance map (bean `6rmv`)

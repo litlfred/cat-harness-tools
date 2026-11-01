@@ -29,7 +29,7 @@
  * Every string is escaped: a name is text, never markup.
  */
 import type { ArchimateElement, ArchimateModel, ArchimateView, ArchimateViewNode } from "../schemas/archimate.ts";
-import { fillOfType, outlineOf, THEME } from "./figure-theme.ts";
+import { bandColours, fillOfType, outlineOf, THEME } from "./figure-theme.ts";
 
 export interface PosterOptions {
   /** The property holding a card's short text. Default `figureNote`. */
@@ -201,6 +201,16 @@ export function renderPosterSvg(model: ArchimateModel, view: ArchimateView, opts
     const g = t.kids.filter(isGroup);
     return g.length > 1 && g.length === t.kids.length && new Set(g.map((k) => k.node.y)).size === g.length;
   };
+  // A band takes the hue of the layer most of its elements are in.
+  const leaves = (t: Tree): Tree[] => (isGroup(t) ? t.kids.flatMap(leaves) : [t]);
+  const hueOf = (t: Tree): string => {
+    const n = new Map<string, number>();
+    for (const l of leaves(t)) {
+      const f = fillOfType(l.el?.type ?? "");
+      n.set(f, (n.get(f) ?? 0) + 1);
+    }
+    return [...n.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "#ffffff";
+  };
   const PAD = 36;
   const COLW = side.length ? 270 : 0;
   const LW = W - 2 * PAD - (side.length ? COLW + 16 : 0);
@@ -209,12 +219,13 @@ export function renderPosterSvg(model: ArchimateModel, view: ArchimateView, opts
     const sub = prop(t.el, NOTE);
     const hdr = sub ? 40 : 28;
     if (stackedGroups(t)) {
+      const frameAt = out.length;
       let h = hdr;
       for (const k of t.kids) h += band(k, x + 8, y + h, w - 16, draw) + 10;
       if (draw) {
-        out.push(`<rect x="${x}" y="${y}" width="${w}" height="${h + 4}" rx="10" fill="none" stroke="${THEME.frame}" stroke-width="2.2"/>`);
-        T(x + 14, y + 20, nameOf(t).toUpperCase(), 12, 700, THEME.frame);
-        if (sub) T(x + 14, y + 34, sub, 10, 400, THEME.muted, "start", true);
+        out.splice(frameAt, 0, `<rect x="${x}" y="${y}" width="${w}" height="${h + 4}" rx="10" fill="#ffffff" stroke="${THEME.frame}" stroke-width="2.2"/>`, `<path d="M${x} ${y + 10} a10 10 0 0 1 10 -10 h${w - 20} a10 10 0 0 1 10 10 v${hdr - 14} h${-w} z" fill="${THEME.frame}"/>`);
+        T(x + 14, y + 19, nameOf(t).toUpperCase(), 12, 700, "#ffffff");
+        if (sub) T(x + 14, y + 33, sub, 10, 400, "#dfe5ee", "start", true);
       }
       return h + 4;
     }
@@ -222,9 +233,11 @@ export function renderPosterSvg(model: ArchimateModel, view: ArchimateView, opts
     const inner = panels ? panelRow(t.kids, x + 12, y + hdr, w - 24, false) : cardRow(t.kids, x + 12, y + hdr, w - 24, false);
     const h = hdr + inner + 12;
     if (draw) {
-      R(x, y, w, h, THEME.band, THEME.bandStroke, 8, 1.4);
-      T(x + 14, y + 19, nameOf(t).toUpperCase(), 11, 700, THEME.ink);
-      if (sub) T(x + 14, y + 33, sub, 10, 400, THEME.muted, "start", true);
+      const c = bandColours(hueOf(t));
+      R(x, y, w, h, c.ground, c.stroke, 8, 1.4);
+      out.push(`<path d="M${x} ${y + 8} a8 8 0 0 1 8 -8 h${w - 16} a8 8 0 0 1 8 8 v${hdr - 12} h${-w} z" fill="${c.header}"/>`);
+      T(x + 14, y + 18, nameOf(t).toUpperCase(), 11, 700, "#ffffff");
+      if (sub) T(x + 14, y + 32, sub, 10, 400, "#ffffff", "start", true);
       if (panels) panelRow(t.kids, x + 12, y + hdr, w - 24, true);
       else cardRow(t.kids, x + 12, y + hdr, w - 24, true);
     }
@@ -272,8 +285,10 @@ export function renderPosterSvg(model: ArchimateModel, view: ArchimateView, opts
     }
     const col = out.splice(save);
     bottom = Math.max(bottom, yy);
-    R(x, TOP, COLW, bottom - TOP, THEME.band, THEME.header, 10, 2, "8 5");
-    out.push(...col, ...body);
+    const c = bandColours(hueOf({ node: side[0]!.node, kids: side, el: undefined } as Tree));
+    R(x, TOP, COLW, bottom - TOP, c.ground, c.header, 10, 2, "8 5");
+    out.push(`<path d="M${x} ${TOP + 10} a10 10 0 0 1 10 -10 h${COLW - 20} a10 10 0 0 1 10 10 v26 h${-COLW} z" fill="${c.header}"/>`);
+    out.push(...col.map((l) => (l.includes(`text-anchor="middle"`) && l.includes('font-size="13"') ? l.replace(`fill="${THEME.ink}"`, 'fill="#ffffff"') : l)), ...body);
   }
   // Key.
   let ky = bottom + 28;
@@ -290,8 +305,9 @@ export function renderPosterSvg(model: ArchimateModel, view: ArchimateView, opts
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family='${THEME.font}' role="img" aria-label="${esc(title)}">`,
     `<rect width="${W}" height="${H}" fill="${THEME.page}"/>`,
-    `<text x="${PAD}" y="44" font-size="26" font-weight="800" fill="${THEME.ink}">${esc(title)}</text>`,
-    `<text x="${PAD}" y="64" font-size="11" fill="${THEME.muted}" font-style="italic">Drawn from the ArchiMate model “${esc(model.name)}”, view “${esc(view.name)}”</text>`,
+    `<rect width="${W}" height="72" fill="${THEME.frame}"/>`,
+    `<text x="${PAD}" y="42" font-size="26" font-weight="800" fill="#ffffff">${esc(title)}</text>`,
+    `<text x="${PAD}" y="61" font-size="11" fill="#c9d6e6" font-style="italic">Drawn from the ArchiMate model “${esc(model.name)}”, view “${esc(view.name)}”</text>`,
     ...out,
     ...key,
     "</svg>",

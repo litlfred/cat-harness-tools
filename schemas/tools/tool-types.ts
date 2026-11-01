@@ -105,6 +105,14 @@ export const ScriptNameSchema = z
 import { RepoFullNameSchema } from "../kg/repo-full-name.js";
 import { BeanClaimCheckSchema, BeanQueryRowsSchema, DrainQueueSchema, OpenWorkLookupSchema, SessionSweepSchema } from "./store-tool-results.js";
 import { HarnessStatesSchema } from "../sdlc/harness-state.js";
+import { GatesReportTypeSchema, MergedGatesReportTypeSchema } from "../sdlc/gates-report.js";
+import {
+  WorkflowCompletionSchema,
+  WorkflowGateAnswerSchema,
+  WorkflowListingSchema,
+  WorkflowPositionSchema,
+  WorkflowStartedSchema,
+} from "./workflow-tool-results.js";
 export { RepoFullNameSchema };
 
 /** A pull/merge request number. */
@@ -801,6 +809,13 @@ export const TOOL_TYPES = {
   SessionSweep: SessionSweepSchema,
   BeanQueryRows: BeanQueryRowsSchema,
   HarnessStates: HarnessStatesSchema,
+  WorkflowListing: WorkflowListingSchema,
+  WorkflowStarted: WorkflowStartedSchema,
+  WorkflowPosition: WorkflowPositionSchema,
+  WorkflowGateAnswer: WorkflowGateAnswerSchema,
+  WorkflowCompletion: WorkflowCompletionSchema,
+  GatesReport: GatesReportTypeSchema,
+  MergedGatesReport: MergedGatesReportTypeSchema,
 } as const;
 
 export type ToolTypeName = keyof typeof TOOL_TYPES;
