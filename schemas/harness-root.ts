@@ -27,6 +27,7 @@
  * Does not throw at import: a module that only needs the harness for one
  * function should still load where the harness is absent.
  *
+ * @graphNode none — functions that locate the harness instance; no schema
  * @module schemas/harness-root
  */
 import { existsSync } from "node:fs";

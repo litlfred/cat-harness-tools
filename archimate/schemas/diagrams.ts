@@ -2,6 +2,7 @@
  * Derived UML data class diagrams and sequence diagrams from an ArchiMate model
  * (and optional FSH Logical Models and BPMN processes): smart-ra#166 D5.
  *
+ * @graphNode schema
  * @module cat-harness/archimate/schemas/diagrams
  * @conformsTo opengroup-archimate-3.0
  * @covers archimate

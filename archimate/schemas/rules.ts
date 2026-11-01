@@ -14,6 +14,7 @@
  * for the model's authors to fix or for the editors to add a rule. Nothing
  * here rewrites the rules from the model.
  *
+ * @graphNode schema
  * @module cat-harness/archimate/schemas/rules
  * @conformsTo opengroup-archimate-3.0
  * @covers archimate
