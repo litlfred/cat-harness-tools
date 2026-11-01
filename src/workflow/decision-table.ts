@@ -47,6 +47,13 @@ export interface TableInput {
   /** The fact this column reads, e.g. `deferredSorries`. */
   expression: string;
   typeRef?: string;
+  /**
+   * The column's declared values (DMN `inputValues`), as the literals written
+   * there, e.g. `["\"assigned\"", "\"not assigned\"", "\"unknown\""]`.
+   * Absent when the file declares none. The evaluator does not read it; the
+   * table checks in `dmn-qa.ts` use it as the column's domain.
+   */
+  allowedValues?: string[];
 }
 
 export interface TableRule {
@@ -56,6 +63,8 @@ export interface TableRule {
   /** One literal per output column, in order. */
   then: string[];
   description?: string;
+  /** DMN 1.3 rule annotations (`annotationEntry`), in column order. */
+  annotations?: string[];
 }
 
 export interface DecisionTable {
@@ -79,13 +88,18 @@ interface ModdleAny {
   drgElement?: ModdleAny[];
   decisionLogic?: ModdleAny;
   hitPolicy?: string;
-  input?: { label?: string; inputExpression?: { text?: string; typeRef?: string } }[];
+  input?: {
+    label?: string;
+    inputExpression?: { text?: string; typeRef?: string };
+    inputValues?: { text?: string };
+  }[];
   output?: { name?: string; label?: string; typeRef?: string }[];
   rule?: {
     id?: string;
     description?: string;
     inputEntry?: { text?: string }[];
     outputEntry?: { text?: string }[];
+    annotationEntry?: { text?: string }[];
   }[];
 }
 
@@ -141,7 +155,13 @@ export async function loadDecisionTable(dmnPath: string, decisionId: string): Pr
     if (!expression) {
       throw new UnsupportedDmn(`${decisionId}: input column ${n + 1} has no input expression`);
     }
-    return { label: i.label, expression, typeRef: i.inputExpression?.typeRef };
+    const declared = i.inputValues?.text?.trim();
+    return {
+      label: i.label,
+      expression,
+      typeRef: i.inputExpression?.typeRef,
+      ...(declared ? { allowedValues: splitTop(declared) } : {}),
+    };
   });
 
   const outputs = (table.output ?? []).map((o, n) => o.name ?? o.label ?? `output${n + 1}`);
@@ -157,7 +177,14 @@ export async function loadDecisionTable(dmnPath: string, decisionId: string): Pr
           `and ${outputs.length} outputs`,
       );
     }
-    return { id: r.id ?? `rule-${n + 1}`, when, then, description: r.description };
+    const annotations = (r.annotationEntry ?? []).map((e) => (e.text ?? "").trim()).filter(Boolean);
+    return {
+      id: r.id ?? `rule-${n + 1}`,
+      when,
+      then,
+      description: r.description,
+      ...(annotations.length > 0 ? { annotations } : {}),
+    };
   });
   if (rules.length === 0) throw new UnsupportedDmn(`${decisionId}: no rules`);
 
@@ -209,7 +236,7 @@ export async function listDecisions(dmnPath: string): Promise<DecisionSummary[]>
 // ── the FEEL subset ──────────────────────────────────────────────
 
 /** Parse a DMN literal: a quoted string, a number, or a boolean. */
-function literal(text: string): string | number | boolean {
+export function literal(text: string): string | number | boolean {
   const t = text.trim();
   if (/^".*"$/.test(t)) return t.slice(1, -1);
   if (t === "true") return true;
@@ -233,7 +260,7 @@ function literal(text: string): string | number | boolean {
  * An unbalanced paren is left for {@link unaryTest} to refuse — this function
  * only decides where the commas are.
  */
-function splitTop(text: string): string[] {
+export function splitTop(text: string): string[] {
   const out: string[] = [];
   let cur = "";
   let inQuotes = false;
