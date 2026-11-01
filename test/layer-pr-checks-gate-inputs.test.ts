@@ -101,7 +101,7 @@ describe("run-gates.py gate inputs", () => {
   });
 
   test("the lock and default-branch gates are skipped in layer mode only (folio-assistant-core#287)", () => {
-    for (const s of ["mount:lock:check", "mount:remote:check", "check:draft-beans"]) {
+    for (const s of ["mount:lock:check", "mount:remote:check", "check:draft-beans", "readmes:check", "readme-sections:check", "book:check", "check:standalone"]) {
       const [kind] = py("run-gates.py", `m.skip_reason(".", ${JSON.stringify(s)}, {"MODE": "layer"})`) as [string, string];
       expect(kind).toBe("layer-mode");
       expect(py("run-gates.py", `m.skip_reason(".", ${JSON.stringify(s)}, {"MODE": "index"})`)).toEqual([null, null]);

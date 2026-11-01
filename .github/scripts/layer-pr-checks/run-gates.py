@@ -186,9 +186,13 @@ RUNNER_STATE_SCRIPTS = {
 # at their own tips rather than at the index's lock (folio-assistant-core#287).
 # The index's own run, where both hold, runs them.
 LAYER_MODE_SCRIPTS = {
+    "book:check": "reads bootstrap's COMMITTED tree (git ls-files --cached), and a mount in the index is never committed, so it sees no README",
     "check:draft-beans": "reads the root's default branch, and layer mode swaps the caller in without its .git",
+    "check:standalone": "rehearses bootstrap-tools standing alone, which only its own checkout can; in the index the copy's git init fails",
     "mount:lock:check": "compares the mounts with the index's lock, and layer mode mounts each layer at its own tip, not at the lock",
     "mount:remote:check": "compares the mounts with the index's lock, and layer mode mounts each layer at its own tip, not at the lock",
+    "readme-sections:check": "reads the COMMITTED tree (git ls-files --cached), and a mount in the index is never committed, so every section reads empty",
+    "readmes:check": "reads the COMMITTED tree (git ls-files --cached), and a mount in the index is never committed, so every directory reads empty",
 }
 # Gates that judge an INPUT this runner never supplies: run bare, each prints
 # its usage and exits 2 ("could not determine") on base and head alike, so it
