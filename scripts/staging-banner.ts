@@ -508,7 +508,7 @@ export function run(
     const { html: after, outcome } = injectInto(before);
     // A bodiless redirect stub is never shown: the browser leaves it at once
     // for the page it names, which carries its own banner. Counted, not failed
-    // (who-iris/catalogue/index.html, 2026-11-01).
+    // (the IRIS layer's catalogue page, 2026-11-01).
     if (outcome === "no-body" && isRedirectStub(before)) redirects++;
     else if (outcome === "no-body") noBody.push(relative(site, f));
     else if (outcome === "already") skipped++;
