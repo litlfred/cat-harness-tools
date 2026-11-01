@@ -426,7 +426,7 @@ export function readStoreBeans(store: string, root: string): BeanNode[] | null {
 function beansIn(dir: string, root: string): BeanNode[] {
   const out: BeanNode[] = [];
   for (const name of readdirSync(dir).sort()) {
-    if (!name.endsWith(".md")) continue;
+    if (!name.endsWith(".md") || name === "README.md") continue;
     const text = readFileSync(join(dir, name), "utf-8");
     const m = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text);
     // A file with no front matter is not a bean. `beans check` owns that.
