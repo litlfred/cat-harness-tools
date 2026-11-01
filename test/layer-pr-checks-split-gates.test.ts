@@ -9,7 +9,9 @@
  */
 import { describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 const RUN_GATES = resolve(import.meta.dir, "..", ".github", "scripts", "layer-pr-checks", "run-gates.py");
 
@@ -68,6 +70,21 @@ describe("run-gates.py split_gates", () => {
       ].join("\n"),
     ) as string[][];
     expect(names.every((s) => s.length === 1)).toBe(true);
+  });
+  test("a side whose check-standalone.ts has no --part keeps the gate whole", () => {
+    const root = mkdtempSync(join(tmpdir(), "split-gates-"));
+    mkdirSync(join(root, "cat-harness-tools", "scripts"), { recursive: true });
+    const at = (src: string | null) => {
+      if (src !== null) writeFileSync(join(root, "cat-harness-tools", "scripts", "check-standalone.ts"), src);
+      return Object.keys(py(`print(json.dumps(m.split_gates(json.loads(${JSON.stringify(JSON.stringify(gates))}), "bun run cat", root=${JSON.stringify(root)})))`) as object);
+    };
+    try {
+      expect(at(null)).toContain(whole);
+      expect(at("const x = 1;\n")).toContain(whole);
+      expect(at('const partArg = arg("--part", argv);\n')).toContain(`${whole}#4/4`);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
   test("a gate with another script is untouched", () => {
     const g = py(`print(json.dumps(m.split_gates({"x:check:bootstrap-standalone": "bun run cat check:bootstrap-standalone"}, "bun run cat")))`);
