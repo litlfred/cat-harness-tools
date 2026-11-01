@@ -33,6 +33,13 @@
  *    GitHub, at the commit the index pins (`index.lock.json`). Two or more
  *    candidates are left alone: a guess is worse than a reported dead link.
  *
+ * 3. **Then every link at a pin is made pin-free** (`lib/pin-links.ts`). A
+ *    link to a layer's file at the commit `index.lock.json` pins, or to this
+ *    repository at `--sha`, becomes `…/blob/HEAD/…` with `data-fa-pin`, and
+ *    the browser puts the commit back from one `pins.json`. A re-pin then
+ *    changes that one file, not every page linking into the layer (bean
+ *    `fwtz`, "Shrinking the cone itself"). Links at any other commit stay.
+ *
  * Everything else is reported, never guessed at. The report is the check:
  * exit 1 when any internal link is still dead, so the workflow can carry it as
  * "reported, not blocking" the way it carries the tiles check.
@@ -44,6 +51,7 @@ import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "
 import { join, posix, relative, sep } from "node:path";
 
 import { UN_LOCALES } from "../schemas/content/translation.ts";
+import { unpinSite } from "./lib/pin-links.ts";
 
 /** Locales a page can be TRANSLATED into: the UN set without the source. */
 export const TRANSLATED_LOCALES: ReadonlySet<string> = new Set(UN_LOCALES.filter((l) => l !== "en"));
@@ -202,6 +210,15 @@ export interface Repoint {
  */
 const CARRIED = new Set(["STAGING", "_render-log"]);
 
+/**
+ * Whether `rel` lies under a carried directory. A link INTO one is not this
+ * build's to judge either: the deploy lays the carried tree back after the
+ * check, so it is absent from the built site the check reads.
+ */
+export function carried(rel: string): boolean {
+  return CARRIED.has(rel.split("/")[0]!);
+}
+
 /** Every HTML page under `site` that this build wrote, site-relative. */
 export function sitePages(site: string): string[] {
   const out: string[] = [];
@@ -268,7 +285,7 @@ export function checkSite(opts: {
     const next = html.replace(ATTR, (whole, attr: string, value: string) => {
       if (!isInternal(value)) return whole;
       const target = targetOf(page, value, opts.basePath);
-      if (target === undefined || served(opts.site, target)) return whole;
+      if (target === undefined || served(opts.site, target) || carried(target)) return whole;
       if (opts.fix) {
         const r = repointFor(opts.site, page, target, opts.resolveSource);
         if (r) {
@@ -303,8 +320,8 @@ if (import.meta.main) {
     process.exit(2);
   }
   let resolveSource: (rel: string) => string | undefined = () => undefined;
+  const origins = fix ? originsOf(root, repo && sha ? { repository: repo, ref: sha } : undefined) : [];
   if (fix) {
-    const origins = originsOf(root, repo && sha ? { repository: repo, ref: sha } : undefined);
     const idx = tailIndex(checkoutFiles(root));
     resolveSource = (rel) => {
       for (const c of sourceCandidates(rel)) {
@@ -317,6 +334,10 @@ if (import.meta.main) {
   const { dead, repointed, pages } = checkSite({ site, basePath, fix, resolveSource });
   const byWhy = (w: Repoint["why"]): number => repointed.filter((r) => r.why === w).length;
   if (fix) console.log(`site-dead-links: repointed ${byWhy("locale")} link(s) to the untranslated page and ${byWhy("source")} to their source on GitHub`);
+  if (fix) {
+    const u = unpinSite(site, sitePages(site), origins);
+    console.log(`site-dead-links: made ${u.links} pinned link(s) on ${u.pages} page(s) resolve their commit from pins.json in the browser`);
+  }
   const targets = new Map<string, { n: number; page: string }>();
   for (const d of dead) {
     const t = targets.get(d.target);

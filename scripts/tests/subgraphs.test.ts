@@ -21,7 +21,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import {
   isDerivedGraph,
@@ -34,6 +34,7 @@ import { addressesPublishedTree, overDeepLinks, scanSubgraphs } from "../check-s
 import { GraphTypologyRegistry, type GraphTypologyDef } from "../../schemas/kg/graph-typology-registry.ts";
 import { checkoutDirectories } from "../../schemas/kg/harness-config.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { siteNotBuilt } from "../../test/support/checkout.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const dirs = resolveDirectories([{ name: "(local)", root: ROOT, own: true }]);
@@ -211,7 +212,14 @@ describe("the `../` too many count is COMPUTED (bean `syrl`)", () => {
   // the answer can disagree with the declaration.
   const siteDir = resolve(ROOT, siteDirFor(ROOT));
 
-  test("a target that resolves after dropping one `../` IS one", () => {
+  // The page it lands on is a generated skill reference page, written at
+  // publish and gitignored (bean w1gy F18).
+  test.skipIf(
+    siteNotBuilt(
+      "the skill reference pages `skills:docs` writes at publish (gitignored)",
+      join(siteDir, "reference", "skill-instructions", "index.md"),
+    ),
+  )("a target that resolves after dropping one `../` IS one", () => {
     // From `docs/reference/skill-instructions/`, `../../skill-instructions/…`
     // lands in `docs/` — nothing there — while dropping one `../` lands on
     // the page's own directory, where `index.md` is.

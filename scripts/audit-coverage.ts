@@ -161,6 +161,7 @@ import {
 } from "../schemas/kg/cat-harness.js";
 import { KG_CRITERIA, KG_SUBJECT_GRAPH_TYPOLOGIES, type KgQaReport, type KgSubjectKind } from "../schemas/sdlc/kg-qa.js";
 import { gitFiles } from "../schemas/sdlc/git-corpus.ts";
+import { attestationsHomeFor, kgAttestationTrees, storedAdversarialReviews } from "../schemas/sdlc/qa-attestations.ts";
 import { contentIsOffCheckout, resolveSubgraphSource, type SubgraphSource } from "../schemas/kg/subgraph-source.ts";
 // The same single reader `check:declared-dirs` uses, so the two gates cannot
 // disagree about whether a tip-keyed graph is readable here (bean `9ofm`).
@@ -176,6 +177,8 @@ import {
 } from "./qa-results.js";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { quietly } from "../schemas/sdlc/input-trace.ts";
+import { readQaTree } from "./qa-store.ts";
 import { rootProfile } from "./lib/root-gate-set.ts";
 import { exitNotApplicable } from "./lib/not-applicable.ts";
 import { stateMountedDirs } from "./mount-from-lock.ts";
@@ -675,11 +678,49 @@ export function kindUniverse(repo: string): { registered: string[]; declaredOnly
 /**
  * Adversarial review coverage per declared graph typology (proposal §7, child lvlv).
  *
- * Scans `test/results/kg-qa/` sidecars for `adversarial_reviews[]` and checks freshness
- * against the subject's current source hash.
+ * Reads `adversarial_reviews[]` from two places and checks each against the
+ * subject's current source hash:
+ *
+ * - the attestation store (`test/attestations/adversarial-review/`, ruling D2 (a)), where
+ *   the reviews are committed and pinned by `source_hash`;
+ * - the derived `test/results/kg-qa/` sidecars, which still carry the reviews
+ *   `adversarial-backfill` wrote before the store held them, pinned by
+ *   `source_hash`.
+ *
+ * The derived tree is not committed since cat-harness#857 and no generator
+ * writes the reviews, so a reader that looked only there reported every
+ * reviewed kind as `never` on a fresh checkout.
  */
 export function adversarialCoverageByGraph(repo: string, root: string = ROOT): Map<string, AdversarialCoverageState> {
   const result = new Map<string, { hasFresh: boolean; hasStale: boolean }>();
+
+  const record = (
+    subject: { kind?: string; path?: string | null } | undefined,
+    pinned: string | undefined,
+  ): void => {
+    const subjKind = subject?.kind as KgSubjectKind | undefined;
+    const graph = subjKind ? KG_SUBJECT_GRAPH_TYPOLOGIES[subjKind] : undefined;
+    if (!graph) return;
+
+    let isFresh = true;
+    if (subject?.path) {
+      const candidates = [join(root, subject.path), join(repo, subject.path), join(repo, "cat-harness", subject.path)];
+      for (const cand of candidates) {
+        if (existsSync(cand)) {
+          const currentHash = createHash("sha256").update(readFileSync(cand)).digest("hex").slice(0, 12);
+          if (pinned && pinned !== currentHash) {
+            isFresh = false;
+          }
+          break;
+        }
+      }
+    }
+
+    const existing = result.get(graph) ?? { hasFresh: false, hasStale: false };
+    if (isFresh) existing.hasFresh = true;
+    else existing.hasStale = true;
+    result.set(graph, existing);
+  };
 
   const scanDir = (dir: string): void => {
     if (!existsSync(dir)) return;
@@ -697,28 +738,7 @@ export function adversarialCoverageByGraph(repo: string, root: string = ROOT): M
         try {
           const sc = JSON.parse(readFileSync(full, "utf-8")) as KgQaReport;
           if (!sc.adversarial_reviews || sc.adversarial_reviews.length === 0) continue;
-          const subjKind = sc.subject?.kind;
-          const graph = subjKind ? KG_SUBJECT_GRAPH_TYPOLOGIES[subjKind] : undefined;
-          if (!graph) continue;
-
-          let isFresh = true;
-          if (sc.subject?.path) {
-            const candidates = [join(root, sc.subject.path), join(repo, sc.subject.path), join(repo, "cat-harness", sc.subject.path)];
-            for (const cand of candidates) {
-              if (existsSync(cand)) {
-                const currentHash = createHash("sha256").update(readFileSync(cand)).digest("hex").slice(0, 12);
-                if (sc.source_hash && sc.source_hash !== currentHash) {
-                  isFresh = false;
-                }
-                break;
-              }
-            }
-          }
-
-          const existing = result.get(graph) ?? { hasFresh: false, hasStale: false };
-          if (isFresh) existing.hasFresh = true;
-          else existing.hasStale = true;
-          result.set(graph, existing);
+          record(sc.subject, sc.source_hash ?? undefined);
         } catch {
           // ignore unparseable sidecar
         }
@@ -730,6 +750,38 @@ export function adversarialCoverageByGraph(repo: string, root: string = ROOT): M
   if (repo !== root) {
     scanDir(join(repo, "test", "results", "kg-qa"));
     scanDir(join(repo, "cat-harness", "test", "results", "kg-qa"));
+  }
+
+  // The committed half. The harness root's own store first, then every
+  // instance's that `kg-audit` would resolve from it; a layout whose
+  // instances cannot be listed still reads the harness root's.
+  const homes = new Set<string>([resolve(attestationsHomeFor(root).root)]);
+  try {
+    for (const t of kgAttestationTrees(repo, root)) homes.add(resolve(t.attHome));
+  } catch {
+    // instance discovery failed: the harness root's store is still read
+  }
+  for (const home of homes) {
+    for (const s of storedAdversarialReviews(home)) record(s.file.subject, s.file.source_hash ?? undefined);
+  }
+  if (!result.get("tools")?.hasFresh || !result.get("skills")?.hasFresh) {
+    try {
+      const store = quietly(() => readQaTree("main", "", { repoRoot: repo, log: () => {} }));
+      if (store.state === "hit") {
+        for (const [rel, text] of store.files) {
+          if (!rel.endsWith(".kg-qa.json") || !rel.includes("/kg-qa/")) continue;
+          try {
+            const sc = JSON.parse(text) as KgQaReport;
+            if (!sc.adversarial_reviews || sc.adversarial_reviews.length === 0) continue;
+            record(sc.subject, sc.source_hash ?? undefined);
+          } catch {
+            // ignore unparseable sidecar
+          }
+        }
+      }
+    } catch {
+      // ignore unreachable store
+    }
   }
 
   const out = new Map<string, AdversarialCoverageState>();

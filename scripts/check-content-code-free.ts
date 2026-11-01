@@ -52,7 +52,14 @@ export const CODE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".
 export const BROWSER_ASSET_DIRS = ["site-chrome/assets/", "site-chrome/_includes/", "docs/assets/"] as const;
 
 export const isBrowserAsset = (rel: string): boolean =>
-  /\.m?js$/.test(rel) && BROWSER_ASSET_DIRS.some((d) => rel.startsWith(d));
+  /\.m?js$/.test(rel) && (BROWSER_ASSET_DIRS.some((d) => rel.startsWith(d)) || BUILT_PAGE_ASSET.test(rel));
+
+/**
+ * A page built at publish under `docs/<lang>/` ships its script beside it in an
+ * `assets/` folder (the OpenAPI viewer's `openapi.js`, folio-assistant#2741).
+ * It is a browser asset by the same rule as above, and it is never tracked.
+ */
+export const BUILT_PAGE_ASSET = /^docs\/[a-z]{2}(?:-[A-Za-z]+)?\/(?:[^/]+\/)*assets\/[^/]+\.m?js$/;
 
 /** The folio file-list renderer and the Jekyll plugins, kept by owner card (2026-10-30, option A). */
 // declared-path-literal: a classifier over repo-relative paths, as BROWSER_ASSET_DIRS above

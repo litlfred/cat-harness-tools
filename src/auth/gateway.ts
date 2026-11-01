@@ -20,6 +20,9 @@
  *   COOKIE_SECRET         — HMAC signing key (32+ chars)
  *   FOLIO_API_TOKEN    — Bearer token for direct API access
  *   FOLIO_UPSTREAM     — folio-assistant URL (default: http://folio-assistant:8080)
+ *   FOLIO_GATEWAY_SECRET — shared with folio-assistant; sent on every proxied
+ *                         request so the server can tell the gateway's requests
+ *                         from anyone else's (required, 32+ chars)
  *   VIEWER_ROOT           — static viewer dir (default: /var/www/viewer)
  *   OWNER_USERNAME        — GitHub username of repo owner (default from config)
  *   SESSION_MAX_AGE       — session duration in seconds (default: 86400)
@@ -36,10 +39,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 const PORT = parseInt(process.env.AUTH_GATEWAY_PORT || "4180", 10);
 const DOMAIN = process.env.FOLIO_DOMAIN || "localhost";
 const COOKIE_SECRET: string = process.env.COOKIE_SECRET ?? "";
-if (COOKIE_SECRET.length < 32) {
-  console.error("FATAL: COOKIE_SECRET not set or too short (32+ chars required).");
-  process.exit(1);
-}
+const GATEWAY_SECRET: string = process.env.FOLIO_GATEWAY_SECRET ?? "";
 const FOLIO_API_TOKEN = process.env.FOLIO_API_TOKEN || "";
 const MCP_UPSTREAM = process.env.FOLIO_UPSTREAM || "http://folio-assistant:8080";
 const VIEWER_ROOT = process.env.VIEWER_ROOT || "/var/www/viewer";
@@ -81,8 +81,18 @@ interface Session {
 }
 
 const COOKIE_NAME = "folio_session";
+/** Binds an OAuth `state` to the browser that started the login (login CSRF). */
+const STATE_COOKIE_NAME = "folio_oauth_state";
+const STATE_MAX_AGE = 600;
 
-function signSession(session: Session): string {
+/**
+ * The header that tells folio-assistant a request came through this gateway.
+ * Its value is FOLIO_GATEWAY_SECRET. The server refuses `/mcp` without it and
+ * ignores `X-User-*` identity headers on any request that lacks it.
+ */
+export const GATEWAY_HEADER = "X-Folio-Gateway";
+
+export function signSession(session: Session): string {
   const payload = Buffer.from(JSON.stringify(session)).toString("base64url");
   const sig = createHmac("sha256", COOKIE_SECRET).update(payload).digest("base64url");
   return `${payload}.${sig}`;
@@ -119,6 +129,34 @@ function sessionCookieHeader(token: string, maxAge: number): string {
   return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
 }
 
+function stateCookieHeader(state: string, maxAge: number): string {
+  return `${STATE_COOKIE_NAME}=${state}; Path=/auth; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
+}
+
+function sameString(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  return ab.length === bb.length && timingSafeEqual(ab, bb);
+}
+
+/**
+ * The headers to send upstream: the client's, minus every `X-User-*` and
+ * `X-Folio-Gateway` header it sent, plus the gateway's own. Identity headers
+ * are only ever the gateway's; a client-sent `X-User-Actor` or `X-User-Role`
+ * is dropped, never passed through.
+ */
+export function upstreamHeaders(incoming: Headers, identity: Record<string, string>): Headers {
+  const headers = new Headers();
+  for (const [k, v] of incoming) {
+    const lk = k.toLowerCase();
+    if (lk.startsWith("x-user-") || lk === GATEWAY_HEADER.toLowerCase()) continue;
+    headers.append(k, v);
+  }
+  for (const [k, v] of Object.entries(identity)) headers.set(k, v);
+  headers.set(GATEWAY_HEADER, GATEWAY_SECRET);
+  return headers;
+}
+
 // ── OAuth flows ──────────────────────────────────────────────────
 
 function callbackUrl(provider: string): string {
@@ -148,7 +186,7 @@ function githubAuthUrl(state: string): string {
   return `https://github.com/login/oauth/authorize?${params}`;
 }
 
-async function exchangeGoogleCode(code: string): Promise<{ email: string; name: string } | null> {
+export async function exchangeGoogleCode(code: string): Promise<{ email: string; name: string } | null> {
   const resp = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -167,7 +205,10 @@ async function exchangeGoogleCode(code: string): Promise<{ email: string; name: 
     headers: { Authorization: `Bearer ${access_token}` },
   });
   if (!userResp.ok) return null;
-  const user = await userResp.json() as { email: string; name?: string };
+  const user = await userResp.json() as { email?: string; name?: string; verified_email?: boolean };
+  // An unverified address proves nothing about who holds it, so it never
+  // matches the allowlist.
+  if (!user.email || user.verified_email !== true) return null;
   return { email: user.email, name: user.name || user.email };
 }
 
@@ -316,191 +357,203 @@ function checkState(s: string): boolean {
   return true;
 }
 
-Bun.serve({
-  port: PORT,
-  async fetch(req) {
-    const url = new URL(req.url);
-    const path = url.pathname;
+/**
+ * A callback's `state` is good only if this server issued it AND it is the
+ * one the requesting browser was given at /auth/<provider>/start (the
+ * HttpOnly state cookie). Without the cookie check a login started by
+ * someone else could be completed in this browser.
+ */
+function callbackStateOk(req: Request, state: string | null): boolean {
+  if (!state) return false;
+  const cookieState = parseCookies(req.headers.get("cookie"))[STATE_COOKIE_NAME];
+  if (!cookieState || !sameString(cookieState, state)) return false;
+  return checkState(state);
+}
 
-    // ── Health check (no auth) ──────────────────────────────
-    if (path === "/health") {
-      return Response.json({ status: "ok", service: "auth-gateway" });
-    }
+function startLogin(authUrl: (state: string) => string): Response {
+  const state = makeState();
+  return new Response(null, {
+    status: 302,
+    headers: { Location: authUrl(state), "Set-Cookie": stateCookieHeader(state, STATE_MAX_AGE) },
+  });
+}
 
-    // ── Bearer token bypass for /mcp ────────────────────────
-    if (path === "/mcp") {
-      const authHeader = req.headers.get("authorization") || "";
-      if (authHeader.startsWith("Bearer ") && FOLIO_API_TOKEN) {
-        const token = authHeader.slice(7);
-        const tokenBuf = Buffer.from(token);
-        const expectedBuf = Buffer.from(FOLIO_API_TOKEN);
-        if (tokenBuf.length === expectedBuf.length && timingSafeEqual(tokenBuf, expectedBuf)) {
-          return proxyToMcp(req, url);
-        }
-        return new Response("Unauthorized", { status: 401 });
+function loggedIn(token: string): Response {
+  const headers = new Headers({ Location: "/" });
+  headers.append("Set-Cookie", sessionCookieHeader(token, SESSION_MAX_AGE));
+  headers.append("Set-Cookie", stateCookieHeader("", 0));
+  return new Response(null, { status: 302, headers });
+}
+
+export async function handleGatewayRequest(req: Request): Promise<Response> {
+  const url = new URL(req.url);
+  const path = url.pathname;
+
+  // ── Health check (no auth) ──────────────────────────────
+  if (path === "/health") {
+    return Response.json({ status: "ok", service: "auth-gateway" });
+  }
+
+  // ── Bearer token bypass for /mcp ────────────────────────
+  if (path === "/mcp") {
+    const authHeader = req.headers.get("authorization") || "";
+    if (authHeader.startsWith("Bearer ") && FOLIO_API_TOKEN) {
+      const token = authHeader.slice(7);
+      const tokenBuf = Buffer.from(token);
+      const expectedBuf = Buffer.from(FOLIO_API_TOKEN);
+      if (tokenBuf.length === expectedBuf.length && timingSafeEqual(tokenBuf, expectedBuf)) {
+        return proxyToMcp(new Request(req, { headers: upstreamHeaders(req.headers, {}) }), url);
       }
+      return new Response("Unauthorized", { status: 401 });
+    }
+  }
+
+  // ── Login page ──────────────────────────────────────────
+  if (path === "/login") {
+    return loginPage();
+  }
+
+  // ── OAuth start ─────────────────────────────────────────
+  if (path === "/auth/google/start") {
+    return startLogin(googleAuthUrl);
+  }
+  if (path === "/auth/github/start") {
+    return startLogin(githubAuthUrl);
+  }
+
+  // ── Google OAuth callback ───────────────────────────────
+  if (path === "/auth/google/callback") {
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
+    if (!code || !callbackStateOk(req, state)) {
+      return loginPage("Invalid or expired login attempt. Please try again.");
     }
 
-    // ── Login page ──────────────────────────────────────────
-    if (path === "/login") {
-      return loginPage();
+    const user = await exchangeGoogleCode(code);
+    if (!user) {
+      return loginPage("Failed to authenticate with Google.");
     }
 
-    // ── OAuth start ─────────────────────────────────────────
-    if (path === "/auth/google/start") {
-      const state = makeState();
-      return Response.redirect(googleAuthUrl(state), 302);
-    }
-    if (path === "/auth/github/start") {
-      const state = makeState();
-      return Response.redirect(githubAuthUrl(state), 302);
+    const viewers = getGoogleViewers();
+    if (!viewers.has(user.email.toLowerCase())) {
+      log(`Rejected Google user: ${user.email}`);
+      return loginPage("Your Google account is not authorized. Contact the repo owner.");
     }
 
-    // ── Google OAuth callback ───────────────────────────────
-    if (path === "/auth/google/callback") {
-      const code = url.searchParams.get("code");
-      const state = url.searchParams.get("state");
-      if (!code || !state || !checkState(state)) {
-        return loginPage("Invalid or expired login attempt. Please try again.");
-      }
+    const session: Session = {
+      email: user.email,
+      name: user.name,
+      provider: "google",
+      role: "viewer",
+      exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE,
+    };
+    const token = signSession(session);
+    log(`Google login: ${user.email} → viewer`);
+    return loggedIn(token);
+  }
 
-      const user = await exchangeGoogleCode(code);
-      if (!user) {
-        return loginPage("Failed to authenticate with Google.");
-      }
-
-      const viewers = getGoogleViewers();
-      if (!viewers.has(user.email.toLowerCase())) {
-        log(`Rejected Google user: ${user.email}`);
-        return loginPage("Your Google account is not authorized. Contact the repo owner.");
-      }
-
-      const session: Session = {
-        email: user.email,
-        name: user.name,
-        provider: "google",
-        role: "viewer",
-        exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE,
-      };
-      const token = signSession(session);
-      log(`Google login: ${user.email} → viewer`);
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: "/",
-          "Set-Cookie": sessionCookieHeader(token, SESSION_MAX_AGE),
-        },
-      });
+  // ── GitHub OAuth callback ───────────────────────────────
+  if (path === "/auth/github/callback") {
+    const code = url.searchParams.get("code");
+    const state = url.searchParams.get("state");
+    if (!code || !callbackStateOk(req, state)) {
+      return loginPage("Invalid or expired login attempt. Please try again.");
     }
 
-    // ── GitHub OAuth callback ───────────────────────────────
-    if (path === "/auth/github/callback") {
-      const code = url.searchParams.get("code");
-      const state = url.searchParams.get("state");
-      if (!code || !state || !checkState(state)) {
-        return loginPage("Invalid or expired login attempt. Please try again.");
-      }
-
-      const user = await exchangeGithubCode(code);
-      if (!user) {
-        return loginPage("Failed to authenticate with GitHub.");
-      }
-
-      const collabs = getGithubCollabs();
-      if (!collabs.has(user.username.toLowerCase())) {
-        log(`Rejected GitHub user: ${user.username}`);
-        return loginPage("Your GitHub account is not authorized. Contact the repo owner.");
-      }
-
-      const isOwner = user.username.toLowerCase() === OWNER_USERNAME.toLowerCase();
-      const session: Session = {
-        email: user.email || `${user.username}@github`,
-        name: user.name,
-        provider: "github",
-        role: isOwner ? "owner" : "collaborator",
-        exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE,
-      };
-      const token = signSession(session);
-      log(`GitHub login: ${user.username} → ${session.role}`);
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: "/",
-          "Set-Cookie": sessionCookieHeader(token, SESSION_MAX_AGE),
-        },
-      });
+    const user = await exchangeGithubCode(code);
+    if (!user) {
+      return loginPage("Failed to authenticate with GitHub.");
     }
 
-    // ── Logout ──────────────────────────────────────────────
-    if (path === "/auth/logout") {
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: "/login",
-          "Set-Cookie": sessionCookieHeader("", 0),
-        },
-      });
+    const collabs = getGithubCollabs();
+    if (!collabs.has(user.username.toLowerCase())) {
+      log(`Rejected GitHub user: ${user.username}`);
+      return loginPage("Your GitHub account is not authorized. Contact the repo owner.");
     }
 
-    // ── Session check (all other routes require auth) ───────
-    const cookies = parseCookies(req.headers.get("cookie"));
-    const sessionToken = cookies[COOKIE_NAME];
-    const session = sessionToken ? verifySession(sessionToken) : null;
+    const isOwner = user.username.toLowerCase() === OWNER_USERNAME.toLowerCase();
+    const session: Session = {
+      email: user.email || `${user.username}@github`,
+      name: user.name,
+      provider: "github",
+      role: isOwner ? "owner" : "collaborator",
+      exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE,
+    };
+    const token = signSession(session);
+    log(`GitHub login: ${user.username} → ${session.role}`);
+    return loggedIn(token);
+  }
 
-    if (!session) {
-      // API requests get 401, browser requests get redirect
-      if (path.startsWith("/api/") || path === "/mcp") {
-        return new Response("Unauthorized", { status: 401 });
-      }
-      return Response.redirect("/login", 302);
+  // ── Logout ──────────────────────────────────────────────
+  if (path === "/auth/logout") {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: "/login",
+        "Set-Cookie": sessionCookieHeader("", 0),
+      },
+    });
+  }
+
+  // ── Session check (all other routes require auth) ───────
+  const cookies = parseCookies(req.headers.get("cookie"));
+  const sessionToken = cookies[COOKIE_NAME];
+  const session = sessionToken ? verifySession(sessionToken) : null;
+
+  if (!session) {
+    // API requests get 401, browser requests get redirect
+    if (path.startsWith("/api/") || path === "/mcp") {
+      return new Response("Unauthorized", { status: 401 });
     }
+    return Response.redirect("/login", 302);
+  }
 
-    // ── User info endpoint ──────────────────────────────────
-    if (path === "/auth/me") {
-      return Response.json({
-        email: session.email,
-        name: session.name,
-        provider: session.provider,
-        role: session.role,
-      });
-    }
+  // ── User info endpoint ──────────────────────────────────
+  if (path === "/auth/me") {
+    return Response.json({
+      email: session.email,
+      name: session.name,
+      provider: session.provider,
+      role: session.role,
+    });
+  }
 
-    // ── Proxy to folio-assistant with role headers ─────────────────
-    if (path === "/mcp" || path.startsWith("/api/")) {
-      // Inject auth headers for downstream
-      const headers = new Headers(req.headers);
-      headers.set("X-User-Email", session.email);
-      headers.set("X-User-Role", session.role);
-      headers.set("X-User-Name", session.name);
-      headers.set("X-User-Provider", session.provider);
+  // ── Proxy to folio-assistant with role headers ─────────────────
+  if (path === "/mcp" || path.startsWith("/api/")) {
+    // Inject auth headers for downstream (the client's own X-User-* are dropped)
+    const headers = upstreamHeaders(req.headers, {
+      "X-User-Email": session.email,
+      "X-User-Role": session.role,
+      "X-User-Name": session.name,
+      "X-User-Provider": session.provider,
+    });
 
-      return proxyToMcp(new Request(req, { headers }), url);
-    }
+    return proxyToMcp(new Request(req, { headers }), url);
+  }
 
-    // ── Serve static viewer files ───────────────────────────
-    if (path === "/" || path === "/index.html") {
-      return serveStatic(join(VIEWER_ROOT, "index.html"))
-        || new Response("Not found", { status: 404 });
-    }
+  // ── Serve static viewer files ───────────────────────────
+  if (path === "/" || path === "/index.html") {
+    return serveStatic(join(VIEWER_ROOT, "index.html"))
+      || new Response("Not found", { status: 404 });
+  }
 
-    // Folio SPA
-    const ASSISTANT_ROOT = VIEWER_ROOT.replace(/viewer\/?$/, "ui");
-    if (path === "/folio" || path === "/folio/" || path === "/folio/index.html") {
-      return serveStatic(join(ASSISTANT_ROOT, "index.html"))
-        || new Response("Not found", { status: 404 });
-    }
-    if (path.startsWith("/folio/")) {
-      return serveStatic(join(ASSISTANT_ROOT, path.slice("/folio/".length)))
-        || new Response("Not found", { status: 404 });
-    }
+  // Folio SPA
+  const ASSISTANT_ROOT = VIEWER_ROOT.replace(/viewer\/?$/, "ui");
+  if (path === "/folio" || path === "/folio/" || path === "/folio/index.html") {
+    return serveStatic(join(ASSISTANT_ROOT, "index.html"))
+      || new Response("Not found", { status: 404 });
+  }
+  if (path.startsWith("/folio/")) {
+    return serveStatic(join(ASSISTANT_ROOT, path.slice("/folio/".length)))
+      || new Response("Not found", { status: 404 });
+  }
 
-    // All other static files
-    const staticRes = serveStatic(join(VIEWER_ROOT, path.slice(1)));
-    if (staticRes) return staticRes;
+  // All other static files
+  const staticRes = serveStatic(join(VIEWER_ROOT, path.slice(1)));
+  if (staticRes) return staticRes;
 
-    return new Response("Not found", { status: 404 });
-  },
-});
+  return new Response("Not found", { status: 404 });
+}
 
 // ── Proxy helper ─────────────────────────────────────────────────
 
@@ -519,4 +572,15 @@ async function proxyToMcp(req: Request, url: URL): Promise<Response> {
   }
 }
 
-log(`Auth gateway started on :${PORT} (domain: ${DOMAIN}, owner: ${OWNER_USERNAME})`);
+if (import.meta.main) {
+  if (COOKIE_SECRET.length < 32) {
+    console.error("FATAL: COOKIE_SECRET not set or too short (32+ chars required).");
+    process.exit(1);
+  }
+  if (GATEWAY_SECRET.length < 32) {
+    console.error("FATAL: FOLIO_GATEWAY_SECRET not set or too short (32+ chars required).");
+    process.exit(1);
+  }
+  Bun.serve({ port: PORT, fetch: handleGatewayRequest });
+  log(`Auth gateway started on :${PORT} (domain: ${DOMAIN}, owner: ${OWNER_USERNAME})`);
+}

@@ -34,6 +34,7 @@ import { readDeclaration, siteDirFor, siteFileFor } from "../../../schemas/kg/ca
 import { DOCS_SITE, libraryAssetSitePath } from "../../../schemas/library/library-iri.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 import { declaredPageRoute } from "../../viewer-declarations.ts";
+import { siteNotBuilt } from "../../../test/support/checkout.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
 const REPO = resolve(HARNESS, "..");
@@ -45,6 +46,16 @@ const SITE = join(HARNESS, siteDirFor(HARNESS));
  */
 const ROUTE = declaredPageRoute(HARNESS, "library-viewer")!;
 const LIB = join(SITE, ROUTE);
+const INDEX = join(SITE, "assets", "library", "index.json");
+/**
+ * The library projection and the entry shells beside it are written at
+ * publish and gitignored (bean w1gy F18). `describe` still runs its body, so
+ * an index that is not built reads as empty there and the tests over it skip.
+ */
+const NOT_BUILT = siteNotBuilt("the library projection `library:viz` writes at publish (gitignored)", INDEX);
+type LibraryIndex = ReturnType<typeof LibraryIndexSchema.parse>;
+const readIndex = (): LibraryIndex =>
+  NOT_BUILT ? ({ entries: [] } as unknown as LibraryIndex) : LibraryIndexSchema.parse(JSON.parse(readFileSync(INDEX, "utf-8")));
 
 /** The shipped source, evaluated — what is tested is what the page runs. */
 const { entryFromPath, legacyKey } = new Function(`${ADDRESS_JS}\nreturn { entryFromPath, legacyKey };`)() as {
@@ -205,8 +216,8 @@ describe("the shell template", () => {
 });
 
 describe("the committed tree: one materialized shell per entry", () => {
-  const index = LibraryIndexSchema.parse(JSON.parse(readFileSync(join(SITE, "assets", "library", "index.json"), "utf-8")));
-  test("every entry in the projection has a shell at <library>/<instance>/<id>/, and nothing else does", () => {
+  const index = readIndex();
+  test.skipIf(NOT_BUILT)("every entry in the projection has a shell at <library>/<instance>/<id>/, and nothing else does", () => {
     const want = index.entries.map((e) => `${e.instance}/${e.id}`).sort();
     const have: string[] = [];
     for (const inst of readdirSync(LIB)) {
@@ -219,7 +230,7 @@ describe("the committed tree: one materialized shell per entry", () => {
     }
     expect(have.sort()).toEqual(want);
   });
-  test("each shell's alternate JSON-LD is published", () => {
+  test.skipIf(NOT_BUILT)("each shell's alternate JSON-LD is published", () => {
     for (const e of index.entries) {
       const f = join(LIB, e.instance, e.id, "index.html");
       const alt = alternateOf(readFileSync(f, "utf-8"));
@@ -233,33 +244,33 @@ describe("asset and rendering: two resources, two IRIs (owner, 2026-10-02)", () 
   // "each asset should have one IRI, but the view page is a rendering of that
   // asset, a different page. fix IRIs" — and "asset doesnt know about its
   // renderings".
-  const index = LibraryIndexSchema.parse(JSON.parse(readFileSync(join(SITE, "assets", "library", "index.json"), "utf-8")));
+  const index = readIndex();
   test("the site root the IRIs are minted under is the one the site is served at", () => {
     const cfg = readFileSync(join(SITE, "_config.yml"), "utf-8");
     const url = /^url:\s*"?([^"\n]+)"?/m.exec(cfg)?.[1];
     const baseurl = /^baseurl:\s*"?([^"\n]*)"?/m.exec(cfg)?.[1];
     expect(DOCS_SITE).toBe(`${url}${baseurl}/`);
   });
-  test("the rendering points TO the asset: its alternate resolves to the asset's file", () => {
+  test.skipIf(NOT_BUILT)("the rendering points TO the asset: its alternate resolves to the asset's file", () => {
     for (const e of index.entries) {
       const shellDir = join(LIB, e.instance, e.id);
       const alt = alternateOf(readFileSync(join(shellDir, "index.html"), "utf-8"));
       expect(resolve(shellDir, alt!)).toBe(join(SITE, libraryAssetSitePath(e.instance, e.id)));
     }
   });
-  test("every entry's `view` is GENERATED into the projection: another instance's declared root, else its own page", () => {
+  test.skipIf(NOT_BUILT)("every entry's `view` is GENERATED into the projection: another instance's declared root, else its own page", () => {
     const byKey = new Map(index.entries.map((e) => [`${e.instance}/${e.id}`, e]));
     // A referenced entry the smart-trust instance renders, at its declared root.
     expect(byKey.get("smart-base/smart-trust")?.view).toBe("/smart-trust/");
     // An ingested PDF: rendered by the library viewer, at its own entry page.
-    expect(byKey.get("smart-base/who-rhr-1806-eng")?.view).toBe(`/${ROUTE}/smart-base/who-rhr-1806-eng/`);
+    expect(byKey.get("who-iris/who-rhr-1806-eng")?.view).toBe(`/${ROUTE}/who-iris/who-rhr-1806-eng/`);
     for (const e of index.entries) {
       expect(e.view, `${e.instance}/${e.id}`).toBeDefined();
       // Every view is a page that exists on the site, or an instance root route.
       if (e.view!.startsWith(`/${ROUTE}/`)) expect(existsSync(join(SITE, e.view!, "index.html"))).toBe(true);
     }
   });
-  test("the asset never references a rendering of itself", () => {
+  test.skipIf(NOT_BUILT)("the asset never references a rendering of itself", () => {
     for (const e of index.entries) {
       const text = readFileSync(join(SITE, libraryAssetSitePath(e.instance, e.id)), "utf-8");
       expect(text, e.id).not.toMatch(/subjectOf|foaf:page|"page"|\/library\/[^"]*\/index\.html|cat-harness\/library\//);
@@ -301,8 +312,8 @@ describe.skipIf(!HAS_SMART_TRUST_REF)("smart-trust, referenced in smart-base's l
     expect(decl.directories?.some((d) => (d as { instanceRoot?: boolean }).instanceRoot && d.graphTypologies?.includes("docs"))).toBe(true);
     expect(rec.links).toContainEqual({ label: "artefact index", site_path: `${decl.name}/` });
   });
-  test("appears in smart-base's library projection, with its links", () => {
-    const index = LibraryIndexSchema.parse(JSON.parse(readFileSync(join(SITE, "assets", "library", "index.json"), "utf-8")));
+  test.skipIf(NOT_BUILT)("appears in smart-base's library projection, with its links", () => {
+    const index = readIndex();
     const e = index.entries.find((x) => x.instance === "smart-base" && x.id === "smart-trust");
     expect(e?.rung).toBe("referenced");
     expect(e?.title).toBe("WHO SMART Trust");

@@ -129,10 +129,10 @@
  * @covers none — .github/workflows/ is not a declared graph typology
  */
 
-import { TOOLS_ROOT } from "./lib/roots.ts";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
+const TOOLS_ROOT = resolve(import.meta.dir, "..");
 const ROOT = join(import.meta.dir, "..", "..");
 const WORKFLOWS = join(ROOT, ".github", "workflows");
 const BASELINE = join(TOOLS_ROOT, "scripts", "workflow-injection-baseline.json");
@@ -494,6 +494,10 @@ function readBaseline(): string[] {
 }
 
 if (import.meta.main) {
+  if (!existsSync(WORKFLOWS)) {
+    console.log("  ? could not determine — .github/workflows is absent from this checkout");
+    process.exit(2);
+  }
   const found = scanWorkflows();
   const free = found.filter((i) => i.severity === "free-text");
   const constrained = found.filter((i) => i.severity === "constrained");

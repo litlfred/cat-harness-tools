@@ -20,12 +20,12 @@ describe("summariseTree", () => {
   it("groups by top-level route, staging previews by slug, and counts root files apart", () => {
     // a file directly under STAGING/ belongs to no preview, so it is counted as a route of its own
     expect(s.routes.map((r) => r.route)).toEqual(["assets", "en", "STAGING"]);
-    expect(s.previews).toEqual([{ route: "STAGING/pr-1", pages: 2, files: 2 }]);
+    expect(s.previews).toEqual([{ route: "STAGING/pr-1", pages: 2, files: 2, index: true }]);
     expect(s.rootFiles).toBe(2);
   });
   it("only .html files are pages", () => {
-    expect(s.routes.find((r) => r.route === "en")).toEqual({ route: "en", pages: 2, files: 3 });
-    expect(s.routes.find((r) => r.route === "assets")).toEqual({ route: "assets", pages: 0, files: 1 });
+    expect(s.routes.find((r) => r.route === "en")).toEqual({ route: "en", pages: 2, files: 3, index: false });
+    expect(s.routes.find((r) => r.route === "assets")).toEqual({ route: "assets", pages: 0, files: 1, index: false });
   });
 });
 
@@ -34,7 +34,10 @@ const section = (read: SiteSection["read"]): SiteSection => ({ instance: "h", id
 describe("three states, never zeros for could-not-read", () => {
   it("present: a row per route, linked back to the site root", () => {
     const html = pageHtml([section({ state: "present", tip: "a".repeat(40), ...summariseTree(TREE) })], "en/h/site");
-    expect(html).toContain('href="../../../en/"');
+    // `en/` holds no index.html of its own, so it is named, not linked; the preview is linked.
+    expect(html).not.toContain('href="../../../en/"');
+    expect(html).toContain("<code>en/</code>");
+    expect(html).toContain('href="../../../STAGING/pr-1/"');
     expect(html).toContain("Staging previews");
   });
   it("empty says so", () => {
@@ -69,7 +72,7 @@ describe("readSiteBranch against a local remote", () => {
       process.env.BRANCH_STORE_DIR = join(d, "store.git");
       const ok = readSiteBranch(work, "gh-pages").read;
       expect(ok.state).toBe("present");
-      if (ok.state === "present") expect(ok.routes).toEqual([{ route: "en", pages: 1, files: 1 }]);
+      if (ok.state === "present") expect(ok.routes).toEqual([{ route: "en", pages: 1, files: 1, index: true }]);
       expect(readSiteBranch(work, "no-such-branch").read.state).toBe("empty");
       process.env.BRANCH_STORE_REMOTE = join(d, "missing.git");
       expect(readSiteBranch(work, "gh-pages").read.state).toBe("could-not-read");

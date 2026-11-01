@@ -1207,6 +1207,28 @@ const PROOF: QaCriterionDefinition[] = [
     applies_to: ["recommendation"],
   },
   {
+    id: "acronym-in-glossary",
+    domain: "canonical",
+    // The rule is the harness's; the checker is the content core's, because
+    // glossaries (folio-glossary/v1) are content vocabulary. Owner,
+    // 2026-10-31: "make QA review identify acronyms for potential inclusion".
+    // See `checker_contributed`.
+    checker_contributed: true,
+    description:
+      "Every acronym a block's prose uses (WHO, GS1, eLMIS, ICD-11) is a " +
+      "label of a glossary its folio can see: a term's `notation`, " +
+      "`prefLabel` or `altLabel`, in the folio's `glossary/` or a mounted " +
+      "instance's. `warn`, naming each missing acronym at its first line, as " +
+      "a CANDIDATE for the glossary: it never fails, because only a person " +
+      "adds a term. Words set in capitals, plurals and the folio's own ids " +
+      "(PC-R-05) are not acronyms. `n/a` when the block has no prose.",
+    default_severity: "minor",
+    depends_on: ["md"],
+    automated: true,
+    // No `profiles`: a paper's acronyms belong in its glossary too, and a
+    // document-only opt-out is refused (profile-scoping.test.ts).
+  },
+  {
     id: "proof-compile-cost",
     domain: "proof",
     // The rule is core's; the checker is the science layer's, because

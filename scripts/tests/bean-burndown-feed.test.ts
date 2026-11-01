@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { buildBurndownFeed, burndownTargets, fetchBeanHistory, historyRef, type FeedBean } from "../bean-burndown-feed.ts";
+import { buildBurndownFeed, burndownTargets, fetchBeanHistory, historyRef, mountedTipFor, type FeedBean } from "../bean-burndown-feed.ts";
 import { snapshotsFromGit, type Snapshot } from "../epic-burndown.ts";
 
 const fb = (id: string, type: string, status: string): FeedBean => ({ id, title: `T ${id}`, type, status });
@@ -103,6 +103,21 @@ describe("fetchBeanHistory", () => {
       const feed = buildBurndownFeed(snaps, [fb("e", "epic", "todo")], where);
       expect(feed.days).toEqual(["2026-10-20", "2026-10-21"]);
       expect(feed.series[0]).toMatchObject({ open: [1, 0], closed: [0, 1] });
+
+      // When state:mount recorded an earlier mounted tip and the remote branch
+      // moved later during the build, fetchBeanHistory pins the ref to the
+      // mounted tip so burndown.json matches the mounted store.
+      const day1Tip = git(up, "rev-parse", "HEAD~1");
+      mkdirSync(join(here, ".git", "branch-mounts"), { recursive: true });
+      writeFileSync(
+        join(here, ".git", "branch-mounts", "cat-harness.beans.json"),
+        JSON.stringify({ id: "beans", key: "cat-harness.beans", branch: "cat/x/beans", tip: day1Tip }),
+      );
+      expect(mountedTipFor(here, "cat/x/beans")).toBe(day1Tip);
+      const pinned = fetchBeanHistory(here, { branch: "cat/x/beans", web: "https://x", repoWeb: "https://x", days: 30, now: new Date("2026-10-24T00:00:00Z") });
+      expect(pinned).toEqual({ ref: historyRef("cat/x/beans") });
+      const pinnedSnaps = snapshotsFromGit(here, historyRef("cat/x/beans"), "beans/defs", 30);
+      expect(pinnedSnaps.map((x) => x.day)).toEqual(["2026-10-20"]);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

@@ -134,6 +134,19 @@ export async function validatePath(filePath: string, root: string, schemaRoot: s
   if (!existsSync(filePath)) {
     return { path: filePath, state: "undetermined", reason: "no such file" };
   }
+  return validateText(filePath, readFileSync(filePath, "utf-8"), root, schemaRoot);
+}
+
+/**
+ * Validate a node's TEXT as the file it would be at `filePath`.
+ *
+ * {@link validatePath} without the read: the path still decides the owning
+ * declaration and the kind, and `text` is the body. A sidecar read from the
+ * `qa-reports` store (`readQaTree`) has a checkout path but no file in the
+ * checkout once the working copy is not committed (bean `7mwa`,
+ * cat-harness#857), and it is judged by the same rule as one on disk.
+ */
+export async function validateText(filePath: string, text: string, root: string, schemaRoot: string = root): Promise<Verdict> {
   const decl = readDeclaration(root);
   if (!decl) {
     return { path: filePath, state: "undetermined", reason: `no declaration under ${root}` };
@@ -153,7 +166,7 @@ export async function validatePath(filePath: string, root: string, schemaRoot: s
   }
   let data: unknown;
   try {
-    data = JSON.parse(readFileSync(filePath, "utf-8"));
+    data = JSON.parse(text);
   } catch (e) {
     return {
       path: filePath,

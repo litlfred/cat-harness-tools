@@ -22,11 +22,13 @@
  */
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { ActorDefSchema } from "../../schemas/process/role-graph.ts";
 import { ownKgRoots, workflowFile } from "../../scripts/known-skills.ts";
+import { builtAtPublishOf } from "../../scripts/mount-from-lock.ts";
+import { siteNotBuilt } from "../support/checkout.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -116,14 +118,30 @@ describe("living deck: every claim about the KG still holds", () => {
     expect(skill).toMatch(/`external` is the fourth/);
   });
 
-  test("every generated asset the deck shows exists", () => {
+  // Written through `relative_url`: the page publishes under
+  // `docs/cat-harness/concepts/` (bean `kc7k`), where a relative path would not reach `assets/`.
+  const deckAssets = (): string[] => {
     const md = readdirSync(DECK).filter((f) => f.endsWith(".md")).map((f) => read(join(DECK, f))).join("\n");
-    // Written through `relative_url`: the page publishes under
-    // `docs/cat-harness/concepts/` (bean `kc7k`), where a relative path would not reach `assets/`.
-    const assets = [...md.matchAll(/\]\(\{\{ '\/(assets\/[^']+)' \| relative_url \}\}\)/g)].map((m) => m[1]!);
-    expect(assets.length).toBeGreaterThan(0);
-    for (const a of assets) expect(existsSync(join(SITE, a)), a).toBe(true);
-  });
+    return [...md.matchAll(/\]\(\{\{ '\/(assets\/[^']+)' \| relative_url \}\}\)/g)].map((m) => m[1]!);
+  };
+  // Of those, the ones the publish build writes and `.gitignore` keeps out of
+  // a clone — the declaration's `builtAtPublish` (bean w1gy F18). A committed
+  // asset that is missing still fails below; only these can skip.
+  const built = builtAtPublishOf(H);
+  const publishBuilt = deckAssets()
+    .map((a) => join(SITE, a))
+    .filter((abs) => {
+      const rel = relative(H, abs).split("\\").join("/");
+      return built.some((e) => rel === e || (e.endsWith("/") && rel.startsWith(e)));
+    });
+  test.skipIf(publishBuilt.length > 0 && siteNotBuilt("the deck's drawings the publish build writes (gitignored)", ...publishBuilt))(
+    "every generated asset the deck shows exists",
+    () => {
+      const assets = deckAssets();
+      expect(assets.length).toBeGreaterThan(0);
+      for (const a of assets) expect(existsSync(join(SITE, a)), a).toBe(true);
+    },
+  );
 
   test("every deck picture the page shows exists, and is the library entry's own image", () => {
     const md = readdirSync(DECK).filter((f) => f.endsWith(".md")).map((f) => read(join(DECK, f))).join("\n");

@@ -10,7 +10,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -137,6 +137,23 @@ describe("publishedRoot — the root a publish would replace, read without cloni
     expect(f.dirs).toEqual(["artifact", "ast-data", "fhir-artifact-index", "openapi"]);
     expect(f.stamp).toBeDefined();
     expect(publishedRoot(`file://${bare}`, "no-such-branch", [])).toBeUndefined();
+  });
+
+  test("an exclude is a pathspec, never shell text: `$(touch …)` runs nothing (bean cat-tools-j4sh)", () => {
+    const bare = tmp("published-bare-");
+    execFileSync("git", ["init", "-q", "--bare", "-b", "gh-pages", bare]);
+    const seed = folioSiteRoot();
+    const g = (...a: string[]) => execFileSync("git", ["-C", seed, ...a], { stdio: "ignore" });
+    g("init", "-q", "-b", "gh-pages");
+    g("add", "-A");
+    g("-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-q", "-m", "folio-site");
+    g("push", "-q", `file://${bare}`, "gh-pages");
+    const marker = join(tmp("published-marker-"), "x");
+    for (const ex of [`$(touch ${marker})`, `\`touch ${marker}\``, `"; touch ${marker}; "`]) {
+      const root = publishedRoot(`file://${bare}`, "gh-pages", [ex]);
+      expect(root).toBeDefined();
+      expect(existsSync(marker)).toBe(false);
+    }
   });
 });
 

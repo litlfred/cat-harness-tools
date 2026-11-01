@@ -179,6 +179,21 @@ describe("drawing a view", () => {
     expect(new Set(paths).size).toBe(paths.length);
   });
 
+  it("draws a key listing only the colours, shapes and lines the view uses, in plain words", () => {
+    const key = svg.slice(svg.indexOf('<g class="av-legend">'));
+    expect(key).toContain(">Key</text>");
+    expect(key).toContain("Software: systems");
+    expect(key).toContain("Serving: serves");
+    expect(key).toContain("Access: reads or writes data");
+    expect(key).toContain("Grey band: a grouping");
+    expect(key).toContain("Note: a comment");
+    // Nothing the view does not draw.
+    expect(key).not.toContain("Influence");
+    expect(key).not.toContain("Why: who cares");
+    // The drawing grows to hold it, and it can be left off.
+    expect(renderViewSvg(m, m.views[0]!, { legend: false })).not.toContain("av-legend");
+  });
+
   it("says a view with nothing on it is empty, rather than drawing an empty frame", () => {
     const empty = parseArchimate(XML.replace(/<element xsi:type="archimate:ArchimateDiagramModel"[\s\S]*?<\/element>/, '<element xsi:type="archimate:ArchimateDiagramModel" name="Default View" id="id-v0"/>'));
     expect(renderViewSvg(empty, empty.views[0]!)).toContain("This view is empty");
@@ -226,6 +241,30 @@ describe("an instance", () => {
     }
   });
 
+  it("links a document figure to the view it shows, and fails when either is gone", () => {
+    const figure = { block: "folio/f-1.md", label: "Figure 1", model: "1.0.0", view: "id-v1", basis: "same-elements" };
+    const withBlock = (root: string) => {
+      mkdirSync(join(root, "folio"), { recursive: true });
+      writeFileSync(join(root, "folio", "f-1.md"), "![Figure](media/image1.png)\n");
+    };
+    expect(ArchimateConfigSchema.safeParse({ ...config, figures: [{ ...figure, model: "9.9.9" }] }).success).toBe(false);
+    const root = make({ ...config, figures: [figure, { ...figure, block: "folio/f-2.md", label: "Figure 2", view: "id-gone" }] });
+    try {
+      withBlock(root);
+      expect(checkCommitted(root)).toEqual([
+        "1.0.0: Figure 2 (folio/f-2.md) is mapped to view id-gone, which the model does not hold",
+        "Figure 2: block folio/f-2.md is not in the instance",
+      ]);
+      const files = pagesFor(root).files;
+      const page = files.find((f) => f.path === "1.0.0/views/overview/index.html")!;
+      expect(page.content).toContain("drawn in the document as Figure 1 (<code>folio/f-1.md</code>)");
+      const node = JSON.parse(files.find((f) => f.path === "1.0.0/views/id-v1.jsonld")!.content);
+      expect(node["schema:subjectOf"][0]).toEqual({ "schema:name": "Figure 1", "schema:url": "https://example.org/tiny/folio/f-1.md" });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("says so when a model is held that the config does not name", () => {
     const root = make(config, (d) => writeFileSync(join(d, "stray.archimate"), XML));
     try {
@@ -241,7 +280,8 @@ describe("an instance", () => {
       const { graphPath, files } = pagesFor(root);
       expect(graphPath).toBe("archimate");
       const pages = files.filter((f) => f.path.endsWith("/index.html"));
-      expect(pages.length).toBe(1 + 1 + 3 + 2);
+      // model, metamodel, one view, three elements, two relationships
+      expect(pages.length).toBe(1 + 1 + 1 + 3 + 2);
       expect(files.some((f) => f.path === "1.0.0/views/id-v1.svg")).toBe(true);
       for (const f of files.filter((x) => x.path.endsWith(".jsonld"))) {
         expect(JSON.parse(f.content)["@id"]).toBe(`https://example.org/tiny/archimate/${f.path}`);
@@ -260,7 +300,8 @@ describe("an instance", () => {
     try {
       for (const p of pagesFor(root).files.filter((f) => f.path.endsWith("/index.html"))) {
         const cfg = thinPageConfigOf(p.content, PAGE_CONFIG_ID)!;
-        expect(cfg.model).toBe(p.path.split("/").length === 2 ? "./model.json" : "../../model.json");
+        const depth = p.path.split("/").length;
+        expect(cfg.model).toBe(depth === 2 ? "./model.json" : depth === 3 ? "../model.json" : "../../model.json");
         expect(p.content).not.toContain("Holds the records.");
       }
     } finally {
@@ -276,8 +317,11 @@ describe("an instance", () => {
         const m = /<script type="application\/json" data-fa-visualiser-nav>(.*?)<\/script>/.exec(files.find((f) => f.path === path)!.content);
         return JSON.parse(m![1]!);
       };
-      expect(navOf("1.0.0/index.html")[0].items).toEqual([{ label: "Overview", href: "./views/id-v1/" }]);
-      expect(navOf("1.0.0/views/id-v1/index.html")[0]).toMatchObject({ href: "../../", items: [{ href: "../../views/id-v1/" }] });
+      expect(navOf("1.0.0/index.html")[0].items).toEqual([
+        { label: "Metamodel in use", href: "./metamodel/" },
+        { label: "Overview", href: "./views/overview/" },
+      ]);
+      expect(navOf("1.0.0/views/overview/index.html")[0]).toMatchObject({ href: "../../", items: [{ href: "../../metamodel/" }, { href: "../../views/overview/" }] });
       expect(navOf("index.html")[0].items).toEqual([{ label: "Tiny <RA>", href: "1.0.0/" }]);
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -311,12 +355,12 @@ describe("an instance", () => {
         for (const r of refs) expect({ from: at(f), ref: r, ok: resolves(at(f), r) }).toEqual({ from: at(f), ref: r, ok: true });
       }
       // The page reaches the model in the data tree, not beside itself.
-      const view = files.find((f) => f.path === "1.0.0/views/id-v1/index.html")!;
+      const view = files.find((f) => f.path === "1.0.0/views/overview/index.html")!;
       expect(thinPageConfigOf(view.content, PAGE_CONFIG_ID)!.model).toBe("../../../../../../archimate/1.0.0/model.json");
       // In the graph (no site), nothing changes: pages beside their data, and no route to name.
       const inGraph = pagesFor(root);
       expect(inGraph.pageRoot).toBe("archimate");
-      expect(inGraph.files.find((f) => f.path === "1.0.0/views/id-v1.svg")!.content).toContain('href="../elements/id-a/"');
+      expect(inGraph.files.find((f) => f.path === "1.0.0/views/id-v1.svg")!.content).toContain('href="../elements/registry-script/"');
       expect(inGraph.files.filter((f) => f.page).map((f) => renderedByOf(f.content)).filter(Boolean)).toEqual([]);
     } finally {
       rmSync(root, { recursive: true, force: true });

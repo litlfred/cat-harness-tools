@@ -263,6 +263,8 @@ const OWN_WRITER_OVERRIDES: Readonly<Record<string, string>> = {
   // red on `check:glossary` at 7bdda74 while regen, not knowing this pair,
   // could not repair it. `glossary-page.ts` regenerates from its sources.
   "check:glossary": "glossary:page",
+  "glossary:check": "glossary:export",
+  "libraries:check": "libraries:derive",
   // Re-materialises a remote package's skills at its PINNED commit, so it is
   // deterministic and is exactly the repair for a stale copy.
   "check:remote-skills": "sync:remote-skills",

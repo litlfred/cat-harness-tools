@@ -132,6 +132,7 @@ export function vocabularies(): readonly LoadedVocabulary[] {
     const module = join(root, node.vocabulary);
     if (!existsSync(module)) throw new Error(`${file}: names vocabulary ${node.vocabulary}, which does not exist at ${module}`);
     const declared = DISCOVERED_BLOCK_KIND_NODES.filter((k) => k.adapter === node.adapter).map((k) => k.kind);
+    // input-site: imports */schemas/*-vocabulary.ts,schemas/*-vocabulary.ts #d5b0e9a9 — vocabulary modules declared by content-adapters nodes
     out.push(readVocabulary(node.adapter, module, require(module), declared));
   }
   loaded = out;

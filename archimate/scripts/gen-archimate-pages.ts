@@ -39,14 +39,20 @@
  * | `<m>/` | the model's page: views, and elements by layer |
  * | `<m>/model.json` | the model, normalised — what the loader draws from |
  * | `<m>/views/<v>.svg` | the view, drawn (`render-view.ts`) |
- * | `<m>/views/<v>.jsonld`, `.json`, `<m>/views/<v>/` | a view's node and page |
- * | `<m>/elements/<e>.jsonld`, `.json`, `<m>/elements/<e>/` | an element's node and page |
+ * | `<m>/views/<v>.jsonld`, `.json`, `<m>/views/<slug>/` | a view's node and page |
+ * | `<m>/elements/<e>.jsonld`, `.json`, `<m>/elements/<slug>/` | an element's node and page |
  * | `<m>/relationships/<r>.jsonld`, `.json`, `<m>/relationships/<r>/` | a relationship's node and page |
+ * | `<m>/metamodel.json`, `.dot`, `.mmd`, `.svg`, `<m>/metamodel/` | the metamodel the model uses, derived (Tool `archimate-metamodel`, `schemas/metamodel.ts`); the SVG only when a run can lay out DOT |
  * | `index.html` | every model the graph holds |
  * | `assets/archimate.js`, `assets/archimate.css` | the one shared loader and its style |
  *
  * Ids are Archi's own (`schemas/archimate.ts` §"Ids are the model's own"), so
  * an element keeps its IRI across a model's versions wherever Archi kept its id.
+ *
+ * A view's or an element's PAGE is at a readable slug worked out from its
+ * name each build (`schemas/slugs.ts`), `<m>/views/<slug>/`, while its node
+ * keeps the id IRI. Nothing redirects from the old id paths: a clean break
+ * (owner, cat-harness-tools#1054).
  *
  * ## Vocabularies — borrowed, not minted
  *
@@ -66,6 +72,8 @@ import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
 import { readArchimate, type ArchimateModel } from "../schemas/archimate.ts";
 import { renderViewSvg, typeLabel } from "./render-view.ts";
 import { CONFIG_FILE, archimateDir, localDirOf, readConfig } from "./check-archimate.ts";
+import { planSlugs } from "../schemas/slugs.ts";
+import { LAYER_ORDER, categoryOf, layerSlug, metamodelDot, metamodelMermaid, metamodelOf, pairAnchor, typeAnchor, typeName, verbOf, type Metamodel } from "../schemas/metamodel.ts";
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { darkRules } from "../../scripts/lib/scheme-css.ts";
 import { pageParts, withRenderedBy } from "../../scripts/viewer-declarations.ts";
@@ -153,7 +161,10 @@ export function iriBaseOf(decl: Declaration): string {
  * its data and loader, and each drawn view its pages, across the locale (see
  * {@link sitePathOf}); otherwise everything sits together in the graph.
  */
-export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; site?: boolean } = {}): Layout & { files: Written[] } {
+export function pagesFor(
+  instanceRoot: string,
+  opts: { requireServed?: boolean; site?: boolean; drawDot?: (dot: string) => string } = {},
+): Layout & { files: Written[] } {
   const config = readConfig(instanceRoot);
   const dir = archimateDir(instanceRoot, config);
   const declFile = findDeclarationFile(instanceRoot);
@@ -203,6 +214,9 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
     const elIri = (id: string) => `${base}${m}/elements/${id}.jsonld`;
     const relIri = (id: string) => `${base}${m}/relationships/${id}.jsonld`;
     const elements = new Map(model.elements.map((e) => [e.id, e]));
+    const slugOf = planSlugs(model);
+    // The path segment of a view's or an element's page: its slug, else its id.
+    const seg = (id: string): string => slugOf.get(id) ?? id;
 
     json(m, {
       "@context": CONTEXT,
@@ -215,19 +229,54 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
       "schema:contentUrl": `${base}${cm.file.split("/").map(encodeURIComponent).join("/")}`,
       "schema:hasPart": model.views.map((v) => ({ "@id": viewIri(v.id), "@type": "archimate:Diagram", "schema:name": v.name })),
     });
-    files.push({ path: `${m}/model.json`, content: `${JSON.stringify(normalisedFor(model, cm.file))}\n` });
+    files.push({ path: `${m}/model.json`, content: `${JSON.stringify(normalisedFor(model, cm.file, slugOf))}\n` });
     // The rail's left-hand section for this model's pages: the model, then its
     // views (`visualiserNavDeclaration`, the one writer of the format the
     // navbar pass reads). Relative to the page, so it holds in a preview.
     const nav = (toModel: string): string =>
       visualiserNavDeclaration([
-        { label: title, href: toModel, items: model.views.map((v) => ({ label: v.name || "(unnamed view)", href: `${toModel}views/${v.id}/` })) },
+        {
+          label: title,
+          href: toModel,
+          items: [
+            { label: "Metamodel in use", href: `${toModel}metamodel/` },
+            ...model.views.map((v) => ({ label: v.name || "(unnamed view)", href: `${toModel}views/${seg(v.id)}/` })),
+          ],
+        },
         { label: "ArchiMate models", href: `${toModel}../` },
       ]);
     files.push(page(`${m}/index.html`, 1, title, toData(m, `../${m}.jsonld`), { kind: "model", node: toData(m, `../${m}.jsonld`), model: toData(m, "./model.json") },
       `<main class="am"><p class="am-up"><a href="../">← ArchiMate models</a></p><h1>${escHtml(title)}</h1>` +
+        `<p class="am-kind"><a href="metamodel/">Metamodel in use</a>: the element types and relationships this model uses, derived from it</p>` +
         `<div class="am-body" aria-live="polite"><p>Loading the model…</p></div></main>`, nav("./")));
 
+    // The metamodel the model uses, derived, never drawn (Tool `archimate-metamodel`).
+    const mm = metamodelOf(model, m);
+    // Every box and line opens its section of the metamodel page: the
+    // drawing is data (`<m>/`), the page is at the declared route.
+    const mmPage = `${toPage(m, "metamodel")}${site ? "" : "/"}`;
+    const mmDot = metamodelDot(mm, {
+      href: { type: (t) => `${mmPage}#${typeAnchor(t)}`, pair: (a, b) => `${mmPage}#${pairAnchor(a, b)}` },
+    });
+    files.push(
+      { path: `${m}/metamodel.json`, content: `${JSON.stringify(mm, null, 2)}\n` },
+      { path: `${m}/metamodel.dot`, content: mmDot },
+      { path: `${m}/metamodel.mmd`, content: metamodelMermaid(mm) },
+    );
+    const drawn = opts.drawDot !== undefined;
+    if (drawn) files.push({ path: `${m}/metamodel.svg`, content: opts.drawDot!(mmDot) });
+    const mp = `${m}/metamodel`;
+    files.push(page(`${mp}/index.html`, 2, `Metamodel in use — ${title}`, toData(mp, `../../${m}.jsonld`),
+      { kind: "metamodel", node: toData(mp, `../../${m}.jsonld`), model: toData(mp, "../model.json"), metamodel: toData(mp, "../metamodel.json") },
+      metamodelBody(mm, title, {
+        data: (rel) => toData(mp, `../${rel}`),
+        element: (id) => `../elements/${seg(id)}/`,
+        relationship: (id) => `../relationships/${id}/`,
+        nameOf: (id) => elements.get(id)?.name ?? id,
+        drawn,
+      }), nav("../")));
+
+    const figuresOf = (viewId: string) => (config.figures ?? []).filter((f) => f.model === m && f.view === viewId);
     for (const v of model.views) {
       const shown = [...new Set(v.nodes.filter((n) => n.kind === "element" && n.ref && elements.has(n.ref)).map((n) => n.ref!))];
       json(`${m}/views/${v.id}`, {
@@ -240,6 +289,7 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
         ...(v.viewpoint ? { "archimate:viewpoint": v.viewpoint } : {}),
         "schema:image": `${base}${m}/views/${v.id}.svg`,
         "schema:about": shown.map((id) => ({ "@id": elIri(id) })),
+        ...(figuresOf(v.id).length ? { "schema:subjectOf": figuresOf(v.id).map((f) => ({ "schema:name": f.label, "schema:url": `${iriBaseOf(decl)}${f.block}` })) } : {}),
         "dcterms:isPartOf": modelIri,
       });
       // Relative to the SVG's own address (`<m>/views/`), so it links correctly
@@ -250,16 +300,17 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
       files.push({
         path: `${m}/views/${v.id}.svg`,
         content: renderViewSvg(model, v, {
-          elementHref: (id) => toPage(vd, `../elements/${id}/`),
+          elementHref: (id) => toPage(vd, `../elements/${seg(id)}/`),
           relationshipHref: (id) => toPage(vd, `../relationships/${id}/`),
-          viewHref: (id) => toPage(vd, `./${id}/`),
+          viewHref: (id) => toPage(vd, `./${seg(id)}/`),
         }),
       });
-      const vp = `${m}/views/${v.id}`;
+      const vp = `${m}/views/${seg(v.id)}`;
       files.push(page(`${vp}/index.html`, 3, `${v.name} — ${title}`, toData(vp, `../${v.id}.jsonld`),
         { kind: "view", node: toData(vp, `../${v.id}.jsonld`), model: toData(vp, "../../model.json"), id: v.id, svg: toData(vp, `../${v.id}.svg`) },
         `<main class="am am-wide"><p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(v.name)}</h1>` +
-          `<p class="am-kind">View</p><div class="am-body" aria-live="polite"><p>Loading the view…</p></div></main>`, nav("../../")));
+          `<p class="am-kind">View${figuresOf(v.id).map((f) => ` · drawn in the document as ${escHtml(f.label)} (<code>${escHtml(f.block)}</code>)`).join("")}</p>` +
+          `<div class="am-body" aria-live="polite"><p>Loading the view…</p></div></main>`, nav("../../")));
     }
 
     for (const e of model.elements) {
@@ -273,7 +324,7 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
         "schema:category": e.layer,
         "dcterms:isPartOf": modelIri,
       });
-      const ep = `${m}/elements/${e.id}`;
+      const ep = `${m}/elements/${seg(e.id)}`;
       files.push(page(`${ep}/index.html`, 3, `${e.name || typeLabel(e.type)} — ${title}`, toData(ep, `../${e.id}.jsonld`),
         { kind: "element", node: toData(ep, `../${e.id}.jsonld`), model: toData(ep, "../../model.json"), id: e.id },
         `<main class="am"><p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(e.name || "(unnamed)")}</h1>` +
@@ -299,6 +350,7 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
         `<main class="am"><p class="am-up"><a href="../../">← ${escHtml(title)}</a></p><h1>${escHtml(r.name || typeLabel(r.type))}</h1>` +
           `<p class="am-kind">${escHtml(typeLabel(r.type))} relationship</p><div class="am-body" aria-live="polite"><p>Loading the relationship…</p></div></main>`));
     }
+
   }
 
   files.push(stamp({
@@ -320,6 +372,106 @@ export function pagesFor(instanceRoot: string, opts: { requireServed?: boolean; 
     { path: STYLE, content: readFileSync(join(TEMPLATES, "archimate.css"), "utf8") + darkRules(":root { color-scheme: dark; }") + "\n" },
   );
   return { graphPath, pageRoot, files };
+}
+
+/**
+ * Checkboxes over the drawing: ArchiMate's relationship categories, and the
+ * layers. They hide boxes and lines by the classes `metamodelDot` gives them,
+ * in the browser, so they work on a static host. A line shows while any of
+ * its categories is ticked and both its ends' layers are.
+ */
+function filterBar(mm: Metamodel): string {
+  const present = new Set(mm.patterns.filter((p) => p.source !== p.target).map((p) => categoryOf(p.relationship)));
+  const cats = ["structural", "dependency", "dynamic", "other"].filter((c) => present.has(c));
+  const held = new Set(mm.types.map((t) => t.layer));
+  const layers = LAYER_ORDER.filter((l) => l !== "Other" && held.has(l));
+  const box = (kind: string, value: string, label: string) =>
+    `<label style="margin-right:.8rem"><input type="checkbox" checked data-mm-${kind}="${escHtml(value)}"> ${escHtml(label)}</label>`;
+  return (
+    `<form class="am-filters" style="margin:.5rem 0" onsubmit="return false">` +
+    `<div><strong>Relationships:</strong> ${cats.map((c) => box("cat", c, c)).join("")}</div>` +
+    `<div><strong>Layers:</strong> ${layers.map((l) => box("layer", layerSlug(l), l)).join("")}</div></form>` +
+    `<script>(function(){var f=document.currentScript.previousElementSibling;` +
+    `function on(k){var r={};f.querySelectorAll("[data-mm-"+k+"]").forEach(function(i){r[i.getAttribute("data-mm-"+k)]=i.checked;});return r;}` +
+    `function has(e,p){for(var i=0;i<e.classList.length;i++)if(e.classList[i].indexOf(p)===0)return e.classList[i].slice(p.length);}` +
+    `function apply(){var o=document.querySelector(".am-figure object"),d=o&&o.contentDocument;if(!d)return;var c=on("cat"),l=on("layer");` +
+    `d.querySelectorAll("g.node").forEach(function(n){var y=has(n,"mm-layer-");n.style.display=y&&l[y]===false?"none":"";});` +
+    `d.querySelectorAll("g.edge").forEach(function(e){var cs=[].filter.call(e.classList,function(x){return x.indexOf("mm-cat-")===0;});` +
+    `if(!cs.length)return;var any=cs.some(function(x){return c[x.slice(7)]!==false;});` +
+    `var a=has(e,"mm-from-"),b=has(e,"mm-to-");e.style.display=any&&l[a]!==false&&l[b]!==false?"":"none";});}` +
+    `f.addEventListener("change",apply);var o=document.querySelector(".am-figure object");if(o)o.addEventListener("load",apply);apply();})();</script>`
+  );
+}
+
+/**
+ * The body of the "Metamodel in use" page. Everything on it is computed at
+ * build time, so the loader has nothing to draw (`kind: "metamodel"` is not
+ * one of its kinds). Links: `data` to the model's data directory, `element`
+ * and `relationship` to their pages.
+ */
+export function metamodelBody(
+  mm: Metamodel,
+  title: string,
+  link: {
+    data: (rel: string) => string;
+    element: (id: string) => string;
+    relationship: (id: string) => string;
+    nameOf: (id: string) => string;
+    drawn: boolean;
+  },
+): string {
+  const verdict = (a: boolean | undefined): string => (a === true ? "✓ allowed" : a === false ? "✗ not allowed" : "? not in the table");
+  const bad = mm.patterns.filter((p) => p.allowed === false);
+  const rels = (ids: string[]): string =>
+    ids.slice(0, 8).map((id, i) => `<a href="${escHtml(link.relationship(id))}">${i + 1}</a>`).join(" ") + (ids.length > 8 ? ` +${ids.length - 8} more` : "");
+  return (
+    `<main class="am am-wide"><p class="am-up"><a href="../">← ${escHtml(title)}</a></p><h1>Metamodel in use</h1>` +
+    `<p class="am-kind">Derived from the model on every build (Tool <code>archimate-metamodel</code>), never drawn: ` +
+    `${mm.types.length} element type(s) and ${mm.patterns.length} relationship pattern(s), each checked against ArchiMate ${escHtml(mm.archimateVersion)}'s relationship table.</p>` +
+    `<p>${bad.length ? `✗ ${mm.notAllowed} relationship(s) follow ${bad.length} pattern(s) ArchiMate does not allow (red below).` : "✓ Every relationship follows a pattern ArchiMate allows."}` +
+    (mm.placeholders.length ? ` ${mm.placeholders.length} placeholder element(s), named after their own type, are left out (listed at the end).` : "") +
+    `</p>` +
+    (link.drawn ? `<p>Click a box to see its elements, or a line to see its relationships.</p>${filterBar(mm)}` : "") +
+    (link.drawn
+      ? `<div class="am-figure"><object type="image/svg+xml" style="width:100%;height:auto" data="${escHtml(link.data("metamodel.svg"))}" aria-label="Metamodel in use, drawn"></object></div>`
+      : `<p>This build drew no picture; the same diagram is below as Graphviz DOT and Mermaid.</p>`) +
+    `<p>To keep the picture readable, relationships between the same two types share one line, a type's relationships to itself are written in its box, ` +
+    `and <em>associated with</em> (which says nothing about how two things relate), groupings and junctions are left out. The tables below list everything.</p>` +
+    `<p>The same diagram as <a href="${escHtml(link.data("metamodel.dot"))}">Graphviz DOT</a>, a <a href="${escHtml(link.data("metamodel.mmd"))}">Mermaid class diagram</a>, ` +
+    `and <a href="${escHtml(link.data("metamodel.json"))}">JSON</a>.</p>` +
+    `<h2>Element types</h2><table class="am-props"><thead><tr><th>Type</th><th>Layer</th><th>Elements</th></tr></thead><tbody>` +
+    mm.types
+      .map(
+        (t) =>
+          `<tr id="${escHtml(typeAnchor(t.type))}"><td>${escHtml(typeName(t.type))}</td><td>${escHtml(t.layer)}</td><td><details><summary>${t.elements}</summary><ul class="am-els">` +
+          t.ids.map((id) => `<li><a href="${escHtml(link.element(id))}">${escHtml(link.nameOf(id) || "(unnamed)")}</a></li>`).join("") +
+          `</ul></details></td></tr>`,
+      )
+      .join("") +
+    `</tbody></table>` +
+    `<h2>Relationship patterns</h2><table class="am-props"><thead><tr><th>Source</th><th>Relationship</th><th>Target</th><th>Count</th><th>ArchiMate ${escHtml(mm.archimateVersion)}</th><th>Relationships</th></tr></thead><tbody>` +
+    mm.patterns
+      .map(
+        (p, i) =>
+          `<tr${mm.patterns.findIndex((q) => q.source === p.source && q.target === p.target) === i ? ` id="${escHtml(pairAnchor(p.source, p.target))}"` : ""}` +
+          `${p.allowed === false ? ` style="color:#c0392b"` : ""}><td>${escHtml(typeName(p.source))}</td><td>${escHtml(verbOf(p.relationship))}</td><td>${escHtml(typeName(p.target))}</td>` +
+          `<td>${p.count}</td><td>${verdict(p.allowed)}</td><td>${rels(p.relationships)}</td></tr>`,
+      )
+      .join("") +
+    `</tbody></table>` +
+    (mm.placeholders.length
+      ? `<h2>Placeholder elements</h2><p>Named after their own type, so they stand for the type rather than for a thing in the architecture: ` +
+        `how a metamodel gets drawn by hand inside a model. They and their ${mm.placeholderRelationships.length} relationship(s) are left out of the patterns above. ` +
+        `Removing them is the model authors' call.</p><ul class="am-els">` +
+        mm.placeholders.map((e) => `<li><a href="${escHtml(link.element(e.id))}">${escHtml(e.name)}</a> <span class="am-type">${escHtml(typeName(e.type))}</span></li>`).join("") +
+        `</ul>`
+      : "") +
+    `<p class="am-type">Relationship table: ArchiMate ${escHtml(mm.archimateVersion)} Appendix B as Archi holds it (MIT).</p>` +
+    // A click on a box lands on its row: open the row's element list.
+    `<script>(function(){function o(){var t=location.hash&&document.getElementById(decodeURIComponent(location.hash.slice(1)));` +
+    `var d=t&&t.querySelector("details");if(d)d.open=true;}addEventListener("hashchange",o);o();})();</script>` +
+    `</main>`
+  );
 }
 
 /**
@@ -361,7 +513,7 @@ function thinPage(
  * geometry (the SVG carries that), plus which views show each element and
  * relationship — computed once here rather than in every reader's browser.
  */
-export function normalisedFor(model: ArchimateModel, file: string) {
+export function normalisedFor(model: ArchimateModel, file: string, slugOf?: Map<string, string>) {
   const inViews: Record<string, string[]> = {};
   for (const v of model.views) {
     const seen = new Set<string>();
@@ -386,6 +538,8 @@ export function normalisedFor(model: ArchimateModel, file: string) {
       folder: v.folder,
     })),
     inViews,
+    // Each view's and element's page segment where it is not its id (`schemas/slugs.ts`).
+    ...(slugOf && slugOf.size ? { slugs: Object.fromEntries(slugOf) } : {}),
   };
 }
 
@@ -434,7 +588,20 @@ if (import.meta.main) {
   const out = arg("out");
   const check = process.argv.includes("--check");
   const root = resolve(instance);
-  const { graphPath, pageRoot, files } = pagesFor(root, { requireServed: out === undefined, site: out !== undefined });
+  // A site build lays the metamodel's DOT out to SVG with Graphviz compiled to
+  // WebAssembly (no JVM, no binary). If it cannot load, the page says so and
+  // still offers the DOT and Mermaid.
+  let drawDot: ((dot: string) => string) | undefined;
+  if (out) {
+    try {
+      const { Graphviz } = await import("@hpcc-js/wasm-graphviz");
+      const gv = await Graphviz.load();
+      drawDot = (dot) => gv.dot(dot);
+    } catch (e) {
+      console.warn(`! no metamodel drawing: @hpcc-js/wasm-graphviz would not load (${(e as Error).message})`);
+    }
+  }
+  const { graphPath, pageRoot, files } = pagesFor(root, { requireServed: out === undefined, site: out !== undefined, drawDot });
   const target = out ? join(resolve(out), graphPath) : archimateDir(root, readConfig(root));
   if (out) {
     for (const f of files) {

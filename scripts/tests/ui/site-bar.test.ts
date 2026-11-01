@@ -16,8 +16,10 @@ import { firstPaintSchemeScript } from "../../lib/scheme-css.ts";
  * The theme page here is just-the-docs 0.12's `default` layout, reduced to
  * the elements the pass touches.
  */
-const THEME_PAGE = (title: string) => `<!DOCTYPE html>
-<html lang="en-US"><head><meta charset="UTF-8"><title>${title}</title><link rel="stylesheet" href="/assets/css/just-the-docs-default.css"></head>
+const THEME_PAGE = (title: string, row = 1) => `<!DOCTYPE html>
+<html lang="en-US"><head><meta charset="UTF-8"><title>${title}</title><link rel="stylesheet" href="/assets/css/just-the-docs-default.css"><style id="jtd-nav-activation">
+    .site-nav > ul.nav-list:first-child > li:nth-child(${row}) > a { font-weight: 600; }
+  </style></head>
 <body>
   <a class="skip-to-main" href="#main-content">Skip to main content</a>
   <header class="side-bar">
@@ -51,6 +53,19 @@ describe("stripThemeSidebar", () => {
     expect(out).not.toContain("harnesses again");
     expect(out).toContain('<div id="main-header" class="main-header">');
     expect(out).toContain("<h1>Guide</h1>");
+  });
+  test("the nav activation style goes too, so a page added ahead of this one no longer changes it", () => {
+    // The style names the page's row by its position in the whole nav: one
+    // page inserted earlier renumbers it on every later page.
+    const a = stripThemeSidebar(THEME_PAGE("Guide", 108));
+    const b = stripThemeSidebar(THEME_PAGE("Guide", 109));
+    expect(a).not.toContain("jtd-nav-activation");
+    expect(a).toBe(b);
+    expect(a).toContain('<link rel="stylesheet" href="/assets/css/just-the-docs-default.css"></head>');
+  });
+  test("a page that keeps its side bar keeps its activation style", () => {
+    const page = `<html><head><style id="jtd-nav-activation">x</style></head><body><p>no side bar</p></body></html>`;
+    expect(stripThemeSidebar(page)).toBe(page);
   });
   test("elementEnd counts nested elements", () => {
     const h = "<div a><div><div></div></div></div>tail";

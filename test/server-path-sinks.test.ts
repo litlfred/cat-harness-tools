@@ -28,7 +28,7 @@
  * which is the failure mode of every grep-shaped check in this repository.
  */
 import { describe, it, expect } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join, basename } from "node:path";
 import { safeSegment } from "../src/core/safe-path.ts";
 
@@ -144,5 +144,59 @@ describe("safeSegment(basename(x)) — the composition the upload route now uses
     expect(basename("main.tex\0.png")).toBe("main.tex\0.png");
     expect(safeSegment(basename("main.tex\0.png"))).toBeUndefined();
     expect(safeSegment("main\0.tex")).toBeUndefined();
+  });
+});
+
+describe("MCP tools (src/tools) contain the paths their arguments name", () => {
+  // Security review 2026-10-31: the HTTP handlers above were covered, the MCP
+  // tools were not, and `translation_*` joined `source`, `po_file` and `locale`
+  // straight into read and write paths. Same ratchet, same limits: it proves
+  // the guard is next to the sink, not that every value reaching it is checked.
+  const TOOLS = join(import.meta.dir, "../src/tools");
+  const files = readdirSync(TOOLS).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));
+  const read = (f: string) => readFileSync(join(TOOLS, f), "utf-8");
+
+  // A path built from a root and a bare variable. Literal-only joins
+  // (`join(repoRoot, "beans", "defs")`) do not match.
+  const SINK = /\b(join|resolve)\(\s*(repoRoot|root|process\.cwd\(\))\s*,\s*([A-Za-z_][A-Za-z0-9_.]*)\s*[,)]/;
+  const GUARD = /\b(safeSegment|joinSegments|realPathWithin|writableWithin|resolveWithin)\(/;
+  // Values that come from a committed file this tool wrote, not from an argument.
+  const NOT_AN_ARGUMENT = new Set(["state.source"]);
+
+  it("reads the tools directory — otherwise the checks below are vacuous", () => {
+    expect(files.length).toBeGreaterThan(10);
+    expect(files).toContain("translation.ts");
+  });
+
+  it("every root-plus-variable path has a containment check on the same or the next three lines", () => {
+    const unguarded: string[] = [];
+    let seen = 0;
+    for (const f of files) {
+      const lines = read(f).split("\n");
+      lines.forEach((line, i) => {
+        const m = line.match(SINK);
+        if (!m) return;
+        seen++;
+        if (NOT_AN_ARGUMENT.has(m[3])) return;
+        if (!GUARD.test(lines.slice(i, i + 4).join("\n"))) unguarded.push(`${f}:${i + 1}: ${line.trim()}`);
+      });
+    }
+    expect(seen).toBeGreaterThan(0);
+    expect(unguarded).toEqual([]);
+  });
+
+  it("the pre-fix translation spellings are gone", () => {
+    const src = read("translation.ts");
+    for (const spelling of [
+      "join(repoRoot, source)",
+      "join(repoRoot, po_file)",
+      "join(repoRoot, pot_file)",
+      "join(repoRoot, inputPath)",
+      "join(translationsRoot(repoRoot), locale)",
+    ]) {
+      expect(src).not.toContain(spelling);
+    }
+    expect(src).toContain('from "../core/safe-path.js"');
+    expect(src).toContain("LocaleSchema");
   });
 });
