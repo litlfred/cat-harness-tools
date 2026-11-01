@@ -29,6 +29,7 @@ import { z } from "zod";
 import type { TermLayer } from "../content/vocabulary.js";
 
 import { renderingPath } from "../kg/cat-harness.js";
+import { ProvActivitySchema as ProvActivityRecordSchema } from "../content/prov.js";
 
 /** A bean's identifier, e.g. `folio-assistant-1dfh`. */
 export const BeanIdSchema = z.string().regex(/^[a-z0-9-]+$/).describe("A bean identifier, e.g. folio-assistant-1dfh");
@@ -414,6 +415,22 @@ export const LinkModeSchema = z
   .enum(["submodule", "sibling", "remote"])
   .describe("How a new folio links the platform: a git submodule, a sibling checkout, or pinned remote mounts in index.config.json.");
 
+/**
+ * The id of one ArchiMate model in an instance's `cat-archimate.config.json`,
+ * which is the SemVer version it describes (`0.2.0`, `0.2.0-draft.3`). The
+ * config's own pattern, less a leading `.` or `-`, so neither a metacharacter
+ * nor an option can parse.
+ */
+export const ArchimateModelIdSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, "an ArchiMate model id is letters, digits, dot, underscore and hyphen")
+  .describe("An ArchiMate model's id in cat-archimate.config.json, e.g. 0.2.0");
+
+/** What `archimate-metamodel` prints. */
+export const ArchimateMetamodelFormatSchema = z
+  .enum(["text", "json", "dot", "mmd"])
+  .describe("A plain-text report, archimate-metamodel/v1 JSON, Graphviz DOT, or a Mermaid class diagram.");
+
 /** What a preferences call does. */
 export const PreferenceActionSchema = z
   .enum(["get", "set", "reset"])
@@ -678,7 +695,8 @@ export const PortSchema = z
 /**
  * The facts a DMN decision table is evaluated against.
  *
- * **Not injection-safe**, and it is the only structured type in the vocabulary.
+ * **Not injection-safe**, and one of the two structured types in the vocabulary
+ * (the other is {@link ProvActivitySchema}).
  * Values are scalars rather than `unknown` because a decision table compares
  * them — a nested object is not something FEEL can test, so admitting one would
  * let a caller build a fact that no table can ever match.
@@ -691,6 +709,29 @@ export const PortSchema = z
 export const DecisionFactsSchema = z
   .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
   .describe("Facts for a DMN decision table. Scalar values only. Not admissible as a command-line argument.");
+
+/**
+ * One PROV-O activity, as a Tool returns it and `workflow_complete` keeps it.
+ *
+ * `skill_update` returns one for an accepted write that named its step, and
+ * `workflow_complete` takes them back as `activities` and keeps them on the
+ * step's history entry (cat-harness-tools#887, bean `cat-tools-ycn6`). Until
+ * this type existed the Tool nodes could not declare either port, so the
+ * served surface and the declared one disagreed (bean `w1gy`, finding 2).
+ *
+ * The schema is `schemas/content/prov.ts`'s, not a copy: two definitions of
+ * one record are free to drift, and the one the engine checks against is the
+ * one that counts. `workflow_complete` also requires that each activity's
+ * `prov:qualifiedAssociation.prov:hadPlan` end in `#<node>`; that is a fact
+ * about the call, not the value, so it is checked there, not here.
+ *
+ * **Not injection-safe**, for the reason {@link DecisionFactsSchema} is not: it
+ * is a structured value whose strings come from a caller. It is passed
+ * in-process, never as a command-line word.
+ */
+export const ProvActivitySchema = ProvActivityRecordSchema.describe(
+  "A PROV-O activity (schemas/content/prov.ts). Structured. Not admissible as a command-line argument.",
+);
 
 /** Everything published in the shared types document, keyed by `$defs` name. */
 export const TOOL_TYPES = {
@@ -731,6 +772,8 @@ export const TOOL_TYPES = {
   IgCacheAction: IgCacheActionSchema,
   NamespaceLayer: NamespaceLayerSchema,
   PreferenceAction: PreferenceActionSchema,
+  ArchimateModelId: ArchimateModelIdSchema,
+  ArchimateMetamodelFormat: ArchimateMetamodelFormatSchema,
   CommitSha: CommitShaSchema,
   RenderEvent: RenderEventSchema,
   RenderFormat: RenderFormatSchema,
@@ -748,6 +791,7 @@ export const TOOL_TYPES = {
   Dpi: DpiSchema,
   Port: PortSchema,
   DecisionFacts: DecisionFactsSchema,
+  ProvActivity: ProvActivitySchema,
 } as const;
 
 export type ToolTypeName = keyof typeof TOOL_TYPES;
@@ -906,6 +950,9 @@ export const INJECTION_SAFE: ReadonlySet<ToolTypeName> = new Set<ToolTypeName>([
   "IgCacheAction",
   "NamespaceLayer",
   "PreferenceAction",
+  "ArchimateMetamodelFormat",
+  // A pattern type: no leading `.` or `-`, no metacharacter. See the schema.
+  "ArchimateModelId",
   "CommitSha",
   "RenderEvent",
   "RenderFormat",
@@ -923,8 +970,9 @@ export const INJECTION_SAFE: ReadonlySet<ToolTypeName> = new Set<ToolTypeName>([
   "Count",
   "Dpi",
   "Port",
-  // Deliberately absent: `Text`, `FilesystemPath`, `DecisionFacts`. Each is
-  // documented above with the reason it cannot be a command-line word.
+  // Deliberately absent: `Text`, `FilesystemPath`, `DecisionFacts`,
+  // `ProvActivity`. Each is documented above with the reason it cannot be a
+  // command-line word.
 ]);
 
 /** Is this type admissible as a command-line argument? */

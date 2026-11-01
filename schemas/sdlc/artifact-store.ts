@@ -107,6 +107,7 @@ export type RenderStage = (typeof RENDER_STAGES)[number];
  * different messages to the reader.
  */
 export type SearchIndexPlan =
+  // input-site: inert #0d509b6c — type discriminant literal, not a directory path
   | { action: "build"; store: ArtifactStore; url: string }
   | { action: "omit"; reason: string }
   | { action: "refuse"; reason: string };
@@ -151,6 +152,7 @@ export function planSearchIndex(
     };
   }
   return {
+    // input-site: inert #cd9e78f7 — action discriminant literal, not a directory path
     action: "build",
     store,
     url: `${store.publicBaseUrl.replace(/\/+$/, "")}/search-data.json`,

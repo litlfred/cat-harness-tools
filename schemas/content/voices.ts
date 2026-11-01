@@ -66,6 +66,7 @@ import { RepoFullNameSchema } from "../kg/repo-full-name.js";
 import { kgNodeLabelShape, type KgNodeLabels } from "../kg/kg-node";
 import { defaultGraphTypologies, directoryForGraph } from "../kg/cat-harness.js";
 import { BLOCK_KINDS } from "./block-kinds.js";
+import { discoveredEnum } from "../kg/discovered-vocabulary.js";
 import { ProcessElementIdSchema } from "../process/process-element-id.js";
 
 /** Which aspect of the prose (or of its presentation) a rule governs. */
@@ -460,8 +461,15 @@ export type VoiceSupersession = z.infer<typeof VoiceSupersessionSchema>;
  */
 export const VOICE_ARTEFACT_KINDS = ["docs", "skill", "readme", "specification", "code"] as const;
 
-/** One thing a voice audits: a block kind or a declared artefact kind. */
-export const VoiceTargetSchema = z.union([z.enum(BLOCK_KINDS), z.enum(VOICE_ARTEFACT_KINDS)]);
+/**
+ * One thing a voice audits: a block kind or a declared artefact kind.
+ *
+ * The block kinds are the composition's, discovered from the mounted
+ * `block-kinds/` graphs, so they are marked as such: the harness's published
+ * JSON Schema writes them as an open string rather than whichever kinds were
+ * mounted when it was generated (bean `8lcl`).
+ */
+export const VoiceTargetSchema = z.union([discoveredEnum(BLOCK_KINDS, "block-kinds"), z.enum(VOICE_ARTEFACT_KINDS)]);
 
 export const VoiceProfileSchema = z.object({
   /**

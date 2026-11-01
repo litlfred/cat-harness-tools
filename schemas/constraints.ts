@@ -25,7 +25,69 @@ import { NarrativeSlotSchema } from "./content/narrative.ts";
 // the package registry — moved to `skill-package.ts`, which is the harness's
 // own and carries no content-model dependency. Re-exported here so every
 // existing importer is unaffected; new harness code imports it directly.
-export * from "./kg/skill-package.js";
+export {
+  ACTOR_KINDS,
+  ActorDefinitionSchema,
+  ActorKindSchema,
+  CapabilityDefinitionSchema,
+  CapabilityDetectionSchema,
+  ConformanceSchema,
+  DegradationStrategySchema,
+  DependencyKindSchema,
+  DockerRequirementsSchema,
+  HookCommandSchema,
+  HookEventSchema,
+  IdentitySourceSchema,
+  LifecycleStageSchema,
+  RemotePackageRefSchema,
+  RemoteSkillRecordSchema,
+  RemoteSyncConfigSchema,
+  RemoteSyncStrategySchema,
+  RequirementSchema,
+  RequirementStatementRefSchema,
+  RequirementStatementSchema,
+  RoleAssignmentSchema,
+  SUT_ACTOR_KINDS,
+  SessionHookSchema,
+  SkillCapabilityRefSchema,
+  SkillDefinitionSchema,
+  SkillDependencySchema,
+  SkillPackageManifestSchema,
+  SkillPackageRefSchema,
+  SkillRegistrySchema,
+  SkillSchemaRefSchema,
+  SystemUnderTestFacetSchema,
+  sutRefFor,
+} from "./kg/skill-package.js";
+export type {
+  ActorDefinition,
+  ActorKind,
+  CapabilityDefinition,
+  CapabilityDetection,
+  Conformance,
+  DegradationStrategy,
+  DependencyKind,
+  DockerRequirements,
+  HookCommand,
+  HookEvent,
+  IdentitySource,
+  LifecycleStage,
+  RemotePackageRef,
+  RemoteSyncConfig,
+  RemoteSyncStrategy,
+  Requirement,
+  RequirementStatement,
+  RequirementStatementRef,
+  RoleAssignment,
+  SessionHook,
+  SkillCapabilityRef,
+  SkillDefinition,
+  SkillDependency,
+  SkillPackageManifest,
+  SkillPackageRef,
+  SkillRegistry,
+  SystemUnderTestFacet,
+} from "./kg/skill-package.js";
 
 
 
@@ -586,13 +648,24 @@ export interface ConstraintContext {
   allRefIds?: Set<string>;
   /** File existence checker. */
   fileExists: (path: string) => boolean;
-  /** Basename lookup under a Lake package root (for lean.ref fallback). */
-  lakeTreeContainsBasename?: (lakeRoot: string, basename: string) => boolean;
   /** Markdown content of the companion .md file (for cross-ref scanning). */
   mdContent?: string;
-  /** Lean sibling stub content (for §3b-cond kind-check), if the file exists. */
-  leanContent?: string;
+  // A vocabulary module's rules may read more than this: whatever its
+  // `constraintContext` contributes (below), typed in that module's own layer
+  // by extending this interface — the science layer's sibling `.lean` and
+  // Lake-tree lookup, for one (bean `saqd`). They are not this layer's to name.
 }
+
+/**
+ * A vocabulary module's contribution to every block's {@link ConstraintContext}:
+ * called once per validation run with the folio's content root, then once per
+ * block; what the inner call returns is merged into that block's context
+ * before the rules run. Fields the generic context already has are not
+ * overridden.
+ */
+export type ConstraintContextContributor = (run: {
+  repoRoot: string;
+}) => (block: { rootName: string; dir: string }) => Readonly<Record<string, unknown>>;
 
 /**
  * Built-in constraint rules.

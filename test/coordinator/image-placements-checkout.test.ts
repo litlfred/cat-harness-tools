@@ -2,7 +2,7 @@
  * `image-placements` tests about the WHOLE CHECKOUT, moved here from
  * `cat-harness/scripts/tests/image-placements.test.ts` (bean `7zz1`, owner
  * ruling 2026-10-06 "Top-level instance"): each reads the image sidecars of
- * smart-base's library entries, which only the checkout holds. Standing alone,
+ * the WHO library entries (in who-iris since frs5), which only the checkout holds. Standing alone,
  * cat-harness has none of it, and `check:cat-harness-standalone` collects
  * every test in that layer. The rest of that file's tests stay there; every
  * path here is composed from ORIGIN_DIR, the directory they were written in,
@@ -24,9 +24,9 @@ describe("the real corpus is deduplicated, and stays that way", () => {
   const entries = [
     // measured 2026-09-24; the left number is what the corpus held BEFORE
     { path: "cat-harness/library/arxiv-2312.07755v1", was: 84, now: 28 },
-    { path: "smart-base/library/9789241509510-eng", was: 162, now: 103 },
-    { path: "smart-base/library/9789241511766-eng", was: 99, now: 44 },
-    { path: "smart-base/library/9789240010567-eng", was: 17, now: 11 },
+    { path: "who-iris/library/9789241509510-eng", was: 162, now: 103 },
+    { path: "who-iris/library/9789241511766-eng", was: 99, now: 44 },
+    { path: "who-iris/library/9789240010567-eng", was: 17, now: 11 },
   ];
 
   for (const e of entries) {
@@ -59,7 +59,7 @@ describe("the real corpus is deduplicated, and stays that way", () => {
     // descriptions share a clause about the IMAGE and differ about what each
     // copy serves. Collapsing without `note` would have dropped six of them.
     const s = ImagesSidecarSchema.parse(
-      JSON.parse(readFileSync(join(REPO, "smart-base/library/9789240010567-eng/images.json"), "utf8")),
+      JSON.parse(readFileSync(join(REPO, "who-iris/library/9789240010567-eng/images.json"), "utf8")),
     );
     const logo = (s.images ?? []).find((i) => (i.placements?.length ?? 0) === 7);
     expect(logo, "the seven-placement entry").toBeDefined();

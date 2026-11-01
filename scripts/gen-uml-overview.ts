@@ -279,7 +279,9 @@ function drawFamily(
     for (const file of docs) {
       const doc = JSON.parse(readFileSync(file, "utf8")) as Json;
       const rel = relative(join(REPO, section.path), file).replace(/\\/g, "/");
-      const title = typeof doc.title === "string" ? doc.title : rel;
+      // An EMPTY title counts as none: PlantUML refuses `class ""` and fails
+      // the whole render (some IG sidecars, such as a trust IG's, carry `"title": ""`).
+      const title = typeof doc.title === "string" && doc.title.trim() ? doc.title : rel;
       const props = (doc.properties ?? {}) as Record<string, unknown>;
       if (Object.keys(props).length > 0) {
         decompose(doc, title, `schema: ${rel}`, kind, safeId(`${prefix}_${rel}`), acc);

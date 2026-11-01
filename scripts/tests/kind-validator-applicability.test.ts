@@ -16,6 +16,9 @@ import { describe, expect, test } from "bun:test";
 import { defaultGraphTypologies } from "../../schemas/kg/graph-typology-registry.js";
 import { sweep } from "../check-kind-validators.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { join } from "node:path";
+import { instanceRootsIn, readDeclaration } from "../../schemas/kg/cat-harness.js";
+import { typologyOwner } from "../../schemas/kg/node-kind-index.js";
 
 const INSTANCE = HARNESS_ROOT;
 
@@ -38,9 +41,22 @@ describe("the three states partition the registry", () => {
       ...r.undeclared,
       ...r.unresolvable.map((u) => u.kind),
       ...r.contradictory,
+      // A kind another layer owns is in that layer's states, not these (bean w1gy).
+      ...r.elsewhere.map((e) => e.kind),
     ];
     expect(new Set(named).size).toBe(named.length);
     expect(named.length).toBe(defaultGraphTypologies.names().length);
+  });
+
+  test("a kind left to another layer names an owner this checkout does not hold", async () => {
+    // So `elsewhere` cannot become the place a kind of THIS checkout hides:
+    // only the declaring instance's absence puts a kind there.
+    const r = await sweep(INSTANCE);
+    const here = new Set(instanceRootsIn(join(INSTANCE, "..")).map((root) => readDeclaration(root)?.name));
+    for (const e of r.elsewhere) {
+      expect(typologyOwner(defaultGraphTypologies, e.kind)).toBe(e.owner);
+      expect(here.has(e.owner), `${e.kind} is owned by ${e.owner}, which this checkout holds`).toBe(false);
+    }
   });
 });
 

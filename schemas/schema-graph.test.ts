@@ -20,7 +20,7 @@
  * would have passed on all three.
  */
 import { describe, expect, test } from "bun:test";
-import { HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
+import { TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

@@ -381,6 +381,8 @@ const FIT: QaCriterionDefinition[] = [
 const FRAMEWORK: QaCriterionDefinition[] = [
   {
     id: "framework-canonical",
+    // The checker is the science layer's (bean saqd, row 9). See `checker_contributed`.
+    checker_contributed: true,
     domain: "framework",
     description:
       "Uses current canonical math framework, not deprecated notation. " +
@@ -431,6 +433,8 @@ const FRAMEWORK: QaCriterionDefinition[] = [
 const WALL: QaCriterionDefinition[] = [
   {
     id: "wall-side-correct",
+    // The checker is the science layer's (bean saqd, row 9). See `checker_contributed`.
+    checker_contributed: true,
     domain: "wall",
     description:
       "Block (`.lean` body) is on the correct side of the substrate-to-" +
@@ -465,6 +469,8 @@ const WALL: QaCriterionDefinition[] = [
   },
   {
     id: "wall-base-ring-minimal",
+    // The checker is the science layer's (bean saqd, row 9). See `checker_contributed`.
+    checker_contributed: true,
     domain: "wall",
     description:
       "Advisory (§7c base-ring minimality). Flags **algebraic-side** Lean " +
@@ -553,9 +559,9 @@ const WALL: QaCriterionDefinition[] = [
 // fixed-q0, …) and cross-checks the detected regime vector against
 // the chapter's narrative-expected profile. The rules stay here; the
 // checkers are the science layer's (bean saqd, 2026-10-30):
-// `folio-assistant-sci/pipeline/qa-checkers-q-usage.ts`, contributed through
+// https://github.com/litlfred/folio-assistant-sci/blob/main/pipeline/qa-checkers-q-usage.ts, contributed through
 // its `qa-checkers/q-usage-*.json` nodes and run on their own by
-// `folio-assistant-sci/pipeline/q-usage-audit.ts`. See `checker_contributed`.
+// https://github.com/litlfred/folio-assistant-sci/blob/main/pipeline/q-usage-audit.ts. See `checker_contributed`.
 // Chapter profiles stay in `chapter-profile-registry-di.ts`.
 
 const Q_USAGE: QaCriterionDefinition[] = [
@@ -1199,6 +1205,28 @@ const PROOF: QaCriterionDefinition[] = [
     depends_on: ["ts"],
     automated: true,
     applies_to: ["recommendation"],
+  },
+  {
+    id: "acronym-in-glossary",
+    domain: "canonical",
+    // The rule is the harness's; the checker is the content core's, because
+    // glossaries (folio-glossary/v1) are content vocabulary. Owner,
+    // 2026-10-31: "make QA review identify acronyms for potential inclusion".
+    // See `checker_contributed`.
+    checker_contributed: true,
+    description:
+      "Every acronym a block's prose uses (WHO, GS1, eLMIS, ICD-11) is a " +
+      "label of a glossary its folio can see: a term's `notation`, " +
+      "`prefLabel` or `altLabel`, in the folio's `glossary/` or a mounted " +
+      "instance's. `warn`, naming each missing acronym at its first line, as " +
+      "a CANDIDATE for the glossary: it never fails, because only a person " +
+      "adds a term. Words set in capitals, plurals and the folio's own ids " +
+      "(PC-R-05) are not acronyms. `n/a` when the block has no prose.",
+    default_severity: "minor",
+    depends_on: ["md"],
+    automated: true,
+    // No `profiles`: a paper's acronyms belong in its glossary too, and a
+    // document-only opt-out is refused (profile-scoping.test.ts).
   },
   {
     id: "proof-compile-cost",
@@ -2751,15 +2779,12 @@ const VOICE_FILE_IDS = new Set<string>([
   "voice-editorializing",
   "voice-ai-slop",
   "voice-scholarly-default",
-  "framework-canonical",
-  "wall-side-correct",
   // Added 2026-09-18 — all six dispatch from qa-checkers-voice.ts and were
   // silently hashing qa-checkers-extended.ts.
   "voice-probe-narrative",
   "voice-agent-speak",
   "voice-author-notes-pollution",
   "voice-status-section",
-  "wall-base-ring-minimal",
   "cite-named-theorem",
 ]);
 

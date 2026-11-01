@@ -136,7 +136,7 @@ import {
   type InstanceSchemaExport,
   type ZodSchemaScan,
 } from "./harness-schema-export.js";
-import { stagingFields } from "./staging-stamp.js";
+import { stagingContextTerm, stagingFields } from "./staging-stamp.js";
 import {
   QA_RESULTS_DIR,
   buildQaResult,
@@ -167,6 +167,7 @@ import { placedOut, siteRootOf } from "./lib/moved-document.ts";
 import { hostSchemaBase } from "./lib/host-schema.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { diagramPages, owningProcess } from "./lib/diagram-pages.ts";
+import { darkRules } from "./lib/scheme-css.ts";
 
 const ROOT = join(HARNESS_ROOT);
 
@@ -691,15 +692,7 @@ export function buildContext(): Record<string, unknown> {
     // `sha`, `pr` and `run` are words a graph node could plausibly use for
     // something else, and a global term would silently give that other use
     // this meaning. Scoped, they mean this only inside `staging`.
-    staging: {
-      "@id": termIri("staging"),
-      "@context": {
-        branch: termIri("stagingBranch"),
-        sha: termIri("stagingSha"),
-        pr: termIri("stagingRef"),
-        run: termIri("stagingRun"),
-      },
-    },
+    staging: stagingContextTerm(),
     // What a staging preview's graph changed against the graph `main`
     // publishes — written by `scripts/kg-changed-assets.ts` after the export,
     // on a PREVIEW document only (owner, 2026-10-14). The `dependsOn` /
@@ -4040,6 +4033,7 @@ export function writeSubjectDocuments(
   writeFileSync(contextFile, JSON.stringify({ "@context": published["@context"] }, null, 2) + "\n");
   written.push(contextFile);
   const contextName = basename(contextFile);
+  const labels = subjectLabels(graph);
   for (const { node, stem } of subjects) {
     const id = String(node["@id"]);
     const name = stem.split("/").pop()!;
@@ -4064,13 +4058,19 @@ export function writeSubjectDocuments(
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
     written.push(file);
+    // The page embeds the document WITHOUT the staging stamp (bean g196,
+    // owner 2026-11-01, Q-S1-1 A). A preview's banner already names its build
+    // from `staging.json`, and a stamp in every page made each rebuild of one
+    // preview rewrite every subject page. The `.jsonld` above keeps it: data
+    // has no banner, so it says in-band which build it came from.
+    const pageView = Object.fromEntries(Object.entries(doc).filter(([k]) => !(k in stamp)));
     const page = join(dir, `${stem}.html`);
-    writeFileSync(page, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, pageDoc, diagram));
+    writeFileSync(page, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, pageDoc, diagram, labels));
     written.push(page);
     if (parentStems.has(stem)) {
       const index = join(dir, stem, "index.html");
       mkdirSync(dirname(index), { recursive: true });
-      writeFileSync(index, subjectPage(doc, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc, diagram));
+      writeFileSync(index, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc, diagram, labels));
       written.push(index);
     }
   }
@@ -4177,15 +4177,38 @@ export function writeLegacyDocuments(
 const escHtml = (v: unknown): string =>
   String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-/** A value as HTML: an IRI is a link, a list is each of its items. */
-function valueHtml(v: unknown): string {
-  if (Array.isArray(v)) return v.map(valueHtml).join("<br>");
+/**
+ * A value as HTML: an IRI is a link, a list is each of its items.
+ *
+ * An IRI naming another node of the same graph is shown by that node's NAME,
+ * with the IRI under it (owner, 2026-10-31, on a lane's page: "where is link
+ * to …/process/Process_ContributorFeedback"). The bare IRI was the link text,
+ * one unbreakable line wider than the column, so the parent process ran off
+ * the page. The IRI still wraps, and is still the address.
+ */
+function valueHtml(v: unknown, labels: ReadonlyMap<string, string> = new Map()): string {
+  if (Array.isArray(v)) return v.map((x) => valueHtml(x, labels)).join("<br>");
   if (v !== null && typeof v === "object") {
     const id = (v as Record<string, unknown>)["@id"];
-    return typeof id === "string" ? valueHtml(id) : `<code>${escHtml(JSON.stringify(v))}</code>`;
+    return typeof id === "string" ? valueHtml(id, labels) : `<code>${escHtml(JSON.stringify(v))}</code>`;
   }
   const s = String(v);
-  return /^https?:\/\//.test(s) ? `<a href="${escHtml(s)}">${escHtml(s)}</a>` : escHtml(s);
+  if (!/^https?:\/\//.test(s)) return escHtml(s);
+  const label = labels.get(s);
+  return label === undefined
+    ? `<a class="iri" href="${escHtml(s)}">${escHtml(s)}</a>`
+    : `<a href="${escHtml(s)}">${escHtml(label)}</a><br><span class="iri muted">${escHtml(s)}</span>`;
+}
+
+/** Every typed node's display name, by IRI: its title, else its name. */
+export function subjectLabels(graph: readonly Node[]): Map<string, string> {
+  const labels = new Map<string, string>();
+  for (const n of graph) {
+    const id = n["@id"];
+    const label = n.title ?? n.name;
+    if (typeof id === "string" && n["@type"] !== undefined && typeof label === "string" && label !== "") labels.set(id, label);
+  }
+  return labels;
 }
 
 /**
@@ -4202,6 +4225,14 @@ function valueHtml(v: unknown): string {
  * `publish-verify.ts`), so the check counts these pages as excluded, and
  * says how many, rather than as missing.
  */
+/**
+ * The page's dark colours, behind the site's light/dark switch (`darkRules`,
+ * issue #2208) rather than the OS alone. Owner, 2026-10-31, on a lane's page:
+ * "where is light/dark mode? looks bad" — the content followed the OS (dark)
+ * while the rail and bar beside it followed the site (light).
+ */
+const SUBJECT_DARK = darkRules(":root { --fg: #f5f5f7; --bg: #1c1c1e; --muted: #a1a1a6; --line: #3a3a3c; }");
+
 const SUBJECT_SEARCH_EXCLUDE = '<meta name="fa-search-exclude" content="true">';
 
 /**
@@ -4209,20 +4240,30 @@ const SUBJECT_SEARCH_EXCLUDE = '<meta name="fa-search-exclude" content="true">';
  * names, so `…/process/P#flow/F` lands on it), and the same JSON-LD as the
  * `.jsonld` beside it, embedded. Self-contained: no script, no stylesheet.
  */
-function subjectPage(doc: Record<string, unknown>, node: Node, fragments: readonly Node[], jsonldHref: string, docIri: string, diagram?: string): string {
+export function subjectPage(
+  doc: Record<string, unknown>,
+  node: Node,
+  fragments: readonly Node[],
+  jsonldHref: string,
+  docIri: string,
+  diagram?: string,
+  labels: ReadonlyMap<string, string> = new Map(),
+): string {
   const id = String(node["@id"]);
   const title = String(node.title ?? node.name ?? id.split("/").pop());
   const type = stripNamespace(String(node["@type"]));
+  // The node this one is part of (a lane's or a step's process), named at the top.
+  const parent = typeof node.partOf === "string" && /^https?:\/\//.test(node.partOf) ? node.partOf : undefined;
   const rows = (n: Node): string =>
     Object.entries(n)
       .filter(([k]) => k !== "@id" && k !== "@type")
-      .map(([k, v]) => `<tr><th>${escHtml(k)}</th><td>${valueHtml(v)}</td></tr>`)
+      .map(([k, v]) => `<tr><th>${escHtml(k)}</th><td>${valueHtml(v, labels)}</td></tr>`)
       .join("\n");
   const flows = fragments
     .map((f) => {
       const fid = String(f["@id"]);
       const anchor = fid.slice(fid.indexOf("#") + 1);
-      return `<section id="${escHtml(anchor)}"><h3>${escHtml(anchor)}</h3><table>${rows(f)}</table></section>`;
+      return `<section id="${escHtml(anchor)}"><h3>${escHtml(anchor)}</h3><table class="fa-page-wide">${rows(f)}</table></section>`;
     })
     .join("\n");
   // `<` escaped so no value can close the script element early.
@@ -4240,27 +4281,33 @@ ${json}
 </script>
 <style>
 :root { color-scheme: light dark; --fg: #1d1d1f; --bg: #fff; --muted: #6e6e73; --line: #d2d2d7; }
-@media (prefers-color-scheme: dark) { :root { --fg: #f5f5f7; --bg: #1c1c1e; --muted: #a1a1a6; --line: #3a3a3c; } }
-body { margin: 0 auto; max-width: 60rem; padding: 1.5rem 1rem; font: 15px/1.5 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
-code, .iri { font-family: ui-monospace, monospace; font-size: 0.9em; word-break: break-all; }
-.muted { color: var(--muted); }
-table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1.5rem; }
-th, td { text-align: left; vertical-align: top; padding: 0.3rem 0.5rem; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
-th { width: 12rem; font-weight: 600; }
-a { color: inherit; }
+${SUBJECT_DARK}
+body { margin: 0; font: 15px/1.5 system-ui, sans-serif; color: var(--fa-pl-fg, var(--fg)); background: var(--fa-pl-bg, var(--bg)); }
+.fa-page-main { box-sizing: border-box; padding: 1rem 1.5rem 3rem; max-width: 72rem; overflow-wrap: anywhere; }
+code, .iri { font-family: ui-monospace, monospace; font-size: 0.9em; overflow-wrap: anywhere; word-break: break-word; }
+.muted { color: var(--fa-pl-muted, var(--muted)); }
+.fa-page-main .subject-kind { margin: 0; }
+.fa-page-main h1 { margin-top: 0.25rem; }
+table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1.5rem; table-layout: fixed; }
+th, td { text-align: left; vertical-align: top; padding: 0.3rem 0.5rem; border-top: 1px solid var(--fa-pl-line, var(--line)); overflow-wrap: anywhere; }
+th { width: 10rem; font-weight: 600; }
+td .iri { font-size: 0.8em; }
+@media (max-width: 40rem) { th { width: 6.5rem; } }
 </style>
 </head>
 <body>
-<p class="muted">${escHtml(type)}</p>
+<main class="fa-page-main">
+<p class="muted subject-kind">${escHtml(type)}</p>
 <h1>${escHtml(title)}</h1>
-<p class="iri">${escHtml(id)}</p>
-<p><a href="${escHtml(jsonldHref)}">JSON-LD</a>${diagram === undefined ? "" : ` · <a href="${escHtml(diagram)}">diagram</a>`} · part of <a href="${escHtml(docIri)}">${escHtml(docIri)}</a></p>${
+${parent === undefined ? "" : `<p>Part of <a href="${escHtml(parent)}">${escHtml(labels.get(parent) ?? parent.split("/").pop()!)}</a></p>\n`}<p class="iri muted">${escHtml(id)}</p>
+<p><a href="${escHtml(jsonldHref)}">JSON-LD</a>${diagram === undefined ? "" : ` · <a href="${escHtml(diagram)}">diagram</a>`} · in graph <a class="iri" href="${escHtml(docIri)}">${escHtml(docIri.split("/").pop()!)}</a></p>${
     typeof doc.sameAs === "string" ? `\n<p class="muted">A copy published here. The canonical address is <span class="iri">${escHtml(id)}</span> (<code>owl:sameAs</code>).</p>` : ""
   }
-<table>
+<table class="fa-page-wide">
 ${rows(node)}
 </table>
 ${flows === "" ? "" : `<h2>Flows</h2>\n${flows}`}
+</main>
 </body>
 </html>
 `;

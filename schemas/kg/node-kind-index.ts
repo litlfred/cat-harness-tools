@@ -50,9 +50,9 @@
  */
 import { existsSync } from "node:fs";
 import { z } from "zod";
-import { join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
-import { CatHarnessDeclarationKind, declaredAssetPath, readDeclaration, resolveGraphTypology, UNKINDED_BASELINE_ROLE, type GraphTypologyRegistry } from "./cat-harness.js";
+import { CatHarnessDeclarationKind, declaredAssetPath, findInstanceRoot, readDeclaration, resolveGraphTypology, UNKINDED_BASELINE_ROLE, type GraphTypologyRegistry } from "./cat-harness.js";
 import { BASE_GRAPH_TYPOLOGIES, REGISTRATION_MODULE, type NodeSchemaRef } from "./graph-typology-registry.js";
 import { instanceRootsIn } from "./instance-roots.js";
 import { harnessRoot } from "../harness-root.js";
@@ -231,6 +231,7 @@ export async function nodeKindIndex(
     if (!existsSync(abs)) return { declaredBy, reason: "unresolvable" };
     let mod: Record<string, unknown>;
     try {
+      // input-site: imports */schemas/**/*.ts,*/src/**/*.ts,schemas/**/*.ts,src/**/*.ts #771876e3 — validator modules referenced by graph typology and node-kind declarations
       mod = (await import(abs)) as Record<string, unknown>;
     } catch {
       return { declaredBy, reason: "unresolvable" };
@@ -257,6 +258,8 @@ export async function nodeKindIndex(
     if (typology !== name) continue; // an alias: its canonical name is visited on its own
     const def = registry.get(typology);
     if (!def) continue;
+    // Another layer's typology is that layer's to index (bean `w1gy`).
+    if (ownedOutside(registry, typology, repoRoot)) continue;
     const families = Object.entries((def.nodeSchemas ?? {}) as Record<string, NodeSchemaRef>);
     // A typology with families is judged per family; one without is judged on
     // its kind-level validator, and one with neither holds nothing a node kind
@@ -340,7 +343,50 @@ export function typologyOwner(registry: GraphTypologyRegistry, typology: string)
   const abs = resolve(file);
   const roots = [...new Set(registry.roots().flatMap((r) => instanceRootsIn(r)))].sort((a, b) => b.length - a.length);
   const root = roots.find((r) => abs.startsWith(resolve(r) + "/"));
-  return root === undefined ? undefined : readDeclaration(root)?.name;
+  if (root === undefined) return undefined;
+  // The NEAREST declaring instance inside that root, not the root itself: the
+  // standalone fixture (`test/fixtures/standalone-checkout/`, which
+  // `FOLIO_FIXTURE_CHECKOUT` adds to discovery) holds copies of other layers'
+  // instances, and a typology one of them declares is that instance's — not
+  // the instance whose directory happens to contain the fixture (bean `w1gy`).
+  // For a typology an instance root declares directly the two agree.
+  const nearest = findInstanceRoot(dirname(abs));
+  const owner = nearest !== undefined && (resolve(nearest) + "/").startsWith(resolve(root) + "/") ? nearest : root;
+  return readDeclaration(owner)?.name;
+}
+
+/**
+ * Whether a typology is owned by an instance this checkout does not hold — a
+ * layer outside `checkout`, whose families that layer judges against its own
+ * baseline and whose validators it declares. A typology with no owner is
+ * NOT outside: it stays unattributed, and the gate reports it.
+ *
+ * Standalone, the only such typologies are the fixture's (bean `w1gy`); in a
+ * composed checkout every instance is held and this is always false.
+ */
+export function ownedOutside(registry: GraphTypologyRegistry, typology: string, checkout: string): boolean {
+  const owner = typologyOwner(registry, typology);
+  if (owner === undefined) return false;
+  return !checkoutNames(checkout).has(owner);
+}
+
+const namesByCheckout = new Map<string, Set<string>>();
+function checkoutNames(checkout: string): Set<string> {
+  const key = resolve(checkout);
+  let names = namesByCheckout.get(key);
+  if (!names) {
+    names = new Set();
+    for (const r of instanceRootsIn(key)) {
+      try {
+        const name = readDeclaration(r)?.name;
+        if (name) names.add(name);
+      } catch {
+        // an unreadable declaration names nothing
+      }
+    }
+    namesByCheckout.set(key, names);
+  }
+  return names;
 }
 
 /** One family an instance's baseline admits: the key, nothing that can drift with another layer. */

@@ -41,9 +41,10 @@
  *
  * ## What it does not change
  *
- * CI. `gates` runs `skill:register:check` and `kg:audit:check` whole, as
- * before; this table is read only by `regen`. Whether either gate is redundant
- * in CI is a separate question, put on the PR rather than decided here.
+ * `gates` runs `skill:register:check` and `kg:audit:check` whole, as before;
+ * this table is read only by `regen`. The layer PR checks fold
+ * `skill:register:check` the same way on their own
+ * (`.github/scripts/layer-pr-checks/run-gates.py`, `fold_skill_register`).
  */
 import { CHECKS as SKILL_REGISTER_CHECKS } from "./skill-register.ts";
 
@@ -115,7 +116,13 @@ export function foldable(
   return out;
 }
 
-type Clean = "current" | "regenerated";
+/**
+ * The outcomes that are a pass — the same three `regen-after-merge.ts`
+ * counts clean (`CLEAN_OUTCOMES`). `judged` is a judge check's pass (bean
+ * `loxz`); leaving it out made a judged covered check skip its coverers and
+ * stay green over a red one.
+ */
+type Clean = "current" | "regenerated" | "judged";
 
 /** The minimal shape of a regen result this needs. */
 export interface CoverResult {
@@ -162,5 +169,5 @@ export function settleCovered<R extends CoverResult>(results: readonly R[], fold
 }
 
 function isClean(o: string): o is Clean {
-  return o === "current" || o === "regenerated";
+  return o === "current" || o === "regenerated" || o === "judged";
 }

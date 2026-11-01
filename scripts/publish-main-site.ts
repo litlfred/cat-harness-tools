@@ -14,7 +14,7 @@
  * ## It deletes only what it wrote
  *
  * The root of the publish branch is shared: `STAGING/` holds every open PR's
- * preview, `_render-log/` the render history, and a folio may keep files there
+ * preview, `PC/` the frozen public comment releases, `_render-log/` the render history, and a folio may keep files there
  * by hand (a `CNAME`, a verification file). Replacing the root wholesale would
  * delete all of it, which is the `plj1` failure. Overlaying without deleting
  * keeps pages `main` stopped producing, so a reviewer checking a removal is
@@ -37,10 +37,17 @@ import { dirname, join, relative, sep } from "node:path";
 export const MANIFEST = "_main-site.json";
 
 /**
- * Top-level names the main site never writes and never deletes: the previews,
- * the render history, the manifest itself, and git's own directory.
+ * Where the frozen "Draft for Public Comment" releases live (`pc-release.ts`).
+ * Unlike a preview, a release is never removed: the public cited its lines.
  */
-export const RESERVED = ["STAGING", "_render-log", MANIFEST, ".git"] as const;
+export const PC_PREFIX = "PC";
+
+/**
+ * Top-level names the main site never writes and never deletes: the previews,
+ * the public comment releases, the render history, the manifest itself, and
+ * git's own directory.
+ */
+export const RESERVED = ["STAGING", PC_PREFIX, "_render-log", MANIFEST, ".git"] as const;
 
 export interface MainSiteManifest {
   $schema: "folio-main-site/v1";

@@ -104,6 +104,13 @@ export function checkCommitted(instanceRoot: string): string[] {
         if (n.kind === "element" && !ids.has(n.ref ?? "")) problems.push(`${m.id}: view "${v.name}" draws ${n.ref || "nothing"}, which the model does not hold`);
       }
     }
+    const views = new Set(model.views.map((v) => v.id));
+    for (const f of (config.figures ?? []).filter((x) => x.model === m.id)) {
+      if (!views.has(f.view)) problems.push(`${m.id}: ${f.label} (${f.block}) is mapped to view ${f.view}, which the model does not hold`);
+    }
+  }
+  for (const f of config.figures ?? []) {
+    if (!existsSync(join(instanceRoot, f.block))) problems.push(`${f.label}: block ${f.block} is not in the instance`);
   }
   const walk = (d: string) => {
     for (const e of readdirSync(d, { withFileTypes: true })) {

@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 
 import { expandRail, railDataJson } from "../../lib/harness-rail.ts";
 import { RAIL_SECTION_LABELS, bodyTag, injectNavbar } from "../../lib/navbar.ts";
-import { elementEnd, hasPageBar, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "../../lib/site-bar.ts";
+import { SEARCH_EXCLUDE_META, elementEnd, hasPageBar, hasThemeSidebar, stripThemeSidebar, withSiteBar } from "../../lib/site-bar.ts";
 import { railStandalonePages } from "../../mount-instance-docs.ts";
 import { PAGE_LAYOUT_CSS_FILE, PAGE_LAYOUT_JS_FILE } from "../../page-layout.ts";
 import { firstPaintSchemeScript } from "../../lib/scheme-css.ts";
@@ -16,8 +16,10 @@ import { firstPaintSchemeScript } from "../../lib/scheme-css.ts";
  * The theme page here is just-the-docs 0.12's `default` layout, reduced to
  * the elements the pass touches.
  */
-const THEME_PAGE = (title: string) => `<!DOCTYPE html>
-<html lang="en-US"><head><meta charset="UTF-8"><title>${title}</title><link rel="stylesheet" href="/assets/css/just-the-docs-default.css"></head>
+const THEME_PAGE = (title: string, row = 1) => `<!DOCTYPE html>
+<html lang="en-US"><head><meta charset="UTF-8"><title>${title}</title><link rel="stylesheet" href="/assets/css/just-the-docs-default.css"><style id="jtd-nav-activation">
+    .site-nav > ul.nav-list:first-child > li:nth-child(${row}) > a { font-weight: 600; }
+  </style></head>
 <body>
   <a class="skip-to-main" href="#main-content">Skip to main content</a>
   <header class="side-bar">
@@ -52,6 +54,19 @@ describe("stripThemeSidebar", () => {
     expect(out).toContain('<div id="main-header" class="main-header">');
     expect(out).toContain("<h1>Guide</h1>");
   });
+  test("the nav activation style goes too, so a page added ahead of this one no longer changes it", () => {
+    // The style names the page's row by its position in the whole nav: one
+    // page inserted earlier renumbers it on every later page.
+    const a = stripThemeSidebar(THEME_PAGE("Guide", 108));
+    const b = stripThemeSidebar(THEME_PAGE("Guide", 109));
+    expect(a).not.toContain("jtd-nav-activation");
+    expect(a).toBe(b);
+    expect(a).toContain('<link rel="stylesheet" href="/assets/css/just-the-docs-default.css"></head>');
+  });
+  test("a page that keeps its side bar keeps its activation style", () => {
+    const page = `<html><head><style id="jtd-nav-activation">x</style></head><body><p>no side bar</p></body></html>`;
+    expect(stripThemeSidebar(page)).toBe(page);
+  });
   test("elementEnd counts nested elements", () => {
     const h = "<div a><div><div></div></div></div>tail";
     expect(h.slice(elementEnd(h, 0, "div"))).toBe("tail");
@@ -74,6 +89,11 @@ describe("withSiteBar", () => {
     expect(out).toContain('<script src="./assets/js/just-the-docs.js" defer></script>');
     const bare = withSiteBar(page, { toRoot: ".", title: "folio-assistant" });
     expect(bare).not.toContain('id="search-input"');
+    // Never in the theme's index, so marked as left out of search on purpose;
+    // a theme page, which IS indexed, is not marked.
+    expect(out).toContain(SEARCH_EXCLUDE_META);
+    expect(bare).not.toContain(SEARCH_EXCLUDE_META);
+    expect(withSiteBar(stripThemeSidebar(THEME_PAGE("Guide")), { toRoot: "..", title: "x" })).not.toContain(SEARCH_EXCLUDE_META);
   });
   test("an IG page keeps its own bar", () => {
     const ig = `<html><head></head><body><div class="ig-topbar fa-page-bar">IG</div></body></html>`;

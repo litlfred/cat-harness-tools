@@ -23,6 +23,7 @@ import { TYPES, autoDocPage, declaredDirectories, levelPage, owningDirectory } f
 import { knownSkills } from "../known-skills.ts";
 import { instanceRootsIn, isExemptFrom, readDeclaration, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { notApplicableAlone, siteNotBuilt } from "../../test/support/checkout.ts";
 
 // The harness whose docs the generator writes; the test moved up with it (70lx B2).
 const INSTANCE = HARNESS_ROOT;
@@ -246,7 +247,8 @@ describe("a THEMED page, so the layout gives it the top band (2026-10-07)", () =
 });
 
 describe("what is published", () => {
-  it("a sub-graph page exists for who-iris, the sparse case", () => {
+  // who-iris is a higher instance; standing alone it contributes nothing to render.
+  it.skipIf(notApplicableAlone("who-iris, whose one skill (iris-dspace) is the sparse sub-graph this page renders"))("a sub-graph page exists for who-iris, the sparse case", () => {
     // The owner asked for the handler to be exercised on who-iris, which
     // contributes ONE skill. A thin index is a real answer; the test is that
     // it is rendered at all rather than dropped as uninteresting.
@@ -265,7 +267,16 @@ describe("what is published", () => {
 });
 
 describe("the LEVEL pages — a route that reads like a section must answer", () => {
-  it("every level above a built type has an index", () => {
+  // Standing alone the level pages are not built: `auto:docs` writes them at
+  // publish and `auto-docs/` is gitignored (bean w1gy F18).
+  const notBuilt = (...levels: string[][]): boolean =>
+    siteNotBuilt(
+      "the auto-docs level pages `auto:docs` writes at publish (gitignored)",
+      ...levels.map((l) => join(SITE, HANDLER ?? "", "auto-docs", ...l, "index.html")),
+    );
+
+  // The root level is the one every built type sits under: absent, none is built.
+  it.skipIf(notBuilt([]))("every level above a built type has an index", () => {
     // Bean `06e3`: a type id may carry a slash, so `viewerPlacement` nests its
     // page directory and the levels above came into existence holding nothing.
     // `/cat-harness/auto-docs/` and `/cat-harness/auto-docs/index/` were both
@@ -283,7 +294,7 @@ describe("the LEVEL pages — a route that reads like a section must answer", ()
     }
   });
 
-  it("a level page names ITSELF, so the one pruner can read its ownership", () => {
+  it.skipIf(notBuilt([], ["index"]))("a level page names ITSELF, so the one pruner can read its ownership", () => {
     // `orphanSubjectPages` establishes ownership from `var SCOPE`, and a page
     // whose SCOPE does not match its own directory is FOREIGN — reported and
     // left. A level page that got this wrong would be unprunable forever, and
@@ -294,7 +305,7 @@ describe("the LEVEL pages — a route that reads like a section must answer", ()
     expect(mid).toContain('var SCOPE = "index";');
   });
 
-  it("its links are relative to itself, so the tree can move", () => {
+  it.skipIf(notBuilt(["index"]))("its links are relative to itself, so the tree can move", () => {
     const mid = readFileSync(join(SITE, HANDLER!, "auto-docs", "index", "index.html"), "utf-8");
     for (const t of TYPES) {
       const seg = t.id.split("/").pop()!;
@@ -315,11 +326,15 @@ describe("the LEVEL pages — a route that reads like a section must answer", ()
   it("counts a type's items and says what a nested level holds", () => {
     const h = levelPage("", [
       { seg: "index", title: "index", detail: "2 type(s) below" },
-      { seg: "glossary", title: "Glossary", detail: "every defined term", count: 7 },
-    ]);
+      { seg: "glossary", title: "Glossary", detail: "every defined term", count: 7, countKey: "glossary" },
+    ], "../assets/auto-docs/index.json");
     expect(h).toContain("2 type(s) below");
-    expect(h).toContain(">7<");
     expect(h).toContain('href="glossary/"');
+    // The count is FETCHED (cone-shrinking, 2026-10-31): the page carries the
+    // key, so a file added anywhere does not rewrite the page.
+    expect(h).toContain('data-da-count="glossary"');
+    expect(h).not.toContain(">7<");
+    expect(h).toContain('fetch("../assets/auto-docs/index.json"');
   });
 });
 
@@ -366,5 +381,34 @@ describe("a code span that is not a row here links to a skill page or a file (be
   });
   it("a name that resolves to neither stays code", () => {
     expect(html).toContain("and <code>claim</code>.");
+  });
+});
+
+describe("counts are fetched from one file, so pages do not move when a count does", () => {
+  const siblings = (n: number) => [
+    { id: "a-skills", path: "a/skills", count: n },
+    { id: "b-skills", path: "b/skills", count: 3 },
+  ];
+  const page = (n: number) =>
+    autoDocPage(TYPES[0]!, [{ path: "a/skills/x/SKILL.md", name: "x" }], "a-skills", "a/skills", siblings(n), undefined, "../../x.json");
+
+  it("a sibling's count changing leaves the page byte-identical", () => {
+    // Before, each sub-graph page listed every sibling's count, so one file
+    // added anywhere rewrote every sibling page (about 40 per deploy).
+    expect(page(5)).toBe(page(6));
+  });
+
+  it("each sibling carries its key and a pending mark, filled from the counts file", () => {
+    const html = page(5);
+    expect(html).toContain(`data-da-count="${TYPES[0]!.id}/a-skills"`);
+    expect(html).toContain(`data-da-count="${TYPES[0]!.id}/b-skills"`);
+    expect(html).toContain('data-da-count-state="pending"');
+    expect(html).toContain('fetch("../../x.json"');
+    expect(html).toContain("j.counts");
+  });
+
+  it("a level page's type count changing leaves it byte-identical", () => {
+    const lp = (n: number) => levelPage("index", [{ seg: "skills", title: "Skills", detail: "d", count: n, countKey: "index/skills" }], "x.json");
+    expect(lp(1)).toBe(lp(2));
   });
 });

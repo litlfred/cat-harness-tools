@@ -27,7 +27,7 @@
  * recorded**, never as "expectation met".
  *
  * The q-usage checkers that read these profiles are the science layer's
- * (`folio-assistant-sci/pipeline/qa-checkers-q-usage.ts`, bean `saqd`); this
+ * (https://github.com/litlfred/folio-assistant-sci/blob/main/pipeline/qa-checkers-q-usage.ts, bean `saqd`); this
  * registry stays here because it is the generic DI point, and sci's
  * `lean-audit.ts` reads `leanModuleChapter` from it too.
  *

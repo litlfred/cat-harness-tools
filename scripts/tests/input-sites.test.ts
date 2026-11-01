@@ -382,6 +382,7 @@ describe("annotations hold to the data that chooses their targets", () => {
       }
     }
     // The module moved into this layer with schemas/kg/ (8lcl); named from TOOLS_ROOT, not spelled.
+    // declared-path-literal: the module whose `input-site` annotation is the subject of this assertion, the same file this test imports; no declaration answers where a module of this layer sits.
     for (const g of globs) expect(annotated(relTo(join(TOOLS_ROOT, "schemas/kg/harness-config.ts")), g), g).toBe(true);
   });
 
@@ -393,6 +394,7 @@ describe("annotations hold to the data that chooses their targets", () => {
         if (existsSync(f)) expect(globMatch("*/themes/themes.ts", relTo(f)), `${relTo(f)} is outside the glob`).toBe(true);
       }
     }
+    // declared-path-literal: the module whose `input-site` annotation is the subject of this assertion, the same file this test imports; no declaration answers where a module of this layer sits.
     expect(annotated(relTo(join(TOOLS_ROOT, "schemas/ui/theme-by-ref.ts")), "*/themes/themes.ts")).toBe(true);
   });
 
@@ -419,5 +421,29 @@ describe("the audit walks only what can run", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  test("every runtime module under schemas/ is input-site annotated after 8lcl (cat-harness-tools#634)", () => {
+    // declared-path-literal: the directory of schema modules whose input-site annotations this test audits.
+    const schemasRoot = join(TOOLS_ROOT, "schemas");
+    const walk = (dir: string): string[] => {
+      const out: string[] = [];
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name);
+        if (e.isDirectory()) out.push(...walk(full));
+        else if (e.name.endsWith(".ts") && !e.name.endsWith(".test.ts") && e.name !== "test-fixture-preload.ts") out.push(full);
+      }
+      return out;
+    };
+    const unannotated: string[] = [];
+    for (const file of walk(schemasRoot)) {
+      const rel = relative(TOOLS_ROOT, file);
+      for (const s of scanSource(rel, readFileSync(file, "utf-8"))) {
+        if (s.verdicts === undefined || s.verdicts === "stale" || s.malformed) {
+          unannotated.push(`${rel}:${s.line} #${s.pin} (${s.risks.join(",")})`);
+        }
+      }
+    }
+    expect(unannotated).toEqual([]);
   });
 });

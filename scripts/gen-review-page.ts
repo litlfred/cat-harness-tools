@@ -103,11 +103,12 @@
 
 import { DIFF_RENDERERS } from "../schemas/ui/diff-renderers.js";
 import { PUBLISHED_LOCALES } from "../schemas/content/translation.js";
-import { cleanRendered, renderFields, renderInline, renderSideBySide, renderVisual, renderWordDiff } from "./review-renderers.js";
+import { changeRuns, cleanRendered, FRAME_CHROME_CSS, markInFrame, renderFields, renderInline, renderSideBySide, renderVisual, renderWordDiff } from "./review-renderers.js";
 import { computeHeat, heatBucket, renderHeat } from "./review-heat.js";
 import { crumbFor, railOutline, renderMinimap, renderOutline } from "./review-nav.js";
 import { measuredModel, renderedModel, renderMeasured, renderRendered } from "./review-rendered.js";
 import { wordDiff } from "./word-diff.js";
+import { briefBlocks, briefInline, briefModel, briefRepo, briefText, closedIssue, renderBrief, whereToLook } from "./review-brief.js";
 import { darkRules } from "./lib/scheme-css.ts";
 
 const STYLE = `
@@ -125,22 +126,38 @@ const STYLE = `
      The intrinsic size is remembered once an entry has rendered. Measured:
      0.6-0.8 s for both cases (test/review-budget.e2e.ts). */
   #changes li[data-label] { content-visibility: auto; contain-intrinsic-size: auto 14rem; }
-  .layout > aside { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow: auto; font-size: .95rem; }
-  @media (max-width: 62rem) { .layout { grid-template-columns: 1fr; } .layout > aside { position: static; max-height: none; } }
+  /* The pane gets main's own gutters, so it does not sit flush on the rail. */
+  .layout > aside { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow: auto; font-size: .95rem; padding: 2rem 0 1rem 1.5rem; }
+  @media (max-width: 62rem) { .layout { grid-template-columns: 1fr; } .layout > aside { position: static; max-height: none; padding: 1rem 1.5rem 0; } }
   .outline ol { list-style: none; padding-left: .75rem; margin: .25rem 0; }
   .outline > ol { padding-left: 0; }
   .ol-doc { font-weight: 600; } .ol-ch { font-weight: 600; margin-top: .4rem; }
   .outline li { border: 0; padding: .1rem 0; }
   .badges { color: var(--muted); font-size: .9rem; }
-  .minimap ol { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; }
-  .minimap li { border: 0; padding: 0; }
-  .minimap .cell { display: block; width: 100%; min-height: 1.4rem; padding: 0 .4rem; text-align: left; font-size: .8rem; line-height: 1.4rem; border: 1px solid var(--rule); border-radius: .2rem; }
+  /* The minimap is a MAP: small square cells that wrap, one per block, so a
+     900-block document fits in a screen instead of a 23,000px column of
+     empty full-width bars. A cell with glyphs widens to fit them, so the
+     glyphs still repeat the colour. On a narrow screen the pane sits above
+     the list, so the map scrolls in its own box rather than pushing the
+     changes off the screen. */
+  .minimap h2 { margin-top: 1.5rem; }
+  .minimap ol { list-style: none; padding: 2px; margin: 0; display: flex; flex-wrap: wrap; gap: 2px; }
+  .minimap li { border: 0; padding: 0; display: block; }
+  .minimap .cell { display: block; box-sizing: border-box; min-width: .85rem; height: .85rem; padding: 0 .1rem; font: 700 .6rem/.75rem system-ui, sans-serif; text-align: center; border: 1px solid var(--rule); border-radius: 2px; cursor: pointer; }
+  .minimap .cell.h0 { background: transparent; color: var(--fg); }
+  /* A cell with something to look at is filled (.h1-.h3 below). */
+  .minimap .cell:not(.h0) { border-color: transparent; }
   .minimap .cell:focus-visible { outline: 3px solid var(--link); outline-offset: 1px; }
+  .minimap .mm-ch { margin: .6rem 0 .15rem; font-size: .8rem; line-height: 1.3; font-weight: 600; }
+  .minimap .mm-count { font-weight: 400; color: var(--muted); }
+  @media (max-width: 62rem) { .minimap { max-height: 50vh; overflow: auto; } }
   a { color: var(--link); }
   a:focus-visible, button:focus-visible, li:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
   .nav { display: flex; gap: .5rem; margin: 1rem 0; flex-wrap: wrap; align-items: center; }
-  /* Control rules are scoped to .layout: the harness rail's own controls sit outside it. */
-  .layout button { font: inherit; padding: .5rem 1rem; min-height: 2.75rem; border: 1px solid var(--muted); border-radius: .4rem; background: transparent; color: var(--fg); cursor: pointer; }
+  /* Control rules are scoped to .layout: the harness rail's own controls sit outside it.
+     Minimap cells are excluded: this rule's transparent background beat the
+     .h1-.h3 fills, so a changed block looked the same as an unchanged one. */
+  .layout button:where(:not(.cell)) { font: inherit; padding: .5rem 1rem; min-height: 2.75rem; border: 1px solid var(--muted); border-radius: .4rem; background: transparent; color: var(--fg); cursor: pointer; }
   h2 { font-size: 1.05rem; margin-top: 2rem; border-bottom: 1px solid var(--rule); padding-bottom: .25rem; }
   ul { list-style: none; padding: 0; }
   li { padding: .5rem .25rem; border-bottom: 1px solid var(--rule); }
@@ -164,7 +181,12 @@ const STYLE = `
   .diff-fields caption { text-align: left; font-weight: 600; padding: .25rem 0; }
   .diff-fields th, .diff-fields td { border: 1px solid var(--rule); padding: .25rem .4rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
   .diff-fields td:last-child { white-space: nowrap; font-weight: 600; }
-  .diff-sbs iframe { width: 100%; height: 22rem; border: 1px solid var(--rule); border-radius: .3rem; background: #fff; }
+  .diff-sbs iframe { width: 100%; height: 22rem; border: 1px solid var(--rule); border-radius: 0 0 .3rem .3rem; background: #fff; display: block; }
+  .sbs-head { padding: .2rem .6rem; border-radius: .3rem .3rem 0 0; font-size: .85rem; line-height: 1.4; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sbs-side-base { background: #5f6368; }
+  .sbs-side-head { background: #4F6F52; }
+  .sbs-head a, .sbs-head code { color: #fff; }
+  .sbs-head code { background: rgba(0,0,0,.25); padding: 0 .25rem; border-radius: .2rem; }
   @media (max-width: 40rem) { .diff-sbs { grid-template-columns: 1fr; } }
   /* Visual diff (0rxe): pictures on a white card, since they are screenshots
      of light pages; the mode buttons are native radios, one click each. */
@@ -188,6 +210,16 @@ const STYLE = `
   .h1 { background: #86b6ef; color: #1b1b1b; } .h2 { background: #3987e5; color: #1b1b1b; } .h3 { background: #1c5cab; color: #ffffff; }
   ${darkRules(`.h1 { background: #184f95; color: #ffffff; } .h2 { background: #256abf; color: #ffffff; } .h3 { background: #3987e5; color: #161616; }`)}
   button.linklike { border: 0; padding: 0; min-height: 0; background: none; color: var(--link); text-decoration: underline; cursor: pointer; font: inherit; text-align: left; }
+  /* What to expect (cat-harness-tools#1153): the PR's own summary, in a card. */
+  #brief { border: 1px solid var(--rule); border-radius: .5rem; padding: .25rem 1rem .5rem; margin: 1rem 0; }
+  #brief h2 { margin-top: .75rem; }
+  #brief h3 { font-size: 1rem; margin: .75rem 0 .25rem; }
+  #brief ul, #brief ol { padding-left: 1.25rem; }
+  #brief ul { list-style: disc; }
+  #brief li { border: 0; padding: .1rem 0; }
+  #brief ul.brief-where { list-style: none; padding-left: 0; }
+  .brief-body { max-height: 28rem; overflow: auto; }
+  .brief-chip { font-weight: 600; padding: .05rem .45rem; border-radius: .3rem; background: #4F6F52; color: #fff; }
   h2:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
 `;
 
@@ -357,7 +389,9 @@ const SCRIPT = `
   }
 
   // ── Diff renderers (bean d903) ─────────────────────────────────
-  var VIEW_KEY = "folio-review:view";
+  // v2 (owner, 2026-10-31, "default to inline"): a page-level choice made
+  // before, such as Side by side, is not carried over to override the new default.
+  var VIEW_KEY = "folio-review:view:v2";
   function loadView() { try { return window.localStorage.getItem(VIEW_KEY) || ""; } catch (e) { return ""; } }
   function saveView(v) { try { window.localStorage.setItem(VIEW_KEY, v); } catch (e) { /* the defaults, then */ } }
   function defaultFor(kind, structured) {
@@ -394,7 +428,15 @@ const SCRIPT = `
     } else if (id === "inline") {
       out = renderInline(document, base ? base.html : null, head ? head.html : null, wordDiff, cleanRendered);
     } else if (id === "side-by-side") {
-      out = renderSideBySide(document, ctx.before, ctx.after);
+      // The rendered text of each side, diffed, says where each pane scrolls to.
+      var runs = null;
+      if (base || head) {
+        var bt = base ? cleanRendered(document, base.html).textContent || "" : "";
+        var ht = head ? cleanRendered(document, head.html).textContent || "" : "";
+        var sops = wordDiff(bt, ht);
+        if (sops) runs = changeRuns(sops);
+      }
+      out = renderSideBySide(document, ctx.before, ctx.after, { beforeName: ctx.beforeName, facts: ctx.facts, runs: runs, mark: markInFrame });
     } else if (id === "visual") {
       out = renderVisual(document, ctx.visual, ROOT, "vis-" + panel.id);
     } else if (id === "fields") {
@@ -491,6 +533,42 @@ const SCRIPT = `
   function get(url) {
     return fetch(url).then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
   }
+
+  // What to expect (cat-harness-tools#1153): the PR and the issue it closes,
+  // live from GitHub, else the copy staged with the preview. Any branch has a
+  // PR; a change set only adds detail. "Where to look" joins when the
+  // ChangeSet loads.
+  var briefBox = document.getElementById("brief");
+  var BRIEF = null, WHERE = null, JUMP = null;
+  function drawBrief() { if (BRIEF) renderBrief(document, briefBox, BRIEF, WHERE, JUMP); }
+  function gh(path) {
+    return fetch("https://api.github.com/" + path, { headers: { Accept: "application/vnd.github+json" } })
+      .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
+  }
+  get(ROOT + "staging.json").catch(function () { return {}; }).then(function (st) {
+    var rp = briefRepo(st);
+    var prn = st && /^\\d+$/.test(String(st.pr || "")) ? String(st.pr) : null;
+    var live = rp && prn && typeof fetch === "function"
+      ? gh("repos/" + rp.owner + "/" + rp.repo + "/pulls/" + prn).then(function (p) {
+          var pr = { number: p.number, title: p.title || "", body: p.body || "", url: p.html_url || "" };
+          var n = closedIssue(pr.body) || (st.issue && /^\\d+$/.test(String(st.issue)) ? Number(st.issue) : null);
+          var issue = n ? gh("repos/" + rp.owner + "/" + rp.repo + "/issues/" + n).then(function (i) {
+            return { number: i.number, title: i.title || "", url: i.html_url || "" };
+          }).catch(function () { return { number: n, title: "", url: "https://github.com/" + rp.owner + "/" + rp.repo + "/issues/" + n }; }) : Promise.resolve(null);
+          return issue.then(function (i) { return { pr: pr, issue: i, source: "live" }; });
+        })
+      : Promise.reject(new Error("no PR"));
+    return live.catch(function () {
+      return get(ROOT + "review-brief.json").then(function (b) {
+        return { pr: b.pr || null, issue: b.issue || null, source: "snapshot", fetchedAt: b.fetchedAt || null };
+      });
+    }).catch(function () { return { pr: null, issue: null, source: "none" }; }).then(function (r) {
+      // The main site, or a preview with no PR: nothing to summarise, so no pane.
+      if (!r.pr && !prn) { briefBox.hidden = true; return; }
+      BRIEF = briefModel({ staging: st, pr: r.pr, issue: r.issue, source: r.source, fetchedAt: r.fetchedAt });
+      drawBrief();
+    });
+  });
 
   // The rendered list (bean bnjs): fetched on its own, so a preview with a
   // ChangeSet but no rendered impact still shows its blocks, and says why
@@ -611,6 +689,8 @@ const SCRIPT = `
             structure: structureFile && structureFile.blocks ? structureFile.blocks[c.label] || null : null,
             before: before,
             after: after,
+            beforeName: beforeName,
+            facts: st && st.branch ? Object.assign({}, st, { baseSha: cs.base && cs.base.commit ? String(cs.base.commit) : "" }) : null,
           });
           li.appendChild(v.row);
           li.appendChild(v.panel);
@@ -680,6 +760,9 @@ const SCRIPT = `
           list.querySelector('h2[data-section="(unchanged)"]');
         if (t) { t.focus(); t.scrollIntoView({ block: "start" }); }
       }
+      WHERE = whereToLook(cs.changes, 6);
+      JUMP = jumpSection;
+      drawBrief();
       if (OUTLINE && OUTLINE.documents) {
         var rowBy = {};
         heat.rows.forEach(function (r) { rowBy[r.section] = r; });
@@ -781,6 +864,7 @@ export function reviewPageHtml(root: string = "../../"): string {
 <aside id="navpane" aria-label="Navigation"></aside>
 <main>
 <h1>What changed</h1>
+<section id="brief" aria-labelledby="brief-h"><h2 id="brief-h">What to expect in this review</h2><p class="muted">Loading the pull request's summary…</p></section>
 <p id="summary" class="muted"></p>
 <p id="status" role="status" aria-live="polite">Loading the ChangeSet…</p>
 <div class="nav">
@@ -807,7 +891,10 @@ var cleanRendered = ${cleanRendered.toString()};
 var renderWordDiff = ${renderWordDiff.toString()};
 var renderInline = ${renderInline.toString()};
 var renderFields = ${renderFields.toString()};
+var FRAME_CHROME_CSS = ${JSON.stringify(FRAME_CHROME_CSS)};
 var renderSideBySide = ${renderSideBySide.toString()};
+var changeRuns = ${changeRuns.toString()};
+var markInFrame = ${markInFrame.toString()};
 var renderVisual = ${renderVisual.toString()};
 var computeHeat = ${computeHeat.toString()};
 var heatBucket = ${heatBucket.toString()};
@@ -820,6 +907,14 @@ var renderedModel = ${renderedModel.toString()};
 var renderRendered = ${renderRendered.toString()};
 var measuredModel = ${measuredModel.toString()};
 var renderMeasured = ${renderMeasured.toString()};
+var briefRepo = ${briefRepo.toString()};
+var closedIssue = ${closedIssue.toString()};
+var briefText = ${briefText.toString()};
+var briefModel = ${briefModel.toString()};
+var whereToLook = ${whereToLook.toString()};
+var briefBlocks = ${briefBlocks.toString()};
+var briefInline = ${briefInline.toString()};
+var renderBrief = ${renderBrief.toString()};
 </script>
 <script>${SCRIPT}</script>
 </body>

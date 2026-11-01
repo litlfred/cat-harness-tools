@@ -108,6 +108,7 @@ import { siteDirFor } from "../schemas/kg/cat-harness.ts";
 
 import { waitFor } from "../src/core/retry.js";
 import { PUSH_BASE_MS, PUSH_CAP_MS } from "./backoff-sleep.ts";
+import { closedIssue } from "./review-brief.ts";
 import { MANIFEST, RESERVED } from "./publish-main-site.ts";
 import {
   declaredSitePublishers,
@@ -300,7 +301,7 @@ export function slugOf(branch: string): string | undefined {
 }
 
 /** Files a preview's data steps write that are not a site on their own (the workflow's list). */
-const DATA_ONLY = /^(changeset\.json|changeset-text\.json|changeset-structure\.json|rendered-impact\.json|rendered-measured\.json|blocks\.json|block-qa\.json|review-comments\.json|visual-diff\.json|visual)$/;
+const DATA_ONLY = /^(review-brief\.json|changeset\.json|changeset-text\.json|changeset-structure\.json|rendered-impact\.json|rendered-measured\.json|blocks\.json|block-qa\.json|review-comments\.json|visual-diff\.json|visual)$/;
 
 /** True when the build wrote at least one file that is a page, not only data (bean `oisv`). */
 export function builtSomething(siteDir: string): boolean {
@@ -812,6 +813,7 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
       "--pr", "n/a", "--pr-url", `${gh}/pulls?q=head%3A${encodeURIComponent(branch)}`,
       "--branch-url", `${gh}/tree/${branch}`, "--issues-url", `${gh}/issues`,
       "--run-url", runUrl, "--main-site", pagesRoot, "--before-ref", base,
+      ...((mp) => (mp ? ["--main-pages", mp] : []))(mainPagesFile(repo, inputs.publish_branch, log)),
     ]);
   }
 
@@ -895,7 +897,10 @@ export async function stageDeclared(
     log(`guard       the build is measured against the published root (site-parity.ts: theme side bar and search, icon row, rail, top-level directories, folio-build.json); a shortfall refuses the publish${publish ? "" : " (said, not refused, as nothing is published)"}`);
   }
   if (o.plan) return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: false };
-  const pr = target === "preview" ? await openPrFor(owner, name, branch, log) : undefined;
+  const open = target === "preview" ? await openPrFor(owner, name, branch, log) : undefined;
+  const pr = open?.number;
+  const base = previewBase({ ...(o.base ? { base: o.base } : {}), ...(open ? { prBase: open.base } : {}), ...(defaultBranch ? { defaultBranch } : {}) });
+  if (target === "preview") log(`· review compares against origin/${base}${o.base ? " (--base)" : open ? ` (PR #${open.number}'s base)` : " (the default branch)"}`);
   const r = await buildInstanceSite({
     root: repo,
     instance: d.instance,
@@ -910,7 +915,7 @@ export async function stageDeclared(
     ...(d.recipe.profile ? { profile: d.recipe.profile } : {}),
     ...(d.recipe.links ? { links: d.recipe.links } : {}),
     ...(d.recipe.coverage ? { coverage: d.recipe.coverage } : {}),
-    ...(target === "preview" ? { staging: branch, beforePublish: (site: string) => previewData(repo, { instance: d.instance, branch, sha, base: defaultBranch ?? "main", owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}), ...(pr ? { pr } : {}) }, site, log) } : {}),
+    ...(target === "preview" ? { staging: branch, beforePublish: (site: string) => previewData(repo, { instance: d.instance, branch, sha, base, owner, name, ...(o.runUrl ? { runUrl: o.runUrl } : {}), ...(pr ? { pr } : {}) }, site, log) } : {}),
     mount: true,
     fresh: false,
     publish,
@@ -921,13 +926,24 @@ export async function stageDeclared(
 }
 
 /**
- * The open pull request whose head is `branch`, or `undefined`, said in the
+ * The branch a preview's review page compares against. A pull request is
+ * reviewed against the branch it merges into, so a change set stacked on an
+ * unmerged baseline shows only its own change, not the whole baseline. In
+ * order: `--base`, the open PR's base, the default branch, `main`.
+ */
+export function previewBase(o: { base?: string; prBase?: string; defaultBranch?: string }): string {
+  return o.base || o.prBase || o.defaultBranch || "main";
+}
+
+/**
+ * The open pull request whose head is `branch` (its number and the branch it
+ * merges into), or `undefined`, said in the
  * log. A preview's review comments are the tagged comments on that PR (bean
  * 423d), and the workflow is handed its number by the event; a local build has
  * to ask. A lookup that fails (no network, a rate limit) costs the preview its
  * comments, not its publish.
  */
-export async function openPrFor(owner: string, name: string, branch: string, log: (s: string) => void): Promise<number | undefined> {
+export async function openPrFor(owner: string, name: string, branch: string, log: (s: string) => void): Promise<{ number: number; base: string } | undefined> {
   const q = `https://api.github.com/repos/${owner}/${name}/pulls?state=open&head=${encodeURIComponent(`${owner}:${branch}`)}`;
   try {
     const token = process.env.GITHUB_TOKEN;
@@ -936,9 +952,10 @@ export async function openPrFor(owner: string, name: string, branch: string, log
       log(`· no PR looked up for ${branch} (GitHub answered ${r.status}): no review comments on this preview`);
       return undefined;
     }
-    const prs = (await r.json()) as { number: number }[];
+    const prs = (await r.json()) as { number: number; base?: { ref?: string } }[];
     if (!prs.length) log(`· ${branch} has no open pull request: no review comments on this preview`);
-    return prs[0]?.number;
+    const p = prs[0];
+    return p ? { number: p.number, base: p.base?.ref ?? "" } : undefined;
   } catch (e) {
     log(`· no PR looked up for ${branch} (${(e as Error).message}): no review comments on this preview`);
     return undefined;
@@ -954,6 +971,39 @@ export async function openPrFor(owner: string, name: string, branch: string, log
  * is `folio/<instance>`, the conventional root; a checkout without one gets
  * the banner and no ChangeSet, and says so.
  */
+/**
+ * The pages the MAIN site holds, read from the publish ref, written one path
+ * per line for `staging-banner.ts --main-pages`, or undefined when the ref
+ * could not be read.
+ *
+ * Without it the banner cannot tell which pages main has, so every page's
+ * "compare with main" link fell back to the site root (owner, 2026-10-30:
+ * "compare with main should show same page as on main"). The ref is read in
+ * a throwaway bare repository, shallow and blob-less, so the checkout's own
+ * history and refs are never touched. STAGING/ and _render-log/ are not main
+ * pages, so they are left out.
+ */
+export function mainPagesFile(repo: string, publishBranch: string, log: (s: string) => void): string | undefined {
+  const tmp = mkdtempSync(join(tmpdir(), "main-pages-"));
+  try {
+    const remote = git(repo, ["remote", "get-url", "origin"]);
+    execFileSync("git", ["init", "-q", "--bare", tmp]);
+    execFileSync("git", ["-C", tmp, "fetch", "-q", "--depth=1", "--filter=blob:none", remote, publishBranch], { stdio: ["ignore", "pipe", "pipe"] });
+    const pages = execFileSync("git", ["-C", tmp, "ls-tree", "-r", "--name-only", "FETCH_HEAD"], { encoding: "utf-8", maxBuffer: 512 * 1024 * 1024 })
+      .split("\n")
+      .filter((l) => l.endsWith(".html") && !l.startsWith("STAGING/") && !l.startsWith("_render-log/"));
+    const out = join(mkdtempSync(join(tmpdir(), "main-pages-list-")), "main-pages.txt");
+    writeFileSync(out, pages.join("\n") + "\n");
+    log(`· the publish ref ${publishBranch} holds ${pages.length} main page(s): compare links go to the same page on main`);
+    return out;
+  } catch (e) {
+    log(`⚠ could not read the publish ref ${publishBranch} (${(e as Error).message.split("\n")[0]}): compare links fall back to the site root`);
+    return undefined;
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 export function previewData(
   repo: string,
   f: { instance: string; branch: string; sha: string; base: string; owner: string; name: string; runUrl?: string; pr?: number },
@@ -1017,7 +1067,34 @@ export function previewData(
       : ["--pr", "n/a", "--pr-url", `${gh}/pulls?q=head%3A${encodeURIComponent(f.branch)}`]),
     "--branch-url", `${gh}/tree/${f.branch}`, "--issues-url", `${gh}/issues`,
     "--run-url", f.runUrl ?? `${gh}/commit/${f.sha}`, "--main-site", `https://${f.owner}.github.io/${f.name}/`, "--before-ref", f.base,
+    // declared-path-literal: site.build previews publish to gh-pages, as the plan says.
+    ...((mp) => (mp ? ["--main-pages", mp] : []))(mainPagesFile(repo, "gh-pages", log)),
   ]);
+  if (f.pr !== undefined) writeReviewBrief(site, f.owner, f.name, f.pr, log);
+}
+
+/**
+ * The review page's "What to expect" pane reads the PR and its issue live;
+ * this is its fallback copy, taken now (cat-harness-tools#1153). Best effort:
+ * no `gh`, or no network, just means no copy, said in the log.
+ */
+export function writeReviewBrief(site: string, owner: string, name: string, pr: number, log: (s: string) => void): void {
+  const api = (path: string): Record<string, unknown> | null => {
+    const r = spawnSync("gh", ["api", `repos/${owner}/${name}/${path}`], { encoding: "utf-8" });
+    try { return r.status === 0 ? JSON.parse(r.stdout) : null; } catch { return null; }
+  };
+  const p = api(`pulls/${pr}`);
+  if (!p) { log("· review brief: could not read the PR with gh, so the review page reads it live only"); return; }
+  const body = typeof p.body === "string" ? p.body : "";
+  const n = closedIssue(body);
+  const i = n ? api(`issues/${n}`) : null;
+  const brief = {
+    fetchedAt: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
+    pr: { number: pr, title: String(p.title ?? ""), body, url: String(p.html_url ?? "") },
+    issue: n ? { number: n, title: String(i?.title ?? ""), url: String(i?.html_url ?? `https://github.com/${owner}/${name}/issues/${n}`) } : null,
+  };
+  writeFileSync(join(site, "review-brief.json"), JSON.stringify(brief, null, 2) + "\n");
+  log(`· review brief: PR #${pr}${n ? ` and issue #${n}` : ""} copied to review-brief.json`);
 }
 
 const USAGE = `usage: stage-local.ts [--repo DIR] [--branch B] [--base B] [--run-url URL] [--main] [--plan | --dry-run | --artifact DIR] [--workflow-source DIR] [--publisher KIND] [--bare-ig]

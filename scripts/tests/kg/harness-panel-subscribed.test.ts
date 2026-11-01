@@ -57,7 +57,10 @@ async function checkout(harnesses: string[] = [], note?: string): Promise<{ repo
       {
         name: "host",
         livesAt: { repository: "litlfred/host", path: "host" },
-        directories: [{ id: "subscriptions", path: "subscriptions/", dependents: "skip", graphTypologies: ["substrate-snapshot"] }],
+        directories: [
+          { id: "subscriptions", path: "subscriptions/", dependents: "skip", graphTypologies: ["substrate-snapshot"] },
+          { id: "subscribed-harnesses", path: "subscribed-harnesses/", dependents: "skip", graphTypologies: ["subscribed-harnesses"] },
+        ],
       },
       null,
       2,

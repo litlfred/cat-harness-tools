@@ -68,12 +68,44 @@ export const ArchimateConfigModelSchema = z
     description: z.string().min(1).optional(),
   })
   .strict();
+/**
+ * A figure in the instance's document that IS a view of a model: the link
+ * between the picture a reader sees in the prose and the view it was taken
+ * from. `archimate-check` fails when the block or the view is gone, so a
+ * figure cannot silently drift from the model; `archimate-pages` names the
+ * figure on the view's page. Owner, 2026-10-31: "i dont really like native
+ * UML, rather derived".
+ */
+export const ArchimateConfigFigureSchema = z
+  .object({
+    /** The document block holding the figure, relative to the instance root. */
+    block: z
+      .string()
+      .regex(/\.md$/, "a document block, a .md file")
+      .refine((f) => !f.startsWith("/") && !f.split("/").includes(".."), "relative to the instance root, without `..`"),
+    /** What the document calls it, e.g. `Figure 3.7.1`. */
+    label: z.string().min(1),
+    /** The model's id, as in `models`. */
+    model: z.string().regex(SEGMENT),
+    /** The view's Archi id. */
+    view: z.string().min(1),
+    /**
+     * How the match was made: `same-elements` when the figure shows exactly
+     * the view's elements, `by-eye` when a person compared the two pictures.
+     */
+    basis: z.enum(["same-elements", "by-eye"]),
+  })
+  .strict();
+export type ArchimateConfigFigure = z.infer<typeof ArchimateConfigFigureSchema>;
+
 export const ArchimateConfigSchema = z
   .object({
     $schema: z.literal(ARCHIMATE_CONFIG_SCHEMA_TAG),
     /** The `<instance>.json` directory id of graph typology `archimate` the models are held in. */
     directory: z.string().min(1),
     models: z.array(ArchimateConfigModelSchema).min(1),
+    /** The document's figures that are views of these models. */
+    figures: z.array(ArchimateConfigFigureSchema).optional(),
   })
   .strict()
   .superRefine((c, ctx) => {
@@ -81,6 +113,12 @@ export const ArchimateConfigSchema = z
     for (const [i, m] of c.models.entries()) {
       if (seen.has(m.id)) ctx.addIssue({ code: "custom", path: ["models", i, "id"], message: `model id "${m.id}" is declared twice` });
       seen.add(m.id);
+    }
+    const blocks = new Set<string>();
+    for (const [i, f] of (c.figures ?? []).entries()) {
+      if (!seen.has(f.model)) ctx.addIssue({ code: "custom", path: ["figures", i, "model"], message: `figure "${f.label}" names model "${f.model}", which \`models\` does not declare` });
+      if (blocks.has(f.block)) ctx.addIssue({ code: "custom", path: ["figures", i, "block"], message: `block ${f.block} is mapped twice` });
+      blocks.add(f.block);
     }
   });
 export type ArchimateConfig = z.infer<typeof ArchimateConfigSchema>;
@@ -169,6 +207,8 @@ export interface ArchimateView {
   name: string;
   viewpoint?: string;
   documentation?: string;
+  /** The view's own properties — a `slug` one chooses its page path (`slugs.ts`). */
+  properties: ArchimateProperty[];
   folder: string[];
   nodes: ArchimateViewNode[];
   connections: ArchimateViewConnection[];
@@ -242,6 +282,8 @@ const parser = new XMLParser({
   parseAttributeValue: false,
   parseTagValue: false,
   trimValues: false,
+  // Archi writes a line break inside a value as `&#xD;`: decode it, never show it.
+  htmlEntities: true,
   isArray: (name) => ARRAYS.has(name),
 });
 
@@ -330,6 +372,7 @@ function readView(e: X, id: string, folder: string[], documentation: string | un
     name: String(e["@name"] ?? ""),
     ...(str(e["@viewpoint"]) ? { viewpoint: str(e["@viewpoint"]) } : {}),
     ...(documentation ? { documentation } : {}),
+    properties: props(e),
     folder,
     nodes: [],
     connections: [],

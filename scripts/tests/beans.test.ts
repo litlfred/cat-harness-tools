@@ -342,3 +342,21 @@ describe.skipIf(NO_BEAN_STORE)("the REAL corpus: the edge set is exactly the uni
     expect(new Set(edges.map((e) => `${e.blocker}>${e.blocked}`))).toEqual(union);
   });
 });
+
+
+describe("readBeans skips README.md even when it carries generated YAML front matter", () => {
+  test("beans/defs/README.md with a `generated:` fence is not returned as a bean", () => {
+    const r = store({
+      a: bean("t-a", "title: Real bean\nstatus: todo\ntype: task"),
+      README: [
+        "---",
+        'generated: "cat-harness-tools/scripts/subgraph-readmes.ts — bun run cat readme:subgraphs"',
+        "---",
+        "",
+        "# `beans/defs/`",
+      ].join("\n"),
+    });
+    const got = readBeans(r)!;
+    expect(got.map((b) => b.id)).toEqual(["t-a"]);
+  });
+});

@@ -38,7 +38,6 @@ describe("wordDiff", () => {
   });
 
   test("it is self-contained, so the page can embed exactly this function", () => {
-    // eslint-disable-next-line no-new-func
     const embedded = new Function(`return (${wordDiff.toString()})`)() as typeof wordDiff;
     expect(embedded("a b", "a c")).toEqual(wordDiff("a b", "a c"));
   });
@@ -48,9 +47,11 @@ describe("the renderer registry", () => {
   test("exactly one fallback, unique ids, and a default for every kind", () => {
     expect(DIFF_RENDERERS.filter((r) => r.defaultFor.includes("*"))).toHaveLength(1);
     expect(new Set(DIFF_RENDERERS.map((r) => r.id)).size).toBe(DIFF_RENDERERS.length);
-    expect(defaultRendererFor("table").id).toBe("visual");
+    // Every block opens inline (owner, 2026-10-31).
+    expect(defaultRendererFor("table").id).toBe("inline");
     expect(defaultRendererFor("prose").id).toBe("inline");
-    expect(defaultRendererFor("some-new-kind").id).toBe("word");
+    expect(defaultRendererFor("some-new-kind").id).toBe("inline");
+    expect(DIFF_RENDERERS.find((r) => r.id === "inline")!.label).toBe("Inline");
   });
 
   test("every kind a renderer defaults for is a real block kind", () => {

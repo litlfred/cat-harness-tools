@@ -117,7 +117,6 @@ export function safeHref(url: string | undefined): string | undefined {
   // version of this function trimmed only the ends and shipped that bypass;
   // its own spec caught it.
   //
-  // eslint-disable-next-line no-control-regex
   const stripped = url.replace(/[\u0009\u000A\u000D]/g, "");
   const trimmed = stripped.replace(/^[\u0000- ]+/, "").replace(/[\u0000- ]+$/, "");
   if (trimmed === "") return undefined;

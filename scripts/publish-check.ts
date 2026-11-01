@@ -33,6 +33,8 @@
  *    is not under a declared path and is not ignored by ITS INSTANCE's own
  *    `.gitignore`, is stale, exactly what the old `--check` reported (see
  *    {@link ignoredBy} for why the enclosing checkout's rules are not asked).
+ *    A file in a mount but outside every path the lock mounts is not
+ *    committed here either ({@link outsideMounts}).
  *
  * ```
  * bun run cat publish:check <writer-script>     # e.g. auto:docs
@@ -163,6 +165,43 @@ export function outsideInstances(paths: readonly string[], roots: readonly strin
   return new Set(paths.filter((p) => !rs.some((r) => resolve(repoRoot, p).startsWith(r))));
 }
 
+/**
+ * The subset that lies in a MOUNTED instance but outside everything its mount
+ * carries: no locked directory, asset or declaration file covers it.
+ *
+ * A mount holds only what the lock names (`index.lock.json`, each instance's
+ * `directories`, `assets` and `declaration`), so a file a writer leaves
+ * anywhere else in it is not in the index and no re-pin can bring a committed
+ * copy of it here. Calling it a COMMITTED artefact that moved is false, and
+ * the old remedy ("run the writer and commit it") cannot work: committing it
+ * upstream does not mount it (folio-assistant#2781, where `check-l1-complete`
+ * wrote a trust IG's `test/results/library-qa/`, a path that IG does not
+ * declare). An instance the lock does not list (this checkout's own) is not a
+ * mount and is left to {@link ignoredBy}.
+ */
+export function outsideMounts(paths: readonly string[], repoRoot = REPO_ROOT): Set<string> {
+  const out = new Set<string>();
+  const lockFile = join(repoRoot, "index.lock.json");
+  if (paths.length === 0 || !existsSync(lockFile)) return out;
+  type Locked = { path?: string; directories?: Array<{ path: string }>; assets?: Array<{ src: string }>; declaration?: { file: string } };
+  const lock = JSON.parse(readFileSync(lockFile, "utf-8")) as { instances?: Locked[] };
+  const mounts = (lock.instances ?? [])
+    .filter((i): i is Locked & { path: string } => typeof i.path === "string" && i.path !== "")
+    .sort((a, b) => b.path.length - a.path.length);
+  for (const p of paths) {
+    const rel = relative(repoRoot, resolve(repoRoot, p)).split(sep).join("/");
+    const m = mounts.find((i) => rel.startsWith(`${i.path}/`));
+    if (m === undefined) continue;
+    const carried = [
+      ...(m.directories ?? []).map((d) => d.path.replace(/\/+$/, "")),
+      ...(m.assets ?? []).map((a) => `${m.path}/${a.src}`),
+      ...(m.declaration ? [`${m.path}/${m.declaration.file}`] : []),
+    ];
+    if (!carried.some((c) => rel === c || rel.startsWith(`${c}/`))) out.add(p);
+  }
+  return out;
+}
+
 function run(cmd: string, cwd = REPO_ROOT): number {
   // input-site: scripts — the writer's own command line, from the script table
   const r = spawnSync("sh", ["-c", cmd], { cwd, stdio: "inherit" });
@@ -250,6 +289,21 @@ if (import.meta.main) {
       storedDirs.some((d) => (abs + sep).startsWith(d + sep) || abs === d)
     );
   };
+  const PREREQ_WRITERS: Readonly<Record<string, readonly string[]>> = {
+    "navbar:include": ["docs:harness"],
+    "slice:sqlite": ["docs:pages", "library:viz"],
+    "uml:overview": ["glossary:page"],
+  };
+  const prereqs = new Set<string>([
+    ...declared.filter((a) => a.writer.at(-1) === writer && a.writer.length > 1).flatMap((a) => a.writer.slice(0, -1)),
+    ...(PREREQ_WRITERS[writer] ?? []),
+  ]);
+  for (const pre of prereqs) {
+    if (scripts[pre] === undefined) continue;
+    const preDeclared = declared.filter((a) => a.writer.includes(pre));
+    if (preDeclared.length > 0 && preDeclared.every((a) => built(a))) continue;
+    run(`bun run cat ${pre}`, work);
+  }
   const before = snapshot(roots, work);
 
   if (run(`bun run cat ${writer}`, work) !== 0) {
@@ -266,7 +320,8 @@ if (import.meta.main) {
   const changed = moved(before, snapshot(roots, work)).filter((p) => !under(p));
   const ignored = ignoredBy(changed, roots, work);
   const outside = outsideInstances(changed, roots, work);
-  const stale = changed.filter((p) => !ignored.has(p) && !outside.has(p));
+  const unmounted = outsideMounts(changed, work);
+  const stale = changed.filter((p) => !ignored.has(p) && !outside.has(p) && !unmounted.has(p));
   for (const p of stale) console.error(`✗ ${p} is a COMMITTED artefact and \`${writer}\` changed it — run \`bun run cat ${writer}\` and commit it`);
 
   if (empty.length + stale.length > 0) process.exit(1);

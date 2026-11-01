@@ -20,6 +20,7 @@ import {
   type Capability,
 } from "../../src/tools/capabilities";
 import { repoRootFor } from "../../schemas/kg/cat-harness.js";
+import { notApplicableAlone } from "../../test/support/checkout.js";
 
 const REPO = repoRootFor(join(import.meta.dir, "..", ".."));
 
@@ -134,7 +135,16 @@ describe("requires resolution", () => {
   });
 });
 
-describe("the smart-base capability", () => {
+/**
+ * smart-base's probe is declared by the layer whose toolchain it is, in that
+ * layer's own `scenarios/capabilities/` (the overlay `loadCapabilities`
+ * reads), never down here; only a composed checkout holds it.
+ */
+const NO_SMART_BASE_PROBE = notApplicableAlone(
+  "the `smart-base` capability probe, declared in a higher layer's scenarios/capabilities/ and read through the checkout overlay",
+);
+
+describe.skipIf(NO_SMART_BASE_PROBE)("the smart-base capability", () => {
   const smartBase = () => loadCapabilities(REPO).find((c) => c.id === "smart-base")!;
 
   test("is declared and depends on python3", () => {

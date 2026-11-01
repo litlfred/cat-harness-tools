@@ -54,7 +54,7 @@ import { createHash } from "node:crypto";
 import { parse as parseYaml } from "yaml";
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import { contractFile, contractRefProblem, skillContracts } from "./skill-contracts.js";
-import { checkTestRuns, testRunFiles } from "./test-run-conformance.js";
+import { checkTestRuns, testRunFiles, type RunFinding } from "./test-run-conformance.js";
 import { BUILDING_ENV } from "./qa-working-copy.ts";
 import { auditCertifications, auditTestPlans, jsonFilesUnder, auditTestPlanExitCriteria } from "./test-plan-audit.js";
 import { processArrowFindings, schemaArrowFindings } from "./arrow-direction.js";
@@ -135,6 +135,8 @@ import { readQaTree } from "./qa-store.ts";
 import { globalTaskSharedFindings } from "./lib/global-task-criteria.ts";
 import { loadProcessModel, loadGlobalTasks, isGlobalTasksFile, isActivity, isDecision, indistinctBranches, type ProcessModel } from "../src/workflow/process-model.js";
 import { reachability } from "../src/workflow/reachability.js";
+import { diagramQuality, readLayout, LAYOUT_CRITERIA } from "../src/workflow/diagram-quality.js";
+import { diagramFit, FIT_CRITERIA } from "../src/workflow/diagram-fit.js";
 import { raciBreaches, raciRowsOf, type RaciBreachKind } from "./raci-chart.js";
 import { loadDecisionTable, possibleOutcomes } from "../src/workflow/decision-table.js";
 import {
@@ -161,7 +163,8 @@ import {
   neededActors,
   neededPolicies,
 } from "../schemas/process/scenario-overlay.js";
-import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, REPO_ROOT as WORKSPACE_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { computedWhere, computeTestRuns } from "./test-run-compute.ts";
 import { legacyBindingFindings, mechanicalRoleUntested, skillsOutsideLaneRole } from "./lib/lane-role-criteria.ts";
 import { skillEdgeIndex } from "./lib/skill-edges.ts";
 import { type ActorScope, declaredCapabilityIds, unresolvedActorCapabilities } from "./lib/actor-capabilities.ts";
@@ -1095,6 +1098,7 @@ async function auditProcess(
     "gateway-documented": entry(undocumentedDecision, decisions.length > 0),
     "gateway-branches-named": entry(indistinct, decisions.length > 0),
     ...reachabilityCriteria(m),
+    ...qualityCriteria(m, readFileSync(p.file, "utf-8")),
   };
   if (!graph) {
     // No role graph is a state the audit can be in, and it is not a pass.
@@ -1154,6 +1158,25 @@ function reachabilityCriteria(m: ProcessModel): Record<string, KgCriterionEntry>
     "node-reachable": entry(r.unreachable),
     "node-has-exit": entry(r.noExit),
   };
+}
+
+/**
+ * The readability criteria, from `src/workflow/diagram-quality.ts`. The
+ * drawing criteria are `n/a` for a diagram with no DI: nothing was drawn, so
+ * nothing was shown to be untangled.
+ */
+function qualityCriteria(m: ProcessModel, xml: string): Record<string, KgCriterionEntry> {
+  const layout = readLayout(xml);
+  const drawn = layout.edges.size > 0;
+  const q = diagramQuality(m, drawn ? layout : undefined);
+  const out: Record<string, KgCriterionEntry> = {};
+  for (const [id, findings] of Object.entries(q)) {
+    out[id] = entry(findings, !LAYOUT_CRITERIA.has(id) || drawn);
+  }
+  // Readable at 100% (issue #1116): text size, labels clear of lines and boxes, lane order.
+  const fit = diagramFit(xml);
+  for (const id of FIT_CRITERIA) out[id] = entry(fit[id] ?? [], drawn);
+  return out;
 }
 
 // ── Per-decision criteria ───────────────────────────────────────
@@ -1679,11 +1702,11 @@ interface LoadedRequirement {
   };
 }
 
-function readRequirements(): LoadedRequirement[] {
-  if (!existsSync(REQUIREMENT_DIR)) return [];
+function readRequirements(dir: string = REQUIREMENT_DIR): LoadedRequirement[] {
+  if (!existsSync(dir)) return [];
   const out: LoadedRequirement[] = [];
-  for (const f of readdirSync(REQUIREMENT_DIR).filter((f) => f.endsWith(".json")).sort()) {
-    const p = join(REQUIREMENT_DIR, f);
+  for (const f of readdirSync(dir).filter((f) => f.endsWith(".json")).sort()) {
+    const p = join(dir, f);
     try {
       const raw = JSON.parse(readFileSync(p, "utf-8")) as LoadedRequirement["raw"];
       out.push({ id: raw.id ?? f.slice(0, -5), file: f, path: p, raw });
@@ -1898,12 +1921,33 @@ function testRunCriteria(skills: Set<string>): Record<string, KgCriterionEntry> 
     (d) => d.id === "qa" && d.own && d.scope !== "repository" && d.declaredBy !== "(default)",
   );
   if (!r.looked && qaDeclared) {
+    // Neither the checkout nor a readable store holds the runs. A repository
+    // that mounts this instance cannot read its store (it lives on another
+    // repository), so compute them: each run's writer is declared, and one
+    // marked `testRunOutEnv` writes only into a temporary directory, so
+    // judge mode still writes nothing (cat-harness-tools#1191).
+    const computed = WORKSPACE_ROOT ? computeTestRuns(resultsDir, WORKSPACE_ROOT) : { reason: "no workspace holds both layers" };
+    if ("dir" in computed) {
+      try {
+        const c = checkTestRuns(root, computed.dir, skills, undefined, { determined: true });
+        const rel = relative(root, resultsDir);
+        const rename = (fs: RunFinding[]): RunFinding[] => fs.map((f) => ({ ...f, where: computedWhere(f.where, rel) }));
+        const any = c.runs > 0;
+        return {
+          "test-run-skill-resolves": entry(rename(c.unresolved), any),
+          "test-run-conforms": entry(rename(c.nonconforming), any),
+          "test-run-checkable": entry(rename(c.unchecked), any),
+        };
+      } finally {
+        computed.done();
+      }
+    }
     // A declared results directory that is absent says nothing about whether
     // runs exist — since 5hox it is derived and may not be computed or fetched
     // yet. `n/a` would be the false pass audit C5 names (bean `2gst`).
     const unknown = (): KgCriterionEntry => ({
       result: "unknown",
-      findings: [{ where: "—", detail: "the QA results directory is absent, so recorded test runs could not be read. Compute it (`bun run cat qa:refresh`) or fetch it (`bun run cat qa:fetch`)." }],
+      findings: [{ where: "—", detail: `the QA results directory is absent, so recorded test runs could not be read, and they could not be computed here (${computed.reason}). Compute it (\`bun run cat qa:refresh\`) or fetch it (\`bun run cat qa:fetch\`).` }],
     });
     return { "test-run-skill-resolves": unknown(), "test-run-conforms": unknown(), "test-run-checkable": unknown() };
   }
@@ -1988,13 +2032,40 @@ function readSatisfiers(): Satisfier[] {
   return out;
 }
 
+/**
+ * The requirement ids a `derivedFrom` in this instance may name: its own, plus
+ * those of every instance it declares `needs` on, transitively (bean `w1gy`,
+ * owner option A, 2026-10-30).
+ *
+ * The same widening {@link resolvableSkills} and `resolvableRoleIds` make, and
+ * that actors get through `neededActors`: a requirement may specialise one a
+ * lower layer declares — fhir-harness's `req:fhir-validation` derives from
+ * cat-harness's `req:content-lifecycle` — and that is not a dangling ref.
+ * Subjecthood does not widen: only this instance's own requirements are
+ * audited, so a dependency's are read for their ids alone.
+ */
+function resolvableRequirementIds(own: LoadedRequirement[]): Set<string> {
+  const out = new Set(own.map((r) => r.id));
+  for (const dep of orderedDependencies(root)) {
+    try {
+      // declared-path-literal: the convention fallback, at the call site, as
+      // `REQUIREMENT_DIR` is the own instance's `skills/requirements`.
+      for (const r of readRequirements(join(ownDirectoryById(dep.rootPath, "skills", "skills"), "requirements"))) out.add(r.id);
+    } catch {
+      // A dependency's unreadable requirement is that instance's own audit's
+      // finding; one broken dependency must not block every dependent.
+    }
+  }
+  return out;
+}
+
 function auditRequirements(
   reqs: LoadedRequirement[],
   actors: LoadedActor[],
   satisfiers: Satisfier[],
 ): KgQaReport[] {
   const actorIds = new Set(actors.map((a) => a.id));
-  const reqIds = new Set(reqs.map((r) => r.id));
+  const reqIds = resolvableRequirementIds(reqs);
 
   return reqs.map((r) => {
     const mine = satisfiers.filter((s) => s.ref.startsWith(`${r.id}#`)).sort((x, y) => (x.ref + x.from).localeCompare(y.ref + y.from));
@@ -2026,7 +2097,7 @@ function auditRequirements(
     }
     const badParents = (r.raw.derivedFrom ?? [])
       .filter((d) => !reqIds.has(d))
-      .map((d) => ({ where: r.id, detail: `derives from "${d}", which is not a declared requirement.` }));
+      .map((d) => ({ where: r.id, detail: `derives from "${d}", which is declared in no requirement of this instance or anything it \`needs\`.` }));
 
     const criteria: Record<string, KgCriterionEntry> = {
       "requirement-statement-satisfied": entry(unsatisfied, (r.raw.statements ?? []).length > 0),

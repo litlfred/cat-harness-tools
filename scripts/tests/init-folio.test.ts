@@ -23,6 +23,7 @@ import { tmpdir } from "os";
 import { spawnSync } from "child_process";
 
 import { parse as parseYaml } from "yaml";
+import { notApplicableAlone } from "../../test/support/checkout.js";
 
 import {
   enclosingRepoRoot,
@@ -89,6 +90,26 @@ function scaffoldConfig(dir: string): Record<string, unknown> {
  * platform's code is under `cat-harness/` inside it.
  */
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
+
+/** This layer's own root: where its reusable workflows (`.github/workflows/folio-*.yml`) are. */
+const TOOLS_ROOT = resolve(import.meta.dir, "../..");
+
+/**
+ * A paper folio's templates include the `paper` profile, which a layer ABOVE
+ * this one holds (folio-assistant-sci, move M11). A checkout without it has no
+ * paper profile to scaffold from, so a test that scaffolds a paper folio is
+ * not applicable there (bean w1gy F18). A templates lookup that throws guards
+ * nothing: the tests then fail on it by name.
+ */
+const NO_PAPER_PROFILE = ((): boolean => {
+  let held: boolean;
+  try {
+    held = templatesDirs().some((d) => existsSync(join(d, "paper")));
+  } catch {
+    return false;
+  }
+  return !held && notApplicableAlone("the `paper` folio-template profile, which folio-assistant-sci (a higher instance) holds");
+})();
 const dirs: string[] = [];
 
 function tmp(): string {
@@ -129,6 +150,21 @@ function writeDirectoryOverride(dir: string): void {
     JSON.stringify({ subgraphSources: { beans: { kind: "directory" }, todos: { kind: "directory" } } }, null, 2) + "\n",
   );
 }
+
+/**
+ * Composed-only inputs. folio-assistant-sci holds the `paper` template
+ * profile (move M11) and declares the paper adapter; folio-assistant-core
+ * declares the document adapter. A checkout of the platform alone declares
+ * neither, so the remote mounts derived from the checkout's adapters, and a
+ * paper scaffold, have nothing to derive from. The derivation itself is
+ * pinned standing alone by the fixture tests in "remote link mode".
+ */
+const NO_PAPER_LAYER = notApplicableAlone(
+  "folio-assistant-sci, which holds the `paper` folio-templates member (move M11) and declares the paper adapter",
+);
+const NO_CONTENT_ADAPTERS = notApplicableAlone(
+  "folio-assistant-core and folio-assistant-sci, whose declared document and paper adapters the remote mounts are derived from",
+);
 
 describe("slug validation", () => {
   test("accepts lowercase hyphen-joined words", () => {
@@ -220,7 +256,7 @@ describe("what gets written", () => {
     expect(enclosingRepoRoot(d)).toBeNull();
   });
 
-  test("a PAPER folio's staging caller is OFF: dispatch-only, and its build refuses until set (ojcx)", () => {
+  test.skipIf(NO_PAPER_PROFILE)("a PAPER folio's staging caller is OFF: dispatch-only, and its build refuses until set (ojcx)", () => {
     const d = tmp();
     const r = initFolio(opts(d, { contentType: "paper" }));
     const wf = readFileSync(join(d, ".github/workflows/staging.yml"), "utf-8");
@@ -289,7 +325,7 @@ describe("what gets written", () => {
     }
   });
 
-  test("a paper folio gitignores Lean artifacts; a document folio does not", () => {
+  test.skipIf(NO_PAPER_PROFILE)("a paper folio gitignores Lean artifacts; a document folio does not", () => {
     const pap = tmp();
     initFolio(opts(pap, { contentType: "paper" }));
     expect(readFileSync(join(pap, ".gitignore"), "utf-8")).toContain(".lake/");
@@ -307,7 +343,7 @@ describe("what gets written", () => {
  * the four Lean ones (and what they call) for a paper folio only.
  */
 describe("workflow templates (52dz)", () => {
-  const GENERIC = ["qa-sweep.yml", "qa-sweep-nightly.yml", "section-title-audit.yml"];
+  const GENERIC = ["qa-sweep.yml", "qa-sweep-nightly.yml", "section-title-audit.yml", "site-publish.yml"];
   const LEAN = ["blueprint.yml", "lean-build.yml", "lean-build-sidecar.yml", "lean_ci.yml"];
   const LEAN_SUPPORT = [
     ".github/actions/lake-cache-restore/action.yml",
@@ -335,7 +371,7 @@ describe("workflow templates (52dz)", () => {
     for (const f of LEAN_SUPPORT) expect(existsSync(join(d, f))).toBe(false);
   });
 
-  test("a PAPER folio gets the generic workflows AND the Lean ones, with what they call", () => {
+  test.skipIf(NO_PAPER_PROFILE)("a PAPER folio gets the generic workflows AND the Lean ones, with what they call", () => {
     const d = tmp();
     const r = initFolio(opts(d, { contentType: "paper" }));
     for (const wf of [...GENERIC, ...LEAN]) {
@@ -348,7 +384,7 @@ describe("workflow templates (52dz)", () => {
     }
   });
 
-  test("the Lean workflows' local action and scripts are ones the scaffold wrote", () => {
+  test.skipIf(NO_PAPER_PROFILE)("the Lean workflows' local action and scripts are ones the scaffold wrote", () => {
     // `uses: ./.github/actions/<x>` and `python3 .github/scripts/<y>` resolve in
     // the FOLIO, so each must be something this scaffold put there.
     const d = tmp();
@@ -364,7 +400,7 @@ describe("workflow templates (52dz)", () => {
     }
   });
 
-  test("nothing written names one folio's papers, and no placeholder is left", () => {
+  test.skipIf(NO_PAPER_PROFILE)("nothing written names one folio's papers, and no placeholder is left", () => {
     for (const contentType of ["document", "paper"] as const) {
       const d = tmp();
       // A non-default platform path, so a placeholder that was never
@@ -377,14 +413,12 @@ describe("workflow templates (52dz)", () => {
         expect(body.toLowerCase(), `${f} names qou`).not.toContain("qou");
         expect([...body.matchAll(TEMPLATE_PLACEHOLDER_RE)].map((m) => m[0]), `${f} placeholders`).toEqual([]);
       }
-      // ...and the substitution happened: the platform path the caller chose
-      // is the one the QA sweep runs from.
-      expect(readFileSync(join(d, ".github/workflows/qa-sweep.yml"), "utf-8")).toContain(
-        "vendor/fa/cat-harness-tools/pipeline/qa-sweep.ts",
-      );
+      // ...and the substitution happened: the folio the caller sweeps is the
+      // scaffold's content root.
+      expect(readFileSync(join(d, ".github/workflows/qa-sweep.yml"), "utf-8")).toContain('folio: "folio"');
       // GitHub's own `${{ … }}` expressions survive substitution untouched.
       expect(readFileSync(join(d, ".github/workflows/qa-sweep-nightly.yml"), "utf-8")).toContain(
-        "${{ github.run_id }}",
+        "${{ inputs.axes }}",
       );
     }
   });
@@ -403,8 +437,15 @@ describe("workflow templates (52dz)", () => {
         if (!existsSync(abs) || statSync(abs).isDirectory()) continue;
         for (const m of readFileSync(abs, "utf-8").matchAll(/vendor\/fa\/([\w./-]+?\.(?:ts|py|sh|bat|mjs))\b/g)) named.add(m[1]!);
       }
+      // The document workflows are thin callers: what they run is the
+      // reusable workflow they name, which must exist in this repository.
+      for (const f of r.created) {
+        const abs = join(d, f);
+        if (!existsSync(abs) || statSync(abs).isDirectory()) continue;
+        for (const m of readFileSync(abs, "utf-8").matchAll(/litlfred\/cat-harness-tools\/(\.github\/workflows\/[\w.-]+\.yml)@/g)) named.add(m[1]!);
+      }
       expect(named.size, `${contentType}: no platform path found to check`).toBeGreaterThan(0);
-      const missing = [...named].filter((p) => !existsSync(join(REPO_ROOT, p)));
+      const missing = [...named].filter((p) => !existsSync(join(p.startsWith(".github/") ? TOOLS_ROOT : REPO_ROOT, p)));
       expect(missing, `${contentType} names platform files that do not exist`).toEqual([]);
     }
   });
@@ -422,7 +463,9 @@ describe("workflow templates (52dz)", () => {
       const raw = readFileSync(join(d, ".github/workflows", wf), "utf-8");
       const doc = parseYaml(raw) as { permissions?: Record<string, string> };
       expect(doc.permissions?.contents, `${wf} permissions.contents`).toBe("write");
-      expect(raw, `${wf} publishes via qa-store.ts`).toContain("cat-harness-tools/scripts/qa-store.ts\" publish");
+      expect(raw, `${wf} calls the reusable QA workflow`).toMatch(/uses: litlfred\/cat-harness-tools\/\.github\/workflows\/folio-qa-sweep(-nightly)?\.yml@main/);
+      const reusable = readFileSync(join(TOOLS_ROOT, ".github/workflows", `folio-${wf}`), "utf-8");
+      expect(reusable, `folio-${wf} publishes via qa-store.ts`).toContain("scripts/qa-store.ts\" publish");
     }
   });
 
@@ -432,7 +475,7 @@ describe("workflow templates (52dz)", () => {
     expect(() => renderTemplate("run: {{nope}}", values)).toThrow(/unknown template placeholder/);
   });
 
-  test("every template parses as YAML, before and after substitution", () => {
+  test.skipIf(NO_PAPER_PROFILE)("every template parses as YAML, before and after substitution", () => {
     const values = { assistant: "folio-assistant", folio: "folio", platform_git: "g", platform_repo: "o/r" };
     const ymls = folioTemplates("paper").filter((t) => t.target.endsWith(".yml"));
     // Guard against a green run over nothing if the directory moves.
@@ -447,13 +490,17 @@ describe("workflow templates (52dz)", () => {
 
   test("the templates come from the declared directory, not a path written in code", () => {
     // `folio-templates` is looked up by id. This layer's own member holds the
-    // profile every folio gets; the paper profile is a member a dependent
-    // layer holds (move M11), found across the checkout, never by its name.
+    // profile every folio gets.
     const dir = templatesDir();
     expect(existsSync(join(dir, "document"))).toBe(true);
     expect(templatesDirs()[0]).toBe(dir);
-    expect(templatesDirs().some((d) => existsSync(join(d, "paper")))).toBe(true);
     expect(folioTemplates("document").every((t) => !t.target.includes("lean"))).toBe(true);
+  });
+
+  test.skipIf(NO_PAPER_LAYER)("the paper profile is a member a dependent layer holds, found across the checkout", () => {
+    // Move M11: folio-assistant-sci holds it, found across the checkout,
+    // never by its name.
+    expect(templatesDirs().some((d) => existsSync(join(d, "paper")))).toBe(true);
   });
 });
 
@@ -684,7 +731,7 @@ describe("a contentless instance (mer2)", () => {
     ["document folio", (d: string) => initFolio(opts(d))],
     ["paper folio", (d: string) => initFolio(opts(d, { contentType: "paper" }))],
   ] as const) {
-    test(`probe — the ${label}'s declaration loads and every declared directory exists`, () => {
+    test.skipIf(label === "paper folio" && NO_PAPER_PROFILE)(`probe — the ${label}'s declaration loads and every declared directory exists`, () => {
       const d = tmp();
       run(d);
       const decl = readDeclaration(d);
@@ -698,7 +745,7 @@ describe("a contentless instance (mer2)", () => {
     });
   }
 
-  test("a folio's probe sees the content type it asked for, not a fallback", () => {
+  test.skipIf(NO_PAPER_PROFILE)("a folio's probe sees the content type it asked for, not a fallback", () => {
     const d = tmp();
     initFolio(opts(d, { contentType: "paper" }));
     const config = scaffoldConfig(d);
@@ -857,7 +904,7 @@ describe("remote link mode (--link remote, bean c4lg)", () => {
     expect(remotePlatformLayers("paper", [adapter("other", "layer-o")], () => [])).toEqual(PLATFORM);
   });
 
-  test("initFolio with link: 'remote' writes pinned source.remote mounts, site.landing, .gitignore index-mounts block, and root-relative shims", () => {
+  test.skipIf(NO_CONTENT_ADAPTERS)("initFolio with link: 'remote' writes pinned source.remote mounts, site.landing, .gitignore index-mounts block, and root-relative shims", () => {
     const d = tmp();
     const r = initFolio({
       targetDir: d,
@@ -905,7 +952,7 @@ describe("remote link mode (--link remote, bean c4lg)", () => {
     expect(r.notes.join("\n")).toContain("Linked via remote mounts in index.config.json");
   });
 
-  test("CLI --link remote scaffolds a paper folio with folio-assistant-sci included in remote mounts", () => {
+  test.skipIf(NO_CONTENT_ADAPTERS)("CLI --link remote scaffolds a paper folio with folio-assistant-sci included in remote mounts", () => {
     const d = tmp();
     const cli = spawnSync(
       "bun",

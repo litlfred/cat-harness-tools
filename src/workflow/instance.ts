@@ -35,7 +35,7 @@ import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from
 import type { ConventionScope } from "../../schemas/process/convention.js";
 import { authorizeTask, describeVerdict, type TaskAuthVerdict } from "./authorize.js";
 import { provActivityFor } from "./prov-record.js";
-import { ProvActivitySchema, type ProvActivity, type ProvAgreementRef, type ProvConsentRef } from "../../schemas/content/prov.js";
+import { ProvActivitySchema, type ProvActivity, type ProvAgreementDistribution, type ProvConsentRef } from "../../schemas/content/prov.js";
 import type { AccessContext, Principal } from "../core/access.js";
 import { inputSiteReached } from "../../schemas/sdlc/input-trace.ts";
 import {
@@ -81,6 +81,10 @@ export interface HistoryEntry {
    * folio-assistant#875 FR-005; owner 2026-10-30, option A: kept on the
    * workflow step, like `prov`). Each must parse and name this step as its
    * plan. A refused Tool call has none: it did not happen.
+   *
+   * When the step has its own {@link prov} activity, each Tool activity names
+   * it in `prov:wasInformedBy` (W3C PROV-O): the Tool's activity was informed
+   * by, and is part of, the step's. See {@link informedByStep}.
    */
   activities?: ProvActivity[];
 }
@@ -96,9 +100,9 @@ export interface AuthzOptions {
   /** The content the step acts on. */
   target?: string;
   mode?: "advisory" | "strict";
-  /** The Data Sharing Agreement (URL + SHA-256 digest, and optional grant id) this step is decided under (DSA B4, bean `3z44`). */
-  agreement?: ProvAgreementRef;
-  /** Optional grant identifier (DSA B5). */
+  /** The agreement this step is decided under (DSA B4, beans `3z44`, `yy40`): its DCAT distribution + `spdx:checksum`, cited in `prov:used`. */
+  agreement?: ProvAgreementDistribution;
+  /** The grant's W3C VC 2.0 credential `id` (DSA B5), cited in `prov:used`. */
   grant?: string;
   /** The IHE PCF / FHIR R4 Consent (`id` + `versionId`) cited when this step is a consent-based decision (PCF8, bean `2egb`). */
   consent?: ProvConsentRef;
@@ -941,7 +945,7 @@ export function complete(
     note: [opts.note, computedNote].filter(Boolean).join(" · ") || undefined,
     authz,
     prov,
-    ...(activities.length ? { activities } : {}),
+    ...(activities.length ? { activities: informedByStep(activities, prov) } : {}),
   });
 
   const flowIds = chosen ? [chosen] : node.outgoing;
@@ -981,6 +985,37 @@ export function stepActivities(raw: readonly unknown[] | undefined, nodeId: stri
     out.push(parsed.data);
   }
   return out;
+}
+
+/**
+ * Link each Tool activity to the step's own `prov:Activity` with W3C PROV-O
+ * `prov:wasInformedBy` (bean `w1gy`, folio-assistant#875 FR-005): the Tool
+ * acted as part of the step the engine recorded.
+ *
+ * Only when the step HAS its own activity with an `@id` — none is invented,
+ * so a step recorded without an authorization context leaves its Tool
+ * activities as they were handed in. A `prov:wasInformedBy` the Tool already
+ * supplied is kept: the step's `@id` is added beside it (an array, as JSON-LD
+ * writes several values of one property), never put in its place.
+ *
+ * A Tool activity that is hash-sealed (`cat-harness:recordHash`) is left
+ * untouched: adding a field would break the digest it carries, and rewriting
+ * the digest would put the engine's words in the Tool's sealed record.
+ */
+export function informedByStep(
+  activities: readonly ProvActivity[],
+  step: ProvActivity | undefined,
+): ProvActivity[] {
+  const stepId = step?.["@id"];
+  if (!stepId) return [...activities];
+  return activities.map((a) => {
+    if (a["cat-harness:recordHash"] !== undefined) return a;
+    const had = a["prov:wasInformedBy"];
+    const prior = had === undefined ? [] : Array.isArray(had) ? had : [had];
+    if (prior.includes(stepId)) return a;
+    const merged = [...prior, stepId];
+    return { ...a, "prov:wasInformedBy": merged.length === 1 ? merged[0]! : merged };
+  });
 }
 
 /**

@@ -53,6 +53,7 @@ import { directoriesForGraph, readDeclaration } from "../schemas/kg/cat-harness.
 import { ContributionRegistry, type FolioContribution } from "../schemas/content/contributions.ts";
 import { loadContributionsSync } from "../schemas/kg/harness-config.ts";
 import type { TabularCsvwTables } from "../schemas/library/tabular-csvw.ts";
+import type { Block } from "../schemas/types.ts";
 import { checkoutInstanceRoots } from "../scripts/viewer-declarations.ts";
 import { contributionsRoot } from "./repo-root";
 
@@ -130,12 +131,28 @@ export interface TabularCsvwPlugin {
   extract(source: Buffer, opts: { url: string; docId: string; mimetype: string | null }): TabularCsvwTables | null;
 }
 
+/**
+ * A block's live status, overlaid on its manifest as the builder loads it —
+ * implemented by the science layer's `pipeline/lean-status-overlay.ts`, which
+ * sets `lean.sorryFree` and `lean.validation` from the block's resolved `.lean`
+ * (bean `saqd`, row `pipeline/build.ts`). `paperDir` is the paper manifest's
+ * directory; `tsPath` the block's `.ts`. The overlay mutates `block` in place.
+ *
+ * OPTIONAL: a composition that mounts no formalisation layer has no live
+ * status to overlay, and the builder keeps the manifest's own values — which
+ * is what the PDF then shows, not a pass.
+ */
+export interface BlockStatusOverlayPlugin {
+  overlay(block: Block, tsPath: string, paperDir: string): void;
+}
+
 /** Every slot, keyed by the kind string a contributor registers under. */
 export interface PipelinePlugins {
   "lean-lexer": LeanLexerPlugin;
   "latex-preflight": LatexPreflightPlugin;
   "lean-coverage": LeanCoveragePlugin;
   "tabular-csvw": TabularCsvwPlugin;
+  "block-status-overlay": BlockStatusOverlayPlugin;
 }
 
 export type PipelinePluginKind = keyof PipelinePlugins;
@@ -146,6 +163,7 @@ export const PIPELINE_PLUGIN_KINDS: readonly PipelinePluginKind[] = [
   "latex-preflight",
   "lean-coverage",
   "tabular-csvw",
+  "block-status-overlay",
 ];
 
 // ── The process registry ───────────────────────────────────────────
@@ -299,16 +317,6 @@ export function declarationStarts(stripped: string): LeanDeclStart[] {
 /** `latex-preflight` slot: macro lint over a generated compile unit. */
 export function runPreflight(mainTexPath: string): LatexPreflightResult {
   return pipelinePlugin("latex-preflight").runPreflight(mainTexPath);
-}
-
-/** `lean-coverage` slot: the `.lean` file a block's manifest points at. */
-export function resolveLeanFile(tsPath: string, src: string, leanRoot: string): string | null {
-  return pipelinePlugin("lean-coverage").resolveLeanFile(tsPath, src, leanRoot);
-}
-
-/** `lean-coverage` slot: sorry-freedom and validation state of a `.lean` file. */
-export function leanFileStatus(leanPath: string): ReturnType<LeanCoveragePlugin["leanFileStatus"]> {
-  return pipelinePlugin("lean-coverage").leanFileStatus(leanPath);
 }
 
 /** `lean-coverage` slot: coverage statistics for a paper. */

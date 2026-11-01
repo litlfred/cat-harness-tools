@@ -61,7 +61,7 @@ import { loadCodeLists } from "../schemas/library/code-list.ts";
 import { buildCodeListsDoc } from "./code-lists.ts";
 import { isPublished, publishedPath } from "../schemas/kg/url-space.js";
 import { INSTANCE_SCHEMA_DIR } from "./harness-schema-export.js";
-import { stagingFields } from "./staging-stamp.js";
+import { stagingFields, withStaging } from "./staging-stamp.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -146,7 +146,7 @@ export function instanceDocPath(d: { name: string; stub: string }): string {
  *
  * The host's lists are published by `glossary-export` beside its glossary
  * (`<stub>/<stub>-code-lists.jsonld`); no other instance's were published at
- * all, so a concept IRI into, say, folio-assistant-core's
+ * all, so a concept IRI into, say, the content core's
  * `grade-recommendation-strength` named a document nobody wrote. Only the
  * instance's own directories are read: a dependency's lists are that
  * dependency's document.
@@ -298,7 +298,7 @@ if (import.meta.main) {
         const cl = ownCodeListsDocument(resolve(REPO, p.path), p.name, `${siteBase}/${clPath}`);
         if (cl !== undefined) {
           const clOut = join(outDir, clPath);
-          writeFileSync(clOut, JSON.stringify({ ...cl, ...staging }, null, 2) + "\n");
+          writeFileSync(clOut, JSON.stringify(withStaging(cl), null, 2) + "\n");
           copyFileSync(clOut, clOut.replace(/\.jsonld$/, ".json"));
         }
       }

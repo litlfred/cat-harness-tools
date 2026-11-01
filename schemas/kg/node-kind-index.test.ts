@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
 import { readDeclaration } from "./cat-harness";
 import { GraphTypologyRegistry } from "./graph-typology-registry";
@@ -12,6 +12,7 @@ import {
   nodeKindIndex,
   ratchet,
   renderBaseline,
+  ownedOutside,
   typologyOwner,
   UnkindedBaselineKind,
   unkindedKey,
@@ -122,6 +123,33 @@ describe("who owns a family", () => {
     // `widgets` is a test seed, not a base typology: the rule is the base table, so it is unattributed.
     expect(typologyOwner(reg, "widgets")).toBeUndefined();
     expect(typologyOwner(new GraphTypologyRegistry(), "beans")).toBe(readDeclaration(requireHarnessRoot())!.name);
+  });
+
+  test("a typology a FIXTURE instance declares belongs to that instance, not to the one containing the fixture (bean w1gy)", () => {
+    // The standalone fixture's shape: copies of other layers' instances under
+    // this one's test/fixtures/, scanned beside it through FOLIO_FIXTURE_CHECKOUT.
+    const checkout = join(root, "alpha", "test", "fixtures", "checkout");
+    mkdirSync(join(checkout, "beta", "typologies"), { recursive: true });
+    writeFileSync(join(checkout, "beta", "beta.json"), JSON.stringify({ name: "beta", directories: [{ id: "beta-typologies", path: "typologies/", graphTypologies: ["typologies"] }] }));
+    writeFileSync(
+      join(checkout, "beta", "typologies", "sprockets.json"),
+      JSON.stringify({ $schema: "folio-graph-typology/v1", kind: "sprockets", renderable: false, holds: "derived", summary: "the sprockets kind", nodeSchemas: { "sprocket/v1": {} } }),
+    );
+    const prior = process.env.FOLIO_FIXTURE_CHECKOUT;
+    process.env.FOLIO_FIXTURE_CHECKOUT = checkout;
+    try {
+      const r = new GraphTypologyRegistry({}, root);
+      expect(r.declaredBy("sprockets")).toBe(join(checkout, "beta", "typologies", "sprockets.json"));
+      expect(typologyOwner(r, "sprockets")).toBe("beta");
+      expect(typologyOwner(r, "gadgets")).toBe("alpha");
+      // beta is not an instance of the checkout at `root`: its kinds are left to it.
+      expect(ownedOutside(r, "sprockets", root)).toBe(true);
+      expect(ownedOutside(r, "gadgets", root)).toBe(false);
+    } finally {
+      if (prior === undefined) delete process.env.FOLIO_FIXTURE_CHECKOUT;
+      else process.env.FOLIO_FIXTURE_CHECKOUT = prior;
+      rmSync(join(root, "alpha", "test"), { recursive: true, force: true });
+    }
   });
 
   test("one registered in code by a module nothing here knows is NOT attributed to a guess", () => {

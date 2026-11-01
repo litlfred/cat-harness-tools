@@ -48,6 +48,7 @@ import {
   sourceLocale,
 } from "./translation-index.ts";
 import { writeInstanceConfig } from "../test/support/instance-fixture.js";
+import { notApplicableAlone } from "../test/support/checkout.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
@@ -470,14 +471,39 @@ describe("this repository's own corpus", () => {
     expect(translated).toBeGreaterThan(0);
   });
 
-  it("the committed index is up to date and valid", () => {
+  // A key's second segment is the instance whose page it is. The committed
+  // index also names pages a HIGHER instance builds into this site
+  // (`en/folio-assistant-core/glossary`), and a checkout without that
+  // instance has no such page to find (bean w1gy F18).
+  const higherKeys = ((): string[] => {
+    try {
+      const pages = (JSON.parse(readFileSync(join(INSTANCE_ROOT, INDEX_PATH), "utf-8")) as { pages?: Record<string, unknown> }).pages ?? {};
+      return Object.keys(pages).filter((k) => {
+        const inst = k.split("/")[1];
+        return inst !== undefined && inst !== "" && !existsSync(join(dirname(INSTANCE_ROOT), inst));
+      });
+    } catch {
+      return []; // unreadable: the test below fails on it by name
+    }
+  })();
+  // The index is regenerated from the pages this checkout holds, so a checkout
+  // without the instance that builds a committed key's page draws an index
+  // without that key, and the committed one reads as stale by exactly those
+  // keys (bean w1gy F18).
+  it.skipIf(
+    higherKeys.length > 0 &&
+      notApplicableAlone(`the source page of ${higherKeys.map((k) => `"${k}"`).join(", ")}, which an instance this checkout does not hold builds into the site, so the index drawn here omits it`),
+  )("the committed index is up to date and valid", () => {
     const r = checkTranslationIndex(INSTANCE_ROOT);
     const bad = r.findings.filter((f) => f.severity !== "note").map((f) => `${f.where}: ${f.message}`);
     expect(bad).toEqual([]);
     expect(r.state, `run: bun run cat translation:index`).toBe("ok");
   });
 
-  it("the published index names a source page that really exists", () => {
+  it.skipIf(
+    higherKeys.length > 0 &&
+      notApplicableAlone(`the source page of ${higherKeys.map((k) => `"${k}"`).join(", ")}, which an instance this checkout does not hold builds into the site`),
+  )("the published index names a source page that really exists", () => {
     // Guards the one thing a self-consistent generator cannot catch: a key
     // scheme that agrees with itself and matches no nav link on the real site.
     const index = JSON.parse(readFileSync(join(INSTANCE_ROOT, INDEX_PATH), "utf-8")) as {

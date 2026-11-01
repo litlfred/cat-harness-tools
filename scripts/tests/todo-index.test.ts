@@ -10,7 +10,7 @@
  * have passed on every one of them, because the builder was the thing that
  * changed. The contract is what a consumer downloads.
  */
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -22,17 +22,25 @@ import {
   type TodoIndex,
 } from "../../schemas/sdlc/todo-index.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { ensureDocsPages, siteNotBuilt } from "../../test/support/checkout.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const ASSET = join(ROOT, siteDirFor(ROOT), "assets/todos/index.json");
+
+/** Standing alone, the published todo index is not built: `docs:pages` writes it at publish, and it is gitignored. */
+const NOT_BUILT = (): boolean => siteNotBuilt("the published todo index `docs:pages` writes at publish (gitignored)", ASSET);
 
 const published = (): { raw: string; doc: TodoIndex } => {
   const raw = readFileSync(ASSET, "utf-8");
   return { raw, doc: TodoIndexSchema.parse(JSON.parse(raw)) };
 };
 
+beforeAll(() => {
+  ensureDocsPages(ROOT);
+}, 180_000);
+
 describe("the artefact answers `what am I?` from itself", () => {
-  test("the published file parses against the schema that names it", () => {
+  test.skipIf(NOT_BUILT())("the published file parses against the schema that names it", () => {
     // The defect this module exists to end: `folio-todo-index` appeared in
     // exactly two places in this repository, neither of them a schema.
     expect(existsSync(ASSET)).toBe(true);
@@ -40,11 +48,11 @@ describe("the artefact answers `what am I?` from itself", () => {
     expect(parsed.success ? [] : parsed.error.issues).toEqual([]);
   });
 
-  test("the tag in the file is the tag the module declares", () => {
+  test.skipIf(NOT_BUILT())("the tag in the file is the tag the module declares", () => {
     expect(published().doc.$schema).toBe(TODO_INDEX_SCHEMA_TAG);
   });
 
-  test("an UNDECLARED field fails — this is what was missing while three landed unnoticed", () => {
+  test.skipIf(NOT_BUILT())("an UNDECLARED field fails — this is what was missing while three landed unnoticed", () => {
     // The schema is strict on purpose. Without this, a field added to the
     // emitter reaches consumers with nothing able to say the version is now
     // a lie, which happened three times before this test existed.
@@ -55,7 +63,7 @@ describe("the artefact answers `what am I?` from itself", () => {
 });
 
 describe("`target` removes a burden rather than adding a field", () => {
-  test("every item with a resolvable label carries page and node", () => {
+  test.skipIf(NOT_BUILT())("every item with a resolvable label carries page and node", () => {
     const { doc } = published();
     const attached = doc.items.filter((i) => i.targetLabel !== undefined);
     // A corpus with no attached todo would make every assertion below vacuous,
@@ -66,7 +74,7 @@ describe("`target` removes a burden rather than adding a field", () => {
     }
   });
 
-  test("`targetLabel` is KEPT, so every existing matcher still works", () => {
+  test.skipIf(NOT_BUILT())("`targetLabel` is KEPT, so every existing matcher still works", () => {
     // `mountPageStickies` matches `byLabel[...]` on the whole string. R3 is
     // additive: nothing had to change to keep working.
     for (const i of published().doc.items) {
@@ -75,7 +83,7 @@ describe("`target` removes a burden rather than adding a field", () => {
     }
   });
 
-  test("the pair could NOT have been recovered by splitting the string", () => {
+  test.skipIf(NOT_BUILT())("the pair could NOT have been recovered by splitting the string", () => {
     // The measurement that makes R3 more than tidiness. `sec:<page>-<node>`
     // with a page slug that itself contains `-`: a consumer splitting on the
     // separator gets the wrong answer, and there is no rule it could follow
@@ -99,7 +107,7 @@ describe("`target` removes a burden rather than adding a field", () => {
     });
   });
 
-  test("an absent target is an ABSENT KEY, never null", () => {
+  test.skipIf(NOT_BUILT())("an absent target is an ABSENT KEY, never null", () => {
     // A consumer testing truthiness and one testing presence should agree —
     // the same rule the `viewHref`/`editHref` spread already follows.
     const { raw } = published();
@@ -108,7 +116,7 @@ describe("`target` removes a burden rather than adding a field", () => {
 });
 
 describe("the emitted order stays a function of the contents", () => {
-  test("each item's keys are emitted in the schema's order, `target` beside `targetLabel`", () => {
+  test.skipIf(NOT_BUILT())("each item's keys are emitted in the schema's order, `target` beside `targetLabel`", () => {
     // Bean `d2kp`: this file was once unreproducible rather than stale,
     // because `readdirSync` under Bun returns raw directory order. A nested
     // object added without care reintroduces exactly that, one level down.
@@ -118,13 +126,13 @@ describe("the emitted order stays a function of the contents", () => {
     expect(keys.indexOf("target")).toBe(keys.indexOf("targetLabel") + 1);
   });
 
-  test("the nested target's own keys are fixed", () => {
+  test.skipIf(NOT_BUILT())("the nested target's own keys are fixed", () => {
     const { raw } = published();
     const m = /"target": \{\s*"(\w+)":[^}]*?"(\w+)":[^}]*?"(\w+)":/s.exec(raw);
     expect(m?.slice(1, 4)).toEqual(["page", "node", "label"]);
   });
 
-  test("the document is INDENTED — the mergeability property, asserted", () => {
+  test.skipIf(NOT_BUILT())("the document is INDENTED — the mergeability property, asserted", () => {
     const { raw } = published();
     expect(raw.split("\n").length).toBeGreaterThan(10);
     expect(raw.endsWith("\n")).toBe(true);

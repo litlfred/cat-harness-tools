@@ -38,6 +38,7 @@ import { baseDocsDir } from "../compose-docs.js";
 import { instancesCell, instancesRead, NO_INSTANCES, page, pageRelPath, processRows, skillToProcesses } from "../gen-processes-viz.js";
 import { ownElementPattern } from "../../schemas/kg/namespaces.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { siteNotBuilt } from "../../test/support/checkout.ts";
 import { siteRootFrom } from "../../schemas/kg/visualiser-route.js";
 import { PAGE_LOCALE, pageParts } from "../viewer-declarations.js";
 import { dirname } from "node:path";
@@ -250,10 +251,20 @@ describe("the committed page is current", () => {
   it("resolves its path from the declaration", () => {
     const rel = pageRelPath(REPO);
     expect(rel).toBeDefined();
-    // Declared under the page locale. Until the committed site is regenerated
-    // (folio-assistant#2527) the page is still at the address without it.
+    // Declared under the page locale.
     expect(rel!.startsWith(`${PAGE_LOCALE}/`)).toBe(true);
-    const committed = [rel!, rel!.slice(`${PAGE_LOCALE}/`.length)];
+  });
+
+  // Until the committed site is regenerated (folio-assistant#2527) the page is
+  // still at the address without the locale. Standing alone it is at neither:
+  // it is built at publish and gitignored (bean w1gy F18).
+  const declared = pageRelPath(REPO);
+  const committed = declared === undefined ? [] : [declared, declared.slice(`${PAGE_LOCALE}/`.length)];
+  it.skipIf(
+    declared !== undefined &&
+      !committed.some((r) => existsSync(join(DOCS, r))) &&
+      siteNotBuilt("the processes page `processes:viz` writes at publish (gitignored)", join(DOCS, declared)),
+  )("and the page is at that path", () => {
     expect(committed.some((r) => existsSync(join(DOCS, r)))).toBe(true);
   });
 });

@@ -53,7 +53,6 @@ const HEAD = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "_include
 function noticeFn(): (state: string) => string | null {
   const m = /function searchIndexNotice\(state\) \{[\s\S]*?\n  \}/.exec(JS);
   if (!m) throw new Error("searchIndexNotice not found in docs-ui.js");
-  // eslint-disable-next-line no-new-func
   return new Function(`${m[0]}; return searchIndexNotice;`)() as (s: string) => string | null;
 }
 

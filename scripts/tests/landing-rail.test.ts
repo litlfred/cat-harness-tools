@@ -7,13 +7,23 @@
  * header, every one of its graphs as the site's, and its own row in the
  * Harnesses list linking to the IG's root.
  */
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { declaredGraphs, publishedGraphs, railStandalonePages } from "../mount-instance-docs.js";
 import { railDataJson, railPageOf, type RailShared } from "../lib/harness-rail.ts";
+import { HARNESS_ROOT } from "../lib/roots.ts";
+import { notApplicableAlone, siteNotBuilt, STANDALONE } from "../../test/support/checkout.ts";
+import { ensureThemesCss } from "../../test/support/themes-css.ts";
+import { siteFileFor } from "../../schemas/kg/cat-harness.js";
+
+/** Every case here pins the platform's chrome, themes.css included, which `themes:css` writes at publish (gitignored). */
+const THEMES_CSS_NOT_BUILT = siteNotBuilt(
+  "site-chrome/assets/css/themes.css, which `themes:css` writes at publish (gitignored) and the landing site ships as its pinned copy",
+  join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/css/themes.css")),
+);
 
 const BASE = "https://example.org/fa";
 const page = (body: string) => `<!doctype html>\n<html><head><title>t</title></head><body>${body}</body></html>\n`;
@@ -29,7 +39,13 @@ function railOf(root: string, rel: string): { shared: RailShared; toRoot: string
   return { shared, toRoot: p!.toRoot };
 }
 
-describe("a site that only LANDS on a harness: the rail is the site's, not the landing's", () => {
+/** The landing is smart-base, whose declaration labels its row "SMART Base"; only a composed checkout holds it. */
+const NO_SMART_BASE = notApplicableAlone("smart-base, the harness this site lands on, whose declaration names its Harnesses row");
+
+describe.skipIf(THEMES_CSS_NOT_BUILT)("a site that only LANDS on a harness: the rail is the site's, not the landing's", () => {
+  beforeAll(() => {
+    if (!STANDALONE) ensureThemesCss(HARNESS_ROOT);
+  });
   // The landing's graph whose page this fixture site holds, read from the same data the rail reads:
   // one the landing DECLARES, since the rail lists no other. A closure without
   // the landing mounted (the standalone check) has none, and the site holds none.
@@ -72,7 +88,7 @@ describe("a site that only LANDS on a harness: the rail is the site's, not the l
     if (held) expect(railOf(root, "index.html").shared.links.length).toBeGreaterThan(0);
   });
 
-  test("the Harnesses list starts with the site, at its root; the landing links to its own page on the platform", () => {
+  test.skipIf(NO_SMART_BASE)("the Harnesses list starts with the site, at its root; the landing links to its own page on the platform", () => {
     const { shared, toRoot } = railOf(build(), "deep/page.html");
     const rows = shared.harnesses ?? [];
     expect(rows[0]).toEqual({ label: "WHO SMART Guidelines - HIV", href: `${toRoot}/` });
@@ -82,7 +98,7 @@ describe("a site that only LANDS on a harness: the rail is the site's, not the l
     expect(rows.slice(1).every((r) => r.href === undefined || r.href.startsWith(`${BASE}/`))).toBe(true);
   });
 
-  test("without `landing` the rail stays the instance's, as before (bean mftp)", () => {
+  test.skipIf(NO_SMART_BASE)("without `landing` the rail stays the instance's, as before (bean mftp)", () => {
     const root = mkdtempSync(join(tmpdir(), "landing-rail-off-"));
     writeFileSync(join(root, "index.html"), page("<h1>IG</h1>"));
     railStandalonePages(root, "cat-harness", "cat-harness", [], { platformBase: BASE, homeLabel: "smart-immz", instance: "smart-base" });

@@ -45,6 +45,7 @@ import { join, relative, resolve } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 
+import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.ts";
 import { BEAN_GRAPH_FILE, DEFAULT_BEAN_GRAPH_ROOT, parseBeanGraph } from "../schemas/sdlc/bean-graph.ts";
 import {
   BEAN_NOTE_TAG,
@@ -78,6 +79,18 @@ export function noteDirs(root = ROOT): Dirs {
   const notes = graph.directories.find((d) => d.graphTypologies.includes("bean-notes"));
   if (!notes) throw new Error("bean graph declares no `bean-notes` directory — bean `m61r`");
   const defs = graph.directories.filter((d) => d.graphTypologies.includes("bean-defs")).map((d) => join(graphRoot, d.path));
+  for (const dir of corpusDirectoriesForGraph(root, "beans")) {
+    const abs = resolve(dir);
+    if (abs === resolve(graphRoot) || !existsSync(join(abs, BEAN_GRAPH_FILE))) continue;
+    try {
+      const g = parseBeanGraph(JSON.parse(readFileSync(join(abs, BEAN_GRAPH_FILE), "utf-8")));
+      for (const d of g.directories) {
+        if (d.graphTypologies.includes("bean-defs")) defs.push(join(abs, d.path));
+      }
+    } catch {
+      // Malformed secondary bean graph is check:harness-dirs' finding, not this one's.
+    }
+  }
   return { notes: join(graphRoot, notes.path), defs };
 }
 

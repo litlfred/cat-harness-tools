@@ -34,7 +34,12 @@
 // kinds in a typologies/ graph, and a sweep over the code list alone stopped checking
 // every kind that moved (the FHIR IG harness's, cat-openapi's — now cat-harness/openapi/ — core's). Measured
 // 2026-10-04 while building riit; core's code-registered kinds are imported too.
-import { BASE_GRAPH_TYPOLOGIES, declaredKindNodes, defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
+import {
+  BASE_GRAPH_TYPOLOGIES,
+  declaredKindNodes,
+  defaultGraphTypologies,
+  type GraphTypologyRegistry,
+} from "../schemas/kg/graph-typology-registry.js";
 import { FOLIO_GRAPH_TYPOLOGY } from "../schemas/kg/folio-graph-typology.js";
 import { BLOCK_KINDS, CONTENT_ADAPTER_NODES, DISCOVERED_BLOCK_KIND_NODES } from "../schemas/content/block-kinds.js";
 import { declaredNodeFiles } from "../schemas/kg/declared-nodes.js";
@@ -51,6 +56,7 @@ import { ContributionRegistry } from "../schemas/content/contributions.js";
 import { loadContributionsSync } from "../schemas/kg/harness-config.js";
 import { resolveSubgraphSource } from "../schemas/kg/subgraph-source.js";
 import { graphReadPath } from "./graph-read.ts";
+import { ownedOutside, typologyOwner } from "../schemas/kg/node-kind-index.js";
 
 /** The INSTANCE root — this file lives at `<instance>/scripts/`. */
 const instanceRoot = HARNESS_ROOT;
@@ -77,6 +83,13 @@ export interface ValidatorSweep {
    * true.
    */
   contradictory: string[];
+  /**
+   * A kind owned by an instance this checkout does not hold (`ownedOutside`),
+   * with that owner: its validator is that layer's to declare and its gate's to
+   * judge, so it is in none of the states above. Standalone these are the
+   * fixture's kinds (bean `w1gy`); in a composed checkout it is empty.
+   */
+  elsewhere: { kind: string; owner: string }[];
 }
 
 /** Code in another repository: it cannot declare a validator node in this one. */
@@ -104,8 +117,13 @@ export function authoredValidatorStrings(): { kind: string; family?: string; ref
 }
 
 export async function sweep(root: string): Promise<ValidatorSweep> {
-  const out: ValidatorSweep = { resolved: [], notApplicable: [], undeclared: [], unresolvable: [], contradictory: [] };
+  const out: ValidatorSweep = { resolved: [], notApplicable: [], undeclared: [], unresolvable: [], contradictory: [], elsewhere: [] };
   for (const kind of defaultGraphTypologies.names()) {
+    // Another layer's kind is left to that layer (bean `w1gy`).
+    if (ownedOutside(defaultGraphTypologies, kind, join(root, ".."))) {
+      out.elsewhere.push({ kind, owner: typologyOwner(defaultGraphTypologies, kind)! });
+      continue;
+    }
     const def = defaultGraphTypologies.get(kind);
     const na = def?.validatorNotApplicable;
     // The contradiction first, because everything below would otherwise pick a
@@ -232,7 +250,10 @@ function jsonFiles(dir: string): string[] {
  * validate it where the family has a Zod schema. A tag the map does not name
  * fails — declaring the map is the claim that it is complete.
  */
-export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
+export async function sweepFamilies(
+  root: string,
+  registry: GraphTypologyRegistry = defaultGraphTypologies,
+): Promise<FamilySweep[]> {
   const out: FamilySweep[] = [];
   // Every directory the checkout declares, with the kinds it carries. A node
   // under a MORE SPECIFIC declared directory belongs to that directory's
@@ -253,28 +274,37 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
       declaredDirs.push({ abs: join(inst, e.path).replace(/\/+$/, ""), kinds: e.graphTypologies as readonly string[] });
     }
   }
-  const innermostKinds = (file: string): readonly string[] | undefined => {
+  const innermostDeclared = (file: string): { abs: string; kinds: readonly string[] } | undefined => {
     let best: { abs: string; kinds: readonly string[] } | undefined;
     for (const d of declaredDirs) {
       if (file.startsWith(`${d.abs}/`) && (best === undefined || d.abs.length > best.abs.length)) best = d;
     }
-    return best?.kinds;
+    return best;
   };
   // A NESTED kind: it names its `$schema` families and no instance declares a
   // directory of it, so its nodes sit inside a parent kind's directory (the
   // IG artefact JSON-LD that gen-ig-pages writes under an `ig-pages` docs
   // root). Its families route from the parent's sweep and count as its own.
-  const nested = new Map<string, { kind: string; fam: Awaited<ReturnType<typeof resolveNodeSchemas>>[number] }>();
-  for (const kind of defaultGraphTypologies.names()) {
-    if (!defaultGraphTypologies.get(kind)!.nodeSchemas || declaredDirs.some((d) => d.kinds.includes(kind))) continue;
-    for (const fam of await resolveNodeSchemas(kind, root)) if (!nested.has(fam.tag)) nested.set(fam.tag, { kind, fam });
+  type RoutedFamily = Awaited<ReturnType<typeof resolveNodeSchemas>>[number] | { tag: string; state: "unvalidated" };
+  const nested = new Map<string, { kind: string; fam: RoutedFamily }>();
+  for (const kind of registry.names()) {
+    const def = registry.get(kind)!;
+    if (!def.nodeSchemas || declaredDirs.some((d) => d.kinds.includes(kind))) continue;
+    for (const fam of await resolveNodeSchemas(kind, root, registry)) if (!nested.has(fam.tag)) nested.set(fam.tag, { kind, fam });
+    for (const tag of Object.keys(def.nodeSchemas)) if (!nested.has(tag)) nested.set(tag, { kind, fam: { tag, state: "unvalidated" } });
   }
   const routed = new Map<string, Pick<FamilySweep, "counts" | "invalid">>();
-  for (const kind of defaultGraphTypologies.names()) {
-    const def = defaultGraphTypologies.get(kind)!;
+  for (const kind of registry.names()) {
+    const def = registry.get(kind)!;
     if (!def.nodeSchemas) continue;
-    const fams = await resolveNodeSchemas(kind, root);
-    const byTag = new Map(fams.map((f) => [f.tag, f]));
+    const fams = await resolveNodeSchemas(kind, root, registry);
+    const byTag = new Map<string, RoutedFamily>(fams.map((f) => [f.tag, f]));
+    // A family declared with `{}` in `nodeSchemas` and joined to no validator
+    // in this checkout (e.g. `diig-phases-figure/v1` and
+    // `smart-guidelines-approach-figure/v1`, baselined as unkinded in
+    // `node-kinds.baseline.json`) is still a family the typology names:
+    // routed here as `unvalidated`, never reported as `unmapped`.
+    for (const tag of Object.keys(def.nodeSchemas)) if (!byTag.has(tag)) byTag.set(tag, { tag, state: "unvalidated" });
     const s: FamilySweep = { kind, counts: {}, unmapped: [], unresolvable: [], invalid: [], projected: [] };
     for (const f of fams) if (f.state === "unresolvable") s.unresolvable.push({ tag: f.tag, reason: f.reason });
     const repoRoot = join(root, "..");
@@ -359,8 +389,22 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
         const optIn = (node as { $schema?: unknown }).$schema === undefined || file.endsWith(".jsonld");
         if (optIn && !byTag.has(tag) && !nested.has(tag)) continue;
         // Under a more specific declared directory of other kinds: theirs.
-        const inner = innermostKinds(file);
-        if (inner !== undefined && !inner.includes(kind)) continue;
+        // MORE SPECIFIC than the directory being read, that is. `declaredDirs`
+        // holds instance-level entries only, so a directory this kind is
+        // declared at FROM WITHIN (`beans/beans.json`'s `workflows`, which
+        // `directoryEntriesForGraph` resolves) is not in it, and the innermost
+        // entry it finds for `beans/workflows/x.json` is the ENCLOSING
+        // `beans/`. Asking only "is that entry of my kind?" then dropped every
+        // `workflow-state` node from its own sweep, and `require-all` called
+        // the kind EXAMINED NOTHING over the node it had just been handed
+        // (bean `8lcl`, folio-assistant#2812). An enclosing directory never
+        // takes a node away from the kind declared nearer to it; only a deeper
+        // one does, which is the #2529 case this guard exists for. The node
+        // still counts for `beans` too: `beans/` is read as a whole, and its
+        // family map names the child families for exactly that reason.
+        const inner = innermostDeclared(file);
+        const reading = dir.replace(/\/+$/, "");
+        if (inner !== undefined && !inner.kinds.includes(kind) && inner.abs.startsWith(`${reading}/`)) continue;
         const own = byTag.get(tag);
         const via = own === undefined ? nested.get(tag) : undefined;
         const fam = own ?? via?.fam;
@@ -418,7 +462,9 @@ async function main(): Promise<number> {
           ? `  ✓ ${tag}: ${c.parsed}/${c.checked} parse`
           : c.state === "external"
               ? `  · ${tag}: ${c.nodes} node(s), an external specification — named, not run here`
-              : `  · ${tag}: ${c.nodes} node(s), a TypeScript shape, not runnable — could not determine`,
+              : c.state === "unvalidated"
+                  ? `  · ${tag}: ${c.nodes} node(s), routed here, no validator in this checkout — could not determine`
+                  : `  · ${tag}: ${c.nodes} node(s), a TypeScript shape, not runnable — could not determine`,
       );
     }
     if (f.onFamily && Object.keys(f.counts).length === 0) {
@@ -478,6 +524,7 @@ async function main(): Promise<number> {
   // check the claim — the reason names a file format or an absent subject, so
   // "not applicable" cannot become the polite way to launder a real gap.
   for (const n of r.notApplicable) console.log(`  · ${n.kind} — no runtime validator applies: ${n.reason}`);
+  for (const e of r.elsewhere) console.log(`  · ${e.kind} — owned by ${e.owner}, which this checkout does not hold: judged there`);
 
   if (r.contradictory.length > 0) {
     console.log(

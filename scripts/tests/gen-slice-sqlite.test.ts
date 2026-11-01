@@ -6,9 +6,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
-import { inAggregate } from "../../test/support/checkout.ts";
+import { inAggregate, siteNotBuilt } from "../../test/support/checkout.ts";
 import { readBeans, type BeanNode } from "../beans.ts";
-import { auditPayloadTree } from "../gen-subgraph-jsonld.ts";
+import { auditPayloadTree, payloadOutDir } from "../gen-subgraph-jsonld.ts";
 import {
   BEANS_SLICE,
   KG_SLICE,
@@ -239,9 +239,14 @@ describe("gen-slice-sqlite — the slice table", () => {
 
 const INSTANCE = join(HARNESS_ROOT);
 const REPO = repoRootFor(INSTANCE);
-const realTodoIndex = JSON.parse(readFileSync(join(INSTANCE, TODO_INDEX), "utf-8"));
+// The fixtures below are cut from the PUBLISHED indexes, which the publish
+// build writes and `.gitignore` keeps out of a clone (bean w1gy F18).
+// `describe.skipIf` still runs its body, so when a describe skips it is given
+// a stand-in of the index's shape instead of the file it cannot read.
+const TODO_INDEX_NOT_BUILT = siteNotBuilt("the published todo index `docs:pages` writes at publish (gitignored)", join(INSTANCE, TODO_INDEX));
+const realTodoIndex = TODO_INDEX_NOT_BUILT ? { items: [{ relations: [] }] } : JSON.parse(readFileSync(join(INSTANCE, TODO_INDEX), "utf-8"));
 
-describe("gen-slice-sqlite — todos", () => {
+describe.skipIf(TODO_INDEX_NOT_BUILT)("gen-slice-sqlite — todos", () => {
   const item = realTodoIndex.items[0];
   const index = {
     ...realTodoIndex,
@@ -294,9 +299,10 @@ describe("gen-slice-sqlite — todos", () => {
 
 // ── Slice: library ─────────────────────────────────────────────────────────
 
-const realLibraryIndex = JSON.parse(readFileSync(join(INSTANCE, LIBRARY_DIR, "index.json"), "utf-8"));
+const LIBRARY_INDEX_NOT_BUILT = siteNotBuilt("the library projection `library:viz` writes at publish (gitignored)", join(INSTANCE, LIBRARY_DIR, "index.json"));
+const realLibraryIndex = LIBRARY_INDEX_NOT_BUILT ? { entries: [{}] } : JSON.parse(readFileSync(join(INSTANCE, LIBRARY_DIR, "index.json"), "utf-8"));
 
-describe("gen-slice-sqlite — library", () => {
+describe.skipIf(LIBRARY_INDEX_NOT_BUILT)("gen-slice-sqlite — library", () => {
   const e0 = realLibraryIndex.entries[0];
   const index = {
     ...realLibraryIndex,
@@ -408,7 +414,10 @@ describe("gen-slice-sqlite — kg", () => {
     });
   });
 
-  test("the whole-repo KG slices green, its pointers resolve to the COMMITTED payloads, and it stays under the budget", async () => {
+  // The payload tree the pointers resolve into is written at publish and gitignored (bean w1gy F18).
+  test.skipIf(
+    siteNotBuilt("the published payload tree `subgraph:jsonld` writes at publish (gitignored)", join(INSTANCE, payloadOutDir(INSTANCE))),
+  )("the whole-repo KG slices green, its pointers resolve to the COMMITTED payloads, and it stays under the budget", async () => {
     const d = (await KG_SLICE.load(REPO))!;
     expect(d.rows.nodes!.length).toBeGreaterThan(1000);
     expect(d.payloads.links.size).toBeGreaterThan(100);

@@ -13,20 +13,29 @@
  * stacks) live in `test/todos-repo-root.test.ts`
  * (bean `ho66`): standing alone, cat-harness has no such root to read.
  */
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { ROOT } from "../todos.js";
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
+import { ensureDocsPages, siteNotBuilt } from "../../test/support/checkout.ts";
 
 describe("the published process hierarchy", () => {
+  beforeAll(() => {
+    ensureDocsPages(ROOT);
+  }, 180_000);
+  const INDEX = join(ROOT, siteDirFor(ROOT), "assets/todos/index.json");
+  // Standing alone the index is not built: `docs:pages` writes it at publish,
+  // and it is gitignored (bean w1gy F18).
+  const NOT_BUILT = (): boolean =>
+    siteNotBuilt("the published todo index `docs:pages` writes at publish (gitignored)", INDEX);
   const index = () =>
     JSON.parse(
-      readFileSync(join(ROOT, siteDirFor(ROOT), "assets/todos/index.json"), "utf8"),
+      readFileSync(INDEX, "utf8"),
     ) as { processes: Record<string, string[]>; items: Array<{ tags: { processes: string[] } }> };
 
-  test("real call edges are present — a silent regex failure would flatten the board", () => {
+  test.skipIf(NOT_BUILT())("real call edges are present — a silent regex failure would flatten the board", () => {
     // `processHierarchy()` reads `<bpmn:process id>` and `calledElement` with a
     // REGEX rather than through `loadProcessModel`, which is async and pulls in
     // bpmn-moddle for a generator that otherwise touches no XML. The risk of a
@@ -41,7 +50,7 @@ describe("the published process hierarchy", () => {
     expect(Object.values(h).filter((v) => v.length > 0).length).toBeGreaterThan(5);
   });
 
-  test("every process a todo names exists in the hierarchy", () => {
+  test.skipIf(NOT_BUILT())("every process a todo names exists in the hierarchy", () => {
     // A todo tagged with a process no diagram declares would stack at depth 0
     // beside the untagged ones and look correct — a dangling tag that renders
     // as a valid one.

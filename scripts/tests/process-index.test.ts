@@ -20,7 +20,7 @@ import { declaredDiagrams, diagramPath, framedInstances, publishedProcesses, unf
 import { firstSentence } from "../kg-export.ts";
 import { subgraphOutDir } from "../gen-subgraph-jsonld.ts";
 import { repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.ts";
-import { inAggregate } from "../../test/support/checkout.ts";
+import { inAggregate, siteNotBuilt } from "../../test/support/checkout.ts";
 
 const HARNESS = HARNESS_ROOT;
 const REPO = repoRootFor(HARNESS);
@@ -151,8 +151,13 @@ describe("the committed subgraph JSON-LD", () => {
   const { processes, problems } = publishedProcesses(OUT);
   const declared = declaredDiagrams(REPO);
   const framed = framedInstances(HARNESS);
+  // Standing alone the subgraph tree is not built: `subgraph:jsonld` writes it
+  // at publish and `docs/subgraph/` is gitignored, so the walk starts at a
+  // root that is not there (bean w1gy F18).
+  const SUBGRAPH_NOT_BUILT = (): boolean =>
+    siteNotBuilt("the subgraph JSON-LD `subgraph:jsonld` writes at publish (gitignored)", join(OUT, "index.jsonld"));
 
-  test("every file the walk reaches exists and validates", () => {
+  test.skipIf(SUBGRAPH_NOT_BUILT())("every file the walk reaches exists and validates", () => {
     expect(problems).toEqual([]);
   });
   // The committed JSON-LD is generated in the AGGREGATE and frames the higher
@@ -171,7 +176,7 @@ describe("the committed subgraph JSON-LD", () => {
       expect({ p, framed: framed.has(inst) }).toEqual({ p, framed: false });
     }
   });
-  test("bootstrap's diagrams are covered through its OWN subgraphs, linked by `seeAlso` (t8c4)", () => {
+  test.skipIf(SUBGRAPH_NOT_BUILT())("bootstrap's diagrams are covered through its OWN subgraphs, linked by `seeAlso` (t8c4)", () => {
     const { seeAlso } = publishedProcesses(OUT);
     const boot = [...declared].filter(([, inst]) => !framed.has(inst)).map(([p]) => p).sort();
     const { byPath, problems: why } = unframedProcesses(seeAlso, framed, REPO);
@@ -184,10 +189,18 @@ describe("the committed subgraph JSON-LD", () => {
   test("with no `seeAlso`, an unframed instance's diagrams are NOT counted", () => {
     expect(unframedProcesses([], framed, REPO).byPath.size).toBe(0);
   });
-  test("the shipped viewer reads the same rows from the same files", () => {
+  const VIEWED = ["cat-harness/processes", "folio-assistant-core/processes"];
+  // Standing alone the hydrated subgraphs are not built: `subgraph:jsonld`
+  // writes them at publish and the subgraph tree is gitignored (bean w1gy F18).
+  test.skipIf(
+    siteNotBuilt(
+      "the hydrated processes subgraphs `subgraph:jsonld` writes at publish (gitignored)",
+      ...VIEWED.map((sub) => join(OUT, sub, "index.hydrated.jsonld")),
+    ),
+  )("the shipped viewer reads the same rows from the same files", () => {
     const api = viewerApi();
     let n = 0;
-    for (const sub of ["cat-harness/processes", "folio-assistant-core/processes"]) {
+    for (const sub of VIEWED) {
       const doc = JSON.parse(readFileSync(join(OUT, sub, "index.hydrated.jsonld"), "utf-8"));
       n += api.rowsFromHydrated(doc, sub.split("/")[0]!).length;
     }

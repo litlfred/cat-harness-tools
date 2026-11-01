@@ -16,13 +16,39 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
-import { basename, join, relative } from "path";
+import { basename, join, relative, resolve } from "path";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { createHash } from "crypto";
 
 import { extractMarkdown, extractFromManifest, formatPot, type PotEntry } from "../../pipeline/pot-extract.js";
 import { parsePo, injectMarkdown } from "../../pipeline/po-inject.js";
+import { joinSegments, realPathWithin, writableWithin } from "../core/safe-path.js";
+import { LocaleSchema, RepoPathSchema } from "../../schemas/tools/tool-types.js";
+
+/**
+ * A caller-supplied repository path, as the existing file it names inside
+ * `repoRoot`, or `undefined`. Refused, never repaired: an absolute path, a
+ * `..` segment or a link out of the repository names nothing here.
+ */
+function repoFile(repoRoot: string, rel: string): string | undefined {
+  if (!RepoPathSchema.safeParse(rel).success) return undefined;
+  const abs = resolve(repoRoot, rel);
+  return realPathWithin(repoRoot, abs) === undefined ? undefined : abs;
+}
+
+/** `<translationsRoot>/<locale>`, or `undefined` when `locale` is not a BCP 47 tag. */
+function localeDir(root: string, locale: string): string | undefined {
+  if (!LocaleSchema.safeParse(locale).success) return undefined;
+  return joinSegments(root, locale);
+}
+
+function refusal(text: string) {
+  return { content: [{ type: "text" as const, text: `❌ Refused: ${text}` }], isError: true };
+}
+const notInRepo = (name: string, value: string) =>
+  refusal(`${name} '${value}' is not an existing path inside the repository.`);
+const notLocale = (value: string) => refusal(`locale '${value}' is not a BCP 47 language tag.`);
 /**
  * The declared `translation-sources` graph — where a translator's `.pot` and
  * `.po` live. Falls back to the convention because extraction CREATES the
@@ -49,11 +75,11 @@ export function registerTranslationTools(server: McpServer, repoRoot: string): v
       "translations/<locale>/<name>.pot. Uses the same extraction state machine " +
       "as the WHO DAK base IG's extract_translations.py.",
     {
-      path: z.string().describe(
+      path: RepoPathSchema.describe(
         "Path to a .md file or directory of .md files (relative to repo root). " +
           "E.g. 'docs/guides/agent-onboarding.md' or 'folio/paper/chapters/ch1/'"
       ),
-      locale: z.string().default("en").describe(
+      locale: LocaleSchema.default("en").describe(
         "Source locale (BCP 47 tag). Default: 'en'."
       ),
       project_name: z.string().optional().describe(
@@ -61,11 +87,10 @@ export function registerTranslationTools(server: McpServer, repoRoot: string): v
       ),
     },
     async ({ path: inputPath, locale, project_name }) => {
-      const absPath = join(repoRoot, inputPath);
-
-      if (!existsSync(absPath)) {
-        return { content: [{ type: "text" as const, text: `❌ Path not found: ${inputPath}` }] };
-      }
+      const absPath = repoFile(repoRoot, inputPath);
+      if (absPath === undefined) return notInRepo("path", inputPath);
+      const outDir = localeDir(translationsRoot(repoRoot), locale);
+      if (outDir === undefined) return notLocale(locale);
 
       // Collect .md and .ts manifest files (G4: extractFromManifest wired into pipeline)
       const mdFiles: string[] = [];
@@ -97,6 +122,11 @@ export function registerTranslationTools(server: McpServer, repoRoot: string): v
         walkDir(absPath);
       }
 
+      // A link inside a walked directory may point out of the repository.
+      const contained = (f: string) => realPathWithin(repoRoot, f) !== undefined;
+      mdFiles.splice(0, mdFiles.length, ...mdFiles.filter(contained));
+      tsFiles.splice(0, tsFiles.length, ...tsFiles.filter(contained));
+
       if (mdFiles.length === 0 && tsFiles.length === 0) {
         return { content: [{ type: "text" as const, text: `No .md or .ts files found in ${inputPath}` }] };
       }
@@ -118,9 +148,11 @@ export function registerTranslationTools(server: McpServer, repoRoot: string): v
 
       // Write POT
       const name = basename(inputPath).replace(/\.(md|ts)$/, "");
-      const outDir = join(translationsRoot(repoRoot), locale);
-      mkdirSync(outDir, { recursive: true });
       const potPath = join(outDir, `${name}.pot`);
+      mkdirSync(outDir, { recursive: true });
+      // After mkdir, so the check sees the real directory: a locale directory
+      // that is a link out of the translations root is refused here.
+      if (!writableWithin(translationsRoot(repoRoot), potPath)) return refusal(`'${name}.pot' would be written outside the translations directory.`);
       const pot = formatPot(allEntries, { projectName: project_name, locale });
       writeFileSync(potPath, pot);
 
@@ -146,26 +178,23 @@ export function registerTranslationTools(server: McpServer, repoRoot: string): v
       "and substitutes the msgstr. Fuzzy entries are skipped. Output goes to " +
       "translations/<locale>/<filename>.md.",
     {
-      source: z.string().describe(
+      source: RepoPathSchema.describe(
         "Path to the source .md file (relative to repo root)."
       ),
-      po_file: z.string().describe(
+      po_file: RepoPathSchema.describe(
         "Path to the .po file with translations (relative to repo root)."
       ),
-      locale: z.string().describe(
+      locale: LocaleSchema.describe(
         "Target locale (BCP 47 tag, e.g. 'fr', 'ar', 'zh')."
       ),
     },
     async ({ source, po_file, locale }) => {
-      const sourcePath = join(repoRoot, source);
-      const poPath = join(repoRoot, po_file);
-
-      if (!existsSync(sourcePath)) {
-        return { content: [{ type: "text" as const, text: `❌ Source not found: ${source}` }] };
-      }
-      if (!existsSync(poPath)) {
-        return { content: [{ type: "text" as const, text: `❌ PO file not found: ${po_file}` }] };
-      }
+      const sourcePath = repoFile(repoRoot, source);
+      if (sourcePath === undefined) return notInRepo("source", source);
+      const poPath = repoFile(repoRoot, po_file);
+      if (poPath === undefined) return notInRepo("po_file", po_file);
+      const outDir = localeDir(translationsRoot(repoRoot), locale);
+      if (outDir === undefined) return notLocale(locale);
 
       const sourceMd = readFileSync(sourcePath, "utf-8");
       const poContent = readFileSync(poPath, "utf-8");
@@ -174,9 +203,9 @@ export function registerTranslationTools(server: McpServer, repoRoot: string): v
       const result = injectMarkdown(sourceMd, translations);
 
       // Write output
-      const outDir = join(translationsRoot(repoRoot), locale);
-      mkdirSync(outDir, { recursive: true });
       const outPath = join(outDir, basename(source));
+      mkdirSync(outDir, { recursive: true });
+      if (!writableWithin(translationsRoot(repoRoot), outPath)) return refusal(`'${basename(source)}' would be written outside the translations directory.`);
       writeFileSync(outPath, result.translated);
 
       const relOut = relative(repoRoot, outPath);
@@ -201,12 +230,13 @@ export function registerTranslationTools(server: McpServer, repoRoot: string): v
       "total strings, translated, untranslated, fuzzy. Also reports whether " +
       "translations are official (signed off) or unofficial.",
     {
-      locale: z.string().optional().describe(
+      locale: LocaleSchema.optional().describe(
         "Locale to report on (e.g. 'fr'). Omit to report all available locales."
       ),
     },
     async ({ locale }) => {
       const translationsDir = translationsRoot(repoRoot);
+      if (locale !== undefined && localeDir(translationsDir, locale) === undefined) return notLocale(locale);
       if (!existsSync(translationsDir)) {
         return { content: [{ type: "text" as const, text: "No translations/ directory found." }] };
       }
@@ -305,25 +335,25 @@ export function registerTranslationTools(server: McpServer, repoRoot: string): v
       "the SHA-256 hash of the source .md for staleness detection. Updates " +
       "translations/<locale>/status.json. Use after SME review confirms accuracy.",
     {
-      locale: z.string().describe("Target locale being signed off (e.g. 'fr')."),
-      source: z.string().describe("Path to the source .md file (for hash computation)."),
+      locale: LocaleSchema.describe("Target locale being signed off (e.g. 'fr')."),
+      source: RepoPathSchema.describe("Path to the source .md file (for hash computation)."),
       signed_off_by: z.string().describe("Identity of the reviewer signing off."),
       level: z.enum(["block", "section", "chapter", "folio"]).default("chapter").describe(
         "Granularity of the sign-off."
       ),
     },
     async ({ locale, source, signed_off_by, level }) => {
-      const sourcePath = join(repoRoot, source);
-      if (!existsSync(sourcePath)) {
-        return { content: [{ type: "text" as const, text: `❌ Source not found: ${source}` }] };
-      }
+      const sourcePath = repoFile(repoRoot, source);
+      if (sourcePath === undefined) return notInRepo("source", source);
+      const statusDir = localeDir(translationsRoot(repoRoot), locale);
+      if (statusDir === undefined) return notLocale(locale);
 
       const sourceContent = readFileSync(sourcePath, "utf-8");
       const sourceHash = createHash("sha256").update(sourceContent).digest("hex");
 
-      const statusDir = join(translationsRoot(repoRoot), locale);
       mkdirSync(statusDir, { recursive: true });
       const statusPath = join(statusDir, "status.json");
+      if (!writableWithin(translationsRoot(repoRoot), statusPath)) return refusal("status.json would be written outside the translations directory.");
 
       // Read existing status or create new
       let status: Record<string, unknown> = {};
@@ -370,23 +400,18 @@ export function registerTranslationTools(server: McpServer, repoRoot: string): v
       "(4) staleness — whether the source .md has changed since the PO was generated. " +
       "Bean ktt2 tracks the round-trip QA extension of this tool.",
     {
-      pot_file: z.string().describe("Path to the .pot template file."),
-      po_file: z.string().describe("Path to the .po translation file."),
-      source: z.string().optional().describe(
+      pot_file: RepoPathSchema.describe("Path to the .pot template file."),
+      po_file: RepoPathSchema.describe("Path to the .po translation file."),
+      source: RepoPathSchema.optional().describe(
         "Path to the source .md file for staleness check. " +
           "If omitted, only PO/POT consistency is checked."
       ),
     },
     async ({ pot_file, po_file, source }) => {
-      const potPath = join(repoRoot, pot_file);
-      const poPath = join(repoRoot, po_file);
-
-      if (!existsSync(potPath)) {
-        return { content: [{ type: "text" as const, text: `❌ POT not found: ${pot_file}` }] };
-      }
-      if (!existsSync(poPath)) {
-        return { content: [{ type: "text" as const, text: `❌ PO not found: ${po_file}` }] };
-      }
+      const potPath = repoFile(repoRoot, pot_file);
+      if (potPath === undefined) return notInRepo("pot_file", pot_file);
+      const poPath = repoFile(repoRoot, po_file);
+      if (poPath === undefined) return notInRepo("po_file", po_file);
 
       const potContent = readFileSync(potPath, "utf-8");
       const poContent = readFileSync(poPath, "utf-8");
@@ -438,15 +463,15 @@ export function registerTranslationTools(server: McpServer, repoRoot: string): v
 
       // Staleness check
       if (source) {
-        const sourcePath = join(repoRoot, source);
-        if (existsSync(sourcePath)) {
+        const sourcePath = repoFile(repoRoot, source);
+        if (sourcePath !== undefined) {
           const sourceContent = readFileSync(sourcePath, "utf-8");
           const currentEntries: PotEntry[] = [];
           if (source.endsWith(".ts")) {
             currentEntries.push(...extractFromManifest(sourceContent, source));
           } else {
             const siblingTs = sourcePath.replace(/\.md$/, ".ts");
-            if (existsSync(siblingTs)) {
+            if (realPathWithin(repoRoot, siblingTs) !== undefined) {
               currentEntries.push(
                 ...extractFromManifest(readFileSync(siblingTs, "utf-8"), source.replace(/\.md$/, ".ts")),
               );

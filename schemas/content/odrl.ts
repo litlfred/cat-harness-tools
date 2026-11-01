@@ -117,6 +117,7 @@ function resolveActReasonDefinitionPath(): string {
   const filename = "CodeSystem-v3-ActReason.json";
   const here = dirname(fileURLToPath(import.meta.url));
   const candidates = [
+    // input-site: inert #04348fc5 — fallback to the local FHIR package cache when the committed test fixture is absent
     join(homedir(), ".fhir", "packages", HL7_TERMINOLOGY_PACKAGE_ID, "package", filename),
     resolve(here, "..", "..", "test", "fixtures", HL7_TERMINOLOGY_PACKAGE_ID, filename),
   ];
@@ -444,7 +445,8 @@ export interface ProvDutyRecord {
   };
   "prov:agent"?: string;
   "prov:actedOnBehalfOf"?: string;
-  "prov:used"?: readonly string[];
+  /** A node reference, or a described entity (e.g. an agreement's DCAT distribution), matched by its `@id`. */
+  "prov:used"?: readonly (string | { "@id": string })[];
   "prov:generated"?: readonly string[];
   "prov:invalidated"?: readonly string[];
   "cat-harness:underPolicy"?: string | readonly string[];
@@ -732,7 +734,7 @@ function dutyFulfilledByRecord(
   const target = duty.target ?? rule.target;
   if (target !== undefined) {
     const entities = [
-      ...(rec["prov:used"] ?? []),
+      ...(rec["prov:used"] ?? []).map((u) => (typeof u === "string" ? u : u["@id"])),
       ...(rec["prov:invalidated"] ?? []),
       ...(rec.target ? [rec.target] : []),
     ];

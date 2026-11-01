@@ -17,7 +17,8 @@
  * would be a tab stop, and a keyboard or switch user could not get past it.
  * So the minimap is a roving-tabindex list:
  * - one cell is reachable with Tab;
- * - Up and Down move between cells, and Home and End go to either end;
+ * - Up/Down (and Left/Right) move between cells in reading order, and Home
+ *   and End go to either end;
  * - Enter or Space (the cell is a native button) jumps to the block.
  * Every cell is labelled in words ("prose:dose: changed, 2 open comments, QA
  * failing"), and its visible glyphs repeat that, so colour is never the only
@@ -206,7 +207,7 @@ export interface BlockMark {
 }
 
 /**
- * The whole document as one column of cells, in outline order. Darker means
+ * The whole document as small wrapping squares, in outline order. Darker means
  * more reasons to look (a change, open comments, a QA failure); glyphs and
  * the label say which.
  */
@@ -224,17 +225,29 @@ export function renderMinimap(
   box.appendChild(h);
   const help = doc.createElement("p");
   help.className = "muted";
-  help.textContent = "One cell per block, in order. Up and Down move, Enter jumps. Δ changed, + added, ● open comments, ! QA failing.";
+  help.textContent = "One square per block, one row of squares per chapter, in reading order. Arrow keys move, Enter jumps. Filled squares need a look: Δ changed, + added, ● open comments, ! QA failing.";
   box.appendChild(help);
-  const ol = doc.createElement("ol");
-  ol.setAttribute("aria-labelledby", "minimap-h");
+  // One labelled row per chapter, so a reader sees WHICH chapter a change is
+  // in, not only that there is one (owner, 2026-10-30, option A). The cells
+  // stay one roving list across chapters: one tab stop for the whole map.
   const cells: HTMLButtonElement[] = [];
+  const many = outline.documents.length > 1;
+  let n = 0;
   for (const d of outline.documents)
-    for (const ch of d.chapters)
+    for (const ch of d.chapters) {
+      const id = "minimap-ch-" + n++;
+      const cap = doc.createElement("p");
+      cap.className = "mm-ch";
+      cap.id = id;
+      cap.textContent = many ? d.title + " \u203A " + ch.title : ch.title;
+      const ol = doc.createElement("ol");
+      ol.setAttribute("aria-labelledby", id);
+      let flagged = 0;
       for (const s of ch.sections)
         for (const label of s.blocks) {
           const m = mark(label);
           const reasons = (m.change ? 1 : 0) + (m.open ? 1 : 0) + (m.qaFailing ? 1 : 0);
+          if (reasons) flagged++;
           const li = doc.createElement("li");
           const b = doc.createElement("button");
           b.type = "button";
@@ -252,15 +265,25 @@ export function renderMinimap(
           ol.appendChild(li);
           cells.push(b);
         }
+      if (!ol.childNodes.length) continue;
+      if (flagged) {
+        const q = doc.createElement("span");
+        q.className = "mm-count";
+        q.textContent = " \u00B7 " + flagged + " to look at";
+        cap.appendChild(q);
+      }
+      box.appendChild(cap);
+      box.appendChild(ol);
+    }
   // One tab stop: the first cell with something to look at, else the first.
   const first = cells.find((c) => !/\bh0\b/.test(c.className)) || cells[0];
   if (first) first.tabIndex = 0;
-  ol.addEventListener("keydown", (e) => {
+  box.addEventListener("keydown", (e) => {
     const i = cells.indexOf(e.target as HTMLButtonElement);
     if (i < 0) return;
     let j = -1;
-    if (e.key === "ArrowDown") j = Math.min(cells.length - 1, i + 1);
-    else if (e.key === "ArrowUp") j = Math.max(0, i - 1);
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") j = Math.min(cells.length - 1, i + 1);
+    else if (e.key === "ArrowUp" || e.key === "ArrowLeft") j = Math.max(0, i - 1);
     else if (e.key === "Home") j = 0;
     else if (e.key === "End") j = cells.length - 1;
     if (j < 0) return;
@@ -270,6 +293,5 @@ export function renderMinimap(
     cells[j]!.tabIndex = 0;
     cells[j]!.focus();
   });
-  box.appendChild(ol);
   return box;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseDockerUses, parseUses, pinWorkflows, resolveRef, rewriteUses, stagingExempt, verifyRefs } from "../scripts/pin-actions.ts";
@@ -108,6 +108,28 @@ describe("every workflow in this repository passes the stricter pin rule", () =>
         if (u && !u.firstParty && !u.pinned) bad.push(`${f}:${i + 1} ${u.status}`);
       });
     }
+    expect(bad).toEqual([]);
+  });
+});
+
+describe("this layer's own workflows and composite actions are SHA-pinned (bean a1p9)", () => {
+  // Rooted at this layer, not the checkout above it: the files a caller runs
+  // with its write token are .github/workflows/*.yml and the composite
+  // actions under .github/actions/, and both live here.
+  test("every third-party uses: here carries a full SHA and a # <ref>", () => {
+    const gh = join(import.meta.dir, "..", ".github");
+    const files = readdirSync(join(gh, "workflows")).filter((n) => /\.ya?ml$/.test(n)).map((n) => join(gh, "workflows", n));
+    for (const d of readdirSync(join(gh, "actions"))) {
+      for (const n of ["action.yml", "action.yaml"]) if (existsSync(join(gh, "actions", d, n))) files.push(join(gh, "actions", d, n));
+    }
+    const bad: string[] = [];
+    for (const f of files) {
+      readFileSync(f, "utf-8").split("\n").forEach((line, i) => {
+        const u = parseUses(line);
+        if (u && !u.firstParty && !u.pinned) bad.push(`${f}:${i + 1} ${u.status}`);
+      });
+    }
+    expect(files.length).toBeGreaterThan(0);
     expect(bad).toEqual([]);
   });
 });

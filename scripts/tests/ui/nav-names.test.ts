@@ -35,18 +35,29 @@ import {
   sightingsFromNavHtml,
   templateFindings,
 } from "../../check-nav-names.js";
+import { audit as auditViewerNav } from "../../check-viewer-nav.js";
+import { siteNotBuilt } from "../../../test/support/checkout.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..", "..");
 const INSTANCE = join(REPO, "cat-harness");
 const SITE = join(INSTANCE, siteDirFor(INSTANCE));
 const SCRIPT = join("cat-harness-tools", "scripts", "check-nav-names.ts");
 
-/** The railed viewer pages `check:viewer-nav` counts, read off its committed sidecar. */
+/**
+ * Standing alone, whether the two BUILT surfaces the check reads are absent:
+ * `_data/harness.json` and the generated sidebar include are written at
+ * publish and gitignored, so a fresh clone has neither (bean w1gy F18).
+ */
+const NOT_BUILT = (): boolean =>
+  siteNotBuilt(
+    "the harness data and the generated sidebar include the site build writes at publish (gitignored)",
+    join(SITE, "_data", "harness.json"),
+    join(SITE, "_includes", "generated", "navbar-footer.html"),
+  );
+
+/** The railed viewer pages `check:viewer-nav` counts, computed directly from the site. */
 function railedCount(): number {
-  const qa = JSON.parse(readFileSync(join(INSTANCE, "test", "results", "viewer-nav", "viewer-nav.qa.json"), "utf-8")) as {
-    totals?: { railed?: number };
-  };
-  return qa.totals?.railed ?? -1;
+  return auditViewerNav(SITE, REPO).totals.railed;
 }
 
 /** Where {@link siteCopy} writes its synthetic railed page, under the copy's site. */
@@ -102,13 +113,13 @@ function writeRail(site: string, label: string): void {
 describe("the live surfaces", () => {
   const r = checkNavNames(REPO, SITE);
 
-  test("every destination carries one name", () => {
+  test.skipIf(NOT_BUILT())("every destination carries one name", () => {
     expect(r.undetermined).toBeUndefined();
     expect(r.conflicts).toEqual([]);
     expect(r.templates).toEqual([]);
   });
 
-  test("the run read what it claims to have compared", () => {
+  test.skipIf(NOT_BUILT())("the run read what it claims to have compared", () => {
     expect(r.read.harnessData).toBe(true);
     expect(r.read.include).toBe(true);
     expect(r.read.stickies).toBe(true);
@@ -122,7 +133,7 @@ describe("the live surfaces", () => {
     expect(r.destinations).toBeGreaterThan(20);
   });
 
-  test("`--check` passes as committed, sidecar included", () => {
+  test.skipIf(NOT_BUILT())("`--check` passes as committed, sidecar included", () => {
     const p = spawnSync("bun", ["run", SCRIPT, "--check"], { cwd: REPO, encoding: "utf-8" });
     expect(`${p.stdout}${p.stderr}`).toContain("every destination carries one name");
     expect(p.status).toBe(0);
@@ -130,7 +141,7 @@ describe("the live surfaces", () => {
 });
 
 describe("a planted second name fails", () => {
-  test("in the DATA: one tile renamed", () => {
+  test.skipIf(NOT_BUILT())("in the DATA: one tile renamed", () => {
     const c = siteCopy();
     const path = join(c.site, "_data", "harness.json");
     const d = JSON.parse(readFileSync(path, "utf-8")) as { tiles: { id: string; title: string; href?: string }[] };
@@ -147,7 +158,7 @@ describe("a planted second name fails", () => {
     expect(hit!.names.map((n) => n.label)).toEqual(["Skills", "Skills — cat-harness"]);
   });
 
-  test("on the RAIL: one row's label changed in a viewer page", () => {
+  test.skipIf(NOT_BUILT())("on the RAIL: one row's label changed in a viewer page", () => {
     const c = siteCopy();
     // Unplanted, the synthetic rail agrees with the data.
     const dest = methodologiesHref(c.site);
@@ -160,7 +171,7 @@ describe("a planted second name fails", () => {
     expect(hit!.names.map((n) => n.label).sort()).toEqual(["Methodologies", "methodology"]);
   });
 
-  test("in the TEMPLATE: a landing anchor printing the kind word", () => {
+  test.skipIf(NOT_BUILT())("in the TEMPLATE: a landing anchor printing the kind word", () => {
     const c = siteCopy();
     const tpl = join(c.site, "_includes", "harness_details.html");
     const text = readFileSync(tpl, "utf-8");

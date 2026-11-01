@@ -160,6 +160,24 @@ describe("where a checklist is committed (owner, 2026-10-14: commit them, in the
     expect(p.get(c.below)!.out.startsWith(join(c.root, "b") + "/")).toBe(false);
   });
 
+  test("an instance the harness does not name is still below it if it does not reach it (cat-harness#787, bean w1gy)", () => {
+    const root = mkdtempSync(join(tmpdir(), "bpmn-checklist-place-"));
+    dirs.push(root);
+    const inst = (name: string, needs: string[]) => {
+      mkdirSync(join(root, name, "processes"), { recursive: true });
+      writeFileSync(join(root, name, `${name}.json`), JSON.stringify({ name, needs }));
+    };
+    inst("bootstrap", []);
+    inst("bootstrap-tools", ["bootstrap"]);
+    inst("cat-harness", ["bootstrap"]);
+    inst("cat-harness-tools", ["cat-harness", "bootstrap-tools"]);
+    const src = join(root, "bootstrap-tools", "processes", "r.bpmn");
+    writeFileSync(src, XML());
+    const harness = join(root, "cat-harness");
+    const p = placementOf([src], root, harness);
+    expect(p.get(src)).toEqual({ out: join(defaultOutDir(harness), "r.checklist.md"), label: "bootstrap-tools/processes/r.bpmn" });
+  });
+
   test("the cited source names the instance, so the text is the same wherever the instance is checked out", async () => {
     const c = checkout();
     const { files } = await renderAll([c.above], c.root, { harnessRoot: c.harness });

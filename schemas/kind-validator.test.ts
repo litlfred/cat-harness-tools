@@ -274,6 +274,37 @@ describe("instance-qualified references (bean quda)", () => {
     expect(rootOf(undefined, here)).toBe(here);
   });
 
+  test("the running layer's own name resolves where no sibling search reaches it (bean w1gy)", async () => {
+    const { rootOf } = await import("./kg/kind-validator.ts");
+    const toolsRoot = resolve(import.meta.dir, "..");
+    // An instance that is its own checkout: `siblingScopeFor` searches no
+    // siblings for it (ruling 68k7), which is the harness standing alone.
+    const alone = mkdtempSync(join(tmpdir(), "alone-"));
+    try {
+      mkdirSync(join(alone, ".git"));
+      writeFileSync(
+        join(alone, "alone.json"),
+        JSON.stringify({ $schema: "cat-harness-declaration/1.0.0", name: "alone", directories: [] }),
+      );
+      expect(rootOf("cat-harness-tools", alone)).toBe(toolsRoot);
+      expect(rootOf("litlfred/cat-harness-tools", alone)).toBe(toolsRoot);
+      expect(rootOf("alone", alone)).toBe(alone);
+      expect(rootOf("folio-assistant-core", alone)).toBeUndefined();
+    } finally {
+      rmSync(alone, { recursive: true, force: true });
+    }
+  });
+
+  test("the harness's slice validators, which name this layer, resolve (bean w1gy)", async () => {
+    for (const validator of [
+      "cat-harness-tools:scripts/gen-slice-sqlite.ts#SliceIndexKind",
+      "cat-harness-tools:scripts/gen-slice-sqlite.ts#SliceManifestKind",
+    ]) {
+      const r = await resolveKindValidator("test-kind", INSTANCE, registryWith({ validator }));
+      expect(r.state).toBe("resolved");
+    }
+  });
+
   test("an escaping path is still refused — the name is the only way out", async () => {
     const { parseValidatorRef } = await import("./kg/kind-validator.ts");
     expect(() => parseValidatorRef("../folio-assistant-core/schemas/catalogue.ts#CatalogueSchema")).toThrow();
