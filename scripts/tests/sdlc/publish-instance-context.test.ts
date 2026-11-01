@@ -4,7 +4,7 @@
  * faked here, so no test reaches the network (bean folio-assistant-63q4).
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -204,5 +204,15 @@ describe("publish", () => {
     const { api } = fakeApi([["GET /repos/o/r/branches/gh-pages", { status: 403, json: { message: "Resource not accessible" } }]]);
     const out = await publishFile(api, { repo: "o/r", path: CTX_PATH, content: CTX });
     expect(out).toEqual({ kind: "failed", detail: expect.stringContaining("HTTP 403") });
+  });
+});
+
+describe("build --site", () => {
+  test("writes the context into a site being built, at the path it is served at", () => {
+    const site = join(root, "_site-src");
+    const r = Bun.spawnSync(["bun", "run", join(import.meta.dir, "../../publish-instance-context.ts"), "build", "--root", root, "--instance", "base", "--site", site]);
+    expect(r.exitCode).toBe(0);
+    const ctx = JSON.parse(readFileSync(join(site, "ns/context/v1.jsonld"), "utf-8")) as { "@context": Record<string, unknown> };
+    expect(ctx["@context"].skos).toBe("http://www.w3.org/2004/02/skos/core#");
   });
 });

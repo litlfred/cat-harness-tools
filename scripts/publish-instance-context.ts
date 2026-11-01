@@ -43,6 +43,7 @@
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/publish-instance-context.ts build --root fa --instance cat-harness --out ctx.jsonld [--report r.json]
+ *   bun run cat-harness-tools/scripts/publish-instance-context.ts build --root . --instance dth-hrh --site <site source dir>
  *   GITHUB_TOKEN=… bun run cat-harness-tools/scripts/publish-instance-context.ts publish --repo litlfred/cat-harness --file ctx.jsonld [--sha <commit>]
  *
  * @module scripts/publish-instance-context
@@ -340,8 +341,14 @@ async function main(argv: readonly string[]): Promise<number> {
   if (cmd === "build") {
     const instance = arg(argv, "--instance");
     const out = arg(argv, "--out");
-    if (!instance || !out) {
-      console.error("usage: publish-instance-context.ts build --root <index> --instance <name> --out <file> [--report <file>]");
+    // `--site <dir>`: write the context INTO a site being built, at the path
+    // it is served at (`<dir>/<path>`). A repository whose site an agent
+    // builds and publishes whole (`stage-local.ts`, smart-ra and dth-hrh)
+    // carries its context as one of the site's source steps, so the context
+    // is published with the site rather than by a separate workflow.
+    const site = arg(argv, "--site");
+    if (!instance || (!out && !site)) {
+      console.error("usage: publish-instance-context.ts build --root <index> --instance <name> (--out <file> | --site <dir>) [--report <file>]");
       return 2;
     }
     const outcome = buildOne(arg(argv, "--root") ?? ".", instance);
@@ -361,7 +368,9 @@ async function main(argv: readonly string[]): Promise<number> {
       for (const p of outcome.problems) console.error(`::error::${p}`);
       return 1;
     }
-    writeFileSync(out, outcome.context);
+    const file = out ?? join(site!, outcome.path);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, outcome.context);
     console.log(`built ${outcome.instance}'s context: ${outcome.documents} document(s), binds ${outcome.bound.join(" ") || "nothing"}; to be served at ${outcome.url}`);
     return 0;
   }
