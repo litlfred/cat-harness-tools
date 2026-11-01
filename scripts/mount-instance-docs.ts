@@ -346,8 +346,14 @@ export function toRootFor(route: string, fileUnder: string): string {
  * pages stay byte-identical when the rail's links, pages or counts change.
  */
 export function railDataWriter(siteAbs: string): (file: string, body: string) => void {
+  // What this writer has already put on disk: a pass emits the same shared
+  // file for most of its pages, and re-reading it each time to compare was a
+  // read per page (bean fwtz).
+  const written = new Map<string, string>();
   return (file, body) => {
+    if (written.get(file) === body) return;
     const abs = join(siteAbs, file);
+    written.set(file, body);
     if (existsSync(abs) && readFileSync(abs, "utf-8") === body) return;
     mkdirSync(dirname(abs), { recursive: true });
     writeFileSync(abs, body);
@@ -1467,6 +1473,29 @@ export function railStandalonePages(
 
   const railContext = new Map<string, { named: ReturnType<typeof railNames>; linkRoot: string; links: NavItem[]; homeLabel: string | undefined; harnesses: NavItem[] | undefined; mark: ReturnType<typeof instanceMark> }>();
   const navbarRow = foreign ? rebaseNavbarRow(navbarRowData(built), foreign.platformBase, foreign.instance) : navbarRowData(built);
+  // Worked out once per pass, not once per page (bean fwtz, the KG step): each
+  // depends only on the key it is stored under, and at 11,842 pages the
+  // per-page versions were most of the pass — `igSiteOwner` reads a declaration
+  // from disk, `pagesNav` rebuilds the whole page tree, and a writer made per
+  // page re-read the shared rail data file once per page.
+  const emitRailData = railDataWriter(siteAbs);
+  const igOwners = new Map<string, string | undefined>();
+  const igOwnerOf = (segment: string): string | undefined => {
+    if (!igOwners.has(segment)) igOwners.set(segment, igSiteOwner(segment));
+    return igOwners.get(segment);
+  };
+  const pageTrees = new Map<string, NavItem[] | undefined>();
+  const pagesFor = (toRoot: string, locale: string, scopeHref: string | undefined): NavItem[] | undefined => {
+    if (!pageTree) return undefined;
+    const key = `${toRoot}\0${locale}\0${scopeHref ?? ""}`;
+    if (pageTrees.has(key)) return pageTrees.get(key);
+    const treeKey = `${toRoot}\0${locale}\0`;
+    let tree = pageTrees.get(treeKey);
+    if (tree === undefined) pageTrees.set(treeKey, (tree = pagesNav(pageTree, { prefix: toRoot, locale }).items));
+    const pages = scopeHref !== undefined ? pagesUnder(tree, `${toRoot}${scopeHref}`) : tree;
+    pageTrees.set(key, pages);
+    return pages;
+  };
   const walk = (dir: string): void => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       if (e.name.startsWith(".")) continue;
@@ -1518,7 +1547,7 @@ export function railStandalonePages(
       // instance's page: its name, mark and graphs, not the platform's.
       const here = `/${rel.replace(/(^|\/)index\.html$/, "$1")}`;
       const scope = scopes.find((s) => here.startsWith(s.href));
-      const owner = foreign ? (foreign.instance ?? instanceName) : (igSiteOwner(rel.split("/")[0]!) ?? scope?.name ?? instanceName);
+      const owner = foreign ? (foreign.instance ?? instanceName) : (igOwnerOf(rel.split("/")[0]!) ?? scope?.name ?? instanceName);
       // Everything below depends on the owner and the page's depth alone, so it
       // is worked out once per pair, not once per page: `declaredGraphs` reads
       // the declarations, and at 11,834 pages that was most of the KG step (bean fwtz).
@@ -1563,8 +1592,7 @@ export function railStandalonePages(
       }
       const { named, linkRoot, links, homeLabel, harnesses, mark } = ctx;
       // The page tree, cut to the instance's own pages when the page is inside one.
-      const tree = pageTree ? pagesNav(pageTree, { prefix: toRoot, locale: pageLangOf(before) }).items : undefined;
-      const pages = tree && scope ? pagesUnder(tree, `${toRoot}${scope.href}`) : tree;
+      const pages = pagesFor(toRoot, pageLangOf(before), scope?.href);
       const railed = injectRailOnce(before, {
         instance: landed ? (homeLabel ?? named.harness ?? owner) : (named.harness ?? owner),
         ...(homeLabel ? { homeLabel } : {}),
@@ -1579,7 +1607,7 @@ export function railStandalonePages(
         links,
         ...(harnesses ? { harnesses } : {}),
         navbarRow,
-        emitRailData: railDataWriter(siteAbs),
+        emitRailData,
         // A folio's site: the icon row is the same on every page, so it is
         // written once beside the rail's data rather than into each page
         // (2026-10-10 — 849 KB of 1.76 MB of railed HTML on one folio).
