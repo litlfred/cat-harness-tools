@@ -32,7 +32,7 @@
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { applyLaneOrder, bestLaneOrder, crossings, diagonalEdges, diagramFit, edgesThroughShapes, fixTaskSize, headerOverflow, laneOrder, placeLabels, readDi, resizeShapes, straightenFlows, TASK_SIZE, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
+import { applyLaneOrder, bestLaneOrder, crossings, diagonalEdges, diagramFit, edgesThroughShapes, fixTaskSize, headerOverflow, laneOrder, placeLabels, readDi, resizeShapes, shapeOverlaps, straightenFlows, TASK_SIZE, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
 
 type Draw = (xml: string) => Promise<DrawnLabels | undefined>;
 
@@ -77,12 +77,12 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
   if (!/<(?:\w+:)?process\b/.test(xml)) continue;
   const shown = relative(process.cwd(), file);
   // What the layout fixes must not make worse: flows through boxes, flows
-  // crossing, slanted flows. If together they do, the file keeps its layout
+  // crossing, slanted flows, steps drawn on top of each other. If together they do, the file keeps its layout
   // and only its labels are moved.
   const original = xml;
   const harm = (x: string): number[] => {
     const di = readDi(x);
-    return [edgesThroughShapes(di).length, crossings(di).length, diagonalEdges(di).length];
+    return [edgesThroughShapes(di).length, crossings(di).length, diagonalEdges(di).length, shapeOverlaps(di).length];
   };
   const harmBefore = harm(xml);
   if (fix) {
@@ -132,7 +132,7 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
     return { xml: next, fixed: kept, left: all.fixed.length - kept.length };
   };
   const squared = (r: { fixed: string[]; left: number }): void => {
-    if (r.left > 0) console.log(`· ${shown}: ${r.left} task(s) left off ${TASK_SIZE.width} × ${TASK_SIZE.height}: resizing them would draw a flow through a box, a crossing or a slant (move the step or the flow)`);
+    if (r.left > 0) console.log(`· ${shown}: ${r.left} task(s) left off ${TASK_SIZE.width} × ${TASK_SIZE.height}: resizing them would draw a flow through a box, a crossing, a slant or two steps on top of each other (move the step or the flow)`);
     if (r.fixed.length > 0) console.log(`✓ ${shown}: ${r.fixed.length} task(s) drawn at ${TASK_SIZE.width} × ${TASK_SIZE.height}`);
   };
   if (fix) {
@@ -173,7 +173,7 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
       const r = square(original);
       xml = r.fixed.length > 0 && !worse(r.xml, harmBefore) ? r.xml : original;
       writeFileSync(file, xml);
-      console.log(`· ${shown}: the layout fixes would add flows through boxes, crossings or slants ` +
+      console.log(`· ${shown}: the layout fixes would add flows through boxes, crossings, slants or overlapping steps ` +
         `(${harmBefore.join("/")} → ${now.join("/")}); layout left as it is${xml === original ? "" : ", but for the square tasks"}, labels only`);
     }
   }
