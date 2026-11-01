@@ -226,6 +226,7 @@ import { buildQaResult, writeQaResult } from "./qa-results.js";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT, REPO_ROOT, resolveWorkingInstanceRoot, runnerRootFor } from "./lib/roots.ts";
 import { BUILDING_ENV } from "./qa-working-copy.ts";
+import { BUILD_TYPE_ENV, buildTypeOf } from "./lib/build-type.ts";
 
 /**
  * The instance being worked on — `resolveWorkingInstanceRoot` in
@@ -515,6 +516,12 @@ export interface Step {
    * does not run INSIDE a build of that copy — see {@link stepsToRun}.
    */
   readonly readsQaCopy?: true;
+  /**
+   * `derive:publish` runs this writer itself, after `uml:overview`, so in a
+   * PREVIEW's build of the QA working copy it is not run here as well (owner
+   * card Q-CONE-2 B, 2026-11-01: "no double builds"). See {@link stepsToRun}.
+   */
+  readonly builtAtPublish?: true;
 }
 
 /**
@@ -539,16 +546,19 @@ export const STEPS: readonly Step[] = [
   },
   {
     write: ["skills:docs"],
+    builtAtPublish: true,
     verify: ["skills:docs:check"],
     because: "the skill's published reference page",
   },
   {
     write: ["glossary:page"],
+    builtAtPublish: true,
     verify: ["check:glossary"],
     because: "the glossary page and its SKOS projection",
   },
   {
     write: ["auto:docs"],
+    builtAtPublish: true,
     verify: ["auto:docs:check"],
     because: "the generated docs index",
   },
@@ -559,6 +569,7 @@ export const STEPS: readonly Step[] = [
   },
   {
     write: ["lsi:viz"],
+    builtAtPublish: true,
     verify: ["lsi:viz:check"],
     because:
       "the LSI index's VIEWER PAGE, which `lsi:skills` above stales and nothing here regenerated until 2026-09-30. Measured: adding one skill left `cat-harness/docs/lsi/index.md` stale while this chain reported \"8 artefact(s) current\" — so the claim to be at a fixed point was false in exactly the way this chain exists to prevent, and it reddened `main` through `lsi:viz:check` in the Repository-gates job. The index and its page are two artefacts, and a chain that writes one and verifies only the other is a chain with a hole in it. " +
@@ -582,6 +593,7 @@ export const STEPS: readonly Step[] = [
   },
   {
     write: ["subgraph:jsonld"],
+    builtAtPublish: true,
     verify: ["subgraph:jsonld:check"],
     because:
       "a skill's BODY is a content-addressed payload its subgraph index points at, so editing it moves the hash " +
@@ -626,7 +638,21 @@ export function stepsToRun(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): { run: Step[]; deferred: Step[] } {
   if (env[BUILDING_ENV] !== "1") return { run: [...steps], deferred: [] };
-  return { run: steps.filter((s) => !s.readsQaCopy), deferred: steps.filter((s) => s.readsQaCopy) };
+  const later = (s: Step) => s.readsQaCopy === true || (s.builtAtPublish === true && previewBuild(env));
+  return { run: steps.filter((s) => !later(s)), deferred: steps.filter(later) };
+}
+
+/** Whether this is a PREVIEW build (`lib/build-type.ts`); anything else, or a refused value, is not. */
+function previewBuild(env: Readonly<Record<string, string | undefined>>): boolean {
+  const bt = buildTypeOf(env);
+  return "type" in bt && bt.type === "preview";
+}
+
+/** Why a deferred step is not run here. */
+export function deferredWhy(s: Step): string {
+  return s.readsQaCopy
+    ? `it reads the QA working copy this run is part of building; ${BUILDING_ENV}=1`
+    : `a preview's derive:publish runs ${s.write.join(" ")} after this build; ${BUILD_TYPE_ENV}=preview`;
 }
 
 /**
@@ -1065,7 +1091,7 @@ async function main(): Promise<number> {
   for (const s of deferred) {
     // Listed, not run: `ran: false`, never a pass (see {@link writeReport}).
     verdicts.push({ verify: s.verify.join(" "), because: s.because, ran: false });
-    if (!flags.json) console.log(`  – ${s.verify.join(" ")}  (not run: it reads the QA working copy this run is part of building; ${BUILDING_ENV}=1)`);
+    if (!flags.json) console.log(`  – ${s.verify.join(" ")}  (not run: ${deferredWhy(s)})`);
   }
   for (const s of byGates) {
     // Listed, not run here: this CI run's gates ask it over the same tree.

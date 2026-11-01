@@ -101,7 +101,8 @@ import { BUILDING_ENV } from "./qa-working-copy.ts";
 import { TEST_RUN_WRITERS } from "./test-run-compute.ts";
 import { mountedInstanceRoots } from "../schemas/kg/remote-mount.ts";
 import { artefactStub, instanceRootsIn, kgQaHomeFor, readDeclaration } from "../schemas/kg/cat-harness.ts";
-import { scriptTable } from "../schemas/sdlc/script-table.ts";
+import { scriptsOf, scriptTable } from "../schemas/sdlc/script-table.ts";
+import { coneMode, QaCone, straceWorks } from "./qa-cone.ts";
 import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 import { rootProfile, type RootProfile } from "./lib/root-gate-set.ts";
 import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
@@ -631,16 +632,23 @@ export function partitionWriters(
  * in this root (`lib/not-applicable.ts`): its reason is collected into
  * `notApplicable`, and it is judged neither empty nor failed.
  */
-function runWriter(repoRoot: string, w: QaWriter, notApplicable: NotApplicable[]): WriterRun {
+function runWriter(
+  repoRoot: string,
+  w: QaWriter,
+  notApplicable: NotApplicable[],
+  prefix: readonly string[] = [],
+  env: Record<string, string | undefined> = process.env,
+): WriterRun {
   const t = Date.now();
   if (w.run === "external") return { id: w.id, exit: 0, seconds: 0 };
   console.log(`::group::qa:refresh ${w.id} — bun run cat ${w.run.join(" ")}`);
   const reasonFile = join(tmpdir(), `qa-refresh-na-${process.pid}-${w.id.replace(/[^A-Za-z0-9._-]/g, "_")}.txt`);
   rmSync(reasonFile, { force: true });
-  const r = spawnSync("bun", ["run", "cat", ...w.run], {
+  const argv = [...prefix, "bun", "run", "cat", ...w.run];
+  const r = spawnSync(argv[0]!, argv.slice(1), {
     cwd: repoRoot,
     stdio: "inherit",
-    env: { ...process.env, [NOT_APPLICABLE_REASON_ENV]: reasonFile },
+    env: { ...env, [NOT_APPLICABLE_REASON_ENV]: reasonFile },
   });
   console.log("::endgroup::");
   if (r.status === NOT_APPLICABLE_EXIT) {
@@ -721,9 +729,20 @@ function main(argv: string[]): number {
   // Each restore is backed up first, so a wrong guess costs nothing: the file
   // as it stood is under build/qa-refresh-restored/<stamp>/<writer>/<path>.
   const backupRoot = join(repoRoot, "build", "qa-refresh-restored", new Date().toISOString().replace(/[:.]/g, "-"));
+  // The QA cone (owner card Q-CONE-2 B): main records each step's reads, a
+  // preview reruns only the steps whose reads changed (`qa-cone.ts`).
+  const cone = new QaCone(
+    repoRoot,
+    scriptsOf(repoRoot),
+    unbacked.filter((w): w is QaWriter & { run: readonly string[] } => w.run !== "external"),
+    coneMode(process.env, straceWorks),
+    // input-site: inert #47f67742 — the commit names the record; it is not an input of any step
+    process.env.GITHUB_SHA ?? commit,
+  );
+  if (cone.mode !== "off") console.log(`qa:refresh: QA cone ${cone.mode === "record" ? "RECORDING every step under strace" : "ON: a step whose recorded reads all match is put back from main"}`);
   const restored = runRestoring(
     unbacked,
-    (w) => runWriter(repoRoot, w, notApplicable),
+    (w) => (w.run === "external" ? runWriter(repoRoot, w, notApplicable) : cone.step({ id: w.id, run: w.run, writes: w.writes }, (prefix, env) => runWriter(repoRoot, w, notApplicable, prefix, env))),
     () => dirtyTracked(repoRoot),
     (paths) => git(repoRoot, ["checkout", "--", ...paths]),
     {
@@ -737,6 +756,7 @@ function main(argv: string[]): number {
       },
     },
   );
+  cone.finish();
   for (const r of restored) runs.push(r.run);
   const restore = restored.flatMap((r) => r.restored);
   if (restore.length) {
