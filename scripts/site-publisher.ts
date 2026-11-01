@@ -114,7 +114,10 @@ export function detectPublisher(workflows: Map<string, string>, publishers: read
   const found: Detected[] = [];
   const seen: string[] = [];
   for (const [caller, text] of [...workflows.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    for (const m of text.matchAll(/^\s*uses:\s*(\S+)\s*$/gm)) {
+    // A trailing YAML comment is allowed: a pinned SHA is commonly annotated
+    // with the branch it came from (`@<sha> # main`), and the reference is
+    // still the one token before it.
+    for (const m of text.matchAll(/^\s*uses:\s*(\S+)\s*(?:#.*)?$/gm)) {
       const u = parseUses(m[1]!);
       if (!u) continue;
       seen.push(`${caller} → ${u.file}`);
