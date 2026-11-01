@@ -97,6 +97,7 @@
  * interpolated `$BRANCH` into a string; this one builds nodes.
  */
 import { isVendoredViewer } from "./pdf-viewer.ts";
+import { BUILD_TYPES, type BuildType } from "./lib/build-type.ts";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join, relative } from "path";
 
@@ -142,6 +143,12 @@ export interface StagingFacts {
    * any run where the fetch failed.
    */
   mainPagesKnown: boolean;
+  /**
+   * The build type (`lib/build-type.ts`): `preview` borrows main's indexes,
+   * `full` rebuilt them. `pc:release freeze` refuses a `preview`. Absent when
+   * the caller did not say (a workflow from before the switch).
+   */
+  buildType?: BuildType;
   /**
    * Site-relative paths that exist in this build and NOT on main. The short
    * list; membership is checked in the browser. Empty and meaningless when
@@ -504,6 +511,14 @@ if (import.meta.main) {
   const site = required("site");
   const mainSite = required("main-site").replace(/\/+$/, "");
   const issue = flag("issue") || null;
+  // `--build-type` names what this build is; a caller that does not pass it
+  // writes no `buildType`, which `pc:release freeze` reads as "unstated".
+  const bt = flag("build-type");
+  if (bt && !(BUILD_TYPES as readonly string[]).includes(bt)) {
+    console.error(`--build-type is ${BUILD_TYPES.join(" or ")}, not ${JSON.stringify(bt)}`);
+    process.exit(2);
+  }
+  const buildType = (bt || undefined) as BuildType | undefined;
 
   // The publish ref's page list, one path per line, or absent. An EMPTY file
   // is not the same as no file: absent means the fetch failed and we do not
@@ -538,6 +553,7 @@ if (import.meta.main) {
     mainSite,
     beforeRef: flag("before-ref") || null,
     mainPagesKnown,
+    ...(buildType ? { buildType } : {}),
     newPages,
   };
 
