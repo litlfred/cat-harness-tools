@@ -77,9 +77,14 @@ describe("living deck: every claim about the KG still holds", () => {
   });
 
   test("slide 2 — the CDN decision is recorded, MADR-shaped, with at least two real options", () => {
-    const bean = readdirSync(join(REPO, "beans/defs")).find((f) => f.startsWith("folio-assistant-l9v6"));
-    expect(bean, "bean l9v6 (the CDN decision record) is missing").toBeDefined();
-    const body = read(join(REPO, "beans/defs", bean!));
+    // In the store or its archive view: a settled decision is archived with
+    // its bean, and an archived bean is still part of the store (cat-harness-tools#1248).
+    const dirs = [join(REPO, "beans/defs"), join(REPO, "beans/defs/archive")].filter((d) => existsSync(d));
+    const found = dirs
+      .map((d) => ({ d, f: readdirSync(d).find((f) => f.startsWith("folio-assistant-l9v6")) }))
+      .find((x) => x.f !== undefined);
+    expect(found, "bean l9v6 (the CDN decision record) is missing").toBeDefined();
+    const body = read(join(found!.d, found!.f!));
     const opts = body.split("## Considered options")[1]!.split("\n## ")[0]!.match(/^- /gm) ?? [];
     expect(opts.length).toBeGreaterThanOrEqual(2);
     expect(body).toContain("## Decision outcome");

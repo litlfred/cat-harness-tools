@@ -71,7 +71,7 @@ import { visualiserNavDeclaration, type VisualiserNavEntry } from "../../scripts
 import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
 import { readArchimate, type ArchimateModel } from "../schemas/archimate.ts";
 import { renderViewSvg, typeLabel } from "./render-view.ts";
-import { CONFIG_FILE, archimateDir, localDirOf, readConfig } from "./check-archimate.ts";
+import { CONFIG_FILE, archimateDir, configPath, localDirOf, readConfig } from "./check-archimate.ts";
 import { planSlugs } from "../schemas/slugs.ts";
 import { LAYER_ORDER, categoryOf, layerSlug, metamodelDot, metamodelMermaid, metamodelOf, pairAnchor, typeAnchor, typeName, verbOf, type Metamodel } from "../schemas/metamodel.ts";
 import { dataModelDot, dataModelMermaid, dataModelOf, dataModelPuml, sequencesMermaid, sequencesOf, sequencesPuml, type DataModel, type SequenceSet } from "../schemas/diagrams.ts";
@@ -577,6 +577,58 @@ function thinPage(
       ...(tail !== undefined ? { tail } : {}),
     }),
   };
+}
+
+/** A document figure the config maps to a view, with where the site holds its drawing and its page. */
+export interface FigureTarget {
+  /** The block holding the figure, relative to the instance root (`figures[].block`). */
+  block: string;
+  label: string;
+  model: string;
+  view: string;
+  /** The view's name in the model. */
+  viewName: string;
+  /** Site-relative: the view drawn as SVG, which `archimate-pages --out` writes. */
+  svg: string;
+  /** Site-relative, with a trailing slash: the view's page, at the declared route. */
+  page: string;
+}
+
+/**
+ * Every figure the instance's config maps to a view (`figures`), with the site
+ * paths `archimate-pages --out` writes for it, so a document site can show the
+ * live drawing in the figure's place and link its page. Empty when the
+ * instance holds no ArchiMate config or maps no figure. Reads only the models
+ * a figure names.
+ */
+export function figureTargets(instanceRoot: string): FigureTarget[] {
+  if (configPath(instanceRoot) === undefined) return [];
+  const config = readConfig(instanceRoot);
+  const figures = config.figures ?? [];
+  if (figures.length === 0) return [];
+  const dir = archimateDir(instanceRoot, config);
+  const declFile = findDeclarationFile(instanceRoot)!;
+  const decl = JSON.parse(readFileSync(join(instanceRoot, declFile), "utf8")) as Declaration;
+  const graphPath = localDirOf(instanceRoot, dir).replace(/\/$/, "");
+  const pageRoot = declaredPageRoot(decl, config.directory);
+  const out: FigureTarget[] = [];
+  for (const cm of config.models) {
+    const mine = figures.filter((f) => f.model === cm.id);
+    if (mine.length === 0) continue;
+    const model = readArchimate(readFileSync(join(dir, cm.file)));
+    const slugOf = planSlugs(model);
+    for (const f of mine) {
+      const v = model.views.find((x) => x.id === f.view);
+      if (v === undefined) continue; // check-archimate reports it
+      out.push({
+        ...f,
+        viewName: v.name,
+        svg: posix.join(graphPath, cm.id, "views", `${v.id}.svg`),
+        page: `${posix.join(pageRoot, cm.id, "views", slugOf.get(v.id) ?? v.id)}/`,
+      });
+    }
+  }
+  return out;
 }
 
 /**
