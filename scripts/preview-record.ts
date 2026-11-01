@@ -250,6 +250,7 @@ if (import.meta.main) {
     if (cmd === "write") {
       const builder = need("builder");
       if (builder !== "agent" && builder !== "ci") throw new Error(`--builder is agent or ci, not '${builder}'`);
+      // declared-path-literal: "site" is the name of a command-line flag (--site), not a path.
       const site = resolve(need("site"));
       const r = makeRecord({
         site, repo: resolve(flag("repo") ?? "."), slug: need("slug"), builder,
