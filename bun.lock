@@ -62,7 +62,7 @@
         "@playwright/test": "1.63.0",
         "bpmn-js": "18.31.0",
         "liquidjs": "^10.29.0",
-        "zod": "^4.6.5",
+        "zod": "^4.6.6",
       },
       "devDependencies": {
         "ajv": "^6.15.0",
