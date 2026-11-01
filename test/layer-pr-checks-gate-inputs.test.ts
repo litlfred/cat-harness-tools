@@ -108,15 +108,17 @@ describe("run-gates.py gate inputs", () => {
     }
   });
 
-  test("another layer's standalone rehearsal is skipped in layer mode, and runs in its own layer (smart-ra#213)", () => {
+  test("another layer's standalone rehearsal is skipped in any root but its own (smart-ra#213)", () => {
     const skip = (script: string, env: object, own: string[] | null) =>
       py("run-gates.py", `m.skip_reason(".", ${JSON.stringify(script)}, ${JSON.stringify(env)}, ${own === null ? "None" : JSON.stringify(own)})`);
-    const [kind, why] = skip("check:cat-harness-tools-standalone", { MODE: "layer" }, ["smart-ra"]) as [string, string];
-    expect(kind).toBe("layer-mode");
-    expect(why).toContain("cat-harness-tools's own CI");
-    // The layer's own run still judges it, as does the index and an unknown caller.
+    for (const mode of ["layer", "index"]) {
+      const [kind, why] = skip("check:cat-harness-tools-standalone", { MODE: mode }, ["smart-ra"]) as [string, string];
+      expect(kind).toBe("other-layer");
+      expect(why).toContain("cat-harness-tools's own CI");
+    }
+    // The layer's own run and an index that holds it as its own still judge it, as does an unknown caller.
     expect(skip("check:cat-harness-tools-standalone", { MODE: "layer" }, ["cat-harness-tools"])).toEqual([null, null]);
-    expect(skip("check:cat-harness-tools-standalone", { MODE: "index" }, ["smart-ra"])).toEqual([null, null]);
+    expect(skip("check:cat-harness-tools-standalone", { MODE: "index" }, ["cat-harness", "cat-harness-tools", "smart-base"])).toEqual([null, null]);
     expect(skip("check:cat-harness-tools-standalone", { MODE: "layer" }, null)).toEqual([null, null]);
   });
 

@@ -197,9 +197,12 @@ LAYER_MODE_SCRIPTS = {
 # `check:<layer>-standalone` rehearses <layer> with only its own closure laid
 # out beside it, so in another layer's index nothing the caller holds reaches
 # it: its answer is a function of the lower layers' pins and the runner. That
-# layer's own CI judges it (pr-tests.yml "Standalone (no new failures)"), so in
-# LAYER mode it runs only when the caller IS that layer (smart-ra#213, where
-# tools' list churned on every re-pin; cat-harness-tools#1299).
+# layer's own CI judges it (pr-tests.yml "Standalone (no new failures)"), so it
+# runs only in a root whose own instances include that layer (the layer itself,
+# or an index that holds it as its own). In any other root, in layer OR index
+# mode, it is skipped as `other-layer` (smart-ra#213, a folio index whose run
+# is not layer mode, where tools' list churned on every re-pin;
+# cat-harness-tools#1299).
 STANDALONE_GATE = re.compile(r"^check:(.+)-standalone$")
 
 
@@ -303,8 +306,8 @@ def skip_reason(root, script, env=None, own=None):
     if script in LAYER_MODE_SCRIPTS and (os.environ if env is None else env).get("MODE") == "layer":
         return "layer-mode", LAYER_MODE_SCRIPTS[script]
     m = STANDALONE_GATE.match(script)
-    if m and own is not None and m.group(1) not in own and (os.environ if env is None else env).get("MODE") == "layer":
-        return "layer-mode", (f"rehearses {m.group(1)} with only its own closure, which holds nothing of this caller; "
+    if m and own is not None and m.group(1) not in own:
+        return "other-layer", (f"rehearses {m.group(1)} with only its own closure, which holds nothing of this caller; "
                               f"{m.group(1)}'s own CI judges it")
     return None, None
 
