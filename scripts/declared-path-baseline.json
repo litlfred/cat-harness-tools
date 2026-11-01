@@ -74,6 +74,7 @@
     "scripts/partition/instance-rules.ts::schemas/sdlc/test-report.ts",
     "scripts/partition/instance-rules.ts::schemas/sdlc/test-run.ts",
     "scripts/partition/instance-rules.ts::schemas/sdlc/todo-graph.ts",
+    "scripts/partition/instance-rules.ts::schemas/tools/store-tool-results.ts",
     "scripts/partition/instance-rules.ts::schemas/tools/tool-id.ts",
     "scripts/partition/instance-rules.ts::schemas/tools/tool-invocation.ts",
     "scripts/partition/instance-rules.ts::schemas/tools/tool-run.ts",

@@ -37,7 +37,26 @@
  * - **could not determine** (2): the probe could not produce a summary, or no
  *   baseline is committed. Never rendered as held.
  *
- * Usage: bun run cat-harness-tools/scripts/check-standalone.ts --layer <instance> [--update | --measured-out <file>]
+ * ## In parts (`--part i/n`)
+ *
+ * cat-harness-tools' whole layer takes about 500 s standalone, the slowest
+ * single gate of a PR run (folio-assistant-core run 41287467368). `--part i/n`
+ * runs slice i of n of the layer's test files (`bun test --shard=i/n`), so CI
+ * runs the n parts as n gates on n machines (`run-gates.py` `SPLIT_GATES`).
+ * Together the parts run every test file once, and each part is judged on
+ * what it ran:
+ *
+ * - a named failure the baseline does not list is red, exactly as in a whole
+ *   run (a test runs in exactly one part, so no new failure is missed);
+ * - a listed test reported as now passing is one whose file ran in this part,
+ *   so the other parts' tests are not reported as fixed;
+ * - errors that carry no test name cannot be split by file, so a part is red
+ *   when it has any more of them than the whole baseline allows, never fewer
+ *   (`max(0, baseline unnamed)`).
+ *
+ * `--update` and `--measured-out` measure the whole layer; they refuse `--part`.
+ *
+ * Usage: bun run cat-harness-tools/scripts/check-standalone.ts --layer <instance> [--part <i/n>] [--update | --measured-out <file>]
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
@@ -70,7 +89,6 @@ export interface Judgement {
   measured?: Baseline;
 }
 
-/** Pure: the probe's result against the committed baseline. */
 /**
  * A failure's key with its test file relative to the layer. Bun names a file
  * by its absolute path when it sits outside the run's working directory, so the
@@ -88,11 +106,30 @@ export function layerRelativeKey(key: string, layer: string): string {
 export const refreshCommand = (layer: string): string =>
   `bun run cat-harness-tools/scripts/check-standalone.ts --layer ${layer} --update`;
 
-export function judge(probe: Probe, baseline: Baseline | undefined, layer?: string): Judgement {
+/** `i/n` with 1 <= i <= n, or undefined for anything else. */
+export function parsePart(value: string | undefined): { i: number; n: number } | undefined {
+  const m = /^(\d+)\/(\d+)$/.exec((value ?? "").trim());
+  if (!m) return undefined;
+  const i = Number(m[1]);
+  const n = Number(m[2]);
+  return i >= 1 && n >= 1 && i <= n ? { i, n } : undefined;
+}
+
+/**
+ * Pure: the probe's result against the committed baseline. With `part` set,
+ * the probe ran one slice of the test files and `probe.files` names them: see
+ * "In parts" in the module header for what changes.
+ */
+export function judge(probe: Probe, baseline: Baseline | undefined, layer?: string, part?: string): Judgement {
   if (probe.state !== "measured") {
     return { exit: STANDALONE_EXIT.undetermined, lines: [`could not determine: ${probe.note}`] };
   }
+  if (part && !probe.files) {
+    return { exit: STANDALONE_EXIT.undetermined, lines: [`could not determine: part ${part} ran, but which test files it ran is unknown`] };
+  }
   const key = (k: string): string => (layer ? layerRelativeKey(k, layer) : k);
+  const ranHere = part ? new Set(probe.files!.map(key)) : undefined;
+  const inPart = (k: string): boolean => !ranHere || ranHere.has(k.split(" > ")[0]!);
   if (baseline) baseline = { ...baseline, failing: baseline.failing.map(key) };
   const measured: Baseline = { failing: [...new Set(probe.findings.map(key))].sort(), failed: probe.count };
   if (!baseline) {
@@ -105,9 +142,10 @@ export function judge(probe: Probe, baseline: Baseline | undefined, layer?: stri
   const before = new Set(baseline.failing);
   const now = new Set(measured.failing);
   const grew = measured.failing.filter((n) => !before.has(n));
-  const fixed = baseline.failing.filter((n) => !now.has(n));
+  const fixed = baseline.failing.filter((n) => !now.has(n) && inPart(n));
   const unnamedNow = measured.failed - measured.failing.length;
-  const unnamedBefore = baseline.failed - baseline.failing.length;
+  const unnamedWhole = baseline.failed - baseline.failing.length;
+  const unnamedBefore = part ? Math.max(0, unnamedWhole) : unnamedWhole;
 
   const lines: string[] = [];
   const shorter: string[] = [];
@@ -123,10 +161,11 @@ export function judge(probe: Probe, baseline: Baseline | undefined, layer?: stri
     lines.push(`${unnamedNow - unnamedBefore} more failure(s) that carry no test name (errors between tests): ${unnamedBefore} → ${unnamedNow}.`);
   }
   if (lines.length === 0) {
+    const where = part ? ` in part ${part} (${ranHere!.size} test file(s))` : "";
     const head =
-      fixed.length === 0
+      fixed.length === 0 && !part
         ? `held: ${measured.failed} failing standalone, exactly the baseline.`
-        : `held: ${measured.failed} failing standalone, none outside the baseline.`;
+        : `held: ${measured.failed} failing standalone${where}, none outside the baseline.`;
     return { exit: STANDALONE_EXIT.held, lines: [head, ...shorter], measured };
   }
   return { exit: STANDALONE_EXIT.grew, lines: [...lines, ...shorter], measured };
@@ -190,8 +229,19 @@ function main(argv: string[]): number {
     return STANDALONE_EXIT.undetermined;
   }
 
-  const probe = probeStandalone(repoRoot, name, decls);
+  const partArg = arg("--part", argv);
+  const part = partArg === undefined ? undefined : parsePart(partArg);
+  if (partArg !== undefined && !part) {
+    console.error(`--part takes i/n with 1 <= i <= n (got ${JSON.stringify(partArg)})`);
+    return STANDALONE_EXIT.undetermined;
+  }
   const out = arg("--measured-out", argv);
+  if (part && (out || argv.includes("--update"))) {
+    console.error("--update and --measured-out measure the whole layer; they do not take --part");
+    return STANDALONE_EXIT.undetermined;
+  }
+  const slice = part ? `${part.i}/${part.n}` : undefined;
+  const probe = probeStandalone(repoRoot, name, decls, slice ? { shard: slice } : {});
   if (out) {
     // CI measures base and head with this, and judges the pair against the
     // baseline in .github/scripts/compare-standalone.py: cat-harness main moves
@@ -201,7 +251,7 @@ function main(argv: string[]): number {
     console.log(`wrote ${out}: ${probe.state}${probe.state === "measured" ? `, ${probe.count} failing` : ` (${probe.note})`}`);
     return probe.state === "measured" ? STANDALONE_EXIT.held : STANDALONE_EXIT.undetermined;
   }
-  const verdict = judge(probe, readBaseline(name), name);
+  const verdict = judge(probe, readBaseline(name), name, slice);
   if (argv.includes("--update") && verdict.measured) {
     writeBaseline(name, verdict.measured);
     console.log(`wrote ${relative(repoRoot, BASELINE_PATH)} for ${name}: ${verdict.measured.failed} failing standalone.`);

@@ -103,6 +103,7 @@ export const ScriptNameSchema = z
   .describe("A package script name");
 
 import { RepoFullNameSchema } from "../kg/repo-full-name.js";
+import { BeanClaimCheckSchema, DrainQueueSchema, OpenWorkLookupSchema, SessionSweepSchema } from "./store-tool-results.js";
 export { RepoFullNameSchema };
 
 /** A pull/merge request number. */
@@ -792,6 +793,11 @@ export const TOOL_TYPES = {
   Port: PortSchema,
   DecisionFacts: DecisionFactsSchema,
   ProvActivity: ProvActivitySchema,
+  // The data store tools' typed results (owner, 2026-11-01, Q-DS-10 A).
+  BeanClaimCheck: BeanClaimCheckSchema,
+  DrainQueue: DrainQueueSchema,
+  OpenWorkLookup: OpenWorkLookupSchema,
+  SessionSweep: SessionSweepSchema,
 } as const;
 
 export type ToolTypeName = keyof typeof TOOL_TYPES;
