@@ -5459,6 +5459,7 @@ function declaredFromWithin(
     if (!existsSync(p)) continue;
     let nested: { directories?: Array<Record<string, unknown>> };
     try {
+      projectedRead(p, "nested-directories"); // only `directories` is used below
       nested = JSON.parse(readFileSync(p, "utf-8"));
     } catch {
       continue;
@@ -5572,6 +5573,7 @@ function promoteFromWithin(
     if (!existsSync(p)) continue;
     let nested: { directories?: Array<Record<string, unknown>> };
     try {
+      projectedRead(p, "nested-directories"); // only `directories` is used below
       nested = JSON.parse(readFileSync(p, "utf-8"));
     } catch {
       continue; // `check:harness-dirs` owns an unparseable declaration and says so
@@ -7257,6 +7259,7 @@ export function declaredKinds(
       const p = join(declaredKindsEntryRoot(root, d), candidate);
       if (!existsSync(p)) continue;
       try {
+        projectedRead(p, "nested-directories"); // only `directories` is used below
         const nested = JSON.parse(readFileSync(p, "utf-8")) as {
           directories?: Array<{ graphTypologies?: string[]; kinds?: string[] }>;
         };
@@ -7387,6 +7390,7 @@ function walkNested(
       }>;
     };
     try {
+      projectedRead(p, "nested-directories"); // only `directories` is used below
       nested = JSON.parse(readFileSync(p, "utf-8"));
     } catch {
       continue;
@@ -7465,6 +7469,7 @@ import "./folio-graph-typology.js";
 // 2026-09-23, "put glossary into" the content layer).
 import { ThemeRefSchema, type ThemeRef } from "../ui/theme";
 import { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, instanceRootsIn, isForeignCheckout, lockFilesIn } from "./instance-roots";
+import { projectedRead } from "../sdlc/read-projections";
 // Instance DISCOVERY lives in a leaf module (bean dmx1), so the graph-typology
 // registry can find each harness's declared `kinds/` without importing this
 // file, which imports the registry. Re-exported here so no caller moves.

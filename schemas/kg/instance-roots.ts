@@ -12,6 +12,7 @@
  */
 import { existsSync, readdirSync, readFileSync, type Dirent } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { projectedRead } from "../sdlc/read-projections.ts";
 
 /**
  * The REPOSITORY root that contains `instanceRoot` — the aggregate checkout.
@@ -127,6 +128,8 @@ export function findDeclarationFile(dir: string): string | undefined {
     if (stem.length === 0) continue;
     let raw: unknown;
     try {
+      // Only whether it parses and its `name` are used here. A caller that needs more reads the file again, and that open is not covered.
+      projectedRead(join(dir, entry), "declaration-name");
       raw = JSON.parse(readFileSync(join(dir, entry), "utf-8"));
     } catch {
       // UNPARSEABLE IS NOT ABSENT. Skipping it here would make "this instance

@@ -115,6 +115,7 @@ import {
   type PairIO,
 } from "./input-hash.ts";
 import { openTrace } from "../schemas/sdlc/input-trace.ts";
+import { isProjection, projectedState, type ProjectionName } from "../schemas/sdlc/read-projections.ts";
 import { collectTaskIo } from "./task-io.ts";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 
@@ -158,7 +159,21 @@ export interface GitCall {
  * `listed`: the read paths whose directory entries the run read (`getdents`).
  * A read directory NOT in it was only opened, so its state is {@link OPENED_DIR}.
  */
-export type ReadSet = { paths: string[]; git: GitCall[]; listed?: string[]; writes?: string[]; absentBefore?: string[]; rewritten?: string[] } | { undetermined: string };
+export type ReadSet =
+  | {
+      paths: string[];
+      git: GitCall[];
+      listed?: string[];
+      writes?: string[];
+      absentBefore?: string[];
+      rewritten?: string[];
+      /** How many times each path asked for in `countOpens` was opened for reading. */
+      opened?: Record<string, number>;
+    }
+  | { undetermined: string };
+
+/** The calls that open a path, whose count {@link parseTrace} gives for `countOpens`. */
+const OPEN_CALLS = new Set(["open", "openat", "openat2"]);
 
 /**
  * Git subcommands the cone may REPLAY on a PR to ask git's view of the tree
@@ -421,6 +436,8 @@ export function parseTrace(
      * left there, so a rewrite that changed it makes the next run rerun.
      */
     rewriteAsInput?: (rel: string) => boolean;
+    /** Paths whose successful opens for reading are counted into `opened` (`read-projections.ts`). */
+    countOpens?: ReadonlySet<string>;
   } = {},
 ): ReadSet {
   const parsed = calls(text);
@@ -446,6 +463,7 @@ export function parseTrace(
   /** `collect` mode: paths the run wrote, and the first access to each path ("read" / "absent" / "write"). */
   const wrote = new Set<string>();
   const first = new Map<string, "read" | "absent" | "write">();
+  const opened = new Map<string, number>();
   for (const c of parsed) {
     const me = cell(c.pid);
     for (const a of c.args) {
@@ -519,6 +537,7 @@ export function parseTrace(
       if (rel === undefined || excluded(rel, gitPids.has(c.pid))) continue;
       if (write) writes.push(`${c.name} ${rel || "."}`);
       else paths.add(rel);
+      if (!write && opts.countOpens?.has(rel) && OPEN_CALLS.has(c.name) && /^\d/.test(c.ret)) opened.set(rel, (opened.get(rel) ?? 0) + 1);
       // A watch learns of every entry that comes and goes: judge it as a listing.
       if (c.name === "inotify_add_watch") listed.add(rel);
       if (opts.writes === "collect" && !first.has(rel)) first.set(rel, write ? "write" : /^-1 ENOENT\b/.test(c.ret) ? "absent" : "read");
@@ -549,7 +568,15 @@ export function parseTrace(
     if (paths.size > MAX_WRITER_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_WRITER_PATHS}` };
     const rewritten = [...wrote].filter((rel) => first.get(rel) === "read" && !opts.ownOutput?.(rel));
     const kept = [...wrote].filter((rel) => !rewritten.includes(rel));
-    return { paths: [...paths].sort(), git: [...git.values()], ...listedOf(listed, paths), writes: kept.sort(), absentBefore: absentBefore.sort(), ...(rewritten.length ? { rewritten: rewritten.sort() } : {}) };
+    return {
+      paths: [...paths].sort(),
+      git: [...git.values()],
+      ...listedOf(listed, paths),
+      writes: kept.sort(),
+      absentBefore: absentBefore.sort(),
+      ...(rewritten.length ? { rewritten: rewritten.sort() } : {}),
+      ...(opts.countOpens ? { opened: Object.fromEntries([...opts.countOpens].map((p) => [p, opened.get(p) ?? 0])) } : {}),
+    };
   }
   if (writes.length > 0) return { undetermined: `the check writes inside the checkout (${writes.slice(0, 3).join(", ")})` };
   if (paths.size > MAX_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_PATHS}` };
@@ -639,8 +666,23 @@ export function pathState(root: string, rel: string, digests: FileDigests, opts:
 export const OPENED_DIR = "dir";
 
 /** The state a read path is recorded with: a directory's listing only when the run read its entries. */
-export function readState(root: string, rel: string, digests: FileDigests, listed: ReadonlySet<string> | undefined): string {
+export function readState(root: string, rel: string, digests: FileDigests, listed: ReadonlySet<string> | undefined, projection?: ProjectionName): string {
+  if (projection !== undefined) {
+    const p = projectedFileState(root, rel, projection);
+    if (p !== undefined) return p;
+  }
   return pathState(root, rel, digests, { listed: listed === undefined || listed.has(rel) });
+}
+
+/** A regular file's {@link projectedState}, or `undefined` for anything else (which is then judged in full). */
+function projectedFileState(root: string, rel: string, projection: ProjectionName): string | undefined {
+  const abs = rel === "" ? root : join(root, rel);
+  try {
+    if (!lstatSync(abs).isFile()) return undefined;
+    return projectedState(projection, readFileSync(abs, "utf-8"));
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -649,6 +691,12 @@ export function readState(root: string, rel: string, digests: FileDigests, liste
  * still a directory", anything else in full.
  */
 export function stateLike(root: string, rel: string, digests: FileDigests, recorded: string): string {
+  if (recorded.startsWith("proj ")) {
+    const name = recorded.split(" ")[1] ?? "";
+    // A projection this version does not know cannot be recomputed: the full state never equals it, so the writer runs.
+    if (isProjection(name)) return projectedFileState(root, rel, name) ?? pathState(root, rel, digests);
+    return pathState(root, rel, digests);
+  }
   const opened = recorded === OPENED_DIR || recorded.endsWith(` -> ${OPENED_DIR}`);
   return pathState(root, rel, digests, { listed: !opened });
 }

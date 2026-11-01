@@ -39,11 +39,12 @@
  * answer against what the full build wrote.
  */
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 
 import { gitKey, gitState, MAX_TRACE_BYTES, parseTrace, pathState, readState, stateLike, STRACE_ARGS, TRACER_VERSION, type GitCall, type ReadSet } from "./ci-cone.ts";
 import { fingerprint, FileDigests, toolsLine } from "./input-hash.ts";
+import { projectedReads, type ProjectionName } from "../schemas/sdlc/read-projections.ts";
 
 /** Bump when the record's meaning changes; a record from another version is ignored, so every writer runs. */
 export const WRITER_RECORD_VERSION = 1;
@@ -162,11 +163,54 @@ export function tracedArgv(argv: readonly string[], log: string): string[] {
 }
 
 /** The trace at `log` as a read set, or why it cannot be one. */
-export function readTraceFile(log: string, root: string, ownOutput?: (rel: string) => boolean, rewriteAsInput?: (rel: string) => boolean): ReadSet {
+export function readTraceFile(
+  log: string,
+  root: string,
+  ownOutput?: (rel: string) => boolean,
+  rewriteAsInput?: (rel: string) => boolean,
+  countOpens?: ReadonlySet<string>,
+): ReadSet {
   if (!existsSync(log)) return { undetermined: "no trace was written" };
   const size = statSync(log).size;
   if (size > MAX_TRACE_BYTES) return { undetermined: `the trace is ${size} bytes, more than ${MAX_TRACE_BYTES}` };
-  return parseTrace(readFileSync(log, "utf-8"), root, { writes: "collect", ownOutput, rewriteAsInput });
+  return parseTrace(readFileSync(log, "utf-8"), root, { writes: "collect", ownOutput, rewriteAsInput, ...(countOpens ? { countOpens } : {}) });
+}
+
+/** A run's projected reads (`read-projections.ts`), keyed by repository-relative path. */
+export type ProjectedReads = ReadonlyMap<string, { name: ProjectionName | undefined; count: number }>;
+
+/** The projected-read lines of a run's input trace, as {@link ProjectedReads} under `root`. Paths outside it are dropped. */
+export function projectedReadsOf(lines: readonly string[], root: string): ProjectedReads {
+  const roots = [...new Set([resolve(root), realpathOr(root)])];
+  const out = new Map<string, { name: ProjectionName | undefined; count: number }>();
+  for (const [abs, v] of projectedReads(lines)) {
+    const r = roots.find((x) => abs.startsWith(`${x}/`));
+    if (r === undefined) continue;
+    const rel = abs.slice(r.length + 1);
+    const prev = out.get(rel);
+    out.set(rel, prev === undefined ? v : { name: prev.name === v.name ? v.name : undefined, count: prev.count + v.count });
+  }
+  return out;
+}
+
+function realpathOr(p: string): string {
+  try {
+    return realpathSync(p);
+  } catch {
+    return resolve(p);
+  }
+}
+
+/**
+ * The projection a path is recorded through, or `undefined`: only when every
+ * open of it in the trace was reported as projected, under one projection.
+ */
+export function projectionFor(rel: string, reads: ReadSet, projected: ProjectedReads | undefined): ProjectionName | undefined {
+  if (projected === undefined || "undetermined" in reads) return undefined;
+  const p = projected.get(rel);
+  if (p?.name === undefined) return undefined;
+  const opens = reads.opened?.[rel];
+  return opens !== undefined && opens <= p.count ? p.name : undefined;
 }
 
 /**
@@ -183,6 +227,8 @@ export function writerRecordOf(a: {
   reached: string | undefined;
   root: string;
   digests: FileDigests;
+  /** The run's projected reads; a path every open of which was reported is recorded through its projection. */
+  projected?: ProjectedReads;
   /** Answers a git call now; tests replace it. */
   git?: (root: string, c: GitCall) => string;
 }): WriterRecord | { none: string } {
@@ -195,7 +241,7 @@ export function writerRecordOf(a: {
   // input: a skipped writer's outputs are put back from the published site.
   const reads: Record<string, string> = {};
   const listed = new Set(a.reads.listed ?? []);
-  for (const p of a.reads.paths) reads[p] = readState(a.root, p, a.digests, listed);
+  for (const p of a.reads.paths) reads[p] = readState(a.root, p, a.digests, listed, projectionFor(p, a.reads, a.projected));
   const outputs: Record<string, string> = {};
   for (const p of a.reads.writes ?? []) {
     const s = pathState(a.root, p, a.digests);
