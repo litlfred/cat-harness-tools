@@ -10,7 +10,7 @@
  * ```sh
  * bun run cat-harness-tools/scripts/preview-record.ts write   --site _site --repo . --slug <slug> --builder agent|ci [--base <sha>] [--run <url>]
  * bun run cat-harness-tools/scripts/preview-record.ts match   --record <file> --repo . [--tree <sha>]
- * bun run cat-harness-tools/scripts/preview-record.ts compare --claimed <file> --rebuilt <file> [--out <file>]
+ * bun run cat-harness-tools/scripts/preview-record.ts compare --claimed <file> --rebuilt <file> [--slug <slug>] [--run <url>] [--out <file>]
  * ```
  *
  * ## Why (owner, 2026-11-01, Q-SPD-9 B and Q-SPD-9b A; folio-assistant#2881)
@@ -222,7 +222,7 @@ export function comparisonText(c: Comparison, o: { slug: string; run?: string; l
   const limit = o.limit ?? 20;
   const head = "<!-- preview-build-verify -->\n";
   const run = o.run ? `\n\nCI run: ${o.run}` : "";
-  if (c.incomparable) return `${head}**Agent-built preview not verified:** ${c.incomparable}. CI's own build replaced \`STAGING/${o.slug}/\`.${run}\n`;
+  if (c.incomparable) return `${head}**Agent-built preview was stale:** ${c.incomparable}, so the base or the branch moved after the agent built it. CI's build of the current tree replaced \`STAGING/${o.slug}/\`. The agent build was not judged.${run}\n`;
   if (c.same) return `${head}**Agent-built preview verified.** A full CI rebuild of the same tree produced the same files. \`STAGING/${o.slug}/\` stays as the agent built it.${run}\n`;
   const list = (title: string, ps: string[]) => (ps.length === 0 ? "" : `\n\n${title} (${ps.length}):\n${ps.slice(0, limit).map((p) => `- \`${p}\``).join("\n")}${ps.length > limit ? `\n- … and ${ps.length - limit} more` : ""}`);
   return `${head}**Agent-built preview differed from CI's rebuild, so CI's build replaced it.** \`STAGING/${o.slug}/\` now shows the CI build.`
@@ -268,12 +268,14 @@ if (import.meta.main) {
       console.log(`preview-record: ${r.builder} record, tree ${r.tree.slice(0, 12)}; this tree ${tree.slice(0, 12)}: ${ok ? "match" : "no match"}`);
       process.exit(ok ? 0 : 1);
     } else if (cmd === "compare") {
-      // Exit 0 when the two builds produced the same files, 1 when not.
+      // Exit 0 when the two builds produced the same files, 1 when not, 3 when
+      // they were built from different trees and so cannot be compared (the
+      // base moved, or a newer push): not a wrong build, a stale one.
       const c = compareRecords(readRecord(need("claimed")), readRecord(need("rebuilt")));
       const text = comparisonText(c, { slug: flag("slug") ?? "?", ...(flag("run") ? { run: flag("run")! } : {}) });
       if (flag("out")) writeFileSync(flag("out")!, text);
       console.log(c.same ? "preview-record: same files" : `preview-record: ${c.incomparable ?? `${c.changed.length} changed, ${c.onlyClaimed.length} only in the claimed build, ${c.onlyRebuilt.length} only in the rebuild`}`);
-      process.exit(c.same ? 0 : 1);
+      process.exit(c.same ? 0 : c.incomparable ? 3 : 1);
     } else {
       console.error("usage: preview-record.ts write|match|compare (see the module header)");
       process.exit(2);

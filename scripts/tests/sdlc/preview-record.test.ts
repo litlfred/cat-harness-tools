@@ -60,6 +60,7 @@ describe("a record of what a preview build produced", () => {
     const c = compareRecords(a, { ...a, tree: "0".repeat(40) });
     expect(c.same).toBe(false);
     expect(c.incomparable).toContain("different trees");
+    expect(comparisonText(c, { slug: "s1" })).toContain("stale");
   });
   test("an empty build is refused, not recorded", () => {
     expect(() => makeRecord({ site: tree({ "staging.json": "1" }), repo: r, slug: "s1", builder: "agent" })).toThrow("no files");
