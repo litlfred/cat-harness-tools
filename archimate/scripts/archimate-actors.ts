@@ -1,136 +1,218 @@
 #!/usr/bin/env bun
 /**
- * FHIR ActorDefinitions generated from an ArchiMate model: the Tool
+ * The model's actor tags checked against the IG's ActorDefinitions: the Tool
  * `archimate-actors`.
  *
- * Owner, 2026-10-31: *"i dont really like native UML, rather derived"*, then
- * *"make mechanical tools as parts of skills/processes"* (smart-ra#166 D4).
- * An IG's `actors.fsh` restated, by hand, systems the architecture model
- * already holds. Here the model says which of its boxes is an actor, and the
- * FSH is generated from it.
+ * Owner, 2026-11-01 (card Q-ACT-2, option A, smart-ra#166 D4): **actors come
+ * first.** A DAK's L2 generic personas become the IG's L3 FHIR
+ * ActorDefinitions, and the architecture realizes them (SMART Guidelines;
+ * the DPI-H RA §4.3.2). So the ActorDefinitions are written in the IG, and an
+ * ArchiMate model only points at them. This Tool never writes an
+ * ActorDefinition or any FSH: it checks the pointers.
  *
- * ## Which boxes are actors: the model says, by a tag
+ * ## How a box points at an actor: a tag
  *
- * An element is an actor when it carries the Archi property `fhir-actor`,
- * whose value is the FSH instance id (`ClientRegistry`). Nothing is guessed
- * from names: which box is which actor is the model authors' call, made in
- * Archi. The element gives the ActorDefinition its name, title and
- * description (its documentation), its type (`system` for an application or
- * technology element, `person` for a business actor or role), and a
- * `reference` back to the element's IRI.
+ * An element realizes an actor when it carries the Archi property
+ * `fhir-actor`, whose value is the actor's canonical URL
+ * (`http://smart.who.int/ra/ActorDefinition/ClientRegistry`). It is the same
+ * pattern as the `skosConcept` property. Nothing is matched by name: which
+ * box realizes which actor is the model authors' call, made in Archi. One
+ * element may carry several tags, and one actor may be realized by several
+ * elements.
  *
- * ## What it prints
+ * ## What fails
  *
- *   bun run cat archimate:actors --instance <dir> --model <id>                 # the FSH, on stdout
- *   bun run cat archimate:actors --instance <dir> --model <id> --out <file>    # write it
- *   bun run cat archimate:actors --instance <dir> --model <id> --out <file> --check   # exit 1 when <file> is stale
- *   ... --against <hand-written .fsh>   # list its ActorDefinitions no tagged element generates yet
+ * - a value that is not a canonical URL ending in `/ActorDefinition/<id>`;
+ * - a tag on an element kind that cannot be an actor (a data object, a goal);
+ * - a tag that resolves to no ActorDefinition of the IG;
+ * - a type mismatch: a `#person` actor on an application or technology
+ *   element, or a `#system` actor on a business actor or role.
  *
- * `--against` is how a hand-written file is retired one actor at a time: it
- * names the actors still written by hand, so the authors know which boxes to
- * tag. It never fails the run.
+ * An ActorDefinition that no element realizes is reported as a warning, and
+ * fails the run under `--strict`.
+ *
+ *   bun run cat archimate:actors --instance <dir> --model <id> [--ig <dir>] [--strict] [--json]
+ *
+ * `--ig` is the directory holding `sushi-config.yaml` (default: the
+ * instance). `--json` prints element → actors and actor → elements, for the
+ * pages' back-links.
  *
  * @module cat-harness/archimate/scripts/archimate-actors
  * @covers archimate
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { readArchimate, type ArchimateElement, type ArchimateModel } from "../schemas/archimate.ts";
-import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
-import { archimateDir, localDirOf, readConfig } from "./check-archimate.ts";
-import { iriBaseOf } from "./gen-archimate-pages.ts";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+import { readArchimate, type ArchimateModel } from "../schemas/archimate.ts";
+import { archimateDir, readConfig } from "./check-archimate.ts";
 
 export const TOOL_ID = "archimate-actors";
-/** The Archi property that makes an element an actor; its value is the FSH instance id. */
+/** The Archi property by which an element realizes an actor; its value is the actor's canonical URL. */
 export const ACTOR_PROPERTY = "fhir-actor";
-const FSH_ID = /^[A-Za-z][A-Za-z0-9.-]{0,63}$/;
+export type ActorType = "system" | "person";
 
-/** What ActorDefinition.type an element type gives, or undefined when it cannot be an actor. */
-export function actorTypeOf(elementType: string): "system" | "person" | undefined {
-  if (/^Application(Component|Collaboration|Interface)$|^(Node|Device|SystemSoftware|TechnologyCollaboration)$/.test(elementType)) return "system";
-  if (/^Business(Actor|Role|Collaboration)$|^Stakeholder$/.test(elementType)) return "person";
+/** A canonical URL of an ActorDefinition: absolute http(s), path ending `/ActorDefinition/<id>`, an optional `|version`. */
+const ACTOR_CANONICAL = /^https?:\/\/[^\s|/]+(?:\/[^\s|/]+)*\/ActorDefinition\/[A-Za-z0-9.-]{1,64}(?:\|[^\s|]+)?$/;
+
+/** Which actor type an element kind can realize, or undefined when it cannot be an actor. */
+export function actorTypeOf(elementType: string): ActorType | undefined {
+  if (/^Application(Component|Collaboration|Interface)$|^(Node|Device|SystemSoftware|TechnologyCollaboration|TechnologyInterface)$/.test(elementType)) return "system";
+  if (/^Business(Actor|Role|Collaboration)$/.test(elementType)) return "person";
   return undefined;
 }
 
-export interface TaggedActor {
-  /** The FSH instance id, the property's value. */
+/** One ActorDefinition of the IG. */
+export interface IgActor {
   id: string;
-  element: ArchimateElement;
-  type: "system" | "person";
+  /** Its canonical URL: the resource's `url` when given, else `<IG canonical>/ActorDefinition/<id>`. */
+  url: string;
+  type?: ActorType;
+  /** The file it is defined in, relative to the IG directory. */
+  source: string;
 }
 
-/** The model's tagged actors, and what is wrong with any tag. Sorted by id. */
-export function actorsOf(model: ArchimateModel): { actors: TaggedActor[]; problems: string[] } {
-  const actors: TaggedActor[] = [];
-  const problems: string[] = [];
-  const seen = new Map<string, string>();
-  for (const e of model.elements) {
-    for (const p of e.properties.filter((x) => x.key === ACTOR_PROPERTY)) {
-      const id = p.value.trim();
-      const type = actorTypeOf(e.type);
-      if (!FSH_ID.test(id)) problems.push(`${e.id} "${e.name}": ${ACTOR_PROPERTY}="${p.value}" is not an FSH instance id (a letter, then letters, digits, . or -)`);
-      else if (type === undefined) problems.push(`${e.id} "${e.name}": a ${e.type} cannot be an actor (an application or technology element, or a business actor or role)`);
-      else if (seen.has(id)) problems.push(`${e.id} "${e.name}": ${ACTOR_PROPERTY}="${id}" is already on ${seen.get(id)}`);
-      else {
-        seen.set(id, e.id);
-        actors.push({ id, element: e, type });
+/** The IG's canonical, from `sushi-config.yaml`. */
+export function igCanonical(sushiConfig: string): string | undefined {
+  const m = /^canonical:\s*["']?([^"'\s#]+)["']?\s*(?:#.*)?$/m.exec(sushiConfig);
+  return m?.[1].replace(/\/$/, "");
+}
+
+/**
+ * FSH with its comments removed and its multi-line strings blanked, so a
+ * description's lines are not read as rules. One-line strings stay: an
+ * `* id` or `* url` value is one. A `//` after a `:` is a URL, not a comment.
+ */
+function withoutLongStrings(fsh: string): string {
+  return fsh.replace(/"""[\s\S]*?"""|"(?:[^"\\]|\\.)*"|\/\*[\s\S]*?\*\/|(?<!:)\/\/[^\n]*/g, (t) => (t.startsWith('"') ? (t.includes("\n") ? '""' : t) : ""));
+}
+
+const FSH_ENTITY = /^(?=(?:Instance|Profile|Extension|Logical|Resource|ValueSet|CodeSystem|Invariant|RuleSet|Mapping|Alias)\s*:)/m;
+
+/** The ActorDefinition instances of one FSH file: id (`* id` when given), url (`* url` when given) and type. */
+export function fshActors(fsh: string, canonical: string, source: string): IgActor[] {
+  const out: IgActor[] = [];
+  for (const b of withoutLongStrings(fsh).split(FSH_ENTITY)) {
+    const head = /^Instance:\s*(\S+)/.exec(b);
+    if (!head || !/^InstanceOf:\s*ActorDefinition\s*$/m.test(b)) continue;
+    const id = /^\*\s*id\s*=\s*"([^"]+)"/m.exec(b)?.[1] ?? head[1];
+    const url = /^\*\s*url\s*=\s*"([^"]+)"/m.exec(b)?.[1] ?? `${canonical}/ActorDefinition/${id}`;
+    const type = /^\*\s*type\s*=\s*\S*#(system|person)\b/m.exec(b)?.[1] as ActorType | undefined;
+    out.push({ id, url, type, source });
+  }
+  return out;
+}
+
+/** An ActorDefinition from a FHIR JSON resource, or undefined when it is not one. */
+export function jsonActor(json: unknown, canonical: string, source: string): IgActor | undefined {
+  const r = json as { resourceType?: string; id?: string; url?: string; type?: string } | null;
+  if (r?.resourceType !== "ActorDefinition" || typeof r.id !== "string") return undefined;
+  const type = r.type === "system" || r.type === "person" ? r.type : undefined;
+  return { id: r.id, url: r.url ?? `${canonical}/ActorDefinition/${r.id}`, type, source };
+}
+
+function filesUnder(dir: string, ext: string): string[] {
+  if (!existsSync(dir)) return [];
+  const out: string[] = [];
+  for (const name of readdirSync(dir).sort()) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) out.push(...filesUnder(p, ext));
+    else if (name.endsWith(ext)) out.push(p);
+  }
+  return out;
+}
+
+/**
+ * The IG's ActorDefinitions: FSH in `input/fsh/**`, and FHIR JSON in
+ * `fsh-generated/resources/` and `input/resources/` when present. Keyed by
+ * canonical URL; an actor found in FSH and in its generated JSON is one.
+ */
+export function igActors(igDir: string): { canonical: string; actors: Map<string, IgActor> } {
+  const cfg = join(igDir, "sushi-config.yaml");
+  if (!existsSync(cfg)) throw new Error(`${cfg}: no sushi-config.yaml — pass --ig <dir> of the IG`);
+  const canonical = igCanonical(readFileSync(cfg, "utf8"));
+  if (canonical === undefined) throw new Error(`${cfg}: no canonical`);
+  const actors = new Map<string, IgActor>();
+  for (const f of filesUnder(join(igDir, "input", "fsh"), ".fsh")) {
+    for (const a of fshActors(readFileSync(f, "utf8"), canonical, relative(igDir, f))) actors.set(a.url, a);
+  }
+  for (const d of [join(igDir, "fsh-generated", "resources"), join(igDir, "input", "resources")]) {
+    for (const f of filesUnder(d, ".json")) {
+      let j: unknown;
+      try {
+        j = JSON.parse(readFileSync(f, "utf8"));
+      } catch {
+        continue;
       }
+      const a = jsonActor(j, canonical, relative(igDir, f));
+      if (a === undefined) continue;
+      const known = actors.get(a.url);
+      if (known === undefined) actors.set(a.url, a);
+      else known.type ??= a.type;
     }
   }
-  actors.sort((a, b) => a.id.localeCompare(b.id));
-  return { actors, problems };
+  return { canonical, actors };
 }
 
-/** A FSH string literal. */
-function fshString(s: string): string {
-  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+/** One element's tag, resolved. */
+export interface ActorLink {
+  element: string;
+  elementName: string;
+  elementType: string;
+  /** The canonical as tagged, without any `|version`. */
+  actor: string;
 }
 
-/** The ActorDefinitions, as FSH. `iri` gives an element's IRI, written as each actor's `reference`. */
-export function actorsFsh(actors: TaggedActor[], opts: { model: string; iri: (elementId: string) => string }): string {
-  const out = [
-    `// GENERATED by ${TOOL_ID} from ArchiMate model ${opts.model} — edit the model in Archi, not this file.`,
-    `// An element is an actor when it carries the property ${ACTOR_PROPERTY}; its value is the instance id.`,
-    "",
-  ];
-  for (const a of actors) {
-    const e = a.element;
-    out.push(
-      `Instance: ${a.id}`,
-      "InstanceOf: ActorDefinition",
-      "Usage: #definition",
-      `* name = ${fshString(e.name)}`,
-      `* title = ${fshString(e.name)}`,
-      ...(e.documentation?.trim() ? [`* description = ${fshString(e.documentation.trim())}`] : []),
-      "* status = #active",
-      "* experimental = false",
-      `* type = #${a.type}`,
-      `* reference[0] = ${fshString(opts.iri(e.id))}`,
-      "",
-    );
+export interface ActorCheck {
+  links: ActorLink[];
+  problems: string[];
+  /** ActorDefinitions no element realizes, by canonical. */
+  unrealized: string[];
+}
+
+/** Check a model's `fhir-actor` tags against the IG's ActorDefinitions. */
+export function checkActors(model: ArchimateModel, actors: Map<string, IgActor>): ActorCheck {
+  const links: ActorLink[] = [];
+  const problems: string[] = [];
+  for (const e of model.elements) {
+    for (const p of e.properties.filter((x) => x.key === ACTOR_PROPERTY)) {
+      const value = p.value.trim();
+      const where = `${e.id} "${e.name}" (${e.type})`;
+      const kind = actorTypeOf(e.type);
+      if (!ACTOR_CANONICAL.test(value)) {
+        problems.push(`${where}: ${ACTOR_PROPERTY}="${p.value}" is not an ActorDefinition canonical URL (<IG canonical>/ActorDefinition/<id>)`);
+        continue;
+      }
+      if (kind === undefined) {
+        problems.push(`${where}: a ${e.type} cannot realize an actor (an application or technology element, or a business actor or role)`);
+        continue;
+      }
+      const url = value.replace(/\|.*$/, "");
+      const actor = actors.get(url);
+      if (actor === undefined) {
+        problems.push(`${where}: ${ACTOR_PROPERTY}="${value}" names no ActorDefinition of the IG`);
+        continue;
+      }
+      if (actor.type !== undefined && actor.type !== kind) {
+        problems.push(`${where}: ${actor.id} is a #${actor.type} actor, and ${e.type} elements realize only #${kind} actors`);
+        continue;
+      }
+      links.push({ element: e.id, elementName: e.name, elementType: e.type, actor: url });
+    }
   }
-  return `${out.join("\n").trimEnd()}\n`;
+  const realized = new Set(links.map((l) => l.actor));
+  const unrealized = [...actors.keys()].filter((u) => !realized.has(u)).sort();
+  return { links, problems, unrealized };
 }
 
-/** ActorDefinition instance ids in a hand-written FSH file. */
-export function handWrittenActors(fsh: string): string[] {
-  const ids: string[] = [];
-  const re = /^Instance:\s*(\S+)\s*\nInstanceOf:\s*ActorDefinition\b/gm;
-  for (const m of fsh.matchAll(re)) ids.push(m[1]);
-  return ids;
-}
-
-/** One model's actors and the FSH for them, as the instance names them. */
-export function actorsFor(instanceRoot: string, modelId: string): { fsh: string; actors: TaggedActor[]; problems: string[] } {
-  const config = readConfig(instanceRoot);
-  const cm = config.models.find((m) => m.id === modelId);
-  if (cm === undefined) throw new Error(`no model "${modelId}" in ${config.models.map((m) => m.id).join(", ")}`);
-  const dir = archimateDir(instanceRoot, config);
-  const model = readArchimate(readFileSync(join(dir, cm.file)));
-  const decl = JSON.parse(readFileSync(join(instanceRoot, findDeclarationFile(instanceRoot)!), "utf8")) as Parameters<typeof iriBaseOf>[0];
-  const base = `${iriBaseOf(decl)}${localDirOf(instanceRoot, dir).replace(/\/$/, "")}/`;
-  const { actors, problems } = actorsOf(model);
-  return { fsh: actorsFsh(actors, { model: modelId, iri: (id) => `${base}${modelId}/elements/${id}.jsonld` }), actors, problems };
+/** element → actors and actor → elements, for the pages' back-links. */
+export function backLinks(check: ActorCheck, actors: Map<string, IgActor>) {
+  const elements: Record<string, { name: string; type: string; actors: string[] }> = {};
+  const byActor: Record<string, { id: string; type?: ActorType; elements: string[] }> = {};
+  for (const [url, a] of [...actors].sort(([x], [y]) => x.localeCompare(y))) byActor[url] = { id: a.id, type: a.type, elements: [] };
+  for (const l of check.links) {
+    (elements[l.element] ??= { name: l.elementName, type: l.elementType, actors: [] }).actors.push(l.actor);
+    byActor[l.actor].elements.push(l.element);
+  }
+  return { elements, actors: byActor };
 }
 
 function arg(name: string): string | undefined {
@@ -140,34 +222,34 @@ function arg(name: string): string | undefined {
 
 if (import.meta.main) {
   const instance = arg("instance");
-  const model = arg("model");
-  if (!instance || !model) {
-    console.error("usage: archimate-actors.ts --instance <dir> --model <id> [--out <file> [--check]] [--against <hand-written .fsh>]");
+  const modelId = arg("model");
+  if (!instance || !modelId) {
+    console.error("usage: archimate-actors.ts --instance <dir> --model <id> [--ig <dir>] [--strict] [--json]");
     process.exit(2);
   }
   const root = resolve(instance);
-  const { fsh, actors, problems } = actorsFor(root, model);
-  for (const p of problems) console.error(`✗ ${p}`);
-  const out = arg("out");
-  let stale = false;
-  if (out === undefined) process.stdout.write(fsh);
-  else if (process.argv.includes("--check")) {
-    const file = join(root, out);
-    stale = !existsSync(file) || readFileSync(file, "utf8") !== fsh;
-    console.log(stale ? `✗ ${out} is not what the model generates: run without --check` : `✓ ${out}: ${actors.length} actor(s), as the model generates`);
-  } else {
-    writeFileSync(join(root, out), fsh);
-    console.log(`wrote ${out}: ${actors.length} actor(s) from model ${model}`);
+  const config = readConfig(root);
+  const cm = config.models.find((m) => m.id === modelId);
+  if (cm === undefined) {
+    console.error(`no model "${modelId}" in ${config.models.map((m) => m.id).join(", ")}`);
+    process.exit(2);
   }
-  const against = arg("against");
-  if (against !== undefined) {
-    const generated = new Set(actors.map((a) => a.id));
-    const left = handWrittenActors(readFileSync(join(root, against), "utf8")).filter((id) => !generated.has(id));
+  const model = readArchimate(readFileSync(join(archimateDir(root, config), cm.file)));
+  const ig = igActors(resolve(arg("ig") ?? root));
+  const check = checkActors(model, ig.actors);
+  const strict = process.argv.includes("--strict");
+  const failed = check.problems.length > 0 || (strict && check.unrealized.length > 0);
+  if (process.argv.includes("--json")) {
+    const out = { tool: TOOL_ID, model: modelId, canonical: ig.canonical, ...backLinks(check, ig.actors), problems: check.problems, unrealized: check.unrealized };
+    process.stdout.write(`${JSON.stringify(out, null, 2)}\n`);
+  } else {
+    for (const p of check.problems) console.error(`✗ ${p}`);
+    const mark = strict ? "✗" : "!";
+    for (const u of check.unrealized) console.log(`${mark} ${ig.actors.get(u)!.id} (${u}): no element of model ${modelId} realizes it (tag a box ${ACTOR_PROPERTY}=<canonical> in Archi)`);
     console.log(
-      left.length
-        ? `! ${left.length} ActorDefinition(s) in ${against} still written by hand (tag a box ${ACTOR_PROPERTY}=<id> in Archi): ${left.join(", ")}`
-        : `✓ every ActorDefinition in ${against} is generated: the hand-written file can go`,
+      `${failed ? "✗" : "✓"} model ${modelId}: ${check.links.length} tag(s) resolved, ${check.problems.length} problem(s); ` +
+        `${ig.actors.size - check.unrealized.length} of ${ig.actors.size} ActorDefinition(s) realized`,
     );
   }
-  if (problems.length || stale) process.exit(1);
+  if (failed) process.exit(1);
 }
