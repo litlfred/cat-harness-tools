@@ -23,8 +23,10 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
-/** The environment variable naming the trace file of the run being recorded. */
-export const TRACE_ENV = "INPUT_HASH_TRACE";
+import { PROJECTED_LINE, TRACE_ENV } from "./read-projections.ts";
+
+/** The environment variable naming the trace file of the run being recorded (declared in `read-projections.ts`). */
+export { TRACE_ENV };
 
 let quiet = 0;
 
@@ -72,12 +74,15 @@ export function openTrace(root: string): {
    * (a writer run under strace sees a git child or a file load itself).
    */
   reached: (hashedRefs?: readonly string[], seen?: readonly string[]) => string | undefined;
+  /** The run's projected-read lines (`read-projections.ts`), kept when {@link reached} reads the trace. */
+  projected: () => readonly string[];
 } {
   // input-site: inert #394ac31a — names a build-output directory only to leave it out of a walk
   const dir = join(root, "build", "regen-cache", "traces");
   mkdirSync(dir, { recursive: true });
   const path = join(dir, `${process.pid}-${++traceSeq}.log`);
   rmSync(path, { force: true });
+  const projected: string[] = [];
   return {
     // input-site: inert #f435314a — hands the whole environment on to a child; the child's own reads are its own sites
     env: { ...process.env, [TRACE_ENV]: path },
@@ -85,8 +90,10 @@ export function openTrace(root: string): {
       if (!existsSync(path)) return undefined;
       const lines = readFileSync(path, "utf-8").split("\n").filter(Boolean);
       rmSync(path, { force: true });
+      projected.push(...lines.filter((l) => l.startsWith(PROJECTED_LINE)));
       const allowed = new Set([...hashedRefs.map(qaRefLine), ...seen]);
-      return lines.find((l) => !allowed.has(l));
+      return lines.find((l) => !allowed.has(l) && !l.startsWith(PROJECTED_LINE));
     },
+    projected: () => projected,
   };
 }

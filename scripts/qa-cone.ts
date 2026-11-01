@@ -43,6 +43,7 @@ import {
   decideWriter,
   emptyRecords,
   loadWriterRecords,
+  projectedReadsOf,
   readTraceFile,
   saveWriterRecords,
   STRACE_SEES,
@@ -199,15 +200,18 @@ export class QaCone {
       }
       const digests = new FileDigests(this.root);
       const own = globMatcher(step.writes);
+      const reached = trace.reached([], STRACE_SEES);
+      const projected = projectedReadsOf(trace.projected(), this.root);
       const rec = writerRecordOf({
         sha: this.records.sha,
         ran: true,
         before,
         after: qaBase(this.root, this.scripts, step, digests),
-        reads: readTraceFile(traceLog, this.root, own, (rel) => !this.anyOutput(rel)),
-        reached: trace.reached([], STRACE_SEES),
+        reads: readTraceFile(traceLog, this.root, own, (rel) => !this.anyOutput(rel), new Set(projected.keys())),
+        reached,
         root: this.root,
         digests,
+        projected,
       });
       if ("none" in rec) this.records.unrecorded[key] = rec.none;
       else {
