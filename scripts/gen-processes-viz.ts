@@ -77,7 +77,7 @@ import { declarationPathIn } from "../schemas/kg/cat-harness.js";
 import { baseDocsDir } from "./compose-docs.js";
 import { skillPagesOf } from "./lib/skill-pages.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
-import { workflowFiles, kgRoots } from "./known-skills.js";
+import { businessProcessFiles, workflowFiles, kgRoots } from "./known-skills.js";
 import { loadProcessModel, isActivity, isDecision, branchesOf, isGlobalTasksFile, type NotRunElement } from "../src/workflow/process-model.js";
 import {
   laneBinding,
@@ -289,6 +289,52 @@ export interface ProcessStep {
   /** For a call to a global task: the shared step's id and kind, and the values this call gives its inputs. */
   globalTask?: { id: string; type: string; inputs?: Record<string, string> };
   documentation?: string;
+  /** `<cat-harness.processes:narrative href>`, and the text of the section it names, when found. */
+  narrative?: { href: string; text?: string };
+}
+
+/**
+ * The text of the section `href` names: `X.md#frag`, relative to the diagram.
+ * The heading matches when its text, its `{#id}`, or its slug is the
+ * fragment. The text runs to the next heading of the same or a higher level.
+ * Undefined when the file or the heading is missing, so the page says so
+ * rather than showing nothing.
+ */
+export function narrativeText(diagram: string, href: string): string | undefined {
+  const [file, frag] = href.split("#", 2) as [string, string | undefined];
+  if (frag === undefined || frag === "") return undefined;
+  const abs = resolve(dirname(diagram), file || basename(diagram));
+  if (!existsSync(abs)) return undefined;
+  const lines = readFileSync(abs, "utf8").split(/\r?\n/);
+  const slug = (t: string): string => t.toLowerCase().trim().replace(/[^\p{L}\p{N}\s._-]/gu, "").replace(/\s+/g, "-");
+  // `<a name="frag"></a>` (or `id=`) on its own line names the heading after it.
+  const anchorOf = (l: string): string | undefined => /^\s*<a\s+(?:name|id)="([^"]+)"\s*>\s*<\/a>\s*$/.exec(l)?.[1];
+  const heading = (l: string): RegExpExecArray | null => /^(#{1,6})\s+(.*?)\s*$/.exec(l);
+  const section = (from: number, level: number): string | undefined => {
+    let end = lines.length;
+    for (let j = from; j < lines.length; j++) {
+      const h = heading(lines[j]!);
+      if (h && h[1]!.length <= level) {
+        end = j;
+        break;
+      }
+    }
+    // The next section's anchor line is not part of this one's text.
+    while (end > from && (anchorOf(lines[end - 1]!) !== undefined || lines[end - 1]!.trim() === "")) end--;
+    return lines.slice(from, end).join("\n").trim() || undefined;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const m = heading(lines[i]!);
+    if (!m) continue;
+    const text = m[2]!;
+    const id = /\{#([^}]+)\}\s*$/.exec(text)?.[1];
+    const bare = text.replace(/\s*\{#[^}]+\}\s*$/, "");
+    let k = i - 1;
+    while (k >= 0 && lines[k]!.trim() === "") k--;
+    const anchor = k >= 0 ? anchorOf(lines[k]!) : undefined;
+    if (anchor === frag || id === frag || bare === frag || slug(bare) === slug(frag)) return section(i + 1, m[1]!.length);
+  }
+  return undefined;
 }
 
 const uniq = (xs: string[]): string[] => [...new Set(xs.filter((x) => x))].sort((a, b) => a.localeCompare(b, "en"));
@@ -380,7 +426,7 @@ export function processSubjects(repo = REPO): Map<string, string[]> {
   const seen = new Set<string>();
   const out = new Map<string, string[]>();
   for (const r of roots) {
-    for (const f of workflowFiles(r.root)) {
+    for (const f of [...workflowFiles(r.root), ...businessProcessFiles(r.root)]) {
       if (!f.endsWith(".bpmn") || seen.has(f)) continue;
       seen.add(f);
       try {
@@ -402,7 +448,8 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
   const seen = new Set<string>();
   const named = namedRoots(repo);
   const files = instanceRoots(repo)
-    .flatMap((r) => workflowFiles(r))
+    // The `business-processes` kind too: drawn here, never run (Q-SUBG-3).
+    .flatMap((r) => [...workflowFiles(r), ...businessProcessFiles(r)])
     // `.dmn` is a DECISION TABLE, not a process — a different kind that a
     // gateway computes from. Including them would inflate every count on this
     // page with things that have no lanes, no skills and no activities.
@@ -479,6 +526,7 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
           ...(n.calledElement ? { calledElement: n.calledElement } : {}),
           ...(n.globalTask ? { globalTask: { id: n.globalTask.id, type: n.globalTask.type, ...(n.inputs ? { inputs: n.inputs } : {}) } } : {}),
           ...(n.documentation ? { documentation: n.documentation } : {}),
+          ...(n.narrative ? { narrative: { href: n.narrative, ...((t) => (t ? { text: t } : {}))(narrativeText(abs, n.narrative)) } } : {}),
         })),
         decisions: [...m.nodes.values()].filter(isDecision).map((n) => ({
           id: n.id,
@@ -1220,7 +1268,15 @@ export function processPage(
         ? `shared step \`${st.globalTask.id}\`${st.globalTask.inputs ? ` (${Object.entries(st.globalTask.inputs).map(([k, v]) => `${k} = \`${v}\``).join(", ")})` : ""}`
         : "";
     const how = [target, ...st.skills.map(skill)].filter(Boolean).join("<br>") || "—";
-    L.push(`| **${esc(st.name)}**<br>\`${st.id}\` | ${cell(st.lane)} | ${how} | ${cell(st.documentation)} |`);
+    // A business-process task keeps its text in the `.md` beside the diagram
+    // (`<cat-harness.processes:narrative>`, Q-OB-17 A): shown here, and named
+    // when it cannot be found, so a broken link is visible.
+    const narr = st.narrative
+      ? st.narrative.text
+        ? `${st.documentation ? "<br><br>" : ""}${cell(st.narrative.text)}`
+        : `${st.documentation ? "<br>" : ""}_narrative \`${esc(st.narrative.href)}\` not found_`
+      : "";
+    L.push(`| **${esc(st.name)}**<br>\`${st.id}\` | ${cell(st.lane)} | ${how} | ${st.documentation || !st.narrative ? cell(st.documentation) : ""}${narr} |`);
   }
   L.push("");
 
