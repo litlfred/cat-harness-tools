@@ -79,7 +79,7 @@ const isKgQaFile = (rel: string, home: string): boolean =>
  * every reader reads. Nothing is written into the checkout. `storeState` says
  * why the store gave nothing, so an empty sweep names its cause.
  */
-function sidecarsByInstance(): { byInstance: Map<string, Sidecar[]>; storeState: string } {
+function readSidecars(): { byInstance: Map<string, Sidecar[]>; storeState: string } {
   const out = new Map<string, Sidecar[]>();
   const absent: Array<{ key: string; home: string }> = [];
   for (const inst of instanceRootsIn(REPO)) {
@@ -121,6 +121,12 @@ function sidecarsByInstance(): { byInstance: Map<string, Sidecar[]>; storeState:
     if (files.length) out.set(key, files);
   }
   return { byInstance: out, storeState: `read ${read.key}` };
+}
+
+/** Read once per run: the store read is slow, and two tests share it. */
+let sidecarsRead: ReturnType<typeof readSidecars> | undefined;
+function sidecarsByInstance(): ReturnType<typeof readSidecars> {
+  return (sidecarsRead ??= readSidecars());
 }
 
 describe("kg:validate over nested instances (bean `676g`)", () => {
@@ -166,7 +172,7 @@ describe("kg:validate over nested instances (bean `676g`)", () => {
     // ...and a nested owner with the nested root as SCHEMA root is the second half.
     expect((await check(join(REPO, NESTED))).state).toBe("undetermined");
     expect((await check(join(REPO, NESTED), HARNESS)).state).toBe("valid");
-  });
+  }, 120_000); // the store read is the sweep's, and as slow
 
   test("every committed kg-audit sidecar, in every instance, validates", async () => {
     const { byInstance, storeState } = sidecarsByInstance();
