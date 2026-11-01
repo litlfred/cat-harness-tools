@@ -840,7 +840,7 @@ jobs:
           restore-keys: writer-cone-v1-${{ github.repository }}-
       - &strace
         name: strace, to record the writers (a push to main)
-        if: inputs.writer-skip && github.event_name == 'push' && steps.skip-prep.outputs.hit != 'true'
+        if: env.RECORD_WRITERS == 'true' && steps.skip-prep.outputs.hit != 'true'
         run: |
           if command -v strace >/dev/null; then strace -V | head -1; exit 0; fi
           sudo apt-get update -qq && sudo apt-get install -y -qq strace && strace -V | head -1
@@ -929,7 +929,7 @@ jobs:
           export CAT_DERIVE_CACHE_DIR="$PWD/build/derive-cache"
           # Writer records (bean fwtz): recorded on a push, used on a PR.
           if [ "$WRITER_SKIP" = "true" ]; then
-            if [ "${{ github.event_name }}" = "push" ]; then export CAT_WRITER_RECORD=1
+            if [ "${RECORD_WRITERS:-}" = "true" ]; then export CAT_WRITER_RECORD=1
             elif [ -f build/writer-cone/records.json ]; then export CAT_WRITER_SKIP=1
             else echo "writer skip: no records restored, every writer runs"; fi
           fi
@@ -963,7 +963,7 @@ jobs:
           fi
       - &writer-cone-save
         name: Keep main's writer records (bean fwtz)
-        if: inputs.writer-skip && github.event_name == 'push' && steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
+        if: env.RECORD_WRITERS == 'true' && steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: fa/build/writer-cone
@@ -1290,6 +1290,47 @@ jobs:
       - *timings-restore
       - *snapshot-save
       - *upload-prepared
+
+  # Main's writer records (bean fwtz), on their own machine beside the base
+  # side: tracing every derive:publish writer under strace took the base
+  # side's preparation from ~10 to 56 minutes (folio-assistant-core run
+  # 41251751682). PRs read only the records this job saves, so nothing waits
+  # on it but the run's own end.
+  record-writers:
+    name: Record main's page-build scripts (bean fwtz)
+    if: inputs.writer-skip && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SIDE: base
+      RECORD_WRITERS: "true"
+    steps:
+      - id: skip-prep
+        run: echo "hit=false" >> "$GITHUB_OUTPUT"
+      - *judging-scripts
+      - *pin-restore
+      - *pin-record
+      - *pin-write
+      - *pin-save
+      - *pin-reread
+      - *pins
+      - *checkout-index
+      - *base-root
+      - *setup-bun
+      - *caller
+      - *caller-base
+      - *mount-cache
+      - *mount
+      - *mark
+      - *lower-layers-main
+      - *swap
+      - *root-cat
+      - *install
+      - *chromium
+      - *state-mount
+      - *strace
+      - *derive
+      - *writer-cone-save
 
   # Each side is `gate-shards` jobs, on separate machines (bean lpcs, step 3).
   # The ~300 gates ran one at a time, ~2500 s a side
