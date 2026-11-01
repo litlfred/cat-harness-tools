@@ -261,6 +261,33 @@ describe("the printed-command reader — bean `b963`'s third class", () => {
     expect(r.folioRelative).toBeGreaterThan(0);
   });
 
+  test("a command in a code span ends at the span: later prose on the line is not read as its arguments", () => {
+    const root = fixture(
+      {
+        "cat-harness/cat-harness.json": '{"name":"cat-harness"}',
+        "cat-harness/schemas/x.ts": "",
+        "cat-harness/scripts/a.ts":
+          "// run `bun run cat some:baseline`, which shortens it. Most entries are `schemas/`, which moves.\n",
+      },
+      ["cat-harness/scripts", "cat-harness/schemas"],
+    );
+    expect(checkCommandPaths(root).dead).toEqual([]);
+  });
+
+  test("...while a path INSIDE the span is still judged", () => {
+    const root = fixture(
+      {
+        "cat-harness/cat-harness.json": '{"name":"cat-harness"}',
+        "cat-harness/scripts/lean-audit.ts": "",
+        "cat-harness/scripts/a.ts": "// run `bun run scripts/lean-audit.ts` and then read `schemas/`.\n",
+      },
+      ["cat-harness/scripts"],
+    );
+    expect(checkCommandPaths(root).dead.map((h) => h.token)).toEqual([
+      "scripts/lean-audit.ts  →  cat-harness/scripts/lean-audit.ts",
+    ]);
+  });
+
   test("instance roots are DISCOVERED, so a split cannot silently blind the check", () => {
     const root = fixture({ "cat-harness/cat-harness.json": '{"name":"cat-harness"}', "other/other.json": '{"name":"other"}' }, ["cat-harness", "other"]);
     expect(instanceRoots(root)).toEqual(["cat-harness", "other"]);

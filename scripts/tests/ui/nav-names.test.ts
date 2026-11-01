@@ -35,6 +35,7 @@ import {
   sightingsFromNavHtml,
   templateFindings,
 } from "../../check-nav-names.js";
+import { audit as auditViewerNav } from "../../check-viewer-nav.js";
 import { siteNotBuilt } from "../../../test/support/checkout.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..", "..", "..");
@@ -54,12 +55,9 @@ const NOT_BUILT = (): boolean =>
     join(SITE, "_includes", "generated", "navbar-footer.html"),
   );
 
-/** The railed viewer pages `check:viewer-nav` counts, read off its committed sidecar. */
+/** The railed viewer pages `check:viewer-nav` counts, computed directly from the site. */
 function railedCount(): number {
-  const qa = JSON.parse(readFileSync(join(INSTANCE, "test", "results", "viewer-nav", "viewer-nav.qa.json"), "utf-8")) as {
-    totals?: { railed?: number };
-  };
-  return qa.totals?.railed ?? -1;
+  return auditViewerNav(SITE, REPO).totals.railed;
 }
 
 /** Where {@link siteCopy} writes its synthetic railed page, under the copy's site. */
@@ -160,7 +158,7 @@ describe("a planted second name fails", () => {
     expect(hit!.names.map((n) => n.label)).toEqual(["Skills", "Skills — cat-harness"]);
   });
 
-  test("on the RAIL: one row's label changed in a viewer page", () => {
+  test.skipIf(NOT_BUILT())("on the RAIL: one row's label changed in a viewer page", () => {
     const c = siteCopy();
     // Unplanted, the synthetic rail agrees with the data.
     const dest = methodologiesHref(c.site);

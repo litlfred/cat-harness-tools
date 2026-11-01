@@ -12,7 +12,7 @@
  * is; this lowers it, so an author does not do by hand what a search can do.
  *
  * Usage:
- *   bun run cat-harness-tools/archimate/scripts/archimate-detangle.ts --model <file.archimate> [--view <id or page slug>] [--routes-only] [--apply] [--json]
+ *   bun run cat-harness-tools/archimate/scripts/archimate-detangle.ts --model <file.archimate> [--view <id or page slug>] [--routes-only] [--no-slide] [--apply] [--json]
  *
  * Without `--apply` it only reports, per view, the tangles now and after,
  * and what it would change. With `--apply` it writes the model back in place.
@@ -25,6 +25,10 @@
  * - **Two boxes' places**, unless `--routes-only`: two boxes of the same size,
  *   inside the same parent, in the same row or column, swap. Their contents
  *   move with them. Rows, bands and sizes stay as the author drew them.
+ * - **A box's place inside its own parent**, unless `--routes-only` or
+ *   `--no-slide`: a box may slide into free space next to a box it is joined
+ *   to, never overlapping another box and never out of its parent (or into
+ *   a box that is not its parent), since nesting is meaning.
  *
  * It never adds, removes, renames or resizes anything, and never touches a
  * line that ends on another line, or a line that shares both ends with
@@ -140,6 +144,9 @@ function lanes(view: ArchimateView, axis: "x" | "y"): number[] {
   return out;
 }
 
+/** The clear space kept around a slid box, px. */
+const GAP = 10;
+
 /** How far outside the span of its two ends a lane may be and still be tried: no long detours. */
 const DETOUR = 80;
 
@@ -165,7 +172,7 @@ function candidates(s: ArchimateViewNode, t: ArchimateViewNode, laneX: number[],
 }
 
 export interface Change {
-  kind: "route" | "swap";
+  kind: "route" | "swap" | "slide";
   /** The connection re-routed, or the two boxes swapped. */
   ids: string[];
 }
@@ -184,7 +191,7 @@ export interface Result {
 const cloneView = (v: ArchimateView): ArchimateView => ({ ...v, nodes: v.nodes.map((n) => ({ ...n })), connections: v.connections.map((c) => ({ ...c, bendpoints: c.bendpoints.map((b) => ({ ...b })) })) });
 
 /** Search for a less tangled drawing of one view. The view passed in is not changed. */
-export function detangle(input: ArchimateView, opts: { routesOnly?: boolean; passes?: number } = {}): Result {
+export function detangle(input: ArchimateView, opts: { routesOnly?: boolean; noSlide?: boolean; passes?: number } = {}): Result {
   const view = cloneView(input);
   const nodes = new Map(view.nodes.map((n) => [n.id, n]));
   const before = scoreOf(view);
@@ -202,6 +209,44 @@ export function detangle(input: ArchimateView, opts: { routesOnly?: boolean; pas
     for (const d of descendants(id)) { d.x += dx; d.y += dy; }
     const m = moved.get(id) ?? { x: 0, y: 0 };
     moved.set(id, { x: m.x + dx, y: m.y + dy });
+  };
+  /** Whether box n, moved by (dx, dy), would overlap a box that is neither its ancestor nor its descendant, or leave its parent. */
+  const fits = (n: ArchimateViewNode, dx: number, dy: number, inner: Set<string>): boolean => {
+    const x = n.x + dx, y = n.y + dy;
+    const par = n.parent ? nodes.get(n.parent) : undefined;
+    // Keep clear of the parent's label band at its top.
+    if (par && (x < par.x + GAP || y < par.y + 28 || x + n.w > par.x + par.w - GAP || y + n.h > par.y + par.h - GAP)) return false;
+    const anc = new Set<string>();
+    for (let p = n.parent, k = 0; p && k < 64; p = nodes.get(p)?.parent, k++) anc.add(p);
+    for (const o of view.nodes) {
+      if (o.id === n.id || inner.has(o.id) || anc.has(o.id)) continue;
+      if (x < o.x + o.w + GAP && x + n.w + GAP > o.x && y < o.y + o.h + GAP && y + n.h + GAP > o.y) return false;
+    }
+    return true;
+  };
+  /** The best place to slide box n to, if any lowers the tangles. */
+  const slideOf = (n: ArchimateViewNode): { dx: number; dy: number; score: Score } | undefined => {
+    const inner = new Set(descendants(n.id).map((d) => d.id));
+    const mates = view.connections.flatMap((c) => (c.source === n.id ? [c.target] : c.target === n.id ? [c.source] : [])).map((id) => nodes.get(id)).filter((m): m is ArchimateViewNode => !!m && !inner.has(m.id));
+    const spots: Pt[] = [];
+    for (const m of mates) {
+      spots.push({ x: m.x, y: m.y - n.h - 2 * GAP }, { x: m.x, y: m.y + m.h + 2 * GAP }, { x: m.x - n.w - 2 * GAP, y: m.y }, { x: m.x + m.w + 2 * GAP, y: m.y });
+      spots.push({ x: m.x + (m.w - n.w) / 2, y: n.y }, { x: n.x, y: m.y + (m.h - n.h) / 2 });
+    }
+    let pick: { dx: number; dy: number; score: Score } | undefined;
+    for (const sp of spots) {
+      const dx = Math.round(sp.x - n.x), dy = Math.round(sp.y - n.y);
+      if ((!dx && !dy) || !fits(n, dx, dy, inner)) continue;
+      const saved = view.connections.map((c) => c.bendpoints);
+      const touched = new Set([n.id, ...inner]);
+      for (const c of view.connections) if (touched.has(c.source) || touched.has(c.target)) c.bendpoints = [];
+      shift(n.id, dx, dy);
+      const sc = scoreOf(view);
+      shift(n.id, -dx, -dy);
+      view.connections.forEach((c, k) => { c.bendpoints = saved[k]!; });
+      if (tangles(sc) < tangles(pick?.score ?? best)) pick = { dx, dy, score: sc };
+    }
+    return pick;
   };
   const pairCount = new Map<string, number>();
   const pk = (c: ArchimateViewConnection) => (c.source < c.target ? `${c.source} ${c.target}` : `${c.target} ${c.source}`);
@@ -243,6 +288,19 @@ export function detangle(input: ArchimateView, opts: { routesOnly?: boolean; pas
         shift(a.id, dx, dy); shift(b.id, -dx, -dy);
         best = pick.score;
         changes.push({ kind: "swap", ids: [a.id, b.id] });
+      }
+      // Slides: a box moves to free space inside its own parent, next to a box
+      // it is joined to. Never into another parent: nesting is meaning.
+      if (!opts.noSlide) {
+        for (const n of view.nodes.filter((x) => x.kind === "element" || x.kind === "note" || x.kind === "view-ref")) {
+          const sc = slideOf(n);
+          if (!sc) continue;
+          const touched = new Set([n.id, ...descendants(n.id).map((d) => d.id)]);
+          for (const c of view.connections) if ((touched.has(c.source) || touched.has(c.target)) && c.bendpoints.length) { c.bendpoints = []; rerouted.add(c.id); }
+          shift(n.id, sc.dx, sc.dy);
+          best = sc.score;
+          changes.push({ kind: "slide", ids: [n.id] });
+        }
       }
     }
     // Routes: one line at a time, keeping a route only if it is better.
@@ -406,7 +464,7 @@ function arg(name: string): string | undefined {
 if (import.meta.main) {
   const file = arg("model");
   if (!file) {
-    console.error("usage: archimate-detangle.ts --model <file.archimate> [--view <id or page slug>] [--routes-only] [--apply] [--json]");
+    console.error("usage: archimate-detangle.ts --model <file.archimate> [--view <id or page slug>] [--routes-only] [--no-slide] [--apply] [--json]");
     process.exit(2);
   }
   const path = resolve(file);
@@ -420,9 +478,10 @@ if (import.meta.main) {
     process.exit(2);
   }
   const routesOnly = process.argv.includes("--routes-only");
+  const noSlide = process.argv.includes("--no-slide");
   const rows = [];
   for (const v of views as ArchimateView[]) {
-    const r = detangle(v, { routesOnly });
+    const r = detangle(v, { routesOnly, noSlide });
     const improved = tangles(r.after) < tangles(r.before);
     if (improved) xml = writeBack(xml, r);
     rows.push({ id: v.id, name: v.name, before: r.before, after: improved ? r.after : r.before, changes: improved ? r.changes : [] });
@@ -431,8 +490,8 @@ if (import.meta.main) {
   else {
     const fmt = (s: Score) => `${s.crossings}×/${s.throughBox}▢/${s.overlaps}=`;
     for (const r of rows) {
-      const swaps = r.changes.filter((c) => c.kind === "swap").length, routes = r.changes.filter((c) => c.kind === "route").length;
-      console.log(`${fmt(r.before).padStart(12)} → ${fmt(r.after).padEnd(12)} ${swaps ? `${swaps} swap(s) ` : ""}${routes ? `${routes} route(s) ` : ""}${r.name} (${r.id})`);
+      const swaps = r.changes.filter((c) => c.kind === "swap").length, slides = r.changes.filter((c) => c.kind === "slide").length, routes = r.changes.filter((c) => c.kind === "route").length;
+      console.log(`${fmt(r.before).padStart(12)} → ${fmt(r.after).padEnd(12)} ${swaps ? `${swaps} swap(s) ` : ""}${slides ? `${slides} slide(s) ` : ""}${routes ? `${routes} route(s) ` : ""}${r.name} (${r.id})`);
     }
     console.log("  (crossings × / lines through a box ▢ / lines on top of each other =)");
   }

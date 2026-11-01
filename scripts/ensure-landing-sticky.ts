@@ -568,7 +568,14 @@ export function stickiesFor(
  */
 export function readerTextProblems(root: string): string[] {
   const problems: string[] = [];
+  const own = resolve(root);
+  const repoRoot = checkoutRootFor(own);
+  const mountedRoots = new Set([
+    ...mountedInstanceRoots(own).values(),
+    ...(repoRoot !== own ? mountedInstanceRoots(repoRoot).values() : []),
+  ]);
   for (const d of declaredContributions(root)) {
+    if (d.instanceRoot && mountedRoots.has(resolve(d.instanceRoot))) continue;
     if (d.contribution.bodyFrom === undefined) continue;
     const want = readerText(d);
     if (want === undefined) continue;

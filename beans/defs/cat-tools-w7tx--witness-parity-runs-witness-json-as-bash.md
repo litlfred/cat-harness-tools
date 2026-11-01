@@ -2,11 +2,11 @@
 # cat-tools-w7tx
 $schema: bean/1.0.0
 title: 'WITNESS DATA BECOMES PROGRAM TEXT: witness-parity runs a committed witness JSON invocation.reproduce string as bash -c with the full process environment'
-status: todo
+status: completed
 type: bug
 priority: normal
 created_at: 2026-10-31T04:05:00Z
-updated_at: 2026-10-31T04:05:00Z
+updated_at: 2026-10-31T08:50:00Z
 parent: cat-tools-sr31
 ---
 

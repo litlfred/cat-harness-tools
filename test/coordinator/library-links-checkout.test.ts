@@ -16,6 +16,7 @@ import { forgeLocation, siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { libraryResolver } from "../../scripts/lib/library-links.ts";
 import { pageParts } from "../../scripts/viewer-declarations.ts";
 import { visualiserRoute } from "../../schemas/kg/visualiser-route.ts";
+import { siteNotBuilt } from "../support/checkout.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -23,13 +24,18 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 const INSTANCE = resolve(ORIGIN_DIR, "..", "..");
 const REPO = resolve(INSTANCE, "..");
 const r = libraryResolver(REPO, INSTANCE);
-const entries = (
-  JSON.parse(readFileSync(join(INSTANCE, siteDirFor(INSTANCE), "assets", "library", "index.json"), "utf-8")) as {
-    entries: { id: string; instance: string; dir: string }[];
-  }
-).entries;
+const INDEX = join(INSTANCE, siteDirFor(INSTANCE), "assets", "library", "index.json");
+/** The projection is written at publish and gitignored (bean w1gy F18). */
+const NOT_BUILT = siteNotBuilt("the library projection `library:viz` writes at publish (gitignored)", INDEX);
+const entries = NOT_BUILT
+  ? []
+  : (
+      JSON.parse(readFileSync(INDEX, "utf-8")) as {
+        entries: { id: string; instance: string; dir: string }[];
+      }
+    ).entries;
 
-describe("a library reference resolves only where its target exists", () => {
+describe.skipIf(NOT_BUILT)("a library reference resolves only where its target exists", () => {
   it("links every projected item to its viewer page and README", () => {
     // The premise: a resolver over no entries would pass the loop vacuously.
     expect(entries.length).toBeGreaterThan(0);

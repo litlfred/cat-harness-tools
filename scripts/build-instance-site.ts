@@ -64,7 +64,7 @@
  *     directories, the `folio-build.json` stamp. With `--publish` a shortfall refuses; without,
  *     it is said. Owner, 2026-10-14: an IG's main site published by this path loses nothing
  *     `folio-site.yml` gave it.
- *  9. with `--publish`: the root replaces the branch but keeps `STAGING/`, `_render-log/` and
+ *  9. with `--publish`: the root replaces the branch but keeps `STAGING/`, `PC/`, `_render-log/` and
  *     every `site.build.keep` entry (an IG's `branches/`); a preview replaces only `STAGING/<branch>/`
  *
  * Every step runs with the build's own values in its environment ({@link siteStepEnv}:
@@ -108,6 +108,7 @@ export const THEME_SIDEBAR_RULING: DroppedByRuling = {
 import { siteCoverageShortfall } from "./site-coverage.ts";
 import { writeMissingVisualisers } from "./visualiser-writers.ts";
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
+import { PC_PREFIX } from "./publish-main-site.ts";
 
 const TOOLS = "cat-harness-tools/scripts";
 
@@ -588,9 +589,9 @@ function jekyllExe(gemDir: string): string {
     `BUNDLE_GEMFILE=${gemfile} bundle exec ruby -e 'print Gem.bin_path("jekyll", "jekyll")' 2>/dev/null || true`,
     gemDir,
   );
-  if (bundled) return `ruby ${bundled}`;
+  if (bundled) return `ruby ${shellQuote(bundled)}`;
   const found = capture("ls -d /opt/rbenv/versions/*/lib/ruby/gems/*/gems/jekyll-[0-9]*/exe/jekyll 2>/dev/null | sort -V | tail -1 || true", "/");
-  if (found) return `ruby ${found}`;
+  if (found) return `ruby ${shellQuote(found)}`;
   return "jekyll";
 }
 
@@ -848,7 +849,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   } else console.log("coverage: ✓ every declared visualiser page is in the site");
 
   // The root's guard: the built site carries everything the root it replaces carries.
-  const keep = [...new Set(["STAGING", "_render-log", ...(o.keep ?? [])])];
+  const keep = [...new Set(["STAGING", PC_PREFIX, "_render-log", ...(o.keep ?? [])])];
   if (!staging && (o.parity ?? "refuse") !== "off") {
     const against = o.parityAgainst ?? (o.remote ? publishedRoot(o.remote, "gh-pages", keep) : undefined);
     if (against === undefined) console.log("parity: no published root to compare with — nothing to lose");

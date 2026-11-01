@@ -94,7 +94,8 @@ SCRIPT_ID = "cat-harness/scripts/pdf-vector-figures.py"
 # The figure number in a caption candidate. A candidate may be a
 # cross-reference, so these are CANDIDATES for what the page shows and are
 # never asserted to be it -- the inspector's verdict says which, in `shows`.
-LABEL = re.compile(r"^[ \t]*(?:Fig\.|Figure)[ \t]*(\d+(?:\.\d+)*)")
+# `Fig.?`: the same optional dot as `CAPTION` in pdf-vector-labels.py.
+LABEL = re.compile(r"^[ \t]*(?:Fig\.?|Figure)[ \t]*(\d+(?:\.\d+)*)")
 
 # Rendering resolution. Not a threshold: it decides how many pixels a reader
 # gets and no verdict depends on it. 2x the PDF's 72 dpi user space.

@@ -116,14 +116,21 @@ def body_for(sha, run, failures, jobs, green, checks_result):
         lines.append(f"Last green: [`{g[:12]}`]({SERVER}/{REPO}/commit/{g}) "
                      f"([run {green['id']}]({green['html_url']})); "
                      f"[compare `{g[:7]}...{sha[:7]}`]({SERVER}/{REPO}/compare/{g}...{sha}).")
-        cmp = gh(f"repos/{REPO}/compare/{g}...{sha}", ok_codes=(404,)) or {}
-        commits = cmp.get("commits") or []
-        lines.append("")
-        for c in commits[-50:]:
-            first = c["commit"]["message"].splitlines()[0] if c["commit"]["message"] else ""
-            lines.append(f"- [`{c['sha'][:7]}`]({c['html_url']}) {first}")
-        if len(commits) > 50:
-            lines.append(f"- ... and {len(commits) - 50} earlier")
+        # GitHub's /compare/ endpoint returns HTTP 500 ("Sorry, this diff is
+        # temporarily unavailable due to heavy server load") when a commit in
+        # the range has a large diff (smart-base#239, run 41183351401). Do not
+        # abort updating the main-red issue when the commit list fails to load.
+        cmp = gh(f"repos/{REPO}/compare/{g}...{sha}", ok_codes=(404, 422, 500, 502, 503, 504))
+        if cmp is None:
+            lines += ["", "*(GitHub could not compute the commit list for this range; follow the compare link above.)*"]
+        else:
+            commits = cmp.get("commits") or []
+            lines.append("")
+            for c in commits[-50:]:
+                first = c["commit"]["message"].splitlines()[0] if c["commit"]["message"] else ""
+                lines.append(f"- [`{c['sha'][:7]}`]({c['html_url']}) {first}")
+            if len(commits) > 50:
+                lines.append(f"- ... and {len(commits) - 50} earlier")
     else:
         lines.append(f"No successful push run of {run['name']} on main is on record "
                      f"among the last 30, so the range is not known.")

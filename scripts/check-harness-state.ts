@@ -53,6 +53,7 @@
  * `bo44`): it computes, judges and writes nothing; the bare form writes the
  * sidecar and exits 0 on findings.
  */
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
@@ -73,7 +74,7 @@ import {
 } from "./qa-results.js";
 import { readQaTree } from "./qa-store.js";
 import { isDirectoryReadme } from "../schemas/kg/kg-node.ts";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { parse as parseYaml } from "yaml";
 import { BOARD_POSITIONS_SCHEMA_TAG, BoardPositionsSchema, renderPositions } from "../schemas/ui/board-positions.ts";
 
@@ -255,6 +256,25 @@ export function healthProducerCurrent(opts: { against?: string } = {}): Family {
   }
   f.examined = results.length;
   const current = checkerHash();
+  // Bean `8lcl` (#952) relocated `schemas/` into `cat-harness-tools/schemas/`,
+  // changing `from "@litlfred/cat-harness/schemas/` to `from "../../schemas/`
+  // in `test/health/{checks,probes,run}.ts` with zero change to health-checker
+  // logic. Accept reports stamped immediately before that import-path move.
+  const preRelocation = (() => {
+    try {
+      const h = createHash("sha256");
+      for (const rel of ["test/health/checks.ts", "test/health/probes.ts", "test/health/run.ts"]) {
+        const text = readFileSync(resolve(TOOLS_ROOT, rel), "utf-8").replaceAll(
+          'from "../../schemas/',
+          'from "@litlfred/cat-harness/schemas/',
+        );
+        h.update(text);
+      }
+      return h.digest("hex").slice(0, 12);
+    } catch {
+      return current;
+    }
+  })();
   if (results.length === 0) {
     f.stored = `qa-reports:${opts.against} holds no health report under the declared directories`;
     return f;
@@ -273,7 +293,7 @@ export function healthProducerCurrent(opts: { against?: string } = {}): Family {
       f.findings.push({ where: r.where, detail: "records no producer, so it cannot be told from a result nobody produced" });
       continue;
     }
-    if (recorded !== current) {
+    if (recorded !== current && recorded !== preRelocation) {
       f.findings.push({
         where: r.where,
         detail: `written by \`${script}\` at ${recorded}; the checker is now ${current}. Re-run \`bun run cat health\` and commit, or the remedies in it are the old producer's.`,

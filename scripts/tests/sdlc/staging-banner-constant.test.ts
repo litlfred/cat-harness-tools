@@ -68,6 +68,20 @@ function build(facts: Partial<StagingFacts>): { dir: string; html: Map<string, s
   return { dir, html, json };
 }
 
+describe("the build type is a fact in staging.json, never in the pages (owner, 2026-11-01)", () => {
+  const p = build({ buildType: "preview" });
+  const f = build({ buildType: "full" });
+
+  test("staging.json names it, so `pc:release freeze` can refuse a preview", () => {
+    expect(JSON.parse(p.json).buildType).toBe("preview");
+    expect(JSON.parse(f.json).buildType).toBe("full");
+  });
+
+  test("the pages are byte-identical across build types", () => {
+    for (const page of PAGES) expect(p.html.get(page)).toBe(f.html.get(page));
+  });
+});
+
 describe("the injected HTML does not depend on the build — bean `g196`", () => {
   const a = build({ sha: "aaaaaaa", built: "2026-09-20T10:00:00Z" });
   const b = build({ sha: "bbbbbbb", built: "2026-09-20T18:30:00Z", pr: "999" });
@@ -204,6 +218,13 @@ describe("injection mechanics carried over from the bash version", () => {
     const twice = injectInto(once);
     expect(twice.html).toBe(once);
     expect(twice.outcome).toBe("already");
+  });
+
+  test("a page that only NAMES the attribute (the review page's CSS) still gets the banner", () => {
+    const page = `<html><head><style>[data-fa-staging-banner]{display:none}</style></head><body><script>q("[data-fa-staging-banner]")</script>x</body></html>`;
+    const r = injectInto(page);
+    expect(r.outcome).toBe("injected");
+    expect(injectInto(r.html).outcome).toBe("already");
   });
 });
 
@@ -389,16 +410,22 @@ describe("the STAGING build does not bake a per-run stamp into the footer", () =
     expect((client.match(/fetch\(/g) ?? []).length).toBe(2);
   });
 
-  test("the MAIN site still stamps — there is one copy and nothing to dedup", () => {
+  test("the MAIN site no longer bakes it either: the browser fills it from build.json", () => {
     // `footer_custom.html`'s own comment: without a stamp "a stale browser
-    // cache and a deploy that has not run look identical". Removing it
-    // everywhere would fix the storage problem by destroying the signal.
+    // cache and a deploy that has not run look identical". The stamp stays;
+    // only the moment it is bound moved, on the live site too (owner,
+    // 2026-10-31, folio-assistant#2837): baked in, it changed every page on
+    // every deploy, so no preview could share the live site's unchanged
+    // pages (`staging-share.ts`). `docs-site.yml` writes the same facts to
+    // `build.json`, and cat-harness's `docs-ui.js` fills the footer from it.
     const main = readFileSync(
       join(repoRootFor(resolve(HARNESS_ROOT)), ".github", "workflows", "docs-site.yml"),
       "utf-8",
     );
-    expect(main).toContain("short_sha:");
-    expect(main).toContain("built_at:");
+    const code = main.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
+    for (const key of ["short_sha:", "built_at:", "run_url:"]) expect(code).not.toContain(`echo "${key}`);
+    expect(code).toContain("build.json");
+    expect(code).toMatch(/runUrl: \$runUrl/);
   });
 });
 
