@@ -221,6 +221,12 @@ export interface ProcessNode {
   /** `<bootstrap.processes:skill ref="…"/>`, possibly several. */
   skills: string[];
   /**
+   * `<cat-harness.processes:narrative href="X.md#heading"/>`: where a reader
+   * finds this task's narrative text, relative to the diagram (owner,
+   * 2026-11-01, Q-OB-17 A). Descriptive only; the engine never reads it.
+   */
+  narrative?: string;
+  /**
    * `<cat-harness.processes:raci ref="<role>" involvement="accountable|consulted|informed"/>`.
    *
    * **R is NOT here, and that is the point.** A BPMN lane already says who
@@ -1049,6 +1055,12 @@ function codeList(raw: string | undefined, elId: string, attr: string, why: stri
  * (`normaliseOwnExtensions`) is seen by the next one.
  */
 const sharedModdle = new BpmnModdle();
+
+/** The task's `<cat-harness.processes:narrative href>`, when it carries one. */
+function narrativeOf(ext: ReadonlyArray<{ $type: string }>): { narrative?: string } {
+  const el = ext.find((v) => v.$type === "folio:narrative") as { href?: unknown } | undefined;
+  return typeof el?.href === "string" && el.href.trim() !== "" ? { narrative: el.href.trim() } : {};
+}
 
 /** Code lists by instance root — loaded once, since every diagram of an instance shares them. */
 const codeListCache = new Map<string, Promise<Map<string, CodeList>>>();
@@ -2106,6 +2118,7 @@ export async function loadProcessModel(
       laneId: laneIdOf.get(el.id),
       roleRef: roleRefOf.get(el.id),
       skills: ext.filter((v) => v.$type === "folio:skill" && v.ref).map((v) => v.ref!),
+      ...narrativeOf(ext),
       // An unrecognised `involvement` is never COERCED — a typo silently read
       // as `informed` would put somebody on a notification list who was meant
       // to be consulted, and the difference between those two is the whole
