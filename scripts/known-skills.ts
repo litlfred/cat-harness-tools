@@ -949,13 +949,13 @@ export function workflowFiles(root: string, scope: CorpusScope = corpusScopeFor(
 }
 
 /**
- * The `.bpmn` files of the `business-processes` directories `root` itself
- * declares: diagrams that describe work as content (a DAK's business
+ * The `.bpmn` files of the `business-processes` and `folio` directories
+ * `root` itself declares: diagrams that describe work as content (a DAK's business
  * processes), which the processes viewer and `render:bpmn` draw and the
  * engine never runs (owner, 2026-11-01, Q-SUBG-3). Not in
  * {@link workflowFiles}, so no engine gate reads them.
  */
-export function businessProcessFiles(root: string): string[] {
+export function businessProcessFiles(root: string, opts: { folio?: boolean } = {}): string[] {
   const out: string[] = [];
   const walk = (dir: string): void => {
     if (!existsSync(dir)) return;
@@ -965,11 +965,21 @@ export function businessProcessFiles(root: string): string[] {
       else if (e.name.endsWith(".bpmn")) out.push(p);
     }
   };
-  let dirs: string[] = [];
-  try {
-    dirs = directoriesForGraph(root, "business-processes");
-  } catch {
-    dirs = []; // an unreadable declaration is `check:harness-dirs`'s to report
+  // Also every `.bpmn` inside a declared `folio`: a diagram held as a document
+  // block (a DTH's `bp-*` blocks, smart-base's `businessProcess()`, kind
+  // `business-process`) describes work by construction. `folio` is not
+  // knowledge-graph content, so the engine never read these; the viewer did
+  // not either until now. Read by the directory's kind, so the blocks stay
+  // where the chapter manifests point at them.
+  const dirs: string[] = [];
+  // `render:bpmn` passes `folio: false`: a folio block carries its own drawn
+  // SVG (`meta.svgFile`), so drawing it again would be a second copy to keep.
+  for (const kind of opts.folio === false ? ["business-processes"] : ["business-processes", "folio"]) {
+    try {
+      dirs.push(...directoriesForGraph(root, kind));
+    } catch {
+      // an unreadable declaration is `check:harness-dirs`'s to report
+    }
   }
   for (const d of dirs) walk(d);
   return [...new Set(out)].sort();

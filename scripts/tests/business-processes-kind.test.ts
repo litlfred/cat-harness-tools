@@ -48,3 +48,28 @@ describe("business-processes sits within processes", () => {
     expect(defaultGraphTypologies.get("business-processes")?.within).toBe("processes");
   });
 });
+
+describe("a BPMN held as a folio block", () => {
+  test("is a business process: listed by businessProcessFiles, never by workflowFiles", () => {
+    const root = mkdtempSync(join(tmpdir(), "bp-folio-"));
+    try {
+      writeFileSync(
+        join(root, "ig.json"),
+        JSON.stringify({
+          $schema: "cat-harness-declaration/1.0.0",
+          name: "ig",
+          version: "0.1.0",
+          directories: [{ id: "ig-folio", path: "folio/", graphTypologies: ["folio"] }],
+        }),
+      );
+      mkdirSync(join(root, "folio", "ig", "intro"), { recursive: true });
+      writeFileSync(join(root, "folio", "ig", "intro", "bp-01.bpmn"), "<bpmn:definitions/>");
+      expect(businessProcessFiles(root).map((f) => f.slice(root.length))).toEqual(["/folio/ig/intro/bp-01.bpmn"]);
+      expect(workflowFiles(root).some((f) => f.endsWith("bp-01.bpmn"))).toBe(false);
+      // render:bpmn leaves it alone: the block already carries its own SVG.
+      expect(businessProcessFiles(root, { folio: false })).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

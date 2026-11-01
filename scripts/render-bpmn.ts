@@ -82,7 +82,7 @@ function bpmnSources(): string[] {
     // draw (owner, 2026-10-20, "a1"): each is drawn in the processes that call it.
     for (const f of workflowFiles(inst)) if (f.endsWith(".bpmn") && !isGlobalTasksFile(readFileSync(f, "utf8"))) all.add(f);
     // Business processes are drawn too, so their viewer pages have a diagram (Q-SUBG-3).
-    for (const f of businessProcessFiles(inst)) all.add(f);
+    for (const f of businessProcessFiles(inst, { folio: false })) all.add(f);
   }
   const byName = new Map<string, string[]>();
   for (const f of all) byName.set(basename(f), [...(byName.get(basename(f)) ?? []), f]);
