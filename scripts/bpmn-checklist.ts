@@ -148,7 +148,8 @@ export function checklistFor(model: ProcessModel, sourceRel: string): string {
         out.push(`- Shared step \`${n.globalTask.id}\`${given.length > 0 ? `, with ${given.join(", ")}` : ""}.`);
       }
       if (n.calledElement) {
-        out.push(`- A subprocess (\`${n.calledElement}\`): \`workflow_next\` reports its own steps; complete those — this call activity itself is not completable.`);
+        const given = Object.entries(n.inputs ?? {}).map(([k, v]) => `\`${k}\` = \`${v}\``);
+        out.push(`- A subprocess (\`${n.calledElement}\`${given.length > 0 ? `, with ${given.join(", ")}` : ""}): \`workflow_next\` reports its own steps; complete those — this call activity itself is not completable.`);
       } else {
         out.push(`- Record it: \`workflow_complete\` with \`node: "${n.id}"\`.`);
       }
