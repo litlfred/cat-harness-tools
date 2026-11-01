@@ -35,19 +35,36 @@ describe.skipIf(COMPOSED_ABSENT)("instance references are owner/repo and resolve
   const files = (gitCorpus(CHECKOUT) ?? [])
     .map((abs) => relative(CHECKOUT, abs))
     .filter((f) => f.endsWith("voice.json") || /^([^/]+)\/\1\.json$/.test(f));
-  const refs: Array<{ file: string; ref: string }> = [];
-  for (const file of files) {
-    for (const m of readFileSync(join(CHECKOUT, file), "utf8").matchAll(/"instance":\s*"([^"]+)"/g)) {
-      refs.push({ file, ref: m[1]! });
+  // Each reference keeps the `url` of the object that names it, when there is
+  // one: a voice source that names an instance this checkout does not compose
+  // and says where it is held is HELD ELSEWHERE (owner, 2026-10-31, fa#2781:
+  // "report as held elsewhere"). It is listed, not failed. With no `url`,
+  // nothing says where it is, so it must resolve here.
+  const refs: Array<{ file: string; ref: string; url?: string }> = [];
+  const walk = (file: string, node: unknown): void => {
+    if (Array.isArray(node)) return node.forEach((n) => walk(file, n));
+    if (node === null || typeof node !== "object") return;
+    const o = node as Record<string, unknown>;
+    if (typeof o.instance === "string") {
+      refs.push({ file, ref: o.instance, ...(typeof o.url === "string" ? { url: o.url } : {}) });
     }
+    for (const v of Object.values(o)) walk(file, v);
+  };
+  for (const file of files) walk(file, JSON.parse(readFileSync(join(CHECKOUT, file), "utf8")));
+  const elsewhere = refs.filter(({ ref, url }) => !map.byRepository.has(ref) && url !== undefined);
+  if (elsewhere.length > 0) {
+    console.log(
+      `${elsewhere.length} instance reference(s) held elsewhere, not checked here:\n` +
+        elsewhere.map(({ file, ref, url }) => `  ~ ${file}: ${ref}, held at ${url}`).join("\n"),
+    );
   }
 
   test("there are references to check", () => {
     expect(refs.length).toBeGreaterThan(100);
   });
 
-  test("every one resolves through the derived map, by owner/repo", () => {
-    expect(refs.filter(({ ref }) => !map.byRepository.has(ref))).toEqual([]);
+  test("every one resolves through the derived map, by owner/repo, or says where it is held", () => {
+    expect(refs.filter(({ ref, url }) => !map.byRepository.has(ref) && url === undefined)).toEqual([]);
   });
 });
 

@@ -16,11 +16,30 @@ import type { KgQaReport } from "../../schemas/sdlc/kg-qa.js";
  * every lvlv review. A report that brings reviews of its own keeps those; an
  * unreadable prior is left to the caller's other guards, never guessed at.
  */
+import { quietly } from "../../schemas/sdlc/input-trace.ts";
+import { readQa } from "../qa-store.ts";
+
 export function withPriorAdversarialReviews(r: KgQaReport, path: string): KgQaReport {
-  if ((r.adversarial_reviews ?? []).length > 0 || !existsSync(path)) return r;
+  if ((r.adversarial_reviews ?? []).length > 0) return r;
+  let text: string | undefined;
+  if (existsSync(path)) {
+    try {
+      text = readFileSync(path, "utf-8");
+    } catch {
+      return r;
+    }
+  } else {
+    try {
+      const hit = quietly(() => readQa("main", path, { log: () => {} }));
+      if (hit.state === "hit") text = hit.text;
+    } catch {
+      return r;
+    }
+  }
+  if (!text) return r;
   let prior: unknown;
   try {
-    prior = (JSON.parse(readFileSync(path, "utf-8")) as { adversarial_reviews?: unknown }).adversarial_reviews;
+    prior = (JSON.parse(text) as { adversarial_reviews?: unknown }).adversarial_reviews;
   } catch {
     return r;
   }

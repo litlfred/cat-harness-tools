@@ -22,11 +22,12 @@
  * @module cat-harness/scripts/tests/two-greys.test
  */
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { baseDocsDir } from "../compose-docs.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { notApplicableAlone, siteNotBuilt } from "../../test/support/checkout.ts";
 import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
@@ -38,14 +39,19 @@ interface Vis {
   path?: string;
   readOnly?: boolean;
 }
-const harnesses = (
-  JSON.parse(readFileSync(join(BASE_DOCS, "_data", "harness.json"), "utf-8")) as {
-    harnesses?: { name?: string; title?: string; findings?: string[]; visualisations?: Vis[] }[];
-  }
-).harnesses ?? [];
+/** The harness report is written at publish and gitignored (bean w1gy F18). */
+const HARNESS_DATA = join(BASE_DOCS, "_data", "harness.json");
+const NOT_BUILT = siteNotBuilt("the harness data `docs:harness` writes at publish (gitignored)", HARNESS_DATA);
+const harnesses = NOT_BUILT
+  ? []
+  : ((
+      JSON.parse(readFileSync(HARNESS_DATA, "utf-8")) as {
+        harnesses?: { name?: string; title?: string; findings?: string[]; visualisations?: Vis[] }[];
+      }
+    ).harnesses ?? []);
 const all = harnesses.flatMap((h) => (h.visualisations ?? []).map((v) => ({ ...v, title: h.name ?? h.title })));
 
-describe("the two states arrive separately", () => {
+describe.skipIf(NOT_BUILT)("the two states arrive separately", () => {
   it("there are visualisations to reason about", () => {
     // Vacuity guard — every assertion below filters this list.
     expect(all.length).toBeGreaterThan(0);
@@ -117,7 +123,7 @@ describe("the two states arrive separately", () => {
   });
 });
 
-describe("read-only is SAID, not only recorded", () => {
+describe.skipIf(NOT_BUILT)("read-only is SAID, not only recorded", () => {
   /**
    * THE DEFECT THIS PINS: a mark with nothing to style.
    *
@@ -175,7 +181,10 @@ describe("read-only is SAID, not only recorded", () => {
   });
 });
 
-describe("who-iris — the instance that carries both answers", () => {
+/** who-iris is a content instance above the harness, which a standalone checkout does not hold. */
+const NO_IRIS =
+  !existsSync(join(REPO, "who-iris")) && notApplicableAlone("who-iris's checkout, the instance whose report this reads (a higher instance)");
+describe.skipIf(NOT_BUILT || NO_IRIS)("who-iris — the instance that carries both answers", () => {
   // KEYED ON `name`, NOT `title`. This read `title` and broke the moment main
   // gave who-iris the display label "WHO IRIS" — which is precisely the
   // distinction that change introduced: *"`name` stays the machine identifier

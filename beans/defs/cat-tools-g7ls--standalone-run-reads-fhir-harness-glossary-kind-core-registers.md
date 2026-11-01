@@ -2,11 +2,11 @@
 # cat-tools-g7ls
 $schema: bean/1.0.0
 title: 'STANDALONE LOAD ERRORS: ~250 cat-harness-tools tests fail to load standalone because fhir-harness.json declares the "glossary" kind that only folio-assistant-core registers'
-status: done
+status: completed
 type: bug
 priority: normal
 created_at: 2026-10-31T01:40:00Z
-updated_at: 2026-10-31T08:30:00Z
+updated_at: 2026-10-31T13:55:00Z
 parent: folio-assistant-1xhc
 ---
 

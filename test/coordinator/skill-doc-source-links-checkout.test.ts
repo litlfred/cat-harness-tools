@@ -14,6 +14,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.ts";
+import { siteNotBuilt } from "../support/checkout.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -21,6 +22,8 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 const INSTANCE_ROOT = resolve(ORIGIN_DIR, "../..");
 const REPO_ROOT = repoRootFor(INSTANCE_ROOT);
 const OUT_DIR = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT), "reference", "skill-instructions");
+/** The generated pages are written at publish and gitignored (bean w1gy F18). */
+const NOT_BUILT = siteNotBuilt("the skill reference pages `skills:docs` writes at publish (gitignored)", join(OUT_DIR, "index.md"));
 const LINK = /https:\/\/github\.com\/litlfred\/folio-assistant\/(?:blob|edit)\/main\/([^)\s]+)/g;
 
 /** The pages the generator PUBLISHES — the ones its index links. */
@@ -29,9 +32,10 @@ function publishedPages(): Set<string> {
   return new Set([...index.matchAll(/\]\(([^)/]+)\.html\)/g)].map((m) => `${m[1]}.md`));
 }
 
-describe("generated skill pages link a source that exists", () => {
-  const published = publishedPages();
-  const pages = readdirSync(OUT_DIR).filter((f) => f.endsWith(".md") && f !== "index.md");
+describe.skipIf(NOT_BUILT)("generated skill pages link a source that exists", () => {
+  // `describe.skipIf` still runs this body, so nothing is read when it skips.
+  const published = NOT_BUILT ? new Set<string>() : publishedPages();
+  const pages = NOT_BUILT ? [] : readdirSync(OUT_DIR).filter((f) => f.endsWith(".md") && f !== "index.md");
 
   test("the corpus is not empty — the guard every assertion below needs", () => {
     expect(published.size).toBeGreaterThan(100);

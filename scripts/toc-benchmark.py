@@ -34,6 +34,8 @@ Usage:
     toc-benchmark.py --json out.json      # also write per-document results
     toc-benchmark.py --methods regex,font # choose methods
     toc-benchmark.py --layout-backend pdfminer   # font metrics from pdfminer.six
+    toc-benchmark.py --gold scripts/tests/fixtures/dth-toc-gold.json --methods pipeline,consensus \\
+        <who-iris>/uploads/9789240116191-eng/9789240116191-eng.pdf ...   # hand-made answer keys
 """
 
 from __future__ import annotations
@@ -202,6 +204,20 @@ def m_consensus(doc: Doc) -> list[H.Heading]:
     return [s.heading for s in H.consensus_headings(doc.lines, others)]
 
 
+def m_pipeline(doc: Doc) -> list[H.Heading]:
+    """What `pdf-structure.py` itself would use: the PDF's outline (repaired by
+    `repair_outline`) when it has one, else its inferred TOC. Only meaningful
+    against a `--gold` key, since against the outline an outline scores 1."""
+    import pymupdf
+    with pymupdf.open(doc.path) as d:
+        raw = d.get_toc(simple=True)
+    outline, _ = PS.repair_outline(PS._toc_entries(raw), doc.pages)
+    if outline:
+        return [H.Heading(e.level, e.title, e.page, e.number) for e in outline]
+    toc, _ = PS.infer_toc(doc.lines, doc.pages)
+    return [H.Heading(e.level, e.title, e.page, e.number) for e in toc]
+
+
 def m_latex(doc: Doc) -> list[H.Heading]:
     """The paper's own LaTeX headings, placed on their pages
     (`_pdf_headings.latex_headings`), as `pdf-structure.py` uses them: only
@@ -227,7 +243,10 @@ METHODS = {
     "latex": m_latex,
     "grobid": m_grobid,
     "nougat": m_nougat,
+    "pipeline": m_pipeline,
 }
+# Not run unless asked: scored against an outline, the outline scores 1.
+NOT_DEFAULT = {"pipeline"}
 
 
 # ---------------------------------------------------------------- scoring
@@ -423,18 +442,31 @@ def default_corpus(root: str) -> list[str]:
     return found
 
 
-def load(path: str, layout_backend: str = "pymupdf") -> Doc:
+def gold_key(path: str, keys: dict) -> list[H.Heading] | None:
+    """A hand-made answer key for this PDF from a `--gold` file, matched on the
+    file name. For a document whose outline is missing or wrong, the sections a
+    person settled on are the only answer there is (bean `6chd`: the WHO
+    handbooks re-split by hand in who-iris)."""
+    entry = keys.get(os.path.basename(path))
+    if not entry:
+        return None
+    return [H.Heading(int(e["level"]), e["title"], e.get("page"), None) for e in entry["toc"]]
+
+
+def load(path: str, layout_backend: str = "pymupdf", keys: dict | None = None) -> Doc:
     with contextlib.redirect_stdout(io.StringIO()):
         backend = PS.open_backend(path, "pymupdf")
         pages = backend.page_texts()
-    return Doc(path, gold_outline(path), H.extract_lines(path, layout_backend), pages)
+    gold = gold_key(path, keys or {})
+    return Doc(path, gold if gold is not None else gold_outline(path),
+               H.extract_lines(path, layout_backend), pages)
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("pdfs", nargs="*")
     ap.add_argument("--root", default=os.path.dirname(str(__import__("_harness_root").HARNESS_ROOT)))  # bean 70lx: the checkout holding the harness
-    ap.add_argument("--methods", default=",".join(METHODS))
+    ap.add_argument("--methods", default=",".join(m for m in METHODS if m not in NOT_DEFAULT))
     ap.add_argument("--json", default="build/benchmarks/toc-benchmark.json",
                     help="write per-document results here (default: build/benchmarks/toc-benchmark.json)")
     ap.add_argument("--no-json", action="store_true", help="do not write JSON output")
@@ -442,10 +474,16 @@ def main() -> int:
     ap.add_argument("--nougat-mmd", help="directory of Nougat <stem>.mmd outputs, for the `nougat` method")
     ap.add_argument("--layout-backend", choices=["pymupdf", "pdfminer"], default="pymupdf",
                     help="which library reads font metrics (pdfminer.six is MIT; PyMuPDF is AGPL)")
+    ap.add_argument("--gold", help="JSON answer keys by PDF file name ({name: {toc: [{level, title, page}]}}), "
+                    "used instead of the outline for the PDFs it names; e.g. scripts/tests/fixtures/dth-toc-gold.json")
     args = ap.parse_args()
 
     global TEI_DIR, MMD_DIR
     TEI_DIR, MMD_DIR = args.grobid_tei, args.nougat_mmd
+    keys = {}
+    if args.gold:
+        with open(args.gold) as f:
+            keys = {k: v for k, v in json.load(f).items() if not k.startswith("_")}
     pdfs = args.pdfs or default_corpus(args.root)
     methods = [m for m in args.methods.split(",") if m]
     if "grobid" in methods and not TEI_DIR:
@@ -454,7 +492,7 @@ def main() -> int:
         methods.remove("nougat")
     rows = []
     for path in pdfs:
-        doc = load(path, args.layout_backend)
+        doc = load(path, args.layout_backend, keys)
         rel = os.path.relpath(path, args.root)
         if outline_is_pages(doc.gold):
             print(f"set aside, outline bookmarks pages not sections: {rel}", file=sys.stderr)

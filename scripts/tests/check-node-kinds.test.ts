@@ -12,7 +12,8 @@
  * 60 s timeout.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { defaultGraphTypologies, readDeclaration } from "../../schemas/kg/cat-harness.ts";
@@ -28,6 +29,10 @@ let built: NodeKindIndex | undefined;
 const index = async () => (built ??= await nodeKindIndex(defaultGraphTypologies, HARNESS_ROOT, repoRoot));
 const owner = (t: string) => typologyOwner(defaultGraphTypologies, t);
 const baselines = () => new Map(readBaselines(repoRoot).map((d) => [d.instance, d.entries ?? (d.path ? [] : undefined)] as const));
+// A mounted layer's baseline is its own repository's (#1171): this checkout may
+// kind a family it lists, and only that repository prunes it. So, like the
+// gate, these tests do not count such a family as gone.
+const mounted = () => new Set(readBaselines(repoRoot).filter((d) => d.mounted).map((d) => d.instance));
 
 describe("the table is built at publish", () => {
   test("cat-harness declares docs/_data/node-kinds.json builtAtPublish, written by node-kinds, and ignores it", () => {
@@ -51,8 +56,13 @@ describe("the table is built at publish", () => {
   test("the combined build is a node-kind-index whose unkinded families are exactly the instances' baselines", async () => {
     const file = JSON.parse(render(await index()));
     expect(NodeKindIndexFileKind.schema.safeParse(file).success).toBe(true);
-    const held = [...baselines().values()].flatMap((b) => b ?? []).map(unkindedKey).sort();
-    expect((file.unkinded as { typology: string; family?: string }[]).map(unkindedKey).sort()).toEqual(held);
+    const built = (file.unkinded as { typology: string; family?: string }[]).map(unkindedKey).sort();
+    const own = [...baselines()].filter(([i]) => !mounted().has(i)).flatMap(([, b]) => b ?? []).map(unkindedKey);
+    const all = new Set([...baselines().values()].flatMap((b) => b ?? []).map(unkindedKey));
+    // Every unkinded family is held by some baseline, and every family the
+    // checkout's own instances hold is still unkinded.
+    expect(built.filter((k) => !all.has(k))).toEqual([]);
+    expect(own.filter((k) => !built.includes(k)).sort()).toEqual([]);
   }, SLOW);
 });
 
@@ -66,7 +76,8 @@ describe("each instance's baseline, on this checkout", () => {
   test("DAY ONE: the gate passes exactly as the shared baseline did — nothing new, gone, foreign or unattributed", async () => {
     const { layers, unattributed } = ratchet(await index(), owner, baselines());
     expect(unattributed.map(unkindedKey)).toEqual([]);
-    expect(layers.flatMap((l) => [...l.fresh, ...l.gone, ...l.foreign].map((k) => `${l.instance} ${k}`))).toEqual([]);
+    const m = mounted();
+    expect(layers.flatMap((l) => [...l.fresh, ...(m.has(l.instance) ? [] : l.gone), ...l.foreign].map((k) => `${l.instance} ${k}`))).toEqual([]);
   }, SLOW);
 
   test("a NEW unkinded family fails in the layer that declares its typology, and nowhere else", async () => {
@@ -77,4 +88,22 @@ describe("each instance's baseline, on this checkout", () => {
     const failing = layers.filter((l) => l.fresh.length > 0).map((l) => [l.instance, l.fresh]);
     expect(failing).toEqual([[owner(victim.typology)!, [unkindedKey(added)]]]);
   }, SLOW);
+});
+
+describe("a mounted layer's baseline is its own repository's", () => {
+  test("readBaselines marks an instance a lock laid down as mounted, and the checkout's own as not", () => {
+    const root = mkdtempSync(join(tmpdir(), "node-kinds-mounted-"));
+    try {
+      for (const name of ["lower", "own"]) {
+        mkdirSync(join(root, name));
+        writeFileSync(join(root, name, `${name}.json`), JSON.stringify({ name }));
+      }
+      writeFileSync(join(root, "index.lock.json"), JSON.stringify({ instances: [{ path: "lower/" }] }));
+      const by = new Map(readBaselines(root).map((d) => [d.instance, d] as const));
+      expect(by.get("lower")?.mounted).toBe(true);
+      expect(by.get("own")?.mounted).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

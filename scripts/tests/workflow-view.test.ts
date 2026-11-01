@@ -22,6 +22,8 @@ import {
   NO_INSTANCE_REASON,
   readInstances,
   STUCK_AFTER_DAYS,
+  dayOf,
+  startOfUtcDay,
   stuckStatesOf,
   todosNamedBy,
   inheritsClosure,
@@ -29,6 +31,7 @@ import {
   dynamicStateDocument,
   DYNAMIC_STATE_FILE,
   DYNAMIC_STATE_SCHEMA,
+  DynamicStateKind,
 } from "../workflow-view.ts";
 import { loadProcessModel } from "../../src/workflow/process-model.js";
 import { REFUSALS_KEPT, withRefusal } from "../../src/workflow/instance.js";
@@ -364,6 +367,12 @@ describe("the dynamic-state document (bean 6h47)", () => {
     expect(b.stuck.map((x) => x.kind)).toContain("enabled-not-taken");
   });
 
+  test("what it writes is a node of the kind its docs family names, and a wrong type is refused", () => {
+    const written = JSON.parse(JSON.stringify(doc()));
+    expect(DynamicStateKind.schema.safeParse(written).success).toBe(true);
+    expect(DynamicStateKind.schema.safeParse({ ...written, type: "cat-harness:WorkflowInstance" }).success).toBe(false);
+  });
+
   test("an unread store is named, so its instances read as unknown, not none", () => {
     expect(doc().unreadStores).toEqual(["other"]);
   });
@@ -393,5 +402,15 @@ describe("the dynamic-state document (bean 6h47)", () => {
     const jsonld = (await import("jsonld")).default;
     const expanded = await jsonld.expand(JSON.parse(JSON.stringify(d)), { base: "https://example.org/h/state.jsonld" });
     expect(JSON.stringify(expanded)).toContain("https://example.org/h/state.jsonld#workflow/s/a");
+  });
+});
+
+describe("startOfUtcDay / dayOf (cat-harness-tools#1230)", () => {
+  test("two builds on the same UTC day measure against the same instant", () => {
+    const a = startOfUtcDay(new Date("2026-11-01T08:32:58.829Z"));
+    const b = startOfUtcDay(new Date("2026-11-01T23:59:59.999Z"));
+    expect(a.toISOString()).toBe("2026-11-01T00:00:00.000Z");
+    expect(b.getTime()).toBe(a.getTime());
+    expect(dayOf(a)).toBe("2026-11-01");
   });
 });

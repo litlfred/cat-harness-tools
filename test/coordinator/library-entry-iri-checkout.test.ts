@@ -17,6 +17,7 @@ import { entryView, instanceRootRoutes } from "../../scripts/gen-library-viz.ts"
 import { LibraryIndexSchema } from "../../schemas/ui/site-indexes.ts";
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { libraryAssetIri, libraryAssetSitePath } from "../../schemas/library/library-iri.ts";
+import { notApplicableAlone, siteNotBuilt } from "../support/checkout.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -24,13 +25,16 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 const HARNESS = resolve(ORIGIN_DIR, "../..");
 const REPO = resolve(HARNESS, "..");
 const SITE = join(HARNESS, siteDirFor(HARNESS));
+const INDEX = join(SITE, "assets", "library", "index.json");
+/** The projection and the entry files it lists are written at publish and gitignored (bean w1gy F18). */
+const NOT_BUILT = siteNotBuilt("the library projection `library:viz` writes at publish (gitignored)", INDEX);
 
 describe("asset and rendering: two resources, two IRIs (owner, 2026-10-02)", () => {
   // "each asset should have one IRI, but the view page is a rendering of that
   // asset, a different page. fix IRIs" — and "asset doesnt know about its
   // renderings".
-  const index = LibraryIndexSchema.parse(JSON.parse(readFileSync(join(SITE, "assets", "library", "index.json"), "utf-8")));
-  test("every entry's @id IS the address of its published JSON-LD, and that file is published", () => {
+  test.skipIf(NOT_BUILT)("every entry's @id IS the address of its published JSON-LD, and that file is published", () => {
+    const index = LibraryIndexSchema.parse(JSON.parse(readFileSync(INDEX, "utf-8")));
     for (const e of index.entries) {
       const m = JSON.parse(readFileSync(join(REPO, e.dir, "manifest.jsonld"), "utf-8")) as { "@id": string };
       expect(m["@id"], e.dir).toBe(libraryAssetIri(e.instance, e.id));
@@ -44,6 +48,11 @@ describe("asset and rendering: two resources, two IRIs (owner, 2026-10-02)", () 
     expect(entryView({ links: [{ href: "/smart-trust/" }] }, roots, "x/y/z")).toBe("/smart-trust/");
     expect(entryView({ links: [{ href: "/somewhere-else/" }] }, roots, "x/y/z")).toBe("/x/y/z/");
     expect(entryView({}, roots, "x/y/z")).toBe("/x/y/z/");
+  });
+  // smart-trust is an instance above the harness, held only by the composed checkout.
+  const noSmartTrust =
+    !existsSync(join(REPO, "smart-trust")) && notApplicableAlone("smart-trust's checkout, whose declared root this reads (a higher instance)");
+  test.skipIf(noSmartTrust)("and smart-trust's declared root is the route its entries take", () => {
     expect(instanceRootRoutes(REPO).get("smart-trust")).toBe("/smart-trust/");
   });
 });

@@ -121,6 +121,8 @@ export function findDeclarationFile(dir: string): string | undefined {
     if (!entry.endsWith(DECLARATION_SUFFIX)) continue;
     // `index.config.json`, `index.lock.json`: the platform's, never a declaration.
     if (isReservedIndexFile(entry)) continue;
+    // `*.config.json`, `*.baseline.json`, `package.json`, `tsconfig.json`: configs, baselines and manifests, never a declaration.
+    if (entry.endsWith(CONFIG_SUFFIX) || entry.endsWith(".baseline.json") || entry === "package.json" || entry === "tsconfig.json") continue;
     const stem = entry.slice(0, -DECLARATION_SUFFIX.length);
     if (stem.length === 0) continue;
     let raw: unknown;

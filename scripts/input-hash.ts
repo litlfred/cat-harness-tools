@@ -525,7 +525,7 @@ const RUNTIME_ENV = ["BUN_OPTIONS", "NODE_OPTIONS", "GIT_DIR", "GIT_WORK_TREE", 
 
 /** `bun` and `git` versions — a tool upgrade can change an answer with no file changing. */
 let toolVersions: string | undefined;
-function toolsLine(): string {
+export function toolsLine(): string {
   if (toolVersions === undefined) {
     // input-site: traced #69cae5db — the fingerprint machinery
     inputSiteReached("input-hash: git --version");

@@ -23,6 +23,25 @@ import {
   renderKind,
 } from "../gen-kind-json-schemas.ts";
 import { HARNESS_NAME, HARNESS_ROOT } from "../lib/roots.ts";
+import { notApplicableAlone } from "../../test/support/checkout.ts";
+
+/**
+ * Whether the harness's `needs` cannot be found here. `rootOf` finds a needed
+ * instance in the composed checkout, and standing alone it does not search the
+ * clone's siblings (bean `68k7`; the sibling root is w1gy F11). Only that
+ * throw, and only standing alone, is "not applicable": any other error, or the
+ * same one in a composed checkout, fails the tests below by name.
+ */
+const NEEDS_NOT_FOUND = ((): boolean => {
+  try {
+    harnessInstances();
+    return false;
+  } catch (e) {
+    const msg = (e as Error).message;
+    if (!msg.includes("is not mounted beside")) return false;
+    return notApplicableAlone(`the harness's \`needs\`, found where the composed checkout mounts them (${msg})`);
+  }
+})();
 
 describe("pointerToken", () => {
   test("escapes what a JSON Pointer and a URI fragment cannot carry", () => {
@@ -35,11 +54,11 @@ describe("pointerToken", () => {
 describe("renderKind", () => {
   const dir = declaredSchemasDir();
 
-  test("the harness has kinds to render", () => {
+  test.skipIf(NEEDS_NOT_FOUND)("the harness has kinds to render", () => {
     expect(harnessKinds().length).toBeGreaterThan(0);
   });
 
-  test("a kind with a validator gets a file whose $id ends in its path", async () => {
+  test.skipIf(NEEDS_NOT_FOUND)("a kind with a validator gets a file whose $id ends in its path", async () => {
     const d = await renderKind("tools", dir);
     if (!("file" in d)) throw new Error(`tools rendered no file: ${d.none}`);
     const path = relative(HARNESS_ROOT, d.file).split("\\").join("/");
@@ -48,7 +67,7 @@ describe("renderKind", () => {
     expect(JSON.parse(d.text).$id).toBe(d.id);
   });
 
-  test("a kind with families is anyOf over them, each $ref resolving to a $defs entry", async () => {
+  test.skipIf(NEEDS_NOT_FOUND)("a kind with families is anyOf over them, each $ref resolving to a $defs entry", async () => {
     const d = await renderKind("skills", dir);
     if (!("file" in d)) throw new Error(`skills rendered no file: ${d.none}`);
     const doc = JSON.parse(d.text) as { anyOf: { $ref: string }[]; $defs: Record<string, unknown> };
@@ -57,7 +76,7 @@ describe("renderKind", () => {
     expect(doc.anyOf.length).toBeGreaterThan(0);
   });
 
-  test("a kind where no validator applies gets no file, and says why", async () => {
+  test.skipIf(NEEDS_NOT_FOUND)("a kind where no validator applies gets no file, and says why", async () => {
     const na = harnessKinds().find((k) => defaultGraphTypologies.get(k)?.validatorNotApplicable);
     if (!na) throw new Error("no kind declares validatorNotApplicable");
     const d = await renderKind(na, dir);
@@ -72,7 +91,8 @@ describe("renderKind", () => {
 // documents.
 describe("the output does not depend on the layers mounted above the harness", () => {
   const dir = declaredSchemasDir();
-  const instances = harnessInstances();
+  // `describe` still runs this body; the tests that read it skip together.
+  const instances = NEEDS_NOT_FOUND ? [] : harnessInstances();
   const scopes = [...new Set(instances.map((r) => siblingScopeFor(r)))];
 
   const above = realpathSync(mkdtempSync(join(tmpdir(), "kind-json-schemas-above-")));
@@ -103,7 +123,7 @@ describe("the output does not depend on the layers mounted above the harness", (
     }),
   );
 
-  test("the instances read are the harness and what it needs, never a layer above", () => {
+  test.skipIf(NEEDS_NOT_FOUND)("the instances read are the harness and what it needs, never a layer above", () => {
     const names = instances.map((r) => readDeclaration(r)?.name);
     expect(names[0]).toBe(HARNESS_NAME);
     for (const n of readDeclaration(HARNESS_ROOT)?.needs ?? []) expect(names).toContain(n);
@@ -112,7 +132,7 @@ describe("the output does not depend on the layers mounted above the harness", (
     expect(instances.map((r) => basename(r))).not.toContain("higher-layer");
   });
 
-  test("the fixture bites: a registry that reads every instance takes its validator", () => {
+  test.skipIf(NEEDS_NOT_FOUND)("the fixture bites: a registry that reads every instance takes its validator", () => {
     const allowed = new Set([...instances.map((r) => realpathSync(r)), higher]);
     const reading = new GraphTypologyRegistry(BASE_GRAPH_TYPOLOGIES, [...scopes, above], {
       include: (root) => allowed.has(realpathSync(root)),
@@ -120,7 +140,7 @@ describe("the output does not depend on the layers mounted above the harness", (
     expect(reading.validatorNodeFor("uploads", "folio-extraction/v1")?.file).toBe(join(higher, "validators", "extraction.json"));
   });
 
-  test("with it mounted, every harness kind renders byte-for-byte as without it", async () => {
+  test.skipIf(NEEDS_NOT_FOUND)("with it mounted, every harness kind renders byte-for-byte as without it", async () => {
     const alone = harnessRegistry(instances, scopes);
     const beside = harnessRegistry(instances, [...scopes, above]);
     expect(beside.validatorNodeFor("uploads", "folio-extraction/v1")).toBeUndefined();
@@ -147,7 +167,7 @@ describe("the output does not depend on the layers mounted above the harness", (
   // `{ "not": {} }` is right for a field that must be absent (`z.never()`, as
   // `kg-qa/v1` writes for the judgements it moved out); it was wrong for
   // `appliesTo`, whose block kinds the harness alone declares none of.
-  test("a voice's `appliesTo` accepts a block kind the harness does not declare", async () => {
+  test.skipIf(NEEDS_NOT_FOUND)("a voice's `appliesTo` accepts a block kind the harness does not declare", async () => {
     for (const k of ["voices", "voice-vendors", "skills"]) {
       const d = await renderKind(k, dir);
       if (!("text" in d)) throw new Error(`${k} rendered no file: ${d.none}`);
