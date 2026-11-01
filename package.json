@@ -19,8 +19,6 @@
     "./routes/chat": "./src/routes/chat.ts",
     "./tools/nquads-query": "./src/tools/nquads-query.ts",
     "./adapters/*.js": "./adapters/*.ts",
-    "./archimate/*.js": "./archimate/*.ts",
-    "./archimate/*": "./archimate/*",
     "./adapters/*": "./adapters/*",
     "./pipeline/*.js": "./pipeline/*.ts",
     "./pipeline/*": "./pipeline/*",
