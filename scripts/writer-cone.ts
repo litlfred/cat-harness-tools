@@ -98,8 +98,7 @@ export function loadWriterRecords(root: string, file = join(root, WRITER_RECORD_
   return undefined;
 }
 
-export function saveWriterRecords(root: string, records: WriterRecords): void {
-  const path = join(root, WRITER_RECORD_FILE);
+export function saveWriterRecords(root: string, records: WriterRecords, path = join(root, WRITER_RECORD_FILE)): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(records, null, 1)}\n`);
 }
