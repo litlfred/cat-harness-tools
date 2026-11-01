@@ -426,7 +426,13 @@ def shard_names(names, i, n, timings=None, alone=(), jobs=1):
 
 
 def gate_jobs():
-    """`GATE_JOBS`, the gates run at once within one shard; 1 when unset."""
+    """`GATE_JOBS`, the gates run at once within one shard; 1 when unset.
+
+    For the split, 1 under `GATE_CONE=record` too: a push traces its gates one
+    at a time (the `traced` loop), so there they cost their whole seconds and
+    the summed-seconds split is the wall-time split."""
+    if os.environ.get("GATE_CONE", "").strip() == "record":
+        return 1
     return max(1, int(os.environ.get("GATE_JOBS", "1") or "1"))
 
 
@@ -849,9 +855,8 @@ def main():
     skipped = {k: {"command": v["command"], "skipped": v["skipped"]} for k, v in skipped.items()}
     total = len(gates)
     timings = read_timings(os.environ.get("GATE_TIMINGS"))
-    jobs = gate_jobs()
     alone = tree_snapshotting(root)
-    gates = {k: gates[k] for k in shard_names(list(gates), shard, shards, timings, alone, jobs)}
+    gates = {k: gates[k] for k in shard_names(list(gates), shard, shards, timings, alone, gate_jobs())}
     if shard != 1:
         skipped, records = {}, []  # shard 1 carries them, so a merged side holds each once
     split = "by recorded seconds" if timings and shards > 1 else "by count"
@@ -871,6 +876,7 @@ def main():
     results = {}
     pooled = [kv for kv in gates.items() if kv[0] not in alone and kv[0] not in traced]
     serial = [kv for kv in gates.items() if kv[0] in alone and kv[0] not in traced]
+    jobs = max(1, int(os.environ.get("GATE_JOBS", "1")))
     with ThreadPoolExecutor(max_workers=jobs) as pool:
         outcomes = list(pool.map(lambda kv: run(root, kv[0], kv[1]), pooled))
     outcomes += [run(root, k, v) for k, v in serial]

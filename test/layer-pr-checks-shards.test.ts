@@ -159,22 +159,22 @@ describe("run-gates.py shard_names weighs alone gates by wall time", () => {
     return JSON.parse(r.stdout);
   };
   // folio-assistant-core run 41260767852, simplified: one 500 s gate that
-  // runs alone, then pooled gates whose summed seconds equal it. By summed
-  // seconds they are a fair pair; in wall time, with 4 at once, the pooled
-  // half takes a quarter as long, so it is not.
+  // runs alone, then forty 25 s pooled gates (1000 s summed). By summed
+  // seconds the alone gate's shard should take 20 of them; in wall time, with
+  // 4 at once, all forty take 250 s, so they belong on the other shard.
   const timings: Record<string, number> = { "a:check:alone": 500 };
-  for (let k = 0; k < 20; k++) timings[`a:check:p${String(k).padStart(2, "0")}`] = 25;
+  for (let k = 0; k < 40; k++) timings[`a:check:p${String(k).padStart(2, "0")}`] = 25;
 
   test("an alone gate costs its whole seconds, pooled ones their sum over GATE_JOBS", () => {
     const parts = split(timings, ["a:check:alone"], 2, 4);
     const lone = parts.find((p) => p.includes("a:check:alone"));
-    // The pooled shard can hold all 20 (500 s / 4 = 125 s) before it waits as long as the alone one.
+    // The summed-seconds split gives it 10 of the pooled gates (750 s a side).
     expect(lone).toEqual(["a:check:alone"]);
   });
 
   test("with GATE_JOBS 1 the split is the summed-seconds split", () => {
     const parts = split(timings, ["a:check:alone"], 2, 1);
-    expect(parts.map((p) => p.length).sort()).toEqual([1, 20]);
+    expect(parts.map((p) => p.length).sort((x, y) => x - y)).toEqual([11, 30]);
     const plain = split(timings, [], 2, 1);
     expect(plain).toEqual(parts);
   });
