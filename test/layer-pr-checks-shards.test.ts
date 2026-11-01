@@ -145,6 +145,49 @@ describe("run-gates.py GATE_TIMINGS (cat-harness-tools#397)", () => {
   });
 });
 
+describe("run-gates.py shard_names weighs alone gates by wall time", () => {
+  /** shard_names over `names`, called in python3 -I as the workflow's runner is. */
+  const split = (timings: Record<string, number>, alone: string[], n: number, jobs: number): string[][] => {
+    const code = [
+      "import importlib.util, json, sys",
+      "spec = importlib.util.spec_from_file_location('rg', sys.argv[1]); rg = importlib.util.module_from_spec(spec); spec.loader.exec_module(rg)",
+      "t, a, n, j = json.loads(sys.argv[2]), json.loads(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])",
+      "print(json.dumps([rg.shard_names(sorted(t), i, n, t, set(a), j) for i in range(1, n + 1)]))",
+    ].join("\n");
+    const r = spawnSync("python3", ["-I", "-c", code, RUN_GATES, JSON.stringify(timings), JSON.stringify(alone), String(n), String(jobs)], { encoding: "utf-8" });
+    if (r.status !== 0) throw new Error(r.stderr);
+    return JSON.parse(r.stdout);
+  };
+  // folio-assistant-core run 41260767852, simplified: one 500 s gate that
+  // runs alone, then pooled gates whose summed seconds equal it. By summed
+  // seconds they are a fair pair; in wall time, with 4 at once, the pooled
+  // half takes a quarter as long, so it is not.
+  const timings: Record<string, number> = { "a:check:alone": 500 };
+  for (let k = 0; k < 20; k++) timings[`a:check:p${String(k).padStart(2, "0")}`] = 25;
+
+  test("an alone gate costs its whole seconds, pooled ones their sum over GATE_JOBS", () => {
+    const parts = split(timings, ["a:check:alone"], 2, 4);
+    const lone = parts.find((p) => p.includes("a:check:alone"));
+    // The pooled shard can hold all 20 (500 s / 4 = 125 s) before it waits as long as the alone one.
+    expect(lone).toEqual(["a:check:alone"]);
+  });
+
+  test("with GATE_JOBS 1 the split is the summed-seconds split", () => {
+    const parts = split(timings, ["a:check:alone"], 2, 1);
+    expect(parts.map((p) => p.length).sort()).toEqual([1, 20]);
+    const plain = split(timings, [], 2, 1);
+    expect(plain).toEqual(parts);
+  });
+
+  test("eight shards stay disjoint, cover the set and agree across calls", () => {
+    const a = split(timings, ["a:check:alone"], 8, 4);
+    const seen = a.flat();
+    expect(new Set(seen).size).toBe(seen.length);
+    expect(seen.sort()).toEqual(Object.keys(timings).sort());
+    expect(split(timings, ["a:check:alone"], 8, 4)).toEqual(a);
+  });
+});
+
 describe("merge-shards.py", () => {
   const root = fixtureRoot();
   const unsharded = mkdtempSync(join(tmpdir(), "gate-whole-"));
