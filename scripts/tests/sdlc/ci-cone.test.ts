@@ -195,6 +195,7 @@ describe.skipIf(!HAS_STRACE)("the falsifiers, under a real strace (skipped where
     "w:check": "bun scripts/w.ts",
     "red:check": "bun scripts/red.ts",
     "g:check": "bun scripts/g.ts",
+    "o:check": "bun scripts/o.ts",
   };
   const io: PairIO = { inputs: [TRACKED], outputs: [] };
   let baselineId = "entry-1";
@@ -225,6 +226,10 @@ describe.skipIf(!HAS_STRACE)("the falsifiers, under a real strace (skipped where
     );
     write("scripts/w.ts", 'import { writeFileSync } from "node:fs";\nwriteFileSync("data/out.txt", "x");\n');
     write("scripts/red.ts", "process.exit(1);\n");
+    // Asks whether opened/ is a directory and reads one file in it, but never lists it (tools#1265).
+    write("scripts/o.ts", 'import { readFileSync, statSync } from "node:fs";\nif (statSync("opened").isDirectory()) console.log(readFileSync("opened/k.json", "utf-8"));\n');
+    mkdirSync(join(root, "opened"));
+    write("opened/k.json", "k\n");
     // Asks git for the tracked files under data/ (a `tree` site), annotated as the audit requires.
     write(
       "scripts/g.ts",
@@ -278,6 +283,23 @@ describe.skipIf(!HAS_STRACE)("the falsifiers, under a real strace (skipped where
     const d = decide();
     expect(d.skip).toBe(true);
     expect(d.skip && d.sha).toBe("mainsha");
+  });
+
+  test("a directory it only OPENED: a new entry does not make it run; the file it read, or the directory becoming a file, does (tools#1265)", () => {
+    expect(record("o:check").note).toStartWith("recorded");
+    const reads = loadRecords(root)!.checks["o:check"]!.reads;
+    expect(reads["opened"]).toBe("dir");
+    // bun itself lists the checkout root and the directory of every module it loads.
+    expect(reads["scripts"]).toStartWith("dir ");
+    write("opened/new.json", "{}\n");
+    expect(decide("o:check").skip).toBe(true);
+    write("opened/k.json", "changed\n");
+    expect(decide("o:check").skip).toBe(false);
+    write("opened/k.json", "k\n");
+    expect(decide("o:check").skip).toBe(true);
+    rmSync(join(root, "opened"), { recursive: true });
+    write("opened", "now a file\n");
+    expect(decide("o:check").skip).toBe(false);
   });
 
   test("THE CONE: a change to a file the check never read does not make it run", () => {

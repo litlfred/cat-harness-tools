@@ -88,6 +88,16 @@
  *   script's own reads of `.git` are kept.
  * - **This module's own directory and the input-hash cache.** They are
  *   written by the recording machinery, never read by a check.
+ *
+ * ## A directory that was opened is not a directory that was listed
+ *
+ * `getdents64` is traced too (tracer 3, tools#1265). A directory the run only
+ * opened, stat'ed or resolved names inside, and never listed, has the state
+ * {@link OPENED_DIR}: all the run learnt is that the path is a directory, and
+ * every name it looked up inside is a path of its own in the read set. Only a
+ * directory whose entries the run read keeps its sorted entry listing. Before
+ * this, bun opening the checkout root to find `package.json` made a new
+ * top-level entry rerun every writer.
  */
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, lstatSync, statSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -109,7 +119,7 @@ import { collectTaskIo } from "./task-io.ts";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 
 /** Bump when the parser or the read-set rules change. A record from another version is ignored, so every check runs. */
-export const TRACER_VERSION = 2;
+export const TRACER_VERSION = 3;
 
 /** Where the records live, relative to the checkout. `build/` is git-ignored, and the workflow caches this directory. */
 export const CONE_DIR = join("build", "ci-cone");
@@ -134,8 +144,8 @@ export const MAX_WRITER_PATHS = 200000;
  */
 export const MAX_TRACE_BYTES = 256 * 1024 * 1024;
 
-/** What `strace` traces: every path-taking syscall, `getcwd`, and process creation for the cwd of each child. */
-export const STRACE_ARGS = ["-f", "-qq", "-y", "-s", "65536", "-e", "trace=%file,getcwd,clone,clone3,fork,vfork", "-e", "signal=none"] as const;
+/** What `strace` traces: every path-taking syscall, `getcwd`, directory listings, and process creation for the cwd of each child. */
+export const STRACE_ARGS = ["-f", "-qq", "-y", "-s", "65536", "-e", "trace=%file,getcwd,getdents,getdents64,clone,clone3,fork,vfork", "-e", "signal=none"] as const;
 
 /** One git command a traced run executed: where, and with what arguments (after `git`). */
 export interface GitCall {
@@ -144,7 +154,11 @@ export interface GitCall {
   args: string[];
 }
 
-export type ReadSet = { paths: string[]; git: GitCall[]; writes?: string[]; absentBefore?: string[]; rewritten?: string[] } | { undetermined: string };
+/**
+ * `listed`: the read paths whose directory entries the run read (`getdents`).
+ * A read directory NOT in it was only opened, so its state is {@link OPENED_DIR}.
+ */
+export type ReadSet = { paths: string[]; git: GitCall[]; listed?: string[]; writes?: string[]; absentBefore?: string[]; rewritten?: string[] } | { undetermined: string };
 
 /**
  * Git subcommands the cone may REPLAY on a PR to ask git's view of the tree
@@ -275,6 +289,8 @@ const SYSCALLS: Readonly<Record<string, { paths: readonly (readonly [number, num
 
 /** Syscalls that are traced for the cwd bookkeeping only. */
 const PROCESS_CALLS = new Set(["clone", "clone3", "fork", "vfork", "getcwd", "fchdir"]);
+/** Directory listings: they take an fd, which `-y` prints with its path. */
+const LIST_CALLS = new Set(["getdents", "getdents64"]);
 
 /** Split a syscall's argument list at top-level commas, respecting quotes and brackets. */
 export function splitArgs(s: string): string[] {
@@ -351,7 +367,7 @@ function calls(text: string): Call[] | { undetermined: string } {
     if (resumed !== null) {
       const p = pending.get(pid);
       if (p === undefined) {
-        if (/\s*<detached \.\.\.>$/.test(resumed[2]!) || (!(resumed[1]! in SYSCALLS) && !PROCESS_CALLS.has(resumed[1]!))) continue;
+        if (/\s*<detached \.\.\.>$/.test(resumed[2]!) || (!(resumed[1]! in SYSCALLS) && !PROCESS_CALLS.has(resumed[1]!) && !LIST_CALLS.has(resumed[1]!))) continue;
         return { undetermined: `pid ${pid}: a resumed ${resumed[1]} with no start` };
       }
       pending.delete(pid);
@@ -423,6 +439,8 @@ export function parseTrace(
     return c;
   };
   const paths = new Set<string>();
+  /** Paths whose entries the run read. */
+  const listed = new Set<string>();
   const git = new Map<string, GitCall>();
   const writes: string[] = [];
   /** `collect` mode: paths the run wrote, and the first access to each path ("read" / "absent" / "write"). */
@@ -447,6 +465,16 @@ export function parseTrace(
       if (child === null) continue;
       const shared = c.args.some((a) => /\bCLONE_FS\b/.test(a));
       cwd.set(Number(child[1]), shared ? me : { dir: me.dir });
+      continue;
+    }
+    if (LIST_CALLS.has(c.name)) {
+      const dir = fdPath(c.args[0] ?? "");
+      if (dir === undefined) return { undetermined: `${c.name}: a directory fd strace did not name (${(c.args[0] ?? "").slice(0, 80)})` };
+      const rel = repoRelative(roots, normalize(dir).replace(/(.)\/+$/, "$1"));
+      if (rel === undefined || excluded(rel, gitPids.has(c.pid))) continue;
+      listed.add(rel);
+      paths.add(rel);
+      if (opts.writes === "collect" && !first.has(rel)) first.set(rel, "read");
       continue;
     }
     const spec = SYSCALLS[c.name];
@@ -491,6 +519,8 @@ export function parseTrace(
       if (rel === undefined || excluded(rel, gitPids.has(c.pid))) continue;
       if (write) writes.push(`${c.name} ${rel || "."}`);
       else paths.add(rel);
+      // A watch learns of every entry that comes and goes: judge it as a listing.
+      if (c.name === "inotify_add_watch") listed.add(rel);
       if (opts.writes === "collect" && !first.has(rel)) first.set(rel, write ? "write" : /^-1 ENOENT\b/.test(c.ret) ? "absent" : "read");
       if (opts.writes === "collect" && write) wrote.add(rel);
     }
@@ -519,11 +549,17 @@ export function parseTrace(
     if (paths.size > MAX_WRITER_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_WRITER_PATHS}` };
     const rewritten = [...wrote].filter((rel) => first.get(rel) === "read" && !opts.ownOutput?.(rel));
     const kept = [...wrote].filter((rel) => !rewritten.includes(rel));
-    return { paths: [...paths].sort(), git: [...git.values()], writes: kept.sort(), absentBefore: absentBefore.sort(), ...(rewritten.length ? { rewritten: rewritten.sort() } : {}) };
+    return { paths: [...paths].sort(), git: [...git.values()], ...listedOf(listed, paths), writes: kept.sort(), absentBefore: absentBefore.sort(), ...(rewritten.length ? { rewritten: rewritten.sort() } : {}) };
   }
   if (writes.length > 0) return { undetermined: `the check writes inside the checkout (${writes.slice(0, 3).join(", ")})` };
   if (paths.size > MAX_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_PATHS}` };
-  return { paths: [...paths].sort(), git: [...git.values()] };
+  return { paths: [...paths].sort(), git: [...git.values()], ...listedOf(listed, paths) };
+}
+
+/** `{ listed }` for the read paths that were listed, left out when there are none. */
+function listedOf(listed: ReadonlySet<string>, paths: ReadonlySet<string>): { listed?: string[] } {
+  const l = [...listed].filter((p) => paths.has(p)).sort();
+  return l.length ? { listed: l } : {};
 }
 
 /** An `execve` argv array as strace prints it, or `undefined` when any element was cut short. */
@@ -573,7 +609,7 @@ export function excluded(rel: string, byGit: boolean): boolean {
  * digest. A path the run only `stat`ed is hashed by content too, so a size or
  * type it read cannot change unnoticed.
  */
-export function pathState(root: string, rel: string, digests: FileDigests): string {
+export function pathState(root: string, rel: string, digests: FileDigests, opts: { listed?: boolean } = {}): string {
   const abs = rel === "" ? root : join(root, rel);
   let st;
   try {
@@ -590,19 +626,44 @@ export function pathState(root: string, rel: string, digests: FileDigests): stri
     }
     let resolved = "dangling";
     try {
-      resolved = statState(abs, rel, digests);
+      resolved = statState(abs, rel, digests, opts.listed ?? true);
     } catch {
       /* dangling link */
     }
     return `link ${target} -> ${resolved}`;
   }
-  return statState(abs, rel, digests);
+  return statState(abs, rel, digests, opts.listed ?? true);
 }
 
-function statState(abs: string, rel: string, digests: FileDigests): string {
+/** The state of a directory the run opened and never listed: only that it is one. */
+export const OPENED_DIR = "dir";
+
+/** The state a read path is recorded with: a directory's listing only when the run read its entries. */
+export function readState(root: string, rel: string, digests: FileDigests, listed: ReadonlySet<string> | undefined): string {
+  return pathState(root, rel, digests, { listed: listed === undefined || listed.has(rel) });
+}
+
+/**
+ * The state of `rel` now, judged the way `recorded` was taken: a recorded
+ * {@link OPENED_DIR} (or a link that resolved to one) is compared as "is it
+ * still a directory", anything else in full.
+ */
+export function stateLike(root: string, rel: string, digests: FileDigests, recorded: string): string {
+  const opened = recorded === OPENED_DIR || recorded.endsWith(` -> ${OPENED_DIR}`);
+  return pathState(root, rel, digests, { listed: !opened });
+}
+
+function statState(abs: string, rel: string, digests: FileDigests, listed: boolean): string {
   if (rel === ".git" || rel.endsWith("/.git")) {
     try {
       if (statSync(abs).isDirectory()) return "dir";
+    } catch {
+      /* fall through */
+    }
+  }
+  if (!listed) {
+    try {
+      if (statSync(abs).isDirectory()) return OPENED_DIR;
     } catch {
       /* fall through */
     }
@@ -699,7 +760,7 @@ export function decideCone(records: ConeRecords | undefined, script: string, fp:
   for (const [p, state] of Object.entries(rec.reads)) {
     let now: string;
     try {
-      now = pathState(root, p, digests);
+      now = stateLike(root, p, digests, state);
     } catch (e) {
       return { skip: false, why: `could not read ${p}: ${(e as Error).message}` };
     }
@@ -740,7 +801,8 @@ export function coneRecordOf(args: {
   if (args.reached !== undefined) return { none: `the run reached a traced input site (${args.reached})` };
   if ("undetermined" in args.reads) return { none: args.reads.undetermined };
   const reads: Record<string, string> = {};
-  for (const p of args.reads.paths) reads[p] = pathState(args.root, p, args.digests);
+  const listed = new Set(args.reads.listed ?? []);
+  for (const p of args.reads.paths) reads[p] = readState(args.root, p, args.digests, listed);
   const git: Record<string, string> = {};
   for (const c of args.reads.git) git[gitKey(c)] = gitState(args.root, c);
   return { sha: args.sha, base: args.before.hash, reads, git };
