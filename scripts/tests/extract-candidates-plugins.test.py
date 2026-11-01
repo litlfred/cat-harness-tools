@@ -46,6 +46,22 @@ def extract(sections, meta):
              "title": fm.get("section_title")} for fn, fm, body in sections]
 '''
 
+REQ = '''
+ASPECT = "requirements"
+def applies(meta, sections):
+    return "skip" not in (meta.get("title") or "")
+def extract(sections, meta):
+    return [{"kind": "functional-requirement", "number": "FR.1", "statement": body.strip(),
+             "section_file": "sections/" + fn, "formalization_candidate": False}
+            for fn, fm, body in sections if "SHALL" in body]
+'''
+BOTH = '''
+CLASS = "both"
+ASPECT = "both"
+def extract(sections, meta):
+    return []
+'''
+
 
 def layer(tmp: str, name: str, files: dict[str, str]) -> str:
     root = os.path.join(tmp, name)
@@ -125,12 +141,60 @@ def main() -> int:
         r = run([a, undeclared], "--list-classes")
         expect("a directory with no declaration is not a layer", "beta" not in r.stdout, r.stdout)
 
+        # ── Aspects: run beside the class, never chosen as one, merged on --aspects-only.
+        c = layer(tmp, "layer-c", {"req.py": REQ})
+        reqdoc = doc(tmp, "reqdoc", {"arxiv": "2"}, "ALPHA. The system SHALL log.\n")
+        r = run([a, c], "--list-classes")
+        expect("--list-classes names the aspect", "aspect:requirements" in r.stdout and "alpha" in r.stdout, r.stdout)
+        r = run([a, c], reqdoc, "--json")
+        out = json.loads(r.stdout) if r.returncode == 0 else {}
+        expect("an aspect runs beside the class",
+               out.get("document_class") == "alpha" and out.get("aspects") == ["requirements"]
+               and out.get("summary", {}).get("by_kind") == {"theorem": 1, "functional-requirement": 1},
+               r.stdout + r.stderr)
+        tagged = [x for x in out.get("candidates", []) if x["kind"] == "functional-requirement"]
+        expect("an aspect's candidates carry its name", tagged and tagged[0].get("aspect") == "requirements", str(tagged))
+
+        r = run([a, c], reqdoc, "--class", "requirements", "--json")
+        expect("an aspect is not a class", r.returncode == 2, r.stdout + r.stderr)
+
+        # --aspects-only: the class candidates already written are kept; the aspect's are replaced, not doubled.
+        r = run([a, c], reqdoc)
+        expect("a full run writes candidates.json", r.returncode == 0, r.stderr)
+        r1 = run([a, c], reqdoc, "--aspects-only")
+        r2 = run([a, c], reqdoc, "--aspects-only")
+        with open(os.path.join(reqdoc, "candidates.json")) as fh:
+            merged = json.load(fh)
+        expect("--aspects-only keeps class candidates and is idempotent",
+               r1.returncode == 0 and r2.returncode == 0
+               and merged["document_class"] == "alpha"
+               and merged["summary"]["by_kind"] == {"theorem": 1, "functional-requirement": 1},
+               json.dumps(merged.get("summary")) + r1.stderr + r2.stderr)
+
+        # --aspects-only on an entry with no candidates.json and nothing to propose writes nothing.
+        quiet = doc(tmp, "quiet", {"title": "skip me"}, "SHALL\n")
+        r = run([a, c], quiet, "--aspects-only")
+        expect("no aspect applies: nothing written",
+               r.returncode == 0 and not os.path.exists(os.path.join(quiet, "candidates.json")), r.stderr)
+        # A new record from an aspect alone claims nothing about the whole document.
+        fresh = doc(tmp, "fresh", {"title": "fresh"}, "SHALL do it\n")
+        r = run([b, c], fresh, "--aspects-only")
+        with open(os.path.join(fresh, "candidates.json")) as fh:
+            rec = json.load(fh)
+        expect("an aspect-only record carries no whole-document fields",
+               r.returncode == 0 and not ({"document_class", "validated", "disposition"} & set(rec))
+               and rec["summary"]["candidates"] == 1, json.dumps(rec)[:300])
+
+        bad = layer(tmp, "layer-bad", {"both.py": BOTH})
+        r = run([a, bad], "--list-classes")
+        expect("CLASS and ASPECT together is refused", r.returncode == 2 and "exactly one" in r.stderr, r.stderr)
+
     if failures:
         print("FAIL")
         for f in failures:
             print("  -", f)
         return 1
-    print("ok — extractor discovery, detection, VALIDATED and the three refusals")
+    print("ok — extractor discovery, detection, VALIDATED, the refusals, and aspects")
     return 0
 
 
