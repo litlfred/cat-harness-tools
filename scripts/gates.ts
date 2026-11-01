@@ -66,7 +66,7 @@
  *
  * @module scripts/gates
  */
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 
@@ -119,6 +119,7 @@ import {
   type GateStatus,
 } from "./content-compile-gates.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { GATES_REPORT_SCHEMA, GatesReportSchema, type GatesReport } from "../schemas/sdlc/gates-report.ts";
 import { GATES_WORKFLOW } from "./lib/gates-workflow.ts";
 import { rootGateSet, rootProfile } from "./lib/root-gate-set.ts";
 
@@ -2153,6 +2154,60 @@ export function salientFailures(output: string, cap = 6): string[] {
   return hits;
 }
 
+/**
+ * `--report <path>`: where to write the typed report, if anywhere (#1259,
+ * owner card Q-DS-14 A). The text and the exit code are unchanged by it.
+ */
+export function reportPathFrom(argv: readonly string[]): string | undefined {
+  const i = argv.indexOf("--report");
+  if (i < 0) return undefined;
+  const p = argv[i + 1];
+  if (p === undefined || p.startsWith("--")) throw new Error("--report needs a path");
+  return p;
+}
+
+/** An empty report for a run of the fast or whole set, filled in as the run goes. */
+export function startGatesReport(all: boolean): GatesReport {
+  return {
+    $schema: GATES_REPORT_SCHEMA,
+    outcome: "undetermined",
+    exitCode: 2,
+    set: all ? "whole" : "fast",
+    gates: 0,
+    writers: 0,
+    failed: [],
+    skipped: [],
+    mutatedBy: [],
+    undetermined: [],
+    unclassified: [],
+    unrun: [],
+  };
+}
+
+/**
+ * The report as the process exits with `code`. The exit code is the verdict
+ * and is never re-derived; `outcome` only names it, and tells the two exit-1
+ * cases apart. A code outside 0–2 (a crash) is `undetermined`, exit 2 in the
+ * report, because nothing it carries was decided.
+ */
+export function finishGatesReport(report: GatesReport, code: number): GatesReport {
+  const exitCode: 0 | 1 | 2 = code === 0 ? 0 : code === 1 ? 1 : 2;
+  if (exitCode === 1 && report.failed.length === 0 && report.mutatedBy.length === 0) {
+    // Exit 1 with no failed gate and no mutation recorded: the run stopped
+    // (an uncaught error) before it reached a verdict. Not a pass, and not a
+    // gate failure either, so it is reported as undetermined, with the code.
+    return GatesReportSchema.parse({
+      ...report,
+      exitCode,
+      outcome: "undetermined",
+      undetermined: [...report.undetermined, "exited 1 before any verdict: no gate was recorded as failing"],
+    });
+  }
+  const outcome: GatesReport["outcome"] =
+    exitCode === 0 ? "pass" : exitCode === 2 ? "undetermined" : report.failed.length === 0 ? "not-clean" : "fail";
+  return GatesReportSchema.parse({ ...report, exitCode, outcome });
+}
+
 if (import.meta.main) {
   // Compile-gates query / run
   if (process.argv.includes("--compile-gates-list")) {
@@ -2182,6 +2237,17 @@ if (import.meta.main) {
   const listOnly = process.argv.includes("--list");
   const jobs = jobsFromArgv(process.argv);
 
+  // The typed report (#1259, Q-DS-14 A): filled in as the run goes and written
+  // on whatever path the process exits by, so an exit 2 is reported as surely
+  // as a pass. `--list` runs nothing, so it writes nothing.
+  const reportPath = reportPathFrom(process.argv);
+  const report = startGatesReport(all);
+  if (reportPath && !listOnly) {
+    process.on("exit", (code) => {
+      writeFileSync(reportPath, JSON.stringify(finishGatesReport(report, code), null, 2) + "\n");
+    });
+  }
+
   // ── The third state (bean `6366`) ──────────────────────────────────────
   //
   // Until now this exited 0 or 1 only, so "every gate passed" and "I could not
@@ -2209,8 +2275,10 @@ if (import.meta.main) {
     gates = loadGates(ROOT, { all });
   } catch (e) {
     for (const line of undeterminedReport(e, ROOT)) console.error(line);
+    report.undetermined.push(...undeterminedReport(e, ROOT));
     process.exit(2);
   }
+  report.gates = gates.length;
 
   // ── Is the ENVIRONMENT fit to be read from? (bean `3vc1`) ──────────────
   //
@@ -2248,6 +2316,7 @@ if (import.meta.main) {
         "correct thing is what created this. `bun run cat check:environment` alone\n" +
         "reports the same thing without running any gate.",
     );
+    report.undetermined.push(...distorted.map((d) => `environment distorted: ${d.path} — ${d.effect}`));
     process.exit(2);
   }
 
@@ -2286,6 +2355,7 @@ if (import.meta.main) {
             "working copy, and every gate that reads one would report could-not-determine. Fix that first, or " +
             "materialise a published entry with `bun run cat qa:fetch --ref main`.",
         );
+        report.undetermined.push(`no QA working copy: \`${cmd.slice(1).join(" ")}\` exited ${r.status ?? "on a signal"}`);
         process.exit(2);
       }
     }
@@ -2295,6 +2365,7 @@ if (import.meta.main) {
   // Declared writers in the workflow (`isWriterStep`): not gates, so not in
   // the pool or the tree guard's accounting; run after every gate, as CI does.
   const writers = loadWriterSteps(ROOT, { all });
+  report.writers = writers.length;
 
   const scope = all
     ? "every job, plus every locally-runnable step from the other workflows"
@@ -2309,6 +2380,7 @@ if (import.meta.main) {
   // check CI runs and this does not, and the whole cost of that gap was
   // learning about it from a red PR instead of from here.
   const unclassified = unclassifiedSteps(ROOT);
+  report.unclassified = unclassified.map((u) => ({ file: u.file, command: u.step.command }));
   if (unclassified.length) {
     console.log("UNCLASSIFIED — CI runs these and the local set does not:");
     for (const u of unclassified) console.log(`  ? ${u.file}: ${u.step.command}`);
@@ -2319,6 +2391,7 @@ if (import.meta.main) {
   // workflow runs is a gate that cannot fail. `translate-kg-viewer:check` was
   // red on main while CI was green, because nothing ran it (bean `ot9a`).
   const unrun = unrunScripts(ROOT);
+  report.unrun = [...unrun];
   if (unrun.length) {
     console.log("UNRUN — declared in package.json and in NO workflow:");
     for (const u of unrun) console.log(`  ? bun run cat ${u}`);
@@ -2522,6 +2595,11 @@ if (import.meta.main) {
     if (changes.length > 0) mutations.push({ gate: who, changes, attribution: attributeChanges(ROOT, changes, windows) });
     return now.entries;
   }
+
+  report.failed = failed.map(({ gate, why }) => ({ command: gate.command, job: gate.job, step: gate.step, why }));
+  report.skipped = skippedGates.map(({ gate, why }) => ({ command: gate.command, why }));
+  report.mutatedBy = mutations.map((m) => m.gate);
+  report.undetermined = [...undetermined];
 
   console.log("");
   for (const line of undetermined) console.log(line);
