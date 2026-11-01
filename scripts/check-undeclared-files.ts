@@ -108,6 +108,10 @@ export const ROOT_INFRASTRUCTURE: Readonly<Record<string, string>> = {
   // still accept it from a downstream folio or an old branch.
   "index.lock.json": "the checkout's remote-mount lock, generated from index.config.json and replayed by CI before any layer exists",
   "folio-assistant.mount-lock.json": "the legacy name of the remote-mount lock, still read when index.lock.json is absent",
+  // The IG AST cache pins (`ig-ast:pin`, bean `fwtz`): beside
+  // index.lock.json because it is judged against it (`ig-ast:lock:check`
+  // names each pin's IG in that lock), and like it belongs to no one layer.
+  "ig-ast.lock.json": "the IG AST cache pins, written by ig-ast:pin and checked against index.lock.json",
   "index.config.json": "the instantiation root's index: which harnesses this checkout instantiates, their sources and the landing",
   "tsconfig.json": "tsc's project root — the whole checkout's program, which names every instance, so no one layer may hold it",
   "AGENTS.md": "the agent-generic instructions every tool looks for at the root",

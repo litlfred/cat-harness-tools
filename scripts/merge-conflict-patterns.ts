@@ -30,9 +30,9 @@
  * | `refuse` | none | authored, or carries judgement a generator cannot reproduce |
  *
  * A fifth, `qa-sidecar`, delegated each instance's `test/results/kg-qa/` to
- * `qa:resolve-conflicts`. Bean `7mwa` retired both once cat-harness and
- * folio-assistant-core stopped committing `test/results/` (cat-harness#857,
- * folio-assistant-core#482): the sidecars live on the `qa-reports` store, so a
+ * `qa:resolve-conflicts`. Bean `7mwa` retired both once cat-harness and the
+ * content core stopped committing `test/results/` (cat-harness#857 and its
+ * content-core counterpart): the sidecars live on the `qa-reports` store, so a
  * conflict on one is a branch still carrying a stale copy. `derived-results`
  * takes the base's side of it, as it does for the other untracked QA families.
  * The attestations a sidecar once carried live in `test/attestations/` since
@@ -173,7 +173,7 @@ export const PATTERNS: readonly ConflictPattern[] = [
     why:
       "LSI indexes, detangle sidecars, tool-run records and translation-qa sidecars (56 + 71 + 15). Recomputed from the whole corpus, so any concurrent skill or schema change touches them. " +
       "The LSI half is UNTRACKED on `main` since bean `tqjj` and these globs are kept for the branches still carrying it: a branch that edited the sidecar meets a base that deleted it, and `take-base` is the right answer to that too. " +
-      "The `kg-qa` sidecars joined for the same reason (bean `7mwa`): cat-harness and folio-assistant-core stopped committing `test/results/`, so the delegated `qa-sidecar` strategy and `qa:resolve-conflicts` were retired, and the attestations they guarded live in `test/attestations/`. " +
+      "The `kg-qa` sidecars joined for the same reason (bean `7mwa`): cat-harness and the content core stopped committing `test/results/`, so the delegated `qa-sidecar` strategy and `qa:resolve-conflicts` were retired, and the attestations they guarded live in `test/attestations/`. " +
       "It is also the measured limit of what a declaration buys. These paths carried this entry all along and still conflicted on seven open pull requests each, because the strategy settles HOW a conflict is resolved and never whether one arises — `.gitattributes` says the same thing in its own words: \"Removing these conflicts, rather than tidying them, needs the files off `main` altogether.\"",
   },
   {

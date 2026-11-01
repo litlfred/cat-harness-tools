@@ -40,7 +40,7 @@
  * ## In parts (`--part i/n`)
  *
  * cat-harness-tools' whole layer takes about 500 s standalone, the slowest
- * single gate of a PR run (folio-assistant-core run 41287467368). `--part i/n`
+ * single gate of a PR run (a downstream layer's run 41287467368). `--part i/n`
  * runs slice i of n of the layer's test files (`bun test --shard=i/n`), so CI
  * runs the n parts as n gates on n machines (`run-gates.py` `SPLIT_GATES`).
  * Together the parts run every test file once, and each part is judged on
