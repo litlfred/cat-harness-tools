@@ -478,9 +478,12 @@ export const RESERVED_ROOT_AND_ROUTE_NAMES: readonly string[] = [
   "fsh-guts",
   "uploads",
   "test",
+  // input-site: inert #16b14f5d — reserved root and route name literal; reads no build directory
   "build",
+  // input-site: inert #742463a7 — reserved root and route name literal; reads no build directory
   "_site",
   "_docs",
+  // input-site: inert #3e9fe40a — reserved root and route name literal; reads no build directory
   "_kg",
 ] as const;
 

@@ -66,6 +66,37 @@ describe("detangle", () => {
     expect(parseArchimate(out).views[0]!.connections.find((c) => c.id === "id-c1")!.bendpoints.length).toBeGreaterThan(0);
   });
 
+  it("slides a box into free space inside its parent to clear a line, never out of it", () => {
+    const view = parseArchimate(XML).views[0]!;
+    // m sits between a and b on the line a→b; there is room above it.
+    view.nodes = [
+      { id: "id-na", kind: "element", ref: "id-a", x: 0, y: 200, w: 120, h: 55 },
+      { id: "id-nb", kind: "element", ref: "id-b", x: 400, y: 200, w: 120, h: 55 },
+      { id: "id-nm", kind: "element", ref: "id-c", x: 200, y: 190, w: 100, h: 75 },
+    ];
+    view.connections = [{ id: "id-c1", source: "id-na", target: "id-nb", relationship: "id-r1", bendpoints: [] }];
+    expect(scoreOf(view).throughBox).toBe(1);
+    const r = detangle(view, { passes: 1 });
+    expect(r.after.throughBox).toBe(0);
+    // m is not the size of a or b, so no swap: it slides (or the line is re-routed round it).
+    expect(r.changes.some((c) => c.kind === "slide" || c.kind === "route")).toBe(true);
+    expect(r.changes.some((c) => c.kind === "swap")).toBe(false);
+    // Inside a parent, a slide never leaves it.
+    const inParent = parseArchimate(XML).views[0]!;
+    inParent.nodes = [
+      { id: "id-p", kind: "group", text: "P", x: 0, y: 0, w: 600, h: 120 },
+      { id: "id-na", kind: "element", ref: "id-a", x: 10, y: 40, w: 120, h: 55, parent: "id-p" },
+      { id: "id-nb", kind: "element", ref: "id-b", x: 470, y: 40, w: 120, h: 55, parent: "id-p" },
+      { id: "id-nm", kind: "element", ref: "id-c", x: 240, y: 40, w: 120, h: 55, parent: "id-p" },
+    ];
+    inParent.connections = [{ id: "id-c1", source: "id-na", target: "id-nb", relationship: "id-r1", bendpoints: [] }];
+    const r2 = detangle(inParent, { noSlide: false, passes: 1 });
+    const p = r2.view.nodes.find((n) => n.id === "id-p")!;
+    for (const n of r2.view.nodes.filter((n) => n.parent === "id-p")) {
+      expect(n.x >= p.x && n.y >= p.y && n.x + n.w <= p.x + p.w && n.y + n.h <= p.y + p.h).toBe(true);
+    }
+  });
+
   it("leaves a clean view as it is", () => {
     const view = parseArchimate(XML).views[0]!;
     view.connections = view.connections.slice(0, 1);

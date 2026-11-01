@@ -11,6 +11,7 @@
  * Usage:
  *   bun run cat bpmn:detangle <file.bpmn|dir>...           # report
  *   bun run cat bpmn:detangle <file.bpmn> --write          # also apply the best lane order
+ *   bun run cat bpmn:detangle <file.bpmn|dir>... --write --labels-only  # only move labels
  *   bun run cat bpmn:detangle <file.bpmn|dir>... --check   # exit 1 on any finding
  *   bun run cat bpmn:detangle <file.bpmn|dir>... --di-only # skip the browser
  *
@@ -20,17 +21,18 @@
  * on "No". Without a browser, or with `--di-only`, only labels the file
  * places itself are checked, and the report says so.
  *
- * `--write` makes boxes big enough for their text (wider, then taller,
+ * `--write` moves labels off flows, shapes, other labels and lane lines,
+ * makes boxes big enough for their text (wider, then taller,
  * growing the lane), changes the lane order (re-routing the flows between lanes as
  * elbows) and re-routes slanted flows at right angles (owner, 2026-10-31:
- * *"straight angled arrows ugly"*). Moving steps and labels is the author's
+ * *"straight angled arrows ugly"*). Moving steps is the author's
  * judgement, so it is reported, never guessed. Re-render and look.
  *
  * @module scripts/bpmn-detangle
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { applyLaneOrder, bestLaneOrder, crossings, diagramFit, headerOverflow, laneOrder, readDi, resizeShapes, straightenFlows, textOverflow, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
+import { applyLaneOrder, bestLaneOrder, crossings, diagonalEdges, diagramFit, edgesThroughShapes, headerOverflow, laneOrder, placeLabels, readDi, resizeShapes, straightenFlows, textOverflow, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
 
 type Draw = (xml: string) => Promise<DrawnLabels | undefined>;
 
@@ -53,6 +55,9 @@ async function openDraw(): Promise<{ draw: Draw; close: () => Promise<void> } | 
 
 const args = process.argv.slice(2);
 const write = args.includes("--write");
+// Move labels only: no lane, flow or box changes, so the diff is labels alone.
+const labelsOnly = args.includes("--labels-only");
+const fix = write && !labelsOnly;
 const check = args.includes("--check");
 const paths = args.filter((a) => !a.startsWith("--"));
 if (paths.length === 0) {
@@ -71,23 +76,34 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
   let xml = readFileSync(file, "utf8");
   if (!/<(?:\w+:)?process\b/.test(xml)) continue;
   const shown = relative(process.cwd(), file);
-  if (write) {
+  // What the layout fixes must not make worse: flows through boxes, flows
+  // crossing, slanted flows. If together they do, the file keeps its layout
+  // and only its labels are moved.
+  const original = xml;
+  const harm = (x: string): number[] => {
+    const di = readDi(x);
+    return [edgesThroughShapes(di).length, crossings(di).length, diagonalEdges(di).length];
+  };
+  const harmBefore = harm(xml);
+  if (fix) {
     const before = readDi(xml);
     const best = bestLaneOrder(before);
     if (best.cost < best.current) {
       const next = applyLaneOrder(xml, best.order);
       const was = crossings(before).length, now = crossings(readDi(next)).length;
-      // A swap that shortens the lane trips but adds crossings is not a detangle.
-      if (now <= was) {
+      const thruWas = edgesThroughShapes(before).length, thruNow = edgesThroughShapes(readDi(next)).length;
+      // A swap that shortens the lane trips but adds crossings, or draws a
+      // flow through a box, is not a detangle.
+      if (now <= was && thruNow <= thruWas) {
         writeFileSync(file, next);
         xml = next;
         console.log(`✓ ${shown}: lanes reordered, lane crossings ${best.current} → ${best.cost}, flow crossings ${was} → ${now}`);
       } else {
-        console.log(`· ${shown}: a lane swap would add flow crossings (${was} → ${now}); left as it is`);
+        console.log(`· ${shown}: a lane swap would add flow crossings (${was} → ${now}) or flows through boxes (${thruWas} → ${thruNow}); left as it is`);
       }
     }
   }
-  if (write) {
+  if (fix) {
     const { xml: next, fixed } = straightenFlows(xml);
     if (fixed.length > 0) {
       writeFileSync(file, next);
@@ -95,7 +111,7 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
       console.log(`✓ ${shown}: ${fixed.length} slanted flow(s) routed at right angles (${fixed.join(", ")})`);
     }
   }
-  if (write && renderer) {
+  if (fix && renderer) {
     // Text that spills out of its box: first widen it (wrapping fewer
     // lines), then measure again and make it tall enough.
     for (const pass of ["wider", "taller"] as const) {
@@ -104,12 +120,21 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
       const sizes = new Map(over.map((o) => [o.id, pass === "wider"
         ? { width: Math.max(o.box.width, Math.min(o.box.width + 40, 180)), height: o.box.height }
         : { width: o.box.width, height: Math.max(o.box.height, o.need.height) }]));
+      // A box that grows over a flow it does not own stays as it is: the
+      // author moves the flow or shortens the name.
+      const thru = (x: string): Set<string> => new Set(edgesThroughShapes(readDi(x)).map(([e, sh]) => `${e}/${sh}`));
+      const was = thru(xml);
+      for (const id of [...sizes.keys()]) {
+        const one = resizeShapes(xml, new Map([[id, sizes.get(id)!]]));
+        if ([...thru(one)].some((k) => !was.has(k))) sizes.delete(id);
+      }
+      if (sizes.size === 0) break;
       xml = resizeShapes(xml, sizes);
       writeFileSync(file, xml);
-      console.log(`✓ ${shown}: ${over.length} box(es) made ${pass} for their text (${over.map((o) => o.id).join(", ")})`);
+      console.log(`✓ ${shown}: ${sizes.size} box(es) made ${pass} for their text (${[...sizes.keys()].join(", ")})`);
     }
   }
-  if (write && renderer) {
+  if (fix && renderer) {
     // Pool and lane names that spill out of their header strip: grow the
     // lane (for a pool, its last lane) until the name fits.
     const over = headerOverflow(await renderer.draw(xml).catch(() => undefined));
@@ -129,6 +154,28 @@ for (const file of paths.flatMap(bpmnFiles).sort()) {
       xml = resizeShapes(xml, new Map(), min);
       writeFileSync(file, xml);
       console.log(`✓ ${shown}: ${over.length} pool/lane name(s) given room (${over.map((h) => h.id).join(", ")})`);
+    }
+  }
+  if (fix && xml !== original) {
+    const now = harm(xml);
+    if (now.some((n, i) => n > harmBefore[i]!)) {
+      xml = original;
+      writeFileSync(file, xml);
+      console.log(`· ${shown}: the layout fixes would add flows through boxes, crossings or slants ` +
+        `(${harmBefore.join("/")} → ${now.join("/")}); layout left as it is, labels only`);
+    }
+  }
+  if (write && renderer) {
+    // Labels on flows, shapes, other labels or lane lines go to the nearest
+    // clear place. Moving one can free or block another, so a few passes.
+    for (let pass = 0; pass < 3; pass++) {
+      const seen = await renderer.draw(xml).catch(() => undefined);
+      if (!seen) break;
+      const { xml: next, moved } = placeLabels(xml, seen);
+      if (moved.length === 0) break;
+      xml = next;
+      writeFileSync(file, xml);
+      console.log(`✓ ${shown}: ${moved.length} label(s) moved clear (${moved.join(", ")})`);
     }
   }
   const drawn = renderer ? await renderer.draw(xml).catch(() => undefined) : undefined;

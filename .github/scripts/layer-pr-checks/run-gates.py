@@ -183,6 +183,7 @@ NEEDS_INPUT_SCRIPTS = {
     "check:duplicate-ids": "needs a built site directory; bare, it prints its usage and exits 2",
     "check:escaped-markup": "needs a built site directory (or --source <dir>); bare, it prints its usage and exits 2",
     "check:maintained-artefacts": "needs a built site directory; bare, it prints its usage and exits 2",
+    "ingest:ig-chrome:check": "needs --layer <dir> checkouts of each fhir.template in the chain; bare, it prints could not determine and exits 2",
     "wireframe:check": "needs --use, --topic and --surface; bare, a usage error and exit 2",
 }
 # The `PREREQUISITE_FILES` skip for `uml:overview:check` and
@@ -739,7 +740,47 @@ def derive(root, given, tmp, env=None):
                 continue
             seen_scripts.add(command)
             skipped[gname] = {"command": command, "skipped": why, "kind": kind}
+    fold_skill_register(root, runner, gates)
     return own, harness, runner, gates, skipped
+
+
+SKILL_REGISTER_TS = os.path.join("cat-harness-tools", "scripts", "skill-register.ts")
+_VERIFY = re.compile(r'verify:\s*\[\s*"([^"]+)"\s*\]')
+
+
+def skill_register_chain(root):
+    """The chain checks `skill:register:check` runs (`STEPS[].verify` in
+    skill-register.ts at this side's pin), or [] when they cannot be read."""
+    try:
+        with open(os.path.join(root, SKILL_REGISTER_TS)) as f:
+            src = f.read()
+    except OSError:
+        return []
+    start = src.find("export const STEPS")
+    end = src.find("export const CHECKS", start)
+    return _VERIFY.findall(src[start:end]) if start >= 0 and end > start else []
+
+
+def fold_skill_register(root, runner, gates):
+    """Run `skill:register:check` as its declaration half when every chain
+    check it would run is already its own gate in this set (the fold
+    `regen` uses, `pair-cover.ts`, bean `8qyc`). Measured on
+    folio-assistant-core#444 (run 41239562434): 724.8 s of the slowest
+    shard's 14m43s re-ran those checks. Every chain check is still judged,
+    head against base, by its own gate, so nothing goes unjudged. The gate
+    keeps its name, so the two sides compare like for like."""
+    full = f"{runner} skill:register:check"
+    name = next((k for k, v in gates.items() if v == full), None)
+    chain = skill_register_chain(root)
+    if name is None or not chain:
+        return
+    have = set(gates.values())
+    if any(f"{runner} {c}" not in have for c in chain):
+        return
+    residual = f"{runner} skill:register:declarations:check"
+    for k in [k for k, v in gates.items() if v == residual]:
+        del gates[k]
+    gates[name] = residual
 
 
 def main():

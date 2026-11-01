@@ -150,74 +150,366 @@ function lastVerdict(state: InstanceState, node: string): TaskAuthVerdict | unde
   return undefined;
 }
 
-export function registerWorkflowTools(server: McpServer, repoRoot: string): void {
-  const root = resolve(repoRoot);
+/**
+ * The role graph for `repoRoot`, so every step can say what the agent is acting AS.
+ *
+ * Read lazily and a read failure is swallowed to `undefined` rather than
+ * taking the tools down: an instance that declares no role graph is
+ * unmigrated, not broken, and the workflow interpreter predates roles.
+ * A graph that is present but malformed is `kg:audit`'s finding — it fails
+ * loudly there, which is where somebody can act on it.
+ */
+const rolesByRoot = new Map<string, RoleGraph | undefined>();
 
-  /**
-   * The role graph, so every step can say what the agent is acting AS.
-   *
-   * Read lazily and cached, and a read failure is swallowed to `undefined`
-   * rather than taking the tools down: an instance that declares no role graph
-   * is unmigrated, not broken, and the workflow interpreter predates roles.
-   * A graph that is present but malformed is `kg:audit`'s finding — it fails
-   * loudly there, which is where somebody can act on it.
-   */
-  let rolesCache: { graph: RoleGraph | undefined } | undefined;
-  const roles = (): RoleGraph | undefined => {
-    if (!rolesCache) {
-      try {
-        // declared-path-literal: the convention fallback, at the call site.
-        // A role graph lives in a declared knowledge-graph root.
-        // Root first, then the nearest dependency that declares one (bean
-        // `nf2z`): at the repository root the graph lives in a dependency.
-        let graph: RoleGraph | undefined;
-        for (const r of [...processRoots(root)].reverse()) {
-          graph = roleGraphFor(r);
-          // A graph that declares no role of its own is a layer of
-          // EXTENSIONS by id (placement PR0b/PR1, e.g. core's
-          // `scenarios/roles.json`), not the graph a lane binds into: keep
-          // going down to the instance that declares the roles, whose
-          // checkout answer already carries every extension.
-          if (graph && graph.roles.length > 0) break;
-        }
-        rolesCache = { graph };
-      } catch {
-        rolesCache = { graph: undefined };
+export function resolveWorkflowRoles(repoRoot: string): RoleGraph | undefined {
+  const root = resolve(repoRoot);
+  if (rolesByRoot.has(root)) return rolesByRoot.get(root);
+  try {
+    // declared-path-literal: the convention fallback, at the call site.
+    // A role graph lives in a declared knowledge-graph root.
+    // Root first, then the nearest dependency that declares one (bean
+    // `nf2z`): at the repository root the graph lives in a dependency.
+    let graph: RoleGraph | undefined;
+    for (const r of [...processRoots(root)].reverse()) {
+      graph = roleGraphFor(r);
+      // A graph that declares no role of its own is a layer of
+      // EXTENSIONS by id (placement PR0b/PR1, e.g. core's
+      // `scenarios/roles.json`), not the graph a lane binds into: keep
+      // going down to the instance that declares the roles, whose
+      // checkout answer already carries every extension.
+      if (graph && graph.roles.length > 0) break;
+    }
+    rolesByRoot.set(root, graph);
+    return graph;
+  } catch {
+    rolesByRoot.set(root, undefined);
+    return undefined;
+  }
+}
+
+export interface WorkflowStartInput {
+  process: string;
+  subject: string;
+  bean?: string;
+}
+
+export interface WorkflowNextInput {
+  instance: string;
+}
+
+export interface WorkflowGateInput {
+  instance: string;
+  activity: string;
+  actor?: string;
+  target?: string;
+}
+
+export interface WorkflowCompleteInput {
+  instance: string;
+  node: string;
+  outcome?: string;
+  facts?: Record<string, unknown>;
+  actor?: string;
+  target?: string;
+  note?: string;
+  activities?: unknown[];
+}
+
+export interface WorkflowToolEnv {
+  env?: Parameters<typeof githubPrincipalFor>[1];
+  fetch?: Parameters<typeof githubPrincipalFor>[2];
+  roles?: () => RoleGraph | undefined;
+}
+
+/** Shared implementation of `workflow_list` for MCP and CLI (`workflow:list`). */
+export async function workflowList(repoRoot: string): Promise<string> {
+  const root = resolve(repoRoot);
+  const files = processFiles(root);
+  const lines: string[] = ["# Processes", ""];
+  for (const f of files) {
+    try {
+      const m = await loadProcessModel(f);
+      const acts = [...m.nodes.values()].filter((n) => n.kind === "activity");
+      lines.push(
+        `- **${f.replace(/\.bpmn$/, "")}** — ${m.name} (\`${m.id}\`), ` +
+          `${acts.length} activities`,
+      );
+    } catch (e) {
+      lines.push(`- **${f}** — cannot be interpreted: ${(e as Error).message}`);
+    }
+  }
+  if (files.length === 0) lines.push("_(none)_");
+
+  const open = listInstances(root);
+  lines.push("", "# Instances", "");
+  if (open.length === 0) lines.push("_(none)_");
+  for (const i of open) {
+    lines.push(`- \`${i.id}\` — ${i.subject} · ${i.status} · updated ${i.updatedAt}`);
+  }
+  return lines.join("\n");
+}
+
+/** Shared implementation of `workflow_start` for MCP and CLI (`workflow:start`). */
+export async function workflowStart(
+  repoRoot: string,
+  { process, subject, bean }: WorkflowStartInput,
+  opts?: WorkflowToolEnv,
+): Promise<string> {
+  const root = resolve(repoRoot);
+  const roles = opts?.roles ?? (() => resolveWorkflowRoles(root));
+  const model = await resolveModel(root, process);
+  const id = instanceId(model.id, subject);
+  const existing = loadInstance(root, id);
+  if (existing) {
+    return (
+      `An instance already exists for this subject — continuing it rather than ` +
+      `starting a second.\n\n${describe(model, existing, roles())}`
+    );
+  }
+  // The pre-execution gate, and the FIRST non-test caller `<bootstrap.processes:precondition>`
+  // has ever had (issue #853, requirement 3). Asked here rather than in
+  // `startInstance` because a precondition is what must hold BEFORE the start
+  // event: `startInstance` also runs for every subprocess entered mid-flight,
+  // and re-asking there answers a different question.
+  //
+  // Only `unsatisfied` refuses. `could-not-determine` proceeds and is NAMED
+  // in the output — three of the four preconditions in this repository are
+  // `stated` and structurally unobservable, so blocking on them would not be
+  // a gate, it would be an outage. See `workflow/preflight.ts`.
+  const gate = preflight(model);
+  const refusal = preflightRefusal(gate);
+  if (refusal) throw new Error(refusal);
+  const state = startInstance(model, { id, subject, bean });
+  const path = saveInstance(root, state);
+  // The activity log's `task-start`. Reported on the tool's own output
+  // rather than written silently: the skill requires the capture state to
+  // be SAID, and a caller that has to go and look at a directory to find
+  // out whether it has an audit trail does not have one it can rely on.
+  const log = writeLogEntry(
+    root,
+    {
+      event: "task-start",
+      summary: `started ${model.id} for ${subject}`,
+      process: model.id,
+      bean,
+      session: id,
+    },
+    model.logCapture,
+  );
+  return (
+    `Started. State in \`${path.replace(`${root}/`, "")}\`.\n` +
+    // Said on the tool's own output, on the same argument the capture
+    // state is: a caller that has to go and look somewhere else to find
+    // out whether the gate ran does not have one it can rely on.
+    `${describePreflight(gate)}\n` +
+    `${describeCapture(log)}\n\n${describe(model, state, roles())}`
+  );
+}
+
+/** Shared implementation of `workflow_next` for MCP and CLI (`workflow:next`). */
+export async function workflowNext(
+  repoRoot: string,
+  { instance }: WorkflowNextInput,
+  opts?: WorkflowToolEnv,
+): Promise<string> {
+  const root = resolve(repoRoot);
+  const roles = opts?.roles ?? (() => resolveWorkflowRoles(root));
+  const state = loadInstance(root, instance);
+  if (!state) throw new Error(`No instance "${instance}". Try workflow_list.`);
+  const model = await loadProcessModel(resolve(root, state.source));
+  return describe(model, state, roles());
+}
+
+/** Shared implementation of `workflow_gate` for MCP and CLI (`workflow:gate`). */
+export async function workflowGate(
+  repoRoot: string,
+  { instance, activity, actor, target }: WorkflowGateInput,
+  opts?: WorkflowToolEnv,
+): Promise<string> {
+  const root = resolve(repoRoot);
+  const state = loadInstance(root, instance);
+  if (!state) throw new Error(`No instance "${instance}". Try workflow_list.`);
+  const model = await loadProcessModel(resolve(root, state.source));
+  const relaxations = loadRelaxations(root);
+  validateRelaxations(relaxations, [model]);
+  const verdict = checkGate(model, state, activity, relaxations);
+  // The second question a gate answers: not only "may this step run now"
+  // but "may THIS actor run it" (issue #1207). Both are shown; either
+  // refusing refuses.
+  const owner = findInModel(model, activity);
+  const { principal } = await githubPrincipalFor(root, opts?.env ?? process.env, opts?.fetch);
+  const authz = authorizeTask(
+    accessContext(root),
+    {
+      principal,
+      process: owner?.model.id ?? model.id,
+      task: activity,
+      role: owner?.model.nodes.get(activity)?.roleRef,
+      target,
+    },
+    ENGINE_MODE,
+  );
+  const allowed = verdict.allowed && authz.allowed;
+  return (
+    `${allowed ? "ALLOWED" : "REFUSED"} — ${verdict.reason}` +
+    (verdict.relaxedBy
+      ? `\n\nDeclared in skills/${verdict.relaxedBy.package}/workflow-policy.json.`
+      : "") +
+    `\n\n${describeVerdict(authz)}` +
+    (actor && actor !== principal.actor
+      ? `\n\nYou named "${actor}"; strict mode decides on the principal GitHub vouches for, not on a typed actor.`
+      : "")
+  );
+}
+
+/** Shared implementation of `workflow_complete` for MCP and CLI (`workflow:complete`). */
+export async function workflowComplete(
+  repoRoot: string,
+  { instance, node, outcome, facts, actor, target, note: rawNote, activities }: WorkflowCompleteInput,
+  opts?: WorkflowToolEnv,
+): Promise<string> {
+  const root = resolve(repoRoot);
+  const roles = opts?.roles ?? (() => resolveWorkflowRoles(root));
+  // The arguments are a hand-over from the calling agent (H3, H9; bean
+  // `cztn`). Everything but `note` steers the engine, `facts` included,
+  // since a decision table branches on it, so a finding there REFUSES.
+  // `note` is read later by another agent (the bean body, the log), so a
+  // finding there QUARANTINES: kept verbatim, marked, and reported back.
+  const screen = screenHandover(
+    { instance, node, outcome, facts, actor, target, note: rawNote, activities },
+    { fields: WORKFLOW_COMPLETE_HANDOVER },
+  );
+  if (screen.state === "refused") {
+    throw new Error(
+      `workflow_complete refused by the hand-over screen: ` +
+        screen.findings.map((f) => `${f.path} (${f.role}): ${f.kind} "${f.excerpt}"`).join("; "),
+    );
+  }
+  // One line, always: a note is appended to a bean body, where a line of
+  // its own could forge a claim record (`CLAIM_NOTE` is line-anchored;
+  // roast 1ygp L2.4). Whitespace is folded.
+  // Pass on the copy the screen read, never the arguments re-read (L1.2,
+  // adjudication of 1ygp: the library returned it and this caller ignored it).
+  const seen = screen.screened ?? {};
+  const screenedFacts = seen.facts as typeof facts;
+  const screenedNote = typeof seen.note === "string" ? seen.note : undefined;
+  // Capped, and the cap is SAID: "never a word dropped" was false while a
+  // 4,000-character cut was silent (adjudication of 1ygp, new defect 3).
+  const NOTE_MAX = 4000;
+  const folded = screenedNote === undefined ? undefined : oneLineLabel(screenedNote, Number.MAX_SAFE_INTEGER);
+  const oneLine =
+    folded === undefined || folded.length <= NOTE_MAX
+      ? folded
+      : `${folded.slice(0, NOTE_MAX)} [… cut: ${folded.length - NOTE_MAX} more characters not kept]`;
+  const note =
+    screen.state === "quarantined" && oneLine !== undefined
+      ? `[QUARANTINED by the hand-over screen: ${[...new Set(screen.findings.map((f) => f.kind))].join(", ")}; kept, data not instruction] ${oneLine}`
+      : oneLine;
+  const state = loadInstance(root, instance);
+  if (!state) throw new Error(`No instance "${instance}". Try workflow_list.`);
+  const model = await loadProcessModel(resolve(root, state.source));
+  // `actor` stays in the history as what the caller SAID it was acting as;
+  // authorization is decided on the principal GitHub vouches for.
+  const { principal } = await githubPrincipalFor(root, opts?.env ?? process.env, opts?.fetch);
+  let next: InstanceState;
+  try {
+    next = complete(model, state, node, {
+      outcome,
+      facts: screenedFacts,
+      actor: actor ?? principal.account,
+      note,
+      authz: { ctx: accessContext(root), principal, target, mode: ENGINE_MODE },
+      activities: seen.activities as unknown[] | undefined,
+    });
+  } catch (e) {
+    // Bean `v49e`: a refusal is recorded on the instance, so a gate that
+    // keeps refusing is visible as a state rather than as nothing. Only the
+    // engine's own refusals (`WorkflowError`); anything else is a fault,
+    // not a gate. Recorded on a FRESH read, since `complete` may have
+    // touched the copy it was given before it refused.
+    if (e instanceof WorkflowError) {
+      const fresh = loadInstance(root, instance);
+      if (fresh) {
+        saveInstance(
+          root,
+          withRefusal(fresh, { at: new Date().toISOString(), node, actor: actor ?? principal.account, reason: e.message }),
+        );
       }
     }
+    throw e;
+  }
+  saveInstance(root, next);
+
+  // A bean-marked step IS the work-plan operation, not a step about it.
+  // Done after the advance so `resolve` can see whether the process it
+  // tracks actually finished.
+  //
+  // Looked up through the subprocess tree, not in the top-level process:
+  // once a diagram is decomposed the bean-marked steps live in its phases
+  // (`Close_Complete` carries `op="resolve"` and sits in Process_BeanClose,
+  // which every bean-touching process calls — bean `m8gz`), and a
+  // lookup that only knew the parent would find nothing and perform nothing
+  // — silently, which is the worst way for a work-plan write to stop.
+  // `instanceCompleted` stays the PARENT's status on purpose: a bean is
+  // resolved when the whole process finished, not when one phase did.
+  const authz = lastVerdict(next, node);
+  const op = findInModel(model, node)?.model.nodes.get(node)?.workPlanOp;
+  const plan = op
+    ? applyWorkPlanOp(root, next.bean, op, {
+        note,
+        // `resolve` also fires when only archive steps are left, so a
+        // diagram can end in one (`onlyArchiveLeft`). `archive` itself
+        // still needs the instance to have completed.
+        instanceCompleted: op === "resolve" ? onlyArchiveLeft(model, next) : next.status === "completed",
+      })
+    : undefined;
+
+  // `task-end` for the step just recorded. The EVENT is task-end even
+  // when the instance runs on: the unit an agent starts and ends is the
+  // step, and waiting for the whole process would lose every intermediate
+  // one — which is most of what a log is read for. The instance's own
+  // status rides along in the detail so the two are distinguishable.
+  const log = writeLogEntry(
+    root,
+    {
+      event: "task-end",
+      summary: `completed ${node} in ${model.id}`,
+      detail:
+        `instance ${next.id} is now ${next.status}` +
+        (note ? ` — ${note}` : "") +
+        (authz ? ` — ${describeVerdict(authz)}` : ""),
+      process: model.id,
+      task: node,
+      role: findInModel(model, node)?.model.nodes.get(node)?.lane,
+      bean: next.bean,
+      session: next.id,
+    },
+    model.logCapture,
+  );
+  return (
+    describe(model, next, roles()) +
+    (authz ? `\n\n  authorization: ${describeVerdict(authz)}` : "") +
+    (plan ? `\n\n  work plan: ${plan.summary}` : "") +
+    `\n  ${describeCapture(log)}`
+  );
+}
+
+export function registerWorkflowTools(server: McpServer, repoRoot: string, opts?: WorkflowToolEnv): void {
+  const root = resolve(repoRoot);
+
+  let rolesCache: { graph: RoleGraph | undefined } | undefined;
+  const roles = (): RoleGraph | undefined => {
+    if (!rolesCache) rolesCache = { graph: resolveWorkflowRoles(root) };
     return rolesCache.graph;
   };
+  const callOpts: WorkflowToolEnv = { ...opts, roles: opts?.roles ?? roles };
 
   server.tool(
     "workflow_list",
     "List the BPMN processes this folio defines, across every directory it declares as holding its knowledge graph, and any " +
       "instances currently open. Use before workflow_start to see what exists.",
     {},
-    async () => {
-      const files = processFiles(root);
-      const lines: string[] = ["# Processes", ""];
-      for (const f of files) {
-        try {
-          const m = await loadProcessModel(f);
-          const acts = [...m.nodes.values()].filter((n) => n.kind === "activity");
-          lines.push(
-            `- **${f.replace(/\.bpmn$/, "")}** — ${m.name} (\`${m.id}\`), ` +
-              `${acts.length} activities`,
-          );
-        } catch (e) {
-          lines.push(`- **${f}** — cannot be interpreted: ${(e as Error).message}`);
-        }
-      }
-      if (files.length === 0) lines.push("_(none)_");
-
-      const open = listInstances(root);
-      lines.push("", "# Instances", "");
-      if (open.length === 0) lines.push("_(none)_");
-      for (const i of open) {
-        lines.push(`- \`${i.id}\` — ${i.subject} · ${i.status} · updated ${i.updatedAt}`);
-      }
-      return text(lines.join("\n"));
-    },
+    async () => text(await workflowList(root)),
   );
 
   server.tool(
@@ -230,55 +522,7 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string): void
       subject: z.string().describe("What this run is about — a block label, a release name"),
       bean: z.string().optional().describe("Bean id this work is tracked under"),
     },
-    async ({ process, subject, bean }) => {
-      const model = await resolveModel(root, process);
-      const id = instanceId(model.id, subject);
-      const existing = loadInstance(root, id);
-      if (existing) {
-        return text(
-          `An instance already exists for this subject — continuing it rather than ` +
-            `starting a second.\n\n${describe(model, existing, roles())}`,
-        );
-      }
-      // The pre-execution gate, and the FIRST non-test caller `<bootstrap.processes:precondition>`
-      // has ever had (issue #853, requirement 3). Asked here rather than in
-      // `startInstance` because a precondition is what must hold BEFORE the start
-      // event: `startInstance` also runs for every subprocess entered mid-flight,
-      // and re-asking there answers a different question.
-      //
-      // Only `unsatisfied` refuses. `could-not-determine` proceeds and is NAMED
-      // in the output — three of the four preconditions in this repository are
-      // `stated` and structurally unobservable, so blocking on them would not be
-      // a gate, it would be an outage. See `workflow/preflight.ts`.
-      const gate = preflight(model);
-      const refusal = preflightRefusal(gate);
-      if (refusal) throw new Error(refusal);
-      const state = startInstance(model, { id, subject, bean });
-      const path = saveInstance(root, state);
-      // The activity log's `task-start`. Reported on the tool's own output
-      // rather than written silently: the skill requires the capture state to
-      // be SAID, and a caller that has to go and look at a directory to find
-      // out whether it has an audit trail does not have one it can rely on.
-      const log = writeLogEntry(
-        root,
-        {
-          event: "task-start",
-          summary: `started ${model.id} for ${subject}`,
-          process: model.id,
-          bean,
-          session: id,
-        },
-        model.logCapture,
-      );
-      return text(
-        `Started. State in \`${path.replace(`${root}/`, "")}\`.\n` +
-          // Said on the tool's own output, on the same argument the capture
-          // state is: a caller that has to go and look somewhere else to find
-          // out whether the gate ran does not have one it can rely on.
-          `${describePreflight(gate)}\n` +
-          `${describeCapture(log)}\n\n${describe(model, state, roles())}`,
-      );
-    },
+    async (args) => text(await workflowStart(root, args, callOpts)),
   );
 
   server.tool(
@@ -289,12 +533,7 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string): void
       "here has not been reached yet. A call activity is entered automatically, so what " +
       "is reported is the leaf step, with the phases it sits inside shown as `inside:`.",
     { instance: z.string().describe("Instance id, from workflow_start or workflow_list") },
-    async ({ instance }) => {
-      const state = loadInstance(root, instance);
-      if (!state) throw new Error(`No instance "${instance}". Try workflow_list.`);
-      const model = await loadProcessModel(resolve(root, state.source));
-      return text(describe(model, state, roles()));
-    },
+    async (args) => text(await workflowNext(root, args, callOpts)),
   );
 
   server.tool(
@@ -310,37 +549,7 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string): void
       actor: z.string().optional().describe("Who you say would perform it. Recorded only: strict mode authorizes the principal GitHub vouches for"),
       target: z.string().optional().describe("The content it would act on: a block id, path or bean id"),
     },
-    async ({ instance, activity, actor, target }) => {
-      const state = loadInstance(root, instance);
-      if (!state) throw new Error(`No instance "${instance}". Try workflow_list.`);
-      const model = await loadProcessModel(resolve(root, state.source));
-      const relaxations = loadRelaxations(root);
-      validateRelaxations(relaxations, [model]);
-      const verdict = checkGate(model, state, activity, relaxations);
-      // The second question a gate answers: not only "may this step run now"
-      // but "may THIS actor run it" (issue #1207). Both are shown; either
-      // refusing refuses.
-      const owner = findInModel(model, activity);
-      const { principal } = await githubPrincipalFor(root, process.env);
-      const authz = authorizeTask(accessContext(root), {
-        principal,
-        process: owner?.model.id ?? model.id,
-        task: activity,
-        role: owner?.model.nodes.get(activity)?.roleRef,
-        target,
-      }, ENGINE_MODE);
-      const allowed = verdict.allowed && authz.allowed;
-      return text(
-        `${allowed ? "ALLOWED" : "REFUSED"} — ${verdict.reason}` +
-          (verdict.relaxedBy
-            ? `\n\nDeclared in skills/${verdict.relaxedBy.package}/workflow-policy.json.`
-            : "") +
-          `\n\n${describeVerdict(authz)}` +
-          (actor && actor !== principal.actor
-            ? `\n\nYou named "${actor}"; strict mode decides on the principal GitHub vouches for, not on a typed actor.`
-            : ""),
-      );
-    },
+    async (args) => text(await workflowGate(root, args, callOpts)),
   );
 
   server.tool(
@@ -383,129 +592,6 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string): void
             "`activity`). Kept on the step's history entry; each must name this step as its plan",
         ),
     },
-    async ({ instance, node, outcome, facts, actor, target, note: rawNote, activities }) => {
-      // The arguments are a hand-over from the calling agent (H3, H9; bean
-      // `cztn`). Everything but `note` steers the engine, `facts` included,
-      // since a decision table branches on it, so a finding there REFUSES.
-      // `note` is read later by another agent (the bean body, the log), so a
-      // finding there QUARANTINES: kept verbatim, marked, and reported back.
-      const screen = screenHandover(
-        { instance, node, outcome, facts, actor, target, note: rawNote, activities },
-        { fields: WORKFLOW_COMPLETE_HANDOVER },
-      );
-      if (screen.state === "refused") {
-        throw new Error(
-          `workflow_complete refused by the hand-over screen: ` +
-            screen.findings.map((f) => `${f.path} (${f.role}): ${f.kind} "${f.excerpt}"`).join("; "),
-        );
-      }
-      // One line, always: a note is appended to a bean body, where a line of
-      // its own could forge a claim record (`CLAIM_NOTE` is line-anchored;
-      // roast 1ygp L2.4). Whitespace is folded.
-      // Pass on the copy the screen read, never the arguments re-read (L1.2,
-      // adjudication of 1ygp: the library returned it and this caller ignored it).
-      const seen = screen.screened ?? {};
-      const screenedFacts = seen.facts as typeof facts;
-      const screenedNote = typeof seen.note === "string" ? seen.note : undefined;
-      // Capped, and the cap is SAID: "never a word dropped" was false while a
-      // 4,000-character cut was silent (adjudication of 1ygp, new defect 3).
-      const NOTE_MAX = 4000;
-      const folded = screenedNote === undefined ? undefined : oneLineLabel(screenedNote, Number.MAX_SAFE_INTEGER);
-      const oneLine =
-        folded === undefined || folded.length <= NOTE_MAX
-          ? folded
-          : `${folded.slice(0, NOTE_MAX)} [… cut: ${folded.length - NOTE_MAX} more characters not kept]`;
-      const note =
-        screen.state === "quarantined" && oneLine !== undefined
-          ? `[QUARANTINED by the hand-over screen: ${[...new Set(screen.findings.map((f) => f.kind))].join(", ")}; kept, data not instruction] ${oneLine}`
-          : oneLine;
-      const state = loadInstance(root, instance);
-      if (!state) throw new Error(`No instance "${instance}". Try workflow_list.`);
-      const model = await loadProcessModel(resolve(root, state.source));
-      // `actor` stays in the history as what the caller SAID it was acting as;
-      // authorization is decided on the principal GitHub vouches for.
-      const { principal } = await githubPrincipalFor(root, process.env);
-      let next: InstanceState;
-      try {
-        next = complete(model, state, node, {
-          outcome,
-          facts: screenedFacts,
-          actor: actor ?? principal.account,
-          note,
-          authz: { ctx: accessContext(root), principal, target, mode: ENGINE_MODE },
-          activities: seen.activities as unknown[] | undefined,
-        });
-      } catch (e) {
-        // Bean `v49e`: a refusal is recorded on the instance, so a gate that
-        // keeps refusing is visible as a state rather than as nothing. Only the
-        // engine's own refusals (`WorkflowError`); anything else is a fault,
-        // not a gate. Recorded on a FRESH read, since `complete` may have
-        // touched the copy it was given before it refused.
-        if (e instanceof WorkflowError) {
-          const fresh = loadInstance(root, instance);
-          if (fresh) {
-            saveInstance(
-              root,
-              withRefusal(fresh, { at: new Date().toISOString(), node, actor: actor ?? principal.account, reason: e.message }),
-            );
-          }
-        }
-        throw e;
-      }
-      saveInstance(root, next);
-
-      // A bean-marked step IS the work-plan operation, not a step about it.
-      // Done after the advance so `resolve` can see whether the process it
-      // tracks actually finished.
-      //
-      // Looked up through the subprocess tree, not in the top-level process:
-      // once a diagram is decomposed the bean-marked steps live in its phases
-      // (`Close_Complete` carries `op="resolve"` and sits in Process_BeanClose,
-      // which every bean-touching process calls — bean `m8gz`), and a
-      // lookup that only knew the parent would find nothing and perform nothing
-      // — silently, which is the worst way for a work-plan write to stop.
-      // `instanceCompleted` stays the PARENT's status on purpose: a bean is
-      // resolved when the whole process finished, not when one phase did.
-      const authz = lastVerdict(next, node);
-      const op = findInModel(model, node)?.model.nodes.get(node)?.workPlanOp;
-      const plan = op
-        ? applyWorkPlanOp(root, next.bean, op, {
-            note,
-            // `resolve` also fires when only archive steps are left, so a
-            // diagram can end in one (`onlyArchiveLeft`). `archive` itself
-            // still needs the instance to have completed.
-            instanceCompleted: op === "resolve" ? onlyArchiveLeft(model, next) : next.status === "completed",
-          })
-        : undefined;
-
-      // `task-end` for the step just recorded. The EVENT is task-end even
-      // when the instance runs on: the unit an agent starts and ends is the
-      // step, and waiting for the whole process would lose every intermediate
-      // one — which is most of what a log is read for. The instance's own
-      // status rides along in the detail so the two are distinguishable.
-      const log = writeLogEntry(
-        root,
-        {
-          event: "task-end",
-          summary: `completed ${node} in ${model.id}`,
-          detail:
-            `instance ${next.id} is now ${next.status}` +
-            (note ? ` — ${note}` : "") +
-            (authz ? ` — ${describeVerdict(authz)}` : ""),
-          process: model.id,
-          task: node,
-          role: findInModel(model, node)?.model.nodes.get(node)?.lane,
-          bean: next.bean,
-          session: next.id,
-        },
-        model.logCapture,
-      );
-      return text(
-        describe(model, next, roles()) +
-          (authz ? `\n\n  authorization: ${describeVerdict(authz)}` : "") +
-          (plan ? `\n\n  work plan: ${plan.summary}` : "") +
-          `\n  ${describeCapture(log)}`,
-      );
-    },
+    async (args) => text(await workflowComplete(root, args, callOpts)),
   );
 }

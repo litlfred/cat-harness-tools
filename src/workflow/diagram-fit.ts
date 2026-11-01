@@ -24,12 +24,15 @@
  * |---|---|
  * | `diagram-too-wide` · `diagram-too-tall` | the DI extent, against the budget above |
  * | `label-overlap` | two drawn labels intersect (e.g. "Satisfied with changes?" over "No") |
- * | `label-on-edge` | a label sits on a flow that is not its own |
+ * | `label-on-edge` | a label sits on a flow, its own included |
  * | `label-on-shape` | a label covers a task, event or gateway that is not its own |
+ * | `label-on-lane-line` | a label is drawn across the line between two lanes, or a pool's edge |
  * | `header-overflow` | a pool or lane name spills out of its 30-wide header strip |
- * | `text-overflow` | a task's name spills out of its box (16px text in a box drawn for 12px) |
+ * | `text-overflow` | a task's name spills out of its box (16px text in a box drawn for 12px), or runs under its type icon or [+] marker |
  * | `edge-diagonal` | a flow runs at a slant (owner, 2026-10-31: *"straight angled arrows ugly"*) |
  * | `edge-crossing` | two flows cross |
+ * | `shape-overlap` | two steps drawn on top of each other (a boundary event on its task, or a step inside its subprocess, does not count) |
+ * | `edge-through-shape` | a flow is drawn through a task, event or gateway that is neither its source nor its target |
  * | `lane-order` | another order of the lanes makes the cross-lane flows shorter |
  *
  * Label positions come from where bpmn-js DREW them (`DrawnLayout`), because
@@ -76,6 +79,8 @@ export interface DiLayout {
   flows: Map<string, { source: string; target: string; name?: string }>;
   /** Element id → its name, for messages. */
   names: Map<string, string>;
+  /** Element id → its BPMN element kind (userTask, callActivity, …). */
+  kinds?: Map<string, string>;
 }
 
 /** Where the renderer drew the external labels and the flows (bootstrap-tools `DrawnLayout`). */
@@ -88,12 +93,26 @@ export interface DrawnLabels {
   headers?: { id: string; width: number; height: number; room: number }[];
 }
 
+/** How far a label may be moved from where it is drawn when no place beside its element is clear. */
+const REACH = 80;
+/** How far from its own flow or shape a label moved that far may sit. */
+const STAY = 24;
+/** Height of one line of 16px label text as bpmn-js draws it. */
+const LINE_PX = 19;
+
 /** Width of the name strip bpmn-js draws down the left of a horizontal pool or lane. */
 const HEADER = 30;
 
 const num = (s: string | undefined): number => Number(s ?? "NaN");
 const attr = (tag: string, name: string): string | undefined =>
   new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1];
+
+/** A shape's or edge's DI body cut into its own part and its BPMNLabel, wherever in the body the label sits. */
+const LABEL_RE = /<(?:\w+:)?BPMNLabel\b(?:[^>]*\/>|[\s\S]*?<\/(?:\w+:)?BPMNLabel>)/;
+function splitLabel(body: string): [own: string, label: string] {
+  const m = LABEL_RE.exec(body);
+  return m ? [body.slice(0, m.index) + body.slice(m.index + m[0].length), m[0]] : [body, ""];
+}
 
 function boundsIn(body: string): Box | undefined {
   const b = /<(?:\w+:)?Bounds\b([^>]*)\/?>/.exec(body);
@@ -119,9 +138,10 @@ export function readDi(xml: string): DiLayout {
     if (id && source && target) out.flows.set(id, { source, target, name: attr(m[2]!, "name") || undefined });
   }
   for (const m of xml.matchAll(/<(?:\w+:)?\w+\b[^>]*\sid="([^"]+)"[^>]*\sname="([^"]*)"/g)) out.names.set(m[1]!, m[2]!);
+  out.kinds = new Map([...xml.matchAll(/<(?:\w+:)?(\w+)\b[^>]*\sid="([^"]+)"/g)].map((m) => [m[2]!, m[1]!] as const));
   for (const m of plane.matchAll(/<(?:\w+:)?BPMNShape\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?BPMNShape>/g)) {
     const id = attr(m[1]!, "bpmnElement");
-    const [own, labelPart] = m[2]!.split(/<(?:\w+:)?BPMNLabel\b/);
+    const [own, labelPart] = splitLabel(m[2]!);
     const b = boundsIn(own!);
     if (!id || !b) continue;
     const label = labelPart ? boundsIn(labelPart) : undefined;
@@ -132,7 +152,7 @@ export function readDi(xml: string): DiLayout {
   for (const m of plane.matchAll(/<(?:\w+:)?BPMNEdge\b([^>]*)>([\s\S]*?)<\/(?:\w+:)?BPMNEdge>/g)) {
     const id = attr(m[1]!, "bpmnElement");
     if (!id) continue;
-    const [own, labelPart] = m[2]!.split(/<(?:\w+:)?BPMNLabel\b/);
+    const [own, labelPart] = splitLabel(m[2]!);
     const points = [...own!.matchAll(/<(?:\w+:)?waypoint\b([^>]*)\/?>/g)].map((w) => ({ x: num(attr(w[1]!, "x")), y: num(attr(w[1]!, "y")) }));
     const label = labelPart ? boundsIn(labelPart) : undefined;
     out.edges.set(id, label ? { points, label } : { points });
@@ -198,6 +218,30 @@ export function crossings(di: DiLayout): [string, string][] {
     for (let j = i + 1; j < ids.length; j++) {
       const sa = segments(di.edges.get(ids[i]!)!.points), sb = segments(di.edges.get(ids[j]!)!.points);
       if (sa.some(([p, q]) => sb.some(([r, s]) => segmentsCross(p, q, r, s)))) out.push([ids[i]!, ids[j]!]);
+    }
+  }
+  return out;
+}
+
+/** Does `outer` hold all of `inner`? (An expanded subprocess holds its own steps.) */
+const holds = (outer: Box, inner: Box): boolean =>
+  outer.x <= inner.x && outer.y <= inner.y && outer.x + outer.width >= inner.x + inner.width && outer.y + outer.height >= inner.y + inner.height;
+
+/**
+ * Every flow drawn through a shape it does not start or end at, as
+ * `[flow, shape]`. A shape that holds the flow's source or target (the
+ * expanded subprocess the flow runs inside) or overlaps it (the task a
+ * boundary event sits on) is not counted.
+ */
+export function edgesThroughShapes(di: DiLayout): [string, string][] {
+  const out: [string, string][] = [];
+  for (const [eid, e] of di.edges) {
+    const f = di.flows.get(eid);
+    const src = f && di.shapes.get(f.source), tgt = f && di.shapes.get(f.target);
+    for (const [sid, b] of di.shapes) {
+      if (f && (sid === f.source || sid === f.target)) continue;
+      if ([src, tgt].some((x) => x && (holds(b, x) || boxesOverlap(b, x, 0)))) continue;
+      if (segments(e.points).some(([p, q]) => segmentHitsBox(p, q, b, 2))) out.push([eid, sid]);
     }
   }
   return out;
@@ -282,9 +326,11 @@ const fmt = (n: number): string => String(Math.round(n * 100) / 100);
 
 /**
  * Move every lane to its place in `order`, keeping each lane's height. Shapes
- * and same-lane flows move with their lane; a flow between two lanes is
- * re-routed as one elbow (out of the source's top or bottom, along to the
- * target's side), since its old bends were drawn for the old order. A
+ * and same-lane flows move with their lane; a flow between two lanes keeps
+ * its bends, each moving with the lane it lies in. Only when that route now
+ * runs through a box is it re-routed, by the first of a few right-angled
+ * routes that runs through none (a flow that loops back along a lane went
+ * straight through every step in it when it was always re-routed). A
  * cross-lane flow's label bounds are dropped so bpmn-js places it beside the
  * new route rather than where the old route was.
  */
@@ -305,6 +351,17 @@ export function applyLaneOrder(xml: string, order: readonly string[]): string {
     const b = di.shapes.get(id);
     if (!b) return undefined;
     return { ...b, y: b.y + (dy.get(lane.get(id) ?? "") ?? 0) };
+  };
+  const laneAtY = (y: number): string | undefined =>
+    current.find((l) => { const b = di.lanes.get(l)!; return y >= b.y && y <= b.y + b.height; }) ??
+    (y < top ? current[0] : current.at(-1));
+  const after = new Map([...di.shapes.keys()].map((sid) => [sid, moved(sid)!] as const));
+  const blocked = (route: Pt[], source: string, target: string): boolean => {
+    const src = after.get(source), tgt = after.get(target);
+    return [...after].some(([sid, b]) =>
+      sid !== source && sid !== target &&
+      ![src, tgt].some((x) => x && (holds(b, x) || boxesOverlap(b, x, 0))) &&
+      segments(route).some(([p, q]) => segmentHitsBox(p, q, b, 2)));
   };
 
   let plane = firstPlane(xml);
@@ -329,7 +386,17 @@ export function applyLaneOrder(xml: string, order: readonly string[]): string {
     if (!s || !t) return all;
     const indent = /\n(\s*)<(?:\w+:)?waypoint/.exec(body)?.[1] ?? "        ";
     const prefix = /<(\w+:)?waypoint/.exec(body)?.[1] ?? "di:";
-    const pts = elbow(s, t);
+    // Keep the author's bends: each waypoint moves with the lane it lies in,
+    // its ends with their shapes. A horizontal run stays in one lane and a
+    // vertical one keeps its x, so the route stays at right angles. Only if
+    // that now runs through a box is a fresh route tried.
+    const old = di.edges.get(id)?.points ?? [];
+    const kept = old.map((p, i) => ({
+      x: p.x,
+      y: p.y + (dy.get((i === 0 ? ls : i === old.length - 1 ? lt : laneAtY(p.y)) ?? "") ?? 0),
+    }));
+    const clear = (route: Pt[]): boolean => route.length >= 2 && !blocked(route, f.source, f.target);
+    const pts = [kept, elbow(s, t), orthogonalRoute(s, t), elbow(t, s).reverse()].find(clear) ?? (kept.length >= 2 ? kept : elbow(s, t));
     const wps = pts.map((p) => `\n${indent}<${prefix}waypoint x="${fmt(p.x)}" y="${fmt(p.y)}" />`).join("");
     const closeIndent = /\n(\s*)$/.exec(body)?.[1] ?? "      ";
     return `${open}${wps}\n${closeIndent}${close}`;
@@ -419,14 +486,30 @@ export function straightenFlows(xml: string): { xml: string; fixed: string[] } {
 /** Room left around a shape's text: bpmn-js pads 5, and the eye wants a little more. */
 const TEXT_PAD = 8;
 
-/** Shapes whose drawn text runs outside them, with the size the text needs. */
+/** Kinds bpmn-js draws a type icon for, in the top-left corner. */
+const ICON_KINDS = new Set(["userTask", "serviceTask", "scriptTask", "manualTask", "sendTask", "receiveTask", "businessRuleTask"]);
+/** Kinds bpmn-js draws a [+] marker for, at the bottom centre. */
+const MARKER_KINDS = new Set(["callActivity", "subProcess", "adHocSubProcess", "transaction"]);
+/** The icon's corner square, and the marker's height. */
+const ICON = 22;
+const MARKER = 18;
+
+/** Shapes whose drawn text runs outside them, or under their icon or marker, with the size the text needs. */
 export function textOverflow(di: DiLayout, drawn?: DrawnLabels): { id: string; box: Box; need: Box }[] {
   const out: { id: string; box: Box; need: Box }[] = [];
   for (const t of drawn?.texts ?? []) {
     const b = di.shapes.get(t.id);
     if (!b) continue;
     const spills = t.x < b.x - 1 || t.y < b.y - 1 || t.x + t.width > b.x + b.width + 1 || t.y + t.height > b.y + b.height + 1;
-    if (spills) out.push({ id: t.id, box: b, need: { x: b.x, y: b.y, width: t.width + 2 * TEXT_PAD, height: t.height + 2 * TEXT_PAD } });
+    // The task-type icon top left (a person, a cog) and the [+] or loop
+    // marker bottom centre are drawn over the text when the box is tight.
+    const kind = di.kinds?.get(t.id) ?? "";
+    const icon = ICON_KINDS.has(kind) && boxesOverlap(t, { x: b.x, y: b.y, width: ICON, height: ICON }, 0);
+    const marker = MARKER_KINDS.has(kind) && boxesOverlap(t, { x: b.x + b.width / 2 - MARKER, y: b.y + b.height - MARKER, width: 2 * MARKER, height: MARKER }, 0);
+    if (spills || icon || marker) {
+      const pad = icon ? ICON : marker ? MARKER : TEXT_PAD;
+      out.push({ id: t.id, box: b, need: { x: b.x, y: b.y, width: t.width + 2 * TEXT_PAD, height: t.height + 2 * pad } });
+    }
   }
   return out;
 }
@@ -521,13 +604,67 @@ export function resizeShapes(
   const touched = new Set([...sizes.keys()]);
   for (const [id, b] of shapes) if (b.y !== di0.shapes.get(id)!.y || b.x !== di0.shapes.get(id)!.x) touched.add(id);
 
+  // Where an old coordinate lands now. A function of the coordinate alone,
+  // so points that shared an x (or a y) still do, and a right-angled route
+  // stays right-angled. x moves with the column it lies in (or the nearest
+  // one to its left); y with the lane it lies in.
+  const olds = [...di0.shapes].filter(([sid]) => shapes.has(sid));
+  const mapX = (x: number): number => {
+    const inCol = olds.find(([, o]) => x >= o.x && x <= o.x + o.width);
+    if (inCol) {
+      const [sid, o] = inCol, n = shapes.get(sid)!;
+      return x + (n.x + n.width / 2) - (o.x + o.width / 2);
+    }
+    let best: [string, Box] | undefined;
+    for (const e of olds) if (e[1].x + e[1].width < x && (!best || e[1].x + e[1].width > best[1].x + best[1].width)) best = e;
+    if (!best) return x;
+    const n = shapes.get(best[0])!;
+    return x + (n.x + n.width) - (best[1].x + best[1].width);
+  };
+  const mapY = (y: number): number => {
+    const l = order.find((k) => { const b = di0.lanes.get(k)!; return y >= b.y && y <= b.y + b.height; });
+    return y + (l ? shiftOf.get(l) ?? 0 : y < (di0.lanes.get(order[0] ?? "")?.y ?? 0) ? 0 : shift);
+  };
+  // An end that sat on a side of its shape stays on that side.
+  const snap = (p: Pt, o: Box | undefined, n: Box): Pt => {
+    if (!o) return p;
+    const E = 1.5;
+    if (Math.abs(p.x - o.x) < E) return { ...p, x: n.x };
+    if (Math.abs(p.x - (o.x + o.width)) < E) return { ...p, x: n.x + n.width };
+    if (Math.abs(p.y - o.y) < E) return { ...p, y: n.y };
+    if (Math.abs(p.y - (o.y + o.height)) < E) return { ...p, y: n.y + n.height };
+    return p;
+  };
+  const onEdge = (p: Pt, b: Box): boolean => {
+    const E = 1.5, inX = p.x >= b.x - E && p.x <= b.x + b.width + E, inY = p.y >= b.y - E && p.y <= b.y + b.height + E;
+    return (inY && (Math.abs(p.x - b.x) < E || Math.abs(p.x - b.x - b.width) < E)) ||
+      (inX && (Math.abs(p.y - b.y) < E || Math.abs(p.y - b.y - b.height) < E)) ||
+      (inX && inY);
+  };
+  const movedRoute = (pts: Pt[], so: Box | undefined, sn: Box, to: Box | undefined, tn: Box): Pt[] | undefined => {
+    if (pts.length < 2) return undefined;
+    const m = pts.map((p) => ({ x: mapX(p.x), y: mapY(p.y) }));
+    const first = snap(pts[0]!, so, sn), last = snap(pts.at(-1)!, to, tn);
+    if (first !== pts[0]) m[0] = first.x !== pts[0]!.x ? { x: first.x, y: m[0]!.y } : { x: m[0]!.x, y: first.y };
+    if (last !== pts.at(-1)) m[m.length - 1] = last.x !== pts.at(-1)!.x ? { x: last.x, y: m.at(-1)!.y } : { x: m.at(-1)!.x, y: last.y };
+    return onEdge(m[0]!, sn) && onEdge(m.at(-1)!, tn) ? m : undefined;
+  };
+  const routeBlocked = (route: Pt[], source: string, target: string): boolean => {
+    const src = shapes.get(source), tgt = shapes.get(target);
+    return [...shapes].some(([sid, b]) =>
+      sid !== source && sid !== target &&
+      ![src, tgt].some((x) => x && (holds(b, x) || boxesOverlap(b, x, 0))) &&
+      segments(route).some(([p, q]) => segmentHitsBox(p, q, b, 2)));
+  };
+
   let plane = firstPlane(xml);
   const original = plane;
   const setBounds = (body: string, b: Box): string =>
     body.replace(/<((?:\w+:)?Bounds)\b[^>]*\/?>/, (_m, tag: string) => `<${tag} x="${fmt(b.x)}" y="${fmt(b.y)}" width="${fmt(b.width)}" height="${fmt(b.height)}" />`);
   plane = plane.replace(/(<(?:\w+:)?BPMNShape\b([^>]*)>)([\s\S]*?)(<\/(?:\w+:)?BPMNShape>)/g, (all, open: string, attrs: string, body: string, close: string) => {
     const id = attr(attrs, "bpmnElement") ?? "";
-    const [own, ...rest] = body.split(/(?=<(?:\w+:)?BPMNLabel\b)/);
+    const [own, labelPart] = splitLabel(body);
+    const rest = [labelPart];
     if (lanes.has(id)) return open + setBounds(own!, lanes.get(id)!) + rest.join("") + close;
     if (di0.pools.has(id)) {
       const p = di0.pools.get(id)!;
@@ -551,13 +688,170 @@ export function resizeShapes(
       const indent = /\n(\s*)<(?:\w+:)?waypoint/.exec(body)?.[1] ?? "        ";
       const prefix = /<(\w+:)?waypoint/.exec(body)?.[1] ?? "di:";
       const closeIndent = /\n(\s*)$/.exec(body)?.[1] ?? "      ";
-      return `${open}${orthogonalRoute(s, t).map((p) => `\n${indent}<${prefix}waypoint x="${fmt(p.x)}" y="${fmt(p.y)}" />`).join("")}\n${closeIndent}${close}`;
+      // Keep the author's bends where they still run clear; else the first
+      // right-angled route that does. Re-routing every touched flow drew a
+      // loop-back flow straight through the steps of its lane.
+      const kept = movedRoute(di0.edges.get(id)?.points ?? [], di0.shapes.get(f.source), s, di0.shapes.get(f.target), t);
+      const clear = (r: Pt[] | undefined): r is Pt[] => !!r && r.length >= 2 && !routeBlocked(r, f.source, f.target);
+      const route = [kept, orthogonalRoute(s, t), elbow(s, t), elbow(t, s).reverse()].find(clear) ?? orthogonalRoute(s, t);
+      return `${open}${route.map((p) => `\n${indent}<${prefix}waypoint x="${fmt(p.x)}" y="${fmt(p.y)}" />`).join("")}\n${closeIndent}${close}`;
     }
     const d = shiftOf.get(lane.get(f.source) ?? "") ?? 0;
     if (!d) return all;
     return open + body.replace(/(\sy=")([-\d.]+)(")/g, (_m, a: string, v: string, c: string) => a + fmt(Number(v) + d) + c) + close;
   });
   return xml.replace(original, plane);
+}
+
+// ── Labels clear of everything ──────────────────────────────────────────
+
+/** The top and bottom edge of every lane and pool, keyed by lane or pool id. */
+function laneLines(di: DiLayout): [string, [Pt, Pt]][] {
+  const out: [string, [Pt, Pt]][] = [];
+  for (const [id, b] of [...di.lanes, ...di.pools]) {
+    out.push([id, [{ x: b.x, y: b.y }, { x: b.x + b.width, y: b.y }]]);
+    out.push([id, [{ x: b.x, y: b.y + b.height }, { x: b.x + b.width, y: b.y + b.height }]]);
+  }
+  return out;
+}
+
+/** Space kept between a label and what it names. */
+const LABEL_GAP = 4;
+
+/** Where a label may go, nearest first: around its shape, or beside each run of its flow. */
+function labelCandidates(di: DiLayout, id: string, w: number, h: number): Box[] {
+  const s = di.shapes.get(id);
+  const at = (x: number, y: number): Box => ({ x, y, width: w, height: h });
+  if (s) {
+    const cx = s.x + s.width / 2, cy = s.y + s.height / 2, g = LABEL_GAP;
+    const below = s.y + s.height + g, above = s.y - h - g, right = s.x + s.width + g, left = s.x - w - g;
+    return [
+      at(cx - w / 2, below), at(cx - w / 2, above), at(right, cy - h / 2), at(left, cy - h / 2),
+      at(right, below), at(left, below), at(right, above), at(left, above),
+      at(right, s.y + s.height - h), at(left, s.y + s.height - h), at(right, s.y), at(left, s.y),
+    ];
+  }
+  const e = di.edges.get(id);
+  if (!e) return [];
+  const out: Box[] = [];
+  for (const [p, r] of segments(e.points)) {
+    const len = Math.hypot(r.x - p.x, r.y - p.y);
+    for (const t of [0.5, 0.25, 0.75]) {
+      const m = { x: p.x + (r.x - p.x) * t, y: p.y + (r.y - p.y) * t };
+      if (p.y === r.y && len >= 20) out.push(at(m.x - w / 2, m.y - h - 3), at(m.x - w / 2, m.y + 3));
+      else if (p.x === r.x && len >= 20) out.push(at(m.x + 4, m.y - h / 2), at(m.x - w - 4, m.y - h / 2));
+    }
+    // Hugging the start of a run, where a gateway's answers usually sit.
+    if (p.y === r.y) out.push(at(Math.min(p.x, r.x) + 6, p.y - h - 3), at(Math.max(p.x, r.x) - w - 6, p.y - h - 3));
+    if (p.x === r.x) out.push(at(p.x + 4, Math.min(p.y, r.y) + 4), at(p.x + 4, Math.max(p.y, r.y) - h - 4));
+  }
+  // A run too short to hold its label: the four corners where the flow
+  // leaves its source, then where it meets its target.
+  for (const p of [e.points[0], e.points.at(-1)]) {
+    if (p) out.push(at(p.x + 4, p.y - h - 3), at(p.x + 4, p.y + 3), at(p.x - w - 4, p.y - h - 3), at(p.x - w - 4, p.y + 3));
+  }
+  return out;
+}
+
+/**
+ * Move every label that sits on a flow, a shape, another label, a lane line
+ * or a name strip to the nearest place where it touches none of them, and
+ * write that place as its `BPMNLabel` bounds. Sizes are the drawn ones, so a
+ * drawing is needed; a label with nowhere clear to go is left where it is
+ * and the check still reports it. Owner, 2026-10-31: *"need to check for
+ * text on arrows"*.
+ */
+export function placeLabels(xml: string, drawn: DrawnLabels): { xml: string; moved: string[] } {
+  const di = readDi(xml);
+  const lane = laneOf(di);
+  const labels = labelBoxes(di, drawn);
+  const placed = new Map(labels.map((l) => [l.id, l.box]));
+  const edgePts = drawn.edges ? new Map(drawn.edges.map((e) => [e.id, e.points])) : new Map([...di.edges].map(([id, e]) => [id, e.points]));
+  const lines = laneLines(di);
+  const strips = [...di.pools.values(), ...di.lanes.values()].map((h) => ({ x: h.x, y: h.y, width: HEADER, height: h.height }));
+  const area = extent(di);
+  const clear = (id: string, b: Box): boolean => {
+    if (area && (b.x < area.x || b.y < area.y || b.x + b.width > area.x + area.width || b.y + b.height > area.y + area.height)) return false;
+    const home = lane.get(id) && di.lanes.get(lane.get(id)!);
+    if (home && !(b.y >= home.y && b.y + b.height <= home.y + home.height)) return false;
+    for (const [oid, ob] of placed) if (oid !== id && boxesOverlap(b, ob)) return false;
+    for (const s of di.shapes.values()) if (boxesOverlap(b, s)) return false;
+    for (const pts of edgePts.values()) if (segments(pts).some(([p, r]) => segmentHitsBox(p, r, b, 2))) return false;
+    for (const [, [p, r]] of lines) if (segmentHitsBox(p, r, b, 2)) return false;
+    for (const st of strips) if (boxesOverlap(b, st)) return false;
+    return true;
+  };
+  // A label moved far must still read as its own element's: a flow's label
+  // stays nearer its flow than any other, a shape's beside its shape. A
+  // branch label beside the wrong branch is worse than one on its line.
+  const gap = (b: Box, p: Pt, r: Pt): number => {
+    const dx = Math.max(0, b.x - Math.max(p.x, r.x), Math.min(p.x, r.x) - (b.x + b.width));
+    const dy = Math.max(0, b.y - Math.max(p.y, r.y), Math.min(p.y, r.y) - (b.y + b.height));
+    return Math.hypot(dx, dy);
+  };
+  const toEdge = (b: Box, pts: Pt[]): number => Math.min(...segments(pts).map(([p, r]) => gap(b, p, r)));
+  const staysWith = (id: string, b: Box): boolean => {
+    const own = edgePts.get(id);
+    if (own) {
+      const d = toEdge(b, own);
+      return d <= STAY && [...edgePts].every(([oid, pts]) => oid === id || toEdge(b, pts) > d);
+    }
+    const s = di.shapes.get(id);
+    if (!s) return false;
+    const dx = Math.max(0, b.x - (s.x + s.width), s.x - (b.x + b.width)), dy = Math.max(0, b.y - (s.y + s.height), s.y - (b.y + b.height));
+    return Math.hypot(dx, dy) <= STAY;
+  };
+  const moves = new Map<string, Box>();
+  for (const l of labels) {
+    if (clear(l.id, l.box)) continue;
+    // bpmn-js wraps an outside label at its DI width (90 when there is
+    // none), so the box written keeps that width and the text's height.
+    const own = di.shapes.get(l.id)?.label ?? di.edges.get(l.id)?.label;
+    const w = Math.max(l.box.width, own?.width ?? 90);
+    // Where no place holds it at its width, a wider box wraps the same text
+    // into fewer lines: a five-line gateway question at 90 is three at 150.
+    const lines = Math.max(1, Math.round(l.box.height / LINE_PX));
+    const lineH = l.box.height / lines;
+    const sizes = [w, ...[1.5, 2, 2.5].map((k) => Math.min(Math.round(w * k), 260)).filter((x) => x > w)]
+      .map((ww) => ({ ww, hh: Math.ceil(Math.ceil(lines * w / ww) * lineH) }))
+      .filter((sz, i, all) => i === 0 || sz.hh < all[i - 1]!.hh);
+    let to: Box | undefined;
+    for (const { ww, hh } of sizes) {
+      to = labelCandidates(di, l.id, ww, hh).find((c) => clear(l.id, c));
+      if (to) break;
+    }
+    // Still nowhere: the nearest clear place within reach of where it is
+    // drawn now, nearest first, so it stays readable as its element's.
+    for (const { ww, hh } of to ? [] : sizes) {
+      const cx = l.box.x + l.box.width / 2, cy = l.box.y + l.box.height / 2;
+      const ring: Box[] = [];
+      for (let dy = -REACH; dy <= REACH; dy += 8) {
+        for (let dx = -REACH; dx <= REACH; dx += 8) ring.push({ x: cx + dx - ww / 2, y: cy + dy - hh / 2, width: ww, height: hh });
+      }
+      ring.sort((a, b) => Math.hypot(a.x + ww / 2 - cx, a.y + hh / 2 - cy) - Math.hypot(b.x + ww / 2 - cx, b.y + hh / 2 - cy));
+      to = ring.find((c) => clear(l.id, c) && staysWith(l.id, c));
+      if (to) break;
+    }
+    if (!to) continue;
+    placed.set(l.id, to);
+    moves.set(l.id, to);
+  }
+  if (moves.size === 0) return { xml, moved: [] };
+  const plane = firstPlane(xml);
+  const bounds = (tag: string, b: Box): string => `<${tag} x="${fmt(b.x)}" y="${fmt(b.y)}" width="${fmt(b.width)}" height="${fmt(b.height)}" />`;
+  const next = plane.replace(/(<((?:\w+:)?)(BPMNShape|BPMNEdge)\b([^>]*)>)([\s\S]*?)(<\/(?:\w+:)?(?:BPMNShape|BPMNEdge)>)/g,
+    (all, open: string, pre: string, _k: string, attrs: string, body: string, close: string) => {
+      const b = moves.get(attr(attrs, "bpmnElement") ?? "");
+      if (!b) return all;
+      const dc = /<(\w+:)?Bounds\b/.exec(body)?.[1] ?? "dc:";
+      const label = `<${pre}BPMNLabel>${bounds(`${dc}Bounds`, b)}</${pre}BPMNLabel>`;
+      // An existing label element, with or without bounds, is replaced whole.
+      const had = /<(?:\w+:)?BPMNLabel\b(?:[^>]*\/>|[\s\S]*?<\/(?:\w+:)?BPMNLabel>)/;
+      if (had.test(body)) return open + body.replace(had, label) + close;
+      const indent = /\n(\s*)<\/[^>]*>$/.exec(body + close)?.[1] ?? "      ";
+      return `${open}${body.replace(/\s*$/, "")}\n${indent}  ${label}\n${indent}${close}`;
+    });
+  return { xml: xml.replace(plane, next), moved: [...moves.keys()] };
 }
 
 // ── The checks ───────────────────────────────────────────────────────────
@@ -582,10 +876,13 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
     "label-overlap": [],
     "label-on-edge": [],
     "label-on-shape": [],
+    "label-on-lane-line": [],
     "text-overflow": [],
     "header-overflow": [],
     "edge-diagonal": [],
     "edge-crossing": [],
+    "edge-through-shape": [],
+    "shape-overlap": [],
     "lane-order": [],
   };
   const ext = extent(di);
@@ -617,9 +914,9 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
   const edgePts = drawn?.edges ? new Map(drawn.edges.map((e) => [e.id, e.points])) : new Map([...di.edges].map(([id, e]) => [id, e.points]));
   for (const l of labels) {
     for (const [eid, pts] of edgePts) {
-      if (eid === l.id) continue;
+      // Its own flow too: a label drawn over its own arrow hides both.
       if (segments(pts).some(([p, r]) => segmentHitsBox(p, r, l.box, 2))) {
-        out["label-on-edge"]!.push({ where: `${l.id}/${eid}`, detail: `label ${q(l.text)} sits on flow ${eid}. Move the label off the line.` });
+        out["label-on-edge"]!.push({ where: `${l.id}/${eid}`, detail: `label ${q(l.text)} sits on flow ${eid}. Move the label off the line (\`bpmn:detangle --write\` does it).` });
       }
     }
     // The name strip down the left of a horizontal pool or lane is drawn text too.
@@ -633,6 +930,18 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
     for (const [sid, s] of di.shapes) {
       if (boxesOverlap(l.box, s)) {
         out["label-on-shape"]!.push({ where: `${l.id}/${sid}`, detail: `label ${q(l.text)} covers ${q(di.names.get(sid) ?? sid)}.` });
+      }
+    }
+  }
+
+  for (const l of labels) {
+    for (const [lid, line] of laneLines(di)) {
+      if (segmentHitsBox(line[0], line[1], l.box, 2)) {
+        out["label-on-lane-line"]!.push({
+          where: `${l.id}/${lid}`,
+          detail: `label ${q(l.text)} is drawn across the edge of ${q(di.names.get(lid) ?? lid)}. Move it inside one lane (\`bpmn:detangle --write\` does it).`,
+        });
+        break;
       }
     }
   }
@@ -659,6 +968,23 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
   }
   for (const [a, b] of crossings(di)) {
     out["edge-crossing"]!.push({ where: `${a}×${b}`, detail: `flows ${a} and ${b} cross. Re-route one around the other, move a step, or swap lanes (\`bpmn:detangle\`).` });
+  }
+  const ids = [...di.shapes.keys()];
+  for (let i = 0; i < ids.length; i++) {
+    for (let j = i + 1; j < ids.length; j++) {
+      const a = di.shapes.get(ids[i]!)!, c = di.shapes.get(ids[j]!)!;
+      if (holds(a, c) || holds(c, a)) continue;
+      if ([ids[i]!, ids[j]!].some((x) => di.kinds?.get(x) === "boundaryEvent")) continue;
+      if (boxesOverlap(a, c, 2)) {
+        out["shape-overlap"]!.push({ where: `${ids[i]}+${ids[j]}`, detail: `${q(di.names.get(ids[i]!) ?? ids[i]!)} and ${q(di.names.get(ids[j]!) ?? ids[j]!)} are drawn on top of each other. Move one.` });
+      }
+    }
+  }
+  for (const [eid, sid] of edgesThroughShapes(di)) {
+    out["edge-through-shape"]!.push({
+      where: `${eid}/${sid}`,
+      detail: `flow ${eid} is drawn through ${q(di.names.get(sid) ?? sid)}, which it neither leaves nor enters. Route it around the box.`,
+    });
   }
   const best = bestLaneOrder(di);
   if (best.cost < best.current) {

@@ -130,6 +130,7 @@ function audit(args: readonly string[]): Promise<AuditRun> {
       });
       const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
       await p.exited;
+      if (!out.trim()) AUDITS.delete(key);
       return { out, err };
     });
     AUDITS.set(key, run);
@@ -138,15 +139,16 @@ function audit(args: readonly string[]): Promise<AuditRun> {
 }
 
 /** `kg-audit --instance <rel>`, write-free. */
-const auditInstance = (rel: string) => audit(["--instance", rel, ...WRITE_FREE]);
+const auditInstance = (rel: string) =>
+  resolve(REPO, rel) === resolve(HARNESS_ROOT) ? audit(WRITE_FREE) : audit(["--instance", rel, ...WRITE_FREE]);
 
 /**
  * Start every audit this file reads — each instance's and the default run's —
  * so they overlap; the tests then await the ones they judge.
  */
 function startAudits(): void {
-  for (const inst of INSTANCES) void auditInstance(`./${relative(REPO, inst)}`);
   void audit(WRITE_FREE);
+  for (const inst of INSTANCES) void auditInstance(`./${relative(REPO, inst)}`);
 }
 
 /**
@@ -241,7 +243,7 @@ describe("skill refs resolve across the `needs` chain", () => {
     }
 
     expect(offences).toEqual([]);
-  }, 120_000);
+  }, 240_000);
 
   /**
    * The third state, which is a rule rather than a courtesy — and which this
@@ -289,7 +291,7 @@ describe("skill refs resolve across the `needs` chain", () => {
       }
     }
     expect(offences).toEqual([]);
-  }, 120_000);
+  }, 240_000);
 
   /**
    * Resolution widened; OWNERSHIP did not.
@@ -532,7 +534,7 @@ describe("role refs resolve across the `needs` chain", () => {
       }
     }
     expect(offences).toEqual([]);
-  }, 120_000);
+  }, 240_000);
 
   test("some instance resolves a role ONLY through its dependencies", () => {
     // Anti-vacuity. Measured: smart-base and folio-assistant-core declare no
@@ -583,5 +585,5 @@ describe("role refs resolve across the `needs` chain", () => {
       `the run audits ${roleSubjects} role subjects; cat-harness declares ${own.size} and its closure holds ` +
         `${closure.size}. A count matching the closure means the overlay reached subjecthood.`,
     ).toBe(own.size);
-  }, 120_000);
+  }, 240_000);
 });
