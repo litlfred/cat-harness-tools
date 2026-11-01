@@ -52,3 +52,17 @@ describe("renderBlockMarkdown headings", () => {
     expect(renderBlockMarkdown(fig("Fig. 2. X", "fig:2"), { anchors: false })).not.toContain("block-anchor");
   });
 });
+
+describe("the numbered-block frame", () => {
+  test("a figure, diagram or table sits in one frame, Markdown kept inside", () => {
+    const md = renderBlockMarkdown(fig("Fig. 1. Product master data"));
+    expect(md.startsWith('<div class="fa-numbered fa-numbered-figure" markdown="1">\n\n')).toBe(true);
+    expect(md.endsWith("\n\n</div>")).toBe(true);
+    const t = renderBlockMarkdown({ block: { kind: "table", label: "tbl:x", caption: "X" } as unknown as Block, mdContent: "| a |\n|---|\n| b |" });
+    expect(t).toContain('class="fa-numbered fa-numbered-table"');
+  });
+  test("prose has no frame", () => {
+    const md = renderBlockMarkdown({ block: { kind: "prose", label: "prose:x" } as unknown as Block, mdContent: "Text." });
+    expect(md).not.toContain("fa-numbered");
+  });
+});
