@@ -135,6 +135,7 @@ import { readQaTree } from "./qa-store.ts";
 import { globalTaskSharedFindings } from "./lib/global-task-criteria.ts";
 import { loadProcessModel, loadGlobalTasks, isGlobalTasksFile, isActivity, isDecision, indistinctBranches, type ProcessModel } from "../src/workflow/process-model.js";
 import { reachability } from "../src/workflow/reachability.js";
+import { diagramQuality, readLayout, LAYOUT_CRITERIA } from "../src/workflow/diagram-quality.js";
 import { raciBreaches, raciRowsOf, type RaciBreachKind } from "./raci-chart.js";
 import { loadDecisionTable, possibleOutcomes } from "../src/workflow/decision-table.js";
 import {
@@ -1096,6 +1097,7 @@ async function auditProcess(
     "gateway-documented": entry(undocumentedDecision, decisions.length > 0),
     "gateway-branches-named": entry(indistinct, decisions.length > 0),
     ...reachabilityCriteria(m),
+    ...qualityCriteria(m, readFileSync(p.file, "utf-8")),
   };
   if (!graph) {
     // No role graph is a state the audit can be in, and it is not a pass.
@@ -1155,6 +1157,22 @@ function reachabilityCriteria(m: ProcessModel): Record<string, KgCriterionEntry>
     "node-reachable": entry(r.unreachable),
     "node-has-exit": entry(r.noExit),
   };
+}
+
+/**
+ * The readability criteria, from `src/workflow/diagram-quality.ts`. The
+ * drawing criteria are `n/a` for a diagram with no DI: nothing was drawn, so
+ * nothing was shown to be untangled.
+ */
+function qualityCriteria(m: ProcessModel, xml: string): Record<string, KgCriterionEntry> {
+  const layout = readLayout(xml);
+  const drawn = layout.edges.size > 0;
+  const q = diagramQuality(m, drawn ? layout : undefined);
+  const out: Record<string, KgCriterionEntry> = {};
+  for (const [id, findings] of Object.entries(q)) {
+    out[id] = entry(findings, !LAYOUT_CRITERIA.has(id) || drawn);
+  }
+  return out;
 }
 
 // ── Per-decision criteria ───────────────────────────────────────

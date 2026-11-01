@@ -26,9 +26,10 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { readArchimate, type ArchimateModel, type ArchimateView, type ArchimateViewNode } from "../schemas/archimate.ts";
+import { readArchimate, type ArchimateModel, type ArchimateView } from "../schemas/archimate.ts";
 import { planSlugs } from "../schemas/slugs.ts";
 import { routeConnections, type Pt, type RoutedConnection } from "./render-view.ts";
+import { segmentsCross as cross, segmentThroughBox as through, segmentsOf } from "../../src/diagram/segment-geometry.ts";
 
 export interface Tangle {
   kind: "crossing" | "through-box";
@@ -39,43 +40,6 @@ export interface Tangle {
   at: Pt;
 }
 
-/** How far inside a segment, as a fraction of its length, an intersection must be to count. */
-const EPS = 1e-6;
-/** A line that only grazes a box's edge by this many px is not through it. */
-const INSET = 2;
-
-/** Where segments p1-p2 and p3-p4 cross strictly inside both, if they do. */
-function cross(p1: Pt, p2: Pt, p3: Pt, p4: Pt): Pt | undefined {
-  const d = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x);
-  if (Math.abs(d) < 1e-9) return undefined;
-  const t = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / d;
-  const u = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / d;
-  if (t <= EPS || t >= 1 - EPS || u <= EPS || u >= 1 - EPS) return undefined;
-  return { x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y) };
-}
-
-/** Where segment a-b passes through the inside of box n (shrunk by {@link INSET}), if it does: the midpoint of the part inside. */
-function through(a: Pt, b: Pt, n: ArchimateViewNode): Pt | undefined {
-  const x0 = n.x + INSET, y0 = n.y + INSET, x1 = n.x + n.w - INSET, y1 = n.y + n.h - INSET;
-  if (x1 <= x0 || y1 <= y0) return undefined;
-  // Liang–Barsky clipping of the segment to the rectangle.
-  let t0 = 0, t1 = 1;
-  const dx = b.x - a.x, dy = b.y - a.y;
-  for (const [p, q] of [[-dx, a.x - x0], [dx, x1 - a.x], [-dy, a.y - y0], [dy, y1 - a.y]] as const) {
-    if (p === 0) {
-      if (q < 0) return undefined;
-      continue;
-    }
-    const r = q / p;
-    if (p < 0) t0 = Math.max(t0, r);
-    else t1 = Math.min(t1, r);
-    if (t0 > t1) return undefined;
-  }
-  if (t1 - t0 < EPS) return undefined;
-  const t = (t0 + t1) / 2;
-  return { x: a.x + t * dx, y: a.y + t * dy };
-}
-
 /** Every tangle in a view, as drawn. `routed` defaults to the view's own routing; a caller that already has it passes it in. */
 export function tanglesOf(view: ArchimateView, routed: RoutedConnection[] = routeConnections(view)): Tangle[] {
   const nodes = new Map(view.nodes.map((n) => [n.id, n]));
@@ -84,7 +48,7 @@ export function tanglesOf(view: ArchimateView, routed: RoutedConnection[] = rout
     for (let p = nodes.get(id)?.parent, seen = 0; p && seen < 64; p = nodes.get(p)?.parent, seen++) out.add(p);
     return out;
   };
-  const segs = (pts: Pt[]) => pts.slice(1).map((p, i) => [pts[i]!, p] as const);
+  const segs = segmentsOf;
   const out: Tangle[] = [];
   for (let i = 0; i < routed.length; i++) {
     const a = routed[i]!;
