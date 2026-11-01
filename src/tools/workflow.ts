@@ -37,12 +37,12 @@ import { processFiles, processRoots } from "../workflow/process-files.js";
 import { z } from "zod";
 import { basename, resolve } from "node:path";
 import { findInModel, loadProcessModel, type ProcessModel } from "../workflow/process-model.js";
-import { complete, describe, startInstance, withRefusal, WorkflowError, type InstanceState } from "../workflow/instance.js";
+import { complete, describe, position, startInstance, withRefusal, WorkflowError, type InstanceState, type WorkflowPosition } from "../workflow/instance.js";
 import { describePreflight, preflight, preflightRefusal } from "../workflow/preflight.js";
 import { describeCapture, writeLogEntry } from "../logging/log-writer.js";
 import { instanceId, listInstances, loadInstance, saveInstance } from "../workflow/store.js";
 import { applyWorkPlanOp, onlyArchiveLeft } from "../workflow/bean-link.js";
-import { checkGate, loadRelaxations, validateRelaxations } from "../workflow/gate.js";
+import { checkGate, loadRelaxations, validateRelaxations, type GateVerdict } from "../workflow/gate.js";
 import { type RoleGraph } from "../../schemas/process/role-graph.js";
 import { roleGraphFor } from "../../scripts/known-skills.js";
 import { accessContext } from "../core/access.js";
@@ -108,7 +108,48 @@ import { authorizeTask, describeVerdict, type TaskAuthVerdict } from "../workflo
 // (audit-reachability) can measure the SAME list without importing upward.
 export { processFiles, processRoots };
 
-const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
+/**
+ * A workflow tool's answer: the text people read, and the same answer as data
+ * (cat-harness-tools#1259, group 2). The MCP tools return both, the data as
+ * `structuredContent`; the CLI and the string functions keep the text.
+ */
+export interface WorkflowAnswer<R> {
+  text: string;
+  result: R;
+}
+const answer = <R extends object>(a: WorkflowAnswer<R>) => ({
+  content: [{ type: "text" as const, text: a.text }],
+  structuredContent: a.result as Record<string, unknown>,
+});
+
+/** `workflow_list` as data. */
+export interface WorkflowListing {
+  processes: Array<{ file: string; name?: string; id?: string; activities?: number; error?: string }>;
+  instances: Array<{ id: string; subject: string; status: InstanceState["status"]; updatedAt: string }>;
+}
+
+/** `workflow_start` as data: whether a new instance began, and where it is. */
+export interface WorkflowStarted {
+  started: boolean;
+  position: WorkflowPosition;
+}
+
+/** `workflow_gate` as data. `allowed` is both verdicts: either refusing refuses. */
+export interface WorkflowGateAnswer {
+  allowed: boolean;
+  gate: GateVerdict;
+  authorization: TaskAuthVerdict;
+  /** The actor the caller named, when it differs from the principal GitHub vouches for. */
+  namedActor?: string;
+}
+
+/** `workflow_complete` as data. */
+export interface WorkflowCompletion {
+  position: WorkflowPosition;
+  authorization?: TaskAuthVerdict;
+  /** What the step did to the work plan, when it carries a bean operation. */
+  workPlan?: string;
+}
 
 /** Resolve a process by file stem (`editing-hci-validation`) or by process id. */
 async function resolveModel(repoRoot: string, ref: string): Promise<ProcessModel> {
@@ -223,18 +264,25 @@ export interface WorkflowToolEnv {
 
 /** Shared implementation of `workflow_list` for MCP and CLI (`workflow:list`). */
 export async function workflowList(repoRoot: string): Promise<string> {
+  return (await workflowListAnswer(repoRoot)).text;
+}
+
+export async function workflowListAnswer(repoRoot: string): Promise<WorkflowAnswer<WorkflowListing>> {
   const root = resolve(repoRoot);
   const files = processFiles(root);
   const lines: string[] = ["# Processes", ""];
+  const processes: WorkflowListing["processes"] = [];
   for (const f of files) {
     try {
       const m = await loadProcessModel(f);
       const acts = [...m.nodes.values()].filter((n) => n.kind === "activity");
+      processes.push({ file: f, name: m.name, id: m.id, activities: acts.length });
       lines.push(
         `- **${f.replace(/\.bpmn$/, "")}** — ${m.name} (\`${m.id}\`), ` +
           `${acts.length} activities`,
       );
     } catch (e) {
+      processes.push({ file: f, error: (e as Error).message });
       lines.push(`- **${f}** — cannot be interpreted: ${(e as Error).message}`);
     }
   }
@@ -246,7 +294,13 @@ export async function workflowList(repoRoot: string): Promise<string> {
   for (const i of open) {
     lines.push(`- \`${i.id}\` — ${i.subject} · ${i.status} · updated ${i.updatedAt}`);
   }
-  return lines.join("\n");
+  return {
+    text: lines.join("\n"),
+    result: {
+      processes,
+      instances: open.map((i) => ({ id: i.id, subject: i.subject, status: i.status, updatedAt: i.updatedAt })),
+    },
+  };
 }
 
 /** Shared implementation of `workflow_start` for MCP and CLI (`workflow:start`). */
@@ -255,16 +309,27 @@ export async function workflowStart(
   { process, subject, bean }: WorkflowStartInput,
   opts?: WorkflowToolEnv,
 ): Promise<string> {
+  return (await workflowStartAnswer(repoRoot, { process, subject, bean }, opts)).text;
+}
+
+export async function workflowStartAnswer(
+  repoRoot: string,
+  { process, subject, bean }: WorkflowStartInput,
+  opts?: WorkflowToolEnv,
+): Promise<WorkflowAnswer<WorkflowStarted>> {
   const root = resolve(repoRoot);
   const roles = opts?.roles ?? (() => resolveWorkflowRoles(root));
   const model = await resolveModel(root, process);
   const id = instanceId(model.id, subject);
   const existing = loadInstance(root, id);
   if (existing) {
-    return (
-      `An instance already exists for this subject — continuing it rather than ` +
-      `starting a second.\n\n${describe(model, existing, roles())}`
-    );
+    const r = roles();
+    return {
+      text:
+        `An instance already exists for this subject — continuing it rather than ` +
+        `starting a second.\n\n${describe(model, existing, r)}`,
+      result: { started: false, position: position(model, existing, r) },
+    };
   }
   // The pre-execution gate, and the FIRST non-test caller `<bootstrap.processes:precondition>`
   // has ever had (issue #853, requirement 3). Asked here rather than in
@@ -296,14 +361,17 @@ export async function workflowStart(
     },
     model.logCapture,
   );
-  return (
-    `Started. State in \`${path.replace(`${root}/`, "")}\`.\n` +
-    // Said on the tool's own output, on the same argument the capture
-    // state is: a caller that has to go and look somewhere else to find
-    // out whether the gate ran does not have one it can rely on.
-    `${describePreflight(gate)}\n` +
-    `${describeCapture(log)}\n\n${describe(model, state, roles())}`
-  );
+  const r = roles();
+  return {
+    text:
+      `Started. State in \`${path.replace(`${root}/`, "")}\`.\n` +
+      // Said on the tool's own output, on the same argument the capture
+      // state is: a caller that has to go and look somewhere else to find
+      // out whether the gate ran does not have one it can rely on.
+      `${describePreflight(gate)}\n` +
+      `${describeCapture(log)}\n\n${describe(model, state, r)}`,
+    result: { started: true, position: position(model, state, r) },
+  };
 }
 
 /** Shared implementation of `workflow_next` for MCP and CLI (`workflow:next`). */
@@ -312,12 +380,21 @@ export async function workflowNext(
   { instance }: WorkflowNextInput,
   opts?: WorkflowToolEnv,
 ): Promise<string> {
+  return (await workflowNextAnswer(repoRoot, { instance }, opts)).text;
+}
+
+export async function workflowNextAnswer(
+  repoRoot: string,
+  { instance }: WorkflowNextInput,
+  opts?: WorkflowToolEnv,
+): Promise<WorkflowAnswer<WorkflowPosition>> {
   const root = resolve(repoRoot);
   const roles = opts?.roles ?? (() => resolveWorkflowRoles(root));
   const state = loadInstance(root, instance);
   if (!state) throw new Error(`No instance "${instance}". Try workflow_list.`);
   const model = await loadProcessModel(resolve(root, state.source));
-  return describe(model, state, roles());
+  const r = roles();
+  return { text: describe(model, state, r), result: position(model, state, r) };
 }
 
 /** Shared implementation of `workflow_gate` for MCP and CLI (`workflow:gate`). */
@@ -326,6 +403,14 @@ export async function workflowGate(
   { instance, activity, actor, target }: WorkflowGateInput,
   opts?: WorkflowToolEnv,
 ): Promise<string> {
+  return (await workflowGateAnswer(repoRoot, { instance, activity, actor, target }, opts)).text;
+}
+
+export async function workflowGateAnswer(
+  repoRoot: string,
+  { instance, activity, actor, target }: WorkflowGateInput,
+  opts?: WorkflowToolEnv,
+): Promise<WorkflowAnswer<WorkflowGateAnswer>> {
   const root = resolve(repoRoot);
   const state = loadInstance(root, instance);
   if (!state) throw new Error(`No instance "${instance}". Try workflow_list.`);
@@ -350,24 +435,35 @@ export async function workflowGate(
     ENGINE_MODE,
   );
   const allowed = verdict.allowed && authz.allowed;
-  return (
-    `${allowed ? "ALLOWED" : "REFUSED"} — ${verdict.reason}` +
-    (verdict.relaxedBy
-      ? `\n\nDeclared in skills/${verdict.relaxedBy.package}/workflow-policy.json.`
-      : "") +
-    `\n\n${describeVerdict(authz)}` +
-    (actor && actor !== principal.actor
-      ? `\n\nYou named "${actor}"; strict mode decides on the principal GitHub vouches for, not on a typed actor.`
-      : "")
-  );
+  const named = actor && actor !== principal.actor ? actor : undefined;
+  return {
+    text:
+      `${allowed ? "ALLOWED" : "REFUSED"} — ${verdict.reason}` +
+      (verdict.relaxedBy
+        ? `\n\nDeclared in skills/${verdict.relaxedBy.package}/workflow-policy.json.`
+        : "") +
+      `\n\n${describeVerdict(authz)}` +
+      (named
+        ? `\n\nYou named "${named}"; strict mode decides on the principal GitHub vouches for, not on a typed actor.`
+        : ""),
+    result: { allowed, gate: verdict, authorization: authz, ...(named ? { namedActor: named } : {}) },
+  };
 }
 
 /** Shared implementation of `workflow_complete` for MCP and CLI (`workflow:complete`). */
 export async function workflowComplete(
   repoRoot: string,
-  { instance, node, outcome, facts, actor, target, note: rawNote, activities }: WorkflowCompleteInput,
+  input: WorkflowCompleteInput,
   opts?: WorkflowToolEnv,
 ): Promise<string> {
+  return (await workflowCompleteAnswer(repoRoot, input, opts)).text;
+}
+
+export async function workflowCompleteAnswer(
+  repoRoot: string,
+  { instance, node, outcome, facts, actor, target, note: rawNote, activities }: WorkflowCompleteInput,
+  opts?: WorkflowToolEnv,
+): Promise<WorkflowAnswer<WorkflowCompletion>> {
   const root = resolve(repoRoot);
   const roles = opts?.roles ?? (() => resolveWorkflowRoles(root));
   // The arguments are a hand-over from the calling agent (H3, H9; bean
@@ -486,12 +582,19 @@ export async function workflowComplete(
     },
     model.logCapture,
   );
-  return (
-    describe(model, next, roles()) +
-    (authz ? `\n\n  authorization: ${describeVerdict(authz)}` : "") +
-    (plan ? `\n\n  work plan: ${plan.summary}` : "") +
-    `\n  ${describeCapture(log)}`
-  );
+  const r = roles();
+  return {
+    text:
+      describe(model, next, r) +
+      (authz ? `\n\n  authorization: ${describeVerdict(authz)}` : "") +
+      (plan ? `\n\n  work plan: ${plan.summary}` : "") +
+      `\n  ${describeCapture(log)}`,
+    result: {
+      position: position(model, next, r),
+      ...(authz ? { authorization: authz } : {}),
+      ...(plan ? { workPlan: plan.summary } : {}),
+    },
+  };
 }
 
 export function registerWorkflowTools(server: McpServer, repoRoot: string, opts?: WorkflowToolEnv): void {
@@ -509,7 +612,7 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string, opts?
     "List the BPMN processes this folio defines, across every directory it declares as holding its knowledge graph, and any " +
       "instances currently open. Use before workflow_start to see what exists.",
     {},
-    async () => text(await workflowList(root)),
+    async () => answer(await workflowListAnswer(root)),
   );
 
   server.tool(
@@ -522,7 +625,7 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string, opts?
       subject: z.string().describe("What this run is about — a block label, a release name"),
       bean: z.string().optional().describe("Bean id this work is tracked under"),
     },
-    async (args) => text(await workflowStart(root, args, callOpts)),
+    async (args) => answer(await workflowStartAnswer(root, args, callOpts)),
   );
 
   server.tool(
@@ -533,7 +636,7 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string, opts?
       "here has not been reached yet. A call activity is entered automatically, so what " +
       "is reported is the leaf step, with the phases it sits inside shown as `inside:`.",
     { instance: z.string().describe("Instance id, from workflow_start or workflow_list") },
-    async (args) => text(await workflowNext(root, args, callOpts)),
+    async (args) => answer(await workflowNextAnswer(root, args, callOpts)),
   );
 
   server.tool(
@@ -549,7 +652,7 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string, opts?
       actor: z.string().optional().describe("Who you say would perform it. Recorded only: strict mode authorizes the principal GitHub vouches for"),
       target: z.string().optional().describe("The content it would act on: a block id, path or bean id"),
     },
-    async (args) => text(await workflowGate(root, args, callOpts)),
+    async (args) => answer(await workflowGateAnswer(root, args, callOpts)),
   );
 
   server.tool(
@@ -592,6 +695,6 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string, opts?
             "`activity`). Kept on the step's history entry; each must name this step as its plan",
         ),
     },
-    async (args) => text(await workflowComplete(root, args, callOpts)),
+    async (args) => answer(await workflowCompleteAnswer(root, args, callOpts)),
   );
 }

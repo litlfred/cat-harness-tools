@@ -1051,6 +1051,38 @@ function completeInSubprocess(
   });
 }
 
+/**
+ * Where an instance is, as data: what `describe` renders, for programs and
+ * BPMN gateways that read a typed result instead of the text (cat-harness-tools#1259,
+ * group 2). `done` lists every recorded activity and decision, oldest first;
+ * `describe` shows only the last eight.
+ */
+export interface WorkflowPosition {
+  instance: string;
+  process: string;
+  processName: string;
+  subject: string;
+  bean?: string;
+  status: InstanceState["status"];
+  enabled: Enabled[];
+  done: Array<{ node: string; name: string; outcome?: string }>;
+}
+
+export function position(model: ProcessModel, state: InstanceState, roles?: RoleGraph): WorkflowPosition {
+  return {
+    instance: state.id,
+    process: state.processId,
+    processName: model.name,
+    subject: state.subject,
+    ...(state.bean ? { bean: state.bean } : {}),
+    status: state.status,
+    enabled: enabled(model, state, roles),
+    done: state.history
+      .filter((h) => isActivityHistory(model, h))
+      .map((h) => ({ node: h.node, name: model.nodes.get(h.node)?.name ?? h.node, ...(h.outcome ? { outcome: h.outcome } : {}) })),
+  };
+}
+
 /** A short human- and agent-readable rendering of where an instance is. */
 /**
  * The human-readable rendering. `roles` is threaded through rather than
