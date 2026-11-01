@@ -71,7 +71,7 @@
  */
 import { escapeAngles, linkProse } from "./lib/link-prose.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { declarationPathIn } from "../schemas/kg/cat-harness.js";
 import { baseDocsDir } from "./compose-docs.js";
@@ -89,7 +89,7 @@ import {
 } from "../schemas/process/role-graph.js";
 import { ownElementPattern } from "../schemas/kg/namespaces.js";
 import { processPresentations, type Presentation } from "./process-presentations.js";
-import { siteRootFrom } from "../schemas/kg/visualiser-route.js";
+import { siteRootFrom, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { pageParts, tileCountsForPages, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { tileCounts } from "../schemas/ui/tile-count.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -134,6 +134,12 @@ export interface ProcessRow {
   file: string;
   /** The directory it lives under, which is the instance/methodology facet. */
   group: string;
+  /**
+   * The declared name of the instance whose directory holds the file: the
+   * sub-graph whose page lists it (`<harness>/processes/<instance>/`).
+   * Absent only on a row built by hand (a test fixture).
+   */
+  instance?: string;
   id: string;
   name: string;
   lanes: string[];
@@ -312,13 +318,82 @@ function instanceRoots(repo: string): string[] {
     const dir = join(repo, e.name);
     if (declarationPathIn(dir)) out.push(dir);
   }
-  return out.sort();
+  out.sort();
+  // An instance at the checkout ROOT (an IG repository such as smart-trust,
+  // its layers mounted below it) holds diagrams too. Without it, the site's
+  // own instance was the one instance its processes page never listed.
+  if (declarationPathIn(repo)) out.unshift(repo);
+  return out;
+}
+
+/** An instance root and its declared name. */
+interface NamedRoot {
+  readonly root: string;
+  readonly name: string;
+}
+
+function namedRoots(repo: string): NamedRoot[] {
+  const out: NamedRoot[] = [];
+  for (const root of instanceRoots(repo)) {
+    const p = declarationPathIn(root);
+    let name: string | undefined;
+    try {
+      name = p && existsSync(p) ? (JSON.parse(readFileSync(p, "utf-8")) as { name?: string }).name : undefined;
+    } catch {
+      name = undefined;
+    }
+    out.push({ root: resolve(root), name: name || basename(root) });
+  }
+  return out;
+}
+
+/**
+ * The instance whose directory holds `abs`: the DEEPEST root containing it,
+ * so a layer mounted under the checkout root's own instance is its own
+ * sub-graph rather than the root's.
+ */
+export function owningInstance(abs: string, roots: readonly NamedRoot[]): string | undefined {
+  const f = resolve(abs);
+  let best: NamedRoot | undefined;
+  for (const r of roots) {
+    if (f !== r.root && !f.startsWith(r.root + sep)) continue;
+    if (best === undefined || r.root.length > best.root.length) best = r;
+  }
+  return best?.name;
+}
+
+/**
+ * Every diagram file a row is drawn for (global-task files excluded, as
+ * {@link processRows} excludes them), keyed by the instance that holds it.
+ * Synchronous and parse-free, so `site-coverage` asks the same question the
+ * writer answers: an instance owes a sub-graph page exactly when it is a key.
+ */
+export function processSubjects(repo = REPO): Map<string, string[]> {
+  const roots = namedRoots(repo);
+  const seen = new Set<string>();
+  const out = new Map<string, string[]>();
+  for (const r of roots) {
+    for (const f of workflowFiles(r.root)) {
+      if (!f.endsWith(".bpmn") || seen.has(f)) continue;
+      seen.add(f);
+      try {
+        if (isGlobalTasksFile(readFileSync(f, "utf-8"))) continue;
+      } catch {
+        // unreadable: the row reports it as a load error, so it is a subject too
+      }
+      const inst = owningInstance(f, roots);
+      if (inst === undefined) continue;
+      out.set(inst, [...(out.get(inst) ?? []), relative(repo, f)]);
+    }
+  }
+  return new Map([...out].sort((a, b) => a[0].localeCompare(b[0], "en")));
 }
 
 export async function processRows(repo = REPO): Promise<ProcessRow[]> {
   const rows: ProcessRow[] = [];
   const roleGraph = loadRoleGraph(repo);
   const seen = new Set<string>();
+  const named = namedRoots(repo);
   const files = instanceRoots(repo)
     .flatMap((r) => workflowFiles(r))
     // `.dmn` is a DECISION TABLE, not a process — a different kind that a
@@ -330,6 +405,7 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
   for (const abs of files) {
     const file = relative(repo, abs);
     const group = dirname(file);
+    const instance = owningInstance(abs, named);
     // THE SVG LIVES WHERE `render:bpmn` PUTS IT, which is the base docs layer —
     // not beside the diagram.
     //
@@ -361,6 +437,7 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
       rows.push({
         file,
         group,
+        ...(instance ? { instance } : {}),
         id: m.id,
         name: m.name,
         lanes: uniq(m.lanes.map((l) => (l.name ?? "").replace(/\s+/g, " ").trim())),
@@ -408,6 +485,7 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
       rows.push({
         file,
         group,
+        ...(instance ? { instance } : {}),
         id: basename(file, ".bpmn"),
         name: basename(file, ".bpmn"),
         lanes: [],
@@ -673,7 +751,27 @@ const esc = (s: string): string => s.replace(/\|/g, "\\|");
  * wherever the target resolves"). Empty by default, so a caller that has not
  * looked renders every skill as code, as this table did before.
  */
-export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string> = new Set(), instances: InstancesRead = NO_INSTANCES): string {
+/** How {@link page} scopes the index it draws: the whole corpus, or one sub-graph of it. */
+export interface PageScope {
+  /** `undefined` for every instance's diagrams; else the instance whose diagrams the page shows. */
+  readonly instance?: string;
+  /** On the full index: one row per sub-graph page, to browse by instance. */
+  readonly subjects?: readonly { name: string; count: number; href: string }[];
+}
+
+/**
+ * `scope.instance` draws one instance's sub-graph page, one directory below
+ * the index, so every link on it is one segment deeper.
+ */
+export function page(
+  rows: readonly ProcessRow[],
+  skillPages: ReadonlySet<string> = new Set(),
+  instances: InstancesRead = NO_INSTANCES,
+  scope: PageScope = {},
+): string {
+  // From a sub-graph page, the process pages and the site root are one level up.
+  const base = scope.instance === undefined ? "" : "../";
+  const root = `${base}${up()}`;
   const ok = rows.filter((r) => r.loadError === undefined);
   const broken = rows.filter((r) => r.loadError !== undefined);
   const byGroup = new Map<string, number>();
@@ -689,12 +787,22 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
 
   const L: string[] = [];
   L.push("---");
-  L.push("title: Processes");
+  L.push(scope.instance === undefined ? "title: Processes" : `title: 'Processes — ${scope.instance.replace(/'/g, "''")}'`);
   L.push("nav_exclude: true");
   L.push(GENERATED_FM);
   L.push("---");
   L.push("");
-  L.push("# Processes — every executable diagram, searchable");
+  if (scope.instance === undefined) {
+    L.push("# Processes — every executable diagram, searchable");
+  } else {
+    L.push(`# Processes — ${scope.instance}`);
+    L.push("");
+    L.push(
+      `The diagrams **${esc(scope.instance)}** holds in its declared \`processes\` directories — one ` +
+        "sub-graph's slice of [every instance's processes](../). The skills, lanes and findings below " +
+        "count these diagrams only.",
+    );
+  }
   L.push("");
   L.push(
     "Generated by `cat-harness-tools/scripts/gen-processes-viz.ts`. **Every number here is " +
@@ -708,6 +816,17 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
   L.push("|---|---|");
   for (const [g, n] of [...byGroup].sort((a, b) => b[1] - a[1])) L.push(`| \`${esc(g)}/\` | ${n} |`);
   L.push("");
+
+  if (scope.subjects !== undefined && scope.subjects.length > 0) {
+    L.push("## By subgraph");
+    L.push("");
+    L.push("Each instance that holds diagrams has its own page, listing only its processes.");
+    L.push("");
+    L.push("| subgraph | diagrams |");
+    L.push("|---|---|");
+    for (const x of scope.subjects) L.push(`| [${esc(x.name)}](${x.href}) | ${x.count} |`);
+    L.push("");
+  }
 
   L.push("## Every process — one page each");
   L.push("");
@@ -727,7 +846,7 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
   L.push("|---|---|---|---|");
   for (const r of ok) {
     const undoc = r.steps.filter((st) => !st.documentation).length;
-    L.push(`| [${esc(r.name)}](${r.stem}.html) | ${r.activities} | ${undoc || "—"} | ${instancesCell(instances, r.id)} |`);
+    L.push(`| [${esc(r.name)}](${base}${r.stem}.html) | ${r.activities} | ${undoc || "—"} | ${instancesCell(instances, r.id, root)} |`);
   }
   L.push("");
   if (instances.unread.length > 0) {
@@ -751,10 +870,10 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
   // loaded row publishes no page, so it stays code.
   const pageOf = new Map(ok.map((r) => [r.file, r.stem]));
   const skillCell = (s: string): string =>
-    skillPages.has(s) ? `[\`${esc(s)}\`](${up()}reference/skill-instructions/${s}.html)` : `\`${esc(s)}\``;
+    skillPages.has(s) ? `[\`${esc(s)}\`](${root}reference/skill-instructions/${s}.html)` : `\`${esc(s)}\``;
   const runBy = (f: string): string => {
     const stem = pageOf.get(f);
-    return stem === undefined ? `\`${esc(basename(f))}\`` : `[\`${esc(basename(f))}\`](${stem}.html)`;
+    return stem === undefined ? `\`${esc(basename(f))}\`` : `[\`${esc(basename(f))}\`](${base}${stem}.html)`;
   };
   for (const [s, fs] of join) L.push(`| ${skillCell(s)} | ${fs.map(runBy).join(", ")} |`);
   L.push("");
@@ -975,7 +1094,10 @@ export function processPage(
   L.push("---");
   L.push("");
   L.push("{: .note }");
-  L.push(`> Generated from \`${row.file}\` by \`gen-processes-viz.ts\` — do not edit here. [All processes](index.html)`);
+  L.push(
+    `> Generated from \`${row.file}\` by \`gen-processes-viz.ts\` — do not edit here. [All processes](index.html)` +
+      (row.instance ? ` · [${row.instance} processes](${row.instance}/)` : ""),
+  );
   L.push("");
   // Everything from here to the end is authored BPMN text; `wrapRaw` below
   // escapes it so a closing raw tag inside a documentation string cannot end
@@ -1097,12 +1219,23 @@ export function processPage(
  * `<base>/<harness>/<visualizer>`). Never a literal — `site-dir-single-answer`
  * refuses one, and the declaration is the only thing that names it.
  */
-export function pageRelPath(repo = REPO): string | undefined {
+export function pageRelPath(repo = REPO, subgraph?: string): string | undefined {
+  // A sub-graph page is `<locale>/<harness>/processes/<instance>/index.md`,
+  // as the tools viewer draws its own (bean `folio-assistant-1nu0`).
   try {
-    return visualiserSitePath(join(repo, "cat-harness"), VIEWER_TOOL).rel;
+    const { rel, visualiser: v } = visualiserSitePath(join(repo, "cat-harness"), VIEWER_TOOL);
+    if (subgraph === undefined) return rel;
+    return visualiserRoute({ ...pageParts({ harness: v.harness, visualiser: v.id }), subgraph, asset: "index.md" });
   } catch {
     return undefined;
   }
+}
+
+/** The sub-graph pages: one per instance holding diagrams, in instance order. */
+export function subgraphPages(rows: readonly ProcessRow[]): { name: string; rows: ProcessRow[] }[] {
+  const by = new Map<string, ProcessRow[]>();
+  for (const r of rows) if (r.instance) by.set(r.instance, [...(by.get(r.instance) ?? []), r]);
+  return [...by].sort((a, b) => a[0].localeCompare(b[0], "en")).map(([name, rs]) => ({ name, rows: rs }));
 }
 
 /** From a page of this viewer back to the site root — the route's depth, never a literal `../`. */
@@ -1127,8 +1260,9 @@ export function publishedIndex(
   // Read by default, as `skillPages` is: the committed instances are an input
   // of the page, so a caller that omits them gets the page the generator writes.
   instances: InstancesRead = instancesRead(workflowInstanceLinks()),
+  scope: PageScope = {},
 ): string {
-  return withRenderedByFrontMatter(page(rows, skillPages, instances), VIEWER_TOOL);
+  return withRenderedByFrontMatter(page(rows, skillPages, instances, scope), VIEWER_TOOL);
 }
 
 if (import.meta.main) {
@@ -1154,7 +1288,10 @@ if (import.meta.main) {
   // The workflow instances each diagram runs in (bean `v49e`): links to their
   // pages, read from the committed instance files the state visualiser draws.
   const instances = instancesRead(workflowInstanceLinks());
-  const html = publishedIndex(rows, REPO, skillPages, instances);
+  const subs = subgraphPages(rows);
+  const html = publishedIndex(rows, REPO, skillPages, instances, {
+    subjects: subs.map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` })),
+  });
   // Which page sections present each diagram, keyed repository-relative so it
   // matches `row.file` — a page spells its source relative to its OWN instance.
   const presented = new Map<string, Presentation[]>();
@@ -1165,6 +1302,12 @@ if (import.meta.main) {
     }
   }
   const pages = new Map<string, string>([[out, html]]);
+  // One page per sub-graph (owner, 2026-11-01: "show process in the subgraph
+  // smart-trust only"), as `tools`, `library` and `beans` already have.
+  for (const x of subs) {
+    const sub = pageRelPath(REPO, x.name);
+    if (sub !== undefined) pages.set(join(into ?? baseDocsDir(REPO), sub), publishedIndex(x.rows, REPO, skillPages, instances, { instance: x.name }));
+  }
   const ctx = panelContext(REPO, skillPages);
   for (const r of rows.filter((x) => x.loadError === undefined)) {
     const refs = new Set<string>();
@@ -1192,8 +1335,10 @@ if (import.meta.main) {
     }
     console.log(`✓ ${rel} and ${pages.size - 1} process page(s) are current (${rows.length} diagram(s))`);
   } else {
-    mkdirSync(dirname(out), { recursive: true });
-    for (const [f, body] of pages) writeFileSync(f, body);
+    for (const [f, body] of pages) {
+      mkdirSync(dirname(f), { recursive: true });
+      writeFileSync(f, body);
+    }
     // THE TILE COUNT (folio-assistant#931, owner's ruling 2026-10-29): the
     // index's own diagram count, keyed by the tile that opens the index.
     // Build-time data like every projection `scanTileCounts` reads, so
