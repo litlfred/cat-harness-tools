@@ -24,9 +24,23 @@
  * through `textContent`.
  */
 
-/** Parse rendered HTML into a detached, cleaned body. */
-export function cleanRendered(doc: Document, html: string): HTMLElement {
+/**
+ * Parse rendered HTML into a detached, cleaned body.
+ *
+ * `base`, when given, is the directory of the page the HTML was rendered for.
+ * A relative `src` or `href` (a figure's `media/fig.svg`) is resolved from
+ * there, since the review page sits in another directory and would otherwise
+ * show a broken image.
+ */
+export function cleanRendered(doc: Document, html: string, base?: string): HTMLElement {
   const parsed = new DOMParser().parseFromString(html, "text/html");
+  if (base) {
+    parsed.querySelectorAll("img[src],source[src],a[href]").forEach((el) => {
+      const attr = el.hasAttribute("src") ? "src" : "href";
+      const v = el.getAttribute(attr) || "";
+      if (v && !/^([a-z][a-z0-9+.-]*:|\/|#)/i.test(v)) el.setAttribute(attr, base + v);
+    });
+  }
   parsed.querySelectorAll("script,iframe,object,embed,frame,frameset,link,meta,base,form").forEach((n) => n.remove());
   parsed.querySelectorAll("*").forEach((el) => {
     for (const a of Array.from(el.attributes)) {
@@ -37,6 +51,43 @@ export function cleanRendered(doc: Document, html: string): HTMLElement {
     }
   });
   return doc.importNode(parsed.body, true) as HTMLElement;
+}
+
+/**
+ * A before/after pair when a block's pictures changed, else null.
+ *
+ * The text diffs compare words, so a figure swapped for a new one (same alt
+ * text, new `src`) shows no mark at all. This puts the old and the new picture
+ * side by side, labelled, so the change is visible. Each side is cleaned with
+ * its own page's directory (`cleanBase`, `cleanHead`).
+ */
+export function imageChange(
+  doc: Document,
+  baseHtml: string | null,
+  headHtml: string | null,
+  cleanBase: (doc: Document, html: string) => HTMLElement,
+  cleanHead: (doc: Document, html: string) => HTMLElement,
+): HTMLElement | null {
+  const srcs = (html: string | null) => (html === null ? [] : Array.from(new DOMParser().parseFromString(html, "text/html").querySelectorAll("img")).map((i) => i.getAttribute("src") || ""));
+  const b = srcs(baseHtml);
+  const h = srcs(headHtml);
+  if (b.join("\n") === h.join("\n")) return null;
+  const box = doc.createElement("div");
+  box.className = "diff-figures";
+  const side = (label: string, cls: string, html: string | null, clean: (doc: Document, html: string) => HTMLElement) => {
+    const col = doc.createElement("figure");
+    col.className = "diff-figure " + cls;
+    const cap = doc.createElement("figcaption");
+    cap.textContent = label;
+    col.appendChild(cap);
+    const imgs = html === null ? [] : Array.from(clean(doc, html).querySelectorAll("img"));
+    if (!imgs.length) { const p = doc.createElement("p"); p.className = "muted"; p.textContent = "no picture"; col.appendChild(p); }
+    imgs.forEach((i) => col.appendChild(i));
+    box.appendChild(col);
+  };
+  side("Before", "diff-figure-base", baseHtml, cleanBase);
+  side("After", "diff-figure-head", headHtml, cleanHead);
+  return box;
 }
 
 /** The source-level word diff: `<del>` removed, `<ins>` added, the rest as typed. */
