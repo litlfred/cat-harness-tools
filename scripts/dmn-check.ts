@@ -15,6 +15,13 @@
  * one to keep (owner, Q-S4-4 A).
  *
  * Exit code 1 when any error is found (with --strict, any warning too).
+ *
+ * The script is `dmn:report`, not `dmn:check`, on purpose. CI gates every
+ * `check:*` and `*:check` script of an instance's whole dependency harness,
+ * so a `dmn:check` here would run in every repository that mounts this layer
+ * and turn red on tables nobody has fixed yet. A DTH that wants the gate
+ * declares its own `check:dmn` once its tables pass (owner, Q-S4-5 A: warn
+ * first, fix the tables in PRs).
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
