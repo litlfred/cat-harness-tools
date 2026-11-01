@@ -821,6 +821,63 @@ def fold_skill_register(root, runner, gates):
     gates[name] = residual
 
 
+# Gates run as parts, each in its own shard (S-CI6, 2026-11-01). On
+# folio-assistant-core run 41287467368 `check:cat-harness-tools-standalone`
+# took 510 s alone, the floor of every PR run once the shards were balanced.
+# Part i of n runs `<script> --part i/n`: slice i of the layer's test files
+# (check-standalone.ts, "In parts"), so together the parts run every test file
+# once. A side whose pinned check-standalone.ts has no `--part` keeps the
+# gate whole: there the flag would be ignored and each part would run the
+# whole layer, four times the work (`supports_parts`).
+SPLIT_GATES = {"check:cat-harness-tools-standalone": 4}
+CHECK_STANDALONE_TS = os.path.join("cat-harness-tools", "scripts", "check-standalone.ts")
+
+
+def supports_parts(root):
+    """Whether this side's check-standalone.ts takes `--part`."""
+    try:
+        with open(os.path.join(root, CHECK_STANDALONE_TS)) as f:
+            return '"--part"' in f.read()
+    except OSError:
+        return False
+
+
+def split_gates(gates, runner, timings=None, alone=None, table=None, root=None):
+    """`gates` with each SPLIT_GATES gate replaced, in place, by its parts:
+    `<name>#i/n` running `<command> --part i/n`. A part inherits `alone`, and
+    until it has a timing of its own, the whole gate's seconds over n. Returns
+    the new gates dict; `timings` and `alone` are updated in place. With
+    `root` given and no `--part` in its check-standalone.ts, nothing is split."""
+    table = SPLIT_GATES if table is None else table
+    if root is not None and not supports_parts(root):
+        return dict(gates)
+    out = {}
+    for name, command in gates.items():
+        script = command[len(runner) + 1:] if runner and command.startswith(f"{runner} ") else None
+        n = table.get(script) if script else None
+        if not n or n < 2:
+            out[name] = command
+            continue
+        for i in range(1, n + 1):
+            part = f"{name}#{i}/{n}"
+            out[part] = f"{command} --part {i}/{n}"
+            if timings is not None and part not in timings and name in timings:
+                timings[part] = timings[name] / n
+            if alone is not None and name in alone:
+                alone.add(part)
+    return out
+
+
+def verified_by_gates(gates):
+    """The scripts this side's gates run, for skill-register.ts
+    (`CAT_SKILL_REGISTER_VERIFIED_BY_GATES`): the chain checks it may leave to
+    them. The derive:publish step already sets it (owner, 2026-10-23, option
+    A); a gate such as `uml:overview:check` builds the same QA working copy in
+    a shard, whose `skill:register` re-ran nine checks the gate set runs
+    anyway (fa#2867). Every one is still judged by its own gate."""
+    return ",".join(sorted({k.split(":", 1)[1] for k in gates if ":" in k}))
+
+
 def main():
     args = sys.argv[1:]
     given = [args[i + 1] for i, a in enumerate(args) if a == "--instance" and i + 1 < len(args)]
@@ -839,6 +896,7 @@ def main():
         if os.environ.get("GATE_SHARD", "").strip():
             timings = read_timings(os.environ.get("GATE_TIMINGS"))
             alone = tree_snapshotting(args[0]) if timings else set()
+            gates = split_gates(gates, runner, timings, alone, root=args[0])
             listed["gates"] = {k: gates[k] for k in shard_names(list(gates), shard, shards, timings, alone, gate_jobs())}
             listed["skipped"] = skipped if shard == 1 else {}
             listed["shard"] = {"shard": shard, "of": shards, "total": len(gates)}
@@ -853,9 +911,11 @@ def main():
     print(f"own: {', '.join(own)}; dependency harness: {', '.join(harness)}", flush=True)
     print(f"script runner: {runner}", flush=True)
     skipped = {k: {"command": v["command"], "skipped": v["skipped"]} for k, v in skipped.items()}
-    total = len(gates)
+    os.environ.setdefault("CAT_SKILL_REGISTER_VERIFIED_BY_GATES", verified_by_gates(gates))
     timings = read_timings(os.environ.get("GATE_TIMINGS"))
     alone = tree_snapshotting(root)
+    gates = split_gates(gates, runner, timings, alone, root=root)
+    total = len(gates)
     gates = {k: gates[k] for k in shard_names(list(gates), shard, shards, timings, alone, gate_jobs())}
     if shard != 1:
         skipped, records = {}, []  # shard 1 carries them, so a merged side holds each once

@@ -368,7 +368,7 @@ export interface CriterionReport {
  * which is never a pass.
  */
 export type Probe =
-  | { state: "measured"; count: number; findings: string[]; note?: string }
+  | { state: "measured"; count: number; findings: string[]; note?: string; files?: string[] }
   | { state: "not-run"; note: string }
   | { state: "error"; note: string };
 
@@ -833,6 +833,25 @@ function withoutAbsolutePaths(msg: string): string {
  * flat-attributed, and this reads three element names from it. `undefined`
  * when the text is not a report, which the caller turns into an error.
  */
+/** The test files a bun JUnit report holds: each outermost testsuite's name. */
+export function parseJunitFiles(xml: string): string[] {
+  const out = new Set<string>();
+  let depth = 0;
+  for (const m of xml.matchAll(/<(\/?)testsuite\b([^>]*?)(\/?)>/g)) {
+    const [, closing, attrs, selfClosing] = m as unknown as [string, string, string, string];
+    if (closing) {
+      depth--;
+      continue;
+    }
+    if (depth === 0) {
+      const name = /\sname="([^"]*)"/.exec(attrs)?.[1];
+      if (name) out.add(name.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"'));
+    }
+    if (!selfClosing) depth++;
+  }
+  return [...out];
+}
+
 export function parseJunitFailures(xml: string): string[] | undefined {
   if (!/<testsuites\b/.test(xml)) return undefined;
   const decode = (v: string): string =>
@@ -888,7 +907,7 @@ export function probeStandalone(
   repoRoot: string,
   layerName: string,
   decls: LayerDecl[],
-  opts: { timeoutMs?: number; minFreeBytes?: number } = {},
+  opts: { timeoutMs?: number; minFreeBytes?: number; shard?: string } = {},
 ): Probe {
   try {
     const st = statfsSync(tmpdir());
@@ -976,7 +995,11 @@ export function probeStandalone(
     // layer, and #1977's one-test falsifier ran nothing at all (CI, 2026-10-03).
     delete env.BUN_OPTIONS;
     const report = join(ws, ".standalone-junit.xml");
-    const run = spawnSync("bun", ["test", "--reporter=junit", `--reporter-outfile=${report}`], {
+    // `shard` ("i/n", check-standalone.ts `--part`) runs one slice of the
+    // layer's test files, so a slow layer can be measured in parts on separate
+    // machines. It is passed here, on this one command, never by BUN_OPTIONS.
+    const sliced = opts.shard ? [`--shard=${opts.shard}`] : [];
+    const run = spawnSync("bun", ["test", ...sliced, "--reporter=junit", `--reporter-outfile=${report}`], {
       cwd,
       env,
       encoding: "utf-8",
@@ -989,7 +1012,8 @@ export function probeStandalone(
     // A run that executed nothing is not a run with nothing failing.
     const passed = Number(/^\s*(\d+)\s+pass\b/m.exec(`${run.stdout}\n${run.stderr}`)?.[1] ?? 0);
     if (passed + parsed.failed === 0) return { state: "error", note: "bun test ran no tests, so nothing was measured" };
-    const names = existsSync(report) ? parseJunitFailures(readFileSync(report, "utf-8")) : undefined;
+    const xml = existsSync(report) ? readFileSync(report, "utf-8") : undefined;
+    const names = xml === undefined ? undefined : parseJunitFailures(xml);
     if (!names) return { state: "error", note: `bun test wrote no readable JUnit report at ${report}` };
     return {
       state: "measured",
@@ -999,7 +1023,8 @@ export function probeStandalone(
       // A message may name the workspace itself (an instance named after its
       // directory), whose suffix is random: replaced, so names compare across runs.
       findings: [...names, ...parsed.loadErrors].map((n) => n.replaceAll(basename(ws!), "<rehearsal>")),
-      note: `${members.map((m) => m.name).join(", ")} laid out as siblings`,
+      note: `${members.map((m) => m.name).join(", ")} laid out as siblings${opts.shard ? `, test files part ${opts.shard}` : ""}`,
+      ...(opts.shard ? { files: [...new Set([...parseJunitFiles(xml!), ...parsed.loadErrors.map((n) => n.split(" > ")[0]!)])].map((n) => n.replaceAll(basename(ws!), "<rehearsal>")) } : {}),
     };
   } catch (e) {
     return { state: "error", note: `the rehearsal could not be set up: ${message(e)}` };
