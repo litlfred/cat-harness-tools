@@ -2,11 +2,11 @@
 # cat-tools-sr31
 $schema: bean/1.0.0
 title: 'SECURITY REVIEW 2026-10-31: every harnessed layer, against the security sub-KG and the secure-code-authoring voice'
-status: todo
+status: in-progress
 type: epic
 priority: high
 created_at: 2026-10-31T04:05:00Z
-updated_at: 2026-10-31T04:05:00Z
+updated_at: 2026-10-31T08:50:00Z
 parent: folio-assistant-rwmf
 ---
 
@@ -20,5 +20,6 @@ Fixes are separate pull requests, each needing the owner's go-ahead.
 
 ## Done when
 
-- [ ] Every layer reviewed, findings filed as children.
+- [x] Every layer reviewed, findings filed as children.
+- [x] `cat-harness-tools` findings (`cat-tools-a1p9`, `cat-tools-d3vq`, `cat-tools-j4sh`, `cat-tools-q8gk`, `cat-tools-w7tx`) resolved.
 - [ ] The owner has chosen how the held findings are disclosed.

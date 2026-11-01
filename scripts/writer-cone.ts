@@ -163,11 +163,11 @@ export function tracedArgv(argv: readonly string[], log: string): string[] {
 }
 
 /** The trace at `log` as a read set, or why it cannot be one. */
-export function readTraceFile(log: string, root: string, ownOutput?: (rel: string) => boolean): ReadSet {
+export function readTraceFile(log: string, root: string, ownOutput?: (rel: string) => boolean, rewriteAsInput?: (rel: string) => boolean): ReadSet {
   if (!existsSync(log)) return { undetermined: "no trace was written" };
   const size = statSync(log).size;
   if (size > MAX_TRACE_BYTES) return { undetermined: `the trace is ${size} bytes, more than ${MAX_TRACE_BYTES}` };
-  return parseTrace(readFileSync(log, "utf-8"), root, { writes: "collect", ownOutput });
+  return parseTrace(readFileSync(log, "utf-8"), root, { writes: "collect", ownOutput, rewriteAsInput });
 }
 
 /**
@@ -206,8 +206,44 @@ export function writerRecordOf(a: {
   return { sha: a.sha, base: a.before.hash, audit: a.before.audit, reads, git, outputs };
 }
 
+/**
+ * What a skipped writer must have put back: its declared outputs and every
+ * file its traced run actually wrote outside them. A write into another
+ * writer's declared outputs cannot be put back without clobbering that writer,
+ * so the writer is not recorded (bean fwtz; owner 2026-10-31 21:45Z: "rerun
+ * only the scripts whose inputs moved, and publish what they actually wrote").
+ */
+export function snapshotPaths(
+  declared: readonly string[],
+  written: readonly string[],
+  ownDeclared: (rel: string) => boolean,
+  anyDeclared: (rel: string) => boolean,
+): { paths: string[] } | { none: string } {
+  const extra = written.filter((p) => !ownDeclared(p)).sort();
+  const foreign = extra.find((p) => anyDeclared(p));
+  if (foreign !== undefined) return { none: `the writer wrote ${foreign}, which another writer declares as its output` };
+  return { paths: [...declared, ...extra] };
+}
+
+/** How many changed reads {@link changedWhy} names before it only counts. */
+export const CHANGED_SHOWN = 8;
+
+/** `a changed`, or `a changed (+3 more: b, c, d)`: the first changed read keeps its old wording. */
+export function changedWhy(changed: readonly string[]): string {
+  const [first, ...rest] = changed;
+  if (rest.length === 0) return `${first} changed`;
+  const shown = rest.slice(0, CHANGED_SHOWN - 1);
+  const more = rest.length - shown.length;
+  return `${first} changed (+${rest.length} more: ${shown.join(", ")}${more > 0 ? `, and ${more} others` : ""})`;
+}
+
 /** `proof`: the record's audit was clean, so the skip rests on the argument above; otherwise it is evidence the dry run must confirm. */
-export type WriterDecision = { skip: true; sha: string; proof: boolean; why: string } | { skip: false; why: string };
+export type WriterDecision =
+  | { skip: true; sha: string; proof: boolean; why: string }
+  | { skip: false; why: string; cause?: ChurnCause };
+
+/** What made a recorded writer run again, in a form the churn report can group by. */
+export type ChurnCause = { kind: "script" } | { kind: "path"; path: string } | { kind: "git"; args: string[] };
 
 /**
  * Whether `writer` could be skipped now: its fingerprint and the state of
@@ -228,7 +264,10 @@ export function decideWriter(
   const rec = records.writers[writer];
   if (rec === undefined) return { skip: false, why: records.unrecorded[writer] ? `not recorded: ${records.unrecorded[writer]}` : `the deploy at ${records.sha.slice(0, 12)} recorded nothing for it` };
   if ("undetermined" in base) return { skip: false, why: `no key: ${base.undetermined}` };
-  if (base.hash !== rec.base) return { skip: false, why: "its script, imports, audited environment or tools changed" };
+  if (base.hash !== rec.base) return { skip: false, why: "its script, imports, audited environment or tools changed", cause: { kind: "script" } };
+  // Every changed read, not only the first: the first is often the checkout's
+  // own listing (`.`), which hid what else moved (bean fwtz, S-CI3).
+  const changed: string[] = [];
   for (const [p, state] of Object.entries(rec.reads)) {
     let now: string;
     try {
@@ -236,8 +275,9 @@ export function decideWriter(
     } catch (e) {
       return { skip: false, why: `could not read ${p}: ${(e as Error).message}` };
     }
-    if (now !== state) return { skip: false, why: `${p || "."} changed` };
+    if (now !== state) changed.push(p);
   }
+  if (changed.length > 0) return { skip: false, why: changedWhy(changed.map((p) => p || ".")), cause: { kind: "path", path: changed[0]! } };
   for (const [key, state] of Object.entries(rec.git)) {
     let call: GitCall;
     try {
@@ -246,7 +286,7 @@ export function decideWriter(
     } catch {
       return { skip: false, why: `an unreadable git record ${key}` };
     }
-    if (git(root, call) !== state) return { skip: false, why: `git ${call.args.join(" ")} answers differently` };
+    if (git(root, call) !== state) return { skip: false, why: `git ${call.args.join(" ")} answers differently`, cause: { kind: "git", args: call.args } };
   }
   const proof = rec.audit === "clean";
   return {
@@ -310,5 +350,82 @@ export function verifySummary(v: readonly WriterVerdict[], prevSha?: string): st
   for (const x of safe) if (x.verdict === "skip-safe") lines.push(`- \`${x.writer}\` could skip: ${x.outputs} output(s) matched${x.proof ? " (proof)" : " (evidence)"}`);
   for (const x of rerun.slice(0, 20)) if (x.verdict === "rerun") lines.push(`- \`${x.writer}\` reruns: ${x.why}`);
   if (rerun.length > 20) lines.push(`- … ${rerun.length - 20} more rerun`);
+  return lines.join("\n") + "\n";
+}
+
+// ── The churn report (owner, 2026-11-01 07:32Z: "track what changed and input/output in render pipeline") ──
+
+/** Where the churn report is written, beside the records it reads. */
+export const WRITER_CHURN_FILE = join(WRITER_CONE_DIR, "churn.json");
+
+/** What one writer did in a build that could skip writers. */
+export type ChurnEntry = {
+  writer: string;
+  did: "skipped" | "ran" | "reused";
+  why: string;
+  cause?: ChurnCause;
+  seconds: number;
+};
+
+/** One reason for reruns: what changed, who wrote it, and which writers ran again because of it. */
+export type ChurnGroup = { cause: string; writtenBy: string; reran: string[]; seconds: number };
+
+export type ChurnReport = {
+  against: string;
+  skipped: number;
+  ran: number;
+  reused: number;
+  groups: ChurnGroup[];
+  writers: ChurnEntry[];
+};
+
+/**
+ * Group the writers that ran by what made them run. A changed path is put down
+ * to the writer whose record, or whose declared outputs, hold it; any other
+ * path came with the commit itself ("the commit"). Groups are ordered by the
+ * seconds they cost, so the first line is the churn most worth removing.
+ */
+export function churnReport(
+  entries: readonly ChurnEntry[],
+  against: string,
+  writerOf: (path: string) => string | undefined,
+): ChurnReport {
+  const groups = new Map<string, ChurnGroup>();
+  for (const e of entries) {
+    if (e.did !== "ran") continue;
+    const c = e.cause;
+    const [cause, writtenBy] =
+      c === undefined ? [e.why, "-"]
+      : c.kind === "script" ? ["its script, imports or tools", "the commit"]
+      : c.kind === "git" ? [`git ${c.args.join(" ")}`, "the repository"]
+      : [c.path || ".", writerOf(c.path) ?? "the commit"];
+    const g = groups.get(cause) ?? { cause, writtenBy, reran: [], seconds: 0 };
+    g.reran.push(e.writer);
+    g.seconds += e.seconds;
+    groups.set(cause, g);
+  }
+  const count = (d: ChurnEntry["did"]) => entries.filter((e) => e.did === d).length;
+  return {
+    against,
+    skipped: count("skipped"),
+    ran: count("ran"),
+    reused: count("reused"),
+    groups: [...groups.values()].sort((a, b) => b.seconds - a.seconds || a.cause.localeCompare(b.cause)),
+    writers: [...entries].sort((a, b) => a.writer.localeCompare(b.writer)),
+  };
+}
+
+/** The report as a Markdown table, for a job summary. */
+export function renderChurn(r: ChurnReport): string {
+  const cell = (s: string) => s.replace(/\|/g, "\\|");
+  const lines = [
+    `### Render churn against ${r.against.slice(0, 12)}`,
+    "",
+    `${r.skipped} writer(s) skipped, ${r.reused} reused from the cache, ${r.ran} ran.`,
+    "",
+  ];
+  if (r.groups.length === 0) return [...lines, "Nothing ran again."].join("\n") + "\n";
+  lines.push("| What changed | Written by | Ran again because of it | Seconds |", "|---|---|---|---|");
+  for (const g of r.groups) lines.push(`| \`${cell(g.cause)}\` | ${cell(g.writtenBy)} | ${g.reran.map((w) => `\`${w}\``).join(", ")} | ${g.seconds.toFixed(0)} |`);
   return lines.join("\n") + "\n";
 }

@@ -60,6 +60,7 @@ let checkoutPrefixes: Map<string, string> | undefined;
  */
 export function defaultInstancePrefixes(): Map<string, string> {
   if (checkoutPrefixes === undefined) {
+    // input-site: env-unset FOLIO_FIXTURE_CHECKOUT #eac4c68c — a test-only override naming a checkout outside the tree
     const fixture = process.env.FOLIO_FIXTURE_CHECKOUT;
     checkoutPrefixes = new Map([
       ...(fixture ? instancePrefixes(fixture) : new Map<string, string>()),

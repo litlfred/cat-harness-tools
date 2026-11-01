@@ -247,6 +247,7 @@ describe("an instance that declares a kind twice is auditable, not a crash", () 
     expect(out, `no audit summary in:\n${out.slice(0, 300)}${err.slice(0, 300)}`).toMatch(
       /Knowledge-graph audit\s+\(\d+ subjects/,
     );
-  });
+    // It spawns a whole audit of the checkout, which takes 10-15 s even warm.
+  }, 60_000);
 });
 

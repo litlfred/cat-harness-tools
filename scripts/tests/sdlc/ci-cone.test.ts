@@ -13,8 +13,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { decideRun, excluded, gitReplayable, loadRecords, parseTrace, recordRun, splitArgs, unquote } from "../../ci-cone.ts";
-import { BUILD_OUTPUT_DIRS, TRACKED, type BaselineResolver, type PairIO } from "../../input-hash.ts";
+import { decideRun, excluded, gitReplayable, loadRecords, parseTrace, pathState, recordRun, splitArgs, unquote } from "../../ci-cone.ts";
+import { BUILD_OUTPUT_DIRS, FileDigests, TRACKED, type BaselineResolver, type PairIO } from "../../input-hash.ts";
 import { NOT_INSTANCE_DIRS } from "../../../schemas/kg/instance-roots.ts";
 import { statementPin } from "../../input-sites.ts";
 
@@ -144,6 +144,42 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
     expect(splitArgs(`AT_FDCWD</a, b>, "x,y", {a=1, b=2}, 0`)).toEqual(["AT_FDCWD</a, b>", `"x,y"`, "{a=1, b=2}", "0"]);
     expect(unquote(`"a\\"b\\\\c"`)).toBe('a"b\\c');
     expect(unquote(`"abc"...`)).toBeUndefined();
+  });
+
+  test("ignores ???( <detached ...> thread-exit lines, while recording paths from syscalls that detached mid-call", () => {
+    const r = read(
+      [
+        `10 openat(AT_FDCWD</work/repo>, "data/a.json", O_RDONLY|O_CLOEXEC) = 3</work/repo/data/a.json>`,
+        `11 openat(AT_FDCWD</work/repo>, "data/b.json", O_RDONLY <detached ...>`,
+        `12 ???( <detached ...>`,
+        `13 <... futex resumed> <detached ...>`,
+        `10 +++ exited with 0 +++`,
+      ].join("\n"),
+    );
+    expect(r).toEqual({ paths: ["data/a.json", "data/b.json"], git: [] });
+  });
+
+  test("pathState on .git records directory presence without hashing git-internal transient entries, while hashing .git/config by content", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ci-cone-git-state-"));
+    try {
+      expect(pathState(tmp, ".git", new FileDigests(tmp))).toBe("absent");
+      mkdirSync(join(tmp, ".git"), { recursive: true });
+      writeFileSync(join(tmp, ".git", "config"), "[core]\n\trepositoryformatversion = 0\n");
+      const before = pathState(tmp, ".git", new FileDigests(tmp));
+      const cfgBefore = pathState(tmp, ".git/config", new FileDigests(tmp));
+      expect(before).toBe("dir");
+      expect(cfgBefore).toMatch(/^file [0-9a-f]{64}$/);
+      // A sibling git process writing FETCH_HEAD or index.lock inside .git/ must not invalidate a check that only stat-ed .git.
+      writeFileSync(join(tmp, ".git", "FETCH_HEAD"), "deadbeef\n");
+      writeFileSync(join(tmp, ".git", "index.lock"), "");
+      expect(pathState(tmp, ".git", new FileDigests(tmp))).toBe(before);
+      expect(pathState(tmp, ".git/config", new FileDigests(tmp))).toBe(cfgBefore);
+      // A direct read of .git/config still notices when .git/config itself changes.
+      writeFileSync(join(tmp, ".git", "config"), "[core]\n\trepositoryformatversion = 1\n");
+      expect(pathState(tmp, ".git/config", new FileDigests(tmp))).not.toBe(cfgBefore);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
 

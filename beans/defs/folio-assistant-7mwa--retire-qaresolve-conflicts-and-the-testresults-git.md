@@ -6,10 +6,8 @@ status: todo
 type: task
 priority: normal
 created_at: 2026-10-01T08:00:46Z
-updated_at: 2026-10-30T19:45:00Z
+updated_at: 2026-10-31T14:35:00Z
 parent: folio-assistant-3fva
-blocked_by:
-    - folio-assistant-tfqf
 ---
 
 Arc `3fva`, proposal §4 items 3.5 and 3.6. Blocked on the gates and readers beans.
@@ -50,6 +48,16 @@ _2026-10-30T18:40:00Z_ — Completed the `folio_init` / `qa-sweep.yml` template 
 _2026-10-30T19:45:00Z_ — litlfred/cat-harness-tools#949 merged as `6414778` (owner card 19:40Z): qa-sweep now publishes to qa-reports. Still open: no gate or test references a committed `test/results` file. Session https://claude.ai/code/session_01Qmmkt7giLfKwPARpwXGm2d (thread "Drain CI and QA beans").
 
 _2026-10-31T01:15:00Z_ — Box 1 checked on `cat-harness-tools` `main`: not done. `scripts/qa-resolve-conflicts.ts` and its test still exist, and about 30 files under `schemas/`, `pipeline/`, `src/tools/` and three `folio-qa-sweep*`/`folio-section-title-audit` workflows still name `test/results`. This is real work, still blocked by `tfqf`. Session https://claude.ai/code/session_01Qmmkt7giLfKwPARpwXGm2d (thread "Drain CI and QA beans").
+
+_2026-10-31T09:30:00Z_ — Unblocked (`folio-assistant-tfqf` completed) and completed Box 1 (`no gate or test references a committed test/results file`):
+- Per proposal §2.4 (*"A writer still writes to `<instance>/test/results/`, as the working copy"*), writers and `folio-qa-sweep*` workflows write the working copy under `test/results/` before `qa-store.ts publish` pushes it to `qa-reports`; and `qa-resolve-conflicts.ts` / `.gitattributes` stay until `litlfred/cat-harness` removes `test/results/` from its `main` branch and updates `merge-conflict-patterns.md` / `merge-base.bpmn` (`prose-claims-resolve` in `kg:audit:all:check` pins `` `provisionalSide` in `qa-resolve-conflicts.ts` ``, and the owner's 2026-10-23 ruling keeps `-merge` in `gitattributes.test.ts`).
+- Audited and fixed all remaining gates and tests in `cat-harness-tools` that referenced or depended on committed `test/results/` files in the checkout:
+  1. `scripts/check-published-instance-exports.ts` (`sidecarSubjectsFrom`): check `qaStorageOf(qaDir, REPO_ROOT)` before `existsSync(qaDir)`, matching `readBaseline` in `scripts/qa-results.ts`, so a `storage`-backed `qa` directory without `--against` always reports `unknown` even when another writer created a partial working copy on disk.
+  2. `scripts/check-declared-paths.ts` & `scripts/tests/kg/declared-paths.test.ts` (`storedResultDirs`): include `storage`-backed `qa`/`health` directories in `absentResults` so recorded witnesses under `test/results/` remain `unverifiable` when missing from a partial working copy on disk.
+  3. `scripts/tests/kg/kg-export-sidecars.test.ts`: test `sidecarSubjects` with a scratch fixture and `instanceRootsIn(REPO)` when `cat-harness/test/results/kg-export.bootstrap.qa-results.json` is not in the checkout.
+  4. `scripts/tests/adversarial-checklist.test.ts`: test `adversarialCoverageByGraph` against a scratch root populated by `executeBackfillBatch` and assert `validStates` on `coverage(REPO)` rows without requiring committed `cat-harness/test/results/kg-qa/` sidecars on disk.
+  5. `scripts/tests/library/ingest-and-l1.test.ts`: check per-entry `sidecarRootFor` against `resolveQaLocation` so stored `qa` directories assert `"unknown"` and overlay instances without a stored `qa` directory (`smart-trust-phw`) assert `"absent"`; nest `mkdtempSync` fixtures inside a parent temp directory so `corpusDirectoriesForGraph` does not scan `tmpdir()`.
+  6. `scripts/tests/ui/nav-names.test.ts`: compute `railedCount()` via `audit(SITE, REPO).totals.railed` from `scripts/check-viewer-nav.ts` instead of reading `cat-harness/test/results/viewer-nav/viewer-nav.qa.json` from disk.
 
 _2026-10-31T14:35:00Z_: cat-harness no longer commits `test/results`. litlfred/cat-harness#857 (161b243) removed it, after litlfred/cat-harness-tools#1143 (5d30589) on owner card A at 14:06Z. #1143 also made `kg-validate-nested-instances` check an absent `qa` home against the store, and dropped four declared-path witnesses that are test vectors or convention constants.
 

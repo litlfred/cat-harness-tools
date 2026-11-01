@@ -117,6 +117,7 @@ function resolveActReasonDefinitionPath(): string {
   const filename = "CodeSystem-v3-ActReason.json";
   const here = dirname(fileURLToPath(import.meta.url));
   const candidates = [
+    // input-site: inert #04348fc5 — fallback to the local FHIR package cache when the committed test fixture is absent
     join(homedir(), ".fhir", "packages", HL7_TERMINOLOGY_PACKAGE_ID, "package", filename),
     resolve(here, "..", "..", "test", "fixtures", HL7_TERMINOLOGY_PACKAGE_ID, filename),
   ];
