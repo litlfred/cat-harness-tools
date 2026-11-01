@@ -44,8 +44,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { instanceRootsIn } from "../../schemas/kg/cat-harness.js";
-import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { instanceRootsIn, siteDirFor } from "../../schemas/kg/cat-harness.js";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 
 /** The cat-harness instance root — the directory this file's `test/` sits in. */
 export const INSTANCE = resolve(HARNESS_ROOT);
@@ -172,6 +172,24 @@ export function noRootManifest(repo: string, needs: string): boolean {
  */
 export function qaResultDirsIn(repo: string): string[] {
   return instanceRootsIn(repo).map((r) => join(r, "test", "results"));
+}
+
+/**
+ * Build the publish-time projections `gen-docs-pages.ts` writes
+ * (`assets/todos/index.json`, `assets/beans/index.json`,
+ * `assets/beans/count.json`, `todos.jsonld`) when running in the composed
+ * checkout and the projections are not yet on disk (#411). Standing alone this
+ * is a no-op so {@link siteNotBuilt} skips remain intact.
+ */
+export function ensureDocsPages(instanceRoot: string = INSTANCE): void {
+  if (STANDALONE) return;
+  const root = resolve(instanceRoot);
+  const index = join(root, siteDirFor(root), "assets", "todos", "index.json");
+  if (existsSync(index)) return;
+  const repo = checkoutHolding(root);
+  restoringTracked(qaResultDirsIn(repo), () =>
+    spawnSync("bun", [join(TOOLS_ROOT, "scripts", "gen-docs-pages.ts")], { cwd: repo, encoding: "utf-8" }),
+  );
 }
 
 /** One tracked file's bytes, as found before a run that may rewrite it. */

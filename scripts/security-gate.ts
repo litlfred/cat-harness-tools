@@ -50,12 +50,27 @@
  * @covers none — it re-runs other gates by name and reads .github/workflows/, which is not a declared graph typology; the kinds belong to the gates it calls
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { scriptTable, type ScriptEntry } from "../schemas/sdlc/script-table.ts";
+import { ownsScript, writerCommand } from "./lib/script-command.ts";
 import { parseDockerUses, parseUses, stagingExempt } from "./pin-actions.ts";
 
-const ROOT = resolve(import.meta.dir, "..", "..");
+const TOOLS_ROOT = resolve(import.meta.dir, "..");
+const PARENT_ROOT = resolve(import.meta.dir, "..", "..");
+const ROOT =
+  existsSync(join(PARENT_ROOT, "index.config.json")) || existsSync(join(PARENT_ROOT, "package.json"))
+    ? PARENT_ROOT
+    : existsSync(join(TOOLS_ROOT, "package.json"))
+      ? TOOLS_ROOT
+      : PARENT_ROOT;
+
+function defaultWorkflowRoot(): string {
+  if (existsSync(join(ROOT, ".github", "workflows"))) return ROOT;
+  if (existsSync(join(process.cwd(), ".github", "workflows"))) return process.cwd();
+  if (existsSync(join(TOOLS_ROOT, ".github", "workflows"))) return TOOLS_ROOT;
+  return ROOT;
+}
 
 export type GateState = "pass" | "fail" | "unknown";
 export interface GateResult {
@@ -104,9 +119,30 @@ export const PINNED_CHECK_COMMANDS: Readonly<Record<string, string>> = {
   "check:lockfile-pinning": "bun run cat-harness-tools/scripts/check-lockfile-pinning.ts",
   "check:bun-pin": "bun run cat-harness-tools/scripts/check-bun-pin.ts",
   "check:qa-reviewer-permission": "bun run cat-harness-tools/scripts/check-qa-reviewer-permission.ts",
-  "check:materialized-fixity": "bun run folio-assistant-core/scripts/check-materialized-fixity.ts",
+  "check:materialized-fixity": "bun run <layer>/scripts/check-materialized-fixity.ts",
   "check:dependency-advisories": "bun run cat-harness-tools/scripts/check-dependency-advisories.ts",
 };
+
+/**
+ * Resolve the pinned command for `script`. A pin written with `<layer>` (such as
+ * `check:materialized-fixity`, which lives in a content layer above this one)
+ * resolves `<layer>` from whichever layer manifest declares the script, rather
+ * than hard-coding an upper layer's path here (bean `cat-tools-q8gk`).
+ */
+export function pinnedCommandFor(
+  script: string,
+  entry?: ScriptEntry | string,
+  pins: Readonly<Record<string, string>> = PINNED_CHECK_COMMANDS,
+): string | undefined {
+  const raw = Object.prototype.hasOwnProperty.call(pins, script) ? pins[script] : undefined;
+  if (raw === undefined || !raw.includes("<layer>")) return raw;
+  if (!entry) return raw.replace("<layer>/", "");
+  if (typeof entry === "string") return raw.replace("<layer>", entry);
+  const fromManifest = entry.manifest && entry.manifest !== "package.json" ? dirname(entry.manifest) : undefined;
+  const fromCommand = /^bun run ([A-Za-z0-9._-]+)\//.exec(entry.command.trim())?.[1];
+  const layer = fromManifest && fromManifest !== "." ? fromManifest : fromCommand;
+  return layer ? raw.replace("<layer>", layer) : raw.replace("<layer>/", "");
+}
 
 /**
  * Run one package script by NAME, as argv, only when its manifest command is
@@ -126,7 +162,7 @@ export function runCheck(script: string, blocking: boolean, root = ROOT, pins: R
   if (!entry) {
     return { check: script, blocking, state: "unknown", detail: "no such script in any manifest: the check could not be run" };
   }
-  const pinned = Object.prototype.hasOwnProperty.call(pins, script) ? pins[script] : undefined;
+  const pinned = pinnedCommandFor(script, entry, pins);
   if (pinned === undefined) {
     return { check: script, blocking, state: "fail", detail: `no pinned command for ${script} in security-gate.ts PINNED_CHECK_COMMANDS: the gate cannot vouch for what it runs` };
   }
@@ -138,14 +174,15 @@ export function runCheck(script: string, blocking: boolean, root = ROOT, pins: R
       detail: `${entry.manifest} runs \`${entry.command.slice(0, 120)}\` but the gate pins \`${pinned}\`: not run. Change the pin in security-gate.ts if the move is intended`,
     };
   }
-  // A layer's script runs through the `cat` runner; a root one runs directly.
-  const argv = entry.manifest === "package.json" ? ["bun", "run", script] : ["bun", "run", "cat", script];
+  // A root `scripts` entry runs directly; a `checkoutScripts` entry runs through `cat` or `run-script.ts`.
+  const argv = entry.manifest === "package.json" && ownsScript(root, script) ? ["bun", "run", script] : writerCommand(root, script);
   const p = Bun.spawnSync(argv, { cwd: root, stdout: "pipe", stderr: "pipe" });
   // Bun echoes "$ bun run …" on stderr, so prefer the check's own last stdout line.
   const lastLine = (t: string) => t.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("$ ")).pop();
   const tail = (lastLine(p.stdout.toString()) ?? lastLine(p.stderr.toString()) ?? "").slice(0, 300);
   if (p.exitCode === 0) return { check: script, blocking, state: "pass", detail: tail };
   if (p.exitCode === null) return { check: script, blocking, state: "unknown", detail: "the check did not exit (signal)" };
+  if (p.exitCode === 2) return { check: script, blocking, state: "unknown", detail: tail };
   return { check: script, blocking, state: "fail", detail: tail };
 }
 
@@ -159,7 +196,7 @@ export function runCheck(script: string, blocking: boolean, root = ROOT, pins: R
  * that checks cannot disagree about a line.
  */
 export function unpinnedActions(
-  root = ROOT,
+  root = defaultWorkflowRoot(),
 ): { total: number; unpinned: string[]; stagingUnpinned: string[]; dockerUndigested: string[] } | undefined {
   const dir = join(root, ".github", "workflows");
   if (!existsSync(dir)) return undefined;
@@ -189,7 +226,7 @@ export function unpinnedActions(
 }
 
 /** Blocking for published workflows; staging-only workflows are reported, never blocking. */
-export function actionPinning(root = ROOT): GateResult[] {
+export function actionPinning(root = defaultWorkflowRoot()): GateResult[] {
   const r = unpinnedActions(root);
   if (r === undefined) return [{ check: "action-sha-pinning", blocking: true, state: "unknown", detail: "no .github/workflows directory" }];
   const published: GateResult =
@@ -216,8 +253,10 @@ export function actionPinning(root = ROOT): GateResult[] {
   return [published, staging, docker];
 }
 
-export function securityGate(root = ROOT): GateResult[] {
-  return [...SECURITY_CHECKS.map((c) => runCheck(c.script, c.blocking, root)), ...actionPinning(root)];
+export function securityGate(root?: string): GateResult[] {
+  const r = root ?? ROOT;
+  const wfRoot = root ?? defaultWorkflowRoot();
+  return [...SECURITY_CHECKS.map((c) => runCheck(c.script, c.blocking, r)), ...actionPinning(wfRoot)];
 }
 
 /** A release proceeds only when no BLOCKING check failed or could not be run. */

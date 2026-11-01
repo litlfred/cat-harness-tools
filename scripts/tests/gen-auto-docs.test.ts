@@ -326,11 +326,15 @@ describe("the LEVEL pages — a route that reads like a section must answer", ()
   it("counts a type's items and says what a nested level holds", () => {
     const h = levelPage("", [
       { seg: "index", title: "index", detail: "2 type(s) below" },
-      { seg: "glossary", title: "Glossary", detail: "every defined term", count: 7 },
-    ]);
+      { seg: "glossary", title: "Glossary", detail: "every defined term", count: 7, countKey: "glossary" },
+    ], "../assets/auto-docs/index.json");
     expect(h).toContain("2 type(s) below");
-    expect(h).toContain(">7<");
     expect(h).toContain('href="glossary/"');
+    // The count is FETCHED (cone-shrinking, 2026-10-31): the page carries the
+    // key, so a file added anywhere does not rewrite the page.
+    expect(h).toContain('data-da-count="glossary"');
+    expect(h).not.toContain(">7<");
+    expect(h).toContain('fetch("../assets/auto-docs/index.json"');
   });
 });
 
@@ -377,5 +381,34 @@ describe("a code span that is not a row here links to a skill page or a file (be
   });
   it("a name that resolves to neither stays code", () => {
     expect(html).toContain("and <code>claim</code>.");
+  });
+});
+
+describe("counts are fetched from one file, so pages do not move when a count does", () => {
+  const siblings = (n: number) => [
+    { id: "a-skills", path: "a/skills", count: n },
+    { id: "b-skills", path: "b/skills", count: 3 },
+  ];
+  const page = (n: number) =>
+    autoDocPage(TYPES[0]!, [{ path: "a/skills/x/SKILL.md", name: "x" }], "a-skills", "a/skills", siblings(n), undefined, "../../x.json");
+
+  it("a sibling's count changing leaves the page byte-identical", () => {
+    // Before, each sub-graph page listed every sibling's count, so one file
+    // added anywhere rewrote every sibling page (about 40 per deploy).
+    expect(page(5)).toBe(page(6));
+  });
+
+  it("each sibling carries its key and a pending mark, filled from the counts file", () => {
+    const html = page(5);
+    expect(html).toContain(`data-da-count="${TYPES[0]!.id}/a-skills"`);
+    expect(html).toContain(`data-da-count="${TYPES[0]!.id}/b-skills"`);
+    expect(html).toContain('data-da-count-state="pending"');
+    expect(html).toContain('fetch("../../x.json"');
+    expect(html).toContain("j.counts");
+  });
+
+  it("a level page's type count changing leaves it byte-identical", () => {
+    const lp = (n: number) => levelPage("index", [{ seg: "skills", title: "Skills", detail: "d", count: n, countKey: "index/skills" }], "x.json");
+    expect(lp(1)).toBe(lp(2));
   });
 });

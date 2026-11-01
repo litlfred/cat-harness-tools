@@ -8,8 +8,13 @@ import {
   bestLaneOrder,
   crossings,
   diagramFit,
+  edgesThroughShapes,
   FIT_WIDTH,
+  fixTaskSize,
+  offSizeTasks,
+  TASK_SIZE,
   laneOrder,
+  placeLabels,
   readDi,
   segmentHitsBox,
   segmentsCross,
@@ -181,5 +186,98 @@ describe("slanted flows", () => {
       [["ab", "A", "B", [[100, 30], [300, 230]]]],
     );
     expect(straightenFlows(blocked).fixed).toEqual([]);
+  });
+});
+
+describe("labels on arrows and lane lines (owner, 2026-10-31: \"need to check for text on arrows\")", () => {
+  // A start event whose name hangs below it, over the flow leaving it and
+  // across the line into the next lane: the case the owner circled.
+  const xml = bpmn(LANES.slice(0, 2), [["A", 100, 30, 36, 36, [73, 70, 90, 54]], ["B", 60, 130, 120, 60]], [["F", "A", "B", [[118, 66], [118, 130]]]]);
+  test("a label over the flow leaving its own event, and across a lane line, is reported", () => {
+    const f = diagramFit(xml);
+    expect(f["label-on-edge"]!.map((x) => x.where)).toContain("A/F");
+    expect(f["label-on-lane-line"]!.map((x) => x.where)).toContain("A/L1");
+  });
+  test("--write moves it to a clear place inside its lane, and the check is then clean", () => {
+    const { xml: next, moved } = placeLabels(xml, { labels: [{ id: "A", text: "A", x: 73, y: 70, width: 90, height: 54 }] });
+    expect(moved).toEqual(["A"]);
+    const label = readDi(next).shapes.get("A")!.label!;
+    expect(label.y).toBeGreaterThanOrEqual(0);
+    expect(label.y + label.height).toBeLessThanOrEqual(100);
+    const f = diagramFit(next);
+    expect(f["label-on-edge"]).toEqual([]);
+    expect(f["label-on-lane-line"]).toEqual([]);
+    expect(f["label-on-shape"]).toEqual([]);
+  });
+  test("a label already clear is left where it is", () => {
+    const clear = bpmn(LANES.slice(0, 2), [["A", 100, 30, 36, 36, [140, 30, 60, 36]], ["B", 60, 130, 120, 60]], [["F", "A", "B", [[118, 66], [118, 130]]]]);
+    expect(placeLabels(clear, { labels: [{ id: "A", text: "A", x: 140, y: 30, width: 60, height: 36 }] }).moved).toEqual([]);
+  });
+});
+
+describe("flows through boxes", () => {
+  test("a flow drawn through a step it does not touch is reported", () => {
+    const xml = bpmn(LANES, [["A", 50, 120, 100, 60], ["B", 200, 120, 100, 60], ["C", 350, 120, 100, 60]],
+      [["F", "A", "C", [[150, 150], [350, 150]]]]);
+    expect(edgesThroughShapes(readDi(xml))).toEqual([["F", "B"]]);
+    expect(diagramFit(xml)["edge-through-shape"]!.map((f) => f.where)).toEqual(["F/B"]);
+  });
+
+  test("a lane swap keeps a loop-back flow's bends rather than drawing it through the lane's steps", () => {
+    // D (lane One) loops back to A (lane Two) over the top of B and C.
+    const xml = bpmn(LANES,
+      [["A", 50, 120, 100, 60], ["B", 200, 120, 100, 60], ["C", 350, 120, 100, 60], ["D", 350, 20, 100, 60]],
+      [["F", "D", "A", [[350, 50], [30, 50], [30, 150], [50, 150]]]]);
+    const next = applyLaneOrder(xml, ["L2", "L1", "L3"]);
+    const di = readDi(next);
+    expect(laneOrder(di)).toEqual(["L2", "L1", "L3"]);
+    expect(edgesThroughShapes(di)).toEqual([]);
+    expect(di.edges.get("F")!.points).toEqual([{ x: 350, y: 150 }, { x: 30, y: 150 }, { x: 30, y: 50 }, { x: 50, y: 50 }]);
+  });
+});
+
+describe("reading the DI", () => {
+  test("a shape whose BPMNLabel comes before its own Bounds is still read, label and all", () => {
+    const xml = `<?xml version="1.0"?><bpmn:definitions><bpmn:process id="P"><bpmn:exclusiveGateway id="G" name="Done?"/></bpmn:process>
+  <bpmndi:BPMNDiagram><bpmndi:BPMNPlane bpmnElement="P">
+      <bpmndi:BPMNShape bpmnElement="G"><bpmndi:BPMNLabel><dc:Bounds x="10" y="70" width="90" height="20"/></bpmndi:BPMNLabel><dc:Bounds x="30" y="10" width="50" height="50"/></bpmndi:BPMNShape>
+  </bpmndi:BPMNPlane></bpmndi:BPMNDiagram></bpmn:definitions>`;
+    const g = readDi(xml).shapes.get("G");
+    expect(g).toEqual({ x: 30, y: 10, width: 50, height: 50, label: { x: 10, y: 70, width: 90, height: 20 } });
+  });
+});
+
+describe("steps on top of each other", () => {
+  test("two steps drawn over each other are reported; apart they are not", () => {
+    const over = bpmn(LANES, [["A", 50, 120, 100, 60], ["B", 120, 130, 100, 60]], []);
+    expect(diagramFit(over)["shape-overlap"]!.map((f) => f.where)).toEqual(["A+B"]);
+    const apart = bpmn(LANES, [["A", 50, 120, 100, 60], ["B", 200, 120, 100, 60]], []);
+    expect(diagramFit(apart)["shape-overlap"]).toEqual([]);
+  });
+});
+
+describe("tasks are one square size (TASK_SIZE)", () => {
+  test("a wide task and a short one are both drawn at TASK_SIZE, about their centres", () => {
+    const xml = bpmn([["L1", "One", 0, 200]], [["A", 50, 50, 160, 80], ["B", 300, 60, 100, 60]], []);
+    expect(offSizeTasks(xml).sort()).toEqual(["A", "B"]);
+    const { xml: next, fixed } = fixTaskSize(xml);
+    expect(fixed.sort()).toEqual(["A", "B"]);
+    expect(offSizeTasks(next)).toEqual([]);
+    const a = readDi(next).shapes.get("A")!;
+    expect([a.width, a.height]).toEqual([TASK_SIZE.width, TASK_SIZE.height]);
+    expect(a.x + a.width / 2).toBe(130);
+  });
+
+  test("an expanded sub-process keeps its size", () => {
+    const xml = bpmn([["L1", "One", 0, 300]], [["S", 50, 20, 400, 200]], [])
+      .replace('<bpmn:task id="S" name="S"/>', '<bpmn:subProcess id="S" name="S"/>')
+      .replace('<bpmndi:BPMNShape bpmnElement="S">', '<bpmndi:BPMNShape bpmnElement="S" isExpanded="true">');
+    expect(offSizeTasks(xml)).toEqual([]);
+    expect(fixTaskSize(xml).fixed).toEqual([]);
+  });
+
+  test("a diagram already at TASK_SIZE is left byte for byte", () => {
+    const xml = bpmn([["L1", "One", 0, 200]], [["A", 50, 40, TASK_SIZE.width, TASK_SIZE.height]], []);
+    expect(fixTaskSize(xml).xml).toBe(xml);
   });
 });

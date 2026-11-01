@@ -60,6 +60,7 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync 
 import { join, relative } from "node:path";
 import { FRAGMENT } from "./staging-banner.ts";
 import { stripSeo } from "./strip-preview-seo.ts";
+import { readRetained } from "./keep-shared-payloads.ts";
 
 /**
  * Files a preview always keeps: they describe this preview, or serve it. The
@@ -116,9 +117,12 @@ export function planShare(root: string, preview: string, slug: string): SharePla
   const shared: string[] = [];
   let kept = 0;
   let bytesShared = 0;
+  // A blob main keeps only for older previews (keep-shared-payloads.ts) is never
+  // borrowed: it goes once those previews rotate off, and this one would 404.
+  const retained = new Set(Object.keys(readRetained(root).kept));
   for (const rel of filesUnder(preview)) {
     const live = join(root, rel);
-    if (rel.startsWith("STAGING/") || !existsSync(live) || !statSync(live).isFile()) { kept++; continue; }
+    if (rel.startsWith("STAGING/") || retained.has(rel) || !existsSync(live) || !statSync(live).isFile()) { kept++; continue; }
     const p = readFileSync(join(preview, rel));
     if (sameAsLive(rel, p, readFileSync(live), slug)) { shared.push(rel); bytesShared += p.length; }
     else kept++;

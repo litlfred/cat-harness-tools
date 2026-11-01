@@ -740,6 +740,7 @@ describe("injectMarkdown preserves document structure", () => {
     });
     const blanks = (s: string): number => s.split("\n").filter((l) => l.trim() === "").length;
     let pairs = 0;
+    let injected = 0;
     let collapsed = 0;
     for (const page of pages) {
       const srcFile = join(docs!, `${page}.md`);
@@ -756,14 +757,20 @@ describe("injectMarkdown preserves document structure", () => {
         pairs++;
         const result = injectMarkdown(source, parsePo(readFileSync(po, "utf-8")));
         expect(blanks(result.translated)).toBe(blanks(source));
+        if (result.translated !== source) injected++;
         if (result.translated.split("\n").length < source.split("\n").length) collapsed++;
       }
     }
-    // Anti-vacuity, both ways: the loop must have run, and it must have actually
-    // collapsed something on every pair rather than passing by doing nothing.
+    // Anti-vacuity, both ways: the loop must have run, and injection must have
+    // done something on every pair rather than passing by doing nothing.
     // 55 since moves M6–M8 took pages, and their catalogues, up a layer.
+    // Collapsing is counted over the corpus, not per pair: a catalogue whose
+    // wrapped paragraphs `translation:obsolete` retired after the source
+    // changed holds only one-line entries, so nothing in it can collapse until
+    // the page is translated again (cat-harness start/contributing, 2026-10-31).
     expect(pairs).toBeGreaterThanOrEqual(55);
-    expect(collapsed).toBe(pairs);
+    expect(injected).toBe(pairs);
+    expect(collapsed).toBeGreaterThan(0);
   });
 });
 

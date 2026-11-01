@@ -39,6 +39,7 @@ let cached: string | undefined | null = null;
 /** The cat-harness instance root, or `undefined` when none can be found. */
 export function harnessRoot(): string | undefined {
   if (cached !== null) return cached;
+  // input-site: env-unset CAT_HARNESS_ROOT #5f5eb0bf — an override naming a cat-harness root outside the checkout; unset in CI
   const env = process.env.CAT_HARNESS_ROOT;
   if (env && existsSync(join(env, "cat-harness.json"))) return (cached = resolve(env));
   const here = dirname(fileURLToPath(import.meta.url));

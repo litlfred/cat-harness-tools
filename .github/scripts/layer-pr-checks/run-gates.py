@@ -183,6 +183,7 @@ NEEDS_INPUT_SCRIPTS = {
     "check:duplicate-ids": "needs a built site directory; bare, it prints its usage and exits 2",
     "check:escaped-markup": "needs a built site directory (or --source <dir>); bare, it prints its usage and exits 2",
     "check:maintained-artefacts": "needs a built site directory; bare, it prints its usage and exits 2",
+    "ingest:ig-chrome:check": "needs --layer <dir> checkouts of each fhir.template in the chain; bare, it prints could not determine and exits 2",
     "wireframe:check": "needs --use, --topic and --surface; bare, a usage error and exit 2",
 }
 # The `PREREQUISITE_FILES` skip for `uml:overview:check` and
@@ -367,7 +368,7 @@ def parse_shard(value):
     return i, n
 
 
-def shard_names(names, i, n, timings=None):
+def shard_names(names, i, n, timings=None, alone=(), jobs=1):
     """The names shard i of n runs.
 
     With no `timings`, those whose index in sorted(names) is i-1 mod n, returned
@@ -377,24 +378,62 @@ def shard_names(names, i, n, timings=None):
     the shards are balanced by time instead of by count (cat-harness-tools#397:
     on smart-base run 38866215814 the count split gave one head shard 2267 s of
     gates and another 626 s, and the slowest shard is the run's wall time).
-    Longest first, each gate goes to the shard with the least time so far; a
-    gate with no timing counts as the median, and ties go by name, so every
-    shard of a side computes the same partition from the same file. Still
-    returned in the order `names` gives them.
+
+    The time balanced is each shard's expected WALL time, not its summed
+    seconds: `jobs` pooled gates run at once, so they cost a shard their sum
+    over `jobs` (and never less than the longest of them), while an `alone`
+    gate runs after the pool drains and costs its whole seconds. Summed
+    seconds put every shard near 600 s on folio-assistant-core run
+    41260767852, yet the shard holding the 500 s alone
+    `check:cat-harness-tools-standalone` took 9.5 min and others 4-5 min.
+
+    Longest first, each gate goes to the shard whose expected wall time grows
+    least; a gate with no timing counts as the median, and ties go by name and
+    then shard number, so every shard of a side computes the same partition
+    from the same file. Still returned in the order `names` gives them.
     """
     if not timings or n == 1:
         mine = {x for k, x in enumerate(sorted(names)) if k % n == i - 1}
         return [x for x in names if x in mine]
+    jobs = max(1, int(jobs))
+    alone = set(alone)
     known = sorted(t for t in (timings.get(x) for x in names) if t is not None)
     fallback = known[len(known) // 2] if known else 1.0
     cost = {x: timings.get(x, fallback) for x in names}
-    load = [0.0] * n
+    pooled = [0.0] * n  # summed seconds of pooled gates
+    longest = [0.0] * n  # the longest pooled gate
+    serial = [0.0] * n  # summed seconds of alone gates
+
+    def wall(k, x=None):
+        p, m, a = pooled[k], longest[k], serial[k]
+        if x is not None:
+            if x in alone:
+                a += cost[x]
+            else:
+                p, m = p + cost[x], max(m, cost[x])
+        return max(p / jobs, m) + a
+
     owner = {}
     for x in sorted(names, key=lambda x: (-cost[x], x)):
-        k = min(range(n), key=lambda s: (load[s], s))
+        k = min(range(n), key=lambda s: (wall(s, x), s))
         owner[x] = k
-        load[k] += cost[x]
+        if x in alone:
+            serial[k] += cost[x]
+        else:
+            pooled[k] += cost[x]
+            longest[k] = max(longest[k], cost[x])
     return [x for x in names if owner[x] == i - 1]
+
+
+def gate_jobs():
+    """`GATE_JOBS`, the gates run at once within one shard; 1 when unset.
+
+    For the split, 1 under `GATE_CONE=record` too: a push traces its gates one
+    at a time (the `traced` loop), so there they cost their whole seconds and
+    the summed-seconds split is the wall-time split."""
+    if os.environ.get("GATE_CONE", "").strip() == "record":
+        return 1
+    return max(1, int(os.environ.get("GATE_JOBS", "1") or "1"))
 
 
 def read_timings(path):
@@ -739,7 +778,47 @@ def derive(root, given, tmp, env=None):
                 continue
             seen_scripts.add(command)
             skipped[gname] = {"command": command, "skipped": why, "kind": kind}
+    fold_skill_register(root, runner, gates)
     return own, harness, runner, gates, skipped
+
+
+SKILL_REGISTER_TS = os.path.join("cat-harness-tools", "scripts", "skill-register.ts")
+_VERIFY = re.compile(r'verify:\s*\[\s*"([^"]+)"\s*\]')
+
+
+def skill_register_chain(root):
+    """The chain checks `skill:register:check` runs (`STEPS[].verify` in
+    skill-register.ts at this side's pin), or [] when they cannot be read."""
+    try:
+        with open(os.path.join(root, SKILL_REGISTER_TS)) as f:
+            src = f.read()
+    except OSError:
+        return []
+    start = src.find("export const STEPS")
+    end = src.find("export const CHECKS", start)
+    return _VERIFY.findall(src[start:end]) if start >= 0 and end > start else []
+
+
+def fold_skill_register(root, runner, gates):
+    """Run `skill:register:check` as its declaration half when every chain
+    check it would run is already its own gate in this set (the fold
+    `regen` uses, `pair-cover.ts`, bean `8qyc`). Measured on
+    folio-assistant-core#444 (run 41239562434): 724.8 s of the slowest
+    shard's 14m43s re-ran those checks. Every chain check is still judged,
+    head against base, by its own gate, so nothing goes unjudged. The gate
+    keeps its name, so the two sides compare like for like."""
+    full = f"{runner} skill:register:check"
+    name = next((k for k, v in gates.items() if v == full), None)
+    chain = skill_register_chain(root)
+    if name is None or not chain:
+        return
+    have = set(gates.values())
+    if any(f"{runner} {c}" not in have for c in chain):
+        return
+    residual = f"{runner} skill:register:declarations:check"
+    for k in [k for k, v in gates.items() if v == residual]:
+        del gates[k]
+    gates[name] = residual
 
 
 def main():
@@ -759,7 +838,8 @@ def main():
         listed = {"own": own, "harness": harness, "runner": runner, "gates": gates, "skipped": skipped}
         if os.environ.get("GATE_SHARD", "").strip():
             timings = read_timings(os.environ.get("GATE_TIMINGS"))
-            listed["gates"] = {k: gates[k] for k in shard_names(list(gates), shard, shards, timings)}
+            alone = tree_snapshotting(args[0]) if timings else set()
+            listed["gates"] = {k: gates[k] for k in shard_names(list(gates), shard, shards, timings, alone, gate_jobs())}
             listed["skipped"] = skipped if shard == 1 else {}
             listed["shard"] = {"shard": shard, "of": shards, "total": len(gates)}
         json.dump(listed, sys.stdout, indent=1)
@@ -775,7 +855,8 @@ def main():
     skipped = {k: {"command": v["command"], "skipped": v["skipped"]} for k, v in skipped.items()}
     total = len(gates)
     timings = read_timings(os.environ.get("GATE_TIMINGS"))
-    gates = {k: gates[k] for k in shard_names(list(gates), shard, shards, timings)}
+    alone = tree_snapshotting(root)
+    gates = {k: gates[k] for k in shard_names(list(gates), shard, shards, timings, alone, gate_jobs())}
     if shard != 1:
         skipped, records = {}, []  # shard 1 carries them, so a merged side holds each once
     split = "by recorded seconds" if timings and shards > 1 else "by count"
@@ -792,11 +873,10 @@ def main():
     if note:
         print(f"ci cone: {note}", flush=True)
 
-    jobs = max(1, int(os.environ.get("GATE_JOBS", "1")))
     results = {}
-    alone = tree_snapshotting(root)
     pooled = [kv for kv in gates.items() if kv[0] not in alone and kv[0] not in traced]
     serial = [kv for kv in gates.items() if kv[0] in alone and kv[0] not in traced]
+    jobs = max(1, int(os.environ.get("GATE_JOBS", "1")))
     with ThreadPoolExecutor(max_workers=jobs) as pool:
         outcomes = list(pool.map(lambda kv: run(root, kv[0], kv[1]), pooled))
     outcomes += [run(root, k, v) for k, v in serial]

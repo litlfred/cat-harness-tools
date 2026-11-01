@@ -808,9 +808,14 @@ describe("every self-URL the export publishes resolves to something published", 
       // litlfred/bootstrap-tools#52. A Tool here that satisfies a bootstrap
       // skill links to `bootstrap/skill/<id>`, so the walk must know them.
       const bootRoot = join(REPO, "bootstrap");
-      if (existsSync(bootRoot) && typeof bootstrapExport.subjectDocuments === "function") {
+      const subjectDocuments = (
+        bootstrapExport as {
+          subjectDocuments?: (graph: Record<string, unknown>, docFile: string) => Map<string, string>;
+        }
+      ).subjectDocuments;
+      if (existsSync(bootRoot) && typeof subjectDocuments === "function") {
         const bootDoc = bootstrapExport.exportGraph(bootRoot, { docIri: `${BASE}/bootstrap/bootstrap.jsonld` });
-        for (const rel of bootstrapExport.subjectDocuments(bootDoc, "bootstrap.jsonld").keys()) {
+        for (const rel of subjectDocuments(bootDoc, "bootstrap.jsonld").keys()) {
           const p = `bootstrap/${rel}`;
           out.add(p);
           if (p.endsWith("/index.html")) out.add(p.slice(0, -"index.html".length));
