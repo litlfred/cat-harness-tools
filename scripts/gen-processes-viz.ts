@@ -372,7 +372,7 @@ function instanceRoots(repo: string): string[] {
     if (declarationPathIn(dir)) out.push(dir);
   }
   out.sort();
-  // An instance at the checkout ROOT (an IG repository such as smart-trust,
+  // An instance at the checkout ROOT (an IG repository, with
   // its layers mounted below it) holds diagrams too. Without it, the site's
   // own instance was the one instance its processes page never listed.
   if (declarationPathIn(repo)) out.unshift(repo);
@@ -1344,6 +1344,11 @@ function up(repo = REPO): string {
  * (#1168 B7a-2) — every instance's declared processes directories, because
  * every instance's diagrams are on it.
  */
+/** The scope of the top index page: one "By subgraph" row per sub-graph page. */
+export function indexScope(rows: readonly ProcessRow[]): PageScope {
+  return { subjects: subgraphPages(rows).map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` })) };
+}
+
 export function publishedIndex(
   rows: Parameters<typeof page>[0],
   repo = REPO,
@@ -1351,7 +1356,9 @@ export function publishedIndex(
   // Read by default, as `skillPages` is: the committed instances are an input
   // of the page, so a caller that omits them gets the page the generator writes.
   instances: InstancesRead = instancesRead(workflowInstanceLinks()),
-  scope: PageScope = {},
+  // Defaults to the index page, with its "By subgraph" table, so a caller that
+  // omits it gets the page the generator writes (the committed-page check).
+  scope: PageScope = indexScope(rows),
 ): string {
   return withRenderedByFrontMatter(page(rows, skillPages, instances, scope), VIEWER_TOOL);
 }
@@ -1380,9 +1387,7 @@ if (import.meta.main) {
   // pages, read from the committed instance files the state visualiser draws.
   const instances = instancesRead(workflowInstanceLinks());
   const subs = subgraphPages(rows);
-  const html = publishedIndex(rows, REPO, skillPages, instances, {
-    subjects: subs.map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` })),
-  });
+  const html = publishedIndex(rows, REPO, skillPages, instances, indexScope(rows));
   // Which page sections present each diagram, keyed repository-relative so it
   // matches `row.file` — a page spells its source relative to its OWN instance.
   const presented = new Map<string, Presentation[]>();
@@ -1393,8 +1398,8 @@ if (import.meta.main) {
     }
   }
   const pages = new Map<string, string>([[out, html]]);
-  // One page per sub-graph (owner, 2026-11-01: "show process in the subgraph
-  // smart-trust only"), as `tools`, `library` and `beans` already have.
+  // One page per sub-graph (owner, 2026-11-01: show a sub-graph's processes
+  // on its own page), as `tools`, `library` and `beans` already have.
   for (const x of subs) {
     const sub = pageRelPath(REPO, x.name);
     if (sub !== undefined) pages.set(join(into ?? baseDocsDir(REPO), sub), publishedIndex(x.rows, REPO, skillPages, instances, { instance: x.name }));

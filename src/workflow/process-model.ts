@@ -51,7 +51,7 @@ const ACTIVITY_TYPES = [
   // A send or receive task is a performed step whose work is a message: the
   // walk is exactly a Task's (one token in, one out). Who may fulfil it is not
   // constrained, as for `bpmn:Task` (`fulfilmentKindsForBpmnType`). A DAK's
-  // business processes use both (smart-trust onboarding, 2026-11-01).
+  // business processes use both (a downstream DAK's onboarding, 2026-11-01).
   "bpmn:SendTask",
   "bpmn:ReceiveTask",
   "bpmn:CallActivity",
