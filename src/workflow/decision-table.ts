@@ -75,6 +75,12 @@ export interface DecisionTable {
   inputs: TableInput[];
   /** Output column names. A single-output table is the common case. */
   outputs: string[];
+  /**
+   * Each output column's human label (DMN `output/@label`), in column order,
+   * where the file gives one. Only the HTML rendering reads it
+   * (`pipeline/render-dmn-table.ts`); the evaluator keys on {@link outputs}.
+   */
+  outputLabels?: (string | undefined)[];
   rules: TableRule[];
 }
 
@@ -165,6 +171,7 @@ export async function loadDecisionTable(dmnPath: string, decisionId: string): Pr
   });
 
   const outputs = (table.output ?? []).map((o, n) => o.name ?? o.label ?? `output${n + 1}`);
+  const outputLabels = (table.output ?? []).map((o) => o.label);
   if (outputs.length === 0) throw new UnsupportedDmn(`${decisionId}: no output column`);
 
   const rules: TableRule[] = (table.rule ?? []).map((r, n) => {
@@ -195,6 +202,7 @@ export async function loadDecisionTable(dmnPath: string, decisionId: string): Pr
     hitPolicy: hitPolicy as "UNIQUE" | "FIRST",
     inputs,
     outputs,
+    ...(outputLabels.some(Boolean) ? { outputLabels } : {}),
     rules,
   };
 }

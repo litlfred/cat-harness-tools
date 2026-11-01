@@ -40,6 +40,7 @@ import { isSectionRef } from "../adapters/manifest-entries";
 import { kindHeading } from "../schemas/content/translation.ts";
 import { mergePoSources, poResolveContext, resolvePoSources } from "./po-resolve";
 import { injectMarkdown, parsePo, translateBlockFields, translateManifestText } from "./po-inject";
+import { dmnRefusalNote, placeDmnTable, renderDmnFile, type BlockRef, type BlockRefs } from "./render-dmn-table";
 
 // ── Block headers ────────────────────────────────────────────────
 
@@ -63,6 +64,12 @@ import { injectMarkdown, parsePo, translateBlockFields, translateManifestText } 
 export interface LoadedBlockEntry {
   block: Block;
   mdContent: string;
+  /**
+   * The block's decision table, drawn from its `.dmn` companion
+   * (`render-dmn-table.ts`), or the note saying why it was not. Placed in the
+   * body at `<!-- dmn:table -->`, else after it (issue #1323).
+   */
+  dmnTable?: string;
 }
 
 export interface MarkdownRenderOptions {
@@ -227,7 +234,8 @@ export function renderBlockMarkdown(
   // Same resolver as the LaTeX path (`liquid-values.ts`, bean kott), so the
   // site and the PDF print one number; pass-through prefixes (`site.data`)
   // are left for Jekyll / the IG Publisher.
-  const body = resolveLiquidValues(mdContent).trim();
+  const prose = resolveLiquidValues(mdContent).trim();
+  const body = entry.dmnTable ? placeDmnTable(prose, entry.dmnTable) : prose;
   if (body) lines.push(body);
 
   if (caption && caption !== title) {
@@ -342,6 +350,47 @@ export function renderChapterMarkdown(
 
 // ── Whole-folio build ────────────────────────────────────────────
 
+/**
+ * A block's decision table from its `.dmn` companion, if it has one.
+ *
+ * The companion is `meta.dmnFile` when the block names one, else
+ * `<root>.dmn` beside the block, the same stem rule as every other companion.
+ * The decision is the block's `decisionId`, else the file's only decision.
+ * Keyed on the companion, not on a kind name: the kind is a content layer's
+ * (smart-base `decision-table`), and this layer does not name it.
+ *
+ * A table the reader refuses is a warning and a visible note in its place,
+ * not a build error: the refusal is about the content, and the DMN checks
+ * (`dmn:report`) are where a layer chooses to make that a failure.
+ */
+function dmnCompanion(block: Block, chDir: string, rootName: string): string | undefined {
+  const rec = block as unknown as { meta?: { dmnFile?: unknown } };
+  const named = typeof rec.meta?.dmnFile === "string" ? rec.meta.dmnFile : undefined;
+  const dmnPath = join(chDir, named ?? `${rootName}.dmn`);
+  return named || existsSync(dmnPath) ? dmnPath : undefined;
+}
+
+function hasDmnCompanion(block: Block, chDir: string, rootName: string): boolean {
+  return dmnCompanion(block, chDir, rootName) !== undefined;
+}
+
+async function blockDmnTable(
+  block: Block,
+  chDir: string,
+  rootName: string,
+  issues: MarkdownBuildResult["issues"],
+  refs: BlockRefs,
+): Promise<string | undefined> {
+  const dmnPath = dmnCompanion(block, chDir, rootName);
+  if (!dmnPath) return undefined;
+  const rec = block as unknown as { decisionId?: unknown };
+  const decisionId = typeof rec.decisionId === "string" ? rec.decisionId : undefined;
+  const r = await renderDmnFile(dmnPath, decisionId, { refs });
+  if (r.ok) return r.html;
+  issues.push({ level: "warn", message: `Decision table not drawn for ${rootName}: ${r.reason}` });
+  return dmnRefusalNote(r.reason);
+}
+
 export interface MarkdownBuildResult {
   /** The assembled document. */
   markdown: string;
@@ -380,6 +429,8 @@ export async function buildDocumentMarkdown(
   const blocks = new Map<string, LoadedBlockEntry>();
   const chapterSlugs: string[] = [];
   const rendered: string[] = [];
+  const chapterRenders: (() => string)[] = [];
+  const dmnPending: { rootName: string; chDir: string }[] = [];
 
   const locale = opts.locale;
   const shouldResolvePo = Boolean(locale && locale !== "en");
@@ -483,10 +534,11 @@ export async function buildDocumentMarkdown(
         try {
           const block = (await import(tsPath)).default as Block;
           const mdContent = existsSync(mdPath) ? readFileSync(mdPath, "utf-8") : "";
-          if (!mdContent.trim()) {
+          if (!mdContent.trim() && !hasDmnCompanion(block, chDir, rootName)) {
             issues.push({ level: "warn", message: `Block has no narrative body: ${mdPath}` });
           }
           blocks.set(rootName, { block, mdContent });
+          dmnPending.push({ rootName, chDir });
         } catch (e) {
           issues.push({
             level: "error",
@@ -496,7 +548,7 @@ export async function buildDocumentMarkdown(
       }
     }
 
-    rendered.push(
+    chapterRenders.push(() =>
       renderChapterMarkdown(chapter, blocks, {
         baseHeadingLevel: 2,
         ...opts,
@@ -505,6 +557,20 @@ export async function buildDocumentMarkdown(
       }),
     );
   }
+
+  // Decision tables are drawn once every block is loaded, so a label in a
+  // table can link to a block in any chapter, shown by its title.
+  const refs = new Map<string, BlockRef>();
+  for (const { block } of blocks.values()) {
+    const label = blockLabel(block);
+    if (label) refs.set(label, { title: blockTitle(block), href: `#${label}` });
+  }
+  for (const { rootName, chDir } of dmnPending) {
+    const entry = blocks.get(rootName)!;
+    const dmnTable = await blockDmnTable(entry.block, chDir, rootName, issues, refs);
+    if (dmnTable) entry.dmnTable = dmnTable;
+  }
+  for (const render of chapterRenders) rendered.push(render());
 
   return {
     markdown: rendered.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n",
