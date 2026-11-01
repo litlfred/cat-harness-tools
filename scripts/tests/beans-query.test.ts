@@ -9,7 +9,7 @@ import {
   BEAN_NS,
   BEAN_PREFIX
 } from "../beans-query.ts";
-import type { BeanNode } from "../beans.ts";
+import { readArchivedBeans, type BeanNode } from "../beans.ts";
 
 const sampleBeans: BeanNode[] = [
   {
@@ -198,10 +198,16 @@ describe("beans-query", () => {
   });
 
   test("buildBeanStore loads the repository's real bean store cleanly", () => {
-    const { store, beans, quadsCount } = buildBeanStore(resolve("."));
-    expect(beans.length).toBeGreaterThan(500);
-    expect(quadsCount).toBeGreaterThan(5000);
+    const root = resolve(".");
+    const { store, beans, quadsCount } = buildBeanStore(root);
+    // The active store is open work, and a drain empties it on purpose: the
+    // 2026-11-01 archive sweep left 30 (cat-harness-tools#1248). So the size
+    // floor is on the history instead: active plus the archive view, which
+    // archiving moves beans between but never shrinks.
+    expect(beans.length).toBeGreaterThan(0);
+    expect(quadsCount).toBeGreaterThan(beans.length);
     expect(store.size).toBe(quadsCount);
+    expect(beans.length + (readArchivedBeans(root)?.length ?? 0)).toBeGreaterThan(500);
   });
 
   test("CLI --list prints available named queries", () => {
@@ -247,6 +253,8 @@ describe("beans-query", () => {
     expect(proc.exitCode).toBe(0);
     const data = JSON.parse(proc.stdout.toString().trim());
     expect(Array.isArray(data)).toBe(true);
-    expect(Number(data[0].c)).toBeGreaterThan(500);
+    // Every bean the store loads is counted: exact, so a drain cannot break it.
+    expect(Number(data[0].c)).toBeGreaterThan(0);
+    expect(Number(data[0].c)).toBe(buildBeanStore(resolve(".")).beans.length);
   });
 });
