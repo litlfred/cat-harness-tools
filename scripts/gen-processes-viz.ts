@@ -77,7 +77,7 @@ import { declarationPathIn } from "../schemas/kg/cat-harness.js";
 import { baseDocsDir } from "./compose-docs.js";
 import { skillPagesOf } from "./lib/skill-pages.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
-import { workflowFiles, kgRoots } from "./known-skills.js";
+import { businessProcessFiles, workflowFiles, kgRoots } from "./known-skills.js";
 import { loadProcessModel, isActivity, isDecision, branchesOf, isGlobalTasksFile, type NotRunElement } from "../src/workflow/process-model.js";
 import {
   laneBinding,
@@ -380,7 +380,7 @@ export function processSubjects(repo = REPO): Map<string, string[]> {
   const seen = new Set<string>();
   const out = new Map<string, string[]>();
   for (const r of roots) {
-    for (const f of workflowFiles(r.root)) {
+    for (const f of [...workflowFiles(r.root), ...businessProcessFiles(r.root)]) {
       if (!f.endsWith(".bpmn") || seen.has(f)) continue;
       seen.add(f);
       try {
@@ -402,7 +402,8 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
   const seen = new Set<string>();
   const named = namedRoots(repo);
   const files = instanceRoots(repo)
-    .flatMap((r) => workflowFiles(r))
+    // The `business-processes` kind too: drawn here, never run (Q-SUBG-3).
+    .flatMap((r) => [...workflowFiles(r), ...businessProcessFiles(r)])
     // `.dmn` is a DECISION TABLE, not a process — a different kind that a
     // gateway computes from. Including them would inflate every count on this
     // page with things that have no lanes, no skills and no activities.

@@ -25,7 +25,7 @@
  * @conformsTo omg-bpmn-2.0
  * @conformsTo omg-dd-1.0
  */
-import { workflowFiles } from "./known-skills.js";
+import { businessProcessFiles, workflowFiles } from "./known-skills.js";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
@@ -81,6 +81,8 @@ function bpmnSources(): string[] {
     // A layer's shared global tasks hold no process and so no diagram to
     // draw (owner, 2026-10-20, "a1"): each is drawn in the processes that call it.
     for (const f of workflowFiles(inst)) if (f.endsWith(".bpmn") && !isGlobalTasksFile(readFileSync(f, "utf8"))) all.add(f);
+    // Business processes are drawn too, so their viewer pages have a diagram (Q-SUBG-3).
+    for (const f of businessProcessFiles(inst)) all.add(f);
   }
   const byName = new Map<string, string[]>();
   for (const f of all) byName.set(basename(f), [...(byName.get(basename(f)) ?? []), f]);
