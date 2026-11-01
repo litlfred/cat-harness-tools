@@ -321,5 +321,61 @@ export function pagesNav(
       return collator.compare(a.item.label, b.item.label);
     });
   }
-  return { items: topItems.map((x) => x.item), orphans };
+  return { items: foldTitlePrefixes(topItems.map((x) => x.item)), orphans };
+}
+
+/**
+ * `Bibliography: library/w3c`, `Tools — cat-harness`: the head and the rest of
+ * a title that names its family first, or `undefined` for any other title.
+ */
+export function titlePrefix(label: string): { head: string; rest: string } | undefined {
+  const m = /^(.+?)(?::\s+|\s+\u2014\s+)(.+)$/.exec(label);
+  if (!m) return undefined;
+  const head = m[1]!.trim();
+  const rest = m[2]!.trim();
+  return head && rest ? { head, rest } : undefined;
+}
+
+/**
+ * Sibling rows whose titles share a family head — `Bibliography: …` or
+ * `Tools — …` — fold under ONE `<head>` row, at every level (owner,
+ * 2026-11-01: "Tools and biblio in LHS should be collapsible";
+ * cat-harness-tools#1261). A sibling titled `<head>` itself (the `Tools`
+ * page) becomes the parent and keeps its link; otherwise the parent is a
+ * label-only row. A family of one is left as it is. The fold opens by itself
+ * when the current page is inside it (`navbar.ts`).
+ */
+export function foldTitlePrefixes(items: readonly NavItem[]): NavItem[] {
+  const recur = (item: NavItem): NavItem =>
+    item.children ? { ...item, children: foldTitlePrefixes(item.children) } : item;
+  const families = new Map<string, number>();
+  for (const item of items) {
+    const p = titlePrefix(item.label);
+    if (p) families.set(p.head, (families.get(p.head) ?? 0) + 1);
+  }
+  const folded = new Set([...families].filter(([, n]) => n >= 2).map(([head]) => head));
+  if (folded.size === 0) return items.map(recur);
+  const out: NavItem[] = [];
+  const groups = new Map<string, { at: number; own?: NavItem; kids: NavItem[] }>();
+  const groupOf = (head: string, depth: number | undefined) => {
+    let g = groups.get(head);
+    if (!g) {
+      g = { at: out.length, kids: [] };
+      out.push({ label: head, ...(depth ? { depth } : {}) });
+      groups.set(head, g);
+    }
+    return g;
+  };
+  for (const item of items) {
+    const p = titlePrefix(item.label);
+    if (folded.has(item.label)) groupOf(item.label, item.depth).own = recur(item);
+    else if (p && folded.has(p.head)) groupOf(p.head, item.depth).kids.push(shiftDepth({ ...recur(item), label: p.rest }, 1));
+    else out.push(recur(item));
+  }
+  for (const g of groups.values()) {
+    const parent = g.own ?? out[g.at]!;
+    const kids = [...(parent.children ?? []), ...g.kids];
+    out[g.at] = { ...parent, children: kids, fold: childPages(kids.length) };
+  }
+  return out;
 }
