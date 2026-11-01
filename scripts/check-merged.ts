@@ -39,11 +39,19 @@
  * @module scripts/check-merged
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
 import { diffReadings, readTree, type TreeReading } from "./gate-tree-guard.ts";
+import {
+  GatesReportSchema,
+  MERGED_GATES_REPORT_SCHEMA,
+  MergedGatesReportSchema,
+  type GatesReport,
+  type MergedGatesReport,
+} from "../schemas/sdlc/gates-report.ts";
+import { reportPathFrom } from "./gates.ts";
 
 const REPO = resolve(import.meta.dir, "..", "..");
 
@@ -83,7 +91,31 @@ export function againstFrom(argv: readonly string[]): string | undefined {
   return i >= 0 && argv[i + 1] ? argv[i + 1]! : undefined;
 }
 
-function main(): number {
+/** What `--report` writes; `main` fills it on every path out (#1259, Q-DS-14 A). */
+type Draft = Omit<MergedGatesReport, "$schema" | "exitCode">;
+
+/** The report for a run that ended with `code`, from what `main` recorded on the way. */
+export function finishMergedReport(draft: Draft, code: number): MergedGatesReport {
+  const exitCode: 0 | 1 | 2 = code === 0 ? 0 : code === 1 ? 1 : 2;
+  return MergedGatesReportSchema.parse({ $schema: MERGED_GATES_REPORT_SCHEMA, ...draft, exitCode });
+}
+
+/** The inner `gates --report`, if it was written and reads as one. A missing or bad file is no report, never a pass. */
+export function readInnerReport(path: string): GatesReport | undefined {
+  if (!existsSync(path)) return undefined;
+  try {
+    const r = GatesReportSchema.safeParse(JSON.parse(readFileSync(path, "utf-8")));
+    return r.success ? r.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function main(draft: Draft = { outcome: "undetermined" }): number {
+  const done = (code: number, d: Partial<Draft>): number => {
+    Object.assign(draft, d);
+    return code;
+  };
   const against = againstFrom(process.argv);
   const base = baseFrom(process.argv);
   let target: string;
@@ -91,14 +123,14 @@ function main(): number {
     const r = git(["rev-parse", "--verify", `${against}^{commit}`]);
     if (!r.ok) {
       console.error(`::error::check:merged: --against ${against} is not a commit here — COULD NOT DETERMINE.`);
-      return 2;
+      return done(2, { outcome: "undetermined", why: `--against ${against} is not a commit here` });
     }
     target = r.out;
   } else {
     const fetched = git(["fetch", "-q", "origin", base]);
     if (!fetched.ok) {
       console.error(`::error::check:merged: could not fetch origin/${base} — COULD NOT DETERMINE, not clean.\n${fetched.out}`);
-      return 2;
+      return done(2, { outcome: "undetermined", why: `could not fetch origin/${base}` });
     }
     target = `origin/${base}`;
   }
@@ -106,6 +138,7 @@ function main(): number {
   const head = git(["rev-parse", "HEAD"]).out;
   const baseSha = git(["rev-parse", target]).out;
   const behind = git(["rev-list", "--count", `HEAD..${baseSha}`]).out;
+  Object.assign(draft, { head, base: baseSha, ...(/^\d+$/.test(behind) ? { behind: Number(behind) } : {}) });
   console.log(`check:merged — HEAD ${head.slice(0, 8)} with ${against ? "fixed base" : `origin/${base}`} ${baseSha.slice(0, 8)} (${behind} commit(s) not yet in this branch)`);
 
   // The worktree is named after THIS checkout's directory. Some tests assert
@@ -121,7 +154,7 @@ function main(): number {
     const added = git(["worktree", "add", "-q", "--detach", wt, head]);
     if (!added.ok) {
       console.error(`::error::check:merged: could not build a worktree — COULD NOT DETERMINE.\n${added.out}`);
-      return 2;
+      return done(2, { outcome: "undetermined", why: "could not build a worktree" });
     }
 
     const merged = git(["merge", "-q", "--no-edit", "--no-verify", baseSha], wt);
@@ -130,10 +163,10 @@ function main(): number {
       if (conflicts) {
         console.error(`\n✗ the merge CONFLICTS in:\n${conflicts.split("\n").map((f) => `  · ${f}`).join("\n")}`);
         console.error(`\nMerge the base into this branch, regenerate generated files with the repo's tooling, and re-run.`);
-        return 1;
+        return done(1, { outcome: "conflict", conflicts: conflicts.split("\n"), why: "the merge conflicts" });
       }
       console.error(`::error::check:merged: the merge failed without a conflict — COULD NOT DETERMINE.\n${merged.out}`);
-      return 2;
+      return done(2, { outcome: "undetermined", why: "the merge failed without a conflict" });
     }
 
     // Dependencies: reuse the checkout's when the merge leaves the lockfile
@@ -145,7 +178,7 @@ function main(): number {
       const inst = spawnSync("bun", ["install", "--frozen-lockfile"], { cwd: wt, stdio: "inherit" });
       if (inst.status !== 0) {
         console.error("::error::check:merged: bun install failed on the merged tree");
-        return 1;
+        return done(1, { outcome: "fail", why: "bun install failed on the merged tree" });
       }
     } else {
       symlinkSync(join(REPO, "node_modules"), join(wt, "node_modules"), "dir");
@@ -172,7 +205,7 @@ function main(): number {
             "Bean `qook`: `.gitignore` must ignore `node_modules` with NO trailing slash, or git " +
             "treats the pattern as directory-only and the symlink leaks into `git ls-files --others`.",
         );
-        return 2;
+        return done(2, { outcome: "undetermined", why: "the node_modules symlink is not ignored in the worktree" });
       }
     }
 
@@ -182,7 +215,10 @@ function main(): number {
     // apart, and it is a question only THIS script can answer cheaply: it
     // owns the worktree, so it needs no parsing of the runner's output.
     const before = readTree(wt);
-    const gates = spawnSync("bun", ["run", "cat", "gates"], { cwd: wt, stdio: "inherit" });
+    const innerReport = join(dir, "gates-report.json");
+    const gates = spawnSync("bun", ["run", "cat", "gates", "--report", innerReport], { cwd: wt, stdio: "inherit" });
+    const inner = readInnerReport(innerReport);
+    if (inner) draft.gates = inner;
     if (gates.status !== 0) {
       // `gates` exits 1 for two different things, and the advice differs. The
       // exit code is NOT the discriminator and must not be made one: #1363
@@ -195,18 +231,24 @@ function main(): number {
         console.error(`every gate may well have passed. The verdicts after the write describe a tree that`);
         console.error(`was repaired mid-run, so the run cannot say whether the COMMITTED state is good.`);
         console.error(`The defect is the writing gate, not this branch. See \`ymsu\` clause 1.`);
-        return 1;
+        return done(1, { outcome: "not-clean", why: "a gate changed the merged tree while it was being judged" });
       }
       console.error(`\n✗ the MERGED tree fails the gates, though this branch may pass alone.`);
       console.error(`Merge the base into the branch, regenerate what the failing gates name, run \`bun run cat gates\`, push.`);
-      return 1;
+      return done(1, { outcome: "fail", why: "the merged tree fails the gates" });
     }
     console.log(`\n✓ this branch merged with ${baseSha.slice(0, 8)} passes every gate`);
-    return 0;
+    return done(0, { outcome: "pass" });
   } finally {
     git(["worktree", "remove", "--force", wt]);
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
-if (import.meta.main) process.exit(main());
+if (import.meta.main) {
+  const reportPath = reportPathFrom(process.argv);
+  const draft: Draft = { outcome: "undetermined" };
+  const code = main(draft);
+  if (reportPath) writeFileSync(reportPath, JSON.stringify(finishMergedReport(draft, code), null, 2) + "\n");
+  process.exit(code);
+}

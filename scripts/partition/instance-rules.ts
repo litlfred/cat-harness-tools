@@ -395,6 +395,7 @@ export const RULES: Rule[] = [
       "schemas/tools/store-tool-results.ts",       // typed results of the data store tools, part of the Tool I/O vocabulary (#1259)
       "schemas/tools/workflow-tool-results.ts",    // typed results of the workflow engine tools, Tool I/O types (#1259)
       "schemas/sdlc/harness-state.ts",            // a harness's published state, the HarnessStates Tool I/O type (#1259)
+      "schemas/sdlc/gates-report.ts",             // the gates and check:merged reports, Tool I/O types (#1259)
       "schemas/tools/tool-id.ts",                  // a Tool's id — imported by `tool.ts` and `remote-mount.ts` (cat-harness#581)
       "schemas/kg/repo-full-name.ts",           // `owner/name` — a Tool type AND the declaration's repository (bean `6rmv`)
       "schemas/kg/instance-repositories.ts",    // the derived owner/repo ↔ instance map (bean `6rmv`)
