@@ -82,6 +82,8 @@ export const PROV_JSONLD_CONTEXT_URL = PROV_CONTEXT;
  * files, so the copy sits in its library entry.
  */
 export const PROV_JSONLD_CONTEXT_HELD = {
+  // declared-path-literal: a PINNED copy, addressed with its sha256; the pin is to the bytes at
+  // exactly this path, so resolving the directory through a declaration would unpin it.
   path: "cat-harness/library/w3c-2024-prov-jsonld/context.jsonld",
   sha256: "811d5e94d8cb568d7dc4461ef6a247644dd0e775cdc88b65c42238d8e832be1e",
 } as const;
