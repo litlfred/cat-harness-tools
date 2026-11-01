@@ -31,7 +31,12 @@ describe.skipIf(NO_SMART_INSTANCES)("instanceHarnesses", () => {
     expect(smartBase?.href).toBe("https://example.org/fa/smart-base/");
   });
   test("it lists nothing the instance is not built on", () => {
+    // WHO IRIS is not on this list: smart-base `needs` who-iris, so it is a
+    // layer smart-immunizations is built on, and the next test expects it.
     const labels = rows.map((r) => r.label);
-    for (const other of ["smart-trust", "WHO IRIS", "Folio Assistant"]) expect(labels).not.toContain(other);
+    for (const other of ["smart-trust", "WHO SMART Trust", "Folio Assistant", "folio-assistant-sci"]) expect(labels).not.toContain(other);
+  });
+  test("it lists a layer reached only through another layer's `needs`", () => {
+    expect(rows.map((r) => r.label)).toContain("WHO IRIS");
   });
 });

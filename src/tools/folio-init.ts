@@ -21,6 +21,7 @@ import { folioDir } from "../../schemas/kg/cat-harness.js";
 import { z } from "zod";
 import { existsSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { writableWithin } from "../core/safe-path.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import {
@@ -100,6 +101,22 @@ export function registerFolioInitTools(server: McpServer): void {
     },
     async ({ title, authors, content_type, slug, dir, link, assistant_path, force, dry_run }) => {
       const root = resolve(process.cwd(), dir);
+      // `dir` is a tool argument: refuse a folio root outside the repository
+      // rather than scaffold (AGENTS.md, .mcp.json, …) wherever it points.
+      if (!writableWithin(process.cwd(), root)) {
+        return {
+          content: [{ type: "text" as const, text: `Error: dir '${dir}' is not inside the repository the server was pointed at.` }],
+          isError: true,
+        };
+      }
+      // `assistant_path` is written into generated code and config, so it is a
+      // plain relative path or nothing: no quotes, `$`, backticks or spaces.
+      if (assistant_path !== undefined && !/^[A-Za-z0-9._][A-Za-z0-9._/-]*$/.test(assistant_path)) {
+        return {
+          content: [{ type: "text" as const, text: `Error: assistant_path '${assistant_path}' must be a plain relative path.` }],
+          isError: true,
+        };
+      }
       const resolvedSlug = slug ?? slugify(title);
 
       if (!isValidSlug(resolvedSlug)) {

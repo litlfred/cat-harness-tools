@@ -18,6 +18,7 @@
  * | `prov:qualifiedAssociation.prov:hadPlan` | the BPMN task: `<process>#<task id>` |
  * | `prov:actedOnBehalfOf` | the person an agent worked for |
  * | `prov:used` / `prov:generated` | the graph nodes read and written |
+ * | `prov:wasInformedBy` | the activity this one was part of: a Tool activity names its workflow step's |
  * | `prov:used` → `dcat:Distribution` + `spdx:checksum` | the DSA agreement text the decision was made under (DCAT 3) |
  * | `prov:used` → `cred:VerifiableCredential` | the grant, by its W3C VC Data Model 2.0 credential `id` (DSA B5) |
  * | `cat-harness:underPolicy` | the ODRL policy (or policies) it acted under |
@@ -327,6 +328,14 @@ const ProvActivityObjectSchema = z
      */
     "prov:used": z.array(ProvUsedSchema).optional(),
     "prov:generated": z.array(z.string().min(1)).optional(),
+    /**
+     * W3C PROV-O `prov:wasInformedBy`: the activity (or activities) this one
+     * was informed by, by `@id`. The workflow engine writes it on a Tool
+     * activity kept on a step, naming the step's own activity (bean `w1gy`,
+     * folio-assistant#875 FR-005). An array when several, as JSON-LD writes
+     * several values of one property.
+     */
+    "prov:wasInformedBy": z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).optional(),
     /**
      * The ODRL policy uid(s) the run was under. Required: a run under no policy
      * cannot be checked. An array when several policies were in force, which is

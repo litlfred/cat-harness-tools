@@ -1172,6 +1172,8 @@ export function autoDocPage(
   scopePath: string | undefined,
   siblings: Array<{ id: string; path: string; count: number }>,
   refs?: CodeRefs,
+  /** Where the counts file is, relative to this page; absent, no badge is filled. */
+  countsUrl?: string,
 ): string {
   // A description naming ANOTHER artefact on this page links to its row (bean
   // `qgjh`): role descriptions say "Inherits `reviewer`", the reviewer is a row
@@ -1221,7 +1223,7 @@ export function autoDocPage(
     .map(
       (s) =>
         `<li>${s.id === scope ? "<strong>" : `<a href="${up}${esc(s.id)}/">`}${esc(s.id)}${s.id === scope ? "</strong>" : "</a>"}` +
-        ` <span class="p">${esc(s.path)}</span> <span class="n">${s.count}</span></li>`,
+        ` <span class="p">${esc(s.path)}</span> ${countBadge(`${type.id}/${s.id}`)}</li>`,
     )
     .join("\n");
 
@@ -1263,7 +1265,7 @@ ${rows || '<tr><td colspan="2" class="none">Nothing in scope.</td></tr>'}
    ownership before pruning — the same line the viewer generators emit. */
 var SCOPE = "${scope}";
 </script>
-${items.length > TABLE_FILTER_MIN ? TABLE_FILTER_SCRIPT : ""}`,
+${items.length > TABLE_FILTER_MIN ? TABLE_FILTER_SCRIPT : ""}${siblings.length > 1 && countsUrl ? `\n${countsScript(countsUrl)}` : ""}`,
   );
 }
 
@@ -1277,6 +1279,58 @@ export interface LevelChild {
   detail: string;
   /** Items indexed, where the child is a type. */
   count?: number;
+  /**
+   * The child's key in the fetched counts ({@link COUNTS_FIELD}), where it has
+   * a count. The page carries the key, never the number.
+   */
+  countKey?: string;
+}
+
+/**
+ * COUNTS ARE FETCHED, NOT BAKED (cone-shrinking, 2026-10-31).
+ *
+ * Every sub-graph page listed every sibling with its item count, and every
+ * level page listed each type's count. So one file added anywhere rewrote
+ * about 40 published pages, none of which a reader would call changed. The
+ * same rule the tiles follow (cat-harness#434): a number many pages show
+ * lives in one fetched file. The pages carry a key and a pending mark; the
+ * numbers live in `assets/auto-docs/index.json` under this field, beside the
+ * tile counts, so a new file changes that one JSON.
+ *
+ * Absent is a third state, as for tiles: a key the file does not hold, or a
+ * file that cannot be read, shows no number, never `0`.
+ */
+export const COUNTS_FIELD = "counts" as const;
+
+/** The pending count badge a page carries for `key`. */
+export function countBadge(key: string): string {
+  return `<span class="n" data-da-count="${esc(key)}" data-da-count-state="pending">\u2026</span>`;
+}
+
+/**
+ * The script that fills the badges from the counts file at `url`, relative to
+ * the page. NO BACKTICKS AND NO DOLLAR-BRACE: it is interpolated into a
+ * template literal.
+ */
+export function countsScript(url: string): string {
+  return `<script>
+(function () {
+  var badges = document.querySelectorAll(".da-page [data-da-count]");
+  if (!badges.length) return;
+  function set(counts) {
+    Array.prototype.forEach.call(badges, function (b) {
+      var n = counts ? counts[b.getAttribute("data-da-count")] : undefined;
+      var ok = typeof n === "number" && isFinite(n);
+      b.textContent = ok ? String(n) : "";
+      b.setAttribute("data-da-count-state", ok ? "some" : counts ? "absent" : "error");
+    });
+  }
+  fetch(${JSON.stringify(url)}, { cache: "no-cache" })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) { set(j && j.${COUNTS_FIELD} && typeof j.${COUNTS_FIELD} === "object" ? j.${COUNTS_FIELD} : null); })
+    .catch(function () { set(null); });
+})();
+</script>`;
 }
 
 /**
@@ -1298,13 +1352,13 @@ export interface LevelChild {
  * It carries the same `var SCOPE` line as every other page here, so ownership
  * is read off the file by the one pruner rather than assumed from the path.
  */
-export function levelPage(prefix: string, children: readonly LevelChild[]): string {
+export function levelPage(prefix: string, children: readonly LevelChild[], countsUrl?: string): string {
   const here = prefix === "" ? "auto-docs" : prefix;
   const rows = children
     .map(
       (c) =>
         `<li><a href="${esc(c.seg)}/">${esc(c.title)}</a>` +
-        (c.count === undefined ? "" : ` <span class="n">${c.count}</span>`) +
+        (c.countKey === undefined ? "" : ` ${countBadge(c.countKey)}`) +
         `<div class="f">${esc(c.detail)}</div></li>`,
     )
     .join("\n");
@@ -1332,7 +1386,7 @@ ${rows || '<li class="none">Nothing is built under this level.</li>'}
 /* The level this page indexes. Read by orphanSubjectPages() to establish
    ownership before pruning — the same line every other page here emits. */
 var SCOPE = "${esc(prefix === "" ? "auto-docs" : prefix.split("/").pop()!)}";
-</script>`,
+</script>${countsUrl && children.some((c) => c.countKey !== undefined) ? `\n${countsScript(countsUrl)}` : ""}`,
   );
 }
 
@@ -1470,6 +1524,11 @@ if (import.meta.main) {
     process.exit(0);
   }
   const site = siteTarget(join(ROOT, siteDirFor(ROOT)));
+  const countFile = join(site, "assets", "auto-docs", "index.json");
+  /** The counts file as a page at `pageDir` reaches it. */
+  const countsUrlFrom = (pageDir: string): string => relative(pageDir, countFile).split("\\").join("/");
+  /** Every count a page shows, by badge key — written once, to `countFile`. */
+  const counts: Record<string, number> = {};
 
   /** Items indexed per BUILT type — what the level pages below count. */
   const built = new Map<string, number>();
@@ -1493,12 +1552,16 @@ if (import.meta.main) {
       const d = dirs.find((x) => x.id === id);
       return { id, path: d?.path ?? "", count: byDir.get(id)!.length };
     });
+    for (const s of siblings) counts[`${type.id}/${s.id}`] = s.count;
 
     const { pageDir } = viewerPlacement(site, `${route}/${type.id}`, "auto-docs");
     const skillPages = skillPagesOf(REPO_ROOT);
     emit(
       join(pageDir, "index.html"),
-      withRenderedByFrontMatter(autoDocPage(type, items, "", undefined, siblings, codeRefsFor(site, pageDir, REPO_ROOT, skillPages)), VIEWER_TOOL),
+      withRenderedByFrontMatter(
+        autoDocPage(type, items, "", undefined, siblings, codeRefsFor(site, pageDir, REPO_ROOT, skillPages), countsUrlFrom(pageDir)),
+        VIEWER_TOOL,
+      ),
     );
     for (const id of populated) {
       const sub = viewerPlacement(site, `${route}/${type.id}/${id}`, "auto-docs");
@@ -1506,7 +1569,15 @@ if (import.meta.main) {
       emit(
         join(sub.pageDir, "index.html"),
         withRenderedByFrontMatter(
-          autoDocPage(type, byDir.get(id)!, id, dirs.find((d) => d.id === id)?.path, siblings, codeRefsFor(site, sub.pageDir, REPO_ROOT, skillPages)),
+          autoDocPage(
+            type,
+            byDir.get(id)!,
+            id,
+            dirs.find((d) => d.id === id)?.path,
+            siblings,
+            codeRefsFor(site, sub.pageDir, REPO_ROOT, skillPages),
+            countsUrlFrom(sub.pageDir),
+          ),
           VIEWER_TOOL,
         ),
       );
@@ -1586,6 +1657,7 @@ if (import.meta.main) {
 
 
     built.set(type.id, items.length);
+    counts[type.id] = items.length;
     if (!check) {
       console.log(`  ✓ ${type.id}: ${items.length} item(s) across ${populated.length} sub-graph(s)`);
     }
@@ -1611,7 +1683,7 @@ if (import.meta.main) {
         const type = TYPES.find((t) => t.id === childId);
         kids.push(
           type
-            ? { seg, title: type.title, detail: type.extracts, count: built.get(childId) }
+            ? { seg, title: type.title, detail: type.extracts, count: built.get(childId), countKey: childId }
             : {
                 seg,
                 title: seg,
@@ -1626,7 +1698,7 @@ if (import.meta.main) {
     for (const [prefix, kids] of levels) {
       kids.sort((a, b) => a.seg.localeCompare(b.seg, "en"));
       const at = viewerPlacement(site, `${route}${prefix ? `/${prefix}` : ""}`, "auto-docs");
-      emit(join(at.pageDir, "index.html"), levelPage(prefix, kids));
+      emit(join(at.pageDir, "index.html"), levelPage(prefix, kids, countsUrlFrom(at.pageDir)));
       if (!check) console.log(`  ✓ level ${prefix || "auto-docs"}: ${kids.length} child(ren)`);
     }
   }
@@ -1643,12 +1715,17 @@ if (import.meta.main) {
   // directory's tile opens its sub-graph page here, so its badge is that
   // page's own item count. Build-time data like every projection
   // `scanTileCounts` reads, so `--check` does not compare it.
+  //
+  // The PAGE counts ride in the same file (COUNTS_FIELD): the pages carry
+  // keys, so a file added anywhere changes this one JSON and no page.
   if (!check) {
     const tiles = tileCountsForPages(counted, REPO_ROOT, ROOT);
-    const countFile = join(site, "assets", "auto-docs", "index.json");
+    const sorted = Object.fromEntries(Object.entries(counts).sort(([a], [b]) => a.localeCompare(b, "en")));
     mkdirSync(dirname(countFile), { recursive: true });
-    writeFileSync(countFile, JSON.stringify(tileCounts(tiles), null, 2) + "\n");
-    console.log(`  ✓ tile counts: ${Object.keys(tiles).length} tile(s) → assets/auto-docs/index.json`);
+    writeFileSync(countFile, JSON.stringify({ ...tileCounts(tiles), [COUNTS_FIELD]: sorted }, null, 2) + "\n");
+    console.log(
+      `  ✓ tile counts: ${Object.keys(tiles).length} tile(s), page counts: ${Object.keys(sorted).length} → assets/auto-docs/index.json`,
+    );
   }
 
   if (stale > 0) {

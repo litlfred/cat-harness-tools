@@ -6,13 +6,14 @@
  * reader who most needs the reasons is the one about to reinstate the field.
  */
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { Glob } from "bun";
 
 import { fshGutsDirectory, withoutFrozenSubtrees } from "../../schemas/kg/fsh-guts.ts";
 import { notApplicableAlone } from "../../test/support/checkout.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { beanStores } from "../unlinked-beans.ts";
 import { dirname } from "node:path";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
@@ -27,11 +28,21 @@ const STATE_ABSENT = notApplicableAlone(
   "the `fsh-guts` trashcan and the bean store (state branches, mounted only in a composed checkout)",
 );
 
+/**
+ * Every bean id in every store the checkout declares. Since
+ * cat-harness-tools#459 a bean has one home, which may be the platform's
+ * store, cat-harness-tools' or core's, so the root store alone misses the
+ * layers' beans.
+ */
 function beanIds(): Set<string> {
   const out = new Set<string>();
-  for (const rel of new Glob("**/*.md").scanSync({ cwd: join(REPO, "beans", "defs") })) {
-    const m = /^([a-z0-9]+(?:-[a-z0-9]+)*?-[a-z0-9]{4})--/.exec(basename(rel));
-    if (m) out.add(m[1]!);
+  for (const store of beanStores(REPO)) {
+    const defs = join(store, "defs");
+    if (!existsSync(defs)) continue;
+    for (const rel of new Glob("**/*.md").scanSync({ cwd: defs })) {
+      const m = /^([a-z0-9]+(?:-[a-z0-9]+)*?-[a-z0-9]{4})--/.exec(basename(rel));
+      if (m) out.add(m[1]!);
+    }
   }
   return out;
 }

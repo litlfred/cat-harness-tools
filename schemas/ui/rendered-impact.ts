@@ -161,7 +161,7 @@ export const isGenericIndex = (path: string): boolean => GENERIC_INDEX.some((re)
  */
 export const BUILD_STAMPS: ReadonlyArray<readonly [RegExp, string]> = [
   [/\?v=\d{9,}/g, "?v="],
-  [/"generatedAt":\s*"[^"]*"/g, '"generatedAt":""'],
+  [/"generatedAt(?:Time)?":\s*"[^"]*"/g, '"generatedAt":""'],
   // Whether the checkout had uncommitted changes when it was built: a fact
   // about the machine, never about a page (a local build of an edit is dirty).
   [/"sourceTreeDirty":\s*(?:true|false)/g, '"sourceTreeDirty":null'],

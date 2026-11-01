@@ -184,6 +184,8 @@ const specs = readdirSync(SPEC_DIR, { recursive: true })
 
 describe("the guard fires", () => {
   test("on a raw readFileSync of a sidecar path — the 78a399ee5 shape", () => {
+    // declared-path-literal: source text fed to findCorpusCoupling, never read from disk; it reproduces the
+    // 78a399ee5 spec, and the committed corpus it named left cat-harness (bean `7mwa`).
     const bad = `
       const BLOCK_JSON = readFileSync(
         join(ROOT, "test/results/witnesses/process-crdm-methodology/what-is-not-built-yet.block.json"),

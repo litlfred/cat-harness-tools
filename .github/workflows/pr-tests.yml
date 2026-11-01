@@ -93,7 +93,7 @@ jobs:
       index: ${{ steps.pin.outputs.index }}
     steps:
       - name: Read which instances are taken at main
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           sparse-checkout: test/pr-tests-mains.json
           sparse-checkout-cone-mode: false
@@ -120,13 +120,13 @@ jobs:
     steps:
       - &checkout-index
         name: Check out the folio-assistant index
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: litlfred/folio-assistant
           ref: ${{ needs.pin.outputs.index }}
           path: fa
       - &setup-bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.4
       - id: base-cache
@@ -135,7 +135,7 @@ jobs:
       - &mount-cache
         name: Cache remote mounts (bean cis1)
         if: steps.base-cache.outputs.cache-hit != 'true'
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: /home/runner/.cache/cat-mount
           key: cat-mount-v1-${{ hashFiles('fa/index.lock.json') }}
@@ -168,7 +168,7 @@ jobs:
             rm -rf "fa/$name/.git"
           done
       - name: Check out the PR
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: src
       - &swap
@@ -205,7 +205,7 @@ jobs:
     steps:
       - *checkout-index
       - *setup-bun
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: src
           fetch-depth: 2
@@ -233,7 +233,7 @@ jobs:
       - name: Cache base junit report and root gates (bean cis2)
         id: base-cache
         if: matrix.side == 'base'
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ${{ runner.temp }}/junit.xml
@@ -278,7 +278,7 @@ jobs:
         run: |
           bun test ./cat-harness-tools --reporter=junit --reporter-outfile="$RUNNER_TEMP/junit.xml" || true
           test -s "$RUNNER_TEMP/junit.xml"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: junit-${{ matrix.side }}
           path: |
@@ -311,7 +311,7 @@ jobs:
     steps:
       - *checkout-index
       - *setup-bun
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: src
           fetch-depth: 2
@@ -320,7 +320,7 @@ jobs:
         # So a main that predates --measured-out is still measured. Only the
         # checker file is taken from the PR; the tree it measures is main's.
         if: matrix.side == 'base'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: pr-checker
           sparse-checkout: scripts/check-standalone.ts
@@ -328,7 +328,7 @@ jobs:
       - name: Cache base standalone measurement (bean cis2)
         id: base-cache
         if: matrix.side == 'base'
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/standalone.json
           key: pr-tests-standalone-base-v1-${{ steps.base-side.outputs.sha }}-${{ hashFiles('pr-checker/scripts/check-standalone.ts') }}-${{ needs.pin.outputs.mains-key }}-${{ needs.pin.outputs.index }}
@@ -350,7 +350,7 @@ jobs:
         run: |
           bun run cat-harness-tools/scripts/check-standalone.ts --layer cat-harness-tools --measured-out "$RUNNER_TEMP/standalone.json" || true
           test -s "$RUNNER_TEMP/standalone.json" || echo '{"state":"not-run","note":"this side wrote no measurement"}' > "$RUNNER_TEMP/standalone.json"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: standalone-${{ matrix.side }}
           path: ${{ runner.temp }}/standalone.json
@@ -367,13 +367,13 @@ jobs:
         if: github.event.pull_request.draft == true
         run: |
           echo "draft: full tier skipped; it runs when the PR is marked ready for review" | tee -a "$GITHUB_STEP_SUMMARY"
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: github.event.pull_request.draft != true
         with:
           sparse-checkout: |
             .github/scripts
             scripts/standalone-baseline.json
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         if: github.event.pull_request.draft != true
         with:
           path: standalone
@@ -395,11 +395,11 @@ jobs:
         if: github.event.pull_request.draft == true
         run: |
           echo "draft: full tier skipped; it runs when the PR is marked ready for review" | tee -a "$GITHUB_STEP_SUMMARY"
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: github.event.pull_request.draft != true
         with:
           sparse-checkout: .github/scripts
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         if: github.event.pull_request.draft != true
         with:
           path: junit
@@ -419,11 +419,11 @@ jobs:
         if: github.event.pull_request.draft == true
         run: |
           echo "draft: full tier skipped; it runs when the PR is marked ready for review" | tee -a "$GITHUB_STEP_SUMMARY"
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: github.event.pull_request.draft != true
         with:
           sparse-checkout: .github/scripts/layer-pr-checks
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         if: github.event.pull_request.draft != true
         with:
           path: junit

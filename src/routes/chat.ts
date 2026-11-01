@@ -13,8 +13,7 @@ import { getUserRole, getUserName } from "../core/rbac.js";
 import { log, logDebug } from "../core/logging.js";
 import { guardUntrusted } from "../core/handover-screen.js";
 import type { MountedRoute, RouteDeps } from "../route-groups.js";
-
-const CORS = { "Access-Control-Allow-Origin": "*" };
+import { refuseChatMode, refuseChatRequest } from "../core/http-guard.js";
 
 // Lives in `core/anthropic.ts` (bean `w2gr`, step 2) so the content half of an
 // adapter can reach it without importing this route; re-exported for the
@@ -29,6 +28,10 @@ export async function handleChatPost(
 ): Promise<Response | null> {
   if (url.pathname !== "/api/chat") return null;
 
+  // Chat spends the server's API key: authorised, JSON-only, same-origin.
+  const refused = refuseChatRequest(req);
+  if (refused) return refused;
+
   try {
     const body = (await req.json()) as {
       messages: Array<{ role: string; content: string }>;
@@ -36,15 +39,18 @@ export async function handleChatPost(
       mode?: "read" | "edit" | "status";
     };
 
+    const mode = body.mode || "read";
+    const badMode = refuseChatMode(req, mode);
+    if (badMode) return badMode;
+
     const client = getAnthropic();
     if (!client) {
       return Response.json(
         { error: "ANTHROPIC_API_KEY not set. Chat requires an API key." },
-        { status: 503, headers: CORS },
+        { status: 503 },
       );
     }
 
-    const mode = body.mode || "read";
     const userRole = getUserRole(req);
     const userName = getUserName(req);
 
@@ -61,7 +67,6 @@ export async function handleChatPost(
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
-      ...CORS,
     };
 
     const readable = new ReadableStream({
@@ -158,7 +163,7 @@ export async function handleChatPost(
 
     return new Response(readable, { headers: sseHeaders });
   } catch (e) {
-    return Response.json({ error: String(e) }, { status: 500, headers: CORS });
+    return Response.json({ error: String(e) }, { status: 500 });
   }
 }
 

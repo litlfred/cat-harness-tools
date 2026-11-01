@@ -98,6 +98,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { githubPublishDecision, QaUsageError, REFRESH_SCHEMA, refreshReportComplete } from "./qa-store.ts";
 import { movedInventory, movedRoots, type MovedInventory } from "./qa-verify-moved.ts";
 import { BUILDING_ENV } from "./qa-working-copy.ts";
+import { TEST_RUN_WRITERS } from "./test-run-compute.ts";
 import { mountedInstanceRoots } from "../schemas/kg/remote-mount.ts";
 import { artefactStub, instanceRootsIn, kgQaHomeFor, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { scriptTable } from "../schemas/sdlc/script-table.ts";
@@ -246,7 +247,8 @@ export const QA_WRITERS: readonly QaWriter[] = [
     because: "the published witness projections of the block and translation verdicts above",
   },
   { id: "viewer:nav:audit", run: ["viewer:nav:audit"], writes: [`${R}/viewer-nav/**`], because: "viewer navbar census" },
-  { id: "eval:crdm-detect", run: ["eval:crdm-detect"], writes: [`${R}/crdm-detect-eval.test-run.json`], because: "the crdm-detect phrase-signal evaluation over its fixed corpus" },
+  // Declared in test-run-compute.ts, so kg:audit:check can run them without importing this module (#1191).
+  ...TEST_RUN_WRITERS,
   ...(
     [
       ["root-scan-census", "root-scan-census"],

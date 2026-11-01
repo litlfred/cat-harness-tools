@@ -15,17 +15,19 @@ import { siteDirFor } from "../../../schemas/kg/cat-harness.ts";
 import { libraryResolver } from "../../lib/library-links.ts";
 import { itemFacts } from "../../library-readmes.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { siteNotBuilt } from "../../../test/support/checkout.ts";
 
 const INSTANCE = resolve(HARNESS_ROOT);
 const REPO = resolve(INSTANCE, "..");
 const r = libraryResolver(REPO, INSTANCE);
-const entries = (
-  JSON.parse(readFileSync(join(INSTANCE, siteDirFor(INSTANCE), "assets", "library", "index.json"), "utf-8")) as {
-    entries: { id: string; instance: string; dir: string }[];
-  }
-).entries;
+const INDEX = join(INSTANCE, siteDirFor(INSTANCE), "assets", "library", "index.json");
+// The projection is written at publish and gitignored (bean w1gy F18).
+// `describe.skipIf` still runs its body, so an index not built reads as empty.
+const NOT_BUILT = siteNotBuilt("the library projection `library:viz` writes at publish (gitignored)", INDEX);
+const readEntries = <E>(): E[] => (NOT_BUILT ? [] : (JSON.parse(readFileSync(INDEX, "utf-8")) as { entries: E[] }).entries);
+const entries = readEntries<{ id: string; instance: string; dir: string }>();
 
-describe("a library reference resolves only where its target exists", () => {
+describe.skipIf(NOT_BUILT)("a library reference resolves only where its target exists", () => {
 
   it("gives an arXiv item its arXiv record, and invents none for the rest", () => {
     // An item whose metadata RECORDS its arXiv id: `arxiv-0909.4061v2` is
@@ -45,12 +47,8 @@ describe("a library reference resolves only where its target exists", () => {
   });
 });
 
-describe("the library projection carries what a reader opens (qgjh)", () => {
-  const full = (
-    JSON.parse(readFileSync(join(INSTANCE, siteDirFor(INSTANCE), "assets", "library", "index.json"), "utf-8")) as {
-      entries: { id: string; dir: string; arxiv: string; readme?: string }[];
-    }
-  ).entries;
+describe.skipIf(NOT_BUILT)("the library projection carries what a reader opens (qgjh)", () => {
+  const full = readEntries<{ id: string; dir: string; arxiv: string; readme?: string }>();
 
   it("gives every entry with a README its page link", () => {
     for (const e of full) {

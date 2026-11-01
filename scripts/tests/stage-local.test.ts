@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { agentRunLine, agentRunOf, ARTIFACT_MAX_FILES, artifactBundle, builtSomething, inPlatform, ownerRepoOf, platformAssetRefs, readStagingInputs, slugOf } from "../stage-local.ts";
+import { agentRunLine, agentRunOf, ARTIFACT_MAX_FILES, artifactBundle, builtSomething, inPlatform, ownerRepoOf, platformAssetRefs, previewBase, readStagingInputs, slugOf } from "../stage-local.ts";
 
 describe("stage-local", () => {
   test("reads the staging workflow's inputs from the folio's own file, with the workflow's defaults", () => {
@@ -116,5 +116,18 @@ describe("stage-local: agent-run is what the repository declares (owner, 2026-10
     const a = agentRunOf(repoWith("{ not json"));
     expect(a.agentRun).toBe("unreadable");
     expect(agentRunLine(a)).toContain("unknown");
+  });
+});
+
+describe("previewBase", () => {
+  test("a PR stacked on another branch is reviewed against that branch, not main", () => {
+    expect(previewBase({ prBase: "claude/dth-pc-scaffold", defaultBranch: "main" })).toBe("claude/dth-pc-scaffold");
+  });
+  test("--base wins over the PR's base", () => {
+    expect(previewBase({ base: "release", prBase: "claude/x", defaultBranch: "main" })).toBe("release");
+  });
+  test("no PR: the default branch, then main", () => {
+    expect(previewBase({ defaultBranch: "trunk" })).toBe("trunk");
+    expect(previewBase({ prBase: "" })).toBe("main");
   });
 });

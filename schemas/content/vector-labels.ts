@@ -75,7 +75,7 @@
  *
  * ## Which pages qualify — and the over-inclusion is chosen
  *
- * A page is recorded when it carries a **line-start `Fig.`/`Figure` + number**
+ * A page is recorded when it carries a **line-start `Fig.`/`Fig`/`Figure` + number**
  * that is not a table-of-contents entry, **and has a vector layer at all**.
  * That is looser than `declaredFigureCaptions`, which additionally requires a
  * period and whitespace before the caption text, and the looseness is paid for

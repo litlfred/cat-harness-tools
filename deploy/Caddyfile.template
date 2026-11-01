@@ -11,16 +11,9 @@ ${FOLIO_DOMAIN} {
         reverse_proxy folio-assistant:${MCP_INTERNAL_PORT}
     }
 
-    # MCP endpoint: bearer token → direct to folio-assistant, otherwise → auth-gateway
-    route /mcp {
-        @has_token header Authorization Bearer*
-        reverse_proxy @has_token folio-assistant:${MCP_INTERNAL_PORT}
-
-        # No token → auth-gateway handles session check + proxy
-        reverse_proxy auth-gateway:4180
-    }
-
-    # All other routes → auth-gateway (handles login, OAuth callbacks, static files, API)
+    # Everything else, /mcp included, → auth-gateway. The gateway checks the
+    # bearer token or session and is the only caller folio-assistant accepts
+    # on /mcp (FOLIO_GATEWAY_SECRET). Never route /mcp to folio-assistant here.
     route /* {
         reverse_proxy auth-gateway:4180
     }

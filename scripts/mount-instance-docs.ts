@@ -109,6 +109,7 @@ import { WITHHELD_FILE, withheldFilter, withheldPaths } from "./lib/withheld.js"
 import { instanceDirectories, declarationPathIn, readDeclaration, siteDirFor, siteFileFor, visualisationsOf } from "../schemas/kg/cat-harness.js";
 import { declinesNavbar, type NavItem } from "./lib/harness-rail.js";
 import { injectRailOnce } from "./lib/rail-once.js";
+import { withIgRenderRow } from "./lib/ig-render-row.ts";
 import { type ForeignScope, foreignScopeFor, scopeNavbarRow, siteHref } from "./lib/foreign-site-scope.ts";
 import { navMarkFields, type HarnessMark } from "./lib/harness-mark.js";
 import { graphTypologyRowDecor } from "./lib/graph-typology-nav.js";
@@ -345,8 +346,14 @@ export function toRootFor(route: string, fileUnder: string): string {
  * pages stay byte-identical when the rail's links, pages or counts change.
  */
 export function railDataWriter(siteAbs: string): (file: string, body: string) => void {
+  // What this writer has already put on disk: a pass emits the same shared
+  // file for most of its pages, and re-reading it each time to compare was a
+  // read per page (bean fwtz).
+  const written = new Map<string, string>();
   return (file, body) => {
+    if (written.get(file) === body) return;
     const abs = join(siteAbs, file);
+    written.set(file, body);
     if (existsSync(abs) && readFileSync(abs, "utf-8") === body) return;
     mkdirSync(dirname(abs), { recursive: true });
     writeFileSync(abs, body);
@@ -1464,6 +1471,31 @@ export function railStandalonePages(
   // A site whose checkout declares no instance: computed once, it is the same on every page.
   const landed = foreign?.landing === true && foreign.instance !== undefined ? landedSiteGraphs(siteAbs, built, foreign.instance) : undefined;
 
+  const railContext = new Map<string, { named: ReturnType<typeof railNames>; linkRoot: string; links: NavItem[]; homeLabel: string | undefined; harnesses: NavItem[] | undefined; mark: ReturnType<typeof instanceMark> }>();
+  const navbarRow = foreign ? rebaseNavbarRow(navbarRowData(built), foreign.platformBase, foreign.instance) : navbarRowData(built);
+  // Worked out once per pass, not once per page (bean fwtz, the KG step): each
+  // depends only on the key it is stored under, and at 11,842 pages the
+  // per-page versions were most of the pass — `igSiteOwner` reads a declaration
+  // from disk, `pagesNav` rebuilds the whole page tree, and a writer made per
+  // page re-read the shared rail data file once per page.
+  const emitRailData = railDataWriter(siteAbs);
+  const igOwners = new Map<string, string | undefined>();
+  const igOwnerOf = (segment: string): string | undefined => {
+    if (!igOwners.has(segment)) igOwners.set(segment, igSiteOwner(segment));
+    return igOwners.get(segment);
+  };
+  const pageTrees = new Map<string, NavItem[] | undefined>();
+  const pagesFor = (toRoot: string, locale: string, scopeHref: string | undefined): NavItem[] | undefined => {
+    if (!pageTree) return undefined;
+    const key = `${toRoot}\0${locale}\0${scopeHref ?? ""}`;
+    if (pageTrees.has(key)) return pageTrees.get(key);
+    const treeKey = `${toRoot}\0${locale}\0`;
+    let tree = pageTrees.get(treeKey);
+    if (tree === undefined) pageTrees.set(treeKey, (tree = pagesNav(pageTree, { prefix: toRoot, locale }).items));
+    const pages = scopeHref !== undefined ? pagesUnder(tree, `${toRoot}${scopeHref}`) : tree;
+    pageTrees.set(key, pages);
+    return pages;
+  };
   const walk = (dir: string): void => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
       if (e.name.startsWith(".")) continue;
@@ -1515,32 +1547,52 @@ export function railStandalonePages(
       // instance's page: its name, mark and graphs, not the platform's.
       const here = `/${rel.replace(/(^|\/)index\.html$/, "$1")}`;
       const scope = scopes.find((s) => here.startsWith(s.href));
-      const owner = foreign ? (foreign.instance ?? instanceName) : (igSiteOwner(rel.split("/")[0]!) ?? scope?.name ?? instanceName);
-      const named = railNames(built, owner);
-      // The platform's links resolve against the platform's site; only home is this site's.
-      const linkRoot = foreign?.platformBase ?? toRoot;
-      // The folio's OWN graphs are on this site, and link only where it holds them.
-      const site = landed
-        ? new Map([...landed].map(([kind, f]) => [kind, { ...f, href: `${toRoot}/${f.href}` }]))
-        : foreign && ownsCheckout(owner)
-          ? ownSiteGraphs(siteAbs, built, owner, toRoot)
-          : publishedGraphs(built, owner, linkRoot);
-      const declared = declaredGraphs(owner, new Map(), site, named.harness);
-      // The landing's graphs this site does not hold are the landing's, not this site's.
-      const links = landed ? declared.filter((l) => l.href !== undefined) : declared;
-      // The folio's OWN mark is on its own site when it is the checkout's root (gap 4).
-      const markRoot = foreign && ownsCheckout(foreign.instance) ? toRoot : linkRoot;
-      const homeLabel = foreign ? foreign.homeLabel : named.site;
-      const harnesses = landed
-        ? [{ label: homeLabel ?? named.harness ?? owner, href: `${toRoot}/` }, ...(instanceHarnesses(built, foreign!.instance!, linkRoot, undefined) ?? [])]
-        : foreign?.instance
-          ? instanceHarnesses(built, foreign.instance, linkRoot, `${toRoot}/`, markRoot)
-          : instantiatedHarnesses(built, linkRoot);
-      // The landing's mark is not this site's: a site with no instance of its own draws none.
-      const mark = landed ? undefined : instanceMark(built, owner, foreign?.instance === owner ? markRoot : linkRoot);
+      const owner = foreign ? (foreign.instance ?? instanceName) : (igOwnerOf(rel.split("/")[0]!) ?? scope?.name ?? instanceName);
+      // Everything below depends on the owner and the page's depth alone, so it
+      // is worked out once per pair, not once per page: `declaredGraphs` reads
+      // the declarations, and at 11,834 pages that was most of the KG step (bean fwtz).
+      const ctxKey = `${owner}\0${toRoot}`;
+      let ctx = railContext.get(ctxKey);
+      if (ctx === undefined) {
+        ctx = (() => {
+          const named = railNames(built, owner);
+          // The platform's links resolve against the platform's site; only home is this site's.
+          const linkRoot = foreign?.platformBase ?? toRoot;
+          // The folio's OWN graphs are on this site, and link only where it holds them.
+          const site = landed
+            ? new Map([...landed].map(([kind, f]) => [kind, { ...f, href: `${toRoot}/${f.href}` }]))
+            : foreign && ownsCheckout(owner)
+              ? ownSiteGraphs(siteAbs, built, owner, toRoot)
+              : publishedGraphs(built, owner, linkRoot);
+          const declared = declaredGraphs(owner, new Map(), site, named.harness);
+          // The landing's graphs this site does not hold are the landing's, not this site's.
+          const links = landed ? declared.filter((l) => l.href !== undefined) : declared;
+          // The folio's OWN mark is on its own site when it is the checkout's root (gap 4).
+          const markRoot = foreign && ownsCheckout(foreign.instance) ? toRoot : linkRoot;
+          const homeLabel = foreign ? foreign.homeLabel : named.site;
+          const listed = landed
+            ? [{ label: homeLabel ?? named.harness ?? owner, href: `${toRoot}/` }, ...(instanceHarnesses(built, foreign!.instance!, linkRoot, undefined) ?? [])]
+            : foreign?.instance
+              ? instanceHarnesses(built, foreign.instance, linkRoot, `${toRoot}/`, markRoot)
+              : instantiatedHarnesses(built, linkRoot);
+          // A FHIR IG rendered on this site gets a `[fhir]` row to its index
+          // page, right after its harness's row (owner, 2026-10-31).
+          const harnesses = withIgRenderRow(listed, {
+            siteAbs,
+            owner,
+            ownerLabel: landed ? (homeLabel ?? named.harness ?? owner) : named.harness,
+            atRoot: foreign !== undefined || owner === instanceName,
+            toRoot,
+          });
+          // The landing's mark is not this site's: a site with no instance of its own draws none.
+          const mark = landed ? undefined : instanceMark(built, owner, foreign?.instance === owner ? markRoot : linkRoot);
+          return { named, linkRoot, links, homeLabel, harnesses, mark };
+        })();
+        railContext.set(ctxKey, ctx);
+      }
+      const { named, linkRoot, links, homeLabel, harnesses, mark } = ctx;
       // The page tree, cut to the instance's own pages when the page is inside one.
-      const tree = pageTree ? pagesNav(pageTree, { prefix: toRoot, locale: pageLangOf(before) }).items : undefined;
-      const pages = tree && scope ? pagesUnder(tree, `${toRoot}${scope.href}`) : tree;
+      const pages = pagesFor(toRoot, pageLangOf(before), scope?.href);
       const railed = injectRailOnce(before, {
         instance: landed ? (homeLabel ?? named.harness ?? owner) : (named.harness ?? owner),
         ...(homeLabel ? { homeLabel } : {}),
@@ -1554,8 +1606,8 @@ export function railStandalonePages(
         ...(mark ? { mark } : {}),
         links,
         ...(harnesses ? { harnesses } : {}),
-        navbarRow: foreign ? rebaseNavbarRow(navbarRowData(built), foreign.platformBase, foreign.instance) : navbarRowData(built),
-        emitRailData: railDataWriter(siteAbs),
+        navbarRow,
+        emitRailData,
         // A folio's site: the icon row is the same on every page, so it is
         // written once beside the rail's data rather than into each page
         // (2026-10-10 — 849 KB of 1.76 MB of railed HTML on one folio).

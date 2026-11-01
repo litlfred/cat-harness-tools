@@ -41,11 +41,11 @@
  * @module test/support/checkout
  */
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { dirname, relative, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 
-import { instanceRootsIn } from "../../schemas/kg/cat-harness.js";
-import { HARNESS_ROOT } from "../../scripts/lib/roots.ts";
+import { instanceRootsIn, siteDirFor } from "../../schemas/kg/cat-harness.js";
+import { HARNESS_ROOT, TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 
 /** The cat-harness instance root — the directory this file's `test/` sits in. */
 export const INSTANCE = resolve(HARNESS_ROOT);
@@ -142,4 +142,101 @@ export function siteNotBuiltWhen(standalone: boolean, what: string, built: reado
   const shown = missing.map((p) => relative(dirname(INSTANCE), p)).join(", ");
   console.warn(`site not built (standing alone): ${what} — absent: ${shown}`);
   return true;
+}
+
+/**
+ * The guard for a test that runs a command from, or reads, the checkout
+ * ROOT's own `package.json`: the `cat` alias (`bun run cat <script>`) and the
+ * scripts declared there (`bootstrap:schemas:check`, …). The composed
+ * checkout holds that manifest; clones laid side by side have nothing above
+ * them, so the root a script resolves (`repoRootFor`, `dirname(HARNESS_ROOT)`)
+ * has none (bean `folio-assistant-w1gy` F11, the sibling root).
+ *
+ * It skips only when the manifest is ACTUALLY absent at `repo` and the run
+ * stands alone ({@link notApplicableAlone}); in the composed checkout, or
+ * wherever the manifest is there, it returns `false` and the test runs —
+ * and fails loudly if the manifest is missing in the composed checkout.
+ * `needs` says what the test takes from it, at the call site.
+ */
+export function noRootManifest(repo: string, needs: string): boolean {
+  return (
+    !existsSync(join(repo, "package.json")) &&
+    notApplicableAlone(`the checkout root's \`package.json\` at ${repo}, for ${needs} (clones side by side have no root above them)`)
+  );
+}
+
+/**
+ * The `test/results/` directory of every instance in `repo`: where a full
+ * `docs:pages` run re-derives committed QA witnesses, and so what
+ * {@link restoringTracked} protects around one.
+ */
+export function qaResultDirsIn(repo: string): string[] {
+  return instanceRootsIn(repo).map((r) => join(r, "test", "results"));
+}
+
+/**
+ * Build the publish-time projections `gen-docs-pages.ts` writes
+ * (`assets/todos/index.json`, `assets/beans/index.json`,
+ * `assets/beans/count.json`, `todos.jsonld`) when running in the composed
+ * checkout and the projections are not yet on disk (#411). Standing alone this
+ * is a no-op so {@link siteNotBuilt} skips remain intact.
+ */
+export function ensureDocsPages(instanceRoot: string = INSTANCE): void {
+  if (STANDALONE) return;
+  const root = resolve(instanceRoot);
+  const index = join(root, siteDirFor(root), "assets", "todos", "index.json");
+  if (existsSync(index)) return;
+  const repo = checkoutHolding(root);
+  restoringTracked(qaResultDirsIn(repo), () =>
+    spawnSync("bun", [join(TOOLS_ROOT, "scripts", "gen-docs-pages.ts")], { cwd: repo, encoding: "utf-8" }),
+  );
+}
+
+/** One tracked file's bytes, as found before a run that may rewrite it. */
+interface TrackedCopy {
+  path: string;
+  bytes: Buffer | undefined;
+}
+
+/**
+ * Run `fn`, which spawns a writer over the real tree, and put every TRACKED
+ * file under `dirs` back exactly as it was, so the test leaves the
+ * repositories as it found them (bean `folio-assistant-w1gy` F24: a full
+ * `docs:pages` re-derives the committed QA witnesses under
+ * `test/results/witnesses/`, and `bun test` dirtied a sibling repository).
+ *
+ * What is restored is what git tracks under each directory — read from git,
+ * per directory, so it holds in a composed checkout and in side-by-side
+ * clones alike. A file the run deletes is written back; a file it changes is
+ * given its old bytes; a file it ADDS is the writer's and the caller's to
+ * judge (the orphan sweep test asserts exactly that). Then the restore is
+ * CHECKED: a tracked file still differing from what was saved throws, so a
+ * restore that silently missed something fails the test rather than the
+ * next `git status`.
+ */
+export function restoringTracked<T>(dirs: readonly string[], fn: () => T): T {
+  const saved: TrackedCopy[] = [];
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue;
+    const r = spawnSync("git", ["-C", dir, "ls-files", "-z", "--", "."], { encoding: "utf-8", maxBuffer: 256 * 1024 * 1024 });
+    if (r.status !== 0) continue; // not in a work tree: nothing tracked to protect
+    for (const rel of r.stdout.split("\0").filter((f) => f !== "")) {
+      const path = join(dir, rel);
+      saved.push({ path, bytes: existsSync(path) ? readFileSync(path) : undefined });
+    }
+  }
+  try {
+    return fn();
+  } finally {
+    const left: string[] = [];
+    for (const { path, bytes } of saved) {
+      if (bytes === undefined) continue; // already absent before the run
+      const now = existsSync(path) ? readFileSync(path) : undefined;
+      if (now !== undefined && now.equals(bytes)) continue;
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, bytes);
+      if (!readFileSync(path).equals(bytes)) left.push(path);
+    }
+    if (left.length > 0) throw new Error(`could not restore ${left.length} tracked file(s): ${left.join(", ")}`);
+  }
 }

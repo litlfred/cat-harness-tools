@@ -405,6 +405,16 @@ export function readBeans(root: string): BeanNode[] | null {
 }
 
 /**
+ * The beans of one store, given the store's directory (a `beans` graph, as
+ * `beanStores` lists them): its `defs/`, read as {@link readBeans} reads the
+ * checkout's own. `null` when the store holds no `defs/`.
+ */
+export function readStoreBeans(store: string, root: string): BeanNode[] | null {
+  const dir = join(store, "defs");
+  return existsSync(dir) ? beansIn(dir, root) : null;
+}
+
+/**
  * Parse every bean file directly in `dir`. Shared by the active store and the
  * archive view so the front-matter parsing has ONE implementation.
  *
@@ -416,7 +426,7 @@ export function readBeans(root: string): BeanNode[] | null {
 function beansIn(dir: string, root: string): BeanNode[] {
   const out: BeanNode[] = [];
   for (const name of readdirSync(dir).sort()) {
-    if (!name.endsWith(".md")) continue;
+    if (!name.endsWith(".md") || name === "README.md") continue;
     const text = readFileSync(join(dir, name), "utf-8");
     const m = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text);
     // A file with no front matter is not a bean. `beans check` owns that.
