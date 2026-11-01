@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { baseDocsDir } from "../../scripts/compose-docs.js";
-import { pageRelPath, publishedIndex, processRows } from "../../scripts/gen-processes-viz.js";
+import { pageRelPath, publishedIndex, processRows, subgraphPages } from "../../scripts/gen-processes-viz.js";
 import { siteNotBuilt } from "../support/checkout.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
@@ -34,6 +34,10 @@ describe("the committed page is current", () => {
   )("and matches what the generator produces now", () => {
     // A stale page fails the unit suite rather than only the gate, which is
     // where it is noticed first.
-    expect(readFileSync(join(DOCS, pageRelPath(REPO)!), "utf-8")).toBe(publishedIndex(rows));
+    // The writer passes the per-subgraph table (#1312), so the comparison must too.
+    const subjects = subgraphPages(rows).map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` }));
+    expect(readFileSync(join(DOCS, pageRelPath(REPO)!), "utf-8")).toBe(
+      publishedIndex(rows, REPO, undefined, undefined, { subjects }),
+    );
   });
 });
