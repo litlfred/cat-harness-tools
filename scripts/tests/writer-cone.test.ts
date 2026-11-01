@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 import { parseTrace } from "../ci-cone.ts";
 import { FileDigests } from "../input-hash.ts";
-import { churnReport, decideWriter, renderChurn, emptyRecords, snapshotPaths, tracedArgv, underOutputs, verifySummary, verifyWriters, writerRecordOf } from "../writer-cone.ts";
+import { changedWhy, churnReport, decideWriter, renderChurn, emptyRecords, snapshotPaths, tracedArgv, underOutputs, verifySummary, verifyWriters, writerRecordOf } from "../writer-cone.ts";
 
 const ROOT = "/work/repo";
 
@@ -217,5 +217,14 @@ describe("churnReport", () => {
   });
   test("says so when nothing ran", () => {
     expect(renderChurn(churnReport([entries[3]!], "x", writerOf))).toContain("Nothing ran again.");
+  });
+});
+
+describe("changedWhy (bean fwtz, S-CI3)", () => {
+  test("names the first changed read as before, then the rest, capped", () => {
+    expect(changedWhy(["."])).toBe(". changed");
+    expect(changedWhy([".", ".git", "a"])).toBe(". changed (+2 more: .git, a)");
+    const many = Array.from({ length: 12 }, (_, i) => `f${i}`);
+    expect(changedWhy(many)).toBe("f0 changed (+11 more: f1, f2, f3, f4, f5, f6, f7, and 4 others)");
   });
 });
