@@ -261,6 +261,8 @@ export function repointFor(
     const rel = posix.relative(posix.dirname(page), plain) || ".";
     return { to: target.endsWith("/") && !rel.endsWith("/") ? `${rel}/` : rel, why: "locale" };
   }
+  // declared-path-literal: `docs/` here is the PUBLISHED SITE's URL layout,
+  // not the harness's declared `docs` directory, so no declaration answers it.
   // A page published under `docs/<instance>/<chapter>/…` sits in `<instance>/docs/<chapter>/…`
   // in its checkout (the outer two segments reversed by the permalink rule), so a
   // `../../<tail>` link that landed at `docs/<tail>` addressed `<instance>/<tail>`.

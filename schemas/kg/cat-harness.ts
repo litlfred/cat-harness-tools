@@ -440,6 +440,9 @@ export interface ContentDirectory extends GraphNodeDirectory {
   /** Entry slugs of a `library` held back from the summary drain while the rest of it drains. See the schema field (bean `j7ql`). */
   heldEntries?: string[];
 
+  /** Entry slugs of a `library` admitted while no methodology cites them yet; their summaries still drain. See the schema field (bean `e0jh`). */
+  awaitingCitation?: string[];
+
   /**
    * Which theme this subgraph renders on — one answer for every surface that
    * renders it (navbar section, board panel, sticky).
@@ -1909,6 +1912,16 @@ const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
    * derived, so a move cannot release it silently.
    */
   heldEntries: z.array(z.string().min(1)).optional(),
+  /**
+   * Entry slugs of a `library` the owner asked to hold that no methodology
+   * cites YET. The platform library holds only sources its methodologies cite
+   * (`library-ref.test.ts` in folio-assistant-core); a source ingested ahead
+   * of the methodology text that will cite it is listed here, by name, until
+   * it is cited and leaves the list. Unlike {@link heldEntries} this does NOT
+   * hold the entry's summaries back: its blocks still drain. Listed, never
+   * derived, so a source cannot become admitted by accident (bean `e0jh`).
+   */
+  awaitingCitation: z.array(z.string().min(1)).optional(),
   /**
    * HOW this graph is shown, and what can be done to it.
    *
