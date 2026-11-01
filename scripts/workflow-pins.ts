@@ -24,8 +24,12 @@
  * the judging scripts follow the lock too (`tools-ref: lock`, the default).
  *
  * `mount:remote` runs `--write` after it writes the lock, so a re-pin moves
- * the calls with the mounts. A token that pushes the result needs the
- * `workflows` permission (GitHub refuses workflow-file changes otherwise).
+ * the calls with the mounts. In CI (`CI=true`) it does not: the re-pin train's
+ * App has no `workflows` permission (owner, 2026-11-01, Q-PIN-6 "C"), so a
+ * train cannot push workflow-file edits. A call pinned to an OLDER commit than
+ * the lock therefore only trails it: the check warns and passes, and the next
+ * agent-session run of `workflow-pins` catches it up. A branch or tag still
+ * fails. `WORKFLOW_PINS_STRICT=1` makes a trailing pin fail too.
  *
  *   bun run cat workflow-pins          # check (the gate is check:workflow-pins)
  *   bun run cat workflow-pins --write  # rewrite the lines
@@ -48,6 +52,8 @@ export interface Finding {
   have: string;
   want: string | null;
   why: string;
+  /** A commit pin that only trails the lock: a warning, not a failure (see the header). */
+  trailing?: boolean;
 }
 
 /** The mounts of index.lock.json, harness name → commit; empty when there is no lock. */
@@ -153,6 +159,11 @@ export function judgeFile(root: string, file: string, text: string, own: string,
         if (ref === sha) continue;
         want = `${lead}litlfred/${repo}/${path}@${sha} # index.lock.json`;
         why = `index.lock.json mounts ${repo} at ${sha.slice(0, 8)}`;
+        if (SHA.test(ref)) {
+          findings.push({ file: rel, line: i + 1, have: l.trim(), want: want.trim(), why: `${why}; this pin trails it until an agent session runs workflow-pins`, trailing: true });
+          lines[i] = want;
+          continue;
+        }
       } else if (SHA.test(ref)) {
         continue;
       } else {
@@ -209,7 +220,7 @@ if (import.meta.main) {
     process.exit(0);
   }
   for (const f of result.findings) {
-    console.log(`  ${write && f.want !== null ? "✎" : "✗"} ${f.file}:${f.line}  ${f.have}`);
+    console.log(`  ${write && f.want !== null ? "✎" : f.trailing ? "⚠" : "✗"} ${f.file}:${f.line}  ${f.have}`);
     console.log(`      ${f.why}${f.want ? `\n      want: ${f.want}` : ""}`);
   }
   if (write) {
@@ -217,6 +228,8 @@ if (import.meta.main) {
     console.log(`  rewrote ${result.fixed} line(s)${left.length ? `; ${left.length} need a hand pin` : ""}`);
     process.exit(left.length ? 1 : 0);
   }
-  console.log("  run `bun run cat workflow-pins --write`");
-  process.exit(1);
+  const strict = process.env.WORKFLOW_PINS_STRICT === "1";
+  const failing = result.findings.filter((f) => strict || !f.trailing);
+  console.log("  run `bun run cat workflow-pins` in an agent session (it needs to push .github/workflows)");
+  process.exit(failing.length ? 1 : 0);
 }

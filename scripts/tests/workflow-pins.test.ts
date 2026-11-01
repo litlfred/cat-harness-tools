@@ -43,3 +43,17 @@ describe("workflow-pins", () => {
     expect(judge(`# uses: litlfred/other/.github/workflows/x.yml@main\njobs:\n  c:\n    uses: litlfred/other/.github/workflows/x.yml@${"b".repeat(40)}\n`).findings).toHaveLength(0);
   });
 });
+
+describe("workflow-pins: a commit pin behind the lock", () => {
+  test("is a trailing finding (warn), and --write still moves it", () => {
+    const old = "c".repeat(40);
+    const { findings, text } = judge(`jobs:\n  c:\n    uses: litlfred/cat-harness-tools/.github/workflows/x.yml@${old}\n`);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].trailing).toBe(true);
+    expect(text).toContain(`x.yml@${TOOLS} # index.lock.json`);
+  });
+
+  test("a branch is never trailing", () => {
+    expect(judge("jobs:\n  c:\n    uses: litlfred/cat-harness-tools/.github/workflows/x.yml@main\n").findings[0].trailing).toBeUndefined();
+  });
+});
