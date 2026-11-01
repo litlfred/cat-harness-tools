@@ -151,16 +151,6 @@ jobs:
             if (r.state === "failed" || r.state === "partial")
               console.log("::warning::state mount " + r.state + ": see the report above");
           '
-      - name: Java runtime the PlantUML release declares (#2744)
-        uses: ./fa/.github/actions/plantuml-java
-      - name: Build the IG artefact indexes the pages read (fhir-harness#124)
-        working-directory: fa
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: bun run cat ig-index:build
-      - name: Build the mounted IG instances' pages (bean hupw)
-        working-directory: fa
-        run: bun run cat smart:pages
       - name: Run post-merge regen in the composed index
         id: regen
         working-directory: fa
