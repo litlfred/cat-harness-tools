@@ -664,6 +664,7 @@
     "archimate:validate": "bun run cat-harness-tools/archimate/scripts/check-archimate.ts",
     "archimate:pages": "bun run cat-harness-tools/archimate/scripts/gen-archimate-pages.ts",
     "archimate:metamodel": "bun run cat-harness-tools/archimate/scripts/archimate-metamodel.ts",
+    "archimate:blocks": "bun run cat-harness-tools/archimate/scripts/archimate-blocks.ts",
     "archimate:diagrams": "bun run cat-harness-tools/archimate/scripts/archimate-diagrams.ts",
     "archimate:crossings": "bun run cat-harness-tools/archimate/scripts/archimate-crossings.ts",
     "archimate:detangle": "bun run cat-harness-tools/archimate/scripts/archimate-detangle.ts",
