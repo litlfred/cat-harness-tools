@@ -15,12 +15,13 @@
  * `ho66`): standing alone, cat-harness has no such root to read.
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "bun:test";
 
+import { resolveBeanArchive } from "../../scripts/beans.ts";
 import { countConsideredOptions, doneWhenState, frontMatter, frontMatterValue, probeBranches, probeBeans, probeRepoSize, probeStaging, probeTodos } from "./probes.ts";
 
 const made: string[] = [];
@@ -533,6 +534,14 @@ describe("doneWhenState — the four states `fkjo` needs kept apart", () => {
     const p = probeBeans(process.cwd());
     if (p.state !== "ok") return;
     const kinds = new Set(p.value.map((b) => b.doneWhen?.kind));
+    // The archive view too: a drain archives finished beans, and with them
+    // most of the ticked lists (cat-harness-tools#1248).
+    const archive = resolveBeanArchive(process.cwd()).dir;
+    if (archive !== null) {
+      for (const f of readdirSync(archive).filter((n) => n.endsWith(".md") && n !== "README.md")) {
+        kinds.add(doneWhenState(readFileSync(join(archive, f), "utf-8"))?.kind);
+      }
+    }
     expect(kinds.has("all-ticked")).toBe(true);
     expect(kinds.has("open")).toBe(true);
     expect(kinds.has("absent")).toBe(true);
