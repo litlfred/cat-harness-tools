@@ -358,7 +358,81 @@ export interface RoleDef {
    * If a single model lacks these capabilities, the workflow refuses rather than degrades.
    */
   requiredCapabilities?: ModelCapabilities;
+  /**
+   * Present when this role is a DATA STORE: a place where things are kept,
+   * played by a mechanical actor (owner, 2026-11-01, Q-DS-1 A). It stays a
+   * Role, so its `skills` are still its contract (owner, 2026-10-16), and the
+   * role id is the store id a diagram's `dataStoreReference` points at
+   * (Q-DS-3 A). See {@link StoreDef}.
+   */
+  store?: StoreDef;
 }
+
+/**
+ * The API styles a store's interface can be documented in. Each transport
+ * keeps its own standard format (owner, 2026-11-01, Q-DS-2 A):
+ *
+ * - `openapi` — an HTTP API, as an OpenAPI 3 document;
+ * - `fhir-capability` — a FHIR server, as a CapabilityStatement;
+ * - `graphql` — a GraphQL schema (SDL), e.g. beans' `schema.graphqls`;
+ * - `cli` — harness tools (`tool-definition/v1`) that read or write it;
+ * - `json-schema-files` — files in git, as a typology and its JSON Schema;
+ * - `git` — a git repository read through the git CLI or a forge's API.
+ */
+export const STORE_API_STYLES = ["openapi", "fhir-capability", "graphql", "cli", "json-schema-files", "git"] as const;
+export type StoreApiStyle = (typeof STORE_API_STYLES)[number];
+
+/** One documented interface of a store. */
+export interface StoreApi {
+  style: StoreApiStyle;
+  /**
+   * The API's own document: a URL or an instance-relative path. Held as the
+   * API's authors wrote it, never restated (the `openapi` subgraph's rule).
+   * Absent for `cli`, which names its tools instead.
+   */
+  document?: string;
+  /** For `cli`: the harness tool ids that read or write the store. */
+  tools?: string[];
+}
+
+/**
+ * What a store keeps and how it is reached. Its behaviour is NOT here: that is
+ * the role's contract skills, each naming its tests in `tested-by:`.
+ */
+export interface StoreDef {
+  /** The typologies (graph kinds) it holds, by id, e.g. `bean-defs`. */
+  holds?: string[];
+  /** Its interfaces, one per transport. */
+  api?: StoreApi[];
+  /** The actor that plays it, e.g. `beans`, `git`, `google-sheets`. */
+  realisedBy?: string;
+  /** Whether what it keeps reaches a published graph. The activity log does not. */
+  published?: boolean;
+}
+
+/**
+ * Why `role` cannot declare a store, or undefined when it can. A store is
+ * kept, not performed: only a role a machine or an outside party plays can be
+ * one (owner, 2026-11-01, Q-DS-1 A). Checked by {@link readRoleGraph}.
+ */
+export function storeRoleError(role: Pick<RoleDef, "id" | "actorKinds" | "store">): string | undefined {
+  if (!role.store) return undefined;
+  if (role.actorKinds.every((k) => k === "system" || k === "external")) return undefined;
+  return `role "${role.id}" declares a store but admits ${role.actorKinds.join(", ")} actors; a store is played by system or external actors only.`;
+}
+
+export const StoreApiSchema = z.object({
+  style: z.enum(STORE_API_STYLES),
+  document: z.string().min(1).optional(),
+  tools: z.array(z.string().min(1)).min(1).optional(),
+}).strict();
+
+export const StoreDefSchema = z.object({
+  holds: z.array(z.string().min(1)).optional(),
+  api: z.array(StoreApiSchema).optional(),
+  realisedBy: z.string().min(1).optional(),
+  published: z.boolean().optional(),
+}).strict();
 
 /** The declared role graph. */
 export interface RoleGraph {
@@ -465,6 +539,7 @@ export const RoleDefSchema = z.object({
   inherits: z.array(z.string()).optional(),
   judgementOnly: z.boolean().optional(),
   requiredCapabilities: ModelCapabilitiesSchema.optional(),
+  store: StoreDefSchema.optional(),
   // STRICT: an unknown key is an ERROR, not something to drop quietly.
   //
   // `readRoleGraph` already refuses a bad `actorKinds` and a dangling
@@ -731,6 +806,8 @@ export function readRoleGraph(kgRoot: string, lower: ReadonlySet<string> = lower
     }
   }
   for (const r of graph.roles) {
+    const storeError = storeRoleError(r);
+    if (storeError) throw new Error(`${p}: ${storeError}`);
     for (const parent of r.inherits ?? []) {
       // `lower`: role ids a LOWER instance declares (placement PR0b). A
       // higher instance's role may inherit one; the lower graph is read first

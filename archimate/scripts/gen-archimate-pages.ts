@@ -71,9 +71,10 @@ import { visualiserNavDeclaration, type VisualiserNavEntry } from "../../scripts
 import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
 import { readArchimate, type ArchimateModel } from "../schemas/archimate.ts";
 import { renderViewSvg, typeLabel } from "./render-view.ts";
-import { CONFIG_FILE, archimateDir, localDirOf, readConfig } from "./check-archimate.ts";
+import { CONFIG_FILE, archimateDir, configPath, localDirOf, readConfig } from "./check-archimate.ts";
 import { planSlugs } from "../schemas/slugs.ts";
 import { LAYER_ORDER, categoryOf, layerSlug, metamodelDot, metamodelMermaid, metamodelOf, pairAnchor, typeAnchor, typeName, verbOf, type Metamodel } from "../schemas/metamodel.ts";
+import { dataModelDot, dataModelMermaid, dataModelOf, dataModelPuml, sequencesMermaid, sequencesOf, sequencesPuml, type DataModel, type SequenceSet } from "../schemas/diagrams.ts";
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { darkRules } from "../../scripts/lib/scheme-css.ts";
 import { pageParts, withRenderedBy } from "../../scripts/viewer-declarations.ts";
@@ -265,6 +266,30 @@ export function pagesFor(
     );
     const drawn = opts.drawDot !== undefined;
     if (drawn) files.push({ path: `${m}/metamodel.svg`, content: opts.drawDot!(mmDot) });
+    const dm = dataModelOf(model, m);
+    if (dm.classes.length > 0) {
+      const dmDot = dataModelDot(dm, {
+        href: {
+          element: (id) => `${toPage(m, `elements/${seg(id)}`)}${site ? "" : "/"}`,
+          relationship: (id) => `${toPage(m, `relationships/${id}`)}${site ? "" : "/"}`,
+        },
+      });
+      files.push(
+        { path: `${m}/data-model.json`, content: `${JSON.stringify(dm, null, 2)}\n` },
+        { path: `${m}/data-model.puml`, content: dataModelPuml(dm) },
+        { path: `${m}/data-model.mmd`, content: dataModelMermaid(dm) },
+        { path: `${m}/data-model.dot`, content: dmDot },
+      );
+      if (drawn) files.push({ path: `${m}/data-model.svg`, content: opts.drawDot!(dmDot) });
+    }
+    const seqs = sequencesOf(model, m);
+    if (seqs.sequences.length > 0) {
+      files.push(
+        { path: `${m}/sequences.json`, content: `${JSON.stringify(seqs, null, 2)}\n` },
+        { path: `${m}/sequences.puml`, content: sequencesPuml(seqs) },
+        { path: `${m}/sequences.mmd`, content: sequencesMermaid(seqs) },
+      );
+    }
     const mp = `${m}/metamodel`;
     files.push(page(`${mp}/index.html`, 2, `Metamodel in use — ${title}`, toData(mp, `../../${m}.jsonld`),
       { kind: "metamodel", node: toData(mp, `../../${m}.jsonld`), model: toData(mp, "../model.json"), metamodel: toData(mp, "../metamodel.json") },
@@ -272,8 +297,11 @@ export function pagesFor(
         data: (rel) => toData(mp, `../${rel}`),
         element: (id) => `../elements/${seg(id)}/`,
         relationship: (id) => `../relationships/${id}/`,
+        view: (id) => `../views/${seg(id)}/`,
         nameOf: (id) => elements.get(id)?.name ?? id,
         drawn,
+        dataModel: dm,
+        sequences: seqs,
       }), nav("../")));
 
     const figuresOf = (viewId: string) => (config.figures ?? []).filter((f) => f.model === m && f.view === viewId);
@@ -416,8 +444,11 @@ export function metamodelBody(
     data: (rel: string) => string;
     element: (id: string) => string;
     relationship: (id: string) => string;
+    view?: (id: string) => string;
     nameOf: (id: string) => string;
     drawn: boolean;
+    dataModel?: DataModel;
+    sequences?: SequenceSet;
   },
 ): string {
   const verdict = (a: boolean | undefined): string => (a === true ? "✓ allowed" : a === false ? "✗ not allowed" : "? not in the table");
@@ -466,6 +497,46 @@ export function metamodelBody(
         mm.placeholders.map((e) => `<li><a href="${escHtml(link.element(e.id))}">${escHtml(e.name)}</a> <span class="am-type">${escHtml(typeName(e.type))}</span></li>`).join("") +
         `</ul>`
       : "") +
+    (link.dataModel && link.dataModel.classes.length
+      ? `<h2>Data class diagram</h2>` +
+        `<p>Derived from the model's <code>DataObject</code> and <code>BusinessObject</code> elements (${link.dataModel.classes.length} class(es), ${link.dataModel.relationships.length} relationship(s)): ` +
+        `<a href="${escHtml(link.data("data-model.puml"))}">PlantUML</a>, ` +
+        `<a href="${escHtml(link.data("data-model.mmd"))}">Mermaid class diagram</a>, ` +
+        `<a href="${escHtml(link.data("data-model.dot"))}">Graphviz DOT</a>, and ` +
+        `<a href="${escHtml(link.data("data-model.json"))}">JSON</a>.</p>` +
+        (link.drawn
+          ? `<div class="am-figure"><object type="image/svg+xml" style="width:100%;height:auto" data="${escHtml(link.data("data-model.svg"))}" aria-label="Data class diagram, drawn"></object></div>`
+          : "") +
+        `<table class="am-props"><thead><tr><th>Class</th><th>Type</th><th>Logical model</th><th>Attributes</th><th>Accessed / governed by</th></tr></thead><tbody>` +
+        link.dataModel.classes
+          .map(
+            (c) =>
+              `<tr><td><a href="${escHtml(link.element(c.id))}">${escHtml(c.name)}</a></td><td>${escHtml(typeName(c.type))}</td>` +
+              `<td>${c.logicalModel ? `<code>${escHtml(c.logicalModel)}</code>` : "—"}</td>` +
+              `<td>${c.attributes.length ? c.attributes.map((a) => `<code>${escHtml(a.name)}</code>${a.type ? ` (${escHtml(a.type)})` : ""}${a.cardinality ? ` [${escHtml(a.cardinality)}]` : ""}`).join(", ") : "—"}</td>` +
+              `<td>${c.accessedBy.length ? c.accessedBy.map((a) => `<a href="${escHtml(link.element(a.elementId))}">${escHtml(a.name)}</a> (${escHtml(a.label ?? a.kind)})`).join(", ") : "—"}</td></tr>`,
+          )
+          .join("") +
+        `</tbody></table>`
+      : "") +
+    (link.sequences && link.sequences.sequences.length
+      ? `<h2>Sequence diagrams</h2>` +
+        `<p>Derived from the model's <code>ApplicationInteraction</code>s and cross-component <code>Flow</code> / <code>Triggering</code> chains (${link.sequences.sequences.length} sequence diagram(s)): ` +
+        `<a href="${escHtml(link.data("sequences.puml"))}">PlantUML</a>, ` +
+        `<a href="${escHtml(link.data("sequences.mmd"))}">Mermaid sequence diagrams</a>, and ` +
+        `<a href="${escHtml(link.data("sequences.json"))}">JSON</a>.</p>` +
+        `<table class="am-props"><thead><tr><th>Sequence</th><th>Source</th><th>Participants</th><th>Steps</th></tr></thead><tbody>` +
+        link.sequences.sequences
+          .map(
+            (s) =>
+              `<tr><td>${s.viewId && link.view ? `<a href="${escHtml(link.view(s.viewId))}">${escHtml(s.title)}</a>` : escHtml(s.title)}</td>` +
+              `<td>${escHtml(s.source)}</td>` +
+              `<td>${s.participants.map((p) => (p.elementId ? `<a href="${escHtml(link.element(p.elementId))}">${escHtml(p.name)}</a>` : escHtml(p.name))).join(", ")}</td>` +
+              `<td>${s.messages.length}</td></tr>`,
+          )
+          .join("") +
+        `</tbody></table>`
+      : "") +
     `<p class="am-type">Relationship table: ArchiMate ${escHtml(mm.archimateVersion)} Appendix B as Archi holds it (MIT).</p>` +
     // A click on a box lands on its row: open the row's element list.
     `<script>(function(){function o(){var t=location.hash&&document.getElementById(decodeURIComponent(location.hash.slice(1)));` +
@@ -506,6 +577,58 @@ function thinPage(
       ...(tail !== undefined ? { tail } : {}),
     }),
   };
+}
+
+/** A document figure the config maps to a view, with where the site holds its drawing and its page. */
+export interface FigureTarget {
+  /** The block holding the figure, relative to the instance root (`figures[].block`). */
+  block: string;
+  label: string;
+  model: string;
+  view: string;
+  /** The view's name in the model. */
+  viewName: string;
+  /** Site-relative: the view drawn as SVG, which `archimate-pages --out` writes. */
+  svg: string;
+  /** Site-relative, with a trailing slash: the view's page, at the declared route. */
+  page: string;
+}
+
+/**
+ * Every figure the instance's config maps to a view (`figures`), with the site
+ * paths `archimate-pages --out` writes for it, so a document site can show the
+ * live drawing in the figure's place and link its page. Empty when the
+ * instance holds no ArchiMate config or maps no figure. Reads only the models
+ * a figure names.
+ */
+export function figureTargets(instanceRoot: string): FigureTarget[] {
+  if (configPath(instanceRoot) === undefined) return [];
+  const config = readConfig(instanceRoot);
+  const figures = config.figures ?? [];
+  if (figures.length === 0) return [];
+  const dir = archimateDir(instanceRoot, config);
+  const declFile = findDeclarationFile(instanceRoot)!;
+  const decl = JSON.parse(readFileSync(join(instanceRoot, declFile), "utf8")) as Declaration;
+  const graphPath = localDirOf(instanceRoot, dir).replace(/\/$/, "");
+  const pageRoot = declaredPageRoot(decl, config.directory);
+  const out: FigureTarget[] = [];
+  for (const cm of config.models) {
+    const mine = figures.filter((f) => f.model === cm.id);
+    if (mine.length === 0) continue;
+    const model = readArchimate(readFileSync(join(dir, cm.file)));
+    const slugOf = planSlugs(model);
+    for (const f of mine) {
+      const v = model.views.find((x) => x.id === f.view);
+      if (v === undefined) continue; // check-archimate reports it
+      out.push({
+        ...f,
+        viewName: v.name,
+        svg: posix.join(graphPath, cm.id, "views", `${v.id}.svg`),
+        page: `${posix.join(pageRoot, cm.id, "views", slugOf.get(v.id) ?? v.id)}/`,
+      });
+    }
+  }
+  return out;
 }
 
 /**
@@ -560,8 +683,11 @@ function orphans(root: string, wanted: Set<string>): string[] {
       }
       if (wanted.has(p) || e.name.endsWith(".archimate") || e.name === "README.md" || e.name === CONFIG_FILE) continue;
       const ours =
-        /\.(jsonld|svg)$/.test(e.name) ||
+        /\.(jsonld|svg|dot|mmd|puml)$/.test(e.name) ||
         e.name === "model.json" ||
+        e.name === "metamodel.json" ||
+        e.name === "data-model.json" ||
+        e.name === "sequences.json" ||
         // A node's `.json` twin — never a `.json` that has no `.jsonld` beside it.
         (e.name.endsWith(".json") && existsSync(p.replace(/\.json$/, ".jsonld"))) ||
         p === join(root, LOADER) ||

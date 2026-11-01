@@ -20,15 +20,23 @@
  * progress. `refuse` entries exist only to say WHY a common path is not
  * automatic (so the next agent does not add it on a hunch).
  *
- * ## The five strategies
+ * ## The four strategies
  *
  * | strategy | resolution | safe because |
  * |---|---|---|
  * | `take-base` | the base's copy, then regenerate | the file is wholly generated; the gate set regenerates it from the merged inputs |
  * | `owned-tree` | the base's COMMITTED copy, else the branch's; removed only when neither side has it; then regenerate | one writer (`prunedBy`) owns the whole directory and deletes every file it did not write, so a kept orphan is pruned by regen, and the resolution never drops a path (beans `vsv7`, `8j9e`) |
  * | `generated-regions` | each hunk takes the base's side, then regenerate | EVERY hunk lies inside a `<!-- x:begin -->`…`<!-- x:end -->` region, which the generator rewrites; a hunk in authored text refuses |
- * | `qa-sidecar` | `qa:resolve-conflicts` | that command reads git's stages and refuses a sidecar carrying an agent's attestation |
  * | `refuse` | none | authored, or carries judgement a generator cannot reproduce |
+ *
+ * A fifth, `qa-sidecar`, delegated each instance's `test/results/kg-qa/` to
+ * `qa:resolve-conflicts`. Bean `7mwa` retired both once cat-harness and
+ * folio-assistant-core stopped committing `test/results/` (cat-harness#857,
+ * folio-assistant-core#482): the sidecars live on the `qa-reports` store, so a
+ * conflict on one is a branch still carrying a stale copy. `derived-results`
+ * takes the base's side of it, as it does for the other untracked QA families.
+ * The attestations a sidecar once carried live in `test/attestations/` since
+ * bean `2gst`, and no pattern names that tree, so a conflict there is refused.
  *
  * Verification is NOT per pattern: after resolving, `merge-base.ts` runs
  * `regen`, which derives every check/writer pair from the CI workflow and so
@@ -42,7 +50,7 @@ import { visualiserRoute } from "../schemas/kg/visualiser-route.js";
 
 import { PAGE_LOCALE, declaredVisualisers, routesRecordedInSite } from "./viewer-declarations.ts";
 
-export type ConflictStrategy = "take-base" | "owned-tree" | "generated-regions" | "qa-sidecar" | "refuse";
+export type ConflictStrategy = "take-base" | "owned-tree" | "generated-regions" | "refuse";
 
 export interface ConflictPattern {
   /** Stable id; the skill's section anchor. */
@@ -135,17 +143,11 @@ const isCatalogue = (v: RouteOf): boolean => v.id === CATALOGUE_VISUALISER;
 
 /**
  * Ordered: the FIRST pattern whose glob matches decides. Specific paths come
- * before general ones (`kg-qa` sidecars before the generic results tree).
+ * before general ones.
  * Counts are from the 2026-09-30 measurement (conflicted files across 235
  * conflicted merges), recorded in bean `y7b3`.
  */
 export const PATTERNS: readonly ConflictPattern[] = [
-  {
-    id: "kg-qa-sidecar",
-    globs: ["**/test/results/kg-qa/**"],
-    strategy: "qa-sidecar",
-    why: "kg-audit sidecars (53). Delegated: a sidecar can carry an attestation an earlier run or a person recorded, and only qa:resolve-conflicts checks for one.",
-  },
   {
     id: "kg-qa-manifest",
     globs: ["**/test/results/kg-qa.manifest.json", "**/test/results/**/kg-qa.manifest.json"],
@@ -161,6 +163,7 @@ export const PATTERNS: readonly ConflictPattern[] = [
   {
     id: "derived-results",
     globs: [
+      "**/test/results/kg-qa/**",
       "**/test/results/lsi/**",
       "**/test/results/detangle/**",
       "**/test/results/tool-runs/**",
@@ -170,6 +173,7 @@ export const PATTERNS: readonly ConflictPattern[] = [
     why:
       "LSI indexes, detangle sidecars, tool-run records and translation-qa sidecars (56 + 71 + 15). Recomputed from the whole corpus, so any concurrent skill or schema change touches them. " +
       "The LSI half is UNTRACKED on `main` since bean `tqjj` and these globs are kept for the branches still carrying it: a branch that edited the sidecar meets a base that deleted it, and `take-base` is the right answer to that too. " +
+      "The `kg-qa` sidecars joined for the same reason (bean `7mwa`): cat-harness and folio-assistant-core stopped committing `test/results/`, so the delegated `qa-sidecar` strategy and `qa:resolve-conflicts` were retired, and the attestations they guarded live in `test/attestations/`. " +
       "It is also the measured limit of what a declaration buys. These paths carried this entry all along and still conflicted on seven open pull requests each, because the strategy settles HOW a conflict is resolved and never whether one arises — `.gitattributes` says the same thing in its own words: \"Removing these conflicts, rather than tidying them, needs the files off `main` altogether.\"",
   },
   {

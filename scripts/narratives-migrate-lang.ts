@@ -24,11 +24,12 @@
  *
  * @module scripts/narratives-migrate-lang
  */
-import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { LANGUAGE_TAG, NarrativeSlotSchema } from "../schemas/content/narrative.ts";
 import { LIBRARY_NARRATIVE_BEARING, NARRATIVE_BEARING, narrativesIn, slotsIn, type NarrativePath } from "./narratives.ts";
 import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
+import { libraryEntryDirs } from "./lib/library-entry-graphs.ts";
 
 export interface FileResult {
   file: string;
@@ -128,9 +129,8 @@ export function migrateText(raw: string, lang: string): { text: string; result: 
 /** Every narrative-bearing file of every entry in a library directory. */
 export function libraryFiles(lib: string): string[] {
   const out: string[] = [];
-  for (const slug of readdirSync(lib).sort()) {
-    const dir = join(lib, slug);
-    if (!statSync(dir).isDirectory()) continue;
+  // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`).
+  for (const { dir } of libraryEntryDirs(lib)) {
     for (const name of NARRATIVE_BEARING) {
       const f = join(dir, name);
       if (existsSync(f)) out.push(f);

@@ -210,6 +210,25 @@ export function inheritedGroupsFor(dir: string, kind: string, registry: GraphTyp
   return out;
 }
 
+/**
+ * The concern groups PRESENT in `dir`, directory name → code: the ones `dir`
+ * declares itself, and the inherited ones (same-named directory below) that
+ * exist here. What a walker must step INTO rather than read as a child — the
+ * one answer {@link groupedChildrenIn} and the library's entry walk
+ * (`libraryEntryDirs`, bean `6fez`) share.
+ */
+export function presentGroupsIn(dir: string, kind: string, registry: GraphTypologyRegistry = defaultGraphTypologies): Map<string, string> {
+  const groups = new Map<string, string>();
+  if (!existsSync(dir)) return groups;
+  for (const g of declaredGroupsIn(dir, kind, registry)) groups.set(g.path, g.code);
+  for (const g of inheritedGroupsFor(dir, kind, registry)) {
+    // A member exists only where it exists: an inherited group absent here
+    // is not this directory's defect.
+    if (!groups.has(g.path) && existsSync(join(dir, g.path))) groups.set(g.path, g.code);
+  }
+  return groups;
+}
+
 /** One candidate child of a grouping directory. */
 export interface GroupedChild {
   /** Its basename. */
@@ -230,13 +249,7 @@ export interface GroupedChild {
  */
 export function groupedChildrenIn(dir: string, kind: string, registry: GraphTypologyRegistry = defaultGraphTypologies): GroupedChild[] {
   if (!existsSync(dir)) return [];
-  const groups = new Map<string, string>();
-  for (const g of declaredGroupsIn(dir, kind, registry)) groups.set(g.path, g.code);
-  for (const g of inheritedGroupsFor(dir, kind, registry)) {
-    // A member exists only where it exists: an inherited group absent here
-    // is not this directory's defect.
-    if (!groups.has(g.path) && existsSync(join(dir, g.path))) groups.set(g.path, g.code);
-  }
+  const groups = presentGroupsIn(dir, kind, registry);
   const children = (d: string): string[] =>
     readdirSync(d, { withFileTypes: true })
       .filter((e) => e.isDirectory())

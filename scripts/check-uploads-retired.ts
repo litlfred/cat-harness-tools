@@ -73,6 +73,7 @@
  * archive, and a person runs it.
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { libraryEntryDirs } from "./lib/library-entry-graphs.ts";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
@@ -191,8 +192,9 @@ export function ingestedSources(roots: readonly string[] = DEFAULT_ROOTS): Map<s
   const base = roots[0] ?? ROOT;
   for (const lib of libs) {
     if (!existsSync(lib)) continue;
-    for (const slug of readdirSync(lib)) {
-      const m = join(lib, slug, "manifest.jsonld");
+    // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`).
+    for (const { dir: entry } of libraryEntryDirs(lib)) {
+      const m = join(entry, "manifest.jsonld");
       if (!existsSync(m)) continue;
       let doc: unknown;
       try {
@@ -212,7 +214,7 @@ export function ingestedSources(roots: readonly string[] = DEFAULT_ROOTS): Map<s
         }
       };
       walk(doc);
-      for (const h of seen) out.set(h, relative(base, join(lib, slug)));
+      for (const h of seen) out.set(h, relative(base, entry));
     }
   }
   return out;

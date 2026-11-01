@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { BLOCK_HEADING, BASELINE_FILE, inspect, scan } from "../check-bean-blocks.ts";
-import { readBeans, type BeanNode } from "../beans.ts";
+import { readArchivedBeans, readBeans, type BeanNode } from "../beans.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import "../../schemas/kg/folio-graph-typology.js";
 
@@ -97,8 +97,12 @@ describe("the real corpus", () => {
   const found = scan(REPO, beans);
 
   test("there IS a corpus, so a clean run is not vacuous", () => {
-    expect(beans.length).toBeGreaterThan(100);
-    expect(found.filter((b) => b.verdict === "ok").length).toBeGreaterThan(0);
+    // Over the history (active plus the archive view): the active store is
+    // open work, which a drain empties on purpose, and settled blocks are
+    // archived with their beans (cat-harness-tools#1248).
+    const history = [...beans, ...(readArchivedBeans(REPO) ?? [])];
+    expect(history.length).toBeGreaterThan(100);
+    expect(scan(REPO, history).filter((b) => b.verdict === "ok").length).toBeGreaterThan(0);
   });
 
   test("every structured block in the store is complete, or baselined by id", () => {

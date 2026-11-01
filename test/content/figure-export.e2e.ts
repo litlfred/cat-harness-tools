@@ -110,4 +110,31 @@ test.describe("figure export — SVG, PNG, clipboard (#1270)", () => {
     expect(text).toContain("<svg");
     expect(text).toContain("<rect");
   });
+
+  test("Open ↗ is a link to the source SVG file, so a new tab shows the drawing (#915)", async ({ page, context }) => {
+    await open(page);
+    const link = page.getByRole("link", { name: "Open this diagram in a new tab" });
+    await expect(link).toHaveAttribute("href", `${ORIGIN}/uml/overview/cat-harness.svg`);
+    await expect(link).toHaveAttribute("target", "_blank");
+    const [tab] = await Promise.all([context.waitForEvent("page"), link.click({ button: "middle" })]);
+    await tab.waitForLoadState();
+    expect(tab.url()).toBe(`${ORIGIN}/uml/overview/cat-harness.svg`);
+    expect(await tab.content()).toContain("<rect");
+  });
+
+  test("an inline SVG with no file opens as a blob: tab, and the page stays put (#915)", async ({ page, context }) => {
+    const inline = PAGE.replace(
+      /<figure class="bpmn-figure"><img[^>]*><\/figure>/,
+      '<figure class="bpmn-figure"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 400"><circle cx="50" cy="50" r="40"/></svg></figure>',
+    );
+    await page.route(`${ORIGIN}/**`, (route) => route.fulfill({ contentType: "text/html", body: inline }));
+    await page.goto(`${ORIGIN}/inline/`);
+    const opener = page.getByRole("button", { name: "Open this diagram in a new tab" });
+    await opener.focus();
+    const [tab] = await Promise.all([context.waitForEvent("page"), page.keyboard.press("Enter")]);
+    await tab.waitForLoadState();
+    expect(tab.url()).toMatch(/^blob:/);
+    expect(await tab.content()).toContain("<circle");
+    expect(page.url()).toBe(`${ORIGIN}/inline/`);
+  });
 });

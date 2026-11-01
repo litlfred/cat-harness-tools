@@ -212,7 +212,7 @@ describe("build --site", () => {
     const site = join(root, "_site-src");
     const r = Bun.spawnSync(["bun", "run", join(import.meta.dir, "../../publish-instance-context.ts"), "build", "--root", root, "--instance", "base", "--site", site]);
     expect(r.exitCode).toBe(0);
-    const ctx = JSON.parse(readFileSync(join(site, "ns/context/v1.jsonld"), "utf-8")) as { "@context": Record<string, unknown> };
+    const ctx = JSON.parse(readFileSync(join(site, CTX_PATH), "utf-8")) as { "@context": Record<string, unknown> };
     expect(ctx["@context"].skos).toBe("http://www.w3.org/2004/02/skos/core#");
   });
 });

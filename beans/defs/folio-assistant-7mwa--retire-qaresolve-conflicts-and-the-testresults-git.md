@@ -2,11 +2,11 @@
 # folio-assistant-7mwa
 $schema: bean/1.0.0
 title: Retire qa:resolve-conflicts and the test/results .gitattributes entries; move the 14 per-instance test/results dirs and the folio_init template
-status: todo
+status: in-progress
 type: task
 priority: normal
 created_at: 2026-10-01T08:00:46Z
-updated_at: 2026-10-31T14:35:00Z
+updated_at: 2026-11-01T11:40:00Z
 parent: folio-assistant-3fva
 ---
 
@@ -17,7 +17,7 @@ There is nothing left to conflict, so `qa:resolve-conflicts` (`520m`) and the `o
 The per-instance `test/results/` dirs (`folio-assistant-sci`, `fhir-harness`, `smart-*`, `who-*`, `agent-skills`, `large-datasets`, `folio-assistant-core`) gain `storage`. The `folio_init` / `qa-sweep` template writes it, and `qou` (`s3p2`, 3,653 verdicts) becomes the first downstream consumer. That is a separate repo, and it needs the author's go.
 
 ## Done when
-- [ ] no gate or test references a committed `test/results` file
+- [x] no gate or test references a committed `test/results` file
 - [x] a freshly initialised folio publishes to its own qa-reports branch
 
 
@@ -68,3 +68,10 @@ Box 1 is still open, because folio-assistant-core and fhir-harness still commit 
 - `gitattributes.test.ts` `oxka`/`eqxp`, kept by the owner on 2026-10-23.
 
 Retiring `qa:resolve-conflicts` also needs a note in cat-harness's `prepare-merge` skill. The blocker on tfqf now covers only the screenshot box. Session https://claude.ai/code/session_01Qmmkt9MhQCZs54m2YPoyXp.
+
+_2026-11-01T11:40:00Z_ — Took over from the stalled claim (owner: "if stalled agent (no work > 2 hrs) take over"). Retired `qa:resolve-conflicts` on the owner's card of 10:37Z ("A. Retire in that tools PR"):
+- folio-assistant-core#482 (issue #480): stops committing `test/results/`. It ignores the tree and removes the 202 files (witnesses 73, kg-qa 64, block-qa 60, tabular-real-sources 4, the manifest). Its `qa` directory already declared `storage` on `cat/cat-harness/qa-reports`. The core `bun test` gave the same 35 failures with and without the files, all environmental in the scratch layout.
+- litlfred/cat-harness#911 (issue #910): `prepare-merge` records the reason for the retirement. `merge-conflict-patterns` drops the `kg-qa-sidecar` section and the `provisionalSide` prose claim, `qa-reports` points at `merge:main`, and the `merge-base.bpmn` `Task_Classify` / `Task_Resolve` text (with its checklist, `.pot` and glossary copies) no longer names the strategy.
+- This PR deletes `scripts/qa-resolve-conflicts.ts`, its test and its `package.json` script, and drops the `qa-sidecar` strategy and the `kg-qa-sidecar` pattern. `**/test/results/kg-qa/**` joins `derived-results` (take-base), so a branch still carrying a sidecar takes the base's deletion, and `test/attestations/` stays refused. It also drops the `merge-base.ts` step that called the command, and the `oxka`/`eqxp` `test/results` entries in `test/coordinator/gitattributes.test.ts`, with their two CI-gate names. Box 1 is ticked for this layer: no gate or test here reads a committed `test/results` file.
+- Kept, on purpose: `merge-train.ts` `keepTrackedIgnored` / `checkTestResultsDrops`. They guard against dropping tracked files and do nothing where nothing is tracked. fhir-harness, smart-*, who-* and the root checkout could not be read from this session, so whether any of them still commits `test/results` is unverified. Also kept: the `regen-after-merge.ts` writer overrides, checked one gate at a time. `check:term-mapping`→`term:mapping`, `check:published-instance-exports`→`kg:export:bootstrap` and `kg:export:check`→`kg:export:sidecars` still pair a gate with the writer of its working copy (`ensureWorkingCopy`), so each remains the correct repair.
+- Not done here: the matching `.gitattributes` lines live in the root `litlfred/folio-assistant` checkout, which this session could not reach. The other per-instance `test/results/` dirs (fhir-harness, smart-*, who-*, sci, agent-skills, large-datasets) and the `qou` consumer are still open, so the bean stays in progress. Session https://claude.ai/code/session_01Qmmkt91bg25J6So9QAApgm.
