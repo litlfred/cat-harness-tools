@@ -1421,10 +1421,12 @@ export interface PrunePlan {
 }
 
 const DAY = 86_400_000;
+/** Days every `main/<sha>` is kept whole before thinning to one per UTC day. */
+export const QA_KEEP_DAYS = 14;
 
 /**
- * The retention rule, pure (proposal §2.2): every `main/<sha>` for
- * `keepDays`; after that, one per UTC day (the newest written that day); the
+ * The retention rule, pure (proposal §2.2, window shortened to 14 days):
+ * every `main/<sha>` for `keepDays`; after that, one per UTC day (the newest written that day); the
  * newest `main` entry always. `pr/<n>` goes `prDays` after the PR closed. A PR
  * whose state could not be determined is KEPT and named — could-not-determine
  * never deletes.
@@ -1436,7 +1438,10 @@ export function planPrune(
   now: Date,
   opts: { keepDays?: number; prDays?: number; newestMain?: string } = {},
 ): PrunePlan {
-  const keepDays = opts.keepDays ?? 90;
+  // 14, not the proposal's 90: at ~25 merges a day, 90 days of every sha
+  // is ~500 entries and 8 GB summed, against the branch's 500 MB budget.
+  // Owner, 2026-11-01 (Q-FAD-3 A, folio-assistant#860).
+  const keepDays = opts.keepDays ?? QA_KEEP_DAYS;
   const prDays = opts.prDays ?? 7;
   const remove: string[] = [];
   const notes: string[] = [];

@@ -22,7 +22,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "bun:test";
 
 import { resolveBeanArchive } from "../../scripts/beans.ts";
-import { countConsideredOptions, doneWhenState, frontMatter, frontMatterValue, probeBranches, probeBeans, probeRepoSize, probeStaging, probeTodos } from "./probes.ts";
+import { countConsideredOptions, doneWhenState, frontMatter, frontMatterValue, probeBranches, probeBeans, probeRepoSize, probeSpecialBranches, probeStaging, probeTodos } from "./probes.ts";
 
 const made: string[] = [];
 afterAll(() => {
@@ -546,5 +546,27 @@ describe("doneWhenState — the four states `fkjo` needs kept apart", () => {
     expect(kinds.has("open")).toBe(true);
     expect(kinds.has("absent")).toBe(true);
     expect(kinds.has("unreadable")).toBe(true);
+  });
+});
+
+describe("probeSpecialBranches — unique bytes", () => {
+  it("counts a blob once however many paths name it, which is what a clone costs", () => {
+    // qa-reports holds the same verdict file under many `main/<sha>/` paths;
+    // summing every path counted it once per sha (folio-assistant#860).
+    const body = "x".repeat(1000);
+    const remote = repo({ "main/a/v.json": body, "main/b/v.json": body, "main/c/other.json": "yz" });
+    const dir = repo({ "README.md": "local" });
+    run(dir, "git", ["remote", "add", "origin", remote]);
+    run(remote, "git", ["branch", "cat/cat-harness/qa-reports"]);
+    const p = probeSpecialBranches({
+      repoRoot: dir,
+      remote: "origin",
+      rows: [{ id: "qa-reports", shape: "branch", name: "cat/cat-harness/qa-reports", legacy: [], budget: { bytes: 500 * 1024 ** 2, basis: "fixture" } } as never],
+    });
+    expect(p.state).toBe("ok");
+    if (p.state !== "ok") return;
+    const b = p.value.rows[0].branches[0];
+    expect(b.files).toBe(3);
+    expect(b.bytes).toBe(1002);
   });
 });
