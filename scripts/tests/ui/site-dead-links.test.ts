@@ -23,11 +23,24 @@ function site(files: Record<string, string>): string {
 }
 
 describe("which links are checked", () => {
-  it("skips external, anchor, Liquid and script-template values", () => {
-    for (const v of ["https://x.org/a", "mailto:a@b", "#top", "//cdn/x.js", "{{ '/a' | relative_url }}", "viewer/${a.url}", "' + esc(SITE_HREF + r.page) + '", "' + escape(v) + '"]) {
+  it("skips external, anchor, Liquid, ellipsis-placeholder and script-template values", () => {
+    for (const v of ["https://x.org/a", "mailto:a@b", "#top", "//cdn/x.js", "{{ '/a' | relative_url }}", "viewer/${a.url}", "…", "' + esc(SITE_HREF + r.page) + '", "' + escape(v) + '"]) {
       expect(isInternal(v)).toBe(false);
     }
     expect(isInternal("../a/b.html")).toBe(true);
+  });
+
+  it("ignores escaped HTML inside <code>/<pre> and template strings inside <script>, while still checking <script src>", () => {
+    const root = site({
+      "p.html": [
+        '<code>&lt;img src="x.svg"&gt;</code>',
+        '<pre>&lt;a href="y.html"&gt;y&lt;/a&gt;</pre>',
+        '<script>const s = `<a href="/api/pdf" target="_blank">PDF</a>`;</script>',
+        '<script src="missing.js"></script>',
+      ].join("\n"),
+    });
+    const r = checkSite({ site: root, basePath: "", fix: false, resolveSource: () => undefined });
+    expect(r.dead.map((d) => d.target)).toEqual(["missing.js"]);
   });
 
   it("resolves relative and base-path-absolute links to site paths", () => {
@@ -92,6 +105,40 @@ describe("--fix repoints what has one answer and reports the rest", () => {
   it("an ambiguous source is left dead", () => {
     const idx = tailIndex(["cat-harness/docs/AGENTS.md", "smart-base/docs/AGENTS.md"]);
     expect(sourceFor("docs/AGENTS.md", idx)).toBeUndefined();
+  });
+
+  it("a directory link whose section page is published as a sibling .html repoints to that .html", () => {
+    const root = site({
+      "docs/cat-harness/concepts/architecture.html": "<p>arch</p>",
+      "docs/cat-harness/concepts/README.html": '<a href="architecture/">architecture/</a>',
+    });
+    const r = checkSite({ site: root, basePath: "", fix: true, resolveSource: () => undefined });
+    expect(r.dead).toEqual([]);
+    expect(readFileSync(join(root, "docs/cat-harness/concepts/README.html"), "utf-8")).toContain('href="architecture.html"');
+  });
+
+  it("a relative link from docs/<instance>/<chapter>/ that landed at docs/<tail> resolves <instance>/<tail> in the checkout", () => {
+    const idx = tailIndex(["cat-harness/README.md", "cat-harness/docs/README.md", "other-inst/docs/README.md"]);
+    const origins = [{ path: "cat-harness", repository: "litlfred/cat-harness", ref: "abc", upstreamRoot: "" }];
+    const root = site({
+      "docs/cat-harness/start/README.html": '<a href="../../README.md">C@T Harness</a>',
+    });
+    const r = checkSite({
+      site: root,
+      basePath: "",
+      fix: true,
+      resolveSource: (rel) => {
+        for (const c of sourceCandidates(rel)) {
+          const f = sourceFor(c, idx);
+          if (f !== undefined) return blobUrl(f, origins);
+        }
+        return undefined;
+      },
+    });
+    expect(r.dead).toEqual([]);
+    expect(readFileSync(join(root, "docs/cat-harness/start/README.html"), "utf-8")).toContain(
+      'href="https://github.com/litlfred/cat-harness/blob/abc/README.md"',
+    );
   });
 
   it("without --fix nothing is rewritten", () => {

@@ -56,7 +56,9 @@ import {
 import { isBuiltAtPublish, type BuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 import { readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { mountedInstanceRoots } from "../schemas/kg/remote-mount.ts";
 import { scriptsOf as scriptTableOf } from "../schemas/sdlc/script-table.ts";
+import { tipLocations } from "./branch-store.ts";
 import { pairIO } from "./task-io.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -97,12 +99,21 @@ export interface PublishTimeDeclaration {
   builtAtPublish: readonly (Pick<BuiltAtPublish, "path"> & Partial<Pick<BuiltAtPublish, "writer">>)[];
 }
 
-/** Every instance under `repoRoot` that declares `builtAtPublish` (bean `p7mb`). */
+/**
+ * Every instance under `repoRoot` that declares `builtAtPublish` or an
+ * off-checkout `storage` directory such as `test/results/` on `qa-reports`
+ * (beans `p7mb`, `ksek`).
+ */
 export function publishTimeDeclarations(repoRoot: string): PublishTimeDeclaration[] {
   return instanceRootsIn(repoRoot).flatMap((root) => {
-    let list: readonly BuiltAtPublish[] = [];
+    let list: (Pick<BuiltAtPublish, "path"> & Partial<Pick<BuiltAtPublish, "writer">>)[] = [];
     try {
-      list = readDeclaration(root)?.builtAtPublish ?? [];
+      const decl = readDeclaration(root);
+      const built = decl?.builtAtPublish ?? [];
+      const stored = (decl?.directories ?? [])
+        .filter((d) => d.storage !== undefined)
+        .map((d) => ({ path: d.path.replace(/^\/+/, "").replace(/\/?$/, "/") }));
+      list = [...built, ...stored];
     } catch {
       // An unreadable declaration declares nothing here: its paths then count
       // as committed, which can keep a check stale, never hide a stale one.
@@ -125,6 +136,45 @@ export function missingPrerequisiteWriters(decls: readonly PublishTimeDeclaratio
       for (const w of e.writer ?? [])
         if (PREREQUISITE_WRITERS.includes(w) && !existsSync(join(d.root, e.path))) out.add(w);
   return [...out];
+}
+
+/**
+ * Whether `rel` (repo-relative) belongs to the repository that will commit the
+ * post-merge repair (beans `p7mb`, `ksek`):
+ * - never inside a branch-mounted state directory (`tipLocations`: `beans/`,
+ *   `fsh-guts/`, `todos/`, `cat-harness/subscribed-harnesses/`, …), which is
+ *   gitignored and kept on its state branch;
+ * - in a layer run (`instance` set, e.g. `"cat-harness"`), inside that layer's
+ *   tree only;
+ * - in an index run (`instance` unset or `"."`), outside every remote mount
+ *   (`mountedInstanceRoots`), which is gitignored in the index and repaired by
+ *   its own layer run.
+ */
+export function inTargetScope(repoRoot: string, instance?: string): (rel: string) => boolean {
+  const cleanInstance = instance?.replace(/^\/+|\/+$/g, "");
+  let stateDirs: string[] = [];
+  try {
+    stateDirs = tipLocations(repoRoot)
+      .map((l) => l.path.replace(/^\/+|\/+$/g, ""))
+      .filter((p) => p.length > 0);
+  } catch {
+    stateDirs = [];
+  }
+  const inDirList = (rel: string, dirs: readonly string[]): boolean =>
+    dirs.some((d) => rel === d || rel.startsWith(`${d}/`));
+  if (cleanInstance !== undefined && cleanInstance !== "" && cleanInstance !== ".") {
+    return (rel: string): boolean =>
+      (rel === cleanInstance || rel.startsWith(`${cleanInstance}/`)) && !inDirList(rel, stateDirs);
+  }
+  let remoteDirs: string[] = [];
+  try {
+    remoteDirs = [...mountedInstanceRoots(repoRoot).values()]
+      .map((abs) => relative(repoRoot, abs).split(sep).join("/").replace(/^\/+|\/+$/g, ""))
+      .filter((p) => p.length > 0 && !p.startsWith(".."));
+  } catch {
+    remoteDirs = [];
+  }
+  return (rel: string): boolean => !inDirList(rel, remoteDirs) && !inDirList(rel, stateDirs);
 }
 
 /**
@@ -178,11 +228,7 @@ export function treeMoveTracker(
   decls: readonly PublishTimeDeclaration[] = publishTimeDeclarations(repoRoot),
   instance?: string,
 ): MoveTracker {
-  const cleanInstance = instance?.replace(/^\/+|\/+$/g, "");
-  const inScope = (rel: string): boolean =>
-    cleanInstance === undefined || cleanInstance === "" || cleanInstance === "."
-      ? true
-      : rel === cleanInstance || rel.startsWith(`${cleanInstance}/`);
+  const inScope = inTargetScope(repoRoot, instance);
   type Seen = { stat: string; publishTime: boolean; hash?: string };
   let last: Map<string, Seen> | undefined;
   const walk = (prev: Map<string, Seen> | undefined): Map<string, Seen> => {
@@ -773,14 +819,10 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
     };
   }
 
-  const cleanInstance = opts.instance?.replace(/^\/+|\/+$/g, "");
-  const inInstance = (rel: string): boolean =>
-    cleanInstance === undefined || cleanInstance === "" || cleanInstance === "."
-      ? true
-      : rel === cleanInstance || rel.startsWith(`${cleanInstance}/`);
+  const inInstance = inTargetScope(repoRoot, opts.instance);
   const gitChanged = (await git.getChangedFiles()).filter(inInstance);
   const committedMoves = [...new Set([...moves.values()].flatMap((m) => m.committed))].sort();
-  const changedFiles = gitChanged.length > 0 ? gitChanged : committedMoves;
+  const changedFiles = gitChanged.length > 0 ? gitChanged : opts.git !== undefined ? committedMoves : [];
 
   if (changedFiles.length === 0) {
     return {

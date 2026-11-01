@@ -195,6 +195,17 @@ export interface FamilySweep {
    * `EXAMINED NOTHING` is for.
    */
   emptyLiveStore?: { id: string; at: string }[];
+  /**
+   * The kind's content is DERIVED and kept on a commit-keyed branch (`qa` on
+   * `qa-reports`), and the local working copy holds no node.
+   *
+   * **Could not determine — never `EXAMINED NOTHING`.** A commit-keyed
+   * directory is not committed, so what is on disk is whatever other writers
+   * left in it earlier in the same run. Calling it empty made the verdict
+   * depend on gate order (cat-harness-tools#1204, the same defect #759 fixed
+   * in `test-run-conformance`).
+   */
+  derivedNotComputed?: { id: string; at: string; branch: string }[];
   /** Directories of this kind stored on a branch FAMILY: by declaration not in the checkout (bean lehh). */
   onFamily?: number;
 }
@@ -319,6 +330,7 @@ export async function sweepFamilies(
     // branches by declaration, never in the checkout: named, not swept.
     const onFamily = new Set<string>();
     const liveStores = new Map<string, string>();
+    const derivedStores = new Map<string, { at: string; branch: string }>();
     let declared = 0;
     for (const inst of instanceRootsIn(repoRoot)) {
       for (const e of readDeclaration(inst)?.directories ?? []) {
@@ -355,6 +367,7 @@ export async function sweepFamilies(
         const at = where.state === "ok" ? where.at : d.absPath;
         dirs.add(at);
         if (atTip) liveStores.set(d.id, at);
+        else if (src.keyedBy === "commit") derivedStores.set(d.id, { at, branch: src.branch });
       }
     }
     s.onFamily = onFamily.size;
@@ -432,6 +445,10 @@ export async function sweepFamilies(
     if (Object.values(s.counts).reduce((a, c) => a + c.nodes, 0) === 0 && liveStores.size > 0) {
       s.emptyLiveStore = [...liveStores].map(([id, at]) => ({ id, at: relative(repoRoot, at) || "." }));
     }
+    // A derived, commit-keyed store with nothing local: not computed here.
+    if (Object.values(s.counts).reduce((a, c) => a + c.nodes, 0) === 0 && derivedStores.size > 0) {
+      s.derivedNotComputed = [...derivedStores].map(([id, d]) => ({ id, at: relative(repoRoot, d.at) || ".", branch: d.branch }));
+    }
     out.push(s);
   }
   // A nested kind's nodes, met in its parents' directories, are reported as its own.
@@ -490,6 +507,16 @@ async function main(): Promise<number> {
           `  · ${f.kind} at \`${e.id}\` (${e.at}) was READ and holds no node — a determined empty, ` +
             `not an unexamined corpus: its content is one live copy at a branch tip that a running ` +
             `process writes, so zero nodes means zero have been written yet`,
+        );
+      }
+    } else if (f.derivedNotComputed && nodes === 0) {
+      // COULD NOT DETERMINE (cat-harness-tools#1204): the working copy of a
+      // commit-keyed store is whatever earlier gates in this run wrote, so an
+      // empty one says nothing about the kind.
+      for (const d of f.derivedNotComputed) {
+        console.log(
+          `  ⚠ could not determine — ${f.kind} at \`${d.id}\` (${d.at}) is derived and stored on \`${d.branch}\`; ` +
+            `no node is in this checkout's working copy, so it was not computed here`,
         );
       }
     } else if (nodes === 0) {
@@ -664,4 +691,32 @@ async function main(): Promise<number> {
   return 0;
 }
 
-if (import.meta.main) process.exit(await main());
+/**
+ * Runs {@link main} and repeats every `✗` line at the end of the output.
+ *
+ * The CI summary keeps only the last 1,500 characters, and the family lines
+ * print first, so a failing family was cut from the summary
+ * (cat-harness-tools#1204; #1198 did the same for the sidecar judges).
+ */
+export async function runWithFailureRecap(run: () => Promise<number>, log: (line: string) => void = console.log): Promise<number> {
+  const failed: string[] = [];
+  const original = console.log;
+  console.log = (...args: unknown[]) => {
+    const line = args.map(String).join(" ");
+    for (const l of line.split("\n")) if (/^\s*✗/.test(l)) failed.push(l.trim());
+    log(line);
+  };
+  let code: number;
+  try {
+    code = await run();
+  } finally {
+    console.log = original;
+  }
+  if (code !== 0 && failed.length > 1) {
+    log(`\nFailures (${failed.length}), repeated so the CI summary keeps them:`);
+    for (const l of failed) log(`  ${l}`);
+  }
+  return code;
+}
+
+if (import.meta.main) process.exit(await runWithFailureRecap(main));

@@ -163,6 +163,14 @@ export type NodeSchemaRef = (
    * Read by `check-reference-direction` to skip generated files (bean `zhg2`).
    */
   generated?: true;
+  /**
+   * NO FILE carries this family: it is the shape the kind's own source files
+   * are READ into, in memory (the `archimate` kind's `archimate-model/v1`, what
+   * `readArchimate` makes of an `.archimate` file). So it is drawn whether or
+   * not a node on disk carries its tag (`gen-uml-overview`), and never looked
+   * for on disk. Owner, 2026-10-31: UML "rather derived" (smart-ra#166 D2).
+   */
+  derived?: true;
 };
 
 /**

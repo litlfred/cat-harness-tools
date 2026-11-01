@@ -18,7 +18,7 @@ let repo: Repo | undefined;
 afterEach(() => { repo?.cleanup(); repo = undefined; });
 
 describe("path classes come from the merge-conflict declaration", () => {
-  test("take-base and qa-sidecar paths are generated; READMEs are regions; the rest is authored", () => {
+  test("take-base paths, kg-qa sidecars among them, are generated; READMEs are regions; the rest is authored", () => {
     expect(pathClass(GEN)).toEqual({ path: GEN, class: "generated", pattern: "glossary" });
     expect(pathClass("cat-harness/test/results/kg-qa/skills/x.kg-qa.json").class).toBe("generated");
     expect(pathClass("beans/README.md").class).toBe("generated-regions");
