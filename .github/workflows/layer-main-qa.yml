@@ -74,10 +74,28 @@ jobs:
       group: layer-main-qa-${{ github.repository }}
       cancel-in-progress: true
     steps:
+      # The report script at the cat-harness-tools commit the caller's
+      # index.lock.json pins, never a branch tip (security audit S1, owner
+      # 2026-11-01); cat-harness-tools itself uses its own commit.
+      - name: The cat-harness-tools commit the caller pins
+        id: tools-lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ inputs.sha != '' && inputs.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REPOSITORY" = "litlfred/cat-harness-tools" ]; then ref="$SHA"
+          else
+            ref="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw+json" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/contents/index.lock.json?ref=$SHA" \
+              | python3 -Ic 'import json,sys; print(next((m["ref"] for m in json.load(sys.stdin).get("mounts", []) if m.get("harness") == "cat-harness-tools"), ""))')"
+            [ -n "$ref" ] || { echo "::error::$GITHUB_REPOSITORY index.lock.json at $SHA pins no cat-harness-tools"; exit 2; }
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: litlfred/cat-harness-tools
-          ref: main
+          ref: ${{ steps.tools-lock.outputs.ref }}
           sparse-checkout: .github/scripts/layer-main-qa
           path: qa
       - name: Keep the main-red issue in step with main's verdict

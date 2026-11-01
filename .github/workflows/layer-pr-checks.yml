@@ -123,6 +123,11 @@
 #     checks:
 #       uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@main
 #
+# `@main` above and below stands for the commit the caller's index.lock.json
+# pins: `bun run cat workflow-pins` writes it, `mount:remote` moves it with
+# each re-pin, and `check:workflow-pins` fails on a branch (owner, 2026-11-01,
+# security audit S1).
+#
 # Post-merge QA of main (owner, 2026-10-30, "Both"): a push to main runs
 # main's whole gate set and tests (the base side, above), and keeps main's
 # answer for the PRs based on that commit. It also says whether main ITSELF
@@ -231,10 +236,10 @@ on:
         # pre-70lx layers; folio-assistant#2529 merged on 2026-10-15.
         default: "main"
       tools-ref:
-        description: "The cat-harness-tools ref whose judging scripts run (both sides use the same)."
+        description: "The cat-harness-tools ref whose judging scripts run (both sides use the same). `lock`: the commit the caller's index.lock.json pins (cat-harness-tools itself: its own commit)."
         required: false
         type: string
-        default: "main"
+        default: "lock"
       reuse-stored-main:
         description: "On a PR's first attempt, when main's answer for these exact inputs is not cached, judge the PR against the answer a run on the caller's main stored for the PR's own base commit (its merge-base with main) instead of recomputing main (see the header). Off: the base side runs on every cache miss."
         required: false
@@ -342,12 +347,38 @@ jobs:
           list="$(seq -s, 1 "$N")"
           echo "gate shards: $N ([${list}])"
           echo "list=[${list}]" >> "$GITHUB_OUTPUT"
+      # Owner, 2026-11-01 (security audit S1, Q-SEC-4 "B"): a caller pins this
+      # workflow to the cat-harness-tools commit its own index.lock.json names
+      # (`bun run cat workflow-pins`), and the judging scripts follow the same
+      # pin, so nothing here runs code from a branch tip. `tools-ref: lock` (the
+      # default) reads that pin from the caller's index.lock.json at the commit
+      # under test; cat-harness-tools itself judges its own commit. Any other
+      # value is used as given (a branch is resolved at the pin time below).
+      - &tools-lock
+        name: The cat-harness-tools commit the caller pins
+        id: tools-lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WANT: ${{ inputs.tools-ref }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$WANT" != "lock" ]; then ref="$WANT"
+          elif [ "$GITHUB_REPOSITORY" = "litlfred/cat-harness-tools" ]; then ref="$SHA"
+          else
+            ref="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw+json" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/contents/index.lock.json?ref=$SHA" \
+              | python3 -Ic 'import json,sys; print(next((m["ref"] for m in json.load(sys.stdin).get("mounts", []) if m.get("harness") == "cat-harness-tools"), ""))')"
+            [ -n "$ref" ] || { echo "::error::$GITHUB_REPOSITORY index.lock.json at $SHA pins no cat-harness-tools: mount it, or pass tools-ref"; exit 2; }
+          fi
+          echo "judging scripts: cat-harness-tools $ref"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
       - &judging-scripts
         name: The judging scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: litlfred/cat-harness-tools
-          ref: ${{ inputs.tools-ref }}
+          ref: ${{ steps.tools-lock.outputs.ref }}
           path: ci
           sparse-checkout: .github/scripts/layer-pr-checks
       # One pin time per run attempt, shared by every job through the cache
@@ -450,7 +481,7 @@ jobs:
         env:
           MODE: ${{ inputs.mode }}
           INDEX_REF: ${{ inputs.index-ref }}
-          TOOLS_REF: ${{ inputs.tools-ref }}
+          TOOLS_REF: ${{ steps.tools-lock.outputs.ref }}
         run: |
           set -euo pipefail
           at="$(cat "$RUNNER_TEMP/pin/at")"
@@ -1104,6 +1135,7 @@ jobs:
     steps:
       # The same matrix as prepare-head's; a push has no prepare-head.
       - *shards
+      - *tools-lock
       - *judging-scripts
       - *pin-restore
       - *pin-record
@@ -1324,6 +1356,7 @@ jobs:
     steps:
       - id: skip-prep
         run: echo "hit=false" >> "$GITHUB_OUTPUT"
+      - *tools-lock
       - *judging-scripts
       - *pin-restore
       - *pin-record
