@@ -91,7 +91,7 @@ export function isReleaseBuild(env: Record<string, string | undefined>): boolean
  * when `sha` is present, which is the case where we are demonstrably in a run
  * and one variable happens to be unset.
  */
-// input-site: env GITHUB_SHA,KG_BRANCH,GITHUB_REF_NAME,GITHUB_RUN_ID #8cd909dc — build and git identity variables for the staging stamp
+// input-site: env GITHUB_SHA,KG_BRANCH,GITHUB_REF_NAME,GITHUB_RUN_ID #10e8f84f — build and git identity variables for the staging stamp
 export function stagingStamp(env: Record<string, string | undefined> = process.env): StagingStamp | undefined {
   if (isReleaseBuild(env)) return undefined;
   const sha = env.GITHUB_SHA;
