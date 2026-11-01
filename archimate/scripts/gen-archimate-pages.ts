@@ -71,6 +71,7 @@ import { visualiserNavDeclaration, type VisualiserNavEntry } from "../../scripts
 import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
 import { readArchimate, type ArchimateModel } from "../schemas/archimate.ts";
 import { renderViewSvg, typeLabel } from "./render-view.ts";
+import { posterFits, renderPosterSvg } from "./render-poster.ts";
 import { CONFIG_FILE, archimateDir, configPath, localDirOf, readConfig } from "./check-archimate.ts";
 import { planSlugs } from "../schemas/slugs.ts";
 import { LAYER_ORDER, categoryOf, layerSlug, metamodelDot, metamodelMermaid, metamodelOf, pairAnchor, typeAnchor, typeName, verbOf, type Metamodel } from "../schemas/metamodel.ts";
@@ -327,11 +328,14 @@ export function pagesFor(
       const vd = `${m}/views`;
       files.push({
         path: `${m}/views/${v.id}.svg`,
-        content: renderViewSvg(model, v, {
-          elementHref: (id) => toPage(vd, `../elements/${seg(id)}/`),
-          relationshipHref: (id) => toPage(vd, `../relationships/${id}/`),
-          viewHref: (id) => toPage(vd, `./${seg(id)}/`),
-        }),
+        // Banded views without lines are drawn as posters; the rest keep their layout, in the same theme.
+        content: posterFits(model, v)
+          ? renderPosterSvg(model, v, { ...config.poster, elementHref: (id) => toPage(vd, `../elements/${seg(id)}/`) })
+          : renderViewSvg(model, v, {
+              elementHref: (id) => toPage(vd, `../elements/${seg(id)}/`),
+              relationshipHref: (id) => toPage(vd, `../relationships/${id}/`),
+              viewHref: (id) => toPage(vd, `./${seg(id)}/`),
+            }),
       });
       const vp = `${m}/views/${seg(v.id)}`;
       files.push(page(`${vp}/index.html`, 3, `${v.name} — ${title}`, toData(vp, `../${v.id}.jsonld`),

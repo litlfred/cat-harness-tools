@@ -41,6 +41,7 @@ import {
 } from "../schemas/rules.ts";
 import { archimateDir, readConfig } from "./check-archimate.ts";
 import { renderViewSvg } from "./render-view.ts";
+import { posterFits, renderPosterSvg } from "./render-poster.ts";
 
 export const TOOL_ID = "archimate-blocks";
 
@@ -110,7 +111,8 @@ export function blocksOf(instanceRoot: string, config: ArchimateConfig = readCon
     const m = modelOf(f.model);
     const view = m.views.find((v) => v.id === f.view);
     if (view === undefined) throw new Error(`${f.label}: model ${f.model} has no view ${f.view}`);
-    outputs.push({ path: f.svg, label: f.label, content: renderViewSvg(m, view) });
+    // The same drawing the view's own page shows: a poster for a banded view, the themed layout otherwise.
+    outputs.push({ path: f.svg, label: f.label, content: posterFits(m, view) ? renderPosterSvg(m, view, config.poster) : renderViewSvg(m, view) });
   }
   return { outputs, checks };
 }

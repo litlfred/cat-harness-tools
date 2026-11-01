@@ -153,6 +153,19 @@ export const ArchimateConfigSchema = z
     figures: z.array(ArchimateConfigFigureSchema).optional(),
     /** The document's tables that are drawn from data (`archimate-blocks`). */
     tables: z.array(ArchimateConfigTableSchema).optional(),
+    /**
+     * How banded views are drawn as posters (`render-poster.ts`): the element
+     * property holding a card's short text, the property that stars a card,
+     * and the words for a star. Absent, the poster defaults apply.
+     */
+    poster: z
+      .object({
+        noteProperty: z.string().min(1).optional(),
+        starProperty: z.string().min(1).optional(),
+        starLabel: z.string().min(1).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((c, ctx) => {

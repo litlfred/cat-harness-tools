@@ -1,8 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { parseArchimate } from "../schemas/archimate.ts";
 import { fillOfType, layerClass, LAYER_FILL, TABLE_CSS } from "./figure-theme.ts";
-import { noteItems, renderPosterSvg, wrapWords } from "./render-poster.ts";
-import { LAYER_FILL as VIEW_FILL } from "./render-view.ts";
+import { noteItems, posterFits, renderPosterSvg, wrapWords } from "./render-poster.ts";
+import { LAYER_FILL as VIEW_FILL, renderViewSvg } from "./render-view.ts";
+import { bandColours } from "./figure-theme.ts";
 
 /** Two bands (goals, components with a panel), a side column, a frame of two stacked bands. */
 const XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -115,5 +116,20 @@ describe("text helpers", () => {
   it("sets short note items on one line, unless told not to", () => {
     expect(noteItems("EMR · HIS · LIMS · Telemedicine clients")).toEqual(["EMR · HIS · LIMS", "Telemedicine clients"]);
     expect(noteItems("EMR · HIS", false)).toEqual(["EMR", "HIS"]);
+  });
+});
+
+describe("poster theme on drawn views", () => {
+  it("draws a banded view without lines as a poster", () => {
+    expect(posterFits(m, view)).toBe(true);
+    expect(posterFits(m, { ...view, connections: [{ id: "c", source: "d-g1", target: "d-a2", bendpoints: [] } as never] })).toBe(false);
+  });
+  it("gives render-view a title banner and tinted groupings by default, and keeps the plain look on request", () => {
+    const poster = renderViewSvg(m, view);
+    expect(poster).toContain("Drawn from the ArchiMate model");
+    expect(poster).toContain(bandColours(LAYER_FILL.Motivation).header);
+    const plain = renderViewSvg(m, view, { theme: "plain" });
+    expect(plain).not.toContain("Drawn from the ArchiMate model");
+    expect(plain).not.toContain(bandColours(LAYER_FILL.Motivation).header);
   });
 });
