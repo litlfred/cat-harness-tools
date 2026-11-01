@@ -868,6 +868,9 @@ function labelBoxes(di: DiLayout, drawn?: DrawnLabels): { id: string; text: stri
 const q = (s: string): string => `"${s.replace(/\s+/g, " ").trim()}"`;
 
 /** Every readable-at-100% and detangle criterion for one diagram, findings keyed by criterion id. */
+/** The criteria `diagramFit` reports that kg:audit records (`edge-through-shape` is `edge-through-node` there). */
+export const FIT_CRITERIA = ["diagram-too-wide", "diagram-too-tall", "label-overlap", "label-on-edge", "label-on-shape", "label-on-lane-line", "shape-overlap", "lane-order"] as const;
+
 export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Finding[]> {
   const di = readDi(xml);
   const out: Record<string, Finding[]> = {
