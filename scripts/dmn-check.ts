@@ -49,9 +49,6 @@ function dmnFiles(dir: string): string[] {
   return out;
 }
 
-/** Is this root-relative path inside the folio? Its first segment says so. */
-const inFolio = (rel: string): boolean => rel.split(/[\\/]/)[0] === "folio";
-
 /** Check every table under `paths`; paths are relative to `root`. */
 export async function checkDmn(
   root: string,
@@ -86,7 +83,7 @@ export async function checkDmn(
       }
       findings.push(...checkTable(table, opts));
       // Only a table inside the folio has a block to be compared with.
-      if (inFolio(rel)) {
+      if (rel.split(/[\\/]/)[0] === "folio") {
         const md = join(dirname(abs), basename(abs).replace(/\.dmn$/, ".md"));
         findings.push(...checkFolioStructure(table, existsSync(md) ? readFileSync(md, "utf-8") : undefined, relative(root, md)));
       }
@@ -96,7 +93,7 @@ export async function checkDmn(
 
   for (const [id, where] of seen) {
     if (where.length < 2) continue;
-    const keep = where.find(inFolio);
+    const keep = where.find((w) => w.startsWith("folio/") || w.startsWith("folio\\"));
     for (const w of where) {
       if (w === keep) continue;
       reports
