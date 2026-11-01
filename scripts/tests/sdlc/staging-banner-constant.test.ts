@@ -68,6 +68,20 @@ function build(facts: Partial<StagingFacts>): { dir: string; html: Map<string, s
   return { dir, html, json };
 }
 
+describe("the build type is a fact in staging.json, never in the pages (owner, 2026-11-01)", () => {
+  const p = build({ buildType: "preview" });
+  const f = build({ buildType: "full" });
+
+  test("staging.json names it, so `pc:release freeze` can refuse a preview", () => {
+    expect(JSON.parse(p.json).buildType).toBe("preview");
+    expect(JSON.parse(f.json).buildType).toBe("full");
+  });
+
+  test("the pages are byte-identical across build types", () => {
+    for (const page of PAGES) expect(p.html.get(page)).toBe(f.html.get(page));
+  });
+});
+
 describe("the injected HTML does not depend on the build — bean `g196`", () => {
   const a = build({ sha: "aaaaaaa", built: "2026-09-20T10:00:00Z" });
   const b = build({ sha: "bbbbbbb", built: "2026-09-20T18:30:00Z", pr: "999" });
