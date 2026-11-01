@@ -3247,11 +3247,12 @@ for (const r of reports) {
   written.add(resolve(p));
   // Never overwrite a sidecar whose judgements could not be moved.
   if (attUnknown.has(r)) continue;
-  const text = serialise(withPriorAdversarialReviews(r, p));
   if (check) {
-    const current = existsSync(p) ? readFileSync(p, "utf-8") : undefined;
-    if (current !== text) stale.push(relative(root, p));
+    if (!existsSync(p) || readFileSync(p, "utf-8") !== serialise(withPriorAdversarialReviews(r, p))) {
+      stale.push(relative(root, p));
+    }
   } else {
+    const text = serialise(withPriorAdversarialReviews(r, p));
     mkdirSync(join(p, ".."), { recursive: true });
     writeFileSync(p, text);
   }
