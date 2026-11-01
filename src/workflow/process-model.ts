@@ -1793,7 +1793,21 @@ export async function loadProcessModel(
     throw new UnsupportedBpmn(`${basename(bpmnPath)}: no bpmn:Process`);
   }
 
-  const elements = proc.flowElements ?? [];
+  // An EVENT SUBPROCESS (`triggeredByEvent`) is a start-to-end path that can
+  // begin at any point of the process, e.g. a commenter withdrawing a comment
+  // at whatever step it is at (public-comment.bpmn, owner 2026-10-31). Its
+  // steps are read as the process's own, the way a second top-level start
+  // always was; the container is a drawing of "any time", not a step. Its
+  // steps take the container's lane when their own lane does not list them.
+  // Interrupting the main path is not modelled here: the engine has no token
+  // to cancel until it does, and claiming it would be a guess.
+  const eventSubOf = new Map<string, string>();
+  const elements = (proc.flowElements ?? []).flatMap((e) => {
+    if (e.$type !== "bpmn:SubProcess" || !(e as { triggeredByEvent?: boolean }).triggeredByEvent) return [e];
+    const inner = e.flowElements ?? [];
+    for (const c of inner) eventSubOf.set(c.id, e.id);
+    return inner;
+  });
 
   // Refuse before building anything, so the error names every offender at once
   // rather than one per re-run.
@@ -1854,6 +1868,17 @@ export async function loadProcessModel(
       if (roleRef) roleRefOf.set(id, roleRef);
       if (laneConventions.length) laneConventionsOf.set(id, laneConventions);
     }
+  }
+
+  for (const [child, parent] of eventSubOf) {
+    if (laneIdOf.has(child) || !laneIdOf.has(parent)) continue;
+    const name = laneOf.get(parent);
+    if (name) laneOf.set(child, name);
+    laneIdOf.set(child, laneIdOf.get(parent)!);
+    const role = roleRefOf.get(parent);
+    if (role) roleRefOf.set(child, role);
+    const conv = laneConventionsOf.get(parent);
+    if (conv) laneConventionsOf.set(child, conv);
   }
 
   // PROCESS-LEVEL conventions: bound on the <bpmn:process> itself, so they

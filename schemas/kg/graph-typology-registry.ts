@@ -163,6 +163,14 @@ export type NodeSchemaRef = (
    * Read by `check-reference-direction` to skip generated files (bean `zhg2`).
    */
   generated?: true;
+  /**
+   * NO FILE carries this family: it is the shape the kind's own source files
+   * are READ into, in memory (the `archimate` kind's `archimate-model/v1`, what
+   * `readArchimate` makes of an `.archimate` file). So it is drawn whether or
+   * not a node on disk carries its tag (`gen-uml-overview`), and never looked
+   * for on disk. Owner, 2026-10-31: UML "rather derived" (smart-ra#166 D2).
+   */
+  derived?: true;
 };
 
 /**
@@ -246,7 +254,7 @@ export interface GraphTypologyDef {
    * kind, which the navbar folds) says this. `check:subgraphs` routes such a
    * kind's unresolved links to `siteResolved`, as it does a renderable
    * graph's, and the kind's owner judges them from the page that shows them
-   * (fhir-harness's `check:ig-annex-links`). Absent means no.
+   * (an IG harness's annex-links check). Absent means no.
    */
   shownOnPublishedPages?: true;
   /**
@@ -1057,6 +1065,11 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // docs/payload/sha256/ (bean `f233`), written by gen-subgraph-jsonld.
       // Its validator is the node `validators/payload-sidecar.json`.
       "cat-harness-payload/v1": { generated: true },
+      // GENERATOR OUTPUT: the dynamic-state document `<site>/<harness>/state.jsonld`,
+      // written whole by `writeDynamicState` (render stage 3 and the state
+      // visualiser). It names the bean stores it read, so it is not prose.
+      // Its validator is the node `cat-harness-tools/validators/dynamic-state.json`.
+      "cat-harness-dynamic-state/v1": { generated: true },
     },
     summary:
       "Documentation ABOUT the knowledge graph — how the harness works, what its " +
@@ -2197,6 +2210,13 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // labels-only reading gets the nouns right and the relations wrong, so
       // a reader has to be able to tell the two apart.
       "folio-figure-descriptions/v1": {},
+      // A figure transcribed as data on its entry's `figure-data/` (owner,
+      // 2026-10-31, option B: in the library entry): the DIIG phases chart and the SMART
+      // Guidelines approach chart, one file per published version. Their
+      // shapes are with the generators that draw them, in a layer above this
+      // one, so they are routed here and validated there.
+      "diig-phases-figure/v1": {},
+      "smart-guidelines-approach-figure/v1": {},
       // Agent summaries of prose blocks, beside the blocks rather than in
       // them — the blocks stay verbatim and `ingested` (owner, 2026-09-24).
       // The semantic half of its QA is `block-summaries` in check-l1-complete.
@@ -3174,18 +3194,23 @@ export class GraphTypologyRegistry {
   private declaredIn = new Map<string, string>();
   /** Validator nodes, keyed `kind\u0000family`, kept so a kind registered LATER (core's `folio`) is joined too. */
   private validatorNodes = new Map<string, { file: string; node: ValidatorNode }>();
+  private kindRoot = new Map<string, number>();
+  private validatorRoot = new Map<string, number>();
+  private scannedRoots: string[] = [];
   private loaded = false;
 
   /** Kinds a LATER checkout also declares and an earlier one already answered — reported, never silently merged. */
   private shadowedKinds: Array<{ kind: string; kept: string; shadowed: string }> = [];
   /** The checkouts, in precedence order, whose `typologies/` graphs are loaded on first use. */
-  private readonly declaredUnder: readonly string[];
+  private declaredUnder: readonly string[] | undefined;
+  private readonly resolveDeclaredUnder: (() => readonly string[]) | undefined;
   /** Which instances of those checkouts are read; every one when omitted. */
   private readonly include: InstanceFilter | undefined;
 
   /**
    * @param seed the kinds this layer lists in code
-   * @param declaredUnder a checkout — or several, in PRECEDENCE order — whose
+   * @param declaredUnder a checkout — or several, in PRECEDENCE order, or a
+   *   lazythunk returning them so module import touches no filesystem — whose
    *   instances' `typologies/` graphs are loaded on first use; omitted, the
    *   registry holds only `seed` and what is `register`ed (a test's private
    *   registry). Within one checkout a name two files declare is refused, as
@@ -3200,17 +3225,25 @@ export class GraphTypologyRegistry {
    */
   constructor(
     seed: Readonly<Record<string, GraphTypologyDef>> = BASE_GRAPH_TYPOLOGIES,
-    declaredUnder?: string | readonly string[],
+    declaredUnder?: string | readonly string[] | (() => readonly string[]),
     options: { include?: InstanceFilter } = {},
   ) {
     this.include = options.include;
     for (const [k, v] of Object.entries(seed)) this.kinds.set(k, v);
-    const roots = declaredUnder === undefined ? [] : typeof declaredUnder === "string" ? [declaredUnder] : declaredUnder;
-    this.declaredUnder = [...new Set(roots.map((r) => resolve(r)))];
+    if (typeof declaredUnder === "function") {
+      this.resolveDeclaredUnder = declaredUnder;
+    } else {
+      const roots = declaredUnder === undefined ? [] : typeof declaredUnder === "string" ? [declaredUnder] : declaredUnder;
+      this.declaredUnder = [...new Set(roots.map((r) => resolve(r)))];
+    }
   }
 
   /** The checkouts this registry loads declared kinds from, in precedence order. */
   roots(): readonly string[] {
+    if (this.declaredUnder === undefined) {
+      const roots = this.resolveDeclaredUnder ? this.resolveDeclaredUnder() : [];
+      this.declaredUnder = [...new Set(roots.map((r) => resolve(r)))];
+    }
     return this.declaredUnder;
   }
 
@@ -3229,42 +3262,67 @@ export class GraphTypologyRegistry {
    * which is the dh4f shape.
    */
   private ensureDeclared(): void {
-    if (this.loaded || this.declaredUnder.length === 0) return;
+    const roots = this.roots();
+    if (this.loaded || roots.length === 0) return;
     this.loaded = true;
-    // Which checkout (by precedence index) answered each kind / validator key.
-    const kindRoot = new Map<string, number>();
-    const validatorRoot = new Map<string, number>();
-    this.declaredUnder.forEach((root, at) => {
-      for (const { file, node } of declaredKindNodes(root, this.include)) {
-        const prior = this.declaredIn.get(node.kind);
-        if (prior === file) continue;
-        const priorAt = kindRoot.get(node.kind);
-        if (prior !== undefined && priorAt !== undefined && priorAt < at) {
-          this.shadowedKinds.push({ kind: node.kind, kept: prior, shadowed: file });
-          continue;
-        }
-        if (prior !== undefined || this.kinds.has(node.kind)) {
-          throw new GraphTypologyConflictError(node.kind, `declared by ${prior ?? "the base layer's code"} and by ${file}`);
-        }
-        const def = kindDefOf(node) as GraphTypologyDef & WithDeclarer;
-        const by = declaringInstanceFor(file);
-        if (by !== undefined) def[DECLARED_BY] = by;
-        this.kinds.set(node.kind, def);
-        this.declaredIn.set(node.kind, file);
-        kindRoot.set(node.kind, at);
+    for (const root of roots) this.loadCheckoutRoot(root);
+  }
+
+  /**
+   * Ensure declared `typologies/` and `validators/` from `repoRoot` are loaded
+   * when this is an unfiltered checkout-backed registry (bean `cat-tools-g7ls`,
+   * owner card 2026-10-31 "A. Fix the loader").
+   *
+   * When `readDeclaration` reads an instance from a checkout outside
+   * {@link declaredUnder} — e.g. a host or sibling checkout reached from a
+   * standalone run, or a multi-instance test fixture — every discovered
+   * instance's `typologies/` in that checkout (such as a document layer's
+   * `glossary` for an IG harness's declaration) is registered before any declaration in
+   * it is validated. No-op on a bare or filtered registry.
+   */
+  ensureCheckout(repoRoot: string): void {
+    if (this.roots().length === 0 || this.include !== undefined) return;
+    const abs = resolve(repoRoot);
+    if (this.scannedRoots.includes(abs)) return;
+    if (instanceRootsIn(abs).length === 0) return;
+    this.ensureDeclared();
+    this.loadCheckoutRoot(abs);
+  }
+
+  private loadCheckoutRoot(root: string): void {
+    const abs = resolve(root);
+    if (this.scannedRoots.includes(abs)) return;
+    const at = this.scannedRoots.length;
+    this.scannedRoots.push(abs);
+    for (const { file, node } of declaredKindNodes(abs, this.include)) {
+      const prior = this.declaredIn.get(node.kind);
+      if (prior === file) continue;
+      const priorAt = this.kindRoot.get(node.kind);
+      if (prior !== undefined && priorAt !== undefined && priorAt < at) {
+        this.shadowedKinds.push({ kind: node.kind, kept: prior, shadowed: file });
+        continue;
       }
-      for (const v of declaredValidatorNodes(root, this.include)) {
-        const key = `${v.node.validates.kind}\u0000${v.node.validates.family ?? ""}`;
-        const prior = this.validatorNodes.get(key);
-        const priorAt = validatorRoot.get(key);
-        if (prior && priorAt !== undefined && priorAt < at && prior.file !== v.file) continue;
-        if (prior && prior.file !== v.file) {
-          throw new Error(`two validators for ${describeValidator(v.node)}: ${prior.file} and ${v.file}. One family, one validator.`);
-        }
-        this.validatorNodes.set(key, v);
-        validatorRoot.set(key, at);
+      if (prior !== undefined || this.kinds.has(node.kind)) {
+        throw new GraphTypologyConflictError(node.kind, `declared by ${prior ?? "the base layer's code"} and by ${file}`);
       }
-    });
+      const def = kindDefOf(node) as GraphTypologyDef & WithDeclarer;
+      const by = declaringInstanceFor(file);
+      if (by !== undefined) def[DECLARED_BY] = by;
+      this.kinds.set(node.kind, def);
+      this.declaredIn.set(node.kind, file);
+      this.kindRoot.set(node.kind, at);
+    }
+    for (const v of declaredValidatorNodes(abs, this.include)) {
+      const key = `${v.node.validates.kind}\u0000${v.node.validates.family ?? ""}`;
+      const prior = this.validatorNodes.get(key);
+      const priorAt = this.validatorRoot.get(key);
+      if (prior && priorAt !== undefined && priorAt < at && prior.file !== v.file) continue;
+      if (prior && prior.file !== v.file) {
+        throw new Error(`two validators for ${describeValidator(v.node)}: ${prior.file} and ${v.file}. One family, one validator.`);
+      }
+      this.validatorNodes.set(key, v);
+      this.validatorRoot.set(key, at);
+    }
     // A validator naming a kind not registered YET is joined by `register`
     // (core registers `folio` in code after load); one naming no kind at all
     // is `check:kind-validators`' finding.
@@ -3405,6 +3463,7 @@ function describeValidator(n: ValidatorNode): string {
  * same script passed. Two layouts, two answers about one file.
  */
 export function defaultTypologyRoots(
+  // input-site: env-unset REPO_ROOT #949cc29c — caller override naming a checkout outside the tree; unset in CI
   env: Readonly<Record<string, string | undefined>> = process.env,
   cwd: string = process.cwd(),
   moduleDir: string = dirname(fileURLToPath(import.meta.url)),
@@ -3423,7 +3482,7 @@ export function defaultTypologyRoots(
  * module sits in — declare in their `typologies/` graphs (bean dmx1), loaded on
  * first use. Core registers `folio` into it at load. See {@link defaultTypologyRoots}.
  */
-export const defaultGraphTypologies = new GraphTypologyRegistry(BASE_GRAPH_TYPOLOGIES, defaultTypologyRoots());
+export const defaultGraphTypologies = new GraphTypologyRegistry(BASE_GRAPH_TYPOLOGIES, defaultTypologyRoots);
 
 /**
  * The display name of a graph typology: its declared {@link GraphTypologyDef.title},

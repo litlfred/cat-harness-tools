@@ -259,6 +259,9 @@ describe("this repository's own instances", () => {
       // 2026-10-01): L1 and DAK are document KINDS inside smart-base.
       "smart-immunizations",
       "smart-trust",
+      // Added 2026-10-31 when it fired as designed: folio-assistant#2761 mounted
+      // `smart-trust-phw` (bean `nr5p`, PCF1) as an instance of the index.
+      "smart-trust-phw",
       "who-iris",
       // `who-style-guide` was listed here until 2026-10-01, when the owner
       // folded it into who-iris as a subgraph (bean qsx4). It fired as designed.

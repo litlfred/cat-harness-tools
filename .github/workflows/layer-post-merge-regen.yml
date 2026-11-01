@@ -90,18 +90,18 @@ jobs:
       pull-requests: write
     steps:
       - name: Check out the folio-assistant index
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: litlfred/folio-assistant
           ref: ${{ inputs.index-ref }}
           path: fa
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.4
       - name: Mount every instance from the index's lock
         run: bash fa/.github/mount-from-lock.sh --root fa
       - name: Check out the caller
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: src
       - name: Put a copy of the caller in place of its locked mount

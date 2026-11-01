@@ -9,6 +9,10 @@ import { join } from "node:path";
 
 import { duplicateIds, idOf } from "../check-duplicate-ids.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { siteNotBuilt } from "../../test/support/checkout.ts";
+
+const INCLUDE = join(HARNESS_ROOT, "docs", "_includes", "generated", "navbar-footer.html");
+const INCLUDE_NOT_BUILT = siteNotBuilt("the generated sidebar include `navbar:include` writes at publish (gitignored)", INCLUDE);
 
 describe("duplicateIds", () => {
   test("two elements with one id is a finding", () => {
@@ -45,12 +49,13 @@ describe("only an attribute named id counts", () => {
   });
 });
 
-describe("the generated navbar include: one checkbox, labels in every copy", () => {
+describe.skipIf(INCLUDE_NOT_BUILT)("the generated navbar include: one checkbox, labels in every copy", () => {
   // `sjic`: this markup used to be hand-written in `nav_footer_custom.html`,
   // which is now a single `{% include %}`. The `uknu` property it guards —
   // one input per PAGE across the two copies just-the-docs renders — is
   // unchanged and is now the generator's to hold.
-  const src = readFileSync(join(HARNESS_ROOT, "docs", "_includes", "generated", "navbar-footer.html"), "utf8");
+  // `describe.skipIf` still runs this body, so the read is guarded too.
+  const src = INCLUDE_NOT_BUILT ? "" : readFileSync(INCLUDE, "utf8");
   const code = src.replace(/\{%-?\s*comment\s*-?%\}[\s\S]*?\{%-?\s*endcomment\s*-?%\}/g, "");
 
   test("the checkbox input appears once, and only for the first rendered copy", () => {

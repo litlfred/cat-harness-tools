@@ -21,6 +21,6 @@ describe("a served directory's bytes publish at /<instance>/<path> — bean 680p
     // `smart-immunizations/fhir-artifact-index` served from bean `mftp` until
     // the owner's B1 ruling (2026-10-15): smart-immunizations now declares no
     // directories in this index (`directories: []`), so it serves nothing.
-    expect(routes).toEqual(["smart-base/fhir-artifact-index", "smart-trust/fhir-artifact-index", "smart-trust/openapi"]);
+    expect(routes).toEqual(["smart-base/fhir-artifact-index", "smart-trust-phw/fhir-artifact-index", "smart-trust/fhir-artifact-index", "smart-trust/openapi"]);
   });
 });

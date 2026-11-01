@@ -26,6 +26,15 @@
  * A sweep over zero files passes. So the sweep must reach sidecars in several
  * instances OTHER than the auditor's own — the population this bean is about.
  *
+ * ## Where the sidecars are read (bean `7mwa`)
+ *
+ * "Committed" stopped meaning "on disk" when cat-harness stopped committing
+ * its QA working copy (cat-harness#857): an instance whose `qa` home is absent
+ * is swept in the `qa-reports` store's newest `main` entry instead, at the
+ * same checkout paths and by the same validator, because that is what every
+ * reader then reads. An unreachable store is reported in the anti-vacuity
+ * message, never read as clean.
+ *
  * @module test/kg-validate-nested-instances
  *
  * Moved here from
@@ -43,7 +52,8 @@ import { existsSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { instanceRootsIn, kgQaHomeFor, readDeclaration } from "../../schemas/kg/cat-harness.js";
-import { owningInstanceRoot, validatePath } from "../../scripts/kg-validate.js";
+import { owningInstanceRoot, validatePath, validateText } from "../../scripts/kg-validate.js";
+import { readQaTree, type QaStoreOptions } from "../../scripts/qa-store.js";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -52,24 +62,65 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 const REPO = resolve(ORIGIN_DIR, "../../..");
 const HARNESS = join(REPO, "cat-harness");
 
-/** Every committed kg-audit sidecar, keyed by the instance it is ABOUT. */
-function sidecarsByInstance(): Map<string, string[]> {
-  const out = new Map<string, string[]>();
+/** One sidecar: its checkout path, and its text when it came from the store rather than the disk. */
+type Sidecar = { path: string; text?: string };
+
+/** Is this repository-relative path a kg-audit sidecar or the manifest beside them, under `home`? */
+const isKgQaFile = (rel: string, home: string): boolean =>
+  rel === `${home}/kg-qa.manifest.json` || (rel.startsWith(`${home}/kg-qa/`) && rel.endsWith(".kg-qa.json"));
+
+/**
+ * Every kg-audit sidecar a reader picks up, keyed by the instance it is ABOUT.
+ *
+ * Where it is read from (bean `7mwa`): an instance whose `qa` home is in the
+ * working copy is swept on disk, as before. One whose home is ABSENT is swept
+ * in the `qa-reports` store's newest `main` entry, at the same checkout paths:
+ * the corpus left the checkout (cat-harness#857), and the store is then what
+ * every reader reads. Nothing is written into the checkout. `storeState` says
+ * why the store gave nothing, so an empty sweep names its cause.
+ */
+function sidecarsByInstance(): { byInstance: Map<string, Sidecar[]>; storeState: string } {
+  const out = new Map<string, Sidecar[]>();
+  const absent: Array<{ key: string; home: string }> = [];
   for (const inst of instanceRootsIn(REPO)) {
+    const key = relative(REPO, inst) || ".";
     const home = kgQaHomeFor(inst, HARNESS).root;
-    if (!existsSync(home)) continue;
-    const files: string[] = [];
+    if (!existsSync(home)) {
+      absent.push({ key, home: relative(REPO, home).split("\\").join("/") });
+      continue;
+    }
+    const files: Sidecar[] = [];
     const manifest = join(home, "kg-qa.manifest.json");
-    if (existsSync(manifest)) files.push(manifest);
+    if (existsSync(manifest)) files.push({ path: manifest });
     const tree = join(home, "kg-qa");
     if (existsSync(tree)) {
       for (const f of readdirSync(tree, { recursive: true }).map(String)) {
-        if (f.endsWith(".kg-qa.json")) files.push(join(tree, f));
+        if (f.endsWith(".kg-qa.json")) files.push({ path: join(tree, f) });
       }
     }
-    if (files.length) out.set(relative(REPO, inst) || ".", files);
+    if (files.length) out.set(key, files);
   }
-  return out;
+  if (absent.length === 0) return { byInstance: out, storeState: "not read: every qa home is in the working copy" };
+  // The store is reached the way every reader reaches it: the checkout's
+  // `origin`, or QA_STORE_REMOTE / QA_STORE_DIR where the checkout has none.
+  const opts: QaStoreOptions = { repoRoot: REPO, log: () => {} };
+  let read: ReturnType<typeof readQaTree>;
+  try {
+    read = readQaTree("main", "", opts);
+  } catch (e) {
+    return { byInstance: out, storeState: `unknown: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  if (read.state !== "hit") {
+    // A corrupt entry is a finding about what readers read, not an absence.
+    if (read.state === "corrupt") throw new Error(`the qa-reports store is corrupt: ${read.reason}`);
+    return { byInstance: out, storeState: `${read.state}: ${read.reason}` };
+  }
+  for (const { key, home } of absent) {
+    const files: Sidecar[] = [];
+    for (const [rel, text] of read.files) if (isKgQaFile(rel, home)) files.push({ path: join(REPO, rel), text });
+    if (files.length) out.set(key, files);
+  }
+  return { byInstance: out, storeState: `read ${read.key}` };
 }
 
 describe("kg:validate over nested instances (bean `676g`)", () => {
@@ -110,7 +161,7 @@ describe("kg:validate over nested instances (bean `676g`)", () => {
   });
 
   test("every committed kg-audit sidecar, in every instance, validates", async () => {
-    const byInstance = sidecarsByInstance();
+    const { byInstance, storeState } = sidecarsByInstance();
     const others = [...byInstance.keys()].filter((k) => k !== "cat-harness");
     // ANTI-VACUITY, DERIVED rather than counted (owner, 2026-10-10: "derive
     // the floor"). The floor was a literal 5; smart-base stopped committing
@@ -121,22 +172,28 @@ describe("kg:validate over nested instances (bean `676g`)", () => {
     // holds a manifest must ALSO hold sidecars (a manifest with none is the
     // regression this guards), and the sweep must reach at least one instance
     // other than the auditor, which is the population bean `676g` is about.
-    const declaring = instanceRootsIn(REPO)
-      .filter((inst) => existsSync(join(kgQaHomeFor(inst, HARNESS).root, "kg-qa.manifest.json")))
-      .map((inst) => relative(REPO, inst) || ".");
-    const withoutSidecars = declaring.filter((k) => !(byInstance.get(k) ?? []).some((f) => f.endsWith(".kg-qa.json")));
+    // The manifest is asked of the same source the sidecars came from: on
+    // disk, or in the store entry (bean `7mwa`).
+    const declaring = [...byInstance.entries()]
+      .filter(([, files]) => files.some((f) => f.path.endsWith("kg-qa.manifest.json")))
+      .map(([k]) => k);
+    const withoutSidecars = declaring.filter((k) => !(byInstance.get(k) ?? []).some((f) => f.path.endsWith(".kg-qa.json")));
     expect(withoutSidecars, "instances with a kg-qa manifest but no kg-audit sidecars").toEqual([]);
-    expect(others.length, `sidecars found only in: ${[...byInstance.keys()].join(", ")}`).toBeGreaterThanOrEqual(1);
+    expect(
+      others.length,
+      `sidecars found only in: ${[...byInstance.keys()].join(", ")} (qa-reports store: ${storeState})`,
+    ).toBeGreaterThanOrEqual(1);
 
     const offences: string[] = [];
     let n = 0;
     for (const files of byInstance.values()) {
-      for (const f of files) {
+      for (const { path: f, text } of files) {
         n++;
-        const v = await validatePath(f, owningInstanceRoot(f, HARNESS), HARNESS);
+        const owner = owningInstanceRoot(f, HARNESS);
+        const v = text === undefined ? await validatePath(f, owner, HARNESS) : await validateText(f, text, owner, HARNESS);
         if (v.state !== "valid") {
           offences.push(
-            `${relative(REPO, f)}: ${v.state}${v.state === "invalid" ? ` — ${v.problems.slice(0, 2).join("; ")}` : v.state === "undetermined" ? ` — ${v.reason}` : ""}`,
+            `${relative(REPO, f)}${text === undefined ? "" : " (qa-reports)"}: ${v.state}${v.state === "invalid" ? ` — ${v.problems.slice(0, 2).join("; ")}` : v.state === "undetermined" ? ` — ${v.reason}` : ""}`,
           );
         }
       }

@@ -94,13 +94,15 @@ describe("what Jekyll is handed", () => {
     // There were two labels per copy, the `☰` and the `[x]`, and the owner
     // asked for both to go because they duplicated the avatar. So the way in
     // is no longer in this include at all — it is `.site-title`, which
-    // `docs-ui.js` makes toggle this checkbox. Assert BOTH halves, or removing
-    // the labels would read as leaving the sidebar with no way in.
+    // `docs-ui.js` makes open this checkbox. Assert BOTH halves, or removing
+    // the labels would read as leaving the sidebar with no way in. Since the
+    // owner's 2026-10-30 ruling (cat-harness-tools#910) a click on a CLOSED
+    // bar's avatar opens it, and on an open bar it is the theme's home link.
     const { canonical, staging } = variants(file());
     for (const v of [canonical, staging]) expect(v).not.toContain('for="fa-nav-open"');
     const js = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "assets/js/docs-ui.js")), "utf8");
     expect(js).toContain('bar.querySelector(".site-title")');
-    expect(js).toMatch(/box\.checked = !box\.checked/);
+    expect(js).toMatch(/box\.checked = true/);
   });
 });
 

@@ -20,6 +20,7 @@ import { subgraphOutDir } from "../gen-subgraph-jsonld.ts";
 import { instanceRootsIn, readDeclaration, repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { SUBGRAPH_INDEX_FILE } from "../../schemas/kg/subgraph-manifest.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { siteNotBuilt } from "../../test/support/checkout.ts";
 
 const HARNESS = resolve(HARNESS_ROOT);
 const REPO = repoRootFor(HARNESS);
@@ -31,12 +32,17 @@ afterAll(() => {
 
 const declared = instanceRootsIn(REPO).filter((i) => readDeclaration(i) !== undefined);
 
+// The repository subgraph index each site below carries is written at publish
+// and gitignored (bean w1gy F18); not built, there is no real site to index.
+const SUBGRAPH_INDEX = join(HARNESS, subgraphOutDir(HARNESS), SUBGRAPH_INDEX_FILE);
+const NOT_BUILT = siteNotBuilt("the repository subgraph index `subgraph:jsonld` writes at publish (gitignored)", SUBGRAPH_INDEX);
+
 /** A site with every declared instance's export, `skip` excepted. */
 function site(skip: string[] = []): string {
   const dir = mkdtempSync(join(tmpdir(), "root-index-"));
   made.push(dir);
   mkdirSync(join(dir, "subgraph"), { recursive: true });
-  copyFileSync(join(HARNESS, subgraphOutDir(HARNESS), SUBGRAPH_INDEX_FILE), join(dir, "subgraph", SUBGRAPH_INDEX_FILE));
+  copyFileSync(SUBGRAPH_INDEX, join(dir, "subgraph", SUBGRAPH_INDEX_FILE));
   for (const inst of declared) {
     if (skip.includes(readDeclaration(inst)!.name)) continue;
     // Where the deploy writes it: the host at its docPath, every other
@@ -49,8 +55,11 @@ function site(skip: string[] = []): string {
   return dir;
 }
 
-describe("the root index", () => {
-  const { doc, problems } = buildRootIndex(site());
+describe.skipIf(NOT_BUILT)("the root index", () => {
+  // `describe.skipIf` still runs this body, so nothing is built when it skips.
+  const { doc, problems } = NOT_BUILT
+    ? ({ doc: { hasHarness: [] }, problems: [] } as unknown as ReturnType<typeof buildRootIndex>)
+    : buildRootIndex(site());
   const entries = doc.hasHarness as Array<Record<string, unknown>>;
 
   test("names every declared instance, once, and nothing else", () => {

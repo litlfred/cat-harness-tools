@@ -255,6 +255,21 @@ on:
         required: false
         type: boolean
         default: false
+      writer-skip:
+        description: "Skip a derive:publish writer whose recorded reads are unchanged, putting back what it wrote (bean fwtz). A push to the caller's main records each writer under strace; a PR restores the newest record and skips. Off: every writer runs."
+        required: false
+        type: boolean
+        default: true
+      quick-paths:
+        description: "Path prefixes in the calling repository, space-separated (a directory ends in `/`). A PR whose every changed file starts with one of them takes the quick lane: the PR side is mounted, installed and typechecked, `quick-test` runs, and nothing else (no main side, no shards, no derive:publish, no gates). Empty: no quick lane."
+        required: false
+        type: string
+        default: ""
+      quick-test:
+        description: "What `bun test` runs in the quick lane, relative to the instance's directory (run from the root as `./<instance>/<quick-test>`, as the shards run tests). Required when quick-paths is set."
+        required: false
+        type: string
+        default: ""
     # Post-merge QA (owner, 2026-10-30, "Both"): on a push to main, whether
     # main ITSELF is green, for the caller's `layer-main-qa.yml` job, which
     # opens, updates or closes the one `main-red` issue. Empty on a PR.
@@ -307,6 +322,8 @@ jobs:
       tools: ${{ steps.pins.outputs.tools }}
       shards: ${{ steps.shards.outputs.list }}
       skip: ${{ steps.lock-only.outputs.skip }}
+      quick: ${{ steps.quick.outputs.quick }}
+      quick-test: ${{ steps.quick-test.outcome }}
       typecheck: ${{ steps.tsc.outcome }}
     steps:
       # The shard matrix, [1..gate-shards], once, so `run` and `compare` agree
@@ -327,7 +344,7 @@ jobs:
           echo "list=[${list}]" >> "$GITHUB_OUTPUT"
       - &judging-scripts
         name: The judging scripts
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: litlfred/cat-harness-tools
           ref: ${{ inputs.tools-ref }}
@@ -344,7 +361,7 @@ jobs:
       # re-run is a new attempt and so a new time: it judges main as it is.
       - &pin-restore
         id: pin-restore
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
@@ -355,7 +372,7 @@ jobs:
         if: >-
           steps.pin-restore.outputs.cache-hit != 'true' && github.event_name != 'push' &&
           inputs.pin-to-main-record && github.run_attempt == '1'
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/cone
           key: layer-pr-checks-cone-v1-${{ github.repository }}-none-${{ github.run_id }}
@@ -417,13 +434,13 @@ jobs:
       - &pin-save
         if: steps.pin-restore.outputs.cache-hit != 'true'
         continue-on-error: true  # the other side saved first: read its time below
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
       - &pin-reread
         if: steps.pin-restore.outputs.cache-hit != 'true'
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
@@ -457,7 +474,7 @@ jobs:
           { echo "at=$at"; echo "layers-at=$layers_at"; echo "index=$index"; echo "tools=$tools"; } >> "$GITHUB_OUTPUT"
       - &checkout-index
         name: Check out the root (the folio-assistant index, or the caller in index mode)
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ inputs.mode == 'index' && github.repository || 'litlfred/folio-assistant' }}
           # Index mode: the PR's merge commit on both sides; the base side then
@@ -500,13 +517,13 @@ jobs:
           fi
           git log -1 --format='base side: %h %s'
       - &setup-bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.4
       - &caller
         name: Check out the caller
         if: inputs.mode == 'layer'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: src
           fetch-depth: 2
@@ -532,6 +549,33 @@ jobs:
             fi
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
+      # The quick lane (bean qkln; owner 2026-10-31, Q-CI1 A): a PR that
+      # touches only `quick-paths` runs only `quick-test`, about 2 minutes
+      # instead of the full ~30. Never on a push: main always runs in full.
+      - &quick
+        name: Does this PR change only the quick-lane paths?
+        id: quick
+        if: inputs.mode == 'layer' && inputs.quick-paths != '' && github.event_name == 'pull_request'
+        env:
+          PATHS: ${{ inputs.quick-paths }}
+          TEST: ${{ inputs.quick-test }}
+        run: |
+          set -euo pipefail
+          quick=false
+          if [ -z "$TEST" ]; then echo "::error::quick-paths is set but quick-test is empty"; exit 2; fi
+          if git -C src rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            changed="$(git -C src diff --name-only 'HEAD^1' HEAD)"
+            if [ -n "$changed" ]; then
+              quick=true
+              while IFS= read -r f; do
+                hit=false
+                for p in $PATHS; do case "$f" in "$p"*) hit=true; break;; esac; done
+                if [ "$hit" != true ]; then quick=false; echo "not quick: $f is outside quick-paths"; break; fi
+              done <<<"$changed"
+            fi
+            [ "$quick" = true ] && { echo "quick lane: every changed file is under: $PATHS"; echo "$changed"; }
+          fi
+          echo "quick=$quick" >> "$GITHUB_OUTPUT"
       - &caller-base
         name: Base side of the caller
         # Not on a push, for the same reason as the root's base side above.
@@ -562,7 +606,7 @@ jobs:
       - &mount-cache
         name: Cache remote mounts (bean cis1)
         if: steps.skip-prep.outputs.hit != 'true'
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: /home/runner/.cache/cat-mount
           key: cat-mount-v1-${{ hashFiles('fa/index.lock.json') }}
@@ -679,7 +723,7 @@ jobs:
         name: Install Chromium, for the checks that draw through a browser
         # Not on a draft under `draft-fast-tier`: only derive:publish and the
         # gates draw, and a draft runs neither (owner, 2026-10-23, "1y").
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         # `render:bpmn` and the `*:processes:render:check` gates draw BPMN with
         # bpmn-js in Chromium (folio-assistant's B1 test job installs it for
         # the same reason). The index's OWN Playwright installs it, so the
@@ -696,7 +740,7 @@ jobs:
           fi
       - &state-mount
         name: Mount every graph kept on a branch, and build the IG pages
-        if: steps.skip-prep.outputs.hit != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && steps.quick.outputs.quick != 'true'
         # Every branch-kept graph the declarations name (beans, todos,
         # fsh-guts, health, issue-marks, marks, ...), as the index's own CI
         # mounts them with `state:mount`, but through `mountState` directly:
@@ -759,7 +803,7 @@ jobs:
         # fatal: recorded, and judged by the compare job against main.
         # Part of the full tier: skipped on a draft under `draft-fast-tier`,
         # with the shard hand-off steps below.
-        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         working-directory: fa
         run: |
           python3 ../ci/.github/scripts/layer-pr-checks/run-root-gates.py . \
@@ -771,20 +815,41 @@ jobs:
         # keyed by each writer's inputs and script closure (#409), so a stale
         # entry is a key defect, which the derive log's "reused" lines show.
         # Saved per side and run; restored from the newest of this repository.
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
-        uses: actions/cache@v6
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: fa/build/derive-cache
           key: derive-cache-v1-${{ github.repository }}-${{ env.SIDE }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             derive-cache-v1-${{ github.repository }}-${{ env.SIDE }}-
             derive-cache-v1-${{ github.repository }}-
+      # Bean fwtz (owner 2026-10-31: "cache the page build", keyed on input
+      # content, so changed inputs rebuild). The writer cache above keys on
+      # statically derived inputs and reused 0 of 41 writers on
+      # https://github.com/litlfred/folio-assistant-core/pull/444. Writer records
+      # are traced instead: a push to
+      # main records what each writer read and wrote; a PR skips a writer whose
+      # every recorded read is unchanged and puts back what it wrote.
+      - &writer-cone
+        name: Restore main's derive:publish writer records (bean fwtz)
+        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: fa/build/writer-cone
+          key: writer-cone-v1-${{ github.repository }}-${{ github.event.pull_request.base.sha }}
+          restore-keys: writer-cone-v1-${{ github.repository }}-
+      - &strace
+        name: strace, to record the writers (a push to main)
+        if: env.RECORD_WRITERS == 'true' && steps.skip-prep.outputs.hit != 'true'
+        run: |
+          if command -v strace >/dev/null; then strace -V | head -1; exit 0; fi
+          sudo apt-get update -qq && sudo apt-get install -y -qq strace && strace -V | head -1
       - &derive
         name: Build the publish-time pages (derive:publish), on this side
         # Not on a draft under `draft-fast-tier` (owner, 2026-10-23, "1y"):
         # only the tests and gates read these pages, and a draft runs neither.
         # The typecheck does not read them. A ready_for_review run builds them.
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         # B1 (owner, 2026-10-14; cat-harness#194, cb280cd): the pages an
         # instance declares `builtAtPublish` are no longer committed, and
         # `bun run cat derive:publish` builds them over the mounts, as
@@ -805,6 +870,8 @@ jobs:
         # only: derive:publish and its writers call `bun run cat <writer>`,
         # which there would run /usr/bin/cat. package.json is restored before
         # the tests and gates, so they judge the checkout as committed.
+        env:
+          WRITER_SKIP: ${{ inputs.writer-skip }}
         working-directory: fa
         run: |
           set -uo pipefail
@@ -860,8 +927,15 @@ jobs:
           # Reuse on (cat-harness-tools#400): derive:publish keeps reuse off under
           # CI unless a cache directory is named.
           export CAT_DERIVE_CACHE_DIR="$PWD/build/derive-cache"
+          # Writer records (bean fwtz): recorded on a push, used on a PR.
+          if [ "$WRITER_SKIP" = "true" ]; then
+            if [ "${RECORD_WRITERS:-}" = "true" ]; then export CAT_WRITER_RECORD=1
+            elif [ -f build/writer-cone/records.json ]; then export CAT_WRITER_SKIP=1
+            else echo "writer skip: no records restored, every writer runs"; fi
+          fi
           bun run cat derive:publish 2>&1 | tee "$log" || code=$?
           echo "derive cache: $(grep -c '^  reused ' "$log" || true) writer(s) reused, $(grep -c '^  ran ' "$log" || true) ran"
+          echo "writer skip: $(grep -c '^  skipped .*put back its outputs' "$log" || true) writer(s) skipped, $(grep -Ec '^  [^ ]+ runs: ' "$log" || true) ran"
           if [ -n "$injected" ]; then cp "$RUNNER_TEMP/package.json.orig" package.json; fi
           # A root that is not the folio-assistant index (no
           # code-quality-gates.yml: a folio, an IG repository) mounts fewer
@@ -887,6 +961,13 @@ jobs:
           json.dump({"publish:derive:publish": {"command": "bun run cat derive:publish", "exit": int(sys.argv[2]), "tail": tail}}, open(sys.argv[1], "w"), indent=1)
           PY
           fi
+      - &writer-cone-save
+        name: Keep main's writer records (bean fwtz)
+        if: env.RECORD_WRITERS == 'true' && steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: fa/build/writer-cone
+          key: writer-cone-v1-${{ github.repository }}-${{ github.sha }}
       # The typecheck, once, here: it was its own job, a third machine and
       # a third wait for one `tsc` (cat-harness-tools#397). Its outcome goes
       # to the compare job, which fails on it, so the shards still run.
@@ -897,6 +978,14 @@ jobs:
         working-directory: fa/${{ inputs.mode == 'layer' && env.INSTANCE || '.' }}
         run: |
           if [ -f tsconfig.json ]; then bunx tsc --noEmit -p tsconfig.json; else echo "no tsconfig.json: nothing to typecheck"; fi
+      - name: Quick-lane tests
+        id: quick-test
+        if: steps.quick.outputs.quick == 'true'
+        continue-on-error: true
+        working-directory: fa
+        env:
+          TEST: ${{ inputs.quick-test }}
+        run: bun test "./$INSTANCE/$TEST"
       - name: Directory READMEs (QA report, never a gate)
         # Owner, 2026-10-16: "QA report, but not gate". A layer's own PR is
         # told when its directory READMEs are stale, as a warning and in the
@@ -934,8 +1023,8 @@ jobs:
           exit 0
       - &timings-restore
         name: The gate seconds the last run of this repository recorded
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
-        uses: actions/cache/restore@v6
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/timings
           key: layer-pr-checks-timings-v1-${{ github.repository }}-${{ github.run_id }}
@@ -943,7 +1032,7 @@ jobs:
             layer-pr-checks-timings-v1-${{ github.repository }}-
       - &snapshot-save
         name: Hand this side's prepared root to its shards
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/prepared"
@@ -956,8 +1045,8 @@ jobs:
           ls -la "$RUNNER_TEMP/prepared"
       - &upload-prepared
         name: Upload this side's prepared root
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
-        uses: actions/upload-artifact@v7
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: prepared-${{ env.SIDE }}
           path: ${{ runner.temp }}/prepared
@@ -1010,6 +1099,7 @@ jobs:
       - *setup-bun
       - *caller
       - *lock-only
+      - *quick
       - *caller-base
       # The base side is main, and main's answer does not depend on the PR
       # (bean cis2). It is cached under what it is computed FROM: the index
@@ -1083,14 +1173,14 @@ jobs:
       # artifact (below).
       - name: Is main's answer already known?
         id: base-lookup
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ steps.base-key.outputs.key }}
       - name: Are this main's cone records already kept? (a push)
         id: cone-lookup
         if: github.event_name == 'push'
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/cone
           key: ${{ steps.base-key.outputs.cone }}
@@ -1107,7 +1197,7 @@ jobs:
         if: >-
           steps.base-lookup.outputs.cache-hit != 'true' && github.event_name != 'push' &&
           inputs.reuse-stored-main && github.run_attempt == '1'
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ steps.base-key.outputs.key }}
@@ -1120,7 +1210,7 @@ jobs:
           github.event_name != 'push' &&
           (steps.base-lookup.outputs.cache-hit == 'true' || steps.stored-lookup.outputs.cache-matched-key != '')
         continue-on-error: true
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: base-answer
           path: |
@@ -1172,11 +1262,12 @@ jobs:
         env:
           PUSH: ${{ github.event_name == 'push' }}
           PINS_ONLY: ${{ steps.lock-only.outputs.skip == 'true' }}
+          QUICK: ${{ steps.quick.outputs.quick == 'true' }}
           BASE_HIT: ${{ steps.base-hit.outputs.hit == 'true' }}
           CONE_HIT: ${{ steps.cone-lookup.outputs.cache-hit == 'true' }}
         run: |
           hit=false
-          if [ "$PINS_ONLY" = "true" ]; then hit=true
+          if [ "$PINS_ONLY" = "true" ] || [ "$QUICK" = "true" ]; then hit=true
           elif [ "$PUSH" = "true" ]; then { [ "$BASE_HIT" = "true" ] && [ "$CONE_HIT" = "true" ]; } && hit=true
           elif [ "$BASE_HIT" = "true" ]; then hit=true
           fi
@@ -1192,10 +1283,54 @@ jobs:
       - *state-mount
       - *root-gates
       - *derive-cache
+      - *writer-cone
+      - *strace
       - *derive
+      - *writer-cone-save
       - *timings-restore
       - *snapshot-save
       - *upload-prepared
+
+  # Main's writer records (bean fwtz), on their own machine beside the base
+  # side: tracing every derive:publish writer under strace took the base
+  # side's preparation from ~10 to 56 minutes (folio-assistant-core run
+  # 41251751682). PRs read only the records this job saves, so nothing waits
+  # on it but the run's own end.
+  record-writers:
+    name: Record main's page-build scripts (bean fwtz)
+    if: inputs.writer-skip && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SIDE: base
+      RECORD_WRITERS: "true"
+    steps:
+      - id: skip-prep
+        run: echo "hit=false" >> "$GITHUB_OUTPUT"
+      - *judging-scripts
+      - *pin-restore
+      - *pin-record
+      - *pin-write
+      - *pin-save
+      - *pin-reread
+      - *pins
+      - *checkout-index
+      - *base-root
+      - *setup-bun
+      - *caller
+      - *caller-base
+      - *mount-cache
+      - *mount
+      - *mark
+      - *lower-layers-main
+      - *swap
+      - *root-cat
+      - *install
+      - *chromium
+      - *state-mount
+      - *strace
+      - *derive
+      - *writer-cone-save
 
   # Each side is `gate-shards` jobs, on separate machines (bean lpcs, step 3).
   # The ~300 gates ran one at a time, ~2500 s a side
@@ -1216,7 +1351,7 @@ jobs:
     if: >-
       !cancelled() && needs.prepare-base.result == 'success' && (
         (github.event_name == 'push' && needs.prepare-base.outputs.prepared == 'true') ||
-        (github.event_name != 'push' && needs.prepare-head.result == 'success' && needs.prepare-head.outputs.skip != 'true'))
+        (github.event_name != 'push' && needs.prepare-head.result == 'success' && needs.prepare-head.outputs.skip != 'true' && needs.prepare-head.outputs.quick != 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 150
     strategy:
@@ -1232,14 +1367,14 @@ jobs:
       - id: skip-prep
         run: echo "hit=false" >> "$GITHUB_OUTPUT"
       - name: The judging scripts, at the commit this run pinned
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: litlfred/cat-harness-tools
           ref: ${{ matrix.side == 'base' && needs.prepare-base.outputs.tools || needs.prepare-head.outputs.tools }}
           path: ci
           sparse-checkout: .github/scripts/layer-pr-checks
       - name: Check out the root, at the commit this run pinned
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ inputs.mode == 'index' && github.repository || 'litlfred/folio-assistant' }}
           ref: ${{ inputs.mode == 'index' && (github.event_name == 'push' && github.sha || github.ref) || (matrix.side == 'base' && needs.prepare-base.outputs.index || needs.prepare-head.outputs.index) }}
@@ -1250,7 +1385,7 @@ jobs:
       - *mount-cache
       - *mount
       - name: Fetch what this side's prepare job built
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: prepared-${{ matrix.side }}
           path: ${{ runner.temp }}/prepared
@@ -1273,7 +1408,7 @@ jobs:
       # as before the cone.
       - name: The CI cone's records from the caller's main
         id: cone-restore
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/cone
           key: layer-pr-checks-cone-v1-${{ github.repository }}-none-${{ github.run_id }}
@@ -1375,7 +1510,7 @@ jobs:
           ROOT_GATES=""
           [ "$MODE" = "layer" ] && ROOT_GATES="--record $RUNNER_TEMP/root-gates.json"
           python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json" $ROOT_GATES
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: results-${{ matrix.side }}-${{ matrix.shard }}
           if-no-files-found: error
@@ -1413,6 +1548,7 @@ jobs:
           PUSH: ${{ github.event_name == 'push' }}
           PREPARED: ${{ needs.prepare-base.outputs.prepared }}
           DRAFT: ${{ inputs.draft-fast-tier && github.event.pull_request.draft == true }}
+          QUICK: ${{ needs.prepare-head.outputs.quick == 'true' }}
         run: |
           if [ "$PUSH" = "true" ]; then
             if [ "$PREPARED" = "true" ]; then
@@ -1427,6 +1563,11 @@ jobs:
             msg="This PR changes only the caller's own pins (index.lock.json, index.config.json). Layer mode mounts the folio-assistant index's lock, never the caller's, so the tests and gates would judge nothing it changed: nothing was run."
             echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
             echo "only=true" >> "$GITHUB_OUTPUT"
+          elif [ "$QUICK" = "true" ]; then
+            msg="quick lane: this PR changes only \`${{ inputs.quick-paths }}\`, so only \`bun test ${{ inputs.quick-test }}\` and the typecheck ran (no main side, shards, derive:publish or gates)."
+            echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            echo "only=true" >> "$GITHUB_OUTPUT"
+            echo "quick=true" >> "$GITHUB_OUTPUT"
           elif [ "$DRAFT" = "true" ]; then
             msg="draft: full tier skipped. This draft PR was prepared and typechecked only; the tests, the gates and the comparison with main run when it is marked ready for review."
             echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
@@ -1453,13 +1594,13 @@ jobs:
             exit 2
           fi
       # A push always: main's own verdict (below) reads main-verdict.py.
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: steps.pins-only.outputs.only != 'true' || github.event_name == 'push'
         with:
           repository: litlfred/cat-harness-tools
           ref: ${{ github.event_name == 'push' && needs.prepare-base.outputs.tools || needs.prepare-head.outputs.tools }}
           sparse-checkout: .github/scripts/layer-pr-checks
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         if: steps.pins-only.outputs.only != 'true'
         with:
           path: results
@@ -1469,7 +1610,7 @@ jobs:
       # while the head shards run. `cached` is true only when it was handed.
       - name: Main's answer, cached or stored (bean cis2)
         if: steps.pins-only.outputs.only != 'true' && needs.prepare-base.outputs.cached == 'true' && github.event_name != 'push'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: base-answer
           path: ${{ runner.temp }}/base-results
@@ -1555,7 +1696,7 @@ jobs:
       - name: Keep main's answer for the next run (bean cis2)
         if: steps.join.outcome == 'success' && needs.prepare-base.outputs.cached != 'true'
         continue-on-error: true
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ needs.prepare-base.outputs.key }}
@@ -1566,7 +1707,7 @@ jobs:
       - name: The pins main's side was mounted at (a push)
         if: steps.join.outcome == 'success' && github.event_name == 'push'
         continue-on-error: true
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/pin
           key: layer-pr-checks-pin-${{ github.run_id }}-${{ github.run_attempt }}
@@ -1594,14 +1735,14 @@ jobs:
       - name: Keep the CI cone's records for the PRs (a push)
         if: steps.cone.outputs.kept == 'true'
         continue-on-error: true
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/cone
           key: ${{ needs.prepare-base.outputs.cone }}
       - name: Keep the gate seconds, to balance the next run's shards
         if: steps.join.outcome == 'success'
         continue-on-error: true
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/timings
           key: layer-pr-checks-timings-v1-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -1613,7 +1754,7 @@ jobs:
       - name: Main's kept answer (a push that joined nothing)
         if: ${{ !cancelled() && github.event_name == 'push' && steps.join.outcome != 'success' && needs.prepare-base.outputs.key != '' }}
         continue-on-error: true
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/base-results
           key: ${{ needs.prepare-base.outputs.key }}
@@ -1623,7 +1764,7 @@ jobs:
       # and many cannot apply there. No file: every gate is judged.
       - name: The gates this layer declares (a push)
         if: ${{ !cancelled() && github.event_name == 'push' }}
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: caller-declared
           sparse-checkout: .github/main-qa-gates.json
@@ -1653,6 +1794,19 @@ jobs:
         run: |
           echo "::error::tests: ${{ steps.tests.outcome }}, gates: ${{ steps.gates.outcome }}, typecheck: ${{ needs.prepare-head.outputs.typecheck }} — see the step summary"
           exit 1
+      # The quick lane is judged here: its tests and the typecheck. A PR side
+      # that could not be prepared is red, never a pass.
+      - name: Quick-lane verdict
+        if: steps.pins-only.outputs.quick == 'true'
+        env:
+          PREPARED: ${{ needs.prepare-head.result }}
+          TESTS: ${{ needs.prepare-head.outputs.quick-test }}
+          TYPECHECK: ${{ needs.prepare-head.outputs.typecheck }}
+        run: |
+          echo "quick lane: prepare-head $PREPARED, tests ${TESTS:-not run}, typecheck ${TYPECHECK:-not run}" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$PREPARED" = "success" ] || { echo "::error::quick lane: the PR side could not be prepared ($PREPARED)"; exit 1; }
+          [ "$TESTS" = "success" ] || { echo "::error::quick lane: tests ${TESTS:-not run}"; exit 1; }
+          [ "$TYPECHECK" != "failure" ] || { echo "::error::quick lane: typecheck failed"; exit 1; }
       # A draft under `draft-fast-tier`: the fast tier is judged here. A PR
       # side that could not be prepared is red, never a pass. So is a failed
       # typecheck.

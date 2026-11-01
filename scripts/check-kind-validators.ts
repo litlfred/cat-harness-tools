@@ -34,7 +34,12 @@
 // kinds in a typologies/ graph, and a sweep over the code list alone stopped checking
 // every kind that moved (the FHIR IG harness's, cat-openapi's — now cat-harness/openapi/ — core's). Measured
 // 2026-10-04 while building riit; core's code-registered kinds are imported too.
-import { BASE_GRAPH_TYPOLOGIES, declaredKindNodes, defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
+import {
+  BASE_GRAPH_TYPOLOGIES,
+  declaredKindNodes,
+  defaultGraphTypologies,
+  type GraphTypologyRegistry,
+} from "../schemas/kg/graph-typology-registry.js";
 import { FOLIO_GRAPH_TYPOLOGY } from "../schemas/kg/folio-graph-typology.js";
 import { BLOCK_KINDS, CONTENT_ADAPTER_NODES, DISCOVERED_BLOCK_KIND_NODES } from "../schemas/content/block-kinds.js";
 import { declaredNodeFiles } from "../schemas/kg/declared-nodes.js";
@@ -190,6 +195,17 @@ export interface FamilySweep {
    * `EXAMINED NOTHING` is for.
    */
   emptyLiveStore?: { id: string; at: string }[];
+  /**
+   * The kind's content is DERIVED and kept on a commit-keyed branch (`qa` on
+   * `qa-reports`), and the local working copy holds no node.
+   *
+   * **Could not determine — never `EXAMINED NOTHING`.** A commit-keyed
+   * directory is not committed, so what is on disk is whatever other writers
+   * left in it earlier in the same run. Calling it empty made the verdict
+   * depend on gate order (cat-harness-tools#1204, the same defect #759 fixed
+   * in `test-run-conformance`).
+   */
+  derivedNotComputed?: { id: string; at: string; branch: string }[];
   /** Directories of this kind stored on a branch FAMILY: by declaration not in the checkout (bean lehh). */
   onFamily?: number;
 }
@@ -245,7 +261,10 @@ function jsonFiles(dir: string): string[] {
  * validate it where the family has a Zod schema. A tag the map does not name
  * fails — declaring the map is the claim that it is complete.
  */
-export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
+export async function sweepFamilies(
+  root: string,
+  registry: GraphTypologyRegistry = defaultGraphTypologies,
+): Promise<FamilySweep[]> {
   const out: FamilySweep[] = [];
   // Every directory the checkout declares, with the kinds it carries. A node
   // under a MORE SPECIFIC declared directory belongs to that directory's
@@ -277,17 +296,26 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
   // directory of it, so its nodes sit inside a parent kind's directory (the
   // IG artefact JSON-LD that gen-ig-pages writes under an `ig-pages` docs
   // root). Its families route from the parent's sweep and count as its own.
-  const nested = new Map<string, { kind: string; fam: Awaited<ReturnType<typeof resolveNodeSchemas>>[number] }>();
-  for (const kind of defaultGraphTypologies.names()) {
-    if (!defaultGraphTypologies.get(kind)!.nodeSchemas || declaredDirs.some((d) => d.kinds.includes(kind))) continue;
-    for (const fam of await resolveNodeSchemas(kind, root)) if (!nested.has(fam.tag)) nested.set(fam.tag, { kind, fam });
+  type RoutedFamily = Awaited<ReturnType<typeof resolveNodeSchemas>>[number] | { tag: string; state: "unvalidated" };
+  const nested = new Map<string, { kind: string; fam: RoutedFamily }>();
+  for (const kind of registry.names()) {
+    const def = registry.get(kind)!;
+    if (!def.nodeSchemas || declaredDirs.some((d) => d.kinds.includes(kind))) continue;
+    for (const fam of await resolveNodeSchemas(kind, root, registry)) if (!nested.has(fam.tag)) nested.set(fam.tag, { kind, fam });
+    for (const tag of Object.keys(def.nodeSchemas)) if (!nested.has(tag)) nested.set(tag, { kind, fam: { tag, state: "unvalidated" } });
   }
   const routed = new Map<string, Pick<FamilySweep, "counts" | "invalid">>();
-  for (const kind of defaultGraphTypologies.names()) {
-    const def = defaultGraphTypologies.get(kind)!;
+  for (const kind of registry.names()) {
+    const def = registry.get(kind)!;
     if (!def.nodeSchemas) continue;
-    const fams = await resolveNodeSchemas(kind, root);
-    const byTag = new Map(fams.map((f) => [f.tag, f]));
+    const fams = await resolveNodeSchemas(kind, root, registry);
+    const byTag = new Map<string, RoutedFamily>(fams.map((f) => [f.tag, f]));
+    // A family declared with `{}` in `nodeSchemas` and joined to no validator
+    // in this checkout (e.g. `diig-phases-figure/v1` and
+    // `smart-guidelines-approach-figure/v1`, baselined as unkinded in
+    // `node-kinds.baseline.json`) is still a family the typology names:
+    // routed here as `unvalidated`, never reported as `unmapped`.
+    for (const tag of Object.keys(def.nodeSchemas)) if (!byTag.has(tag)) byTag.set(tag, { tag, state: "unvalidated" });
     const s: FamilySweep = { kind, counts: {}, unmapped: [], unresolvable: [], invalid: [], projected: [] };
     for (const f of fams) if (f.state === "unresolvable") s.unresolvable.push({ tag: f.tag, reason: f.reason });
     const repoRoot = join(root, "..");
@@ -302,6 +330,7 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
     // branches by declaration, never in the checkout: named, not swept.
     const onFamily = new Set<string>();
     const liveStores = new Map<string, string>();
+    const derivedStores = new Map<string, { at: string; branch: string }>();
     let declared = 0;
     for (const inst of instanceRootsIn(repoRoot)) {
       for (const e of readDeclaration(inst)?.directories ?? []) {
@@ -338,6 +367,7 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
         const at = where.state === "ok" ? where.at : d.absPath;
         dirs.add(at);
         if (atTip) liveStores.set(d.id, at);
+        else if (src.keyedBy === "commit") derivedStores.set(d.id, { at, branch: src.branch });
       }
     }
     s.onFamily = onFamily.size;
@@ -415,6 +445,10 @@ export async function sweepFamilies(root: string): Promise<FamilySweep[]> {
     if (Object.values(s.counts).reduce((a, c) => a + c.nodes, 0) === 0 && liveStores.size > 0) {
       s.emptyLiveStore = [...liveStores].map(([id, at]) => ({ id, at: relative(repoRoot, at) || "." }));
     }
+    // A derived, commit-keyed store with nothing local: not computed here.
+    if (Object.values(s.counts).reduce((a, c) => a + c.nodes, 0) === 0 && derivedStores.size > 0) {
+      s.derivedNotComputed = [...derivedStores].map(([id, d]) => ({ id, at: relative(repoRoot, d.at) || ".", branch: d.branch }));
+    }
     out.push(s);
   }
   // A nested kind's nodes, met in its parents' directories, are reported as its own.
@@ -445,7 +479,9 @@ async function main(): Promise<number> {
           ? `  ✓ ${tag}: ${c.parsed}/${c.checked} parse`
           : c.state === "external"
               ? `  · ${tag}: ${c.nodes} node(s), an external specification — named, not run here`
-              : `  · ${tag}: ${c.nodes} node(s), a TypeScript shape, not runnable — could not determine`,
+              : c.state === "unvalidated"
+                  ? `  · ${tag}: ${c.nodes} node(s), routed here, no validator in this checkout — could not determine`
+                  : `  · ${tag}: ${c.nodes} node(s), a TypeScript shape, not runnable — could not determine`,
       );
     }
     if (f.onFamily && Object.keys(f.counts).length === 0) {
@@ -471,6 +507,16 @@ async function main(): Promise<number> {
           `  · ${f.kind} at \`${e.id}\` (${e.at}) was READ and holds no node — a determined empty, ` +
             `not an unexamined corpus: its content is one live copy at a branch tip that a running ` +
             `process writes, so zero nodes means zero have been written yet`,
+        );
+      }
+    } else if (f.derivedNotComputed && nodes === 0) {
+      // COULD NOT DETERMINE (cat-harness-tools#1204): the working copy of a
+      // commit-keyed store is whatever earlier gates in this run wrote, so an
+      // empty one says nothing about the kind.
+      for (const d of f.derivedNotComputed) {
+        console.log(
+          `  ⚠ could not determine — ${f.kind} at \`${d.id}\` (${d.at}) is derived and stored on \`${d.branch}\`; ` +
+            `no node is in this checkout's working copy, so it was not computed here`,
         );
       }
     } else if (nodes === 0) {
@@ -645,4 +691,32 @@ async function main(): Promise<number> {
   return 0;
 }
 
-if (import.meta.main) process.exit(await main());
+/**
+ * Runs {@link main} and repeats every `✗` line at the end of the output.
+ *
+ * The CI summary keeps only the last 1,500 characters, and the family lines
+ * print first, so a failing family was cut from the summary
+ * (cat-harness-tools#1204; #1198 did the same for the sidecar judges).
+ */
+export async function runWithFailureRecap(run: () => Promise<number>, log: (line: string) => void = console.log): Promise<number> {
+  const failed: string[] = [];
+  const original = console.log;
+  console.log = (...args: unknown[]) => {
+    const line = args.map(String).join(" ");
+    for (const l of line.split("\n")) if (/^\s*✗/.test(l)) failed.push(l.trim());
+    log(line);
+  };
+  let code: number;
+  try {
+    code = await run();
+  } finally {
+    console.log = original;
+  }
+  if (code !== 0 && failed.length > 1) {
+    log(`\nFailures (${failed.length}), repeated so the CI summary keeps them:`);
+    for (const l of failed) log(`  ${l}`);
+  }
+  return code;
+}
+
+if (import.meta.main) process.exit(await runWithFailureRecap(main));

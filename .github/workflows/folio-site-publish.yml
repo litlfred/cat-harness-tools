@@ -45,7 +45,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           # The job token is set once, globally, in the step below. Two
@@ -54,7 +54,7 @@ jobs:
 
       - uses: litlfred/cat-harness-tools/.github/actions/mount-layers@main
 
-      - uses: ruby/setup-ruby@v1
+      - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
         with:
           ruby-version: "3.3"
 

@@ -105,6 +105,8 @@ const GLOSSARY_ROUTE = (CONTENT && declaredPageRoute(CORE_ROOT, "glossary-page")
 const GLOSSARY_LEGACY_ROUTE = (CONTENT && declaredRoute(CORE_ROOT, "glossary-page")) ?? GLOSSARY_FALLBACK;
 const glossaryPageAt = (route: string): string => join(HARNESS, siteDir(OWN), ...route.split("/"), "index.md");
 const GLOSSARY_PAGE = [GLOSSARY_ROUTE, GLOSSARY_LEGACY_ROUTE].map(glossaryPageAt).find((p) => existsSync(p)) ?? glossaryPageAt(GLOSSARY_ROUTE);
+/** The glossary page whose `<dt id>` anchors every class must reach — written at publish, so a test can ask whether it is there. */
+export const glossaryPage = (): string => GLOSSARY_PAGE;
 /**
  * Where a term's entry is: on the page of the instance that owns its scheme,
  * `<route>/instance/<instance>/` (the content core, owner 2026-10-15: the

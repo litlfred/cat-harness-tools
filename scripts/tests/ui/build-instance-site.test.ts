@@ -3,7 +3,8 @@ import { describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps } from "../../build-instance-site.ts";
+import { spawnSync } from "node:child_process";
+import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, ownerRepo, pageUrls, stagingDir, targetOf, keepPinned, checkLinks, missingRequired, readUpstreamPages, stepCommand, writerCommand, pinGeneratedData, publishedRoot, shellFlags, chromeArtefacts, buildChrome, LIBRARY_GATE, gateSteps } from "../../build-instance-site.ts";
 import type { DeclaredArtefact } from "../../derive-at-publish.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
@@ -108,13 +109,13 @@ describe("keepPinned — a build leaves a mounted layer as the lock pins it (lit
 describe("build-instance-site — a checkout that only mounts layers (an IG repository)", () => {
   test("a step runs from the checkout's own package.json, or through run-script.ts where it has none", () => {
     const d = mkdtempSync(join(tmpdir(), "bis-step-"));
-    expect(stepCommand(d, "ig-site:compose")).toMatch(/run-script\.ts" ig-site:compose$/);
+    expect(stepCommand(d, "ig-site:compose")).toMatch(/run-script\.ts['"]? ig-site:compose$/);
     writeFileSync(join(d, "package.json"), JSON.stringify({ scripts: { "build:site": "echo" } }));
     expect(stepCommand(d, "build:site")).toBe("bun run build:site");
     // A package.json for the IG's own tooling, naming none of the site's steps
     // (smart-immunizations: fsh-sushi only): the step still resolves.
     writeFileSync(join(d, "package.json"), JSON.stringify({ dependencies: { "fsh-sushi": "^3" } }));
-    expect(stepCommand(d, "ig-site:compose")).toMatch(/run-script\.ts" ig-site:compose$/);
+    expect(stepCommand(d, "ig-site:compose")).toMatch(/run-script\.ts['"]? ig-site:compose$/);
     expect(() => stepCommand(d, "x; rm -rf /")).toThrow();
   });
 
@@ -236,5 +237,26 @@ describe("gateSteps — every site build runs the library gate folio-assistant's
   });
   test("it is a script name a step may carry", () => {
     expect(SCRIPT_NAME.test(LIBRARY_GATE)).toBe(true);
+  });
+});
+
+describe("publishedRoot — shell-safe quoting of git archive arguments (bean cat-tools-j4sh)", () => {
+  test("an exclude of $(touch ...) is single-quoted for bash and does not execute", () => {
+    const dir = mkdtempSync(join(tmpdir(), "bis-pubroot-"));
+    const remote = join(dir, "remote");
+    const marker = join(dir, "pwned");
+    mkdirSync(remote);
+    const g = (...a: string[]) => spawnSync("git", a, { cwd: remote, encoding: "utf-8" });
+    g("init", "-q", "-b", "gh-pages");
+    g("config", "user.email", "t@t");
+    g("config", "user.name", "t");
+    writeFileSync(join(remote, "index.html"), "<p>ok</p>");
+    g("add", "index.html");
+    g("commit", "-qm", "init");
+
+    const tree = publishedRoot(remote, "gh-pages", [`$(touch ${marker})`, "`touch " + marker + "`"]);
+    expect(existsSync(marker)).toBe(false);
+    expect(tree).toBeDefined();
+    expect(readFileSync(join(tree!, "index.html"), "utf-8")).toBe("<p>ok</p>");
   });
 });

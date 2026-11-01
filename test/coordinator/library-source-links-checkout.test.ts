@@ -21,6 +21,7 @@ import { declaredPageRoute } from "../../scripts/viewer-declarations.ts";
 import { LibraryIndexSchema } from "../../schemas/ui/site-indexes.ts";
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph } from "../../schemas/kg/harness-config.js";
+import { siteNotBuilt } from "../support/checkout.ts";
 
 const TOOL = resolve(import.meta.dir, "../../scripts/gen-library-viz.ts");
 const HARNESS = resolve(import.meta.dir, "../../../cat-harness");
@@ -28,9 +29,22 @@ const REPO = resolve(HARNESS, "..");
 const SITE = join(HARNESS, siteDirFor(HARNESS));
 const SEG = basename(corpusDirectoriesForGraph(HARNESS, "library")[0]!);
 const { pageDir, dataDir } = viewerPlacement(SITE, declaredPageRoute(HARNESS, "library-viewer")!, SEG);
-const index = LibraryIndexSchema.parse(JSON.parse(readFileSync(join(dataDir, "index.json"), "utf-8")));
+/**
+ * The library projection and the viewer's pages are written at publish and
+ * gitignored (bean w1gy F18). `describe` still runs its body, so an index
+ * that is not built reads as empty and the tests over the site skip.
+ */
+const NOT_BUILT = siteNotBuilt(
+  "the library projection and pages `library:viz` writes at publish (gitignored)",
+  join(dataDir, "index.json"),
+  join(pageDir, "index.html"),
+);
+type LibraryIndex = ReturnType<typeof LibraryIndexSchema.parse>;
+const index: LibraryIndex = NOT_BUILT
+  ? ({ entries: [] } as unknown as LibraryIndex)
+  : LibraryIndexSchema.parse(JSON.parse(readFileSync(join(dataDir, "index.json"), "utf-8")));
 
-describe("source links resolve on the checkout's site", () => {
+describe.skipIf(NOT_BUILT)("source links resolve on the checkout's site", () => {
   test("every entry page's sources are files the site holds", () => {
     for (const e of index.entries) {
       const shellDir = join(pageDir, e.instance, e.id);
@@ -71,7 +85,7 @@ describe("`--site <dir>` writes a per-repository site", () => {
     expect(instanceSubgraphFile(HARNESS, site, "x")).toBe(at);
   });
 
-  test("pages land under the given site at the same declared route, and this harness's own docs are untouched", () => {
+  test.skipIf(NOT_BUILT)("pages land under the given site at the same declared route, and this harness's own docs are untouched", () => {
     const site = mkdtempSync(join(tmpdir(), "lib-site-"));
     const own = join(pageDir, "index.html");
     const before = statSync(own).mtimeMs;

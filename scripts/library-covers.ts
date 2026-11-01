@@ -17,6 +17,8 @@
  *
  *     bun run cat library:covers           # render the missing ones
  *     bun run cat library:covers --check   # report only
+ *
+ * @covers library
  */
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";

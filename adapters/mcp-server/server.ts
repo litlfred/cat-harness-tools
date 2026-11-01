@@ -26,6 +26,8 @@ import {
   INVALID_ENUM, parseTodoPriority, parseTodoStatus, TODO_PRIORITIES, TODO_STATUSES,
 } from "../../src/core/feedback.js";
 import { allows, forbidden, getUserEmail, getUserName, getUserRole } from "../../src/core/rbac.js";
+import { refuseBranchName, refuseChatMode, refuseChatRequest, refuseCheckoutRequest } from "../../src/core/http-guard.js";
+import { bindHostname, refuseMcp, trustedRequest } from "../../src/core/gateway-trust.js";
 // `renderBlock` was reached through `await import(join(REPO_ROOT, …))`, which
 // types as `any` — so nothing checked what was handed to it, and a
 // `ResolvedBlock` went in for two years where a `Block` was declared. The
@@ -2337,10 +2339,15 @@ async function handlePostRequest(url: URL, req: Request): Promise<Response | nul
 
   // ── Git checkout (branch switch with dirty-state handling) ───
   if (path === "/api/git/checkout") {
+    // Authorised, JSON-only, no wildcard CORS: this rewrites the working tree.
+    const refused = refuseCheckoutRequest(req);
+    if (refused) return refused;
     try {
       const { spawnSync } = await import("child_process");
-      const body = await req.json() as { branch: string; action?: "switch" | "stash" | "commit" | "discard" };
-      const targetBranch = body.branch;
+      const body = await req.json() as { branch: unknown; action?: "switch" | "stash" | "commit" | "discard" };
+      const badBranch = refuseBranchName(body.branch);
+      if (badBranch) return badBranch;
+      const targetBranch = body.branch as string;
       const action = body.action || "switch";
       const fromBranch = currentBranch();
       log('git', `checkout: ${fromBranch} → ${targetBranch}`, `action=${action}`);
@@ -2356,7 +2363,7 @@ async function handlePostRequest(url: URL, req: Request): Promise<Response | nul
           const stash = spawnSync("git", ["stash", "push", "-m", `folio-auto-stash-${fromBranch}`], { cwd: REPO_ROOT, stdio: "pipe" });
           if (stash.status !== 0) {
             log('git', `stash: FAILED — ${stash.stderr.toString().trim()}`);
-            return Response.json({ error: `Stash failed: ${stash.stderr.toString()}` }, { status: 500, headers: { "Access-Control-Allow-Origin": "*" } });
+            return Response.json({ error: `Stash failed: ${stash.stderr.toString()}` }, { status: 500 });
           }
           log('git', `stash: ok`);
         } else if (action === "commit") {
@@ -2365,7 +2372,7 @@ async function handlePostRequest(url: URL, req: Request): Promise<Response | nul
           const commit = spawnSync("git", ["commit", "-m", "Folio: auto-save before branch switch"], { cwd: REPO_ROOT, stdio: "pipe" });
           if (commit.status !== 0) {
             log('git', `commit: FAILED — ${commit.stderr.toString().trim()}`);
-            return Response.json({ error: `Commit failed: ${commit.stderr.toString()}` }, { status: 500, headers: { "Access-Control-Allow-Origin": "*" } });
+            return Response.json({ error: `Commit failed: ${commit.stderr.toString()}` }, { status: 500 });
           }
           log('git', `commit: ok`);
         } else if (action === "discard") {
@@ -2380,25 +2387,25 @@ async function handlePostRequest(url: URL, req: Request): Promise<Response | nul
             message: "Working tree has uncommitted changes",
             branch: fromBranch,
             changes: st.stdout.toString().trim().split("\n").filter(Boolean),
-          }, { status: 409, headers: { "Access-Control-Allow-Origin": "*" } });
+          }, { status: 409 });
         }
       }
 
       // Do the checkout
-      const co = spawnSync("git", ["checkout", targetBranch], { cwd: REPO_ROOT, stdio: "pipe" });
+      const co = spawnSync("git", ["checkout", targetBranch, "--"], { cwd: REPO_ROOT, stdio: "pipe" });
       if (co.status !== 0) {
         log('git', `checkout: FAILED — ${co.stderr.toString().trim()}`);
-        return Response.json({ error: `Checkout failed: ${co.stderr.toString()}` }, { status: 500, headers: { "Access-Control-Allow-Origin": "*" } });
+        return Response.json({ error: `Checkout failed: ${co.stderr.toString()}` }, { status: 500 });
       }
 
       log('git', `checkout: ok — now on ${currentBranch()}`);
       return Response.json({
         ok: true,
         branch: currentBranch(),
-      }, { headers: { "Access-Control-Allow-Origin": "*" } });
+      });
     } catch (e) {
       log('git', `checkout: error — ${e}`);
-      return Response.json({ error: String(e) }, { status: 500, headers: { "Access-Control-Allow-Origin": "*" } });
+      return Response.json({ error: String(e) }, { status: 500 });
     }
   }
 
@@ -2407,6 +2414,9 @@ async function handlePostRequest(url: URL, req: Request): Promise<Response | nul
   // Returns SSE stream. LLM can call tools to fetch data from the server
   // before composing a final response.
   if (path === "/api/chat") {
+    // Chat spends the server's API key: authorised, JSON-only, same-origin.
+    const refused = refuseChatRequest(req);
+    if (refused) return refused;
     try {
       const body = await req.json() as {
         messages: Array<{ role: string; content: string }>;
@@ -2423,12 +2433,15 @@ async function handlePostRequest(url: URL, req: Request): Promise<Response | nul
         body.context?.blockLabel ? `block=${body.context.blockLabel}` :
         body.context?.visibleBlocks?.length ? `visible=${body.context.visibleBlocks.length} blocks` : undefined);
 
+      const badMode = refuseChatMode(req, body.mode || "read");
+      if (badMode) return badMode;
+
       const client = getAnthropic();
       if (!client) {
         log("chat", "ANTHROPIC_API_KEY not set — chat unavailable");
         return Response.json(
           { error: "ANTHROPIC_API_KEY not set. Claude chat requires an API key." },
-          { status: 503, headers: { "Access-Control-Allow-Origin": "*" } }
+          { status: 503 }
         );
       }
 
@@ -2881,7 +2894,6 @@ These become clickable buttons so users don't have to type. Make them specific t
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
-        "Access-Control-Allow-Origin": "*",
       };
 
       const readable = new ReadableStream({
@@ -2989,7 +3001,7 @@ These become clickable buttons so users don't have to type. Make them specific t
 
       return new Response(readable, { headers: sseHeaders });
     } catch (e) {
-      return Response.json({ error: String(e) }, { status: 500, headers: { "Access-Control-Allow-Origin": "*" } });
+      return Response.json({ error: String(e) }, { status: 500 });
     }
   }
 
@@ -3692,9 +3704,12 @@ if (mode === "stdio") {
   // Start viewer HTTP server on a separate port
   const viewerPort = FOLIO_PORT;
 
+  const hostname = bindHostname();
   Bun.serve({
     port: viewerPort,
-    async fetch(req) {
+    hostname,
+    async fetch(rawReq) {
+      const req = trustedRequest(rawReq, hostname);
       const url = new URL(req.url);
       const start = Date.now();
       logDebug('http', `${req.method} ${url.pathname}`);
@@ -3748,17 +3763,20 @@ if (mode === "stdio") {
   });
   await server.connect(httpTransport);
 
+  const hostname = bindHostname();
   Bun.serve({
     port,
-    async fetch(req) {
-      const url = new URL(req.url);
+    hostname,
+    async fetch(rawReq) {
+      const url = new URL(rawReq.url);
       const start = Date.now();
-      logDebug('http', `${req.method} ${url.pathname}`);
+      logDebug('http', `${rawReq.method} ${url.pathname}`);
 
-      // MCP endpoint
+      // MCP endpoint: only the auth-gateway's requests (src/core/gateway-trust.ts)
       if (url.pathname === "/mcp") {
-        return httpTransport.handleRequest(req);
+        return refuseMcp(rawReq, hostname) ?? httpTransport.handleRequest(rawReq);
       }
+      const req = trustedRequest(rawReq, hostname);
 
       // Health check
       if (url.pathname === "/health") {

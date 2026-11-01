@@ -757,6 +757,20 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     reason: "takes `--site ./_site`: it resolves links in the BUILT site, which Jekyll produces in CI",
   },
   {
+    match: "harness:state --out ./_site",
+    kind: "ci-only",
+    reason:
+      "writes one state file per harness into the BUILT site (bean `supn`); it judges nothing, and " +
+      "`harness:state --json` prints the same answer in a checkout",
+  },
+  {
+    match: "site-dead-links.ts",
+    kind: "ci-only",
+    reason:
+      "takes `--site ./_site`: it finds and repoints dead links in the BUILT site (folio-assistant#2741), " +
+      "which Jekyll produces in CI; its logic is covered in a checkout by site-dead-links.test.ts",
+  },
+  {
     match: "publish-verify.ts",
     kind: "ci-only",
     reason:
@@ -959,6 +973,21 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
     match: "restore-staging.ts",
     kind: "ci-only",
     reason: "reconciles the `gh-pages` working tree against the open PRs' previews; needs that branch checked out",
+  },
+  {
+    // Added by folio-assistant#2843 in `feature-staging.yml`: rewrites the
+    // `gh-pages` checkout in place (`pages/STAGING/<slug>/` -> `_staging-blob/`
+    // + `_staging-manifest/<slug>.json`) and writes `pages/404.html` and
+    // `pages/_worker.js` right before the staging commit/push. Its four modes
+    // (`apply`, `GC`, `write-404`, `verify`) — content-addressed deduplication,
+    // manifest emission, and the fallback worker and root 404 — are covered by
+    // `staging-share.test.ts` in `bun test`.
+    match: "staging-share.ts",
+    kind: "ci-only",
+    reason:
+      "deduplicates the built `pages/STAGING/<slug>/` tree in the `gh-pages` checkout before the staging push; " +
+      "all four modes (`apply`, `GC`, `write-404`, `verify`) — content-addressed deduplication, manifest " +
+      "emission, and the fallback worker and root 404 — are covered by `staging-share.test.ts` in `bun test`",
   },
   {
     match: "staging-cleanup-preflight.ts",

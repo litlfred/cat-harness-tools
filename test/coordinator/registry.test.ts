@@ -36,6 +36,7 @@ import { spawnSync } from "child_process";
 import { SkillRegistrySchema } from "../../schemas/constraints.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { packageDirsIn } from "../../scripts/skill-topics.js";
+import { noRootManifest } from "../support/checkout.ts";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
@@ -43,12 +44,15 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
 const ROOT = join(ORIGIN_DIR, "..", "..");
 const OUT = join(repoRootFor(ROOT), ".claude", "skills", "registry.json");
+/** `generate-registry` names the registry after the checkout root's `package.json`. */
+const NO_ROOT = noRootManifest(repoRootFor(ROOT), "the name `generate-registry` gives the registry");
 const SAVED = `${OUT}.testbak`;
 
 // The generator writes to a fixed path in the working tree. Preserve whatever
 // is there so a developer's copy is not clobbered by running the suite.
 let hadExisting = false;
 beforeAll(() => {
+  if (NO_ROOT) return;
   hadExisting = existsSync(OUT);
   if (hadExisting) renameSync(OUT, SAVED);
   const r = spawnSync("bun", ["run", join(import.meta.dir, "..", "..", "scripts", "generate-registry.ts")], {
@@ -63,7 +67,7 @@ afterAll(() => {
   } catch {}
 });
 
-describe("generated skill registry", () => {
+describe.skipIf(NO_ROOT)("generated skill registry", () => {
   test("satisfies SkillRegistrySchema", () => {
     const raw: unknown = JSON.parse(readFileSync(OUT, "utf-8"));
     const parsed = SkillRegistrySchema.safeParse(raw);

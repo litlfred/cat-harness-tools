@@ -18,6 +18,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { GATES_WORKFLOW, LAYER_PR_CHECKS, loadGates, loadGatesCiRuns, loadUnresolved } from "../gates.ts";
+import { layerScript } from "../run-script.ts";
 import { GateSetUndetermined, rootGateSet, rootProfile } from "../lib/root-gate-set.ts";
 import { QA_WRITERS, assess, notApplicableWriters, type QaWriter } from "../qa-refresh.ts";
 import type { MovedInventory } from "../qa-verify-moved.ts";
@@ -194,5 +195,18 @@ describe("qa:refresh in a content root", () => {
   test("the writers that read state graphs say so", () => {
     const reads = QA_WRITERS.filter((w) => w.readsState).map((w) => w.id).sort();
     expect(reads).toEqual(["check:harness-state", "check:unlinked-beans", "docs:pages", "skill:register"]);
+  });
+
+  test("a layer's own `scripts` entry (not in `checkoutScripts`) is resolved in that layer's directory by `run-script.ts`", () => {
+    const root = contentRoot();
+    const entry = layerScript(root, "foo:check");
+    expect(entry).toEqual({
+      name: "foo:check",
+      command: "bun foo.ts",
+      cwd: join(root, "lib"),
+      manifest: join("lib", "package.json"),
+    });
+    expect(layerScript(root, "check:b")).toBeUndefined();
+    expect(layerScript(root, "no-such:script")).toBeUndefined();
   });
 });

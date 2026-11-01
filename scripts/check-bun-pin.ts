@@ -49,14 +49,12 @@
  * @covers none — .github/workflows/ is not a declared graph typology
  * @graphNode tool
  */
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { parse } from "yaml";
-import { HARNESS_ROOT } from "./lib/roots.ts";
 
-const INSTANCE_ROOT = resolve(HARNESS_ROOT);
-const REPO_ROOT = resolve(INSTANCE_ROOT, "..");
+const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 /** The ONE answer to which Bun this repository runs. Exported so `check:bun-runtime`
  *  names the same file rather than repeating the literal. */
 export const PIN_FILE = "cat-harness/.bun-version";
@@ -127,11 +125,13 @@ export function auditWorkflow(name: string, doc: unknown, expected: string): Omi
 }
 
 export function bunPin(repoRoot: string = REPO_ROOT): Report {
-  const expected = readPinFile(readFileSync(join(repoRoot, PIN_FILE), "utf-8"));
+  const pinPath = join(repoRoot, PIN_FILE);
+  const expected = existsSync(pinPath) ? readPinFile(readFileSync(pinPath, "utf-8")) : undefined;
   const report: Report = { expected, workflows: 0, sites: 0, findings: [] };
   if (expected === undefined) return report;
 
   const dir = join(repoRoot, ".github", "workflows");
+  if (!existsSync(dir)) return report;
   for (const f of readdirSync(dir).filter((f) => f.endsWith(".yml") || f.endsWith(".yaml")).sort()) {
     report.workflows++;
     const one = auditWorkflow(f, parse(readFileSync(join(dir, f), "utf-8")), expected);

@@ -3,6 +3,8 @@
  * Where each harness got to in its initialization, and how healthy it is —
  * worked out from the checkout, never committed. Bean `supn`, boxes 1 and 2.
  *
+ * @covers none — writer — it writes one state file per harness into the built site; it judges nothing
+ *
  * ```sh
  * bun run cat harness:state --out ./_site/assets/harnesses   # what the deploy runs
  * bun run cat harness:state --json                            # print, write nothing

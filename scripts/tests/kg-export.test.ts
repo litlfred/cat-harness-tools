@@ -30,7 +30,11 @@ import { readRoleGraph } from "../../schemas/process/role-graph.ts";
 import { EXTERNAL_SCHEMA_TAG } from "../../schemas/kg/external-schema.ts";
 import { basename, isAbsolute, join, relative, resolve } from "node:path";
 import { workflowFiles } from "../known-skills.ts";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+// A namespace import: `subjectDocuments` exists from bootstrap-tools#52, and a
+// checkout pinned below it must still load this file (the walk then reports
+// bootstrap's subjects as unpublished, which is what that deploy does).
+import * as bootstrapExport from "@litlfred/bootstrap-tools/scripts/export-graph.ts";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 
@@ -799,6 +803,25 @@ describe("every self-URL the export publishes resolves to something published", 
         }
       };
       write(publishedDocument(EXPORT_CANONICAL) as Record<string, unknown>, docPath, legacyDocPath);
+      // bootstrap's subjects, which bootstrap-tools' `export-graph.ts` writes
+      // beside `bootstrap/bootstrap.jsonld` in the same deploy step since
+      // litlfred/bootstrap-tools#52. A Tool here that satisfies a bootstrap
+      // skill links to `bootstrap/skill/<id>`, so the walk must know them.
+      const bootRoot = join(REPO, "bootstrap");
+      const subjectDocuments = (
+        bootstrapExport as {
+          subjectDocuments?: (graph: Record<string, unknown>, docFile: string) => Map<string, string>;
+        }
+      ).subjectDocuments;
+      if (existsSync(bootRoot) && typeof subjectDocuments === "function") {
+        const bootDoc = bootstrapExport.exportGraph(bootRoot, { docIri: `${BASE}/bootstrap/bootstrap.jsonld` });
+        for (const rel of subjectDocuments(bootDoc, "bootstrap.jsonld").keys()) {
+          const p = `bootstrap/${rel}`;
+          out.add(p);
+          if (p.endsWith("/index.html")) out.add(p.slice(0, -"index.html".length));
+          else if (p.endsWith(".html")) out.add(p.slice(0, -".html".length));
+        }
+      }
       for (const p of instanceExportPlan()) {
         const e = OWNER_DOCS.get(resolve(REPO, p.path));
         if (e !== undefined) write(publishedDocument(e) as Record<string, unknown>, `${p.stub}/${p.stub}.jsonld`);
