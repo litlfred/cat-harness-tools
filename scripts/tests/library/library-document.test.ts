@@ -63,6 +63,21 @@ describe("readEntryDocument", () => {
     expect(d.checks.figureSequenceGaps).toEqual(["table 2"]);
   });
 
+  test("the summary badge reads the narrative list's state, so a confirmed summary is not shown as draft", () => {
+    const by = { kind: "agent", id: "claude-code", model: "test-model" };
+    const dir = entry(base, {
+      "sections/sec-000-1-introduction.md": "Intro.",
+      "sections/sec-001-2-methods.md": "Methods.",
+      "summaries.json": JSON.stringify({ summaries: [
+        { source: "sections/sec-000-1-introduction.md", narrative: [{ text: "Draft text.", lang: "en", state: "draft", drafted_by: by }] },
+        { source: "sections/sec-001-2-methods.md", narrative: [{ text: "Confirmed text.", lang: "en", state: "confirmed", drafted_by: by, confirmed_by: { kind: "human", id: "owner" } }] },
+      ] }),
+    });
+    const d = readEntryDocument(dir, "r")!;
+    expect(d.sections[0].summary?.status).toBe("draft");
+    expect(d.sections[1].summary?.status).toBe("confirmed");
+  });
+
   test("a withheld entry publishes no extract, and keeps structure and summaries", () => {
     const dir = entry(base, { "sections/sec-000-1-introduction.md": "Secret text." });
     const d = readEntryDocument(dir, "r", { withheld: true })!;

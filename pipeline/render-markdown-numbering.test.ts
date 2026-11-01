@@ -39,6 +39,11 @@ describe("renderBlockMarkdown headings", () => {
     expect(md).toContain("*Product master data*");
     expect(md).not.toContain("*Fig. 1. Product master data*");
   });
+  test("a numbered figure says its caption once, on the heading line", () => {
+    const md = renderBlockMarkdown(fig("Fig. 5. WHO SMART Guidelines Approach", "fig:5"));
+    expect(md).toContain("**Figure 5.** *WHO SMART Guidelines Approach*");
+    expect(md.split("WHO SMART Guidelines Approach").length - 1).toBe(1);
+  });
   test("an unnumbered table keeps its plain heading and still gets the link icon", () => {
     const md = renderBlockMarkdown({
       block: { kind: "table", label: "tbl:target-users", caption: "Target users" } as unknown as Block,
