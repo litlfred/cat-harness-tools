@@ -144,7 +144,7 @@ export interface GitCall {
   args: string[];
 }
 
-export type ReadSet = { paths: string[]; git: GitCall[]; writes?: string[]; absentBefore?: string[] } | { undetermined: string };
+export type ReadSet = { paths: string[]; git: GitCall[]; writes?: string[]; absentBefore?: string[]; rewritten?: string[] } | { undetermined: string };
 
 /**
  * Git subcommands the cone may REPLAY on a PR to ask git's view of the tree
@@ -378,6 +378,7 @@ function calls(text: string): Call[] | { undetermined: string } {
   done.sort((a, b) => a.index - b.index);
   const out: Call[] = [];
   for (const d of done) {
+    if (d.line.startsWith("???(")) continue;
     const m = /^(\w+)\((.*)\)\s+=\s+(.*)$/.exec(d.line);
     if (m === null) return { undetermined: `unparsed trace line: ${d.line.slice(0, 160)}` };
     out.push({ pid: d.pid, name: m[1]!, args: splitArgs(m[2]!), ret: m[3]! });
@@ -397,6 +398,13 @@ export function parseTrace(
     writes?: "refuse" | "collect";
     /** `collect` mode: the writer's DECLARED outputs. Re-reading one before rewriting it (write-if-changed) is not an input. */
     ownOutput?: (rel: string) => boolean;
+    /**
+     * A path the writer read and then rewrote that no writer declares and no
+     * earlier writer wrote: it is kept as an input, with its state AFTER the
+     * run. A later run skips only when the path already holds what this run
+     * left there, so a rewrite that changed it makes the next run rerun.
+     */
+    rewriteAsInput?: (rel: string) => boolean;
   } = {},
 ): ReadSet {
   const parsed = calls(text);
@@ -498,7 +506,10 @@ export function parseTrace(
       // Its own declared output, read back before it is rewritten: the run
       // compares with, or extends, what it last wrote. A skip puts exactly
       // that back, and the dry run checks every output after a full build.
-      if (f === "read" && !opts.ownOutput?.(rel)) return { undetermined: `the writer reads ${rel || "."} and then rewrites it` };
+      if (f === "read" && !opts.ownOutput?.(rel)) {
+        if (opts.rewriteAsInput?.(rel)) continue;
+        return { undetermined: `the writer reads ${rel || "."} and then rewrites it` };
+      }
       paths.delete(rel);
       if (f === "absent") absentBefore.push(rel);
     }
@@ -506,7 +517,9 @@ export function parseTrace(
     // a skip restores exactly that: not an input.
     if (opts.ownOutput !== undefined) for (const p of [...paths]) if (opts.ownOutput(p)) paths.delete(p);
     if (paths.size > MAX_WRITER_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_WRITER_PATHS}` };
-    return { paths: [...paths].sort(), git: [...git.values()], writes: [...wrote].sort(), absentBefore: absentBefore.sort() };
+    const rewritten = [...wrote].filter((rel) => first.get(rel) === "read" && !opts.ownOutput?.(rel));
+    const kept = [...wrote].filter((rel) => !rewritten.includes(rel));
+    return { paths: [...paths].sort(), git: [...git.values()], writes: kept.sort(), absentBefore: absentBefore.sort(), ...(rewritten.length ? { rewritten: rewritten.sort() } : {}) };
   }
   if (writes.length > 0) return { undetermined: `the check writes inside the checkout (${writes.slice(0, 3).join(", ")})` };
   if (paths.size > MAX_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_PATHS}` };
@@ -587,6 +600,13 @@ export function pathState(root: string, rel: string, digests: FileDigests): stri
 }
 
 function statState(abs: string, rel: string, digests: FileDigests): string {
+  if (rel === ".git" || rel.endsWith("/.git")) {
+    try {
+      if (statSync(abs).isDirectory()) return "dir";
+    } catch {
+      /* fall through */
+    }
+  }
   let names: string[] | undefined;
   try {
     names = readdirSync(abs).sort();
@@ -734,6 +754,7 @@ function summary(line: string): void {
 }
 
 function straceWorks(): boolean {
+  if (Bun.which("strace") === null) return false;
   const r = Bun.spawnSync(["strace", "-f", "-qq", "-o", "/dev/null", "true"], { stdout: "ignore", stderr: "ignore" });
   return r.exitCode === 0;
 }
@@ -764,8 +785,29 @@ export const RUNNER = ["bun", "run", "cat"] as const;
  */
 export function recordRun(o: ConeRunOpts): { code: number; note: string } {
   const stdio = o.stdio ?? "inherit";
+  // When `runner` is omitted, run the resolved command directly via `sh -c`
+  // (as `run-script.ts` does) instead of spawning `bun run cat <script>` under
+  // `strace`: `run-script.ts` calls `scriptTable(REPO)` -> `instanceRootsIn(REPO)`
+  // to look up the script name `main()` already resolved in `o.scripts`, which
+  // polluted every traced check's read set with every instance directory and
+  // declaration in the checkout (cat-harness-tools#634).
+  const scriptCmd = o.scripts[o.script];
+  const cmdArgs =
+    o.runner !== undefined
+      ? [...o.runner, o.script]
+      : scriptCmd !== undefined
+        ? ["sh", "-c", scriptCmd]
+        : [...RUNNER, o.script];
+  const cmdEnv = (base: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
+    o.runner === undefined && scriptCmd !== undefined
+      ? {
+          ...base,
+          PATH: `${join(o.root, "node_modules", ".bin")}${base.PATH ? `:${base.PATH}` : ""}`,
+          npm_lifecycle_event: o.script,
+        }
+      : base;
   const plain = (why: string) => {
-    const r = Bun.spawnSync([...(o.runner ?? RUNNER), o.script], { cwd: o.root, stdin: stdio, stdout: stdio, stderr: stdio });
+    const r = Bun.spawnSync(cmdArgs, { cwd: o.root, stdin: stdio, stdout: stdio, stderr: stdio, env: cmdEnv(process.env) });
     return { code: r.exitCode ?? 1, note: `not traced — ${why}` };
   };
   let before: Fingerprint;
@@ -777,18 +819,18 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
   if ("undetermined" in before) return plain(before.undetermined);
   const trace = openTrace(o.root);
   const log = join(tmpdir(), `ci-cone-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.strace`);
-  const r = Bun.spawnSync(["strace", ...STRACE_ARGS, "-o", log, ...(o.runner ?? RUNNER), o.script], {
+  const r = Bun.spawnSync(["strace", ...STRACE_ARGS, "-o", log, ...cmdArgs], {
     cwd: o.root,
     stdin: stdio,
     stdout: stdio,
     stderr: stdio,
-    env: trace.env,
+    env: cmdEnv(trace.env),
   });
   let code = r.exitCode ?? 1;
   if (code !== 0) {
     // The verdict must be the check's, never the tracer's. A traced run that
     // failed is asked again, untraced, and THAT exit status is the answer.
-    const again = Bun.spawnSync([...(o.runner ?? RUNNER), o.script], { cwd: o.root, stdin: stdio, stdout: stdio, stderr: stdio });
+    const again = Bun.spawnSync(cmdArgs, { cwd: o.root, stdin: stdio, stdout: stdio, stderr: stdio, env: cmdEnv(process.env) });
     code = again.exitCode ?? 1;
     rmSync(log, { force: true });
     return { code, note: `not recorded — the traced run exited ${r.exitCode ?? r.signalCode}; re-run untraced, which exited ${code}` };

@@ -1065,6 +1065,11 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // docs/payload/sha256/ (bean `f233`), written by gen-subgraph-jsonld.
       // Its validator is the node `validators/payload-sidecar.json`.
       "cat-harness-payload/v1": { generated: true },
+      // GENERATOR OUTPUT: the dynamic-state document `<site>/<harness>/state.jsonld`,
+      // written whole by `writeDynamicState` (render stage 3 and the state
+      // visualiser). It names the bean stores it read, so it is not prose.
+      // Its validator is the node `cat-harness-tools/validators/dynamic-state.json`.
+      "cat-harness-dynamic-state/v1": { generated: true },
     },
     summary:
       "Documentation ABOUT the knowledge graph — how the harness works, what its " +
@@ -2206,7 +2211,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // a reader has to be able to tell the two apart.
       "folio-figure-descriptions/v1": {},
       // A figure transcribed as data on its entry's `figure-data/` (owner,
-      // 2026-10-31, "B in the catalogue instance"): the DIIG phases chart and the SMART
+      // 2026-10-31, option B: in the library entry): the DIIG phases chart and the SMART
       // Guidelines approach chart, one file per published version. Their
       // shapes are with the generators that draw them, in a layer above this
       // one, so they are routed here and validated there.
@@ -3197,13 +3202,15 @@ export class GraphTypologyRegistry {
   /** Kinds a LATER checkout also declares and an earlier one already answered — reported, never silently merged. */
   private shadowedKinds: Array<{ kind: string; kept: string; shadowed: string }> = [];
   /** The checkouts, in precedence order, whose `typologies/` graphs are loaded on first use. */
-  private readonly declaredUnder: readonly string[];
+  private declaredUnder: readonly string[] | undefined;
+  private readonly resolveDeclaredUnder: (() => readonly string[]) | undefined;
   /** Which instances of those checkouts are read; every one when omitted. */
   private readonly include: InstanceFilter | undefined;
 
   /**
    * @param seed the kinds this layer lists in code
-   * @param declaredUnder a checkout — or several, in PRECEDENCE order — whose
+   * @param declaredUnder a checkout — or several, in PRECEDENCE order, or a
+   *   lazythunk returning them so module import touches no filesystem — whose
    *   instances' `typologies/` graphs are loaded on first use; omitted, the
    *   registry holds only `seed` and what is `register`ed (a test's private
    *   registry). Within one checkout a name two files declare is refused, as
@@ -3218,17 +3225,25 @@ export class GraphTypologyRegistry {
    */
   constructor(
     seed: Readonly<Record<string, GraphTypologyDef>> = BASE_GRAPH_TYPOLOGIES,
-    declaredUnder?: string | readonly string[],
+    declaredUnder?: string | readonly string[] | (() => readonly string[]),
     options: { include?: InstanceFilter } = {},
   ) {
     this.include = options.include;
     for (const [k, v] of Object.entries(seed)) this.kinds.set(k, v);
-    const roots = declaredUnder === undefined ? [] : typeof declaredUnder === "string" ? [declaredUnder] : declaredUnder;
-    this.declaredUnder = [...new Set(roots.map((r) => resolve(r)))];
+    if (typeof declaredUnder === "function") {
+      this.resolveDeclaredUnder = declaredUnder;
+    } else {
+      const roots = declaredUnder === undefined ? [] : typeof declaredUnder === "string" ? [declaredUnder] : declaredUnder;
+      this.declaredUnder = [...new Set(roots.map((r) => resolve(r)))];
+    }
   }
 
   /** The checkouts this registry loads declared kinds from, in precedence order. */
   roots(): readonly string[] {
+    if (this.declaredUnder === undefined) {
+      const roots = this.resolveDeclaredUnder ? this.resolveDeclaredUnder() : [];
+      this.declaredUnder = [...new Set(roots.map((r) => resolve(r)))];
+    }
     return this.declaredUnder;
   }
 
@@ -3247,9 +3262,10 @@ export class GraphTypologyRegistry {
    * which is the dh4f shape.
    */
   private ensureDeclared(): void {
-    if (this.loaded || this.declaredUnder.length === 0) return;
+    const roots = this.roots();
+    if (this.loaded || roots.length === 0) return;
     this.loaded = true;
-    for (const root of this.declaredUnder) this.loadCheckoutRoot(root);
+    for (const root of roots) this.loadCheckoutRoot(root);
   }
 
   /**
@@ -3265,7 +3281,7 @@ export class GraphTypologyRegistry {
    * it is validated. No-op on a bare or filtered registry.
    */
   ensureCheckout(repoRoot: string): void {
-    if (this.declaredUnder.length === 0 || this.include !== undefined) return;
+    if (this.roots().length === 0 || this.include !== undefined) return;
     const abs = resolve(repoRoot);
     if (this.scannedRoots.includes(abs)) return;
     if (instanceRootsIn(abs).length === 0) return;
@@ -3447,6 +3463,7 @@ function describeValidator(n: ValidatorNode): string {
  * same script passed. Two layouts, two answers about one file.
  */
 export function defaultTypologyRoots(
+  // input-site: env-unset REPO_ROOT #949cc29c — caller override naming a checkout outside the tree; unset in CI
   env: Readonly<Record<string, string | undefined>> = process.env,
   cwd: string = process.cwd(),
   moduleDir: string = dirname(fileURLToPath(import.meta.url)),
@@ -3465,7 +3482,7 @@ export function defaultTypologyRoots(
  * module sits in — declare in their `typologies/` graphs (bean dmx1), loaded on
  * first use. Core registers `folio` into it at load. See {@link defaultTypologyRoots}.
  */
-export const defaultGraphTypologies = new GraphTypologyRegistry(BASE_GRAPH_TYPOLOGIES, defaultTypologyRoots());
+export const defaultGraphTypologies = new GraphTypologyRegistry(BASE_GRAPH_TYPOLOGIES, defaultTypologyRoots);
 
 /**
  * The display name of a graph typology: its declared {@link GraphTypologyDef.title},

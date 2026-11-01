@@ -35,7 +35,7 @@ import { TODO_PAGE_CONFIG_ID, isTodoPage, todoPageHtml } from "../todo-page.ts";
 import { renderTodoListing } from "../todo-listing.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { docsSources, siteNodeOf } from "../lib/docs-sources.ts";
-import { siteNotBuilt } from "../../test/support/checkout.ts";
+import { ensureDocsPages, siteNotBuilt } from "../../test/support/checkout.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const SITE = join(ROOT, siteDirFor(ROOT));
@@ -44,6 +44,7 @@ const SITE = join(ROOT, siteDirFor(ROOT));
  * (bean w1gy F18). Not built, "what is published" has nothing to read: its
  * index is empty, so it makes no per-todo tests, and its graph test skips.
  */
+ensureDocsPages(ROOT);
 const NOT_BUILT = siteNotBuilt(
   "the todo index and graph `docs:pages` writes at publish (gitignored)",
   join(SITE, "assets/todos/index.json"),

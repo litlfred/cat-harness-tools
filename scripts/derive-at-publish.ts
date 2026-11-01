@@ -114,7 +114,7 @@
  * ```
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -124,6 +124,7 @@ import { readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { flattenDependencies } from "../schemas/kg/dependency-order.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
+import { buildTypeOf, isIndexWriter } from "./lib/build-type.ts";
 import { dirname } from "node:path";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { FileDigests, TRACKED, fingerprint, trackedTreeDigest, type Fingerprint } from "./input-hash.ts";
@@ -146,10 +147,16 @@ import {
 import { openTrace } from "../schemas/sdlc/input-trace.ts";
 import {
   decideWriter,
+  churnReport,
+  renderChurn,
+  WRITER_CHURN_FILE,
+  type ChurnEntry,
+  type ChurnCause,
   emptyRecords,
   loadWriterRecords,
   readTraceFile,
   saveWriterRecords,
+  snapshotPaths,
   STRACE_SEES,
   tracedArgv,
   underOutputs,
@@ -185,6 +192,8 @@ export interface DeclaredArtefact {
   reads?: readonly string[];
   /** The kinds of the declared directory this entry fills (`directory`), so a reader of those kinds is ordered after it. */
   fills?: readonly string[];
+  /** A whole-corpus index: a `preview` build puts back main's copy rather than running its writer (`lib/build-type.ts`). */
+  index?: true;
 }
 
 /**
@@ -212,7 +221,7 @@ export function declaredPlan(repoRoot = REPO_ROOT, cause?: "checkout" | "state")
     if (root === undefined) continue;
     const decl = readDeclaration(root) as
       | {
-          builtAtPublish?: Array<{ path: string; writer: string[]; because: "checkout" | "state"; reads?: string[]; directory?: string }>;
+          builtAtPublish?: Array<{ path: string; writer: string[]; because: "checkout" | "state"; reads?: string[]; directory?: string; index?: true }>;
           directories?: Array<{ id?: string; graphTypologies?: string[]; kinds?: string[] }>;
         }
       | undefined;
@@ -228,6 +237,7 @@ export function declaredPlan(repoRoot = REPO_ROOT, cause?: "checkout" | "state")
         because: e.because,
         ...(e.reads?.length ? { reads: e.reads } : {}),
         ...(fills.length ? { fills } : {}),
+        ...(e.index === true ? { index: true as const } : {}),
       });
     }
   }
@@ -458,14 +468,28 @@ if (import.meta.main) {
   const recordOn = env[WRITER_RECORD_ENV] === "1" && straceWorks();
   // input-site: inert #a3e7d915 — the commit names the record; it is not an input of any writer
   const records = emptyRecords(env.GITHUB_SHA ?? "local");
+  // Files each writer read and then rewrote, kept as its inputs (see parseTrace's rewriteAsInput).
+  const rewrittenBy = new Map<string, string[]>();
+  const declaredOutput = underOutputs(allOutputs);
   // Previews skip a writer whose recorded reads all match, and put back the
   // outputs the recording run kept (owner 2026-10-31 14:32Z: "dont wait for
   // clean deploys to skip. we can fix aftermath"). Never while recording.
   const skipOn = env[WRITER_SKIP_ENV] === "1" && !recordOn;
-  const prevRecords = skipOn ? loadWriterRecords(REPO_ROOT) : undefined;
+  // A PREVIEW build does not rebuild a whole-corpus index: it puts back main's
+  // copy from the same recording the skip reads (owner 2026-11-01, "preview" =
+  // no reindex, only changes). A full build, and a recording run, run them.
+  const bt = buildTypeOf(env);
+  if ("refused" in bt) {
+    console.log(`::error::derive:publish: ${bt.refused}`);
+    process.exit(2);
+  }
+  const borrowOn = bt.type === "preview" && !recordOn;
+  const prevRecords = skipOn || borrowOn ? loadWriterRecords(REPO_ROOT) : undefined;
   const outDir = join(REPO_ROOT, WRITER_OUTPUTS_DIR);
+  const decideDigests = new FileDigests(REPO_ROOT);
   const recScripts = recordOn || skipOn ? (cacheOn.on ? scripts : scriptsOf(REPO_ROOT)) : {};
   if (env[WRITER_RECORD_ENV] === "1" && !recordOn) console.log("  writer records: OFF (strace does not run here)");
+  console.log(`  build type: ${bt.type} (${bt.why})${borrowOn ? `; indexes from main: ${prevRecords ? prevRecords.sha.slice(0, 12) : "no recording here, so they are built"}` : ""}`);
   if (skipOn) console.log(`  writer skip: ON (${prevRecords ? `records of ${prevRecords.sha.slice(0, 12)}, ${Object.keys(prevRecords.writers).length} writer(s)` : "no records: every writer runs"})`);
   console.log(
     `  ${jobs} job(s); reuse ${cacheOn.on ? `ON (${cacheDir}${treeBefore && "undetermined" in treeBefore ? `; tree undetermined: ${treeBefore.undetermined}` : ""})` : `OFF (${cacheOn.why})`}`,
@@ -484,22 +508,26 @@ if (import.meta.main) {
         return first.outcome.kind === "skipped" ? first : await runWriterAsync(["bun", "run", "cat", w], REPO_ROOT, jobs > 1);
       }
       const digests = new FileDigests(REPO_ROOT);
+      let readSet: ReturnType<typeof readTraceFile> = { undetermined: "not read" };
       const rec = writerRecordOf({
         sha: records.sha,
         ran: true,
         before,
         after: writerBase(REPO_ROOT, recScripts, w, digests),
-        reads: readTraceFile(traceLog, REPO_ROOT, underOutputs(byWriter.get(w) ?? [])),
+        reads: (readSet = readTraceFile(traceLog, REPO_ROOT, underOutputs(byWriter.get(w) ?? []), (rel) => !declaredOutput(rel))),
         reached: trace.reached([], STRACE_SEES),
         root: REPO_ROOT,
         digests,
       });
-      if ("none" in rec) records.unrecorded[w] = rec.none;
-      else {
+      const own = byWriter.get(w) ?? [];
+      const snap = "none" in rec ? rec : snapshotPaths(own, Object.keys(rec.outputs), underOutputs(own), declaredOutput);
+      if ("none" in snap) records.unrecorded[w] = snap.none;
+      else if (!("none" in rec)) {
         records.writers[w] = rec;
-        // Keep what it wrote, so a preview that skips it can put it back.
+        if ("rewritten" in readSet && readSet.rewritten) rewrittenBy.set(w, readSet.rewritten);
+        // Keep what it actually wrote, declared or not, so a preview that skips it puts all of it back.
         const keep = nestedForeign(w, byWriter);
-        commitStaged(outDir, w, records.sha, stageOutputs(outDir, w, records.sha, REPO_ROOT, byWriter.get(w) ?? [], keep));
+        commitStaged(outDir, w, records.sha, stageOutputs(outDir, w, records.sha, REPO_ROOT, snap.paths, keep));
       }
     } catch (e) {
       // Recording is never allowed to change the writer's outcome.
@@ -509,17 +537,40 @@ if (import.meta.main) {
     }
     return first;
   };
+  // What each writer did and why, for the churn report (skip mode only: without records there is nothing to compare).
+  const churn: ChurnEntry[] = [];
   const runOne = async (w: string): Promise<WriterOutcome> => {
     const keep = nestedForeign(w, byWriter);
+    let cause: ChurnCause | undefined;
+    let ranWhy = "";
+    // Seconds per writer, so a slow one can be named from a published log (bean fwtz).
+    const t0 = performance.now();
+    const secs = () => `${((performance.now() - t0) / 1000).toFixed(1)}s`;
+    if (borrowOn && prevRecords !== undefined && isIndexWriter(w, declared)) {
+      if (hasEntry(outDir, w, prevRecords.sha) && restoreOutputs(outDir, w, prevRecords.sha, REPO_ROOT, keep)) {
+        reused.set(w, prevRecords.sha);
+        console.log(`  borrowed ${w}: a preview build does not reindex; put back main's copy from ${prevRecords.sha.slice(0, 12)} [${secs()}]`);
+        return { kind: "ran" };
+      }
+      console.log(`  ${w} runs: an index, but main's recording holds no copy of it [decided in ${secs()}]`);
+    }
     if (skipOn && prevRecords !== undefined) {
-      const fresh = new FileDigests(REPO_ROOT);
+      // One file-digest memo for every decision: it is keyed on size and
+      // mtime, so a file a predecessor rewrote is hashed again, and a fresh
+      // memo per writer re-hashed every recorded read once per writer. Only
+      // git's view of the tree is asked again for each writer.
+      const fresh = decideDigests;
+      fresh.tree = undefined;
       const d = decideWriter(prevRecords, w, writerBase(REPO_ROOT, recScripts, w, fresh), REPO_ROOT, fresh);
       if (d.skip && hasEntry(outDir, w, prevRecords.sha) && restoreOutputs(outDir, w, prevRecords.sha, REPO_ROOT, keep)) {
         reused.set(w, prevRecords.sha);
-        console.log(`  skipped ${w}: ${d.why}; put back its outputs from ${prevRecords.sha.slice(0, 12)}${d.proof ? "" : " (evidence, not proof)"}`);
+        console.log(`  skipped ${w}: ${d.why}; put back its outputs from ${prevRecords.sha.slice(0, 12)}${d.proof ? "" : " (evidence, not proof)"} [${secs()}]`);
+        churn.push({ writer: w, did: "skipped", why: d.why, seconds: (performance.now() - t0) / 1000 });
         return { kind: "ran" };
       }
-      console.log(`  ${w} runs: ${d.skip ? "its recorded outputs are not here" : d.why}`);
+      ranWhy = d.skip ? "its recorded outputs are not here" : d.why;
+      if (!d.skip) cause = d.cause;
+      console.log(`  ${w} runs: ${ranWhy} [decided in ${secs()}]`);
     }
     const fp = base.get(w);
     let key: string | undefined;
@@ -530,6 +581,7 @@ if (import.meta.main) {
       if (hasEntry(cacheDir, w, key) && restoreOutputs(cacheDir, w, key, REPO_ROOT, keep)) {
         reused.set(w, key);
         console.log(`  reused ${w} (inputs unchanged since ${key.slice(0, 12)}${fp.wholeTree ? ", keyed on the whole tree" : ""})`);
+        if (skipOn) churn.push({ writer: w, did: "reused", why: ranWhy, cause, seconds: (performance.now() - t0) / 1000 });
         return { kind: "ran" };
       }
       why = `no result recorded for ${key.slice(0, 12)}`;
@@ -538,17 +590,36 @@ if (import.meta.main) {
     }
     const { outcome, log } = recordOn ? await runRecorded(w) : await runWriterAsync(["bun", "run", "cat", w], REPO_ROOT, jobs > 1);
     if (jobs > 1) process.stdout.write(`── ${w} ──\n${log}${log.endsWith("\n") || log === "" ? "" : "\n"}`);
-    console.log(`  ran ${w} (${why})`);
+    console.log(`  ran ${w} (${why}) [${secs()}]`);
+    if (skipOn) churn.push({ writer: w, did: "ran", why: ranWhy, cause, seconds: (performance.now() - t0) / 1000 });
+    // An index whose run could not be recorded still keeps its outputs, so a
+    // preview can borrow them: borrowing needs main's bytes, not its reads.
+    if (recordOn && outcome.kind === "ran" && isIndexWriter(w, declared) && !hasEntry(outDir, w, records.sha)) {
+      commitStaged(outDir, w, records.sha, stageOutputs(outDir, w, records.sha, REPO_ROOT, byWriter.get(w) ?? [], keep));
+      console.log(`  kept ${w}'s outputs for previews to borrow (an index${records.unrecorded[w] ? `; not recorded: ${records.unrecorded[w]}` : ""})`);
+    }
     if (outcome.kind === "ran" && key !== undefined) staged.set(w, { key, path: stageOutputs(cacheDir, w, key, REPO_ROOT, byWriter.get(w) ?? [], keep) });
     return outcome;
   };
   const outcomes = await schedule(writers, edges, jobs, runOne);
   if (recordOn) {
+    // A file a writer rewrote is kept as its input only when no other writer
+    // wrote it too: otherwise its state after the run says nothing about what
+    // this writer read.
+    for (const [w, paths] of rewrittenBy) {
+      const other = paths.find((p) =>
+        Object.entries(records.writers).some(([x, r]) => x !== w && p in r.outputs) ||
+        [...rewrittenBy].some(([x, ps]) => x !== w && ps.includes(p)));
+      if (other === undefined) continue;
+      delete records.writers[w];
+      records.unrecorded[w] = `the writer rewrites ${other}, which another writer also writes`;
+    }
     saveWriterRecords(REPO_ROOT, records);
     const un = Object.entries(records.unrecorded);
     console.log(`  writer records: ${Object.keys(records.writers).length} recorded, ${un.length} not (${WRITER_RECORD_FILE})`);
     for (const [w, why] of un) console.log(`    not recorded: ${w} — ${why}`);
   }
+  if (skipOn) writeChurn(prevRecords?.sha ?? "none", churn, (p) => writerOfPath(p, prevRecords, byWriter));
   for (const w of writers) {
     const o = outcomes.get(w)!;
     if (o.kind === "failed") {
@@ -588,4 +659,28 @@ if (import.meta.main) {
     process.exit(1);
   }
   console.log(`  ✓ ${judged.length} declared artefact(s) built or reused${reused.size ? ` (${reused.size} writer(s) reused: ${[...reused.keys()].join(", ")})` : ""}${notHere.length ? `, ${notHere.length} skipped (their writer does not apply to this root)` : ""}`);
+}
+
+/** The writer that wrote `path`: by the previous build's records, else by declared outputs. */
+export function writerOfPath(
+  path: string,
+  prev: { writers: Record<string, { outputs: Record<string, string> }> } | undefined,
+  byWriter: ReadonlyMap<string, readonly string[]>,
+): string | undefined {
+  for (const [w, r] of Object.entries(prev?.writers ?? {})) if (path in r.outputs) return w;
+  for (const [w, outs] of byWriter) if (underOutputs([...outs])(path)) return w;
+  return undefined;
+}
+
+/** Write the churn report beside the records, and to the job summary when there is one. */
+function writeChurn(against: string, entries: readonly ChurnEntry[], writerOf: (p: string) => string | undefined): void {
+  const report = churnReport(entries, against, writerOf);
+  const file = join(REPO_ROOT, WRITER_CHURN_FILE);
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, JSON.stringify(report, null, 2) + "\n");
+  const md = renderChurn(report);
+  console.log(md);
+  // input-site: inert #7c1e04b2 — the job summary is where the report is shown, never an input of a writer
+  const summary = process.env.GITHUB_STEP_SUMMARY;
+  if (summary) appendFileSync(summary, md);
 }

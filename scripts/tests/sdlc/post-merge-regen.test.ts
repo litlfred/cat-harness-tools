@@ -14,6 +14,7 @@ import {
   builtAtPublishIn,
   checkPostMergeRegen,
   FIXITY_CHECKS,
+  missingPrerequisiteWriters,
   postMergePairs,
   resolveRepoRoot,
   treeMoveTracker,
@@ -741,6 +742,22 @@ describe("builtAtPublish outputs are never stale (bean folio-assistant-p7mb)", (
       expect(writerCalls).toBe(1);
     } finally {
       done();
+    }
+  });
+});
+
+describe("prerequisite writers come from the declarations, not from instance names", () => {
+  test("a writer runs only when an instance declares it and its output is absent", () => {
+    const root = mkdtempSync(join(tmpdir(), "prereq-writers-"));
+    try {
+      mkdirSync(join(root, "ig", "fhir-artifact-index"), { recursive: true });
+      const decl = (writer: string[], path: string): PublishTimeDeclaration => ({ root: join(root, "ig"), builtAtPublish: [{ path, writer }] });
+      expect(missingPrerequisiteWriters([decl(["ig-index:build"], "fhir-artifact-index/index.json")])).toEqual(["ig-index:build"]);
+      writeFileSync(join(root, "ig", "fhir-artifact-index", "index.json"), "{}");
+      expect(missingPrerequisiteWriters([decl(["ig-index:build"], "fhir-artifact-index/index.json")])).toEqual([]);
+      expect(missingPrerequisiteWriters([decl(["render:bpmn"], "missing.svg")])).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });
