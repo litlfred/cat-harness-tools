@@ -23,14 +23,10 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
-/** The environment variable naming the trace file of the run being recorded. */
-export const TRACE_ENV = "INPUT_HASH_TRACE";
+import { PROJECTED_LINE, TRACE_ENV } from "./read-projections.ts";
 
-/**
- * The prefix of a projected-read line (`read-projections.ts`): a report of how
- * a file was used, not a read the fingerprint misses, so it is never "reached".
- */
-export const PROJECTED_LINE = "projected ";
+/** The environment variable naming the trace file of the run being recorded (declared in `read-projections.ts`). */
+export { TRACE_ENV };
 
 let quiet = 0;
 

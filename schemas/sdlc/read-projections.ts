@@ -36,9 +36,18 @@
 import { createHash } from "node:crypto";
 import { appendFileSync } from "node:fs";
 
-import { PROJECTED_LINE, TRACE_ENV } from "./input-trace.ts";
+/**
+ * The environment variable naming the trace file of the run being recorded.
+ * Declared here, and re-exported by `input-trace.ts`, because the harness
+ * modules that report projected reads may not import that module.
+ */
+export const TRACE_ENV = "INPUT_HASH_TRACE";
 
-export { PROJECTED_LINE };
+/**
+ * The prefix of a projected-read line: a report of how a file was used, not a
+ * read the fingerprint misses, so `input-trace.ts` never counts it as reached.
+ */
+export const PROJECTED_LINE = "projected ";
 
 const parsed = (text: string): { ok: true; value: unknown } | { ok: false } => {
   try {
