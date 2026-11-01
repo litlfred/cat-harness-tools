@@ -48,7 +48,7 @@
 import type { ArchimateElement, ArchimateLayer, ArchimateModel, ArchimateRelationship, ArchimateView, ArchimateViewConnection, ArchimateViewNode } from "../schemas/archimate.ts";
 
 // The layer colours and outlines are the shared figure theme's (figure-theme.ts).
-import { LAYER_FILL, outlineOf } from "./figure-theme.ts";
+import { LAYER_FILL, outlineOf, bandColours, THEME } from "./figure-theme.ts";
 export { LAYER_FILL, outlineOf };
 
 const esc = (s: string): string =>
@@ -200,6 +200,13 @@ export interface RenderOptions {
   viewHref?: (viewId: string) => string;
   /** Draw a key below the view: what each colour, shape and line used in it means (`legendSvg`). Default true. */
   legend?: boolean;
+  /**
+   * `poster` (the default): the shared figure theme (`figure-theme.ts`) — a
+   * title banner, and each grouping a band tinted in the hue of the layer most
+   * of its boxes belong to, under a deep header strip. Box fills stay the
+   * ArchiMate layer colours either way. `plain`: grey groupings, no banner.
+   */
+  theme?: "poster" | "plain";
 }
 
 /** One view as a standalone SVG document. */
@@ -221,6 +228,22 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
   // What the view uses, for its key: only what a reader can see on it.
   const nodes = new Map(view.nodes.map((n) => [n.id, n]));
   const used = { layers: new Set<ArchimateLayer>(), shapes: new Set<Shape>(), relationships: new Set<string>(), groups: false, notes: false, nested: false, viewRefs: false };
+  const poster = opts.theme !== "plain";
+  // A grouping's hue: the layer fill most of the boxes inside it (at any depth) have.
+  const kids = new Map<string, string[]>();
+  for (const n of view.nodes) if (n.parent) kids.set(n.parent, [...(kids.get(n.parent) ?? []), n.id]);
+  const hueOf = (id: string): string => {
+    const count = new Map<string, number>();
+    const walk = (k: string) => {
+      for (const c of kids.get(k) ?? []) {
+        const e = elements.get(nodes.get(c)?.ref ?? "");
+        if (e && nodes.get(c)?.kind === "element") count.set(LAYER_FILL[e.layer], (count.get(LAYER_FILL[e.layer]) ?? 0) + 1);
+        walk(c);
+      }
+    };
+    walk(id);
+    return [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "#e2e8f0";
+  };
   if (!Number.isFinite(minX)) {
     minX = 0; minY = 0; maxX = 360; maxY = 60;
     out.push(`<text class="av-note" x="180" y="34" text-anchor="middle">This view is empty: the model draws nothing on it.</text>`);
@@ -228,7 +251,16 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
 
   for (const n of view.nodes) {
     if (n.parent && nodes.get(n.parent)?.kind === "element" && n.kind === "element") used.nested = true;
-    if (n.kind === "group") {
+    if (n.kind === "group" && poster) {
+      used.groups = true;
+      const c = bandColours(hueOf(n.id));
+      const hh = LINE_H + 8;
+      out.push(
+        `<g class="av-g"><rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="6" fill="${c.ground}" stroke="${c.stroke}" stroke-width="1.2"/>` +
+          `<path d="M${n.x} ${n.y + 6} a6 6 0 0 1 6 -6 h${n.w - 12} a6 6 0 0 1 6 6 v${hh - 6} h${-n.w} z" fill="${c.header}"/>` +
+          `<text class="av-group" x="${n.x + 8}" y="${n.y + FONT + 5}" style="fill:#fff">${esc(wrap(n.text ?? "", n.w - 16, 1)[0] ?? "")}</text></g>`,
+      );
+    } else if (n.kind === "group") {
       used.groups = true;
       const fill = n.fill ?? "#f2f2f2";
       out.push(
@@ -259,6 +291,19 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
       if (shape === "junction") {
         const c = centre(n);
         out.push(`<circle cx="${c.x}" cy="${c.y}" r="${Math.min(n.w, n.h) / 2}" fill="#000"/>`);
+        continue;
+      }
+      if (poster && e?.type === "Grouping") {
+        // A Grouping element is drawn as a band, like a diagram group, and still links to its page.
+        used.groups = true;
+        const c = bandColours(hueOf(n.id));
+        const hh = LINE_H + 8;
+        const body =
+          `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="6" fill="${c.ground}" stroke="${c.stroke}" stroke-width="1.2" stroke-dasharray="6 3"/>` +
+          `<path d="M${n.x} ${n.y + 6} a6 6 0 0 1 6 -6 h${n.w - 12} a6 6 0 0 1 6 6 v${hh - 6} h${-n.w} z" fill="${c.header}"/>` +
+          `<text class="av-group" x="${n.x + 8}" y="${n.y + FONT + 5}" style="fill:#fff">${esc(wrap(e.name, n.w - 16, 1)[0] ?? "")}</text>`;
+        const title = `<title>${esc(e.name)} (Grouping)</title>`;
+        out.push(opts.elementHref ? `<a href="${esc(opts.elementHref(e.id))}" target="_top">${title}${body}</a>` : `<g>${title}${body}</g>`);
         continue;
       }
       if (e) {
@@ -297,21 +342,27 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
   }
 
   if (opts.legend !== false && Number.isFinite(maxY)) {
-    const key = legendSvg(used, minX, maxY + 28);
+    const key = legendSvg(used, minX, maxY + 28, poster);
     if (key.h > 0) {
       out.push(key.svg);
       grow(minX + key.w, maxY + 28 + key.h);
     }
   }
 
+  const banner = poster ? 52 : 0;
   const vx = Math.floor(minX - pad);
-  const vy = Math.floor(minY - pad);
+  const vy = Math.floor(minY - pad - banner);
   const vw = Math.ceil(maxX - minX + 2 * pad);
-  const vh = Math.ceil(maxY - minY + 2 * pad);
+  const vh = Math.ceil(maxY - minY + 2 * pad + banner);
+  const head = poster
+    ? `<rect x="${vx}" y="${vy}" width="${vw}" height="${banner}" fill="${THEME.frame}"/>` +
+      `<text x="${vx + pad}" y="${vy + 24}" style="font:700 17px ${esc(THEME.font)};fill:#fff">${esc(view.name)}</text>` +
+      `<text x="${vx + pad}" y="${vy + 41}" style="font:italic 10px ${esc(THEME.font)};fill:#c9d6e6">Drawn from the ArchiMate model “${esc(model.name)}”</text>`
+    : "";
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx} ${vy} ${vw} ${vh}" width="${vw}" height="${vh}" role="img" aria-labelledby="av-title">` +
-    `<title id="av-title">${esc(view.name)} — ${esc(model.name)}</title>${STYLE}${MARKERS}` +
-    `<rect x="${vx}" y="${vy}" width="${vw}" height="${vh}" fill="#fff"/>` +
+    `<title id="av-title">${esc(view.name)} — ${esc(model.name)}</title>${poster ? STYLE.replace(/system-ui,-apple-system,"Segoe UI",sans-serif|system-ui,sans-serif/g, THEME.font) : STYLE}${MARKERS}` +
+    `<rect x="${vx}" y="${vy}" width="${vw}" height="${vh}" fill="${poster ? THEME.page : "#fff"}"/>` + head +
     out.join("\n") +
     `</svg>\n`
   );
@@ -449,12 +500,16 @@ export function legendSvg(
   used: { layers: Set<ArchimateLayer>; shapes: Set<Shape>; relationships: Set<string>; groups: boolean; notes: boolean; nested: boolean; viewRefs: boolean },
   x: number,
   y: number,
+  poster = false,
 ): { svg: string; w: number; h: number } {
   const rows: string[] = [];
-  const ROW = 20, SW = 44, W = 640;
+  const ROW = 20, SW = 44, CHAR = 6.2;
+  // The key is as wide as its longest line, so no line runs past the frame.
+  let W = 640;
   let cy = y + 30;
-  const text = (t: string) => `<text class="av-key" x="${x + SW + 14}" y="${cy + 4}">${esc(t)}</text>`;
-  const head = (t: string) => { rows.push(`<text class="av-keyh" x="${x}" y="${cy + 4}">${esc(t)}</text>`); cy += ROW; };
+  const fit = (left: number, t: string) => { W = Math.max(W, Math.ceil(left + t.length * CHAR)); };
+  const text = (t: string) => { fit(SW + 14, t); return `<text class="av-key" x="${x + SW + 14}" y="${cy + 4}">${esc(t)}</text>`; };
+  const head = (t: string) => { fit(0, t); rows.push(`<text class="av-keyh" x="${x}" y="${cy + 4}">${esc(t)}</text>`); cy += ROW; };
   const layers = LAYER_ORDER.filter((l) => used.layers.has(l));
   if (layers.length) {
     head("Colour: which part of the architecture a box belongs to");
@@ -475,7 +530,8 @@ export function legendSvg(
   }
   const extras: Array<[(cy: number) => string, string]> = [];
   if (used.nested) extras.push([(c) => `<rect x="${x}" y="${c - 9}" width="${SW}" height="18" fill="#fff" stroke="#555"/><rect x="${x + 10}" y="${c - 4}" width="${SW - 20}" height="9" fill="#fff" stroke="#555"/>`, "A box inside another box: a part of it"]);
-  if (used.groups) extras.push([(c) => `<rect x="${x}" y="${c - 7}" width="${SW}" height="14" fill="#f2f2f2" stroke="#888"/>`, "Grey band: a grouping for layout only; it adds no meaning"]);
+  if (used.groups && poster) extras.push([(c) => `<rect x="${x}" y="${c - 7}" width="${SW}" height="14" rx="3" fill="${bandColours("#b5ffff").ground}" stroke="${bandColours("#b5ffff").stroke}"/><rect x="${x}" y="${c - 7}" width="${SW}" height="5" fill="${bandColours("#b5ffff").header}"/>`, "Band with a dark header: a grouping for layout only; it adds no meaning (tinted in the layer most of its boxes belong to)"]);
+  else if (used.groups) extras.push([(c) => `<rect x="${x}" y="${c - 7}" width="${SW}" height="14" fill="#f2f2f2" stroke="#888"/>`, "Grey band: a grouping for layout only; it adds no meaning"]);
   if (used.notes) extras.push([(c) => `<polygon points="${x},${c - 7} ${x + SW - 6},${c - 7} ${x + SW},${c - 1} ${x + SW},${c + 7} ${x},${c + 7}" fill="#fff" stroke="#888"/>`, "Note: a comment from the authors"]);
   if (used.viewRefs) extras.push([(c) => `<rect x="${x}" y="${c - 7}" width="${SW}" height="14" fill="#dcdcdc" stroke="#555"/>`, "Dark grey box: a link to another view"]);
   if (extras.length) head("Other marks");

@@ -192,7 +192,7 @@ describe("drawing a view", () => {
     expect(key).toContain("Software: systems");
     expect(key).toContain("Serving: serves");
     expect(key).toContain("Access: reads or writes data");
-    expect(key).toContain("Grey band: a grouping");
+    expect(key).toContain("a grouping for layout only");
     expect(key).toContain("Note: a comment");
     // Nothing the view does not draw.
     expect(key).not.toContain("Influence");
