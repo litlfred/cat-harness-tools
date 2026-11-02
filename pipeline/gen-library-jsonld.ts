@@ -510,8 +510,8 @@ export function buildDocumentNodes(
         path: `blocks/${bid}.jsonld`,
         content: node({
           "@id": iri(`blocks/${bid}`),
-          // A kind a dependency contributes (`functional-requirement`,
-          // `indicator`) is typed through the contribution registry; without
+          // A dependency's kind (a higher layer's `functional-requirement`
+          // or `indicator`) is typed through the contribution registry; without
           // it such a node had no `@type` at all.
           "@type": candidateTypes(c.kind),
           kind: c.kind,
@@ -675,8 +675,8 @@ function contributedKinds(): ContributionRegistry | undefined {
 /**
  * A candidate's `@type`: its kind's, through the contribution registry, or the
  * generic library block class when no mounted layer types the kind. An
- * L1 library may hold a contributed kind such as `indicator` without mounting
- * the layer that contributes it; its node is then still a typed block, never one with no type.
+ * L1 library may hold another layer's `indicator` without mounting that
+ * layer; its node is then still a typed block, never one with no type.
  */
 export function candidateTypes(kind: string): string[] {
   const types = typesForKind(kind, contributedKinds());

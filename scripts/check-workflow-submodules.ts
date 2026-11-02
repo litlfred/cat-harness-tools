@@ -150,6 +150,30 @@ export function jobsOf(src: string): Job[] {
   return jobs;
 }
 
+/**
+ * A checkout whose `sparse-checkout` names only paths under `.github/` holds
+ * the repository's own CI scripts and none of the platform's source, so no
+ * mount can be missing from it. `repin-train-verdict.yml` checks out main's
+ * `.github/scripts` alone, on purpose, to judge a train with main's script.
+ */
+export function ciScriptsOnly(block: readonly string[]): boolean {
+  const at = block.findIndex((l) => /^\s*sparse-checkout:/.test(l));
+  if (at < 0) return false;
+  const inline = /^\s*sparse-checkout:\s*(.*?)\s*$/.exec(block[at]!)?.[1] ?? "";
+  const paths: string[] = [];
+  if (inline !== "" && !/^[|>][-+]?$/.test(inline)) paths.push(inline);
+  else {
+    const indent = /^(\s*)/.exec(block[at]!)![1]!.length;
+    for (const l of block.slice(at + 1)) {
+      if (l.trim() === "") continue;
+      if (/^(\s*)/.exec(l)![1]!.length <= indent) break;
+      paths.push(l.trim());
+    }
+  }
+  const clean = paths.map((p) => p.replace(/^["']|["']$/g, "").replace(/^\.\//, "").replace(/^\//, ""));
+  return clean.length > 0 && clean.every((p) => p === ".github" || p.startsWith(".github/"));
+}
+
 /** Every `actions/checkout` in one job, with the `with:` keys that matter here. */
 export function checkoutsOf(job: Job): CheckoutStep[] {
   const out: CheckoutStep[] = [];
@@ -197,7 +221,7 @@ export function checkoutsOf(job: Job): CheckoutStep[] {
       line: job.start + i + 1,
       path,
       submodules: mounted,
-      publish: block.some((l) => PUBLISH_REF.test(l)),
+      publish: block.some((l) => PUBLISH_REF.test(l)) || ciScriptsOnly(block),
     });
   }
   return out;
