@@ -89,7 +89,12 @@ export const LibrarySectionSchema = z
 export const LibraryBlockSchema = z
   .object({
     ...derived,
-    "@type": z.tuple([z.string().regex(/^[\w.-]+:\w+$/), z.string().regex(/^doco:\w+$/)]),
+    // The DoCO co-type is absent for a kind that has none (core's
+    // `recommendation`, smart-base's `indicator` and requirement kinds).
+    "@type": z.union([
+      z.tuple([z.string().regex(/^[\w.-]+:\w+$/), z.string().regex(/^doco:\w+$/)]),
+      z.tuple([z.string().regex(/^[\w.-]+:\w+$/)]),
+    ]),
     kind: z.string().min(1),
     title: z.string().optional(),
     label: z.string().optional(),
@@ -102,6 +107,9 @@ export const LibraryBlockSchema = z
     narrative: z.unknown().optional(),
     // A table's column headers.
     headers: z.array(z.string()).optional(),
+    // A Stage B candidate's own facts: the source's number, what the source
+    // calls it, its strength, the aspect that proposed it (cat-harness-tools#1356).
+    meta: z.record(z.string(), z.string()).optional(),
   })
   .strict();
 

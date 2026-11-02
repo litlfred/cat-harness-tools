@@ -60,7 +60,17 @@ function git(root: string, args: string[]): string | undefined {
  * still resolves links against the right repository.
  */
 export function detectRepoUrl(root: string): string | undefined {
-  const remote = git(root, ["remote", "get-url", "origin"]);
+  let remote: string;
+  try {
+    // input-site: tree #bdd3672c — git remote get-url origin: the checkout's origin URL
+    remote = execFileSync("git", ["-C", root, "remote", "get-url", "origin"], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 64 * 1024 * 1024,
+    }).trim();
+  } catch {
+    return undefined;
+  }
   if (!remote) return undefined;
   const ssh = remote.match(/^git@([^:]+):(.+?)(?:\.git)?$/);
   if (ssh) return `https://${ssh[1]}/${ssh[2]}`;

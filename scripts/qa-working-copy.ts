@@ -71,7 +71,7 @@ export const STAMP_PATH = join(dirname(CACHE_FILE), "qa-working-copy.json");
  * `readsState` (bean `rn24`, `cat-harness-tools#281`).
  */
 export const WORKING_COPY_STEPS: readonly (readonly string[])[] = [
-  // input-site: inert #fde1a412 — an OUTPUT path the working-copy build writes, never reads
+  // input-site: inert #8d52aad6 — an OUTPUT path the working-copy build writes, never reads
   ["bun", "run", "cat-harness-tools/scripts/kg-export.ts", "--instance", "./bootstrap", "--out", "build/bootstrap-kg-export.jsonld"],
   ["bun", "run", "cat", "qa:refresh"],
   ["bun", "run", "cat", "glossary:page"],

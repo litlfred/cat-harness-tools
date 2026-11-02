@@ -25,9 +25,19 @@ document, and one may be the fallback — unless forced with `--class`;
 extractor declares `VALIDATED = False` has not been run against a real
 document of its kind and says so in its output.
 
+Besides the one CLASS a document is, a layer may provide ASPECTS: things
+every document of a family may hold whatever its class — requirements and
+normative statements in a DAK or DTH source are the first (owner,
+2026-11-01: "that should be a general part of L1 ingestion for DAK and
+DTH"). Every aspect that applies runs, after the class extractor; see the
+contract below. `--aspects-only` runs just the aspects and merges their
+candidates into an existing `candidates.json`, which is what `cat ingest`
+runs on every entry it stages.
+
 Usage:
     extract-candidates.py uploads/<doc-id>/ [...]
     extract-candidates.py --corpus uploads/ --class <class>
+    extract-candidates.py --aspects-only library/<doc-id>/
     extract-candidates.py --list-classes
 """
 
@@ -42,6 +52,8 @@ import sys
 from typing import Any
 
 SCHEMA = "ingest-candidates/v1"
+DISPOSITION = ("proposals only — promote via document-intake Stage 4; "
+               "nothing here is folio content and nothing here creates Lean")
 
 # ---------------------------------------------------------------- extractors
 #
@@ -70,6 +82,16 @@ SCHEMA = "ingest-candidates/v1"
 #     VALIDATED: bool = True             False while the class has not been
 #                                        run against a real document of its
 #                                        kind; reported as `"validated"`
+#
+# An ASPECT extractor defines `ASPECT: str` in place of `CLASS`, the same
+# `extract(sections, meta)`, and optionally `applies(meta, sections) -> bool`
+# (default: always). It is not a class: auto-detection never picks it and
+# `--class` cannot name it. Every aspect whose `applies` holds runs on every
+# document, and each candidate it returns is tagged `"aspect": <name>` so a
+# re-run replaces that aspect's candidates and nothing else. An aspect is
+# gated by MOUNTING: it applies only where its layer is mounted, so the DAK
+# layer's requirement aspect runs in DAK and DTH repositories and not in a
+# mathematics one.
 #
 # A class claimed by two layers is an error, never first-found-wins: which
 # extractor runs must not depend on the order the layers are mounted in. A
@@ -169,9 +191,10 @@ def _load(path: str):
     return mod
 
 
-def discover_extractors(roots: list[str] | None = None) -> dict[str, Any]:
-    """Every extractor the mounted layers provide, keyed by CLASS."""
+def _discover(roots: list[str] | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Every extractor the mounted layers provide: (classes by CLASS, aspects by ASPECT)."""
     found: dict[str, Any] = {}
+    aspects: dict[str, Any] = {}
     origin: dict[str, str] = {}
     for root in layer_roots() if roots is None else roots:
         d = os.path.join(root, EXTRACTORS_DIR)
@@ -181,16 +204,45 @@ def discover_extractors(roots: list[str] | None = None) -> dict[str, Any]:
             path = os.path.join(d, fn)
             mod = _load(path)
             cls = getattr(mod, "CLASS", None)
-            if not isinstance(cls, str) or not callable(getattr(mod, "extract", None)):
-                raise ExtractorError(f"{path}: an extractor defines CLASS (str) and extract(sections, meta)")
-            if cls in found:
-                raise ExtractorError(f'class "{cls}" is provided by both {origin[cls]} and {path}')
-            found[cls] = mod
-            origin[cls] = path
+            aspect = getattr(mod, "ASPECT", None)
+            if not callable(getattr(mod, "extract", None)) or (isinstance(cls, str)) == (isinstance(aspect, str)):
+                raise ExtractorError(
+                    f"{path}: an extractor defines exactly one of CLASS or ASPECT (str), and extract(sections, meta)"
+                )
+            key, table = (f"class {cls}", found) if isinstance(cls, str) else (f"aspect {aspect}", aspects)
+            name = cls if isinstance(cls, str) else aspect
+            if key in origin:
+                raise ExtractorError(f'{key.split()[0]} "{name}" is provided by both {origin[key]} and {path}')
+            table[name] = mod
+            origin[key] = path
     fallbacks = [c for c, m in found.items() if getattr(m, "FALLBACK", False)]
     if len(fallbacks) > 1:
         raise ExtractorError(f"more than one FALLBACK class: {', '.join(sorted(fallbacks))}")
-    return found
+    return found, aspects
+
+
+def discover_extractors(roots: list[str] | None = None) -> dict[str, Any]:
+    """Every CLASS extractor the mounted layers provide, keyed by CLASS."""
+    return _discover(roots)[0]
+
+
+def discover_aspects(roots: list[str] | None = None) -> dict[str, Any]:
+    """Every ASPECT extractor the mounted layers provide, keyed by ASPECT."""
+    return _discover(roots)[1]
+
+
+def run_aspects(sections, meta: dict[str, Any], aspects: dict[str, Any]) -> tuple[list[str], list[dict[str, Any]]]:
+    """The aspects that apply, in name order, and their candidates, each tagged with its aspect."""
+    ran: list[str] = []
+    out: list[dict[str, Any]] = []
+    for name, mod in sorted(aspects.items()):
+        applies = getattr(mod, "applies", None)
+        if callable(applies) and not applies(meta, sections):
+            continue
+        ran.append(name)
+        for c in mod.extract(sections, meta):
+            out.append({**c, "aspect": name})
+    return ran, out
 
 
 def require_extractor(extractors: dict[str, Any], cls: str):
@@ -218,7 +270,8 @@ def read_sections(docdir: str) -> list[tuple[str, dict[str, str], str]]:
     for fn in sorted(os.listdir(sdir)):
         if not fn.endswith(".md"):
             continue
-        raw = open(os.path.join(sdir, fn), encoding="utf-8", errors="replace").read()
+        with open(os.path.join(sdir, fn), encoding="utf-8", errors="replace") as fh:
+            raw = fh.read()
         fm: dict[str, str] = {}
         body = raw
         if raw.startswith("---\n"):
@@ -247,28 +300,46 @@ def detect_class(meta: dict[str, Any], sections, extractors: dict[str, Any]) -> 
     raise ExtractorError(f"no extractor claims this document and none is FALLBACK (classes found: {have}); pass --class")
 
 
-def process(docdir: str, forced: str | None, extractors: dict[str, Any] | None = None) -> dict[str, Any] | None:
-    spath = os.path.join(docdir, "structure.json")
-    if not os.path.exists(spath):
-        return None
-    art = json.load(open(spath))
-    meta = art.get("metadata", {})
-    sections = read_sections(docdir)
-    if extractors is None:
-        extractors = discover_extractors()
-    cls = forced or detect_class(meta, sections, extractors)
-    mod = require_extractor(extractors, cls)
-    cands = mod.extract(sections, meta)
-
+def _summary(cands: list[dict[str, Any]]) -> dict[str, Any]:
     by_kind: dict[str, int] = {}
     for c in cands:
         by_kind[c["kind"]] = by_kind.get(c["kind"], 0) + 1
+    return {
+        "candidates": len(cands),
+        "by_kind": by_kind,
+        "formalization_candidates": sum(1 for c in cands if c.get("formalization_candidate")),
+    }
+
+
+def process(
+    docdir: str,
+    forced: str | None,
+    extractors: dict[str, Any] | None = None,
+    aspects: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    spath = os.path.join(docdir, "structure.json")
+    if not os.path.exists(spath):
+        return None
+    with open(spath, encoding="utf-8") as fh:
+        art = json.load(fh)
+    meta = art.get("metadata", {})
+    sections = read_sections(docdir)
+    if extractors is None or aspects is None:
+        found, asp = _discover()
+        extractors = found if extractors is None else extractors
+        aspects = asp if aspects is None else aspects
+    cls = forced or detect_class(meta, sections, extractors)
+    mod = require_extractor(extractors, cls)
+    cands = list(mod.extract(sections, meta))
+    ran, extra = run_aspects(sections, meta, aspects)
+    cands += extra
 
     return {
         "_schema": SCHEMA,
         "doc_id": art.get("doc_id"),
         "document_class": cls,
         "validated": bool(getattr(mod, "VALIDATED", True)),
+        "aspects": ran,
         "source": {
             "structure_sha256": art.get("source", {}).get("sha256"),
             "file": art.get("source", {}).get("file"),
@@ -279,13 +350,57 @@ def process(docdir: str, forced: str | None, extractors: dict[str, Any] | None =
             "arxiv": meta.get("arxiv"),
             "doi": meta.get("doi"),
         },
-        "disposition": "proposals only — promote via document-intake Stage 4; "
-                       "nothing here is folio content and nothing here creates Lean",
-        "summary": {
-            "candidates": len(cands),
-            "by_kind": by_kind,
-            "formalization_candidates": sum(1 for c in cands if c["formalization_candidate"]),
+        "disposition": DISPOSITION,
+        "summary": _summary(cands),
+        "candidates": cands,
+    }
+
+
+def process_aspects(docdir: str, aspects: dict[str, Any]) -> dict[str, Any] | None:
+    """Only the aspects, merged into the entry's `candidates.json` (or a new one).
+
+    A class candidate already there is kept untouched; an aspect's earlier
+    candidates are replaced by this run's, so a re-run is idempotent. When no
+    aspect applies and there is no `candidates.json`, the answer is None and
+    nothing is written: an entry with nothing to propose stays as it was.
+    """
+    spath = os.path.join(docdir, "structure.json")
+    if not os.path.exists(spath):
+        return None
+    with open(spath, encoding="utf-8") as fh:
+        art = json.load(fh)
+    meta = art.get("metadata", {})
+    ran, extra = run_aspects(read_sections(docdir), meta, aspects)
+    cpath = os.path.join(docdir, "candidates.json")
+    prior: dict[str, Any] | None = None
+    if os.path.exists(cpath):
+        with open(cpath, encoding="utf-8") as fh:
+            prior = json.load(fh)
+    if not ran and prior is None:
+        return None
+    # A new record carries no `document_class`, `validated` or `disposition`:
+    # the manifest reads those as the WHOLE document's, and an aspect run
+    # says nothing about the whole document.
+    base = prior or {
+        "_schema": SCHEMA,
+        "doc_id": art.get("doc_id"),
+        "source": {
+            "structure_sha256": art.get("source", {}).get("sha256"),
+            "file": art.get("source", {}).get("file"),
         },
+        "provenance": {
+            "title": meta.get("title"),
+            "authors": meta.get("authors_raw"),
+            "arxiv": meta.get("arxiv"),
+            "doi": meta.get("doi"),
+        },
+    }
+    kept = [c for c in base.get("candidates", []) if c.get("aspect") not in set(ran)]
+    cands = kept + extra
+    return {
+        **base,
+        "aspects": sorted(set(base.get("aspects", [])) | set(ran)),
+        "summary": _summary(cands),
         "candidates": cands,
     }
 
@@ -296,15 +411,21 @@ def main() -> int:
     ap.add_argument("--corpus", help="root containing <doc-id>/ directories")
     ap.add_argument("--class", dest="cls", help="force document class (one a mounted layer's extractor provides)")
     ap.add_argument("--json", action="store_true", help="print to stdout, write nothing")
-    ap.add_argument("--list-classes", action="store_true", help="print the classes the mounted layers provide, and where")
+    ap.add_argument("--list-classes", action="store_true", help="print the classes and aspects the mounted layers provide, and where")
+    ap.add_argument("--aspects-only", action="store_true",
+                    help="run only the aspects that apply, merged into each entry's candidates.json")
     args = ap.parse_args()
 
     try:
-        extractors = discover_extractors()
+        extractors, aspects = _discover()
         if args.list_classes:
             for c, m in sorted(extractors.items()):
                 print(f"{c:<16} {m.__file__}")
+            for a, m in sorted(aspects.items()):
+                print(f"{'aspect:' + a:<16} {m.__file__}")
             return 0
+        if args.cls and args.aspects_only:
+            ap.error("--class and --aspects-only do not combine")
         if args.cls:
             require_extractor(extractors, args.cls)
     except ExtractorError as e:
@@ -324,7 +445,7 @@ def main() -> int:
     tot = fml = docs = 0
     for d in dirs:
         try:
-            res = process(d, args.cls, extractors)
+            res = process_aspects(d, aspects) if args.aspects_only else process(d, args.cls, extractors, aspects)
         except ExtractorError as e:
             print(f"extract-candidates: {d}: {e}", file=sys.stderr)
             return 2
