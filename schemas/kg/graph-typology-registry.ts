@@ -772,7 +772,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     // entries in this file. The constant lives in the leaf `declared-nodes.ts`
     // because the typology and validator scans read it before this registry exists.
     declarationFile: HARNESS_SUBGRAPH_DECLARATION_FILE,
-    // Its identity is its individual, `…/cat-harness/ns#graphTypology/cat-harness`
+    // Its identity is its individual, `…/cat-harness/v0/ns/graphTypology/cat-harness`
     // (`graphTypologyIri`). It was also a class, `KGraph`, from 2026-09-21 until
     // the per-kind classes went (bean `3r47`, 2026-09-30); the concept that
     // name stood for is bootstrap's Knowledge Graph. `kg` and `cat-harness`
@@ -3120,7 +3120,7 @@ export interface DeclaringInstance {
   readonly prefix: string;
   readonly name: string;
   readonly root: string;
-  /** `<iriBase>v<major>/ns#` — {@link instanceNamespaceOf}. */
+  /** `<iriBase>v<major>/ns/` — {@link instanceNamespaceOf}. */
   readonly namespace: string;
 }
 
@@ -3213,7 +3213,7 @@ export function ownPrefixTable(registry: GraphTypologyRegistry = defaultGraphTyp
 export function ownNamespaceValues(registry: GraphTypologyRegistry = defaultGraphTypologies): readonly string[] {
   const content = contentLayerInstance(registry);
   // declared-path-literal: `ns/` here is a segment of a namespace IRI, not a directory.
-  return content === undefined ? OWN_NAMESPACE_VALUES : [...OWN_NAMESPACE_VALUES, content.namespace, content.namespace.replace(/ns#$/, "ns/")];
+  return content === undefined ? OWN_NAMESPACE_VALUES : [...OWN_NAMESPACE_VALUES, content.namespace];
 }
 
 export class GraphTypologyRegistry {

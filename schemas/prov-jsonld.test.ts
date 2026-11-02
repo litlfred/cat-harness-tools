@@ -79,7 +79,7 @@ describe("provJsonldDocument — a real checkout's actors, roles and plans", () 
   test("underPolicy's IRIs are links too", async () => {
     const nodes = await expanded(provJsonldDocument("t--x", [activity("owner", "authoring-agent", "code-change-review#T")], book).document);
     const act = nodes.find((n) => (n["@type"] as string[] | undefined)?.includes(`${P}Activity`))!;
-    const key = Object.keys(act).find((k) => k.endsWith("#underPolicy"))!;
+    const key = Object.keys(act).find((k) => k.endsWith("/underPolicy"))!;
     expect(act[key]).toEqual([{ "@id": "https://litlfred.github.io/folio-assistant/policies/folio-defaults" }]);
   });
 

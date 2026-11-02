@@ -117,7 +117,7 @@ export const CAT_BOOTSTRAP_NS = ownNamespace("cat-bootstrap");
 export const CAT_HARNESS_NS = ownNamespace("cat-harness");
 // The content layer's namespace is NOT here (folio-assistant#2598, owner
 // 2026-10-16, "2a" then "1a"). An instance above this one mints into its own
-// namespace, `<iriBase>v<major>/ns#` from its declaration
+// namespace, `<iriBase>v<major>/ns/` from its declaration
 // (`instanceNamespace`), and a kind it declares in its `typologies/` graph is
 // named in that namespace by the registry (`GraphTypologyDef.namespace`).
 
@@ -198,7 +198,7 @@ export const OWN_NAMESPACE_VALUES: readonly string[] = ownNamespaces.codes.flatM
  * The namespace of the BPMN extension elements BOOTSTRAP declares for its own
  * diagrams — `skill`, `role`, `precondition` — written with the prefix of the
  * declaring Subgraph, `bootstrap.processes:` (owner, 2026-09-24, bean `12s9`
- * stage 2). `<stub>/<subgraph>/ns#`, like every other vocabulary address here.
+ * stage 2). `<stub>/<subgraph>/ns/`, like every other vocabulary address here.
  * Its definition is data in bootstrap itself, `processes/ns.jsonld`, which the
  * site publishes at this address.
  */
@@ -248,7 +248,7 @@ export const CANONICAL_EXTENSION_PREFIX = "folio";
 // REMOVE with the tolerance in `bootstrap-tools/schemas/release-iri.ts`, once
 // every litlfred layer binds `<iriBase>v<major>/` (owner ruling 2026-10-23,
 // option B). Until then a layer composed at its own `main` still writes
-// `xmlns:cat-harness.processes="…/cat-harness/0.1.0/processes/ns#"`, and the
+// `xmlns:cat-harness.processes="…/cat-harness/0.1.0/processes/ns/"`, and the
 // checks accept that same-major spelling as deprecated. The READER must too:
 // without this, every extension in such a diagram — its skills, lanes'
 // roles, policy and gateways — is silently not ours, which is the failure
@@ -309,7 +309,7 @@ export function ownElementPattern(xml: string, local: string, rest = "", flags =
  * the declaring instance's stub.
  *
  * Owner, 2026-09-23: "prefix -> match stub". Each namespace above is already
- * `<canonical>/<stub>/ns#`, so the path segment, the stub and the prefix are
+ * `<canonical>/<stub>/ns/`, so the path segment, the stub and the prefix are
  * now ONE word in three places instead of three words that must agree. They
  * were `bs`, `cat` and `fac` until then, and the cost of three spellings was
  * measured rather than argued (bean `zaqn`): `CONTENT_CONTEXT` renamed its
@@ -338,24 +338,24 @@ export type NsPrefix = keyof typeof NS_PREFIXES;
  * rather than listed here (folio-assistant#2598, owner 2026-10-16).
  *
  * An instance that declares an `iriBase` mints under its own release,
- * `<iriBase>v<major>/ns#` (`release-iri.ts`). One that declares none mints
- * under the platform's site, `<stem><stub>/ns#`. `instanceNamespace` in
+ * `<iriBase>v<major>/ns/` (`release-iri.ts`). One that declares none mints
+ * under the platform's site, `<stem><stub>/ns/`. `instanceNamespace` in
  * `instance-repositories.ts` is this function; it lives here because the
  * graph-typology registry needs it and cannot import that module (a cycle
  * through `cat-harness.ts`).
  */
 export function instanceNamespaceOf(decl: { name: string; stub?: string; iriBase?: string; version?: string }): string {
   const release = releaseIris(decl);
-  return release ? `${release.agent}ns#` : `${LEGACY_FOLIO_NS.replace(/ns#$/, "")}${decl.stub ?? decl.name}/ns#`;
+  return release ? `${release.agent}ns/` : `${LEGACY_FOLIO_NS.replace(/ns[#/]$/, "")}${decl.stub ?? decl.name}/ns/`;
 }
 
-/** The instance stub a namespace of ours names — the segment before `/ns#`. */
+/** The instance stub a namespace of ours names — the segment before `/ns/`. */
 export function stubOfNamespace(ns: string): string | undefined {
   // A release segment — `v0`, the major every address carries since the
   // owner's 2026-10-23 ruling, or the full `0.1.0` an older copy may still
-  // spell — sits between the stub and `ns#` once an instance declares an
+  // spell — sits between the stub and `ns/` once an instance declares an
   // iriBase (`bootstrap-tools/schemas/release-iri.ts`); it is never the stub.
-  return /\/([^/]+)\/(?:(?:\d+\.\d+\.\d+|v\d+)\/)?ns#$/.exec(ns)?.[1];
+  return /\/([^/]+)\/(?:(?:\d+\.\d+\.\d+|v\d+)\/)?ns\/$/.exec(ns)?.[1];
 }
 
 /**
@@ -378,7 +378,7 @@ export function prefixForLayer(layer: TermLayer): NsPrefix {
 }
 
 const CORE_LAYER_UNNAMED =
-  "namespaces: the core layer's namespace is its declaring instance's (<iriBase>v<major>/ns#); " +
+  "namespaces: the core layer's namespace is its declaring instance's (<iriBase>v<major>/ns/); " +
   "ask contentLayerInstance() in graph-typology-registry.ts, or the kind's GraphTypologyDef.namespace";
 
 /**

@@ -19,7 +19,7 @@ import { join } from "node:path";
 
 import { loadProcessModel, partitionTolerated } from "../../../src/workflow/process-model.ts";
 
-const NS = "https://litlfred.github.io/bootstrap/v0/processes/ns#";
+const NS = "https://litlfred.github.io/bootstrap/v0/processes/ns/";
 
 /** A one-task diagram whose head and lane markup the test chooses. */
 function diagram(opts: { head?: string; lane: string; laneExt?: string }): string {

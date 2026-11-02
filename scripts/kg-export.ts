@@ -2765,7 +2765,7 @@ function undeclaredTerms(
   const declared = new Set(Object.keys(context).filter((k) => !k.startsWith("@")));
   const seen = new Map<string, { types: Set<string>; n: number }>();
   for (const node of graph) {
-    const type = String(node["@type"] ?? "").split("#").pop() ?? "?";
+    const type = String(node["@type"] ?? "").split(/[#/]/).pop() ?? "?";
     for (const key of Object.keys(node)) {
       if (key.startsWith("@") || declared.has(key)) continue;
       const e = seen.get(key) ?? { types: new Set<string>(), n: 0 };

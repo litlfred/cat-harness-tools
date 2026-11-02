@@ -157,6 +157,6 @@ describe("declared, so a JSON-LD processor keeps it", () => {
       ctx.changedAssetsUnavailable,
       ...Object.values(ctx.changedAssets["@context"]).map((v) => (typeof v === "string" ? v : v["@id"])),
     ];
-    for (const iri of iris) expect(Object.keys(PROPERTY_GLOSSES)).toContain(iri.split("#").pop()!);
+    for (const iri of iris) expect(Object.keys(PROPERTY_GLOSSES)).toContain(iri.split(/[#/]/).pop()!);
   });
 });

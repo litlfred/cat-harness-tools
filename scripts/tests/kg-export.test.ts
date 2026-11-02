@@ -370,7 +370,7 @@ describe("kg export", () => {
     const recomputed: Record<string, number> = {};
     for (const n of EXPORT["@graph"]) {
       if (isTombstone(n)) continue; // not a node of any type here — see `tombstonesFor`
-      const t = String(n["@type"]).split("#")[1] ?? String(n["@type"]);
+      const t = String(n["@type"]).split(/[#/]/).pop() ?? String(n["@type"]);
       recomputed[t] = (recomputed[t] ?? 0) + 1;
     }
     expect(EXPORT.counts).toEqual(recomputed);
