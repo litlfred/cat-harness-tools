@@ -1527,6 +1527,14 @@ jobs:
           ROOT_GATES=""
           [ "$MODE" = "layer" ] && ROOT_GATES="--record $RUNNER_TEMP/root-gates.json"
           python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json" $ROOT_GATES
+      # The artefact's own name, inside it: when the compare job's download
+      # matches ONE artefact (one shard, one side), the action unpacks it into
+      # `results/` itself rather than `results/<name>/`, and this file is how
+      # the compare job puts it back where merge-shards.py looks.
+      - name: Name this shard's artefact inside it
+        env:
+          NAME: results-${{ matrix.side }}-${{ matrix.shard }}
+        run: printf '%s\n' "$NAME" > "$RUNNER_TEMP/artefact-name"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: results-${{ matrix.side }}-${{ matrix.shard }}
@@ -1536,6 +1544,7 @@ jobs:
             ${{ runner.temp }}/gates.json
             ${{ runner.temp }}/gates-shard.json
             ${{ runner.temp }}/cone-records.json
+            ${{ runner.temp }}/artefact-name
 
   # `!cancelled()`, not the default `success()`: a shard or prepare job that
   # failed or timed out must make this job RED (its artefact is missing,
@@ -1622,6 +1631,21 @@ jobs:
         with:
           path: results
           pattern: results-*
+      # One shard on one side (`gate-shards: 1` with main's answer cached, or a
+      # push) is one artefact, which the action unpacks into `results/` itself.
+      # Put it under its own name, as with two or more (bootstrap-tools#68,
+      # run 41359773941: "the artefact results-head-1 is missing").
+      - name: Keep a lone artefact under its own name
+        if: steps.pins-only.outputs.only != 'true'
+        run: |
+          set -euo pipefail
+          if [ -f results/artefact-name ]; then
+            name="$(cat results/artefact-name)"
+            case "$name" in results-head-[0-9]*|results-base-[0-9]*) ;; *) echo "::error::results/artefact-name is '$name'"; exit 2 ;; esac
+            mkdir -p "results/$name"
+            find results -maxdepth 1 -type f -exec mv {} "results/$name/" \;
+            echo "one artefact, unpacked flat: moved under results/$name"
+          fi
       # Handed on by prepare-base, which restored it (cat-harness-tools#926):
       # an artifact of this run, never a cache entry that can be evicted
       # while the head shards run. `cached` is true only when it was handed.
