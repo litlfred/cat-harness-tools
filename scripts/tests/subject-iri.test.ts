@@ -5,7 +5,7 @@
  * path, not a `#fragment`": `<doc dir>/<kind>/<id>` for a subject, a step
  * `…/process/P/node/T`, a lane `…/process/P/lane/L`, and a flow the one
  * fragment, `…/process/P#flow/F`. Every subject must load, so kg-export writes
- * its `.jsonld` and page; every old fragment keeps a one-release tombstone.
+ * its `.jsonld` and page. Nothing forwards an old fragment (clean break, #1378).
  */
 import { describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -20,7 +20,7 @@ import {
   subjectIri,
   subjectPathOf,
 } from "../lib/subject-iri.ts";
-import { makeIri, migrationTombstones, writeSubjectDocuments } from "../kg-export.ts";
+import { makeIri, writeSubjectDocuments } from "../kg-export.ts";
 import { SEARCH_EXCLUDE_MARKER } from "../publish-verify.ts";
 import { subgraphIri } from "../subgraph-node.ts";
 import { diagramPages, owningProcess } from "../lib/diagram-pages.ts";
@@ -136,21 +136,7 @@ describe("every subject loads: its own .jsonld and page", () => {
     { "@id": makeIri(HOST, "skill", "z"), "@type": "https://x.test/ns#Skill" },
     { "@id": "https://x.test/site/folio-assistant-core/tools/t.jsonld", "@type": "https://x.test/ns#Tool" },
   ];
-  const tombstones = migrationTombstones(graph as never, DOC);
-  const published = { "@context": ctx, "@id": DOC, "@graph": [...graph, ...tombstones] };
-
-  test("one tombstone per subject of THIS document, under its old fragment, sameAs its path", () => {
-    expect(tombstones.map((t) => t["@id"]).sort()).toEqual(
-      ["skill/a", "process/P", "process/P/node/T", "process/P/lane/L", "process/P/flow/F"].map((p) => `${DOC}#${p}`).sort(),
-    );
-    const flow = tombstones.find((t) => t["@id"] === `${DOC}#process/P/flow/F`)!;
-    expect(flow).toEqual({
-      "@id": `${DOC}#process/P/flow/F`,
-      deprecated: true,
-      isReplacedBy: "https://x.test/site/folio-assistant-core/process/P#flow/F",
-      sameAs: "https://x.test/site/folio-assistant-core/process/P#flow/F",
-    } as never);
-  });
+  const published = { "@context": ctx, "@id": DOC, "@graph": graph };
 
   test("the writer puts a .jsonld and a page at every subject's path, and nothing else", () => {
     const dir = mkdtempSync(join(tmpdir(), "subject-docs-"));

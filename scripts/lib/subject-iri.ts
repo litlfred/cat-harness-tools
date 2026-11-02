@@ -70,8 +70,7 @@ const KINDS = new Set(SUBJECT_KINDS);
  * Stubs whose document is still published by a generator that mints
  * `#fragment` subjects. Empty since litlfred/cat-harness-tools#958: bootstrap's
  * publisher, bootstrap-tools' `export-graph.ts`, mints `<doc dir>/<kind>/<id>`
- * too (litlfred/bootstrap-tools#52), and keeps a tombstone per old fragment
- * for one release. Kept, empty, so a publisher that ever lags again has one
+ * too (litlfred/bootstrap-tools#52). Kept, empty, so a publisher that ever lags again has one
  * place to be named; `subject-iri.test.ts` holds it to that publisher list.
  */
 export const FRAGMENT_DOCUMENT_STUBS: readonly string[] = [];
@@ -156,8 +155,10 @@ export function subjectPathOf(iri: string, docIri: string): string | undefined {
 /**
  * The `#fragment` IRI this subject had before #603:
  * `<old document>#<kind>/<id>`, a flow's `#flow/` folded back to `/flow/`.
- * What a one-release tombstone is named by. `undefined` when `iri` is not a
- * subject of `docIri`'s document.
+ * Still how a glossary lane usage is named (a fragment of the glossary
+ * document, until cat-harness-tools#1379 gives it a path). Nothing forwards
+ * an old fragment any more (clean break, #1378). `undefined` when `iri` is
+ * not a subject of `docIri`'s document.
  *
  * `legacyDocIri` is the document the fragment was OF, when that is not
  * `docIri`: the host's document left the site root for

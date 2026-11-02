@@ -38,14 +38,14 @@ import * as bootstrapExport from "@litlfred/bootstrap-tools/scripts/export-graph
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 
-import { buildExport, exportIdentity, publishedDocument, writeLegacyDocuments, writeSubjectDocuments, writeToolDocuments, publishedIdentity, publishedInstanceSchemas, readSourceProvenance, undeclaredRootTerms } from "../kg-export.js";
-import { legacyFragmentIri, subjectPathOf } from "../lib/subject-iri.ts";
+import { buildExport, exportIdentity, publishedDocument, writeSubjectDocuments, writeToolDocuments, publishedIdentity, publishedInstanceSchemas, readSourceProvenance, undeclaredRootTerms } from "../kg-export.js";
+import { subjectPathOf } from "../lib/subject-iri.ts";
 import { gitFixtureRepo } from "../../test/support/git-fixture.js";
-import { PUBLISHED_ELSEWHERE, declaresOwnCanonical, instanceExportPlan, publishesInstanceSchema } from "../instance-exports.js";
+import { declaresOwnCanonical, instanceExportPlan, publishesInstanceSchema } from "../instance-exports.js";
 import { isExternalContract, skillContracts } from "../skill-contracts.js";
 import { buildDeclarationSchema, buildSkillIoContracts } from "../harness-schema-export.js";
 import { hostSchemaBase } from "../lib/host-schema.ts";
-import { artefactStub, findDeclarationFile, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.js";
+import { artefactStub, findDeclarationFile, findInstanceRoot, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.js";
 import { termIri } from "../../schemas/kg/namespaces.js";
 import { ownPrefixTable } from "../../schemas/kg/graph-typology-registry.js";
 import { inAggregate } from "../../test/support/checkout.js";
@@ -128,13 +128,11 @@ const EXPORT_PREVIEW = await buildExport({ baseUrl: "https://example.invalid/fa/
 /**
  * The CHECKOUT-scope graph — every instance stacked on this one, under this
  * document's name. Not published since bean `4ak5` item 2 (owner ruling
- * 2026-10-05, option B): it is what the tombstones are measured against, and
+ * 2026-10-05, option B): it is what the published graph is measured against, and
  * the only graph still holding a package whose manifest name differs from its
  * directory, which the package-id witness below needs.
  */
 const EXPORT_CHECKOUT = await buildExport({ baseUrl: BASE, scope: "checkout" });
-/** A tombstone: no `@type`, `deprecated`, and where the node went (bean `4ak5`). */
-const isTombstone = (n: Record<string, unknown>): boolean => n.deprecated === true;
 // Minted through `termIri`, exactly as the exporter mints it. Rebuilding the
 // IRI from a namespace constant is what made this helper silently return zero
 // rows for every type once the namespaces split — a green-looking suite over
@@ -356,9 +354,6 @@ describe("kg export", () => {
     const ids = EXPORT["@graph"].map((n) => n["@id"]);
     for (const n of EXPORT["@graph"]) {
       expect(typeof n["@id"]).toBe("string");
-      // A tombstone has no type by the owner's ruling — it is no longer
-      // anything here; its own shape is asserted in the tombstone block.
-      if (isTombstone(n)) continue;
       expect(inFolioNs(String(n["@type"]))).toBe(true);
     }
     expect(ids.length).toBe(new Set(ids).size);
@@ -369,7 +364,6 @@ describe("kg export", () => {
     // can disagree with `@graph`, it is worse than absent.
     const recomputed: Record<string, number> = {};
     for (const n of EXPORT["@graph"]) {
-      if (isTombstone(n)) continue; // not a node of any type here — see `tombstonesFor`
       const t = String(n["@type"]).split(/[#/]/).pop() ?? String(n["@type"]);
       recomputed[t] = (recomputed[t] ?? 0) + 1;
     }
@@ -394,7 +388,7 @@ describe("kg export", () => {
     expect(stub).toBe("cat-harness");
     // The host is no longer special (#603 decision 1b, owner 2026-10-23: one
     // rule for every layer, subjects beside their document). Its old root
-    // address is where the one-release tombstones are served.
+    // address is only read by `placedOut`; nothing is served there (#1378).
     expect(exportIdentity({ baseUrl: BASE }).docIri).toBe(`${BASE}/${decl.name}/${stub}.jsonld`);
     expect(exportIdentity({ baseUrl: BASE }).docPath).toBe(`${decl.name}/${stub}.jsonld`);
     expect(exportIdentity({ baseUrl: BASE }).legacyDocIri).toBe(`${BASE}/${stub}.jsonld`);
@@ -690,14 +684,12 @@ describe("every self-URL the export publishes resolves to something published", 
   function publishedPaths(): Set<string> {
     const stub = artefactStub(readDeclaration(join(HARNESS_ROOT))!);
     // The host's document under its own directory since #603 decision 1b
-    // (owner, 2026-10-23), and its old root address kept for one release as
-    // the tombstone document the same step writes.
-    const { docPath, legacyDocPath } = exportIdentity({ baseUrl: BASE });
+    // (owner, 2026-10-23). Nothing is written at its old root address any
+    // more (clean break, cat-harness-tools#1378).
+    const { docPath } = exportIdentity({ baseUrl: BASE });
     const out = new Set<string>([
       docPath,
       docPath.replace(/\.jsonld$/, ".json"),
-      `${stub}.jsonld`,
-      `${stub}.json`,
       `${stub}.schema.json`,
       // bootstrap's own graph, published by the same step because THIS
       // graph links into it — `pve3`'s "neither" ruling made a Tool here
@@ -750,7 +742,7 @@ describe("every self-URL the export publishes resolves to something published", 
     // instance's line, then every instance in `instance-exports.ts`'s plan —
     // the deploy's own list, read rather than restated, since a second list
     // here would be the "what is declared" answer that went stale before.
-    // A tombstone and a re-homed skill link land in these.
+    // A re-homed skill link lands in these.
     //
     // An index checkout's root declares no instance (owner, 2026-10-08), so
     // there is no root line to publish and none to admit here.
@@ -761,8 +753,8 @@ describe("every self-URL the export publishes resolves to something published", 
       out.add(`${s}/${s}.json`);
     }
     // The host's schemas sit under its directory since #676, beside its
-    // document; each old root address holds its one-release tombstone, which
-    // the same step writes, so both are published.
+    // document; each old root address holds its one-release schema tombstone
+    // (#676), which the same step writes, so both are published.
     const hostDir = docPath.includes("/") ? docPath.slice(0, docPath.lastIndexOf("/") + 1) : "";
     for (const p of [`${stub}.schema.json`, "tool.schema.json", "tool-types.schema.json"]) out.add(`${hostDir}${p}`);
     for (const c of buildSkillIoContracts({ baseUrl: BASE })) {
@@ -786,13 +778,11 @@ describe("every self-URL the export publishes resolves to something published", 
       out.add(`${hostDir}tool-types/${n}.schema.json`);
     }
     const toolDir = join(HARNESS_ROOT, "tools");
-    // Beside the document, so under `<name>/` since #603 decision 1b; the
-    // old root `tools/<id>.jsonld` holds each one's tombstone for a release.
+    // Beside the document, so under `<name>/` since #603 decision 1b.
     const docDir = docPath.includes("/") ? docPath.slice(0, docPath.lastIndexOf("/") + 1) : "";
     for (const f of readdirSync(toolDir, { withFileTypes: true })) {
       if (!f.isDirectory()) continue;
       out.add(`${docDir}tools/${f.name}.jsonld`);
-      out.add(`tools/${f.name}.jsonld`);
     }
     const svgDir = join(HARNESS_ROOT, siteDirFor(join(HARNESS_ROOT)), "assets", "img", "workflows");
     for (const f of readdirSync(svgDir)) if (f.endsWith(".svg")) out.add(`assets/img/workflows/${f}`);
@@ -803,8 +793,8 @@ describe("every self-URL the export publishes resolves to something published", 
     // writer does not produce must fail here. Pages serves `<x>.html` at `<x>`.
     const site = mkdtempSync(join(tmpdir(), "kg-subjects-"));
     try {
-      const write = (doc: Record<string, unknown>, at: string, legacy?: string) => {
-        const files = [...writeSubjectDocuments(doc, join(site, at)), ...writeLegacyDocuments(doc, join(site, at), at, legacy)];
+      const write = (doc: Record<string, unknown>, at: string) => {
+        const files = writeSubjectDocuments(doc, join(site, at));
         for (const f of files) {
           const rel = relative(site, f).split("\\").join("/");
           out.add(rel);
@@ -812,7 +802,7 @@ describe("every self-URL the export publishes resolves to something published", 
           else if (rel.endsWith(".html")) out.add(rel.slice(0, -".html".length));
         }
       };
-      write(publishedDocument(EXPORT_CANONICAL) as Record<string, unknown>, docPath, legacyDocPath);
+      write(publishedDocument(EXPORT_CANONICAL) as Record<string, unknown>, docPath);
       // bootstrap's subjects, which bootstrap-tools' `export-graph.ts` writes
       // beside `bootstrap/bootstrap.jsonld` in the same deploy step since
       // litlfred/bootstrap-tools#52. A Tool here that satisfies a bootstrap
@@ -1104,20 +1094,17 @@ describe("a package's id is declared, not derived from its path", () => {
   // rather than listed, so adding a skill there is not a test edit.
   //
   // Read from the CHECKOUT-scope graph since bean `4ak5` item 2: who-iris is
-  // its own instance, so the published graph holds a tombstone where its
-  // package was (asserted below), and no package of cat-harness's own has a
+  // its own instance, so the published graph does not hold its package
+  // (asserted below), and no package of cat-harness's own has a
   // manifest name that differs from its directory. The rule is
   // `packageIdFor`'s, which runs the same in either scope.
   const WITNESS = "who-iris";
 
   // Reads other instances' exports, so it runs only where those instances
   // exist; skipped visibly when cat-harness stands alone (bean `ho66`).
-  test.skipIf(!inAggregate())("in the PUBLISHED graph the witness is a tombstone forwarding to its own instance's document", () => {
-    // Named by the fragment the LAST release published: of the host's old
-    // root document, which moved under `<site>/<name>/` (#603 decision 1b).
-    const at = `${exportIdentity({ instanceRoot: HARNESS_ROOT }).legacyDocIri ?? EXPORT["@id"]}#package/${WITNESS}`;
-    const t = (EXPORT["@graph"] as Array<Record<string, unknown>>).find((n) => n["@id"] === at);
-    expect(t).toEqual({ "@id": at, deprecated: true, isReplacedBy: publishedIdentity(join(REPO, WITNESS)).docIri });
+  test.skipIf(!inAggregate())("in the PUBLISHED graph the witness is gone: nothing forwards it (clean break, #1378)", () => {
+    const ids = (EXPORT["@graph"] as Array<Record<string, unknown>>).map((n) => String(n["@id"]));
+    expect(ids.filter((id) => id.endsWith(`#package/${WITNESS}`) || id.endsWith(`/package/${WITNESS}`))).toEqual([]);
   });
 
   test("a directory with NO manifest falls back to its basename, and says so", () => {
@@ -1332,35 +1319,12 @@ describe("each Tool is its own document, at the path its IRI names", () => {
   });
 
   // #603 decision 1b (owner, 2026-10-23): the host's document and Tools left
-  // the site root. Each old address must still answer, with where it went.
-  test("the old root document and each old Tool document forward, for one release", () => {
+  // the site root. Clean break (owner, 2026-11-02, cat-harness-tools#1378):
+  // nothing answers at the old addresses, and no node forwards one.
+  test("the published graph holds no forwarding node: every node is a live subject", () => {
     const pub = publishedDocument(EXPORT_CANONICAL) as unknown as Record<string, unknown>;
-    const { docPath, legacyDocPath, legacyDocIri, docIri } = exportIdentity({ baseUrl: BASE });
-    expect(pub["@id"]).toBe(docIri);
-    expect(legacyDocPath).toBeDefined();
-    const site = mkdtempSync(join(tmpdir(), "kgx-legacy-"));
-    try {
-      const written = writeLegacyDocuments(pub, join(site, docPath), docPath, legacyDocPath);
-      const root = JSON.parse(readFileSync(join(site, legacyDocPath!), "utf-8")) as Record<string, unknown>;
-      expect(root["@id"]).toBe(legacyDocIri);
-      expect([root.deprecated, root.isReplacedBy, root.sameAs]).toEqual([true, docIri, docIri]);
-      const stones = root["@graph"] as Array<Record<string, unknown>>;
-      expect(stones.length).toBeGreaterThan(1000);
-      for (const t of stones) expect(String(t["@id"]).startsWith(`${legacyDocIri}#`)).toBe(true);
-      // One file per Tool at its old address, its one node the tombstone.
-      const tools = (pub["@graph"] as Array<Record<string, unknown>>).filter((n) => n["@type"] === termIri("Tool"));
-      expect(written.length).toBe(1 + tools.length);
-      for (const t of tools) {
-        const old = toolIri(legacyDocIri!, String(t.name));
-        const doc = JSON.parse(readFileSync(join(site, "tools", `${String(t.name)}.jsonld`), "utf-8")) as Record<string, unknown>;
-        expect(doc["@id"]).toBe(old);
-        expect(doc["@graph"]).toEqual([{ "@id": old, deprecated: true, isReplacedBy: t["@id"], sameAs: t["@id"] }]);
-      }
-      // `--out` that does not end in the document's path names no site root.
-      expect(writeLegacyDocuments(pub, join(site, "elsewhere.jsonld"), docPath, legacyDocPath)).toEqual([]);
-    } finally {
-      rmSync(site, { recursive: true, force: true });
-    }
+    const forwards = (pub["@graph"] as Array<Record<string, unknown>>).filter((n) => n.deprecated === true || n.isReplacedBy !== undefined);
+    expect(forwards.map((n) => n["@id"])).toEqual([]);
   });
 
   test("no Tool is a fragment of the instance document any more", () => {
@@ -1553,10 +1517,9 @@ describe("an actor's roles are links to Role nodes (#1168 B8)", () => {
  * `cat-harness.jsonld` is built in instance scope: cat-harness's own declared
  * directories only. Measured the day it landed, the checkout-scope document
  * it replaced carried 825 nodes of five other instances under
- * `cat-harness.jsonld#…` fragments. Each such `@id` keeps a tombstone for ONE
- * release, forwarding to the same node in its owner's published document —
- * GitHub Pages cannot redirect a fragment. Remove the tombstone tests with
- * `tombstonesFor`.
+ * `cat-harness.jsonld#…` fragments. Each such node is in its owner's
+ * published document; nothing here forwards it (clean break, owner
+ * 2026-11-02, cat-harness-tools#1378).
  */
 const OWNER_EXPORTS = new Map<string, Set<string>>();
 /** The same builds, whole, by instance root — for the schema-link tests below. */
@@ -1572,19 +1535,6 @@ for (const r of instanceRootsIn(REPO)) {
 describe("the published graph is this instance's own (bean 4ak5 item 2)", () => {
   const HOST = resolve(join(HARNESS_ROOT));
   const graph = EXPORT_CANONICAL["@graph"] as Array<Record<string, unknown>>;
-  const DOC = String(EXPORT_CANONICAL["@id"]);
-  // #603's tombstones (a subject's old fragment, `sameAs` its path) are the
-  // ones whose replacement is in THIS graph under that very fragment; the
-  // rest are this block's: nodes that moved to their owner's document.
-  // The host's last release published them under its ROOT document (#603
-  // decision 1b), so the old fragments name that one, not `DOC`.
-  const LEGACY = exportIdentity({ baseUrl: BASE }).legacyDocIri ?? DOC;
-  // A Tool's old document forwards to it too (`<base>/tools/<id>.jsonld`).
-  const here = new Set(graph.filter((n) => !isTombstone(n)).map((n) => String(n["@id"])));
-  const migrated = (t: Record<string, unknown>): boolean =>
-    legacyFragmentIri(String(t.isReplacedBy), DOC, LEGACY) === t["@id"] || (t.sameAs === t.isReplacedBy && here.has(String(t.isReplacedBy)));
-  const tombstones = graph.filter((n) => isTombstone(n) && !migrated(n));
-
   test("no node's source path is outside this instance", () => {
     const outside: string[] = [];
     for (const n of graph) {
@@ -1600,82 +1550,36 @@ describe("the published graph is this instance's own (bean 4ak5 item 2)", () => 
 
   // Reads other instances' exports, so it runs only where those instances
   // exist; skipped visibly when cat-harness stands alone (bean `ho66`).
-  test.skipIf(!inAggregate())("every @id the checkout-scope graph mints and this one lacks is a tombstone", () => {
-    // Two WHOLE builds, so a collector that becomes scope-dependent without
-    // `tombstonesFor` re-running it fails here rather than leaving an `@id`
-    // with no forwarding address.
-    const here = new Set(graph.filter((n) => !isTombstone(n)).map((n) => String(n["@id"])));
-    // A moved node's tombstone is named by the FRAGMENT the last release
-    // published (#603), not by the path it would have had here.
-    const moved = (EXPORT_CHECKOUT["@graph"] as Array<Record<string, unknown>>)
-      .filter((n) => !isTombstone(n))
-      .map((n) => String(n["@id"]))
-      .filter((id) => !here.has(id))
-      .map((id) => legacyFragmentIri(id, DOC, LEGACY) ?? id);
+  test.skipIf(!inAggregate())("every @id the checkout-scope graph mints and this one lacks is held by its owner's PUBLISHED document", () => {
+    // Nothing forwards it (clean break, #1378), so the owner must hold it:
+    // the same subject path under the owner's own document, or, for a node no
+    // other document names by path (a package), a source inside another
+    // instance, whose document is then its home.
+    const DOC = String(EXPORT_CANONICAL["@id"]);
+    const here = new Set(graph.map((n) => String(n["@id"])));
+    const moved = (EXPORT_CHECKOUT["@graph"] as Array<Record<string, unknown>>).filter((n) => !here.has(String(n["@id"])));
     expect(moved.length).toBeGreaterThan(0);
-    const stones = new Set(tombstones.map((n) => String(n["@id"])));
-    expect(moved.filter((id) => !stones.has(id))).toEqual([]);
-    // And nothing is tombstoned that is still here, or that never was.
-    expect(tombstones.length).toBe(moved.length);
-  });
-
-  test("a tombstone is exactly the ruling's shape, and the context maps it to OWL and Dublin Core", () => {
-    // `sameAs` too when the owner holds the SAME node (#603); a node forwarded
-    // to a document, which holds no node for it, gets none.
-    for (const t of tombstones) {
-      expect(Object.keys(t).sort()).toEqual(t.sameAs === undefined ? ["@id", "deprecated", "isReplacedBy"] : ["@id", "deprecated", "isReplacedBy", "sameAs"]);
-      if (t.sameAs !== undefined) expect(t.sameAs).toBe(t.isReplacedBy as string);
+    expect(moved.filter((n) => subjectPathOf(String(n["@id"]), DOC) === undefined).map((n) => n["@id"])).toEqual([]);
+    const ownerPaths = new Set<string>();
+    for (const [d, ids] of OWNER_EXPORTS) for (const i of ids) {
+      const p = subjectPathOf(i, d);
+      if (p !== undefined) ownerPaths.add(p);
     }
-    const ctx = EXPORT_CANONICAL["@context"] as Record<string, Record<string, string>>;
-    expect(ctx.deprecated!["@id"]).toBe("http://www.w3.org/2002/07/owl#deprecated");
-    expect(ctx.isReplacedBy).toEqual({ "@id": "http://purl.org/dc/terms/isReplacedBy", "@type": "@id" });
-    expect(ctx.sameAs).toEqual({ "@id": "http://www.w3.org/2002/07/owl#sameAs", "@type": "@id" });
-  });
-
-  test("every tombstone forwards to a node its owner's PUBLISHED document holds", () => {
-    // The owner's document is the one `instance-exports.ts` writes — built
-    // the way it builds it, with no `--base-url` for an instance that
-    // declares its own `canonicalUrl`. A package has no node in any other
-    // instance's document (the package collector is instance-bound), so it
-    // forwards to the document itself.
-    const published = new Set([...instanceExportPlan().map((p) => p.stub), ...Object.keys(PUBLISHED_ELSEWHERE)]);
-    const stubOf = new Map(instanceRootsIn(REPO).map((r) => [publishedIdentity(r, BASE).docIri, artefactStub(readDeclaration(r)!)]));
-    const lost: string[] = [];
-    for (const t of tombstones) {
-      const to = String(t.isReplacedBy);
-      // The owner document: `to` itself, or the one whose subject `to` is.
-      const doc = OWNER_EXPORTS.has(to) ? to : [...OWNER_EXPORTS.keys()].find((d) => subjectPathOf(to, d) !== undefined);
-      const held = doc === undefined ? undefined : OWNER_EXPORTS.get(doc);
-      const stub = doc === undefined ? undefined : stubOf.get(doc);
-      const ok = held !== undefined && stub !== undefined && published.has(stub) && (to === doc || held.has(to));
-      if (!ok) lost.push(`${String(t["@id"])} → ${to}`);
-    }
-    expect(lost).toEqual([]);
-  });
-
-  test("every subject keeps its pre-#603 fragment as a one-release tombstone, sameAs its path", () => {
-    const subjects = graph.filter((n) => !isTombstone(n) && subjectPathOf(String(n["@id"]), DOC) !== undefined);
-    expect(subjects.length).toBeGreaterThan(1000);
-    const stones = new Map(graph.filter(isTombstone).map((t) => [String(t["@id"]), t]));
-    const missing: string[] = [];
-    for (const n of subjects) {
-      const id = String(n["@id"]);
-      const old = legacyFragmentIri(id, DOC, LEGACY)!;
-      expect(old.startsWith(`${LEGACY}#`)).toBe(true);
-      const t = stones.get(old);
-      if (t === undefined) missing.push(old);
-      else expect(t).toEqual({ "@id": old, deprecated: true, isReplacedBy: id, sameAs: id });
-    }
-    expect(missing).toEqual([]);
+    const homeless = moved.filter((n) => {
+      if (ownerPaths.has(subjectPathOf(String(n["@id"]), DOC)!)) return false;
+      const src = [n.path, n.instructionsPath, n.sourcePath, n.module].find((v): v is string => typeof v === "string" && v !== "");
+      const inst = src === undefined ? undefined : findInstanceRoot(resolve(HARNESS_ROOT, src));
+      return inst === undefined || resolve(inst) === HOST;
+    });
+    expect(homeless.map((n) => n["@id"])).toEqual([]);
   });
 
   // Reads other instances' exports, so it runs only where those instances
   // exist; skipped visibly when cat-harness stands alone (bean `ho66`).
   test.skipIf(!inAggregate())("nothing left behind links to a node that moved", () => {
-    // `danglingLinks` is computed before the tombstones are appended, so a
-    // link to a node that LEFT is reported rather than resolved by its own
-    // forwarding address — a role's skill held by a stacked instance is
-    // re-homed by `skillHome`, as a Tool's `satisfies` is.
+    // A link to a node that LEFT is reported, not resolved: a role's skill
+    // held by a stacked instance is re-homed by `skillHome`, as a Tool's
+    // `satisfies` is.
     expect(EXPORT_CANONICAL.danglingLinks).toEqual([]);
   });
 });
