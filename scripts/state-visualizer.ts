@@ -188,6 +188,9 @@ import {
   type TodoLike,
 } from "./workflow-view.ts";
 import { positionOf, type InstanceState } from "../src/workflow/instance.js";
+import { detectRepoUrl } from "../src/core/git-refs.js";
+import { branchKeptHref, branchKeptLocation } from "./branch-kept-href.ts";
+import { PB_CSS, processedBeanBody, processedBeansBody, processedBeansRoutes, processedBeansRows, rebase } from "./processed-beans.ts";
 import { loadProcessModel, type ProcessModel } from "../src/workflow/process-model.js";
 import { roleGraphFor, workflowFiles } from "./known-skills.js";
 import { readMemoryNodes } from "./agent-memory.ts";
@@ -3007,8 +3010,82 @@ function drawWorkflows(visualiser: string, s: InstanceSubject, storeDir: string,
     workflowPagesDrawn++;
   }
   if (flows.length > 0) emit(join(hubDir, "index.html"), withRenderedByFrontMatter(workflowHubPage(s.name, s.absPath, view), VIEWER_TOOL));
+  // Archived beans too: archiving is a view, not a state (bean e8m3), so an instance naming one still names a bean of this store.
+  let archived: readonly BeanNode[] = [];
+  try {
+    archived = readArchivedBeans(s.instanceRoot) ?? [];
+  } catch {
+    // an unreadable archive leaves those beans "not in this store", which the page says
+  }
+  const pbOrphans = drawProcessedBeans(s.name, s.instanceRoot, storeDir, flows, [...read.beans, ...archived], models);
   const { owned } = orphanSubjectPages(hubDir, ids, carriesMarker(GENERATED_BY));
-  return check && builtAtPublishHere(join(hubDir, "x", "index.html")) ? [] : owned.map((name) => relative(SITE, join(hubDir, name)));
+  return check && builtAtPublishHere(join(hubDir, "x", "index.html")) ? [] : [...owned.map((name) => relative(SITE, join(hubDir, name))), ...pbOrphans];
+}
+/**
+ * A bean store's beans-by-process pages (cat-harness-tools#1413, bean
+ * `folio-assistant-pbv1`), every one a path IRI under the store's page:
+ * `processed-beans/`, `processed-beans/<processId>/`, `processed-bean/<beanId>/`.
+ */
+function drawProcessedBeans(store: string, instanceRoot: string, storeDir: string, flows: ReturnType<typeof readInstances>, beans: readonly BeanNode[], models: ReadonlyMap<string, ModelRead>): string[] {
+  const instances = flows.flatMap((r) => ("state" in r ? [r.state] : []));
+  const web = detectRepoUrl(instanceRoot)?.replace(/\.git$/, "").replace(/\/+$/, "");
+  const diagrams = new Map(
+    [...models].flatMap(([id, m]) => ("model" in m ? [[id, { nodes: new Set(m.model.nodes.keys()), ends: endNodesOf(m.model) }] as const] : [])),
+  );
+  const rows = processedBeansRows({
+    instances,
+    beans,
+    now: NOW,
+    diagrams,
+    // Relative to the STORE page; each page below re-anchors them to its own depth.
+    drawingFor: (bpmn) => {
+      const svg = join(SITE, "assets", "img", "workflows", `${basename(bpmn, ".bpmn")}.svg`);
+      return existsSync(svg) ? relative(storeDir, svg).split(sep).join("/") : undefined;
+    },
+    instanceHref: (id) => (ROUTE_SEGMENT.test(id) ? `workflows/${id}/` : undefined),
+    // A bean links to its file on the branch that keeps it (beans live on a state branch, not main).
+    beanSource: (b) => (web ? branchKeptHref(branchKeptLocation(instanceRoot, b.file, web)) : undefined),
+    processPageFor: (bpmn) => {
+      const dir = processesPageDir();
+      return dir === undefined ? undefined : relative(storeDir, join(dir, `${basename(bpmn, ".bpmn")}.html`)).split(sep).join("/");
+    },
+    // No forge link for the .bpmn itself: its recorded path is checkout-relative and may sit in a
+    // mounted layer's repository, so a link composed here would guess the repository. The process page links it.
+  });
+  const shell = (title: string, body: string) =>
+    withRenderedByFrontMatter(page({ title, noLiquid: true, body: `<style>\n${PB_CSS}\n</style>\n${body}` }), VIEWER_TOOL);
+  const all = join(storeDir, "processed-beans");
+  emit(join(all, "index.html"), shell(`${store} — beans by process`, processedBeansBody(store, rebase(rows, "../"), NOW, "../")));
+  const routes = processedBeansRoutes(rows);
+  for (const p of routes.processes) {
+    const mine = rebase(rows.filter((r) => r.process === p), "../../");
+    emit(join(all, p, "index.html"), shell(`${store} — beans in ${p}`, processedBeansBody(store, mine, NOW, "../../", p)));
+  }
+  const one = join(storeDir, "processed-bean");
+  for (const b of routes.beans) {
+    const mine = rebase(rows.filter((r) => r.beans.some((x) => x.id === b)), "../../");
+    emit(join(one, b, "index.html"), shell(`${store} — bean ${b} by process`, processedBeanBody(store, b, mine, NOW, "../../")));
+  }
+  if (routes.beans.length > 0 || rows.length > 0) {
+    emit(join(one, "index.html"), shell(`${store} — one bean by process`, processedBeanIndex(store, routes.beans)));
+  }
+  // Pages for a process or bean no instance names any more: the caller prunes them with the store's other orphans.
+  return ([[all, routes.processes], [one, routes.beans]] as const).flatMap(([dir, keep]) =>
+    check && builtAtPublishHere(join(dir, "x", "index.html"))
+      ? []
+      : orphanSubjectPages(dir, [...keep], carriesMarker(GENERATED_BY)).owned.map((name) => relative(SITE, join(dir, name))),
+  );
+}
+
+/** `processed-bean/`: the beans that have a page, so the route has a page of its own. */
+function processedBeanIndex(store: string, beans: readonly string[]): string {
+  return (
+    `<h1 id="processed-bean">Beans in processes: ${esc(store)}</h1>` +
+    `<p class="sv-sub"><a href="../">${esc(store)}'s work plan</a> · <a href="../processed-beans/">beans by process</a></p>` +
+    (beans.length === 0
+      ? `<p class="sv-sub">No workflow instance in this store names a bean.</p>`
+      : `<ul>${beans.map((b) => `<li><a href="${esc(b)}/"><code>${esc(b)}</code></a></li>`).join("")}</ul>`)
+  );
 }
 const ownName = readDeclaration(ROOT)?.name ?? basename(ROOT);
 for (const v of mine.filter((x) => x.subgraphs === "instance")) {
