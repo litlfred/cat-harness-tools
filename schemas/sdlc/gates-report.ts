@@ -10,6 +10,7 @@
  * gate passed but one changed the tree).
  *
  * @module cat-harness-tools/schemas/sdlc/gates-report
+ * @graphNode schema
  */
 import { z } from "zod";
 
