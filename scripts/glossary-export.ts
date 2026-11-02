@@ -135,7 +135,7 @@ import { glossaryHomeFor, readDeclaration, repoRootFor } from "../schemas/kg/cat
 import { kgRoots } from "./known-skills.js";
 import { declaredSubgraphNode, exportIdentity, makeIri } from "./kg-export.js";
 import { legacyFragmentIri } from "./lib/subject-iri.ts";
-import { movedDocument, placedOut, siteRootOf } from "./lib/moved-document.ts";
+import { placedOut } from "./lib/moved-document.ts";
 import { codeListDirs, loadCodeLists } from "../schemas/library/code-list.js";
 import { gitFiles } from "../schemas/sdlc/git-corpus.ts";
 import { buildCodeListsDoc } from "./code-lists.js";
@@ -367,45 +367,6 @@ const isoToday: Today = () => new Date().toISOString().slice(0, 10);
  */
 export function glossaryIri(base: string, docPath: string): string {
   return `${base.replace(/\/$/, "")}/${docPath.replace(/\.jsonld$/, "-glossary.jsonld")}`;
-}
-
-/**
- * The host's glossary and code lists at the ROOT addresses they had until
- * 2026-10-23, as one-release tombstones — litlfred/cat-harness-tools#603
- * decision 1b (owner: the host is no longer special; one rule for every
- * layer, documents and subjects under `<site>/<name>/`).
- *
- * The glossary's IRI follows the graph document's path ({@link glossaryIri}),
- * so when `exportIdentity` reports a `legacyDocPath` the glossary moved with
- * it, and each lane usage — a fragment of the GRAPH document — moved with
- * that. Written under the site root `out` implies; nothing when `out` does
- * not end in the glossary's own path, since the root would be a guess.
- *
- * @returns the file written and the old IRI, for the code lists to follow
- */
-export function legacyGlossaryDocuments(
-  doc: Record<string, unknown>,
-  out: string,
-  instanceRoot?: string,
-  baseUrl?: string,
-): { file: string; oldIri: string; count: number } | undefined {
-  const id = exportIdentity({ baseUrl, instanceRoot });
-  if (id.legacyDocPath === undefined || id.legacyDocIri === undefined || id.legacyDocPath === id.docPath) return undefined;
-  const glossaryPath = (p: string) => p.replace(/\.jsonld$/, "-glossary.jsonld");
-  const root = siteRootOf(out, glossaryPath(id.docPath));
-  if (root === undefined) return undefined;
-  const oldIri = glossaryIri(id.base, id.legacyDocPath);
-  // A lane usage is a fragment of the glossary document since #961; its
-  // pre-move address was a fragment of the old root graph document.
-  const glossaryDoc = String(doc["@id"]);
-  const pairs = ((doc["@graph"] ?? []) as Array<Record<string, unknown>>)
-    .map((n) => String(n["@id"]))
-    .filter((iri) => iri.startsWith(`${glossaryDoc}#`))
-    .map((iri) => [`${id.legacyDocIri}${iri.slice(glossaryDoc.length)}`, iri] as const);
-  const file = join(root, glossaryPath(id.legacyDocPath));
-  mkdirSync(dirname(file), { recursive: true });
-  writeFileSync(file, `${JSON.stringify(movedDocument(doc["@context"], oldIri, String(doc["@id"]), pairs), null, 2)}\n`);
-  return { file, oldIri, count: pairs.length };
 }
 
 /**
@@ -813,7 +774,7 @@ if (import.meta.main) {
     glossaryPathOf(gid.docPath),
     gid.legacyDocPath === undefined ? undefined : glossaryPathOf(gid.legacyDocPath),
   );
-  if (outMoved) console.log(`--out ${asked} is the old root address; writing the glossary at ${out}, and its tombstone there`);
+  if (outMoved) console.log(`--out ${asked} is the old root address; writing the glossary at ${out}`);
 
   console.log(`${ledger.instance} swimlane glossary`);
   console.log(`  ${report.concepts} concept(s), ${report.usages} lane usage(s)`);
@@ -851,9 +812,6 @@ if (import.meta.main) {
 
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, `${JSON.stringify(doc, null, 2)}\n`);
-  // The old root address forwards, for one release (#603 decision 1b): the
-  // host's glossary moved under `<site>/<name>/` with its graph document.
-  const moved = legacyGlossaryDocuments(doc, out, instanceRoot, baseUrl);
 
   // The instance's CODE LISTS, as SKOS, beside the glossary — the same run and
   // the same predicates (owner, 2026-09-23: use the existing SKOS tooling).
@@ -869,18 +827,7 @@ if (import.meta.main) {
     const clDoc = buildCodeListsDoc(lists, clIri);
     writeFileSync(clOut, `${JSON.stringify(clDoc, null, 2)}\n`);
     console.log(`  code lists → ${relative(repoRootFor(ROOT), clOut)} (${lists.length})`);
-    if (moved !== undefined) {
-      const oldCl = sibling(moved.oldIri);
-      const pairs = ((clDoc["@graph"] ?? []) as Array<Record<string, unknown>>)
-        .map((n) => String(n["@id"]))
-        .filter((id) => id.startsWith(`${clIri}#`))
-        .map((id) => [`${oldCl}${id.slice(clIri.length)}`, id] as const);
-      const file = sibling(moved.file);
-      writeFileSync(file, `${JSON.stringify(movedDocument(clDoc["@context"], oldCl, clIri, pairs), null, 2)}\n`);
-      console.log(`  code lists' old address → ${relative(repoRootFor(ROOT), file)} (${pairs.length} tombstone(s))`);
-    }
   }
-  if (moved !== undefined) console.log(`  old address → ${relative(repoRootFor(ROOT), moved.file)} (${moved.count} tombstone(s))`);
   const lp = ledgerPath(instanceDir);
   mkdirSync(dirname(lp), { recursive: true });
   writeFileSync(lp, `${JSON.stringify(ledger, null, 2)}\n`);

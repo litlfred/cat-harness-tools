@@ -25,7 +25,7 @@
  * ## The publication rules are not here
  *
  * Which instance's document is published where, under which base, with which
- * schema, for how long a moved `@id` keeps a tombstone, and what is stripped:
+ * schema, and what is stripped:
  * `skills/kg/kg-core/instance-publication.md` §"What each instance publishes"
  * (bean `4ak5` item 4). This module carries the mechanics those rules need.
  *
@@ -162,7 +162,7 @@ import {
 } from "../schemas/kg/harness-config.js";
 import { contentSourceContext, contentSourceJsonLd, resolveSubgraphSource, type SubgraphSource } from "../schemas/kg/subgraph-source.js";
 import { subgraphIri } from "./subgraph-node.js";
-import { legacyFragmentIri, subjectBase, subjectFileStem, subjectIri, subjectPathOf } from "./lib/subject-iri.ts";
+import { subjectBase, subjectFileStem, subjectIri, subjectPathOf } from "./lib/subject-iri.ts";
 import { placedOut, siteRootOf } from "./lib/moved-document.ts";
 import { hostSchemaBase } from "./lib/host-schema.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
@@ -435,17 +435,9 @@ export function buildContext(): Record<string, unknown> {
     // "same underlying thing, different presentation" and merges nothing.
     alternateOf: { "@id": `${PROV}alternateOf`, ...link },
     canonicalDocument: { "@id": termIri("canonicalDocument"), ...link },
-    // A TOMBSTONE's two terms — see `tombstonesFor`; remove with it, one
-    // release after the split (bean `4ak5` item 2). The standard properties,
-    // as `ns-export` and `glossary-export` already publish a retired term:
-    // `isReplacedBy` is a LINK to the same node in its owning instance's
-    // document, which is the whole use of keeping the old `@id`.
-    deprecated: { "@id": `${STANDARD_PREFIXES.owl}deprecated`, "@type": `${XSD}boolean` },
-    isReplacedBy: { "@id": `${STANDARD_PREFIXES.dcterms}isReplacedBy`, ...link },
-    // A `#fragment` subject's tombstone also says it IS the slash-path node
-    // (litlfred/cat-harness-tools#603): the same subject under a new name, not
-    // a presentation of it — so `owl:sameAs` is right here where it is wrong
-    // for `alternateOf` above. See `migrationTombstones`.
+    // A served COPY of a subject document names its canonical one: the same
+    // document at another address, so `owl:sameAs` is right here where it is
+    // wrong for `alternateOf` above. See `writeSubjectDocuments`.
     sameAs: { "@id": `${STANDARD_PREFIXES.owl}sameAs`, ...link },
 
     // ── The standards a graph is written in, and what validates it ──────
@@ -902,8 +894,8 @@ function keywordAliases(): Set<string> {
  * `@id` in front of it — the README generator's twenty-three PDF 404s. That
  * reason still holds, so the export now SERVES every path it mints:
  * {@link writeSubjectDocuments} writes `<kind>/<id>.jsonld` and
- * `<kind>/<id>.html` beside the document, and the old fragments keep a
- * one-release tombstone ({@link migrationTombstones}).
+ * `<kind>/<id>.html` beside the document. The old fragments are gone: a
+ * clean break (owner, 2026-11-02, cat-harness-tools#1378), nothing forwards them.
  *
  * The form itself is `scripts/lib/subject-iri.ts`'s, so this and
  * `subgraph-node`'s `subgraphIri` cannot spell it two ways.
@@ -2868,13 +2860,12 @@ export interface ExportOptions {
    * is in that instance's own document (`instance-exports.ts`). Measured the
    * day it landed: 825 of 3369 nodes were other instances' — 495 of them
    * the content core's — under `cat-harness.jsonld#…` fragments. Each
-   * `@id` the checkout graph had and this one lacks is answered by a
-   * tombstone ({@link tombstonesFor}), for one release.
+   * `@id` the checkout graph had and this one lacks is in its owner's
+   * document; nothing here forwards it (clean break, cat-harness-tools#1378).
    *
    * `"checkout"` is {@link corpusScopeFor}'s answer for this instance, and is
    * for a caller that wants the corpus-wide graph rather than the published
-   * document — `gen-slice-sqlite`'s `kg` slice says so at its call site. It
-   * carries no tombstones: nothing is missing from it.
+   * document — `gen-slice-sqlite`'s `kg` slice says so at its call site.
    *
    * Ignored for a foreign instance, which is built from the generic
    * collectors in its own scope already.
@@ -3014,8 +3005,9 @@ export function exportIdentity(opts: ExportOptions = {}): {
   /**
    * Where this document was published until 2026-10-23, when that is not
    * `docPath`: the host's `<stub>.jsonld` at the site root, before every
-   * layer's document moved under `<base>/<name>/` (#603 decision 1b). Its
-   * one-release tombstones are written there and named by it.
+   * layer's document moved under `<base>/<name>/` (#603 decision 1b). Only
+   * `placedOut` reads it, so a deploy step still naming the old `--out` path
+   * writes to the new one. Nothing is published there (clean break, #1378).
    */
   legacyDocPath?: string;
   /** {@link legacyDocPath} as an IRI under `base`. */
@@ -3133,7 +3125,7 @@ export function exportIdentity(opts: ExportOptions = {}): {
   // is no longer special*. Its document, its Tools and its subjects sit under
   // `<base>/<name>/` like every other layer's — one rule for every layer, and
   // subjects beside their document. The root address it had is
-  // `legacyDocPath`, and the one-release tombstones name it.
+  // `legacyDocPath`; nothing is published there any more (#1378).
   //
   // A foreign instance with its OWN `canonicalUrl` is unchanged here: on its
   // own site it is the host, and where its document goes there is phase 2 of
@@ -3203,182 +3195,6 @@ export async function scannedInstanceSchemas(instanceRoot: string, baseUrl?: str
   return publishedInstanceSchemas(instanceRoot, baseUrl, await scanInstanceZodSchemas(instanceRoot));
 }
 
-// ── TOMBSTONES — ONE RELEASE ONLY; REMOVE IN THE NEXT (bean `4ak5` item 2) ──
-//
-// Owner ruling 2026-10-05 (option B): `cat-harness.jsonld` is built in
-// instance scope, and every `@id` the checkout-scope document had that this
-// one lacks keeps a node for one release:
-//
-//   { "@id": <old>, "owl:deprecated": true,
-//     "dcterms:isReplacedBy": { "@id": <the same node in its owner's document> } }
-//
-// — written `deprecated` / `isReplacedBy` under the context, which maps them
-// to exactly those IRIs (see `buildContext`). GitHub Pages cannot redirect a
-// FRAGMENT, so without this a consumer holding `cat-harness.jsonld#skill/x`
-// would fetch the document and find nothing at the fragment, with nothing to
-// say where it went. The precedent is the vocabulary's own retired terms
-// (`schemas/content/vocabulary.ts` `replacedBy`) and a role's former names
-// (`schemas/process/role-graph.ts` `formerNames`).
-//
-// Removal: delete `tombstonesFor`, its call in `buildExport`, and the two
-// context terms. `kg-export.test.ts` holds every tombstone to a replacement
-// the deploy writes, so the release that drops them only drops that test.
-
-/** What {@link tombstonesFor} found: the nodes, and anything it could not place. */
-interface Tombstones {
-  nodes: Node[];
-  problems: string[];
-}
-
-const tombstoneMemo = new Map<string, Promise<Tombstones>>();
-
-/**
- * One tombstone per `@id` the CHECKOUT-scope document mints and `kept` does
- * not hold.
- *
- * Only the collectors whose answer depends on the scope are re-run —
- * skills, packages, processes, roles and schema modules; the rest read this
- * instance alone in either scope. `kg-export.test.ts` compares two whole builds, so a collector
- * that becomes scope-dependent later and is not added here fails there rather
- * than leaving an `@id` with no forwarding address.
- *
- * The replacement is the node with the SAME fragment in its owner's published
- * document, read from that instance's generic collectors — the ones
- * `instance-exports.ts` publishes it with. A node no owner mints (a
- * `SkillPackage` or a `Schema`: those collectors are instance-bound, so no
- * other instance's document carries one) is forwarded to its owner's
- * DOCUMENT, found by its path. A node neither finds, or two owners claim, is a problem:
- * a tombstone that points nowhere is a 404 with extra steps.
- */
-async function tombstonesFor(
-  kept: ReadonlySet<string>,
-  docIri: string,
-  base: string,
-  baseUrl: string | undefined,
-  legacyDocIri: string = docIri,
-): Promise<Tombstones> {
-  const key = `${docIri}\0${legacyDocIri}\0${base}\0${baseUrl ?? ""}\0${kept.size}`;
-  let hit = tombstoneMemo.get(key);
-  if (hit === undefined) {
-    hit = computeTombstones(kept, docIri, base, baseUrl, legacyDocIri);
-    tombstoneMemo.set(key, hit);
-  }
-  return hit;
-}
-
-async function computeTombstones(
-  kept: ReadonlySet<string>,
-  docIri: string,
-  base: string,
-  baseUrl: string | undefined,
-  legacyDocIri: string,
-): Promise<Tombstones> {
-  const problems: string[] = [];
-  // A source the CHECKOUT build could not read is a hole in the tombstone
-  // set, so it is reported — prefixed, since the instance build read fine.
-  const corpusProblems: string[] = [];
-  const checkout: Node[] = [
-    ...collectSkills(docIri, base, corpusProblems, ROOT, "checkout"),
-    ...collectPackages(docIri, corpusProblems, "checkout"),
-    ...(await collectProcesses(docIri, corpusProblems, ROOT, [], base, "checkout")),
-    ...collectDeclaredRoles(docIri, ROOT, "checkout"),
-    ...collectSchemas(docIri, base, "checkout"),
-  ];
-  for (const p of corpusProblems) problems.push(`tombstones: the checkout-scope corpus — ${p}`);
-  const dropped = new Map<string, Node>();
-  for (const n of checkout) {
-    const id = String(n["@id"]);
-    if (!kept.has(id) && subjectPathOf(id, docIri) !== undefined) dropped.set(id, n);
-  }
-  if (dropped.size === 0) return { nodes: [], problems };
-
-  // Fragment → the IRIs owners publish it under. An owner's own unreadable
-  // source is that export's problem, reported by it and gated by
-  // `check:published-instance-exports`; here it can only mean a missing
-  // owner, which the path fallback and the "no home" problem below catch.
-  const owners = new Map<string, string[]>();
-  for (const inst of instanceRootsIn(repoRootFor(ROOT))) {
-    if (resolve(inst) === resolve(ROOT)) continue;
-    const id = publishedIdentity(inst, baseUrl);
-    const { nodes } = await collectInstanceNodes(inst, id.docIri, id.base, [], undefined, baseUrl);
-    for (const n of nodes) {
-      const iri = String(n["@id"]);
-      const path = subjectPathOf(iri, id.docIri);
-      if (path === undefined) continue;
-      owners.set(path, [...(owners.get(path) ?? []), iri]);
-    }
-  }
-
-  const nodes: Node[] = [];
-  for (const [id, n] of [...dropped].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
-    const claims = owners.get(subjectPathOf(id, docIri)!) ?? [];
-    // The host's last release published these under its ROOT document, which
-    // moved under `<base>/<name>/` in the same release (#603 decision 1b).
-    const old = legacyFragmentIri(id, docIri, legacyDocIri) ?? id;
-    let to: string | undefined;
-    if (claims.length > 1) {
-      problems.push(`tombstones: ${old} is minted by ${claims.length} instances (${claims.join(", ")}) — no single replacement`);
-      continue;
-    }
-    if (claims.length === 1) to = claims[0];
-    else {
-      const path = [n.path, n.instructionsPath, n.sourcePath, n.module].find((v): v is string => typeof v === "string" && v !== "");
-      const inst = path === undefined ? undefined : findInstanceRoot(resolve(ROOT, path));
-      if (inst !== undefined && resolve(inst) !== resolve(ROOT)) to = publishedIdentity(inst, baseUrl).docIri;
-    }
-    if (to === undefined) {
-      problems.push(`tombstones: ${old} left this document and no instance publishes it — nothing to forward it to`);
-      continue;
-    }
-    // No `@type`, by the ruling's shape: the node is no longer anything
-    // here, and a type would put it back in every per-type count and view.
-    // Named by the `#fragment` the last release published (#603): the
-    // slash-path form of a node that left was never published here, so a
-    // tombstone under it would forward an address nobody holds.
-    nodes.push({
-      "@id": old,
-      deprecated: true,
-      isReplacedBy: to,
-      ...(claims.length === 1 ? { sameAs: to } : {}),
-    } as unknown as Node);
-  }
-  return { nodes, problems };
-}
-
-/**
- * One tombstone per subject this document now names by a PATH, under the
- * `#fragment` IRI it had until litlfred/cat-harness-tools#603:
- *
- *     { "@id": "<old doc>#<kind>/<id>", "deprecated": true,
- *       "isReplacedBy": "<doc dir>/<kind>/<id>", "sameAs": "<doc dir>/<kind>/<id>" }
- *
- * `<old doc>` is `legacyDocIri` when the document itself moved — the host's,
- * from `<base>/<stub>.jsonld` to `<base>/<name>/<stub>.jsonld` (owner,
- * 2026-10-23, decision 1b: one rule for every layer, subjects beside their
- * document). Then each Tool's old document gets one as well,
- * `<base>/tools/<id>.jsonld` → `<base>/<name>/tools/<id>.jsonld`.
- *
- * The {@link tombstonesFor} shape, for the reason it exists: GitHub Pages
- * cannot redirect a fragment, so a consumer holding the old `@id` fetches this
- * document and must find the new name at the old one. `sameAs` because it is
- * the same subject under a new name. ONE RELEASE ONLY, like those — remove in
- * the next, with the `sameAs` context term.
- */
-export function migrationTombstones(graph: readonly Node[], docIri: string, legacyDocIri: string = docIri): Node[] {
-  const out: Node[] = [];
-  for (const n of graph) {
-    const id = String(n["@id"]);
-    const old =
-      legacyFragmentIri(id, docIri, legacyDocIri) ??
-      (legacyDocIri !== docIri && n["@type"] === termIri("Tool") && typeof n.name === "string" && id === toolIri(docIri, n.name)
-        ? toolIri(legacyDocIri, n.name)
-        : undefined);
-    if (old === undefined) continue;
-    out.push({ "@id": old, deprecated: true, isReplacedBy: id, sameAs: id } as unknown as Node);
-  }
-  return out;
-}
-
 /**
  * The declared Subgraph node a PUBLISHER points at — its absolute IRI in the
  * declaring instance's published document, and its resolved content source in
@@ -3411,7 +3227,6 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
     docIri,
     base,
     docPath,
-    legacyDocIri,
     canonicalIri,
     isPreview,
     instanceDir: exportedInstance,
@@ -3548,21 +3363,6 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
     }
   }
 
-  // Tombstones last, after `alternateOf` and the subgraph stamp, so a
-  // tombstone is exactly the ruling's three fields; and kept out of `counts`
-  // and `danglingLinks` below, so a link to a node that LEFT still reads as
-  // dangling rather than as resolved by its own forwarding address.
-  const moved =
-    !foreign && scope === "instance"
-      ? await tombstonesFor(new Set(graph.map((n) => String(n["@id"]))), docIri, base, opts.baseUrl, legacyDocIri)
-      : { nodes: [], problems: [] };
-  problems.push(...moved.problems);
-  // Every subject's pre-#603 fragment, after the moved nodes' — disjoint
-  // from them, since those name nodes this graph no longer holds.
-  // The host's are named by its old ROOT document (`legacyDocIri`, #603
-  // decision 1b), and `writeLegacyDocuments` serves them there.
-  const tombstones = { nodes: [...moved.nodes, ...migrationTombstones(graph, docIri, legacyDocIri)] };
-
   // §3.4. Computed over the instance being EXPORTED, not over this one — a
   // foreign instance's document states that instance's dependency set, and
   // reading it from `ROOT` would publish cat-harness's stack under
@@ -3635,12 +3435,12 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
     ...dependsOnFields,
     counts,
     problems,
-    undeclaredTerms: undeclaredTerms([...graph, ...tombstones.nodes], buildContext()),
+    undeclaredTerms: undeclaredTerms(graph, buildContext()),
     undeclaredSchemaModules: [
       ...schemaAudit.undeclared.map((m) => ({ module: m.module, why: "no-tag" as const })),
       ...schemaAudit.reasonless.map((m) => ({ module: m.module, why: "none-without-reason" as const })),
     ],
-    "@graph": [...graph, ...tombstones.nodes],
+    "@graph": graph,
   };
 }
 
@@ -4013,7 +3813,7 @@ export function writeSubjectDocuments(
   const subjects: Array<{ node: Node; stem: string }> = [];
   for (const n of graph) {
     const id = String(n["@id"]);
-    // A tombstone names an old fragment and carries no `@type`; it has no page.
+    // A node with no `@type` is not a subject; it has no page.
     if (n["@type"] === undefined) continue;
     const stem = subjectFileStem(id, docIri);
     if (stem !== undefined) {
@@ -4080,103 +3880,6 @@ export function writeSubjectDocuments(
       writeFileSync(index, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc, diagram, labels));
       written.push(index);
     }
-  }
-  return written;
-}
-
-/**
- * The one-release tombstones of a document that MOVED, served at the
- * addresses it moved from — litlfred/cat-harness-tools#603 decision 1b
- * (owner, 2026-10-23: the host is no longer special; one rule for every
- * layer, subjects beside their document).
- *
- * The host's document left `<base>/<stub>.jsonld` for
- * `<base>/<name>/<stub>.jsonld`, and its Tools `<base>/tools/<id>.jsonld` for
- * `<base>/<name>/tools/<id>.jsonld`. A consumer holding an old address must
- * find the new one AT the old one — GitHub Pages cannot redirect a `.jsonld`
- * — so this writes, under the site root `--out` implies:
- *
- * - `<legacyDocPath>`: the old document as a tombstone itself (`deprecated`,
- *   `isReplacedBy` and `sameAs` the new document) whose `@graph` is every
- *   tombstone named by one of its `#fragment`s;
- * - `tools/<id>.jsonld` beside it: one per Tool, the Tool's tombstone as its
- *   single node, the shape {@link writeToolDocuments} gives the live one.
- *
- * The tombstones stay in the new document's `@graph` as well, where the 4ak5
- * mechanism (`tombstonesFor`) has always put them, so a reader of either
- * finds them. ONE RELEASE ONLY, with the rest of the tombstones.
- *
- * Nothing is written when `--out` does not end in `docPath`: the site root
- * would be a guess, and a tombstone at a guessed path forwards nothing.
- *
- * @returns the paths written
- */
-export function writeLegacyDocuments(
-  published: Record<string, unknown>,
-  out: string,
-  docPath: string,
-  legacyDocPath: string | undefined,
-): string[] {
-  if (legacyDocPath === undefined || legacyDocPath === docPath) return [];
-  const siteRoot = siteRootOf(out, docPath);
-  if (siteRoot === undefined) return [];
-  const docIri = String(published["@id"]);
-  // The new document's IRI with its path swapped for the old one: the same
-  // base, so the same answer `exportIdentity` gives as `legacyDocIri`.
-  if (!docIri.endsWith(docPath)) return [];
-  const legacyDocIri = docIri.slice(0, docIri.length - docPath.length) + legacyDocPath;
-  const graph = (published["@graph"] ?? []) as Node[];
-  const stamp = Object.fromEntries(Object.entries(stagingFields()).filter(([k]) => k in published));
-  const isTomb = (n: Node): boolean => n["@type"] === undefined && (n as Record<string, unknown>).deprecated === true;
-  const fragmentTombs = graph.filter((n) => isTomb(n) && String(n["@id"]).startsWith(`${legacyDocIri}#`));
-  const legacyToolBase = `${subjectBase(legacyDocIri)}tools/`;
-  const toolTombs = graph.filter((n) => isTomb(n) && String(n["@id"]).startsWith(legacyToolBase));
-
-  // The context the new document publishes once beside itself; named, not
-  // inlined (~13 KB a copy). Written here too when nothing else wrote it.
-  const contextFile = out.replace(/\.jsonld$/, "") + ".context.jsonld";
-  if (!existsSync(contextFile)) {
-    mkdirSync(dirname(contextFile), { recursive: true });
-    writeFileSync(contextFile, JSON.stringify({ "@context": published["@context"] }, null, 2) + "\n");
-  }
-  const contextPath = docPath.replace(/\.jsonld$/, "") + ".context.jsonld";
-  const contextFrom = (fromDir: string): string =>
-    /^https?:\/\//.test(docIri)
-      ? `${subjectBase(docIri)}${basename(contextFile)}`
-      : `${"../".repeat(fromDir.split("/").filter(Boolean).length)}${contextPath}`;
-
-  const written: string[] = [];
-  const legacyFile = join(siteRoot, legacyDocPath);
-  mkdirSync(dirname(legacyFile), { recursive: true });
-  writeFileSync(
-    legacyFile,
-    JSON.stringify(
-      {
-        "@context": contextFrom(dirname(legacyDocPath) === "." ? "" : dirname(legacyDocPath)),
-        "@id": legacyDocIri,
-        deprecated: true,
-        isReplacedBy: docIri,
-        sameAs: docIri,
-        ...stamp,
-        "@graph": fragmentTombs,
-      },
-      null,
-      2,
-    ) + "\n",
-  );
-  written.push(legacyFile);
-  const legacyDir = dirname(legacyDocPath) === "." ? "" : dirname(legacyDocPath);
-  for (const t of toolTombs) {
-    const rel = String(t["@id"]).slice(subjectBase(legacyDocIri).length);
-    if (rel.includes("..") || !rel.endsWith(".jsonld")) continue;
-    const file = join(siteRoot, legacyDir, rel);
-    mkdirSync(dirname(file), { recursive: true });
-    const relDir = dirname(join(legacyDir, rel)).split(sep).join("/");
-    writeFileSync(
-      file,
-      JSON.stringify({ "@context": contextFrom(relDir), "@id": t["@id"], partOf: legacyDocIri, ...stamp, "@graph": [t] }, null, 2) + "\n",
-    );
-    written.push(file);
   }
   return written;
 }
@@ -4384,14 +4087,13 @@ if (import.meta.main) {
   // fine locally.
   // input-site: inert #1d8aaee1 — default export destination, an output path this script writes, never reads
   // `_kg/` stands for the site root, so the document sits at its published
-  // path under it, `<name>/<stub>.jsonld` (#603 decision 1b), and the old
-  // root address beside it holds the tombstones, as on the site.
+  // path under it, `<name>/<stub>.jsonld` (#603 decision 1b).
   const asked = arg("--out") ?? join(repoRootFor(ROOT), "_kg", docPath);
   // A deploy step still naming the old root path is read as naming the same
   // site (#603 decision 1b), so the index's workflows and this layer can be
   // re-pinned in either order. See `placedOut`.
   const { out, moved: outMoved } = placedOut(asked, docPath, legacyDocPath);
-  if (outMoved) console.log(`--out ${asked} is the old root address; writing the document at its published path, ${out}, and the tombstone there`);
+  if (outMoved) console.log(`--out ${asked} is the old root address; writing the document at its published path, ${out}`);
   const data = await buildExport({ baseUrl, instanceRoot, scope });
 
   mkdirSync(dirname(out), { recursive: true });
@@ -4409,13 +4111,9 @@ if (import.meta.main) {
   // documents are then copies named by where they are served.
   const servedAt = arg("--served-at");
   const subjectDocs = writeSubjectDocuments(published, out, servedAt, diagramPages(published));
-  const legacyDocs = writeLegacyDocuments(published, out, docPath, legacyDocPath);
 
   console.log(`KG export → ${relative(ROOT, out)}\n  @id  ${data["@id"]}`);
   if (toolDocs.length > 0) console.log(`  + ${toolDocs.length} Tool document(s) → ${relative(ROOT, join(dirname(out), "tools"))}/`);
-  if (legacyDocs.length > 0) console.log(`  + ${legacyDocs.length} tombstone document(s) at the old address(es), first ${relative(ROOT, legacyDocs[0])}`);
-  else if (legacyDocPath !== undefined && legacyDocPath !== docPath)
-    console.log(`  (no tombstone documents: --out does not end in ${docPath}, so the site root, and ${legacyDocPath} under it, is unknown)`);
   if (subjectDocs.length > 0) console.log(`  + ${subjectDocs.length} subject file(s) (.jsonld and .html) → ${relative(ROOT, dirname(out)) || "."}/<kind>/`);
   for (const [t, n] of Object.entries(data.counts).sort()) console.log(`  ${String(n).padStart(5)}  ${t}`);
   console.log(`  ${String(data["@graph"].length).padStart(5)}  total`);

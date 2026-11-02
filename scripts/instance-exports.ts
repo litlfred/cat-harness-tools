@@ -82,20 +82,16 @@ export const PUBLISHED_ELSEWHERE: Readonly<Record<string, PublishedElsewhere>> =
     // only scope accepted: `--scope checkout` would publish every stacked
     // instance's nodes under this name again, so it does not match.
     // `<name>/<stub>.jsonld` since #603 decision 1b (owner, 2026-10-23): the
-    // host's document sits under its own directory like every layer's, and
-    // the step writes the old root `<stub>.jsonld` as its tombstone. The old
-    // `--out "./_site/${STUB}.jsonld"` still matches, for the one release
-    // the tombstones cover: the exporter reads it as naming the same site
-    // and writes the document at its published path (`placedOut`), so the
-    // index's workflows and this layer can be re-pinned in either order.
-    // Drop the old arm with the tombstones.
+    // host's document sits under its own directory like every layer's. The
+    // old `--out "./_site/${STUB}.jsonld"` still matches: the exporter reads
+    // it as naming the same site and writes the document at its published
+    // path (`placedOut`). Nothing is written at the old root address any more
+    // (clean break, cat-harness-tools#1378). Drop the old arm with `placedOut`.
     publisher: /kg-export\.ts\s+(?:--base-url\s+\S+\s+)?(?:--scope\s+instance\s+)?--out\s+"\.\/_site\/(?:\$\{STUB\}\/)?\$\{STUB\}\.jsonld"/,
     why:
       "the host: built by its own step, not this script, though since 2026-10-23 it publishes where every layer " +
-      "does, `<name>/<stub>.jsonld`, the address every published `@id` names (the old root `<stub>.jsonld` holds " +
-      "its one-release tombstones). " +
-      "Built in instance scope since bean `4ak5` item 2 (the split): its own directories only, with a " +
-      "tombstone for one release at each `@id` that moved to its owner's document",
+      "does, `<name>/<stub>.jsonld`, the address every published `@id` names. " +
+      "Built in instance scope since bean `4ak5` item 2 (the split): its own directories only",
   },
   bootstrap: {
     publisher: /bootstrap-tools\/scripts\/export-graph\.ts\s+--root\s+\.\/bootstrap\s/,
