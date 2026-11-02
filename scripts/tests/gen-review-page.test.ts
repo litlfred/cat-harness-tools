@@ -112,6 +112,33 @@ describe("review page", () => {
     expect(html).toContain("function docPage(doc)");
     expect(html).toContain("base + docPage(doc)");
   });
+
+  test("links back to the source document at the top (owner, 2026-11-02)", () => {
+    // Right under the heading, before the brief; the site's documents until the outline loads.
+    expect(html.indexOf('id="source-docs"')).toBeGreaterThan(html.indexOf("<h1>What changed</h1>"));
+    expect(html.indexOf('id="source-docs"')).toBeLessThan(html.indexOf('id="brief"'));
+    expect(html).toContain('<a id="source-doc-link" href="../../index.html">the document</a>');
+    // Then each document the outline names, by title, at its page.
+    expect(html).toContain("sourceLinks(OUTLINE)");
+    expect(html).toContain("a.href = ROOT + d.page");
+  });
+
+  test("names every chapter, section and block with an anchor and a copy-link button (owner, 2026-11-02)", () => {
+    // Chapter: the section key's path; section: that path + "/" + label; block: its label, as on the document pages.
+    expect(html).toContain('h2.id = where.replace("::", "/")');
+    expect(html).toContain("ca.id = chap");
+    expect(html).toContain("li.id = c.label");
+    expect(html).toContain('anchorButton(h2.id, "section")');
+    expect(html).toContain('anchorButton(c.label, "block")');
+    // A link opened with a hash lands on its item once the list is built.
+    expect(html).toContain("goToHash();");
+  });
+
+  test("says when the words did not change, instead of an inline diff with no marks (owner, 2026-11-02)", () => {
+    expect(html).toContain("No visible text change. ");
+    expect(html).toContain("function sameText(a, b)");
+    expect(html).toContain("aspects: c.aspects || []");
+  });
 });
 
 describe("reviewSiteRoot — the site root from the review page's own path (#2527)", () => {
