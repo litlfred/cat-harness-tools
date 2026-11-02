@@ -941,10 +941,13 @@ describe("a Role comes from the registry; a lane is a Lane that binds one", () =
     // Two kinds of node, joined by `bindsRole` ON THE LANE: the Role carries
     // what the role IS, each Lane where it acts. The lane holds the pointer,
     // not the role (#1168). The join is only worth having if it resolves,
-    // which is what the `log` lane failed until the lane set was read.
-    const log = registry.find((r) => r.notation === "log")!;
-    const binding = EXPORT["@graph"].filter((n) => n.bindsRole === log["@id"]);
+    // which is what the `log` lane failed until the lane set was read. Since
+    // Q-BR-3 A (cat-harness 0139401) the activity log is a data store, not a
+    // lane, so the join is checked on the same diagram's Operator lane.
+    const user = registry.find((r) => r.notation === "user")!;
+    const binding = EXPORT["@graph"].filter((n) => n.bindsRole === user["@id"]);
     expect(binding.length).toBeGreaterThanOrEqual(1);
+    const log = registry.find((r) => r.notation === "log")!;
     expect(log.bindsLane).toBeUndefined();
     expect(log.hasSkill).toContain(
       EXPORT["@graph"].find((n) => String(n["@id"]).endsWith("/skill/activity-log"))!["@id"],

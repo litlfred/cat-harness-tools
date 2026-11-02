@@ -61,6 +61,10 @@ describe("viewer Tools declare what they render", () => {
     // Owner, 2026-10-09: the `archimate` subgraph of cat-harness, whose first
     // instance is smart-ra's DPI-H reference architecture models.
     archimate: "litlfred/smart-ra",
+    // Owner, 2026-11-01, Q-SUBG-6 A: a display sub-graph of `processes` for a
+    // DAK's business processes. processes-viewer renders it (cat-harness
+    // 4fb8e9c); no instance this index mounts declares it yet.
+    "business-processes": "a DAK outside this index",
   };
 
   it("every rendered kind is declared by some directory", () => {

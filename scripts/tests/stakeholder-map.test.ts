@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { stakeholderMap, formatStakeholderMap } from "../../src/impact/stakeholder-map.ts";
 import { readRoleGraph } from "../../schemas/process/role-graph.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { roleGraphFor } from "../known-skills.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const TODO_MANAGER = "skills/sdlc/sdlc-core/todo-manager.md";
@@ -44,9 +45,10 @@ describe("stakeholder map", () => {
     // report gave no way to tell those from a real role. Bean `qif9`.
     const map = TODO_MAP;
     expect(map.roles.length).toBeGreaterThan(0);
-    const declared = new Set(
-      (readRoleGraph(join(ROOT, "scenarios"))?.roles ?? []).map((r) => r.id),
-    );
+    // The registry the map itself resolves against: this instance's roles,
+    // with its dependents' overlaid when it runs inside an index checkout
+    // (placement PR0b). The lanes reached include theirs, so must the roles.
+    const declared = new Set((roleGraphFor(ROOT)?.roles ?? []).map((r) => r.id));
     expect(declared.size).toBeGreaterThan(0);
     for (const r of map.roles) expect(`${r}: ${declared.has(r)}`).toBe(`${r}: true`);
     // And the retired vocabulary cannot come back through this door.
@@ -59,7 +61,7 @@ describe("stakeholder map", () => {
     const map = TODO_MAP;
     // A lane binds by its own `<folio:role ref>` (#1168); one with no ref, or a
     // ref to no declared role, binds nothing.
-    const declared = new Set((readRoleGraph(join(ROOT, "scenarios"))?.roles ?? []).map((r) => r.id));
+    const declared = new Set((roleGraphFor(ROOT)?.roles ?? []).map((r) => r.id));
     const unbound = map.lanes.filter((l) => l.roleRef === undefined || !declared.has(l.roleRef));
     // Conditional on the corpus having one, and the assertion says which
     // case ran — a test that quietly passes on an empty filter is the

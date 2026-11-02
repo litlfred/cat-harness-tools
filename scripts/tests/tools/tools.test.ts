@@ -307,6 +307,9 @@ describe("substitutable Tools are DERIVED, and say how to choose (#1168, B9a)", 
       "github-pr-files ~ gitlab-mr-files",
       "github-pr-list ~ gitlab-mr-list",
       "github-pr-view ~ gitlab-mr-view",
+      // folio-assistant-core 458bb7a: both rewrite generated table blocks of a
+      // document, and each carries a `selection` saying which to pick.
+      "glossary-table ~ references-render",
       "ingest-extended ~ ingest-stdlib",
       "package-release-manual ~ release-please",
       // Two runtimes for one server (bean `0hi8`: "at least two tools satisfy
