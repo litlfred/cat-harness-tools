@@ -93,12 +93,17 @@ jobs:
           else
             lock() { curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw+json" \
               "$GITHUB_API_URL/repos/$1/contents/index.lock.json?ref=$2"; }
-            # A layer below the index (bootstrap-tools, fhir-harness) keeps no
-            # lock of its own; it judges with the commit the folio-assistant
-            # index pins, which is still a pin and not a branch tip.
-            if body="$(lock "$GITHUB_REPOSITORY" "$SHA")"; then from="$GITHUB_REPOSITORY index.lock.json at $SHA"
-            else body="$(lock litlfred/folio-assistant "main")"; from="litlfred/folio-assistant index.lock.json at main"; fi
-            ref="$(printf '%s' "$body" | python3 -Ic 'import json,sys; print(next((m["ref"] for m in json.load(sys.stdin).get("mounts", []) if m.get("harness") == "cat-harness-tools"), ""))')"
+            # A layer whose lock does not pin cat-harness-tools (bootstrap-tools and
+            # fhir-harness keep no lock; cat-harness mounts only what sits below it)
+            # judges with the commit the folio-assistant index pins, which is still a
+            # pin and not a branch tip.
+            pick() { python3 -Ic 'import json,sys; print(next((m["ref"] for m in json.load(sys.stdin).get("mounts", []) if m.get("harness") == "cat-harness-tools"), ""))'; }
+            ref=""; from="$GITHUB_REPOSITORY index.lock.json at $SHA"
+            if body="$(lock "$GITHUB_REPOSITORY" "$SHA")"; then ref="$(printf '%s' "$body" | pick)"; fi
+            if [ -z "$ref" ]; then
+              from="litlfred/folio-assistant index.lock.json at main"
+              ref="$(lock litlfred/folio-assistant "main" | pick)"
+            fi
             [ -n "$ref" ] || { echo "::error::$from pins no cat-harness-tools"; exit 2; }
           fi
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
