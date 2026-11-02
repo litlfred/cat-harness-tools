@@ -41,7 +41,7 @@ import { spawnSync } from "node:child_process";
 import { buildExport, exportIdentity, publishedDocument, writeSubjectDocuments, writeToolDocuments, publishedIdentity, publishedInstanceSchemas, readSourceProvenance, undeclaredRootTerms } from "../kg-export.js";
 import { subjectPathOf } from "../lib/subject-iri.ts";
 import { gitFixtureRepo } from "../../test/support/git-fixture.js";
-import { PUBLISHED_ELSEWHERE, declaresOwnCanonical, instanceExportPlan, publishesInstanceSchema } from "../instance-exports.js";
+import { declaresOwnCanonical, instanceExportPlan, publishesInstanceSchema } from "../instance-exports.js";
 import { isExternalContract, skillContracts } from "../skill-contracts.js";
 import { buildDeclarationSchema, buildSkillIoContracts } from "../harness-schema-export.js";
 import { hostSchemaBase } from "../lib/host-schema.ts";
@@ -1535,7 +1535,6 @@ for (const r of instanceRootsIn(REPO)) {
 describe("the published graph is this instance's own (bean 4ak5 item 2)", () => {
   const HOST = resolve(join(HARNESS_ROOT));
   const graph = EXPORT_CANONICAL["@graph"] as Array<Record<string, unknown>>;
-  const DOC = String(EXPORT_CANONICAL["@id"]);
   test("no node's source path is outside this instance", () => {
     const outside: string[] = [];
     for (const n of graph) {

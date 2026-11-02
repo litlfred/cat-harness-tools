@@ -92,7 +92,6 @@ import { REGISTRY_GROUPS } from "../schemas/kg/kg-node.js";
 import {
   artefactStub,
   defaultGraphTypologies,
-  findInstanceRoot,
   graphTypologyIri,
   isPublishedDirectory,
   isPublishedGraphTypology,
@@ -163,7 +162,7 @@ import {
 import { contentSourceContext, contentSourceJsonLd, resolveSubgraphSource, type SubgraphSource } from "../schemas/kg/subgraph-source.js";
 import { subgraphIri } from "./subgraph-node.js";
 import { subjectBase, subjectFileStem, subjectIri, subjectPathOf } from "./lib/subject-iri.ts";
-import { placedOut, siteRootOf } from "./lib/moved-document.ts";
+import { placedOut } from "./lib/moved-document.ts";
 import { hostSchemaBase } from "./lib/host-schema.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { diagramPages, owningProcess } from "./lib/diagram-pages.ts";
