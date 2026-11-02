@@ -57,14 +57,14 @@ describe("a Stage B requirement block (cat-harness-tools#1356)", () => {
   };
 
   test("a kind with no DoCO co-type has one @type, and its meta is the source's facts", () => {
-    const typed = { ...req, "@type": ["smart-base:Indicator"], meta: { source_number: "1-01", source_kind: "nhwa-indicator" } };
+    const typed = { ...req, "@type": ["layer:Indicator"], meta: { source_number: "1-01", source_kind: "nhwa-indicator" } };
     expect(LibraryBlockSchema.safeParse(familyBody(typed)).success).toBe(true);
     // The generic class, when no mounted layer types the kind.
     expect(LibraryBlockSchema.safeParse(familyBody({ ...req, "@type": [LIBRARY_NODE_FAMILIES.block] })).success).toBe(true);
   });
 
   test("meta holds strings only, and a third type is still refused", () => {
-    expect(LibraryBlockSchema.safeParse(familyBody({ ...req, "@type": ["smart-base:Indicator"], meta: { n: 1 } })).success).toBe(false);
+    expect(LibraryBlockSchema.safeParse(familyBody({ ...req, "@type": ["layer:Indicator"], meta: { n: 1 } })).success).toBe(false);
     expect(LibraryBlockSchema.safeParse(familyBody({ ...block, "@type": ["a:B", "doco:Section", "c:D"] })).success).toBe(false);
   });
 });

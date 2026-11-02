@@ -52,7 +52,7 @@
 import { readFileSync, mkdirSync, writeFileSync } from "fs";
 import { resolve, dirname, relative } from "path";
 import { globSync } from "glob";
-import { execSync } from "child_process";
+import { execFileSync, execSync } from "child_process";
 import type { ComputationWitness } from "../schemas/types.ts";
 import { findContentRepoRoot } from "../pipeline/repo-root";
 
@@ -117,10 +117,9 @@ function gitFileFirstShas(filePaths: string[]): Map<string, string> {
   if (filePaths.length === 0) return out;
   for (const fp of filePaths) out.set(fp, "unknown");
   try {
-    const batch = execSync(
-      `git log --format="COMMIT %H" --name-only -- ${filePaths
-        .map((f) => `"${f}"`)
-        .join(" ")}`,
+    const batch = execFileSync(
+      "git",
+      ["log", "--format=COMMIT %H", "--name-only", "--", ...filePaths],
       { cwd: REPO_ROOT, maxBuffer: 32 * 1024 * 1024 }
     ).toString();
     let cur = "unknown";
@@ -143,7 +142,7 @@ function gitFileFirstShas(filePaths: string[]): Map<string, string> {
 
 function ageDays(filePath: string): number {
   try {
-    const ts = execSync(`git log -n 1 --format=%ct -- "${filePath}"`, {
+    const ts = execFileSync("git", ["log", "-n", "1", "--format=%ct", "--", filePath], {
       cwd: REPO_ROOT,
     })
       .toString()
