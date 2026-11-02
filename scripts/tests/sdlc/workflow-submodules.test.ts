@@ -191,3 +191,26 @@ describe("the blind spot is reported rather than implied", () => {
     expect(composites[0]?.detail).toContain(".github/actions/do-a-thing");
   });
 });
+
+describe("a checkout of the repository's own CI scripts alone", () => {
+  // repin-train-verdict.yml checks out main's `.github/scripts` and nothing
+  // else, so no platform source is there for a mount to be missing from.
+  const sparse = (spec: string) => `jobs:
+  verdict:
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+${spec}
+      - run: bun .github/scripts/repin-train.ts verdict --sha "$SHA"
+`;
+
+  test("is not a finding, inline or as a block", () => {
+    expect(auditWorkflow("w.yml", sparse("          sparse-checkout: .github/scripts")).findings).toHaveLength(0);
+    expect(auditWorkflow("w.yml", sparse("          sparse-checkout: |\n            .github/scripts\n            .github/actions")).findings).toHaveLength(0);
+  });
+
+  test("a sparse checkout that also takes platform source still is", () => {
+    expect(auditWorkflow("w.yml", sparse("          sparse-checkout: |\n            .github/scripts\n            cat-harness")).findings).toHaveLength(1);
+  });
+});
