@@ -14,7 +14,7 @@
  * ## What it emits
  *
  * PROV-JSONLD's shape (W3C Member Submission 2024-08-25, held at
- * `cat-harness/library/w3c-2024-prov-jsonld/`), owner's decision: an `Activity`
+ * `cat-harness/library/kg/w3c-2024-prov-jsonld/`), owner's decision: an `Activity`
  * node, and each qualified association as its own `Association` node whose
  * `activity`, `agent`, `role` and `plan` are the context's TERMS — so its
  * coercions and its `@reverse` mapping to `prov:qualifiedAssociation` apply
@@ -84,7 +84,7 @@ export const PROV_JSONLD_CONTEXT_URL = PROV_CONTEXT;
 export const PROV_JSONLD_CONTEXT_HELD = {
   // declared-path-literal: a PINNED copy, addressed with its sha256; the pin is to the bytes at
   // exactly this path, so resolving the directory through a declaration would unpin it.
-  path: "cat-harness/library/w3c-2024-prov-jsonld/context.jsonld",
+  path: "cat-harness/library/kg/w3c-2024-prov-jsonld/context.jsonld",
   sha256: "811d5e94d8cb568d7dc4461ef6a247644dd0e775cdc88b65c42238d8e832be1e",
 } as const;
 
