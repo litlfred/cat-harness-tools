@@ -165,6 +165,12 @@ const STYLE = `
   .label { font-family: ui-monospace, monospace; }
   .links a { margin-right: 1rem; }
   .muted { color: var(--muted); }
+  .source-docs { margin: -.25rem 0 .75rem; font-size: 1.05rem; font-weight: 600; }
+  .anchor-btn { float: right; margin-left: .5rem; min-width: 2rem; min-height: 2rem; font-size: .95rem; line-height: 1; padding: .2rem .35rem; border: 1px solid var(--rule); border-radius: .35rem; background: var(--bg); color: var(--fg); cursor: pointer; }
+  .anchor-btn:focus-visible { outline: 3px solid var(--link); outline-offset: 2px; }
+  h2 .anchor-btn { font-weight: 400; margin-top: -.3rem; }
+  .anchor-target { display: block; }
+  .meta-only { margin: .25rem 0 .5rem; padding: .4rem .7rem; border-left: 3px solid #b26b00; background: color-mix(in srgb, #ffb84d 18%, transparent); border-radius: 0 .3rem .3rem 0; }
   .comments { margin: .25rem 0 0 1rem; padding-left: .75rem; border-left: 3px solid var(--rule); }
   .comment { padding: .15rem 0; }
   .tagline { font-family: ui-monospace, monospace; font-size: .9rem; }
@@ -239,6 +245,57 @@ const SCRIPT = `
   var ROOT = reviewSiteRoot(location.pathname, LOCALES);
   var allDocs = document.getElementById("all-documents");
   if (allDocs) allDocs.href = ROOT + "index.html";
+  // Back to the source document, at the top (owner, 2026-11-02: "you should
+  // have link back to source document at top"). Each document the outline
+  // names, by its title; the site's list of documents until it loads.
+  var srcLink = document.getElementById("source-doc-link");
+  if (srcLink) srcLink.href = ROOT + "index.html";
+  // Named anchors (owner, 2026-11-02: "should have (named/semantic/slug) #
+  // links for items in the page like #dth-hrh/ch05-user-personas-and-use-cases").
+  // A chapter is its section key's path, a section that path plus "/" and its
+  // label, a block its own label: the same id the document pages give it.
+  // The link button copies the address and puts it in the address bar.
+  function anchorButton(id, what) {
+    var b = el("button", "\ud83d\udd17", "anchor-btn");
+    b.type = "button";
+    b.title = "Copy link to this " + what;
+    b.setAttribute("aria-label", "Copy link to this " + what);
+    b.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var url = location.href.replace(/#.*$/, "") + "#" + encodeURIComponent(id).replace(/%2F/g, "/").replace(/%3A/g, ":");
+      try { history.replaceState(null, "", url); } catch (x) { /* the copy still works */ }
+      var said = function (t) { status.textContent = t; };
+      try {
+        navigator.clipboard.writeText(url).then(function () { said("Link copied: " + url); }, function () { said("Link: " + url); });
+      } catch (x) { said("Link: " + url); }
+    });
+    return b;
+  }
+  function goToHash() {
+    var h = location.hash ? location.hash.slice(1) : "";
+    if (!h) return;
+    var t = null;
+    try { t = document.getElementById(decodeURIComponent(h)); } catch (x) { t = document.getElementById(h); }
+    if (!t) return;
+    if (t.tabIndex < 0 && !t.hasAttribute("tabindex")) t.tabIndex = -1;
+    t.scrollIntoView({ block: "start" });
+    t.focus({ preventScroll: true });
+  }
+  window.addEventListener("hashchange", goToHash);
+  function sourceLinks(outline) {
+    var box = document.getElementById("source-docs");
+    var ds = outline && outline.documents ? outline.documents : [];
+    var ok = ds.filter(function (d) { var p = String(d.page || ""); return d.title && p && safePage(p); });
+    if (!box || !ok.length) return;
+    while (box.firstChild) box.removeChild(box.firstChild);
+    box.appendChild(document.createTextNode(ok.length > 1 ? "Back to the documents: " : "Back to the document: "));
+    ok.forEach(function (d, i) {
+      if (i) box.appendChild(document.createTextNode(" · "));
+      var a = el("a", String(d.title));
+      a.href = ROOT + d.page;
+      box.appendChild(a);
+    });
+  }
   var status = document.getElementById("status");
   var summary = document.getElementById("summary");
   var list = document.getElementById("changes");
@@ -400,14 +457,16 @@ const SCRIPT = `
   // ── Diff renderers (bean d903) ─────────────────────────────────
   // v2 (owner, 2026-10-31, "default to inline"): a page-level choice made
   // before, such as Side by side, is not carried over to override the new default.
-  var VIEW_KEY = "folio-review:view:v2";
+  // v3 (owner, 2026-11-02, "defaults to in-line for all elements"): the same,
+  // for structured blocks, which opened on the field table before.
+  var VIEW_KEY = "folio-review:view:v3";
   function loadView() { try { return window.localStorage.getItem(VIEW_KEY) || ""; } catch (e) { return ""; } }
   function saveView(v) { try { window.localStorage.setItem(VIEW_KEY, v); } catch (e) { /* the defaults, then */ } }
   function defaultFor(kind, structured) {
     var fb = null;
-    // A block the build published fields for opens on the field renderer
-    // (STRUCTURED, bean f327) before any renderer its kind names.
-    if (structured) for (var j = 0; j < RENDERERS.length; j++) if (RENDERERS[j].defaultFor.indexOf("@structured") >= 0) return RENDERERS[j].id;
+    // Every block opens inline, structured ones too (owner, 2026-11-02). A
+    // structured block falls back to the field renderer (STRUCTURED, bean
+    // f327) in pick() only when inline cannot run on it.
     for (var i = 0; i < RENDERERS.length; i++) {
       if (RENDERERS[i].defaultFor.indexOf(kind) >= 0) return RENDERERS[i].id;
       if (RENDERERS[i].defaultFor.indexOf("*") >= 0) fb = RENDERERS[i].id;
@@ -443,6 +502,17 @@ const SCRIPT = `
       var ops = wordDiff(base ? base.prose : "", head ? head.prose : "");
       out = ops === null ? "This block is too long for a word diff. Choose side by side." : renderWordDiff(document, ops);
     } else if (id === "inline") {
+      // Words the same on both sides: say so, rather than show a diff with no
+      // marks that reads as broken (owner, 2026-11-02, "no green or red").
+      if (base && head && sameText(base, head)) {
+        var note = el("div", null, "meta-only");
+        note.appendChild(el("strong", "No visible text change. "));
+        note.appendChild(el("span", (ctx.aspects || []).indexOf("manifest") >= 0 || (ctx.aspects || []).length === 0
+          ? "Only this block's metadata changed, such as a linked element or its source."
+          : "The change is to: " + (ctx.aspects || []).join(", ") + "."));
+        if (ctx.structure) note.appendChild(renderFields(document, ctx.structure));
+        panel.appendChild(note);
+      }
       out = renderInline(document, base ? base.html : null, head ? head.html : null, wordDiff, head ? cleanHead : cleanBase);
     } else if (id === "side-by-side") {
       // The rendered text of each side, diffed, says where each pane scrolls to.
@@ -468,6 +538,12 @@ const SCRIPT = `
     if (typeof out === "string") panel.appendChild(el("p", out, "muted"));
     else if (out) panel.appendChild(out);
   }
+  function sameText(a, b) {
+    if (a.html === b.html) return true;
+    var ta = (cleanRendered(document, a.html || "").textContent || "").replace(/\\s+/g, " ").trim();
+    var tb = (cleanRendered(document, b.html || "").textContent || "").replace(/\\s+/g, " ").trim();
+    return ta === tb && (a.prose || "") === (b.prose || "");
+  }
   var viewers = [];
   function viewSelector(ctx) {
     var row = el("div", null, "viewrow");
@@ -491,10 +567,11 @@ const SCRIPT = `
       if (!r || unavailable(r, ctx)) {
         // The chosen view cannot run here: fall back to the first one that
         // can, preferring those that list this block's kind (0rxe: a table
-        // with no pictures opens side by side, not on a word diff).
+        // with no pictures opens side by side, not on a word diff), then the
+        // field table for a structured block.
         var can = RENDERERS.filter(function (x) { return !unavailable(x, ctx); });
-        r = (ctx.structure ? can.filter(function (x) { return x.defaultFor.indexOf("@structured") >= 0; })[0] : null) ||
-          can.filter(function (x) { return x.defaultFor.indexOf(ctx.kind) >= 0; })[0] || can[0];
+        r = can.filter(function (x) { return x.defaultFor.indexOf(ctx.kind) >= 0; })[0] ||
+          (ctx.structure ? can.filter(function (x) { return x.defaultFor.indexOf("@structured") >= 0; })[0] : null) || can[0];
       }
       if (!r) { while (panel.firstChild) panel.removeChild(panel.firstChild); panel.appendChild(el("p", "Nothing to show for this change: it is to the manifest only.", "muted")); return; }
       sel.value = r.id;
@@ -623,6 +700,7 @@ const SCRIPT = `
       var structureFile = both[7];
       var visualFile = both[6];
       OUTLINE = both[5];
+      sourceLinks(OUTLINE);
       var blocksFile = both[3];
       var qaFile = both[4];
       // A summary that found NO verdict corpus (bean tfqf): every block in it
@@ -673,6 +751,15 @@ const SCRIPT = `
         var h2 = el("h2", where.replace("::", " \\u203a "));
         h2.tabIndex = -1;
         h2.setAttribute("data-section", where);
+        var chap = where.split("::")[0];
+        if (where.indexOf("::") > 0 && !document.getElementById(chap)) {
+          var ca = el("span", null, "anchor-target");
+          ca.id = chap;
+          ca.tabIndex = -1;
+          list.appendChild(ca);
+        }
+        if (!document.getElementById(where.replace("::", "/"))) h2.id = where.replace("::", "/");
+        if (h2.id) h2.appendChild(anchorButton(h2.id, "section"));
         list.appendChild(h2);
         var ul = el("ul");
         groups[where].forEach(function (c) {
@@ -680,6 +767,7 @@ const SCRIPT = `
           li.tabIndex = -1;
           li.setAttribute("data-label", c.label);
           li.setAttribute("data-section", where);
+          if (!document.getElementById(c.label)) { li.id = c.label; li.appendChild(anchorButton(c.label, "block")); }
           li.setAttribute("data-open", String((byLabel[c.label] || []).filter(function (x) { return x.status === "open" || x.status === "addressed"; }).length));
           li.appendChild(el("span", kindWords(c).join(", "), "kind"));
           li.appendChild(el("span", c.label, "label"));
@@ -707,6 +795,7 @@ const SCRIPT = `
           li.appendChild(links);
           var v = viewSelector({
             kind: (c.head || c.base || {}).kind || "",
+            aspects: c.aspects || [],
             text: txt && txt.blocks ? txt.blocks[c.label] || null : null,
             visual: visualFile && visualFile.blocks ? visualFile.blocks[c.label] || null : null,
             structure: structureFile && structureFile.blocks ? structureFile.blocks[c.label] || null : null,
@@ -764,6 +853,7 @@ const SCRIPT = `
       if (!txt && cs.changes.length) summary.textContent += " No change text on this build, so only the views of the pages" + (visualFile ? " and the pictures" : "") + " are available.";
       applyView(viewAll.value);
       applyCommentFilter(commentFilter.value, false);
+      goToHash();
       // The heat map (qbfi), above the list it indexes.
       var heat = computeHeat({ changes: cs.changes, comments: rc ? rc.comments : null, blocks: blocksFile, qa: qaFile ? qaFile.blocks : null, verdicts: rc && Array.isArray(rc.verdicts) ? rc.verdicts : null });
       if (heat.rows.length) {
@@ -887,6 +977,7 @@ export function reviewPageHtml(root: string = "../../"): string {
 <aside id="navpane" aria-label="Navigation"></aside>
 <main>
 <h1>What changed</h1>
+<p id="source-docs" class="source-docs">Back to <a id="source-doc-link" href="${root}index.html">the document</a></p>
 <section id="brief" aria-labelledby="brief-h"><h2 id="brief-h">What to expect in this review</h2><p class="muted">Loading the pull request's summary…</p></section>
 <p id="summary" class="muted"></p>
 <p id="status" role="status" aria-live="polite">Loading the ChangeSet…</p>
