@@ -143,3 +143,76 @@ describe("poster theme on drawn views", () => {
     expect(hb).toContain("Drawn from the ArchiMate model");
   });
 });
+
+/** One frame round the whole stack, with two bands side by side in its last row (DTH SC Fig. 14). */
+const FRAMED = `<?xml version="1.0" encoding="UTF-8"?>
+<archimate:model xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:archimate="http://www.archimatetool.com/archimate" name="Framed" id="id-m">
+  <folder name="Application" id="f2" type="application">
+    <element xsi:type="archimate:ApplicationComponent" name="Gateway" id="a1"/>
+    <element xsi:type="archimate:ApplicationComponent" name="Orders" id="a2"/>
+    <element xsi:type="archimate:ApplicationComponent" name="Stock" id="a3"/>
+    <element xsi:type="archimate:ApplicationComponent" name="Product Registry" id="a4"/>
+    <element xsi:type="archimate:ApplicationComponent" name="Data Warehouse" id="a5"/>
+    <element xsi:type="archimate:ApplicationComponent" name="Regulators" id="a6"/>
+  </folder>
+  <folder name="Other" id="f4" type="other">
+    <element xsi:type="archimate:Grouping" name="Enterprise" id="ge"/>
+    <element xsi:type="archimate:Grouping" name="Interop" id="gi"/>
+    <element xsi:type="archimate:Grouping" name="Systems" id="gs"/>
+    <element xsi:type="archimate:Grouping" name="Shared" id="gh"/>
+    <element xsi:type="archimate:Grouping" name="Foundational" id="gf"/>
+    <element xsi:type="archimate:Grouping" name="Data" id="gd"/>
+    <element xsi:type="archimate:Grouping" name="Outside" id="go"/>
+    <element xsi:type="archimate:Grouping" name="Ecosystem" id="gx"/>
+  </folder>
+  <folder name="Views" id="f5" type="diagrams">
+    <element xsi:type="archimate:ArchimateDiagramModel" name="Framed" id="v">
+      <child xsi:type="archimate:DiagramObject" id="d-ge" archimateElement="ge"><bounds x="24" y="24" width="800" height="500"/>
+        <child xsi:type="archimate:DiagramObject" id="d-gi" archimateElement="gi"><bounds x="12" y="40" width="700" height="100"/>
+          <child xsi:type="archimate:DiagramObject" id="d-a1" archimateElement="a1"><bounds x="12" y="40" width="170" height="55"/></child>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="d-gs" archimateElement="gs"><bounds x="12" y="160" width="700" height="160"/>
+          <child xsi:type="archimate:DiagramObject" id="d-a2" archimateElement="a2"><bounds x="12" y="40" width="170" height="55"/></child>
+          <child xsi:type="archimate:DiagramObject" id="d-a3" archimateElement="a3"><bounds x="12" y="100" width="170" height="55"/></child>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="d-gh" archimateElement="gh"><bounds x="12" y="340" width="200" height="150"/>
+          <child xsi:type="archimate:DiagramObject" id="d-gf" archimateElement="gf"><bounds x="12" y="40" width="180" height="100"/>
+            <child xsi:type="archimate:DiagramObject" id="d-a4" archimateElement="a4"><bounds x="5" y="40" width="170" height="55"/></child>
+          </child>
+        </child>
+        <child xsi:type="archimate:DiagramObject" id="d-gd" archimateElement="gd"><bounds x="230" y="340" width="400" height="150"/>
+          <child xsi:type="archimate:DiagramObject" id="d-a5" archimateElement="a5"><bounds x="12" y="40" width="170" height="55"/></child>
+        </child>
+      </child>
+      <child xsi:type="archimate:DiagramObject" id="d-go" archimateElement="go"><bounds x="900" y="24" width="200" height="100"/></child>
+      <child xsi:type="archimate:DiagramObject" id="d-gx" archimateElement="gx"><bounds x="1120" y="24" width="200" height="100"/>
+        <child xsi:type="archimate:DiagramObject" id="d-a6" archimateElement="a6"><bounds x="12" y="40" width="170" height="55"/></child>
+      </child>
+    </element>
+  </folder>
+</archimate:model>`;
+
+describe("render-poster, one frame round the stack", () => {
+  const fm = parseArchimate(FRAMED);
+  const fv = fm.views[0]!;
+  const svg = renderPosterSvg(fm, fv);
+  const xOf = (name: string) => Number(new RegExp(`<text x="([0-9.]+)"[^>]*>${name}</text>`).exec(svg)?.[1]);
+  const yOf = (name: string) => Number(new RegExp(`<text x="[0-9.]+" y="([0-9.]+)"[^>]*>${name}</text>`).exec(svg)?.[1]);
+  it("fits when the frame holds three or more groupings", () => {
+    expect(posterFits(fm, fv)).toBe(true);
+  });
+  it("puts bands that share a row in the view side by side", () => {
+    expect(yOf("SHARED")).toBe(yOf("DATA"));
+    expect(xOf("DATA")).toBeGreaterThan(xOf("SHARED"));
+    expect(yOf("SYSTEMS")).toBeGreaterThan(yOf("INTEROP"));
+  });
+  it("keeps the view's own row breaks for cards", () => {
+    expect(yOf("Stock")).toBeGreaterThan(yOf("Orders"));
+    expect(xOf("Stock")).toBe(xOf("Orders"));
+  });
+  it("names every side-column grouping, the later ones in dark type", () => {
+    expect(svg).toMatch(/fill="#ffffff"[^>]*>OUTSIDE</);
+    expect(svg).toMatch(/>ECOSYSTEM</);
+    expect(svg).not.toMatch(/fill="#ffffff"[^>]*>ECOSYSTEM</);
+  });
+});

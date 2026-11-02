@@ -16,9 +16,14 @@
  * - **Bands.** Each top-level Grouping in the left-hand stack is a band, in
  *   the order the view has them top to bottom. A top-level Grouping to the
  *   right of that stack is a side column, drawn dashed, beside every band.
- * - **Frames.** A band whose Groupings sit one above the other is a frame
- *   holding those as bands; whose Groupings sit side by side, a row of panels,
- *   each holding its own cards. Elements beside the panels are cards of their own.
+ * - **Frames.** A band holding only Groupings, in more than one row, is a
+ *   frame holding those as bands; Groupings that share a row are bands side by
+ *   side, as wide as the view draws them. One frame round the whole stack
+ *   counts its own Groupings as the stack (DTH SC Fig. 14). A band whose
+ *   Groupings all sit in one row is a row of panels, each holding its own
+ *   cards. Elements beside the panels are cards of their own.
+ * - **Rows.** Cards keep the view's row breaks: as many to a row as the view's
+ *   widest row, at most ten.
  * - **Cards.** One per element: its name, and the `note` property's text
  *   split at " · " into lines. A card whose element has the `star` property
  *   set to `true` gets a star. In the side column, an element whose note is a
@@ -100,8 +105,10 @@ export function posterFits(model: ArchimateModel, view: ArchimateView): boolean 
   const boxes = view.nodes.filter((n) => n.kind === "element" && !grouping(n));
   const inside = boxes.filter((n) => n.parent && byId.has(n.parent)).length;
   const left = Math.min(...tops.map((n) => n.x));
-  const stacked = tops.filter((n) => n.x <= left + 20).length;
-  return stacked >= 3 && boxes.length > 0 && inside >= 0.9 * boxes.length;
+  const stack = tops.filter((n) => n.x <= left + 20);
+  // One frame round the whole stack counts its own groupings as the bands.
+  const framed = stack.length === 1 ? view.nodes.filter((n) => n.parent === stack[0]!.id && grouping(n)).length : 0;
+  return Math.max(stack.length, framed) >= 3 && boxes.length > 0 && inside >= 0.9 * boxes.length;
 }
 
 export function renderPosterSvg(model: ArchimateModel, view: ArchimateView, opts: PosterOptions = {}): string {
@@ -172,9 +179,19 @@ export function renderPosterSvg(model: ArchimateModel, view: ArchimateView, opts
     mark(x + w - (star ? 26 : 9), y + h - 9, t.el);
     if (href) out.push("</a>");
   };
-  // A row of cards across `w`, wrapping at ten; returns its height.
+  // Boxes in rows as the view has them: a box starts a new row when it sits below the middle of the row's first box.
+  const rowsOf = (items: Tree[]): Tree[][] => {
+    const rows: Tree[][] = [];
+    for (const t of items) {
+      const r = rows[rows.length - 1];
+      if (r && t.node.y < r[0]!.node.y + r[0]!.node.h / 2) r.push(t);
+      else rows.push([t]);
+    }
+    return rows;
+  };
+  // A row of cards across `w`, as many a row as the view puts in its widest row, at most ten; returns its height.
   const cardRow = (items: Tree[], x: number, y: number, w: number, draw: boolean): number => {
-    const per = Math.min(items.length, 10) || 1;
+    const per = Math.min(Math.max(0, ...rowsOf(items).map((r) => r.length)), 10) || 1;
     const bw = (w - 10 * (per - 1)) / per;
     let total = 0;
     for (let r = 0; r * per < items.length; r++) {
@@ -215,10 +232,8 @@ export function renderPosterSvg(model: ArchimateModel, view: ArchimateView, opts
     }
     return h;
   };
-  const stackedGroups = (t: Tree) => {
-    const g = t.kids.filter(isGroup);
-    return g.length > 1 && g.length === t.kids.length && new Set(g.map((k) => k.node.y)).size === g.length;
-  };
+  // A frame holds only groupings, in rows; a row of several is drawn as bands side by side.
+  const isFrame = (t: Tree) => t.kids.length > 1 && t.kids.every(isGroup) && rowsOf(t.kids).length > 1;
   // A band takes the hue of the layer most of its elements are in.
   const leaves = (t: Tree): Tree[] => (isGroup(t) ? t.kids.flatMap(leaves) : [t]);
   const hueOf = (t: Tree): string => {
@@ -232,14 +247,27 @@ export function renderPosterSvg(model: ArchimateModel, view: ArchimateView, opts
   const PAD = 36;
   const COLW = side.length ? 270 : 0;
   const LW = W - 2 * PAD - (side.length ? COLW + 16 : 0);
-  // A band; returns its height.
-  const band = (t: Tree, x: number, y: number, w: number, draw: boolean): number => {
+  // A band, stretched to at least `minH`; returns its height.
+  const band = (t: Tree, x: number, y: number, w: number, draw: boolean, minH = 0): number => {
     const sub = prop(t.el, NOTE);
     const hdr = sub ? 40 : 28;
-    if (stackedGroups(t)) {
+    if (isFrame(t)) {
       const frameAt = out.length;
       let h = hdr;
-      for (const k of t.kids) h += band(k, x + 8, y + h, w - 16, draw) + 10;
+      for (const row of rowsOf(t.kids)) {
+        const gap = 10;
+        const span = row.reduce((n, k) => n + Math.max(1, k.node.w), 0);
+        const avail = w - 16 - gap * (row.length - 1);
+        const ws = row.map((k) => (avail * Math.max(1, k.node.w)) / span);
+        const rh = Math.max(...row.map((k, i) => band(k, 0, 0, ws[i]!, false)));
+        let bx = x + 8;
+        row.forEach((k, i) => {
+          band(k, bx, y + h, ws[i]!, draw, rh);
+          bx += ws[i]! + gap;
+        });
+        h += rh + 10;
+      }
+      h = Math.max(h, minH - 4);
       if (draw) {
         out.splice(frameAt, 0, `<rect x="${x}" y="${y}" width="${w}" height="${h + 4}" rx="10" fill="#ffffff" stroke="${THEME.frame}" stroke-width="2.2"/>`, `<path d="M${x} ${y + 10} a10 10 0 0 1 10 -10 h${w - 20} a10 10 0 0 1 10 10 v${hdr - 14} h${-w} z" fill="${THEME.frame}"/>`);
         T(x + 14, y + 19, nameOf(t).toUpperCase(), 12, 700, "#ffffff");
@@ -249,7 +277,7 @@ export function renderPosterSvg(model: ArchimateModel, view: ArchimateView, opts
     }
     const panels = t.kids.some(isGroup);
     const inner = panels ? panelRow(t.kids, x + 12, y + hdr, w - 24, false) : cardRow(t.kids, x + 12, y + hdr, w - 24, false);
-    const h = hdr + inner + 12;
+    const h = Math.max(hdr + inner + 12, minH);
     if (draw) {
       const c = bandColours(hueOf(t));
       R(x, y, w, h, c.ground, c.stroke, 8, 1.4);
@@ -303,10 +331,12 @@ export function renderPosterSvg(model: ArchimateModel, view: ArchimateView, opts
     }
     const col = out.splice(save);
     bottom = Math.max(bottom, yy);
-    const c = bandColours(hueOf({ node: side[0]!.node, kids: side, el: undefined } as Tree));
+    const c = bandColours(hueOf({ node: side[0]!.node, kids: side, el: side[0]!.el }));
     R(x, TOP, COLW, bottom - TOP, c.ground, c.header, 10, 2, "8 5");
     out.push(`<path d="M${x} ${TOP + 10} a10 10 0 0 1 10 -10 h${COLW - 20} a10 10 0 0 1 10 10 v26 h${-COLW} z" fill="${c.header}"/>`);
-    out.push(...col.map((l) => (l.includes(`text-anchor="middle"`) && l.includes('font-size="13"') ? l.replace(`fill="${THEME.ink}"`, 'fill="#ffffff"') : l)), ...body);
+    // Only the first heading sits on the column's header bar; the others stay dark on its ground.
+    const first = col.findIndex((l) => l.includes(`text-anchor="middle"`) && l.includes('font-size="13"'));
+    out.push(...col.map((l, i) => (i === first ? l.replace(`fill="${THEME.ink}"`, 'fill="#ffffff"') : l)), ...body);
   }
   // Key.
   let ky = bottom + 28;
