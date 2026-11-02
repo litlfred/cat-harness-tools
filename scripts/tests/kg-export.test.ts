@@ -45,7 +45,7 @@ import { declaresOwnCanonical, instanceExportPlan, publishesInstanceSchema } fro
 import { isExternalContract, skillContracts } from "../skill-contracts.js";
 import { buildDeclarationSchema, buildSkillIoContracts } from "../harness-schema-export.js";
 import { hostSchemaBase } from "../lib/host-schema.ts";
-import { artefactStub, findDeclarationFile, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.js";
+import { artefactStub, findDeclarationFile, findInstanceRoot, instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../../schemas/kg/cat-harness.js";
 import { termIri } from "../../schemas/kg/namespaces.js";
 import { ownPrefixTable } from "../../schemas/kg/graph-typology-registry.js";
 import { inAggregate } from "../../test/support/checkout.js";
@@ -1551,13 +1551,27 @@ describe("the published graph is this instance's own (bean 4ak5 item 2)", () => 
   // Reads other instances' exports, so it runs only where those instances
   // exist; skipped visibly when cat-harness stands alone (bean `ho66`).
   test.skipIf(!inAggregate())("every @id the checkout-scope graph mints and this one lacks is held by its owner's PUBLISHED document", () => {
-    // Nothing forwards it (clean break, #1378), so the owner must hold it.
+    // Nothing forwards it (clean break, #1378), so the owner must hold it:
+    // the same subject path under the owner's own document, or, for a node no
+    // other document names by path (a package), a source inside another
+    // instance, whose document is then its home.
+    const DOC = String(EXPORT_CANONICAL["@id"]);
     const here = new Set(graph.map((n) => String(n["@id"])));
-    const moved = (EXPORT_CHECKOUT["@graph"] as Array<Record<string, unknown>>).map((n) => String(n["@id"])).filter((id) => !here.has(id));
+    const moved = (EXPORT_CHECKOUT["@graph"] as Array<Record<string, unknown>>).filter((n) => !here.has(String(n["@id"])));
     expect(moved.length).toBeGreaterThan(0);
-    const held = new Set([...OWNER_EXPORTS.values()].flatMap((ids) => [...ids]));
-    const docs = new Set(OWNER_EXPORTS.keys());
-    expect(moved.filter((id) => !held.has(id) && !docs.has(id) && ![...docs].some((d) => subjectPathOf(id, d) !== undefined))).toEqual([]);
+    expect(moved.filter((n) => subjectPathOf(String(n["@id"]), DOC) === undefined).map((n) => n["@id"])).toEqual([]);
+    const ownerPaths = new Set<string>();
+    for (const [d, ids] of OWNER_EXPORTS) for (const i of ids) {
+      const p = subjectPathOf(i, d);
+      if (p !== undefined) ownerPaths.add(p);
+    }
+    const homeless = moved.filter((n) => {
+      if (ownerPaths.has(subjectPathOf(String(n["@id"]), DOC)!)) return false;
+      const src = [n.path, n.instructionsPath, n.sourcePath, n.module].find((v): v is string => typeof v === "string" && v !== "");
+      const inst = src === undefined ? undefined : findInstanceRoot(resolve(HARNESS_ROOT, src));
+      return inst === undefined || resolve(inst) === HOST;
+    });
+    expect(homeless.map((n) => n["@id"])).toEqual([]);
   });
 
   // Reads other instances' exports, so it runs only where those instances
