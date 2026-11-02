@@ -400,14 +400,16 @@ const SCRIPT = `
   // ── Diff renderers (bean d903) ─────────────────────────────────
   // v2 (owner, 2026-10-31, "default to inline"): a page-level choice made
   // before, such as Side by side, is not carried over to override the new default.
-  var VIEW_KEY = "folio-review:view:v2";
+  // v3 (owner, 2026-11-02, "defaults to in-line for all elements"): the same,
+  // for structured blocks, which opened on the field table before.
+  var VIEW_KEY = "folio-review:view:v3";
   function loadView() { try { return window.localStorage.getItem(VIEW_KEY) || ""; } catch (e) { return ""; } }
   function saveView(v) { try { window.localStorage.setItem(VIEW_KEY, v); } catch (e) { /* the defaults, then */ } }
   function defaultFor(kind, structured) {
     var fb = null;
-    // A block the build published fields for opens on the field renderer
-    // (STRUCTURED, bean f327) before any renderer its kind names.
-    if (structured) for (var j = 0; j < RENDERERS.length; j++) if (RENDERERS[j].defaultFor.indexOf("@structured") >= 0) return RENDERERS[j].id;
+    // Every block opens inline, structured ones too (owner, 2026-11-02). A
+    // structured block falls back to the field renderer (STRUCTURED, bean
+    // f327) in pick() only when inline cannot run on it.
     for (var i = 0; i < RENDERERS.length; i++) {
       if (RENDERERS[i].defaultFor.indexOf(kind) >= 0) return RENDERERS[i].id;
       if (RENDERERS[i].defaultFor.indexOf("*") >= 0) fb = RENDERERS[i].id;
@@ -491,10 +493,11 @@ const SCRIPT = `
       if (!r || unavailable(r, ctx)) {
         // The chosen view cannot run here: fall back to the first one that
         // can, preferring those that list this block's kind (0rxe: a table
-        // with no pictures opens side by side, not on a word diff).
+        // with no pictures opens side by side, not on a word diff), then the
+        // field table for a structured block.
         var can = RENDERERS.filter(function (x) { return !unavailable(x, ctx); });
-        r = (ctx.structure ? can.filter(function (x) { return x.defaultFor.indexOf("@structured") >= 0; })[0] : null) ||
-          can.filter(function (x) { return x.defaultFor.indexOf(ctx.kind) >= 0; })[0] || can[0];
+        r = can.filter(function (x) { return x.defaultFor.indexOf(ctx.kind) >= 0; })[0] ||
+          (ctx.structure ? can.filter(function (x) { return x.defaultFor.indexOf("@structured") >= 0; })[0] : null) || can[0];
       }
       if (!r) { while (panel.firstChild) panel.removeChild(panel.firstChild); panel.appendChild(el("p", "Nothing to show for this change: it is to the manifest only.", "muted")); return; }
       sel.value = r.id;
