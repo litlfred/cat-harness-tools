@@ -29,6 +29,8 @@ import { appendNoteToText, setFieldInText } from "../../beans-fallback.ts";
 import { BeanStatusSchema } from "../../../schemas/tools/tool-types.ts";
 import {
   admits,
+  beansAtIn,
+  positionsIn,
   parseBeanText,
   refuseWrite,
   renderBeanText,
@@ -36,6 +38,8 @@ import {
   setSequenceInText,
   slugifyTitle,
   versionOf,
+  type InstanceLike,
+  type Position,
 } from "../../../src/workflow/work-plan-store.ts";
 import {
   workPlanStoreConformance,
@@ -102,6 +106,7 @@ function world(): { repo: string; url: string; base: string } {
 
 const STATUSES = new Set<string>(BeanStatusSchema.options);
 const ARCHIVE = `${DEFS}/archive`;
+const WORKFLOWS = "beans/workflows";
 
 type Entry = { path: string; blob: string; text: string; bean: BeanFields };
 
@@ -194,6 +199,22 @@ class GitBranchStore implements StoreUnderTest {
     return { state: "updated", version: versionOf(text) };
   }
 
+  /** Every instance at the tip, in `beans/workflows/`. */
+  private instances(): InstanceLike[] {
+    const t = this.s.readTree(WORKFLOWS);
+    if (t.state === "miss") return [];
+    if (t.state !== "hit") throw new Error(`cannot read ${WORKFLOWS}: ${t.reason}`);
+    return [...t.files].filter(([p]) => p.endsWith(".json")).map(([, text]) => JSON.parse(text) as InstanceLike);
+  }
+
+  positions(id: string): Position[] {
+    return positionsIn(this.instances(), resolveId(this.all().keys(), id) ?? id);
+  }
+
+  beansAt(process: string, step?: string): string[] {
+    return beansAtIn(this.instances(), process, step);
+  }
+
   /**
    * A note carries no `ifMatch`: the caller cannot be asked to retry an
    * append. So the Tool retries it — re-read, append, write against what it
@@ -221,6 +242,14 @@ workPlanStoreConformance({
     const w = world();
     const open = (name: string): GitBranchStore =>
       new GitBranchStore(BranchStore.open(BRANCH, { repoRoot: w.repo, remote: w.url, storeDir: join(w.base, `${name}.git`), log: () => {} }));
-    return { a: open("a"), b: open("b") };
+    const seeder = BranchStore.open(BRANCH, { repoRoot: w.repo, remote: w.url, storeDir: join(w.base, "seed.git"), log: () => {} });
+    return {
+      a: open("a"),
+      b: open("b"),
+      seedInstance: (s) => {
+        const r = seeder.write([{ path: `${WORKFLOWS}/${s.id}.json`, content: `${JSON.stringify({ $schema: "folio-workflow-instance/v1", ...s }, null, 2)}\n` }], `start ${s.id}`);
+        if (r.state !== "pushed") throw new Error(`seed ${s.id}: ${r.state} — ${r.reason}`);
+      },
+    };
   },
 });

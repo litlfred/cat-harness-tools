@@ -14,8 +14,9 @@
  * `completed` or `scrapped` (`check:bean-archive`'s invariant), `get` still
  * finds an archived bean, and `list` leaves archived beans out unless asked.
  *
- * `history`, `positions` and `beansAt` are optional until steps 4 and 5 give
- * them a first implementation.
+ * `positions` and `beansAt` read the workflow instances the store holds,
+ * through {@link positionsIn} and {@link beansAtIn}, which every Tool shares.
+ * `history` is optional until step 5.
  *
  * @module folio-assistant/workflow/work-plan-store
  */
@@ -73,9 +74,13 @@ export interface HistoryEvent {
 /** One entry of `positions(id)`. */
 export interface Position {
   process: string;
+  /** The instance id; a phase's is the parent's, then the call activity's node, joined by `/`. */
   instance: string;
+  /** The steps holding a token. */
   nodes: string[];
   status: string;
+  /** When the instance last moved. */
+  lastMoved?: string;
 }
 
 /** The contract's operations. */
@@ -86,8 +91,8 @@ export interface WorkPlanStore {
   update(id: string, change: BeanChange, ifMatch: string): { state: "updated"; version: string } | Refusal | { state: "none" };
   note(id: string, text: string, by: string): { state: "noted"; version: string } | { state: "none" };
   history?(id: string): HistoryEvent[];
-  positions?(id: string): Position[];
-  beansAt?(process: string, step?: string): string[];
+  positions(id: string): Position[];
+  beansAt(process: string, step?: string): string[];
 }
 
 /** The statuses a bean may be archived in. */
@@ -224,4 +229,75 @@ export function resolveId(ids: Iterable<string>, id: string): string | undefined
   if (all.includes(id)) return id;
   const bySuffix = all.filter((k) => k.endsWith(`-${id}`));
   return bySuffix.length === 1 ? bySuffix[0] : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Where a bean is: read from the instances (owner, 2026-11-02, Q-BSD-1 B).
+// The bean records no position of its own; these are the one reading of the
+// instances every Tool shares, so `positions` and `beansAt` agree whichever
+// Tool holds them.
+
+/** An instance as these two read it: the fields of `InstanceState` they need. */
+export interface InstanceLike {
+  id: string;
+  processId: string;
+  bean?: string;
+  carriedBeans?: string[];
+  tokens: string[];
+  status: string;
+  updatedAt?: string;
+  history?: ReadonlyArray<{ at?: string }>;
+  children?: Record<string, InstanceLike>;
+}
+
+/** The newest moment an instance moved: `updatedAt`, else its latest dated history line. */
+function lastMove(s: InstanceLike): string | undefined {
+  if (s.updatedAt) return s.updatedAt;
+  return (s.history ?? []).map((h) => h.at).filter((a): a is string => !!a).sort().at(-1);
+}
+
+/**
+ * Every instance and sub-instance, each with the beans it carries. A bean the
+ * parent names travels into every phase the parent calls, as the engine's
+ * `TaskContext.carriedBeans` already has it.
+ */
+function* walk(s: InstanceLike, inherited: ReadonlySet<string>, path: string): Generator<{ s: InstanceLike; beans: Set<string>; id: string }> {
+  const beans = new Set([...inherited, ...(s.bean ? [s.bean] : []), ...(s.carriedBeans ?? [])]);
+  yield { s, beans, id: path };
+  for (const [node, child] of Object.entries(s.children ?? {})) yield* walk(child, beans, `${path}/${node}`);
+}
+
+/**
+ * `positions(beanId)`: every instance (and phase) naming the bean, with where
+ * its tokens are. A sub-instance's id is the parent's, then the call
+ * activity's node, joined by `/`. Oldest move first.
+ */
+export function positionsIn(instances: Iterable<InstanceLike>, beanId: string): Position[] {
+  const out: Array<Position & { lastMoved?: string }> = [];
+  for (const top of instances) {
+    for (const { s, beans, id } of walk(top, new Set(), top.id)) {
+      if (!beans.has(beanId)) continue;
+      const moved = lastMove(s);
+      out.push({ process: s.processId, instance: id, nodes: [...s.tokens].sort(), status: s.status, ...(moved ? { lastMoved: moved } : {}) });
+    }
+  }
+  return out.sort((a, b) => (a.lastMoved ?? "").localeCompare(b.lastMoved ?? "") || a.instance.localeCompare(b.instance));
+}
+
+/**
+ * `beansAt(process, step?)`: the beans with a token at that step of that
+ * process. With no step, the beans of every RUNNING instance of the process:
+ * a finished instance's tokens rest on its end event, and "the beans in this
+ * process" means the ones still in it. Sorted, each once.
+ */
+export function beansAtIn(instances: Iterable<InstanceLike>, process: string, step?: string): string[] {
+  const out = new Set<string>();
+  for (const top of instances) {
+    for (const { s, beans } of walk(top, new Set(), top.id)) {
+      if (s.processId !== process) continue;
+      const here = step === undefined ? s.status === "running" : s.tokens.includes(step);
+      if (here) for (const b of beans) out.add(b);
+    }
+  }
+  return [...out].sort();
 }
