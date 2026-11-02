@@ -136,6 +136,25 @@ function platformInstance(platformRoot: string, id: string): ReturnType<typeof l
 }
 
 /**
+ * The files a change edited, from `git diff --name-status -M100%` lines.
+ *
+ * A pure move (`R100`: same bytes, new path) is not an edit: the block's text
+ * is what the editor approved, and moving it to another chapter is a change to
+ * the chapter manifests, which are not blocks. Any other status keeps its
+ * (new) path, so a move that also changes the file is still gated.
+ */
+export function changedContentFiles(nameStatusLines: string[]): string[] {
+  const out: string[] = [];
+  for (const line of nameStatusLines) {
+    const [status, ...paths] = line.split("\t");
+    if (!status || paths.length === 0) continue;
+    if (status === "R100") continue;
+    out.push(paths[paths.length - 1]);
+  }
+  return out;
+}
+
+/**
  * Check every changed content file against the editing process.
  *
  * Returns one finding per block (not per file — a change to `x.ts` and `x.md`

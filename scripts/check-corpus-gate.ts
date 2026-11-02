@@ -29,7 +29,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
-import { checkCorpusGate } from "../src/workflow/corpus-gate.js";
+import { changedContentFiles, checkCorpusGate } from "../src/workflow/corpus-gate.js";
 import { readBlockManifest } from "../pipeline/qa-utils.js";
 import { loadBlockModuleSync } from "../pipeline/block-module.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
@@ -84,9 +84,13 @@ const git = (args: string[]): string[] =>
 
 // --diff-filter=d: a deleted block cannot be gated on a process step, and
 // refusing deletions would make the gate impossible to satisfy.
-const files = staged
-  ? git(["diff", "--cached", "--name-only", "--diff-filter=d"])
-  : git(["diff", "--name-only", "--diff-filter=d", `${since}...HEAD`]);
+// -M100%: a file moved with its bytes unchanged (a block moved to another
+// chapter) is not an edit, so `changedContentFiles` drops it.
+const files = changedContentFiles(
+  staged
+    ? git(["diff", "--cached", "--name-status", "-M100%", "--diff-filter=d"])
+    : git(["diff", "--name-status", "-M100%", "--diff-filter=d", `${since}...HEAD`]),
+);
 
 const findings = await checkCorpusGate(repoRoot, { files, platformRoot, labelFor });
 const refused = findings.filter((f) => !f.allowed);
