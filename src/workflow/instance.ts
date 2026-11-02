@@ -179,6 +179,13 @@ export interface InstanceState {
    * written before this was recorded, which is not the same as "never refused".
    */
   refusals?: RefusalEntry[];
+  /**
+   * What a change-set instance (`content-change-review`) changes: its change
+   * set id and the labels of every block it touches. Written when the scope
+   * is detected; the corpus gate reads it to recognise the change-set path
+   * (`change-set-coverage.ts`). Absent on every other kind of instance.
+   */
+  scope?: { changeSet: string; blocks: string[] };
 }
 
 /** One refused `workflow_complete`: the step asked for, by whom, and the engine's reason. */

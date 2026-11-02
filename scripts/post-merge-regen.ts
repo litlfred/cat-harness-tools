@@ -317,6 +317,30 @@ export function onlyBuiltAtPublish(writer: string | undefined, moves: ReadonlyMa
 }
 
 /**
+ * Gates whose INPUTS only `derive:publish` builds, so post-merge regen cannot
+ * judge them (bean `p7mb`, epic `1xhc`). `onlyBuiltAtPublish` covers a check
+ * whose own writer's outputs are publish-time; these read OTHER writers'
+ * publish-time output, so no writer regen runs can turn them green:
+ *
+ * - `slice:sqlite:check` audits the kg slice against the payload tree, which
+ *   `derive:publish` builds ("points at payload …, which the published tree
+ *   does not hold").
+ * - `check:nav-names:check` reads the railed viewer pages and the navbar
+ *   include. No railed page is in the checkout any more, so outside a publish
+ *   it exits 2, "nothing was compared".
+ *
+ * Measured 2026-11-01 on fa main 0ed9b2b and cat-harness c523aef, and again on
+ * train fa#2893 (tools f92092e): both were the only `unrepairedChecks`, every
+ * post-merge regen run red. Neither goes unjudged: `code-quality-gates.yml`
+ * runs both after restoring the publish-time pages (its B1 steps). So regen
+ * reports them with `builtAtPublishChecks`, never as a pass and never as stale.
+ */
+export const JUDGED_AFTER_PUBLISH: Readonly<Record<string, string>> = {
+  "slice:sqlite:check": "audits the kg slice against the payload tree derive:publish builds",
+  "check:nav-names:check": "reads the railed viewer pages and navbar include derive:publish builds",
+};
+
+/**
  * Resolve the repository root containing the gating workflows and scripts.
  * Walks up if inside a submodule or isolated worktree.
  */
@@ -736,7 +760,9 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
   });
   const settledResults = settleCovered(fixpoint.results, folds);
   const unrepaired = settledResults.filter(
-    (r) => r.outcome === "unrepaired" || r.outcome === "writer-failed" || r.outcome === "no-writer",
+    (r) =>
+      JUDGED_AFTER_PUBLISH[r.check] === undefined &&
+      (r.outcome === "unrepaired" || r.outcome === "writer-failed" || r.outcome === "no-writer"),
   );
   // A repair whose writer moved only `builtAtPublish` paths (or, when a check
   // failed in the audit pass before another writer built its `builtAtPublish`
@@ -761,6 +787,8 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
   const builtAtPublishCheckNames = settledResults
     .filter((r) => {
       if (directPublishTime.has(r.check)) return true;
+      // Red here, judged by code-quality-gates after publish-pages: see JUDGED_AFTER_PUBLISH.
+      if (JUDGED_AFTER_PUBLISH[r.check] !== undefined && (staleSet.has(r.check) || r.outcome !== "current")) return true;
       const cov = COVERED[r.check];
       if (cov === undefined) return false;
       return (

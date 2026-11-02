@@ -52,7 +52,7 @@ jobs:
           fi
           echo "documents: $(echo "$papers" | tr '\n' ' ')"
 
-      - uses: litlfred/cat-harness-tools/.github/actions/mount-layers@main
+      - uses: litlfred/cat-harness-tools/.github/actions/mount-layers@1257da8bbbb8e661391d08b014b16464de19613f # last change to .github/actions/mount-layers
 
       - name: QA sweep (warn-only on baseline criticals)
         continue-on-error: true

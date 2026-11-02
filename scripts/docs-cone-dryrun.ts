@@ -53,6 +53,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { gunzipSync } from "node:zlib";
 
 import {
   BUILD_STAMPS,
@@ -245,6 +246,28 @@ export const DEPLOY_STAMPS: ReadonlyArray<readonly [RegExp, string]> = [
   // workflow page's stuck-age lead and `data-wv-built` attribute.
   [/\b([Mm]easured at )\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z((?:,\s+|\s+)\(?when this page was built\)?)/g, "$1<built>$2"],
   [/(&quot;at&quot;:&quot;)\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z(&quot;)/g, "$1$2"],
+  // `pins.json` (`scripts/lib/pin-links.ts`) records `".": "<head-sha>"` for
+  // the index checkout itself alongside each layer's pin; the index's own SHA
+  // moves on every commit while layer pins only move on a re-pin.
+  [/("\.":\s*)"[0-9a-f]{40}"/g, '$1""'],
+  // `root-index.ts` hashes the raw bytes of each `<instance>/<stub>.jsonld`
+  // (including its per-deploy `generatedAt` / `sourceCommit` / `staging` stamps)
+  // into `index.json` and `index.jsonld` alongside `"nodes"`.
+  [/("nodes":\s*\d+,\s*"bytes":\s*)\d+(,\s*"sha256":\s*)"[0-9a-f]{64}"/g, '$10$2""'],
+  // `gen-site-viz.ts` renders the pre-deploy `gh-pages` tip SHA, `_render-log/`
+  // count and `STAGING/` preview table into `en/cat-harness/site/index.html`.
+  [/(<p class="m">Tip <code>)[0-9a-f]{12}(<\/code>[^<]*?·\s*)\d+( staging preview\(s\))/g, "$1$20$3"],
+  [/(<tr><td><code>_render-log\/<\/code><\/td><td>\d+<\/td><td>)\d+(<\/td><\/tr>)/g, "$10$2"],
+  [/(<table><thead><tr><th>Preview<\/th><th>Pages<\/th><th>Files<\/th><\/tr><\/thead><tbody>)[\s\S]*?(<\/tbody><\/table>)/g, "$1$2"],
+  // `qa-site-assets.ts` writes `assets/qa/availability.json`, where `source`
+  // (`checkout` vs `fetched`), `key` and `reason` depend on whether the
+  // `qa-reports` branch already held `main/<sha>` when the deploy started,
+  // while `expected` and `published` record the corpus counts that landed.
+  [/("source":\s*)"(?:checkout|fetched(?:-fallback)?)"(,\s*"requested":\s*\[[^\]]*\])(?:,\s*"key":\s*"[^"]*")?(,\s*"reason":\s*)"[^"]*"/g, '$1"present"$2$3""'],
+  // `ig-index:build` packs `fhir-artifact-index/package.tgz` with tar/gzip
+  // (whose mtime header varies compressed size by a few bytes across runs)
+  // and records that archive's byte length in `fhir-artifact-index/index.json`.
+  [/("localPath":\s*"fhir-artifact-index\/package\.tgz",\s*"bytes":\s*)\d+/g, "$10"],
 ];
 
 /** Files every deploy rewrites whole: compared by neither side (the writer records of bean fwtz option B among them). */
@@ -255,8 +278,34 @@ export const NOT_THE_MAIN_SITE = /^(STAGING|_render-log|\.git)(\/|$)/;
 
 const SPLIT_SEARCH_INDEX = /^assets\/js\/search\/[^/]+\.json$/;
 const TEXTUAL = /\.(html?|css|js|json|jsonld|xml|txt|svg|md|map)$/i;
+const TARBALL = /\.(tgz|tar\.gz)$/i;
+
+/**
+ * Strip the per-build `mtime` (bytes 136..148) and header `chksum` (148..156)
+ * from each 512-byte POSIX `ustar` header inside a gzipped tar archive while
+ * keeping every member's name, mode, size and payload bytes intact.
+ */
+function untimedTar(gz: Buffer): Buffer {
+  try {
+    const tar = Buffer.from(gunzipSync(gz));
+    if (tar.length === 0 || tar.length % 512 !== 0) return gz;
+    for (let off = 0; off + 512 <= tar.length; ) {
+      if (tar.subarray(off + 257, off + 262).toString("ascii") !== "ustar") {
+        off += 512;
+        continue;
+      }
+      const size = parseInt(tar.subarray(off + 124, off + 136).toString("ascii").replace(/\0.*$/, "").trim(), 8) || 0;
+      tar.fill(0, off + 136, off + 156);
+      off += 512 + Math.ceil(size / 512) * 512;
+    }
+    return tar;
+  } catch {
+    return gz;
+  }
+}
 
 export function stampedHash(path: string, bytes: Buffer): string {
+  if (TARBALL.test(path)) return createHash("sha256").update(untimedTar(bytes)).digest("hex");
   if (!TEXTUAL.test(path)) return createHash("sha256").update(bytes).digest("hex");
   let text = bytes.toString("utf-8");
   for (const [re, blank] of DEPLOY_STAMPS) text = text.replace(re, blank);

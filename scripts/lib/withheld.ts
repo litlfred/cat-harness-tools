@@ -13,9 +13,10 @@
  * of a refused work after the mount had stopped serving it.
  */
 import { existsSync, readFileSync } from "node:fs";
-import { basename, dirname, join, relative, sep } from "node:path";
+import { basename, join, relative, sep } from "node:path";
 
 import { WithheldSchema } from "../../schemas/content/withheld.js";
+import { libraryOfEntry } from "./library-entry-graphs.ts";
 
 export const WITHHELD_FILE = "withheld.json";
 
@@ -74,12 +75,13 @@ export function withheldFilter(dir: string, withheld: readonly string[]): (src: 
 
 /**
  * Why a library ENTRY directory is withheld by its parent's list, or
- * `undefined` when it is not. The parent is the library root that carries
- * `withheld.json`; the entry is named there as `<slug>/`.
+ * `undefined` when it is not. The library root carries `withheld.json`, and
+ * the entry is named there as `<slug>/`. For an entry filed in a concern group
+ * (`library/<group>/<slug>/`, bean `6fez`) that root is two levels up, not the
+ * group directory.
  */
 export function withheldReason(entryDir: string): string | undefined {
-  const slug = basename(entryDir);
-  return withheldEntries(dirname(entryDir)).find((e) => e.path === slug)?.reason;
+  return withheldEntryFor(entryDir)?.reason;
 }
 
 /**
@@ -90,5 +92,5 @@ export function withheldReason(entryDir: string): string | undefined {
  */
 export function withheldEntryFor(entryDir: string): WithheldEntry | undefined {
   const slug = basename(entryDir);
-  return withheldEntries(dirname(entryDir)).find((e) => e.path === slug);
+  return withheldEntries(libraryOfEntry(entryDir)).find((e) => e.path === slug);
 }

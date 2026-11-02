@@ -71,3 +71,58 @@ describe("the numbered-block frame", () => {
     expect(md).not.toContain("fa-numbered");
   });
 });
+
+describe("structured blocks: a light card", () => {
+  const fr = {
+    block: { kind: "functional-requirement", label: "freq:FR-AN-01", title: "Standard reports and dashboards on stock…", meta: { requirementId: "FR-AN-01" } } as unknown as Block,
+    mdContent: "**FR-AN-01.** Standard reports and dashboards on stock and status.\n\n*Priority:* to be set. *Linked use cases:* to be traced.\n",
+  };
+  test("kind label, id chip and the body on one line; the id and the cut title are said once", () => {
+    const md = renderBlockMarkdown(fr);
+    expect(md.startsWith('<div class="fa-block fa-block-functional-requirement" markdown="1">\n\n')).toBe(true);
+    expect(md).toContain('<span class="fa-block-kind">Functional requirement</span> <span class="fa-block-id">FR-AN-01</span> Standard reports and dashboards on stock and status.');
+    expect(md).not.toContain("**FR-AN-01.**");
+    expect(md).not.toContain("stock…");
+  });
+  test("trailing *Label:* lines become the metadata row", () => {
+    expect(renderBlockMarkdown(fr)).toContain('<div class="fa-block-meta" markdown="1">\n\n*Priority:* to be set. *Linked use cases:* to be traced.\n\n</div>');
+  });
+  test("an id with a title in its bold lead keeps the title", () => {
+    const md = renderBlockMarkdown({
+      block: { kind: "non-functional-requirement", label: "nfreq:NFR-01", title: "Security", meta: { requirementId: "NFR-01" } } as unknown as Block,
+      mdContent: "**NFR-01 Security.** Data are protected.",
+    });
+    expect(md).toContain('<span class="fa-block-kind">Non-functional requirement</span> <span class="fa-block-id">NFR-01</span> **Security.** Data are protected.');
+  });
+  test("a list body keeps the heading on its own line, and the text is otherwise unchanged", () => {
+    const body = "- One.\n- Two.\n\n```\na\n\n\nb\n```";
+    const md = renderBlockMarkdown({ block: { kind: "user-scenario", label: "scen:x", title: "X" } as unknown as Block, mdContent: body });
+    expect(md).toContain('<span class="fa-block-kind">User scenario</span> **X.**\n\n' + body);
+  });
+  test("an indicator shows its id, its calculation as a fraction, and its module and disaggregation", () => {
+    const md = renderBlockMarkdown({
+      block: {
+        kind: "indicator",
+        label: "ind:1-01",
+        title: "Density of health workers",
+        meta: { indicatorId: "1-01", module: "1", numerator: "Active health workers", denominator: "Total population", unit: "10 000", disaggregation: "occupation; sex" },
+      } as unknown as Block,
+      mdContent: "Health workers per 10 000 population.",
+    });
+    expect(md).toContain('<span class="fa-block-kind">Indicator</span> <span class="fa-block-id">1-01</span> **Density of health workers.** Health workers per 10 000 population.');
+    expect(md).toContain('<span class="fa-block-ratio-num"><span class="fa-block-ratio-label">Numerator</span> Active health workers</span>');
+    expect(md).toContain('<span class="fa-block-ratio-unit">\u00d7 10 000</span>');
+    expect(md).toContain("*Module:* 1 \u00b7 *Disaggregation:* occupation; sex");
+  });
+  test("an indicator whose text already gives the numerator is not repeated", () => {
+    const md = renderBlockMarkdown({
+      block: { kind: "indicator", label: "ind:x", meta: { numerator: "A", denominator: "B" } } as unknown as Block,
+      mdContent: "Text.\n\n*Numerator:* A. *Denominator:* B.",
+    });
+    expect(md).not.toContain("fa-block-ratio");
+  });
+  test("prose and numbered kinds are not cards", () => {
+    expect(renderBlockMarkdown({ block: { kind: "prose", label: "p:x" } as unknown as Block, mdContent: "Text." })).not.toContain("fa-block");
+    expect(renderBlockMarkdown(fig("Fig. 1. X"))).not.toContain("fa-block ");
+  });
+});

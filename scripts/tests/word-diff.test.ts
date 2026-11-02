@@ -54,6 +54,13 @@ describe("the renderer registry", () => {
     expect(DIFF_RENDERERS.find((r) => r.id === "inline")!.label).toBe("Inline");
   });
 
+  test("a structured block opens inline too, not on the field table (owner, 2026-11-02)", () => {
+    expect(defaultRendererFor("functional-requirement", DIFF_RENDERERS, true).id).toBe("inline");
+    expect(defaultRendererFor("prose", DIFF_RENDERERS, true).id).toBe("inline");
+    // The field table is still there, as the fallback when inline cannot run.
+    expect(defaultRendererFor("x", DIFF_RENDERERS.filter((r) => r.id === "fields"), true).id).toBe("fields");
+  });
+
   test("every kind a renderer defaults for is a real block kind", () => {
     for (const r of DIFF_RENDERERS) for (const k of r.defaultFor) if (k !== "*" && k !== "@structured") expect(BLOCK_KINDS as readonly string[]).toContain(k);
   });

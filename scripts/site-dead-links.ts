@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Every internal link in a BUILT site, checked against the files the site
- * holds — and, with `--fix`, the two kinds of dead link that have one right
+ * holds — and, with `--fix`, the three kinds of dead link that have one right
  * answer repointed first.
  *
  * @module scripts/site-dead-links
@@ -32,8 +32,17 @@
  *    segments, the longest tail that matches), the link goes to that file on
  *    GitHub, at the commit the index pins (`index.lock.json`). Two or more
  *    candidates are left alone: a guess is worse than a reported dead link.
+ * 3. **In a preview, a page of an instance the preview does not carry.** A
+ *    preview builds only the composed instances its branch reaches
+ *    (`compose-docs.ts`, `carriedInstances`), so a link into one it left out
+ *    is dead here and live on the published site. When the build is a
+ *    preview (`--base-path …/STAGING/<slug>`), the target's first segment is
+ *    a composed instance, and that instance's composed directory holds the
+ *    page's source, the link goes to the same path on the published site.
+ *    A canonical build never takes this rule: there a missing page is a
+ *    finding.
  *
- * 3. **Then every link at a pin is made pin-free** (`lib/pin-links.ts`). A
+ * 4. **Then every link at a pin is made pin-free** (`lib/pin-links.ts`). A
  *    link to a layer's file at the commit `index.lock.json` pins, or to this
  *    repository at `--sha`, becomes `…/blob/HEAD/…` with `data-fa-pin`, and
  *    the browser puts the commit back from one `pins.json`. A re-pin then
@@ -48,9 +57,10 @@
  *   bun run cat-harness-tools/scripts/site-dead-links.ts --site  ./_site --root . [--fix] [--repo litlfred/folio-assistant --sha <commit>] [--report dead.tsv]
  */
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { join, posix, relative, sep } from "node:path";
+import { join, posix, relative, resolve, sep } from "node:path";
 
 import { UN_LOCALES } from "../schemas/content/translation.ts";
+import { composedInstances } from "./compose-docs.ts";
 import { unpinSite } from "./lib/pin-links.ts";
 
 /** Locales a page can be TRANSLATED into: the UN set without the source. */
@@ -207,7 +217,7 @@ export interface Repoint {
   page: string;
   from: string;
   to: string;
-  why: "locale" | "source";
+  why: "locale" | "source" | "published";
 }
 
 /**
@@ -297,12 +307,42 @@ export function sourceCandidates(rel: string): string[] {
   return [rel];
 }
 
+/**
+ * The published site's root path for a PREVIEW's base path, or undefined when
+ * the build is not a preview: `/folio-assistant/STAGING/x` → `/folio-assistant`.
+ */
+export function publishedRootOf(basePath: string): string | undefined {
+  const m = /^(.*)\/STAGING\/[^/]+\/?$/.exec(basePath);
+  return m ? m[1] : undefined;
+}
+
+/**
+ * Rule 3: the published-site path for a target inside a composed instance this
+ * preview did not carry, or undefined. `instances` maps the instance's site
+ * segment to its composed directory; the page counts only when that directory
+ * holds its source (`x.html` as `x.md` or itself), so a page nobody wrote stays
+ * reported.
+ */
+export function publishedFor(target: string, publishedRoot: string, instances: ReadonlyMap<string, readonly string[]>): string | undefined {
+  const slash = target.indexOf("/");
+  if (slash <= 0) return undefined;
+  const dirs = instances.get(target.slice(0, slash));
+  if (dirs === undefined) return undefined;
+  const rest = target.slice(slash + 1);
+  if (rest === "") return undefined;
+  const sources = rest.endsWith(".html") ? [rest.replace(/\.html$/, ".md"), rest] : rest.endsWith("/") ? [`${rest}index.md`, `${rest}README.md`] : [rest];
+  const held = dirs.some((d) => sources.some((f) => existsSync(join(d, f))));
+  return held ? `${publishedRoot}/${target}` : undefined;
+}
+
 /** Check (and with `fix`, repoint) every page. Returns what is still dead and what was repointed. */
 export function checkSite(opts: {
   site: string;
   basePath: string;
   fix: boolean;
   resolveSource: (rel: string) => string | undefined;
+  /** Rule 3, preview builds only: where a page of an uncarried instance is published. */
+  resolvePublished?: (target: string) => string | undefined;
 }): { dead: DeadLink[]; repointed: Repoint[]; pages: number } {
   const dead: DeadLink[] = [];
   const repointed: Repoint[] = [];
@@ -316,7 +356,8 @@ export function checkSite(opts: {
       const target = targetOf(page, value, opts.basePath);
       if (target === undefined || served(opts.site, target) || carried(target)) return whole;
       if (opts.fix) {
-        const r = repointFor(opts.site, page, target, opts.resolveSource);
+        const published = opts.resolvePublished?.(target);
+        const r = repointFor(opts.site, page, target, opts.resolveSource) ?? (published === undefined ? undefined : { to: published, why: "published" as const });
         if (r) {
           const suffix = value.match(/[?#].*$/)?.[0] ?? "";
           repointed.push({ page, from: value, to: r.to + suffix, why: r.why });
@@ -370,9 +411,16 @@ if (import.meta.main) {
       return undefined;
     };
   }
-  const { dead, repointed, pages } = checkSite({ site, basePath, fix, resolveSource });
+  let resolvePublished: ((target: string) => string | undefined) | undefined;
+  const publishedRoot = publishedRootOf(basePath);
+  if (fix && publishedRoot !== undefined) {
+    const instances = new Map<string, string[]>();
+    for (const c of composedInstances(resolve(root))) instances.set(c.under, [...(instances.get(c.under) ?? []), c.dir]);
+    resolvePublished = (target) => publishedFor(target, publishedRoot, instances);
+  }
+  const { dead, repointed, pages } = checkSite({ site, basePath, fix, resolveSource, resolvePublished });
   const byWhy = (w: Repoint["why"]): number => repointed.filter((r) => r.why === w).length;
-  if (fix) console.log(`site-dead-links: repointed ${byWhy("locale")} link(s) to the untranslated page and ${byWhy("source")} to their source on GitHub`);
+  if (fix) console.log(`site-dead-links: repointed ${byWhy("locale")} link(s) to the untranslated page, ${byWhy("source")} to their source on GitHub and ${byWhy("published")} to the published site (instances this preview does not carry)`);
   if (fix) {
     const u = unpinSite(site, sitePages(site), origins);
     console.log(`site-dead-links: made ${u.links} pinned link(s) on ${u.pages} page(s) resolve their commit from pins.json in the browser`);

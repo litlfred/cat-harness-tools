@@ -1018,7 +1018,7 @@ export async function generateSubgraphs(
   const warnings: string[] = [];
   const libraryLoader = libraryContextLoader(checkoutRootFor(root));
   for (const inst of framedInstances(root)) {
-    const data = await buildExport({ instanceRoot: inst, scope: "instance" });
+    const data = await buildExport({ instanceRoot: inst, scope: "instance", provenance: false });
     const name = readDeclaration(inst)?.name ?? basename(inst);
     for (const p of data.problems) exportProblems.push(`kg-export (${name}): ${p}`);
     const own = (data["@graph"] as Node[]).filter((n) => n.deprecated !== true && !rootOf.has(String(n["@id"])));

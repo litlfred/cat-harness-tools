@@ -31,7 +31,9 @@ const PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>
 <script>${JS}<\/script></body></html>`;
 
 async function open(page: Page): Promise<void> {
-  await page.route(`${ORIGIN}/**`, (route) => {
+  // On the CONTEXT, not the page: "Open ↗" opens a new tab, and a page-level
+  // route does not serve it, so the tab would never load the drawing.
+  await page.context().route(`${ORIGIN}/**`, (route) => {
     const url = route.request().url();
     if (url.endsWith(".svg")) return route.fulfill({ contentType: "image/svg+xml", body: SVG });
     return route.fulfill({ contentType: "text/html", body: PAGE });
@@ -40,6 +42,11 @@ async function open(page: Page): Promise<void> {
   // The toolbar mounts once the <img> has been inlined as an <svg>.
   await expect(page.locator(".bpmn-figure svg")).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Download this diagram as SVG" })).toBeVisible();
+  // Owner, 2026-11-01: with a mouse the controls float over the figure and
+  // take clicks only while the pointer is on it (docs-ui.css, "Figure
+  // controls on hover"), so a reader reaches them by moving onto the figure
+  // first. Playwright's own click does not, so the pointer goes there here.
+  await page.locator(".bpmn-figure").hover();
 }
 
 test.describe("figure export — SVG, PNG, clipboard (#1270)", () => {

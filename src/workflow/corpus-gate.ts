@@ -29,15 +29,27 @@
  * A block whose label cannot be established is **refused**, not waved through.
  * A gate that fails open is a gate that reports clean by not looking.
  *
+ * ## Two approved routes
+ *
+ * One edit to one block goes through `editing-hci-validation`, and its
+ * instance must have reached `Task_Commit`. A change set (one PR, many blocks)
+ * goes through `content-change-review` instead: a block passes when a running
+ * change-set instance committed in the same diff lists it in `scope.blocks`
+ * and has finished its make phase (`change-set-coverage.ts`). Committee
+ * approval and the merge stay person steps after that, and the verdict says
+ * so. A block in neither is refused as before.
+ *
  * @module folio-assistant/workflow/corpus-gate
  */
 
 import { existsSync } from "node:fs";
 import { workflowFiles } from "../../scripts/known-skills.js";
-import { basename, resolve } from "node:path";
+import { basename, relative, resolve } from "node:path";
 import { loadProcessModel, type ProcessModel } from "./process-model.js";
 import { checkGate, loadRelaxations, validateRelaxations, type Relaxation } from "./gate.js";
-import { instanceId, loadInstance } from "./store.js";
+import { instanceId, loadInstance, workflowDir } from "./store.js";
+import { changeSetCover, nearMiss } from "./change-set-coverage.js";
+import type { InstanceState } from "./instance.js";
 
 /** The step a corpus write must have been authorised by. */
 export const COMMIT_ACTIVITY = "Task_Commit";
@@ -155,6 +167,7 @@ export async function checkCorpusGate(
   }
 
   const seen = new Map<string, GateFinding>();
+  const changeSets = changedChangeSetInstances(repoRoot, opts.files);
 
   for (const file of opts.files) {
     const ts = manifestFor(repoRoot, file);
@@ -183,7 +196,21 @@ export async function checkCorpusGate(
     // platform store then counts as "no record there", which still fails
     // closed: the block is refused unless the repository has the record.
     const state = loadInstance(repoRoot, id) ?? platformInstance(opts.platformRoot, id);
+    const cover = state && allowedByEditing(model, state, relaxations) ? undefined : changeSetCover(changeSets, label);
+    if (cover) {
+      seen.set(ts, {
+        file,
+        label,
+        instance: cover.instance,
+        allowed: true,
+        reason:
+          `covered by change set ${cover.changeSet} (\`${cover.instance}\`), made in process; ` +
+          `committee approval and the merge stay with a person`,
+      });
+      continue;
+    }
     if (!state) {
+      const near = nearMiss(changeSets, label);
       seen.set(ts, {
         file,
         label,
@@ -192,7 +219,10 @@ export async function checkCorpusGate(
         reason:
           `no workflow instance \`${id}\` — nothing records that the validation findings ` +
           `were shown to the editor for this block. Start one with workflow_start ` +
-          `{ process: "editing-hci-validation", subject: "${label}" }.`,
+          `{ process: "editing-hci-validation", subject: "${label}" }, or list the block in ` +
+          `a content-change-review instance for its change set` +
+          (near ? ` (${near})` : "") +
+          `.`,
       });
       continue;
     }
@@ -211,4 +241,38 @@ export async function checkCorpusGate(
   }
 
   return [...seen.values()];
+}
+
+/** Does the editing instance allow the commit, now or already? */
+function allowedByEditing(model: ProcessModel, state: InstanceState, relaxations: Relaxation[]): boolean {
+  return (
+    state.history.some((h) => h.node === COMMIT_ACTIVITY) ||
+    checkGate(model, state, COMMIT_ACTIVITY, relaxations).allowed
+  );
+}
+
+/**
+ * The workflow instances this diff adds or changes, read from the repository.
+ *
+ * Only the changed ones: an instance is cover for the PR that commits it, so
+ * an old change set cannot authorise a later edit (`change-set-coverage.ts`).
+ * An unreadable instance directory means no change-set cover, which still
+ * fails closed.
+ */
+function changedChangeSetInstances(repoRoot: string, files: string[]): InstanceState[] {
+  let dir: string;
+  try {
+    dir = relative(resolve(repoRoot), workflowDir(resolve(repoRoot)));
+  } catch {
+    return [];
+  }
+  const out: InstanceState[] = [];
+  for (const f of files) {
+    if (!f.endsWith(".json")) continue;
+    const rel = relative(dir, f);
+    if (rel.startsWith("..") || rel.includes("/")) continue;
+    const st = loadInstance(repoRoot, basename(f, ".json"));
+    if (st) out.push(st);
+  }
+  return out;
 }

@@ -119,7 +119,10 @@ const NAMED_COPY = new RegExp(
     "globalTask|globalUserTask|globalScriptTask|globalManualTask|globalBusinessRuleTask|" +
     "startEvent|endEvent|intermediateCatchEvent|intermediateThrowEvent|boundaryEvent|" +
     "exclusiveGateway|parallelGateway|inclusiveGateway|eventBasedGateway|" +
-    "sequenceFlow|participant|collaboration)\\b[^>]*?\\sname=\"([^\"]*)\"",
+    "sequenceFlow|participant|collaboration|" +
+    // Stores are drawn as data stores, not lanes (owner, 2026-11-01, Q-BR-3 A),
+    // and the real extractor reads their names.
+    "dataStore|dataStoreReference|dataObjectReference)\\b[^>]*?\\sname=\"([^\"]*)\"",
   "g",
 );
 

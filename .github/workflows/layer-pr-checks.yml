@@ -123,6 +123,11 @@
 #     checks:
 #       uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@main
 #
+# `@main` above and below stands for the commit the caller's index.lock.json
+# pins: `bun run cat workflow-pins` writes it, `mount:remote` moves it with
+# each re-pin, and `check:workflow-pins` fails on a branch (owner, 2026-11-01,
+# security audit S1).
+#
 # Post-merge QA of main (owner, 2026-10-30, "Both"): a push to main runs
 # main's whole gate set and tests (the base side, above), and keeps main's
 # answer for the PRs based on that commit. It also says whether main ITSELF
@@ -231,10 +236,10 @@ on:
         # pre-70lx layers; folio-assistant#2529 merged on 2026-10-15.
         default: "main"
       tools-ref:
-        description: "The cat-harness-tools ref whose judging scripts run (both sides use the same)."
+        description: "The cat-harness-tools ref whose judging scripts run (both sides use the same). `lock`: the commit the caller's index.lock.json pins (cat-harness-tools itself: its own commit)."
         required: false
         type: string
-        default: "main"
+        default: "lock"
       reuse-stored-main:
         description: "On a PR's first attempt, when main's answer for these exact inputs is not cached, judge the PR against the answer a run on the caller's main stored for the PR's own base commit (its merge-base with main) instead of recomputing main (see the header). Off: the base side runs on every cache miss."
         required: false
@@ -255,6 +260,11 @@ on:
         required: false
         type: boolean
         default: false
+      writer-record-hours:
+        description: "How often, at most, a push to main re-records the page-build writers under strace (bean fwtz). The record takes 40-85 minutes and every run waits for it at its end; a PR uses the newest record and checks it path by path, so an older one still serves. 0 records on every push."
+        required: false
+        type: number
+        default: 6
       writer-skip:
         description: "Skip a derive:publish writer whose recorded reads are unchanged, putting back what it wrote (bean fwtz). A push to the caller's main records each writer under strace; a PR restores the newest record and skips. Off: every writer runs."
         required: false
@@ -292,8 +302,13 @@ permissions:
 # run of a PR that is closed or merged is cancelled by the `closed` event,
 # here for a caller that triggers on it, and for every workflow on the head
 # branch by `layer-cancel-on-close.yml`.
+# A PR's runs are keyed by the PR's number, never by `github.ref`: on a
+# `closed` event GitHub sets the ref to the BASE branch, so a merged PR's
+# closing run joined main's group and, being a pull_request run, cancelled
+# main's running push run and the new one (fhir-harness run 41395643928,
+# "higher priority waiting request"). pr-tests.yml is keyed the same way.
 concurrency:
-  group: layer-pr-checks-${{ github.repository }}-${{ github.ref }}
+  group: layer-pr-checks-${{ github.repository }}-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # The instance, once: the input when given, else (layer mode) the calling
@@ -342,12 +357,50 @@ jobs:
           list="$(seq -s, 1 "$N")"
           echo "gate shards: $N ([${list}])"
           echo "list=[${list}]" >> "$GITHUB_OUTPUT"
+      # Owner, 2026-11-01 (security audit S1, Q-SEC-4 "B"): a caller pins this
+      # workflow to the cat-harness-tools commit its own index.lock.json names
+      # (`bun run cat workflow-pins`), and the judging scripts follow the same
+      # pin, so nothing here runs code from a branch tip. `tools-ref: lock` (the
+      # default) reads that pin from the caller's index.lock.json at the commit
+      # under test; cat-harness-tools itself judges its own commit. Any other
+      # value is used as given (a branch is resolved at the pin time below).
+      - &tools-lock
+        name: The cat-harness-tools commit the caller pins
+        id: tools-lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WANT: ${{ inputs.tools-ref }}
+          INDEX_REF: ${{ inputs.index-ref }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$WANT" != "lock" ]; then ref="$WANT"
+          elif [ "$GITHUB_REPOSITORY" = "litlfred/cat-harness-tools" ]; then ref="$SHA"
+          else
+            lock() { curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw+json" \
+              "$GITHUB_API_URL/repos/$1/contents/index.lock.json?ref=$2"; }
+            # A layer the index mounts but which keeps no
+            # lock of its own judges with the commit the folio-assistant
+            # index pins, which is still a pin and not a branch tip.
+            if body="$(lock "$GITHUB_REPOSITORY" "$SHA")"; then from="$GITHUB_REPOSITORY index.lock.json at $SHA"
+            else body="$(lock litlfred/folio-assistant "$INDEX_REF")"; from="litlfred/folio-assistant index.lock.json at $INDEX_REF"; fi
+            ref="$(printf '%s' "$body" | python3 -Ic 'import json,sys; print(next((m["ref"] for m in json.load(sys.stdin).get("mounts", []) if m.get("harness") == "cat-harness-tools"), ""))')"
+            # A layer below cat-harness-tools (cat-harness) keeps a lock that
+            # cannot mount it: same fall-back, to the index's pin.
+            if [ -z "$ref" ] && [[ "$from" != litlfred/folio-assistant* ]]; then
+              body="$(lock litlfred/folio-assistant "$INDEX_REF")"; from="litlfred/folio-assistant index.lock.json at $INDEX_REF ($GITHUB_REPOSITORY's lock mounts no cat-harness-tools)"
+              ref="$(printf '%s' "$body" | python3 -Ic 'import json,sys; print(next((m["ref"] for m in json.load(sys.stdin).get("mounts", []) if m.get("harness") == "cat-harness-tools"), ""))')"
+            fi
+            [ -n "$ref" ] || { echo "::error::$from pins no cat-harness-tools: mount it, or pass tools-ref"; exit 2; }
+          fi
+          echo "judging scripts: cat-harness-tools $ref"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
       - &judging-scripts
         name: The judging scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: litlfred/cat-harness-tools
-          ref: ${{ inputs.tools-ref }}
+          ref: ${{ steps.tools-lock.outputs.ref }}
           path: ci
           sparse-checkout: .github/scripts/layer-pr-checks
       # One pin time per run attempt, shared by every job through the cache
@@ -450,7 +503,7 @@ jobs:
         env:
           MODE: ${{ inputs.mode }}
           INDEX_REF: ${{ inputs.index-ref }}
-          TOOLS_REF: ${{ inputs.tools-ref }}
+          TOOLS_REF: ${{ steps.tools-lock.outputs.ref }}
         run: |
           set -euo pipefail
           at="$(cat "$RUNNER_TEMP/pin/at")"
@@ -1101,9 +1154,46 @@ jobs:
       # True on the first harness PR: main had no lock, so main's side is
       # the PR's own tree (see the base-root step).
       first-setup: ${{ steps.base-root.outputs.first-setup == 'true' }}
+      # Whether this push re-records the page-build writers (writer-record-hours).
+      record-writers: ${{ steps.writer-stamp.outputs.record }}
+      writer-bucket: ${{ steps.writer-bucket.outputs.bucket }}
     steps:
       # The same matrix as prepare-head's; a push has no prepare-head.
       - *shards
+      - *tools-lock
+      # Has a push recorded the page-build writers in this window? (bean fwtz;
+      # owner, 2026-11-01, card Q-CIS-2 A: off the main path.) A cache key per
+      # window of `writer-record-hours`: the first push in a window records
+      # and saves the stamp, the rest skip the 40-85 minute job.
+      - name: Is a writer record due? (a push)
+        id: writer-bucket
+        if: github.event_name == 'push' && inputs.writer-skip
+        env:
+          HOURS: ${{ inputs.writer-record-hours }}
+        run: |
+          set -euo pipefail
+          if [ "${HOURS:-0}" -le 0 ] 2>/dev/null; then echo "bucket=$GITHUB_SHA" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "bucket=$(( $(date -u +%s) / (3600 * HOURS) ))" >> "$GITHUB_OUTPUT"
+      - name: Was the writer record made in this window?
+        id: writer-stamp-lookup
+        if: steps.writer-bucket.outcome == 'success'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/writer-stamp
+          key: writer-record-stamp-v1-${{ github.repository }}-${{ steps.writer-bucket.outputs.bucket }}
+          lookup-only: true
+      - name: Record the writers on this push?
+        id: writer-stamp
+        if: steps.writer-bucket.outcome == 'success'
+        env:
+          HIT: ${{ steps.writer-stamp-lookup.outputs.cache-hit == 'true' }}
+        run: |
+          if [ "$HIT" = "true" ]; then
+            echo "the page-build writers were recorded in this ${{ inputs.writer-record-hours }}-hour window: not recorded again"
+            echo "record=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "record=true" >> "$GITHUB_OUTPUT"
+          fi
       - *judging-scripts
       - *pin-restore
       - *pin-record
@@ -1315,7 +1405,10 @@ jobs:
   # on it but the run's own end.
   record-writers:
     name: Record main's page-build scripts (bean fwtz)
-    if: inputs.writer-skip && github.event_name == 'push'
+    needs: [prepare-base]
+    if: >-
+      !cancelled() && inputs.writer-skip && github.event_name == 'push' &&
+      needs.prepare-base.outputs.record-writers == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -1324,6 +1417,7 @@ jobs:
     steps:
       - id: skip-prep
         run: echo "hit=false" >> "$GITHUB_OUTPUT"
+      - *tools-lock
       - *judging-scripts
       - *pin-restore
       - *pin-record
@@ -1348,6 +1442,18 @@ jobs:
       - *strace
       - *derive
       - *writer-cone-save
+      - name: Stamp this window's writer record (writer-record-hours)
+        if: steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
+        run: |
+          mkdir -p "$RUNNER_TEMP/writer-stamp"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/writer-stamp/sha"
+      - name: Keep the stamp
+        if: steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/writer-stamp
+          key: writer-record-stamp-v1-${{ github.repository }}-${{ needs.prepare-base.outputs.writer-bucket }}
 
   # Each side is `gate-shards` jobs, on separate machines (bean lpcs, step 3).
   # The ~300 gates ran one at a time, ~2500 s a side
@@ -1527,6 +1633,14 @@ jobs:
           ROOT_GATES=""
           [ "$MODE" = "layer" ] && ROOT_GATES="--record $RUNNER_TEMP/root-gates.json"
           python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json" $ROOT_GATES
+      # The artefact's own name, inside it: when the compare job's download
+      # matches ONE artefact (one shard, one side), the action unpacks it into
+      # `results/` itself rather than `results/<name>/`, and this file is how
+      # the compare job puts it back where merge-shards.py looks.
+      - name: Name this shard's artefact inside it
+        env:
+          NAME: results-${{ matrix.side }}-${{ matrix.shard }}
+        run: printf '%s\n' "$NAME" > "$RUNNER_TEMP/artefact-name"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: results-${{ matrix.side }}-${{ matrix.shard }}
@@ -1536,6 +1650,7 @@ jobs:
             ${{ runner.temp }}/gates.json
             ${{ runner.temp }}/gates-shard.json
             ${{ runner.temp }}/cone-records.json
+            ${{ runner.temp }}/artefact-name
 
   # `!cancelled()`, not the default `success()`: a shard or prepare job that
   # failed or timed out must make this job RED (its artefact is missing,
@@ -1622,6 +1737,21 @@ jobs:
         with:
           path: results
           pattern: results-*
+      # One shard on one side (`gate-shards: 1` with main's answer cached, or a
+      # push) is one artefact, which the action unpacks into `results/` itself.
+      # Put it under its own name, as with two or more (bootstrap-tools#68,
+      # run 41359773941: "the artefact results-head-1 is missing").
+      - name: Keep a lone artefact under its own name
+        if: steps.pins-only.outputs.only != 'true'
+        run: |
+          set -euo pipefail
+          if [ -f results/artefact-name ]; then
+            name="$(cat results/artefact-name)"
+            case "$name" in results-head-[0-9]*|results-base-[0-9]*) ;; *) echo "::error::results/artefact-name is '$name'"; exit 2 ;; esac
+            mkdir -p "results/$name"
+            find results -maxdepth 1 -type f -exec mv {} "results/$name/" \;
+            echo "one artefact, unpacked flat: moved under results/$name"
+          fi
       # Handed on by prepare-base, which restored it (cat-harness-tools#926):
       # an artifact of this run, never a cache entry that can be evicted
       # while the head shards run. `cached` is true only when it was handed.

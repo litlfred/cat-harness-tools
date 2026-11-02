@@ -78,6 +78,24 @@ export const THEME = {
 } as const;
 
 /**
+ * The handbook look (`theme: "handbook"` in `render-view.ts`): for a figure
+ * redrawn from a printed source, it is drawn close to the printed page instead of
+ * in layer colours. It has white boxes with teal outlines, pale panels and teal
+ * headings, and the title in ink above them. It is the one exception to "a fill
+ * says the layer", and it is chosen per figure (owner, 2026-11-01, Q-DTH1-9 B:
+ * "handbook look in shared theme"). The key then says shape and nesting, not colour.
+ */
+export const HANDBOOK = {
+  page: "#e9ebee",
+  panel: "#f1f7f8",
+  box: "#ffffff",
+  teal: "#13939f",
+  tealText: "#0f7f8a",
+  ink: "#1f2d4d",
+  muted: "#5b6577",
+} as const;
+
+/**
  * The same look for an HTML table: the theme's type and inks, a neutral
  * header, and `.layer-<Layer>` classes that tint a cell naming an ArchiMate
  * type (`layerClass`).

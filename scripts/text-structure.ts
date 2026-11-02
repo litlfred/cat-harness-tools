@@ -42,6 +42,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
+import { libraryEntryDir } from "./lib/library-entry-graphs.ts";
 
 import {
   STRUCTURE_FILENAME,
@@ -297,7 +298,9 @@ export function runRung(
     ...imagePaths.map((p) => ({ path: rel(p), bytes: readFileSync(p), image: true })),
   ];
   const o = buildEntry(files, docId, opts);
-  const dir = join(lib, docId);
+  // Re-ingest writes over the entry where it is filed (`library/<group>/<slug>/`,
+  // bean `6fez`); a new entry lands unfiled at `library/<slug>/`.
+  const dir = libraryEntryDir(lib, docId) ?? join(lib, docId);
   mkdirSync(join(dir, "sections"), { recursive: true });
   writeFileSync(join(dir, STRUCTURE_FILENAME), JSON.stringify(o.structure, null, 2) + "\n");
   for (const [sid, body] of o.sections) writeFileSync(join(dir, "sections", `${sid}.md`), body);

@@ -15,6 +15,7 @@ import {
   checkPostMergeRegen,
   FIXITY_CHECKS,
   inTargetScope,
+  JUDGED_AFTER_PUBLISH,
   missingPrerequisiteWriters,
   postMergePairs,
   publishTimeDeclarations,
@@ -663,6 +664,55 @@ describe("builtAtPublish outputs are never stale (bean folio-assistant-p7mb)", (
       expect(report.builtAtPublishChecks).toEqual(["slice:sqlite:check", "library:viz:check"]);
       // Clean check from audit pass ran ONCE (in the audit pass), never re-asked in fixpoint passes
       expect(calls.get("translation:block-qa:check")).toBe(1);
+    } finally {
+      done();
+    }
+  });
+
+  test("a gate judged after publish is reported with builtAtPublishChecks, an unlisted red one stays unrepaired", async () => {
+    const { repo, decls, done } = scratch();
+    try {
+      // `check:nav-names:check` has no writer and exits non-zero outside a publish
+      // (no railed page in the checkout); `slice:sqlite:check` stays red after its
+      // writer because it reads the payload tree only derive:publish builds.
+      const runner: Runner = (script) => {
+        if (script === "check:nav-names:check") return false;
+        if (script === "slice:sqlite:check") return false;
+        if (script === "slice:sqlite") return true;
+        return true;
+      };
+      const listed = await checkPostMergeRegen({
+        repoRoot: repo,
+        pairs: [
+          { check: "check:nav-names:check", writer: undefined },
+          { check: "slice:sqlite:check", writer: "slice:sqlite" },
+        ],
+        runner,
+        tracker: treeMoveTracker(repo, decls),
+        git: quietGit(),
+        gh: noPr,
+        createPr: true,
+      });
+      expect(JUDGED_AFTER_PUBLISH["check:nav-names:check"]).toBeDefined();
+      expect(listed.unrepairedChecks).toEqual([]);
+      expect(listed.staleChecks).toEqual([]);
+      expect([...listed.builtAtPublishChecks].sort()).toEqual(["check:nav-names:check", "slice:sqlite:check"]);
+      expect(listed.status).toBe("clean");
+      expect(listed.exitCode).toBe(0);
+
+      // The falsifier: the same red, under a name NOT in the list, is still unrepaired.
+      const unlisted = await checkPostMergeRegen({
+        repoRoot: repo,
+        pairs: [{ check: "other:gate:check", writer: "other:gate" }],
+        runner: (script) => script !== "other:gate:check",
+        tracker: treeMoveTracker(repo, decls),
+        git: quietGit(),
+        gh: noPr,
+        createPr: true,
+      });
+      expect(unlisted.unrepairedChecks).toEqual(["other:gate:check"]);
+      expect(unlisted.builtAtPublishChecks).toEqual([]);
+      expect(unlisted.exitCode).toBe(1);
     } finally {
       done();
     }

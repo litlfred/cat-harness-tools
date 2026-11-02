@@ -108,7 +108,7 @@ import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "../schemas/
 import { corpusDirectoriesForGraph, instanceConfigFor } from "../schemas/kg/harness-config.js";
 import { instanceDirectoryForGraph } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { entrySubgraphDirs, libraryEntryDirs, nonEntryDirs } from "./lib/library-entry-graphs.ts";
+import { entrySubgraphDirs, libraryEntryDir, libraryEntryDirs, nonEntryDirs } from "./lib/library-entry-graphs.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.ts";
 
 export type State = "met" | "unmet" | "not-derivable";
@@ -280,6 +280,10 @@ export const ENTRY_SIDECARS: readonly string[] = [
   // names the source it was read from by sha256, like every sidecar here.
   "docx-structure.json",
   "pdf-line-map.json",
+  // Stage B's proposals (`extract-candidates.py`, schema ingest-candidates/v1),
+  // which gen-library-jsonld turns into typed blocks: requirements, indicators
+  // and normative statements in a DAK or DTH source (cat-harness-tools#1356).
+  "candidates.json",
 ];
 
 /**
@@ -1775,7 +1779,9 @@ export function sidecarRootFor(
   libs: readonly string[] = corpusDirectoriesForGraph(root, "library"),
 ): string {
   for (const lib of libs) {
-    const entry = join(lib, slug);
+    // Flat or filed in a concern group (bean `6fez`): a filed entry is not at
+    // `<lib>/<slug>`, and missing it would write its sidecar to the wrong root.
+    const entry = libraryEntryDir(lib, slug) ?? join(lib, slug);
     if (existsSync(entry)) {
       const owner = instanceConfigFor(entry)?.root;
       if (owner && (owner === root || instanceDirectoryForGraph(owner, "qa") !== undefined)) {

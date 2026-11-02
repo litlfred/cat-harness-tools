@@ -1094,7 +1094,7 @@ describe("bean h11k — G5: translated block render path (Markdown & LaTeX)", ()
     };
 
     const mdOut = renderBlockMarkdown(entry, { locale: "fr", translations });
-    expect(mdOut).toContain("**Théorème.** *Théorème de Noether*");
+    expect(mdOut).toContain('<span class="fa-block-kind">Théorème</span> **Théorème de Noether.**');
     expect(mdOut).toContain(
       "Chaque symétrie différentiable de l'action $S$ engendre un courant conservé `j^mu`.",
     );
@@ -1190,7 +1190,7 @@ describe("bean h11k — G5: translated block render path (Markdown & LaTeX)", ()
       expect(built.markdown).toContain("# Directive clinique");
       expect(built.markdown).toContain("## Chapitre premier");
       expect(built.markdown).toContain("### Première section");
-      expect(built.markdown).toContain("**Définition.** *Continuité des soins*");
+      expect(built.markdown).toContain('<span class="fa-block-kind">Définition</span> **Continuité des soins.**');
       expect(built.markdown).toContain(
         "Les soins sont coordonnés entre `L1` et les [équipes cliniques](#sec:first) au taux $\\alpha*\\beta$.",
       );

@@ -22,7 +22,6 @@
  */
 import { existsSync, readdirSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 import { loadManifestValue, manifestPath } from "../pipeline/json-manifest.ts";
 
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
@@ -99,8 +98,6 @@ function publishedHref(src: DocsSource, slug: string): string {
 
 async function presentationsIn(src: DocsSource, out: Map<string, Presentation[]>, key: (source: string) => string): Promise<void> {
   for (const manifest of manifestsIn(src.srcDir)) {
-    // input-site: traced #e8ca3daa — a docs page manifest, loaded by path
-    inputSiteReached("process-presentations: computed load");
     const page = (await loadManifestValue(manifest)) as PageManifest;
     for (const node of page.nodes) {
       if (node.asset?.kind !== "bpmn") continue;
