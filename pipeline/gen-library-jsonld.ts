@@ -110,6 +110,7 @@ import {
   type LibraryTitleSource,
 } from "./library-title.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { presentGroupsIn } from "../scripts/concern-groups.ts";
 import { libraryEntryDirs } from "../scripts/lib/library-entry-graphs.ts";
 
 /** A resolved manifest title and where it came from (issue #1794). */
@@ -380,8 +381,18 @@ function iriFor(docId: string, instance: string | undefined): (rest: string) => 
  */
 export function libraryInstanceOf(entryDir: string): string | undefined {
   // Resolved first: from `library/<id>` the folder above is ".".
-  const instanceRoot = dirname(dirname(resolve(entryDir)));
-  return readDeclaration(instanceRoot)?.name;
+  const parent = dirname(resolve(entryDir));
+  const flat = readDeclaration(dirname(parent))?.name;
+  if (flat !== undefined) return flat;
+  // Filed in a concern group, `library/<group>/<id>` (bean `6fez`): the
+  // library is one folder higher. Only a group the library declares or
+  // inherits counts, so an entry sitting in some other folder still gets
+  // `undefined` rather than a guess. Measured 2026-11-02: cat-harness filed
+  // its 74 entries into groups and every manifest IRI fell back to the
+  // relative form, 5531 nodes stale.
+  const library = dirname(parent);
+  if (!presentGroupsIn(library, "library").has(basename(parent))) return undefined;
+  return readDeclaration(dirname(library))?.name;
 }
 
 /**

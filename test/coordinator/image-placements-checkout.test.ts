@@ -23,7 +23,7 @@ const REPO = join(ORIGIN_DIR, "../../..");
 describe("the real corpus is deduplicated, and stays that way", () => {
   const entries = [
     // measured 2026-09-24; the left number is what the corpus held BEFORE
-    { path: "cat-harness/library/arxiv-2312.07755v1", was: 84, now: 28 },
+    { path: "cat-harness/library/ui/arxiv-2312.07755v1", was: 84, now: 28 },
     { path: "who-iris/library/9789241509510-eng", was: 162, now: 103 },
     { path: "who-iris/library/9789241511766-eng", was: 99, now: 44 },
     { path: "who-iris/library/9789240010567-eng", was: 17, now: 11 },
