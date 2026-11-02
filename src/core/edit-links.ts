@@ -976,6 +976,12 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   // window.faBlockPanel.pane(id, { icon, title, render(label, body) }) and
   // its icon with .icon(box, id, count).
   const panes = { edit: { icon: "\u270e", title: "Help improve this section" } };
+  const LINK_CSS = "html.fa-bp .ba-moved{display:none!important}" +
+    "html.fa-bp .ba-heading{float:right;flex-direction:row;margin-left:.6rem;font-size:.8rem;font-weight:400}" +
+    ".ba-ic.ba-copied{border-color:#2e7d32;background:#2e7d32;color:#fff}" +
+    ".ba-ic{position:relative;width:28px;height:28px;padding:0;border:1px solid #8885;border-radius:7px;background:color-mix(in srgb,currentColor 5%,transparent);color:inherit;font-size:14px;line-height:1;cursor:pointer}" +
+    "html.fa-bp .block-actions.ba-heading{display:flex;gap:4px;opacity:.3}" +
+    "html.fa-bp h2:hover>.ba-heading,html.fa-bp h3:hover>.ba-heading,html.fa-bp h4:hover>.ba-heading,html.fa-bp .ba-heading:focus-within{opacity:1}";
   const EXPLAIN = {
     suggest: ["\u270d Suggest a change", "Propose new wording in an editor. It is sent as a GitHub issue with your change, and the editors decide on it."],
     feedback: ["\ud83d\udce3 Give feedback", "Raise a question, concern or error without proposing text. Opens a GitHub issue that names this section."],
@@ -1010,7 +1016,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     document.querySelectorAll('.ba-ic[aria-expanded="true"]').forEach((b) => b.setAttribute("aria-expanded", "false"));
     box.querySelectorAll(".ba-ic").forEach((b) => b.setAttribute("aria-expanded", String(b.dataset.pane === id)));
     const tabs = el("div", { className: "bp-tabs" });
-    for (const b of box.querySelectorAll(".ba-ic")) {
+    for (const b of box.querySelectorAll(".ba-ic:not(.ba-link)")) {
       const t = b.cloneNode(true);
       t.setAttribute("aria-expanded", String(b.dataset.pane === id));
       t.onclick = (e) => { e.stopPropagation(); open(box, b.dataset.pane, from); };
@@ -1049,17 +1055,60 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     b.setAttribute("aria-expanded", "false");
     b.append(el("span", { textContent: p.icon || "\u2022" }));
     if (count) b.append(el("b", { className: "ba-n", textContent: String(count) }));
-    // ✎ last; every other pane's icon above it.
+    // 🔗 first, ✎ last; every other pane's icon between them.
     if (id === "edit") box.append(b);
-    else box.insertBefore(b, box.querySelector('.ba-ic[data-pane="edit"]') || box.firstChild);
+    else box.insertBefore(b, box.querySelector('.ba-ic[data-pane="edit"]') || null);
   };
+  // 🔗 Link (owner, 2026-11-02: "should be an anchor link (on right icon
+  // for the content block that has feedback edit etc)", and the heading
+  // anchors move there too). First in every group; it copies the block's or
+  // heading's address and puts it in the address bar instead of opening a pane.
+  const linkIcon = (box, id, what) => {
+    if (!id || box.querySelector('.ba-ic[data-pane="link"]')) return;
+    const b = el("button", { className: "ba-ic ba-link", type: "button", title: "Copy link to this " + what });
+    b.dataset.pane = "link";
+    b.dataset.anchor = id;
+    b.setAttribute("aria-label", "Copy link to this " + what);
+    b.append(el("span", { textContent: "\ud83d\udd17" }));
+    box.insertBefore(b, box.firstChild);
+  };
+  const copyLink = (b) => {
+    const url = location.href.replace(/#.*$/, "") + "#" + encodeURIComponent(b.dataset.anchor).replace(/%3A/g, ":").replace(/%2F/g, "/");
+    try { history.replaceState(null, "", url); } catch (x) { /* the copy still works */ }
+    const done = (t) => { b.title = t; b.classList.add("ba-copied"); setTimeout(() => { b.classList.remove("ba-copied"); b.title = "Copy link"; }, 2000); };
+    try { navigator.clipboard.writeText(url).then(() => done("Link copied"), () => done(url)); } catch (x) { done(url); }
+  };
+  const HEADINGS = ".main-content h2[id], .main-content h3[id], .main-content h4[id], main h2[id], main h3[id], main h4[id]";
   const icons = (root) => {
     const r = root || document;
     if (!r || typeof r.querySelectorAll !== "function") return;
-    for (const box of r.querySelectorAll(".block-actions")) if (box.querySelector("a[data-fa-link]")) icon(box, "edit");
+    for (const box of r.querySelectorAll(".block-actions")) {
+      if (box.querySelector("a[data-fa-link]")) icon(box, "edit");
+      if (box.closest(".fa-block-panel")) continue;
+      const label = box.dataset.block || "";
+      if (label && document.getElementById(label)) {
+        linkIcon(box, label, "block");
+        // The block's own anchor link, if the build drew one, now lives in the group.
+        for (const a of document.querySelectorAll("a.block-anchor")) if (a.getAttribute("href") === "#" + label) a.classList.add("ba-moved");
+      }
+    }
+    // Every heading with an id gets the group too, and the theme's anchor
+    // beside it is hidden: one place for a link on every page.
+    for (const h of r.querySelectorAll(HEADINGS)) {
+      if (h.closest(".fa-block-panel, nav, .side-bar")) continue;
+      let box = h.querySelector(":scope > .block-actions");
+      if (!box) {
+        box = el("span", { className: "block-actions ba-heading" });
+        box.dataset.block = h.id;
+        h.insertBefore(box, h.firstChild);
+      }
+      linkIcon(box, h.id, "section");
+      h.querySelectorAll(":scope > a.anchor-heading").forEach((a) => a.classList.add("ba-moved"));
+    }
   };
   document.addEventListener("click", (e) => {
     const b = e.target.closest && e.target.closest(".ba-ic");
+    if (b && b.dataset.pane === "link") { e.preventDefault(); e.stopPropagation(); copyLink(b); return; }
     if (b && !(panel && panel.contains(b))) {
       e.preventDefault();
       const box = b.closest(".block-actions");
@@ -1072,6 +1121,10 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && panel && panel.classList.contains("open") && !document.querySelector("dialog[open]")) close(); });
   if (typeof document.documentElement === "object" && document.documentElement && document.documentElement.classList) {
     document.documentElement.classList.add("fa-bp");
+    if (!document.getElementById("fa-bp-link-css")) {
+      const st = el("style", { id: "fa-bp-link-css", textContent: LINK_CSS });
+      (document.head || document.documentElement).append(st);
+    }
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => icons());
     else icons();
   }
