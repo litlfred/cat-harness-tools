@@ -23,10 +23,12 @@
  * ## Where a link points
  *
  * At the node's release address, the rule `check:node-iris` enforces:
- * `<iriBase>v<major>/<path in its knowledge graph>[#fragment]`, read through
+ * `<iriBase>v<major>/<path in its knowledge graph>[/<node>]`, read through
  * the OWNING instance's declaration (`releaseIris`). An actor is
- * `scenarios/actors/<id>`, a role `scenarios/roles#<id>`, a plan
- * `<dir>/<process file stem>#<task>`.
+ * `scenarios/actors/<id>`, a role `scenarios/roles/<id>`, a plan step
+ * `<dir>/<process file stem>/<task>`. A node inside a document is a path
+ * segment under it, never a `#` fragment, so each has its own page (#1379,
+ * card Q-SLASH-2 B; IRIs use slashes, never `#`).
  *
  * **Three states, never two.** When the owner is found and declares an
  * `iriBase`, the value is a link. When it is found and declares none, or is not
@@ -227,7 +229,7 @@ export function addressBook(repo: string, mint?: SubjectMinter): AddressBook {
     const r = releaseIris(decl ?? undefined);
     if (!r) return { unaddressed: `${decl?.name ?? basename(o.root)} declares no iriBase, so ${o.path} has no release address` };
     const frag = fragment ?? o.fragment;
-    return { iri: `${releaseIri(r, o.path, "agent")}${frag ? `#${frag}` : ""}` };
+    return { iri: `${releaseIri(r, o.path, "agent")}${frag ? `/${frag}` : ""}` };
   };
 
   // `prov:used` also names tool releases (`<name>@<version>` or

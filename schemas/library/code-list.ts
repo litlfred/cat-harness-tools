@@ -164,12 +164,13 @@ export async function codeListDirs(instanceRoot: string): Promise<string[]> {
 /**
  * A code list as SKOS: the scheme and one concept per code.
  *
- * `base` is the document IRI; each scheme is `<base>#<id>` and each concept
- * `<base>#<id>/<code>`, so a code is addressable and two lists may share a
- * code without sharing a concept.
+ * `base` is the document IRI; each scheme is `<base>/<id>` and each concept
+ * `<base>/<id>/<code>`, so a code is addressable and two lists may share a
+ * code without sharing a concept. Slashes, never `#`, so each scheme can have
+ * its own page (#1379).
  */
 export function codeListToSkos(list: CodeList, base: string): Record<string, unknown>[] {
-  const scheme = `${base}#${list.id}`;
+  const scheme = `${base}/${list.id}`;
   const src = (s?: { href?: string; note?: string }) =>
     s === undefined ? undefined : s.href !== undefined ? { "@id": s.href } : s.note;
   return [
