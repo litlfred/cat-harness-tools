@@ -991,7 +991,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   const ON = "{opacity:1;filter:none}";
   const LINK_CSS = "html.fa-bp .ba-moved{display:none!important}" +
     // A lazy page fills a block after its box: its own 🔗 is hidden by place.
-    "html.fa-bp p:has(>.block-actions)+.fa-blk a.block-anchor{display:none}" +
+    "html.fa-bp .ba-has+.fa-blk a.block-anchor{display:none}" +
     ".ba-ic.ba-copied{border-color:#2e7d32;background:#2e7d32;color:#fff}" +
     ".ba-ic{position:relative;width:28px;height:28px;padding:0;border:1px solid #8885;border-radius:7px;background:color-mix(in srgb,currentColor 5%,transparent);color:inherit;font-size:14px;line-height:1;cursor:pointer}" +
     "html.fa-bp .block-actions{opacity:1}" +
@@ -1142,6 +1142,8 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       const label = box.dataset.block || "";
       if (label && document.getElementById(label)) {
         linkIcon(box, label, "block");
+        // Marks the block's place, which stays when the panel borrows the box.
+        (box.parentElement && box.parentElement.tagName === "P" ? box.parentElement : box).classList.add("ba-has");
         // The block's own anchor link, if the build drew one, now lives in the group.
         for (const a of document.querySelectorAll("a.block-anchor")) if (a.getAttribute("href") === "#" + label) a.classList.add("ba-moved");
       }
