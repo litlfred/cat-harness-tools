@@ -549,10 +549,12 @@ export async function workflowCompleteAnswer(
   // `instanceCompleted` stays the PARENT's status on purpose: a bean is
   // resolved when the whole process finished, not when one phase did.
   const authz = lastVerdict(next, node);
-  const op = findInModel(model, node)?.model.nodes.get(node)?.workPlanOp;
+  const stepNode = findInModel(model, node)?.model.nodes.get(node);
+  const op = stepNode?.workPlanOp;
   const plan = op
     ? applyWorkPlanOp(root, next.bean, op, {
         note,
+        claimIfNotStarted: stepNode?.worksBean === true,
         // `resolve` also fires when only archive steps are left, so a
         // diagram can end in one (`onlyArchiveLeft`). `archive` itself
         // still needs the instance to have completed.

@@ -270,10 +270,10 @@ export function renderBlockMarkdown(
   return [`<div class="fa-numbered fa-numbered-${block.kind}" markdown="1">`, "", ...lines, "", "</div>"].join("\n");
 }
 
-/** The block's own identifier, when its fields carry one (`FR-AN-01`, `NFR-01`). */
+/** The block's own identifier, when its fields carry one (`FR-AN-01`, `NFR-01`, an indicator's `1-01`). */
 function blockId(block: Block): string | undefined {
   const meta = "meta" in block && block.meta && typeof block.meta === "object" ? (block.meta as Record<string, unknown>) : {};
-  for (const k of ["requirementId", "id"]) {
+  for (const k of ["requirementId", "indicatorId", "id"]) {
     const v = meta[k];
     if (typeof v === "string" && v.trim() !== "") return v.trim();
   }
@@ -348,11 +348,51 @@ function structuredBlockMarkdown(
     rest = cut < 0 ? "" : rest.slice(0, cut).trimEnd();
   }
 
+  if ((block.kind as string) === "indicator") indicatorParts(block, meta, (html) => (rest = rest ? `${rest}\n\n${html}` : html));
+
   lines.push(runIn !== undefined && runIn !== "" ? `${head.join(" ")} ${runIn}` : head.join(" "));
   if (rest) lines.push("", rest);
   if (caption && title && caption !== title) lines.push("", `*${caption}*`);
   if (meta.length > 0) lines.push("", `<div class="fa-block-meta" markdown="1">`, "", meta.join("\n\n"), "", "</div>");
   return [`<div class="fa-block fa-block-${block.kind}" markdown="1">`, "", ...lines, "", "</div>"].join("\n");
+}
+
+/** An indicator's fields, read from its `meta` (Q-IND-1 A, 2026-11-02). */
+const INDICATOR_META: ReadonlyArray<readonly [key: string, label: string]> = [
+  ["module", "Module"],
+  ["disaggregation", "Disaggregation"],
+  ["dataSources", "Data sources"],
+];
+
+/**
+ * An indicator card shows its calculation as a fraction, numerator over
+ * denominator (times its unit), and its module, disaggregation and data
+ * sources as metadata lines. Owner, 2026-11-02: "do we have node kind /
+ * viewers for indicators yet?"; card Q-IND-1 = A. A field the text already
+ * gives as a `*Numerator:*`-style line is not repeated.
+ */
+function indicatorParts(block: Block, meta: string[], addBody: (html: string) => void): void {
+  const m = "meta" in block && block.meta && typeof block.meta === "object" ? (block.meta as Record<string, unknown>) : {};
+  const str = (k: string): string | undefined => (typeof m[k] === "string" && (m[k] as string).trim() !== "" ? (m[k] as string).trim() : undefined);
+  const said = (label: string): boolean => meta.some((l) => l.toLowerCase().startsWith(`*${label.toLowerCase()}:*`));
+  const num = str("numerator");
+  const den = str("denominator");
+  if (num && den && !said("Numerator") && !said("Denominator")) {
+    const unit = str("unit");
+    addBody(
+      `<div class="fa-block-ratio" role="group" aria-label="Calculation">` +
+        `<div class="fa-block-ratio-frac"><span class="fa-block-ratio-num"><span class="fa-block-ratio-label">Numerator</span> ${escHtml(num)}</span>` +
+        `<span class="fa-block-ratio-den"><span class="fa-block-ratio-label">Denominator</span> ${escHtml(den)}</span></div>` +
+        (unit ? `<span class="fa-block-ratio-unit">\u00d7 ${escHtml(unit)}</span>` : "") +
+        `</div>`,
+    );
+  }
+  // One metadata line, like a requirement's "*Priority:* … *Linked use cases:* …".
+  const line = INDICATOR_META.flatMap(([k, label]) => {
+    const v = str(k);
+    return v && !said(label) ? [`*${label}:* ${v}`] : [];
+  }).join(" \u00b7 ");
+  if (line) meta.push(line);
 }
 
 /**

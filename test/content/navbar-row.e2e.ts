@@ -513,13 +513,14 @@ test.describe("at rest the strip carries marks and nothing else", () => {
     // navbar". Kept as a guard: the avatar must still take its clicks. A
     // click on a CLOSED bar (no hover: dispatched, so the pointer does not
     // move onto it) pins it open; an open bar's avatar is the home link
-    // (owner, 2026-10-30).
+    // (owner, 2026-10-30), and says so. Its href is the theme's, so the
+    // fixture's `#home` is what it keeps; "goes home" is tested below.
     await load(page, CUSTOM);
     await expect(page.locator(".side-bar .fa-glass-handle")).toHaveCount(0);
     await expect(page.locator("body > .fa-glass-handle")).toHaveCount(1);
     await page.locator(".side-bar .site-title").dispatchEvent("click");
     await expect(page.locator("#fa-nav-open")).toBeChecked();
-    await expect(page.locator(".side-bar .site-title")).toHaveAttribute("href", /\/$/);
+    await expect(page.locator(".side-bar .site-title")).toHaveAttribute("title", "Go to the landing page");
   });
 
   test("NO text region is visible until the bar is opened", async ({ page }) => {
@@ -760,20 +761,28 @@ test.describe("the navbar can be closed, and the hover peek comes back", () => {
     await expect(avatar(page)).toHaveAttribute("aria-expanded", "false");
   });
 
-  test("closing by the avatar is NOT remembered -- the peek returns once the pointer leaves", async ({ page }) => {
+  /* Owner, 2026-10-30: an open bar's avatar goes home, so the avatar no
+   * longer closes the bar. Owner, 2026-11-02 (Q-FMR-11 A): a bar pinned open
+   * unpins when the MOUSE leaves it, and goes back to the hover peek. A pin
+   * comes from a click on a CLOSED bar with no hover, which is the touch
+   * case, so it is dispatched here rather than clicked: a real mouse would
+   * hover the strip open first, and its click would go home. */
+  const pin = async (p: import("@playwright/test").Page) => {
+    await avatar(p).dispatchEvent("click");
+    await expect(p.locator("#fa-nav-open")).toBeChecked();
+    await expect(avatar(p)).toHaveAttribute("aria-expanded", "true");
+  };
+
+  test("a pin lifts when the mouse leaves the bar, and nothing is stored", async ({ page }) => {
     await load(page, CUSTOM);
-    await avatar(page).click();
-    await expect(avatar(page)).toHaveAttribute("aria-expanded", "true");
-    await avatar(page).click();
-    expect(await page.locator("#fa-nav-open").isChecked()).toBe(false);
-    // The close collapses the bar out from under the avatar's centre, so the
-    // pointer has usually left already; either way nothing is stored.
+    await pin(page);
+    await page.hover(".side-bar .site-nav");
+    await page.mouse.move(900, 400);
+    await expect(page.locator("#fa-nav-open")).not.toBeChecked();
+    await expect(avatar(page)).toHaveAttribute("aria-expanded", "false");
     await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeLessThan(100);
     expect(await page.evaluate(() => window.localStorage.getItem("fa-nav"))).toBeNull();
-    await page.mouse.move(900, 400);
     expect(await page.evaluate(() => document.documentElement.getAttribute("data-fa-nav"))).toBeNull();
-    await page.hover(".side-bar .site-nav");
-    await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeGreaterThan(200);
   });
 
   test("a stay-closed an earlier visit STORED is cleared, not obeyed", async ({ page }) => {
@@ -787,68 +796,44 @@ test.describe("the navbar can be closed, and the hover peek comes back", () => {
     await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeGreaterThan(200);
   });
 
-  test("closed means the POINTER stops opening it -- and only the pointer", async ({ page }) => {
+  test("after the pin lifts, the hover peek comes back -- and so does keyboard focus", async ({ page }) => {
     await load(page, CUSTOM);
-    await avatar(page).click();
-    await avatar(page).click();
-    await page.hover(".side-bar .fa-nav-icons");
-    await page.waitForTimeout(250);
-    const strip = await page.locator(".side-bar").evaluate((n) => Math.round(n.getBoundingClientRect().width));
-    expect(strip).toBeLessThan(100);
+    await pin(page);
+    await page.hover(".side-bar .site-nav");
+    await page.mouse.move(900, 400);
+    await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeLessThan(100);
+    await page.hover(".side-bar .site-nav");
+    await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeGreaterThan(200);
+    await page.mouse.move(900, 400);
+    await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeLessThan(100);
 
-    // A KEYBOARD READER IS NOT TRAPPED. Focus still opens it -- suppressing
-    // that would leave them tabbing through links they cannot see.
-    //
-    // KEYBOARD focus, so it is `:focus-visible`: the pointer is still parked on
-    // the icon column, where `.fa-nav-tip-hold` (#1805) holds the strip shut
-    // for a POINTER and lets go for a keyboard. A bare `.focus()` after two
-    // clicks is pointer-modality focus, which is not what a keyboard reader
-    // makes; a key press first gives it the keyboard's modality.
+    // A KEYBOARD READER IS NOT TRAPPED: keyboard focus still opens it. A key
+    // press first gives the focus the keyboard's modality (`:focus-visible`).
     await page.keyboard.press("Shift");
     await page.locator(".side-bar .site-nav a").first().focus();
     expect(await page.evaluate(() => document.activeElement!.matches(":focus-visible"))).toBe(true);
-    await page.waitForTimeout(250);
-    const focused = await page.locator(".side-bar").evaluate((n) => Math.round(n.getBoundingClientRect().width));
-    expect(focused).toBeGreaterThan(200);
+    await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeGreaterThan(200);
   });
 
-  test("the avatar LIFTS it -- an action whose inverse is unreachable is not a toggle", async ({ page }) => {
-    // `l4zi`. Without this the bar could be closed once and never peek again.
-    //
-    // The hold lasts only while the pointer is on the bar (cat-harness#169),
-    // so the close is made where the bar still IS once it has collapsed: 20px
-    // in, on the strip. A click at the avatar's centre (x=132 of the open
-    // 264px bar) collapses the bar out from under the pointer, the pointerleave
-    // that follows releases the hold within milliseconds -- measured: closed
-    // at 698ms, leave at 700ms, released at 701ms -- and there is nothing left
-    // for the avatar to lift. That case is the "NOT remembered" test above.
+  test("a finger leaving does NOT lift the pin -- the tap that pinned it would undo itself", async ({ page }) => {
     await load(page, CUSTOM);
-    const onStrip = async () => {
-      const b = (await avatar(page).boundingBox())!;
-      await avatar(page).click({ position: { x: 20 - b.x, y: b.height / 2 } });
-    };
-    await onStrip();
-    await expect(avatar(page)).toHaveAttribute("aria-expanded", "true");
-    await onStrip();
-    await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeLessThan(100);
-    expect(await page.evaluate(() => document.documentElement.getAttribute("data-fa-nav"))).toBe("closed");
-    await onStrip();
-    expect(await page.evaluate(() => document.documentElement.getAttribute("data-fa-nav"))).toBeNull();
-    await expect(avatar(page)).toHaveAttribute("aria-expanded", "true");
-    expect(await page.evaluate(() => window.localStorage.getItem("fa-nav"))).toBeNull();
-  });
-
-  test("by KEYBOARD too -- Enter on the focused avatar opens and closes", async ({ page }) => {
-    await load(page, CUSTOM);
-    await avatar(page).focus();
-    await page.keyboard.press("Enter");
+    await pin(page);
+    await page.locator(".side-bar").evaluate((bar) => {
+      bar.dispatchEvent(new PointerEvent("pointerleave", { pointerType: "touch", bubbles: false }));
+    });
     await expect(page.locator("#fa-nav-open")).toBeChecked();
+  });
+
+  test("by KEYBOARD, Enter on the focused avatar goes home rather than toggling", async ({ page }) => {
+    await load(page, CUSTOM);
+    await page.keyboard.press("Shift");
     await avatar(page).focus();
     await page.keyboard.press("Enter");
+    await expect.poll(() => page.url()).toBe("http://navbar.fixture/nav#home");
     await expect(page.locator("#fa-nav-open")).not.toBeChecked();
   });
 
-  test("a browser that refuses localStorage still gets the close", async ({ page }) => {
+  test("a browser that refuses localStorage still pins and unpins", async ({ page }) => {
     // Nothing is stored any more, but the load still READS storage to clear an
     // old stay-closed, so a throwing localStorage must not break the bar.
     await page.addInitScript(() => {
@@ -858,9 +843,10 @@ test.describe("the navbar can be closed, and the hover peek comes back", () => {
     });
     const { errors } = await load(page, CUSTOM);
     expect(errors).toEqual([]);
-    await avatar(page).click();
-    await avatar(page).click();
-    expect(await page.locator("#fa-nav-open").isChecked()).toBe(false);
+    await pin(page);
+    await page.hover(".side-bar .site-nav");
+    await page.mouse.move(900, 400);
+    await expect(page.locator("#fa-nav-open")).not.toBeChecked();
     await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeLessThan(100);
   });
 });
@@ -897,26 +883,23 @@ test.describe("a sub-graph is drawn INSIDE its parent's row, folded — issue #1
   });
 });
 
-test.describe("the avatar opens and closes the bar — owner, 2026-09-27", () => {
-  // "navbar starts hidden, click avatar opens for a split second then returns
-  // to hidden": the avatar was the home link, so a click reloaded the page.
-  test("one click pins the bar open, a second closes it, and neither navigates", async ({ page }) => {
+test.describe("the avatar pins a closed bar and goes home from an open one — owner, 2026-09-27 and 2026-10-30", () => {
+  // 2026-09-27: "navbar starts hidden, click avatar opens for a split second
+  // then returns to hidden": the avatar was the home link, so a click on a
+  // closed bar reloaded the page. 2026-10-30: "who eblmen not clicable to go
+  // to landing page": once the bar is open, the avatar IS the home link.
+  test("a click on a closed bar pins it without navigating; a click on the open bar goes home", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await load(page, CUSTOM);
-    await page.locator(".site-title").evaluate((a) => a.setAttribute("href", "http://navbar.fixture/elsewhere"));
     const avatar = page.locator(".side-bar .site-title");
     await expect(avatar).toHaveAttribute("aria-expanded", "false");
-    await avatar.click();
+    await avatar.dispatchEvent("click");
     expect(page.url()).toBe("http://navbar.fixture/nav");
     expect(await page.locator("#fa-nav-open").isChecked()).toBe(true);
     await expect(avatar).toHaveAttribute("aria-expanded", "true");
     await avatar.click();
-    expect(page.url()).toBe("http://navbar.fixture/nav");
-    expect(await page.locator("#fa-nav-open").isChecked()).toBe(false);
+    await expect.poll(() => page.url()).toBe("http://navbar.fixture/nav#home");
     expect(await page.evaluate(() => localStorage.getItem("fa-nav"))).toBeNull();
-    // Closed means closed: not held open by the avatar's focus.
-    await page.mouse.move(900, 400);
-    await expect.poll(async () => (await page.locator(".side-bar").boundingBox())!.width).toBeLessThan(100);
   });
 });
 
