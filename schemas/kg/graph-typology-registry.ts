@@ -2252,6 +2252,11 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       // An entry's LSI keywords, per section and per document (issue #2302).
       // Derived from the whole library's term weights by library-keywords.ts.
       "folio-keywords/v1": { generated: true },
+      // Stage B's proposals for an entry (`extract-candidates.py`): typed
+      // candidates gen-library-jsonld turns into blocks, among them the
+      // requirements, indicators and normative statements of a DAK or DTH
+      // source (cat-harness-tools#1356, owner 2026-11-01).
+      "ingest-candidates/v1": {},
       // What the site mount must not publish from this directory (bean `cw35`).
       // Written by the instance's generator from its licence gates; the mount
       // validates it with this schema and refuses to mount if it cannot.

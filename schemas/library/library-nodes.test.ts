@@ -45,3 +45,47 @@ describe("library JSON-LD node families", () => {
     expect(LibrarySourceDocumentSchema.safeParse({ ...manifest, "@type": ["doco:Section"] }).success).toBe(false);
   });
 });
+
+describe("a Stage B requirement block (cat-harness-tools#1356)", () => {
+  const req = {
+    ...untyped,
+    "@id": "library/d/blocks/indicator-s024-01",
+    kind: "indicator",
+    title: "Density of health workers per 10 000 population",
+    text: "indicator-s024-01.md",
+    derivedFrom: "library/d/sections/s024",
+  };
+
+  test("a kind with no DoCO co-type has one @type, and its meta is the source's facts", () => {
+    const typed = { ...req, "@type": ["smart-base:Indicator"], meta: { source_number: "1-01", source_kind: "nhwa-indicator" } };
+    expect(LibraryBlockSchema.safeParse(familyBody(typed)).success).toBe(true);
+    // The generic class, when no mounted layer types the kind.
+    expect(LibraryBlockSchema.safeParse(familyBody({ ...req, "@type": [LIBRARY_NODE_FAMILIES.block] })).success).toBe(true);
+  });
+
+  test("meta holds strings only, and a third type is still refused", () => {
+    expect(LibraryBlockSchema.safeParse(familyBody({ ...req, "@type": ["smart-base:Indicator"], meta: { n: 1 } })).success).toBe(false);
+    expect(LibraryBlockSchema.safeParse(familyBody({ ...block, "@type": ["a:B", "doco:Section", "c:D"] })).success).toBe(false);
+  });
+});
+
+describe("candidates.json (ingest-candidates/v1)", () => {
+  test("what extract-candidates writes, and a hand-written record without whole-document fields, both parse", async () => {
+    const { IngestCandidatesSchema } = await import("./ingest-candidates.ts");
+    const cand = { kind: "indicator", number: "1-01", name: "Density", statement: "Density …", section_file: "sections/sec-023-x.md", pages: "51-53", formalization_candidate: false, route_to: "l2-dak-authoring" };
+    expect(IngestCandidatesSchema.safeParse({ _schema: "ingest-candidates/v1", doc_id: "d", candidates: [cand] }).success).toBe(true);
+    expect(
+      IngestCandidatesSchema.safeParse({
+        _schema: "ingest-candidates/v1", doc_id: "d", document_class: "who-l1", validated: false, aspects: ["requirements"],
+        disposition: "proposals only", summary: { candidates: 1, by_kind: { indicator: 1 }, formalization_candidates: 0 },
+        candidates: [{ ...cand, aspect: "requirements", grade_nearby: false }],
+      }).success,
+    ).toBe(true);
+    expect(IngestCandidatesSchema.safeParse({ _schema: "ingest-candidates/v1", candidates: [{ ...cand, section_file: "x.md" }] }).success).toBe(false);
+  });
+
+  test("the family resolves for the library kind", async () => {
+    const fams = new Map((await resolveNodeSchemas("library", HARNESS)).map((f) => [f.tag, f.state]));
+    expect(fams.get("ingest-candidates/v1")).toBe("resolved");
+  });
+});

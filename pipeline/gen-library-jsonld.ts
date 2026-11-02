@@ -72,6 +72,9 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { basename, dirname, join, resolve } from "path";
 import { typesForKind } from "../schemas/kg/jsonld.ts";
+import { ContributionRegistry, type FolioContribution } from "../schemas/content/contributions.ts";
+import { loadContributionsSync } from "../schemas/kg/harness-config.ts";
+import { contributionsRoot } from "./repo-root";
 import {
   defaultInstancePrefixes,
   documentContext,
@@ -173,7 +176,13 @@ interface Candidate {
   kind: string;
   statement?: string;
   name?: string | null;
+  /** The source's OWN number for the item ("FXREQ.001", "1-01"), never one an agent made up. */
   number?: string | null;
+  /** What the source calls it ("nhwa-indicator", "good-practice-statement"). */
+  source_kind?: string | null;
+  /** The aspect extractor that proposed it (`extract-candidates.py`). */
+  aspect?: string | null;
+  strength?: string | null;
   section_file?: string;
   section_title?: string;
   pages?: string;
@@ -490,7 +499,10 @@ export function buildDocumentNodes(
         path: `blocks/${bid}.jsonld`,
         content: node({
           "@id": iri(`blocks/${bid}`),
-          "@type": typesForKind(c.kind),
+          // A dependency's kind (smart-base's `functional-requirement`,
+          // `indicator`) is typed through the contribution registry; without
+          // it such a node had no `@type` at all.
+          "@type": candidateTypes(c.kind),
           kind: c.kind,
           title: c.name ?? undefined,
           pageStart: sec.page_start ?? undefined,
@@ -499,6 +511,7 @@ export function buildDocumentNodes(
           derivedFrom: iri(`sections/${key}`),
           sourceDocument: iri("manifest"),
           provenance: "ingested",
+          meta: candidateMeta(c),
         }),
       });
       if (statement) out.push({ path: `blocks/${bid}.md`, content: `${statement}\n` });
@@ -623,6 +636,55 @@ function libraryPrefixes(): Map<string, string> {
     contentPrefixes = new Map([...defaultInstancePrefixes(), ...instancePrefixes(root, root)]);
   }
   return contentPrefixes;
+}
+
+let contributions: ContributionRegistry | null | undefined;
+
+/**
+ * The block kinds the content repository's dependencies contribute — the DAK
+ * layer's `functional-requirement`, `non-functional-requirement`, `indicator`
+ * and the rest. Loaded once, as `gen-block-jsonld` loads them. A checkout
+ * whose contributions cannot be loaded types only the core kinds, which is
+ * what it did before.
+ */
+function contributedKinds(): ContributionRegistry | undefined {
+  if (contributions === undefined) {
+    try {
+      contributions = loadContributionsSync<FolioContribution, ContributionRegistry>(
+        contributionsRoot(),
+        new ContributionRegistry(),
+      );
+    } catch {
+      contributions = null;
+    }
+  }
+  return contributions ?? undefined;
+}
+
+/**
+ * A candidate's `@type`: its kind's, through the contribution registry, or the
+ * generic library block class when no mounted layer types the kind. An
+ * L1 library (who-iris) may hold a smart-base `indicator` without mounting
+ * smart-base; its node is then still a typed block, never one with no type.
+ */
+export function candidateTypes(kind: string): string[] {
+  const types = typesForKind(kind, contributedKinds());
+  return types.length ? types : [termCurie("Block")];
+}
+
+/**
+ * What a candidate says about ITSELF that a reader of the node needs: the
+ * source's own number, what the source calls it, its strength, and which
+ * aspect proposed it. `undefined` when it says none of these, so a node built
+ * from a candidate without them is byte-identical to before.
+ */
+export function candidateMeta(c: Candidate): Record<string, string> | undefined {
+  const m: Record<string, string> = {};
+  if (c.number) m.source_number = c.number;
+  if (c.source_kind) m.source_kind = c.source_kind;
+  if (c.strength) m.strength = c.strength;
+  if (c.aspect) m.aspect = c.aspect;
+  return Object.keys(m).length ? m : undefined;
 }
 
 /** Serialise, dropping undefined so output is byte-stable. */
