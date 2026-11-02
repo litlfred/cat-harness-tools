@@ -28,8 +28,11 @@
  * has no workflows to scan. What stays here is the gate's own behaviour.
  */
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { auditWorkflow, readPinFile } from "../../check-bun-pin.ts";
+import { auditWorkflow, bunPin, PIN_FILE, readPinFile, resolveReusable, reusableCalls } from "../../check-bun-pin.ts";
 
 /** A workflow with one `setup-bun` step, pinned to `v`, or unpinned. */
 const wf = (v?: string, uses = "oven-sh/setup-bun@v2"): unknown => ({
@@ -135,5 +138,72 @@ describe("auditWorkflow — falsified by breaking", () => {
   test("a workflow with no jobs, and a null document, yield nothing rather than throwing", () => {
     expect(auditWorkflow("a.yml", { jobs: {} }, "1.3.14")).toEqual({ sites: 0, findings: [] });
     expect(auditWorkflow("a.yml", null, "1.3.14")).toEqual({ sites: 0, findings: [] });
+  });
+});
+
+describe("reusable workflows — a site that only calls them (re-pin wave 5)", () => {
+  /** A checkout with `.bun-version`, the given workflows, and optionally a mounted layer's workflows. */
+  const checkout = (files: Record<string, string>): string => {
+    const root = mkdtempSync(join(tmpdir(), "bun-pin-"));
+    mkdirSync(join(root, "cat-harness"), { recursive: true });
+    writeFileSync(join(root, PIN_FILE), "1.4.4\n");
+    for (const [rel, text] of Object.entries(files)) {
+      mkdirSync(join(root, rel, ".."), { recursive: true });
+      writeFileSync(join(root, rel), text);
+    }
+    return root;
+  };
+  const caller = "jobs:\n  checks:\n    uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@main\n";
+  const called = (v: string): string =>
+    `on: workflow_call\njobs:\n  t:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: oven-sh/setup-bun@v2\n        with:\n          bun-version: ${v}\n`;
+
+  test("job-level uses: are the calls; step-level uses: are not", () => {
+    expect(reusableCalls({ jobs: { a: { uses: "o/r/.github/workflows/x.yml@v1" }, b: { steps: [{ uses: "actions/checkout@v7" }] } } })).toEqual([
+      "o/r/.github/workflows/x.yml@v1",
+    ]);
+    expect(reusableCalls(null)).toEqual([]);
+  });
+
+  test("a local call is the repository's own file, already scanned", () => {
+    expect(resolveReusable("/nowhere", "./.github/workflows/x.yml")).toBe("local");
+  });
+
+  test("a call into a MOUNTED layer is followed, and a disagreeing pin there is caught", () => {
+    const root = checkout({
+      ".github/workflows/harness-pr-checks.yml": caller,
+      "cat-harness-tools/.github/workflows/layer-pr-checks.yml": called("1.4.2"),
+    });
+    try {
+      const r = bunPin(root);
+      expect(r.sites).toBe(1);
+      expect(r.findings).toEqual([
+        { workflow: "cat-harness-tools/.github/workflows/layer-pr-checks.yml", job: "t", step: "step 1", kind: "disagrees", found: "1.4.2" },
+      ]);
+      expect(r.delegated).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a call whose file is not in the checkout is named as delegated, not silently passed", () => {
+    const root = checkout({ ".github/workflows/harness-pr-checks.yml": caller });
+    try {
+      const r = bunPin(root);
+      expect(r.sites).toBe(0);
+      expect(r.delegated).toEqual(["litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@main"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("no setup-bun and no calls is still 'could not determine' material: nothing delegated", () => {
+    const root = checkout({ ".github/workflows/a.yml": "jobs:\n  a:\n    steps:\n      - uses: actions/checkout@v7\n" });
+    try {
+      const r = bunPin(root);
+      expect(r.sites).toBe(0);
+      expect(r.delegated).toBeUndefined();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
