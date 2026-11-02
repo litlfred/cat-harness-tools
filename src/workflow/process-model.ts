@@ -796,6 +796,17 @@ export interface ProcessModel {
    * which is what it was before subprocess descent existed.
    */
   children: Map<string, ProcessModel>;
+  /**
+   * The inputs this process declares, by name: `<bpmn:ioSpecification>` on
+   * the process itself (owner, 2026-11-01, Q-BR-5 A). A shared process that
+   * several callers run with their own values — the tracking watch, run by
+   * each watch with its own label — declares them here, and each call gives
+   * every one a value, as a call to a global task does. Inside the process a
+   * step passes one on with a `dataInputAssociation` whose `sourceRef` is the
+   * process's input; that step's `inputs` read `{name}` until a call binds it.
+   * Absent when the process takes none.
+   */
+  inputs?: string[];
 }
 
 export class UnsupportedBpmn extends Error {}
@@ -1345,7 +1356,10 @@ interface ModdleElement {
   ioSpecification?: { dataInputs?: { id: string; name?: string }[] };
   /** A call's `dataInputAssociation`s: an `assignment` gives a declared input its value. */
   dataInputAssociations?: {
-    /** Set when the association reads a data store or data object rather than assigning a value. */
+    /**
+     * A process input this association passes on (in a process that declares
+     * inputs), or a data store or data object it reads rather than assigning a value.
+     */
     sourceRef?: { id?: string }[];
     targetRef?: { id?: string };
     assignment?: { from?: { body?: string }; to?: { body?: string } }[];
@@ -1790,18 +1804,40 @@ function sharedDocumentation(g: ModdleElement, call: ModdleElement): { text?: st
  * diagram does not load: a shared step run without its label is not the step
  * on the diagram.
  */
-function asSharedStep(call: ModdleElement, g: ModdleElement, bpmnPath: string): { el: ModdleElement; inputs?: Record<string, string> } {
-  const where = `${basename(bpmnPath)}: ${call.id} calls global task ${g.id}`;
-  const declared = (g.ioSpecification?.dataInputs ?? []).map((d) => d.name ?? d.id);
+/**
+ * The values a call gives the inputs its callee declares — a global task's or
+ * a process's, read the same way. Each value is an `assignment`'s literal, or,
+ * in a process that declares inputs, `{name}` for the process input the
+ * association's `sourceRef` passes on (bound when a call to that process gives
+ * it a value: {@link bindInputs}). Every declared input gets one, and no other,
+ * or the diagram does not load.
+ */
+function callInputs(
+  call: ModdleElement,
+  declared: readonly string[],
+  where: string,
+  processInputs: ReadonlyMap<string, string> = new Map(),
+): Record<string, string> {
   const nameOf = new Map((call.ioSpecification?.dataInputs ?? []).map((d) => [d.id, d.name ?? d.id]));
   const given: Record<string, string> = {};
   for (const a of call.dataInputAssociations ?? []) {
-    // A read from a drawn store is not an input assignment (`dataOf` below).
-    if (a.sourceRef?.length) continue;
+    const source = a.sourceRef?.[0]?.id;
     const target = a.targetRef?.id;
+    if (a.sourceRef?.length && (source === undefined || !processInputs.has(source))) {
+      // An input of the call that names a source which is no input of this process.
+      if (processInputs.size && target !== undefined && nameOf.has(target) && !a.assignment?.length) {
+        throw new UnsupportedBpmn(`${where}: input "${nameOf.get(target)}" passes on ${source ?? "nothing"}, which is not an input this process declares`);
+      }
+      // A read from a drawn store is not an input assignment (`dataOf` below).
+      continue;
+    }
     const name = target === undefined ? undefined : nameOf.get(target);
-    const value = a.assignment?.[0]?.from?.body;
     if (name === undefined) throw new UnsupportedBpmn(`${where}: a dataInputAssociation targets ${target ?? "nothing"}, which is not one of the call's own dataInputs`);
+    if (source !== undefined) {
+      given[name] = `{${processInputs.get(source)!}}`;
+      continue;
+    }
+    const value = a.assignment?.[0]?.from?.body;
     if (value === undefined) throw new UnsupportedBpmn(`${where}: input "${name}" is associated with no assignment value`);
     given[name] = value.trim();
   }
@@ -1809,6 +1845,34 @@ function asSharedStep(call: ModdleElement, g: ModdleElement, bpmnPath: string): 
   if (missing.length) throw new UnsupportedBpmn(`${where}, which declares input(s) ${missing.join(", ")}, and gives none of them a value`);
   const extra = Object.keys(given).filter((n) => !declared.includes(n));
   if (extra.length) throw new UnsupportedBpmn(`${where}, which declares no input(s) ${extra.join(", ")}`);
+  return given;
+}
+
+/**
+ * Give a called process's `{name}` placeholders the values its call gave.
+ * The child model is loaded fresh for each call, so this rewrites its own copy.
+ */
+function bindInputs(child: ProcessModel, values: Readonly<Record<string, string>>): void {
+  for (const node of child.nodes.values()) {
+    if (!node.inputs) continue;
+    for (const [k, v] of Object.entries(node.inputs)) {
+      const m = /^\{([^{}]+)\}$/.exec(v);
+      if (m && m[1]! in values) node.inputs[k] = values[m[1]!]!;
+    }
+  }
+  // A call inside the child passed the child's own inputs on as `{name}` too.
+  for (const grandchild of child.children.values()) bindInputs(grandchild, values);
+}
+
+function asSharedStep(
+  call: ModdleElement,
+  g: ModdleElement,
+  bpmnPath: string,
+  processInputs?: ReadonlyMap<string, string>,
+): { el: ModdleElement; inputs?: Record<string, string> } {
+  const where = `${basename(bpmnPath)}: ${call.id} calls global task ${g.id}`;
+  const declared = (g.ioSpecification?.dataInputs ?? []).map((d) => d.name ?? d.id);
+  const given = callInputs(call, declared, where, processInputs);
   return {
     el: {
       ...g,
@@ -1969,13 +2033,18 @@ export async function loadProcessModel(
   const dataOf = (el: ModdleElement, dir: "reads" | "writes"): string[] => {
     const ends =
       dir === "reads"
-        ? (el.dataInputAssociations ?? []).flatMap((a) => (a.sourceRef ?? []).map((r) => r.id))
+        ? (el.dataInputAssociations ?? [])
+            .flatMap((a) => (a.sourceRef ?? []).map((r) => r.id))
+            // A process input passed on to a step is not a store read (callInputs).
+            .filter((id) => id === undefined || !processInputs.has(id))
         : (el.dataOutputAssociations ?? []).map((a) => a.targetRef?.id);
     return ends.map((id) => {
       const name = id === undefined ? undefined : dataNameOf.get(id);
       if (name === undefined) {
         throw new UnsupportedBpmn(
-          `${basename(bpmnPath)}: ${el.id} ${dir} ${id ?? "nothing"}, which is not a data store or data object drawn in this process`,
+          processInputs.size && dir === "reads"
+            ? `${basename(bpmnPath)}: ${el.id} passes on ${id ?? "nothing"}, which is not an input this process declares, nor a data store or data object drawn in it`
+            : `${basename(bpmnPath)}: ${el.id} ${dir} ${id ?? "nothing"}, which is not a data store or data object drawn in this process`,
         );
       }
       return name;
@@ -2094,6 +2163,11 @@ export async function loadProcessModel(
   const here = homes.get(dirname(bpmnPath)) ?? {};
   homes.set(dirname(bpmnPath), here);
   const shared = new Map<string, { el: ModdleElement; ref: GlobalTaskRef; inputs?: Record<string, string> }>();
+  // The inputs this process declares, by dataInput id → name (Q-BR-5 A).
+  const processInputs = new Map(
+    ((proc as ModdleElement).ioSpecification?.dataInputs ?? []).map((d) => [d.id, d.name ?? d.id] as const),
+  );
+  const callEls = new Map<string, ModdleElement>();
   for (const el of elements) {
     if (el.$type !== "bpmn:CallActivity" || !el.calledElement) continue;
     const id = el.calledElement;
@@ -2101,11 +2175,12 @@ export async function loadProcessModel(
     const home = (here.globals ??= new Map([...ownInstanceGlobalTaskIndex(dirname(bpmnPath)), ...globalTaskIndex(dirname(bpmnPath))])).get(id);
     if (!home) continue;
     const g = await readGlobalTask(home, id);
-    shared.set(el.id, { ...asSharedStep(el, g, bpmnPath), ref: { id, type: g.$type, source: home, name: cleanName(g.name) || id } });
+    shared.set(el.id, { ...asSharedStep(el, g, bpmnPath, processInputs), ref: { id, type: g.$type, source: home, name: cleanName(g.name) || id } });
   }
 
   for (const raw of elements) {
     if (raw.$type === "bpmn:SequenceFlow") continue;
+    if (raw.$type === "bpmn:CallActivity") callEls.set(raw.id, raw);
     const step = shared.get(raw.id);
     const el = step?.el ?? raw;
     const ext = el.extensionElements?.values ?? [];
@@ -2410,6 +2485,15 @@ export async function loadProcessModel(
       (here.dep ??= dependencyProcessIndex(dirname(bpmnPath))).get(node.calledElement);
     if (!home) continue;
     const child = await loadProcessModel(home, path, homes, opts);
+    const call = callEls.get(node.id);
+    const declared = child.inputs ?? [];
+    if (call && (declared.length || call.dataInputAssociations?.length)) {
+      const given = callInputs(call, declared, `${basename(bpmnPath)}: ${node.id} calls process ${child.id}`, processInputs);
+      if (Object.keys(given).length) {
+        node.inputs = given;
+        bindInputs(child, given);
+      }
+    }
     children.set(node.id, child);
     checkAcceptedCodes(node, child, bpmnPath);
   }
@@ -2432,6 +2516,7 @@ export async function loadProcessModel(
     startNodes,
     decisions,
     children,
+    ...(processInputs.size ? { inputs: [...processInputs.values()] } : {}),
   };
 }
 
