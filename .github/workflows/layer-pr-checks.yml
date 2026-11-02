@@ -374,8 +374,8 @@ jobs:
           else
             lock() { curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw+json" \
               "$GITHUB_API_URL/repos/$1/contents/index.lock.json?ref=$2"; }
-            # A layer below the index (bootstrap-tools, fhir-harness) keeps no
-            # lock of its own; it judges with the commit the folio-assistant
+            # A layer the index mounts but which keeps no
+            # lock of its own judges with the commit the folio-assistant
             # index pins, which is still a pin and not a branch tip.
             if body="$(lock "$GITHUB_REPOSITORY" "$SHA")"; then from="$GITHUB_REPOSITORY index.lock.json at $SHA"
             else body="$(lock litlfred/folio-assistant "$INDEX_REF")"; from="litlfred/folio-assistant index.lock.json at $INDEX_REF"; fi
