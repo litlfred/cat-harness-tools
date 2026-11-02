@@ -52,13 +52,10 @@
  * @module folio-assistant/workflow/bean-link
  */
 
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
-import { inputSiteReached } from "../../schemas/sdlc/input-trace.ts";
-import { resolveBeanDefs } from "../../scripts/beans.ts";
 import type { InstanceState } from "./instance.js";
 import type { ProcessModel } from "./process-model.js";
+import { ARCHIVE_DIR, MountedGitBranchStore } from "./work-plan-store-git-mount.ts";
+import { TERMINAL_STATUSES, type WorkPlanStore } from "./work-plan-store.ts";
 
 export type WorkPlanOp = "claim" | "note" | "resolve" | "archive";
 
@@ -67,9 +64,6 @@ export const WORK_PLAN_OPS = new Set<string>(["claim", "note", "resolve", "archi
 /** The status a step that works the bean may claim from (Q-BR-8 F). A draft is not work yet. */
 const NOT_STARTED = new Set(["todo"]);
 
-/** The statuses `check:bean-archive` allows in the archive. */
-const TERMINAL = new Set(["completed", "scrapped"]);
-
 export interface BeanRef {
   id: string;
   title: string;
@@ -77,118 +71,39 @@ export interface BeanRef {
   path: string;
 }
 
-const BEANS_DIR = "beans";
-/** The archive, inside the defs directory, where `beans archive` moves a bean (`beans/beans.json`: `defs/archive`). */
-const ARCHIVE_DIR = "archive";
-
 /**
- * Where to look for a bean: the store's declared `defs` directory and its
- * `archive/`, then the flat `beans/` this module was written against.
- *
- * The flat layout alone found nothing once the store moved to `beans/defs/`:
- * every claim, note and resolve then reported "not in beans/" and recorded
- * nothing. The declaration is read through `resolveBeanDefs`, the one answer
- * every bean reader shares; an unreachable store falls through to the legacy
- * directory rather than throwing out of a workflow step.
- */
-function beanDirs(repoRoot: string): string[] {
-  let defs: string | null = null;
-  try {
-    defs = resolveBeanDefs(repoRoot).dir;
-  } catch {
-    defs = null;
-  }
-  const dirs = defs ? [defs, join(defs, ARCHIVE_DIR)] : [];
-  dirs.push(join(repoRoot, BEANS_DIR));
-  return [...new Set(dirs)].filter((d) => existsSync(d));
-}
-
-/** Run the beans CLI; `undefined` when it is not installed or the call fails. */
-function cli(repoRoot: string, args: string[]): string | undefined {
-  try {
-    // input-site: traced #5457f2e6 — the beans CLI, a binary outside the tree
-    inputSiteReached("bean-link: beans CLI");
-    return execFileSync("beans", args, {
-      cwd: repoRoot,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).trim();
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * Find a bean by id.
+ * Find a bean by id in the mounted store: its file, for a caller that reads
+ * the file itself. The engine does not; it goes through {@link WorkPlanStore}.
  *
  * Bean filenames are `<id>--<slugged-title>.md`, so the id is a prefix rather
  * than the whole name; matching on the prefix plus the `--` separator avoids
  * `fq0b` also matching a hypothetical `fq0bx`.
  */
 export function findBean(repoRoot: string, id: string): BeanRef | undefined {
-  let path: string | undefined;
-  for (const dir of beanDirs(repoRoot)) {
-    const file = readdirSync(dir).find((f) => f.startsWith(`${id}--`) && f.endsWith(".md"));
-    if (file) {
-      path = join(dir, file);
-      break;
-    }
-  }
-  if (!path) return undefined;
-  const body = readFileSync(path, "utf8");
-  return {
-    id,
-    title: body.match(/^title:\s*(.+)$/m)?.[1].trim().replace(/^['"]|['"]$/g, "") ?? id,
-    status: body.match(/^status:\s*(.+)$/m)?.[1].trim() ?? "unknown",
-    path,
-  };
+  const e = new MountedGitBranchStore(repoRoot).all().get(id);
+  return e ? { id, title: e.bean.title, status: e.bean.status, path: e.path } : undefined;
 }
 
+/** The beans in the mounted store's first directory, archived ones left out. */
 export function listBeans(repoRoot: string): BeanRef[] {
-  const dir = beanDirs(repoRoot)[0];
-  if (!dir) return [];
-  return readdirSync(dir)
-    .filter((f) => f.endsWith(".md") && f.includes("--"))
-    .map((f) => f.split("--")[0])
-    .map((id) => findBean(repoRoot, id))
-    .filter((b): b is BeanRef => b !== undefined);
-}
-
-/**
- * Rewrite `status:` in the front matter, and bump `updated_at`.
- *
- * The fallback for when the CLI is absent — which is not hypothetical: this
- * repo's own session-start hook reports "beans CLI not on PATH" and reads
- * `beans/` directly. A work-plan integration that only worked with the CLI
- * installed would be off exactly when someone is picking up a fresh container.
- */
-function setStatusInFile(bean: BeanRef, status: string): void {
-  const body = readFileSync(bean.path, "utf8");
-  if (!/^status:\s*.+$/m.test(body)) {
-    throw new Error(`${bean.path} has no \`status:\` in its front matter`);
-  }
-  // input-site: traced #1f19f8e1 — stamps a bean being written
-  inputSiteReached("bean-link: clock");
-  const stamp = new Date().toISOString().replace(/\.\d+Z$/, "Z");
-  const next = body
-    .replace(/^status:\s*.+$/m, `status: ${status}`)
-    .replace(/^updated_at:\s*.+$/m, `updated_at: ${stamp}`);
-  writeFileSync(bean.path, next, "utf8");
-}
-
-function appendToFile(bean: BeanRef, text: string): void {
-  const body = readFileSync(bean.path, "utf8").replace(/\s*$/, "\n");
-  writeFileSync(bean.path, `${body}\n${text}\n`, "utf8");
+  const store = new MountedGitBranchStore(repoRoot);
+  const first = store.dirs()[0];
+  if (!first) return [];
+  return [...store.all().values()]
+    .filter((e) => e.path.startsWith(`${first}/`) && !e.path.slice(first.length + 1).includes("/"))
+    .map((e) => ({ id: e.bean.id, title: e.bean.title, status: e.bean.status, path: e.path }));
 }
 
 export interface WorkPlanResult {
   /** What was done, for the caller to report. */
   summary: string;
-  bean?: BeanRef;
+  bean?: Pick<BeanRef, "id" | "title" | "status">;
 }
 
 /**
- * Apply a work-plan operation to the instance's bean.
+ * Apply a work-plan operation to the instance's bean, through the store's
+ * operations (cat-harness#991 step 3). `opts.store` is the Tool; the default
+ * is the git state branch on its mount, which is every checkout today.
  *
  * Never throws for a missing bean: an instance may legitimately have none (a
  * one-off run, a subject that is not tracked). It says so instead, because
@@ -198,39 +113,61 @@ export function applyWorkPlanOp(
   repoRoot: string,
   beanId: string | undefined,
   op: WorkPlanOp,
-  opts: { note?: string; instanceCompleted?: boolean; claimIfNotStarted?: boolean } = {},
+  opts: { note?: string; instanceCompleted?: boolean; claimIfNotStarted?: boolean; store?: WorkPlanStore } = {},
 ): WorkPlanResult {
   if (!beanId) {
     return { summary: `no bean on this instance, so the ${op} step recorded nothing in beans/` };
   }
-  const bean = findBean(repoRoot, beanId);
-  if (!bean) {
+  const store = opts.store ?? new MountedGitBranchStore(repoRoot);
+  const got = store.get(beanId);
+  if (got.state !== "hit") {
     return { summary: `bean ${beanId} is not in beans/ — nothing recorded` };
   }
-
+  const bean = { id: got.bean.id, title: got.bean.title, status: got.bean.status };
   const note = opts.note?.trim();
+  const BY = "workflow";
 
-  if (op === "archive") return archiveBean(bean, note, opts.instanceCompleted === true);
+  /** A status change on the version just read; a refusal is reported, never thrown. */
+  const setStatus = (status: string, version: string): string | undefined => {
+    const r = store.update(bean.id, { status }, version);
+    return r.state === "updated" ? undefined : r.state === "refused" ? `${r.why}: ${r.detail}` : "the bean is gone";
+  };
+
+  if (op === "archive") {
+    if (got.bean.archived) return { summary: `bean ${bean.id} already archived`, bean };
+    const why = !opts.instanceCompleted
+      ? "the process it tracks is still running"
+      : !TERMINAL_STATUSES.has(bean.status)
+        ? `it is ${bean.status}, and only a completed or scrapped bean may be archived`
+        : undefined;
+    if (why) {
+      store.note(bean.id, `${note ? `${note} ` : ""}Archive step reached, bean not archived: ${why}.`, BY);
+      return { summary: `bean ${bean.id} left in place: ${why} — noted instead of archived`, bean };
+    }
+    const noted = store.note(bean.id, note ?? "Archived by the process that completed it (workflow `archive` step).", BY);
+    if (noted.state !== "noted") return { summary: `bean ${bean.id} is not in beans/ — nothing recorded` };
+    const r = store.update(bean.id, { archived: true }, noted.version);
+    if (r.state !== "updated") return { summary: `bean ${bean.id} not archived: ${r.state === "refused" ? `${r.why}: ${r.detail}` : "the bean is gone"}`, bean };
+    return { summary: `bean ${bean.id} archived (${bean.status}) to ${ARCHIVE_DIR}/`, bean };
+  }
 
   if (op === "note" || (op === "resolve" && !opts.instanceCompleted)) {
     // A step drawn against the Beans store is where an agent takes the bean
     // up (Q-BR-8 F), so a bean nobody has started is claimed there. Never a
     // bean that is already in progress or finished: only NOT_STARTED moves.
     const claimed = op === "note" && opts.claimIfNotStarted === true && NOT_STARTED.has(bean.status);
-    if (claimed && cli(repoRoot, ["update", beanId, "-s", "in-progress"]) === undefined) {
-      setStatusInFile(bean, "in-progress");
+    if (claimed) {
+      const refused = setStatus("in-progress", got.version);
+      if (refused) return { summary: `bean ${bean.id} not claimed: ${refused}`, bean };
     }
-    const text = note ?? `Workflow step reached (${op}).`;
-    if (cli(repoRoot, ["update", beanId, "--body-append", text]) === undefined) {
-      appendToFile(bean, text);
-    }
+    store.note(bean.id, note ?? `Workflow step reached (${op}).`, BY);
     return {
       summary:
         op === "note"
           ? claimed
-            ? `bean ${beanId}: ${bean.status} → in-progress, and noted`
-            : `noted on bean ${beanId}`
-          : `bean ${beanId} left ${bean.status}: the process it tracks is still running, ` +
+            ? `bean ${bean.id}: ${bean.status} → in-progress, and noted`
+            : `noted on bean ${bean.id}`
+          : `bean ${bean.id} left ${bean.status}: the process it tracks is still running, ` +
             `so whether the work is done is not settled — noted instead of resolved`,
       bean,
     };
@@ -238,17 +175,12 @@ export function applyWorkPlanOp(
 
   const status = op === "claim" ? "in-progress" : "completed";
   if (bean.status === status) {
-    return { summary: `bean ${beanId} already ${status}`, bean };
+    return { summary: `bean ${bean.id} already ${status}`, bean };
   }
-  if (cli(repoRoot, ["update", beanId, "-s", status]) === undefined) {
-    setStatusInFile(bean, status);
-  }
-  if (note) {
-    if (cli(repoRoot, ["update", beanId, "--body-append", note]) === undefined) {
-      appendToFile(bean, note);
-    }
-  }
-  return { summary: `bean ${beanId}: ${bean.status} → ${status}`, bean };
+  const refused = setStatus(status, got.version);
+  if (refused) return { summary: `bean ${bean.id} left ${bean.status}: ${refused}`, bean };
+  if (note) store.note(bean.id, note, BY);
+  return { summary: `bean ${bean.id}: ${bean.status} → ${status}`, bean };
 }
 
 /**
@@ -287,30 +219,4 @@ function finishesAfter(model: ProcessModel, nodeId: string, seen: Set<string>): 
       return to.workPlanOp === "archive" && finishesAfter(model, to.id, seen);
     })
   );
-}
-
-/**
- * The `archive` op: move a terminal bean into the store's `archive/`, with the
- * reason, once the process it tracks has finished. Anything short of that is
- * noted, never forced: an archived non-terminal bean is open work hidden from
- * every count, the invariant `check:bean-archive` exists for.
- */
-function archiveBean(bean: BeanRef, note: string | undefined, instanceCompleted: boolean): WorkPlanResult {
-  const dir = dirname(bean.path);
-  if (basename(dir) === ARCHIVE_DIR) return { summary: `bean ${bean.id} already archived`, bean };
-  const archive = join(dir, ARCHIVE_DIR);
-  const why = !instanceCompleted
-    ? "the process it tracks is still running"
-    : !TERMINAL.has(bean.status)
-      ? `it is ${bean.status}, and only a completed or scrapped bean may be archived`
-      : undefined;
-  if (why) {
-    appendToFile(bean, `${note ? `${note} ` : ""}Archive step reached, bean not archived: ${why}.`);
-    return { summary: `bean ${bean.id} left in place: ${why} — noted instead of archived`, bean };
-  }
-  appendToFile(bean, note ?? "Archived by the process that completed it (workflow `archive` step).");
-  mkdirSync(archive, { recursive: true });
-  const to = join(archive, basename(bean.path));
-  renameSync(bean.path, to);
-  return { summary: `bean ${bean.id} archived (${bean.status}) to ${ARCHIVE_DIR}/`, bean: { ...bean, path: to } };
 }

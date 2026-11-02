@@ -11,7 +11,10 @@
  * them (`work-plan-store-git-branch` in cat-harness), with the same text
  * transforms the filesystem writer uses ({@link setFieldInText},
  * {@link appendNoteToText}), so a bean it writes reads back under the `beans`
- * CLI. Step 3 moves it into `src/` behind the `WorkPlanStore` interface.
+ * CLI. The engine uses the same Tool on its mount
+ * (`src/workflow/work-plan-store-git-mount.ts`, held to this suite in
+ * `work-plan-store-git-mount.test.ts`); this one writes the branch directly,
+ * which is what the race needs.
  *
  * @module scripts/tests/sdlc/work-plan-store-git
  */
@@ -24,6 +27,16 @@ import { join } from "node:path";
 import { BranchStore } from "../../branch-store.ts";
 import { appendNoteToText, setFieldInText } from "../../beans-fallback.ts";
 import { BeanStatusSchema } from "../../../schemas/tools/tool-types.ts";
+import {
+  admits,
+  parseBeanText,
+  refuseWrite,
+  renderBeanText,
+  resolveId,
+  setSequenceInText,
+  slugifyTitle,
+  versionOf,
+} from "../../../src/workflow/work-plan-store.ts";
 import {
   workPlanStoreConformance,
   type BeanChange,
@@ -85,125 +98,45 @@ function world(): { repo: string; url: string; base: string } {
 }
 
 // ---------------------------------------------------------------------------
-// The bean file, as the `beans` CLI writes it.
-
-const FM = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
-
-const slugify = (s: string): string =>
-  s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50);
-
-const quote = (s: string): string => `'${s.replace(/'/g, "''")}'`;
-
-function sequence(key: string, ids: readonly string[] | undefined): string[] {
-  return ids?.length ? [`${key}:`, ...ids.map((x) => `    - ${x}`)] : [];
-}
-
-function render(b: BeanFields, stamp: string): string {
-  return [
-    "---",
-    `# ${b.id}`,
-    `title: ${quote(b.title)}`,
-    `status: ${b.status}`,
-    `type: ${b.type}`,
-    "priority: normal",
-    ...sequence("tags", b.tags),
-    `created_at: ${stamp}`,
-    `updated_at: ${stamp}`,
-    ...(b.parent ? [`parent: ${b.parent}`] : []),
-    ...sequence("blocked_by", b.blockedBy),
-    "---",
-    "",
-  ].join("\n") + b.body;
-}
-
-function seqIn(front: string, key: string): { ids: string[]; span?: [number, number] } {
-  const m = new RegExp(`^${key}:[ \\t]*\\n((?:[ \\t]+-[ \\t]*\\S.*(?:\\n|$))+)`, "m").exec(front);
-  if (!m) return { ids: [] };
-  const ids = m[1]!
-    .split("\n")
-    .map((l) => l.replace(/^[ \t]*-[ \t]*/, "").trim().replace(/^['"]|['"]$/g, ""))
-    .filter(Boolean);
-  return { ids, span: [m.index, m.index + m[0].length] };
-}
-
-function parse(text: string): BeanFields | undefined {
-  const m = FM.exec(text);
-  if (!m) return undefined;
-  const front = m[1]!;
-  const field = (k: string): string | undefined => {
-    const v = new RegExp(`^${k}:[ \\t]*(.*)$`, "m").exec(front)?.[1]?.trim();
-    if (!v) return undefined;
-    return v.startsWith("'") ? v.slice(1, -1).replace(/''/g, "'") : v.replace(/^"|"$/g, "");
-  };
-  const id = /^#\s*(\S+)\s*$/m.exec(front)?.[1];
-  if (!id) return undefined;
-  const parent = field("parent");
-  const blockedBy = seqIn(front, "blocked_by").ids;
-  const tags = seqIn(front, "tags").ids;
-  return {
-    id,
-    title: field("title") ?? "",
-    status: field("status") ?? "",
-    type: field("type") ?? "",
-    ...(parent ? { parent } : {}),
-    ...(blockedBy.length ? { blockedBy } : {}),
-    ...(tags.length ? { tags } : {}),
-    body: m[2] ?? "",
-  };
-}
-
-/** Replace a block sequence in the front matter (or drop it when empty). */
-function setSequenceInText(raw: string, key: string, ids: readonly string[]): string {
-  const m = FM.exec(raw)!;
-  let front = m[1]!;
-  const { span } = seqIn(front, key);
-  const block = sequence(key, ids).join("\n");
-  if (span) front = front.slice(0, span[0]) + (block ? `${block}\n` : "") + front.slice(span[1]);
-  else if (block) front = `${front}\n${block}`;
-  front = front.replace(/\n+$/, "");
-  return setFieldInText(`---\n${front}\n---\n${m[2]}`, "updated_at", new Date().toISOString().replace(/\.\d+Z$/, "Z"));
-}
-
-// ---------------------------------------------------------------------------
-// The Tool.
+// The Tool, on the branch itself.
 
 const STATUSES = new Set<string>(BeanStatusSchema.options);
+const ARCHIVE = `${DEFS}/archive`;
+
+type Entry = { path: string; blob: string; text: string; bean: BeanFields };
 
 class GitBranchStore implements StoreUnderTest {
   constructor(private readonly s: BranchStore) {}
 
-  /** Every bean at the tip: id → path, blob, fields. */
-  private all(): Map<string, { path: string; blob: string; bean: BeanFields }> {
-    const d = this.s.listDir(DEFS);
-    if (d.state !== "hit") throw new Error(`cannot read ${DEFS}: ${d.reason}`);
-    const out = new Map<string, { path: string; blob: string; bean: BeanFields }>();
+  private dir(path: string, archived: boolean, out: Map<string, Entry>): void {
+    const d = this.s.listDir(path);
+    if (d.state === "miss" && archived) return;
+    if (d.state !== "hit") throw new Error(`cannot read ${path}: ${d.reason}`);
     for (const e of d.entries) {
-      if (e.type !== "blob" || !e.name.endsWith(".md") || e.name === "README.md") continue;
-      const path = `${DEFS}/${e.name}`;
-      const r = this.s.readFile(path);
-      if (r.state !== "hit") throw new Error(`cannot read ${path}: ${r.reason}`);
-      const bean = parse(r.text);
-      if (bean) out.set(bean.id, { path, blob: r.blob, bean });
+      if (e.type !== "blob" || !e.name.endsWith(".md") || !e.name.includes("--")) continue;
+      const file = `${path}/${e.name}`;
+      const r = this.s.readFile(file);
+      if (r.state !== "hit") throw new Error(`cannot read ${file}: ${r.reason}`);
+      const bean = parseBeanText(r.text);
+      if (bean && !out.has(bean.id)) out.set(bean.id, { path: file, blob: r.blob, text: r.text, bean: archived ? { ...bean, archived: true } : bean });
     }
+  }
+
+  /** Every bean at the tip, `defs/` then `defs/archive/`. */
+  private all(): Map<string, Entry> {
+    const out = new Map<string, Entry>();
+    this.dir(DEFS, false, out);
+    this.dir(ARCHIVE, true, out);
     return out;
   }
 
-  private resolve(all: ReturnType<GitBranchStore["all"]>, id: string): string | undefined {
-    if (all.has(id)) return id;
-    const bySuffix = [...all.keys()].filter((k) => k.endsWith(`-${id}`));
-    return bySuffix.length === 1 ? bySuffix[0] : undefined;
-  }
-
-  private linksExist(all: ReturnType<GitBranchStore["all"]>, b: Pick<BeanFields, "parent" | "blockedBy">): string | undefined {
-    for (const l of [...(b.parent ? [b.parent] : []), ...(b.blockedBy ?? [])]) {
-      if (!all.has(l)) return l;
-    }
-    return undefined;
+  private fields(all: Map<string, Entry>): Map<string, BeanFields> {
+    return new Map([...all].map(([k, v]) => [k, v.bean]));
   }
 
   get(id: string): Got {
     const all = this.all();
-    const key = this.resolve(all, id);
+    const key = resolveId(all.keys(), id);
     if (!key) return { state: "none" };
     const e = all.get(key)!;
     return { state: "hit", bean: e.bean, version: e.blob };
@@ -212,55 +145,53 @@ class GitBranchStore implements StoreUnderTest {
   list(filter: BeanFilter = {}): BeanFields[] {
     return [...this.all().values()]
       .map((e) => e.bean)
-      .filter((b) => !filter.status || b.status === filter.status)
-      .filter((b) => !filter.type || b.type === filter.type)
-      .filter((b) => !filter.tag || (b.tags ?? []).includes(filter.tag))
-      .filter((b) => !filter.parent || b.parent === filter.parent)
+      .filter((b) => admits(filter, b))
       .sort((a, b) => a.id.localeCompare(b.id));
   }
 
   create(bean: BeanFields): { state: "created"; version: string } | Refusal {
-    if (!STATUSES.has(bean.status)) return { state: "refused", why: "closed-list", detail: `status ${bean.status}` };
     const all = this.all();
+    const refused = refuseWrite(this.fields(all), bean, STATUSES);
+    if (refused) return refused;
     if (all.has(bean.id)) return { state: "refused", why: "exists", detail: bean.id };
-    const dangling = this.linksExist(all, bean);
-    if (dangling) return { state: "refused", why: "dangling-link", detail: dangling };
-    const path = `${DEFS}/${bean.id}--${slugify(bean.title)}.md`;
-    const text = render(bean, new Date().toISOString().replace(/\.\d+Z$/, "Z"));
+    const path = `${bean.archived ? ARCHIVE : DEFS}/${bean.id}--${slugifyTitle(bean.title)}.md`;
+    const text = renderBeanText(bean, new Date().toISOString().replace(/\.\d+Z$/, "Z"));
     // `expect: null` — the path must not exist at the tip. A sibling that
     // created the same id between our read and our push makes this a conflict.
     const w = this.s.write([{ path, content: text, expect: null }], `create ${bean.id}`);
     if (w.state === "conflict") return { state: "refused", why: "exists", detail: `${bean.id} was created by another writer` };
     if (w.state !== "pushed") throw new Error(`create ${bean.id}: ${w.state} — ${w.reason}`);
-    return { state: "created", version: this.s.hashBlob(text) };
+    return { state: "created", version: versionOf(text) };
   }
 
   update(id: string, change: BeanChange, ifMatch: string): { state: "updated"; version: string } | Refusal | { state: "none" } {
-    if (change.status !== undefined && !STATUSES.has(change.status)) {
-      return { state: "refused", why: "closed-list", detail: `status ${change.status}` };
-    }
     const all = this.all();
-    const key = this.resolve(all, id);
+    const key = resolveId(all.keys(), id);
     if (!key) return { state: "none" };
     const e = all.get(key)!;
     if (e.blob !== ifMatch) return { state: "refused", why: "stale", detail: `${key} is at ${e.blob.slice(0, 12)}, not ${ifMatch.slice(0, 12)}` };
-    const dangling = this.linksExist(all, change);
-    if (dangling) return { state: "refused", why: "dangling-link", detail: dangling };
+    const refused = refuseWrite(this.fields(all), { ...e.bean, ...change }, STATUSES);
+    if (refused) return refused;
 
-    const r = this.s.readFile(e.path);
-    if (r.state !== "hit") throw new Error(`cannot read ${e.path}: ${r.reason}`);
-    let text = r.text;
-    if (change.title !== undefined) text = setFieldInText(text, "title", quote(change.title));
+    let text = e.text;
+    if (change.title !== undefined) text = setFieldInText(text, "title", `'${change.title.replace(/'/g, "''")}'`);
     if (change.status !== undefined) text = setFieldInText(text, "status", change.status);
     if (change.type !== undefined) text = setFieldInText(text, "type", change.type);
     if (change.parent !== undefined) text = setFieldInText(text, "parent", change.parent);
-    if (change.blockedBy !== undefined) text = setSequenceInText(text, "blocked_by", change.blockedBy);
-    if (change.tags !== undefined) text = setSequenceInText(text, "tags", change.tags);
+    if (change.blockedBy !== undefined) text = setFieldInText(setSequenceInText(text, "blocked_by", change.blockedBy), "updated_at", new Date().toISOString().replace(/\.\d+Z$/, "Z"));
+    if (change.tags !== undefined) text = setFieldInText(setSequenceInText(text, "tags", change.tags), "updated_at", new Date().toISOString().replace(/\.\d+Z$/, "Z"));
 
-    const w = this.s.write([{ path: e.path, content: text, expect: ifMatch }], `update ${key}`);
+    // Archiving moves the file between `defs/` and `defs/archive/`: one commit,
+    // the old path removed and the new one written, both against what was read.
+    const archived = change.archived ?? e.bean.archived === true;
+    const to = `${archived ? ARCHIVE : DEFS}/${e.path.split("/").pop()}`;
+    const changes = to === e.path
+      ? [{ path: e.path, content: text, expect: ifMatch }]
+      : [{ path: e.path, content: null, expect: ifMatch }, { path: to, content: text, expect: null }];
+    const w = this.s.write(changes, `update ${key}`);
     if (w.state === "conflict") return { state: "refused", why: "stale", detail: `${key} changed between this read and this write` };
     if (w.state !== "pushed") throw new Error(`update ${key}: ${w.state} — ${w.reason}`);
-    return { state: "updated", version: this.s.hashBlob(text) };
+    return { state: "updated", version: versionOf(text) };
   }
 
   /**
@@ -271,14 +202,12 @@ class GitBranchStore implements StoreUnderTest {
   note(id: string, text: string, by: string): { state: "noted"; version: string } | { state: "none" } {
     for (let attempt = 0; attempt < 5; attempt++) {
       const all = this.all();
-      const key = this.resolve(all, id);
+      const key = resolveId(all.keys(), id);
       if (!key) return { state: "none" };
       const e = all.get(key)!;
-      const r = this.s.readFile(e.path);
-      if (r.state !== "hit") throw new Error(`cannot read ${e.path}: ${r.reason}`);
-      const next = appendNoteToText(r.text, `${text} (${by})`);
-      const w = this.s.write([{ path: e.path, content: next, expect: r.blob }], `note ${key}`);
-      if (w.state === "pushed") return { state: "noted", version: this.s.hashBlob(next) };
+      const next = appendNoteToText(e.text, `${text} (${by})`);
+      const w = this.s.write([{ path: e.path, content: next, expect: e.blob }], `note ${key}`);
+      if (w.state === "pushed") return { state: "noted", version: versionOf(next) };
       if (w.state !== "conflict") throw new Error(`note ${key}: ${w.state} — ${w.reason}`);
     }
     throw new Error(`note ${id}: five writers in a row changed the bean under this one`);
