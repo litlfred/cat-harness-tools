@@ -89,19 +89,23 @@ jobs:
           SHA: ${{ inputs.sha != '' && inputs.sha || github.sha }}
         run: |
           set -euo pipefail
-          pin='import json,sys; print(next((m["ref"] for m in json.load(sys.stdin).get("mounts", []) if m.get("harness") == "cat-harness-tools"), ""))'
           if [ "$GITHUB_REPOSITORY" = "litlfred/cat-harness-tools" ]; then ref="$SHA"
           else
-            ref="$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw+json" \
-              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/contents/index.lock.json?ref=$SHA" | python3 -Ic "$pin")"
-            # A layer below cat-harness-tools cannot mount it: take the pin of
-            # the folio-assistant index that mounts the caller (still a pin).
-            if [ -z "$ref" ]; then
-              ref="$(curl -fsSL -H "Accept: application/vnd.github.raw+json" \
-                "$GITHUB_API_URL/repos/litlfred/folio-assistant/contents/index.lock.json?ref=main" | python3 -Ic "$pin")"
-              [ -n "$ref" ] && echo "$GITHUB_REPOSITORY index.lock.json pins no cat-harness-tools; using folio-assistant main's pin"
+            lock() { curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw+json" \
+              "$GITHUB_API_URL/repos/$1/contents/index.lock.json?ref=$2"; }
+            # A layer below the index (bootstrap-tools, fhir-harness) keeps no
+            # lock of its own; it judges with the commit the folio-assistant
+            # index pins, which is still a pin and not a branch tip.
+            if body="$(lock "$GITHUB_REPOSITORY" "$SHA")"; then from="$GITHUB_REPOSITORY index.lock.json at $SHA"
+            else body="$(lock litlfred/folio-assistant "main")"; from="litlfred/folio-assistant index.lock.json at main"; fi
+            ref="$(printf '%s' "$body" | python3 -Ic 'import json,sys; print(next((m["ref"] for m in json.load(sys.stdin).get("mounts", []) if m.get("harness") == "cat-harness-tools"), ""))')"
+            # A layer below cat-harness-tools (cat-harness) keeps a lock that
+            # cannot mount it: same fall-back, to the index's pin.
+            if [ -z "$ref" ] && [[ "$from" != litlfred/folio-assistant* ]]; then
+              body="$(lock litlfred/folio-assistant "main")"; from="litlfred/folio-assistant index.lock.json at main ($GITHUB_REPOSITORY's lock mounts no cat-harness-tools)"
+              ref="$(printf '%s' "$body" | python3 -Ic 'import json,sys; print(next((m["ref"] for m in json.load(sys.stdin).get("mounts", []) if m.get("harness") == "cat-harness-tools"), ""))')"
             fi
-            [ -n "$ref" ] || { echo "::error::neither $GITHUB_REPOSITORY index.lock.json at $SHA nor folio-assistant main's pins cat-harness-tools"; exit 2; }
+            [ -n "$ref" ] || { echo "::error::$from pins no cat-harness-tools"; exit 2; }
           fi
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
