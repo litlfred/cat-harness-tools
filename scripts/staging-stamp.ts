@@ -19,6 +19,12 @@
  * it copies the `.json` alias *after* the stamp "so the two documents cannot
  * disagree about which build they came from". One function, one answer.
  *
+ * ## Previews only
+ *
+ * A build of `main` (or `master`) is the published site, and `build.json`
+ * names its commit once for every page. So it is not stamped; see
+ * {@link RELEASE_BRANCHES}.
+ *
  * ## Absent rather than fabricated
  *
  * Outside CI there is no build, so there is no stamp: this returns `undefined`
@@ -52,6 +58,31 @@ export interface StagingStamp {
 export const STAGING_KEY = "staging";
 
 /**
+ * Branches whose build is the published site, not a preview of it.
+ *
+ * ## Why the main site carries no stamp (bean `g196`, 2026-10-31)
+ *
+ * The term's own gloss: "Which build produced this document, when it is a
+ * staging preview rather than a release." The main site answers that question
+ * once, in `build.json` (sha, built, run URL), which the footer already reads in
+ * the browser. Stamping it into every document as well made every main deploy
+ * rewrite every graph page and data file: on gh-pages `ee02d1d..5bdefb2`
+ * (2026-10-31 19:33Z to 21:14Z) 10,635 files changed, and in a sample of 150 of
+ * them 112 (75%) differed ONLY by this stamp's `sha` and `run`.
+ */
+export const RELEASE_BRANCHES: ReadonlySet<string> = new Set(["main", "master"]);
+
+/**
+ * Whether this run builds the published site. A workflow that names its branch
+ * (`KG_BRANCH`, set by the staging workflows) is a preview, whatever the name:
+ * a fork's `main` opened as a pull request is still a preview.
+ */
+export function isReleaseBuild(env: Record<string, string | undefined>): boolean {
+  if (env.KG_BRANCH !== undefined && env.KG_BRANCH !== "") return false;
+  return RELEASE_BRANCHES.has(env.GITHUB_REF_NAME ?? "");
+}
+
+/**
  * The stamp for the current process, or `undefined` when there is no build.
  *
  * `sha` is what makes a stamp meaningful, so its absence means no stamp at all
@@ -60,8 +91,9 @@ export const STAGING_KEY = "staging";
  * when `sha` is present, which is the case where we are demonstrably in a run
  * and one variable happens to be unset.
  */
-// input-site: env GITHUB_SHA,KG_BRANCH,GITHUB_REF_NAME,GITHUB_RUN_ID #8cd909dc — build and git identity variables for the staging stamp
+// input-site: env GITHUB_SHA,KG_BRANCH,GITHUB_REF_NAME,GITHUB_RUN_ID #10e8f84f — build and git identity variables for the staging stamp
 export function stagingStamp(env: Record<string, string | undefined> = process.env): StagingStamp | undefined {
+  if (isReleaseBuild(env)) return undefined;
   const sha = env.GITHUB_SHA;
   if (!sha) return undefined;
   return {

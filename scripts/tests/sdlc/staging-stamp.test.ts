@@ -56,8 +56,24 @@ describe("stagingStamp", () => {
   });
 
   it("falls back to the ref when the workflow set no branch", () => {
-    const s = stagingStamp({ GITHUB_SHA: "abc123", GITHUB_REF_NAME: "main" });
-    expect(s).toEqual({ branch: "main", sha: "abc123", pr: "main", run: "" });
+    const s = stagingStamp({ GITHUB_SHA: "abc123", GITHUB_REF_NAME: "feat/y" });
+    expect(s).toEqual({ branch: "feat/y", sha: "abc123", pr: "feat/y", run: "" });
+  });
+
+  it("stamps nothing on a build of main: build.json names that commit once (bean g196)", () => {
+    // Every main deploy rewrote ~8,000 graph pages and data files for this
+    // stamp alone, so it must stay off the published site.
+    for (const ref of ["main", "master"]) {
+      expect(stagingStamp({ GITHUB_SHA: "abc123", GITHUB_REF_NAME: ref, GITHUB_RUN_ID: "9" })).toBeUndefined();
+      expect(Object.keys(stagingFields({ GITHUB_SHA: "abc123", GITHUB_REF_NAME: ref }))).toHaveLength(0);
+    }
+  });
+
+  it("still stamps a preview whose branch happens to be called main", () => {
+    // A fork's `main` opened as a pull request: the staging workflow names
+    // the branch, and that makes it a preview whatever the name.
+    const s = stagingStamp({ GITHUB_SHA: "abc123", KG_BRANCH: "main", GITHUB_REF_NAME: "12/merge", GITHUB_RUN_ID: "5" });
+    expect(s).toEqual({ branch: "main", sha: "abc123", pr: "12/merge", run: "5" });
   });
 });
 

@@ -49,14 +49,12 @@
  * @covers none — .github/workflows/ is not a declared graph typology
  * @graphNode tool
  */
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { parse } from "yaml";
-import { HARNESS_ROOT } from "./lib/roots.ts";
 
-const INSTANCE_ROOT = resolve(HARNESS_ROOT);
-const REPO_ROOT = resolve(INSTANCE_ROOT, "..");
+const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 /** The ONE answer to which Bun this repository runs. Exported so `check:bun-runtime`
  *  names the same file rather than repeating the literal. */
 export const PIN_FILE = "cat-harness/.bun-version";
@@ -78,6 +76,13 @@ export interface Report {
   /** `setup-bun` steps seen, so a scan that matched nothing cannot read clean. */
   sites: number;
   findings: Finding[];
+  /**
+   * Reusable workflows called from another repository whose file is not in
+   * this checkout. Their `setup-bun` steps are judged by this gate where they
+   * live, so a site whose jobs only call them has delegated the pin rather
+   * than dropped it. Named, so the hand-off is visible rather than silent.
+   */
+  delegated?: string[];
 }
 
 /** The version in `.bun-version`: one bare `X.Y.Z`, nothing else. */
@@ -127,18 +132,64 @@ export function auditWorkflow(name: string, doc: unknown, expected: string): Omi
 }
 
 export function bunPin(repoRoot: string = REPO_ROOT): Report {
-  const expected = readPinFile(readFileSync(join(repoRoot, PIN_FILE), "utf-8"));
+  const pinPath = join(repoRoot, PIN_FILE);
+  const expected = existsSync(pinPath) ? readPinFile(readFileSync(pinPath, "utf-8")) : undefined;
   const report: Report = { expected, workflows: 0, sites: 0, findings: [] };
   if (expected === undefined) return report;
 
   const dir = join(repoRoot, ".github", "workflows");
-  for (const f of readdirSync(dir).filter((f) => f.endsWith(".yml") || f.endsWith(".yaml")).sort()) {
+  if (!existsSync(dir)) return report;
+  const delegated = new Set<string>();
+  const audited = new Set<string>();
+  const audit = (label: string, path: string): void => {
+    if (audited.has(path)) return;
+    audited.add(path);
     report.workflows++;
-    const one = auditWorkflow(f, parse(readFileSync(join(dir, f), "utf-8")), expected);
+    const doc = parse(readFileSync(path, "utf-8"));
+    const one = auditWorkflow(label, doc, expected);
     report.sites += one.sites;
     report.findings.push(...one.findings);
+    // A job that calls a reusable workflow installs Bun THERE. Follow it when
+    // its file is in this checkout (a mounted layer keeps its .github/), and
+    // otherwise name it as delegated.
+    for (const call of reusableCalls(doc)) {
+      const target = resolveReusable(repoRoot, call);
+      if (target === "local") continue;
+      if (target) audit(`${target.label}`, target.path);
+      else delegated.add(call);
+    }
+  };
+  for (const f of readdirSync(dir).filter((f) => f.endsWith(".yml") || f.endsWith(".yaml")).sort()) {
+    audit(f, join(dir, f));
   }
+  if (delegated.size > 0) report.delegated = [...delegated].sort();
   return report;
+}
+
+/** The job-level `uses:` of a workflow: the reusable workflows its jobs call. */
+export function reusableCalls(doc: unknown): string[] {
+  const jobs = (doc as { jobs?: Record<string, { uses?: unknown }> } | null)?.jobs ?? {};
+  return Object.values(jobs)
+    .map((j) => j?.uses)
+    .filter((u): u is string => typeof u === "string");
+}
+
+/**
+ * Where a reusable-workflow call's file is in this checkout.
+ *
+ * `./.github/workflows/x.yml` is one of this repository's own files, which the
+ * scan reads anyway (`"local"`). `owner/repo/.github/workflows/x.yml@ref` is
+ * found at `<repo>/.github/workflows/x.yml` when that repository is mounted
+ * here as an instance; otherwise `undefined`, which the caller reports as
+ * delegated. The mounted copy is the pinned one, which is the one CI calls
+ * when the site's caller names the same pin.
+ */
+export function resolveReusable(repoRoot: string, call: string): "local" | { label: string; path: string } | undefined {
+  if (call.startsWith("./")) return "local";
+  const m = /^[^/]+\/([^/]+)\/(\.github\/workflows\/[^@]+)@/.exec(call);
+  if (!m) return undefined;
+  const path = join(repoRoot, m[1]!, m[2]!);
+  return existsSync(path) ? { label: `${m[1]}/${m[2]}`, path } : undefined;
 }
 
 if (import.meta.main) {
@@ -151,6 +202,16 @@ if (import.meta.main) {
         `literal is checked against it — so an unreadable one is a blocker, not a default.`,
     );
     process.exit(2);
+  }
+  if (report.sites === 0 && (report.delegated?.length ?? 0) > 0) {
+    console.log(
+      `Bun pin — ${PIN_FILE} says ${report.expected}; ${report.workflows} workflow(s) install no Bun ` +
+        `themselves. Their jobs call ${report.delegated!.length} reusable workflow(s) that are not in ` +
+        `this checkout, and this gate judges their \`setup-bun\` steps in the repository that holds them:`,
+    );
+    for (const d of report.delegated!) console.log(`  → ${d}`);
+    console.log("  ✓ no Bun is installed here, so no pin can disagree here");
+    process.exit(0);
   }
   if (report.sites === 0) {
     console.error(

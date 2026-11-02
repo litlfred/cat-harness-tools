@@ -41,9 +41,10 @@
  *
  * ## What it does not change
  *
- * CI. `gates` runs `skill:register:check` and `kg:audit:check` whole, as
- * before; this table is read only by `regen`. Whether either gate is redundant
- * in CI is a separate question, put on the PR rather than decided here.
+ * `gates` runs `skill:register:check` and `kg:audit:check` whole, as before;
+ * this table is read only by `regen`. The layer PR checks fold
+ * `skill:register:check` the same way on their own
+ * (`.github/scripts/layer-pr-checks/run-gates.py`, `fold_skill_register`).
  */
 import { CHECKS as SKILL_REGISTER_CHECKS } from "./skill-register.ts";
 

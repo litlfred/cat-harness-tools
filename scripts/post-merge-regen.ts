@@ -56,7 +56,9 @@ import {
 import { isBuiltAtPublish, type BuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 import { readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { mountedInstanceRoots } from "../schemas/kg/remote-mount.ts";
 import { scriptsOf as scriptTableOf } from "../schemas/sdlc/script-table.ts";
+import { tipLocations } from "./branch-store.ts";
 import { pairIO } from "./task-io.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -94,21 +96,85 @@ export function postMergePairs<P extends { check: string }>(pairs: readonly P[])
 export interface PublishTimeDeclaration {
   /** Absolute. */
   root: string;
-  builtAtPublish: readonly Pick<BuiltAtPublish, "path">[];
+  builtAtPublish: readonly (Pick<BuiltAtPublish, "path"> & Partial<Pick<BuiltAtPublish, "writer">>)[];
 }
 
-/** Every instance under `repoRoot` that declares `builtAtPublish` (bean `p7mb`). */
+/**
+ * Every instance under `repoRoot` that declares `builtAtPublish` or an
+ * off-checkout `storage` directory such as `test/results/` on `qa-reports`
+ * (beans `p7mb`, `ksek`).
+ */
 export function publishTimeDeclarations(repoRoot: string): PublishTimeDeclaration[] {
   return instanceRootsIn(repoRoot).flatMap((root) => {
-    let list: readonly BuiltAtPublish[] = [];
+    let list: (Pick<BuiltAtPublish, "path"> & Partial<Pick<BuiltAtPublish, "writer">>)[] = [];
     try {
-      list = readDeclaration(root)?.builtAtPublish ?? [];
+      const decl = readDeclaration(root);
+      const built = decl?.builtAtPublish ?? [];
+      const stored = (decl?.directories ?? [])
+        .filter((d) => d.storage !== undefined)
+        .map((d) => ({ path: d.path.replace(/^\/+/, "").replace(/\/?$/, "/") }));
+      list = [...built, ...stored];
     } catch {
       // An unreadable declaration declares nothing here: its paths then count
       // as committed, which can keep a check stale, never hide a stale one.
     }
     return list.length > 0 ? [{ root: resolve(root), builtAtPublish: list }] : [];
   });
+}
+
+/** Writers whose outputs other checks read, so they run before the repair pass. */
+export const PREREQUISITE_WRITERS: readonly string[] = ["ig-index:build"];
+
+/**
+ * The prerequisite writers that some declaring instance needs run: one of
+ * its `builtAtPublish` entries names the writer and its path is absent.
+ */
+export function missingPrerequisiteWriters(decls: readonly PublishTimeDeclaration[]): string[] {
+  const out = new Set<string>();
+  for (const d of decls)
+    for (const e of d.builtAtPublish)
+      for (const w of e.writer ?? [])
+        if (PREREQUISITE_WRITERS.includes(w) && !existsSync(join(d.root, e.path))) out.add(w);
+  return [...out];
+}
+
+/**
+ * Whether `rel` (repo-relative) belongs to the repository that will commit the
+ * post-merge repair (beans `p7mb`, `ksek`):
+ * - never inside a branch-mounted state directory (`tipLocations`: `beans/`,
+ *   `fsh-guts/`, `todos/`, `cat-harness/subscribed-harnesses/`, …), which is
+ *   gitignored and kept on its state branch;
+ * - in a layer run (`instance` set, e.g. `"cat-harness"`), inside that layer's
+ *   tree only;
+ * - in an index run (`instance` unset or `"."`), outside every remote mount
+ *   (`mountedInstanceRoots`), which is gitignored in the index and repaired by
+ *   its own layer run.
+ */
+export function inTargetScope(repoRoot: string, instance?: string): (rel: string) => boolean {
+  const cleanInstance = instance?.replace(/^\/+|\/+$/g, "");
+  let stateDirs: string[] = [];
+  try {
+    stateDirs = tipLocations(repoRoot)
+      .map((l) => l.path.replace(/^\/+|\/+$/g, ""))
+      .filter((p) => p.length > 0);
+  } catch {
+    stateDirs = [];
+  }
+  const inDirList = (rel: string, dirs: readonly string[]): boolean =>
+    dirs.some((d) => rel === d || rel.startsWith(`${d}/`));
+  if (cleanInstance !== undefined && cleanInstance !== "" && cleanInstance !== ".") {
+    return (rel: string): boolean =>
+      (rel === cleanInstance || rel.startsWith(`${cleanInstance}/`)) && !inDirList(rel, stateDirs);
+  }
+  let remoteDirs: string[] = [];
+  try {
+    remoteDirs = [...mountedInstanceRoots(repoRoot).values()]
+      .map((abs) => relative(repoRoot, abs).split(sep).join("/").replace(/^\/+|\/+$/g, ""))
+      .filter((p) => p.length > 0 && !p.startsWith(".."));
+  } catch {
+    remoteDirs = [];
+  }
+  return (rel: string): boolean => !inDirList(rel, remoteDirs) && !inDirList(rel, stateDirs);
 }
 
 /**
@@ -162,11 +228,7 @@ export function treeMoveTracker(
   decls: readonly PublishTimeDeclaration[] = publishTimeDeclarations(repoRoot),
   instance?: string,
 ): MoveTracker {
-  const cleanInstance = instance?.replace(/^\/+|\/+$/g, "");
-  const inScope = (rel: string): boolean =>
-    cleanInstance === undefined || cleanInstance === "" || cleanInstance === "."
-      ? true
-      : rel === cleanInstance || rel.startsWith(`${cleanInstance}/`);
+  const inScope = inTargetScope(repoRoot, instance);
   type Seen = { stat: string; publishTime: boolean; hash?: string };
   let last: Map<string, Seen> | undefined;
   const walk = (prev: Map<string, Seen> | undefined): Map<string, Seen> => {
@@ -253,6 +315,30 @@ export function onlyBuiltAtPublish(writer: string | undefined, moves: ReadonlyMa
   const m = writer === undefined ? undefined : moves.get(writer);
   return m !== undefined && m.builtAtPublish.length > 0 && m.committed.length === 0;
 }
+
+/**
+ * Gates whose INPUTS only `derive:publish` builds, so post-merge regen cannot
+ * judge them (bean `p7mb`, epic `1xhc`). `onlyBuiltAtPublish` covers a check
+ * whose own writer's outputs are publish-time; these read OTHER writers'
+ * publish-time output, so no writer regen runs can turn them green:
+ *
+ * - `slice:sqlite:check` audits the kg slice against the payload tree, which
+ *   `derive:publish` builds ("points at payload …, which the published tree
+ *   does not hold").
+ * - `check:nav-names:check` reads the railed viewer pages and the navbar
+ *   include. No railed page is in the checkout any more, so outside a publish
+ *   it exits 2, "nothing was compared".
+ *
+ * Measured 2026-11-01 on fa main 0ed9b2b and cat-harness c523aef, and again on
+ * train fa#2893 (tools f92092e): both were the only `unrepairedChecks`, every
+ * post-merge regen run red. Neither goes unjudged: `code-quality-gates.yml`
+ * runs both after restoring the publish-time pages (its B1 steps). So regen
+ * reports them with `builtAtPublishChecks`, never as a pass and never as stale.
+ */
+export const JUDGED_AFTER_PUBLISH: Readonly<Record<string, string>> = {
+  "slice:sqlite:check": "audits the kg slice against the payload tree derive:publish builds",
+  "check:nav-names:check": "reads the railed viewer pages and navbar include derive:publish builds",
+};
 
 /**
  * Resolve the repository root containing the gating workflows and scripts.
@@ -478,6 +564,19 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
   // Watch both `p.writer` and `p.check`: checks routed through `publish-check.ts <writer>`
   // execute `<writer>` on disk inside the check call itself.
   const decls = opts.tracker === undefined && opts.runner === undefined ? publishTimeDeclarations(repoRoot) : [];
+  // An IG's artefact index is read by the checks below, and it is built at
+  // publish rather than committed. Build it first when an instance that
+  // declares it lacks it. Which instances those are is read from their
+  // declarations, so this layer names none of them (it sits below them).
+  if (opts.runner === undefined) {
+    for (const w of missingPrerequisiteWriters(decls.length > 0 ? decls : publishTimeDeclarations(repoRoot))) {
+      spawnSync("bun", ["run", "cat", w], {
+        cwd: repoRoot,
+        encoding: "utf-8",
+        env: { ...process.env, [BUILDING_ENV]: "1" },
+      });
+    }
+  }
   const tracker = opts.tracker ?? (opts.runner === undefined ? treeMoveTracker(repoRoot, decls, opts.instance) : undefined);
   const moves = new Map<string, WriterMoves>();
   const scriptToWriter = new Map<string, string>();
@@ -661,7 +760,9 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
   });
   const settledResults = settleCovered(fixpoint.results, folds);
   const unrepaired = settledResults.filter(
-    (r) => r.outcome === "unrepaired" || r.outcome === "writer-failed" || r.outcome === "no-writer",
+    (r) =>
+      JUDGED_AFTER_PUBLISH[r.check] === undefined &&
+      (r.outcome === "unrepaired" || r.outcome === "writer-failed" || r.outcome === "no-writer"),
   );
   // A repair whose writer moved only `builtAtPublish` paths (or, when a check
   // failed in the audit pass before another writer built its `builtAtPublish`
@@ -686,6 +787,8 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
   const builtAtPublishCheckNames = settledResults
     .filter((r) => {
       if (directPublishTime.has(r.check)) return true;
+      // Red here, judged by code-quality-gates after publish-pages: see JUDGED_AFTER_PUBLISH.
+      if (JUDGED_AFTER_PUBLISH[r.check] !== undefined && (staleSet.has(r.check) || r.outcome !== "current")) return true;
       const cov = COVERED[r.check];
       if (cov === undefined) return false;
       return (
@@ -744,14 +847,10 @@ export async function checkPostMergeRegen(opts: PostMergeRegenOptions = {}): Pro
     };
   }
 
-  const cleanInstance = opts.instance?.replace(/^\/+|\/+$/g, "");
-  const inInstance = (rel: string): boolean =>
-    cleanInstance === undefined || cleanInstance === "" || cleanInstance === "."
-      ? true
-      : rel === cleanInstance || rel.startsWith(`${cleanInstance}/`);
+  const inInstance = inTargetScope(repoRoot, opts.instance);
   const gitChanged = (await git.getChangedFiles()).filter(inInstance);
   const committedMoves = [...new Set([...moves.values()].flatMap((m) => m.committed))].sort();
-  const changedFiles = gitChanged.length > 0 ? gitChanged : committedMoves;
+  const changedFiles = gitChanged.length > 0 ? gitChanged : opts.git !== undefined ? committedMoves : [];
 
   if (changedFiles.length === 0) {
     return {

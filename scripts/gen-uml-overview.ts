@@ -514,7 +514,10 @@ export async function sectionsOf(instanceRoot: string): Promise<Section[]> {
         // bootstrap/skills, which holds none of them.
         const here = tagsForSection(section.path, kind);
         if (!here) continue; // could not determine: recorded in UNDETERMINED, and the run stops before writing
-        const present = families.filter((f) => here.has(f.tag));
+        // A DERIVED family is carried by no file: it is what the kind's source
+        // files are read into (the `archimate` kind's model), so it is drawn
+        // wherever the kind is.
+        const present = families.filter((f) => here.has(f.tag) || f.derived);
         for (const f of present) drawFamily(f, kind, prefix, acc, section);
         if (present.length === 0) {
           section.undetermined.push({

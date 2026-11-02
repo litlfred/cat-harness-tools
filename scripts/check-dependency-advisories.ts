@@ -158,10 +158,16 @@ export function renderVerdict(v: AuditVerdict): string[] {
 
 if (import.meta.main) {
   const { spawnSync } = await import("node:child_process");
-  const { readFileSync } = await import("node:fs");
+  const { existsSync, readFileSync } = await import("node:fs");
   const { join } = await import("node:path");
 
-  const ROOT = join(import.meta.dir, "../..");
+  const parentRoot = join(import.meta.dir, "../..");
+  const layerRoot = join(import.meta.dir, "..");
+  const ROOT = existsSync(join(parentRoot, "bun.lock"))
+    ? parentRoot
+    : existsSync(join(layerRoot, "bun.lock"))
+      ? layerRoot
+      : parentRoot;
 
   let scanned = 0;
   try {

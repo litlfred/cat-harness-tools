@@ -771,6 +771,79 @@ def layout_headings(lines: list[Line]) -> tuple[list[Heading], str]:
     return font_headings(lines), "font"
 
 
+# ---------------------------------------------------------------- labelled steps
+
+# A step label set apart from its heading: "STEP 1" in a box beside the
+# heading, as the WHO digital transformation handbooks print every step.
+RE_STEP_LABEL = re.compile(r"^\s*step\s+(\d{1,2})\s*[.:]?\s*$", re.I)
+# A heading is set in type this much larger than the body.
+STEP_HEADING_SCALE = 1.6
+
+
+def _runs(page_lines: list[Line], min_size: float) -> list[tuple[float, float, float, str]]:
+    """Consecutive large lines of one size joined into one title:
+    (y0, y1, size, text). A heading broken over two lines is one heading."""
+    out: list[list] = []
+    for l in page_lines:
+        if l.size < min_size or not RE_HAS_WORD.search(l.text):
+            continue
+        last = out[-1] if out else None
+        if last and last[2] == l.size and -0.5 * l.size <= l.y0 - last[1] <= 0.8 * l.size:
+            last[1] = l.y1
+            last[3] = f"{last[3]} {l.text.strip()}"
+        else:
+            out.append([l.y0, l.y1, l.size, l.text.strip()])
+    return [tuple(r) for r in out]
+
+
+def step_headings(lines: list[Line]) -> list[Heading]:
+    """Steps a document labels as such: a "STEP n" label next to a large heading.
+
+    The printed contents of a WHO digital transformation handbook may list its
+    chapters only, while each chapter is a run of labelled steps (measured on
+    9789240116191-eng: 14 contents entries, 18 steps, all hand-added to the
+    who-iris entry). The label is the evidence, not the style alone: a generic
+    style-found subsection is still not added beneath a contents page.
+
+    The heading is the large run nearest the label on its page, above or below,
+    within six lines. Returned as "Step n. <heading>", at level 2 (relative: the
+    caller places it under the contents entry it falls in). Fewer than two
+    labels is not a step structure, so nothing is returned.
+    """
+    bsize = body_size(lines)
+    if not bsize:
+        return []
+    by_page: dict[int, list[Line]] = defaultdict(list)
+    for l in lines:
+        by_page[l.page].append(l)
+    out: list[tuple[int, float, Heading]] = []
+    seen: set[tuple[int, str]] = set()
+    for page, page_lines in sorted(by_page.items()):
+        runs = None
+        for l in page_lines:
+            m = RE_STEP_LABEL.match(l.text)
+            if not m:
+                continue
+            if runs is None:
+                runs = _runs(page_lines, STEP_HEADING_SCALE * bsize)
+            # The nearest run either side: the handbooks set the label just
+            # above the heading, other layouts beside or below it.
+            dist = [(r[0] - l.y1 if r[0] >= l.y1 - 2 else l.y0 - r[1], r) for r in runs]
+            dist = [(d, r) for d, r in dist if d >= -2 and d <= 6 * max(l.size, bsize)]
+            if not dist:
+                continue
+            run = min(dist, key=lambda x: x[0])[1]
+            title = re.sub(r"\s+", " ", run[3]).strip()
+            key = (page, norm_title(title))
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append((page, run[0], Heading(2, f"Step {int(m.group(1))}. {title}", page, None)))
+    # In the order the page prints them, which the text stream need not follow.
+    out.sort(key=lambda t: (t[0], t[1]))
+    return [h for *_, h in out] if len(out) >= 2 else []
+
+
 # ---------------------------------------------------------------- method 4: consensus
 
 # Section names a document leaves unnumbered even when it numbers the rest.
@@ -880,6 +953,18 @@ def consensus_headings(lines: list[Line], others: dict[str, list[Heading]] | Non
         # printed contents is a deliberate choice of depth. Measured on
         # 9789241548960_eng, adding the 35 subsections whose numbers extend a
         # contents entry cost 0.06 title F1 against the document's outline.
+        # Labelled steps are the exception (`step_headings`): the label says
+        # the document divides there, which a style alone does not. A step
+        # the contents already lists is not added twice.
+        listed = [h for h, *_ in out]
+        for st in step_headings(lines):
+            bare = re.sub(r"^Step \d+\.\s*", "", st.title)
+            if any(similar(bare, h.title) >= 0.85 or similar(st.title, h.title) >= 0.85 for h in listed):
+                continue
+            parent = max((h for h in listed if (h.page or 0) <= (st.page or 0)),
+                         key=lambda h: h.page or 0, default=None)
+            level = (parent.level + 1) if parent else 2
+            out.append(ScoredHeading(st._replace(level=level), 0.85, ("step-label", "style")))
         out.sort(key=lambda s: (s.heading.page or 0))
     else:
         numbered_styles = {st for h, st in zip(font, styles) if h.number}

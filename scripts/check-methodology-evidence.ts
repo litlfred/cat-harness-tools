@@ -79,6 +79,7 @@ import { isDirectoryReadme } from "../schemas/kg/kg-node.ts";
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { isSkillMd, skillMdDirs } from "./known-skills.ts";
+import { libraryEntryDir } from "./lib/library-entry-graphs.ts";
 
 /**
  * This module's own instance root.
@@ -192,9 +193,16 @@ export function resolveEvidence(root: string, ref: string): string | undefined {
   // AGAINST are read from the declaration, on the next line. Reading the
   // declaration to strip this prefix would be asking where a library lives in
   // order to parse a string that does not name one.
-  const slug = ref.slice("library/".length);
+  //
+  // The slug is the identity and the group only where it is filed (bean
+  // `6fez`): `library/<bib-slug>` resolves to `library/<slug>/` or
+  // `library/<group>/<slug>/`, so no reference is rewritten when an entry is
+  // filed. Anything after the slug is a path inside the entry, as before.
+  const [slug = "", ...rest] = ref.slice("library/".length).split("/");
   for (const lib of corpusDirectoriesForGraph(root, "library")) {
-    const p = join(lib, slug);
+    const entry = libraryEntryDir(lib, slug);
+    if (entry === undefined) continue;
+    const p = join(entry, ...rest);
     if (existsSync(p) && statSync(p).isDirectory()) return p;
   }
   return undefined;

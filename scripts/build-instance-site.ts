@@ -589,9 +589,9 @@ function jekyllExe(gemDir: string): string {
     `BUNDLE_GEMFILE=${gemfile} bundle exec ruby -e 'print Gem.bin_path("jekyll", "jekyll")' 2>/dev/null || true`,
     gemDir,
   );
-  if (bundled) return `ruby ${bundled}`;
+  if (bundled) return `ruby ${shellQuote(bundled)}`;
   const found = capture("ls -d /opt/rbenv/versions/*/lib/ruby/gems/*/gems/jekyll-[0-9]*/exe/jekyll 2>/dev/null | sort -V | tail -1 || true", "/");
-  if (found) return `ruby ${found}`;
+  if (found) return `ruby ${shellQuote(found)}`;
   return "jekyll";
 }
 

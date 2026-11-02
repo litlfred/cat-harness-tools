@@ -6,6 +6,7 @@
  * is the loader those folders used to carry beside them. Discovery
  * (`tools/discover.ts`) loads a directory with no `index.ts` the same way.
  *
+ * @graphNode none — a reader over the harness's Tool folders; the Tool node's schema is `tool.ts`
  * @module schemas/tools/harness-tools
  */
 import { requireHarnessRoot } from "../harness-root.js";

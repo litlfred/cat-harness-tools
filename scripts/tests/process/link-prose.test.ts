@@ -3,7 +3,7 @@
  * and what cannot be linked is reported (owner, 2026-10-31).
  */
 import { describe, expect, test } from "bun:test";
-import { linkProse } from "../../lib/link-prose.ts";
+import { escapeAngles, linkProse } from "../../lib/link-prose.ts";
 
 const procs: Record<string, string> = { Process_ContentChangeReview: "content-change-review.html" };
 const skills = new Set(["public-comment", "review-comments"]);
@@ -44,5 +44,17 @@ describe("linkProse", () => {
     const r = run("run `render-bpmn` first");
     expect(r.text).toBe("run `render-bpmn` first");
     expect(r.unlinked).toEqual([]);
+  });
+});
+
+describe("escapeAngles", () => {
+  test("a placeholder no longer opens an HTML element that swallows the links after it", () => {
+    const t = run("a permanent PC/<version> site; handled in Process_ContentChangeReview.").text;
+    expect(escapeAngles(t)).toBe(
+      "a permanent PC/&lt;version&gt; site; handled in [Process_ContentChangeReview](content-change-review.html).",
+    );
+  });
+  test("code spans keep their brackets", () => {
+    expect(escapeAngles("run `pc:release <version>` for <slug>")).toBe("run `pc:release <version>` for &lt;slug&gt;");
   });
 });

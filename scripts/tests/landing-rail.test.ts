@@ -7,7 +7,7 @@
  * header, every one of its graphs as the site's, and its own row in the
  * Harnesses list linking to the IG's root.
  */
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,7 +15,8 @@ import { join } from "node:path";
 import { declaredGraphs, publishedGraphs, railStandalonePages } from "../mount-instance-docs.js";
 import { railDataJson, railPageOf, type RailShared } from "../lib/harness-rail.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { notApplicableAlone, siteNotBuilt } from "../../test/support/checkout.ts";
+import { notApplicableAlone, siteNotBuilt, STANDALONE } from "../../test/support/checkout.ts";
+import { ensureThemesCss } from "../../test/support/themes-css.ts";
 import { siteFileFor } from "../../schemas/kg/cat-harness.js";
 
 /** Every case here pins the platform's chrome, themes.css included, which `themes:css` writes at publish (gitignored). */
@@ -42,6 +43,9 @@ function railOf(root: string, rel: string): { shared: RailShared; toRoot: string
 const NO_SMART_BASE = notApplicableAlone("smart-base, the harness this site lands on, whose declaration names its Harnesses row");
 
 describe.skipIf(THEMES_CSS_NOT_BUILT)("a site that only LANDS on a harness: the rail is the site's, not the landing's", () => {
+  beforeAll(() => {
+    if (!STANDALONE) ensureThemesCss(HARNESS_ROOT);
+  });
   // The landing's graph whose page this fixture site holds, read from the same data the rail reads:
   // one the landing DECLARES, since the rail lists no other. A closure without
   // the landing mounted (the standalone check) has none, and the site holds none.

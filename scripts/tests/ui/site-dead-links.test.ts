@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { blobUrl, checkSite, isInternal, sourceCandidates, sourceFor, tailIndex, targetOf, withoutLocale } from "../../site-dead-links.ts";
+import { blobUrl, checkSite, isInternal, publishedFor, publishedRootOf, sourceCandidates, sourceFor, tailIndex, targetOf, withoutLocale } from "../../site-dead-links.ts";
 
 function site(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "site-dead-links-"));
@@ -23,11 +23,24 @@ function site(files: Record<string, string>): string {
 }
 
 describe("which links are checked", () => {
-  it("skips external, anchor, Liquid and script-template values", () => {
-    for (const v of ["https://x.org/a", "mailto:a@b", "#top", "//cdn/x.js", "{{ '/a' | relative_url }}", "viewer/${a.url}", "' + esc(SITE_HREF + r.page) + '", "' + escape(v) + '"]) {
+  it("skips external, anchor, Liquid, ellipsis-placeholder and script-template values", () => {
+    for (const v of ["https://x.org/a", "mailto:a@b", "#top", "//cdn/x.js", "{{ '/a' | relative_url }}", "viewer/${a.url}", "…", "' + esc(SITE_HREF + r.page) + '", "' + escape(v) + '"]) {
       expect(isInternal(v)).toBe(false);
     }
     expect(isInternal("../a/b.html")).toBe(true);
+  });
+
+  it("ignores escaped HTML inside <code>/<pre> and template strings inside <script>, while still checking <script src>", () => {
+    const root = site({
+      "p.html": [
+        '<code>&lt;img src="x.svg"&gt;</code>',
+        '<pre>&lt;a href="y.html"&gt;y&lt;/a&gt;</pre>',
+        '<script>const s = `<a href="/api/pdf" target="_blank">PDF</a>`;</script>',
+        '<script src="missing.js"></script>',
+      ].join("\n"),
+    });
+    const r = checkSite({ site: root, basePath: "", fix: false, resolveSource: () => undefined });
+    expect(r.dead.map((d) => d.target)).toEqual(["missing.js"]);
   });
 
   it("resolves relative and base-path-absolute links to site paths", () => {
@@ -94,10 +107,79 @@ describe("--fix repoints what has one answer and reports the rest", () => {
     expect(sourceFor("docs/AGENTS.md", idx)).toBeUndefined();
   });
 
+  it("a directory link whose section page is published as a sibling .html repoints to that .html", () => {
+    const root = site({
+      "docs/cat-harness/concepts/architecture.html": "<p>arch</p>",
+      "docs/cat-harness/concepts/README.html": '<a href="architecture/">architecture/</a>',
+    });
+    const r = checkSite({ site: root, basePath: "", fix: true, resolveSource: () => undefined });
+    expect(r.dead).toEqual([]);
+    expect(readFileSync(join(root, "docs/cat-harness/concepts/README.html"), "utf-8")).toContain('href="architecture.html"');
+  });
+
+  it("a relative link from docs/<instance>/<chapter>/ that landed at docs/<tail> resolves <instance>/<tail> in the checkout", () => {
+    const idx = tailIndex(["cat-harness/README.md", "cat-harness/docs/README.md", "other-inst/docs/README.md"]);
+    const origins = [{ path: "cat-harness", repository: "litlfred/cat-harness", ref: "abc", upstreamRoot: "" }];
+    const root = site({
+      "docs/cat-harness/start/README.html": '<a href="../../README.md">C@T Harness</a>',
+    });
+    const r = checkSite({
+      site: root,
+      basePath: "",
+      fix: true,
+      resolveSource: (rel) => {
+        for (const c of sourceCandidates(rel)) {
+          const f = sourceFor(c, idx);
+          if (f !== undefined) return blobUrl(f, origins);
+        }
+        return undefined;
+      },
+    });
+    expect(r.dead).toEqual([]);
+    expect(readFileSync(join(root, "docs/cat-harness/start/README.html"), "utf-8")).toContain(
+      'href="https://github.com/litlfred/cat-harness/blob/abc/README.md"',
+    );
+  });
+
   it("without --fix nothing is rewritten", () => {
     const root = site({ "assets/x.svg": "", "es/p.html": '<img src="../es/assets/x.svg">' });
     const r = checkSite({ site: root, basePath: "", fix: false, resolveSource: () => undefined });
     expect(r.repointed).toEqual([]);
     expect(r.dead).toHaveLength(1);
+  });
+});
+
+describe("in a preview, a page of an instance the preview does not carry goes to the published site", () => {
+  it("reads the published root off a preview base path, and none off a canonical one", () => {
+    expect(publishedRootOf("/folio-assistant/STAGING/repin-train-1")).toBe("/folio-assistant");
+    expect(publishedRootOf("/folio-assistant")).toBeUndefined();
+    expect(publishedRootOf("")).toBeUndefined();
+  });
+
+  it("repoints only when the instance's composed directory holds the page's source", () => {
+    const composed = site({ "concepts/who.md": "# who" });
+    const instances = new Map([["an-ig", [composed]]]);
+    expect(publishedFor("an-ig/concepts/who.html", "/folio-assistant", instances)).toBe("/folio-assistant/an-ig/concepts/who.html");
+    expect(publishedFor("an-ig/concepts/nobody-wrote-this.html", "/folio-assistant", instances)).toBeUndefined();
+    expect(publishedFor("other/concepts/who.html", "/folio-assistant", instances)).toBeUndefined();
+  });
+
+  it("checkSite takes the rule only when it is given one, so a canonical build still reports", () => {
+    const composed = site({ "guides/dak.md": "# dak" });
+    const instances = new Map([["an-ig", [composed]]]);
+    const files = { "en/p/x.html": '<a href="../../an-ig/guides/dak.html#a">dak</a>' };
+    const canonical = checkSite({ site: site(files), basePath: "", fix: true, resolveSource: () => undefined });
+    expect(canonical.dead.map((d) => d.target)).toEqual(["an-ig/guides/dak.html"]);
+    const root = site(files);
+    const preview = checkSite({
+      site: root,
+      basePath: "/folio-assistant/STAGING/s",
+      fix: true,
+      resolveSource: () => undefined,
+      resolvePublished: (t) => publishedFor(t, "/folio-assistant", instances),
+    });
+    expect(preview.dead).toEqual([]);
+    expect(preview.repointed.map((r) => [r.to, r.why])).toEqual([["/folio-assistant/an-ig/guides/dak.html#a", "published"]]);
+    expect(readFileSync(join(root, "en/p/x.html"), "utf-8")).toContain('href="/folio-assistant/an-ig/guides/dak.html#a"');
   });
 });

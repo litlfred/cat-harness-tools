@@ -232,7 +232,9 @@ describe("the fallback can work the plan, not just read it", () => {
     // The strongest available assertion that the two are one store: the beans
     // this session created through the CLI are visible to the fallback.
     const beans = listBeans(REPO_ROOT);
-    expect(beans.length).toBeGreaterThan(100);
+    // Not a size floor: the active store is open work, which a drain empties
+    // on purpose (cat-harness-tools#1248). It must hold beans, and every one must parse.
+    expect(beans.length).toBeGreaterThan(0);
     expect(beans.every((b) => b.id.startsWith("folio-assistant-"))).toBe(true);
     expect(beans.every((b) => b.title !== "(untitled)")).toBe(true);
   });

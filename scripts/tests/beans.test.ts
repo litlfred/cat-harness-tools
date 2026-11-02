@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
-import { beanDefsDir, beanFindings, blockEdges, blockedBy, blocksOf, hasExpiry, isOpen, readBeans } from "../beans.ts";
+import { beanDefsDir, beanFindings, blockEdges, blockedBy, blocksOf, hasExpiry, isOpen, readArchivedBeans, readBeans, resolveBeanArchive } from "../beans.ts";
 import { notApplicableAlone } from "../../test/support/checkout.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
@@ -294,10 +294,15 @@ describe.skipIf(NO_BEAN_STORE)("the REAL corpus: the edge set is exactly the uni
   let declaredBlocking = 0;
   let declaredBlockedBy = 0;
   let read: Set<string> | undefined;
-  const corpus = (): Set<string> => (read ??= unionOfDeclarations());
+  const corpus = (): Set<string> => (read ??= unionOfDeclarations(beanDefsDir(repo)!));
+  // The archive view, read the same way: a drain archives most blocked beans
+  // with their edges, so the precondition below counts both halves
+  // (cat-harness-tools#1248).
+  let readArchive: Set<string> | undefined;
+  const archiveDir = (): string | null => resolveBeanArchive(repo).dir;
+  const archived = (): Set<string> => (readArchive ??= archiveDir() === null ? new Set() : unionOfDeclarations(archiveDir()!));
 
-  function unionOfDeclarations(): Set<string> {
-    const dir = beanDefsDir(repo)!;
+  function unionOfDeclarations(dir: string): Set<string> {
     const union = new Set<string>();
     for (const name of readdirSync(dir)) {
       if (!name.endsWith(".md")) continue;
@@ -331,6 +336,7 @@ describe.skipIf(NO_BEAN_STORE)("the REAL corpus: the edge set is exactly the uni
 
   test("the corpus declares edges from both ends (else this test proves nothing)", () => {
     corpus();
+    archived();
     expect(declaredBlocking).toBeGreaterThan(0);
     expect(declaredBlockedBy).toBeGreaterThan(0);
   });
@@ -340,5 +346,30 @@ describe.skipIf(NO_BEAN_STORE)("the REAL corpus: the edge set is exactly the uni
     const { edges } = blockEdges(readBeans(repo)!);
     expect(edges.length).toBe(union.size);
     expect(new Set(edges.map((e) => `${e.blocker}>${e.blocked}`))).toEqual(union);
+  });
+
+  test("...and so does blockEdges(readArchivedBeans) over the archive view", () => {
+    const union = archived();
+    const { edges } = blockEdges(readArchivedBeans(repo) ?? []);
+    expect(edges.length).toBe(union.size);
+    expect(new Set(edges.map((e) => `${e.blocker}>${e.blocked}`))).toEqual(union);
+  });
+});
+
+
+describe("readBeans skips README.md even when it carries generated YAML front matter", () => {
+  test("beans/defs/README.md with a `generated:` fence is not returned as a bean", () => {
+    const r = store({
+      a: bean("t-a", "title: Real bean\nstatus: todo\ntype: task"),
+      README: [
+        "---",
+        'generated: "cat-harness-tools/scripts/subgraph-readmes.ts — bun run cat readme:subgraphs"',
+        "---",
+        "",
+        "# `beans/defs/`",
+      ].join("\n"),
+    });
+    const got = readBeans(r)!;
+    expect(got.map((b) => b.id)).toEqual(["t-a"]);
   });
 });

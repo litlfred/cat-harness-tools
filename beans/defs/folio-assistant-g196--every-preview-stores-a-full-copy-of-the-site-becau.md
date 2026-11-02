@@ -2,11 +2,11 @@
 # folio-assistant-g196
 $schema: bean/1.0.0
 title: Every preview stores a full copy of the site because per-preview facts are baked into every page
-status: todo
+status: in-progress
 type: feature
 priority: normal
 created_at: 2026-09-19T12:53:43Z
-updated_at: 2026-10-30T19:45:00Z
+updated_at: 2026-10-31T22:42:32Z
 parent: folio-assistant-1xhc
 ---
 
@@ -698,3 +698,9 @@ _2026-10-30T14:40Z_ — Implemented owner ruling (2) in `cat-harness-tools#904`:
 _2026-10-30T19:45:00Z_ — litlfred/cat-harness-tools#904 merged as `bfaaa9f` (owner card 19:40Z): shared rail and row assets are named by scope, not content. Takes effect on the site after folio-assistant re-pins cat-harness-tools past `bfaaa9f` (CI speed thread). Open boxes above are unchanged. Session https://claude.ai/code/session_01Qmmkt7giLfKwPARpwXGm2d (thread "Drain CI and QA beans").
 
 _2026-10-31T01:15:00Z_ — Re-measured STAGING on gh-pages `db3f36f` (git tree sizes, read from the API): about **911 MB** in all, 3 previews plus `_retired` (0.3 MB). `claude-repin-lane-e-2` 563 MB (31,901 files), `claude-repin-pot-who-free` 596 MB (32,982), `claude-workflow-steps-accounted` 408 MB (17,939). Each carries `staging.json`. So each preview is still a full copy, as expected while the baseurl and href rows are deliberately not done; the ~77 MB projection is not met and is not claimed. Two previews record `pr: n/a` (no open PR) and the third is PR #2674's from 2026-10-23, so all three look prunable. Session https://claude.ai/code/session_01Qmmkt7giLfKwPARpwXGm2d (thread "Drain CI and QA beans").
+
+_2026-10-31T22:42:32Z_ — Claimed by sibling S1 of the bean drain (thread "Slim preview pages to match main", session https://claude.ai/code/session_01Qmmkt8NsZHrqX71Q8Hnx8w). Measured on gh-pages `6b6942b`:
+
+- **Row 2 of "Shrinking the cone" is already met another way.** `staging-share.ts` (cat-harness-tools#1115) compares preview pages to main's with the banner, the two metas, the SEO strip and the TypeDoc title set aside, and serves the equal ones from main. The four live previews share 16,675 to 18,462 files each and keep 9,213 to 11,243. The footer is already filled in the browser (main pages render `deployed dev`).
+- **What the kept pages differ by.** A sample of 120 kept pages of `claude-repin-core-figure-kinds`: 59 are graph pages (preview IRIs and `alternateOf`, kept by the owner's 2026-10-30 ruling, plus the `staging` stamp); 50 are Jekyll pages with a different `?v=` asset hash, which is real (that preview re-pins cat-harness-tools).
+- **The bigger cone: the `staging` stamp on main.** Main deploy `ee02d1d..5bdefb2` (19:33Z to 21:14Z) changed 10,635 files; in a sample of 150, 112 (75%) differed only by the stamp's `sha` and `run`. Fixed here: a build of `main`/`master` with no `KG_BRANCH` writes no stamp (`isReleaseBuild` in `staging-stamp.ts`), which is what the term's gloss already says ("when it is a staging preview rather than a release"). `build.json` names main's commit once.

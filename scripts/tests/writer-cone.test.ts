@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 import { parseTrace } from "../ci-cone.ts";
 import { FileDigests } from "../input-hash.ts";
-import { decideWriter, emptyRecords, tracedArgv, underOutputs, verifySummary, verifyWriters, writerRecordOf } from "../writer-cone.ts";
+import { changedWhy, churnReport, decideWriter, renderChurn, emptyRecords, snapshotPaths, tracedArgv, underOutputs, verifySummary, verifyWriters, writerRecordOf } from "../writer-cone.ts";
 
 const ROOT = "/work/repo";
 
@@ -100,6 +100,18 @@ describe("parseTrace in collect mode — a writer's reads and writes", () => {
     });
   });
 
+  test("a directory it listed (getdents64) is marked listed; one it only opened is not (tools#1265)", () => {
+    const r = collect([
+      `10 openat(AT_FDCWD</work/repo>, "/work/repo/data", O_RDONLY|O_CLOEXEC|O_DIRECTORY) = 5</work/repo/data>`,
+      `10 getdents64(5</work/repo/data>, 0x7ffe /* 4 entries */, 8192) = 96`,
+      `10 getdents64(5</work/repo/data>, 0x7ffe /* 0 entries */, 8192) = 0`,
+      `10 openat(AT_FDCWD</work/repo>, "/work/repo/opened", O_RDONLY|O_CLOEXEC|O_DIRECTORY) = 6</work/repo/opened>`,
+      `10 openat(6</work/repo/opened>, "k.json", O_RDONLY|O_CLOEXEC) = 7</work/repo/opened/k.json>`,
+      `10 getdents64(9</usr/lib>, 0x7ffe /* 4 entries */, 8192) = 96`,
+    ]);
+    expect(r).toEqual({ paths: ["data", "opened", "opened/k.json"], git: [], listed: ["data"], writes: [], absentBefore: [] });
+  });
+
   test("the default still refuses any write (checks are unchanged)", () => {
     const r = parseTrace(`10 openat(AT_FDCWD</work/repo>, "x", O_WRONLY|O_CREAT, 0644) = 3</work/repo/x>`, ROOT);
     expect("undetermined" in r).toBe(true);
@@ -155,9 +167,9 @@ describe("writerRecordOf and decideWriter", () => {
       const ev = decideWriter(records, "w", fp, root, new FileDigests(root));
       expect(ev.skip && !ev.proof && ev.why.includes("evidence only")).toBe(true);
       records.writers["w"] = rec;
-      expect(decideWriter(records, "w", { hash: "other", audit: "clean" }, root, new FileDigests(root))).toEqual({ skip: false, why: "its script, imports, audited environment or tools changed" });
+      expect(decideWriter(records, "w", { hash: "other", audit: "clean" }, root, new FileDigests(root))).toEqual({ skip: false, why: "its script, imports, audited environment or tools changed", cause: { kind: "script" } });
       writeFileSync(join(root, "in/a.txt"), "two");
-      expect(decideWriter(records, "w", fp, root, new FileDigests(root))).toEqual({ skip: false, why: "in/a.txt changed" });
+      expect(decideWriter(records, "w", fp, root, new FileDigests(root))).toEqual({ skip: false, why: "in/a.txt changed", cause: { kind: "path", path: "in/a.txt" } });
       writeFileSync(join(root, "in/a.txt"), "one");
 
       // verifyWriters: a skippable writer whose fresh output matches is safe; one that differs is unsafe.
@@ -182,6 +194,31 @@ describe("writerRecordOf and decideWriter", () => {
     expect(writerRecordOf({ ...base, reads: { undetermined: "why" } })).toEqual({ none: "why" });
   });
 
+  test("a directory only opened is recorded as \"dir\": a new entry keeps the skip, a listed one's new entry does not (tools#1265)", () => {
+    const root = mkdtempSync(join(tmpdir(), "writer-cone-"));
+    try {
+      mkdirSync(join(root, "opened"));
+      mkdirSync(join(root, "listed"));
+      const reads = { paths: ["listed", "opened"], git: [], listed: ["listed"], writes: [], absentBefore: [] };
+      const rec = writerRecordOf({ sha: "abc123", ran: true, before: fp, after: fp, reads, reached: undefined, root, digests: new FileDigests(root) });
+      if ("none" in rec) throw new Error(rec.none);
+      expect(rec.reads["opened"]).toBe("dir");
+      expect(rec.reads["listed"]).toStartWith("dir ");
+      const records = emptyRecords("abc123");
+      records.writers["w"] = rec;
+      writeFileSync(join(root, "opened/new.txt"), "x");
+      expect(decideWriter(records, "w", fp, root, new FileDigests(root)).skip).toBe(true);
+      writeFileSync(join(root, "listed/new.txt"), "x");
+      expect(decideWriter(records, "w", fp, root, new FileDigests(root))).toEqual({ skip: false, why: "listed changed", cause: { kind: "path", path: "listed" } });
+      rmSync(join(root, "listed/new.txt"));
+      rmSync(join(root, "opened"), { recursive: true });
+      writeFileSync(join(root, "opened"), "a file now");
+      expect(decideWriter(records, "w", fp, root, new FileDigests(root))).toEqual({ skip: false, why: "opened changed", cause: { kind: "path", path: "opened" } });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("no records, or an unrecorded writer, always runs", () => {
     expect(decideWriter(undefined, "w", fp, ROOT, new FileDigests(ROOT)).skip).toBe(false);
     const r = emptyRecords("abc");
@@ -192,5 +229,55 @@ describe("writerRecordOf and decideWriter", () => {
   test("tracedArgv wraps the writer in strace", () => {
     expect(tracedArgv(["bun", "run", "cat", "w"], "/tmp/l").slice(-6)).toEqual(["-o", "/tmp/l", "bun", "run", "cat", "w"]);
     expect(tracedArgv(["x"], "/tmp/l")[0]).toBe("strace");
+  });
+});
+
+describe("snapshotPaths (what a skip puts back)", () => {
+  const own = ["site/a/", "out.json"];
+  const others = ["site/b/"];
+  test("adds every file the run wrote outside its declared outputs", () => {
+    const r = snapshotPaths(own, ["site/a/x.html", "out.json", "build/extra.json"], underOutputs(own), underOutputs([...own, ...others]));
+    expect(r).toEqual({ paths: ["site/a/", "out.json", "build/extra.json"] });
+  });
+  test("refuses a write into another writer's declared output", () => {
+    const r = snapshotPaths(own, ["site/b/y.html"], underOutputs(own), underOutputs([...own, ...others]));
+    expect("none" in r && r.none).toContain("site/b/y.html");
+  });
+});
+
+describe("churnReport", () => {
+  const writerOf = (p: string) => (p.startsWith("docs/a/") ? "a:pages" : undefined);
+  const entries = [
+    { writer: "a:pages", did: "ran" as const, why: "src.md changed", cause: { kind: "path" as const, path: "src.md" }, seconds: 10 },
+    { writer: "b:pages", did: "ran" as const, why: "docs/a/x.json changed", cause: { kind: "path" as const, path: "docs/a/x.json" }, seconds: 30 },
+    { writer: "c:pages", did: "ran" as const, why: "docs/a/x.json changed", cause: { kind: "path" as const, path: "docs/a/x.json" }, seconds: 5 },
+    { writer: "d:pages", did: "skipped" as const, why: "reads unchanged", seconds: 0.1 },
+    { writer: "e:pages", did: "ran" as const, why: "script", cause: { kind: "script" as const }, seconds: 1 },
+  ];
+  test("groups reruns by what changed and who wrote it, costliest first", () => {
+    const r = churnReport(entries, "abcdef0123456789", writerOf);
+    expect([r.skipped, r.ran, r.reused]).toEqual([1, 4, 0]);
+    expect(r.groups.map((g) => [g.cause, g.writtenBy, g.reran, g.seconds])).toEqual([
+      ["docs/a/x.json", "a:pages", ["b:pages", "c:pages"], 35],
+      ["src.md", "the commit", ["a:pages"], 10],
+      ["its script, imports or tools", "the commit", ["e:pages"], 1],
+    ]);
+  });
+  test("renders a table naming the cascade", () => {
+    const md = renderChurn(churnReport(entries, "abcdef0123456789", writerOf));
+    expect(md).toContain("against abcdef012345");
+    expect(md).toContain("| `docs/a/x.json` | a:pages | `b:pages`, `c:pages` | 35 |");
+  });
+  test("says so when nothing ran", () => {
+    expect(renderChurn(churnReport([entries[3]!], "x", writerOf))).toContain("Nothing ran again.");
+  });
+});
+
+describe("changedWhy (bean fwtz, S-CI3)", () => {
+  test("names the first changed read as before, then the rest, capped", () => {
+    expect(changedWhy(["."])).toBe(". changed");
+    expect(changedWhy([".", ".git", "a"])).toBe(". changed (+2 more: .git, a)");
+    const many = Array.from({ length: 12 }, (_, i) => `f${i}`);
+    expect(changedWhy(many)).toBe("f0 changed (+11 more: f1, f2, f3, f4, f5, f6, f7, and 4 others)");
   });
 });

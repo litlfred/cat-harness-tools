@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 
 import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { inAggregate, siteNotBuilt } from "../../test/support/checkout.ts";
-import { readBeans, type BeanNode } from "../beans.ts";
+import { readArchivedBeans, readBeans, type BeanNode } from "../beans.ts";
 import { auditPayloadTree, payloadOutDir } from "../gen-subgraph-jsonld.ts";
 import {
   BEANS_SLICE,
@@ -198,13 +198,19 @@ describe.skipIf(!inAggregate())("gen-slice-sqlite — the real bean store", () =
   // whole file at load instead of skipping these two.
   let read: BeanNode[] | undefined;
   const beans = (): BeanNode[] => (read ??= readBeans(repoRootFor(join(HARNESS_ROOT))) ?? []);
+  // Real beans for the round trip: active plus the archive view. The active
+  // store alone is open work, which a drain empties on purpose (the 2026-11-01
+  // sweep left 30 and archived `q8ar`; cat-harness-tools#1248).
+  let all: BeanNode[] | undefined;
+  const history = (): BeanNode[] =>
+    (all ??= [...beans(), ...(readArchivedBeans(repoRootFor(join(HARNESS_ROOT))) ?? [])].sort((a, b) => a.id.localeCompare(b.id)));
 
   test("rows equal the bean count, and a known bean is queryable by id and by FTS", () =>
     withDir((dir) => {
-      expect(beans().length).toBeGreaterThan(100);
-      const m = buildSlice(BEANS_SLICE, beansData(beans()), dir);
-      expect(m.rows.beans).toBe(beans().length);
-      const known = beans().find((b) => b.id === "folio-assistant-q8ar")!;
+      expect(history().length).toBeGreaterThan(100);
+      const m = buildSlice(BEANS_SLICE, beansData(history()), dir);
+      expect(m.rows.beans).toBe(history().length);
+      const known = history().find((b) => b.id === "folio-assistant-q8ar")!;
       expect(known).toBeDefined();
       const db = new Database(join(dir, m.file), { readonly: true });
       expect(db.query(`SELECT title, status FROM beans WHERE id = ?`).get(known.id)).toEqual({ title: known.title, status: known.status });

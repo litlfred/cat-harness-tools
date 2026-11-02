@@ -41,6 +41,7 @@ import { join, resolve } from "node:path";
 import { checkoutDirectories } from "../schemas/kg/harness-config.js";
 import { ROUTE_SEGMENT, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { toolSubjects } from "./gen-tools-viz.ts";
+import { processSubjects } from "./gen-processes-viz.ts";
 import { declaredVisualisers, forwardingParts, pageParts, type DeclaredVisualiser } from "./viewer-declarations.ts";
 
 /** One page the declarations say the site must carry. */
@@ -111,6 +112,9 @@ export type SubjectReader = (root: string, dirs: readonly { instance: string; ab
 
 export const SUBJECT_READERS: Readonly<Record<string, SubjectReader>> = {
   "tools-viewer": (root) => toolSubjects(root).subjects.map((s) => s.name),
+  // A diagram, not a sub-folder: `bootstrap/processes/` holds files only and
+  // still owes a page; a folder of DMN tables or global tasks owes none.
+  "processes-viewer": (root) => [...processSubjects(root).keys()],
   "ig-pages": igIndexSubjects,
 };
 

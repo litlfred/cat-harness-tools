@@ -16,11 +16,12 @@
  *
  * @module scripts/tests/library-dirs
  */
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 // The CORPUS (placement PR0, bean `ejye`): the libraries the platform once
 // mirrored are asked of the checkout now.
 import { corpusDirectoriesForGraph as directoriesForGraph } from "../../schemas/kg/harness-config.js";
+import { libraryEntryDirs } from "../lib/library-entry-graphs.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 /** The instance root these helpers resolve against: `cat-harness`. */
@@ -40,16 +41,10 @@ export function libraryDirs(root: string = INSTANCE): string[] {
  */
 export function libraryEntries(root: string = INSTANCE): Array<{ slug: string; dir: string }> {
   const out: Array<{ slug: string; dir: string }> = [];
+  // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`):
+  // the same walk the readers make, so a test cannot see a different corpus.
   for (const lib of libraryDirs(root)) {
-    for (const slug of readdirSync(lib).sort()) {
-      const dir = join(lib, slug);
-      try {
-        if (statSync(dir).isDirectory()) out.push({ slug, dir });
-      } catch {
-        // A directory entry that vanished between readdir and stat is not this
-        // helper's business; the tests using it assert about what IS there.
-      }
-    }
+    for (const { slug, dir } of libraryEntryDirs(lib)) out.push({ slug, dir });
   }
   return out;
 }

@@ -46,6 +46,7 @@ import { dirname, join, resolve } from "node:path";
 import { detect, parseSkillExclusions } from "../src/crdm/detect-signals.ts";
 import { buildTestRun, hashesReproduce, TestRunSchema } from "../schemas/sdlc/test-run.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { TEST_RUN_OUT_ENV } from "./test-run-compute.ts";
 
 const root = resolve(HARNESS_ROOT);
 const verbose = process.argv.includes("--verbose");
@@ -140,7 +141,10 @@ console.log(
 // phrase list is derived FROM, so editing it can change the result without
 // touching a line of this script, which is exactly the `cv10` failure.
 // declared-path-literal: the harness's own QA results, joined under HARNESS_ROOT; it names no other instance's test/results/, though any instance declaring that path spells it the same.
-const OUT = join(root, "test/results/crdm-detect-eval.test-run.json");
+// A gate computing this run without writing the tree points it at a
+// temporary directory (test-run-compute.ts, #1191).
+const OUT_DIR = process.env[TEST_RUN_OUT_ENV];
+const OUT = OUT_DIR ? join(OUT_DIR, "crdm-detect-eval.test-run.json") : join(root, "test/results/crdm-detect-eval.test-run.json");
 const run = buildTestRun({
   // bean 70lx: the corpus and the code are this layer's, the skill is the harness's
   root: dirname(root),
@@ -191,6 +195,6 @@ if (!priorSaysSame) {
   mkdirSync(dirname(OUT), { recursive: true });
   writeFileSync(OUT, JSON.stringify(run, null, 2) + "\n");
 }
-console.log(`\nTest run → test/results/crdm-detect-eval.test-run.json`);
+console.log(`\nTest run → ${OUT_DIR ? OUT : "test/results/crdm-detect-eval.test-run.json"}`);
 console.log(`  data    ${run.data.hash}  over ${run.data.inputs.length} input(s)`);
 console.log(`  process ${run.process.hash}  over ${run.process.inputs.length} input(s)`);

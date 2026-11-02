@@ -205,4 +205,17 @@ describe("several checkouts, in precedence order (kg-separation lesson 6)", () =
     const bare = new GraphTypologyRegistry(BASE_GRAPH_TYPOLOGIES);
     expect(() => readDeclaration(consumer, bare)).toThrow(/unknown graph typology "g7ls-contributed"/);
   });
+  test("a lazy roots thunk is not evaluated at construction time — importing the module touches no filesystem (cat-harness-tools#634)", () => {
+    const inspected = checkout({ contributor: [node("l6-lazy")] });
+    let calls = 0;
+    const r = new GraphTypologyRegistry({}, () => {
+      calls++;
+      return [inspected];
+    });
+    expect(calls).toBe(0);
+    expect(r.has("l6-lazy")).toBe(true);
+    expect(calls).toBe(1);
+    expect(r.roots()).toEqual([inspected]);
+    expect(calls).toBe(1);
+  });
 });

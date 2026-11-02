@@ -388,8 +388,12 @@ export function checkPrintedCommands(repo: string, report: CommandPathReport): v
       if (!m) continue;
       // From the verb to the end of the line, with the syntax that carried it
       // stripped: quotes and backticks, a closing JSDoc, a trailing comma.
+      // A verb that opens a code span (`` `bun run x` ``) ends at the span's
+      // closing backtick: the prose after it is not part of the command.
+      const opensSpan = line[m.index - 1] === "`";
+      const close = opensSpan ? line.indexOf("`", m.index) : -1;
       const cmd = line
-        .slice(m.index)
+        .slice(m.index, close === -1 ? undefined : close)
         .replace(/[`'"]/g, " ")
         .replace(/\s*\*\/\s*$/, "")
         .replace(/,\s*$/, "");

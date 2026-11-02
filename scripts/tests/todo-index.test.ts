@@ -10,7 +10,7 @@
  * have passed on every one of them, because the builder was the thing that
  * changed. The contract is what a consumer downloads.
  */
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
@@ -22,7 +22,7 @@ import {
   type TodoIndex,
 } from "../../schemas/sdlc/todo-index.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
-import { siteNotBuilt } from "../../test/support/checkout.ts";
+import { ensureDocsPages, siteNotBuilt } from "../../test/support/checkout.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const ASSET = join(ROOT, siteDirFor(ROOT), "assets/todos/index.json");
@@ -34,6 +34,10 @@ const published = (): { raw: string; doc: TodoIndex } => {
   const raw = readFileSync(ASSET, "utf-8");
   return { raw, doc: TodoIndexSchema.parse(JSON.parse(raw)) };
 };
+
+beforeAll(() => {
+  ensureDocsPages(ROOT);
+}, 180_000);
 
 describe("the artefact answers `what am I?` from itself", () => {
   test.skipIf(NOT_BUILT())("the published file parses against the schema that names it", () => {

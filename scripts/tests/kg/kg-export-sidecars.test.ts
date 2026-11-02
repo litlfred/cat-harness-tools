@@ -32,11 +32,22 @@ describe("kg-export sidecar subjects are DERIVED from what is committed (bean `v
   test("the real tree: the host, plus every committed foreign sidecar, and no orphan", () => {
     const { subjects, orphans } = sidecarSubjects();
     expect(subjects[0]).toEqual({ stem: "kg-export" });
-    // The file that was stale with every gate green must be a subject.
-    const boot = subjects.find((s) => s.stem === "kg-export.bootstrap");
-    expect(boot, "kg-export.bootstrap.qa-results.json is committed but not checked").toBeDefined();
-    expect(boot!.instance).toBe(join(REPO, "bootstrap"));
     expect(orphans).toEqual([]);
+    // With `test/results/` on `qa-reports` (bean 7mwa), the working copy may
+    // not be in the checkout; the real declarations' resolution of
+    // `kg-export.bootstrap.qa-results.json` to `bootstrap/` is still pinned.
+    const dir = mkdtempSync(join(tmpdir(), "kg-export-sidecars-real-"));
+    try {
+      writeFileSync(join(dir, "kg-export.qa-results.json"), "{}");
+      writeFileSync(join(dir, "kg-export.bootstrap.qa-results.json"), "{}");
+      const fromFixture = sidecarSubjects(dir, instanceRootsIn(REPO));
+      const boot = (subjects.length > 1 ? subjects : fromFixture.subjects).find((s) => s.stem === "kg-export.bootstrap");
+      expect(boot, "kg-export.bootstrap.qa-results.json is not resolved to ./bootstrap").toBeDefined();
+      expect(boot!.instance).toBe(join(REPO, "bootstrap"));
+      expect(fromFixture.orphans).toEqual([]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("a committed sidecar whose stub no instance declares is an ORPHAN, not skipped", () => {

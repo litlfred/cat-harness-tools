@@ -39,7 +39,7 @@
  * @covers none — .github/workflows/ is not a declared graph typology
  */
 import { execFileSync } from "node:child_process";
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dir, "..", "..");
@@ -215,6 +215,7 @@ export interface PinResult {
 
 export function pinWorkflows(root = ROOT, opts: { dryRun?: boolean; lsRemote?: typeof defaultLsRemote } = {}): PinResult[] {
   const dir = join(root, ".github", "workflows");
+  if (!existsSync(dir)) return [];
   const cache = new Map<string, { sha: string } | { refused: string }>();
   const results: PinResult[] = [];
   for (const f of readdirSync(dir).filter((n) => /\.ya?ml$/.test(n)).sort()) {
@@ -259,6 +260,7 @@ export function pinWorkflows(root = ROOT, opts: { dryRun?: boolean; lsRemote?: t
  */
 export function verifyRefs(root = ROOT, opts: { lsRemote?: typeof defaultLsRemote } = {}): { checked: number; mismatched: string[] } {
   const dir = join(root, ".github", "workflows");
+  if (!existsSync(dir)) return { checked: 0, mismatched: [] };
   const cache = new Map<string, { sha: string } | { refused: string }>();
   const mismatched: string[] = [];
   let checked = 0;

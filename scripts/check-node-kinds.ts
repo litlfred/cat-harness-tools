@@ -43,10 +43,11 @@
  * its bytes — so these tools can land before the declaration flips.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
 import { defaultGraphTypologies, readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.js";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
+import { lockedMountPaths } from "../schemas/kg/index-config.js";
 import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
 import {
   baselinePath,
@@ -102,30 +103,34 @@ interface DeclaredBaseline {
   entries?: Pick<Unkinded, "typology" | "family">[];
   text?: string;
   error?: string;
+  /** Laid down by a mount: its baseline is its own repository's to write and judge. */
+  mounted?: boolean;
 }
 
 /** Every instance in the checkout, with its declared baseline read. */
 export function readBaselines(root = repoRoot): DeclaredBaseline[] {
   const out: DeclaredBaseline[] = [];
+  const mounts = new Set(lockedMountPaths(root).map((p) => resolve(root, p)));
   for (const r of instanceRootsIn(root)) {
     const instance = readDeclaration(r)?.name;
     if (!instance) continue;
+    const mounted = mounts.has(resolve(r));
     const path = baselinePath(r);
     if (path === undefined) {
-      out.push({ instance });
+      out.push({ instance, mounted });
       continue;
     }
     if (!existsSync(path)) {
-      out.push({ instance, path, error: "is declared and missing" });
+      out.push({ instance, path, mounted, error: "is declared and missing" });
       continue;
     }
     const text = readFileSync(path, "utf-8");
     try {
       const parsed = UnkindedBaselineKind.schema.safeParse(JSON.parse(text));
-      if (!parsed.success) out.push({ instance, path, text, error: `is not ${UnkindedBaselineKind.tag}: ${parsed.error.message}` });
-      else out.push({ instance, path, text, entries: (parsed.data as { unkinded: Pick<Unkinded, "typology" | "family">[] }).unkinded });
+      if (!parsed.success) out.push({ instance, path, text, mounted, error: `is not ${UnkindedBaselineKind.tag}: ${parsed.error.message}` });
+      else out.push({ instance, path, text, mounted, entries: (parsed.data as { unkinded: Pick<Unkinded, "typology" | "family">[] }).unkinded });
     } catch (e) {
-      out.push({ instance, path, text, error: `does not parse: ${(e as Error).message}` });
+      out.push({ instance, path, text, mounted, error: `does not parse: ${(e as Error).message}` });
     }
   }
   return out;
@@ -179,6 +184,16 @@ function perLayer(index: NodeKindIndex, check: boolean, accept: boolean): number
     for (const k of l.foreign) {
       console.log(`  ✗ ${at} lists ${k}, which another instance owns — a baseline names only its own instance's families`);
       if (check) failed = true;
+    }
+    // A mounted layer's baseline is judged and written in its own repository,
+    // at its own commit. Here a layer ABOVE it may kind one of its families,
+    // so the entry looks stale, but it is not stale where the owner runs. And
+    // `derive:publish` runs this writer after `subgraph:jsonld` has hashed the
+    // mount's files, so rewriting the baseline would leave the published tree
+    // without the payload the KG names (core#439, slice:sqlite:check).
+    if (d?.mounted) {
+      if (l.gone.length > 0) console.log(`  · ${at} is mounted: ${l.gone.length} famil(ies) it baselines are kinded in this checkout (${l.gone.join(", ")}); its own repository prunes them`);
+      continue;
     }
     if (check && l.gone.length > 0) {
       console.log(`\n✗ ${at} is stale — ${l.gone.length} baselined famil(ies) became node kinds or are gone: ${l.gone.join(", ")}. Run \`bun run cat node-kinds\` and commit.`);

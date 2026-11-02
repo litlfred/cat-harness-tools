@@ -18,7 +18,7 @@
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
-import { ArchimateConfigSchema, readArchimate, type ArchimateConfig } from "../schemas/archimate.ts";
+import { ArchimateConfigSchema, readArchimate, type ArchimateConfig, type ArchimateModel } from "../schemas/archimate.ts";
 import { findDeclarationFile } from "../../schemas/kg/cat-harness.ts";
 
 export const CONFIG_FILE = "cat-archimate.config.json";
@@ -75,6 +75,63 @@ export function archimateDir(instanceRoot: string, config: ArchimateConfig): str
 /** The archimate directory, instance-relative and in POSIX form — the graph's path under the instance's site. */
 export const localDirOf = (instanceRoot: string, dir: string): string => relative(instanceRoot, dir).split("\\").join("/");
 
+/**
+ * The element properties that tie an ArchiMate model to the data and APIs it
+ * describes (owner, 2026-11-01, Q-DS-8 A), set the way `skosConcept` already
+ * ties an element to the glossary:
+ *
+ * - `store` — on the application component that IS a data store: the store's
+ *   id (a harness Role id, or the FHIR `ActorDefinition` id of a system);
+ * - `api` — on that component, or on an application interface composed into
+ *   it: the address of the API's own document (OpenAPI, CapabilityStatement,
+ *   GraphQL schema);
+ * - `schema` — on a data object: the address of the schema of what is kept;
+ * - `actorDefinition` — on the component: the FHIR `ActorDefinition` it is.
+ */
+export const STORE_LINK_KEYS = ["store", "api", "schema", "actorDefinition"] as const;
+
+/** The element types that can play a store: something that runs. */
+const STORE_TYPES = new Set(["ApplicationComponent", "SystemSoftware", "Node"]);
+
+/**
+ * What is wrong with a model's store links. Opt-in: only an element that
+ * says it is a store is held to the rest, so a model that marks none passes,
+ * and marking one is a promise the check then keeps.
+ *
+ * - a link property with an empty value says nothing;
+ * - `store` sits on something that runs, not on data or a role;
+ * - a store has at least one `api`, on itself or on an application interface
+ *   composed into or assigned to it — a store nobody can reach is a gap the
+ *   model should show, and an absent link hides it.
+ * A data object a store holds need not carry `schema` yet; that is advice for
+ * the model's authors, not a failure.
+ */
+export function storeLinkProblems(modelId: string, model: Pick<ArchimateModel, "elements" | "relationships">): string[] {
+  const problems: string[] = [];
+  const byId = new Map(model.elements.map((e) => [e.id, e]));
+  const prop = (id: string, key: string) => byId.get(id)?.properties.filter((p) => p.key === key) ?? [];
+  for (const e of model.elements) {
+    for (const p of e.properties) {
+      if ((STORE_LINK_KEYS as readonly string[]).includes(p.key) && p.value.trim() === "") {
+        problems.push(`${modelId}: "${e.name}" has an empty ${p.key} property`);
+      }
+    }
+    if (!prop(e.id, "store").length) continue;
+    if (!STORE_TYPES.has(e.type)) {
+      problems.push(`${modelId}: "${e.name}" is a ${e.type} marked as a store; a store is an application component, system software or a node`);
+      continue;
+    }
+    const interfaces = model.relationships
+      .filter((r) => (r.type === "Composition" || r.type === "Assignment") && r.source === e.id && byId.get(r.target)?.type === "ApplicationInterface")
+      .map((r) => r.target);
+    const hasApi = prop(e.id, "api").length > 0 || interfaces.some((i) => prop(i, "api").length > 0);
+    if (!hasApi) {
+      problems.push(`${modelId}: store "${e.name}" has no api property, on itself or on an application interface composed into it`);
+    }
+  }
+  return problems;
+}
+
 /** Problems with what is committed; empty means it is consistent. */
 export function checkCommitted(instanceRoot: string): string[] {
   const config = readConfig(instanceRoot);
@@ -104,6 +161,7 @@ export function checkCommitted(instanceRoot: string): string[] {
         if (n.kind === "element" && !ids.has(n.ref ?? "")) problems.push(`${m.id}: view "${v.name}" draws ${n.ref || "nothing"}, which the model does not hold`);
       }
     }
+    problems.push(...storeLinkProblems(m.id, model));
     const views = new Set(model.views.map((v) => v.id));
     for (const f of (config.figures ?? []).filter((x) => x.model === m.id)) {
       if (!views.has(f.view)) problems.push(`${m.id}: ${f.label} (${f.block}) is mapped to view ${f.view}, which the model does not hold`);

@@ -13,8 +13,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { decideRun, excluded, gitReplayable, loadRecords, parseTrace, recordRun, splitArgs, unquote } from "../../ci-cone.ts";
-import { BUILD_OUTPUT_DIRS, TRACKED, type BaselineResolver, type PairIO } from "../../input-hash.ts";
+import { decideRun, excluded, gitReplayable, loadRecords, parseTrace, pathState, recordRun, splitArgs, unquote } from "../../ci-cone.ts";
+import { BUILD_OUTPUT_DIRS, FileDigests, TRACKED, type BaselineResolver, type PairIO } from "../../input-hash.ts";
 import { NOT_INSTANCE_DIRS } from "../../../schemas/kg/instance-roots.ts";
 import { statementPin } from "../../input-sites.ts";
 
@@ -145,6 +145,42 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
     expect(unquote(`"a\\"b\\\\c"`)).toBe('a"b\\c');
     expect(unquote(`"abc"...`)).toBeUndefined();
   });
+
+  test("ignores ???( <detached ...> thread-exit lines, while recording paths from syscalls that detached mid-call", () => {
+    const r = read(
+      [
+        `10 openat(AT_FDCWD</work/repo>, "data/a.json", O_RDONLY|O_CLOEXEC) = 3</work/repo/data/a.json>`,
+        `11 openat(AT_FDCWD</work/repo>, "data/b.json", O_RDONLY <detached ...>`,
+        `12 ???( <detached ...>`,
+        `13 <... futex resumed> <detached ...>`,
+        `10 +++ exited with 0 +++`,
+      ].join("\n"),
+    );
+    expect(r).toEqual({ paths: ["data/a.json", "data/b.json"], git: [] });
+  });
+
+  test("pathState on .git records directory presence without hashing git-internal transient entries, while hashing .git/config by content", () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ci-cone-git-state-"));
+    try {
+      expect(pathState(tmp, ".git", new FileDigests(tmp))).toBe("absent");
+      mkdirSync(join(tmp, ".git"), { recursive: true });
+      writeFileSync(join(tmp, ".git", "config"), "[core]\n\trepositoryformatversion = 0\n");
+      const before = pathState(tmp, ".git", new FileDigests(tmp));
+      const cfgBefore = pathState(tmp, ".git/config", new FileDigests(tmp));
+      expect(before).toBe("dir");
+      expect(cfgBefore).toMatch(/^file [0-9a-f]{64}$/);
+      // A sibling git process writing FETCH_HEAD or index.lock inside .git/ must not invalidate a check that only stat-ed .git.
+      writeFileSync(join(tmp, ".git", "FETCH_HEAD"), "deadbeef\n");
+      writeFileSync(join(tmp, ".git", "index.lock"), "");
+      expect(pathState(tmp, ".git", new FileDigests(tmp))).toBe(before);
+      expect(pathState(tmp, ".git/config", new FileDigests(tmp))).toBe(cfgBefore);
+      // A direct read of .git/config still notices when .git/config itself changes.
+      writeFileSync(join(tmp, ".git", "config"), "[core]\n\trepositoryformatversion = 1\n");
+      expect(pathState(tmp, ".git/config", new FileDigests(tmp))).not.toBe(cfgBefore);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 // ── End to end, under a real strace ────────────────────────────────────────
@@ -159,6 +195,7 @@ describe.skipIf(!HAS_STRACE)("the falsifiers, under a real strace (skipped where
     "w:check": "bun scripts/w.ts",
     "red:check": "bun scripts/red.ts",
     "g:check": "bun scripts/g.ts",
+    "o:check": "bun scripts/o.ts",
   };
   const io: PairIO = { inputs: [TRACKED], outputs: [] };
   let baselineId = "entry-1";
@@ -189,6 +226,10 @@ describe.skipIf(!HAS_STRACE)("the falsifiers, under a real strace (skipped where
     );
     write("scripts/w.ts", 'import { writeFileSync } from "node:fs";\nwriteFileSync("data/out.txt", "x");\n');
     write("scripts/red.ts", "process.exit(1);\n");
+    // Asks whether opened/ is a directory and reads one file in it, but never lists it (tools#1265).
+    write("scripts/o.ts", 'import { readFileSync, statSync } from "node:fs";\nif (statSync("opened").isDirectory()) console.log(readFileSync("opened/k.json", "utf-8"));\n');
+    mkdirSync(join(root, "opened"));
+    write("opened/k.json", "k\n");
     // Asks git for the tracked files under data/ (a `tree` site), annotated as the audit requires.
     write(
       "scripts/g.ts",
@@ -242,6 +283,23 @@ describe.skipIf(!HAS_STRACE)("the falsifiers, under a real strace (skipped where
     const d = decide();
     expect(d.skip).toBe(true);
     expect(d.skip && d.sha).toBe("mainsha");
+  });
+
+  test("a directory it only OPENED: a new entry does not make it run; the file it read, or the directory becoming a file, does (tools#1265)", () => {
+    expect(record("o:check").note).toStartWith("recorded");
+    const reads = loadRecords(root)!.checks["o:check"]!.reads;
+    expect(reads["opened"]).toBe("dir");
+    // bun itself lists the checkout root and the directory of every module it loads.
+    expect(reads["scripts"]).toStartWith("dir ");
+    write("opened/new.json", "{}\n");
+    expect(decide("o:check").skip).toBe(true);
+    write("opened/k.json", "changed\n");
+    expect(decide("o:check").skip).toBe(false);
+    write("opened/k.json", "k\n");
+    expect(decide("o:check").skip).toBe(true);
+    rmSync(join(root, "opened"), { recursive: true });
+    write("opened", "now a file\n");
+    expect(decide("o:check").skip).toBe(false);
   });
 
   test("THE CONE: a change to a file the check never read does not make it run", () => {

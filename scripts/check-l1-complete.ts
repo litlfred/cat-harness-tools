@@ -108,7 +108,7 @@ import { REFERENCED_SOURCE_SCHEMA_ID, ReferencedSourceSchema } from "../schemas/
 import { corpusDirectoriesForGraph, instanceConfigFor } from "../schemas/kg/harness-config.js";
 import { instanceDirectoryForGraph } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
-import { entrySubgraphDirs, nonEntryDirs } from "./lib/library-entry-graphs.ts";
+import { entrySubgraphDirs, libraryEntryDir, libraryEntryDirs, nonEntryDirs } from "./lib/library-entry-graphs.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.ts";
 
 export type State = "met" | "unmet" | "not-derivable";
@@ -269,6 +269,10 @@ export const ENTRY_SIDECARS: readonly string[] = [
   // `volume-separation.py propose` (cat-harness-tools#132). Proposed, never
   // applied: a person confirms a span before it becomes an entry.
   "separation-proposal.json",
+  // A scanned entry's advisory formula-region bounding boxes, written by
+  // `pdf-formula-regions.py` (cat-harness-tools#131, bean `f0hv`). Advisory,
+  // never transcribed and never gated.
+  "formula-regions.json",
   // The two review-anchor arms of the document adapter (`docx-structure.py`,
   // `pdf-line-map.py`): the .docx's own structure and the PDF's page/line map,
   // written beside `structure.json` so a public comment citing "page 12, line
@@ -1673,21 +1677,21 @@ export function checkAll(root: string): EntryReport[] | undefined {
   noteAbsent(presence.absent, "a library");
   for (const lib of presence.present) {
     const others = nonEntryDirs(lib);
-    for (const d of readdirSync(lib).sort()) {
-      if (!statSync(join(lib, d)).isDirectory()) continue;
+    // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`).
+    for (const { slug: d, dir } of libraryEntryDirs(lib)) {
       // Another kind's directory kept in the library is not an entry.
-      if (others.has(join(lib, d))) continue;
+      if (others.has(dir)) continue;
       const prior = seen.get(d);
       if (prior !== undefined) {
         throw new Error(
-          `slug "${d}" appears in two libraries — ${prior} and ${join(lib, d)}. ` +
+          `slug "${d}" appears in two libraries — ${prior} and ${dir}. ` +
             `The committed verdict is keyed on the slug alone, so one would silently ` +
             `overwrite the other. Rename one.`,
         );
       }
-      seen.set(d, join(lib, d));
+      seen.set(d, dir);
       out.push({
-        ...checkEntry(join(lib, d)),
+        ...checkEntry(dir),
         library: libs.length > 1 ? relative(root, lib) : undefined,
       });
     }
@@ -1771,7 +1775,9 @@ export function sidecarRootFor(
   libs: readonly string[] = corpusDirectoriesForGraph(root, "library"),
 ): string {
   for (const lib of libs) {
-    const entry = join(lib, slug);
+    // Flat or filed in a concern group (bean `6fez`): a filed entry is not at
+    // `<lib>/<slug>`, and missing it would write its sidecar to the wrong root.
+    const entry = libraryEntryDir(lib, slug) ?? join(lib, slug);
     if (existsSync(entry)) {
       const owner = instanceConfigFor(entry)?.root;
       if (owner && (owner === root || instanceDirectoryForGraph(owner, "qa") !== undefined)) {

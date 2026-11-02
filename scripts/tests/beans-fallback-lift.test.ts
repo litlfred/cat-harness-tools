@@ -13,7 +13,7 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { liftBlockInText, updateBean } from "../beans-fallback.ts";
+import { liftBlockInText, listBeans, updateBean } from "../beans-fallback.ts";
 
 function store(beans: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "beans-lift-"));
@@ -70,5 +70,19 @@ describe("closing a blocker lifts its blocks", () => {
   test("the text transform says when there was nothing to lift", () => {
     const raw = "---\n# t-b\ntitle: b\nstatus: todo\n---\n\nBody.\n";
     expect(liftBlockInText(raw, "blocked_by", "t-a", "x")).toBeUndefined();
+  });
+});
+
+
+describe("listBeans skips README.md", () => {
+  test("README.md with generated front matter is not listed as an open bean", () => {
+    const root = store({
+      "t-a": "status: todo\ntype: task",
+    });
+    writeFileSync(
+      join(root, "beans", "README.md"),
+      '---\ngenerated: "cat-harness-tools/scripts/subgraph-readmes.ts"\n---\n\n# `beans/defs/`\n',
+    );
+    expect(listBeans(root).map((b) => b.id)).toEqual(["t-a"]);
   });
 });

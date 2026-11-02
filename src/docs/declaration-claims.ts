@@ -218,7 +218,12 @@ export function claimsIn(markdown: string, file: string, graphs: GraphSources): 
  * through a convenience.
  */
 export function historicalPrefixes(repoRoot: string): string[] {
-  const historical = new Set(["fsh-guts", "beans", "bean-defs", "workflow-state", "library"]);
+  // `substrate-snapshot` is not history but somebody else's bytes at a pin
+  // (`subscriptions/`, read-only): a claim in it describes the upstream's
+  // declarations, not ours, so judging it against ours is wrong by
+  // construction (folio-assistant#2862: an iHRIS skill naming its own
+  // `roles.json`).
+  const historical = new Set(["fsh-guts", "beans", "bean-defs", "workflow-state", "library", "substrate-snapshot"]);
   const out = new Set<string>();
   for (const instance of instanceRootsIn(repoRoot)) {
     for (const entry of readDeclaration(instance)?.directories ?? []) {

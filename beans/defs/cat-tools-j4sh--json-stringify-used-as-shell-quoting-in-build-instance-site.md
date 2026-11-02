@@ -2,11 +2,11 @@
 # cat-tools-j4sh
 $schema: bean/1.0.0
 title: 'JSON.stringify IS NOT SHELL QUOTING: build-instance-site builds bash -c strings with JSON-quoted paths and excludes, where $( ) and backticks still expand'
-status: todo
+status: completed
 type: bug
 priority: low
 created_at: 2026-10-31T04:05:00Z
-updated_at: 2026-10-31T04:05:00Z
+updated_at: 2026-10-31T08:50:00Z
 parent: cat-tools-sr31
 ---
 

@@ -357,6 +357,7 @@ export function withConsent<T extends { ref: string; trust?: MountTrust }>(mount
   if (mount.trust?.consent?.ref === mount.ref) return mount;
   const consent = MountConsentSchema.parse({
     by: grant.by,
+    // input-site: inert #0e0591be — default date when stamping a new consent grant; never reached by a read-only check
     on: grant.on ?? new Date().toISOString().slice(0, 10),
     ref: mount.ref,
     evidence: grant.evidence,

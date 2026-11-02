@@ -49,6 +49,7 @@ import {
   retiredKeys,
   skillPackages,
   stepsToRun,
+  deferredWhy,
   unlisted,
   verifyHere,
   VERIFIED_BY_GATES_ENV,
@@ -555,6 +556,21 @@ describe("inside a build of the QA working copy, the steps that read it are defe
     const { run, deferred } = stepsToRun(STEPS, { [BUILDING_ENV]: "1" });
     expect(deferred.map((s) => s.write.join(" "))).toEqual(["uml:overview"]);
     expect(run.map((s) => s.write.join(" "))).toEqual(CHAIN.filter((c) => c !== "uml:overview"));
+  });
+
+  test("in a PREVIEW's build, the writers derive:publish runs anyway are deferred too (Q-CONE-2 B)", () => {
+    const { run, deferred } = stepsToRun(STEPS, { [BUILDING_ENV]: "1", CAT_BUILD_TYPE: "preview" });
+    expect(deferred.map((s) => s.write.join(" "))).toEqual(["skills:docs", "lsi:viz", "uml:overview"]);
+    expect(run.map((s) => s.write.join(" "))).toEqual(["skill:commands", "glossary:page", "auto:docs", "lsi:skills", "kg:audit", "kg:detangle", "subgraph:jsonld"]);
+    expect(deferredWhy(deferred[0]!)).toContain("CAT_BUILD_TYPE=preview");
+    // A full build, a refused value, or a preview outside a QA build: unchanged.
+    expect(stepsToRun(STEPS, { [BUILDING_ENV]: "1", CAT_BUILD_TYPE: "full" }).deferred.map((s) => s.write.join(" "))).toEqual(["uml:overview"]);
+    expect(stepsToRun(STEPS, { [BUILDING_ENV]: "1", CAT_BUILD_TYPE: "bogus" }).deferred.map((s) => s.write.join(" "))).toEqual(["uml:overview"]);
+    expect(stepsToRun(STEPS, { CAT_BUILD_TYPE: "preview" }).deferred).toEqual([]);
+  });
+
+  test("only writers no later QA step reads are marked built-at-publish (traced 2026-11-01)", () => {
+    expect(STEPS.filter((s) => s.builtAtPublish).map((s) => s.write.join(" "))).toEqual(["skills:docs", "lsi:viz"]);
   });
 
   test("the step that draws the QA tree is the one marked", () => {

@@ -106,6 +106,16 @@ export const BuiltAtPublishSchema = z
       .optional(),
     /** One sentence a reviewer can check: what makes it pin- or state-dependent. */
     reason: z.string().min(1),
+    /**
+     * A whole-corpus INDEX (search, LSI, SQLite slices, a handler index), not a
+     * page a reviewer reads. A `preview` build puts back main's copy instead of
+     * running its writer; a `full` build (main, public comment, release)
+     * always runs it (owner, 2026-11-01: "preview" = no reindex, only
+     * changes). A writer is borrowed only when EVERY entry it writes says so,
+     * so marking one of a writer's pages does not skip the others.
+     * `cat-harness-tools/scripts/lib/build-type.ts`.
+     */
+    index: z.literal(true).optional(),
   })
   .strict()
   .superRefine((e, ctx) => {

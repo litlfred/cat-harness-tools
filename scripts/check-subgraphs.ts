@@ -382,6 +382,64 @@ function markdownIn(abs: string): string[] {
   return [...new Glob("**/*.md").scanSync({ cwd: abs })];
 }
 
+/**
+ * The bean store's archive VIEW, paired with the store it sits inside.
+ *
+ * Bean `e8m3`: the owner ruled 2026-09-26 that archiving is a view rather
+ * than a terminal state, so an archived bean is still part of the store and
+ * still resolves. `beans archive` (a third-party binary) moves a file from
+ * `defs/` to `defs/archive/` and rewrites nothing, so after a sweep two kinds
+ * of link stop resolving on disk while still naming the right bean
+ * (cat-harness-tools#1248):
+ *
+ * - a link FROM an archived bean, written relative to `defs/`;
+ * - a link TO an archived bean, written as `defs/<bean>.md`.
+ *
+ * Both are tried again in the other half of the pair. Only `bean-defs`
+ * directories nested inside another `bean-defs` directory pair up, so no
+ * other graph gets this leniency.
+ */
+export function beanArchiveViews(
+  dirs: ReadonlyArray<{ absPath?: string; path: string; graphTypologies: readonly string[] }>,
+  root: string,
+): Array<{ store: string; view: string }> {
+  const defs = dirs
+    .filter((d) => d.graphTypologies.includes("bean-defs"))
+    .map((d) => resolve(d.absPath ?? join(root, d.path)));
+  const out: Array<{ store: string; view: string }> = [];
+  for (const view of defs) {
+    for (const store of defs) {
+      if (view !== store && view.startsWith(store + "/")) out.push({ store, view });
+    }
+  }
+  return out;
+}
+
+/** {@link resolveInTree}, then the other half of a store/archive pair ({@link beanArchiveViews}). */
+export function resolveAcrossArchive(
+  file: string,
+  target: string,
+  wanted: string,
+  views: ReadonlyArray<{ store: string; view: string }>,
+): string | undefined {
+  const direct = resolveInTree(wanted);
+  if (direct !== undefined) return direct;
+  for (const { store, view } of views) {
+    // From an archived bean, as if it still sat in the store.
+    const from = dirname(file);
+    if (from === view || from.startsWith(view + "/")) {
+      const moved = resolveInTree(resolve(join(store, relative(view, from)), target));
+      if (moved !== undefined) return moved;
+    }
+    // To a bean that has since been archived.
+    if (dirname(wanted) === store) {
+      const archived = resolveInTree(join(view, relative(store, wanted)));
+      if (archived !== undefined) return archived;
+    }
+  }
+  return undefined;
+}
+
 export function scanSubgraphs(root: string = ROOT): SubgraphReport {
   // The CORPUS on the platform's own run (placement PR0, bean `ejye`): what
   // the platform's `scope: "repository"` mirrors used to bring into this sweep
@@ -412,6 +470,7 @@ export function scanSubgraphs(root: string = ROOT): SubgraphReport {
   const exempt: string[] = [];
   const siteResolved: SubgraphReport["siteResolved"] = [];
   let scanned = 0;
+  const archiveViews = beanArchiveViews(dirs, root);
 
   for (const dir of dirs) {
     const abs = dir.absPath ?? join(root, dir.path);
@@ -455,8 +514,9 @@ export function scanSubgraphs(root: string = ROOT): SubgraphReport {
         // A link destination is a URL: `%20`, `%28`, `%40` name the file's own
         // characters (`linkTarget` in subgraph-readmes writes them), so decode
         // before asking the filesystem. Malformed escapes stay as written.
-        const wanted = resolve(dirname(file), decodeLinkTarget(target));
-        const resolved = resolveInTree(wanted);
+        const decoded = decodeLinkTarget(target);
+        const wanted = resolve(dirname(file), decoded);
+        const resolved = resolveAcrossArchive(file, decoded, wanted, archiveViews);
         if (resolved === undefined && absentOffMain.some((a) => wanted === a || wanted.startsWith(a + "/"))) {
           unverifiable.push({ from: relative(root, file), fromDir: label(owner), target });
           continue;

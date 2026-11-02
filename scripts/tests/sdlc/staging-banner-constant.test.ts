@@ -68,6 +68,20 @@ function build(facts: Partial<StagingFacts>): { dir: string; html: Map<string, s
   return { dir, html, json };
 }
 
+describe("the build type is a fact in staging.json, never in the pages (owner, 2026-11-01)", () => {
+  const p = build({ buildType: "preview" });
+  const f = build({ buildType: "full" });
+
+  test("staging.json names it, so `pc:release freeze` can refuse a preview", () => {
+    expect(JSON.parse(p.json).buildType).toBe("preview");
+    expect(JSON.parse(f.json).buildType).toBe("full");
+  });
+
+  test("the pages are byte-identical across build types", () => {
+    for (const page of PAGES) expect(p.html.get(page)).toBe(f.html.get(page));
+  });
+});
+
 describe("the injected HTML does not depend on the build — bean `g196`", () => {
   const a = build({ sha: "aaaaaaa", built: "2026-09-20T10:00:00Z" });
   const b = build({ sha: "bbbbbbb", built: "2026-09-20T18:30:00Z", pr: "999" });
@@ -205,6 +219,13 @@ describe("injection mechanics carried over from the bash version", () => {
     expect(twice.html).toBe(once);
     expect(twice.outcome).toBe("already");
   });
+
+  test("a page that only NAMES the attribute (the review page's CSS) still gets the banner", () => {
+    const page = `<html><head><style>[data-fa-staging-banner]{display:none}</style></head><body><script>q("[data-fa-staging-banner]")</script>x</body></html>`;
+    const r = injectInto(page);
+    expect(r.outcome).toBe("injected");
+    expect(injectInto(r.html).outcome).toBe("already");
+  });
 });
 
 /* ── A COMMENT ABOUT THE BANNER BROKE THE BANNER ──────────────────────────
@@ -289,6 +310,23 @@ describe("the banner goes in the BODY, not in a comment that mentions one", () =
       runUrl: "u", mainSite: "m", mainPagesKnown: false, newPages: [],
     });
     expect(out.injected).toBe(1);
+    expect(out.noBody).toEqual(["bad.html"]);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("a bodiless meta-refresh stub is counted as a redirect, not a page with no banner", () => {
+    const dir = mkdtempSync(join(tmpdir(), "fa-staging-rd-"));
+    writeFileSync(
+      join(dir, "stub.html"),
+      '<!doctype html>\n<meta charset="utf-8">\n<title>Catalogue</title>\n<meta http-equiv="refresh" content="0; url=../../catalogue/">\n<link rel="canonical" href="../../catalogue/">\n',
+    );
+    writeFileSync(join(dir, "bad.html"), "<html><head></head></html>");
+    const out = run(dir, {
+      branch: "b", sha: "s", built: "t", pr: "1",
+      prUrl: "u", branchUrl: "u", issue: null, issueUrl: null,
+      runUrl: "u", mainSite: "m", mainPagesKnown: false, newPages: [],
+    });
+    expect(out.redirects).toBe(1);
     expect(out.noBody).toEqual(["bad.html"]);
     rmSync(dir, { recursive: true, force: true });
   });

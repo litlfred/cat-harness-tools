@@ -35,6 +35,7 @@
     "scripts/lib/jekyll-permalink.ts",
     "scripts/lib/skill-edges.ts",
     "scripts/site-publisher.ts",
+    "scripts/stage-workflow-local.ts",
     "scripts/tests/compose-docs.test.ts",
     "scripts/tests/default-scope-globs.test.ts",
     "scripts/tests/docs-route.test.ts",

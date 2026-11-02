@@ -161,7 +161,8 @@ export function briefInline(doc: Document, parent: Element, text: string): void 
   let m;
   while ((m = re.exec(s))) {
     if (m.index > last) parent.appendChild(doc.createTextNode(s.slice(last, m.index)));
-    if (m[1] !== undefined) { const b = doc.createElement("strong"); b.textContent = m[1]; parent.appendChild(b); }
+    // Bold may hold a link ("**No. [136](…#PC-0137):**"), so its inside is drawn the same way.
+    if (m[1] !== undefined) { const b = doc.createElement("strong"); briefInline(doc, b, m[1]); parent.appendChild(b); }
     else if (m[2] !== undefined) { const c = doc.createElement("code"); c.textContent = m[2]; parent.appendChild(c); }
     else {
       const label = m[3] !== undefined ? m[3] : m[5]!;

@@ -66,6 +66,7 @@
  *   destination with two names, on a template that prints a kind word, or on
  *   a committed sidecar that is stale or absent. This is the gate CI runs.
  */
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { RAIL_DATA_DIR, expandRail, railDataJson } from "./lib/harness-rail.ts";
 import { join, relative, resolve, sep } from "node:path";
@@ -388,8 +389,11 @@ export function navNamesQaResult(r: NavNamesResult): QaResult {
 
 if (import.meta.main) {
   const siteAbs = join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT));
-  const r = checkNavNames(REPO_ROOT, siteAbs);
   const check = process.argv.includes("--check");
+  if (!check && !existsSync(join(siteAbs, "_data", "harness.json"))) {
+    spawnSync("bun", ["run", "cat", "docs:harness"], { cwd: REPO_ROOT, stdio: "inherit" });
+  }
+  const r = checkNavNames(REPO_ROOT, siteAbs);
 
   if (r.undetermined) {
     console.error(`UNDETERMINED: ${r.undetermined}.`);

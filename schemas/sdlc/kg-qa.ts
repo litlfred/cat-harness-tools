@@ -1043,6 +1043,177 @@ export const KG_CRITERIA: readonly KgCriterionDefinition[] = [
       "A node that is not an end event and has no outgoing flow, so control arrives and the process neither " +
       "continues nor terminates.",
   },
+  // ── Readability (owner, 2026-10-31, thread "Improve BPMN quality checks
+  // from research"). Evidence and what was left out: the module comment of
+  // `src/workflow/diagram-quality.ts`. Counts are over the 76 processes of
+  // cat-harness and cat-harness-tools on the day they were added. All but
+  // two are `minor`: reported, never gated.
+  {
+    id: "activity-implicit-split",
+    applies: ["process"],
+    scope: "instance",
+    // `major`: the semantics are ambiguous, not just the look — a reader
+    // cannot tell a fork from a choice. 8 on the day it was added.
+    severity: "major",
+    summary:
+      "A task has two or more outgoing sequence flows and no gateway, so a reader must guess whether the branches " +
+      "run in parallel or one is chosen (Leopold, Mendling, Günther 2016). A loop-back INTO a task is not reported.",
+  },
+  {
+    id: "gateway-mixed",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary: "One gateway both joins (2+ in) and splits (2+ out). Use a join gateway, then a split (7PMG G2, G4).",
+  },
+  {
+    id: "process-size",
+    applies: ["process"],
+    scope: "instance",
+    // `minor`: the 20 is house style (`bpmn-authoring`), stricter than any
+    // threshold in the literature.
+    severity: "minor",
+    summary:
+      "More than 20 flow nodes: split the process by phase into call activities (`bpmn-authoring`). House style, " +
+      "stricter than the evidence, whose only number is 7PMG's 50 — see `process-decompose`.",
+  },
+  {
+    id: "process-decompose",
+    applies: ["process"],
+    scope: "instance",
+    // `major`: the one size threshold with evidence. 0 on the day it was added.
+    severity: "major",
+    summary:
+      "More than 50 flow nodes. 7PMG G7: above 50 elements a model's error probability tends to exceed 50% " +
+      "(Mendling, Reijers, van der Aalst 2010).",
+  },
+  {
+    id: "process-single-start",
+    applies: ["process"],
+    scope: "instance",
+    // Start events only. Several NAMED end events are this corpus's design —
+    // the bean CLOSE call before each end — so G3's end half is not checked.
+    severity: "minor",
+    summary: "A process level has more than one start event (7PMG G3). One entry point per level, or a call activity per entry.",
+  },
+  {
+    id: "decision-label-question",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary: "A named decision is not phrased as a question. A decision asks; its branch labels are the answers.",
+  },
+  {
+    id: "activity-label-verb-first",
+    applies: ["process"],
+    scope: "instance",
+    // `minor` and a heuristic: a noun or gerund ending on the first word. The
+    // evidence (Mendling, Reijers, Recker 2010) is perceived ambiguity in one
+    // questionnaire, not measured comprehension, so this never gates.
+    severity: "minor",
+    summary:
+      "An activity label starts with a word that reads as a noun or gerund (`Signature verification`, `Reviewing`). " +
+      "Use verb-object: an imperative verb, then its object (7PMG G6).",
+  },
+  {
+    id: "edge-rectilinear",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "A sequence flow has a diagonal segment. Owner, 2026-09-23: keep edges rectilinear (`bpmn-processes`). " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "edge-crossing",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "Two sequence flows cross. Same geometry as `archimate-crossings`. Owner, 2026-09-23: no overlapping. " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "edge-through-node",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "A sequence flow runs over a flow node it does not connect. Route loop-backs in the channel below the lane " +
+      "(`bpmn-processes`). `n/a` for a diagram with no DI.",
+  },
+  {
+    id: "diagram-too-wide",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "The drawing is wider than 1400px, so at 100% it does not fit a screen and text shrinks when scaled. Split the process or tighten spacing (`bpmn:detangle --write`). " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "diagram-too-tall",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "The drawing is taller than 900px, so at 100% it does not fit a screen. Split the process or tighten lanes. " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "label-overlap",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "Two labels overlap, so neither can be read. Move one (`bpmn:detangle --write` places labels). " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "label-on-edge",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "A label sits on a sequence flow, so the line runs through the text. Move the label off the line. " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "label-on-shape",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "A label covers a shape or runs into its name. Move the label clear of the box. " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "label-on-lane-line",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "A label crosses a lane or pool boundary, so it reads as if it belongs to two lanes. Keep it inside its lane. " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "shape-overlap",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "Two flow nodes are drawn on top of each other. Move one. " +
+      "`n/a` for a diagram with no DI.",
+  },
+  {
+    id: "lane-order",
+    applies: ["process"],
+    scope: "instance",
+    severity: "minor",
+    summary:
+      "Another lane order gives fewer lane jumps. Swap lanes (`bpmn:detangle --write` tries every order). " +
+      "`n/a` for a diagram with no DI.",
+  },
   {
     id: "prose-reviewed-since-code-changed",
     applies: ["process", "skill"],

@@ -87,6 +87,47 @@ describe("run-gates.py gate inputs", () => {
     expect(kind).toBe("live-state");
     expect(why).toContain("live state");
   });
+
+  test("ingest:ig-chrome:check is skipped as needs-input because it requires external --layer template checkouts (smart-base#239)", () => {
+    const [kind, why] = py("run-gates.py", `m.skip_reason(".", "ingest:ig-chrome:check")`) as [string, string];
+    expect(kind).toBe("needs-input");
+    expect(why).toContain("--layer");
+  });
+
+  test("software:check judges the runner, not the checkout (folio-assistant-core#287)", () => {
+    const [kind, why] = py("run-gates.py", `m.skip_reason(".", "software:check", {})`) as [string, string];
+    expect(kind).toBe("runner-state");
+    expect(why).toContain("machine");
+  });
+
+  test("the lock and default-branch gates are skipped in layer mode only (folio-assistant-core#287)", () => {
+    for (const s of ["mount:lock:check", "mount:remote:check", "check:draft-beans", "readmes:check", "readme-sections:check", "book:check", "check:standalone"]) {
+      const [kind] = py("run-gates.py", `m.skip_reason(".", ${JSON.stringify(s)}, {"MODE": "layer"})`) as [string, string];
+      expect(kind).toBe("layer-mode");
+      expect(py("run-gates.py", `m.skip_reason(".", ${JSON.stringify(s)}, {"MODE": "index"})`)).toEqual([null, null]);
+    }
+  });
+
+  test("another layer's standalone rehearsal is skipped in any root but its own (smart-ra#213)", () => {
+    const skip = (script: string, env: object, own: string[] | null) =>
+      py("run-gates.py", `m.skip_reason(".", ${JSON.stringify(script)}, ${JSON.stringify(env)}, ${own === null ? "None" : JSON.stringify(own)})`);
+    for (const mode of ["layer", "index"]) {
+      const [kind, why] = skip("check:cat-harness-tools-standalone", { MODE: mode }, ["smart-ra"]) as [string, string];
+      expect(kind).toBe("other-layer");
+      expect(why).toContain("cat-harness-tools's own CI");
+    }
+    // The layer's own run and an index that holds it as its own still judge it, as does an unknown caller.
+    expect(skip("check:cat-harness-tools-standalone", { MODE: "layer" }, ["cat-harness-tools"])).toEqual([null, null]);
+    expect(skip("check:cat-harness-tools-standalone", { MODE: "index" }, ["cat-harness", "cat-harness-tools", "smart-base"])).toEqual([null, null]);
+    expect(skip("check:cat-harness-tools-standalone", { MODE: "layer" }, null)).toEqual([null, null]);
+  });
+
+  test("the bare-usage gates are skipped as needs-input (folio-assistant-core#287)", () => {
+    for (const s of ["check:qa-corpus", "check:session-staleness", "folio:shim:check", "publish:check"]) {
+      const [kind] = py("run-gates.py", `m.skip_reason(".", ${JSON.stringify(s)}, {})`) as [string, string];
+      expect(kind).toBe("needs-input");
+    }
+  });
 });
 
 describe("root-cat-script.py", () => {

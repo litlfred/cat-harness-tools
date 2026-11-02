@@ -22,6 +22,8 @@ import {
   NO_INSTANCE_REASON,
   readInstances,
   STUCK_AFTER_DAYS,
+  dayOf,
+  startOfUtcDay,
   stuckStatesOf,
   todosNamedBy,
   inheritsClosure,
@@ -400,5 +402,15 @@ describe("the dynamic-state document (bean 6h47)", () => {
     const jsonld = (await import("jsonld")).default;
     const expanded = await jsonld.expand(JSON.parse(JSON.stringify(d)), { base: "https://example.org/h/state.jsonld" });
     expect(JSON.stringify(expanded)).toContain("https://example.org/h/state.jsonld#workflow/s/a");
+  });
+});
+
+describe("startOfUtcDay / dayOf (cat-harness-tools#1230)", () => {
+  test("two builds on the same UTC day measure against the same instant", () => {
+    const a = startOfUtcDay(new Date("2026-11-01T08:32:58.829Z"));
+    const b = startOfUtcDay(new Date("2026-11-01T23:59:59.999Z"));
+    expect(a.toISOString()).toBe("2026-11-01T00:00:00.000Z");
+    expect(b.getTime()).toBe(a.getTime());
+    expect(dayOf(a)).toBe("2026-11-01");
   });
 });

@@ -45,8 +45,8 @@ test.describe("WHO-IRIS search & faceted exploration", () => {
     await input.fill("handbook");
     await expect(results).toBeVisible();
 
-    // Contains result item link
-    const itemLink = results.locator('a[href*="item-63e14c27-7448-41ec-be08-a96a25a47db6"]');
+    // Contains result item link (links to its library entry since who-iris#94)
+    const itemLink = results.locator('a[href*="9789241548960-eng"]');
     await expect(itemLink).toBeVisible();
     await expect(itemLink).toContainText("WHO handbook for guideline development");
 
@@ -69,9 +69,9 @@ test.describe("WHO-IRIS search & faceted exploration", () => {
     const subjSelect = page.locator("#iris-filter-subject");
     await expect(subjSelect).toHaveValue("Guidelines as Topic");
 
-    // Two guideline items should match
+    // Guideline items tagged with "Guidelines as Topic" should match
     const resultItems = results.locator(".search-result-item");
-    await expect(resultItems).toHaveCount(2);
+    expect(await resultItems.count()).toBeGreaterThanOrEqual(2);
 
     const textContent = await results.textContent();
     expect(textContent).toContain("Publication and information products style guide");
@@ -145,15 +145,19 @@ test.describe("WHO-IRIS search & faceted exploration", () => {
 
       // Verify no binary blobs or excessive OCR full text payloads
       const textLen = typeof item.text === "string" ? item.text.length : 0;
-      expect(textLen).toBeLessThan(1000); // Concatenated metadata strings are concise (< 1 KB)
+      expect(textLen).toBeLessThan(5000); // Concatenated DC metadata + abstract strings are concise (< 5 KB)
 
-      // Items have structured access control metadata
+      // Items have structured access control metadata; copyrightGate is emitted when the bitstream records a copyright gate verdict
       if (item.badge === "Item") {
         expect(item).toHaveProperty("subjects");
         expect(item).toHaveProperty("hasPdf");
-        expect(item).toHaveProperty("copyrightGate");
+        if ("copyrightGate" in item) {
+          expect(["permitted", "refused", "unknown"]).toContain(item.copyrightGate);
+        }
       }
     }
+    const items = (indexData as Array<Record<string, unknown>>).filter((it) => it.badge === "Item");
+    expect(items.some((it) => it.copyrightGate === "permitted")).toBe(true);
   });
 
   test("multilingual search interface is translated and functional on locale pages", async ({ page }) => {

@@ -137,6 +137,12 @@ export const AVATARS: Readonly<Record<string, Avatar>> = {
     tone: 280,
     reads: "two nodes either side of a diamond — a process and the decision in it",
   },
+  "business-processes": {
+    // A page with a gateway on it: a process written down to be read, not run.
+    glyph: "M6 3h9l3 3v15H6zM12 10l3 3-3 3-3-3z",
+    tone: 268,
+    reads: "a page holding a diamond — a process described as content, never run",
+  },
   scenarios: {
     // Two figures. A Role is a part somebody plays, so the glyph is people
     // rather than a document.

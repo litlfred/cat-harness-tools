@@ -204,7 +204,7 @@ export function listBeans(root: string, cfg = readStoreConfig(root)): Bean[] {
   const dir = where.at;
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
-    .filter((f) => f.endsWith(".md"))
+    .filter((f) => f.endsWith(".md") && f !== "README.md")
     .map((f) => parseBean(join(dir, f)))
     .filter((b): b is Bean => Boolean(b))
     .sort((a, b) => a.id.localeCompare(b.id));

@@ -356,11 +356,15 @@ export interface ShapeField {
  * failure. (An `untyped` state existed until #1168 B6b removed the registry
  * form that produced it.)
  */
-export type NodeSchemaResolution =
+export type NodeSchemaResolution = (
   | { tag: string; state: "resolved"; ref: ValidatorRef; schema: z.ZodTypeAny }
   | { tag: string; state: "shape"; ref: ValidatorRef; fields: ShapeField[] }
   | { tag: string; state: "external"; spec: string }
-  | { tag: string; state: "unresolvable"; reason: string };
+  | { tag: string; state: "unresolvable"; reason: string }
+) & {
+  /** The registry's `derived`: no file carries the family; it is what the kind's source files are read into. */
+  derived?: true;
+};
 
 /**
  * Read an interface's or object type alias's fields from source.
@@ -414,6 +418,7 @@ export async function resolveNodeSchemas(
   const map = (registry.get(canonical)?.nodeSchemas ?? {}) as Record<string, NodeSchemaRef>;
   const out: NodeSchemaResolution[] = [];
   for (const [tag, ref] of Object.entries(map)) {
+    const at = out.length;
     if (ref.validator) {
       const v = await loadValidator(ref.validator, canonical, instanceRoot);
       out.push(
@@ -427,6 +432,7 @@ export async function resolveNodeSchemas(
     } else if (ref.external) {
       out.push({ tag, state: "external", spec: ref.external });
     }
+    if (ref.derived && out.length > at) out[at] = { ...out[at], derived: true };
   }
   return out;
 }

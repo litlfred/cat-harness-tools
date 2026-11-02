@@ -185,7 +185,9 @@ test.describe("IG site diagrams — the shared figure viewer (bean n7f8)", () =>
     const level = page.locator(".fa-figure-tools:has(+ .fa-figure-scope svg[data-fa-src$='wide.svg']) .fa-zoom-level");
     await expect(scope).toHaveAttribute("tabindex", "0");
     // Reached by Tab from its own toolbar, not only by a script focusing it.
-    await page.locator(".fa-figure-tools:has(+ .fa-figure-scope svg[data-fa-src$='wide.svg']) button", { hasText: "Copy" }).focus();
+    // From the toolbar's LAST control: cat-harness#916 put "Open ↗" after
+    // Copy, so Tab from Copy now lands on that link, not on the figure.
+    await page.locator(".fa-figure-tools:has(+ .fa-figure-scope svg[data-fa-src$='wide.svg']) :is(button, a)").last().focus();
     await page.keyboard.press("Tab");
     await expect(scope).toBeFocused();
 

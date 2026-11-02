@@ -69,16 +69,16 @@
  *   bun run cat-harness-tools/scripts/gen-processes-viz.ts
  *   bun run cat-harness-tools/scripts/gen-processes-viz.ts --check
  */
-import { linkProse } from "./lib/link-prose.ts";
+import { escapeAngles, linkProse } from "./lib/link-prose.ts";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { declarationPathIn } from "../schemas/kg/cat-harness.js";
 import { baseDocsDir } from "./compose-docs.js";
 import { skillPagesOf } from "./lib/skill-pages.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
-import { workflowFiles, kgRoots } from "./known-skills.js";
-import { loadProcessModel, isActivity, isDecision, branchesOf, isGlobalTasksFile } from "../src/workflow/process-model.js";
+import { businessProcessFiles, workflowFiles, kgRoots } from "./known-skills.js";
+import { loadProcessModel, isActivity, isDecision, branchesOf, isGlobalTasksFile, type NotRunElement } from "../src/workflow/process-model.js";
 import {
   laneBinding,
   readRoleGraph,
@@ -89,7 +89,7 @@ import {
 } from "../schemas/process/role-graph.js";
 import { ownElementPattern } from "../schemas/kg/namespaces.js";
 import { processPresentations, type Presentation } from "./process-presentations.js";
-import { siteRootFrom } from "../schemas/kg/visualiser-route.js";
+import { siteRootFrom, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { pageParts, tileCountsForPages, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { tileCounts } from "../schemas/ui/tile-count.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -134,6 +134,12 @@ export interface ProcessRow {
   file: string;
   /** The directory it lives under, which is the instance/methodology facet. */
   group: string;
+  /**
+   * The declared name of the instance whose directory holds the file: the
+   * sub-graph whose page lists it (`<harness>/processes/<instance>/`).
+   * Absent only on a row built by hand (a test fixture).
+   */
+  instance?: string;
   id: string;
   name: string;
   lanes: string[];
@@ -173,6 +179,13 @@ export interface ProcessRow {
   markers?: Marker[];
   /** Set when the diagram would not load at all. Reported, never silently dropped. */
   loadError?: string;
+  /**
+   * What the diagram draws that the interpreter does not run (a boundary
+   * timer, an intermediate event): read past by a VIEW load, so the page is
+   * drawn, and named on it so nothing is dropped silently (owner, 2026-11-01,
+   * Q-SUBG-2 B). The engine still refuses to run such a diagram.
+   */
+  notRun?: NotRunElement[];
   /** Basename without `.bpmn` — the page name and the SVG name. */
   stem: string;
   /** `<bpmn:documentation>` on the process element. */
@@ -276,6 +289,52 @@ export interface ProcessStep {
   /** For a call to a global task: the shared step's id and kind, and the values this call gives its inputs. */
   globalTask?: { id: string; type: string; inputs?: Record<string, string> };
   documentation?: string;
+  /** `<cat-harness.processes:narrative href>`, and the text of the section it names, when found. */
+  narrative?: { href: string; text?: string };
+}
+
+/**
+ * The text of the section `href` names: `X.md#frag`, relative to the diagram.
+ * The heading matches when its text, its `{#id}`, or its slug is the
+ * fragment. The text runs to the next heading of the same or a higher level.
+ * Undefined when the file or the heading is missing, so the page says so
+ * rather than showing nothing.
+ */
+export function narrativeText(diagram: string, href: string): string | undefined {
+  const [file, frag] = href.split("#", 2) as [string, string | undefined];
+  if (frag === undefined || frag === "") return undefined;
+  const abs = resolve(dirname(diagram), file || basename(diagram));
+  if (!existsSync(abs)) return undefined;
+  const lines = readFileSync(abs, "utf8").split(/\r?\n/);
+  const slug = (t: string): string => t.toLowerCase().trim().replace(/[^\p{L}\p{N}\s._-]/gu, "").replace(/\s+/g, "-");
+  // `<a name="frag"></a>` (or `id=`) on its own line names the heading after it.
+  const anchorOf = (l: string): string | undefined => /^\s*<a\s+(?:name|id)="([^"]+)"\s*>\s*<\/a>\s*$/.exec(l)?.[1];
+  const heading = (l: string): RegExpExecArray | null => /^(#{1,6})\s+(.*?)\s*$/.exec(l);
+  const section = (from: number, level: number): string | undefined => {
+    let end = lines.length;
+    for (let j = from; j < lines.length; j++) {
+      const h = heading(lines[j]!);
+      if (h && h[1]!.length <= level) {
+        end = j;
+        break;
+      }
+    }
+    // The next section's anchor line is not part of this one's text.
+    while (end > from && (anchorOf(lines[end - 1]!) !== undefined || lines[end - 1]!.trim() === "")) end--;
+    return lines.slice(from, end).join("\n").trim() || undefined;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const m = heading(lines[i]!);
+    if (!m) continue;
+    const text = m[2]!;
+    const id = /\{#([^}]+)\}\s*$/.exec(text)?.[1];
+    const bare = text.replace(/\s*\{#[^}]+\}\s*$/, "");
+    let k = i - 1;
+    while (k >= 0 && lines[k]!.trim() === "") k--;
+    const anchor = k >= 0 ? anchorOf(lines[k]!) : undefined;
+    if (anchor === frag || id === frag || bare === frag || slug(bare) === slug(frag)) return section(i + 1, m[1]!.length);
+  }
+  return undefined;
 }
 
 const uniq = (xs: string[]): string[] => [...new Set(xs.filter((x) => x))].sort((a, b) => a.localeCompare(b, "en"));
@@ -312,15 +371,85 @@ function instanceRoots(repo: string): string[] {
     const dir = join(repo, e.name);
     if (declarationPathIn(dir)) out.push(dir);
   }
-  return out.sort();
+  out.sort();
+  // An instance at the checkout ROOT (an IG repository, with
+  // its layers mounted below it) holds diagrams too. Without it, the site's
+  // own instance was the one instance its processes page never listed.
+  if (declarationPathIn(repo)) out.unshift(repo);
+  return out;
+}
+
+/** An instance root and its declared name. */
+interface NamedRoot {
+  readonly root: string;
+  readonly name: string;
+}
+
+function namedRoots(repo: string): NamedRoot[] {
+  const out: NamedRoot[] = [];
+  for (const root of instanceRoots(repo)) {
+    const p = declarationPathIn(root);
+    let name: string | undefined;
+    try {
+      name = p && existsSync(p) ? (JSON.parse(readFileSync(p, "utf-8")) as { name?: string }).name : undefined;
+    } catch {
+      name = undefined;
+    }
+    out.push({ root: resolve(root), name: name || basename(root) });
+  }
+  return out;
+}
+
+/**
+ * The instance whose directory holds `abs`: the DEEPEST root containing it,
+ * so a layer mounted under the checkout root's own instance is its own
+ * sub-graph rather than the root's.
+ */
+export function owningInstance(abs: string, roots: readonly NamedRoot[]): string | undefined {
+  const f = resolve(abs);
+  let best: NamedRoot | undefined;
+  for (const r of roots) {
+    if (f !== r.root && !f.startsWith(r.root + sep)) continue;
+    if (best === undefined || r.root.length > best.root.length) best = r;
+  }
+  return best?.name;
+}
+
+/**
+ * Every diagram file a row is drawn for (global-task files excluded, as
+ * {@link processRows} excludes them), keyed by the instance that holds it.
+ * Synchronous and parse-free, so `site-coverage` asks the same question the
+ * writer answers: an instance owes a sub-graph page exactly when it is a key.
+ */
+export function processSubjects(repo = REPO): Map<string, string[]> {
+  const roots = namedRoots(repo);
+  const seen = new Set<string>();
+  const out = new Map<string, string[]>();
+  for (const r of roots) {
+    for (const f of [...workflowFiles(r.root), ...businessProcessFiles(r.root)]) {
+      if (!f.endsWith(".bpmn") || seen.has(f)) continue;
+      seen.add(f);
+      try {
+        if (isGlobalTasksFile(readFileSync(f, "utf-8"))) continue;
+      } catch {
+        // unreadable: the row reports it as a load error, so it is a subject too
+      }
+      const inst = owningInstance(f, roots);
+      if (inst === undefined) continue;
+      out.set(inst, [...(out.get(inst) ?? []), relative(repo, f)]);
+    }
+  }
+  return new Map([...out].sort((a, b) => a[0].localeCompare(b[0], "en")));
 }
 
 export async function processRows(repo = REPO): Promise<ProcessRow[]> {
   const rows: ProcessRow[] = [];
   const roleGraph = loadRoleGraph(repo);
   const seen = new Set<string>();
+  const named = namedRoots(repo);
   const files = instanceRoots(repo)
-    .flatMap((r) => workflowFiles(r))
+    // The `business-processes` kind too: drawn here, never run (Q-SUBG-3).
+    .flatMap((r) => [...workflowFiles(r), ...businessProcessFiles(r)])
     // `.dmn` is a DECISION TABLE, not a process — a different kind that a
     // gateway computes from. Including them would inflate every count on this
     // page with things that have no lanes, no skills and no activities.
@@ -330,6 +459,7 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
   for (const abs of files) {
     const file = relative(repo, abs);
     const group = dirname(file);
+    const instance = owningInstance(abs, named);
     // THE SVG LIVES WHERE `render:bpmn` PUTS IT, which is the base docs layer —
     // not beside the diagram.
     //
@@ -354,13 +484,15 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
     if (isGlobalTasksFile(xml)) continue;
     const declared = ownElementPattern(xml, "policy", String.raw`[^>]*\benforcement\s*=`, "").test(xml);
     try {
-      const m = await loadProcessModel(abs);
+      // A VIEW load: this page draws a process and runs nothing (Q-SUBG-2 B).
+      const m = await loadProcessModel(abs, [], new Map(), { view: true });
       const nodes = [...m.nodes.values()];
       const acts = nodes.filter(isActivity);
       const markers = svg ? await taskMarkers(xml, readFileSync(svgRel, "utf-8"), acts) : [];
       rows.push({
         file,
         group,
+        ...(instance ? { instance } : {}),
         id: m.id,
         name: m.name,
         lanes: uniq(m.lanes.map((l) => (l.name ?? "").replace(/\s+/g, " ").trim())),
@@ -382,6 +514,7 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
         ...(svg ? { svg } : {}),
         ...(markers.length > 0 ? { markers } : {}),
         stem: basename(abs, ".bpmn"),
+        ...(m.notRun ? { notRun: m.notRun } : {}),
         ...(m.documentation ? { documentation: m.documentation } : {}),
         laneDetails: m.lanes.map((l) => laneDetail(l, acts, roleGraph)),
         steps: acts.map((n) => ({
@@ -393,6 +526,7 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
           ...(n.calledElement ? { calledElement: n.calledElement } : {}),
           ...(n.globalTask ? { globalTask: { id: n.globalTask.id, type: n.globalTask.type, ...(n.inputs ? { inputs: n.inputs } : {}) } } : {}),
           ...(n.documentation ? { documentation: n.documentation } : {}),
+          ...(n.narrative ? { narrative: { href: n.narrative, ...((t) => (t ? { text: t } : {}))(narrativeText(abs, n.narrative)) } } : {}),
         })),
         decisions: [...m.nodes.values()].filter(isDecision).map((n) => ({
           id: n.id,
@@ -408,6 +542,7 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
       rows.push({
         file,
         group,
+        ...(instance ? { instance } : {}),
         id: basename(file, ".bpmn"),
         name: basename(file, ".bpmn"),
         lanes: [],
@@ -673,7 +808,27 @@ const esc = (s: string): string => s.replace(/\|/g, "\\|");
  * wherever the target resolves"). Empty by default, so a caller that has not
  * looked renders every skill as code, as this table did before.
  */
-export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string> = new Set(), instances: InstancesRead = NO_INSTANCES): string {
+/** How {@link page} scopes the index it draws: the whole corpus, or one sub-graph of it. */
+export interface PageScope {
+  /** `undefined` for every instance's diagrams; else the instance whose diagrams the page shows. */
+  readonly instance?: string;
+  /** On the full index: one row per sub-graph page, to browse by instance. */
+  readonly subjects?: readonly { name: string; count: number; href: string }[];
+}
+
+/**
+ * `scope.instance` draws one instance's sub-graph page, one directory below
+ * the index, so every link on it is one segment deeper.
+ */
+export function page(
+  rows: readonly ProcessRow[],
+  skillPages: ReadonlySet<string> = new Set(),
+  instances: InstancesRead = NO_INSTANCES,
+  scope: PageScope = {},
+): string {
+  // From a sub-graph page, the process pages and the site root are one level up.
+  const base = scope.instance === undefined ? "" : "../";
+  const root = `${base}${up()}`;
   const ok = rows.filter((r) => r.loadError === undefined);
   const broken = rows.filter((r) => r.loadError !== undefined);
   const byGroup = new Map<string, number>();
@@ -689,12 +844,22 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
 
   const L: string[] = [];
   L.push("---");
-  L.push("title: Processes");
+  L.push(scope.instance === undefined ? "title: Processes" : `title: 'Processes — ${scope.instance.replace(/'/g, "''")}'`);
   L.push("nav_exclude: true");
   L.push(GENERATED_FM);
   L.push("---");
   L.push("");
-  L.push("# Processes — every executable diagram, searchable");
+  if (scope.instance === undefined) {
+    L.push("# Processes — every executable diagram, searchable");
+  } else {
+    L.push(`# Processes — ${scope.instance}`);
+    L.push("");
+    L.push(
+      `The diagrams **${esc(scope.instance)}** holds in its declared \`processes\` directories — one ` +
+        "sub-graph's slice of [every instance's processes](../). The skills, lanes and findings below " +
+        "count these diagrams only.",
+    );
+  }
   L.push("");
   L.push(
     "Generated by `cat-harness-tools/scripts/gen-processes-viz.ts`. **Every number here is " +
@@ -708,6 +873,17 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
   L.push("|---|---|");
   for (const [g, n] of [...byGroup].sort((a, b) => b[1] - a[1])) L.push(`| \`${esc(g)}/\` | ${n} |`);
   L.push("");
+
+  if (scope.subjects !== undefined && scope.subjects.length > 0) {
+    L.push("## By subgraph");
+    L.push("");
+    L.push("Each instance that holds diagrams has its own page, listing only its processes.");
+    L.push("");
+    L.push("| subgraph | diagrams |");
+    L.push("|---|---|");
+    for (const x of scope.subjects) L.push(`| [${esc(x.name)}](${x.href}) | ${x.count} |`);
+    L.push("");
+  }
 
   L.push("## Every process — one page each");
   L.push("");
@@ -727,7 +903,7 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
   L.push("|---|---|---|---|");
   for (const r of ok) {
     const undoc = r.steps.filter((st) => !st.documentation).length;
-    L.push(`| [${esc(r.name)}](${r.stem}.html) | ${r.activities} | ${undoc || "—"} | ${instancesCell(instances, r.id)} |`);
+    L.push(`| [${esc(r.name)}](${base}${r.stem}.html) | ${r.activities} | ${undoc || "—"} | ${instancesCell(instances, r.id, root)} |`);
   }
   L.push("");
   if (instances.unread.length > 0) {
@@ -751,10 +927,10 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
   // loaded row publishes no page, so it stays code.
   const pageOf = new Map(ok.map((r) => [r.file, r.stem]));
   const skillCell = (s: string): string =>
-    skillPages.has(s) ? `[\`${esc(s)}\`](${up()}reference/skill-instructions/${s}.html)` : `\`${esc(s)}\``;
+    skillPages.has(s) ? `[\`${esc(s)}\`](${root}reference/skill-instructions/${s}.html)` : `\`${esc(s)}\``;
   const runBy = (f: string): string => {
     const stem = pageOf.get(f);
-    return stem === undefined ? `\`${esc(basename(f))}\`` : `[\`${esc(basename(f))}\`](${stem}.html)`;
+    return stem === undefined ? `\`${esc(basename(f))}\`` : `[\`${esc(basename(f))}\`](${base}${stem}.html)`;
   };
   for (const [s, fs] of join) L.push(`| ${skillCell(s)} | ${fs.map(runBy).join(", ")} |`);
   L.push("");
@@ -807,6 +983,16 @@ export function page(rows: readonly ProcessRow[], skillPages: ReadonlySet<string
 
   L.push("## Findings");
   L.push("");
+  const notRunRows = ok.filter((r) => r.notRun && r.notRun.length > 0);
+  if (notRunRows.length > 0) {
+    L.push(
+      `**${notRunRows.length} diagram(s) draw elements the engine does not run.** Each has its page, with the ` +
+        "elements listed; `workflow_start` refuses to run them.",
+    );
+    L.push("");
+    for (const r of notRunRows) L.push(`- \`${esc(r.file)}\` — ${uniq(r.notRun!.map((n) => `\`${n.type}\``)).join(", ")}`);
+    L.push("");
+  }
   if (broken.length > 0) {
     L.push(`**${broken.length} diagram(s) would not load.** Reported rather than omitted — a`);
     L.push("dropped file shrinks every denominator above and reads as one that does not exist.");
@@ -935,7 +1121,7 @@ export function processPage(
       (n) => (skillPages.has(n) ? `${up()}reference/skill-instructions/${n}.html` : undefined),
     );
     r.unlinked.forEach(unlinked);
-    return r.text;
+    return escapeAngles(r.text);
   };
   const skill = (s: string): string =>
     skillPages.has(s) ? `[\`${s}\`](${up()}reference/skill-instructions/${s}.html)` : `\`${s}\``;
@@ -975,7 +1161,10 @@ export function processPage(
   L.push("---");
   L.push("");
   L.push("{: .note }");
-  L.push(`> Generated from \`${row.file}\` by \`gen-processes-viz.ts\` — do not edit here. [All processes](index.html)`);
+  L.push(
+    `> Generated from \`${row.file}\` by \`gen-processes-viz.ts\` — do not edit here. [All processes](index.html)` +
+      (row.instance ? ` · [${row.instance} processes](${row.instance}/)` : ""),
+  );
   L.push("");
   // Everything from here to the end is authored BPMN text; `wrapRaw` below
   // escapes it so a closing raw tag inside a documentation string cannot end
@@ -986,6 +1175,22 @@ export function processPage(
   L.push(`\`${row.id}\` · ${row.enforcement}${row.enforcementDeclared ? "" : " (defaulted)"} · ${row.activities} step(s)`);
   L.push("");
   L.push(row.documentation ? prose(row.documentation) : "_This process carries no `<bpmn:documentation>`._");
+  if (row.notRun && row.notRun.length > 0) {
+    L.push("");
+    L.push("{: .warning }");
+    L.push(
+      `> **Not run by the engine.** This diagram draws ${row.notRun.length} element(s) the process interpreter does not ` +
+        "implement. They are shown on the diagram and listed here, but `workflow_start` refuses to run this process until " +
+        "the interpreter supports them.",
+    );
+    L.push("");
+    L.push("| element | type | on |");
+    L.push("|---|---|---|");
+    const nameOf = new Map(row.steps.map((st) => [st.id, st.name]));
+    for (const n of row.notRun) {
+      L.push(`| ${esc(n.name ?? n.id)} | \`${n.type}\` | ${n.attachedTo ? esc(nameOf.get(n.attachedTo) ?? n.attachedTo) : "—"} |`);
+    }
+  }
   L.push("");
   if (row.svg) {
     // With markers, the diagram carries the ⓘ task panel (owner, 2026-10-16:
@@ -1063,7 +1268,15 @@ export function processPage(
         ? `shared step \`${st.globalTask.id}\`${st.globalTask.inputs ? ` (${Object.entries(st.globalTask.inputs).map(([k, v]) => `${k} = \`${v}\``).join(", ")})` : ""}`
         : "";
     const how = [target, ...st.skills.map(skill)].filter(Boolean).join("<br>") || "—";
-    L.push(`| **${esc(st.name)}**<br>\`${st.id}\` | ${cell(st.lane)} | ${how} | ${cell(st.documentation)} |`);
+    // A business-process task keeps its text in the `.md` beside the diagram
+    // (`<cat-harness.processes:narrative>`, Q-OB-17 A): shown here, and named
+    // when it cannot be found, so a broken link is visible.
+    const narr = st.narrative
+      ? st.narrative.text
+        ? `${st.documentation ? "<br><br>" : ""}${cell(st.narrative.text)}`
+        : `${st.documentation ? "<br>" : ""}_narrative \`${esc(st.narrative.href)}\` not found_`
+      : "";
+    L.push(`| **${esc(st.name)}**<br>\`${st.id}\` | ${cell(st.lane)} | ${how} | ${st.documentation || !st.narrative ? cell(st.documentation) : ""}${narr} |`);
   }
   L.push("");
 
@@ -1097,12 +1310,23 @@ export function processPage(
  * `<base>/<harness>/<visualizer>`). Never a literal — `site-dir-single-answer`
  * refuses one, and the declaration is the only thing that names it.
  */
-export function pageRelPath(repo = REPO): string | undefined {
+export function pageRelPath(repo = REPO, subgraph?: string): string | undefined {
+  // A sub-graph page is `<locale>/<harness>/processes/<instance>/index.md`,
+  // as the tools viewer draws its own (bean `folio-assistant-1nu0`).
   try {
-    return visualiserSitePath(join(repo, "cat-harness"), VIEWER_TOOL).rel;
+    const { rel, visualiser: v } = visualiserSitePath(join(repo, "cat-harness"), VIEWER_TOOL);
+    if (subgraph === undefined) return rel;
+    return visualiserRoute({ ...pageParts({ harness: v.harness, visualiser: v.id }), subgraph, asset: "index.md" });
   } catch {
     return undefined;
   }
+}
+
+/** The sub-graph pages: one per instance holding diagrams, in instance order. */
+export function subgraphPages(rows: readonly ProcessRow[]): { name: string; rows: ProcessRow[] }[] {
+  const by = new Map<string, ProcessRow[]>();
+  for (const r of rows) if (r.instance) by.set(r.instance, [...(by.get(r.instance) ?? []), r]);
+  return [...by].sort((a, b) => a[0].localeCompare(b[0], "en")).map(([name, rs]) => ({ name, rows: rs }));
 }
 
 /** From a page of this viewer back to the site root — the route's depth, never a literal `../`. */
@@ -1120,6 +1344,11 @@ function up(repo = REPO): string {
  * (#1168 B7a-2) — every instance's declared processes directories, because
  * every instance's diagrams are on it.
  */
+/** The scope of the top index page: one "By subgraph" row per sub-graph page. */
+export function indexScope(rows: readonly ProcessRow[]): PageScope {
+  return { subjects: subgraphPages(rows).map((x) => ({ name: x.name, count: x.rows.length, href: `${x.name}/` })) };
+}
+
 export function publishedIndex(
   rows: Parameters<typeof page>[0],
   repo = REPO,
@@ -1127,8 +1356,11 @@ export function publishedIndex(
   // Read by default, as `skillPages` is: the committed instances are an input
   // of the page, so a caller that omits them gets the page the generator writes.
   instances: InstancesRead = instancesRead(workflowInstanceLinks()),
+  // Defaults to the index page, with its "By subgraph" table, so a caller that
+  // omits it gets the page the generator writes (the committed-page check).
+  scope: PageScope = indexScope(rows),
 ): string {
-  return withRenderedByFrontMatter(page(rows, skillPages, instances), VIEWER_TOOL);
+  return withRenderedByFrontMatter(page(rows, skillPages, instances, scope), VIEWER_TOOL);
 }
 
 if (import.meta.main) {
@@ -1154,7 +1386,8 @@ if (import.meta.main) {
   // The workflow instances each diagram runs in (bean `v49e`): links to their
   // pages, read from the committed instance files the state visualiser draws.
   const instances = instancesRead(workflowInstanceLinks());
-  const html = publishedIndex(rows, REPO, skillPages, instances);
+  const subs = subgraphPages(rows);
+  const html = publishedIndex(rows, REPO, skillPages, instances, indexScope(rows));
   // Which page sections present each diagram, keyed repository-relative so it
   // matches `row.file` — a page spells its source relative to its OWN instance.
   const presented = new Map<string, Presentation[]>();
@@ -1165,6 +1398,12 @@ if (import.meta.main) {
     }
   }
   const pages = new Map<string, string>([[out, html]]);
+  // One page per sub-graph (owner, 2026-11-01: show a sub-graph's processes
+  // on its own page), as `tools`, `library` and `beans` already have.
+  for (const x of subs) {
+    const sub = pageRelPath(REPO, x.name);
+    if (sub !== undefined) pages.set(join(into ?? baseDocsDir(REPO), sub), publishedIndex(x.rows, REPO, skillPages, instances, { instance: x.name }));
+  }
   const ctx = panelContext(REPO, skillPages);
   for (const r of rows.filter((x) => x.loadError === undefined)) {
     const refs = new Set<string>();
@@ -1192,8 +1431,10 @@ if (import.meta.main) {
     }
     console.log(`✓ ${rel} and ${pages.size - 1} process page(s) are current (${rows.length} diagram(s))`);
   } else {
-    mkdirSync(dirname(out), { recursive: true });
-    for (const [f, body] of pages) writeFileSync(f, body);
+    for (const [f, body] of pages) {
+      mkdirSync(dirname(f), { recursive: true });
+      writeFileSync(f, body);
+    }
     // THE TILE COUNT (folio-assistant#931, owner's ruling 2026-10-29): the
     // index's own diagram count, keyed by the tile that opens the index.
     // Build-time data like every projection `scanTileCounts` reads, so

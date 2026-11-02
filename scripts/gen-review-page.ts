@@ -103,7 +103,7 @@
 
 import { DIFF_RENDERERS } from "../schemas/ui/diff-renderers.js";
 import { PUBLISHED_LOCALES } from "../schemas/content/translation.js";
-import { changeRuns, cleanRendered, markInFrame, renderFields, renderInline, renderSideBySide, renderVisual, renderWordDiff } from "./review-renderers.js";
+import { changeRuns, cleanRendered, FRAME_CHROME_CSS, imageChange, markInFrame, renderFields, renderInline, renderSideBySide, renderVisual, renderWordDiff } from "./review-renderers.js";
 import { computeHeat, heatBucket, renderHeat } from "./review-heat.js";
 import { crumbFor, railOutline, renderMinimap, renderOutline } from "./review-nav.js";
 import { measuredModel, renderedModel, renderMeasured, renderRendered } from "./review-rendered.js";
@@ -182,7 +182,7 @@ const STYLE = `
   .diff-fields th, .diff-fields td { border: 1px solid var(--rule); padding: .25rem .4rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
   .diff-fields td:last-child { white-space: nowrap; font-weight: 600; }
   .diff-sbs iframe { width: 100%; height: 22rem; border: 1px solid var(--rule); border-radius: 0 0 .3rem .3rem; background: #fff; display: block; }
-  .sbs-head { padding: .35rem .6rem; border-radius: .3rem .3rem 0 0; font-size: .9rem; color: #fff; overflow-wrap: anywhere; }
+  .sbs-head { padding: .2rem .6rem; border-radius: .3rem .3rem 0 0; font-size: .85rem; line-height: 1.4; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sbs-side-base { background: #5f6368; }
   .sbs-side-head { background: #4F6F52; }
   .sbs-head a, .sbs-head code { color: #fff; }
@@ -190,6 +190,15 @@ const STYLE = `
   @media (max-width: 40rem) { .diff-sbs { grid-template-columns: 1fr; } }
   /* Visual diff (0rxe): pictures on a white card, since they are screenshots
      of light pages; the mode buttons are native radios, one click each. */
+  /* A changed picture: before and after, side by side (the text diff cannot
+     see a new src). */
+  .diff-figures { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin: .25rem 0 .75rem; }
+  .diff-figure { margin: 0; border: 2px solid var(--rule); border-radius: .3rem; padding: .4rem; background: #fff; }
+  .diff-figure figcaption { font-weight: 600; font-size: .85rem; margin-bottom: .3rem; color: #1f1f1f; }
+  .diff-figure-base { border-color: #b3261e; }
+  .diff-figure-head { border-color: #4F6F52; }
+  .diff-figure img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  @media (max-width: 40rem) { .diff-figures { grid-template-columns: 1fr; } }
   .diff-visual img { max-width: 100%; height: auto; border: 1px solid var(--rule); border-radius: .3rem; background: #fff; display: block; }
   .visual-modes { border: 0; padding: 0; margin: .25rem 0 .5rem; display: flex; flex-wrap: wrap; gap: .25rem 1rem; }
   .visual-modes legend { float: left; margin-right: .5rem; font-weight: 600; }
@@ -389,7 +398,9 @@ const SCRIPT = `
   }
 
   // ── Diff renderers (bean d903) ─────────────────────────────────
-  var VIEW_KEY = "folio-review:view";
+  // v2 (owner, 2026-10-31, "default to inline"): a page-level choice made
+  // before, such as Side by side, is not carried over to override the new default.
+  var VIEW_KEY = "folio-review:view:v2";
   function loadView() { try { return window.localStorage.getItem(VIEW_KEY) || ""; } catch (e) { return ""; } }
   function saveView(v) { try { window.localStorage.setItem(VIEW_KEY, v); } catch (e) { /* the defaults, then */ } }
   function defaultFor(kind, structured) {
@@ -420,11 +431,19 @@ const SCRIPT = `
     var base = t.base || null;
     var head = t.head || null;
     var out;
+    // Each side's HTML resolves relative links from its own page's directory.
+    function dirOf(u) { return u ? String(u).replace(/[#?].*$/, "").replace(/[^\/]*$/, "") : ""; }
+    var headDir = dirOf(ctx.after) || dirOf(ctx.before);
+    var baseDir = dirOf(ctx.before) || headDir;
+    function cleanHead(d, h) { return cleanRendered(d, h, headDir); }
+    function cleanBase(d, h) { return cleanRendered(d, h, baseDir); }
+    var figs = (id === "inline" || id === "side-by-side") && (base || head) ? imageChange(document, base ? base.html : null, head ? head.html : null, cleanBase, cleanHead) : null;
+    if (figs) panel.appendChild(figs);
     if (id === "word") {
       var ops = wordDiff(base ? base.prose : "", head ? head.prose : "");
       out = ops === null ? "This block is too long for a word diff. Choose side by side." : renderWordDiff(document, ops);
     } else if (id === "inline") {
-      out = renderInline(document, base ? base.html : null, head ? head.html : null, wordDiff, cleanRendered);
+      out = renderInline(document, base ? base.html : null, head ? head.html : null, wordDiff, head ? cleanHead : cleanBase);
     } else if (id === "side-by-side") {
       // The rendered text of each side, diffed, says where each pane scrolls to.
       var runs = null;
@@ -439,6 +458,12 @@ const SCRIPT = `
       out = renderVisual(document, ctx.visual, ROOT, "vis-" + panel.id);
     } else if (id === "fields") {
       out = renderFields(document, ctx.structure);
+    }
+    // The pictures are already shown, before and after; inline shows only
+    // the text around them, and nothing when the picture was all that changed.
+    if (figs && id === "inline" && out && typeof out !== "string") {
+      out.querySelectorAll("img").forEach(function (i) { i.remove(); });
+      if (!(out.textContent || "").trim()) out = null;
     }
     if (typeof out === "string") panel.appendChild(el("p", out, "muted"));
     else if (out) panel.appendChild(out);
@@ -688,7 +713,7 @@ const SCRIPT = `
             before: before,
             after: after,
             beforeName: beforeName,
-            facts: st && st.branch ? st : null,
+            facts: st && st.branch ? Object.assign({}, st, { baseSha: cs.base && cs.base.commit ? String(cs.base.commit) : "" }) : null,
           });
           li.appendChild(v.row);
           li.appendChild(v.panel);
@@ -886,9 +911,11 @@ var matchesCommentFilter = ${matchesCommentFilter.toString()};
 var RENDERERS = ${JSON.stringify(DIFF_RENDERERS).replace(/</g, "\\u003c")};
 var wordDiff = ${wordDiff.toString()};
 var cleanRendered = ${cleanRendered.toString()};
+var imageChange = ${imageChange.toString()};
 var renderWordDiff = ${renderWordDiff.toString()};
 var renderInline = ${renderInline.toString()};
 var renderFields = ${renderFields.toString()};
+var FRAME_CHROME_CSS = ${JSON.stringify(FRAME_CHROME_CSS)};
 var renderSideBySide = ${renderSideBySide.toString()};
 var changeRuns = ${changeRuns.toString()};
 var markInFrame = ${markInFrame.toString()};

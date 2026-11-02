@@ -65,8 +65,22 @@
 
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { extname, join, relative } from "node:path";
-import { instanceDirectoriesForGraph } from "../schemas/kg/cat-harness.ts";
-import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.ts";
+
+function instanceDirectoriesForGraph(instanceRoot: string, graphKind: string): string[] {
+  const file = findDeclarationFile(instanceRoot);
+  if (!file) return [];
+  try {
+    const decl = JSON.parse(readFileSync(join(instanceRoot, file), "utf-8")) as {
+      directories?: Array<{ path?: string; scope?: string; graphTypologies?: string[]; graphKinds?: string[] }>;
+    };
+    return (decl.directories ?? [])
+      .filter((d) => d.scope !== "repository" && typeof d.path === "string" && (d.graphTypologies ?? d.graphKinds ?? []).includes(graphKind))
+      .map((d) => join(instanceRoot, d.path!.replace(/\/+$/, "")));
+  } catch {
+    return [];
+  }
+}
 
 const ROOT = join(import.meta.dir, "..", "..");
 
@@ -226,7 +240,14 @@ export function scanRoots(root: string): string[] {
 const ROOTS = scanRoots(ROOT);
 
 if (import.meta.main) {
-  const { leaks, filesScanned, unreadable } = scanTree(ROOT, ROOTS);
+  const hasFixed = FIXED_ROOTS.every((r) => existsSync(join(ROOT, r)));
+  const activeRoots = hasFixed
+    ? ROOTS
+    : [
+        ...FIXED_ROOTS.filter((r) => existsSync(join(ROOT, r))),
+        ...instanceRootsIn(ROOT).map((d) => relative(ROOT, d) || "."),
+      ];
+  const { leaks, filesScanned, unreadable } = scanTree(ROOT, activeRoots.length > 0 ? [...new Set(activeRoots)] : ROOTS);
   console.log(`Secret leaks (${filesScanned} text file(s) across ${ROOTS.length} declared root(s))`);
 
   if (unreadable.length > 0) {

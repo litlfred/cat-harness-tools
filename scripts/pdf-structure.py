@@ -72,10 +72,10 @@ import json
 import os
 import re
 import unicodedata
-from collections import Counter
+from collections import Counter, defaultdict
 import sys
 import warnings
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, replace
 from typing import Any
 
 warnings.filterwarnings("ignore")
@@ -627,6 +627,135 @@ def inferred_toc_trust(toc: list["TocEntry"], pages: list[str],
                   f"({collapsed:.0%} of entries produced no section, more than "
                   f"{TOC_MAX_COLLAPSED_SHARE:.0%}) — contents collapse in the body")
     return reason, mean, share
+
+
+# A line in the top or bottom margin of its page: this share of the height.
+FURNITURE_MARGIN = 0.05
+# Body-sized: running heads are set at or a little above the body size (PHC
+# 10 pt over 9 pt body); a chapter label in the margin ("CHAPTER 3", 12 pt) is not.
+FURNITURE_MAX_SCALE = 1.15
+# Repeated in the margin of at least this many pages.
+FURNITURE_MIN_PAGES = 3
+RE_FOLIO = re.compile(r"^[\W_]*(?:\d{1,4}|[ivxlc]{1,7})[\W_]*$", re.I)
+
+
+def _printed(text: str) -> str:
+    """A line as printed: control characters dropped, spaces collapsed."""
+    return re.sub(r"\s+", " ", "".join(c for c in text if c.isprintable())).strip()
+
+
+def _furniture_key(text: str) -> str:
+    """The line's form with its numbers ignored, so "page 11" and "page 12"
+    count as one running footer."""
+    return re.sub(r"\d+", "#", _printed(text).lower())
+
+
+def page_furniture(lines: list | None) -> dict[int, list[str]]:
+    """The running heads, footers, folios and side tabs on each page.
+
+    Page text keeps them, so a section's text carried its chapter title and page
+    number at every page break (9789240116191-eng repeats the chapter title and
+    folio at the foot of every page; 9789240101197-eng its side navigation tabs;
+    9789240093362-eng the handbook title). Each DTH L1 was cleaned by hand.
+
+    A line is furniture when it sits in the top or bottom margin and is either a
+    bare folio, or body-sized text whose form (digits ignored) recurs in the
+    margin of three or more pages at the same height. A short chapter's running head recurs on
+    only a few pages, so the bar is a page count, not the share of the document
+    that `_pdf_headings.furniture_keys` uses for headings.
+    """
+    if not lines:
+        return {}
+    bsize = _pdf_headings.body_size(lines)
+    margin = []
+    for l in lines:
+        h = l.page_height or 0
+        if h and (l.y0 < FURNITURE_MARGIN * h or l.y1 > (1 - FURNITURE_MARGIN) * h):
+            margin.append(l)
+    # A running head is printed at the same height on every page it is on; a
+    # callout ("TIP") that happens to reach the margin is not.
+    def place(l) -> tuple[str, int]:
+        return (_furniture_key(l.text), round(l.y0 / 4))
+    pages_of: dict[tuple[str, int], set[int]] = defaultdict(set)
+    for l in margin:
+        pages_of[place(l)].add(l.page)
+    out: dict[int, list[str]] = defaultdict(list)
+    for l in margin:
+        text = l.text.strip()
+        if not text:
+            continue
+        folio = bool(RE_FOLIO.match(text))
+        repeated = (l.size <= FURNITURE_MAX_SCALE * bsize
+                    and len(pages_of[place(l)]) >= FURNITURE_MIN_PAGES)
+        if folio or repeated:
+            out[l.page].append(text)
+    return dict(out)
+
+
+def strip_furniture(pages: list[str], lines: list | None) -> tuple[list[str], int]:
+    """`pages` with each page's furniture lines removed, and how many went.
+
+    One page-text line is removed per furniture line found on that page, matched
+    on its printable text, so body text that happens to repeat a running head
+    elsewhere on the page stays.
+    """
+    furniture = page_furniture(lines)
+    if not furniture:
+        return pages, 0
+    out: list[str] = []
+    removed = 0
+    for i, text in enumerate(pages, start=1):
+        # Matched on the exact printed text: the folio "20" must not take the
+        # step number "1" with it.
+        todo = [_printed(t) for t in furniture.get(i, [])]
+        if not todo:
+            out.append(text)
+            continue
+        kept: list[str] = []
+        for line in text.split("\n"):
+            k = _printed(line)
+            if k and k in todo:
+                todo.remove(k)
+                removed += 1
+                continue
+            kept.append(line)
+        out.append("\n".join(kept))
+    return out, removed
+
+
+# A flat outline is reordered when more than this share of its neighbours run
+# backwards in page.
+OUTLINE_DISORDER = 0.1
+
+
+def repair_outline(entries: list[TocEntry], pages: list[str] | None = None) -> tuple[list[TocEntry], bool]:
+    """Line breaks in titles joined, and a flat outline put in page order.
+
+    An outline is the document's own answer and its entries are kept (bean
+    `6xaz`). Two things about it are layout accidents, not answers: a title
+    broken over lines ("How to use \\nthis handbook"), and the order of a flat
+    outline whose entries run against their pages. 9789240093362-eng lists each
+    chapter's sections last to first (pages 21, 20, 18), so its sections came out
+    in the wrong order and were re-split by hand. A nested outline is left as
+    it is: its order carries the tree.
+    """
+    fixed = [replace(e, title=re.sub(r"\s+", " ", e.title).strip()) for e in entries]
+    if len(fixed) < 3 or len({e.level for e in fixed}) > 1:
+        return fixed, False
+    paged = [e.page for e in fixed if e.page is not None]
+    back = sum(1 for a, b in zip(paged, paged[1:]) if b < a)
+    if not paged or back <= OUTLINE_DISORDER * (len(paged) - 1):
+        return fixed, False
+    # Entries on one page go in the order the page prints them ("Targeted
+    # scenarios" above "Targeted users", both on page 23, listed the other way
+    # round); one the page text does not show keeps its outline place.
+    def where(i: int) -> tuple[int, int, int]:
+        e = fixed[i]
+        found = locate_heading(pages, e) if pages and e.page is not None else None
+        line = found[1] if found and found[0] == e.page - 1 else 10**9
+        return (e.page if e.page is not None else 10**9, line, i)
+    order = sorted(range(len(fixed)), key=where)
+    return [fixed[i] for i in order], True
 
 
 def split_pages(pages: list[str]) -> list[Section]:
@@ -1211,6 +1340,9 @@ def _adjust_banner_mark(lines: list[str], pi: int, li: int, span: int = 1) -> tu
     return (pi, li)
 
 
+RE_STEP_TITLE = re.compile(r"^Step \d+\.\s+(.+)$")
+
+
 def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
     """`(page_idx, line_idx)` of the line that prints outline entry `e`, or None.
 
@@ -1218,6 +1350,14 @@ def locate_heading(pages: list[str], e: TocEntry) -> tuple[int, int] | None:
     of `split_sections` so `heading-match-dryrun.py` asks the same question the
     splitter does, rather than a second spelling of it.
     """
+    # A labelled step ("Step 3. Coordinate reviews ...", `_pdf_headings.
+    # step_headings`) prints its label apart from its heading, so the heading
+    # is looked for without it.
+    step = RE_STEP_TITLE.match(e.title)
+    if step:
+        found = locate_heading(pages, replace(e, title=step.group(1)))
+        if found:
+            return found
     needle = _match_key(e.title)[:44]
     if not needle:
         return None
@@ -1711,13 +1851,16 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
     # every downstream reader sees whole words (bean `3spu`).
     pages = [join_soft_hyphens(p) for p in pages]
 
-    outline = _toc_entries(reader.raw_toc())
+    outline, outline_reordered = repair_outline(_toc_entries(reader.raw_toc()), pages)
     # An inferred table of contents is asked to justify itself; an outline is
     # the document's own answer and is not second-guessed (bean `6xaz`).
     # The page layout, read once for the TOC, the figures and the contents
     # check. None when there is none to read: OCR'd text has no fonts, and a
     # pypdf-only install has no layout-capable backend.
     lines = layout_lines(path, ocr_used)
+    # Running heads, footers, folios and side tabs out of the text before it is
+    # split, so no section carries them (bean `6chd`).
+    pages, furniture_stripped = strip_furniture(pages, lines)
     inferred: list[TocEntry] = []
     inferred_method: str | None = None
     tex_source = latex_source_for(path, latex_source)
@@ -1874,6 +2017,12 @@ def _process(path: str, outdir: str | None = None, use_ocr: bool = False,
             **({"toc_alignment": toc_alignment} if toc_alignment else {}),
             "sections": len(sections),
             "chars_total": sum(s.n_chars for s in sections),
+            # Running heads, footers, folios and side tabs taken out of the
+            # page text before the split (`strip_furniture`).
+            "furniture_lines_stripped": furniture_stripped,
+            # The outline was flat and ran against its own pages, so it was put
+            # in page order (`repair_outline`). Absent when it was not.
+            **({"outline_reordered": True} if outline_reordered else {}),
         },
     }
     return artefact, sections

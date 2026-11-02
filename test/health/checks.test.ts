@@ -312,6 +312,29 @@ describe("staging-preview-orphans", () => {
     expect(r.findings[0].action).toContain("Ask the owner");
   });
 
+  it("never judges `STAGING/_retired`, the retired-record store, as a preview", () => {
+    // folio-assistant#860 named `_retired` an orphan: it has no branch and no
+    // PR because it is not a preview at all.
+    const r = stagingOrphanCheck(healthyContext({
+      staging: {
+        state: "ok",
+        value: {
+          branch: "present",
+          previews: [
+            { slug: "_retired", bytes: 319 * 1024, files: 367 },
+            { slug: "claude-live", bytes: 37 * MB, files: 700 },
+          ],
+          command: "fixture",
+        },
+      },
+      openPrHeads: { state: "ok", value: ["claude/live"] },
+    }));
+    expect(r.state).toBe("ok");
+    expect(JSON.stringify(r.findings)).not.toContain("_retired");
+    expect(r.measurements.find((m) => m.metric === "staging-orphan-count")?.value).toBe(0);
+    expect(r.measurements.find((m) => m.metric === "staging-live-count")?.value).toBe(1);
+  });
+
   it("is `unknown` when the PR list could not be fetched, rather than calling every preview an orphan", () => {
     const r = stagingOrphanCheck(healthyContext({
       staging: { state: "ok", value: { branch: "present", previews: previews(6, 37 * MB), command: "fixture" } },

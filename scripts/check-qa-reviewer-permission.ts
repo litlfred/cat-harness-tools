@@ -70,17 +70,48 @@
 
 import { readPolicyGrants } from "../schemas/content/odrl.js";
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 
+import { findDeclarationFile, instanceRootNamed } from "../schemas/kg/instance-roots.ts";
 import type { QaCriterionEntry, QaReviewer } from "../schemas/sdlc/block-qa.ts";
-import { isCheckerWitness, isCouldNotDispatch } from "../pipeline/untainted-verification.ts";
-import { actorsDir } from "../schemas/process/role-graph.ts";
-import { directoryForGraph } from "../schemas/kg/cat-harness.ts";
 import { vacuityRefusal, type Source } from "./vacuity-refusal.ts";
-import { TOOLS_ROOT } from "./lib/roots.ts";
+const TOOLS_ROOT = resolve(import.meta.dir, "..");
+
+function isCheckerWitness(entry: QaCriterionEntry): boolean {
+  return entry.result === "n/a" && entry.metrics?.role === "checker";
+}
+
+function isCouldNotDispatch(entry: QaCriterionEntry): boolean {
+  return entry.result === "n/a" && entry.metrics?.dispatch === "unavailable";
+}
+
+function directoryForGraph(instanceRoot: string, graphKind: string): string | undefined {
+  const file = findDeclarationFile(instanceRoot);
+  if (!file) return undefined;
+  try {
+    const decl = JSON.parse(readFileSync(join(instanceRoot, file), "utf-8")) as {
+      directories?: Array<{ path?: string; scope?: string; graphTypologies?: string[]; graphKinds?: string[] }>;
+    };
+    const hit = (decl.directories ?? []).find(
+      (d) => typeof d.path === "string" && (d.graphTypologies ?? d.graphKinds ?? []).includes(graphKind),
+    );
+    if (!hit?.path) return undefined;
+    const base = hit.scope === "repository" ? resolve(instanceRoot, "..") : instanceRoot;
+    return join(base, hit.path.replace(/\/+$/, ""));
+  } catch {
+    return undefined;
+  }
+}
+
+function actorsDir(repoRoot: string): string | undefined {
+  const platform = instanceRootNamed(repoRoot, "cat-harness");
+  if (!platform) return undefined;
+  const scenarios = directoryForGraph(platform, "scenarios");
+  return scenarios ? join(scenarios, "actors") : undefined;
+}
 
 const ROOT = join(import.meta.dir, "..", "..");
-const ACTOR_DIR = actorsDir(ROOT) ?? (() => { throw new Error("the platform declares no `scenarios` graph, so the actor registry (bean rqao) has no home to read"); })();
+const ACTOR_DIR = actorsDir(ROOT);
 // declared-path-literal: the convention home of cat-harness's ODRL policies
 // (issue #1180), beside the actor registry this gate already reads by path.
 const POLICY_DIR = join(ROOT, "cat-harness", "policies");
@@ -100,11 +131,11 @@ export type Outcome = "permitted" | "forbidden" | "unresolved";
 
 /** Every declared actor's permission set, keyed by id. */
 export function readActors(
-  dir: string = ACTOR_DIR,
+  dir: string | undefined = ACTOR_DIR,
   grants: ReadonlyMap<string, readonly string[]> = readPolicyGrants(POLICY_DIR),
 ): Map<string, Set<string>> {
   const out = new Map<string, Set<string>>();
-  if (!existsSync(dir)) return out;
+  if (!dir || !existsSync(dir)) return out;
   for (const f of readdirSync(dir)) {
     if (!f.endsWith(".json")) continue;
     try {
@@ -245,6 +276,10 @@ export function report(findings: Finding[], known: Set<string>) {
 }
 
 if (import.meta.main) {
+  if (!ACTOR_DIR) {
+    console.log("  ? could not determine — the platform declares no `scenarios` graph in this checkout (actor registry absent)");
+    process.exit(2);
+  }
   const write = process.argv.includes("--write-baseline");
   const actors = readActors();
   const ATTESTATIONS = attestationsDir();

@@ -744,3 +744,12 @@ describe("regen mounts the branch-kept graphs before it grades", () => {
     expect(regenArgs("abc123")[regenArgs("abc123").indexOf("--changed") + 1]).toBe("abc123");
   });
 });
+
+describe("bean p7mb — glossary:check and libraries:check pair with their writers via WRITER_OVERRIDES", () => {
+  test("WRITER_OVERRIDES maps glossary:check to glossary:export and libraries:check to libraries:derive", () => {
+    expect(WRITER_OVERRIDES["glossary:check"]).toBe("glossary:export");
+    expect(WRITER_OVERRIDES["libraries:check"]).toBe("libraries:derive");
+    expect(writerFor(SCRIPTS, "glossary:check")).toBe("glossary:export");
+    expect(writerFor(SCRIPTS, "libraries:check")).toBe("libraries:derive");
+  });
+});

@@ -53,6 +53,20 @@ describe("freeze", () => {
     expect(index.releases.map((x: { version: string }) => x.version)).toEqual(["v0.9"]);
   });
 
+  test("refuses a preview build: a public comment release is a full build (owner, 2026-11-01)", () => {
+    const pages = pagesWithPreview();
+    writeFileSync(join(pages, "STAGING", "claude-draft", "staging.json"), JSON.stringify({ buildType: "preview" }));
+    expect(() => freeze({ pages, version: "v1", from: "STAGING/claude-draft", now: NOW })).toThrow(/preview build/);
+    expect(existsSync(join(pages, PC_PREFIX, "v1"))).toBe(false);
+  });
+
+  test("records the build type it froze: full, or unstated for a copy built before the switch", () => {
+    const pages = pagesWithPreview();
+    expect(freeze({ pages, version: "v1", from: "STAGING/claude-draft", now: NOW }).build).toBe("unstated");
+    writeFileSync(join(pages, "STAGING", "claude-draft", "staging.json"), JSON.stringify({ buildType: "full" }));
+    expect(freeze({ pages, version: "v2", from: "STAGING/claude-draft", now: NOW }).build).toBe("full");
+  });
+
   test("refuses a version that already exists: a release is never overwritten", () => {
     const pages = pagesWithPreview();
     freeze({ pages, version: "v1", from: "STAGING/claude-draft", now: NOW });

@@ -783,6 +783,9 @@ const PENDING: readonly { file: string; names: number }[] = [
   // what `analyse` reports. No declaration can answer where a finding is, and this one does not
   // resolve from THIS instance's root because the file is in another instance — which is the
   // very fact the entry records.
+  // A skill naming who-iris (where figure data lives) and smart-base (the L2 it serves); no single
+  // destination, so it waits here for the owner's ruling (litlfred/cat-harness-tools#1299).
+  { file: "folio-assistant-core/skills/library/ingestion/figure-rebuild.md", names: 2 },
 ];
 
 /**

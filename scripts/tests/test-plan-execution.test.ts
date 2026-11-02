@@ -174,11 +174,14 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
       if (beanCalls.includes(n.calledElement ?? "")) continue;
       expect(n.workPlanOp).toBeDefined();
     }
-    // Opened first, and closed straight before each end the claim reaches.
+    // Opened first, and closed once: every outcome runs the one bean-close
+    // call, and "How did it end?" after it routes to that outcome's own end.
     expect(model.nodes.get("Call_BeanOpen")?.calledElement).toBe("Process_BeanOpen");
+    expect(model.nodes.get("Call_BeanClose")?.calledElement).toBe("Process_BeanClose");
+    const into = (id: string) => model.nodes.get(id)!.incoming.map((f) => model.flows.get(f)!.from);
+    expect(into("GW_BeanClosedHow")).toEqual(["Call_BeanClose"]);
     for (const end of ["End_Certified", "End_Refused", "End_Undetermined"]) {
-      const from = model.nodes.get(end)!.incoming.map((f) => model.flows.get(f)!.from);
-      expect(from.map((id) => [end, model.nodes.get(id)?.calledElement])).toEqual([[end, "Process_BeanClose"]]);
+      expect([end, into(end)]).toEqual([end, ["GW_BeanClosedHow"]]);
     }
     expect(model.decisions.get("GW_ExitCriteria")?.id).toBe("Decision_TestCertification");
     expect(model.nodes.get("Call_Sign")?.calledElement).toBe("Process_QaReportSigning");
@@ -210,6 +213,7 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
     // bean-close.bpmn: an end named for success closes the bean as `done`.
     expect(at(s)).toEqual(["Close_Outcome"]);
     drainSubprocess(model, s, "Call_BeanClose", { Close_Outcome: "done" });
+    complete(model, s, "GW_BeanClosedHow", { outcome: "certified" });
     expect(s.status).toBe("completed");
     expect(s.history.map((h) => h.node)).toContain("End_Certified");
   });
@@ -221,7 +225,8 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
     expect(at(s)).toEqual(["A_RecordRefusal"]);
     complete(model, s, "A_RecordRefusal");
     // bean-close.bpmn: an end named for a refusal closes the bean as `not wanted`.
-    drainSubprocess(model, s, "Call_BeanClose_2", { Close_Outcome: "not wanted" });
+    drainSubprocess(model, s, "Call_BeanClose", { Close_Outcome: "not wanted" });
+    complete(model, s, "GW_BeanClosedHow", { outcome: "refused" });
     expect(s.status).toBe("completed");
     expect(s.history.map((h) => h.node)).not.toContain("Call_Sign");
   });
@@ -233,9 +238,10 @@ describe("test-plan-execution.bpmn runs end to end on a fixture plan", () => {
     expect(at(s)).toEqual(["A_RecordUndetermined"]);
     complete(model, s, "A_RecordUndetermined");
     // bean-close.bpmn: an undetermined end hands the bean back as `blocked`.
-    drainSubprocess(model, s, "Call_BeanClose_3", { Close_Outcome: "blocked" });
+    drainSubprocess(model, s, "Call_BeanClose", { Close_Outcome: "blocked" });
+    complete(model, s, "GW_BeanClosedHow", { outcome: "undetermined" });
     expect(s.status).toBe("completed");
-    expect(s.children?.Call_BeanClose_3?.history.map((h) => h.node)).toContain("Close_RecordBlocker");
+    expect(s.children?.Call_BeanClose?.history.map((h) => h.node)).toContain("Close_RecordBlocker");
   });
 
   test("the gateway is computed: asserting the branch is refused", () => {

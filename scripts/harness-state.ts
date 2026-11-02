@@ -61,60 +61,32 @@ import { initSteps, offlineProbe, type InitStep, type StepState } from "@litlfre
 import { repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { healthReportPath, parseHealthReport } from "../schemas/sdlc/health-report.ts";
 import { instanceRootsIn } from "../schemas/kg/instance-roots.ts";
-import { z } from "zod";
+import {
+  HARNESS_STATE_SCHEMA,
+  HARNESS_STATE_INDEX_SCHEMA,
+  HARNESS_STEP_STATES,
+  HarnessStateIndexSchema,
+  HarnessStateSchema,
+  type HarnessBadge,
+  type HarnessState,
+  type HarnessStepState,
+} from "../schemas/sdlc/harness-state.ts";
 
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
-export const HARNESS_STATE_SCHEMA = "folio-harness-state/v1";
-export const HARNESS_STATE_INDEX_SCHEMA = "folio-harness-state-index/v1";
+export {
+  HARNESS_STATE_SCHEMA,
+  HARNESS_STATE_INDEX_SCHEMA,
+  HarnessStateSchema,
+  HarnessStateIndexSchema,
+  type HarnessState,
+} from "../schemas/sdlc/harness-state.ts";
 
-const STATES = ["done", "not-done", "could-not-determine", "stated"] as const satisfies readonly StepState[];
-const BADGE_STATES = ["ok", "finding", "unknown"] as const;
-
-const StepSchema = z
-  .object({
-    id: z.string().min(1),
-    namedBy: z.string().min(1),
-    what: z.string(),
-    state: z.enum(STATES),
-    detail: z.string(),
-    action: z.string().optional(),
-  })
-  .strict();
-
-const BadgeSchema = z
-  .object({
-    id: z.enum(["initialization", "repository"]),
-    state: z.enum(BADGE_STATES),
-    label: z.string().min(1),
-  })
-  .strict();
-
-/** One harness's state, as the deploy publishes it. */
-export const HarnessStateSchema = z
-  .object({
-    $schema: z.literal(HARNESS_STATE_SCHEMA),
-    harness: z.string().min(1),
-    initialization: z
-      .object({
-        position: z.string().min(1),
-        next: z.object({ step: z.string().min(1), action: z.string() }).strict().nullable(),
-        counts: z.object(Object.fromEntries(STATES.map((s) => [s, z.number().int().nonnegative()])) as Record<StepState, z.ZodNumber>).strict(),
-        steps: z.array(StepSchema),
-      })
-      .strict(),
-    health: z.object({ badges: z.array(BadgeSchema) }).strict(),
-  })
-  .strict();
-export type HarnessState = z.infer<typeof HarnessStateSchema>;
-
-/** The list of harnesses in `--out`, for a page that shows them all. */
-export const HarnessStateIndexSchema = z
-  .object({
-    $schema: z.literal(HARNESS_STATE_INDEX_SCHEMA),
-    harnesses: z.array(z.object({ harness: z.string().min(1), file: z.string().min(1), position: z.string().min(1) }).strict()),
-  })
-  .strict();
+// The schema's step states must stay bootstrap-tools' `StepState`, both ways.
+const STATES = HARNESS_STEP_STATES satisfies readonly StepState[];
+const _sameStates: readonly HarnessStepState[] = [] as StepState[];
+void _sameStates;
+type Badge = HarnessBadge;
 
 /** Replace `root` (and `root/`) in `text` with a checkout-relative form. */
 export function relativize(text: string, root: string): string {
@@ -123,14 +95,14 @@ export function relativize(text: string, root: string): string {
 }
 
 /** The `initialization` badge, from the step states alone. */
-export function initializationBadge(counts: Record<StepState, number>): z.infer<typeof BadgeSchema> {
+export function initializationBadge(counts: Record<StepState, number>): Badge {
   if (counts["not-done"] > 0) return { id: "initialization", state: "finding", label: `${counts["not-done"]} setup step(s) not done` };
   if (counts["could-not-determine"] > 0) return { id: "initialization", state: "unknown", label: `${counts["could-not-determine"]} setup step(s) could not be checked from here` };
   return { id: "initialization", state: "ok", label: `every checkable setup step done (${counts.done})` };
 }
 
 /** The `repository` badge: the instance's own committed health report, or `unknown` without one. */
-export function repositoryBadge(instanceRoot: string): z.infer<typeof BadgeSchema> {
+export function repositoryBadge(instanceRoot: string): Badge {
   const p = healthReportPath(instanceRoot);
   if (!existsSync(p)) return { id: "repository", state: "unknown", label: "no committed health report in this checkout" };
   try {
@@ -176,7 +148,7 @@ function unmounted(s: InitStep): InitStep {
 }
 
 /** One harness's state, from its steps. Pure: the steps and the badge for its repository are handed in. */
-export function stateOf(name: string, steps: readonly InitStep[], repoRoot: string, repository: z.infer<typeof BadgeSchema>): HarnessState {
+export function stateOf(name: string, steps: readonly InitStep[], repoRoot: string, repository: Badge): HarnessState {
   const counts = Object.fromEntries(STATES.map((s) => [s, 0])) as Record<StepState, number>;
   for (const s of steps) counts[s.state]++;
   const first = steps.find((s) => s.state === "not-done");

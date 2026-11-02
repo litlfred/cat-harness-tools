@@ -693,6 +693,9 @@ export const PROPERTY_GLOSSES: Readonly<Record<string, TermGloss>> = {
   pageStart: { gloss: "The first page of the source an ingested node covers." },
   pageEnd: { gloss: "The last page of the source an ingested node covers." },
   strength: { gloss: "The stated strength of an ingested recommendation." },
+  systemUnderTest: {
+    gloss: "The kind, version, and runtime facet of an actor that a test plan executes against.",
+  },
 };
 
 /**

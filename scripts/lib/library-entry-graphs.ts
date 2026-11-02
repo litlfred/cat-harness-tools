@@ -35,12 +35,13 @@
  * @module scripts/lib/library-entry-graphs
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { findInstanceRoot, instanceDirectories, readDeclaration } from "../../schemas/kg/cat-harness.ts";
 import { defaultGraphTypologies, type GraphTypologyRegistry } from "../../schemas/kg/graph-typology-registry.ts";
 import { findDeclarationFile } from "../../schemas/kg/instance-roots.ts";
 import { libraryAssetSitePath } from "../../schemas/library/library-iri.ts";
+import { presentGroupsIn } from "../concern-groups.ts";
 
 /** One file of a sub-graph declared inside a library entry. */
 export interface EntryGraphFile {
@@ -208,4 +209,97 @@ export function nonEntryDirs(lib: string, registry: GraphTypologyRegistry = defa
     if (resolve(abs, "..") === resolve(lib) && !(e.graphTypologies ?? []).includes("library")) out.add(abs);
   }
   return out;
+}
+
+/** One library entry directory, flat or filed in a concern group. */
+export interface LibraryEntryDir {
+  /** The entry's slug: its directory name, and the `docId` every id is minted from. */
+  slug: string;
+  /** The entry directory, absolute when `lib` is. */
+  dir: string;
+  /** Its path relative to the library, `/`-separated: `<slug>` or `<group>/<slug>`. */
+  rel: string;
+  /** The concern-group code it is filed in, when it is filed. */
+  group?: string;
+}
+
+function isDirectory(p: string): boolean {
+  try {
+    return statSync(p).isDirectory();
+  } catch {
+    // Vanished between readdir and stat: not an entry this walk can read.
+    return false;
+  }
+}
+
+/**
+ * Every entry directory of the library `lib`, FLAT OR GROUPED — bean `6fez`,
+ * placement ruling 3 (2026-09-30, option A): sources are filed at
+ * `library/<group>/<slug>/`, and a new upload lands UNFILED at
+ * `library/<slug>/`. So both layouts are permanent, side by side, and a walker
+ * that reads `library/*` one level deep would take a group for an entry and
+ * miss everything filed in it.
+ *
+ * A group is told from an entry by the library's own declaration
+ * (`library/library.json`, `concern-groups/v1`) or by inheritance from the
+ * same-named library below — {@link presentGroupsIn}, the answer
+ * `groupedChildrenIn` gives every other grouping kind. Nothing is guessed from
+ * a directory's name or contents.
+ *
+ * Sorted by slug, with the plain code-unit order `readdirSync().sort()` gives,
+ * so a flat library lists exactly as every walker listed it before. Every
+ * subdirectory is returned; another kind's directory kept in the library is
+ * the caller's to drop, with {@link nonEntryDirs}, as before. Empty when `lib`
+ * is not a directory.
+ */
+export function libraryEntryDirs(lib: string, registry: GraphTypologyRegistry = defaultGraphTypologies): LibraryEntryDir[] {
+  if (!isDirectory(lib)) return [];
+  const groups = presentGroupsIn(lib, "library", registry);
+  const out: LibraryEntryDir[] = [];
+  for (const name of readdirSync(lib)) {
+    const dir = join(lib, name);
+    if (!isDirectory(dir)) continue;
+    const code = groups.get(name);
+    if (code === undefined) {
+      out.push({ slug: name, dir, rel: name });
+      continue;
+    }
+    for (const inner of readdirSync(dir)) {
+      const d = join(dir, inner);
+      if (isDirectory(d)) out.push({ slug: inner, dir: d, rel: `${name}/${inner}`, group: code });
+    }
+  }
+  const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+  return out.sort((a, b) => cmp(a.slug, b.slug) || cmp(a.rel, b.rel));
+}
+
+/**
+ * Where the entry `slug` sits in the library `lib` — `library/<slug>/` or
+ * `library/<group>/<slug>/` — or `undefined`. The resolver for every
+ * slug-keyed reference (`library/<bib-slug>` evidence, `heldEntries`, an
+ * image-verdicts docId): the slug is the identity, the group is only where it
+ * is filed (bean `6fez`).
+ */
+export function libraryEntryDir(lib: string, slug: string, registry: GraphTypologyRegistry = defaultGraphTypologies): string | undefined {
+  if (slug === "" || slug.includes("/") || slug.includes("\\")) return undefined;
+  const groups = presentGroupsIn(lib, "library", registry);
+  const flat = join(lib, slug);
+  if (!groups.has(slug) && isDirectory(flat)) return flat;
+  for (const g of [...groups.keys()].sort()) {
+    const d = join(lib, g, slug);
+    if (isDirectory(d)) return d;
+  }
+  return undefined;
+}
+
+/**
+ * The library an entry directory belongs to: its parent, or — when the entry
+ * is filed in a concern group — its grandparent (bean `6fez`). For a caller
+ * that holds an entry and needs the whole library it is a member of, such as
+ * a corpus-wide index whose weights must not shrink to one group.
+ */
+export function libraryOfEntry(entryDir: string, registry: GraphTypologyRegistry = defaultGraphTypologies): string {
+  const parent = dirname(resolve(entryDir));
+  const grand = dirname(parent);
+  return presentGroupsIn(grand, "library", registry).has(basename(parent)) ? grand : parent;
 }

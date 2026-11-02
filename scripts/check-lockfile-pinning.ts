@@ -68,9 +68,9 @@
  */
 
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { TOOLS_ROOT } from "./lib/roots.ts";
+import { join, resolve } from "node:path";
 
+const TOOLS_ROOT = resolve(import.meta.dir, "..");
 const ROOT = join(import.meta.dir, "..", "..");
 const WORKFLOWS = join(ROOT, ".github", "workflows");
 const BASELINE = join(TOOLS_ROOT, "scripts", "lockfile-pinning-baseline.json");
@@ -157,6 +157,10 @@ function readBaseline(): string[] {
 }
 
 if (import.meta.main) {
+  if (!existsSync(WORKFLOWS)) {
+    console.log("  ? could not determine — .github/workflows is absent from this checkout");
+    process.exit(2);
+  }
   const findings = scanWorkflows();
   const { pinned, guarded } = countPinned();
   const degrading = findings.filter((f) => f.kind === "degrading");

@@ -123,6 +123,11 @@
 #     checks:
 #       uses: litlfred/cat-harness-tools/.github/workflows/layer-pr-checks.yml@main
 #
+# `@main` above and below stands for the commit the caller's index.lock.json
+# pins: `bun run cat workflow-pins` writes it, `mount:remote` moves it with
+# each re-pin, and `check:workflow-pins` fails on a branch (owner, 2026-11-01,
+# security audit S1).
+#
 # Post-merge QA of main (owner, 2026-10-30, "Both"): a push to main runs
 # main's whole gate set and tests (the base side, above), and keeps main's
 # answer for the PRs based on that commit. It also says whether main ITSELF
@@ -231,10 +236,10 @@ on:
         # pre-70lx layers; folio-assistant#2529 merged on 2026-10-15.
         default: "main"
       tools-ref:
-        description: "The cat-harness-tools ref whose judging scripts run (both sides use the same)."
+        description: "The cat-harness-tools ref whose judging scripts run (both sides use the same). `lock`: the commit the caller's index.lock.json pins (cat-harness-tools itself: its own commit)."
         required: false
         type: string
-        default: "main"
+        default: "lock"
       reuse-stored-main:
         description: "On a PR's first attempt, when main's answer for these exact inputs is not cached, judge the PR against the answer a run on the caller's main stored for the PR's own base commit (its merge-base with main) instead of recomputing main (see the header). Off: the base side runs on every cache miss."
         required: false
@@ -255,6 +260,26 @@ on:
         required: false
         type: boolean
         default: false
+      writer-record-hours:
+        description: "How often, at most, a push to main re-records the page-build writers under strace (bean fwtz). The record takes 40-85 minutes and every run waits for it at its end; a PR uses the newest record and checks it path by path, so an older one still serves. 0 records on every push."
+        required: false
+        type: number
+        default: 6
+      writer-skip:
+        description: "Skip a derive:publish writer whose recorded reads are unchanged, putting back what it wrote (bean fwtz). A push to the caller's main records each writer under strace; a PR restores the newest record and skips. Off: every writer runs."
+        required: false
+        type: boolean
+        default: true
+      quick-paths:
+        description: "Path prefixes in the calling repository, space-separated (a directory ends in `/`). A PR whose every changed file starts with one of them takes the quick lane: the PR side is mounted, installed and typechecked, `quick-test` runs, and nothing else (no main side, no shards, no derive:publish, no gates). Empty: no quick lane."
+        required: false
+        type: string
+        default: ""
+      quick-test:
+        description: "What `bun test` runs in the quick lane, relative to the instance's directory (run from the root as `./<instance>/<quick-test>`, as the shards run tests). Required when quick-paths is set."
+        required: false
+        type: string
+        default: ""
     # Post-merge QA (owner, 2026-10-30, "Both"): on a push to main, whether
     # main ITSELF is green, for the caller's `layer-main-qa.yml` job, which
     # opens, updates or closes the one `main-red` issue. Empty on a PR.
@@ -307,6 +332,8 @@ jobs:
       tools: ${{ steps.pins.outputs.tools }}
       shards: ${{ steps.shards.outputs.list }}
       skip: ${{ steps.lock-only.outputs.skip }}
+      quick: ${{ steps.quick.outputs.quick }}
+      quick-test: ${{ steps.quick-test.outcome }}
       typecheck: ${{ steps.tsc.outcome }}
     steps:
       # The shard matrix, [1..gate-shards], once, so `run` and `compare` agree
@@ -325,12 +352,50 @@ jobs:
           list="$(seq -s, 1 "$N")"
           echo "gate shards: $N ([${list}])"
           echo "list=[${list}]" >> "$GITHUB_OUTPUT"
+      # Owner, 2026-11-01 (security audit S1, Q-SEC-4 "B"): a caller pins this
+      # workflow to the cat-harness-tools commit its own index.lock.json names
+      # (`bun run cat workflow-pins`), and the judging scripts follow the same
+      # pin, so nothing here runs code from a branch tip. `tools-ref: lock` (the
+      # default) reads that pin from the caller's index.lock.json at the commit
+      # under test; cat-harness-tools itself judges its own commit. Any other
+      # value is used as given (a branch is resolved at the pin time below).
+      - &tools-lock
+        name: The cat-harness-tools commit the caller pins
+        id: tools-lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WANT: ${{ inputs.tools-ref }}
+          INDEX_REF: ${{ inputs.index-ref }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$WANT" != "lock" ]; then ref="$WANT"
+          elif [ "$GITHUB_REPOSITORY" = "litlfred/cat-harness-tools" ]; then ref="$SHA"
+          else
+            lock() { curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github.raw+json" \
+              "$GITHUB_API_URL/repos/$1/contents/index.lock.json?ref=$2"; }
+            # A layer the index mounts but which keeps no
+            # lock of its own judges with the commit the folio-assistant
+            # index pins, which is still a pin and not a branch tip.
+            if body="$(lock "$GITHUB_REPOSITORY" "$SHA")"; then from="$GITHUB_REPOSITORY index.lock.json at $SHA"
+            else body="$(lock litlfred/folio-assistant "$INDEX_REF")"; from="litlfred/folio-assistant index.lock.json at $INDEX_REF"; fi
+            ref="$(printf '%s' "$body" | python3 -Ic 'import json,sys; print(next((m["ref"] for m in json.load(sys.stdin).get("mounts", []) if m.get("harness") == "cat-harness-tools"), ""))')"
+            # A layer below cat-harness-tools (cat-harness) keeps a lock that
+            # cannot mount it: same fall-back, to the index's pin.
+            if [ -z "$ref" ] && [[ "$from" != litlfred/folio-assistant* ]]; then
+              body="$(lock litlfred/folio-assistant "$INDEX_REF")"; from="litlfred/folio-assistant index.lock.json at $INDEX_REF ($GITHUB_REPOSITORY's lock mounts no cat-harness-tools)"
+              ref="$(printf '%s' "$body" | python3 -Ic 'import json,sys; print(next((m["ref"] for m in json.load(sys.stdin).get("mounts", []) if m.get("harness") == "cat-harness-tools"), ""))')"
+            fi
+            [ -n "$ref" ] || { echo "::error::$from pins no cat-harness-tools: mount it, or pass tools-ref"; exit 2; }
+          fi
+          echo "judging scripts: cat-harness-tools $ref"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
       - &judging-scripts
         name: The judging scripts
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: litlfred/cat-harness-tools
-          ref: ${{ inputs.tools-ref }}
+          ref: ${{ steps.tools-lock.outputs.ref }}
           path: ci
           sparse-checkout: .github/scripts/layer-pr-checks
       # One pin time per run attempt, shared by every job through the cache
@@ -433,7 +498,7 @@ jobs:
         env:
           MODE: ${{ inputs.mode }}
           INDEX_REF: ${{ inputs.index-ref }}
-          TOOLS_REF: ${{ inputs.tools-ref }}
+          TOOLS_REF: ${{ steps.tools-lock.outputs.ref }}
         run: |
           set -euo pipefail
           at="$(cat "$RUNNER_TEMP/pin/at")"
@@ -481,6 +546,7 @@ jobs:
           path: fa
       - &base-root
         name: Base side of the root (index mode)
+        id: base-root
         # Not on a push: the pushed commit IS main's side, and a merge
         # commit's first parent would be the main before it.
         if: inputs.mode == 'index' && env.SIDE == 'base' && github.event_name != 'push'
@@ -492,12 +558,25 @@ jobs:
           # exactly. Anything else (workflow_dispatch): the default branch's tip.
           set -euo pipefail
           cd "$DIR"
+          pr="$(git rev-parse HEAD)"
           if git rev-parse -q --verify 'HEAD^2' >/dev/null; then
             git checkout -q --detach 'HEAD^1'
           else
             git fetch -q --depth 1 origin "$DEFAULT_BRANCH"
             git checkout -q --detach FETCH_HEAD
           fi
+          # The first harness PR (owner, 2026-11-01 09:22Z, smart-ips-pilgrimage#7):
+          # main has no index.lock.json yet, because this PR adds it, so main
+          # cannot be mounted. Main is then no baseline at all, and the PR is
+          # judged against itself: it is green unless its own tests or gates
+          # cannot run, and the summary says it set the first baseline.
+          first=false
+          if [ ! -f index.lock.json ]; then
+            first=true
+            git checkout -q --detach "$pr"
+            echo "::notice::first harness PR: main has no index.lock.json, so main's side is this PR's own tree (it sets the first baseline)"
+          fi
+          echo "first-setup=$first" >> "$GITHUB_OUTPUT"
           git log -1 --format='base side: %h %s'
       - &setup-bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -532,6 +611,33 @@ jobs:
             fi
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
+      # The quick lane (bean qkln; owner 2026-10-31, Q-CI1 A): a PR that
+      # touches only `quick-paths` runs only `quick-test`, about 2 minutes
+      # instead of the full ~30. Never on a push: main always runs in full.
+      - &quick
+        name: Does this PR change only the quick-lane paths?
+        id: quick
+        if: inputs.mode == 'layer' && inputs.quick-paths != '' && github.event_name == 'pull_request'
+        env:
+          PATHS: ${{ inputs.quick-paths }}
+          TEST: ${{ inputs.quick-test }}
+        run: |
+          set -euo pipefail
+          quick=false
+          if [ -z "$TEST" ]; then echo "::error::quick-paths is set but quick-test is empty"; exit 2; fi
+          if git -C src rev-parse -q --verify 'HEAD^2' >/dev/null; then
+            changed="$(git -C src diff --name-only 'HEAD^1' HEAD)"
+            if [ -n "$changed" ]; then
+              quick=true
+              while IFS= read -r f; do
+                hit=false
+                for p in $PATHS; do case "$f" in "$p"*) hit=true; break;; esac; done
+                if [ "$hit" != true ]; then quick=false; echo "not quick: $f is outside quick-paths"; break; fi
+              done <<<"$changed"
+            fi
+            [ "$quick" = true ] && { echo "quick lane: every changed file is under: $PATHS"; echo "$changed"; }
+          fi
+          echo "quick=$quick" >> "$GITHUB_OUTPUT"
       - &caller-base
         name: Base side of the caller
         # Not on a push, for the same reason as the root's base side above.
@@ -679,7 +785,7 @@ jobs:
         name: Install Chromium, for the checks that draw through a browser
         # Not on a draft under `draft-fast-tier`: only derive:publish and the
         # gates draw, and a draft runs neither (owner, 2026-10-23, "1y").
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         # `render:bpmn` and the `*:processes:render:check` gates draw BPMN with
         # bpmn-js in Chromium (folio-assistant's B1 test job installs it for
         # the same reason). The index's OWN Playwright installs it, so the
@@ -696,7 +802,7 @@ jobs:
           fi
       - &state-mount
         name: Mount every graph kept on a branch, and build the IG pages
-        if: steps.skip-prep.outputs.hit != 'true'
+        if: steps.skip-prep.outputs.hit != 'true' && steps.quick.outputs.quick != 'true'
         # Every branch-kept graph the declarations name (beans, todos,
         # fsh-guts, health, issue-marks, marks, ...), as the index's own CI
         # mounts them with `state:mount`, but through `mountState` directly:
@@ -759,7 +865,7 @@ jobs:
         # fatal: recorded, and judged by the compare job against main.
         # Part of the full tier: skipped on a draft under `draft-fast-tier`,
         # with the shard hand-off steps below.
-        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: inputs.mode == 'layer' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         working-directory: fa
         run: |
           python3 ../ci/.github/scripts/layer-pr-checks/run-root-gates.py . \
@@ -771,7 +877,7 @@ jobs:
         # keyed by each writer's inputs and script closure (#409), so a stale
         # entry is a key defect, which the derive log's "reused" lines show.
         # Saved per side and run; restored from the newest of this repository.
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: fa/build/derive-cache
@@ -779,12 +885,33 @@ jobs:
           restore-keys: |
             derive-cache-v1-${{ github.repository }}-${{ env.SIDE }}-
             derive-cache-v1-${{ github.repository }}-
+      # Bean fwtz (owner 2026-10-31: "cache the page build", keyed on input
+      # content, so changed inputs rebuild). The writer cache above keys on
+      # statically derived inputs and reused 0 of 41 writers on
+      # https://github.com/litlfred/folio-assistant-core/pull/444. Writer records
+      # are traced instead: a push to
+      # main records what each writer read and wrote; a PR skips a writer whose
+      # every recorded read is unchanged and puts back what it wrote.
+      - &writer-cone
+        name: Restore main's derive:publish writer records (bean fwtz)
+        if: inputs.writer-skip && github.event_name == 'pull_request' && steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: fa/build/writer-cone
+          key: writer-cone-v1-${{ github.repository }}-${{ github.event.pull_request.base.sha }}
+          restore-keys: writer-cone-v1-${{ github.repository }}-
+      - &strace
+        name: strace, to record the writers (a push to main)
+        if: env.RECORD_WRITERS == 'true' && steps.skip-prep.outputs.hit != 'true'
+        run: |
+          if command -v strace >/dev/null; then strace -V | head -1; exit 0; fi
+          sudo apt-get update -qq && sudo apt-get install -y -qq strace && strace -V | head -1
       - &derive
         name: Build the publish-time pages (derive:publish), on this side
         # Not on a draft under `draft-fast-tier` (owner, 2026-10-23, "1y"):
         # only the tests and gates read these pages, and a draft runs neither.
         # The typecheck does not read them. A ready_for_review run builds them.
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         # B1 (owner, 2026-10-14; cat-harness#194, cb280cd): the pages an
         # instance declares `builtAtPublish` are no longer committed, and
         # `bun run cat derive:publish` builds them over the mounts, as
@@ -805,6 +932,8 @@ jobs:
         # only: derive:publish and its writers call `bun run cat <writer>`,
         # which there would run /usr/bin/cat. package.json is restored before
         # the tests and gates, so they judge the checkout as committed.
+        env:
+          WRITER_SKIP: ${{ inputs.writer-skip }}
         working-directory: fa
         run: |
           set -uo pipefail
@@ -860,8 +989,15 @@ jobs:
           # Reuse on (cat-harness-tools#400): derive:publish keeps reuse off under
           # CI unless a cache directory is named.
           export CAT_DERIVE_CACHE_DIR="$PWD/build/derive-cache"
+          # Writer records (bean fwtz): recorded on a push, used on a PR.
+          if [ "$WRITER_SKIP" = "true" ]; then
+            if [ "${RECORD_WRITERS:-}" = "true" ]; then export CAT_WRITER_RECORD=1
+            elif [ -f build/writer-cone/records.json ]; then export CAT_WRITER_SKIP=1
+            else echo "writer skip: no records restored, every writer runs"; fi
+          fi
           bun run cat derive:publish 2>&1 | tee "$log" || code=$?
           echo "derive cache: $(grep -c '^  reused ' "$log" || true) writer(s) reused, $(grep -c '^  ran ' "$log" || true) ran"
+          echo "writer skip: $(grep -c '^  skipped .*put back its outputs' "$log" || true) writer(s) skipped, $(grep -Ec '^  [^ ]+ runs: ' "$log" || true) ran"
           if [ -n "$injected" ]; then cp "$RUNNER_TEMP/package.json.orig" package.json; fi
           # A root that is not the folio-assistant index (no
           # code-quality-gates.yml: a folio, an IG repository) mounts fewer
@@ -887,6 +1023,13 @@ jobs:
           json.dump({"publish:derive:publish": {"command": "bun run cat derive:publish", "exit": int(sys.argv[2]), "tail": tail}}, open(sys.argv[1], "w"), indent=1)
           PY
           fi
+      - &writer-cone-save
+        name: Keep main's writer records (bean fwtz)
+        if: env.RECORD_WRITERS == 'true' && steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: fa/build/writer-cone
+          key: writer-cone-v1-${{ github.repository }}-${{ github.sha }}
       # The typecheck, once, here: it was its own job, a third machine and
       # a third wait for one `tsc` (cat-harness-tools#397). Its outcome goes
       # to the compare job, which fails on it, so the shards still run.
@@ -897,6 +1040,14 @@ jobs:
         working-directory: fa/${{ inputs.mode == 'layer' && env.INSTANCE || '.' }}
         run: |
           if [ -f tsconfig.json ]; then bunx tsc --noEmit -p tsconfig.json; else echo "no tsconfig.json: nothing to typecheck"; fi
+      - name: Quick-lane tests
+        id: quick-test
+        if: steps.quick.outputs.quick == 'true'
+        continue-on-error: true
+        working-directory: fa
+        env:
+          TEST: ${{ inputs.quick-test }}
+        run: bun test "./$INSTANCE/$TEST"
       - name: Directory READMEs (QA report, never a gate)
         # Owner, 2026-10-16: "QA report, but not gate". A layer's own PR is
         # told when its directory READMEs are stale, as a warning and in the
@@ -934,7 +1085,7 @@ jobs:
           exit 0
       - &timings-restore
         name: The gate seconds the last run of this repository recorded
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ${{ runner.temp }}/timings
@@ -943,7 +1094,7 @@ jobs:
             layer-pr-checks-timings-v1-${{ github.repository }}-
       - &snapshot-save
         name: Hand this side's prepared root to its shards
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/prepared"
@@ -956,7 +1107,7 @@ jobs:
           ls -la "$RUNNER_TEMP/prepared"
       - &upload-prepared
         name: Upload this side's prepared root
-        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true)
+        if: steps.skip-prep.outputs.hit != 'true' && !(inputs.draft-fast-tier && github.event.pull_request.draft == true) && steps.quick.outputs.quick != 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: prepared-${{ env.SIDE }}
@@ -995,9 +1146,49 @@ jobs:
       # Whether this job built main's side for its shards. The `run` job reads
       # it on a push, where there is no PR side to wait for.
       prepared: ${{ steps.skip-prep.outputs.hit != 'true' }}
+      # True on the first harness PR: main had no lock, so main's side is
+      # the PR's own tree (see the base-root step).
+      first-setup: ${{ steps.base-root.outputs.first-setup == 'true' }}
+      # Whether this push re-records the page-build writers (writer-record-hours).
+      record-writers: ${{ steps.writer-stamp.outputs.record }}
+      writer-bucket: ${{ steps.writer-bucket.outputs.bucket }}
     steps:
       # The same matrix as prepare-head's; a push has no prepare-head.
       - *shards
+      - *tools-lock
+      # Has a push recorded the page-build writers in this window? (bean fwtz;
+      # owner, 2026-11-01, card Q-CIS-2 A: off the main path.) A cache key per
+      # window of `writer-record-hours`: the first push in a window records
+      # and saves the stamp, the rest skip the 40-85 minute job.
+      - name: Is a writer record due? (a push)
+        id: writer-bucket
+        if: github.event_name == 'push' && inputs.writer-skip
+        env:
+          HOURS: ${{ inputs.writer-record-hours }}
+        run: |
+          set -euo pipefail
+          if [ "${HOURS:-0}" -le 0 ] 2>/dev/null; then echo "bucket=$GITHUB_SHA" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "bucket=$(( $(date -u +%s) / (3600 * HOURS) ))" >> "$GITHUB_OUTPUT"
+      - name: Was the writer record made in this window?
+        id: writer-stamp-lookup
+        if: steps.writer-bucket.outcome == 'success'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/writer-stamp
+          key: writer-record-stamp-v1-${{ github.repository }}-${{ steps.writer-bucket.outputs.bucket }}
+          lookup-only: true
+      - name: Record the writers on this push?
+        id: writer-stamp
+        if: steps.writer-bucket.outcome == 'success'
+        env:
+          HIT: ${{ steps.writer-stamp-lookup.outputs.cache-hit == 'true' }}
+        run: |
+          if [ "$HIT" = "true" ]; then
+            echo "the page-build writers were recorded in this ${{ inputs.writer-record-hours }}-hour window: not recorded again"
+            echo "record=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "record=true" >> "$GITHUB_OUTPUT"
+          fi
       - *judging-scripts
       - *pin-restore
       - *pin-record
@@ -1010,6 +1201,7 @@ jobs:
       - *setup-bun
       - *caller
       - *lock-only
+      - *quick
       - *caller-base
       # The base side is main, and main's answer does not depend on the PR
       # (bean cis2). It is cached under what it is computed FROM: the index
@@ -1172,11 +1364,12 @@ jobs:
         env:
           PUSH: ${{ github.event_name == 'push' }}
           PINS_ONLY: ${{ steps.lock-only.outputs.skip == 'true' }}
+          QUICK: ${{ steps.quick.outputs.quick == 'true' }}
           BASE_HIT: ${{ steps.base-hit.outputs.hit == 'true' }}
           CONE_HIT: ${{ steps.cone-lookup.outputs.cache-hit == 'true' }}
         run: |
           hit=false
-          if [ "$PINS_ONLY" = "true" ]; then hit=true
+          if [ "$PINS_ONLY" = "true" ] || [ "$QUICK" = "true" ]; then hit=true
           elif [ "$PUSH" = "true" ]; then { [ "$BASE_HIT" = "true" ] && [ "$CONE_HIT" = "true" ]; } && hit=true
           elif [ "$BASE_HIT" = "true" ]; then hit=true
           fi
@@ -1192,10 +1385,70 @@ jobs:
       - *state-mount
       - *root-gates
       - *derive-cache
+      - *writer-cone
+      - *strace
       - *derive
+      - *writer-cone-save
       - *timings-restore
       - *snapshot-save
       - *upload-prepared
+
+  # Main's writer records (bean fwtz), on their own machine beside the base
+  # side: tracing every derive:publish writer under strace took the base
+  # side's preparation from ~10 to 56 minutes (run
+  # https://github.com/litlfred/folio-assistant-core/actions/runs/41251751682). PRs read only the records this job saves, so nothing waits
+  # on it but the run's own end.
+  record-writers:
+    name: Record main's page-build scripts (bean fwtz)
+    needs: [prepare-base]
+    if: >-
+      !cancelled() && inputs.writer-skip && github.event_name == 'push' &&
+      needs.prepare-base.outputs.record-writers == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SIDE: base
+      RECORD_WRITERS: "true"
+    steps:
+      - id: skip-prep
+        run: echo "hit=false" >> "$GITHUB_OUTPUT"
+      - *tools-lock
+      - *judging-scripts
+      - *pin-restore
+      - *pin-record
+      - *pin-write
+      - *pin-save
+      - *pin-reread
+      - *pins
+      - *checkout-index
+      - *base-root
+      - *setup-bun
+      - *caller
+      - *caller-base
+      - *mount-cache
+      - *mount
+      - *mark
+      - *lower-layers-main
+      - *swap
+      - *root-cat
+      - *install
+      - *chromium
+      - *state-mount
+      - *strace
+      - *derive
+      - *writer-cone-save
+      - name: Stamp this window's writer record (writer-record-hours)
+        if: steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
+        run: |
+          mkdir -p "$RUNNER_TEMP/writer-stamp"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/writer-stamp/sha"
+      - name: Keep the stamp
+        if: steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/writer-stamp
+          key: writer-record-stamp-v1-${{ github.repository }}-${{ needs.prepare-base.outputs.writer-bucket }}
 
   # Each side is `gate-shards` jobs, on separate machines (bean lpcs, step 3).
   # The ~300 gates ran one at a time, ~2500 s a side
@@ -1216,7 +1469,7 @@ jobs:
     if: >-
       !cancelled() && needs.prepare-base.result == 'success' && (
         (github.event_name == 'push' && needs.prepare-base.outputs.prepared == 'true') ||
-        (github.event_name != 'push' && needs.prepare-head.result == 'success' && needs.prepare-head.outputs.skip != 'true'))
+        (github.event_name != 'push' && needs.prepare-head.result == 'success' && needs.prepare-head.outputs.skip != 'true' && needs.prepare-head.outputs.quick != 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 150
     strategy:
@@ -1375,6 +1628,14 @@ jobs:
           ROOT_GATES=""
           [ "$MODE" = "layer" ] && ROOT_GATES="--record $RUNNER_TEMP/root-gates.json"
           python3 ci/.github/scripts/layer-pr-checks/run-gates.py fa "$RUNNER_TEMP/gates.json" $OWN --record "$RUNNER_TEMP/derive-publish.json" $ROOT_GATES
+      # The artefact's own name, inside it: when the compare job's download
+      # matches ONE artefact (one shard, one side), the action unpacks it into
+      # `results/` itself rather than `results/<name>/`, and this file is how
+      # the compare job puts it back where merge-shards.py looks.
+      - name: Name this shard's artefact inside it
+        env:
+          NAME: results-${{ matrix.side }}-${{ matrix.shard }}
+        run: printf '%s\n' "$NAME" > "$RUNNER_TEMP/artefact-name"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: results-${{ matrix.side }}-${{ matrix.shard }}
@@ -1384,6 +1645,7 @@ jobs:
             ${{ runner.temp }}/gates.json
             ${{ runner.temp }}/gates-shard.json
             ${{ runner.temp }}/cone-records.json
+            ${{ runner.temp }}/artefact-name
 
   # `!cancelled()`, not the default `success()`: a shard or prepare job that
   # failed or timed out must make this job RED (its artefact is missing,
@@ -1413,6 +1675,7 @@ jobs:
           PUSH: ${{ github.event_name == 'push' }}
           PREPARED: ${{ needs.prepare-base.outputs.prepared }}
           DRAFT: ${{ inputs.draft-fast-tier && github.event.pull_request.draft == true }}
+          QUICK: ${{ needs.prepare-head.outputs.quick == 'true' }}
         run: |
           if [ "$PUSH" = "true" ]; then
             if [ "$PREPARED" = "true" ]; then
@@ -1427,6 +1690,11 @@ jobs:
             msg="This PR changes only the caller's own pins (index.lock.json, index.config.json). Layer mode mounts the folio-assistant index's lock, never the caller's, so the tests and gates would judge nothing it changed: nothing was run."
             echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
             echo "only=true" >> "$GITHUB_OUTPUT"
+          elif [ "$QUICK" = "true" ]; then
+            msg="quick lane: this PR changes only \`${{ inputs.quick-paths }}\`, so only \`bun test ${{ inputs.quick-test }}\` and the typecheck ran (no main side, shards, derive:publish or gates)."
+            echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+            echo "only=true" >> "$GITHUB_OUTPUT"
+            echo "quick=true" >> "$GITHUB_OUTPUT"
           elif [ "$DRAFT" = "true" ]; then
             msg="draft: full tier skipped. This draft PR was prepared and typechecked only; the tests, the gates and the comparison with main run when it is marked ready for review."
             echo "$msg"; echo "$msg" >> "$GITHUB_STEP_SUMMARY"
@@ -1464,6 +1732,21 @@ jobs:
         with:
           path: results
           pattern: results-*
+      # One shard on one side (`gate-shards: 1` with main's answer cached, or a
+      # push) is one artefact, which the action unpacks into `results/` itself.
+      # Put it under its own name, as with two or more (bootstrap-tools#68,
+      # run 41359773941: "the artefact results-head-1 is missing").
+      - name: Keep a lone artefact under its own name
+        if: steps.pins-only.outputs.only != 'true'
+        run: |
+          set -euo pipefail
+          if [ -f results/artefact-name ]; then
+            name="$(cat results/artefact-name)"
+            case "$name" in results-head-[0-9]*|results-base-[0-9]*) ;; *) echo "::error::results/artefact-name is '$name'"; exit 2 ;; esac
+            mkdir -p "results/$name"
+            find results -maxdepth 1 -type f -exec mv {} "results/$name/" \;
+            echo "one artefact, unpacked flat: moved under results/$name"
+          fi
       # Handed on by prepare-base, which restored it (cat-harness-tools#926):
       # an artifact of this run, never a cache entry that can be evicted
       # while the head shards run. `cached` is true only when it was handed.
@@ -1506,6 +1789,14 @@ jobs:
           if tier != "exact":
               print("\nIt is the answer for this PR's own base commit; a failure that reached it after that run through the index, a lower layer or a branch-kept graph shows here as new. If a NEW failure below is not this PR's, re-run **all** jobs: a second attempt recomputes main exactly.")
           PY
+      - name: Say that this is the first harness PR
+        if: steps.pins-only.outputs.only != 'true' && needs.prepare-base.outputs.first-setup == 'true'
+        run: |
+          {
+            echo "### First harness PR: no baseline on main"
+            echo
+            echo "Main has no \`index.lock.json\` yet, because this PR adds it, so main cannot be mounted. Main's side was computed from this PR's own tree: nothing below can be new, and every failing gate is listed as the baseline this PR sets. Later PRs are judged against main as usual."
+          } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Join each side's shards
         id: join
         if: steps.pins-only.outputs.only != 'true'
@@ -1653,6 +1944,19 @@ jobs:
         run: |
           echo "::error::tests: ${{ steps.tests.outcome }}, gates: ${{ steps.gates.outcome }}, typecheck: ${{ needs.prepare-head.outputs.typecheck }} — see the step summary"
           exit 1
+      # The quick lane is judged here: its tests and the typecheck. A PR side
+      # that could not be prepared is red, never a pass.
+      - name: Quick-lane verdict
+        if: steps.pins-only.outputs.quick == 'true'
+        env:
+          PREPARED: ${{ needs.prepare-head.result }}
+          TESTS: ${{ needs.prepare-head.outputs.quick-test }}
+          TYPECHECK: ${{ needs.prepare-head.outputs.typecheck }}
+        run: |
+          echo "quick lane: prepare-head $PREPARED, tests ${TESTS:-not run}, typecheck ${TYPECHECK:-not run}" | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$PREPARED" = "success" ] || { echo "::error::quick lane: the PR side could not be prepared ($PREPARED)"; exit 1; }
+          [ "$TESTS" = "success" ] || { echo "::error::quick lane: tests ${TESTS:-not run}"; exit 1; }
+          [ "$TYPECHECK" != "failure" ] || { echo "::error::quick lane: typecheck failed"; exit 1; }
       # A draft under `draft-fast-tier`: the fast tier is judged here. A PR
       # side that could not be prepared is red, never a pass. So is a failed
       # typecheck.

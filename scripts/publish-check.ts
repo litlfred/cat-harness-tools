@@ -289,6 +289,21 @@ if (import.meta.main) {
       storedDirs.some((d) => (abs + sep).startsWith(d + sep) || abs === d)
     );
   };
+  const PREREQ_WRITERS: Readonly<Record<string, readonly string[]>> = {
+    "navbar:include": ["docs:harness"],
+    "slice:sqlite": ["docs:pages", "library:viz"],
+    "uml:overview": ["glossary:page"],
+  };
+  const prereqs = new Set<string>([
+    ...declared.filter((a) => a.writer.at(-1) === writer && a.writer.length > 1).flatMap((a) => a.writer.slice(0, -1)),
+    ...(PREREQ_WRITERS[writer] ?? []),
+  ]);
+  for (const pre of prereqs) {
+    if (scripts[pre] === undefined) continue;
+    const preDeclared = declared.filter((a) => a.writer.includes(pre));
+    if (preDeclared.length > 0 && preDeclared.every((a) => built(a))) continue;
+    run(`bun run cat ${pre}`, work);
+  }
   const before = snapshot(roots, work);
 
   if (run(`bun run cat ${writer}`, work) !== 0) {

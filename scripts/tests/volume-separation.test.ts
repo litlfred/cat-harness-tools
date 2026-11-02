@@ -12,16 +12,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const SCRIPT = join(new URL("..", import.meta.url).pathname, "volume-separation.py");
+const GDZ_FIXTURE_DIR = join(new URL("../../test/fixtures/volume-separation/gdz-invent-math-106", import.meta.url).pathname);
 const made: string[] = [];
 afterEach(() => {
   for (const d of made.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
-/** A ten-page volume entry. */
-function volume(pages = 10): { root: string; entry: string } {
+/** A page-granularity volume entry. */
+function volume(pages = 10, name = "invent-math-106"): { root: string; entry: string } {
   const root = mkdtempSync(join(tmpdir(), "vsep-"));
   made.push(root);
-  const entry = join(root, "library", "invent-math-106");
+  const entry = join(root, "library", name);
   mkdirSync(join(entry, "sections"), { recursive: true });
   const sections = Array.from({ length: pages }, (_, i) => ({ id: `page-${String(i + 1).padStart(3, "0")}`, page_start: i + 1, page_end: i + 1 }));
   writeFileSync(join(entry, "structure.json"), JSON.stringify({ granularity: "page", sections }));
@@ -125,5 +126,31 @@ describe("volume-separation", () => {
     const { root, entry } = volume();
     writeFileSync(join(entry, "structure.json"), JSON.stringify({ granularity: "section", sections: [] }));
     expect(run(root, "queue", entry, "--out", "build/q.json").err).toContain("not 'page'");
+  });
+
+  test("GDZ Invent. Math. 106 (PPN356556735_0106) acceptance run: majority vote proposes all 26 articles and matches the 4-article hand cut", () => {
+    const { root, entry } = volume(673, "PPN356556735_0106");
+    const votesFile = join(GDZ_FIXTURE_DIR, "votes.json");
+    const expectedProposal = JSON.parse(readFileSync(join(GDZ_FIXTURE_DIR, "separation-proposal.json"), "utf8"));
+    expect(run(root, "propose", entry, "--votes", votesFile).code).toBe(0);
+    const actualProposal = JSON.parse(readFileSync(join(entry, "separation-proposal.json"), "utf8"));
+    expect(actualProposal).toEqual(expectedProposal);
+    expect(actualProposal.spans).toHaveLength(26);
+    expect(actualProposal.undetermined).toHaveLength(9);
+
+    const scoreContent26 = JSON.parse(run(root, "score", entry, "--truth", join(GDZ_FIXTURE_DIR, "truth-content-pages-26.json")).out);
+    expect(scoreContent26.exact_spans).toBe(26);
+    expect(scoreContent26.starts).toEqual({ precision: 1, recall: 1 });
+    expect(scoreContent26.ends).toEqual({ precision: 1, recall: 1 });
+
+    const scoreHandCut4 = JSON.parse(run(root, "score", entry, "--truth", join(GDZ_FIXTURE_DIR, "truth-qou-hand-cut-4.json")).out);
+    expect(scoreHandCut4.exact_spans).toBe(4);
+    expect(scoreHandCut4.starts).toEqual({ precision: 0.154, recall: 1 });
+    expect(scoreHandCut4.ends).toEqual({ precision: 0.154, recall: 1 });
+
+    const scoreOutline26 = JSON.parse(run(root, "score", entry, "--truth", join(GDZ_FIXTURE_DIR, "truth-gdz-outline-26.json")).out);
+    expect(scoreOutline26.exact_spans).toBe(15);
+    expect(scoreOutline26.starts).toEqual({ precision: 1, recall: 1 });
+    expect(scoreOutline26.ends).toEqual({ precision: 0.577, recall: 0.577 });
   });
 });

@@ -12,7 +12,7 @@
       "tagPrefix": "v",
       "binds": [
         "cat-harness-tools/scripts/pdf-viewer.ts — `PDFJS_SHA256` must be re-measured with the version; `install` refuses a zip whose hash differs, so a bump without it fails the site build rather than shipping unverified bytes.",
-        "cat-harness-tools/scripts/pdf-viewer.ts `openShim` — listens for `webviewerloaded` on BOTH `document` and `parent.document` and calls `PDFViewerApplication.open({url})` after `initializedPromise`, and sets `defaultUrl` to empty. All three are pdf.js internals measured at v6.4.299; a rename leaves every embed an empty viewer while the build stays green.",
+        "cat-harness-tools/scripts/pdf-viewer.ts `openShim` — listens for `webviewerloaded` on BOTH `document` and `parent.document` and calls `PDFViewerApplication.open({url})` after `initializedPromise`, and sets `defaultUrl` to empty. All three are pdf.js internals measured at v6.4.299 and again at v6.5.438; a rename leaves every embed an empty viewer while the build stays green.",
         "cat-harness-tools/scripts/pdf-viewer.ts `patchViewerHtml` — anchors on `<script src=\"../build/pdf.mjs\" type=\"module\">` in `web/viewer.html`, and throws if it moved.",
         "cat-harness-tools/scripts/pdf-viewer.ts `KEEP` — the release paths copied into the site; `install` throws on any that is missing."
       ]

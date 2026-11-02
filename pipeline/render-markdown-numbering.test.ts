@@ -39,6 +39,11 @@ describe("renderBlockMarkdown headings", () => {
     expect(md).toContain("*Product master data*");
     expect(md).not.toContain("*Fig. 1. Product master data*");
   });
+  test("a numbered figure says its caption once, on the heading line", () => {
+    const md = renderBlockMarkdown(fig("Fig. 5. WHO SMART Guidelines Approach", "fig:5"));
+    expect(md).toContain("**Figure 5.** *WHO SMART Guidelines Approach*");
+    expect(md.split("WHO SMART Guidelines Approach").length - 1).toBe(1);
+  });
   test("an unnumbered table keeps its plain heading and still gets the link icon", () => {
     const md = renderBlockMarkdown({
       block: { kind: "table", label: "tbl:target-users", caption: "Target users" } as unknown as Block,
@@ -50,5 +55,52 @@ describe("renderBlockMarkdown headings", () => {
   });
   test("no anchors means no link icon", () => {
     expect(renderBlockMarkdown(fig("Fig. 2. X", "fig:2"), { anchors: false })).not.toContain("block-anchor");
+  });
+});
+
+describe("the numbered-block frame", () => {
+  test("a figure, diagram or table sits in one frame, Markdown kept inside", () => {
+    const md = renderBlockMarkdown(fig("Fig. 1. Product master data"));
+    expect(md.startsWith('<div class="fa-numbered fa-numbered-figure" markdown="1">\n\n')).toBe(true);
+    expect(md.endsWith("\n\n</div>")).toBe(true);
+    const t = renderBlockMarkdown({ block: { kind: "table", label: "tbl:x", caption: "X" } as unknown as Block, mdContent: "| a |\n|---|\n| b |" });
+    expect(t).toContain('class="fa-numbered fa-numbered-table"');
+  });
+  test("prose has no frame", () => {
+    const md = renderBlockMarkdown({ block: { kind: "prose", label: "prose:x" } as unknown as Block, mdContent: "Text." });
+    expect(md).not.toContain("fa-numbered");
+  });
+});
+
+describe("structured blocks: a light card", () => {
+  const fr = {
+    block: { kind: "functional-requirement", label: "freq:FR-AN-01", title: "Standard reports and dashboards on stock…", meta: { requirementId: "FR-AN-01" } } as unknown as Block,
+    mdContent: "**FR-AN-01.** Standard reports and dashboards on stock and status.\n\n*Priority:* to be set. *Linked use cases:* to be traced.\n",
+  };
+  test("kind label, id chip and the body on one line; the id and the cut title are said once", () => {
+    const md = renderBlockMarkdown(fr);
+    expect(md.startsWith('<div class="fa-block fa-block-functional-requirement" markdown="1">\n\n')).toBe(true);
+    expect(md).toContain('<span class="fa-block-kind">Functional requirement</span> <span class="fa-block-id">FR-AN-01</span> Standard reports and dashboards on stock and status.');
+    expect(md).not.toContain("**FR-AN-01.**");
+    expect(md).not.toContain("stock…");
+  });
+  test("trailing *Label:* lines become the metadata row", () => {
+    expect(renderBlockMarkdown(fr)).toContain('<div class="fa-block-meta" markdown="1">\n\n*Priority:* to be set. *Linked use cases:* to be traced.\n\n</div>');
+  });
+  test("an id with a title in its bold lead keeps the title", () => {
+    const md = renderBlockMarkdown({
+      block: { kind: "non-functional-requirement", label: "nfreq:NFR-01", title: "Security", meta: { requirementId: "NFR-01" } } as unknown as Block,
+      mdContent: "**NFR-01 Security.** Data are protected.",
+    });
+    expect(md).toContain('<span class="fa-block-kind">Non-functional requirement</span> <span class="fa-block-id">NFR-01</span> **Security.** Data are protected.');
+  });
+  test("a list body keeps the heading on its own line, and the text is otherwise unchanged", () => {
+    const body = "- One.\n- Two.\n\n```\na\n\n\nb\n```";
+    const md = renderBlockMarkdown({ block: { kind: "user-scenario", label: "scen:x", title: "X" } as unknown as Block, mdContent: body });
+    expect(md).toContain('<span class="fa-block-kind">User scenario</span> **X.**\n\n' + body);
+  });
+  test("prose and numbered kinds are not cards", () => {
+    expect(renderBlockMarkdown({ block: { kind: "prose", label: "p:x" } as unknown as Block, mdContent: "Text." })).not.toContain("fa-block");
+    expect(renderBlockMarkdown(fig("Fig. 1. X"))).not.toContain("fa-block ");
   });
 });

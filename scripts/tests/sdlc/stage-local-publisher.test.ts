@@ -47,6 +47,14 @@ describe("stage-local: which publisher, read from the repository's own workflows
     expect(detectPublisher(new Map([["fhirbuild.yml", IG_CALLER]]), ON_OFFER)).toMatchObject({ kind: "ig", uses: { owner: "WorldHealthOrganization", repo: "smart-base", file: "fhirbuild.yml" } });
   });
 
+  test("a pinned uses: line with a trailing comment is still read (smart-trust's `@<sha> # main`)", () => {
+    const pinned = IG_CALLER.replace("fhirbuild.yml@main", "fhirbuild.yml@49178a48d460bb53acf6e90d8c0aee3f0146d8f7 # main");
+    expect(detectPublisher(new Map([["fhirbuild.yml", pinned]]), ON_OFFER)).toMatchObject({
+      kind: "ig",
+      uses: { file: "fhirbuild.yml", ref: "49178a48d460bb53acf6e90d8c0aee3f0146d8f7" },
+    });
+  });
+
   test("a repository calling two of one publisher's workflows builds with the one it prefers", () => {
     expect(detectPublisher(new Map([["fhirbuild.yml", IG_CALLER], ["ghbuild.yml", IG_PAGES_CALLER]]), ON_OFFER).uses.file).toBe("ghbuild.yml");
   });

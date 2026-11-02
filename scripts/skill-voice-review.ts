@@ -112,7 +112,11 @@ export function skillVoices(
   // `undefined` ("the config could not be read") is a real answer here.
   opts: { active?: string[] | undefined } = {},
 ): SkillVoice[] | undefined {
-  const active = "active" in opts ? opts.active : readActiveVoices(repoRoot);
+  // In an index checkout the root declares no instance, and the checkout's
+  // skill-authoring voice activation lives on `cat-harness`'s entry in
+  // `index.config.json` (moved from the retired root config on 2026-10-09;
+  // see `voice-gate-checkout.test.ts`).
+  const active = "active" in opts ? opts.active : (readActiveVoices(repoRoot) ?? readActiveVoices(HARNESS_ROOT));
   if (active === undefined) return undefined;
   if (active.length === 0) return [];
 

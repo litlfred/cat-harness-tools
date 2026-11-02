@@ -149,7 +149,9 @@ export function classifyFilePath(path: string): ChangeCategory {
     norm.includes("test/health/results/") ||
     // declared-path-literal: directory prefix for classifying generated test sidecar artifacts as exempt
     norm.includes("test/results/") ||
+    // input-site: inert #c79b34db — path prefix classifying generated output as exempt; reads no directory
     norm.startsWith("_site/") ||
+    // input-site: inert #5a9d8a44 — path prefix classifying generated output as exempt; reads no directory
     norm.startsWith("dist/")
   ) {
     return "exempt";

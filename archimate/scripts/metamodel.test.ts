@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { parseArchimate } from "../schemas/archimate.ts";
-import { RelationshipTableSchema, isAllowed, isPlaceholder, metamodelDot, metamodelMermaid, metamodelOf, relationshipTable, type Metamodel, type MetamodelPattern } from "../schemas/metamodel.ts";
+import { RelationshipTableSchema, categorySubsets, drawnCategories, isAllowed, metamodelSvgName, isPlaceholder, metamodelDot, metamodelMermaid, metamodelOf, relationshipTable, type Metamodel, type MetamodelPattern } from "../schemas/metamodel.ts";
 import { parseArchiTable, tableJson } from "./import-archi-relationships.ts";
 import { report } from "./archimate-metamodel.ts";
 
@@ -128,6 +128,16 @@ describe("the metamodel in use", () => {
     expect(linked).toContain(`URL="page/#type-Goal", target="_top"`);
     expect(linked).toContain(`URL="page/#pattern-Capability-Goal", target="_top"`);
     expect(dot).not.toContain("URL=");
+    // Filtered to one category, the picture is laid out without the other lines, and the types only they touched.
+    const structural = metamodelDot(dense, { categories: ["structural"] });
+    expect(structural).toContain(`label="realises ×2", class="mm-cat-structural`);
+    expect(structural).not.toContain("influences");
+    expect(structural).toContain(`(to itself: aggregates ×13)`);
+    expect(metamodelDot(dense, { categories: ["dynamic"] })).not.toContain(`"Capability" [`);
+    expect(drawnCategories(dense)).toEqual(["structural", "dependency"]);
+    expect(categorySubsets(dense)).toEqual([["structural"], ["dependency"]]);
+    expect(metamodelSvgName(["dependency"], ["structural", "dependency"])).toBe("metamodel.dependency.svg");
+    expect(metamodelSvgName(["dependency", "structural"], ["structural", "dependency"])).toBe("metamodel.svg");
   });
 
   it("reports in plain text, the refusal first", () => {

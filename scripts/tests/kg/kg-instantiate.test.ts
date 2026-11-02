@@ -352,10 +352,22 @@ describe("instantiate: refusals, each with its reason", () => {
 
   test("a state path that climbs out is refused before anything is written", async () => {
     const c = checkout();
-    await subscribed(c, { ...SUBSTRATE, directories: [{ id: "esc", path: "../outside/", graphTypologies: ["workflow-state"] }, SUBSTRATE.directories[0]] });
-    const r = instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
-    expect(!r.ok && r.state).toBe("refused");
-    expect(!r.ok && r.reason).toMatch(/climbs out/);
+    const decl = { ...SUBSTRATE, directories: [{ id: "esc", path: "../outside/", graphTypologies: ["workflow-state"] }, SUBSTRATE.directories[0]] };
+    // Two guards, in order. bootstrap's declaration schema refuses a `..` path
+    // at subscribe (bootstrap-tools#59); a bootstrap-tools pinned before it
+    // admits the declaration, and instantiate's own guard refuses it. Either
+    // way it is refused, and nothing is written outside.
+    const s = await subscribe({ target: `litlfred/${decl["name"]}@${SHA}`, instance: c.host, fetch: serve(decl) });
+    if (!s.ok) {
+      expect(s.reason).toMatch(/directories\.0\.path/);
+    } else {
+      const raw = JSON.parse(readFileSync(c.file, "utf8")) as { subscriptions: { id: string; harnesses?: string[] }[] };
+      const subs = raw.subscriptions.map((x) => (x.id === decl["name"] ? { ...x, harnesses: [String(decl["name"])] } : x));
+      writeFileSync(c.file, setTopLevelKey(readFileSync(c.file, "utf8"), "subscriptions", subs));
+      const r = instantiate({ subscription: "ihris-kb", harness: "ihris-kb", instance: c.host });
+      expect(!r.ok && r.state).toBe("refused");
+      expect(!r.ok && r.reason).toMatch(/climbs out/);
+    }
     expect(existsSync(join(c.repo, "outside"))).toBe(false);
   });
 });

@@ -63,14 +63,29 @@ export function hasThemeSidebar(html: string): boolean {
 }
 
 /**
- * A just-the-docs page without its side bar and the footer's mobile copy of
- * the side bar's footer. Unchanged when it has no side bar.
+ * The theme's per-page nav ACTIVATION style: `<style id="jtd-nav-activation">`,
+ * which highlights and unfolds this page's row of `#site-nav` by its
+ * POSITION (`li:nth-child(108) > ul > li:nth-child(4) …`).
+ */
+const NAV_ACTIVATION = /<style id="jtd-nav-activation">[\s\S]*?<\/style>/;
+
+/**
+ * A just-the-docs page without its side bar, the footer's mobile copy of the
+ * side bar's footer, and the side bar's activation style. Unchanged when it
+ * has no side bar.
+ *
+ * The activation style goes with the side bar because it styles nothing once
+ * `#site-nav` is gone, and it is what made one page's edit touch every page:
+ * it names this page's row by position in the WHOLE nav, so a page added or
+ * retitled ahead of it renumbers it. Measured on gh-pages `cc01b54`, it was
+ * the only nav-shaped bytes left in a stripped page (1.4 KB); the rail's own
+ * data is already one shared file (`railDataAsset`, named by scope).
  */
 export function stripThemeSidebar(html: string): string {
   if (!hasThemeSidebar(html)) return html;
   let out = without(html, /<header class="side-bar"[^>]*>/, "header");
   out = without(out, /<div class="d-md-none mt-4 fs-2"[^>]*>/, "div");
-  return out;
+  return out.replace(NAV_ACTIVATION, "");
 }
 
 /** Does the page already hold a top bar of its own? */

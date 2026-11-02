@@ -15,13 +15,14 @@
  * `ho66`): standing alone, cat-harness has no such root to read.
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "bun:test";
 
-import { countConsideredOptions, doneWhenState, frontMatter, frontMatterValue, probeBranches, probeBeans, probeRepoSize, probeStaging, probeTodos } from "./probes.ts";
+import { resolveBeanArchive } from "../../scripts/beans.ts";
+import { countConsideredOptions, doneWhenState, frontMatter, frontMatterValue, probeBranches, probeBeans, probeRepoSize, probeSpecialBranches, probeStaging, probeTodos } from "./probes.ts";
 
 const made: string[] = [];
 afterAll(() => {
@@ -533,9 +534,39 @@ describe("doneWhenState — the four states `fkjo` needs kept apart", () => {
     const p = probeBeans(process.cwd());
     if (p.state !== "ok") return;
     const kinds = new Set(p.value.map((b) => b.doneWhen?.kind));
+    // The archive view too: a drain archives finished beans, and with them
+    // most of the ticked lists (cat-harness-tools#1248).
+    const archive = resolveBeanArchive(process.cwd()).dir;
+    if (archive !== null) {
+      for (const f of readdirSync(archive).filter((n) => n.endsWith(".md") && n !== "README.md")) {
+        kinds.add(doneWhenState(readFileSync(join(archive, f), "utf-8"))?.kind);
+      }
+    }
     expect(kinds.has("all-ticked")).toBe(true);
     expect(kinds.has("open")).toBe(true);
     expect(kinds.has("absent")).toBe(true);
     expect(kinds.has("unreadable")).toBe(true);
+  });
+});
+
+describe("probeSpecialBranches — unique bytes", () => {
+  it("counts a blob once however many paths name it, which is what a clone costs", () => {
+    // qa-reports holds the same verdict file under many `main/<sha>/` paths;
+    // summing every path counted it once per sha (folio-assistant#860).
+    const body = "x".repeat(1000);
+    const remote = repo({ "main/a/v.json": body, "main/b/v.json": body, "main/c/other.json": "yz" });
+    const dir = repo({ "README.md": "local" });
+    run(dir, "git", ["remote", "add", "origin", remote]);
+    run(remote, "git", ["branch", "cat/cat-harness/qa-reports"]);
+    const p = probeSpecialBranches({
+      repoRoot: dir,
+      remote: "origin",
+      rows: [{ id: "qa-reports", shape: "branch", name: "cat/cat-harness/qa-reports", legacy: [], budget: { bytes: 500 * 1024 ** 2, basis: "fixture" } } as never],
+    });
+    expect(p.state).toBe("ok");
+    if (p.state !== "ok") return;
+    const b = p.value.rows[0].branches[0];
+    expect(b.files).toBe(3);
+    expect(b.bytes).toBe(1002);
   });
 });

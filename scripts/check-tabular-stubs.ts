@@ -36,8 +36,9 @@
  * @covers qa
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { libraryEntryDirs } from "./lib/library-entry-graphs.ts";
 import { noteAbsent, splitDeclared } from "./lib/declared-presence.ts";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { tools } from "../schemas/tools/harness-tools.ts";
@@ -152,11 +153,8 @@ function run(): number {
     console.error("Could not resolve a `library` directory. This is NOT a pass.");
     return 2;
   }
-  const entries = libs.flatMap((lib) =>
-    readdirSync(lib)
-      .map((d) => join(lib, d))
-      .filter((d) => statSync(d).isDirectory()),
-  );
+  // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`).
+  const entries = libs.flatMap((lib) => libraryEntryDirs(lib).map((e) => e.dir));
 
   // Read from the tool declarations rather than a literal here.
   let stubbed: Set<string>;

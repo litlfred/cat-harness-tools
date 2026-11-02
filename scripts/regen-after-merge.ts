@@ -18,8 +18,8 @@
  * voices — an artefact **neither side would ever emit**.
  *
  * **A conflict is a question; a clean merge is an assertion that the result is
- * correct.** That is why this is not bean `520m` and why
- * `qa:resolve-conflicts` cannot help: that command only ever inspects UNMERGED
+ * correct.** That is why this is not bean `520m` and why the retired
+ * `qa:resolve-conflicts` (bean `7mwa`) could not help: it only ever inspected UNMERGED
  * paths, and here there were none.
  *
  * The general shape, which is not specific to voices:
@@ -263,6 +263,8 @@ const OWN_WRITER_OVERRIDES: Readonly<Record<string, string>> = {
   // red on `check:glossary` at 7bdda74 while regen, not knowing this pair,
   // could not repair it. `glossary-page.ts` regenerates from its sources.
   "check:glossary": "glossary:page",
+  "glossary:check": "glossary:export",
+  "libraries:check": "libraries:derive",
   // Re-materialises a remote package's skills at its PINNED commit, so it is
   // deterministic and is exactly the repair for a stale copy.
   "check:remote-skills": "sync:remote-skills",

@@ -27,7 +27,7 @@ import {
   mechanicalWinner,
   reconcile,
 } from "../check-bean-front-matter.ts";
-import { readBeanFiles } from "../bean-store-read.ts";
+import { readBeanFiles, readBeanStore } from "../bean-store-read.ts";
 import { readdirSync } from "node:fs";
 
 /** `sqtq` as committed in `224e0beac8`, line for line. */
@@ -565,5 +565,67 @@ describe("check-bean-front-matter — duplicate ids across files (4vg7)", () => 
         { id: "a", file: "a2.md", archived: true },
       ]),
     ]).toEqual([["a", ["a1.md", join("archive", "a2.md")]]]);
+  });
+});
+
+
+const INVALID_STATUS_DONE = [
+  "---",
+  "# cat-tools-g7ls",
+  "title: 'Standalone run reads fhir-harness glossary kind core registers'",
+  "status: done",
+  "type: bug",
+  "priority: normal",
+  "created_at: 2026-10-30T19:00:00Z",
+  "---",
+  "",
+  "A body.",
+  "",
+].join("\n");
+
+const GENERATED_README = [
+  "---",
+  'generated: "cat-harness-tools/scripts/subgraph-readmes.ts — bun run cat readme:subgraphs"',
+  "---",
+  "",
+  "# `beans/defs/`",
+  "",
+].join("\n");
+
+describe("check-bean-front-matter — invalid status and generated README.md", () => {
+  test("a bean with `status: done` (cat-tools-g7ls in d29eea56) is caught as `invalid-status`", () => {
+    const root = storeWith({
+      "folio-assistant-aaaa--ok.md": GOOD_FRONT_MATTER,
+      "cat-tools-g7ls--standalone.md": INVALID_STATUS_DONE,
+    });
+    try {
+      const r = checkBeanFrontMatter(root);
+      const bad = r.defects.filter((d) => d.kind === "invalid-status");
+      expect(bad).toHaveLength(1);
+      expect(bad[0]!.id).toBe("cat-tools-g7ls");
+      expect(bad[0]!.baselined).toBe(false);
+      expect(bad[0]!.message).toContain('"done"');
+      expect(bad[0]!.message).toContain("completed");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a `README.md` with generated YAML front matter is skipped as expected, never parsed as a bean", () => {
+    const root = storeWith({
+      "folio-assistant-aaaa--ok.md": GOOD_FRONT_MATTER,
+      "README.md": GENERATED_README,
+    });
+    try {
+      const store = readBeanStore(root);
+      if (store.state !== "read") throw new Error(store.state);
+      expect(store.beans.map((b) => b.id)).toEqual(["folio-assistant-aaaa"]);
+      expect(store.skipped).toEqual([{ file: "README.md", archived: false, expected: true }]);
+      const r = checkBeanFrontMatter(root);
+      expect(r.beans).toBe(1);
+      expect(r.defects).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

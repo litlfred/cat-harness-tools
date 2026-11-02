@@ -73,6 +73,7 @@ export function scriptTable(repoRoot: string): Map<string, ScriptEntry> {
     }
   };
   add(readJson(join(root, "package.json"))?.scripts, "package.json");
+  add(readJson(join(root, "package.json"))?.[CHECKOUT_SCRIPTS_KEY], "package.json");
   for (const inst of instanceRootsIn(root)) {
     if (resolve(inst) === root) continue;
     const manifest = join(relative(root, inst), "package.json");

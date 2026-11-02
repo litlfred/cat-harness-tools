@@ -65,7 +65,7 @@ import { basename, dirname, join, relative, resolve } from "node:path";
 // no graph-typology registered to ask. `readDeclaration` would, and a gate that
 // throws on an unregistered kind reports a break it did not find.
 import { declarationPathIn } from "../schemas/kg/cat-harness.js";
-import { againstRef, qaResultPath, qaResultState, readQaResult, type QaResultState } from "./qa-results.js";
+import { againstRef, qaResultPath, qaResultState, qaStorageOf, readQaResult, type QaResultState } from "./qa-results.js";
 import { readQaTree } from "./qa-store.js";
 import { PUBLISHED_ELSEWHERE, declaredInstanceStubs, instanceExportPlan, type PlannedExport } from "./instance-exports.js";
 import { publishedInstanceSchemas, scannedInstanceSchemas } from "./kg-export.js";
@@ -269,6 +269,13 @@ export function sidecarSubjectsFrom(
     const t = readQaTree(opts.against, qaDir);
     if (t.state !== "hit") return { subjects: [], unknown: `qa-reports:${opts.against} — ${t.state}: ${t.reason}` };
     return { subjects: subjectsFrom([...t.files.keys()].map((p) => basename(p)), covered) };
+  }
+  const branch = qaStorageOf(qaDir, REPO_ROOT);
+  if (branch !== undefined) {
+    return {
+      subjects: [],
+      unknown: `${qaDir.slice(REPO_ROOT.length + 1)} is stored on ${branch} — pass --against <ref> to compare the qa-reports copies`,
+    };
   }
   if (!existsSync(qaDir)) {
     return {

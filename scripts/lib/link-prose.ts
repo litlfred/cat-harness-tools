@@ -80,3 +80,20 @@ export function linkProse(
   );
   return { text: out, unlinked: [...unlinked] };
 }
+
+/**
+ * Escape `<` and `>` in authored prose outside code spans, so Markdown shows
+ * them as text.
+ *
+ * Owner, 2026-10-31, on the public-comment-release page: "misrendering". The
+ * documentation said "a permanent PC/&lt;version&gt; site"; the BPMN entity
+ * decodes to `<version>`, which kramdown read as an HTML element, so every
+ * link after it on the page printed as raw `[text](url)`. Authored BPMN text
+ * is prose, never HTML, so a bracket in it is always a character.
+ */
+export function escapeAngles(text: string): string {
+  return text
+    .split(/(`+[^`]*`+)/)
+    .map((x, i) => (i % 2 ? x : x.replace(/</g, "&lt;").replace(/>/g, "&gt;")))
+    .join("");
+}

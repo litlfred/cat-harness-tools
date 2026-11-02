@@ -18,6 +18,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { BASE_GRAPH_TYPOLOGIES, GraphTypologyRegistry } from "../../schemas/kg/graph-typology-registry.js";
 import { sweepFamilies } from "../check-kind-validators.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 
@@ -92,5 +93,53 @@ describe("a deeper directory of another kind still takes its nodes (folio-assist
     const sweep = await sweepFamilies(inst);
     expect(nodesOf(sweep, "sweep-marks")).toBe(1);
     expect(nodesOf(sweep, "beans")).toBe(0);
+  });
+});
+
+describe("a family declared with {} in nodeSchemas is routed as unvalidated, not unmapped", () => {
+  const inst = instanceDir("figure-data");
+  mkdirSync(join(inst, "library", "doc-1", "figure-data"), { recursive: true });
+  writeDeclaration(inst, {
+    name: "figure-data",
+    directories: [{ id: "lib", path: "library/", graphTypologies: ["library"] }],
+  });
+  writeFileSync(
+    join(inst, "library", "doc-1", "figure-data", "fig-1.json"),
+    JSON.stringify({ $schema: "diig-phases-figure/v1" }),
+  );
+  writeFileSync(
+    join(inst, "library", "doc-1", "figure-data", "fig-2.json"),
+    JSON.stringify({ $schema: "smart-guidelines-approach-figure/v1" }),
+  );
+
+  // The two families are `{}` in this layer's code, but a composition that
+  // mounts the instance holding their validators joins them, and the default
+  // registry then resolves them instead. The claim is about `{}` families, so
+  // the sweep reads a registry seeded from this layer's code alone, with no
+  // checkout to join.
+  const library = BASE_GRAPH_TYPOLOGIES.library!;
+  const registry = new GraphTypologyRegistry({
+    library: {
+      ...library,
+      nodeSchemas: { "diig-phases-figure/v1": {}, "smart-guidelines-approach-figure/v1": {} },
+    },
+  });
+
+  test("both figure-data families route to library as unvalidated with zero unmapped", async () => {
+    const sweep = await sweepFamilies(inst, registry);
+    const lib = sweep.find((f) => f.kind === "library");
+    expect(lib?.unmapped).toEqual([]);
+    expect(lib?.counts["diig-phases-figure/v1"]).toEqual({
+      nodes: 1,
+      checked: 0,
+      parsed: 0,
+      state: "unvalidated",
+    });
+    expect(lib?.counts["smart-guidelines-approach-figure/v1"]).toEqual({
+      nodes: 1,
+      checked: 0,
+      parsed: 0,
+      state: "unvalidated",
+    });
   });
 });

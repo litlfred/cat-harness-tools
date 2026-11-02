@@ -14,7 +14,11 @@ import {
   builtAtPublishIn,
   checkPostMergeRegen,
   FIXITY_CHECKS,
+  inTargetScope,
+  JUDGED_AFTER_PUBLISH,
+  missingPrerequisiteWriters,
   postMergePairs,
+  publishTimeDeclarations,
   resolveRepoRoot,
   treeMoveTracker,
   type GhExecutor,
@@ -665,6 +669,55 @@ describe("builtAtPublish outputs are never stale (bean folio-assistant-p7mb)", (
     }
   });
 
+  test("a gate judged after publish is reported with builtAtPublishChecks, an unlisted red one stays unrepaired", async () => {
+    const { repo, decls, done } = scratch();
+    try {
+      // `check:nav-names:check` has no writer and exits non-zero outside a publish
+      // (no railed page in the checkout); `slice:sqlite:check` stays red after its
+      // writer because it reads the payload tree only derive:publish builds.
+      const runner: Runner = (script) => {
+        if (script === "check:nav-names:check") return false;
+        if (script === "slice:sqlite:check") return false;
+        if (script === "slice:sqlite") return true;
+        return true;
+      };
+      const listed = await checkPostMergeRegen({
+        repoRoot: repo,
+        pairs: [
+          { check: "check:nav-names:check", writer: undefined },
+          { check: "slice:sqlite:check", writer: "slice:sqlite" },
+        ],
+        runner,
+        tracker: treeMoveTracker(repo, decls),
+        git: quietGit(),
+        gh: noPr,
+        createPr: true,
+      });
+      expect(JUDGED_AFTER_PUBLISH["check:nav-names:check"]).toBeDefined();
+      expect(listed.unrepairedChecks).toEqual([]);
+      expect(listed.staleChecks).toEqual([]);
+      expect([...listed.builtAtPublishChecks].sort()).toEqual(["check:nav-names:check", "slice:sqlite:check"]);
+      expect(listed.status).toBe("clean");
+      expect(listed.exitCode).toBe(0);
+
+      // The falsifier: the same red, under a name NOT in the list, is still unrepaired.
+      const unlisted = await checkPostMergeRegen({
+        repoRoot: repo,
+        pairs: [{ check: "other:gate:check", writer: "other:gate" }],
+        runner: (script) => script !== "other:gate:check",
+        tracker: treeMoveTracker(repo, decls),
+        git: quietGit(),
+        gh: noPr,
+        createPr: true,
+      });
+      expect(unlisted.unrepairedChecks).toEqual(["other:gate:check"]);
+      expect(unlisted.builtAtPublishChecks).toEqual([]);
+      expect(unlisted.exitCode).toBe(1);
+    } finally {
+      done();
+    }
+  });
+
   test("a committed file move in pass 1 re-asks only checks whose declared inputs match", async () => {
     const { repo, decls, done } = scratch();
     try {
@@ -741,6 +794,109 @@ describe("builtAtPublish outputs are never stale (bean folio-assistant-p7mb)", (
       expect(writerCalls).toBe(1);
     } finally {
       done();
+    }
+  });
+  test("publishTimeDeclarations includes off-checkout storage directories (e.g. test/results/ on qa-reports)", () => {
+    const decls = publishTimeDeclarations(REPO);
+    expect(builtAtPublishIn("cat-harness/test/results/check.qa-results.json", decls, REPO)).toBe(true);
+    expect(builtAtPublishIn("cat-harness/site/index.html", decls, REPO)).toBe(true);
+    expect(builtAtPublishIn("cat-harness/README.md", decls, REPO)).toBe(false);
+  });
+
+  test("index scoping (bean ksek): in an index checkout with remote mounts, writers that only touch remote mounts are classified as builtAtPublishChecks and open no PR", async () => {
+    const { repo, decls, done } = scratch();
+    try {
+      mkdirSync(join(repo, "mounted-layer"), { recursive: true });
+      writeFileSync(join(repo, "mounted-layer/layer.txt"), "before\n");
+      writeFileSync(join(repo, "README.md"), "index-readme\n");
+      writeFileSync(
+        join(repo, "index.lock.json"),
+        JSON.stringify({
+          $schema: "cat-harness-mount-lock/v1",
+          mounts: [
+            {
+              harness: "mounted-layer",
+              repository: "litlfred/mounted-layer",
+              ref: "0000000000000000000000000000000000000001",
+            },
+          ],
+          instances: [
+            {
+              instance: "mounted-layer",
+              repository: "litlfred/mounted-layer",
+              sha: "0000000000000000000000000000000000000001",
+              upstreamRoot: "",
+              path: "mounted-layer",
+              via: "mounted-layer",
+              pinnedBy: "declared",
+              declaration: {
+                file: "mounted-layer.json",
+                sha256: "0000000000000000000000000000000000000000000000000000000000000001",
+              },
+              directories: [
+                {
+                  id: "*",
+                  path: "mounted-layer",
+                  upstreamPath: ".",
+                  treeDigest: "0000000000000000000000000000000000000000000000000000000000000002",
+                  files: 1,
+                },
+              ],
+            },
+          ],
+        }),
+      );
+
+      const scope = inTargetScope(repo);
+      expect(scope("mounted-layer/layer.txt")).toBe(false);
+      expect(scope("README.md")).toBe(true);
+
+      let layerRepaired = false;
+      const runner: Runner = (script) => {
+        if (script === "kind:register:check") return layerRepaired;
+        if (script === "kind:register") {
+          writeFileSync(join(repo, "mounted-layer/layer.txt"), "after\n");
+          layerRepaired = true;
+          return true;
+        }
+        return true;
+      };
+
+      const report = await checkPostMergeRegen({
+        repoRoot: repo,
+        pairs: [{ check: "kind:register:check", writer: "kind:register" }],
+        runner,
+        tracker: treeMoveTracker(repo, decls),
+        git: quietGit([]),
+        gh: noPr,
+        createPr: true,
+      });
+
+      expect(report.status).toBe("clean");
+      expect(report.staleChecks).toEqual([]);
+      expect(report.repairedChecks).toEqual([]);
+      expect(report.builtAtPublishChecks).toEqual(["kind:register:check"]);
+      expect(report.changedFiles).toEqual([]);
+      expect(report.prOpened).toBe(false);
+      expect(report.exitCode).toBe(0);
+    } finally {
+      done();
+    }
+  });
+});
+
+describe("prerequisite writers come from the declarations, not from instance names", () => {
+  test("a writer runs only when an instance declares it and its output is absent", () => {
+    const root = mkdtempSync(join(tmpdir(), "prereq-writers-"));
+    try {
+      mkdirSync(join(root, "ig", "fhir-artifact-index"), { recursive: true });
+      const decl = (writer: string[], path: string): PublishTimeDeclaration => ({ root: join(root, "ig"), builtAtPublish: [{ path, writer }] });
+      expect(missingPrerequisiteWriters([decl(["ig-index:build"], "fhir-artifact-index/index.json")])).toEqual(["ig-index:build"]);
+      writeFileSync(join(root, "ig", "fhir-artifact-index", "index.json"), "{}");
+      expect(missingPrerequisiteWriters([decl(["ig-index:build"], "fhir-artifact-index/index.json")])).toEqual([]);
+      expect(missingPrerequisiteWriters([decl(["render:bpmn"], "missing.svg")])).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
     }
   });
 });

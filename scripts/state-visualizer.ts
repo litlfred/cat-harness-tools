@@ -173,6 +173,8 @@ import {
   NO_INSTANCE_REASON,
   readInstances,
   STUCK_AFTER_DAYS,
+  dayOf,
+  startOfUtcDay,
   stuckStatesOf,
   todosNamedBy,
   workingContextOf,
@@ -1484,7 +1486,7 @@ function workflowViewLead(view: WorkflowViewContext): string {
   return (
     `<p class="sv-sub">Each instance opens its own view: the diagram with the token highlighted, the history, and ` +
     `the beans and todos its steps name. <strong>stuck</strong> lists the states read from committed data, ages ` +
-    `measured at ${esc(view.now.toISOString())} (when this page was built) against a ${STUCK_AFTER_DAYS}-day ` +
+    `measured on ${esc(dayOf(view.now))} (UTC, the day this page was built) against a ${STUCK_AFTER_DAYS}-day ` +
     `threshold. A gate the engine refused since the instance last moved is <code>refused-gate</code>; ${esc(GATE_REFUSALS.why)}</p>`
   );
 }
@@ -1827,7 +1829,7 @@ export function workflowInstancePage(v: WorkflowInstanceView): string {
     (states.length === 0
       ? `<p class="sv-sub">None found in committed data${s.status === "completed" ? " — the instance is completed" : ""}.</p>`
       : `<ul>${states.map((x) => `<li><span class="sv-tag is-stuck">${esc(x.kind)}</span> ${describe(x.detail)}</li>`).join("")}</ul>`) +
-    `<p class="sv-sub">Measured at ${esc(v.now.toISOString())}, when this page was built; a token unmoved for more than ` +
+    `<p class="sv-sub">Measured on ${esc(dayOf(v.now))} (UTC), the day this page was built; a token unmoved for more than ` +
     `${STUCK_AFTER_DAYS} days is <code>enabled-not-taken</code>, and a step the engine refused since the instance last moved is <code>refused-gate</code>.</p>`;
 
   const refusals = s.refusals;
@@ -2917,7 +2919,10 @@ const subjectOrphans: string[] = [];
 const hubs: string[] = [];
 // The reference time of every age-based stuck state (bean `v49e`), read once
 // so every page of one run measures against the same instant and says which.
-const NOW = new Date();
+// The start of the UTC day, not the instant: ages are counted in days, and an
+// instant gave every page new bytes on every build, so every writer reading
+// these pages ran again (cat-harness-tools#1230).
+const NOW = startOfUtcDay(new Date());
 const todosForView = readViewTodos();
 // Bean `v49e`, item 3: the working context of each step holding a token. Read
 // once; a graph or memory store that cannot be read leaves that part unshown

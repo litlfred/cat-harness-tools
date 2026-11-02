@@ -2,11 +2,11 @@
 # folio-assistant-5a3l
 $schema: bean/1.0.0
 title: 'DEPLOYMENT: topologies and operating modes are two axes, not one list of modes'
-status: in-progress
+status: completed
 type: epic
 priority: high
 created_at: 2026-09-19T08:52:35Z
-updated_at: 2026-10-04T15:12:14Z
+updated_at: 2026-11-01T20:50:00Z
 parent: folio-assistant-rwmf
 ---
 
@@ -220,3 +220,5 @@ person's job is to decide — which is what it did.
 **Expiry**: re-check when fewer than three children remain open, or on
 **2026-12-25**. Not sooner — fifteen open children is not a state that turns
 over in a month.
+
+_2026-11-01T20:50Z_ — Completed (owner card Q-DQ-1 A): every done-when box is ticked. Open children moved (fa beans branch): amom, 9hxd, oz9e, fvec to rwmf. Session https://claude.ai/code/session_01Qmmkt7h4RWc6UwiBW5kbZ2

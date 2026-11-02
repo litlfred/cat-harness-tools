@@ -226,6 +226,14 @@ export function readBeanStore(root: string): BeanStore {
   for (const src of sources)
   for (const name of readdirSync(src.dir).sort()) {
     if (!name.endsWith(".md")) continue;
+    // Checked BEFORE the fence regex: `subgraph-readmes.ts` writes a
+    // `generated:` YAML header at the top of `beans/defs/README.md`, which
+    // otherwise matches `^---\n...\n---` and promotes `README.md` into `beans`
+    // as a statusless ghost row (`id: "README"`, `status: ""`).
+    if (NOT_BEANS.has(name)) {
+      skipped.push({ file: name, archived: src.archived, expected: true });
+      continue;
+    }
     const text = readFileSync(join(src.dir, name), "utf-8");
     const m = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(text);
     // REPORTED, not dropped. This read *"a file with no front matter is not a

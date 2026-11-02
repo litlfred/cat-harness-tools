@@ -97,6 +97,7 @@
  * interpolated `$BRANCH` into a string; this one builds nodes.
  */
 import { isVendoredViewer } from "./pdf-viewer.ts";
+import { BUILD_TYPES, type BuildType } from "./lib/build-type.ts";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join, relative } from "path";
 
@@ -142,6 +143,12 @@ export interface StagingFacts {
    * any run where the fetch failed.
    */
   mainPagesKnown: boolean;
+  /**
+   * The build type (`lib/build-type.ts`): `preview` borrows main's indexes,
+   * `full` rebuilt them. `pc:release freeze` refuses a `preview`. Absent when
+   * the caller did not say (a workflow from before the switch).
+   */
+  buildType?: BuildType;
   /**
    * Site-relative paths that exist in this build and NOT on main. The short
    * list; membership is checked in the browser. Empty and meaningless when
@@ -284,6 +291,7 @@ function fill(d,f,r){
   while(d.firstChild)d.removeChild(d.firstChild);
   d.appendChild(document.createTextNode('\\u2014 '));
   var b=link(f.branchUrl,'');b.appendChild(chip(f.branch));d.appendChild(b);
+  var rv=el('span',{'data-fa-staging-review':''});d.appendChild(rv);
   d.appendChild(sep());d.appendChild(document.createTextNode('commit '));d.appendChild(chip(f.sha));
   d.appendChild(sep());d.appendChild(document.createTextNode('built '+f.built));
   d.appendChild(sep());d.appendChild(link(f.prUrl,f.pr&&f.pr!=='n/a'?'PR #'+f.pr:'no open PR found'));
@@ -305,6 +313,27 @@ function fill(d,f,r){
   stamp(f);
   measure();
   fresh(d,f);
+  review(rv,r,rel);
+}
+// The preview's review page (owner, 2026-11-01, Q-REV-1): reviewers could not
+// find it from a staging page. A folio writes it at <root>/<locale>/review/,
+// an IG at <root>/review/. Asked with HEAD, which the staging worker passes
+// through, so a 404 here is not answered with the live site's page. No review
+// page, no link.
+function review(s,r,rel){
+  if(typeof fetch!=='function')return;
+  var c=[],m=rel.match(/^([a-z]{2,3}(?:-[A-Za-z0-9]+)?)\\//);
+  if(m)c.push(r+m[1]+'/review/');
+  c.push(r+'review/');
+  (function next(i){
+    if(i>=c.length)return;
+    fetch(c[i]+'index.html',{method:'HEAD',cache:'no-store'}).then(function(x){
+      if(!x.ok)return next(i+1);
+      s.appendChild(sep());
+      s.appendChild(link(c[i],'\\ud83d\\udd0d Review changes','font-weight:bold'));
+      measure();
+    }).catch(function(){next(i+1);});
+  })(0);
 }
 // Live staleness (owner, 2026-10-31, option C): ask GitHub for the branch's
 // head now and say so when it has moved past the commit this preview was
@@ -455,7 +484,11 @@ export type Injection = "injected" | "already" | "no-body";
  * second pass over a tree is a no-op rather than a doubled banner.
  */
 export function injectInto(html: string): { html: string; outcome: Injection } {
-  if (html.includes("data-fa-staging-banner")) return { html, outcome: "already" };
+  // The banner ELEMENT, not the bare word: the review page names the attribute
+  // in its own CSS and script (to hide the banner inside its preview frames),
+  // and a plain substring test took that for a banner and left the page
+  // without one (owner, 2026-10-31: "what happened to staging bar at top?").
+  if (/<[a-z][a-z0-9-]*\s[^>]*data-fa-staging-banner[\s=>]/i.test(html)) return { html, outcome: "already" };
   const at = bodyInsertionPoint(html);
   if (at < 0) return { html, outcome: "no-body" };
   return { html: html.slice(0, at) + FRAGMENT + html.slice(at), outcome: "injected" };
@@ -464,22 +497,35 @@ export function injectInto(html: string): { html: string; outcome: Injection } {
 export function run(
   site: string,
   facts: StagingFacts,
-): { injected: number; skipped: number; noBody: string[] } {
+): { injected: number; skipped: number; noBody: string[]; redirects: number } {
   writeFileSync(join(site, "staging.json"), JSON.stringify(facts, null, 2) + "\n");
   let injected = 0;
   let skipped = 0;
+  let redirects = 0;
   const noBody: string[] = [];
   for (const f of htmlFiles(site)) {
     const before = readFileSync(f, "utf-8");
     const { html: after, outcome } = injectInto(before);
-    if (outcome === "no-body") noBody.push(relative(site, f));
+    // A bodiless redirect stub is never shown: the browser leaves it at once
+    // for the page it names, which carries its own banner. Counted, not failed
+    // (a downstream catalogue forwarding page, 2026-11-01).
+    if (outcome === "no-body" && isRedirectStub(before)) redirects++;
+    else if (outcome === "no-body") noBody.push(relative(site, f));
     else if (outcome === "already") skipped++;
     else {
       writeFileSync(f, after);
       injected++;
     }
   }
-  return { injected, skipped, noBody };
+  return { injected, skipped, noBody, redirects };
+}
+
+/**
+ * An immediate `<meta http-equiv="refresh" content="0; url=…">` with no
+ * real `<body>`: a forwarding stub, not a page a reader sees.
+ */
+export function isRedirectStub(html: string): boolean {
+  return /<meta\s[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*content\s*=\s*["']?\s*0\s*[;,]\s*url\s*=/i.test(html);
 }
 
 function flag(name: string): string | undefined {
@@ -500,6 +546,14 @@ if (import.meta.main) {
   const site = required("site");
   const mainSite = required("main-site").replace(/\/+$/, "");
   const issue = flag("issue") || null;
+  // `--build-type` names what this build is; a caller that does not pass it
+  // writes no `buildType`, which `pc:release freeze` reads as "unstated".
+  const bt = flag("build-type");
+  if (bt && !(BUILD_TYPES as readonly string[]).includes(bt)) {
+    console.error(`--build-type is ${BUILD_TYPES.join(" or ")}, not ${JSON.stringify(bt)}`);
+    process.exit(2);
+  }
+  const buildType = (bt || undefined) as BuildType | undefined;
 
   // The publish ref's page list, one path per line, or absent. An EMPTY file
   // is not the same as no file: absent means the fetch failed and we do not
@@ -534,10 +588,11 @@ if (import.meta.main) {
     mainSite,
     beforeRef: flag("before-ref") || null,
     mainPagesKnown,
+    ...(buildType ? { buildType } : {}),
     newPages,
   };
 
-  const { injected, skipped, noBody } = run(site, facts);
+  const { injected, skipped, noBody, redirects } = run(site, facts);
   console.log(
     mainPagesKnown
       ? `Read the publish ref; ${newPages.length} page(s) have no counterpart on main`
@@ -546,6 +601,7 @@ if (import.meta.main) {
   console.log(
     `Injected the constant staging banner into ${injected} HTML file(s)` +
       (skipped ? ` (${skipped} already carried it)` : "") +
+      (redirects ? `, skipped ${redirects} redirect stub(s)` : "") +
       ` and wrote staging.json`,
   );
 

@@ -27,6 +27,7 @@
  * Does not throw at import: a module that only needs the harness for one
  * function should still load where the harness is absent.
  *
+ * @graphNode none — functions that locate the harness instance; no schema
  * @module schemas/harness-root
  */
 import { existsSync } from "node:fs";
@@ -39,6 +40,7 @@ let cached: string | undefined | null = null;
 /** The cat-harness instance root, or `undefined` when none can be found. */
 export function harnessRoot(): string | undefined {
   if (cached !== null) return cached;
+  // input-site: env-unset CAT_HARNESS_ROOT #5f5eb0bf — an override naming a cat-harness root outside the checkout; unset in CI
   const env = process.env.CAT_HARNESS_ROOT;
   if (env && existsSync(join(env, "cat-harness.json"))) return (cached = resolve(env));
   const here = dirname(fileURLToPath(import.meta.url));

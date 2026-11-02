@@ -75,6 +75,7 @@ import {
   type LsiUnit,
 } from "../pipeline/lsi";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { libraryEntryDir, libraryEntryDirs } from "./lib/library-entry-graphs.ts";
 import type { LsiSidecar } from "../schemas/kg/qa-record-shapes.ts";
 // bean 70lx: these record shapes are definitions, and moved to the harness's schemas/
 export type { LsiSidecar };
@@ -147,13 +148,18 @@ function walk(dir: string, out: string[] = []): string[] {
 export function unitsOf(absPath: string, graphTypologies: string[], docs?: string[]): LsiUnit[] {
   let files: string[];
   if (graphTypologies.includes("library")) {
-    const slugs = docs?.length ? docs : readdirSync(absPath, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+    // Flat or filed in a concern group (`library/<group>/<slug>/`, bean `6fez`).
+    // A named doc is found wherever it is filed; one that is absent reads as
+    // flat, contributing nothing, as it always has.
+    const entries = docs?.length
+      ? docs.map((s) => ({ slug: s, dir: libraryEntryDir(absPath, s) ?? join(absPath, s) }))
+      : libraryEntryDirs(absPath);
     // A section the library marks SPECIMEN (section-verdicts.json, bean
     // `fnqn`) is sample text, not the document speaking: indexing it teaches
     // the index filler's vocabulary as a theme, which is how it was found.
     const specimens = specimenSections(absPath);
-    files = slugs.flatMap((s) => {
-      const sec = join(absPath, s, "sections");
+    files = entries.flatMap(({ slug: s, dir }) => {
+      const sec = join(dir, "sections");
       return existsSync(sec)
         ? readdirSync(sec)
             .filter((f) => f.endsWith(".md") && !specimens.has(`${s}/${f.replace(/\.md$/, "")}`))

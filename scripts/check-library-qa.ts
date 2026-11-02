@@ -95,6 +95,7 @@ import {
 import { tally } from "./summaries.ts";
 import { againstOrUsage, buildQaResult, judgeQaResult, judgeUsage, writeQaResult, type QaResult } from "./qa-results.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { libraryOfEntry } from "./lib/library-entry-graphs.ts";
 
 // The HARNESS (70lx B2): this script moved up, and what it reads stayed in cat-harness.
 const ROOT = HARNESS_ROOT;
@@ -197,8 +198,9 @@ export function readEntryFacts(dir: string, id: string, instance: string): Entry
     ...fr(tabularFile, "source.file", tsource.file),
   ];
 
-  // The catalogue lives at the INSTANCE root, two levels up from `library/<slug>`.
-  const instanceRoot = dirname(dirname(dir));
+  // The catalogue lives at the INSTANCE root: up from `library/<slug>`, or
+  // from `library/<group>/<slug>` when the entry is filed (bean `6fez`).
+  const instanceRoot = dirname(libraryOfEntry(dir));
   const cat = catalogueRecordFor(instanceRoot, id, unreadable);
   const dc = cat?.rec;
 

@@ -51,6 +51,8 @@ import { join } from "node:path";
 import { PinnedTerminologySchema } from "../content/pinned-terminology.ts";
 
 /** The pin record, repository-relative. */
+// declared-path-literal: the pinned edition's record and snapshot, addressed by path because the
+// pin is to these exact files in cat-harness, the layer below that holds them.
 export const SPDX_LICENSE_LIST_PIN = "cat-harness/external-schemas/spdx-license-list.json";
 /** The derived snapshot of the pinned edition's ids, repository-relative. */
 export const SPDX_LICENSE_LIST_SNAPSHOT = "cat-harness/external-schemas/spdx-license-list.terminology.json";

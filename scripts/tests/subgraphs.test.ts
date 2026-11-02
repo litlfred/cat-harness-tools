@@ -20,7 +20,8 @@
  * has none of it.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import {
@@ -30,7 +31,7 @@ import {
   siteDirFor,
   subgraphTree,
 } from "../../schemas/kg/cat-harness.ts";
-import { addressesPublishedTree, overDeepLinks, scanSubgraphs } from "../check-subgraphs.ts";
+import { addressesPublishedTree, beanArchiveViews, overDeepLinks, resolveAcrossArchive, scanSubgraphs } from "../check-subgraphs.ts";
 import { GraphTypologyRegistry, type GraphTypologyDef } from "../../schemas/kg/graph-typology-registry.ts";
 import { checkoutDirectories } from "../../schemas/kg/harness-config.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -279,4 +280,60 @@ describe("a kind whose markdown a published page SHOWS addresses the published t
     expect(addressesPublishedTree([], reg)).toBe(false);
     expect(addressesPublishedTree(["unknown"], reg)).toBe(false);
   });
+});
+
+// cat-harness-tools#1248: `beans archive` moves a bean from `defs/` to
+// `defs/archive/` and rewrites none of its links. The archive is a view of the
+// store (bean `e8m3`), so both halves of the pair resolve a bean's links.
+describe("the bean archive view resolves like the store it sits in", () => {
+  const withStore = (fn: (root: string) => void) => {
+    const root = mkdtempSync(join(tmpdir(), "archive-view-"));
+    try {
+      mkdirSync(join(root, "beans/defs/archive"), { recursive: true });
+      mkdirSync(join(root, "beans/notes"), { recursive: true });
+      writeFileSync(join(root, "AGENTS.md"), "x");
+      writeFileSync(join(root, "beans/defs/archive/b.md"), "x");
+      fn(root);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  };
+  const dirs = [
+    { path: "beans/defs", graphTypologies: ["bean-defs"] },
+    { path: "beans/defs/archive", graphTypologies: ["bean-defs"] },
+    { path: "beans/notes", graphTypologies: ["bean-notes"] },
+    { path: "docs", graphTypologies: ["docs"] },
+    { path: "docs/archive", graphTypologies: ["docs"] },
+  ];
+
+  test("only a bean-defs directory inside another pairs up", () =>
+    withStore((root) => {
+      expect(beanArchiveViews(dirs, root)).toEqual([
+        { store: join(root, "beans/defs"), view: join(root, "beans/defs/archive") },
+      ]);
+    }));
+
+  test("a link FROM an archived bean resolves as if it sat in the store", () =>
+    withStore((root) => {
+      const views = beanArchiveViews(dirs, root);
+      const file = join(root, "beans/defs/archive/b.md");
+      expect(resolveAcrossArchive(file, "../../AGENTS.md", resolve(join(root, "beans/defs/archive"), "../../AGENTS.md"), views))
+        .toBe(join(root, "AGENTS.md"));
+    }));
+
+  test("a link TO a bean that has since been archived still resolves", () =>
+    withStore((root) => {
+      const views = beanArchiveViews(dirs, root);
+      const file = join(root, "beans/notes/README.md");
+      expect(resolveAcrossArchive(file, "../defs/b.md", join(root, "beans/defs/b.md"), views))
+        .toBe(join(root, "beans/defs/archive/b.md"));
+    }));
+
+  test("a link that names nothing in either half is still unresolved", () =>
+    withStore((root) => {
+      const views = beanArchiveViews(dirs, root);
+      const file = join(root, "beans/defs/archive/b.md");
+      expect(resolveAcrossArchive(file, "../../NOPE.md", resolve(join(root, "beans/defs/archive"), "../../NOPE.md"), views)).toBeUndefined();
+      expect(resolveAcrossArchive(join(root, "beans/notes/README.md"), "../defs/c.md", join(root, "beans/defs/c.md"), views)).toBeUndefined();
+    }));
 });

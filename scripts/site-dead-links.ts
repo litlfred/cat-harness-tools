@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Every internal link in a BUILT site, checked against the files the site
- * holds — and, with `--fix`, the two kinds of dead link that have one right
+ * holds — and, with `--fix`, the three kinds of dead link that have one right
  * answer repointed first.
  *
  * @module scripts/site-dead-links
@@ -32,8 +32,17 @@
  *    segments, the longest tail that matches), the link goes to that file on
  *    GitHub, at the commit the index pins (`index.lock.json`). Two or more
  *    candidates are left alone: a guess is worse than a reported dead link.
+ * 3. **In a preview, a page of an instance the preview does not carry.** A
+ *    preview builds only the composed instances its branch reaches
+ *    (`compose-docs.ts`, `carriedInstances`), so a link into one it left out
+ *    is dead here and live on the published site. When the build is a
+ *    preview (`--base-path …/STAGING/<slug>`), the target's first segment is
+ *    a composed instance, and that instance's composed directory holds the
+ *    page's source, the link goes to the same path on the published site.
+ *    A canonical build never takes this rule: there a missing page is a
+ *    finding.
  *
- * 3. **Then every link at a pin is made pin-free** (`lib/pin-links.ts`). A
+ * 4. **Then every link at a pin is made pin-free** (`lib/pin-links.ts`). A
  *    link to a layer's file at the commit `index.lock.json` pins, or to this
  *    repository at `--sha`, becomes `…/blob/HEAD/…` with `data-fa-pin`, and
  *    the browser puts the commit back from one `pins.json`. A re-pin then
@@ -48,9 +57,10 @@
  *   bun run cat-harness-tools/scripts/site-dead-links.ts --site  ./_site --root . [--fix] [--repo litlfred/folio-assistant --sha <commit>] [--report dead.tsv]
  */
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { join, posix, relative, sep } from "node:path";
+import { join, posix, relative, resolve, sep } from "node:path";
 
 import { UN_LOCALES } from "../schemas/content/translation.ts";
+import { composedInstances } from "./compose-docs.ts";
 import { unpinSite } from "./lib/pin-links.ts";
 
 /** Locales a page can be TRANSLATED into: the UN set without the source. */
@@ -60,13 +70,20 @@ export const TRANSLATED_LOCALES: ReadonlySet<string> = new Set(UN_LOCALES.filter
 const SKIP_DIRS = new Set([".git", "node_modules", "_site", "_docs", ".jekyll-cache", ".bundle", "vendor"]);
 
 const ATTR = /\s(href|src)="([^"]*)"/g;
+/**
+ * Non-markup spans (`<script>`, `<style>`, `<code>`, `<pre>`) matched ahead of
+ * `ATTR` so escaped HTML examples (`<code>&lt;img src="x.svg"&gt;</code>`) and
+ * script template strings (`<a href="/api/pdf">`) are not read as links, while
+ * `<script src="…">` on the opening tag still is.
+ */
+const NON_LINK_OR_ATTR = /<(style|code|pre)\b[^>]*>[\s\S]*?<\/\1>|<script\b([^>]*)>([\s\S]*?)<\/script>|\s(href|src)="([^"]*)"/gi;
 
 /** A link this check owns: internal, and not an anchor, a script URL or unrendered Liquid. */
 export function isInternal(value: string): boolean {
   if (value === "" || value.startsWith("#") || value.startsWith("//")) return false;
   if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return false;
-  // Unrendered Liquid, and a script's template literal caught by the attribute pattern.
-  if (value.includes("{{") || value.includes("{%") || value.includes("${")) return false;
+  // Unrendered Liquid, a script's template literal, or a prose ellipsis placeholder (`[id](…)`).
+  if (value.includes("{{") || value.includes("{%") || value.includes("${") || value.includes("…")) return false;
   // A script's string concatenation caught by the attribute pattern:
   // `'<a href="' + esc(r.page) + '">'` yields the value `' + esc(r.page) + '`.
   if (/'\s*\+|\+\s*'/.test(value)) return false;
@@ -200,7 +217,7 @@ export interface Repoint {
   page: string;
   from: string;
   to: string;
-  why: "locale" | "source";
+  why: "locale" | "source" | "published";
 }
 
 /**
@@ -241,14 +258,36 @@ export function repointFor(
   target: string,
   resolveSource: (rel: string) => string | undefined,
 ): { to: string; why: Repoint["why"] } | undefined {
+  // A directory link (`architecture/`) whose section page is published as a
+  // sibling `.html` (`architecture.html`, as `readme:subgraphs` tables write it).
+  if (target.endsWith("/")) {
+    const flat = `${target.replace(/\/+$/, "")}.html`;
+    if (served(site, flat)) {
+      return { to: posix.relative(posix.dirname(page), flat) || posix.basename(flat), why: "locale" };
+    }
+  }
   const plain = withoutLocale(target);
   if (plain !== undefined && served(site, plain)) {
     const rel = posix.relative(posix.dirname(page), plain) || ".";
     return { to: target.endsWith("/") && !rel.endsWith("/") ? `${rel}/` : rel, why: "locale" };
   }
+  // declared-path-literal: `docs/` here is the PUBLISHED SITE's URL layout,
+  // not the harness's declared `docs` directory, so no declaration answers it.
+  // A page published under `docs/<instance>/<chapter>/…` sits in `<instance>/docs/<chapter>/…`
+  // in its checkout (the outer two segments reversed by the permalink rule), so a
+  // `../../<tail>` link that landed at `docs/<tail>` addressed `<instance>/<tail>`.
+  const inst = /^docs\/([^/]+)\//.exec(page)?.[1];
+  const instScoped =
+    inst !== undefined && target.startsWith("docs/") && !target.startsWith(`docs/${inst}/`)
+      ? `${inst}/${target.slice("docs/".length)}`
+      : undefined;
   // A missing translation of a page the site does not publish at all: its
   // source, in the language it was written in.
-  for (const candidate of plain === undefined ? [target] : [target, plain]) {
+  const candidates = [
+    ...(plain === undefined ? [target] : [target, plain]),
+    ...(instScoped === undefined ? [] : [instScoped]),
+  ];
+  for (const candidate of candidates) {
     const url = resolveSource(candidate);
     if (url !== undefined) return { to: url, why: "source" };
   }
@@ -268,12 +307,42 @@ export function sourceCandidates(rel: string): string[] {
   return [rel];
 }
 
+/**
+ * The published site's root path for a PREVIEW's base path, or undefined when
+ * the build is not a preview: `/folio-assistant/STAGING/x` → `/folio-assistant`.
+ */
+export function publishedRootOf(basePath: string): string | undefined {
+  const m = /^(.*)\/STAGING\/[^/]+\/?$/.exec(basePath);
+  return m ? m[1] : undefined;
+}
+
+/**
+ * Rule 3: the published-site path for a target inside a composed instance this
+ * preview did not carry, or undefined. `instances` maps the instance's site
+ * segment to its composed directory; the page counts only when that directory
+ * holds its source (`x.html` as `x.md` or itself), so a page nobody wrote stays
+ * reported.
+ */
+export function publishedFor(target: string, publishedRoot: string, instances: ReadonlyMap<string, readonly string[]>): string | undefined {
+  const slash = target.indexOf("/");
+  if (slash <= 0) return undefined;
+  const dirs = instances.get(target.slice(0, slash));
+  if (dirs === undefined) return undefined;
+  const rest = target.slice(slash + 1);
+  if (rest === "") return undefined;
+  const sources = rest.endsWith(".html") ? [rest.replace(/\.html$/, ".md"), rest] : rest.endsWith("/") ? [`${rest}index.md`, `${rest}README.md`] : [rest];
+  const held = dirs.some((d) => sources.some((f) => existsSync(join(d, f))));
+  return held ? `${publishedRoot}/${target}` : undefined;
+}
+
 /** Check (and with `fix`, repoint) every page. Returns what is still dead and what was repointed. */
 export function checkSite(opts: {
   site: string;
   basePath: string;
   fix: boolean;
   resolveSource: (rel: string) => string | undefined;
+  /** Rule 3, preview builds only: where a page of an uncarried instance is published. */
+  resolvePublished?: (target: string) => string | undefined;
 }): { dead: DeadLink[]; repointed: Repoint[]; pages: number } {
   const dead: DeadLink[] = [];
   const repointed: Repoint[] = [];
@@ -282,12 +351,13 @@ export function checkSite(opts: {
     const file = join(opts.site, page);
     const html = readFileSync(file, "utf-8");
     let changed = false;
-    const next = html.replace(ATTR, (whole, attr: string, value: string) => {
+    const visitAttr = (whole: string, attr: string, value: string): string => {
       if (!isInternal(value)) return whole;
       const target = targetOf(page, value, opts.basePath);
       if (target === undefined || served(opts.site, target) || carried(target)) return whole;
       if (opts.fix) {
-        const r = repointFor(opts.site, page, target, opts.resolveSource);
+        const published = opts.resolvePublished?.(target);
+        const r = repointFor(opts.site, page, target, opts.resolveSource) ?? (published === undefined ? undefined : { to: published, why: "published" as const });
         if (r) {
           const suffix = value.match(/[?#].*$/)?.[0] ?? "";
           repointed.push({ page, from: value, to: r.to + suffix, why: r.why });
@@ -297,7 +367,17 @@ export function checkSite(opts: {
       }
       dead.push({ page, value, target });
       return whole;
-    });
+    };
+    const next = html.replace(
+      NON_LINK_OR_ATTR,
+      (whole, _skipTag: string | undefined, scriptAttrs: string | undefined, scriptBody: string | undefined, attr: string | undefined, value: string | undefined) => {
+        if (attr !== undefined && value !== undefined) return visitAttr(whole, attr, value);
+        if (scriptAttrs !== undefined) {
+          return `<script${scriptAttrs.replace(ATTR, visitAttr)}>${scriptBody ?? ""}</script>`;
+        }
+        return whole;
+      },
+    );
     if (changed) writeFileSync(file, next);
   }
   return { dead, repointed, pages: pages.length };
@@ -331,9 +411,16 @@ if (import.meta.main) {
       return undefined;
     };
   }
-  const { dead, repointed, pages } = checkSite({ site, basePath, fix, resolveSource });
+  let resolvePublished: ((target: string) => string | undefined) | undefined;
+  const publishedRoot = publishedRootOf(basePath);
+  if (fix && publishedRoot !== undefined) {
+    const instances = new Map<string, string[]>();
+    for (const c of composedInstances(resolve(root))) instances.set(c.under, [...(instances.get(c.under) ?? []), c.dir]);
+    resolvePublished = (target) => publishedFor(target, publishedRoot, instances);
+  }
+  const { dead, repointed, pages } = checkSite({ site, basePath, fix, resolveSource, resolvePublished });
   const byWhy = (w: Repoint["why"]): number => repointed.filter((r) => r.why === w).length;
-  if (fix) console.log(`site-dead-links: repointed ${byWhy("locale")} link(s) to the untranslated page and ${byWhy("source")} to their source on GitHub`);
+  if (fix) console.log(`site-dead-links: repointed ${byWhy("locale")} link(s) to the untranslated page, ${byWhy("source")} to their source on GitHub and ${byWhy("published")} to the published site (instances this preview does not carry)`);
   if (fix) {
     const u = unpinSite(site, sitePages(site), origins);
     console.log(`site-dead-links: made ${u.links} pinned link(s) on ${u.pages} page(s) resolve their commit from pins.json in the browser`);

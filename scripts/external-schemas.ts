@@ -36,8 +36,7 @@ import { ownNamespaceValues } from "../schemas/kg/graph-typology-registry.js";
 import { portableSegment } from "../schemas/kg/portable-path.ts";
 import { directoriesForGraph, instanceDirectoriesForGraph } from "../schemas/kg/cat-harness.js";
 import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
-import { workflowFiles, corpusScopeFor } from "./known-skills.js";
-import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
+import { workflowFiles } from "./known-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -111,7 +110,7 @@ export function namespacesInUse(root = ROOT): string[] {
  * misstates it.
  */
 export function targetNamespacesInUse(
-  files: readonly string[] = workflowFiles(ROOT, corpusScopeFor(ROOT)),
+  files: readonly string[] = workflowFiles(ROOT, "instance"),
   base = resolve(ROOT, ".."),
 ): Map<string, string[]> {
   // The DECLARED workflow graph, not a literal `processes/`: that reaches a
@@ -161,7 +160,7 @@ export function jsonLdNamespacesInUse(root = ROOT): Map<string, string[]> {
       else visit(p);
     }
   };
-  const codeDirs = [...directoriesForGraph(root, "code"), ...corpusDirectoriesForGraph(root, "schemas")];
+  const codeDirs = [...directoriesForGraph(root, "code"), ...directoriesForGraph(root, "schemas")];
   for (const d of new Set(codeDirs)) {
     walk(d, (f) => {
       if (!f.endsWith(".ts") || f.endsWith(".test.ts")) return;

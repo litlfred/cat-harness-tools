@@ -2,11 +2,11 @@
 # cat-tools-q8gk
 $schema: bean/1.0.0
 title: 'SECURITY GATE ALWAYS REFUSES OUTSIDE THE COMPOSED ROOT: materialized-fixity is pinned to a folio-assistant-core script, and four checks crash or go undetermined from a layer checkout'
-status: todo
+status: completed
 type: bug
 priority: normal
 created_at: 2026-10-31T04:05:00Z
-updated_at: 2026-10-31T04:05:00Z
+updated_at: 2026-10-31T08:50:00Z
 parent: cat-tools-sr31
 ---
 
@@ -23,5 +23,5 @@ So a layer cannot run its own release security gate, and `bun audit` findings in
 
 ## Done when
 
-- [ ] Each check either runs from a layer checkout or reports a named `unknown` without a stack trace.
-- [ ] materialized-fixity is resolved from whichever layer declares it, not a hard-coded path.
+- [x] Each check either runs from a layer checkout or reports a named `unknown` without a stack trace.
+- [x] materialized-fixity is resolved from whichever layer declares it, not a hard-coded path.

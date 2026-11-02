@@ -80,14 +80,19 @@ export const DIFF_RENDERERS: readonly DiffRenderer[] = z.array(DiffRendererSchem
     label: "Word diff of the source",
     description: "The block's Markdown with removed words struck through and added words marked. Shows exactly what the author typed.",
     needs: ["text"],
-    defaultFor: ["*"],
+    defaultFor: [],
   },
   {
+    // Every block opens inline (owner, 2026-10-31: "review pages should
+    // default to 'inline as rendered' not 'side by side'", and "'inline as
+    // rendered' -> 'inline'"). It lists the picture kinds too, so it wins for
+    // them; when a block has no text, the page falls back to the next
+    // renderer that lists its kind (pictures, then side by side).
     id: "inline",
-    label: "Inline, as rendered",
+    label: "Inline",
     description: "The block as a reader sees it now, with added words marked and removed words struck through where they were.",
     needs: ["text"],
-    defaultFor: ["prose", "remark", "definition", "example", "recommendation"],
+    defaultFor: ["*", "prose", "remark", "definition", "example", "recommendation", "table", "figure", "diagram", "equation", "simulator"],
   },
   {
     id: "visual",

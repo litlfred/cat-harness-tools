@@ -49,6 +49,8 @@ describe("page-layout.css", () => {
     expect(rule(":root:has(.fa-page-bar)")).toBe("scroll-padding-top:0!important");
     expect(rule(".fa-page-main,.fa-page-main *")).toBe("scroll-margin-top:calc(var(--fa-staging-offset,0px) + var(--fa-page-bar-h,0px) + .5rem)");
     expect(js).toContain('"--fa-page-bar-h"');
+    // On a just-the-docs page too (column `.main-content`), over its own shorter `.fa-doc :target{4rem}` (owner, 2026-10-31, dth-pc "Zambia").
+    expect(rule(":root:has(.fa-page-bar) :is(.fa-page-main,.main-content) *")).toBe("scroll-margin-top:calc(var(--fa-staging-offset,0px) + var(--fa-page-bar-h,0px) + .5rem)");
   });
 
   it("styles nothing a page did not opt into but the body's margin", () => {

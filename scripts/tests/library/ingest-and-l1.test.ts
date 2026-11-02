@@ -26,6 +26,7 @@ import {
   entryKind,
   expiredExceptions,
   sidecarDocument,
+  sidecarRootFor,
   sourceBlockOf,
   sidecarStates,
   staleSidecars,
@@ -335,14 +336,17 @@ describe("L1 completeness", () => {
     // exited 0. Measured 2026-09-20: `bun run cat check:l1-complete` runs from
     // the REPOSITORY root while the instance lives under `cat-harness/`, so
     // the gate found no declaration and passed over four real entries.
-    const root = mkdtempSync(join(tmpdir(), "l1-undeclared-"));
-    made.push(root);
+    const base = mkdtempSync(join(tmpdir(), "l1-undeclared-"));
+    made.push(base);
+    const root = join(base, "sub");
+    mkdirSync(root, { recursive: true });
     expect(checkAll(root)).toBeUndefined();
   });
 
   test("...and a DECLARED library holding nothing is `[]`, a real finding", () => {
-    const root = mkdtempSync(join(tmpdir(), "l1-empty-"));
-    made.push(root);
+    const base = mkdtempSync(join(tmpdir(), "l1-empty-"));
+    made.push(base);
+    const root = join(base, "sub");
     mkdirSync(join(root, "library"), { recursive: true });
     writeDeclaration(root, JSON.stringify({
         name: "t",
@@ -405,10 +409,13 @@ describe("the verdict as a committed sidecar", () => {
   });
 
   test("a missing sidecar is stale, not absent-and-fine", () => {
-    const root = mkdtempSync(join(tmpdir(), "l1-side-"));
-    made.push(root);
-    expect(staleSidecars(root, [checkEntry(entry())])).toHaveLength(1);
-    expect(staleSidecars(root, [checkEntry(entry())])[0]).toContain("no sidecar");
+    const base = mkdtempSync(join(tmpdir(), "l1-side-"));
+    made.push(base);
+    const root = join(base, "sub");
+    mkdirSync(root, { recursive: true });
+    const off = staleSidecars(root, [checkEntry(entry())]);
+    expect(off).toHaveLength(1);
+    expect(off[0]).toContain("no sidecar");
   });
 
   test("the committed verdicts for the real corpus are current — or, when not committed, ABSENT and never current", () => {
@@ -422,11 +429,22 @@ describe("the verdict as a committed sidecar", () => {
     const states = sidecarStates(root, all ?? []);
     expect(states.length).toBeGreaterThan(0);
     // Bean 5hox: the directory declares `storage`, so its working copy is not
-    // a record and, with no `--against`, every verdict reads UNKNOWN — present
-    // or absent, and never `current` about a copy nobody stored.
+    // a record and, with no `--against`, every verdict in a stored `qa`
+    // directory reads UNKNOWN — and an instance in the overlay with no stored
+    // `qa` directory and no committed sidecar (`smart-trust-phw`) reads ABSENT;
+    // never `current` or `stale` about a copy nobody stored.
     const results = join(root, "test", "results");
-    if (resolveQaLocation(join(root, "..")).directories.some((d) => d.absPath === results && d.storage)) {
-      expect(new Set(states.map((x) => x.state))).toEqual(new Set(["unknown"]));
+    const loc = resolveQaLocation(join(root, ".."));
+    const storedRoots = new Set(loc.directories.filter((d) => d.storage).map((d) => d.absPath));
+    if (storedRoots.has(results)) {
+      for (const x of states) {
+        const entryResults = join(sidecarRootFor(root, x.slug), "test", "results");
+        if (storedRoots.has(entryResults)) {
+          expect(x.state).toBe("unknown");
+        } else if (!existsSync(join(entryResults, "library-qa"))) {
+          expect(x.state).toBe("absent");
+        }
+      }
       return;
     }
     if (!existsSync(join(root, "test", "results", "library-qa"))) {
@@ -1321,9 +1339,12 @@ describe("an entry's declared library sub-graph is not a stray — `8pzh`", () =
 describe("libraryRootFor (bean 12ws)", () => {
   test("returns cwd when it declares a library graph", () => {
     // A fixture, not a sibling instance: `who-iris/` exists only in the
-    // monorepo, so reading it fails the standalone ratchet.
-    const root = mkdtempSync(join(tmpdir(), "l1-root-"));
-    made.push(root);
+    // monorepo, so reading it fails the standalone ratchet. Nested one level
+    // inside `base` so `dirname(root)` is `base` rather than `tmpdir()`.
+    const base = mkdtempSync(join(tmpdir(), "l1-root-"));
+    made.push(base);
+    const root = join(base, "sub");
+    mkdirSync(root, { recursive: true });
     writeDeclaration(root, {
       name: "t",
       directories: [{ id: "library", path: "library/", graphTypologies: ["library"] }],
@@ -1333,13 +1354,14 @@ describe("libraryRootFor (bean 12ws)", () => {
 
   test("falls back to own instance when cwd does not declare a library", () => {
     const own = resolve(HARNESS_ROOT);
-    // A fresh EMPTY directory, not `tmpdir()` itself: the shared temp root
-    // holds whatever other tests left there, and a leaked fixture instance
-    // with a `library` (e.g. `libqa-*`, 156 of them measured on 2026-10-09)
-    // makes the temp root a checkout that declares one, so this case asserted
-    // about a directory it did not control.
-    const empty = mkdtempSync(join(tmpdir(), "l1-nolib-"));
-    made.push(empty);
+    // A fresh EMPTY directory nested inside `base`, not directly in `tmpdir()`:
+    // the shared temp root holds whatever other tests left there, and a leaked
+    // fixture instance with a `library` (e.g. `libqa-*`, 156 of them measured
+    // on 2026-10-09) makes `tmpdir()` a parent directory that holds instances.
+    const base = mkdtempSync(join(tmpdir(), "l1-nolib-"));
+    made.push(base);
+    const empty = join(base, "sub");
+    mkdirSync(empty, { recursive: true });
     const fallback = libraryRootFor(empty);
     expect(fallback).toBe(own);
   });

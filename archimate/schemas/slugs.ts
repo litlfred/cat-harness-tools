@@ -1,6 +1,7 @@
 /**
  * Readable page paths for ArchiMate views and elements.
  *
+ * @graphNode none — path functions for ArchiMate pages; no schema
  * @module cat-harness/archimate/schemas/slugs
  * @covers archimate
  *

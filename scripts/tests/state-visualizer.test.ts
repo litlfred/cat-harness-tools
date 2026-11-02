@@ -10,7 +10,7 @@
  * move whenever anybody works, and a test that fails because somebody closed a
  * bean is a test that gets deleted.
  */
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -60,7 +60,7 @@ import {
   visualiserPageDir,
   visualiserPageRef,
 } from "../viewer-declarations.ts";
-import { siteNotBuilt } from "../../test/support/checkout.ts";
+import { ensureDocsPages, siteNotBuilt } from "../../test/support/checkout.ts";
 
 const ROOT = HARNESS_ROOT;
 const SITE = join(ROOT, siteDirFor(ROOT));
@@ -138,6 +138,9 @@ describe("the route is the policy, not this generator's choice", () => {
 });
 
 describe("each page reads the projection that already exists", () => {
+  beforeAll(() => {
+    ensureDocsPages(ROOT);
+  }, 180_000);
   test.skipIf(dashboardsNotBuilt("beans"))("relative to itself, at the depth its own route implies", () => {
     // `beans` is a THEMED page (#2418): `fa-beans-src` is the layout's own,
     // through `relative_url`. The no-JS fallback still links the projection,

@@ -24,7 +24,11 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { GraphExportSchema } from "@litlfred/bootstrap-tools/schemas/graph-export.ts";
-import { exportGraph, subjectBase } from "@litlfred/bootstrap-tools/scripts/export-graph.ts";
+// A namespace import: `subjectBase` exists from bootstrap-tools#52, and a
+// checkout pinned below it must still typecheck and load this file.
+import * as bootstrapExport from "@litlfred/bootstrap-tools/scripts/export-graph.ts";
+const { exportGraph } = bootstrapExport;
+const subjectBase = (bootstrapExport as { subjectBase?: (docIri: string) => string }).subjectBase;
 import { isSkillMd } from "../known-skills.js";
 import {
   repoRootFor,
@@ -117,8 +121,9 @@ describe("what it contains, read against the disk", () => {
  */
 function idsOfType(doc: Record<string, unknown>, type: string): string[] {
   const graph = (doc["@graph"] ?? []) as Array<Record<string, unknown>>;
-  const base = subjectBase(String(doc["@id"]));
+  const base = typeof subjectBase === "function" ? subjectBase(String(doc["@id"])) : undefined;
   const stem = (iri: string): string => {
+    if (base === undefined) return iri.split("#")[1]!.split("/").slice(1).join("/");
     if (base === "" || !iri.startsWith(base)) throw new Error(`${iri} is not a subject path under ${base || "(no base)"}`);
     return iri.slice(base.length).split("/").slice(1).join("/");
   };

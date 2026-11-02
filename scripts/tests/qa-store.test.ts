@@ -390,10 +390,13 @@ describe("prune", () => {
   const now = new Date("2026-10-01T12:00:00Z");
   const daysAgo = (d: number, h = 0) => new Date(now.getTime() - d * 86_400_000 - h * 3_600_000).toISOString();
 
-  test("the rule: 90 days kept whole, one per day after, PRs 7 days after close, unknown kept", () => {
+  test("the rule: 14 days kept whole, one per day after, PRs 7 days after close, unknown kept", () => {
     const plan = planPrune(
       [
         { sha: "1".repeat(40), writtenAt: daysAgo(10) },
+        // Two on one day 20 days ago: past the 14-day window, so only the newer stays.
+        { sha: "6".repeat(40), writtenAt: daysAgo(20, 1) },
+        { sha: "7".repeat(40), writtenAt: daysAgo(20, 3) },
         { sha: "2".repeat(40), writtenAt: daysAgo(100, 1) },
         { sha: "3".repeat(40), writtenAt: daysAgo(100, 3) },
         { sha: "4".repeat(40), writtenAt: daysAgo(200) },
@@ -409,7 +412,7 @@ describe("prune", () => {
         pr === 1 ? { state: "closed", closedAt: daysAgo(8) } : pr === 2 ? { state: "closed", closedAt: daysAgo(3) } : pr === 3 ? { state: "open" } : { state: "unknown" },
       now,
     );
-    expect(plan.remove).toEqual([`main/${"3".repeat(40)}`, "pr/1"]);
+    expect(plan.remove).toEqual([`main/${"3".repeat(40)}`, `main/${"7".repeat(40)}`, "pr/1"]);
     expect(plan.notes.some((n) => n.startsWith("pr/4"))).toBe(true);
     expect(plan.notes.some((n) => n.includes("5555"))).toBe(true);
   });

@@ -3,10 +3,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, posix } from "node:path";
 import { deflateRawSync } from "node:zlib";
-import { ArchimateConfigSchema, layerOf, modelXmlOf, parseArchimate, readArchimate, zipEntry } from "../schemas/archimate.ts";
+import { ARCHIMATE_MODEL_TAG, ArchimateConfigSchema, ArchimateModelSchema, layerOf, modelXmlOf, parseArchimate, readArchimate, zipEntry } from "../schemas/archimate.ts";
 import { renderViewSvg, wrap } from "./render-view.ts";
 import { checkCommitted } from "./check-archimate.ts";
-import { PAGE_CONFIG_ID, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
+import { PAGE_CONFIG_ID, figureTargets, pagesFor, sitePathOf, type Written } from "./gen-archimate-pages.ts";
 import { thinPageConfigOf } from "../../scripts/thin-page.ts";
 import { renderedByOf } from "../../scripts/viewer-declarations.ts";
 
@@ -79,6 +79,13 @@ function zipOf(name: string, data: Buffer, deflate: boolean): Buffer {
 }
 
 describe("reading a model", () => {
+  it("reads into the derived family archimate-model/v1, which its own schema checks", () => {
+    const model = parseArchimate(XML);
+    expect(ARCHIMATE_MODEL_TAG).toBe("archimate-model/v1");
+    expect(ArchimateModelSchema.safeParse(model).success).toBe(true);
+    expect(ArchimateModelSchema.safeParse({ ...model, elements: [{ ...model.elements[0], layer: "Nowhere" }] }).success).toBe(false);
+  });
+
   const m = parseArchimate(XML);
 
   it("reads elements with their layer, documentation, properties and folder", () => {
@@ -185,7 +192,7 @@ describe("drawing a view", () => {
     expect(key).toContain("Software: systems");
     expect(key).toContain("Serving: serves");
     expect(key).toContain("Access: reads or writes data");
-    expect(key).toContain("Grey band: a grouping");
+    expect(key).toContain("a grouping for layout only");
     expect(key).toContain("Note: a comment");
     // Nothing the view does not draw.
     expect(key).not.toContain("Influence");
@@ -260,6 +267,13 @@ describe("an instance", () => {
       expect(page.content).toContain("drawn in the document as Figure 1 (<code>folio/f-1.md</code>)");
       const node = JSON.parse(files.find((f) => f.path === "1.0.0/views/id-v1.jsonld")!.content);
       expect(node["schema:subjectOf"][0]).toEqual({ "schema:name": "Figure 1", "schema:url": "https://example.org/tiny/folio/f-1.md" });
+      // What a document site needs to draw the figure live: the SVG and the page, site-relative.
+      const site = pagesFor(root, { site: true });
+      const [t] = figureTargets(root);
+      expect(t).toMatchObject({ block: "folio/f-1.md", label: "Figure 1", view: "id-v1", viewName: "Overview" });
+      expect(site.files.map((f) => sitePathOf(site, f))).toContain(t.svg);
+      expect(site.files.map((f) => sitePathOf(site, f))).toContain(`${t.page}index.html`);
+      expect(figureTargets(root)).toHaveLength(1);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

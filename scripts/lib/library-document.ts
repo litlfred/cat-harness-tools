@@ -292,7 +292,8 @@ export function readEntryDocument(dir: string, id: string, opts: { withheld?: bo
     const nar = displayNarrative(r.narrative);
     const text = nar?.text;
     if (src && typeof text === "string" && text.trim()) {
-      summaries.set(src, { text, status: String(nar?.status ?? r.status ?? "draft") });
+      // The narrative schema names this field `state`; `status` is the older form.
+      summaries.set(src, { text, status: String(nar?.state ?? nar?.status ?? r.status ?? "draft") });
     }
   }
 

@@ -73,6 +73,8 @@ export interface PcRelease {
   /** The source commit the site was built from, and the path it was copied from. */
   commit?: string;
   from?: string;
+  /** The build type of the copied site (`lib/build-type.ts`): `full`, or `unstated` for a copy built before the switch. Never `preview`. */
+  build?: string;
   /** The document page inside the release, relative to it. */
   document?: string;
   pdf?: { file: string; sha256: string };
@@ -151,6 +153,18 @@ export function releaseDir(pages: string, version: string): string {
   return join(pages, PC_PREFIX, version);
 }
 
+/** The `buildType` a built site's `staging.json` names (`lib/build-type.ts`), or undefined when it names none. */
+export function stagedBuildType(site: string): string | undefined {
+  const p = join(site, "staging.json");
+  if (!existsSync(p)) return undefined;
+  try {
+    const t = (JSON.parse(readFileSync(p, "utf8")) as { buildType?: unknown }).buildType;
+    return typeof t === "string" ? t : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function freeze(o: FreezeOptions): PcRelease {
   const dest = releaseDir(o.pages, o.version);
   if (existsSync(dest)) throw new Error(`${PC_PREFIX}/${o.version}/ already exists: a release is never overwritten. Choose a new version.`);
@@ -159,6 +173,14 @@ export function freeze(o: FreezeOptions): PcRelease {
   const site = o.site ?? (from ? join(o.pages, from) : undefined);
   if (!site || !existsSync(site) || !statSync(site).isDirectory()) throw new Error(`no built site to freeze: ${site ?? "give --site or --from"}`);
   if (resolve(site).startsWith(resolve(join(o.pages, PC_PREFIX)) + sep)) throw new Error("a release is copied from a build, not from another release");
+  // A public comment release is a FULL build (owner, 2026-11-01): a preview
+  // borrows main's indexes, so its search and slices describe main, not the
+  // draft being frozen. A copy that names no build type predates the switch
+  // and is let through, with that recorded.
+  const buildType = stagedBuildType(site);
+  if (buildType === "preview") {
+    throw new Error(`${from ?? site} is a preview build, which borrows main's indexes. Build it full first (feature-staging dispatch with build_type: full), then freeze.`);
+  }
 
   const title = o.title ?? `Draft for Public Comment ${o.version}`;
   const released = (o.now ?? new Date()).toISOString();
@@ -203,6 +225,7 @@ export function freeze(o: FreezeOptions): PcRelease {
     ...(o.opens ? { opens: o.opens } : {}),
     ...(o.commit ? { commit: o.commit } : {}),
     ...(from ? { from } : {}),
+    build: buildType ?? "unstated",
     ...(o.document ? { document: o.document } : {}),
     ...(pdf ? { pdf } : {}),
     ...(lineMap ? { lineMap } : {}),

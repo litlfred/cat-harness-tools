@@ -236,7 +236,14 @@ jobs:
             echo "Files:"
             git diff --name-only "HEAD~1" | sed 's/^/- `/; s/$/`/'
           } > "$RUNNER_TEMP/body.md"
-          gh pr create --base "$BASE" --head "$branch" --title "fix(derived): regenerate post-merge derived artefacts" --body-file "$RUNNER_TEMP/body.md"
+          if ! err="$(gh pr create --base "$BASE" --head "$branch" --title "fix(derived): regenerate post-merge derived artefacts" --body-file "$RUNNER_TEMP/body.md" 2>&1)"; then
+            echo "$err"
+            if grep -q "not permitted to create or approve pull requests" <<<"$err"; then
+              echo "::warning::Repair branch $branch pushed, but GITHUB_TOKEN is not permitted to create pull requests in $GITHUB_REPOSITORY: https://github.com/$GITHUB_REPOSITORY/compare/$BASE...$branch?expand=1"
+            else
+              exit 1
+            fi
+          fi
       - name: Report the regen verdict
         if: always()
         env:

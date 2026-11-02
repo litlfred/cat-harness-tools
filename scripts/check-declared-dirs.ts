@@ -244,14 +244,15 @@ export function tipPresence(
     // alone either finds none or finds another instance's mount; the declared
     // path is what says which graph this is. Then the id, as before — but a
     // marker for a DIFFERENT declared path is another graph's, not this one's.
-    marker = markerAtPath(repoRoot, rel);
+    // Only where the mount lives is used below (`path`, `into`): read as a location (`read-projections.ts`).
+    marker = markerAtPath(repoRoot, rel, "location");
     if (!marker) {
-      const byId = readMarker(repoRoot, markerId);
+      const byId = readMarker(repoRoot, markerId, "location");
       if (byId && (byId.path === undefined || byId.path === rel)) marker = byId;
     }
     if (!marker && abs) {
       try {
-        marker = readMarker(dirname(abs), markerId);
+        marker = readMarker(dirname(abs), markerId, "location");
         if (marker) markerRoot = dirname(abs);
       } catch {
         // fallback failed

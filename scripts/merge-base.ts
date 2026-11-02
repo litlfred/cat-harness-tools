@@ -125,8 +125,8 @@ function syncSubmodules(root: string): void {
  */
 export function takeBaseAction(stages: ReadonlySet<number>): "theirs" | "delete" | "resolved" {
   // No stages at all is NOT a deletion: the path was already resolved by an
-  // earlier step (`qa:resolve-conflicts` runs first and stages what it
-  // resolves). Reading "no stage 3" there as "the base deleted it" `git rm`ed
+  // earlier step (`qa:resolve-conflicts` did, until bean `7mwa` retired it;
+  // any step that stages what it resolves still can). Reading "no stage 3" there as "the base deleted it" `git rm`ed
   // two generated kg-export sidecars on #1955, 2026-10-03, while the run still
   // reported proved (bean `vsv7`).
   if (stages.size === 0) return "resolved";
@@ -496,22 +496,6 @@ if (import.meta.main) {
   }
   if (p.refused.length) abort(`${p.refused.length} conflict(s) need a person (✗ above)`);
 
-  // qa sidecars first: that command reads git's stages and stages what it resolves.
-  const qaSidecars = p.resolvable.filter((c) => c.strategy === "qa-sidecar").map((c) => c.path);
-  if (qaSidecars.length > 0) {
-    const qa = spawnSync("bun", ["run", "cat", "qa:resolve-conflicts", "--", ...qaSidecars], { cwd: root, stdio: "inherit" });
-    const still = git(root, "diff", "--name-only", "--diff-filter=U").split("\n").filter(Boolean);
-    const qaLeft = qaSidecars.filter((path) => still.includes(path));
-    if (qa.status !== 0 || qaLeft.length) {
-      // Report as refusals (see resolutionFailure), so the bot's comment names them.
-      for (const path of qaLeft) {
-        const c = p.resolvable.find((x) => x.path === path);
-        console.log(`  ✗ ${path}  [${c?.pattern?.id ?? "qa-sidecar"}: could not resolve] — left conflicted by qa:resolve-conflicts`);
-      }
-      if (!qaLeft.length) console.log(`  ✗ qa:resolve-conflicts  [qa-sidecar: could not resolve] — exited ${qa.status} (see its output above)`);
-      abort(`qa:resolve-conflicts left ${qaLeft.length} sidecar(s) conflicted`);
-    }
-  }
   for (const c of p.resolvable) {
     // A README one side deleted has no hunks to resolve: it is a take-base
     // case whichever pattern named it.

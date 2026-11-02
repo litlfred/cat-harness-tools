@@ -17,7 +17,7 @@ import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "bun:test";
 
-import { probeBeans } from "../health/probes.ts";
+import { countConsideredOptions, probeBeans } from "../health/probes.ts";
 
 /**
  * The directory this test was written in (`cat-harness/test/health/`): every path below
@@ -75,7 +75,19 @@ describe("countConsideredOptions — the parse the MADR criterion rests on", () 
     const p = probeBeans(repoRootFor(resolve(ORIGIN_DIR, "..", "..")));
     expect(p.state).toBe("ok");
     if (p.state !== "ok") return;
+    // The subjects are mostly settled decisions, and a drain archives those:
+    // the 2026-11-01 sweep left no open bean with considered options
+    // (cat-harness-tools#1248). So the detector is run over the archive view
+    // too, which archiving fills rather than empties.
+    const { readFileSync, readdirSync } = await import("node:fs");
+    const { resolveBeanArchive } = await import("../../scripts/beans.ts");
+    const archive = resolveBeanArchive(repoRootFor(resolve(ORIGIN_DIR, "..", ".."))).dir;
+    const archived = archive === null
+      ? 0
+      : readdirSync(archive)
+          .filter((f) => f.endsWith(".md"))
+          .filter((f) => countConsideredOptions(readFileSync(join(archive, f), "utf-8")) !== undefined).length;
     const records = p.value.filter((b) => b.consideredOptions !== undefined);
-    expect(records.length).toBeGreaterThan(0);
+    expect(records.length + archived).toBeGreaterThan(0);
   });
 });
