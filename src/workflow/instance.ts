@@ -614,7 +614,8 @@ export function enabled(
   const roleFor = (node: { lane?: string; roleRef?: string }): string | undefined =>
     roles ? roleForLane(roles, node.lane, node.roleRef)?.id : undefined;
 
-  return state.tokens.flatMap((id): Enabled[] => {
+  // A legacy `folio-workflow-instance/v1` record has no `tokens`: nothing is enabled.
+  return (state.tokens ?? []).flatMap((id): Enabled[] => {
     const node = model.nodes.get(id)!;
 
     // A call activity with a subprocess running inside it is not itself work —
