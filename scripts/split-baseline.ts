@@ -126,7 +126,7 @@ async function main(): Promise<number> {
     // A skill that newly resolves is a note, not a failure. The split moved
     // files and a move never adds a skill, but every repo that mounts this
     // layer runs this gate, and a repo adding its own skill is not a defect
-    // (smart-base#249). A skill that stops resolving still fails.
+    // (the DAK base layer's PR #249). A skill that stops resolving still fails.
     const { failing: d, notes } = splitFindings(diff(existing, now));
     for (const line of notes) console.log(`  note: ${line}`);
     if (d.length === 0) {

@@ -416,8 +416,8 @@ export function isSkillMd(path: string): boolean {
  *
  * Nothing had broken, and that is the point. All twelve resolved anyway
  * through a SECOND home — eleven because they also have a
- * `schemas/skills/<name>/` I/O contract, and `smart-base-tools` because it
- * also had `.claude/skills/local/smart-base-tools.json` (now under
+ * `schemas/skills/<name>/` I/O contract, and the tools skill named after the DAK base layer
+ * because it also had a `.claude/skills/local/<name>.json` (now under
  * the DAK base layer's `skills/skill-definitions/`, bean `rqao`). Delete any one of
  * those second homes and `check-workflow-refs` reports a real, present skill
  * as dangling: the "wall of false dangling refs" this module's own header says
@@ -821,7 +821,7 @@ export function knownSkills(root: string, scope: CorpusScope = corpusScopeFor(ro
   // `NON_SKILL_GROUPS` admits. They surfaced as `kg-audit --instance` reporting
   // 23 `skill-in-role-or-process` findings against bootstrap for skills it does
   // not declare, and as `graph.test.ts`'s "nothing in bootstrap/ names anything
-  // above it" (bean `iwtn`) failing on `smart-base-tools` — a cat-harness skill.
+  // above it" (bean `iwtn`) failing on the tools skill named after the DAK base layer — a cat-harness skill.
   //
   // The direction is DECLARED, not a matter of taste. `needs` records the
   // layering in the owner's words — *"So bootsteap, cat harness, fa-core, f-a,
@@ -966,7 +966,7 @@ export function businessProcessFiles(root: string, opts: { folio?: boolean } = {
     }
   };
   // Also every `.bpmn` inside a declared `folio`: a diagram held as a document
-  // block (a DTH's `bp-*` blocks, smart-base's `businessProcess()`, kind
+  // block (a DTH's `bp-*` blocks, the DAK layer's `businessProcess()`, kind
   // `business-process`) describes work by construction. `folio` is not
   // knowledge-graph content, so the engine never read these; the viewer did
   // not either until now. Read by the directory's kind, so the blocks stay

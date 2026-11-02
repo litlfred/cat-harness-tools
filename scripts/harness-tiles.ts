@@ -270,7 +270,7 @@ export type HarnessTile = {
    * instance webpage theme already uses (`/<name>/`), plus the site mount.
    * The FIRST tile that matches wins, and tiles come dependents first, so the
    * content instance a page is about beats the platform that renders it
-   * (`/en/cat-harness/processes/folio-assistant-core/` is core's page).
+   * (`/en/cat-harness/processes/<content layer>/` is that layer's page).
    * `siteDefault` marks the site owner, whose mount is `/`: its ground is the
    * fallback for a page no scope claims, never a scope itself, because `/`
    * is in every URL and would claim them all.

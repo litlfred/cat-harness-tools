@@ -457,7 +457,7 @@ export function renderChapterMarkdown(
  * `<root>.dmn` beside the block, the same stem rule as every other companion.
  * The decision is the block's `decisionId`, else the file's only decision.
  * Keyed on the companion, not on a kind name: the kind is a content layer's
- * (smart-base `decision-table`), and this layer does not name it.
+ * (a DAK layer's `decision-table`), and this layer does not name it.
  *
  * A table the reader refuses is a warning and a visible note in its place,
  * not a build error: the refusal is about the content, and the DMN checks
