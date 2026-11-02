@@ -305,7 +305,7 @@ permissions:
 # A PR's runs are keyed by the PR's number, never by `github.ref`: on a
 # `closed` event GitHub sets the ref to the BASE branch, so a merged PR's
 # closing run joined main's group and, being a pull_request run, cancelled
-# main's running push run and the new one (fhir-harness run 41395643928,
+# main's running push run and the new one (a downstream layer's run 41395643928,
 # "higher priority waiting request"). pr-tests.yml is keyed the same way.
 concurrency:
   group: layer-pr-checks-${{ github.repository }}-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || github.ref }}
