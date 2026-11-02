@@ -50,10 +50,13 @@ const CSS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/css/docs-ui.css"))
 const JS = readFileSync(join(ROOT, siteFileFor(ROOT, "assets/js/docs-ui.js")), "utf8");
 
 /**
- * A page the generator wrote. `community-list.html` is the replica's landing —
- * the page a reader arrives on, so the one whose folio matters most.
+ * A page the generator wrote. `index.html` is the replica's home, the page a
+ * reader arrives on, so the one whose folio matters most. It was
+ * `community-list.html` until the owner removed the item, collection and
+ * community-list pages (2026-10-30, who-iris `site/README.md`); only the
+ * IRIS-style home is still built.
  */
-const PAGE_FILE = join(REPO, "who-iris", "site", "community-list.html");
+const PAGE_FILE = join(REPO, "who-iris", "site", "index.html");
 const PAGE = existsSync(PAGE_FILE) ? readFileSync(PAGE_FILE, "utf8") : "";
 
 /**
@@ -128,7 +131,7 @@ test.describe("the generated page carries the mount", () => {
 
 test.describe("the glass comes down on a library page", () => {
   test("the handle is there, on the route library/ is served at", async ({ page }) => {
-    await serve(page, "/who-iris/community-list.html");
+    await serve(page, "/who-iris/index.html");
     await expect(page.locator(".fa-glass-handle")).toBeVisible();
   });
 
@@ -141,12 +144,12 @@ test.describe("the glass comes down on a library page", () => {
   });
 
   test("and under a staging preview, where an absolute site URL would break", async ({ page }) => {
-    await serve(page, "/folio-assistant/STAGING/claude-example/who-iris/community-list.html");
+    await serve(page, "/folio-assistant/STAGING/claude-example/who-iris/index.html");
     await expect(page.locator(".fa-glass-handle")).toBeVisible();
   });
 
   test("it opens, and closing is reachable — `l4zi`", async ({ page }) => {
-    await serve(page, "/who-iris/community-list.html");
+    await serve(page, "/who-iris/index.html");
     const handle = page.locator(".fa-glass-handle");
     await handle.click();
     await expect(page.locator('.fa-sticky-layer[data-fa-glass="open"]')).toBeVisible();
@@ -157,7 +160,7 @@ test.describe("the glass comes down on a library page", () => {
   test("an empty glass says so rather than looking broken", async ({ page }) => {
     // The todo index 404s on a replica — there is no folio content here yet.
     // "Nothing on your glass" and "the glass is broken" are opposite facts.
-    await serve(page, "/who-iris/community-list.html");
+    await serve(page, "/who-iris/index.html");
     await page.locator(".fa-glass-handle").click();
     await expect(page.locator(".fa-glass-empty")).toBeVisible();
   });
@@ -234,10 +237,10 @@ test.describe("the replica is unchanged with the glass closed", () => {
     // is present, and the band really drew its locale control.
     expect(PAGE).toContain(`id="${TRANSLATION_META_ID}"`);
 
-    await serve(page, "/who-iris/community-list.html", { withMount: false });
+    await serve(page, "/who-iris/index.html", { withMount: false });
     const before = await snapshot(page);
 
-    await serve(page, "/who-iris/community-list.html");
+    await serve(page, "/who-iris/index.html");
     await expect(page.locator(".fa-glass-handle")).toBeVisible(); // the mount really ran
     await expect(page.locator(".fa-page-lang-toggle")).toHaveCount(1); // and so did the locale band
     const after = await snapshot(page);
@@ -252,7 +255,7 @@ test.describe("the replica is unchanged with the glass closed", () => {
   });
 
   test("the locale band is an overlay on the reserved strip, not a row in the flow (uvt0)", async ({ page }) => {
-    await serve(page, "/who-iris/community-list.html");
+    await serve(page, "/who-iris/index.html");
     await expect(page.locator(".fa-page-lang-toggle")).toBeVisible();
     const g = await page.evaluate(() => {
       const band = document.querySelector(".fa-glass-band[data-fa-band-tools]")!;
@@ -281,10 +284,10 @@ test.describe("the replica is unchanged with the glass closed", () => {
   // at the inline START, the handle at the centre, and they must not touch —
   // in RTL at phone width too, where the start is the right edge.
   for (const [path, width] of [
-    ["/who-iris/community-list.html", 1280],
-    ["/who-iris/community-list.html", 390],
-    ["/who-iris/ar/community-list.html", 1280],
-    ["/who-iris/ar/community-list.html", 390],
+    ["/who-iris/index.html", 1280],
+    ["/who-iris/index.html", 390],
+    ["/who-iris/ar/index.html", 1280],
+    ["/who-iris/ar/index.html", 390],
   ] as const) {
     test(`the locale control clears the handle on the shared strip (uvt0, ${path} @ ${width})`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 });
@@ -302,7 +305,7 @@ test.describe("the replica is unchanged with the glass closed", () => {
   }
 
   test("the band above the replica is the handle's, and clears it", async ({ page }) => {
-    await serve(page, "/who-iris/community-list.html");
+    await serve(page, "/who-iris/index.html");
     const handle = page.locator(".fa-glass-handle");
     await expect(handle).toBeVisible();
     const [band, handleBottom, bannerTop] = await page.evaluate(() => [
@@ -317,7 +320,7 @@ test.describe("the replica is unchanged with the glass closed", () => {
   });
 
   test("the ingested-copy banner — who-iris requirement 1 — still reads as itself", async ({ page }) => {
-    await serve(page, "/who-iris/community-list.html");
+    await serve(page, "/who-iris/index.html");
     const banner = page.locator(".ingested").first();
     await expect(banner).toBeVisible();
     await expect(banner).toHaveCSS("background-color", "rgb(0, 102, 102)");
@@ -335,7 +338,7 @@ test.describe("the replica at phone width", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test("the page is no wider than the screen", async ({ page }) => {
-    await serve(page, "/who-iris/community-list.html");
+    await serve(page, "/who-iris/index.html");
     const [scroll, client] = await page.evaluate(() => [
       document.documentElement.scrollWidth,
       document.documentElement.clientWidth,
@@ -356,7 +359,7 @@ for (const width of [1024, 1280]) {
     test.use({ viewport: { width, height: 800 } });
 
     test("the page is no wider than the screen", async ({ page }) => {
-      await serve(page, "/who-iris/community-list.html");
+      await serve(page, "/who-iris/index.html");
       const [scroll, client] = await page.evaluate(() => [
         document.documentElement.scrollWidth,
         document.documentElement.clientWidth,
