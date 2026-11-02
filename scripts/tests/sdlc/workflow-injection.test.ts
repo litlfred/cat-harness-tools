@@ -452,8 +452,29 @@ describe("`script:` blocks are JavaScript, and the same values land in them (bea
     // in that surface silently disappears and the gate goes green having looked
     // at one of two surfaces. `could not determine` is never rendered as clean,
     // and neither is `did not look`.
-    const found = scanWorkflows();
-    const scripts = found.filter((i) => i.surface === "script");
+    //
+    // It used to count live script-surface FINDINGS, which tied it to whether
+    // some workflow happened to interpolate an untrusted value: fa#2909 retired
+    // the last such workflow and the guard went red with the scanner unchanged.
+    // So it takes a real `script:` block from the corpus, plants one untrusted
+    // interpolation in it, and asks the scanner to see it — the real block
+    // shape, read the real way, without depending on the corpus being unsafe.
+    // The same directory `scanWorkflows()` reads by default: the checkout root
+    // above this layer.
+    const WORKFLOWS = join(import.meta.dir, "..", "..", "..", "..", ".github", "workflows");
+    const real = readdirSync(WORKFLOWS)
+      .filter((n) => /\.ya?ml$/.test(n))
+      .map((n) => readFileSync(join(WORKFLOWS, n), "utf-8").split("\n"))
+      .find((lines) => lines.some((l) => /^\s+script:\s*[|>]/.test(l)));
+    expect(real).toBeDefined();
+    const at = real!.findIndex((l) => /^\s+script:\s*[|>]/.test(l));
+    const indent = real![at]!.length - real![at]!.trimStart().length + 2;
+    const planted = [
+      ...real!.slice(0, at + 1),
+      `${" ".repeat(indent)}const t = "\${{ github.event.issue.title }}";`,
+      ...real!.slice(at + 1),
+    ].join("\n");
+    const scripts = scanWorkflows(workflows(planted)).filter((i) => i.surface === "script");
     expect(scripts.length).toBeGreaterThan(0);
   });
 });
