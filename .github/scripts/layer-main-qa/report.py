@@ -20,7 +20,9 @@ gates, tests and jobs, and the commits since the last green main: the newest
 successful push run of the gate run's workflow on main. Green: the open issue
 is closed. Only the newest main reports: when SHA is no longer main's head, a
 newer push's run reports instead, and the issue is not touched. Unknown, or a
-cancelled gate run: nothing is touched.
+cancelled gate run that gave no verdict: nothing is touched. A cancelled gate
+run that still gave a green or red VERDICT is judged by that verdict: main's
+gate set finished, and only a later job (the writer record) was cancelled.
 
 Exits 1 when main is red, so the QA run itself is red; 0 otherwise.
 """
@@ -85,7 +87,9 @@ def body_for(sha, run, failures, jobs, green, checks_result):
     lines = ["<!-- main-red: kept by layer-main-qa.yml; edited on every red push to main -->",
              f"**main is red** at [`{short}`]({SERVER}/{REPO}/commit/{sha}), "
              f"judged by [{run['name']} run {run['id']}]({run['html_url']}).", ""]
-    if checks_result not in ("", "success"):
+    if checks_result == "cancelled":
+        lines += ["The gate run was cancelled after main's gate set finished; this is that gate set's verdict.", ""]
+    elif checks_result not in ("", "success"):
         lines += [f"The gate run itself ended **{checks_result}**: main's gate set did not finish.", ""]
     gates = failures.get("gates") or []
     if gates:
@@ -153,11 +157,17 @@ def main():
     except ValueError:
         failures = {}
     run = gh(f"repos/{REPO}/actions/runs/{run_id}")
-    if checks_result == "cancelled" or (not verdict and run.get("conclusion") == "cancelled"):
+    # main-verdict.py gives green or red only from main's finished gate set
+    # (missing reports are `unknown`), so a run cancelled after that, as when
+    # the writer record is cancelled, still has main's answer.
+    answered = verdict in ("green", "red")
+    cancelled = checks_result == "cancelled" or run.get("conclusion") == "cancelled"
+    if cancelled and not answered:
         summary(f"The gate run for `{sha[:12]}` was cancelled: no verdict, the `{LABEL}` issue is not touched.")
         return 0
     jobs = failed_jobs(run_id)
-    if checks_result not in ("", "success") or (not verdict and run.get("conclusion") not in ("success", None)):
+    if (checks_result not in ("", "success", "cancelled")
+            or (not verdict and run.get("conclusion") not in ("success", None))):
         verdict = "red"
     if not verdict:
         verdict = "green" if run.get("conclusion") == "success" else "unknown"
