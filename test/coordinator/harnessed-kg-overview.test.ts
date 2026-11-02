@@ -65,11 +65,15 @@ describe("living deck: every claim about the KG still holds", () => {
   // smart-base/scripts/who-smart-content-types.test.ts with the section it
   // reads, which is now smart-base's (bean p9bu).
 
-  test("slide 6 — the lifecycle process still has the six lanes and eight tasks shown", () => {
+  test("slide 6 — the lifecycle process has the five lanes, the work-plan store and the skills shown", () => {
     const x = read(workflowFile(H, "content-lifecycle.bpmn"));
-    expect([...x.matchAll(/<bpmn:lane [^>]*name=/g)]).toHaveLength(6);
+    // The work plan is a data store, not a lane (core#487, Q-BR-3 A), and a
+    // task names its skill in its extension elements, not in brackets in its
+    // name (Q-RED-3 B). slide-06.md says the same; change both together.
+    expect([...x.matchAll(/<bpmn:lane [^>]*name=/g)]).toHaveLength(5);
+    expect(x).toMatch(/<bpmn:dataStoreReference [^>]*dataStoreRef="work-plan"/);
     for (const skill of ["content-plan", "todo-manager", "content-author", "content-test",
-      "content-publish", "content-feedback", "content-retire"]) expect(x).toContain(`[${skill}]`);
+      "content-publish", "content-feedback", "content-retire"]) expect(x).toContain(`skill ref="${skill}"`);
   });
 
   test("slide 8 — the generated UML has the Voice Profile class the snapshot lacks", () => {
