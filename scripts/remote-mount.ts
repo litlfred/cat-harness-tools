@@ -201,6 +201,7 @@ import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from "./subgraph-index-package.ts";
 import { toolClosure, type ClosureInstance, type ResolvedTool, type ToolChoice } from "./tool-closure.ts";
 import { upstreamConcernMembers, upstreamDirectories, type UpstreamDirectory } from "./upstream-directories.ts";
+import { run as syncWorkflowPins } from "./workflow-pins.ts";
 import { ConcernGroupCodeSchema } from "../schemas/kg/concern-groups.ts";
 
 /**
@@ -1697,6 +1698,17 @@ export function mountRemote(opts: RemoteMountOptions = {}): MountReport {
     };
     writeFileSync(lockFile, JSON.stringify(lock, null, 2) + "\n");
     syncIgnoreBlock(plan.instanceRoot, blockConfig);
+    // The shared-workflow calls follow the lock (owner, 2026-11-01, security
+    // audit S1): `uses: litlfred/<layer>/…@<the ref just written>`.
+    // Not in CI: the re-pin train's App cannot push workflow files (owner,
+    // 2026-11-01, Q-PIN-6 "C"), so there the pins trail the lock and
+    // check:workflow-pins only warns until an agent session catches them up.
+    // WORKFLOW_PINS_WRITE=1 forces the write.
+    if (process.env.CI !== "true" || process.env.WORKFLOW_PINS_WRITE === "1") {
+      const pins = syncWorkflowPins(plan.instanceRoot, true);
+      if (pins.fixed) console.log(`  workflow pins: moved ${pins.fixed} litlfred/… call(s) to the new lock`);
+      for (const f of pins.findings.filter((x) => x.want === null && !x.why.startsWith("tools-ref"))) console.warn(`  workflow pins: ${f.file}:${f.line} ${f.why}`);
+    }
     return { plan, lockFile, excluded };
   } finally {
     for (const t of trees.values()) t.close();

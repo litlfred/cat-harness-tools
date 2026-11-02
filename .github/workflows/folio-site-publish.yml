@@ -52,7 +52,7 @@ jobs:
           # Authorization headers for github.com make every request fail.
           persist-credentials: false
 
-      - uses: litlfred/cat-harness-tools/.github/actions/mount-layers@main
+      - uses: litlfred/cat-harness-tools/.github/actions/mount-layers@1257da8bbbb8e661391d08b014b16464de19613f # last change to .github/actions/mount-layers
 
       - uses: ruby/setup-ruby@de492cf36cbab201753d720ce4f4e336cd688c94 # v1.336.0
         with:
