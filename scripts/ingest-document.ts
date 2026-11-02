@@ -384,7 +384,7 @@ export function withDerivedArms(
   // source: `l1-blocks.ts` builds blocks from `sections/`. The image arms read
   // a PDF and do not apply; the notebook rung writes its own `images.json`.
   if (plan.rung === "notebook" || plan.rung === "text") {
-    return { ...plan, steps: [...plan.steps, ["bun", "run", tsHelper("l1-blocks.ts"), "-o", staging]] };
+    return { ...plan, steps: [...plan.steps, ["bun", "run", tsHelper("l1-blocks.ts"), "-o", staging], aspectsArm(staging)] };
   }
   const PDF_RUNGS = ["pdf-structure", "pdf-pages", "pdf-ocr+pdf-pages"];
   // A deck writes the same `structure.json` + `sections/` a paged PDF does, and
@@ -406,6 +406,7 @@ export function withDerivedArms(
       steps: [
         ...plan.steps,
         ["bun", "run", tsHelper("l1-blocks.ts"), "-o", staging],
+        aspectsArm(staging),
         ["bun", "run", tsHelper("apply-image-verdicts.ts"), "--staging", staging, "--library", library],
       ],
     };
@@ -455,6 +456,7 @@ export function withDerivedArms(
       // `l1-blocks.ts` reads what the rung already wrote, so it takes the
       // ENTRY directory and no source at all. See the table above.
       ["bun", "run", tsHelper("l1-blocks.ts"), "-o", staging],
+      aspectsArm(staging),
       // ── The fourth arm, and it must come AFTER `pdf-images.py` — bean `8suc`
       //
       // `pdf-images.py` opens the sidecar with `"w"`: no existence check, no
@@ -483,6 +485,22 @@ export function withDerivedArms(
       ["python3", pyHelper("pdf-cover.py"), pdf, "-o", join(staging, COVER_FILENAME), "--width", "300"],
     ],
   };
+}
+
+/**
+ * The Stage B ASPECTS over what the rung wrote — requirements and normative
+ * statements first (owner, 2026-11-01: requirement extraction "should be a
+ * general part of L1 ingestion for DAK and DTH").
+ *
+ * An aspect is gated by MOUNTING, not here: the DAK layer's requirement
+ * aspect runs where that layer is mounted and nowhere else, and with no
+ * aspect mounted the arm writes nothing and exits 0. It merges into the
+ * entry's `candidates.json`, which `--promote`'s `buildEntryNodes` turns into
+ * one typed node per item, `derivedFrom` its L1 section. It takes the ENTRY,
+ * as `l1-blocks.ts` does, because it reads `sections/`.
+ */
+export function aspectsArm(staging: string): string[] {
+  return ["python3", pyHelper("extract-candidates.py"), "--aspects-only", staging];
 }
 
 /**

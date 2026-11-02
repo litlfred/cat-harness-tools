@@ -68,6 +68,17 @@ describe("pdf-structure/v1", () => {
     expect(PdfStructureSchema.safeParse(d).success).toBe(false);
   });
 
+  test("the diagnostics pdf-structure.py writes are accepted: furniture_lines_stripped, outline_reordered", () => {
+    // pdf-structure.py wrote both before the schema named them, so every fresh
+    // ingest failed in l1-blocks.ts (found on who-iris#167, 2026-11-01).
+    const d = minimal();
+    d.diagnostics = { pages_without_text: 0, likely_scanned: false, toc_entries: 0, sections: 1, chars_total: 5, furniture_lines_stripped: 12, outline_reordered: true };
+    const r = PdfStructureSchema.safeParse(d);
+    expect(r.success ? "" : r.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")).toBe("");
+    d.diagnostics = { ...(d.diagnostics as Record<string, unknown>), outline_reordered: false };
+    expect(PdfStructureSchema.safeParse(d).success).toBe(false);
+  });
+
   test("an unknown top-level key is rejected", () => {
     expect(PdfStructureSchema.safeParse({ ...minimal(), sections_text: "withheld" }).success).toBe(false);
   });

@@ -109,7 +109,7 @@ describe("the PDF-only arms never run on a notebook (bean rkqp)", () => {
       writeFileSync(f, JSON.stringify(nb([md("# T")])));
       const plan = withDerivedArms(planFor(f, undefined, dir, null), f, dir, join(dir, "n"), dir);
       const scripts = plan.steps.map((s) => s.find((a) => /\.(py|ts)$/.test(a))!.split("/").pop());
-      expect(scripts).toEqual(["notebook-structure.ts", "l1-blocks.ts"]);
+      expect(scripts).toEqual(["notebook-structure.ts", "l1-blocks.ts", "extract-candidates.py"]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
