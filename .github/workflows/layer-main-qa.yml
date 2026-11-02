@@ -17,10 +17,13 @@
 #   - green: the open issue is closed.
 #   - the gate run was cancelled, or main's answer could not be read: nothing
 #     is touched.
-# Only the NEWEST main reports: this job's concurrency cancels an older
-# main's report in favour of the newer one, and a report whose commit is no
-# longer main's head leaves the issue to the newer push. The gate runs
-# themselves are never cancelled on main (each keeps its main's answer).
+# Only the NEWEST main reports: a report whose commit is no longer main's
+# head leaves the issue to the newer push. The report itself is never
+# cancelled (owner, 2026-11-01, card Q-CIS-1 A): it is a job of the layer's
+# checks run, so cancelling it marked a run whose every gate PASSED as
+# "cancelled" (cat-harness 1b22283), and main showed no green run while
+# merges kept landing. The gate runs themselves are never cancelled on main
+# (each keeps its main's answer).
 #
 # A layer calls it as the second job of its checks workflow (see the header
 # of layer-pr-checks.yml); the index from a `workflow_run` of its gates.
@@ -70,9 +73,11 @@ jobs:
       contents: read
       issues: write
       actions: read
+    # Per commit and never cancelling: two reports may overlap, and the older
+    # one stands down because its commit is no longer main's head (above).
     concurrency:
-      group: layer-main-qa-${{ github.repository }}
-      cancel-in-progress: true
+      group: layer-main-qa-${{ github.repository }}-${{ github.sha }}
+      cancel-in-progress: false
     steps:
       # The report script at the cat-harness-tools commit the caller's
       # index.lock.json pins, never a branch tip (security audit S1, owner

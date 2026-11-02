@@ -48,7 +48,7 @@
 import type { ArchimateElement, ArchimateLayer, ArchimateModel, ArchimateRelationship, ArchimateView, ArchimateViewConnection, ArchimateViewNode } from "../schemas/archimate.ts";
 
 // The layer colours and outlines are the shared figure theme's (figure-theme.ts).
-import { LAYER_FILL, outlineOf, bandColours, THEME } from "./figure-theme.ts";
+import { LAYER_FILL, outlineOf, bandColours, THEME, HANDBOOK } from "./figure-theme.ts";
 export { LAYER_FILL, outlineOf };
 
 const esc = (s: string): string =>
@@ -205,8 +205,12 @@ export interface RenderOptions {
    * title banner, and each grouping a band tinted in the hue of the layer most
    * of its boxes belong to, under a deep header strip. Box fills stay the
    * ArchiMate layer colours either way. `plain`: grey groupings, no banner.
+   * `handbook`: close to a printed handbook figure, for a figure redrawn from
+   * a printed source (`HANDBOOK` in figure-theme.ts). It draws white boxes with teal
+   * outlines and no type label, pale panels with teal headings, and the title in
+   * ink above.
    */
-  theme?: "poster" | "plain";
+  theme?: "poster" | "plain" | "handbook";
 }
 
 /** One view as a standalone SVG document. */
@@ -228,7 +232,28 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
   // What the view uses, for its key: only what a reader can see on it.
   const nodes = new Map(view.nodes.map((n) => [n.id, n]));
   const used = { layers: new Set<ArchimateLayer>(), shapes: new Set<Shape>(), relationships: new Set<string>(), groups: false, notes: false, nested: false, viewRefs: false };
-  const poster = opts.theme !== "plain";
+  const hb = opts.theme === "handbook";
+  const poster = opts.theme !== "plain" && !hb;
+  // Handbook look: how many grouping boxes enclose a node (0 = outermost).
+  const isGroupish = (id: string): boolean => {
+    const n = nodes.get(id);
+    return !!n && (n.kind === "group" || (n.kind === "element" && elements.get(n.ref ?? "")?.type === "Grouping"));
+  };
+  const depthOf = (id: string): number => {
+    let d = 0;
+    for (let p = nodes.get(id)?.parent; p; p = nodes.get(p)?.parent) if (isGroupish(p)) d++;
+    return d;
+  };
+  // A panel as the handbook prints it: outer ones pale with an upper-case heading,
+  // inner ones white with a small centred heading.
+  const hbPanel = (n: ArchimateViewNode, label: string): string => {
+    const d = depthOf(n.id);
+    const fill = d === 0 ? HANDBOOK.panel : HANDBOOK.box;
+    const head = d < 2
+      ? `<text class="av-group" x="${n.x + 12}" y="${n.y + FONT + 9}" style="fill:${HANDBOOK.tealText};font-weight:700;letter-spacing:.06em">${esc(wrap(label.toUpperCase(), n.w - 24, 1)[0] ?? "")}</text>`
+      : `<text class="av-group" x="${n.x + n.w / 2}" y="${n.y + FONT + 7}" text-anchor="middle" style="fill:${HANDBOOK.tealText};font-weight:400">${esc(wrap(label, n.w - 16, 1)[0] ?? "")}</text>`;
+    return `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${d === 0 ? 12 : 9}" fill="${fill}" stroke="${HANDBOOK.teal}" stroke-width="${d < 2 ? 1.8 : 1}"/>` + head;
+  };
   // A grouping's hue: the layer fill most of the boxes inside it (at any depth) have.
   const kids = new Map<string, string[]>();
   for (const n of view.nodes) if (n.parent) kids.set(n.parent, [...(kids.get(n.parent) ?? []), n.id]);
@@ -251,7 +276,10 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
 
   for (const n of view.nodes) {
     if (n.parent && nodes.get(n.parent)?.kind === "element" && n.kind === "element") used.nested = true;
-    if (n.kind === "group" && poster) {
+    if (n.kind === "group" && hb) {
+      used.groups = true;
+      out.push(`<g class="av-g">${hbPanel(n, n.text ?? "")}</g>`);
+    } else if (n.kind === "group" && poster) {
       used.groups = true;
       const c = bandColours(hueOf(n.id));
       const hh = LINE_H + 8;
@@ -293,6 +321,13 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
         out.push(`<circle cx="${c.x}" cy="${c.y}" r="${Math.min(n.w, n.h) / 2}" fill="#000"/>`);
         continue;
       }
+      if (hb && e?.type === "Grouping") {
+        used.groups = true;
+        const title = `<title>${esc(e.name)} (Grouping)</title>`;
+        const body = hbPanel(n, e.name);
+        out.push(opts.elementHref ? `<a href="${esc(opts.elementHref(e.id))}" target="_top">${title}${body}</a>` : `<g>${title}${body}</g>`);
+        continue;
+      }
       if (poster && e?.type === "Grouping") {
         // A Grouping element is drawn as a band, like a diagram group, and still links to its page.
         used.groups = true;
@@ -307,17 +342,17 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
         continue;
       }
       if (e) {
-        used.layers.add(e.layer);
+        if (!hb) used.layers.add(e.layer);
         used.shapes.add(shape);
       }
-      const fill = e ? n.fill ?? LAYER_FILL[e.layer] : "url(#missing)";
+      const fill = e ? (hb ? HANDBOOK.box : n.fill ?? LAYER_FILL[e.layer]) : "url(#missing)";
       const name = e ? e.name : "(element missing from the model)";
       const type = e ? typeLabel(e.type) : "";
       const lines = wrap(name, n.w - 10, Math.max(1, Math.floor((n.h - 14) / LINE_H)));
       const body =
-        box(n, shape, esc(fill), ` stroke="${e ? outlineOf(fill) : "#d33"}" stroke-width="1"`) +
-        (type ? `<text class="av-type" x="${n.x + n.w - (shape === "pill" ? n.h / 3 : shape === "clipped" ? 9 : 5)}" y="${n.y + 10}" text-anchor="end">${esc(type)}</text>` : "") +
-        textBlock(lines, n.x + n.w / 2, n.y + 12, "av-name");
+        box(n, shape, esc(fill), ` stroke="${e ? (hb ? HANDBOOK.teal : outlineOf(fill)) : "#d33"}" stroke-width="1"`) +
+        (type && !hb ? `<text class="av-type" x="${n.x + n.w - (shape === "pill" ? n.h / 3 : shape === "clipped" ? 9 : 5)}" y="${n.y + 10}" text-anchor="end">${esc(type)}</text>` : "") +
+        textBlock(lines, n.x + n.w / 2, hb ? n.y + Math.max(8, (n.h - lines.length * LINE_H) / 2) : n.y + 12, hb ? "av-name av-hb" : "av-name");
       const title = `<title>${esc(name)}${type ? ` (${esc(type)})` : ""}</title>`;
       out.push(e && opts.elementHref ? `<a href="${esc(opts.elementHref(e.id))}" target="_top">${title}${body}</a>` : `<g>${title}${body}</g>`);
     }
@@ -342,27 +377,30 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
   }
 
   if (opts.legend !== false && Number.isFinite(maxY)) {
-    const key = legendSvg(used, minX, maxY + 28, poster);
+    const key = legendSvg(used, minX, maxY + 28, hb ? "handbook" : poster);
     if (key.h > 0) {
       out.push(key.svg);
       grow(minX + key.w, maxY + 28 + key.h);
     }
   }
 
-  const banner = poster ? 52 : 0;
+  const banner = poster || hb ? 52 : 0;
   const vx = Math.floor(minX - pad);
   const vy = Math.floor(minY - pad - banner);
   const vw = Math.ceil(maxX - minX + 2 * pad);
   const vh = Math.ceil(maxY - minY + 2 * pad + banner);
-  const head = poster
+  const head = hb
+    ? `<text x="${vx + pad}" y="${vy + 28}" style="font:700 18px ${esc(THEME.font)};fill:${HANDBOOK.ink}">${esc(view.name)}</text>` +
+      `<text x="${vx + pad}" y="${vy + 44}" style="font:italic 10px ${esc(THEME.font)};fill:${HANDBOOK.muted}">Drawn from the ArchiMate model “${esc(model.name)}”</text>`
+    : poster
     ? `<rect x="${vx}" y="${vy}" width="${vw}" height="${banner}" fill="${THEME.frame}"/>` +
       `<text x="${vx + pad}" y="${vy + 24}" style="font:700 17px ${esc(THEME.font)};fill:#fff">${esc(view.name)}</text>` +
       `<text x="${vx + pad}" y="${vy + 41}" style="font:italic 10px ${esc(THEME.font)};fill:#c9d6e6">Drawn from the ArchiMate model “${esc(model.name)}”</text>`
     : "";
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vx} ${vy} ${vw} ${vh}" width="${vw}" height="${vh}" role="img" aria-labelledby="av-title">` +
-    `<title id="av-title">${esc(view.name)} — ${esc(model.name)}</title>${poster ? STYLE.replace(/system-ui,-apple-system,"Segoe UI",sans-serif|system-ui,sans-serif/g, THEME.font) : STYLE}${MARKERS}` +
-    `<rect x="${vx}" y="${vy}" width="${vw}" height="${vh}" fill="${poster ? THEME.page : "#fff"}"/>` + head +
+    `<title id="av-title">${esc(view.name)} — ${esc(model.name)}</title>${poster || hb ? STYLE.replace(/system-ui,-apple-system,"Segoe UI",sans-serif|system-ui,sans-serif/g, THEME.font) : STYLE}${hb ? `<style>.av-hb{font-weight:400;fill:${HANDBOOK.ink}}</style>` : ""}${MARKERS}` +
+    `<rect x="${vx}" y="${vy}" width="${vw}" height="${vh}" fill="${hb ? HANDBOOK.page : poster ? THEME.page : "#fff"}"/>` + head +
     out.join("\n") +
     `</svg>\n`
   );
@@ -500,8 +538,9 @@ export function legendSvg(
   used: { layers: Set<ArchimateLayer>; shapes: Set<Shape>; relationships: Set<string>; groups: boolean; notes: boolean; nested: boolean; viewRefs: boolean },
   x: number,
   y: number,
-  poster = false,
+  poster: boolean | "handbook" = false,
 ): { svg: string; w: number; h: number } {
+  const hb = poster === "handbook";
   const rows: string[] = [];
   const ROW = 20, SW = 44, CHAR = 6.2;
   // The key is as wide as its longest line, so no line runs past the frame.
@@ -520,17 +559,18 @@ export function legendSvg(
   }
   const shapes = (["clipped", "round", "pill", "rect"] as const).filter((sh) => used.shapes.has(sh));
   if (shapes.length) {
-    head("Shape: what kind of thing a box is (its small italic label names the exact kind)");
+    head(hb ? "Shape: what kind of thing a box is (point at a box to see its exact kind)" : "Shape: what kind of thing a box is (its small italic label names the exact kind)");
     for (const sh of shapes) {
       // Taller than a colour swatch, so the corners can be told apart.
       cy += 4;
-      rows.push(box({ id: "", kind: "element", x, y: cy - 12, w: SW, h: 24 }, sh, "#fff", ` stroke="#555"`) + text(SHAPE_MEANING[sh]));
+      rows.push(box({ id: "", kind: "element", x, y: cy - 12, w: SW, h: 24 }, sh, "#fff", ` stroke="${hb ? HANDBOOK.teal : "#555"}"`) + text(SHAPE_MEANING[sh]));
       cy += ROW + 6;
     }
   }
   const extras: Array<[(cy: number) => string, string]> = [];
   if (used.nested) extras.push([(c) => `<rect x="${x}" y="${c - 9}" width="${SW}" height="18" fill="#fff" stroke="#555"/><rect x="${x + 10}" y="${c - 4}" width="${SW - 20}" height="9" fill="#fff" stroke="#555"/>`, "A box inside another box: a part of it"]);
-  if (used.groups && poster) extras.push([(c) => `<rect x="${x}" y="${c - 7}" width="${SW}" height="14" rx="3" fill="${bandColours("#b5ffff").ground}" stroke="${bandColours("#b5ffff").stroke}"/><rect x="${x}" y="${c - 7}" width="${SW}" height="5" fill="${bandColours("#b5ffff").header}"/>`, "Band with a dark header: a grouping for layout only; it adds no meaning (tinted in the layer most of its boxes belong to)"]);
+  if (used.groups && hb) extras.push([(c) => `<rect x="${x}" y="${c - 7}" width="${SW}" height="14" rx="4" fill="${HANDBOOK.panel}" stroke="${HANDBOOK.teal}" stroke-width="1.5"/>`, "Panel with a teal outline and heading: a grouping for layout only; it adds no meaning"]);
+  else if (used.groups && poster) extras.push([(c) => `<rect x="${x}" y="${c - 7}" width="${SW}" height="14" rx="3" fill="${bandColours("#b5ffff").ground}" stroke="${bandColours("#b5ffff").stroke}"/><rect x="${x}" y="${c - 7}" width="${SW}" height="5" fill="${bandColours("#b5ffff").header}"/>`, "Band with a dark header: a grouping for layout only; it adds no meaning (tinted in the layer most of its boxes belong to)"]);
   else if (used.groups) extras.push([(c) => `<rect x="${x}" y="${c - 7}" width="${SW}" height="14" fill="#f2f2f2" stroke="#888"/>`, "Grey band: a grouping for layout only; it adds no meaning"]);
   if (used.notes) extras.push([(c) => `<polygon points="${x},${c - 7} ${x + SW - 6},${c - 7} ${x + SW},${c - 1} ${x + SW},${c + 7} ${x},${c + 7}" fill="#fff" stroke="#888"/>`, "Note: a comment from the authors"]);
   if (used.viewRefs) extras.push([(c) => `<rect x="${x}" y="${c - 7}" width="${SW}" height="14" fill="#dcdcdc" stroke="#555"/>`, "Dark grey box: a link to another view"]);

@@ -27,6 +27,7 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
+import { libraryEntryDir } from "./lib/library-entry-graphs.ts";
 
 import { NOTEBOOK_STRUCTURE_SCHEMA_ID, NotebookStructureSchema, STRUCTURE_FILENAME, type NotebookStructure } from "../schemas/content/document-structure.ts";
 
@@ -214,7 +215,9 @@ export function runRung(file: string, lib: string, docId?: string): string {
     },
     id,
   );
-  const dir = join(lib, id);
+  // Re-ingest writes over the entry where it is filed (`library/<group>/<slug>/`,
+  // bean `6fez`); a new entry lands unfiled at `library/<slug>/`.
+  const dir = libraryEntryDir(lib, id) ?? join(lib, id);
   mkdirSync(join(dir, "sections"), { recursive: true });
   writeFileSync(join(dir, STRUCTURE_FILENAME), JSON.stringify(out.structure, null, 2) + "\n");
   for (const [sid, body] of out.sections) writeFileSync(join(dir, "sections", `${sid}.md`), body);

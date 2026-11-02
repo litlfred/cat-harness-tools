@@ -260,6 +260,11 @@ on:
         required: false
         type: boolean
         default: false
+      writer-record-hours:
+        description: "How often, at most, a push to main re-records the page-build writers under strace (bean fwtz). The record takes 40-85 minutes and every run waits for it at its end; a PR uses the newest record and checks it path by path, so an older one still serves. 0 records on every push."
+        required: false
+        type: number
+        default: 6
       writer-skip:
         description: "Skip a derive:publish writer whose recorded reads are unchanged, putting back what it wrote (bean fwtz). A push to the caller's main records each writer under strace; a PR restores the newest record and skips. Off: every writer runs."
         required: false
@@ -1132,10 +1137,46 @@ jobs:
       # True on the first harness PR: main had no lock, so main's side is
       # the PR's own tree (see the base-root step).
       first-setup: ${{ steps.base-root.outputs.first-setup == 'true' }}
+      # Whether this push re-records the page-build writers (writer-record-hours).
+      record-writers: ${{ steps.writer-stamp.outputs.record }}
+      writer-bucket: ${{ steps.writer-bucket.outputs.bucket }}
     steps:
       # The same matrix as prepare-head's; a push has no prepare-head.
       - *shards
       - *tools-lock
+      # Has a push recorded the page-build writers in this window? (bean fwtz;
+      # owner, 2026-11-01, card Q-CIS-2 A: off the main path.) A cache key per
+      # window of `writer-record-hours`: the first push in a window records
+      # and saves the stamp, the rest skip the 40-85 minute job.
+      - name: Is a writer record due? (a push)
+        id: writer-bucket
+        if: github.event_name == 'push' && inputs.writer-skip
+        env:
+          HOURS: ${{ inputs.writer-record-hours }}
+        run: |
+          set -euo pipefail
+          if [ "${HOURS:-0}" -le 0 ] 2>/dev/null; then echo "bucket=$GITHUB_SHA" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "bucket=$(( $(date -u +%s) / (3600 * HOURS) ))" >> "$GITHUB_OUTPUT"
+      - name: Was the writer record made in this window?
+        id: writer-stamp-lookup
+        if: steps.writer-bucket.outcome == 'success'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/writer-stamp
+          key: writer-record-stamp-v1-${{ github.repository }}-${{ steps.writer-bucket.outputs.bucket }}
+          lookup-only: true
+      - name: Record the writers on this push?
+        id: writer-stamp
+        if: steps.writer-bucket.outcome == 'success'
+        env:
+          HIT: ${{ steps.writer-stamp-lookup.outputs.cache-hit == 'true' }}
+        run: |
+          if [ "$HIT" = "true" ]; then
+            echo "the page-build writers were recorded in this ${{ inputs.writer-record-hours }}-hour window: not recorded again"
+            echo "record=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "record=true" >> "$GITHUB_OUTPUT"
+          fi
       - *judging-scripts
       - *pin-restore
       - *pin-record
@@ -1347,7 +1388,10 @@ jobs:
   # on it but the run's own end.
   record-writers:
     name: Record main's page-build scripts (bean fwtz)
-    if: inputs.writer-skip && github.event_name == 'push'
+    needs: [prepare-base]
+    if: >-
+      !cancelled() && inputs.writer-skip && github.event_name == 'push' &&
+      needs.prepare-base.outputs.record-writers == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
@@ -1381,6 +1425,18 @@ jobs:
       - *strace
       - *derive
       - *writer-cone-save
+      - name: Stamp this window's writer record (writer-record-hours)
+        if: steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
+        run: |
+          mkdir -p "$RUNNER_TEMP/writer-stamp"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/writer-stamp/sha"
+      - name: Keep the stamp
+        if: steps.skip-prep.outputs.hit != 'true' && hashFiles('fa/build/writer-cone/records.json') != ''
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/writer-stamp
+          key: writer-record-stamp-v1-${{ github.repository }}-${{ needs.prepare-base.outputs.writer-bucket }}
 
   # Each side is `gate-shards` jobs, on separate machines (bean lpcs, step 3).
   # The ~300 gates ran one at a time, ~2500 s a side
