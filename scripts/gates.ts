@@ -1490,6 +1490,15 @@ export interface ScriptExemption {
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   {
+    script: "check:workflow-pins",
+    kind: "report",
+    reason:
+      "RED UNTIL THE ROLLOUT (security audit S1, owner Q-SEC-4 \"B\", 2026-11-01): it judges the calling repository's own " +
+      "`.github/workflows/*`, and every layer still calls `litlfred/*@main` until its index.lock.json is re-pinned past the " +
+      "commit that adds this script and `bun run cat workflow-pins` is run there. Wiring it now would red every PR in every " +
+      "layer on refs this commit does not change; it becomes a gate in each repository's own CI once that repository is pinned",
+  },
+  {
     script: "jsonld:contexts:check",
     kind: "report",
     reason:

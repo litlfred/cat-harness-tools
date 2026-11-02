@@ -71,7 +71,8 @@ describe("the corpus: viewers are read from the harness declarations (owner, 202
     // tools directory opens its own instance's page.
     expect(resolveFor("cat-harness", "tools")).toMatch(committed("cat-harness/tools/cat-harness/index.md"));
     expect(resolveFor("smart-base", "tools")).toMatch(committed("cat-harness/tools/smart-base/index.md"));
-    expect(resolveFor("cat-harness", "processes")).toMatch(committed("cat-harness/processes/index.md"));
+    // Processes has per-instance sub-graph pages too since cat-harness#930.
+    expect(resolveFor("cat-harness", "processes")).toMatch(committed("cat-harness/processes/cat-harness/index.md"));
     // A corpus-wide visualiser with per-instance sub-graphs opens the subject's view.
     expect(resolveFor("who-iris", "library")).toMatch(committed("cat-harness/library/who-iris/index.html"));
     // A declared nested sub-graph path (`subgraphUnder`), never one inferred from the pages.

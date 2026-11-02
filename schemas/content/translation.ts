@@ -444,7 +444,7 @@ function translatedHeadings(lang: string): Map<string, string> {
 /**
  * The translated heading for a block kind in a given locale.
  * Falls back to the node's English heading, then to the kind name
- * title-cased (a contributed kind with no node here).
+ * sentence-cased with its hyphens as spaces (a contributed kind with no node here).
  */
 export function kindHeading(kind: string, locale: string): string {
   const lang = locale.split("-")[0]; // "zh-Hans" → "zh"
@@ -453,5 +453,6 @@ export function kindHeading(kind: string, locale: string): string {
     const t = translatedHeadings(lang).get(poKey(`block-kind:${kind}`, english ?? ""));
     if (t !== undefined) return t;
   }
-  return english ?? kind.charAt(0).toUpperCase() + kind.slice(1);
+  // "functional-requirement" reads "Functional requirement", not "Functional-requirement".
+  return english ?? (kind.charAt(0).toUpperCase() + kind.slice(1)).replace(/-/g, " ").replace(/\b(non|co|re|sub) /gi, "$1-");
 }

@@ -126,6 +126,7 @@ import { THEME_SEARCH_SCRIPTS, hasThemeSidebar, stripThemeSidebar, withSiteBar }
 import { beforeHeadEnd, hasRail, headEndTag } from "./lib/navbar.ts";
 import { writePageLayout } from "./page-layout.ts";
 import { renderAvatarsCss } from "./gen-avatars-css.ts";
+import { renderThemesCss } from "./gen-themes-css.ts";
 import { DOCS_SITE_BASE } from "../schemas/kg/jsonld.js";
 import { isPublished } from "../schemas/kg/url-space.js";
 import { instanceSitePath } from "./instance-exports.ts";
@@ -895,6 +896,21 @@ export const PINNED_CHROME_FILES: readonly string[] = [
 ];
 
 /**
+ * The bytes of a pinned chrome file the harness generates rather than commits,
+ * from the same renderer its writer uses; `undefined` for any other file.
+ *
+ * `themes.css` is rendered from the PLATFORM's themes only. The writer also
+ * folds in the sticky themes of the instances in the harness's own checkout,
+ * and those dress the harness's own boards; scanning for them from a site
+ * would read whatever that site happens to mount instead.
+ */
+export function generatedChromeBytes(rel: string): Buffer | undefined {
+  if (rel === "assets/css/avatars.css") return Buffer.from(renderAvatarsCss());
+  if (rel === "assets/css/themes.css") return Buffer.from(renderThemesCss());
+  return undefined;
+}
+
+/**
  * Copy {@link PINNED_CHROME_FILES} from the mounted (pinned) harness into
  * `siteAbs`. A file the site already holds with the SAME bytes is left; one
  * it holds with DIFFERENT bytes is also left, and reported — the site's own
@@ -905,9 +921,10 @@ export function pinPlatformChrome(siteAbs: string, harnessRoot: string = HARNESS
   const out = { copied: [] as string[], same: [] as string[], differing: [] as string[] };
   for (const rel of [...PINNED_CHROME_FILES, ...PINNED_DATA_FILES]) {
     const from = join(harnessRoot, siteFileFor(harnessRoot, rel));
-    // `avatars.css` is generated, not committed (`avatars:css`): a mount that
-    // has not run the writer is given its bytes from the same renderer.
-    const generated = !existsSync(from) && rel === "assets/css/avatars.css" ? Buffer.from(renderAvatarsCss()) : undefined;
+    // `avatars.css` and `themes.css` are generated, not committed
+    // (`avatars:css`, `themes:css`): a mount that has not run the writer is
+    // given its bytes from the same renderer.
+    const generated = existsSync(from) ? undefined : generatedChromeBytes(rel);
     if (!existsSync(from) && !generated) throw new Error(`pinPlatformChrome: the harness has no ${rel} (looked at ${from}) — the rail would link a file nobody shipped`);
     const bytes = generated ?? readFileSync(from);
     const to = join(siteAbs, rel);

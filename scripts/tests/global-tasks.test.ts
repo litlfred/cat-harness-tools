@@ -267,3 +267,129 @@ describe("the tools that read diagrams read the shared file too", () => {
     }
   });
 });
+
+/**
+ * A shared PROCESS that takes inputs (owner, 2026-11-01, Q-BR-5 A): the
+ * tracking watch, run by each watch with its own label. The process declares
+ * `label`; its call to a global task passes it on by `sourceRef`; each caller
+ * gives it a value, and the shared step inside reads that value.
+ */
+const SHARED_WATCH = `${HEAD}
+  <bpmn:resource id="build-pipeline" name="Build pipeline"/>
+  <bpmn:process id="P_Watch">
+    <bpmn:ioSpecification id="P_Watch_IO">
+      <bpmn:dataInput id="P_Watch_Label" name="label"/>
+      <bpmn:inputSet id="P_Watch_In"><bpmn:dataInputRefs>P_Watch_Label</bpmn:dataInputRefs></bpmn:inputSet>
+      <bpmn:outputSet id="P_Watch_Out"/>
+    </bpmn:ioSpecification>
+    <bpmn:laneSet id="LS_W"><bpmn:lane id="L_W" name="CI" partitionElementRef="build-pipeline">
+      <bpmn:flowNodeRef>S_W</bpmn:flowNodeRef><bpmn:flowNodeRef>Call_Track</bpmn:flowNodeRef><bpmn:flowNodeRef>E_W</bpmn:flowNodeRef>
+    </bpmn:lane></bpmn:laneSet>
+    <bpmn:startEvent id="S_W"/>
+    <bpmn:callActivity id="Call_Track" calledElement="GT_Track">
+      <bpmn:ioSpecification id="IO_CT">
+        <bpmn:dataInput id="In_CT" name="label"/>
+        <bpmn:inputSet id="InSet_CT"><bpmn:dataInputRefs>In_CT</bpmn:dataInputRefs></bpmn:inputSet>
+        <bpmn:outputSet id="OutSet_CT"/>
+      </bpmn:ioSpecification>
+      <bpmn:dataInputAssociation id="A_CT">
+        <bpmn:sourceRef>P_Watch_Label</bpmn:sourceRef>
+        <bpmn:targetRef>In_CT</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:callActivity>
+    <bpmn:endEvent id="E_W"/>
+    <bpmn:sequenceFlow id="FW1" sourceRef="S_W" targetRef="Call_Track"/>
+    <bpmn:sequenceFlow id="FW2" sourceRef="Call_Track" targetRef="E_W"/>
+  </bpmn:process>
+</bpmn:definitions>`;
+
+/** A watch that runs the shared process with its own label (or none). */
+function watch(id: string, label: string | undefined): string {
+  const io =
+    label === undefined
+      ? ""
+      : `
+      <bpmn:ioSpecification id="IO_${id}">
+        <bpmn:dataInput id="In_${id}" name="label"/>
+        <bpmn:inputSet id="InSet_${id}"><bpmn:dataInputRefs>In_${id}</bpmn:dataInputRefs></bpmn:inputSet>
+        <bpmn:outputSet id="OutSet_${id}"/>
+      </bpmn:ioSpecification>
+      <bpmn:dataInputAssociation id="A_${id}">
+        <bpmn:targetRef>In_${id}</bpmn:targetRef>
+        <bpmn:assignment id="As_${id}">
+          <bpmn:from xsi:type="bpmn:tFormalExpression">${label}</bpmn:from>
+          <bpmn:to xsi:type="bpmn:tFormalExpression">In_${id}</bpmn:to>
+        </bpmn:assignment>
+      </bpmn:dataInputAssociation>`;
+  return `${HEAD}
+  <bpmn:resource id="build-pipeline" name="Build pipeline"/>
+  <bpmn:process id="${id}">
+    <bpmn:laneSet id="LS_${id}"><bpmn:lane id="Lane_${id}" name="CI" partitionElementRef="build-pipeline">
+      <bpmn:flowNodeRef>S_${id}</bpmn:flowNodeRef><bpmn:flowNodeRef>Call_Watch</bpmn:flowNodeRef><bpmn:flowNodeRef>E_${id}</bpmn:flowNodeRef>
+    </bpmn:lane></bpmn:laneSet>
+    <bpmn:startEvent id="S_${id}"/>
+    <bpmn:callActivity id="Call_Watch" name="Report on the one tracking issue" calledElement="P_Watch">${io}
+    </bpmn:callActivity>
+    <bpmn:endEvent id="E_${id}"/>
+    <bpmn:sequenceFlow id="F1_${id}" sourceRef="S_${id}" targetRef="Call_Watch"/>
+    <bpmn:sequenceFlow id="F2_${id}" sourceRef="Call_Watch" targetRef="E_${id}"/>
+  </bpmn:process>
+</bpmn:definitions>`;
+}
+
+describe("a process may take inputs, as a global task does", () => {
+  test("each call binds the shared process's input, and the step inside reads the caller's value", async () => {
+    const dir = fixture({ "global-tasks.bpmn": GLOBALS, "watch.bpmn": SHARED_WATCH, "a.bpmn": watch("P_A", "ci-health"), "b.bpmn": watch("P_B", "repo-health") });
+    try {
+      for (const [file, label] of [["a.bpmn", "ci-health"], ["b.bpmn", "repo-health"]] as const) {
+        const m = await loadProcessModel(join(dir, file));
+        expect(m.nodes.get("Call_Watch")!.inputs).toEqual({ label });
+        const child = m.children.get("Call_Watch")!;
+        expect(child.inputs).toEqual(["label"]);
+        expect(child.nodes.get("Call_Track")!.inputs).toEqual({ label });
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("loaded on its own, the shared process names the input it passes on", async () => {
+    const dir = fixture({ "global-tasks.bpmn": GLOBALS, "watch.bpmn": SHARED_WATCH });
+    try {
+      const m = await loadProcessModel(join(dir, "watch.bpmn"));
+      expect(m.inputs).toEqual(["label"]);
+      expect(m.nodes.get("Call_Track")!.inputs).toEqual({ label: "{label}" });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a call that gives a declared process input no value refuses the load", async () => {
+    const dir = fixture({ "global-tasks.bpmn": GLOBALS, "watch.bpmn": SHARED_WATCH, "a.bpmn": watch("P_A", undefined) });
+    try {
+      await expect(loadProcessModel(join(dir, "a.bpmn"))).rejects.toThrow(/calls process P_Watch, which declares input\(s\) label, and gives none of them a value/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("passing on an input the process does not declare refuses the load", async () => {
+    const bad = SHARED_WATCH.replace("<bpmn:sourceRef>P_Watch_Label</bpmn:sourceRef>", "<bpmn:sourceRef>In_CT</bpmn:sourceRef>");
+    const dir = fixture({ "global-tasks.bpmn": GLOBALS, "watch.bpmn": bad });
+    try {
+      await expect(loadProcessModel(join(dir, "watch.bpmn"))).rejects.toThrow(/passes on In_CT, which is not an input this process declares/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+test("a checklist names the values a call gives a shared process", async () => {
+  const dir = fixture({ "global-tasks.bpmn": GLOBALS, "watch.bpmn": SHARED_WATCH, "a.bpmn": watch("P_A", "ci-health") });
+  try {
+    const md = checklistFor(await loadProcessModel(join(dir, "a.bpmn")), "a.bpmn");
+    expect(md).toContain("- A subprocess (`P_Watch`, with `label` = `ci-health`)");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
