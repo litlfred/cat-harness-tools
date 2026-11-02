@@ -97,7 +97,10 @@ export function pathsFilters(yaml: string): string[][] {
 export function invokedScripts(yaml: string, root: string): string[] {
   const out = new Set<string>();
   for (const m of yaml.matchAll(/([A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)+\.(?:ts|sh))/g)) {
-    const p = m[1]!;
+    // `./x/y.ts` and `x/y.ts` name the same file; a `paths:` pattern never
+    // starts with `./`, so the prefix would leave it matching nothing
+    // (feature-staging.yml imports two scripts as `./cat-harness-tools/...`).
+    const p = m[1]!.replace(/^(\.\/)+/, "");
     if (p.startsWith(".github/")) continue; // the workflow's own file
     if (existsSync(join(root, p))) out.add(p);
   }
