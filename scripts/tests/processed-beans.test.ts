@@ -89,6 +89,30 @@ describe("processedBeansRows", () => {
   });
 });
 
+describe("links", () => {
+  test("beans link to their source, processes to their page and steps to its steps section", () => {
+    const [r] = processedBeansRows({
+      instances: [instance("i1", { bean: "fa-aaaa", tokens: ["Task_1"] })],
+      beans: [bean("fa-aaaa", "todo")],
+      now: NOW,
+      diagrams: new Map([["i1", diagram]]),
+      drawingFor: () => undefined,
+      instanceHref: (id) => `workflows/${id}/`,
+      beanSource: (b) => `https://github.com/o/r/blob/cat/cat-harness/beans/${b.file}`,
+      processPageFor: () => "../../processes/a.html",
+    });
+    expect(r.beans[0]!.source).toBe("https://github.com/o/r/blob/cat/cat-harness/beans/beans/defs/fa-aaaa.md");
+    expect(r.processPage).toBe("../../processes/a.html");
+    const [deeper] = rebase([r], "../");
+    expect(deeper.processPage).toBe("../../../processes/a.html");
+    expect(deeper.beans[0]!.source).toBe(r.beans[0]!.source);
+    const html = processedBeansBody("s", [deeper], NOW, "../");
+    expect(html).toContain("#steps");
+    expect(html).toContain(">source</a>");
+    expect(html).toContain("process page");
+  });
+});
+
 describe("routes are path IRIs", () => {
   test("only URL-segment ids get a page", () => {
     const out = rows([instance("i1", { bean: "fa-aaaa", processId: "Process_A" }), instance("i2", { bean: "bad id", processId: "Process B" })], []);

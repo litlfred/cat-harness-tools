@@ -47,6 +47,8 @@ export interface ProcessedBean {
   title?: string;
   status?: string;
   updatedAt?: string;
+  /** The bean's source file on the forge, on the branch that keeps it. */
+  source?: string;
 }
 
 /** One instance, joined with its beans and its diagram. */
@@ -58,6 +60,10 @@ export interface ProcessedRow {
   source: string;
   /** The published SVG, relative to the page, when one is published. */
   drawing?: string;
+  /** The processes viewer's page for this diagram, relative to the page. */
+  processPage?: string;
+  /** The `.bpmn` file on the forge. */
+  sourceHref?: string;
   status: string;
   /** Completed, or every token rests on an end event, or no token at all and completed. */
   finished: boolean;
@@ -83,6 +89,12 @@ export interface ProcessedBeansInput {
   diagrams: ReadonlyMap<string, { nodes: ReadonlySet<string>; ends: ReadonlySet<string> }>;
   drawingFor: (source: string) => string | undefined;
   instanceHref: (id: string) => string | undefined;
+  /** A bean's source file on the forge. */
+  beanSource?: (b: BeanNode) => string | undefined;
+  /** The processes viewer's page for a `.bpmn` path. */
+  processPageFor?: (source: string) => string | undefined;
+  /** A `.bpmn` path's file on the forge. */
+  sourceHrefFor?: (source: string) => string | undefined;
 }
 
 /** The projection both pages embed. Pure: the same input gives the same rows. */
@@ -97,7 +109,9 @@ export function processedBeansRows(input: ProcessedBeansInput): ProcessedRow[] {
       const ids = [...new Set([...(s.bean ? [s.bean] : []), ...(s.carriedBeans ?? [])])];
       const beans = ids.map((id): ProcessedBean => {
         const b = byId.get(id);
-        return b ? { id, found: true, title: b.title, status: b.status, updatedAt: b.updatedAt } : { id, found: false };
+        if (!b) return { id, found: false };
+        const source = input.beanSource?.(b);
+        return { id, found: true, title: b.title, status: b.status, updatedAt: b.updatedAt, ...(source ? { source } : {}) };
       });
       const missingNodes = diagram ? s.tokens.filter((t) => !diagram.nodes.has(t)) : [];
       const stuck = [...new Set(stuckStatesOf(s, input.beans, input.now, ends).map((x) => x.kind as string))];
@@ -109,12 +123,16 @@ export function processedBeansRows(input: ProcessedBeansInput): ProcessedRow[] {
       const done = [...new Set((s.history ?? []).map((h) => h.node).filter((n): n is string => typeof n === "string" && !tokens.has(n)))];
       const drawing = s.source ? input.drawingFor(s.source) : undefined;
       const href = input.instanceHref(s.id);
+      const processPage = s.source ? input.processPageFor?.(s.source) : undefined;
+      const sourceHref = s.source ? input.sourceHrefFor?.(s.source) : undefined;
       return {
         instance: s.id,
         ...(href ? { href } : {}),
         process: s.processId,
         source: s.source ?? "",
         ...(drawing ? { drawing } : {}),
+        ...(processPage ? { processPage } : {}),
+        ...(sourceHref ? { sourceHref } : {}),
         status: s.status ?? "",
         finished,
         tokens: [...s.tokens],
@@ -241,11 +259,24 @@ const PB_SCRIPT = String.raw`<script>
     return r.beans.map(function (b) {
       var h = beanHref(b.id);
       return (h ? '<a href="' + esc(h) + '"><code>' + esc(b.id) + "</code></a> " : "<code>" + esc(b.id) + "</code> ") +
-        (b.found ? esc(b.title) + ' <span class="pb-chip">' + esc(b.status) + "</span>" : '<span class="pb-chip is-broken">not in this store</span>');
+        (b.found ? esc(b.title) + ' <span class="pb-chip">' + esc(b.status) + "</span>" + (b.source ? ' <a href="' + esc(b.source) + '">source</a>' : "") : '<span class="pb-chip is-broken">not in this store</span>');
     }).join("<br>") || "none named";
   }
   function stuckCell(r) {
     return r.stuck.map(function (k) { return '<span class="pb-chip ' + (k === "enabled-not-taken" ? "is-stalled" : "is-broken") + '">' + esc(k) + "</span>"; }).join(" ") || "none found";
+  }
+  function stepCell(r) {
+    return r.tokens.map(function (t) {
+      return r.processPage ? '<a href="' + esc(r.processPage) + '#steps"><code>' + esc(t) + "</code></a>" : "<code>" + esc(t) + "</code>";
+    }).join(", ") || "no step";
+  }
+  function procLinks(r) {
+    return (r.processPage ? ' · <a href="' + esc(r.processPage) + '">process page</a>' : "") +
+      (r.sourceHref ? ' · <a href="' + esc(r.sourceHref) + '">BPMN source</a>' : "");
+  }
+  function procName(proc) {
+    var ph = procHref(proc);
+    return ph ? '<a href="' + esc(ph) + '"><code>' + esc(proc) + "</code></a>" : "<code>" + esc(proc) + "</code>";
   }
   function moved(r) { return r.lastMoved ? esc(r.lastMoved.slice(0, 10)) + " (" + r.ageDays + " days)" : "unknown"; }
 
@@ -283,8 +314,7 @@ const PB_SCRIPT = String.raw`<script>
         var withDrawing = its.filter(function (r) { return r.drawing; })[0];
         var card = document.createElement("section");
         card.className = "pb-card";
-        var ph = procHref(proc);
-        card.innerHTML = "<h2>" + (ph && ROWS.some(function (r) { return r.process !== proc; }) ? '<a href="' + esc(ph) + '">' + esc(proc) + "</a>" : esc(proc)) + '</h2><p class="sv-sub"><code>' + esc(its[0].source) + "</code> · " +
+        card.innerHTML = "<h2>" + procName(proc) + '</h2><p class="sv-sub"><code>' + esc(its[0].source) + "</code>" + procLinks(its[0]) + " · " +
           its.filter(function (r) { return !r.finished; }).length + " running, " + its.filter(function (r) { return r.finished; }).length +
           " finished. A badge counts the beans waiting at a step; select it to filter the table.</p>" +
           (withDrawing ? '<div class="pb-diagram"><p class="sv-sub">The drawing loads when this card scrolls into view.</p></div>' : '<p class="sv-sub">No drawing of this process is published, so the positions are in the table only.</p>') +
@@ -297,8 +327,7 @@ const PB_SCRIPT = String.raw`<script>
       });
       rows.sort(function (a, b) { return String(a[sortKey] == null ? "" : a[sortKey]).localeCompare(String(b[sortKey] == null ? "" : b[sortKey])) * sortDir; });
       $("pb-tbody").innerHTML = rows.map(function (r) {
-        return "<tr><td>" + beanCell(r) + "</td><td><code>" + esc(r.process) + "</code></td><td>" +
-          (r.tokens.map(function (t) { return "<code>" + esc(t) + "</code>"; }).join(", ") || "no step") + "</td><td>" +
+        return "<tr><td>" + beanCell(r) + "</td><td>" + procName(r.process) + "</td><td>" + stepCell(r) + "</td><td>" +
           (r.href ? '<a href="' + esc(r.href) + '">' + esc(r.instance) + "</a>" : esc(r.instance)) + " · " + (r.finished ? "finished" : "running") +
           "</td><td>" + moved(r) + "</td><td>" + stuckCell(r) + "</td></tr>";
       }).join("") || '<tr><td colspan="6">No instance matches these filters.</td></tr>';
@@ -314,12 +343,11 @@ const PB_SCRIPT = String.raw`<script>
       var its = ROWS.filter(function (r) { return r.beans.some(function (b) { return b.id === id; }); });
       var b = its.length ? its[0].beans.filter(function (x) { return x.id === id; })[0] : null;
       var out = $("pb-one");
-      out.innerHTML = (b ? '<section class="pb-card"><h2><code>' + esc(id) + "</code></h2><p>" + (b.found ? esc(b.title) + ' <span class="pb-chip">' + esc(b.status) + "</span> · updated " + esc((b.updatedAt || "").slice(0, 10)) : '<span class="pb-chip is-broken">not in this store</span>') +
+      out.innerHTML = (b ? '<section class="pb-card"><h2><code>' + esc(id) + "</code></h2><p>" + (b.found ? esc(b.title) + ' <span class="pb-chip">' + esc(b.status) + "</span> · updated " + esc((b.updatedAt || "").slice(0, 10)) + (b.source ? ' · <a href="' + esc(b.source) + '">source</a>' : "") : '<span class="pb-chip is-broken">not in this store</span>') +
         '</p><p class="sv-sub">Named by ' + its.length + " workflow instance(s). Solid outline: where the token is; dashed: steps already in the history.</p></section>" : "") +
         its.map(function (r, i) {
-          var ph = procHref(r.process);
-          return '<section class="pb-card"><h2>' + (ph ? '<a href="' + esc(ph) + '"><code>' + esc(r.process) + "</code></a>" : "<code>" + esc(r.process) + "</code>") + "</h2><p>" + (r.href ? '<a href="' + esc(r.href) + '">' + esc(r.instance) + "</a>" : esc(r.instance)) +
-            " · " + (r.finished ? "finished" : "running") + " · last moved " + moved(r) + " · " + stuckCell(r) + "</p>" +
+          return '<section class="pb-card"><h2>' + procName(r.process) + "</h2><p>" + (r.href ? '<a href="' + esc(r.href) + '">' + esc(r.instance) + "</a>" : esc(r.instance)) +
+            " · " + (r.finished ? "finished" : "running") + " · token at " + stepCell(r) + " · last moved " + moved(r) + procLinks(r) + "</p><p>" + stuckCell(r) + "</p>" +
             (r.drawing ? '<div class="pb-diagram" id="pb-d' + i + '"></div>' : '<p class="sv-sub">No drawing of this process is published.</p>') +
             (r.missingNodes.length ? '<p class="sv-sub"><strong>node-missing</strong>: ' + r.missingNodes.map(function (n) { return "<code>" + esc(n) + "</code>"; }).join(", ") + " is not in the current diagram.</p>" : "") +
             "</section>";
@@ -416,5 +444,10 @@ export function processedBeanBody(store: string, bean: string, rows: readonly Pr
 /** Rows with every page-relative href re-anchored one or more levels deeper. */
 export function rebase(rows: readonly ProcessedRow[], prefix: string): ProcessedRow[] {
   const at = (h?: string) => (h === undefined || /^[a-z]+:|^\//.test(h) ? h : prefix + h);
-  return rows.map((r) => ({ ...r, ...(r.href ? { href: at(r.href) } : {}), ...(r.drawing ? { drawing: at(r.drawing) } : {}) }));
+  return rows.map((r) => ({
+    ...r,
+    ...(r.href ? { href: at(r.href) } : {}),
+    ...(r.drawing ? { drawing: at(r.drawing) } : {}),
+    ...(r.processPage ? { processPage: at(r.processPage) } : {}),
+  }));
 }
