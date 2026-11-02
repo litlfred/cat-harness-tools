@@ -777,16 +777,10 @@ const EXEMPTIONS: readonly ReferenceExemption[] = [
  * left the same day: nothing in it names a layer above any more. The six
  * fhir-harness entries left on 2026-10-20: fhir-harness#118 moved its module
  * paths under `pipeline/`, and none of the six names a layer above any more.
+ * Core's `figure-rebuild.md` skill left on 2026-11-02: folio-assistant-core#569
+ * says "the L1 library entry" and "the FHIR layer" instead of naming them.
  */
-const PENDING: readonly { file: string; names: number }[] = [
-  // declared-path-literal: a FINDING's location, recorded repo-root-relative because that is
-  // what `analyse` reports. No declaration can answer where a finding is, and this one does not
-  // resolve from THIS instance's root because the file is in another instance — which is the
-  // very fact the entry records.
-  // A skill naming who-iris (where figure data lives) and smart-base (the L2 it serves); no single
-  // destination, so it waits here for the owner's ruling (litlfred/cat-harness-tools#1299).
-  { file: "folio-assistant-core/skills/library/ingestion/figure-rebuild.md", names: 2 },
-];
+const PENDING: readonly { file: string; names: number }[] = [];
 
 /**
  * X1 — a TRANSLATION MIRROR (owner, Q-B 2026-10-01: "exempt translation
