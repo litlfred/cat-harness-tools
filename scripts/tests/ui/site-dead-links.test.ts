@@ -158,18 +158,18 @@ describe("in a preview, a page of an instance the preview does not carry goes to
 
   it("repoints only when the instance's composed directory holds the page's source", () => {
     const composed = site({ "concepts/who.md": "# who" });
-    const instances = new Map([["smart-base", [composed]]]);
-    expect(publishedFor("smart-base/concepts/who.html", "/folio-assistant", instances)).toBe("/folio-assistant/smart-base/concepts/who.html");
-    expect(publishedFor("smart-base/concepts/nobody-wrote-this.html", "/folio-assistant", instances)).toBeUndefined();
+    const instances = new Map([["an-ig", [composed]]]);
+    expect(publishedFor("an-ig/concepts/who.html", "/folio-assistant", instances)).toBe("/folio-assistant/an-ig/concepts/who.html");
+    expect(publishedFor("an-ig/concepts/nobody-wrote-this.html", "/folio-assistant", instances)).toBeUndefined();
     expect(publishedFor("other/concepts/who.html", "/folio-assistant", instances)).toBeUndefined();
   });
 
   it("checkSite takes the rule only when it is given one, so a canonical build still reports", () => {
     const composed = site({ "guides/dak.md": "# dak" });
-    const instances = new Map([["smart-base", [composed]]]);
-    const files = { "en/p/x.html": '<a href="../../smart-base/guides/dak.html#a">dak</a>' };
+    const instances = new Map([["an-ig", [composed]]]);
+    const files = { "en/p/x.html": '<a href="../../an-ig/guides/dak.html#a">dak</a>' };
     const canonical = checkSite({ site: site(files), basePath: "", fix: true, resolveSource: () => undefined });
-    expect(canonical.dead.map((d) => d.target)).toEqual(["smart-base/guides/dak.html"]);
+    expect(canonical.dead.map((d) => d.target)).toEqual(["an-ig/guides/dak.html"]);
     const root = site(files);
     const preview = checkSite({
       site: root,
@@ -179,7 +179,7 @@ describe("in a preview, a page of an instance the preview does not carry goes to
       resolvePublished: (t) => publishedFor(t, "/folio-assistant", instances),
     });
     expect(preview.dead).toEqual([]);
-    expect(preview.repointed.map((r) => [r.to, r.why])).toEqual([["/folio-assistant/smart-base/guides/dak.html#a", "published"]]);
-    expect(readFileSync(join(root, "en/p/x.html"), "utf-8")).toContain('href="/folio-assistant/smart-base/guides/dak.html#a"');
+    expect(preview.repointed.map((r) => [r.to, r.why])).toEqual([["/folio-assistant/an-ig/guides/dak.html#a", "published"]]);
+    expect(readFileSync(join(root, "en/p/x.html"), "utf-8")).toContain('href="/folio-assistant/an-ig/guides/dak.html#a"');
   });
 });
