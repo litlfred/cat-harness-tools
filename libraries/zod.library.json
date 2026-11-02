@@ -119,6 +119,7 @@
     "schemas/sdlc/bean-note.ts",
     "schemas/sdlc/binary-release.ts",
     "schemas/sdlc/change-size.ts",
+    "schemas/sdlc/gates-report.ts",
     "schemas/sdlc/harness-state.ts",
     "schemas/sdlc/health-report.ts",
     "schemas/sdlc/kg-qa.ts",
