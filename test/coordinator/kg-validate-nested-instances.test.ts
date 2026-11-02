@@ -165,11 +165,18 @@ describe("kg:validate over nested instances (bean `676g`)", () => {
     // Since bean `7mwa` the core no longer commits test/results/ either, so the
     // sidecar is read where the sweep below reads it: on disk, or from the
     // qa-reports store.
-    const NESTED = "folio-assistant-core";
-    const nested = join(REPO, NESTED, "test/results/kg-qa/scenarios/kg.kg-qa.json");
+    //
+    // Chosen, not named (2026-11-02, folio-assistant#2781): the core's
+    // sidecar left the qa-reports store, and a named path breaks each time
+    // one does. Any kg-audit sidecar of a nested instance other than the
+    // auditor serves, so the first one the sweep finds is taken.
     const { byInstance, storeState } = sidecarsByInstance();
-    const found = (byInstance.get(NESTED) ?? []).find((f) => resolve(f.path) === resolve(nested));
-    expect(found, `fixture sidecar moved — pick another nested one (qa-reports store: ${storeState})`).toBeDefined();
+    const candidates = [...byInstance.entries()]
+      .filter(([instance]) => instance !== "cat-harness")
+      .flatMap(([instance, files]) => files.filter((f) => f.path.endsWith(".kg-qa.json")).map((f) => ({ instance, f })));
+    expect(candidates.length, `no nested kg-audit sidecar to falsify with (qa-reports store: ${storeState})`).toBeGreaterThan(0);
+    const { instance: NESTED, f: found } = candidates[0]!;
+    const nested = resolve(found.path);
     const check = (root: string, schemaRoot?: string) =>
       found!.text === undefined ? validatePath(nested, root, schemaRoot) : validateText(nested, found!.text, root, schemaRoot);
     expect((await check(HARNESS)).state).toBe("undetermined");
