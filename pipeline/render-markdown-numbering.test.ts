@@ -71,3 +71,36 @@ describe("the numbered-block frame", () => {
     expect(md).not.toContain("fa-numbered");
   });
 });
+
+describe("structured blocks: a light card", () => {
+  const fr = {
+    block: { kind: "functional-requirement", label: "freq:FR-AN-01", title: "Standard reports and dashboards on stock…", meta: { requirementId: "FR-AN-01" } } as unknown as Block,
+    mdContent: "**FR-AN-01.** Standard reports and dashboards on stock and status.\n\n*Priority:* to be set. *Linked use cases:* to be traced.\n",
+  };
+  test("kind label, id chip and the body on one line; the id and the cut title are said once", () => {
+    const md = renderBlockMarkdown(fr);
+    expect(md.startsWith('<div class="fa-block fa-block-functional-requirement" markdown="1">\n\n')).toBe(true);
+    expect(md).toContain('<span class="fa-block-kind">Functional requirement</span> <span class="fa-block-id">FR-AN-01</span> Standard reports and dashboards on stock and status.');
+    expect(md).not.toContain("**FR-AN-01.**");
+    expect(md).not.toContain("stock…");
+  });
+  test("trailing *Label:* lines become the metadata row", () => {
+    expect(renderBlockMarkdown(fr)).toContain('<div class="fa-block-meta" markdown="1">\n\n*Priority:* to be set. *Linked use cases:* to be traced.\n\n</div>');
+  });
+  test("an id with a title in its bold lead keeps the title", () => {
+    const md = renderBlockMarkdown({
+      block: { kind: "non-functional-requirement", label: "nfreq:NFR-01", title: "Security", meta: { requirementId: "NFR-01" } } as unknown as Block,
+      mdContent: "**NFR-01 Security.** Data are protected.",
+    });
+    expect(md).toContain('<span class="fa-block-kind">Non-functional requirement</span> <span class="fa-block-id">NFR-01</span> **Security.** Data are protected.');
+  });
+  test("a list body keeps the heading on its own line, and the text is otherwise unchanged", () => {
+    const body = "- One.\n- Two.\n\n```\na\n\n\nb\n```";
+    const md = renderBlockMarkdown({ block: { kind: "user-scenario", label: "scen:x", title: "X" } as unknown as Block, mdContent: body });
+    expect(md).toContain('<span class="fa-block-kind">User scenario</span> **X.**\n\n' + body);
+  });
+  test("prose and numbered kinds are not cards", () => {
+    expect(renderBlockMarkdown({ block: { kind: "prose", label: "p:x" } as unknown as Block, mdContent: "Text." })).not.toContain("fa-block");
+    expect(renderBlockMarkdown(fig("Fig. 1. X"))).not.toContain("fa-block ");
+  });
+});

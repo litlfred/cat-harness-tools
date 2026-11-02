@@ -66,7 +66,8 @@ describe("block kinds are discovered, not listed", () => {
     expect(kindHeading("figure", "es")).toBe("Figura"); // had no row before; diagram's rendering
     expect(kindHeading("prose", "ru")).toBe(""); // shown with no heading, in every locale
     expect(kindHeading("lemma", "xx")).toBe("Lemma"); // no catalogue: the node's English
-    expect(kindHeading("decision-table", "fr")).toBe("Decision-table"); // no node here: title-cased
+    expect(kindHeading("decision-table", "fr")).toBe("Decision table"); // no node here: sentence-cased
+    expect(kindHeading("non-functional-requirement", "en")).toBe("Non-functional requirement"); // a "non-" prefix keeps its hyphen
   });
 
   test("a kind declared by two files is refused, naming both", () => {
