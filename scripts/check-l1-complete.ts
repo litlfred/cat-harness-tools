@@ -280,6 +280,10 @@ export const ENTRY_SIDECARS: readonly string[] = [
   // names the source it was read from by sha256, like every sidecar here.
   "docx-structure.json",
   "pdf-line-map.json",
+  // Stage B's proposals (`extract-candidates.py`, schema ingest-candidates/v1),
+  // which gen-library-jsonld turns into typed blocks: requirements, indicators
+  // and normative statements in a DAK or DTH source (cat-harness-tools#1356).
+  "candidates.json",
 ];
 
 /**

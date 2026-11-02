@@ -24,6 +24,7 @@ import {
   sectionKey,
   blockId,
   candidateMeta,
+  candidateTypes,
   ingestRungOf,
   RUNG_INPUT,
   buildEntryNodes,
@@ -693,5 +694,15 @@ describe("a requirement candidate (L1 requirement ingestion, 2026-11-01)", () =>
     expect(node.derivedFrom).toBe("library/0110001v3/sections/sec-000");
     expect(node.meta).toEqual({ source_number: "R1", strength: "should" });
     expect(parse("blocks/rem-sec-000-01.jsonld").meta).toBeUndefined();
+  });
+});
+
+describe("a candidate's @type (cat-harness-tools#1356)", () => {
+  test("a kind no mounted layer types is still a typed library block, never untyped", () => {
+    // No layer in this checkout contributes this kind.
+    expect(candidateTypes("no-such-kind-anywhere")).toEqual(["cat-harness:Block"]);
+    // A core kind keeps its own pair.
+    expect(candidateTypes("theorem").length).toBeGreaterThan(0);
+    expect(candidateTypes("theorem")).not.toContain("cat-harness:Block");
   });
 });

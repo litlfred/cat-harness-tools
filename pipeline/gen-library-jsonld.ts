@@ -502,7 +502,7 @@ export function buildDocumentNodes(
           // A dependency's kind (smart-base's `functional-requirement`,
           // `indicator`) is typed through the contribution registry; without
           // it such a node had no `@type` at all.
-          "@type": typesForKind(c.kind, contributedKinds()),
+          "@type": candidateTypes(c.kind),
           kind: c.kind,
           title: c.name ?? undefined,
           pageStart: sec.page_start ?? undefined,
@@ -659,6 +659,17 @@ function contributedKinds(): ContributionRegistry | undefined {
     }
   }
   return contributions ?? undefined;
+}
+
+/**
+ * A candidate's `@type`: its kind's, through the contribution registry, or the
+ * generic library block class when no mounted layer types the kind. An
+ * L1 library (who-iris) may hold a smart-base `indicator` without mounting
+ * smart-base; its node is then still a typed block, never one with no type.
+ */
+export function candidateTypes(kind: string): string[] {
+  const types = typesForKind(kind, contributedKinds());
+  return types.length ? types : [termCurie("Block")];
 }
 
 /**
