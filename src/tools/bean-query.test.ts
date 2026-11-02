@@ -28,4 +28,15 @@ describe("bean-query MCP tool", () => {
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed.length).toBeGreaterThan(0);
   });
+
+  test("returns the rows as structuredContent in every format", async () => {
+    const server = new McpServer({ name: "test-server", version: "1.0.0" });
+    registerBeanQueryTool(server, resolve("."));
+    const serverObj = server as unknown as { _registeredTools: Record<string, { handler: (args: unknown) => Promise<{ content: Array<{ type: string; text: string }>; structuredContent?: { rows: Array<Record<string, string>> } }> }> };
+    const tool = serverObj._registeredTools["bean_query"];
+    const json = await tool.handler({ named: "safe_drain_candidates", format: "json" });
+    const table = await tool.handler({ named: "safe_drain_candidates", format: "table" });
+    expect(json.structuredContent?.rows).toEqual(JSON.parse(json.content[0].text));
+    expect(table.structuredContent?.rows).toEqual(json.structuredContent?.rows);
+  });
 });
