@@ -40,6 +40,12 @@
  * periodic sweep (`beans archive`) cannot: the sweep stays the floor, the op is
  * the exception (`todo-manager` § Archiving).
  *
+ * Since 2026-11-02 (Q-BR-8 F) a step may also say it works the bean with a
+ * standard data output association to the Beans store (`work-plan`) instead
+ * of `op="note"`. That step is where an agent takes the bean up, so it claims
+ * a `todo` bean before noting (`claimIfNotStarted`); OPEN and CLOSE still
+ * decide whose bean it is and how it ends.
+ *
  * Only ever `state.bean` — the bean whoever started the instance nominated.
  * This never touches a bean it was not handed.
  *
@@ -57,6 +63,9 @@ import type { ProcessModel } from "./process-model.js";
 export type WorkPlanOp = "claim" | "note" | "resolve" | "archive";
 
 export const WORK_PLAN_OPS = new Set<string>(["claim", "note", "resolve", "archive"]);
+
+/** The status a step that works the bean may claim from (Q-BR-8 F). A draft is not work yet. */
+const NOT_STARTED = new Set(["todo"]);
 
 /** The statuses `check:bean-archive` allows in the archive. */
 const TERMINAL = new Set(["completed", "scrapped"]);
@@ -189,7 +198,7 @@ export function applyWorkPlanOp(
   repoRoot: string,
   beanId: string | undefined,
   op: WorkPlanOp,
-  opts: { note?: string; instanceCompleted?: boolean } = {},
+  opts: { note?: string; instanceCompleted?: boolean; claimIfNotStarted?: boolean } = {},
 ): WorkPlanResult {
   if (!beanId) {
     return { summary: `no bean on this instance, so the ${op} step recorded nothing in beans/` };
@@ -204,6 +213,13 @@ export function applyWorkPlanOp(
   if (op === "archive") return archiveBean(bean, note, opts.instanceCompleted === true);
 
   if (op === "note" || (op === "resolve" && !opts.instanceCompleted)) {
+    // A step drawn against the Beans store is where an agent takes the bean
+    // up (Q-BR-8 F), so a bean nobody has started is claimed there. Never a
+    // bean that is already in progress or finished: only NOT_STARTED moves.
+    const claimed = op === "note" && opts.claimIfNotStarted === true && NOT_STARTED.has(bean.status);
+    if (claimed && cli(repoRoot, ["update", beanId, "-s", "in-progress"]) === undefined) {
+      setStatusInFile(bean, "in-progress");
+    }
     const text = note ?? `Workflow step reached (${op}).`;
     if (cli(repoRoot, ["update", beanId, "--body-append", text]) === undefined) {
       appendToFile(bean, text);
@@ -211,7 +227,9 @@ export function applyWorkPlanOp(
     return {
       summary:
         op === "note"
-          ? `noted on bean ${beanId}`
+          ? claimed
+            ? `bean ${beanId}: ${bean.status} → in-progress, and noted`
+            : `noted on bean ${beanId}`
           : `bean ${beanId} left ${bean.status}: the process it tracks is still running, ` +
             `so whether the work is done is not settled — noted instead of resolved`,
       bean,
