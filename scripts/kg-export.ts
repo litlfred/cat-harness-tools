@@ -2880,6 +2880,13 @@ export interface ExportOptions {
    * collectors in its own scope already.
    */
   scope?: CorpusScope;
+  /**
+   * Whether to ask git for the document-level source provenance (`sourceCommit*`,
+   * `sourceTreeDirty`). Defaults to `true`. A caller that reads only `@graph`
+   * (`gen-slice-sqlite`, `gen-subgraph-jsonld`) passes `false` so it neither
+   * runs `git status` nor records `HEAD` as an input.
+   */
+  provenance?: boolean;
 }
 
 /** Filename stem and document IRI for this instance's published graph. */
@@ -3420,7 +3427,7 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
   // developer's machine. Putting it there would make `problems: []` fail on
   // every local run and train the reader to ignore the field that exists to
   // report real failures.
-  const src = readSourceProvenance();
+  const src: SourceProvenance = opts.provenance === false ? {} : readSourceProvenance();
   const commitFields = {
     ...(src.unavailable ? { sourceCommitUnavailable: src.unavailable } : {}),
     ...(src.iri ? { sourceCommit: src.iri } : {}),
