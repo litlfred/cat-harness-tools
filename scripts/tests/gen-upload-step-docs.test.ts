@@ -31,8 +31,8 @@ import { defineTool, type ToolDefinition } from "../../schemas/tools/tool.ts";
 
 const NS = [
   'xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"',
-  'xmlns:bootstrap.processes="https://litlfred.github.io/bootstrap/v0/processes/ns#"',
-  'xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/v0/processes/ns#"',
+  'xmlns:bootstrap.processes="https://litlfred.github.io/bootstrap/v0/processes/ns/"',
+  'xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/v0/processes/ns/"',
 ].join(" ");
 
 /** A one-lane diagram whose start event reaches `body`. Written, then loaded. */

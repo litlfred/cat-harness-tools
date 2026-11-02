@@ -14,6 +14,7 @@ import {
   formatTable,
   NAMED_QUERIES
 } from "../../scripts/beans-query.ts";
+import { BeanQueryRowsSchema } from "../../schemas/tools/store-tool-results.ts";
 
 export function registerBeanQueryTool(server: McpServer, repoRoot: string): void {
   server.tool(
@@ -83,13 +84,17 @@ export function registerBeanQueryTool(server: McpServer, repoRoot: string): void
           ].join("\n");
         }
 
+        // The rows as data too (cat-harness-tools#1259, group 1): a caller
+        // checks `structuredContent.rows` against `BeanQueryRows` whatever
+        // text format it asked for.
         return {
           content: [
             {
               type: "text" as const,
               text: output
             }
-          ]
+          ],
+          structuredContent: { rows: BeanQueryRowsSchema.parse(results) }
         };
       } catch (err: unknown) {
         return {

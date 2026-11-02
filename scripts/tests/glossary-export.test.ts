@@ -34,7 +34,6 @@ import {
   LEDGER_SCHEMA,
   buildGlossary,
   glossaryIri,
-  legacyGlossaryDocuments,
   liveLedgerEntry,
   readLanes,
   type Ledger,
@@ -67,7 +66,7 @@ const graphOf = (doc: Record<string, unknown>): Node[] => doc["@graph"] as Node[
 const concepts = (doc: Record<string, unknown>): Node[] =>
   graphOf(doc).filter((n) => n["@type"] === "skos:Concept");
 const usages = (doc: Record<string, unknown>): Node[] =>
-  graphOf(doc).filter((n) => typeof n["@type"] === "string" && String(n["@type"]).endsWith("#LaneUsage"));
+  graphOf(doc).filter((n) => typeof n["@type"] === "string" && String(n["@type"]).endsWith("/LaneUsage"));
 
 describe("the corpus it is actually run against", () => {
   const { doc, report } = buildGlossary({ today: () => "2026-09-21" });
@@ -340,33 +339,14 @@ describe("glossaryIri", () => {
 });
 
 // #603 decision 1b (owner, 2026-10-23): the host's glossary moved under
-// `<site>/<name>/` with its graph document. The old root address forwards.
-describe("the host glossary's old root address", () => {
+// `<site>/<name>/` with its graph document. Clean break (owner, 2026-11-02,
+// cat-harness-tools#1378): nothing is written at the old root address.
+describe("the host glossary's address", () => {
   const BASE = "https://x.test/site";
-  test("forwards the document and each lane usage, for one release", () => {
+  test("is beside its graph document, and holds no forwarding node", () => {
     const { doc } = buildGlossary({ baseUrl: BASE });
     expect(String(doc["@id"])).toBe(`${BASE}/cat-harness/cat-harness-glossary.jsonld`);
-    const site = mkdtempSync(join(tmpdir(), "glossary-legacy-"));
-    try {
-      const moved = legacyGlossaryDocuments(doc, join(site, "cat-harness", "cat-harness-glossary.jsonld"), undefined, BASE)!;
-      expect(moved.oldIri).toBe(`${BASE}/cat-harness-glossary.jsonld`);
-      const old = JSON.parse(readFileSync(join(site, "cat-harness-glossary.jsonld"), "utf-8")) as Record<string, unknown>;
-      expect([old["@id"], old.deprecated, old.isReplacedBy, old.sameAs]).toEqual([moved.oldIri, true, doc["@id"], doc["@id"]]);
-      const us = usages(doc);
-      expect(us.length).toBeGreaterThan(0);
-      expect(moved.count).toBe(us.length);
-      const stones = new Map((old["@graph"] as Node[]).map((t) => [String(t.isReplacedBy), String(t["@id"])]));
-      for (const u of us) {
-        const id = String(u["@id"]);
-        // A usage is a fragment of the glossary that holds it (#961); its tombstone keeps the pre-move address.
-        expect(id.startsWith(`${BASE}/cat-harness/cat-harness-glossary.jsonld#glossary-usage/`)).toBe(true);
-        expect(stones.get(id)).toBe(id.replace(`${BASE}/cat-harness/cat-harness-glossary.jsonld#`, `${BASE}/cat-harness.jsonld#`));
-      }
-      // Anywhere but the published path, the site root is unknown: nothing.
-      expect(legacyGlossaryDocuments(doc, join(site, "x.jsonld"), undefined, BASE)).toBeUndefined();
-    } finally {
-      rmSync(site, { recursive: true, force: true });
-    }
+    expect(graphOf(doc).filter((n) => n.deprecated === true && n["@type"] === undefined)).toEqual([]);
   });
 });
 

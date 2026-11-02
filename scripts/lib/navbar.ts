@@ -26,7 +26,7 @@
  * |---|---|---|
  * | `top` | the instance's mark (its open/close control, #1757) and the open document's index when there is one | no |
  * | `graphs` | this KG's own content — `docs/`, `library/`, every declared kind that HAS content | **yes** |
- * | `bottom` | the instantiated harnesses, expandable, each with its avatar; then home | no |
+ * | `bottom` | the instantiated harnesses, expandable, each with its avatar (no home row since 2026-10-30: the header's mark, a house by default, is the home link) | no |
  *
  * *"KG libraries is a scrollable stacks between fixed top an bottom parts"*.
  * So the flex column is `0 0 auto` / `1 1 auto` + `overflow-y:auto` / `0 0
@@ -934,8 +934,25 @@ export function fshGutsHtml(f: { label: string }): string {
   );
 }
 
+/**
+ * The house drawn as the header's mark when the site declares no avatar or
+ * glyph of its own. Owner, 2026-11-02: *"use home icon as default avatar at
+ * top navbar next to harness title"* -- the header is the home link, so its
+ * mark says so, where a blank square in the theme colour said nothing.
+ */
+export const HOME_GLYPH = "M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5";
+
+/** The header's mark: the declared one, or {@link HOME_GLYPH} when there is none. */
+export function headMark(m: NavbarModel): NavItem {
+  const declared = m.mark ?? {};
+  const own = declared.avatar !== undefined || declared.icon !== undefined ||
+    (declared.glyphPath !== undefined && declared.glyphPath !== BLANK_AVATAR.glyph);
+  if (own) return { label: m.instance, ...declared };
+  return { label: m.instance, glyphPath: HOME_GLYPH, ...(declared.tone !== undefined ? { tone: declared.tone } : {}) };
+}
+
 export function headHtml(m: NavbarModel, c: Ctx = { liquid: false }): string {
-  const item: NavItem = { label: m.instance, ...(m.mark ?? {}) };
+  const item = headMark(m);
   const inner = mark(item, c) + `<span class="fa-nav-name fa-nav-label">${esc(m.instance)}</span>`;
   if (m.headHref === undefined) {
     return `<label class="fa-nav-head" for="fa-nav-open" title="Open or close navigation">` + inner + `</label>`;

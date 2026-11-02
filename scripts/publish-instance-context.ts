@@ -127,8 +127,9 @@ export function buildOne(repoRoot: string, instance: string, options: GenerateOp
  * The instance's own VOCABULARY, served where its term IRIs point.
  *
  * Owner, 2026-10-15 ("2 Serve vocab at own iriBase"): a term IRI is
- * `<iriBase>v<major>/ns#Term` (`cat-harness/schemas/kg/namespaces.ts`), so the
- * document `<iriBase>v<major>/ns` has to exist on the instance's own Pages or
+ * `<iriBase>v<major>/ns/Term` (`cat-harness/schemas/kg/namespaces.ts`; slash
+ * form since cat-harness-tools#1378, Q-SLASH-1 A), so the document
+ * `<iriBase>v<major>/ns/` has to exist on the instance's own Pages or
  * every term it mints answers 404 — which was the state of two instances,
  * cat-harness one of them, when this was written (no `0.1.0/` on either
  * gh-pages).
@@ -142,12 +143,19 @@ export function buildOne(repoRoot: string, instance: string, options: GenerateOp
  * (folio-assistant#2560 is the same clash on the aggregate site). An instance
  * whose `ns` is a document has its context beside it (D1), so `ns` is free.
  *
- * Published three times, as `ns-export --out-dir` does: extensionless because
- * the IRI is, `.jsonld` for the canonical extension, `.json` because Pages
- * sends no correct Content-Type for `.jsonld`.
+ * A slash namespace (`…/ns/`) is a DIRECTORY, because every term below it is
+ * a path of its own: the document is its index, `index.html` (what Pages
+ * serves for `…/ns/`, carrying the vocabulary as an embedded JSON-LD script),
+ * `index.jsonld` and `index.json`. Clean break (owner, 2026-11-02): no copy
+ * is kept at the old extensionless `ns` path.
+ *
+ * A hash-form `@id` (an instance not yet on the slash rule) is still
+ * published three times: extensionless because the IRI is, `.jsonld` for the
+ * canonical extension, `.json` because Pages sends no correct Content-Type
+ * for `.jsonld`.
  */
 export type VocabularyOutcome =
-  | { kind: "built"; instance: string; iriBase: string; url: string; paths: string[]; terms: number; content: string }
+  | { kind: "built"; instance: string; iriBase: string; url: string; paths: string[]; terms: number; content: string; html: string }
   | { kind: "skipped"; instance: string; reason: string }
   | { kind: "failed"; instance: string; problems: string[] };
 
@@ -182,7 +190,49 @@ export function buildVocabularyOne(repoRoot: string, instance: string): Vocabula
     paths: where.paths,
     terms: report.defined.length,
     content: `${JSON.stringify(doc, null, 2)}\n`,
+    html: vocabularyHtml(instance, String(id), doc),
   };
+}
+
+const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/**
+ * The page Pages serves at a slash namespace's own address: the term list a
+ * person reads, and the whole vocabulary as `application/ld+json` for an
+ * agent (a static host cannot negotiate content type, so one page carries both).
+ */
+export function vocabularyHtml(instance: string, id: string, doc: unknown): string {
+  const graph = ((doc as { "@graph"?: unknown[] })["@graph"] ?? []) as Array<Record<string, unknown>>;
+  const rows = graph
+    .filter((n) => typeof n["@id"] === "string")
+    .map((n) => {
+      const label = String(n["label"] ?? n["prefLabel"] ?? n["@id"]);
+      const def = n["definition"] ?? n["comment"];
+      return `<li><code>${escHtml(String(n["@id"]))}</code> ${escHtml(label)}${def === undefined ? "" : ` — ${escHtml(String(def))}`}</li>`;
+    })
+    .join("\n");
+  // `</` cannot appear inside the script element, so it is escaped in the JSON.
+  const json = JSON.stringify(doc, null, 2).replace(/<\//g, "<\\/");
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escHtml(instance)} vocabulary</title>
+<link rel="alternate" type="application/ld+json" href="index.jsonld">
+<script type="application/ld+json">
+${json}
+</script>
+</head>
+<body>
+<h1>${escHtml(instance)} vocabulary</h1>
+<p>Namespace <code>${escHtml(id)}</code>. Machine-readable: <a href="index.jsonld">index.jsonld</a>.</p>
+<ul>
+${rows}
+</ul>
+</body>
+</html>
+`;
 }
 
 /**
@@ -203,7 +253,7 @@ export function vocabularyPaths(id: unknown, iriBase: string, contextPath: strin
   if (rel === "" || (top !== undefined && (rel === top || rel.startsWith(`${top}/`)))) {
     return { problem: `the vocabulary's @id ${id} would be served at \`${rel || "/"}\`, which collides with the context directory ${top ?? ""}/` };
   }
-  const paths = [rel, `${rel}.jsonld`, `${rel}.json`];
+  const paths = id.endsWith("/") ? [`${rel}/index.html`, `${rel}/index.jsonld`, `${rel}/index.json`] : [rel, `${rel}.jsonld`, `${rel}.json`];
   if (paths.includes(contextPath)) {
     return { problem: `the vocabulary's @id ${id} would be served at \`${contextPath}\`, which is where the context is published` };
   }
@@ -393,7 +443,7 @@ async function main(argv: readonly string[]): Promise<number> {
     for (const p of outcome.paths) {
       const dest = join(outDir, p);
       mkdirSync(dirname(dest), { recursive: true });
-      writeFileSync(dest, outcome.content);
+      writeFileSync(dest, p.endsWith(".html") ? outcome.html : outcome.content);
     }
     // The list the workflow publishes, one path per line, so it never restates them.
     writeFileSync(join(outDir, ".paths"), `${outcome.paths.join("\n")}\n`);

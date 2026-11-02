@@ -110,6 +110,7 @@ import {
   type LibraryTitleSource,
 } from "./library-title.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { presentGroupsIn } from "../scripts/concern-groups.ts";
 import { libraryEntryDirs } from "../scripts/lib/library-entry-graphs.ts";
 
 /** A resolved manifest title and where it came from (issue #1794). */
@@ -188,6 +189,14 @@ interface Candidate {
   pages?: string;
   formalization_candidate?: boolean;
   route_to?: string | null;
+  /**
+   * The item's printed fields, by name ("numerator", "denominator",
+   * "dataSources"), as plain strings: a list the source prints is one string
+   * joined with "; ". Copied into the block's `meta` as they are, so a
+   * renderer can show an indicator or a requirement as fields rather than as
+   * one paragraph. Never overrides the keys `candidateMeta` sets itself.
+   */
+  fields?: Record<string, string> | null;
 }
 
 interface Candidates {
@@ -372,8 +381,18 @@ function iriFor(docId: string, instance: string | undefined): (rest: string) => 
  */
 export function libraryInstanceOf(entryDir: string): string | undefined {
   // Resolved first: from `library/<id>` the folder above is ".".
-  const instanceRoot = dirname(dirname(resolve(entryDir)));
-  return readDeclaration(instanceRoot)?.name;
+  const parent = dirname(resolve(entryDir));
+  const flat = readDeclaration(dirname(parent))?.name;
+  if (flat !== undefined) return flat;
+  // Filed in a concern group, `library/<group>/<id>` (bean `6fez`): the
+  // library is one folder higher. Only a group the library declares or
+  // inherits counts, so an entry sitting in some other folder still gets
+  // `undefined` rather than a guess. Measured 2026-11-02: cat-harness filed
+  // its 74 entries into groups and every manifest IRI fell back to the
+  // relative form, 5531 nodes stale.
+  const library = dirname(parent);
+  if (!presentGroupsIn(library, "library").has(basename(parent))) return undefined;
+  return readDeclaration(dirname(library))?.name;
 }
 
 /**
@@ -499,8 +518,8 @@ export function buildDocumentNodes(
         path: `blocks/${bid}.jsonld`,
         content: node({
           "@id": iri(`blocks/${bid}`),
-          // A dependency's kind (smart-base's `functional-requirement`,
-          // `indicator`) is typed through the contribution registry; without
+          // A dependency's kind (a higher layer's `functional-requirement`
+          // or `indicator`) is typed through the contribution registry; without
           // it such a node had no `@type` at all.
           "@type": candidateTypes(c.kind),
           kind: c.kind,
@@ -664,8 +683,8 @@ function contributedKinds(): ContributionRegistry | undefined {
 /**
  * A candidate's `@type`: its kind's, through the contribution registry, or the
  * generic library block class when no mounted layer types the kind. An
- * L1 library (who-iris) may hold a smart-base `indicator` without mounting
- * smart-base; its node is then still a typed block, never one with no type.
+ * L1 library may hold another layer's `indicator` without mounting that
+ * layer; its node is then still a typed block, never one with no type.
  */
 export function candidateTypes(kind: string): string[] {
   const types = typesForKind(kind, contributedKinds());
@@ -674,12 +693,15 @@ export function candidateTypes(kind: string): string[] {
 
 /**
  * What a candidate says about ITSELF that a reader of the node needs: the
- * source's own number, what the source calls it, its strength, and which
- * aspect proposed it. `undefined` when it says none of these, so a node built
+ * source's own number, what the source calls it, its strength, which aspect
+ * proposed it, and its printed `fields` (strings only; empty ones dropped). `undefined` when it says none of these, so a node built
  * from a candidate without them is byte-identical to before.
  */
 export function candidateMeta(c: Candidate): Record<string, string> | undefined {
   const m: Record<string, string> = {};
+  for (const [k, v] of Object.entries(c.fields ?? {})) {
+    if (typeof v === "string" && v.trim() !== "") m[k] = v;
+  }
   if (c.number) m.source_number = c.number;
   if (c.source_kind) m.source_kind = c.source_kind;
   if (c.strength) m.strength = c.strength;

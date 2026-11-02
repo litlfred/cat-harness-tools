@@ -75,6 +75,14 @@ describe("vocabulary paths", () => {
     });
   });
 
+  test("a slash namespace is a directory: served as its index, so each term can be a page below it", () => {
+    // cat-harness-tools#1378 (owner, Q-SLASH-1 A): `…/v0/ns/` holds `…/v0/ns/<Term>`,
+    // so nothing may be written at the bare `v0/ns` path. Clean break: no copy there.
+    expect(vocabularyPaths("https://x.github.io/y/v0/ns/", "https://x.github.io/y/")).toEqual({
+      paths: ["v0/ns/index.html", "v0/ns/index.jsonld", "v0/ns/index.json"],
+    });
+  });
+
   test("an @id outside the iriBase is refused: that Pages site cannot serve it", () => {
     const r = vocabularyPaths("https://litlfred.github.io/folio-assistant/y/ns", "https://x.github.io/y/");
     expect("problem" in r && r.problem).toContain("not under the iriBase");

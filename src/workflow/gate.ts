@@ -199,7 +199,10 @@ export function checkGate(
       reason: `${model.id} is advisory — its content package owns what adequate means here`,
     };
   }
-  if (state.tokens.includes(activity)) {
+  // A `folio-workflow-instance/v1` record (beans/workflows/ on older folios)
+  // carries no `tokens`; it enables nothing, so the gate falls through to the
+  // relaxations and refuses rather than crashing.
+  if ((state.tokens ?? []).includes(activity)) {
     return { allowed: true, reason: `${activity} is enabled` };
   }
 

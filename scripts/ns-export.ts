@@ -1,7 +1,7 @@
 /**
  * The folio namespace, as a document that dereferences.
  *
- * `FOLIO_NS` is `https://litlfred.github.io/folio-assistant/ns#` and every
+ * `FOLIO_NS` is `https://litlfred.github.io/folio-assistant/ns/` and every
  * class and property the graph projects hangs off it. **Nothing served that
  * stem.** `scripts/tests/kg-export.test.ts` exempted it from the dead-link
  * walk BY NAME — "an IRI stem, not a file — nothing serves it and nothing
@@ -130,7 +130,7 @@ export function vocabularyIri(): string {
   // the content core's `ns`), each of which IS a file and dereferences. The
   // union is a convenience for a person reading the whole vocabulary at once,
   // so it can sit anywhere that resolves.
-  return `${LEGACY_FOLIO_NS.replace(/ns#$/, "")}ns/vocabulary.jsonld`;
+  return `${LEGACY_FOLIO_NS.replace(/ns[#/]$/, "")}ns/vocabulary.jsonld`;
 }
 
 /** Find the platform or repository root holding sibling instances. */
@@ -154,7 +154,7 @@ export function namespaceForPrefixOrLayer(target: string): string {
   const prefixes = defaultInstancePrefixes();
   const ns = prefixes.get(target);
   if (ns) return ns;
-  return `${LEGACY_FOLIO_NS.replace(/ns#$/, "")}${target}/ns#`;
+  return `${LEGACY_FOLIO_NS.replace(/ns[#/]$/, "")}${target}/ns/`;
 }
 
 /**
