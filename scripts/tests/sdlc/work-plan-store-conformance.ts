@@ -292,6 +292,7 @@ export function workPlanStoreConformance(tool: ToolUnderTest): void {
       const inst = (id: string, extra: Partial<Pick<InstanceLike, "bean" | "carriedBeans" | "tokens" | "status" | "children">> = {}) => ({
         id,
         processId: "code-change-review",
+        // declared-path-literal: a fixture instance's `source`, written into a temporary store and never read as a file
         source: "processes/code-change-review.bpmn",
         subject: id,
         tokens: ["Task_Review"],
