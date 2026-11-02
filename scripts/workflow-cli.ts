@@ -21,6 +21,11 @@
  *   bun run cat workflow:start <process> <subject> [--bean <id>] [--root <dir>]
  *   bun run cat workflow:next <instance> [--root <dir>]
  *   bun run cat workflow:complete <instance> <node> [--outcome <branch>] [--facts <json>] [--actor <id>] [--target <id>] [--note <text> | --stdin] [--activities <json>] [--root <dir>]
+ *   bun run cat-harness-tools/scripts/workflow-cli.ts scope <instance> --change-set <CS-NNN> --blocks <label,label,…> [--root <dir>]
+ *
+ * `scope` records which blocks a change-set (`content-change-review`) instance
+ * changes. The corpus gate reads it to recognise the change-set path
+ * (`src/workflow/change-set-coverage.ts`). It records no step and no sign-off.
  *
  * Each command also accepts `--json '<payload>'` (or a single JSON-object
  * positional argument) with the MCP tool's input fields.
@@ -45,6 +50,8 @@ import {
   type WorkflowToolEnv,
 } from "../src/tools/workflow.ts";
 import { declaredInstanceName, REPO_ROOT } from "./lib/roots.ts";
+import { loadInstance, saveInstance } from "../src/workflow/store.ts";
+import { CHANGE_REVIEW_PROCESS } from "../src/workflow/change-set-coverage.ts";
 
 export interface WorkflowCliOptions extends WorkflowToolEnv {
   /** Working directory when `--root` is not passed; defaults to `process.cwd()`. */
@@ -73,6 +80,8 @@ const VALUE_FLAGS = new Set([
   "--note",
   "--activities",
   "--json",
+  "--change-set",
+  "--blocks",
 ]);
 
 interface ParsedArgs {
@@ -164,10 +173,10 @@ function parseJsonArray(raw: string, label: string): unknown[] {
   return parsed;
 }
 
-function normalizeSubcommand(raw: string | undefined): "start" | "next" | "complete" | "list" | "gate" | undefined {
+function normalizeSubcommand(raw: string | undefined): "start" | "next" | "complete" | "list" | "gate" | "scope" | undefined {
   if (!raw) return undefined;
   const cleaned = raw.replace(/^workflow[:_]/, "");
-  if (cleaned === "start" || cleaned === "next" || cleaned === "complete" || cleaned === "list" || cleaned === "gate") {
+  if (cleaned === "start" || cleaned === "next" || cleaned === "complete" || cleaned === "list" || cleaned === "gate" || cleaned === "scope") {
     return cleaned;
   }
   return undefined;
@@ -181,6 +190,7 @@ function usageText(): string {
     "  bun run cat workflow:complete <instance> <node> [--outcome <branch>] [--facts <json>] [--actor <id>] [--target <id>] [--note <text> | --stdin] [--activities <json>] [--root <dir>] [--json <payload>]",
     "  bun run cat-harness-tools/scripts/workflow-cli.ts list [--root <dir>]",
     "  bun run cat-harness-tools/scripts/workflow-cli.ts gate <instance> <activity> [--actor <id>] [--target <id>] [--root <dir>]",
+    "  bun run cat-harness-tools/scripts/workflow-cli.ts scope <instance> --change-set <CS-NNN> --blocks <label,label,…> [--root <dir>]",
   ].join("\n");
 }
 
@@ -254,6 +264,28 @@ export async function runWorkflowCli(
       }
       const out = await workflowGate(root, { instance, activity, actor, target }, opts);
       return { code: 0, out };
+    }
+
+    if (sub === "scope") {
+      const instance = flags.get("--instance") ?? positionals[0] ?? strField(payload, "instance");
+      const changeSet = flags.get("--change-set") ?? strField(payload, "changeSet");
+      const blocksRaw = flags.get("--blocks") ?? strField(payload, "blocks");
+      if (!instance || !changeSet || !blocksRaw) {
+        throw new UsageError(
+          "usage: workflow-cli.ts scope <instance> --change-set <CS-NNN> --blocks <label,label,…> [--root <dir>]",
+        );
+      }
+      if (!/^CS-\d{3,}$/.test(changeSet)) throw new UsageError(`--change-set must look like CS-014, got ${changeSet}`);
+      const blocks = [...new Set(blocksRaw.split(",").map((b) => b.trim()).filter(Boolean))].sort();
+      if (blocks.length === 0) throw new UsageError("--blocks names no block");
+      const state = loadInstance(root, instance);
+      if (!state) return { code: 1, out: `no workflow instance \`${instance}\`` };
+      if (state.processId !== CHANGE_REVIEW_PROCESS) {
+        return { code: 1, out: `${instance} is a ${state.processId} instance; only ${CHANGE_REVIEW_PROCESS} carries a change-set scope` };
+      }
+      if (state.status !== "running") return { code: 1, out: `${instance} is completed; a published change set's scope is fixed` };
+      const p = saveInstance(root, { ...state, scope: { changeSet, blocks }, updatedAt: new Date().toISOString() });
+      return { code: 0, out: `${instance}: scope ${changeSet}, ${blocks.length} block(s) → ${p}` };
     }
 
     // sub === "complete"
