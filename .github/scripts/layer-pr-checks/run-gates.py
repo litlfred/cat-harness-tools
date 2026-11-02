@@ -181,6 +181,14 @@ LIVE_STATE_SCRIPTS = {
 RUNNER_STATE_SCRIPTS = {
     "software:check": "judges the software installed on the machine it runs on; a CI runner is not a workstation",
 }
+# Sweep forms: a script named `check:` that is NOT a gate. `gates.ts` declares
+# it `kind: "report"` because it makes ADVISORY findings fatal on purpose, for a
+# person sweeping coverage; the gating form beside it is what CI runs. Run here,
+# an advisory (an editorial call) would fail every layer's main QA.
+# Q-FMR-12 (owner, 2026-11-02): the navbar gate is not strict in CI.
+SWEEP_ONLY_SCRIPTS = {
+    "check:navbar-consistency:strict": "the --strict sweep that fails on advisories; CI gates on `check:navbar-consistency:check`",
+}
 # Gates that cannot determine anything in LAYER mode (`MODE=layer`), where the
 # caller is swapped into the index without its .git and the layers are mounted
 # at their own tips rather than at the index's lock (folio-assistant-core#287).
@@ -303,6 +311,8 @@ def skip_reason(root, script, env=None, own=None):
         return "needs-input", NEEDS_INPUT_SCRIPTS[script]
     if script in RUNNER_STATE_SCRIPTS:
         return "runner-state", RUNNER_STATE_SCRIPTS[script]
+    if script in SWEEP_ONLY_SCRIPTS:
+        return "sweep-only", SWEEP_ONLY_SCRIPTS[script]
     if script in LAYER_MODE_SCRIPTS and (os.environ if env is None else env).get("MODE") == "layer":
         return "layer-mode", LAYER_MODE_SCRIPTS[script]
     m = STANDALONE_GATE.match(script)
@@ -786,7 +796,7 @@ def derive(root, given, tmp, env=None):
     Returns (own, harness, runner, gates, skipped): gate name -> command for
     the gates this runner runs, and gate name -> {command, skipped, kind} for
     the declared ones it does not. `kind` says why: `live-state`,
-    `needs-input`, `runner-state`, `layer-mode`, `prerequisite`, or `input-absent` (a SUPPLIED_INPUTS gate
+    `needs-input`, `runner-state`, `sweep-only`, `layer-mode`, `prerequisite`, or `input-absent` (a SUPPLIED_INPUTS gate
     on a side that holds no such input -- CI runs it where the input exists).
 
     `--list` prints this as JSON, and it is what `gates.ts` `loadGates` reads

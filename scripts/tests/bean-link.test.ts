@@ -173,7 +173,7 @@ describe("the diagrams declare which operation each step performs", () => {
       join(dir, "bad.bpmn"),
       `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                  xmlns:bootstrap.processes="https://litlfred.github.io/bootstrap/v0/processes/ns#" xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/v0/processes/ns#"
+                  xmlns:bootstrap.processes="https://litlfred.github.io/bootstrap/v0/processes/ns/" xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/v0/processes/ns/"
                   id="D" targetNamespace="urn:x">
   <bpmn:process id="Process_Bad" name="Bad" isExecutable="false">
     <bpmn:startEvent id="S"><bpmn:outgoing>F1</bpmn:outgoing></bpmn:startEvent>
@@ -200,7 +200,7 @@ describe("a step drawn against the Beans store works the bean (Q-BR-8 F)", () =>
   // S → Work (writes the work-plan store) → Read (reads it only) → Named (writes it, op="claim") → E
   const diagram = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/v0/processes/ns#"
+                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/v0/processes/ns/"
                   id="D" targetNamespace="urn:x">
   <bpmn:dataStore id="work-plan" name="Work plan (beans)"/>
   <bpmn:process id="Process_W" name="W" isExecutable="false">
@@ -260,7 +260,7 @@ describe("resolve before a closing archive step", () => {
   // S → Work → Resolve → [Archive] → E, with the archive step optionally followed by more work.
   const diagram = (afterArchive: boolean): string => `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/v0/processes/ns#"
+                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/v0/processes/ns/"
                   id="D" targetNamespace="urn:x">
   <bpmn:process id="Process_A" name="A" isExecutable="false">
     <bpmn:startEvent id="S"/>

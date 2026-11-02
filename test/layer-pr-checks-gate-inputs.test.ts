@@ -100,6 +100,13 @@ describe("run-gates.py gate inputs", () => {
     expect(why).toContain("machine");
   });
 
+  test("the navbar --strict sweep is not a gate: its advisories are editorial calls (Q-FMR-12)", () => {
+    const [kind, why] = py("run-gates.py", `m.skip_reason(".", "check:navbar-consistency:strict", {})`) as [string, string];
+    expect(kind).toBe("sweep-only");
+    expect(why).toContain("navbar-consistency:check");
+    expect(py("run-gates.py", `m.skip_reason(".", "check:navbar-consistency:check", {})`)).toEqual([null, null]);
+  });
+
   test("the lock and default-branch gates are skipped in layer mode only (folio-assistant-core#287)", () => {
     for (const s of ["mount:lock:check", "mount:remote:check", "check:draft-beans", "readmes:check", "readme-sections:check", "book:check", "check:standalone"]) {
       const [kind] = py("run-gates.py", `m.skip_reason(".", ${JSON.stringify(s)}, {"MODE": "layer"})`) as [string, string];

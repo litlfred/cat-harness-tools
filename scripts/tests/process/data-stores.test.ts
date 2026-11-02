@@ -20,7 +20,7 @@ import { UnsupportedBpmn, isGlobalTasksFile, loadProcessModel } from "../../../s
 
 const HEAD = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                  xmlns:bootstrap.processes="https://litlfred.github.io/bootstrap/v0/processes/ns#"
+                  xmlns:bootstrap.processes="https://litlfred.github.io/bootstrap/v0/processes/ns/"
                   targetNamespace="urn:t">`;
 
 function fixture(body: string, declared = ""): string {

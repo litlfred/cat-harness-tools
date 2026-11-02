@@ -266,7 +266,7 @@ describe("the process → instance join the processes viewer links by", () => {
 });
 
 describe("the working context at the token (item 3)", () => {
-  const NS = "https://litlfred.github.io/bootstrap/v0/processes/ns#";
+  const NS = "https://litlfred.github.io/bootstrap/v0/processes/ns/";
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
   xmlns:bootstrap.processes="${NS}" id="D" targetNamespace="https://example.test/wf">

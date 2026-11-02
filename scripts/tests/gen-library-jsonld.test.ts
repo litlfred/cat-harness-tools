@@ -40,6 +40,7 @@ import { STANDARD_PREFIXES, contextBindings, vocabMapping } from "../../schemas/
 import { manifestLicence } from "../../schemas/library/source-licence.ts";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { clearGroupCache } from "../concern-groups.ts";
 
 const DIR = mkdtempSync(join(tmpdir(), "gen-library-"));
 afterAll(() => {
@@ -663,6 +664,32 @@ describe("the instance an entry belongs to", () => {
   });
 });
 
+describe("the instance a GROUPED entry belongs to (bean 6fez)", () => {
+  test("an entry in a declared group, library/<group>/<id>, names the instance", () => {
+    // Measured 2026-11-02: once cat-harness filed its entries into groups,
+    // the declaration two folders up was the library's, so every manifest
+    // IRI fell back to the relative form and 5531 nodes read as stale.
+    const root = mkdtempSync(join(tmpdir(), "grouped-"));
+    const lib = join(root, "inst", "library");
+    mkdirSync(join(lib, "ui", "d"), { recursive: true });
+    mkdirSync(join(lib, "stray", "e"), { recursive: true });
+    writeFileSync(join(lib, "library.json"), JSON.stringify({ $schema: "concern-groups/v1", groups: ["ui"] }));
+    writeDeclaration(join(root, "inst"), {
+      name: "inst",
+      directories: [{ id: "library", path: "library/", graphTypologies: ["library"] }],
+    });
+    clearGroupCache();
+    try {
+      expect(libraryInstanceOf(join(lib, "ui", "d"))).toBe("inst");
+      // A folder the library does not declare as a group is not one: no guess.
+      expect(libraryInstanceOf(join(lib, "stray", "e"))).toBeUndefined();
+    } finally {
+      clearGroupCache();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("an argument run() would not read is refused before anything is written", () => {
   test("--help, a typo, or a stray value is named; the real flags and their values pass", () => {
     expect(unknownArgument(["--help"])).toBe("--help");
@@ -680,6 +707,16 @@ describe("a requirement candidate (L1 requirement ingestion, 2026-11-01)", () =>
     expect(
       candidateMeta({ kind: "indicator", number: "1-01", source_kind: "nhwa-indicator", aspect: "requirements" }),
     ).toEqual({ source_number: "1-01", source_kind: "nhwa-indicator", aspect: "requirements" });
+  });
+
+  test("copies printed fields into meta as strings, never over its own keys", () => {
+    expect(
+      candidateMeta({
+        kind: "indicator",
+        number: "1-01",
+        fields: { indicatorId: "1-01", numerator: "Number of active health workers", source_number: "x", empty: " " },
+      }),
+    ).toEqual({ indicatorId: "1-01", numerator: "Number of active health workers", source_number: "1-01" });
   });
 
   test("its node keeps the section link and gains the meta; one without stays byte-identical", () => {

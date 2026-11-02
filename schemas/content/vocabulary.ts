@@ -3,7 +3,7 @@
  *
  * ## Why this file exists
  *
- * `FOLIO_NS` is `https://litlfred.github.io/folio-assistant/ns#`, and every
+ * `FOLIO_NS` is `https://litlfred.github.io/folio-assistant/ns/`, and every
  * class and property the graph projects hangs off it. **Nothing served that
  * stem.** `scripts/tests/kg-export.test.ts` exempted it from the dead-link
  * check BY NAME, commenting "an IRI stem, not a file — nothing serves it and
@@ -58,7 +58,7 @@ import { BOOTSTRAP_TERMS } from "@litlfred/bootstrap-tools/schemas/graph.ts";
  * - `harness` — the agentic machinery: tools, capabilities, requirements,
  *   work plan, process detail.
  * - `core` — authored content, declared by an instance above the harness and
- *   minted in THAT instance's namespace (`<iriBase>v<major>/ns#` from its
+ *   minted in THAT instance's namespace (`<iriBase>v<major>/ns/` from its
  *   declaration). The harness glosses no `core` term: since
  *   folio-assistant#2598 (owner, 2026-10-16, "1a") the kinds it uses itself —
  *   todos, library, uploads, voices, the folio — are harness terms, and the
