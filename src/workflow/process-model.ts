@@ -78,6 +78,13 @@ const SUPPORTED = new Set<string>([
  * one; what it says is kept on {@link ProcessModel.dataStores} and on each
  * step's {@link ProcessNode.reads} and {@link ProcessNode.writes}.
  */
+/**
+ * The store id of the work plan (beans), as declared in a layer's shared
+ * stores file (`<bpmn:dataStore id="work-plan"/>`). A step that writes to it
+ * works the bean ({@link ProcessNode.worksBean}).
+ */
+export const BEAN_STORE = "work-plan";
+
 const DATA_TYPES = new Set<string>(["bpmn:DataStoreReference", "bpmn:DataObjectReference", "bpmn:DataObject"]);
 
 /**
@@ -401,6 +408,14 @@ export interface ProcessNode {
    * do not perform automatically.
    */
   workPlanOp?: WorkPlanOp;
+  /**
+   * True when the step has a data output association to the Beans store
+   * ({@link BEAN_STORE}). Such a step works the bean where it stands: its
+   * op is `note` unless the extension names another, and completing it
+   * claims a bean that is not yet started (owner, 2026-11-02, Q-BR-8 F: an
+   * agent can take up any task whose skill it has a tool for).
+   */
+  worksBean?: boolean;
   /**
    * Bean references associated with this activity (via `<cat-harness.processes:bean ref="…"/>` or `id` or `bean`).
    */
@@ -2030,6 +2045,11 @@ export async function loadProcessModel(
         `Give each a dataStoreRef: the store's Role id, e.g. dataStoreRef="work-plan".`,
     );
   }
+  // A step that writes to the Beans store works the bean at that step
+  // (owner, 2026-11-02, Q-BR-8 F): the drawn data association replaces the
+  // hidden `<cat-harness.processes:bean op="note"/>`. An op the extension
+  // names still wins, so OPEN and CLOSE may draw the store too.
+  const worksBean = (el: ModdleElement): boolean => dataOf(el, "writes").includes(BEAN_STORE);
   const dataOf = (el: ModdleElement, dir: "reads" | "writes"): string[] => {
     const ends =
       dir === "reads"
@@ -2221,10 +2241,11 @@ export async function loadProcessModel(
       adjudicationDefers:
         adjudicationDefersOf(el, adjudicationDeclOf(ext, el.id), fulfilmentOf(ext, el.id)) ||
         undefined,
-      touchesWorkPlan: ext.some((v) => v.$type === "folio:bean"),
+      touchesWorkPlan: ext.some((v) => v.$type === "folio:bean") || worksBean(raw),
       reads: dataOf(raw, "reads"),
       writes: dataOf(raw, "writes"),
-      workPlanOp: readWorkPlanOp(el.id, ext),
+      workPlanOp: readWorkPlanOp(el.id, ext) ?? (worksBean(raw) ? "note" : undefined),
+      ...(worksBean(raw) ? { worksBean: true } : {}),
       beanRef: (ext.find((v) => v.$type === "folio:bean" && (v.ref || v.id || v.bean))?.ref ??
         ext.find((v) => v.$type === "folio:bean" && (v.ref || v.id || v.bean))?.id ??
         ext.find((v) => v.$type === "folio:bean" && (v.ref || v.id || v.bean))?.bean) as

@@ -50,6 +50,12 @@ export const DIFF_RENDERER_INPUTS = ["text", "pages", "screenshots", "structure"
  * element — are declared by the layers above this one (a DAK layer's
  * `block-kinds/`), which this layer may not name, so the renderer is the
  * default by what the block HAS rather than by a list of kinds (bean f327).
+ *
+ * It is the FALLBACK for such a block, not its first choice: a structured
+ * block still opens inline when it has text (owner, 2026-11-02: "i cant see
+ * any changes in 'fields, before after'. I would want that the review page
+ * defaults to in-line for all elements"). The field table lists metadata
+ * such as IRIs, and hides the words a reader sees change.
  */
 export const STRUCTURED = "@structured" as const;
 
@@ -64,7 +70,8 @@ export const DiffRendererSchema = z.object({
   /**
    * Block kinds this renderer is the DEFAULT for, from `BLOCK_KINDS`. `*` is
    * the fallback, and exactly one renderer carries it. {@link STRUCTURED} is
-   * any block with structured sides, and comes before its kind. Two renderers may list
+   * any block with structured sides, and comes after its kind and `*`: it is
+   * chosen only when those cannot run on the block. Two renderers may list
    * the same kind: order is preference, and the page takes the first one
    * that can run on the block. A test holds every
    * other entry to a kind that exists, so a renamed kind cannot silently
@@ -120,12 +127,16 @@ export const DIFF_RENDERERS: readonly DiffRenderer[] = z.array(DiffRendererSchem
   },
 ]);
 
-/** The renderer a block of `kind` opens with; `structured` when the build published its fields. */
+/**
+ * The renderer a block of `kind` opens with when every renderer can run on it;
+ * `structured` when the build published its fields. The page falls back to
+ * the field renderer only when this one cannot run (no text for the block).
+ */
 export function defaultRendererFor(kind: string, renderers: readonly DiffRenderer[] = DIFF_RENDERERS, structured = false): DiffRenderer {
   return (
-    (structured ? renderers.find((r) => r.defaultFor.includes(STRUCTURED)) : undefined) ??
     renderers.find((r) => r.defaultFor.includes(kind)) ??
     renderers.find((r) => r.defaultFor.includes("*")) ??
+    (structured ? renderers.find((r) => r.defaultFor.includes(STRUCTURED)) : undefined) ??
     renderers[0]!
   );
 }
