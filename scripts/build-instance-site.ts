@@ -88,6 +88,7 @@ import { siteDirFor, siteFileFor } from "../schemas/kg/cat-harness.ts";
 import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 
 import { checkInlineScripts } from "./check-inline-scripts.ts";
+import { checkAnchors } from "./check-anchors.ts";
 import { shellQuote } from "./run-script.ts";
 import { chromeLayers, writeForwardingPages } from "./compose-docs.ts";
 import { ownsScript, writerCommand } from "./lib/script-command.ts";
@@ -892,6 +893,14 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     for (const p of ownScripts.slice(0, 50)) console.error(`  ✗ ${p.page}:${p.line} ${p.reason}`);
     throw new Error(`${ownScripts.length} inline script(s) do not survive the build: the site is not published`);
   }
+
+  // Accessibility and QA (owner, 2026-11-02): every heading has a named
+  // anchor with a 🔗 to copy it, and a review page leads back to its
+  // document. Reported, not gated: viewers are asked to try.
+  const anchors = checkAnchors(site);
+  const anchorPages = new Set(anchors.problems.map((p) => p.page)).size;
+  console.log(`anchors: ${anchors.pages} html pages, ${anchorPages} to fix (reported, not gated)`);
+  for (const p of anchors.problems.slice(0, 20)) console.log(`  · ${p.page}: ${p.reason}`);
 
   o.beforePublish?.(site);
 
