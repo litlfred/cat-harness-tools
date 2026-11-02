@@ -80,7 +80,7 @@ import {
 } from "../schemas/sdlc/viewer-nav-qa.ts";
 import { declinesNavbar, isStandalonePage, sitePathForPage } from "./viewer-page.ts";
 import { RAIL_DATA_DIR, expandRail, railDataJson, wantsLinkedRail } from "./lib/harness-rail.ts";
-import { RAIL_SECTION_LABELS } from "./lib/navbar.ts";
+import { HOME_GLYPH, RAIL_SECTION_LABELS } from "./lib/navbar.ts";
 import { againstOrUsage, qaResultsFile, readBaseline } from "./qa-results.ts";
 
 const ROOT = HARNESS_ROOT;
@@ -146,11 +146,13 @@ export function layoutFlags(html: string, marked: ReadonlySet<string> = new Set(
     const letter = /^[\p{L}\p{N}]$/u.test(glyph.trim());
     const drawn = /<img\b|<svg\b/.test(glyph);
     if (!control || !(drawn || letter)) flags.push("clickable-mark");
-    // The letter is the FLOOR, for a harness with no mark (bean `2vpn`). A
-    // header that names a harness whose resolved mark exists and still draws
-    // its letter has dropped that mark between `harness-tiles.ts` and here.
+    // The FLOOR, for a harness with no mark (bean `2vpn`): the house since
+    // 2026-11-02 (owner: home icon as the default avatar), a letter before
+    // it. A header that names a harness whose resolved mark exists and still
+    // draws the floor has dropped that mark between `harness-tiles.ts` and here.
+    const floor = letter || glyph.includes(`d="${HOME_GLYPH}"`);
     const name = /<span class="fa-nav-name[^"]*">([^<]*)<\/span>/.exec(head[2]!)?.[1]?.trim();
-    if (letter && name !== undefined && marked.has(name)) flags.push("declared-mark");
+    if (floor && name !== undefined && marked.has(name)) flags.push("declared-mark");
   }
 
   const summaries = [...nav.matchAll(/<details class="fa-nav-group"( open)?><summary>[\s\S]*?<span class="fa-nav-label">([^<]*)</g)];
