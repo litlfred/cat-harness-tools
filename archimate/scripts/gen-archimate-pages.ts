@@ -74,7 +74,7 @@ import { renderViewSvg, typeLabel } from "./render-view.ts";
 import { posterFits, renderPosterSvg } from "./render-poster.ts";
 import { CONFIG_FILE, archimateDir, configPath, localDirOf, readConfig } from "./check-archimate.ts";
 import { planSlugs } from "../schemas/slugs.ts";
-import { LAYER_ORDER, categoryOf, layerSlug, metamodelDot, metamodelMermaid, metamodelOf, pairAnchor, typeAnchor, typeName, verbOf, type Metamodel } from "../schemas/metamodel.ts";
+import { LAYER_ORDER, categorySubsets, drawnCategories, layerSlug, metamodelDot, metamodelSvgName, metamodelMermaid, metamodelOf, pairAnchor, typeAnchor, typeName, verbOf, type Metamodel } from "../schemas/metamodel.ts";
 import { dataModelDot, dataModelMermaid, dataModelOf, dataModelPuml, sequencesMermaid, sequencesOf, sequencesPuml, type DataModel, type SequenceSet } from "../schemas/diagrams.ts";
 import { TOOLS_ROOT } from "../../scripts/lib/roots.ts";
 import { darkRules } from "../../scripts/lib/scheme-css.ts";
@@ -257,16 +257,24 @@ export function pagesFor(
     // Every box and line opens its section of the metamodel page: the
     // drawing is data (`<m>/`), the page is at the declared route.
     const mmPage = `${toPage(m, "metamodel")}${site ? "" : "/"}`;
-    const mmDot = metamodelDot(mm, {
-      href: { type: (t) => `${mmPage}#${typeAnchor(t)}`, pair: (a, b) => `${mmPage}#${pairAnchor(a, b)}` },
-    });
+    const mmHref = { type: (t: string) => `${mmPage}#${typeAnchor(t)}`, pair: (a: string, b: string) => `${mmPage}#${pairAnchor(a, b)}` };
+    const mmDot = metamodelDot(mm, { href: mmHref });
     files.push(
       { path: `${m}/metamodel.json`, content: `${JSON.stringify(mm, null, 2)}\n` },
       { path: `${m}/metamodel.dot`, content: mmDot },
       { path: `${m}/metamodel.mmd`, content: metamodelMermaid(mm) },
     );
     const drawn = opts.drawDot !== undefined;
-    if (drawn) files.push({ path: `${m}/metamodel.svg`, content: opts.drawDot!(mmDot) });
+    if (drawn) {
+      files.push({ path: `${m}/metamodel.svg`, content: opts.drawDot!(mmDot) });
+      // Each set of categories the filters can pick is laid out on its own,
+      // so unticking one redraws the picture without those lines, not the
+      // full tangle with gaps in it (owner, 2026-11-01: "detangle metamodel filters").
+      const all = drawnCategories(mm);
+      for (const cats of categorySubsets(mm)) {
+        files.push({ path: `${m}/${metamodelSvgName(cats, all)}`, content: opts.drawDot!(metamodelDot(mm, { href: mmHref, categories: cats })) });
+      }
+    }
     const dm = dataModelOf(model, m);
     if (dm.classes.length > 0) {
       const dmDot = dataModelDot(dm, {
@@ -412,26 +420,42 @@ export function pagesFor(
  * in the browser, so they work on a static host. A line shows while any of
  * its categories is ticked and both its ends' layers are.
  */
-function filterBar(mm: Metamodel): string {
-  const present = new Set(mm.patterns.filter((p) => p.source !== p.target).map((p) => categoryOf(p.relationship)));
-  const cats = ["structural", "dependency", "dynamic", "other"].filter((c) => present.has(c));
+function filterBar(mm: Metamodel, svg: (name: string) => string): string {
+  const cats = drawnCategories(mm);
   const held = new Set(mm.types.map((t) => t.layer));
   const layers = LAYER_ORDER.filter((l) => l !== "Other" && held.has(l));
   const box = (kind: string, value: string, label: string) =>
     `<label style="margin-right:.8rem"><input type="checkbox" checked data-mm-${kind}="${escHtml(value)}"> ${escHtml(label)}</label>`;
+  // Which drawing each set of ticked categories shows, keyed by the set joined in order.
+  const drawings: Record<string, string> = {};
+  for (const set of [...categorySubsets(mm), cats]) drawings[set.join("-")] = svg(metamodelSvgName(set, cats));
   return (
-    `<form class="am-filters" style="margin:.5rem 0" onsubmit="return false">` +
+    `<form class="am-filters" style="margin:.5rem 0" onsubmit="return false" data-mm-svgs="${escHtml(JSON.stringify(drawings))}">` +
     `<div><strong>Relationships:</strong> ${cats.map((c) => box("cat", c, c)).join("")}</div>` +
-    `<div><strong>Layers:</strong> ${layers.map((l) => box("layer", layerSlug(l), l)).join("")}</div></form>` +
-    `<script>(function(){var f=document.currentScript.previousElementSibling;` +
+    `<div><strong>Layers:</strong> ${layers.map((l) => box("layer", layerSlug(l), l)).join("")}</div>` +
+    `<p class="am-filter-note" style="margin:.3rem 0;font-size:.9em" hidden>No relationship category is ticked.</p></form>` +
+    // Categories pick a drawing laid out for them; layers then hide the lines
+    // with an end in an unticked layer, and any box left with no line.
+    `<script>(function(){var f=document.currentScript.previousElementSibling,svgs=JSON.parse(f.getAttribute("data-mm-svgs")),note=f.querySelector(".am-filter-note");` +
     `function on(k){var r={};f.querySelectorAll("[data-mm-"+k+"]").forEach(function(i){r[i.getAttribute("data-mm-"+k)]=i.checked;});return r;}` +
     `function has(e,p){for(var i=0;i<e.classList.length;i++)if(e.classList[i].indexOf(p)===0)return e.classList[i].slice(p.length);}` +
-    `function apply(){var o=document.querySelector(".am-figure object"),d=o&&o.contentDocument;if(!d)return;var c=on("cat"),l=on("layer");` +
-    `d.querySelectorAll("g.node").forEach(function(n){var y=has(n,"mm-layer-");n.style.display=y&&l[y]===false?"none":"";});` +
-    `d.querySelectorAll("g.edge").forEach(function(e){var cs=[].filter.call(e.classList,function(x){return x.indexOf("mm-cat-")===0;});` +
-    `if(!cs.length)return;var any=cs.some(function(x){return c[x.slice(7)]!==false;});` +
-    `var a=has(e,"mm-from-"),b=has(e,"mm-to-");e.style.display=any&&l[a]!==false&&l[b]!==false?"":"none";});}` +
-    `f.addEventListener("change",apply);var o=document.querySelector(".am-figure object");if(o)o.addEventListener("load",apply);apply();})();</script>`
+    `function obj(){return document.querySelector(".am-figure object");}` +
+    `function layers(){var o=obj(),d=o&&o.contentDocument;if(!d)return;var l=on("layer"),seen={};` +
+    `d.querySelectorAll("g.edge").forEach(function(e){var a=has(e,"mm-from-"),b=has(e,"mm-to-");if(a===undefined)return;var v=l[a]!==false&&l[b]!==false;e.style.display=v?"":"none";` +
+    `if(v){var t=(e.querySelector("title")||{}).textContent||"";t.split("->").forEach(function(n){seen[n.trim()]=1;});}});` +
+    `var any=Object.keys(l).some(function(k){return l[k]===false;}),shown={};` +
+    `d.querySelectorAll("g.node").forEach(function(n){var y=has(n,"mm-layer-"),t=((n.querySelector("title")||{}).textContent||"").trim();` +
+    `var v=(y&&l[y]===false)||(any&&!seen[t]);n.style.display=v?"none":"";if(!v&&y)shown[y]=1;});` +
+    // A layer's band goes too once none of its boxes is left.
+    `d.querySelectorAll("g.cluster").forEach(function(g){var y=has(g,"mm-layer-");g.style.display=y&&!shown[y]?"none":"";});` +
+    // Then crop the drawing to what is left, so no empty band stays on the page.
+    `var s=d.documentElement,bg=d.querySelector("g.graph > polygon");if(!s.hasAttribute("data-vb"))s.setAttribute("data-vb",[s.getAttribute("viewBox"),s.getAttribute("width"),s.getAttribute("height")].join("|"));` +
+    `var o0=s.getAttribute("data-vb").split("|");if(bg)bg.style.display=any?"none":"";` +
+    `if(any){var b=s.getBBox(),p=8;s.setAttribute("viewBox",[b.x-p,b.y-p,b.width+2*p,b.height+2*p].join(" "));s.setAttribute("width",(b.width+2*p)+"pt");s.setAttribute("height",(b.height+2*p)+"pt");}` +
+    `else{s.setAttribute("viewBox",o0[0]);s.setAttribute("width",o0[1]);s.setAttribute("height",o0[2]);}}` +
+    `function apply(){var c=on("cat"),k=Object.keys(c).filter(function(x){return c[x];}).join("-"),o=obj();note.hidden=!!k;if(!o)return;` +
+    `o.style.display=k?"":"none";if(!k)return;var u=svgs[k];if(u&&o.getAttribute("data")!==u){o.setAttribute("data",u);return;}layers();}` +
+    `f.addEventListener("change",apply);var o=obj();if(o)o.addEventListener("load",layers);apply();})();</script>`
   );
 }
 
@@ -466,7 +490,7 @@ export function metamodelBody(
     `<p>${bad.length ? `✗ ${mm.notAllowed} relationship(s) follow ${bad.length} pattern(s) ArchiMate does not allow (red below).` : "✓ Every relationship follows a pattern ArchiMate allows."}` +
     (mm.placeholders.length ? ` ${mm.placeholders.length} placeholder element(s), named after their own type, are left out (listed at the end).` : "") +
     `</p>` +
-    (link.drawn ? `<p>Click a box to see its elements, or a line to see its relationships.</p>${filterBar(mm)}` : "") +
+    (link.drawn ? `<p>Click a box to see its elements, or a line to see its relationships.</p>${filterBar(mm, link.data)}` : "") +
     (link.drawn
       ? `<div class="am-figure"><object type="image/svg+xml" style="width:100%;height:auto" data="${escHtml(link.data("metamodel.svg"))}" aria-label="Metamodel in use, drawn"></object></div>`
       : `<p>This build drew no picture; the same diagram is below as Graphviz DOT and Mermaid.</p>`) +
