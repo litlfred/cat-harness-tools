@@ -188,6 +188,14 @@ interface Candidate {
   pages?: string;
   formalization_candidate?: boolean;
   route_to?: string | null;
+  /**
+   * The item's printed fields, by name ("numerator", "denominator",
+   * "dataSources"), as plain strings: a list the source prints is one string
+   * joined with "; ". Copied into the block's `meta` as they are, so a
+   * renderer can show an indicator or a requirement as fields rather than as
+   * one paragraph. Never overrides the keys `candidateMeta` sets itself.
+   */
+  fields?: Record<string, string> | null;
 }
 
 interface Candidates {
@@ -674,12 +682,15 @@ export function candidateTypes(kind: string): string[] {
 
 /**
  * What a candidate says about ITSELF that a reader of the node needs: the
- * source's own number, what the source calls it, its strength, and which
- * aspect proposed it. `undefined` when it says none of these, so a node built
+ * source's own number, what the source calls it, its strength, which aspect
+ * proposed it, and its printed `fields` (strings only; empty ones dropped). `undefined` when it says none of these, so a node built
  * from a candidate without them is byte-identical to before.
  */
 export function candidateMeta(c: Candidate): Record<string, string> | undefined {
   const m: Record<string, string> = {};
+  for (const [k, v] of Object.entries(c.fields ?? {})) {
+    if (typeof v === "string" && v.trim() !== "") m[k] = v;
+  }
   if (c.number) m.source_number = c.number;
   if (c.source_kind) m.source_kind = c.source_kind;
   if (c.strength) m.strength = c.strength;

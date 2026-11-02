@@ -682,6 +682,16 @@ describe("a requirement candidate (L1 requirement ingestion, 2026-11-01)", () =>
     ).toEqual({ source_number: "1-01", source_kind: "nhwa-indicator", aspect: "requirements" });
   });
 
+  test("copies printed fields into meta as strings, never over its own keys", () => {
+    expect(
+      candidateMeta({
+        kind: "indicator",
+        number: "1-01",
+        fields: { indicatorId: "1-01", numerator: "Number of active health workers", source_number: "x", empty: " " },
+      }),
+    ).toEqual({ indicatorId: "1-01", numerator: "Number of active health workers", source_number: "1-01" });
+  });
+
   test("its node keeps the section link and gains the meta; one without stays byte-identical", () => {
     const withReq = {
       candidates: [
