@@ -89,8 +89,8 @@ export const LibrarySectionSchema = z
 export const LibraryBlockSchema = z
   .object({
     ...derived,
-    // The DoCO co-type is absent for a kind that has none (core's
-    // `recommendation`, smart-base's `indicator` and requirement kinds).
+    // The DoCO co-type is absent for a kind that has none (`recommendation`,
+    // `indicator` and the requirement kinds).
     "@type": z.union([
       z.tuple([z.string().regex(/^[\w.-]+:\w+$/), z.string().regex(/^doco:\w+$/)]),
       z.tuple([z.string().regex(/^[\w.-]+:\w+$/)]),

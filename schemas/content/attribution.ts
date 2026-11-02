@@ -199,8 +199,8 @@ export const LIBRARY_BLOCK_ORIGIN: Record<string, "extracted" | "authored"> = {
   // requirement extraction is a standard L1 step for DAK and DTH). Each is the
   // source's sentence, table row or indicator lifted verbatim, with the
   // source's own number or none, so it is extracted exactly as prose is.
-  // Measured on who-iris#165 (NHWA indicators) and #167 (HRHIS guide):
-  // without these, `narrative-provenance` reported every one "not classified".
+  // Measured 2026-11-01 on two L1 libraries (NHWA indicators, the HRHIS
+  // guide): without these, `narrative-provenance` reported every one "not classified".
   recommendation: "extracted",
   "functional-requirement": "extracted",
   "non-functional-requirement": "extracted",
