@@ -261,6 +261,33 @@ export type HarnessTile = {
    */
   mark?: HarnessMark;
   /**
+   * THE PAGE GROUND — this instance's theme art behind every one of its docs
+   * pages (bean `yj32`, owner card Q-DEP-2 A, 2026-11-01: "behind every docs
+   * page").
+   *
+   * `scopes` are the URL segments that make a page this instance's, matched
+   * with `contains` by `_includes/page_ground.html` — the same rule the
+   * instance webpage theme already uses (`/<name>/`), plus the site mount.
+   * The FIRST tile that matches wins, and tiles come dependents first, so the
+   * content instance a page is about beats the platform that renders it
+   * (`/en/cat-harness/processes/folio-assistant-core/` is core's page).
+   * `siteDefault` marks the site owner, whose mount is `/`: its ground is the
+   * fallback for a page no scope claims, never a scope itself, because `/`
+   * is in every URL and would claim them all.
+   *
+   * `art` is all three crops or absent: absent means this instance's theme
+   * has no backdrop (or no theme), and its pages get NO ground rather than
+   * the owner's — a palette-only theme is a choice. The scrim is the page's
+   * own (`docs-ui.css`, `.fa-page-ground`), not the theme's sticky scrim,
+   * because the ink it protects is the page's ink, not the card's.
+   */
+  pageGround?: {
+    scopes: string[];
+    siteDefault?: true;
+    art?: Record<"mobile" | "laptop" | "card", string>;
+    title?: string;
+  };
+  /**
    * Hue angle — the tile's theme. From the instance's own theme accent when it
    * resolves one, else from the avatar registry; {@link toneFrom} says which.
    */
@@ -1220,6 +1247,22 @@ function tileFor(
       ? resolveThemeBackdrop(theme, owner.decl.images).art.get("card")
       : undefined;
   const card = ownCard ?? ownerCard;
+  // THE PAGE GROUND (bean `yj32`): the same own-first join, all three crops.
+  const ownArt = theme ? resolveThemeBackdrop(theme, decl.images).art : undefined;
+  const ownerArt =
+    theme && (ownArt === undefined || ownArt.size === 0) && owner
+      ? resolveThemeBackdrop(theme, owner.decl.images).art
+      : undefined;
+  const groundFromOwn = ownArt !== undefined && ownArt.size > 0;
+  const groundArt = groundFromOwn ? ownArt : ownerArt;
+  const groundSrcs: Record<string, string> = {};
+  for (const [layout, img] of groundArt ?? []) {
+    const src = groundFromOwn
+      ? publishedIcon(instanceDir, img.src, siteMount)
+      : publishedIcon(owner!.dir, img.src, "/");
+    if (src !== undefined) groundSrcs[layout] = src;
+  }
+  const groundComplete = ["mobile", "laptop", "card"].every((l) => groundSrcs[l] !== undefined);
   // THE PATH FOLLOWS THE SOURCE. An image declared by the site owner is
   // published under the SITE's own root, not under this instance's mount —
   // composing it from `folio` would point at a path the instance does not
@@ -1384,6 +1427,15 @@ function tileFor(
      * nothing.
      */
     ...(navMark ? { mark: navMark } : {}),
+    pageGround: {
+      scopes: [
+        ...new Set([`/${decl.name}/`, `/${artefactStub(decl)}/`, ...(siteMount && siteMount !== "/" ? [siteMount] : [])]),
+      ],
+      ...(siteMount === "/" ? { siteDefault: true as const } : {}),
+      ...(groundComplete
+        ? { art: groundSrcs as Record<"mobile" | "laptop" | "card", string>, title: theme!.name }
+        : {}),
+    },
     tone: own ? (themeTone ?? avatar.tone) : (resolvedTone ?? themeTone ?? avatar.tone),
     toneFrom: (themeTone !== undefined || (!own && resolvedTone !== undefined)) ? ("theme" as const) : ("avatar" as const),
     reads: own ? avatar.reads : BLANK_AVATAR.reads,

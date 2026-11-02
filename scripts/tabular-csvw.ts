@@ -26,6 +26,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
+import { libraryEntryDir } from "./lib/library-entry-graphs.ts";
 import { fileURLToPath } from "node:url";
 
 import { NOT_AUTHORED } from "../schemas/content/narrative.ts";
@@ -87,7 +88,9 @@ function main(argv: string[]): number {
     console.error(`SKIP ${basename(file)}: not a table the tabular-csvw reader takes, nothing written`);
     return 2;
   }
-  const out = join(lib, slug);
+  // Re-ingest writes over the entry where it is filed (`library/<group>/<slug>/`,
+  // bean `6fez`); a new entry lands unfiled at `library/<slug>/`.
+  const out = libraryEntryDir(lib, slug) ?? join(lib, slug);
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, TABULAR_CSVW_FILENAME), JSON.stringify(record, null, 2) + "\n");
   console.log(`ok  ${slug.padEnd(28)} ${record.tables.length} table(s)  [csvw]`);

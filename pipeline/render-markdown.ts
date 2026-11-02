@@ -217,7 +217,11 @@ export function renderBlockMarkdown(
   if (heading) {
     const name = numbered ? `${heading} ${numbered.number}` : heading;
     const link = opts.anchors !== false && label && NUMBERED_KINDS.has(block.kind) ? ` ${blockAnchorLink(label, name)}` : "";
-    lines.push((title ? `**${name}.** *${title}*` : `**${name}.**`) + link);
+    // A numbered block says its caption once, on the heading line (owner,
+    // 2026-11-01, of a figure: "why figure 5 repeated twice?"). It used to
+    // print "Figure 5." above and the caption again in italics below.
+    const named = title ?? (numbered && numbered.rest ? numbered.rest : undefined);
+    lines.push((named ? `**${name}.** *${named}*` : `**${name}.**`) + link);
     lines.push("");
   } else if (title) {
     // A kind with no heading is `prose`, and unheaded prose is the whole
@@ -238,7 +242,7 @@ export function renderBlockMarkdown(
   const body = entry.dmnTable ? placeDmnTable(prose, entry.dmnTable) : prose;
   if (body) lines.push(body);
 
-  if (caption && caption !== title) {
+  if (caption && caption !== title && !(numbered && numbered.rest && !title)) {
     // A numbered heading already says "Figure 1", so the caption drops its
     // own "Fig. 1." rather than print the number twice.
     const shown = numbered && numbered.rest ? numbered.rest : caption;

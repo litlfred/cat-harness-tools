@@ -15,7 +15,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, isAbsolute, join, join as joinPath, relative, resolve } from "node:path";
 
-import { checkoutRootFor, resolveDirectories, repoRootFor, isKgContentDirectory } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, directoriesForGraph, resolveDirectories, repoRootFor, isKgContentDirectory } from "../schemas/kg/cat-harness.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 /**
@@ -155,7 +155,7 @@ function holdsMarkdown(abs: string): boolean {
 export function kgDirectories(
   root: string,
   scope: CorpusScope = corpusScopeFor(root),
-): Array<{ id: string; path: string; absPath: string }> {
+): Array<{ id: string; path: string; absPath: string; graphTypologies?: string[] }> {
   return declaredKgDirectories(root, scope).filter((d) => existsSync(d.absPath));
 }
 
@@ -169,7 +169,7 @@ export function kgDirectories(
 export function declaredKgDirectories(
   root: string,
   scope: CorpusScope = corpusScopeFor(root),
-): Array<{ id: string; path: string; absPath: string }> {
+): Array<{ id: string; path: string; absPath: string; graphTypologies?: string[] }> {
   try {
     return (scope === "checkout" ? checkoutDirectories(root, { stackedOn: root }) : resolveDirectories([{ name: "(local)", root, own: true }]))
       // EXACTLY ONE knowledge-graph typology, not merely including one.
@@ -892,6 +892,11 @@ function holdsDiagrams(dir: string): boolean {
 export function workflowDirs(root: string, scope: CorpusScope = corpusScopeFor(root)): string[] {
   const out: string[] = [];
   for (const d of kgDirectories(root, scope)) {
+    // A `business-processes` directory DESCRIBES work and is never run (owner,
+    // 2026-11-01, Q-SUBG-6 A). It is read by KIND, not by file extension: its
+    // `.bpmn` files would otherwise reach the engine through `holdsDiagrams`
+    // below, and every engine gate would grade a DAK's diagrams as workflows.
+    if (d.graphTypologies?.includes("business-processes")) continue;
     // `processes/`, the convention since 2026-09-21. An instance that has not
     // migrated declares its diagrams directly and is reached by the second
     // branch below, so no legacy name is needed here.
@@ -940,6 +945,43 @@ export function workflowFiles(root: string, scope: CorpusScope = corpusScopeFor(
   // Belt and braces on top of `workflowDirs`'s own dedupe: a caller may pass
   // overlapping directories this function never chose, and the same file
   // reached twice is a duplicate `@id` downstream either way.
+  return [...new Set(out)].sort();
+}
+
+/**
+ * The `.bpmn` files of the `business-processes` and `folio` directories
+ * `root` itself declares: diagrams that describe work as content (a DAK's business
+ * processes), which the processes viewer and `render:bpmn` draw and the
+ * engine never runs (owner, 2026-11-01, Q-SUBG-3). Not in
+ * {@link workflowFiles}, so no engine gate reads them.
+ */
+export function businessProcessFiles(root: string, opts: { folio?: boolean } = {}): string[] {
+  const out: string[] = [];
+  const walk = (dir: string): void => {
+    if (!existsSync(dir)) return;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = joinPath(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name.endsWith(".bpmn")) out.push(p);
+    }
+  };
+  // Also every `.bpmn` inside a declared `folio`: a diagram held as a document
+  // block (a DTH's `bp-*` blocks, smart-base's `businessProcess()`, kind
+  // `business-process`) describes work by construction. `folio` is not
+  // knowledge-graph content, so the engine never read these; the viewer did
+  // not either until now. Read by the directory's kind, so the blocks stay
+  // where the chapter manifests point at them.
+  const dirs: string[] = [];
+  // `render:bpmn` passes `folio: false`: a folio block carries its own drawn
+  // SVG (`meta.svgFile`), so drawing it again would be a second copy to keep.
+  for (const kind of opts.folio === false ? ["business-processes"] : ["business-processes", "folio"]) {
+    try {
+      dirs.push(...directoriesForGraph(root, kind));
+    } catch {
+      // an unreadable declaration is `check:harness-dirs`'s to report
+    }
+  }
+  for (const d of dirs) walk(d);
   return [...new Set(out)].sort();
 }
 
