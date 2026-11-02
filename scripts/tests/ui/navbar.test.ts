@@ -33,7 +33,8 @@ import {
 } from "../../lib/navbar.js";
 import { NAVBAR_LINKED, NAVBAR_ROW_CSS, NAVBAR_ROW_INLINE, NAVBAR_ROW_JS, declinesNavbar, expandRail, injectRail, railDataJson, railPageOf, wantsLinkedRail, railModel, withNavbarRow } from "../../lib/harness-rail.js";
 import { injectRailOnce } from "../../lib/rail-once.js";
-import { NAVBAR_CSS, documentIndexOf, numberedHeading, visualiserLabelOf } from "../../lib/navbar.js";
+import { HOME_GLYPH, NAVBAR_CSS, documentIndexOf, numberedHeading, visualiserLabelOf } from "../../lib/navbar.js";
+import { BLANK_AVATAR } from "../../../schemas/ui/blank-avatar.js";
 import { thinPageHtml } from "../../thin-page.js";
 import {
   BEGIN,
@@ -295,9 +296,22 @@ describe("at rest it is a strip, and opens three ways", () => {
     expect([...bare.matchAll(new RegExp(`<label class="([^"]+)" for="${id}"`, "g"))].map((m) => m[1])).toEqual(["fa-nav-head"]);
   });
 
-  it("the header carries the instance's mark — its initial when no avatar is declared", () => {
+  it("the header carries the instance's mark — the home icon when no avatar is declared (owner, 2026-11-02)", () => {
     const html = navbarHtml({ ...model, instance: "who-iris" });
-    expect(region(html, "fa-nav-top")).toMatch(/<span class="fa-nav-glyph[^"]*"[^>]*>W<\/span>/);
+    expect(region(html, "fa-nav-top")).toContain(`<path d="${HOME_GLYPH}"`);
+    expect(region(html, "fa-nav-top")).not.toMatch(/<span class="fa-nav-glyph[^"]*"[^>]*>W<\/span>/);
+    // A blank declared mark is no mark of the site's own, so it is the house too.
+    const blank = navbarHtml({ ...model, mark: { glyphPath: BLANK_AVATAR.glyph, tone: 184 } });
+    expect(region(blank, "fa-nav-top")).toContain(`<path d="${HOME_GLYPH}"`);
+    expect(region(blank, "fa-nav-top")).toContain("--fa-nav-hue:184");
+    expect(region(blank, "fa-nav-top")).not.toContain("fa-nav-blank");
+  });
+
+  it("a declared glyph or letter beats the home icon", () => {
+    const glyph = navbarHtml({ ...model, mark: { glyphPath: "M3 18h18" } });
+    expect(region(glyph, "fa-nav-top")).not.toContain(HOME_GLYPH);
+    const icon = navbarHtml({ ...model, mark: { icon: "Q" } });
+    expect(region(icon, "fa-nav-top")).toMatch(/>Q<\/span>/);
   });
 
   it("the header carries the declared avatar when there is one", () => {

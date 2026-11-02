@@ -178,9 +178,10 @@ export interface RailOptions {
 /**
  * The model for a mounted page.
  *
- * `home` is last in the fixed bottom — *"keep home at bottom for who iris."*
- * It is the one item whose href this file composes, because `toRoot` is the
- * only piece of routing a mounted page knows about itself.
+ * There is no home row in the fixed bottom any more (owner, 2026-10-30: *"dont
+ * need home on bottomof harnes navbars"*; retired in bean `sjic`, 2026-11-02).
+ * The header is the home link, and its href is the one this file composes,
+ * because `toRoot` is the only piece of routing a mounted page knows about itself.
  */
 export function railModel(o: RailOptions): NavbarModel & { graphs: NavGroup } {
   const harnesses: NavGroup | undefined =
