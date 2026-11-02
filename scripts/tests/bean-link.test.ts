@@ -200,7 +200,7 @@ describe("a step drawn against the Beans store works the bean (Q-BR-8 F)", () =>
   // S → Work (writes the work-plan store) → Read (reads it only) → Named (writes it, op="claim") → E
   const diagram = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/v0/processes/ns#"
+                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/v0/processes/ns/"
                   id="D" targetNamespace="urn:x">
   <bpmn:dataStore id="work-plan" name="Work plan (beans)"/>
   <bpmn:process id="Process_W" name="W" isExecutable="false">
