@@ -975,12 +975,25 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   // theirs) with a line on what each does. Another layer adds a pane with
   // window.faBlockPanel.pane(id, { icon, title, render(label, body) }) and
   // its icon with .icon(box, id, count).
-  const panes = { edit: { icon: "\u270e", title: "Help improve this section" } };
+  // Owner, 2026-11-02: one small icon per block, "use the feedback icon",
+  // with the block's 🔗 above it in the gutter: a faint 📣 opens one panel with the block's link, its suggest, feedback
+  // and edit, and its public comments. The other icons stay in the box, so
+  // a layer can still add a pane, but only the trigger shows on the page.
+  const panes = { edit: { icon: "\ud83d\udce3", title: "Help improve this section" } };
   const LINK_CSS = "html.fa-bp .ba-moved{display:none!important}" +
     "html.fa-bp .ba-heading{float:right;flex-direction:row;margin-left:.6rem;font-size:.8rem;font-weight:400}" +
     ".ba-ic.ba-copied{border-color:#2e7d32;background:#2e7d32;color:#fff}" +
     ".ba-ic{position:relative;width:28px;height:28px;padding:0;border:1px solid #8885;border-radius:7px;background:color-mix(in srgb,currentColor 5%,transparent);color:inherit;font-size:14px;line-height:1;cursor:pointer}" +
     "html.fa-bp .block-actions.ba-heading{display:flex;gap:4px;opacity:.3}" +
+    "html.fa-bp .block-actions:not(.ba-heading){opacity:1}" +
+    "html.fa-bp .block-actions:not(.ba-heading)>.ba-ic:not(.ba-trigger):not(.ba-link){display:none}" +
+    "html.fa-bp .block-actions>.ba-trigger,html.fa-bp .block-actions:not(.ba-heading)>.ba-link{width:20px;height:20px;border:0;background:none;font-size:13px;opacity:.4;filter:grayscale(1)}" +
+    "html.fa-bp .block-actions:not(.ba-heading)>.ba-link{font-size:11px}" +
+    "html.fa-bp .block-actions>.ba-trigger .ba-n{top:-4px;right:-6px;font-size:9px;padding:0 3px}" +
+    "html.fa-bp .block-actions:hover>.ba-trigger,html.fa-bp .ba-trigger:focus-visible,html.fa-bp .ba-trigger[aria-expanded=true],html.fa-bp :hover>.block-actions>.ba-trigger,html.fa-bp p:has(+.fa-blk:hover)>.block-actions>.ba-trigger,html.fa-bp .block-actions:not(.ba-heading):hover>.ba-link,html.fa-bp .block-actions:not(.ba-heading)>.ba-link:focus-visible,html.fa-bp :hover>.block-actions:not(.ba-heading)>.ba-link,html.fa-bp p:has(+.fa-blk:hover)>.block-actions>.ba-link{opacity:1;filter:none}" +
+    ".fa-block-panel .bp-copy{font:inherit;font-size:.82rem;margin:.1rem 0 .3rem;padding:.3rem .6rem;border:1px solid #8886;border-radius:6px;background:none;color:inherit;cursor:pointer}" +
+    ".fa-block-panel .bp-copy.ba-copied{border-color:#2e7d32;background:#2e7d32;color:#fff}" +
+    ".fa-block-panel .bp-pane{margin-top:1rem}.fa-block-panel .bp-pane>h4{margin:0 0 .3rem;font-size:.9rem}" +
     "html.fa-bp h2:hover>.ba-heading,html.fa-bp h3:hover>.ba-heading,html.fa-bp h4:hover>.ba-heading,html.fa-bp .ba-heading:focus-within{opacity:1}";
   const EXPLAIN = {
     suggest: ["\u270d Suggest a change", "Propose new wording in an editor. It is sent as a GitHub issue with your change, and the editors decide on it."],
@@ -1014,20 +1027,26 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     const label = box.dataset.block || "";
     state = { box: box, id: id, from: from };
     document.querySelectorAll('.ba-ic[aria-expanded="true"]').forEach((b) => b.setAttribute("aria-expanded", "false"));
-    box.querySelectorAll(".ba-ic").forEach((b) => b.setAttribute("aria-expanded", String(b.dataset.pane === id)));
-    const tabs = el("div", { className: "bp-tabs" });
-    for (const b of box.querySelectorAll(".ba-ic:not(.ba-link)")) {
-      const t = b.cloneNode(true);
-      t.setAttribute("aria-expanded", String(b.dataset.pane === id));
-      t.onclick = (e) => { e.stopPropagation(); open(box, b.dataset.pane, from); };
-      tabs.append(t);
-    }
+    const trigger = box.querySelector(":scope > .ba-trigger");
+    if (trigger) trigger.setAttribute("aria-expanded", "true");
+    // One panel for the block: its link, its own links, then every other
+    // pane a layer added (public comments), in that order.
+    const hasLinks = !!box.querySelector(":scope > a[data-fa-link]");
+    const others = Array.from(box.querySelectorAll(":scope > .ba-ic:not(.ba-link)")).map((b) => b.dataset.pane).filter((k) => k !== "edit" && panes[k] && panes[k].render);
     const x = el("button", { className: "bp-x", type: "button", textContent: "\u2715", title: "Close (Esc)" });
     x.onclick = close;
-    const p = panes[id] || { title: id };
+    const p = hasLinks ? panes.edit : panes[others[0]] || { title: id };
     const body = el("div", { className: "bp-body" });
-    panel.replaceChildren(x, tabs, el("h3", { textContent: p.title }), el("div", { className: "bp-sub", textContent: titleOf(box) }), body);
-    if (id === "edit") {
+    const head = [x, el("h3", { textContent: p.title }), el("div", { className: "bp-sub", textContent: titleOf(box) })];
+    const lk = box.querySelector(':scope > .ba-link');
+    if (lk) {
+      const c = el("button", { className: "bp-copy", type: "button", textContent: "\ud83d\udd17 " + lk.title });
+      c.dataset.anchor = lk.dataset.anchor;
+      c.onclick = (e) => { e.stopPropagation(); copyLink(c); };
+      head.push(c);
+    }
+    panel.replaceChildren(...head, body);
+    if (hasLinks) {
       fill(box);
       ready(box);
       for (const a of box.querySelectorAll(":scope > a[data-fa-link]")) {
@@ -1043,7 +1062,15 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       box.parentNode.insertBefore(home, box);
       moved = box;
       body.append(box);
-    } else if (p.render) p.render(label, body);
+    }
+    for (const k of others) {
+      const sec = el("div", { className: "bp-pane" });
+      if (hasLinks || others.length > 1) sec.append(el("h4", { textContent: (panes[k].icon ? panes[k].icon + " " : "") + panes[k].title }));
+      const inner = el("div");
+      sec.append(inner);
+      body.append(sec);
+      panes[k].render(label, inner);
+    }
     panel.classList.add("open");
     panel.focus({ preventScroll: true });
   };
@@ -1058,6 +1085,25 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     // 🔗 first, ✎ last; every other pane's icon between them.
     if (id === "edit") box.append(b);
     else box.insertBefore(b, box.querySelector('.ba-ic[data-pane="edit"]') || null);
+    retrigger(box);
+  };
+  // The one icon a block shows: 📣 when it has links, else the first pane's
+  // own icon. The 📣 carries the count of the other panes (public comments).
+  const retrigger = (box) => {
+    if (box.classList.contains("ba-heading")) return;
+    const ics = Array.from(box.querySelectorAll(":scope > .ba-ic:not(.ba-link)"));
+    if (!ics.length) return;
+    const t = box.querySelector(':scope > .ba-ic[data-pane="edit"]') || ics[0];
+    for (const b of ics) b.classList.toggle("ba-trigger", b === t);
+    if (t.dataset.pane !== "edit") return;
+    let n = 0;
+    for (const b of ics) { const c = b !== t && b.querySelector(".ba-n"); if (c) n += Number(c.textContent) || 0; }
+    let bn = t.querySelector(".ba-n");
+    if (n) {
+      if (!bn) { bn = el("b", { className: "ba-n" }); t.append(bn); }
+      bn.textContent = String(n);
+      t.title = panes.edit.title + " (" + n + " comment" + (n === 1 ? "" : "s") + ")";
+    } else if (bn) bn.remove();
   };
   // 🔗 Link (owner, 2026-11-02: "should be an anchor link (on right icon
   // for the content block that has feedback edit etc)", and the heading
@@ -1112,7 +1158,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     if (b && !(panel && panel.contains(b))) {
       e.preventDefault();
       const box = b.closest(".block-actions");
-      if (state && state.box === box && state.id === b.dataset.pane) close();
+      if (state && state.box === box) close();
       else if (box) open(box, b.dataset.pane, b);
       return;
     }
