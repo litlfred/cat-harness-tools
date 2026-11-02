@@ -23,6 +23,8 @@ import {
   buildDocumentNodes,
   sectionKey,
   blockId,
+  candidateMeta,
+  candidateTypes,
   ingestRungOf,
   RUNG_INPUT,
   buildEntryNodes,
@@ -669,5 +671,38 @@ describe("an argument run() would not read is refused before anything is written
     expect(unknownArgument([])).toBeUndefined();
     expect(unknownArgument(["--check", "--prune", "--doc", "x"])).toBeUndefined();
     expect(unknownArgument(["--entry", "ingest-staging/x"])).toBeUndefined();
+  });
+});
+
+describe("a requirement candidate (L1 requirement ingestion, 2026-11-01)", () => {
+  test("carries the source's own number and kind, and nothing it was not given", () => {
+    expect(candidateMeta({ kind: "remark" })).toBeUndefined();
+    expect(
+      candidateMeta({ kind: "indicator", number: "1-01", source_kind: "nhwa-indicator", aspect: "requirements" }),
+    ).toEqual({ source_number: "1-01", source_kind: "nhwa-indicator", aspect: "requirements" });
+  });
+
+  test("its node keeps the section link and gains the meta; one without stays byte-identical", () => {
+    const withReq = {
+      candidates: [
+        ...candidates.candidates,
+        { kind: "recommendation", number: "R1", strength: "should", statement: "Registries should be updated.", section_file: "sections/sec-000-1-introduction.md" },
+      ],
+    };
+    const out = buildDocumentNodes("0110001v3", structure, withReq, () => true);
+    const node = JSON.parse(out.find((f) => f.path === "blocks/recommendation-sec-000-02.jsonld")!.content) as Record<string, unknown>;
+    expect(node.derivedFrom).toBe("library/0110001v3/sections/sec-000");
+    expect(node.meta).toEqual({ source_number: "R1", strength: "should" });
+    expect(parse("blocks/rem-sec-000-01.jsonld").meta).toBeUndefined();
+  });
+});
+
+describe("a candidate's @type (cat-harness-tools#1356)", () => {
+  test("a kind no mounted layer types is still a typed library block, never untyped", () => {
+    // No layer in this checkout contributes this kind.
+    expect(candidateTypes("no-such-kind-anywhere")).toEqual(["cat-harness:Block"]);
+    // A core kind keeps its own pair.
+    expect(candidateTypes("theorem").length).toBeGreaterThan(0);
+    expect(candidateTypes("theorem")).not.toContain("cat-harness:Block");
   });
 });

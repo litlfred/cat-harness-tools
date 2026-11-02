@@ -99,6 +99,28 @@ describe("structured blocks: a light card", () => {
     const md = renderBlockMarkdown({ block: { kind: "user-scenario", label: "scen:x", title: "X" } as unknown as Block, mdContent: body });
     expect(md).toContain('<span class="fa-block-kind">User scenario</span> **X.**\n\n' + body);
   });
+  test("an indicator shows its id, its calculation as a fraction, and its module and disaggregation", () => {
+    const md = renderBlockMarkdown({
+      block: {
+        kind: "indicator",
+        label: "ind:1-01",
+        title: "Density of health workers",
+        meta: { indicatorId: "1-01", module: "1", numerator: "Active health workers", denominator: "Total population", unit: "10 000", disaggregation: "occupation; sex" },
+      } as unknown as Block,
+      mdContent: "Health workers per 10 000 population.",
+    });
+    expect(md).toContain('<span class="fa-block-kind">Indicator</span> <span class="fa-block-id">1-01</span> **Density of health workers.** Health workers per 10 000 population.');
+    expect(md).toContain('<span class="fa-block-ratio-num"><span class="fa-block-ratio-label">Numerator</span> Active health workers</span>');
+    expect(md).toContain('<span class="fa-block-ratio-unit">\u00d7 10 000</span>');
+    expect(md).toContain("*Module:* 1 \u00b7 *Disaggregation:* occupation; sex");
+  });
+  test("an indicator whose text already gives the numerator is not repeated", () => {
+    const md = renderBlockMarkdown({
+      block: { kind: "indicator", label: "ind:x", meta: { numerator: "A", denominator: "B" } } as unknown as Block,
+      mdContent: "Text.\n\n*Numerator:* A. *Denominator:* B.",
+    });
+    expect(md).not.toContain("fa-block-ratio");
+  });
   test("prose and numbered kinds are not cards", () => {
     expect(renderBlockMarkdown({ block: { kind: "prose", label: "p:x" } as unknown as Block, mdContent: "Text." })).not.toContain("fa-block");
     expect(renderBlockMarkdown(fig("Fig. 1. X"))).not.toContain("fa-block ");

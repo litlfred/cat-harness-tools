@@ -19,6 +19,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
+import { TRACE_ENV, openTrace } from "../../schemas/sdlc/input-trace.ts";
 import { DEFAULT_PUBLISH_REF, detectRepoUrl, ownerRepo, publishTargets, publishedPaths, withoutCredentials } from "../../src/core/git-refs.js";
 import { loadReadmeConfig } from "../../pipeline/readme-toc.js";
 import { repoRootFor } from "../../schemas/kg/cat-harness.js";
@@ -119,6 +120,25 @@ describe("withoutCredentials — no token reaches a page (smart-ra, 2026-10-14)"
       expect(detectRepoUrl(repo)).toBe("https://github.com/o/r");
     } finally {
       rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  test("detectRepoUrl is a replayable tree read, not a traced input site", () => {
+    const fx = gitFixtureRepo({ files: { "AGENTS.md": "# fixture\n" } });
+    const prev = process.env[TRACE_ENV];
+    try {
+      const trace1 = openTrace(fx.root);
+      process.env[TRACE_ENV] = trace1.env[TRACE_ENV];
+      expect(detectRepoUrl(fx.root)).toBeDefined();
+      expect(trace1.reached()).toBeUndefined();
+      const trace2 = openTrace(fx.root);
+      process.env[TRACE_ENV] = trace2.env[TRACE_ENV];
+      expect(publishedPaths(fx.root, "HEAD")?.has("AGENTS.md")).toBe(true);
+      expect(trace2.reached()).toBe("git-refs: git");
+    } finally {
+      if (prev === undefined) delete process.env[TRACE_ENV];
+      else process.env[TRACE_ENV] = prev;
+      fx.cleanup();
     }
   });
 });

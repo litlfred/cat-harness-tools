@@ -196,6 +196,66 @@ describe("the diagrams declare which operation each step performs", () => {
   });
 });
 
+describe("a step drawn against the Beans store works the bean (Q-BR-8 F)", () => {
+  // S → Work (writes the work-plan store) → Read (reads it only) → Named (writes it, op="claim") → E
+  const diagram = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:cat-harness.processes="https://litlfred.github.io/cat-harness/v0/processes/ns#"
+                  id="D" targetNamespace="urn:x">
+  <bpmn:dataStore id="work-plan" name="Work plan (beans)"/>
+  <bpmn:process id="Process_W" name="W" isExecutable="false">
+    <bpmn:startEvent id="S"/>
+    <bpmn:task id="Work" name="Work">
+      <bpmn:dataOutputAssociation id="DOA1"><bpmn:targetRef>Beans</bpmn:targetRef></bpmn:dataOutputAssociation>
+    </bpmn:task>
+    <bpmn:task id="Read" name="Read">
+      <bpmn:dataInputAssociation id="DIA1"><bpmn:sourceRef>Beans</bpmn:sourceRef></bpmn:dataInputAssociation>
+    </bpmn:task>
+    <bpmn:task id="Named" name="Named">
+      <bpmn:extensionElements><cat-harness.processes:bean op="claim"/></bpmn:extensionElements>
+      <bpmn:dataOutputAssociation id="DOA2"><bpmn:targetRef>Beans</bpmn:targetRef></bpmn:dataOutputAssociation>
+    </bpmn:task>
+    <bpmn:dataStoreReference id="Beans" name="Beans" dataStoreRef="work-plan"/>
+    <bpmn:endEvent id="E"/>
+    <bpmn:sequenceFlow id="F1" sourceRef="S" targetRef="Work"/>
+    <bpmn:sequenceFlow id="F2" sourceRef="Work" targetRef="Read"/>
+    <bpmn:sequenceFlow id="F3" sourceRef="Read" targetRef="Named"/>
+    <bpmn:sequenceFlow id="F4" sourceRef="Named" targetRef="E"/>
+  </bpmn:process>
+</bpmn:definitions>
+`;
+
+  test("a write to the store is a note; a read alone is not; a named op still wins", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "bean-store-"));
+    writeFileSync(join(dir, "w.bpmn"), diagram);
+    const model = await loadProcessModel(join(dir, "w.bpmn"));
+    rmSync(dir, { recursive: true, force: true });
+    const work = model.nodes.get("Work")!;
+    expect([work.workPlanOp, work.worksBean, work.touchesWorkPlan]).toEqual(["note", true, true]);
+    const read = model.nodes.get("Read")!;
+    expect([read.workPlanOp, read.worksBean, read.touchesWorkPlan]).toEqual([undefined, undefined, false]);
+    expect(model.nodes.get("Named")!.workPlanOp).toBe("claim");
+  });
+
+  test("working the bean claims one nobody has started, then notes", () => {
+    bean("wb01", "Not started", "todo");
+    const r = applyWorkPlanOp(repo, "wb01", "note", { note: "did a step", claimIfNotStarted: true });
+    expect(r.summary).toBe("bean wb01: todo → in-progress, and noted");
+    const body = readFileSync(findBean(repo, "wb01")!.path, "utf8");
+    expect(body).toContain("status: in-progress");
+    expect(body).toContain("did a step");
+  });
+
+  test("never claims a draft, or a bean already in progress or finished", () => {
+    for (const status of ["draft", "in-progress", "completed", "scrapped"]) {
+      bean(`wb${status.slice(0, 2)}`, `Bean ${status}`, status);
+      const r = applyWorkPlanOp(repo, `wb${status.slice(0, 2)}`, "note", { note: "x", claimIfNotStarted: true });
+      expect([status, r.summary]).toEqual([status, `noted on bean wb${status.slice(0, 2)}`]);
+      expect(readFileSync(findBean(repo, `wb${status.slice(0, 2)}`)!.path, "utf8")).toContain(`status: ${status}`);
+    }
+  });
+});
+
 describe("resolve before a closing archive step", () => {
   // S → Work → Resolve → [Archive] → E, with the archive step optionally followed by more work.
   const diagram = (afterArchive: boolean): string => `<?xml version="1.0" encoding="UTF-8"?>

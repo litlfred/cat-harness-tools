@@ -8,6 +8,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { gzipSync } from "node:zlib";
 
 import { RENDERED_IMPACT_TAG, RenderedImpactSchema } from "../../schemas/ui/rendered-impact.js";
 import {
@@ -265,6 +266,98 @@ describe("measureDeploy", () => {
     );
     expect(stampedHash("en/cat-harness/beans/cat-harness/workflows/x/index.html", Buffer.from(wf("2026-10-31T03:03:12.208Z", "completed")))).not.toBe(
       stampedHash("en/cat-harness/beans/cat-harness/workflows/x/index.html", Buffer.from(wf("2026-10-31T03:45:37.683Z", "running"))),
+    );
+  });
+
+  test("post-#1084 deploy stamps (pins.json self-sha, root-index sha256, site:viz gh-pages state, availability.json source race, and ustar package.tgz mtime) are stamps; content changes are not", () => {
+    const sha1 = "aa193439f8961442431731741009911675888111";
+    const sha2 = "c27093c3d1d245bc25b3175a8f6f26183079ab6b";
+    const pins = (self: string, layer: string) => JSON.stringify({ ".": self, bootstrap: layer }, null, 2);
+    expect(stampedHash("pins.json", Buffer.from(pins(sha1, sha1)))).toBe(stampedHash("pins.json", Buffer.from(pins(sha2, sha1))));
+    expect(stampedHash("pins.json", Buffer.from(pins(sha1, sha1)))).not.toBe(stampedHash("pins.json", Buffer.from(pins(sha2, sha2))));
+
+    const rootIdx = (nodes: number, bytes: number, sha: string) =>
+      JSON.stringify({ "@graph": [{ name: "bootstrap", nodes, bytes, sha256: sha }] }, null, 2);
+    const h1 = "116cf67213305989b492e851ae0ef357c90e26b267d3921a7c454e2bc1c0f823";
+    const h2 = "584fb94c798dc1df548aa5382e4431400b4beaa12989ab24803667f8c31df8bb";
+    expect(stampedHash("index.json", Buffer.from(rootIdx(489, 1358333, h1)))).toBe(
+      stampedHash("index.json", Buffer.from(rootIdx(489, 1358340, h2))),
+    );
+    expect(stampedHash("index.json", Buffer.from(rootIdx(489, 1358333, h1)))).not.toBe(
+      stampedHash("index.json", Buffer.from(rootIdx(490, 1358333, h1))),
+    );
+
+    const siteViz = (tip: string, apiPages: number, renderLogs: number, previews: number, previewRow: string) =>
+      `<p class="m">Tip <code>${tip}</code> · 55 top-level route(s), 12662 page(s) · ${previews} staging preview(s) · 18 file(s) at the root</p>` +
+      `<table><thead><tr><th>Route</th><th>Pages</th><th>Files</th></tr></thead><tbody><tr><td><code>_render-log/</code></td><td>0</td><td>${renderLogs}</td></tr><tr><td><code>api/</code></td><td>${apiPages}</td><td>2660</td></tr></tbody></table>` +
+      `<table><thead><tr><th>Preview</th><th>Pages</th><th>Files</th></tr></thead><tbody>${previewRow}</tbody></table>`;
+    expect(
+      stampedHash("en/cat-harness/site/index.html", Buffer.from(siteViz("806c1d062fe5", 2651, 43, 6, "<tr><td>a</td><td>1</td><td>2</td></tr>"))),
+    ).toBe(
+      stampedHash("en/cat-harness/site/index.html", Buffer.from(siteViz("0486e13b5abc", 2651, 44, 5, "<tr><td>b</td><td>3</td><td>4</td></tr>"))),
+    );
+    expect(
+      stampedHash("en/cat-harness/site/index.html", Buffer.from(siteViz("806c1d062fe5", 2651, 43, 6, "<tr><td>a</td><td>1</td><td>2</td></tr>"))),
+    ).not.toBe(
+      stampedHash("en/cat-harness/site/index.html", Buffer.from(siteViz("0486e13b5abc", 2652, 44, 5, "<tr><td>b</td><td>3</td><td>4</td></tr>"))),
+    );
+
+    const availCheckout = JSON.stringify({
+      $schema: "folio-qa-availability/v1",
+      source: "checkout",
+      requested: ["main/<sha>", "main"],
+      reason: "no exact entry for main/<sha> on `qa-reports`; the checkout already holds the QA corpus",
+      expected: { witnesses: 17, results: 19 },
+      published: { witnesses: 17, results: 20 },
+    });
+    const availFetched = JSON.stringify({
+      $schema: "folio-qa-availability/v1",
+      source: "fetched",
+      requested: ["main/<sha>", "main"],
+      key: "main/<sha>",
+      reason: "fetched exact entry `main/<sha>` from `qa-reports`",
+      expected: { witnesses: 17, results: 19 },
+      published: { witnesses: 17, results: 20 },
+    });
+    const availUnavailable = JSON.stringify({
+      $schema: "folio-qa-availability/v1",
+      source: "unavailable",
+      requested: ["main/<sha>", "main"],
+      reason: "missing",
+      expected: { witnesses: 17, results: 19 },
+      published: { witnesses: 17, results: 20 },
+    });
+    expect(stampedHash("assets/qa/availability.json", Buffer.from(availCheckout))).toBe(
+      stampedHash("assets/qa/availability.json", Buffer.from(availFetched)),
+    );
+    expect(stampedHash("assets/qa/availability.json", Buffer.from(availCheckout))).not.toBe(
+      stampedHash("assets/qa/availability.json", Buffer.from(availUnavailable)),
+    );
+
+    const igIdx = (bytes: number, artifacts: number) =>
+      JSON.stringify({ package: { localPath: "fhir-artifact-index/package.tgz", bytes }, artifacts }, null, 2);
+    expect(stampedHash("smart-base/fhir-artifact-index/index.json", Buffer.from(igIdx(1218748, 230)))).toBe(
+      stampedHash("smart-base/fhir-artifact-index/index.json", Buffer.from(igIdx(1218804, 230))),
+    );
+    expect(stampedHash("smart-base/fhir-artifact-index/index.json", Buffer.from(igIdx(1218748, 230)))).not.toBe(
+      stampedHash("smart-base/fhir-artifact-index/index.json", Buffer.from(igIdx(1218804, 231))),
+    );
+
+    const makeTarGz = (mtimeOctal: string, payload: string): Buffer => {
+      const tar = Buffer.alloc(1024, 0);
+      tar.write("package/package.json", 0, "ascii");
+      tar.write( payload.length.toString(8).padStart(11, "0") + "\0", 124, "ascii");
+      tar.write(mtimeOctal.padStart(11, "0") + "\0", 136, "ascii");
+      tar.write("012345\0 ", 148, "ascii");
+      tar.write("ustar\0", 257, "ascii");
+      tar.write(payload, 512, "utf-8");
+      return gzipSync(tar);
+    };
+    expect(stampedHash("smart-base/fhir-artifact-index/package.tgz", makeTarGz("15267205120", "{\"name\":\"a\"}"))).toBe(
+      stampedHash("smart-base/fhir-artifact-index/package.tgz", makeTarGz("15267211023", "{\"name\":\"a\"}")),
+    );
+    expect(stampedHash("smart-base/fhir-artifact-index/package.tgz", makeTarGz("15267205120", "{\"name\":\"a\"}"))).not.toBe(
+      stampedHash("smart-base/fhir-artifact-index/package.tgz", makeTarGz("15267211023", "{\"name\":\"b\"}")),
     );
   });
 

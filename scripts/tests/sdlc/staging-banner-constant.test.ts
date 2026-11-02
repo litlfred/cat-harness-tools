@@ -422,9 +422,11 @@ describe("the STAGING build does not bake a per-run stamp into the footer", () =
     // the assertion must name what distinguishes the two, not what they share.
     expect(client).toMatch(/stamp\(f\);/);
     // From the same one fetch of `staging.json`, not a second request. The
-    // other fetch in the client is the staleness check against GitHub (#1076).
+    // other two fetches in the client are the staleness check against GitHub
+    // (#1076) and the HEAD probe that finds the preview's review page (#1318).
     expect((client.match(/fetch\(r\+'staging\.json'/g) ?? []).length).toBe(1);
-    expect((client.match(/fetch\(/g) ?? []).length).toBe(2);
+    expect((client.match(/fetch\(c\[i\]\+'index\.html',\{method:'HEAD'/g) ?? []).length).toBe(1);
+    expect((client.match(/fetch\(/g) ?? []).length).toBe(3);
   });
 
   test("the MAIN site no longer bakes it either: the browser fills it from build.json", () => {
