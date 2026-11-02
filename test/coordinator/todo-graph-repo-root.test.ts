@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { declaredSubgraphNode } from "../../scripts/kg-export.ts";
 import { subgraphPublicationFindings } from "../../scripts/subgraph-node.ts";
-import { siteNotBuilt } from "../support/checkout.ts";
+import { ensureDocsPages, siteNotBuilt } from "../support/checkout.ts";
 
 /**
  * The directory this test was written in (`cat-harness/scripts/tests/`): every path below
@@ -29,6 +29,10 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
 const ROOT = join(ORIGIN_DIR, "..", "..");
 const SITE = join(ROOT, siteDirFor(ROOT));
+
+// The document is written by `docs:pages`, so build it when it is missing
+// rather than rely on another file in this shard having run it first (#411).
+ensureDocsPages(ROOT);
 
 /** The todo graph is written at publish and gitignored (bean w1gy F18). */
 const NOT_BUILT = siteNotBuilt("the todo graph `docs:pages` writes at publish (gitignored)", join(SITE, "todos.jsonld"));

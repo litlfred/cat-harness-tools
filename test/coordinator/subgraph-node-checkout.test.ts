@@ -16,13 +16,17 @@ import { join } from "node:path";
 import { siteDirFor } from "../../schemas/kg/cat-harness.ts";
 import { declaredSubgraphNode } from "../../scripts/kg-export.ts";
 import { subgraphPublicationFindings } from "../../scripts/subgraph-node.ts";
-import { siteNotBuilt } from "../support/checkout.ts";
+import { ensureDocsPages, siteNotBuilt } from "../support/checkout.ts";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
 const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/scripts/tests");
 
 const ROOT = join(ORIGIN_DIR, "..", "..");
 const SITE = join(ROOT, siteDirFor(ROOT));
+
+// The document is written by `docs:pages`, so build it when it is missing
+// rather than rely on another file in this shard having run it first (#411).
+ensureDocsPages(ROOT);
 
 /** Declared subgraph id → the committed document that publishes its contents. */
 const PUBLISHED: ReadonlyArray<{ id: string; file: string }> = [{ id: "todos", file: join(SITE, "todos.jsonld") }];
