@@ -67,7 +67,7 @@ const graphOf = (doc: Record<string, unknown>): Node[] => doc["@graph"] as Node[
 const concepts = (doc: Record<string, unknown>): Node[] =>
   graphOf(doc).filter((n) => n["@type"] === "skos:Concept");
 const usages = (doc: Record<string, unknown>): Node[] =>
-  graphOf(doc).filter((n) => typeof n["@type"] === "string" && String(n["@type"]).endsWith("#LaneUsage"));
+  graphOf(doc).filter((n) => typeof n["@type"] === "string" && String(n["@type"]).endsWith("/LaneUsage"));
 
 describe("the corpus it is actually run against", () => {
   const { doc, report } = buildGlossary({ today: () => "2026-09-21" });

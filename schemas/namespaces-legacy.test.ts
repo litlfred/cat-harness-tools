@@ -33,7 +33,7 @@ describe("own extension namespaces during the v<major> transition", () => {
       const m = majorOf(ns);
       expect(isOwnExtensionNamespace(respelt(ns, `${m + 1}.0.0`))).toBe(false);
       expect(isOwnExtensionNamespace(respelt(ns, `${m}.1`))).toBe(false);
-      expect(isOwnExtensionNamespace(respelt(ns, `${m}.1.0`).replace(/ns#$/, "other#"))).toBe(false);
+      expect(isOwnExtensionNamespace(respelt(ns, `${m}.1.0`).replace(/ns\/$/, "other/"))).toBe(false);
     }
     expect(isOwnExtensionNamespace(undefined)).toBe(false);
   });

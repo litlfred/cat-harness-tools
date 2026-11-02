@@ -532,7 +532,7 @@ export const DYNAMIC_STATE_FILE = "state.jsonld";
 /** The schema tag, so a reader can tell the two documents apart without the path. */
 export const DYNAMIC_STATE_SCHEMA = "cat-harness-dynamic-state/v1";
 
-const CAT_NS = "https://litlfred.github.io/cat-harness/v0/ns#";
+const CAT_NS = "https://litlfred.github.io/cat-harness/v0/ns/";
 const PROV_NS = "http://www.w3.org/ns/prov#";
 const XSD_NS = "http://www.w3.org/2001/XMLSchema#";
 

@@ -260,7 +260,7 @@ test.describe("kg viewer", () => {
     const dir = "_kg/fixtures";
     mkdirSync(`${dir}/${STUB}`, { recursive: true });
     copyFileSync(`_kg/${STUB}/index.html`, `${dir}/${STUB}/index.html`);
-    const NS = "https://litlfred.github.io/folio-assistant/ns#";
+    const NS = "https://litlfred.github.io/folio-assistant/ns/";
     writeFileSync(
       `${dir}/${STUB}/${STUB}.jsonld`,
       JSON.stringify({

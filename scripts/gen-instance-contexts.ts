@@ -39,7 +39,7 @@
  *
  * - Declarations as DATA — `name`, `needs`, `stub`, `jsonldPrefixes` from each
  *   `<dir>/<dir>.json` — never by importing the layer above.
- * - An instance's OWN namespace (`<stub>` → `…/<stub>/v0/ns#`) is implicit:
+ * - An instance's OWN namespace (`<stub>` → `…/<stub>/v0/ns/`) is implicit:
  *   it comes from cat-harness's `ownPrefixTable` / `own-namespaces.json`, not from
  *   `jsonldPrefixes`, which holds EXTERNAL vocabularies only.
  * - Documents: every `.jsonld` git lists (tracked plus untracked-not-ignored,
