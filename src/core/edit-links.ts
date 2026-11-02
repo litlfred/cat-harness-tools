@@ -976,25 +976,35 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   // window.faBlockPanel.pane(id, { icon, title, render(label, body) }) and
   // its icon with .icon(box, id, count).
   // Owner, 2026-11-02: one small icon per block, "use the feedback icon",
-  // with the block's 🔗 above it in the gutter: a faint 📣 opens one panel with the block's link, its suggest, feedback
+  // in the left gutter: a faint 📣 opens one panel with the block's link, its suggest, feedback
   // and edit, and its public comments. The other icons stay in the box, so
   // a layer can still add a pane, but only the trigger shows on the page.
   const panes = { edit: { icon: "\ud83d\udce3", title: "Help improve this section" } };
+  // Owner, 2026-11-02 (18:16Z): "already anchor in lhs gutter ... needs to
+  // be greyed out. we only need one. put feedback in left gutter. no right
+  // gutter", and (18:17Z) "anchor hover should appear when over title AND
+  // content". So the theme's own heading anchor stays, always shown but grey,
+  // and coloured while the pointer is over its heading or that heading's
+  // section (.fa-hot, set below); each block's 📣 sits in the same left
+  // gutter, coloured while its block is hovered; the block's 🔗 lives only in
+  // the panel, as its copy-link button.
+  const ON = "{opacity:1;filter:none}";
   const LINK_CSS = "html.fa-bp .ba-moved{display:none!important}" +
-    "html.fa-bp .ba-heading{float:right;flex-direction:row;margin-left:.6rem;font-size:.8rem;font-weight:400}" +
+    // A lazy page fills a block after its box: its own 🔗 is hidden by place.
+    "html.fa-bp p:has(>.block-actions)+.fa-blk a.block-anchor{display:none}" +
     ".ba-ic.ba-copied{border-color:#2e7d32;background:#2e7d32;color:#fff}" +
     ".ba-ic{position:relative;width:28px;height:28px;padding:0;border:1px solid #8885;border-radius:7px;background:color-mix(in srgb,currentColor 5%,transparent);color:inherit;font-size:14px;line-height:1;cursor:pointer}" +
-    "html.fa-bp .block-actions.ba-heading{display:flex;gap:4px;opacity:.3}" +
-    "html.fa-bp .block-actions:not(.ba-heading){opacity:1}" +
-    "html.fa-bp .block-actions:not(.ba-heading)>.ba-ic:not(.ba-trigger):not(.ba-link){display:none}" +
-    "html.fa-bp .block-actions>.ba-trigger,html.fa-bp .block-actions:not(.ba-heading)>.ba-link{width:20px;height:20px;border:0;background:none;font-size:13px;opacity:.4;filter:grayscale(1)}" +
-    "html.fa-bp .block-actions:not(.ba-heading)>.ba-link{font-size:11px}" +
+    "html.fa-bp .block-actions{opacity:1}" +
+    "html.fa-bp .block-actions>.ba-ic:not(.ba-trigger){display:none}" +
+    "@media (min-width:50rem){html.fa-bp .main-content .block-actions{float:left;clear:left;width:1.5rem;margin:0 0 6px -1.5rem;text-align:center}}" +
+    "html.fa-bp .block-actions>.ba-trigger{width:20px;height:20px;border:0;background:none;font-size:13px;opacity:.35;filter:grayscale(1)}" +
     "html.fa-bp .block-actions>.ba-trigger .ba-n{top:-4px;right:-6px;font-size:9px;padding:0 3px}" +
-    "html.fa-bp .block-actions:hover>.ba-trigger,html.fa-bp .ba-trigger:focus-visible,html.fa-bp .ba-trigger[aria-expanded=true],html.fa-bp :hover>.block-actions>.ba-trigger,html.fa-bp p:has(+.fa-blk:hover)>.block-actions>.ba-trigger,html.fa-bp .block-actions:not(.ba-heading):hover>.ba-link,html.fa-bp .block-actions:not(.ba-heading)>.ba-link:focus-visible,html.fa-bp :hover>.block-actions:not(.ba-heading)>.ba-link,html.fa-bp p:has(+.fa-blk:hover)>.block-actions>.ba-link{opacity:1;filter:none}" +
+    "html.fa-bp .block-actions:hover>.ba-trigger,html.fa-bp .ba-trigger:focus-visible,html.fa-bp .ba-trigger[aria-expanded=true],html.fa-bp :hover>.block-actions>.ba-trigger,html.fa-bp p:has(+.fa-blk:hover)>.block-actions>.ba-trigger" + ON +
+    "html.fa-bp .main-content .anchor-heading svg{visibility:visible;opacity:.35;filter:grayscale(1)}" +
+    "html.fa-bp .main-content .fa-hot>.anchor-heading svg,html.fa-bp .main-content :hover>.anchor-heading svg,html.fa-bp .main-content .anchor-heading:focus svg" + ON +
     ".fa-block-panel .bp-copy{font:inherit;font-size:.82rem;margin:.1rem 0 .3rem;padding:.3rem .6rem;border:1px solid #8886;border-radius:6px;background:none;color:inherit;cursor:pointer}" +
     ".fa-block-panel .bp-copy.ba-copied{border-color:#2e7d32;background:#2e7d32;color:#fff}" +
-    ".fa-block-panel .bp-pane{margin-top:1rem}.fa-block-panel .bp-pane>h4{margin:0 0 .3rem;font-size:.9rem}" +
-    "html.fa-bp h2:hover>.ba-heading,html.fa-bp h3:hover>.ba-heading,html.fa-bp h4:hover>.ba-heading,html.fa-bp .ba-heading:focus-within{opacity:1}";
+    ".fa-block-panel .bp-pane{margin-top:1rem}.fa-block-panel .bp-pane>h4{margin:0 0 .3rem;font-size:.9rem}";
   const EXPLAIN = {
     suggest: ["\u270d Suggest a change", "Propose new wording in an editor. It is sent as a GitHub issue with your change, and the editors decide on it."],
     feedback: ["\ud83d\udce3 Give feedback", "Raise a question, concern or error without proposing text. Opens a GitHub issue that names this section."],
@@ -1090,7 +1100,6 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   // The one icon a block shows: 📣 when it has links, else the first pane's
   // own icon. The 📣 carries the count of the other panes (public comments).
   const retrigger = (box) => {
-    if (box.classList.contains("ba-heading")) return;
     const ics = Array.from(box.querySelectorAll(":scope > .ba-ic:not(.ba-link)"));
     if (!ics.length) return;
     const t = box.querySelector(':scope > .ba-ic[data-pane="edit"]') || ics[0];
@@ -1124,7 +1133,6 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     const done = (t) => { b.title = t; b.classList.add("ba-copied"); setTimeout(() => { b.classList.remove("ba-copied"); b.title = "Copy link"; }, 2000); };
     try { navigator.clipboard.writeText(url).then(() => done("Link copied"), () => done(url)); } catch { done(url); }
   };
-  const HEADINGS = ".main-content h2[id], .main-content h3[id], .main-content h4[id], main h2[id], main h3[id], main h4[id]";
   const icons = (root) => {
     const r = root || document;
     if (!r || typeof r.querySelectorAll !== "function") return;
@@ -1138,20 +1146,22 @@ export const EDIT_LINKS_RUNTIME = `(() => {
         for (const a of document.querySelectorAll("a.block-anchor")) if (a.getAttribute("href") === "#" + label) a.classList.add("ba-moved");
       }
     }
-    // Every heading with an id gets the group too, and the theme's anchor
-    // beside it is hidden: one place for a link on every page.
-    for (const h of r.querySelectorAll(HEADINGS)) {
-      if (h.closest(".fa-block-panel, nav, .side-bar")) continue;
-      let box = h.querySelector(":scope > .block-actions");
-      if (!box) {
-        box = el("span", { className: "block-actions ba-heading" });
-        box.dataset.block = h.id;
-        h.insertBefore(box, h.firstChild);
-      }
-      linkIcon(box, h.id, "section");
-      h.querySelectorAll(":scope > a.anchor-heading").forEach((a) => a.classList.add("ba-moved"));
-    }
   };
+  // The heading whose section the pointer is in: walk up to the document's
+  // top level, then back to the nearest heading before it.
+  let hot = null;
+  document.addEventListener("mouseover", (e) => {
+    let n = e.target && e.target.closest ? e.target.closest(".main-content *") : null;
+    let h = null;
+    if (n && !n.closest(".fa-block-panel, nav, .side-bar")) {
+      while (n.parentElement && !n.parentElement.matches(".fa-doc, .main-content, main")) n = n.parentElement;
+      for (let x = n; x && !h; x = x.previousElementSibling) if (/^H[1-6]$/.test(x.tagName) && x.querySelector(":scope > .anchor-heading")) h = x;
+    }
+    if (h === hot) return;
+    if (hot) hot.classList.remove("fa-hot");
+    hot = h;
+    if (hot) hot.classList.add("fa-hot");
+  });
   document.addEventListener("click", (e) => {
     const b = e.target.closest && e.target.closest(".ba-ic");
     if (b && b.dataset.pane === "link") { e.preventDefault(); e.stopPropagation(); copyLink(b); return; }
