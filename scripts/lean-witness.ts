@@ -23,7 +23,7 @@
 import { readFileSync, writeFileSync, unlinkSync, existsSync } from "fs";
 import { resolve, basename } from "path";
 import { globSync } from "glob";
-import { execSync } from "child_process";
+import { execFileSync, execSync } from "child_process";
 import { findContentRepoRoot } from "../pipeline/repo-root";
 
 // Was `import.meta.dir`-relative, i.e. the PLATFORM — but every path below is
@@ -59,7 +59,7 @@ function getCurrentCommitSha(): string {
 /** Get the last commit SHA that touched a specific file. */
 export function getFileCommitSha(filePath: string): string {
   try {
-    return execSync(`git log -1 --format=%H -- "${filePath}"`, {
+    return execFileSync("git", ["log", "-1", "--format=%H", "--", filePath], {
       cwd: REPO_ROOT,
     })
       .toString()
