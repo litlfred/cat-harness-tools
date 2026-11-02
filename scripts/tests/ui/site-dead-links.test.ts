@@ -11,7 +11,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { blobUrl, checkSite, isInternal, sourceCandidates, sourceFor, tailIndex, targetOf, withoutLocale } from "../../site-dead-links.ts";
+import { blobUrl, checkSite, isInternal, publishedFor, publishedRootOf, sourceCandidates, sourceFor, tailIndex, targetOf, withoutLocale } from "../../site-dead-links.ts";
 
 function site(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), "site-dead-links-"));
@@ -146,5 +146,40 @@ describe("--fix repoints what has one answer and reports the rest", () => {
     const r = checkSite({ site: root, basePath: "", fix: false, resolveSource: () => undefined });
     expect(r.repointed).toEqual([]);
     expect(r.dead).toHaveLength(1);
+  });
+});
+
+describe("in a preview, a page of an instance the preview does not carry goes to the published site", () => {
+  it("reads the published root off a preview base path, and none off a canonical one", () => {
+    expect(publishedRootOf("/folio-assistant/STAGING/repin-train-1")).toBe("/folio-assistant");
+    expect(publishedRootOf("/folio-assistant")).toBeUndefined();
+    expect(publishedRootOf("")).toBeUndefined();
+  });
+
+  it("repoints only when the instance's composed directory holds the page's source", () => {
+    const composed = site({ "concepts/who.md": "# who" });
+    const instances = new Map([["smart-base", [composed]]]);
+    expect(publishedFor("smart-base/concepts/who.html", "/folio-assistant", instances)).toBe("/folio-assistant/smart-base/concepts/who.html");
+    expect(publishedFor("smart-base/concepts/nobody-wrote-this.html", "/folio-assistant", instances)).toBeUndefined();
+    expect(publishedFor("other/concepts/who.html", "/folio-assistant", instances)).toBeUndefined();
+  });
+
+  it("checkSite takes the rule only when it is given one, so a canonical build still reports", () => {
+    const composed = site({ "guides/dak.md": "# dak" });
+    const instances = new Map([["smart-base", [composed]]]);
+    const files = { "en/p/x.html": '<a href="../../smart-base/guides/dak.html#a">dak</a>' };
+    const canonical = checkSite({ site: site(files), basePath: "", fix: true, resolveSource: () => undefined });
+    expect(canonical.dead.map((d) => d.target)).toEqual(["smart-base/guides/dak.html"]);
+    const root = site(files);
+    const preview = checkSite({
+      site: root,
+      basePath: "/folio-assistant/STAGING/s",
+      fix: true,
+      resolveSource: () => undefined,
+      resolvePublished: (t) => publishedFor(t, "/folio-assistant", instances),
+    });
+    expect(preview.dead).toEqual([]);
+    expect(preview.repointed.map((r) => [r.to, r.why])).toEqual([["/folio-assistant/smart-base/guides/dak.html#a", "published"]]);
+    expect(readFileSync(join(root, "en/p/x.html"), "utf-8")).toContain('href="/folio-assistant/smart-base/guides/dak.html#a"');
   });
 });
