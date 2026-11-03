@@ -751,6 +751,37 @@ export function readQaTree(ref: string, prefix: string, opts: QaStoreOptions = {
   return { state: "hit", key: s.snap.key, tip: s.snap.tip, prefix: rel, files };
 }
 
+/**
+ * The entry a COMMIT published, wherever it was published from: `main/<sha>`
+ * when the commit was pushed to main, else the one `pr/<n>/<sha>` that holds
+ * it. Bean `7mwa` (owner, 2026-11-03, "each layer publishes"): an index reads a
+ * mounted layer's QA at the commit its lock pins, and a re-pin train may pin a
+ * pull request's head, whose results the layer published under `pr/<n>/`.
+ *
+ * Two PR entries holding one commit is `corrupt`, never a guess.
+ */
+export function readQaTreeAtCommit(sha: string, prefix: string, opts: QaStoreOptions = {}): QaTreeRead {
+  if (!FULL_SHA.test(sha)) throw new QaUsageError(`not a full commit sha: "${sha}"`);
+  const main = readQaTree(`main/${sha}`, prefix, opts);
+  if (main.state !== "miss" || !main.reason.startsWith("no entry")) return main;
+  const { store } = openStore(opts);
+  let keys: string[];
+  try {
+    const t = store.fetchTip();
+    if (t.state !== "ok") return t.state === "absent" ? main : { state: "unknown", reason: t.reason };
+    const rootTree = store.must(["rev-parse", `${t.tip}^{tree}`]).trim();
+    const pr = store.lookup(rootTree, "pr");
+    const numbers = pr?.type === "tree" ? store.lsTree(pr.sha).filter((e) => e.type === "tree").map((e) => e.name) : [];
+    keys = numbers.filter((n) => store.lookup(rootTree, `pr/${n}/${sha}`)).map((n) => `pr/${n}/${sha}`);
+  } catch (e) {
+    if (e instanceof QaUsageError) throw e;
+    return { state: "unknown", reason: (e as Error).message };
+  }
+  if (keys.length === 0) return { state: "miss", reason: `no entry main/${sha} or pr/<n>/${sha}` };
+  if (keys.length > 1) return { state: "corrupt", reason: `${sha} is published under ${keys.length} pull requests: ${keys.join(", ")}` };
+  return readQaTree(keys[0]!, prefix, opts);
+}
+
 /** The verified manifest of an entry. */
 export function readQaManifest(ref: string, opts: QaStoreOptions = {}): (QaReadHit & { manifest: QaManifest }) | QaNotHit {
   const s = snapshot(ref, opts);
