@@ -15,8 +15,9 @@
  * finds an archived bean, and `list` leaves archived beans out unless asked.
  *
  * `positions` and `beansAt` read the workflow instances the store holds,
- * through {@link positionsIn} and {@link beansAtIn}, which every Tool shares.
- * `history` is optional until step 5.
+ * through {@link positionsIn} and {@link beansAtIn}, which every Tool shares;
+ * `history` is the bean's own versions merged with those instances' steps
+ * (`work-plan-store-history.ts`).
  *
  * @module folio-assistant/workflow/work-plan-store
  */
@@ -62,11 +63,29 @@ export interface BeanFilter {
   archived?: boolean;
 }
 
+/**
+ * What kind of change an event records (proposal §4.6). `claimed` is a status
+ * change into `in-progress`; `step-reached` comes from a workflow instance,
+ * every other kind from the bean itself.
+ */
+export type HistoryKind =
+  | "created"
+  | "status-changed"
+  | "claimed"
+  | "noted"
+  | "changed"
+  | "archived"
+  | "unarchived"
+  | "removed"
+  | "step-reached";
+
 /** One entry of `history(id)`, oldest first. */
 export interface HistoryEvent {
   at: string;
   by: string;
+  kind: HistoryKind;
   what: string;
+  /** Set when a workflow instance made the change: the instance (a phase's id is `parent/callNode`) and its step. */
   instance?: string;
   node?: string;
 }
@@ -90,7 +109,7 @@ export interface WorkPlanStore {
   create(bean: BeanFields): { state: "created"; version: string } | Refusal;
   update(id: string, change: BeanChange, ifMatch: string): { state: "updated"; version: string } | Refusal | { state: "none" };
   note(id: string, text: string, by: string): { state: "noted"; version: string } | { state: "none" };
-  history?(id: string): HistoryEvent[];
+  history(id: string): HistoryEvent[];
   positions(id: string): Position[];
   beansAt(process: string, step?: string): string[];
 }
@@ -246,7 +265,7 @@ export interface InstanceLike {
   tokens: string[];
   status: string;
   updatedAt?: string;
-  history?: ReadonlyArray<{ at?: string }>;
+  history?: ReadonlyArray<{ at?: string; node?: string; actor?: string; outcome?: string }>;
   children?: Record<string, InstanceLike>;
 }
 
@@ -261,7 +280,7 @@ function lastMove(s: InstanceLike): string | undefined {
  * parent names travels into every phase the parent calls, as the engine's
  * `TaskContext.carriedBeans` already has it.
  */
-function* walk(s: InstanceLike, inherited: ReadonlySet<string>, path: string): Generator<{ s: InstanceLike; beans: Set<string>; id: string }> {
+export function* walk(s: InstanceLike, inherited: ReadonlySet<string>, path: string): Generator<{ s: InstanceLike; beans: Set<string>; id: string }> {
   const beans = new Set([...inherited, ...(s.bean ? [s.bean] : []), ...(s.carriedBeans ?? [])]);
   yield { s, beans, id: path };
   for (const [node, child] of Object.entries(s.children ?? {})) yield* walk(child, beans, `${path}/${node}`);

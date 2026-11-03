@@ -40,7 +40,13 @@ export interface ToolUnderTest {
     a: StoreUnderTest;
     b: StoreUnderTest;
     /** Write a workflow instance into the store, as the engine does when a process starts or moves. */
-    seedInstance(s: InstanceLike & { source: string; subject: string; startedAt: string; arrivals: Record<string, string[]>; history: Array<{ at: string; node?: string }> }): void;
+    seedInstance(s: InstanceLike & { source: string; subject: string; startedAt: string; arrivals: Record<string, string[]>; history: Array<{ at: string; node?: string; actor?: string }> }): void;
+    /**
+     * Make the writes so far part of the store's history, where the Tool
+     * records history only on a later step (the mount: a push). Absent when
+     * every write is already history.
+     */
+    settle?(): void;
   };
   /** Per-test budget, for Tools whose operations are real I/O. */
   timeoutMs?: number;
@@ -268,22 +274,65 @@ export function workPlanStoreConformance(tool: ToolUnderTest): void {
       }, t);
     });
 
-    describe("6. keep the history", () => {
-      const probe = tool.fresh().a;
-      if (!probe.history) {
-        test.todo(`history(id) — not provided by ${tool.name} yet (cat-harness#991 step 5)`, () => {});
-        return;
-      }
-      test("history answers every change, oldest first, with who made it", () => {
-        const { a } = tool.fresh();
+    describe("6. keep the history (Q-BSD-4 A: the bean's versions, merged with the instances' steps)", () => {
+      test("every change, oldest first, each with who made it and what kind it was", () => {
+        const { a, settle } = tool.fresh();
         const v = created(a.create(bean("fx-aaaa")));
-        a.update("fx-aaaa", { status: "in-progress" }, v);
-        a.note("fx-aaaa", "a note", "writer-a");
-        const h = a.history!("fx-aaaa");
-        expect(h.length).toBeGreaterThanOrEqual(3);
-        const ats = h.map((e) => e.at);
-        expect([...ats].sort()).toEqual(ats);
+        settle?.();
+        const r = a.update("fx-aaaa", { status: "in-progress" }, v);
+        settle?.();
+        if (r.state !== "updated") throw new Error(JSON.stringify(r));
+        a.note("fx-aaaa", "first finding", "writer-a");
+        settle?.();
+        const h = a.history("fx-aaaa");
+        expect(h.map((e) => e.kind)).toEqual(["created", "claimed", "noted"]);
+        expect(h[1]!.what).toBe("todo → in-progress");
+        expect(h[2]!.what).toContain("first finding");
+        const ats = h.map((e) => Date.parse(e.at));
+        expect([...ats].sort((x, y) => x - y)).toEqual(ats);
         for (const e of h) expect(e.by.length).toBeGreaterThan(0);
+      }, t);
+
+      test("archiving is in the history, and the bean's history survives the move", () => {
+        const { a, settle } = tool.fresh();
+        const v = created(a.create(bean("fx-aaaa", { status: "completed" })));
+        settle?.();
+        expect(a.update("fx-aaaa", { archived: true }, v).state).toBe("updated");
+        settle?.();
+        expect(a.history("fx-aaaa").map((e) => e.kind)).toEqual(["created", "archived"]);
+      }, t);
+
+      test("the steps of an instance naming the bean are in it, with the instance, the step and who took it", () => {
+        const { a, seedInstance, settle } = tool.fresh();
+        created(a.create(bean("fx-aaaa")));
+        seedInstance({
+          id: "ccr--a",
+          processId: "code-change-review",
+          // declared-path-literal: a fixture instance's `source`, written into a temporary store and never read as a file
+          source: "processes/code-change-review.bpmn",
+          subject: "a",
+          bean: "fx-aaaa",
+          tokens: ["Task_Merge"],
+          arrivals: {},
+          history: [
+            { at: "2026-11-02T10:00:00Z", node: "Start" },
+            { at: "2026-11-02T10:05:00Z", node: "Task_Review", actor: "reviewer-agent" },
+          ],
+          status: "running",
+          startedAt: "2026-11-02T10:00:00Z",
+          updatedAt: "2026-11-02T10:05:00Z",
+        });
+        settle?.();
+        const steps = a.history("fx-aaaa").filter((e) => e.kind === "step-reached");
+        expect(steps.map((e) => [e.instance, e.node, e.by])).toEqual([
+          ["ccr--a", "Start", "workflow"],
+          ["ccr--a", "Task_Review", "reviewer-agent"],
+        ]);
+      }, t);
+
+      test("an id the store does not hold has no history", () => {
+        const { a } = tool.fresh();
+        expect(a.history("fx-zzzz")).toEqual([]);
       }, t);
     });
 

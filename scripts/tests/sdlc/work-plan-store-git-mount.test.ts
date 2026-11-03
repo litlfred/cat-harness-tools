@@ -10,6 +10,7 @@
  * @module scripts/tests/sdlc/work-plan-store-git-mount
  */
 import { afterAll } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -39,7 +40,21 @@ workPlanStoreConformance({
         ],
       }),
     );
+    // A checkout that keeps `beans/` itself, so its history is the checkout's
+    // `git log`; `settle` commits, as a push makes a mount's writes history.
+    const git = (...args: string[]): void => {
+      const r = spawnSync("git", ["-C", repo, ...args], {
+        encoding: "utf-8",
+        env: { ...process.env, GIT_AUTHOR_NAME: "writer", GIT_AUTHOR_EMAIL: "w@w", GIT_COMMITTER_NAME: "writer", GIT_COMMITTER_EMAIL: "w@w" },
+      });
+      if (r.status !== 0) throw new Error(`git ${args[0]}: ${r.stderr}`);
+    };
+    git("init", "-q", "-b", "main");
     return {
+      settle: () => {
+        git("add", "-A");
+        git("commit", "-q", "--allow-empty", "-m", "settle");
+      },
       a: new MountedGitBranchStore(repo, { cli: false }),
       b: new MountedGitBranchStore(repo, { cli: false }),
       seedInstance: (s) => writeFileSync(join(repo, "beans", "workflows", `${s.id}.json`), `${JSON.stringify({ $schema: "folio-workflow-instance/v1", ...s }, null, 2)}\n`),

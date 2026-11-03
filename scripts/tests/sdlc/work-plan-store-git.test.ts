@@ -38,9 +38,11 @@ import {
   setSequenceInText,
   slugifyTitle,
   versionOf,
+  type HistoryEvent,
   type InstanceLike,
   type Position,
 } from "../../../src/workflow/work-plan-store.ts";
+import { beanVersions, branchReader, historyFrom } from "../../../src/workflow/work-plan-store-history.ts";
 import {
   workPlanStoreConformance,
   type BeanChange,
@@ -205,6 +207,13 @@ class GitBranchStore implements StoreUnderTest {
     if (t.state === "miss") return [];
     if (t.state !== "hit") throw new Error(`cannot read ${WORKFLOWS}: ${t.reason}`);
     return [...t.files].filter(([p]) => p.endsWith(".json")).map(([, text]) => JSON.parse(text) as InstanceLike);
+  }
+
+  history(id: string): HistoryEvent[] {
+    const all = this.all();
+    const key = resolveId(all.keys(), id);
+    if (!key) return [];
+    return historyFrom(key, beanVersions(branchReader(this.s), all.get(key)!.path), this.instances());
   }
 
   positions(id: string): Position[] {

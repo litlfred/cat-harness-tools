@@ -87,6 +87,7 @@ describe("beansInContext", () => {
       update: (id, c, v) => s.update(id, c, v),
       note: (id, t, by) => s.note(id, t, by),
       beansAt: (p, st) => s.beansAt(p, st),
+      history: (id) => s.history(id),
       positions: () => {
         throw new Error("the workflows graph is not mounted");
       },
