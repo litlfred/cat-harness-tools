@@ -219,8 +219,8 @@ describe("a memory store drawn in the diagram (§4.14: only where the process ne
     const state = startInstance(model, { id: "mem--a", subject: "a", bean: "fx-aaaa" });
     const [step] = enabled(model, state);
     expect(step?.node).toBe("Task_Resume");
-    expect(step?.context.readsMemory).toBe(true);
-    expect(step?.context.writesMemory).toBeUndefined();
+    expect(step?.context?.readsMemory).toBe(true);
+    expect(step?.context?.writesMemory).toBeUndefined();
     expect(model.nodes.get("Task_Stop")!.writes).toContain("memory");
 
     store.keep("fx-aaaa", { at: "2026-11-03T07:00:00Z", by: "agent-1", kind: "checkpoint", text: "parser done, tests next" });
