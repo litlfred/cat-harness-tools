@@ -85,6 +85,14 @@ const SUPPORTED = new Set<string>([
  */
 export const BEAN_STORE = "work-plan";
 
+/**
+ * The store id of the memory store (cat-harness#991 §4.14, Q14): drawn only
+ * where a process needs memory — a checkpoint before an agent stops, a space
+ * a swarm shares, a hand-over between lanes. Which Tool keeps it is the
+ * deployment's choice; beans are one.
+ */
+export const MEMORY_STORE = "memory";
+
 const DATA_TYPES = new Set<string>(["bpmn:DataStoreReference", "bpmn:DataObjectReference", "bpmn:DataObject"]);
 
 /**

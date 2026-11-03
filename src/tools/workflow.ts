@@ -36,7 +36,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { processFiles, processRoots } from "../workflow/process-files.js";
 import { z } from "zod";
 import { basename, resolve } from "node:path";
-import { findInModel, loadProcessModel, type ProcessModel } from "../workflow/process-model.js";
+import { findInModel, loadProcessModel, MEMORY_STORE, type ProcessModel } from "../workflow/process-model.js";
 import { complete, describe, position, startInstance, withRefusal, WorkflowError, type InstanceState, type WorkflowPosition } from "../workflow/instance.js";
 import { describePreflight, preflight, preflightRefusal } from "../workflow/preflight.js";
 import { describeCapture, writeLogEntry } from "../logging/log-writer.js";
@@ -44,6 +44,7 @@ import { instanceId, listInstances, loadInstance, saveInstance } from "../workfl
 import { applyWorkPlanOp, onlyArchiveLeft } from "../workflow/bean-link.js";
 import { workPlanStoreFor } from "../workflow/work-plan-store-select.js";
 import { closeOut, drawsWorkPlan, record, takeUp, workContextFrom, type WorkContextTarget } from "../workflow/work-context.js";
+import type { MemoryEntry } from "../../schemas/kg/memory-record.ts";
 import { describeBeans, withBeans } from "../workflow/work-plan-store.js";
 import { checkGate, loadRelaxations, validateRelaxations, type GateVerdict } from "../workflow/gate.js";
 import { type RoleGraph } from "../../schemas/process/role-graph.js";
@@ -320,6 +321,36 @@ function keepContext(root: string, opts: WorkflowToolEnv | undefined, act: (t: W
   return act(target).summary;
 }
 
+/**
+ * Fill `context.memory` on every enabled step drawn reading the memory store,
+ * from the instance's own item, through the deployment's work-context store.
+ * Returns the lines `workflow_next` adds to its text.
+ */
+function withMemory(
+  pos: { enabled: Array<{ node: string; context?: { readsMemory?: boolean; memory?: MemoryEntry[] } }> },
+  chosen: ReturnType<typeof workPlanStoreFor>,
+  item: string | undefined,
+): string {
+  const readers = pos.enabled.filter((e) => e.context?.readsMemory);
+  if (!readers.length) return "";
+  let target: WorkContextTarget;
+  try {
+    target = workContextFrom(chosen);
+  } catch (e) {
+    return `\n\n  memory not read: ${e instanceof Error ? e.message : String(e)}`;
+  }
+  if ("none" in target) return "\n\n  memory: this deployment keeps none";
+  if (!item) return "\n\n  memory: this instance tracks no item";
+  const r = target.store.recall(item);
+  if (r.state !== "hit") return `\n\n  memory not read: item ${item} is not in the store`;
+  for (const e of readers) e.context!.memory = r.record.entries;
+  const last = r.record.entries.slice(-10);
+  return (
+    `\n\n  memory (${r.record.entries.length} kept, for ${readers.map((e) => e.node).join(", ")}):` +
+    last.map((e) => `\n    - ${e.at} ${e.by} ${e.kind}${e.text ? `: ${e.text}` : ""}`).join("")
+  );
+}
+
 /** Shared implementation of `workflow_start` for MCP and CLI (`workflow:start`). */
 export async function workflowStart(
   repoRoot: string,
@@ -436,7 +467,9 @@ export async function workflowNextAnswer(
   }
   const pos = withBeans(position(model, state, r), chosen.store);
   const beans = [...new Map(pos.enabled.flatMap((e) => e.context?.beans ?? []).map((b) => [b.id, b])).values()];
-  return { text: describe(model, state, r) + describeBeans(beans), result: pos };
+  // A step drawn reading the memory store is handed what was kept (§4.14).
+  const memory = withMemory(pos, chosen, state.bean);
+  return { text: describe(model, state, r) + describeBeans(beans) + memory, result: pos };
 }
 
 /** Shared implementation of `workflow_gate` for MCP and CLI (`workflow:gate`). */
@@ -625,6 +658,12 @@ export async function workflowCompleteAnswer(
   if (!drawsWorkPlan(model)) {
     const stepName = stepNode?.name || node;
     const meta = { process: model.id, instance: next.id, node, by: actor ?? principal.account ?? "workflow" };
+    // A step drawn writing the memory store keeps the agent's note as where
+    // the work stands (§4.14): the record an agent leaves before it stops.
+    if (stepNode?.writes.includes(MEMORY_STORE) && note) {
+      const k = keepContext(root, opts, (t) => record(t, next.bean, { ...meta, kind: "checkpoint" }, note));
+      if (k) contextKept.push(k);
+    }
     if (!op && stepNode?.kind === "activity") {
       const said = [outcome ? `→ ${outcome}` : "", note ?? ""].filter(Boolean).join(" ");
       const k = keepContext(root, opts, (t) => record(t, next.bean, { ...meta, kind: "step-done" }, `${stepName} done${said ? ` ${said}` : ""}`));
