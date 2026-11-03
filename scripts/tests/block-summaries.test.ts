@@ -17,7 +17,7 @@
  */
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
@@ -371,15 +371,26 @@ describe("the real backlog — not vacuous, and it adds up", () => {
     const heldByOwner = (lib: string): boolean => ownerEntry(lib)?.summaries === "held";
     for (const lib of directoriesForGraph(ROOT, "library").filter((d) => existsSync(d) && !heldByOwner(d))) {
       const heldHere = new Set(ownerEntry(lib)?.heldEntries ?? []);
-      for (const slug of readdirSync(lib)) {
-        if (heldHere.has(slug)) continue;
-        const blocksDir = join(lib, slug, "blocks");
-        if (!existsSync(blocksDir)) continue;
-        const sc = join(lib, slug, SUMMARIES_FILE);
+      // An entry is `<slug>/` or, filed by concern group since bean `6fez`,
+      // `<group>/<slug>/`; a hold names the slug wherever it is filed.
+      const entries: string[] = [];
+      for (const top of readdirSync(lib)) {
+        if (existsSync(join(lib, top, "blocks"))) entries.push(top);
+        else if (statSync(join(lib, top)).isDirectory())
+          for (const sub of readdirSync(join(lib, top))) if (existsSync(join(lib, top, sub, "blocks"))) entries.push(join(top, sub));
+      }
+      for (const rel of entries) {
+        if (heldHere.has(basename(rel))) continue;
+        const blocksDir = join(lib, rel, "blocks");
+        const sc = join(lib, rel, SUMMARIES_FILE);
         const recs = new Map<string, { source_hash: string; narrative: { state: string } | { state: string }[] }>(
           existsSync(sc) ? JSON.parse(readFileSync(sc, "utf-8")).summaries.map((r: { block: string }) => [r.block, r]) : [],
         );
         for (const f of readdirSync(blocksDir)) {
+          // A block is a `.jsonld` node (`.json` before the JSON-LD rename);
+          // the `.md` beside it is a block's text, not a block. The library
+          // tally reads the same files (summaries.ts `entryItems`).
+          if (!f.endsWith(".jsonld") && !f.endsWith(".json")) continue;
           const b = JSON.parse(readFileSync(join(blocksDir, f), "utf-8"));
           if (b.kind !== "prose" || typeof b.text !== "string") continue;
           const md = readFileSync(join(blocksDir, b.text), "utf-8");
@@ -414,7 +425,8 @@ describe("a library whose owner holds summaries back (bean x80s)", () => {
     const held = heldLibraries(ROOT);
     // The owner's 2026-09-24 decision, declared on agent-skills' library and
     // carried per entry when that corpus dissolved into cat-harness's (bean j7ql).
-    expect(held.some((d) => d.endsWith("library/arxiv-2607.25032v1"))).toBe(true);
+    // Filed by concern group since bean `6fez` (`library/conduct/<slug>`).
+    expect(held.some((d) => d.endsWith("/arxiv-2607.25032v1"))).toBe(true);
     for (const b of next(ROOT, { n: 10_000 })) {
       expect(held.some((d) => d.endsWith(`/${b.entry}`) || existsSync(join(d, b.entry)))).toBe(false);
     }

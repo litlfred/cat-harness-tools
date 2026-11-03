@@ -29,7 +29,8 @@
           "Open_Exists": "yes",
           "Open_Owner": "mine / unclaimed",
           "GW_BeanYours": "claimed",
-          "Close_Outcome": "done"
+          "Close_Outcome": "done",
+          "GW_BeanClosedHow": "certified"
         }
       },
       "expected": {
@@ -56,7 +57,8 @@
           "A_FileCertification",
           "Close_Outcome:done",
           "Close_Complete",
-          "Close_Archive"
+          "Close_Archive",
+          "GW_BeanClosedHow:certified"
         ],
         "terminalNode": "End_Certified",
         "exitOutcome": "certified",
@@ -114,7 +116,8 @@
           "Open_Exists": "yes",
           "Open_Owner": "mine / unclaimed",
           "GW_BeanYours": "claimed",
-          "Close_Outcome": "done"
+          "Close_Outcome": "done",
+          "GW_BeanClosedHow": "certified"
         }
       },
       "expected": {
@@ -141,7 +144,8 @@
           "A_FileCertification",
           "Close_Outcome:done",
           "Close_Complete",
-          "Close_Archive"
+          "Close_Archive",
+          "GW_BeanClosedHow:certified"
         ],
         "terminalNode": "End_Certified",
         "exitOutcome": "certified",
@@ -195,7 +199,8 @@
           "Open_Exists": "yes",
           "Open_Owner": "mine / unclaimed",
           "GW_BeanYours": "claimed",
-          "Close_Outcome": "done"
+          "Close_Outcome": "done",
+          "GW_BeanClosedHow": "refused"
         }
       },
       "expected": {
@@ -215,7 +220,8 @@
           "A_RecordRefusal",
           "Close_Outcome:done",
           "Close_Complete",
-          "Close_Archive"
+          "Close_Archive",
+          "GW_BeanClosedHow:refused"
         ],
         "terminalNode": "End_Refused",
         "exitOutcome": "refused",
@@ -262,7 +268,8 @@
           "Open_Exists": "yes",
           "Open_Owner": "mine / unclaimed",
           "GW_BeanYours": "claimed",
-          "Close_Outcome": "done"
+          "Close_Outcome": "done",
+          "GW_BeanClosedHow": "undetermined"
         }
       },
       "expected": {
@@ -282,7 +289,8 @@
           "A_RecordUndetermined",
           "Close_Outcome:done",
           "Close_Complete",
-          "Close_Archive"
+          "Close_Archive",
+          "GW_BeanClosedHow:undetermined"
         ],
         "terminalNode": "End_Undetermined",
         "exitOutcome": "undetermined",
@@ -333,7 +341,8 @@
           "Open_Exists": "yes",
           "Open_Owner": "mine / unclaimed",
           "GW_BeanYours": "claimed",
-          "Close_Outcome": "done"
+          "Close_Outcome": "done",
+          "GW_BeanClosedHow": "certified"
         }
       },
       "expected": {
@@ -360,7 +369,8 @@
           "A_FileCertification",
           "Close_Outcome:done",
           "Close_Complete",
-          "Close_Archive"
+          "Close_Archive",
+          "GW_BeanClosedHow:certified"
         ],
         "terminalNode": "End_Certified",
         "exitOutcome": "certified",
@@ -417,7 +427,8 @@
           "Open_Exists": "yes",
           "Open_Owner": "mine / unclaimed",
           "GW_BeanYours": "claimed",
-          "Close_Outcome": "done"
+          "Close_Outcome": "done",
+          "GW_BeanClosedHow": "refused"
         }
       },
       "expected": {
@@ -437,7 +448,8 @@
           "A_RecordRefusal",
           "Close_Outcome:done",
           "Close_Complete",
-          "Close_Archive"
+          "Close_Archive",
+          "GW_BeanClosedHow:refused"
         ],
         "terminalNode": "End_Refused",
         "exitOutcome": "refused",
@@ -495,7 +507,8 @@
           "Open_Exists": "yes",
           "Open_Owner": "mine / unclaimed",
           "GW_BeanYours": "claimed",
-          "Close_Outcome": "done"
+          "Close_Outcome": "done",
+          "GW_BeanClosedHow": "certified"
         }
       },
       "expected": {
@@ -522,7 +535,8 @@
           "A_FileCertification",
           "Close_Outcome:done",
           "Close_Complete",
-          "Close_Archive"
+          "Close_Archive",
+          "GW_BeanClosedHow:certified"
         ],
         "terminalNode": "End_Certified",
         "exitOutcome": "certified",
@@ -575,7 +589,8 @@
           "Open_Exists": "yes",
           "Open_Owner": "mine / unclaimed",
           "GW_BeanYours": "claimed",
-          "Close_Outcome": "done"
+          "Close_Outcome": "done",
+          "GW_BeanClosedHow": "certified"
         }
       },
       "expected": {
@@ -602,7 +617,8 @@
           "A_FileCertification",
           "Close_Outcome:done",
           "Close_Complete",
-          "Close_Archive"
+          "Close_Archive",
+          "GW_BeanClosedHow:certified"
         ],
         "terminalNode": "End_Certified",
         "exitOutcome": "certified",
@@ -655,7 +671,8 @@
           "Open_Exists": "yes",
           "Open_Owner": "mine / unclaimed",
           "GW_BeanYours": "claimed",
-          "Close_Outcome": "done"
+          "Close_Outcome": "done",
+          "GW_BeanClosedHow": "undetermined"
         }
       },
       "expected": {
@@ -675,7 +692,8 @@
           "A_RecordUndetermined",
           "Close_Outcome:done",
           "Close_Complete",
-          "Close_Archive"
+          "Close_Archive",
+          "GW_BeanClosedHow:undetermined"
         ],
         "terminalNode": "End_Undetermined",
         "exitOutcome": "undetermined",
@@ -726,7 +744,8 @@
           "Open_Exists": "yes",
           "Open_Owner": "mine / unclaimed",
           "GW_BeanYours": "claimed",
-          "Close_Outcome": "done"
+          "Close_Outcome": "done",
+          "GW_BeanClosedHow": "certified"
         }
       },
       "expected": {
@@ -753,7 +772,8 @@
           "A_FileCertification",
           "Close_Outcome:done",
           "Close_Complete",
-          "Close_Archive"
+          "Close_Archive",
+          "GW_BeanClosedHow:certified"
         ],
         "terminalNode": "End_Certified",
         "exitOutcome": "certified",

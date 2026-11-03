@@ -229,7 +229,10 @@ export async function renderInstance(root: string): Promise<InstanceRender> {
   // collector contributed, and `nodeCount` reports it separately from the
   // total so a reader can see both.
   const isGraphTypology = (n: (typeof nodes.nodes)[number]): boolean =>
-    String(n["@type"] ?? "").endsWith("#GraphTypology");
+    // Slash IRIs (owner card Q-GLO-6 A, cat-harness-tools#1378): the type is
+    // `…/ns/GraphTypology`. The `#` form is still read so a checkout whose
+    // lower layers predate the slash re-pin is not judged as publishing nothing.
+    /[/#]GraphTypology$/.test(String(n["@type"] ?? ""));
   const published = [...new Set(nodes.nodes.filter(isGraphTypology).map((n) => String(n.name)))].sort();
   const undeclared = published.filter((k) => !declared.has(k));
   const ownNodes = nodes.nodes.filter((n) => !isGraphTypology(n)).length;
