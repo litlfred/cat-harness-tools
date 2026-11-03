@@ -218,6 +218,16 @@ describe("finished instances, beans in no process, open and closed (owner, 2026-
     expect(html).toContain('<option value="open" selected>Open</option>');
   });
 
+  test("a store with no instance links no `workflows/` hub: that hub is drawn only over instances", () => {
+    // Found 2026-11-03 rendering a newly harnessed IG: folio-assistant-core's beans-processed page
+    // linked ../workflows/, which no step writes for a store with beans and no instance.
+    const none = processedBeansBody("folio-assistant-core", [], NOW, "../", undefined, unplacedBeans([bean("fa-bbbb", "todo")], []));
+    expect(none).not.toContain('href="../workflows/"');
+    expect(none).toContain('href="../beans-processed/"');
+    const some = processedBeansBody("core", rows([instance("i", { bean: "fa-aaaa", tokens: ["Task_1"] })], [bean("fa-aaaa", "todo")]), NOW, "../");
+    expect(some).toContain('href="../workflows/"');
+  });
+
   test("the bean index filters open and closed, open by default", () => {
     const html = processedBeanIndexBody("cat-harness", [{ id: "fa-aaaa", title: "t", status: "todo", closed: false }], "../");
     expect(html).toContain('data-pb="index"');
