@@ -46,6 +46,7 @@
     "scripts/partition/instance-rules.ts::schemas/kg/instance-repositories.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/kg-node.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/layer-direction.ts",
+    "scripts/partition/instance-rules.ts::schemas/kg/memory-record.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/namespaces.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/node-kind.ts",
     "scripts/partition/instance-rules.ts::schemas/kg/portable-path.ts",
