@@ -14,7 +14,7 @@
  * `<instance>.<directory id>`, in its own `enableSubgraphs`.
  *
  * **The folio root decides, and nothing is inherited.** A layer's list
- * enables the sub-graphs for ITSELF: smart-base needing a folio-assistant
+ * enables the sub-graphs for ITSELF: a layer mounted by a folio-assistant
  * that enabled `cat-harness.sdlc` still has it off. So every reader asks
  * {@link enabledSubgraphs} of the root it is resolving FOR — the folio, the
  * downstream of a mount, the instance whose own resolution it is — never of
