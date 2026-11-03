@@ -190,7 +190,7 @@ import {
 import { positionOf, type InstanceState } from "../src/workflow/instance.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { branchKeptHref, branchKeptLocation } from "./branch-kept-href.ts";
-import { PB_CSS, processedBeanBody, processedBeanIndexBody, processedBeansBody, processedBeansRoutes, processedBeansRows, rebase, unplacedBeans, type ProcessedBeanHistory } from "./processed-beans.ts";
+import { PB_CSS, processedBeanBody, processedBeanIndexBody, processedBeansBody, processedBeansCombinedBody, processedBeansRoutes, processedBeansRows, rebase, RESERVED_STORE_NAMES, unplacedBeans, type ProcessedBeanHistory, type StoreRows } from "./processed-beans.ts";
 import { MountedGitBranchStore } from "../src/workflow/work-plan-store-git-mount.ts";
 import { loadProcessModel, type ProcessModel } from "../src/workflow/process-model.js";
 import { roleGraphFor, workflowFiles } from "./known-skills.js";
@@ -3081,6 +3081,8 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
   const beanSource = (b: BeanNode): string | undefined => (web ? branchKeptHref(branchKeptLocation(instanceRoot, b.file, web)) : undefined);
   const unplaced = unplacedBeans(beans, rows, beanSource);
   emit(join(all, "index.html"), shell(`${store} — beans by process`, processedBeansBody(store, rebase(rows, "../"), NOW, "../", undefined, unplaced)));
+  // Kept for the combined page every store's rows go on (owner, 2026-11-03).
+  combinedParts.push({ store, rows, unplaced, needs: readDeclaration(instanceRoot)?.needs ?? [] });
   const routes = processedBeansRoutes(rows);
   for (const p of routes.processes) {
     const mine = rebase(rows.filter((r) => r.process === p), "../../");
@@ -3107,8 +3109,12 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
   );
 }
 
+/** Each bean store's rows, gathered while its pages are drawn, for `…/beans/beans-processed/`. */
+let combinedParts: StoreRows[] = [];
+
 const ownName = readDeclaration(ROOT)?.name ?? basename(ROOT);
 for (const v of mine.filter((x) => x.subgraphs === "instance")) {
+  combinedParts = [];
   const { kinds, beans, code, memory, unread, candidates, subjects, unrouted } = perInstanceSubjects(v, ROOT, harnessOf());
   if (kinds.length === 0 || unread.length > 0) {
     console.error(
@@ -3145,7 +3151,19 @@ for (const v of mine.filter((x) => x.subgraphs === "instance")) {
     emit(join(pageDirOf(v.id), "index.html"), withRenderedByFrontMatter(instanceHubPage(v, subjects), VIEWER_TOOL));
   }
   const parent = pageDirOf(v.id);
-  const { owned, foreign } = orphanSubjectPages(parent, subjects.map((s) => s.name), carriesMarker(GENERATED_BY));
+  // Every store's beans by process on one page, beside the store pages
+  // (owner, 2026-11-03). A store named like that page would be overwritten by
+  // it, so such a store is refused, by name, and the combined page not drawn.
+  const reserved = subjects.filter((s) => RESERVED_STORE_NAMES.has(s.name)).map((s) => s.name);
+  if (beans && reserved.length > 0) {
+    console.error(`  ! visualiser \`${v.id}\`: a store may not be named ${reserved.join(", ")} — that is the combined page's route; the combined page is not drawn`);
+  } else if (beans && combinedParts.length > 0) {
+    emit(
+      join(parent, "beans-processed", "index.html"),
+      withRenderedByFrontMatter(page({ title: "Beans by process — every store", noLiquid: true, body: `<style>\n${PB_CSS}\n</style>\n${processedBeansCombinedBody(combinedParts, NOW)}` }), VIEWER_TOOL),
+    );
+  }
+  const { owned, foreign } = orphanSubjectPages(parent, [...subjects.map((s) => s.name), ...(beans ? RESERVED_STORE_NAMES : [])], carriesMarker(GENERATED_BY));
   for (const name of foreign) console.error(`  ! ${relative(SITE, join(parent, name))} is not an instance page and does not identify itself — left in place`);
   // Under a built-at-publish route a stale local copy is not a committed
   // orphan, so `--check` does not report it; a write run still prunes it.

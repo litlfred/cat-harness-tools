@@ -67,7 +67,16 @@ export interface UnplacedBean {
   excerpt?: string;
   /** Its page under `bean-processed/`, when it has one, relative to the store page. */
   href?: string;
+  /** On the combined page: the store it is from. */
+  store?: string;
 }
+
+/**
+ * Route segments a store may not be named: the combined page sits beside the
+ * store pages at `…/beans/beans-processed/` (owner, 2026-11-03), and a store
+ * of the same name would be overwritten by it.
+ */
+export const RESERVED_STORE_NAMES: ReadonlySet<string> = new Set(["beans-processed", "bean-processed"]);
 
 /** The statuses a bean is closed in. */
 export const CLOSED_STATUSES: ReadonlySet<string> = new Set(["completed", "scrapped"]);
@@ -107,6 +116,9 @@ export interface ProcessedRow {
   stuck: string[];
   /** Tokens on steps the current diagram does not have. */
   missingNodes: string[];
+  /** On the combined page: the store the row is from, and that store's page relative to this one. */
+  store?: string;
+  up?: string;
   /**
    * Where a FINISHED instance ended: its tokens when they rest on an end event,
    * else the last step in its history. Empty while it runs. A finished instance
@@ -272,6 +284,11 @@ export const PB_CSS = `.pb-filters { display: grid; grid-template-columns: repea
 .pb-list details { margin: 0.2rem 0 0; }
 .pb-list details p, .pb-detail details p { white-space: pre-wrap; font-size: 0.85rem; margin: 0.3rem 0; }
 .pb-detail { border-left: 4px solid #0d6e78; }
+.pb-stores { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; border: 1px solid rgba(127,127,127,0.4); border-radius: 6px; margin: 0 0 1rem; padding: 0.4rem 0.8rem; }
+.pb-stores label { display: flex; align-items: center; gap: 0.3rem; min-height: 2.75rem; }
+.pb-stores input { width: 1.25rem; height: 1.25rem; }
+.pb-live { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; font-size: 0.9rem; margin: 0 0 0.8rem; }
+.pb-live input { width: 1.25rem; height: 1.25rem; }
 .pb-detail button { font: inherit; min-height: 2.75rem; padding: 0.3rem 0.7rem; border-radius: 6px; border: 1px solid rgba(127,127,127,0.6); background: transparent; color: inherit; cursor: pointer; }`;
 
 /**
@@ -288,8 +305,10 @@ const PB_SCRIPT = String.raw`<script>
   var STALL = +root.getAttribute("data-pb-stall");
   var UP = root.getAttribute("data-pb-up");
   var seg = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-  var beanHref = function (id) { return seg.test(id) ? UP + "bean-processed/" + id + "/" : null; };
-  var procHref = function (id) { return seg.test(id) ? UP + "beans-processed/" + id + "/" : null; };
+  // On the combined page a row carries its own store's page as "up".
+  var upOf = function (r) { return (r && r.up) || UP; };
+  var beanHref = function (id, r) { return seg.test(id) ? upOf(r) + "bean-processed/" + id + "/" : null; };
+  var procHref = function (id, r) { return seg.test(id) ? upOf(r) + "beans-processed/" + id + "/" : null; };
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
   var stalled = function (r) { return !r.finished && r.ageDays != null && r.ageDays > STALL; };
@@ -363,7 +382,7 @@ const PB_SCRIPT = String.raw`<script>
   }
   function beanCell(r) {
     return r.beans.map(function (b) {
-      var h = beanHref(b.id);
+      var h = beanHref(b.id, r);
       return (h ? '<a href="' + esc(h) + '"><code>' + esc(b.id) + "</code></a> " : "<code>" + esc(b.id) + "</code> ") +
         (b.found ? esc(b.title) + ' <span class="pb-chip">' + esc(b.status) + "</span>" + (b.source ? ' <a href="' + esc(b.source) + '">source</a>' : "") : '<span class="pb-chip is-broken">not in this store</span>');
     }).join("<br>") || "none named";
@@ -380,17 +399,18 @@ const PB_SCRIPT = String.raw`<script>
     return (r.processPage ? ' · <a href="' + esc(r.processPage) + '">process page</a>' : "") +
       (r.sourceHref ? ' · <a href="' + esc(r.sourceHref) + '">BPMN source</a>' : "");
   }
-  function procName(proc) {
-    var ph = procHref(proc);
+  function procName(proc, r) {
+    var ph = procHref(proc, r);
     return ph ? '<a href="' + esc(ph) + '"><code>' + esc(proc) + "</code></a>" : "<code>" + esc(proc) + "</code>";
   }
   var isOpen = function (b) { return !b.closed; };
   var openMatch = function (sel, b) { return !sel || (sel === "closed" ? !!b.closed : isOpen(b)); };
   // One bean, readable where it is shown: status, links, and its body behind a disclosure.
-  function beanDetail(b, extra) {
+  function beanDetail(b, extra, r) {
     // A bean in a process has a page; one in no process has none, so it is not linked to one.
-    var h = b.href ? b.href : b.found !== undefined ? beanHref(b.id) : null;
-    return "<li>" + (h ? '<a href="' + esc(h) + '"><code>' + esc(b.id) + "</code></a> " : "<code>" + esc(b.id) + "</code> ") +
+    var h = b.href ? b.href : b.found !== undefined ? beanHref(b.id, r) : null;
+    var st = (r && r.store) || b.store;
+    return "<li>" + (st ? '<span class="pb-chip">' + esc(st) + "</span> " : "") + (h ? '<a href="' + esc(h) + '"><code>' + esc(b.id) + "</code></a> " : "<code>" + esc(b.id) + "</code> ") +
       (b.found === false ? '<span class="pb-chip is-broken">not in this store</span>' : esc(b.title) + ' <span class="pb-chip">' + esc(b.status) + "</span>") +
       (b.updatedAt ? " · updated " + esc(String(b.updatedAt).slice(0, 10)) : "") +
       (b.source ? ' · <a href="' + esc(b.source) + '">source</a>' : "") + (extra || "") +
@@ -415,6 +435,21 @@ const PB_SCRIPT = String.raw`<script>
   }
   if (MODE === "all") {
     var F = { q: $("pb-q"), process: $("pb-process"), state: $("pb-state"), bean: $("pb-beanstatus"), stale: $("pb-stale"), beans: $("pb-open") };
+    // The combined page's store tick boxes (owner, 2026-11-03): every store on by default.
+    var storeBoxes = [].slice.call(document.querySelectorAll("[data-pb-store-box]"));
+    // "Include the stores it depends on" (owner, 2026-11-03: "needs dependencies"):
+    // the ticked stores, widened by their needs, and theirs, all the way down.
+    var needsEl = document.getElementById("pb-needs");
+    var NEEDS = needsEl ? JSON.parse(needsEl.textContent) : {};
+    var depsBox = $("pb-deps");
+    var storeOn = function (name) {
+      if (!storeBoxes.length || !name) return true;
+      var on = storeBoxes.filter(function (b) { return b.checked; }).map(function (b) { return b.value; });
+      if (depsBox && depsBox.checked) {
+        for (var i = 0; i < on.length; i++) (NEEDS[on[i]] || []).forEach(function (n) { if (on.indexOf(n) < 0) on.push(n); });
+      }
+      return on.indexOf(name) >= 0;
+    };
     var unplacedEl = document.getElementById("pb-unplaced-data");
     var UNPLACED = unplacedEl ? JSON.parse(unplacedEl.textContent) : null;
     var detail = $("pb-detail");
@@ -425,7 +460,7 @@ const PB_SCRIPT = String.raw`<script>
         '<ul class="pb-list">' + rs.map(function (r) {
           var extra = " · " + (r.href ? '<a href="' + esc(r.href) + '">' + esc(r.instance) + "</a>" : esc(r.instance)) +
             " · " + (r.finished ? "finished" : "running") + " · last moved " + moved(r) + " " + stuckCell(r);
-          return r.beans.map(function (b) { return beanDetail(b, extra); }).join("");
+          return r.beans.map(function (b) { return beanDetail(b, extra, r); }).join("");
         }).join("") + "</ul>" +
         '<p><button type="button" id="pb-narrow">Show only these in the table</button> <button type="button" id="pb-close">Close</button></p>';
       detail.hidden = false;
@@ -442,7 +477,7 @@ const PB_SCRIPT = String.raw`<script>
         (!F.process.value || r.process === F.process.value) &&
         (!F.state.value || (F.state.value === "running" ? !r.finished : F.state.value === "finished" ? r.finished : r.stuck.length > 0)) &&
         (!F.bean.value || r.beans.some(function (b) { return (b.found ? b.status : "not in this store") === F.bean.value; })) &&
-        r.beans.some(function (b) { return openMatch(F.beans.value, b); }) &&
+        r.beans.some(function (b) { return openMatch(F.beans.value, b); }) && storeOn(r.store) &&
         (!st || (!r.finished && (r.ageDays == null || r.ageDays > st)));
     };
     var render = function () {
@@ -469,7 +504,7 @@ const PB_SCRIPT = String.raw`<script>
         var withDrawing = its.filter(function (r) { return r.drawing; })[0];
         var card = document.createElement("section");
         card.className = "pb-card";
-        card.innerHTML = "<h2>" + procName(proc) + '</h2><p class="sv-sub"><code>' + esc(its[0].source) + "</code>" + procLinks(its[0]) + " · " +
+        card.innerHTML = "<h2>" + procName(proc, its[0]) + '</h2><p class="sv-sub"><code>' + esc(its[0].source) + "</code>" + procLinks(its[0]) + " · " +
           its.filter(function (r) { return !r.finished; }).length + " running, " + its.filter(function (r) { return r.finished; }).length +
           " finished. A badge counts the beans at a step (running, stalled, or finished there); select it to read them.</p>" +
           (withDrawing ? '<div class="pb-diagram"><p class="sv-sub">The drawing loads when this card scrolls into view.</p></div>' : '<p class="sv-sub">No drawing of this process is published, so the positions are in the table only.</p>') +
@@ -482,24 +517,79 @@ const PB_SCRIPT = String.raw`<script>
       });
       rows.sort(function (a, b) { return String(a[sortKey] == null ? "" : a[sortKey]).localeCompare(String(b[sortKey] == null ? "" : b[sortKey])) * sortDir; });
       $("pb-tbody").innerHTML = rows.map(function (r) {
-        return "<tr><td>" + beanCell(r) + "</td><td>" + procName(r.process) + "</td><td>" + stepCell(r) + "</td><td>" +
+        return "<tr><td>" + beanCell(r) + "</td><td>" + (r.store ? '<span class="pb-chip">' + esc(r.store) + "</span> " : "") + procName(r.process, r) + "</td><td>" + stepCell(r) + "</td><td>" +
           (r.href ? '<a href="' + esc(r.href) + '">' + esc(r.instance) + "</a>" : esc(r.instance)) + " · " + (r.finished ? "finished" : "running") +
           "</td><td>" + moved(r) + "</td><td>" + stuckCell(r) + "</td></tr>";
       }).join("") || '<tr><td colspan="6">No instance matches these filters.</td></tr>';
       if (UNPLACED) {
         var q = F.q.value.trim().toLowerCase();
         var un = UNPLACED.filter(function (b) {
-          return openMatch(F.beans.value, b) && (!F.bean.value || b.status === F.bean.value) && (!q || (b.id + " " + b.title).toLowerCase().indexOf(q) >= 0);
+          return openMatch(F.beans.value, b) && storeOn(b.store) && (!F.bean.value || b.status === F.bean.value) && (!q || (b.id + " " + b.title).toLowerCase().indexOf(q) >= 0);
         });
         $("pb-unplaced").innerHTML = un.map(function (b) { return beanDetail(b); }).join("") || "<li>No bean outside a process matches these filters.</li>";
         $("pb-chips").insertAdjacentHTML("beforeend", '<li class="pb-chip">' + un.length + " of " + UNPLACED.length + " beans in no process</li>");
       }
     };
     Object.keys(F).forEach(function (k) { F[k].addEventListener("input", render); });
+    storeBoxes.forEach(function (b) { b.addEventListener("change", render); });
+    if (depsBox) depsBox.addEventListener("change", render);
     document.querySelectorAll("[data-pb-sort]").forEach(function (b) {
       b.addEventListener("click", function () { var k = b.getAttribute("data-pb-sort"); sortDir = sortKey === k ? -sortDir : 1; sortKey = k; render(); });
     });
     render();
+
+    // The 5-second refresh (owner, 2026-11-03): only on a page served from this
+    // machine, from the local store server's read-only route. The page keeps the
+    // drawings and links it was built with; only the positions and beans move.
+    var LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+    if (LOCAL && $("pb-live")) {
+      $("pb-live").hidden = false;
+      var STORE = root.getAttribute("data-pb-store"), PROC = root.getAttribute("data-pb-process");
+      var liveBox = $("pb-live-on"), liveState = $("pb-live-state");
+      var bases = [location.origin, "http://localhost:8080"], base = null, lastSig = "", timer = null;
+      var merge = function (fresh) {
+        var byInst = {}, byProc = {}, src = {};
+        ROWS.forEach(function (r) {
+          byInst[r.instance] = r;
+          if (r.drawing && !byProc[r.process]) byProc[r.process] = r;
+          r.beans.forEach(function (b) { if (b.source) src[b.id] = b.source; });
+        });
+        (UNPLACED || []).forEach(function (b) { if (b.source) src[b.id] = b.source; });
+        var keepSrc = function (b) { if (src[b.id] && !b.source) b.source = src[b.id]; return b; };
+        ROWS = fresh.rows.filter(function (r) { return !PROC || r.process === PROC; }).map(function (r) {
+          var mine = byInst[r.instance], like = mine || byProc[r.process] || {};
+          ["drawing", "processPage", "sourceHref"].forEach(function (k) { if (like[k]) r[k] = like[k]; });
+          if (mine && mine.href) r.href = mine.href;
+          r.beans.forEach(keepSrc);
+          return r;
+        });
+        if (UNPLACED) UNPLACED = fresh.unplaced.map(keepSrc);
+      };
+      var tick = function () {
+        var tryAt = base ? [base] : bases;
+        (function attempt(i) {
+          if (i >= tryAt.length) { base = null; liveState.textContent = "Live updates off: no local store server answered; showing the page as built."; return; }
+          fetch(tryAt[i] + "/api/work-plan/beans-processed", { cache: "no-store" })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (x) {
+              base = tryAt[i];
+              if (!x.ok) { liveState.textContent = "Live: the local store could not be read (" + (x.j.error || "no reason given") + "); showing the last answer."; return; }
+              if (x.j.store !== STORE) { liveState.textContent = "Live: the local server holds " + x.j.store + "'s work plan, not " + STORE + "'s."; return; }
+              liveState.textContent = "Live · " + x.j.tool + " · checked " + String(x.j.at).slice(11, 19) + " UTC";
+              var sig = JSON.stringify([x.j.rows, x.j.unplaced]);
+              if (sig === lastSig) return;
+              lastSig = sig;
+              merge(x.j);
+              render();
+            })
+            .catch(function () { attempt(i + 1); });
+        })(0);
+      };
+      var start = function () { if (!timer) { tick(); timer = setInterval(tick, 5000); } };
+      var stop = function () { if (timer) { clearInterval(timer); timer = null; } liveState.textContent = "Live updates paused."; };
+      liveBox.addEventListener("change", function () { if (liveBox.checked) start(); else stop(); });
+      start();
+    }
   } else {
     var show = function () {
       var id = root.getAttribute("data-pb-bean");
@@ -509,7 +599,7 @@ const PB_SCRIPT = String.raw`<script>
       out.innerHTML = (b ? '<section class="pb-card"><h2><code>' + esc(id) + "</code></h2><p>" + (b.found ? esc(b.title) + ' <span class="pb-chip">' + esc(b.status) + "</span> · updated " + esc((b.updatedAt || "").slice(0, 10)) + (b.source ? ' · <a href="' + esc(b.source) + '">source</a>' : "") : '<span class="pb-chip is-broken">not in this store</span>') +
         '</p><p class="sv-sub">Named by ' + its.length + " workflow instance(s). Solid outline: where the token is; dashed: steps already in the history.</p></section>" : "") +
         its.map(function (r, i) {
-          return '<section class="pb-card"><h2>' + procName(r.process) + "</h2><p>" + (r.href ? '<a href="' + esc(r.href) + '">' + esc(r.instance) + "</a>" : esc(r.instance)) +
+          return '<section class="pb-card"><h2>' + procName(r.process, r) + "</h2><p>" + (r.href ? '<a href="' + esc(r.href) + '">' + esc(r.instance) + "</a>" : esc(r.instance)) +
             " · " + (r.finished ? "finished" : "running") + " · token at " + stepCell(r) + " · last moved " + moved(r) + procLinks(r) + "</p><p>" + stuckCell(r) + "</p>" +
             (r.drawing ? '<div class="pb-diagram" id="pb-d' + i + '"></div>' : '<p class="sv-sub">No drawing of this process is published.</p>') +
             (r.missingNodes.length ? '<p class="sv-sub"><strong>node-missing</strong>: ' + r.missingNodes.map(function (n) { return "<code>" + esc(n) + "</code>"; }).join(", ") + " is not in the current diagram.</p>" : "") +
@@ -638,15 +728,31 @@ function nav(store: string, up: string): string {
  * processes with an instance, the beans on each diagram, filters. `rows` are
  * this page's rows, hrefs relative to it; `up` is the store page relative to it.
  */
-export function processedBeansBody(store: string, rows: readonly ProcessedRow[], now: Date, up: string, process?: string, unplaced?: readonly UnplacedBean[]): string {
+export function processedBeansBody(
+  store: string,
+  rows: readonly ProcessedRow[],
+  now: Date,
+  up: string,
+  process?: string,
+  unplaced?: readonly UnplacedBean[],
+  /** The combined page: the stores it joins, each with a tick box (owner, 2026-11-03). */
+  stores?: readonly string[],
+  /** The combined page: each store's dependencies among `stores`, for "include what it depends on". */
+  needs?: Readonly<Record<string, readonly string[]>>,
+): string {
   const procs = [...new Set(rows.map((r) => r.process))].sort();
   const beanStates = [...new Set(rows.flatMap((r) => r.beans.map((b) => (b.found ? b.status! : "not in this store"))))].sort();
   const id = process ? `beans-processed-${process}` : "beans-processed";
   return (
     `<h1 id="${esc(id)}">${process ? `Beans in <code>${esc(process)}</code>` : "Beans by process"}: ${esc(store)}</h1>` +
-    nav(store, up) +
+    (stores
+      ? `<p class="sv-sub"><a href="${up}">the bean stores</a> · ${stores.map((st) => `<a href="${up}${esc(st)}/beans-processed/">${esc(st)}</a>`).join(" · ")}</p>`
+      : nav(store, up)) +
     lead(store, now, up) +
-    `<div data-pb="all" data-pb-stall="${STUCK_AFTER_DAYS}" data-pb-up="${esc(up)}">` +
+    `<div data-pb="all" data-pb-stall="${STUCK_AFTER_DAYS}" data-pb-up="${esc(up)}" data-pb-store="${esc(store)}"${process ? ` data-pb-process="${esc(process)}"` : ""}>` +
+    // Shown only on a page opened from localhost: the refresh reads the local
+    // store server; on the published site there is nothing to refresh from.
+    (stores ? "" : `<p class="pb-live" id="pb-live" hidden><label><input type="checkbox" id="pb-live-on" checked> Refresh every 5 s from the local bean store</label> <span id="pb-live-state" role="status"></span></p>`) +
     `<form class="pb-filters" onsubmit="return false">` +
     `<label for="pb-q">Search<input id="pb-q" type="search" placeholder="bean, title, step, instance"></label>` +
     (process
@@ -656,7 +762,15 @@ export function processedBeansBody(store: string, rows: readonly ProcessedRow[],
     `<label for="pb-state">Instance<select id="pb-state"><option value="">Any</option><option value="running">Running</option><option value="finished">Finished</option><option value="stuck">Any stuck state</option></select></label>` +
     `<label for="pb-beanstatus">Bean status<select id="pb-beanstatus"><option value="">Any</option>${beanStates.map((s) => `<option>${esc(s)}</option>`).join("")}</select></label>` +
     `<label for="pb-stale">Not moved for<select id="pb-stale"><option value="">Any time</option><option value="${STUCK_AFTER_DAYS}">More than ${STUCK_AFTER_DAYS} days</option><option value="30">More than 30 days</option><option value="60">More than 60 days</option></select></label>` +
-    `</form><ul class="pb-chips" id="pb-chips"></ul>` +
+    `</form>` +
+    (stores
+      ? `<fieldset class="pb-stores"><legend>Stores</legend>${stores
+          .map((st) => `<label><input type="checkbox" data-pb-store-box value="${esc(st)}" checked> ${esc(st)}</label>`)
+          .join("")}` +
+        `<label class="pb-deps"><input type="checkbox" id="pb-deps"> and the stores each ticked store depends on (its <code>needs</code>)</label></fieldset>` +
+        `<script type="application/json" id="pb-needs">${scriptJson(needs ?? {})}</script>`
+      : "") +
+    `<ul class="pb-chips" id="pb-chips"></ul>` +
     `<section class="pb-card pb-detail" id="pb-detail" tabindex="-1" aria-live="polite" hidden></section>` +
     (rows.length === 0 ? `<p class="sv-sub">No BPMN instance is recorded in this store, so no bean sits at any step.</p>` : "") +
     `<div id="pb-cards"></div>` +
@@ -714,6 +828,28 @@ function historySection(history?: ProcessedBeanHistory): string {
     `<ol class="pb-events" id="pb-events"></ol>` +
     `</section>`
   );
+}
+
+/** One store's part of the combined page: its rows and beans in no process, hrefs relative to its own page. */
+export interface StoreRows {
+  store: string;
+  rows: readonly ProcessedRow[];
+  unplaced: readonly UnplacedBean[];
+  /** The instances this store's instance `needs` (its declaration): the stores it depends on. */
+  needs?: readonly string[];
+}
+
+/**
+ * `…/beans/beans-processed/`: every store's beans by process on one page, a
+ * tick box per store (owner, 2026-11-03). Each row keeps its own store's links:
+ * its hrefs are re-anchored at `../<store>/` and it carries that as `up`.
+ */
+export function processedBeansCombinedBody(parts: readonly StoreRows[], now: Date): string {
+  const stores = parts.map((p) => p.store).sort();
+  const rows = parts.flatMap((p) => rebase(p.rows, `../${p.store}/`).map((r) => ({ ...r, store: p.store, up: `../${p.store}/` })));
+  const unplaced = parts.flatMap((p) => p.unplaced.map((b) => ({ ...b, store: p.store })));
+  const needs = Object.fromEntries(parts.map((p) => [p.store, [...(p.needs ?? [])].filter((n) => stores.includes(n))]));
+  return processedBeansBody("every store", rows, now, "../", undefined, unplaced, stores, needs);
 }
 
 /**

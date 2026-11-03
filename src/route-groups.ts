@@ -112,7 +112,8 @@ export interface RouteDeps {
  * server's chain a chain. A `Response` ends dispatch.
  */
 export interface MountedRoute {
-  get?: (url: URL) => Promise<Response | null> | Response | null;
+  /** `req` is the request itself, for a route that must read a header (an `Origin`). */
+  get?: (url: URL, req?: Request) => Promise<Response | null> | Response | null;
   post?: (url: URL, req: Request) => Promise<Response | null> | Response | null;
 }
 
@@ -251,9 +252,9 @@ export async function mountDeclaredRoutes(
 }
 
 /** Try each mounted route in order; the first non-null `Response` wins. */
-export async function dispatchGet(routes: readonly MountedRoute[], url: URL): Promise<Response | null> {
+export async function dispatchGet(routes: readonly MountedRoute[], url: URL, req?: Request): Promise<Response | null> {
   for (const r of routes) {
-    const res = await r.get?.(url);
+    const res = await r.get?.(url, req);
     if (res) return res;
   }
   return null;
