@@ -496,17 +496,19 @@ describe("the review step is selection, not typing", () => {
     expect(REJECTION_REASONS.every((_, i) => Number.isInteger(i + 1))).toBe(true);
   });
 
+  // Each CLI run is a cold `bun run` (about 3 s in an index checkout), so three
+  // of them overrun bun's 5 s default and fail as a timeout, not on a verdict.
   test("a bad selection says the range rather than acting", () => {
     for (const n of ["0", "99", "x"]) {
       const r = Bun.spawnSync(["bun", "run", join(TOOLS_ROOT, "scripts/narratives.ts"), "confirm", n], { cwd: ROOT });
       expect(r.exitCode).not.toBe(0);
     }
-  });
+  }, 30_000);
 
   test("a rejection with no reason is refused at the CLI too", () => {
     const r = Bun.spawnSync(["bun", "run", join(TOOLS_ROOT, "scripts/narratives.ts"), "reject", "1"], { cwd: ROOT });
     expect(r.exitCode).not.toBe(0);
-  });
+  }, 30_000);
 });
 
 describe("an agent cannot record itself as the human — the hole the tool itself opened", () => {
