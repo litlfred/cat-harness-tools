@@ -290,10 +290,15 @@ describe("HTTP routes", () => {
   });
 
   test("chat is POST-only and work-plan GET-only, so each dispatch is one shorter than the list", async () => {
-    const { routes } = await mountDeclaredRoutes(SERVER_ROUTES, SERVER_ROOT, deps());
-    const ids = SERVER_ROUTES.map((r) => r.id);
-    expect(ids.filter((_, i) => !routes[i]!.get)).toEqual(["chat"]);
-    expect(ids.filter((_, i) => !routes[i]!.post)).toEqual(["work-plan"]);
+    // Paired by id through the outcomes, not by position: a layer that is not
+    // installed (a standalone checkout has no content routes) mounts fewer
+    // routes than are declared, and the routes come back in declaration order.
+    const { routes, outcomes } = await mountDeclaredRoutes(SERVER_ROUTES, SERVER_ROOT, deps());
+    const mounted = outcomes.filter((o) => o.state === "mounted").map((o) => o.id);
+    expect(mounted).toContain("chat");
+    expect(mounted).toContain("work-plan");
+    expect(mounted.filter((_, i) => !routes[i]!.get)).toEqual(["chat"]);
+    expect(mounted.filter((_, i) => !routes[i]!.post)).toEqual(["work-plan"]);
   });
 
   test("the three content routes are declared `core`", () => {
