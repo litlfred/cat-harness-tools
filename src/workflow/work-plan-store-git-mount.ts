@@ -67,6 +67,8 @@ export interface MountedBean {
 }
 
 export class MountedGitBranchStore implements WorkPlanStore {
+  private readonly readers = new Map<string, GitReader>();
+
   /**
    * @param repoRoot the checkout whose `beans/` is mounted.
    * @param opts.cli use the `beans` CLI when it is installed (default true).
@@ -209,14 +211,15 @@ export class MountedGitBranchStore implements WorkPlanStore {
     } catch {
       loc = undefined;
     }
-    let reader: GitReader;
-    let path = rel;
-    if (loc) {
-      reader = branchReader(BranchStore.open(loc.branch, { repoRoot: this.repoRoot, log: () => {} }));
-      path = `${branchPathOf(loc)}${rel.slice(loc.path.length)}`;
-    } else {
-      reader = checkoutReader(this.repoRoot);
+    // One reader per branch for this store's life: a site build reads every
+    // bean's history, and each reader fetches the whole branch once.
+    const key = loc ? `branch:${loc.branch}` : "checkout";
+    let reader = this.readers.get(key);
+    if (!reader) {
+      reader = loc ? branchReader(BranchStore.open(loc.branch, { repoRoot: this.repoRoot, log: () => {} })) : checkoutReader(this.repoRoot);
+      this.readers.set(key, reader);
     }
+    const path = loc ? `${branchPathOf(loc)}${rel.slice(loc.path.length)}` : rel;
     return historyFrom(e.bean.id, beanVersions(reader, path), listInstances(this.repoRoot));
   }
 

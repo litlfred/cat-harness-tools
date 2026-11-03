@@ -35,6 +35,7 @@
  */
 import type { BeanNode } from "./beans.ts";
 import type { InstanceState } from "../src/workflow/instance.js";
+import type { HistoryEvent } from "../src/workflow/work-plan-store.ts";
 import { lastMoved, stuckStatesOf, STUCK_AFTER_DAYS, dayOf } from "./workflow-view.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -79,6 +80,14 @@ export interface ProcessedRow {
   /** Tokens on steps the current diagram does not have. */
   missingNodes: string[];
 }
+
+/**
+ * One bean's history for its page (cat-harness#991 step 5; owner, 2026-11-03:
+ * "show all the processes and the bean stepping through it"). `drawings` maps
+ * each process in the history to its published drawing, relative to the page.
+ * `unknown` says why the history could not be read: never an empty one.
+ */
+export type ProcessedBeanHistory = { events: HistoryEvent[]; drawings: Record<string, string> } | { unknown: string };
 
 /** What {@link processedBeansRows} reads. */
 export interface ProcessedBeansInput {
@@ -179,7 +188,16 @@ export const PB_CSS = `.pb-filters { display: grid; grid-template-columns: repea
 .pb-table button { all: unset; cursor: pointer; text-decoration: underline; }
 .pb-hist { list-style: none; padding: 0; margin: 0; }
 .pb-hist li::before { content: none; }
-.pb-hist li { margin: 0 0 0.4rem; font-size: 0.85rem; }`;
+.pb-hist li { margin: 0 0 0.4rem; font-size: 0.85rem; }
+.pb-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin: 0.5rem 0; }
+.pb-steps button { font: inherit; font-size: 0.9rem; min-width: 2.75rem; min-height: 2.75rem; padding: 0.3rem 0.7rem; border-radius: 6px; border: 1px solid rgba(127,127,127,0.6); background: transparent; color: inherit; cursor: pointer; }
+.pb-steps button:focus-visible, .pb-steps input:focus-visible { outline: 3px solid #0d6e78; outline-offset: 2px; }
+.pb-steps input[type=range] { flex: 1 1 12rem; min-height: 2.75rem; }
+.pb-now { border-left: 4px solid #0d6e78; padding: 0.4rem 0.8rem; margin: 0.5rem 0; }
+.pb-events { list-style: none; padding: 0; margin: 0.5rem 0 0; max-height: 18rem; overflow-y: auto; font-size: 0.85rem; }
+.pb-events li::before { content: none; }
+.pb-events li { padding: 0.2rem 0.4rem; border-radius: 4px; cursor: pointer; }
+.pb-events li[aria-current="step"] { outline: 2px solid #0d6e78; font-weight: 600; }`;
 
 /**
  * The client: reads the embedded rows, filters them from the form (kept in the
@@ -362,6 +380,78 @@ const PB_SCRIPT = String.raw`<script>
       });
     };
     show();
+
+    // The history stepper (owner, 2026-11-03): every event, the process the bean
+    // was in at that moment drawn with its step, and keyboard and button controls.
+    var histEl = document.getElementById("pb-history");
+    var H = histEl ? JSON.parse(histEl.textContent) : null;
+    if (H && H.events && H.events.length) {
+      var EV = H.events, at = EV.length - 1, timer = null;
+      var list = $("pb-events"), now = $("pb-now"), range = $("pb-at"), label = $("pb-at-label"), dia = $("pb-hist-diagram");
+      var playBtn = document.querySelector('[data-pb-go="play"]');
+      list.innerHTML = EV.map(function (e, i) {
+        return '<li data-i="' + i + '"><time>' + esc(e.at.slice(0, 16).replace("T", " ")) + "</time> · " + esc(e.kind) + " · " + esc(e.what) + "</li>";
+      }).join("");
+      // The steps an instance had reached BY event i: what the diagram dashes as done.
+      var reached = function (i, inst) {
+        var seen = [];
+        for (var k = 0; k < i; k++) if (EV[k].instance === inst && EV[k].node && seen.indexOf(EV[k].node) < 0) seen.push(EV[k].node);
+        return seen;
+      };
+      // The latest step event at or before i: the process the bean is in at that moment.
+      var stepAt = function (i) { for (var k = i; k >= 0; k--) if (EV[k].kind === "step-reached") return k; return -1; };
+      var drawn = null;
+      var go = function (i) {
+        at = Math.max(0, Math.min(EV.length - 1, i));
+        var e = EV[at];
+        range.value = at;
+        label.textContent = "event " + (at + 1) + " of " + EV.length;
+        now.innerHTML = "<strong>" + esc(e.kind) + "</strong> · " + esc(e.at.replace("T", " ").replace(/\.\d+/, "")) + " · by " + esc(e.by) +
+          "<br>" + esc(e.what) + (e.instance ? '<br><span class="sv-sub">instance <code>' + esc(e.instance) + "</code>" + (e.node ? " at <code>" + esc(e.node) + "</code>" : "") + "</span>" : "");
+        list.querySelectorAll("li").forEach(function (li) {
+          if (+li.getAttribute("data-i") === at) { li.setAttribute("aria-current", "step"); li.scrollIntoView({ block: "nearest" }); }
+          else li.removeAttribute("aria-current");
+        });
+        var k = stepAt(at);
+        if (k < 0) { dia.hidden = true; drawn = null; return; }
+        var s = EV[k], proc = s.what.split(":")[0], href = H.drawings[proc];
+        if (!href) { dia.hidden = false; dia.textContent = "No drawing of " + proc + " is published."; drawn = null; return; }
+        var marks = {};
+        reached(k, s.instance).forEach(function (n) { marks[n] = { rows: [] }; });
+        marks[s.node] = { rows: [{ beans: [{ id: root.getAttribute("data-pb-bean"), title: s.what }], finished: false }] };
+        var key = href + "|" + k;
+        if (drawn === key) return;
+        drawn = key;
+        dia.hidden = false;
+        draw(dia, href, marks);
+      };
+      var stop = function () { if (timer) { clearInterval(timer); timer = null; } playBtn.setAttribute("aria-pressed", "false"); playBtn.textContent = "▶ Play"; };
+      var play = function () {
+        if (timer) return stop();
+        if (at >= EV.length - 1) go(0);
+        playBtn.setAttribute("aria-pressed", "true"); playBtn.textContent = "⏸ Pause";
+        timer = setInterval(function () { if (at >= EV.length - 1) stop(); else go(at + 1); }, 1200);
+      };
+      var act = { first: function () { stop(); go(0); }, prev: function () { stop(); go(at - 1); }, next: function () { stop(); go(at + 1); }, last: function () { stop(); go(EV.length - 1); }, play: play };
+      document.querySelectorAll("[data-pb-go]").forEach(function (b) { b.addEventListener("click", function () { act[b.getAttribute("data-pb-go")](); }); });
+      range.addEventListener("input", function () { stop(); go(+range.value); });
+      list.addEventListener("click", function (ev) { var li = ev.target.closest("li[data-i]"); if (li) { stop(); go(+li.getAttribute("data-i")); } });
+      document.addEventListener("keydown", function (ev) {
+        var t = ev.target, tag = t && t.tagName;
+        // A form control keeps its own keys: the slider steps itself (and fires its own input event).
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (t && t.isContentEditable)) return;
+        if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
+        var k = ev.key;
+        if (k === "ArrowRight") act.next();
+        else if (k === "ArrowLeft") act.prev();
+        else if (k === "Home") act.first();
+        else if (k === "End") act.last();
+        else if (k === " " && (tag !== "BUTTON")) act.play();
+        else return;
+        ev.preventDefault();
+      });
+      go(at);
+    }
   }
 })();
 </script>`;
@@ -430,14 +520,45 @@ export function processedBeansBody(store: string, rows: readonly ProcessedRow[],
 }
 
 /** `processed-bean/<bean>/`: one bean through every instance that names it. `rows` are that bean's. */
-export function processedBeanBody(store: string, bean: string, rows: readonly ProcessedRow[], now: Date, up: string): string {
+export function processedBeanBody(store: string, bean: string, rows: readonly ProcessedRow[], now: Date, up: string, history?: ProcessedBeanHistory): string {
   return (
     `<h1 id="processed-bean-${esc(bean)}">Bean <code>${esc(bean)}</code> in its processes</h1>` +
     nav(store, up) +
     lead(store, now, up) +
-    `<div data-pb="one" data-pb-stall="${STUCK_AFTER_DAYS}" data-pb-up="${esc(up)}" data-pb-bean="${esc(bean)}"><div id="pb-one"></div></div>` +
+    `<div data-pb="one" data-pb-stall="${STUCK_AFTER_DAYS}" data-pb-up="${esc(up)}" data-pb-bean="${esc(bean)}">` +
+    historySection(history) +
+    `<div id="pb-one"></div></div>` +
     `<script type="application/json" id="pb-rows">${scriptJson(rows)}</script>` +
+    (history ? `<script type="application/json" id="pb-history">${scriptJson(history)}</script>` : "") +
     PB_SCRIPT
+  );
+}
+
+/** The history stepper's frame; the client fills it. Absent history: the section says so. */
+function historySection(history?: ProcessedBeanHistory): string {
+  const head = `<h2 class="sv-h2" id="pb-history-h">History</h2>`;
+  if (!history) return `<section class="pb-card" aria-labelledby="pb-history-h">${head}<p class="sv-sub">This page was built without the bean's history.</p></section>`;
+  if ("unknown" in history) {
+    return `<section class="pb-card" aria-labelledby="pb-history-h">${head}<p class="sv-sub"><strong>The history could not be read</strong>, so it is not shown: ${esc(history.unknown)}</p></section>`;
+  }
+  if (history.events.length === 0) return `<section class="pb-card" aria-labelledby="pb-history-h">${head}<p class="sv-sub">No change to this bean is recorded yet.</p></section>`;
+  return (
+    `<section class="pb-card" aria-labelledby="pb-history-h" id="pb-history-card">${head}` +
+    `<p class="sv-sub">Every change to the bean and every step of a process it went through, oldest first. ` +
+    `Step with the buttons, or the keyboard: <kbd>←</kbd> <kbd>→</kbd> one event, <kbd>Home</kbd> <kbd>End</kbd> first and last, <kbd>Space</kbd> play or pause.</p>` +
+    `<div class="pb-steps" role="toolbar" aria-label="Step through the history">` +
+    `<button type="button" data-pb-go="first" aria-label="First event">⏮</button>` +
+    `<button type="button" data-pb-go="prev" aria-label="Previous event">◀</button>` +
+    `<button type="button" data-pb-go="play" aria-label="Play" aria-pressed="false">▶ Play</button>` +
+    `<button type="button" data-pb-go="next" aria-label="Next event">▶</button>` +
+    `<button type="button" data-pb-go="last" aria-label="Last event">⏭</button>` +
+    `<input type="range" id="pb-at" min="0" max="${history.events.length - 1}" value="${history.events.length - 1}" aria-label="Event">` +
+    `<span id="pb-at-label" aria-hidden="true"></span>` +
+    `</div>` +
+    `<div class="pb-now" id="pb-now" aria-live="polite"></div>` +
+    `<div class="pb-diagram" id="pb-hist-diagram" hidden></div>` +
+    `<ol class="pb-events" id="pb-events"></ol>` +
+    `</section>`
   );
 }
 
