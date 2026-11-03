@@ -8,7 +8,8 @@
   "holds": "content",
   "perInstance": true,
   "nodeSchemas": {
-    "folio-glossary/v1": {}
+    "folio-glossary/v1": {},
+    "folio-glossary-tables/v1": {}
   },
   "summary": "SKOS terms (folio-glossary/v1): local terms with definitions and codes, linked to external SKOS schemes by exactMatch rather than copied. Rendered on the glossary/ page.",
   "avatar": {
