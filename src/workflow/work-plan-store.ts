@@ -22,6 +22,7 @@
  * @module folio-assistant/workflow/work-plan-store
  */
 import { createHash } from "node:crypto";
+import { entriesInBody, MEMORY_SCOPES, renderEntryLine, type MemoryEntry, type MemoryScope } from "../../schemas/kg/memory-record.ts";
 
 /** A bean as the contract speaks of it: fields, not a file. */
 export interface BeanFields {
@@ -102,8 +103,33 @@ export interface Position {
   lastMoved?: string;
 }
 
-/** The contract's operations. */
-export interface WorkPlanStore {
+/**
+ * A memory record as `recall` answers it (proposal §4.14, Q17). For a bean
+ * the scope is `item` unless a `memory-scope:` tag says otherwise, and the
+ * entries are the body lines `renderEntryLine` wrote.
+ */
+export interface MemoryRecordView {
+  id: string;
+  title: string;
+  scope: MemoryScope;
+  about: string[];
+  entries: MemoryEntry[];
+  version: string;
+}
+
+/**
+ * The memory store: the layer every memory Tool implements (Q17, option 1).
+ * `keep` appends, so agents sharing a record never overwrite one another;
+ * `open` makes a record for a run or a shared space.
+ */
+export interface MemoryStore {
+  keep(id: string, entry: MemoryEntry): { state: "kept"; version: string } | { state: "none" };
+  recall(id: string): { state: "hit"; record: MemoryRecordView } | { state: "none" };
+  open(record: { id: string; title: string; scope: MemoryScope; about?: string[] }): { state: "opened"; version: string } | Refusal;
+}
+
+/** The contract's operations: the memory store's, and the work item's on top of them. */
+export interface WorkPlanStore extends MemoryStore {
   get(id: string): Got;
   list(filter?: BeanFilter): BeanFields[];
   create(bean: BeanFields): { state: "created"; version: string } | Refusal;
@@ -112,6 +138,54 @@ export interface WorkPlanStore {
   history(id: string): HistoryEvent[];
   positions(id: string): Position[];
   beansAt(process: string, step?: string): string[];
+}
+
+// ---------------------------------------------------------------------------
+// The memory layer, in terms of the work item's operations, so any work-plan
+// Tool is a memory Tool too: the same service, with fewer parameters.
+
+const SCOPE_TAG = "memory-scope:";
+const ABOUT_TAG = "about:";
+
+/** `keep` for a work-plan Tool: the entry as one body line. */
+export function keepOn(store: Pick<WorkPlanStore, "note">, id: string, entry: MemoryEntry): { state: "kept"; version: string } | { state: "none" } {
+  const r = store.note(id, renderEntryLine(entry), entry.by);
+  return r.state === "noted" ? { state: "kept", version: r.version } : { state: "none" };
+}
+
+/** `recall` for a work-plan Tool: the bean read as a memory record. */
+export function recallOn(store: Pick<WorkPlanStore, "get">, id: string): { state: "hit"; record: MemoryRecordView } | { state: "none" } {
+  const got = store.get(id);
+  if (got.state !== "hit") return { state: "none" };
+  const tags = got.bean.tags ?? [];
+  const scope = tags.find((t) => t.startsWith(SCOPE_TAG))?.slice(SCOPE_TAG.length);
+  return {
+    state: "hit",
+    record: {
+      id: got.bean.id,
+      title: got.bean.title,
+      scope: (MEMORY_SCOPES as readonly string[]).includes(scope ?? "") ? (scope as MemoryScope) : "item",
+      about: tags.filter((t) => t.startsWith(ABOUT_TAG)).map((t) => t.slice(ABOUT_TAG.length)),
+      entries: entriesInBody(got.bean.body),
+      version: got.version,
+    },
+  };
+}
+
+/** `open` for a work-plan Tool: a bean in progress, tagged with its scope and what it is about. */
+export function openOn(
+  store: Pick<WorkPlanStore, "create">,
+  record: { id: string; title: string; scope: MemoryScope; about?: string[] },
+): { state: "opened"; version: string } | Refusal {
+  const r = store.create({
+    id: record.id,
+    title: record.title,
+    status: "in-progress",
+    type: "task",
+    tags: [`${SCOPE_TAG}${record.scope}`, ...(record.about ?? []).map((a) => `${ABOUT_TAG}${a}`)],
+    body: "",
+  });
+  return r.state === "created" ? { state: "opened", version: r.version } : r;
 }
 
 /** The statuses a bean may be archived in. */
