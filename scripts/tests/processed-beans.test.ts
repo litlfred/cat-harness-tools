@@ -11,9 +11,11 @@ import {
   processedBeanBody,
   processedBeanIndexBody,
   processedBeansBody,
+  processedBeansCombinedBody,
   processedBeansRoutes,
   processedBeansRows,
   rebase,
+  RESERVED_STORE_NAMES,
   unplacedBeans,
 } from "../processed-beans.ts";
 
@@ -221,5 +223,56 @@ describe("finished instances, beans in no process, open and closed (owner, 2026-
     expect(html).toContain('data-pb="index"');
     expect(html).toContain('<option value="open" selected>Open</option>');
     expect(html).toContain('<option value="closed">Closed</option>');
+  });
+});
+
+describe("the combined page, every store at …/beans/beans-processed/ (owner, 2026-11-03)", () => {
+  const a = rows([instance("ia", { bean: "fa-aaaa", tokens: ["Task_1"] })], [bean("fa-aaaa", "todo")]);
+  const b = rows([instance("ib", { bean: "fb-bbbb", tokens: ["Task_2"] })], [bean("fb-bbbb", "in-progress")]);
+  const html = processedBeansCombinedBody(
+    [
+      { store: "cat-harness", rows: a, unplaced: [] },
+      { store: "folio-assistant-core", rows: b, unplaced: unplacedBeans([bean("fc-cccc", "todo")], []) },
+    ],
+    NOW,
+  );
+  const embedded = JSON.parse(/<script type="application\/json" id="pb-rows">([\s\S]*?)<\/script>/.exec(html)![1]!) as Array<{ store: string; up: string; href?: string }>;
+
+  test("each row keeps its own store: its links re-anchored at that store's page", () => {
+    expect(embedded.map((r) => [r.store, r.up, r.href])).toEqual([
+      ["cat-harness", "../cat-harness/", "../cat-harness/workflows/ia/"],
+      ["folio-assistant-core", "../folio-assistant-core/", "../folio-assistant-core/workflows/ib/"],
+    ]);
+  });
+
+  test("a tick box per store, on by default, and links to each store's own page", () => {
+    expect(html).toContain('<input type="checkbox" data-pb-store-box value="cat-harness" checked>');
+    expect(html).toContain('<input type="checkbox" data-pb-store-box value="folio-assistant-core" checked>');
+    expect(html).toContain('href="../folio-assistant-core/beans-processed/"');
+  });
+
+  test("beans in no process say which store they are from", () => {
+    expect(html).toContain('"store":"folio-assistant-core"');
+  });
+
+  test("each store's needs go to the page, kept to the stores on it, for \"and what it depends on\"", () => {
+    const withNeeds = processedBeansCombinedBody(
+      [
+        { store: "cat-harness", rows: a, unplaced: [], needs: ["bootstrap"] },
+        { store: "folio-assistant-core", rows: b, unplaced: [], needs: ["cat-harness", "bootstrap"] },
+      ],
+      NOW,
+    );
+    const needs = JSON.parse(/<script type="application\/json" id="pb-needs">([\s\S]*?)<\/script>/.exec(withNeeds)![1]!);
+    expect(needs).toEqual({ "cat-harness": [], "folio-assistant-core": ["cat-harness"] });
+    expect(withNeeds).toContain('id="pb-deps"');
+  });
+
+  test("no live refresh: the local server serves one store, not every store", () => {
+    expect(html).not.toContain('id="pb-live"');
+  });
+
+  test("a store may not be named like a page beside it", () => {
+    expect([...RESERVED_STORE_NAMES].sort()).toEqual(["bean-processed", "beans-processed"]);
   });
 });
