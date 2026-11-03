@@ -136,7 +136,7 @@ describe("routes are path IRIs", () => {
     for (const html of [all, one]) {
       expect(html).not.toMatch(/href="[^"]*\?/);
       expect(html).not.toContain("URLSearchParams");
-      expect(html).toContain('"processed-bean/" + id + "/"');
+      expect(html).toContain('"bean-processed/" + id + "/"');
     }
     expect(one).toContain('data-pb-bean="fa-aaaa"');
   });

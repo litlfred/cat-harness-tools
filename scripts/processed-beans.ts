@@ -14,8 +14,8 @@
  * ## Two pages, one projection
  *
  * `workflow-view.ts` draws one page per INSTANCE. This adds the two views it
- * lacks: `processed-beans/` (every process with an instance, each diagram
- * marked with how many beans wait at each step) and `processed-bean/?bean=<id>`
+ * lacks: `beans-processed/` (every process with an instance, each diagram
+ * marked with how many beans wait at each step) and `bean-processed/?bean=<id>`
  * (one bean through every instance that names it). Both read one projection,
  * {@link processedBeansRows}, embedded in the page, so the filters run in the
  * browser and the URL query keeps them (`?q=&process=&stale=30`).
@@ -65,7 +65,7 @@ export interface UnplacedBean {
   updatedAt?: string;
   source?: string;
   excerpt?: string;
-  /** Its page under `processed-bean/`, when it has one, relative to the store page. */
+  /** Its page under `bean-processed/`, when it has one, relative to the store page. */
   href?: string;
 }
 
@@ -288,8 +288,8 @@ const PB_SCRIPT = String.raw`<script>
   var STALL = +root.getAttribute("data-pb-stall");
   var UP = root.getAttribute("data-pb-up");
   var seg = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
-  var beanHref = function (id) { return seg.test(id) ? UP + "processed-bean/" + id + "/" : null; };
-  var procHref = function (id) { return seg.test(id) ? UP + "processed-beans/" + id + "/" : null; };
+  var beanHref = function (id) { return seg.test(id) ? UP + "bean-processed/" + id + "/" : null; };
+  var procHref = function (id) { return seg.test(id) ? UP + "beans-processed/" + id + "/" : null; };
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
   var stalled = function (r) { return !r.finished && r.ageDays != null && r.ageDays > STALL; };
@@ -608,8 +608,8 @@ export const PB_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 /**
  * The routes these pages take under a bean store's page
  * (`<base>/<harness>/beans/<store>/`), every one a path IRI, never a query:
- * `processed-beans/`, `processed-beans/<processId>/` and
- * `processed-bean/<beanId>/`. An id that is not a URL segment gets no page,
+ * `beans-processed/`, `beans-processed/<processId>/` and
+ * `bean-processed/<beanId>/`. An id that is not a URL segment gets no page,
  * and is shown as text where it is named.
  */
 export function processedBeansRoutes(rows: readonly ProcessedRow[]): { processes: string[]; beans: string[] } {
@@ -630,18 +630,18 @@ function lead(store: string, now: Date, up: string): string {
 }
 
 function nav(store: string, up: string): string {
-  return `<p class="sv-sub"><a href="${up}">${esc(store)}'s work plan</a> · <a href="${up}processed-beans/">beans by process</a> · <a href="${up}workflows/">every instance</a></p>`;
+  return `<p class="sv-sub"><a href="${up}">${esc(store)}'s work plan</a> · <a href="${up}beans-processed/">beans by process</a> · <a href="${up}workflows/">every instance</a></p>`;
 }
 
 /**
- * `processed-beans/` (no `process`) or `processed-beans/<process>/`: the
+ * `beans-processed/` (no `process`) or `beans-processed/<process>/`: the
  * processes with an instance, the beans on each diagram, filters. `rows` are
  * this page's rows, hrefs relative to it; `up` is the store page relative to it.
  */
 export function processedBeansBody(store: string, rows: readonly ProcessedRow[], now: Date, up: string, process?: string, unplaced?: readonly UnplacedBean[]): string {
   const procs = [...new Set(rows.map((r) => r.process))].sort();
   const beanStates = [...new Set(rows.flatMap((r) => r.beans.map((b) => (b.found ? b.status! : "not in this store"))))].sort();
-  const id = process ? `processed-beans-${process}` : "processed-beans";
+  const id = process ? `beans-processed-${process}` : "beans-processed";
   return (
     `<h1 id="${esc(id)}">${process ? `Beans in <code>${esc(process)}</code>` : "Beans by process"}: ${esc(store)}</h1>` +
     nav(store, up) +
@@ -673,10 +673,10 @@ export function processedBeansBody(store: string, rows: readonly ProcessedRow[],
   );
 }
 
-/** `processed-bean/<bean>/`: one bean through every instance that names it. `rows` are that bean's. */
+/** `bean-processed/<bean>/`: one bean through every instance that names it. `rows` are that bean's. */
 export function processedBeanBody(store: string, bean: string, rows: readonly ProcessedRow[], now: Date, up: string, history?: ProcessedBeanHistory): string {
   return (
-    `<h1 id="processed-bean-${esc(bean)}">Bean <code>${esc(bean)}</code> in its processes</h1>` +
+    `<h1 id="bean-processed-${esc(bean)}">Bean <code>${esc(bean)}</code> in its processes</h1>` +
     nav(store, up) +
     lead(store, now, up) +
     `<div data-pb="one" data-pb-stall="${STUCK_AFTER_DAYS}" data-pb-up="${esc(up)}" data-pb-bean="${esc(bean)}">` +
@@ -717,12 +717,12 @@ function historySection(history?: ProcessedBeanHistory): string {
 }
 
 /**
- * `processed-bean/`: every bean with a page of its own, filterable by open or
+ * `bean-processed/`: every bean with a page of its own, filterable by open or
  * closed (default open; owner, 2026-11-03) and by text. `up` is the store page.
  */
 export function processedBeanIndexBody(store: string, beans: readonly UnplacedBean[], up: string): string {
   return (
-    `<h1 id="processed-bean">Beans in processes: ${esc(store)}</h1>` +
+    `<h1 id="bean-processed">Beans in processes: ${esc(store)}</h1>` +
     nav(store, up) +
     (beans.length === 0
       ? `<p class="sv-sub">No workflow instance in this store names a bean.</p>`

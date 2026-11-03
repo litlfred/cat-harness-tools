@@ -3025,7 +3025,7 @@ function drawWorkflows(visualiser: string, s: InstanceSubject, storeDir: string,
 /**
  * A bean store's beans-by-process pages (cat-harness-tools#1413, bean
  * `folio-assistant-pbv1`), every one a path IRI under the store's page:
- * `processed-beans/`, `processed-beans/<processId>/`, `processed-bean/<beanId>/`.
+ * `beans-processed/`, `beans-processed/<processId>/`, `bean-processed/<beanId>/`.
  */
 function drawProcessedBeans(store: string, instanceRoot: string, storeDir: string, flows: ReturnType<typeof readInstances>, beans: readonly BeanNode[], models: ReadonlyMap<string, ModelRead>): string[] {
   const instances = flows.flatMap((r) => ("state" in r ? [r.state] : []));
@@ -3075,7 +3075,7 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
       return { unknown: e instanceof Error ? e.message.split("\n")[0]! : String(e) };
     }
   };
-  const all = join(storeDir, "processed-beans");
+  const all = join(storeDir, "beans-processed");
   // Every bean, not only the ones an instance names: a store with beans and no instance
   // (folio-assistant-core, 2026-11-03) otherwise read as an empty page.
   const beanSource = (b: BeanNode): string | undefined => (web ? branchKeptHref(branchKeptLocation(instanceRoot, b.file, web)) : undefined);
@@ -3086,7 +3086,7 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
     const mine = rebase(rows.filter((r) => r.process === p), "../../");
     emit(join(all, p, "index.html"), shell(`${store} — beans in ${p}`, processedBeansBody(store, mine, NOW, "../../", p)));
   }
-  const one = join(storeDir, "processed-bean");
+  const one = join(storeDir, "bean-processed");
   for (const b of routes.beans) {
     const mine = rebase(rows.filter((r) => r.beans.some((x) => x.id === b)), "../../");
     emit(join(one, b, "index.html"), shell(`${store} — bean ${b} by process`, processedBeanBody(store, b, mine, NOW, "../../", historyOf(b))));
