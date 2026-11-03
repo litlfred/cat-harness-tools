@@ -55,6 +55,7 @@ import { dirname, join, resolve } from "node:path";
 import { scriptTable, type ScriptEntry } from "../schemas/sdlc/script-table.ts";
 import { ownsScript, writerCommand } from "./lib/script-command.ts";
 import { parseDockerUses, parseUses, stagingExempt } from "./pin-actions.ts";
+import { NOT_APPLICABLE_EXIT } from "./lib/not-applicable.ts";
 
 const TOOLS_ROOT = resolve(import.meta.dir, "..");
 const PARENT_ROOT = resolve(import.meta.dir, "..", "..");
@@ -183,6 +184,11 @@ export function runCheck(script: string, blocking: boolean, root = ROOT, pins: R
   if (p.exitCode === 0) return { check: script, blocking, state: "pass", detail: tail };
   if (p.exitCode === null) return { check: script, blocking, state: "unknown", detail: "the check did not exit (signal)" };
   if (p.exitCode === 2) return { check: script, blocking, state: "unknown", detail: tail };
+  // 78 is "not applicable in this root" (`lib/not-applicable.ts`): the check
+  // did not judge anything here, so it did not refuse. It is not a pass
+  // either: at release, could-not-check is never clean, so it reads as
+  // `unknown` and still blocks, as the exit 2 it replaced did.
+  if (p.exitCode === NOT_APPLICABLE_EXIT) return { check: script, blocking, state: "unknown", detail: `not applicable in this root — ${tail}` };
   return { check: script, blocking, state: "fail", detail: tail };
 }
 

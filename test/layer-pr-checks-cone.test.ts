@@ -363,6 +363,14 @@ describe("compare-gates.py with cone-skipped gates", () => {
   test("unchanged on base, head could not determine: NEW", () => {
     const r = compare({ g: U }, { g: { command: "c", exit: 2, tail: "?" } });
     expect(r.status).toBe(1);
+    expect(r.out).toContain("NEW: could not determine");
+  });
+
+  test("passed on base, head could not determine: labelled could not determine, still counted", () => {
+    const r = compare({ g: { command: "c", exit: 0, tail: "" } }, { g: { command: "c", exit: 2, tail: "?" } });
+    expect(r.status).toBe(1);
+    expect(r.out).toContain("| `g` | 0 | 2 | NEW: could not determine |");
+    expect(r.out).not.toContain("NEW FAILURE");
   });
 
   test("unchanged on base, head passes: pass", () => {
