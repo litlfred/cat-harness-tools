@@ -421,7 +421,7 @@ describe("a layer's own code lists are published beside its document (#960)", ()
       );
       const built = ownCodeListsDocument(dir, "demo", doc)!;
       expect(built["@id"]).toBe(doc);
-      expect((built["@graph"] as Array<{ "@id": string }>).map((n) => n["@id"])).toEqual([`${doc}#level`, `${doc}#level/high`]);
+      expect((built["@graph"] as Array<{ "@id": string }>).map((n) => n["@id"])).toEqual([`${doc}/level`, `${doc}/level/high`]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
