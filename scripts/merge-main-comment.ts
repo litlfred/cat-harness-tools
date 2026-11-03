@@ -57,7 +57,7 @@
  * the job summary, a warning annotation, and its own red member job. What it
  * loses is the second, third and fortieth email about one condition.
  *
- * Governed by {@link skills/sdlc/sdlc-core/ci-health.md} §"The second instance:
+ * Governed by {@link sdlc/skills/sdlc-core/ci-health.md} §"The second instance:
  * merge-main's in-place comment" (bean `obhe`).
  *
  * Usage (from the workflow; inputs in the environment, as the step sets them):

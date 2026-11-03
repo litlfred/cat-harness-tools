@@ -36,7 +36,7 @@ import { complete, enabled, startInstance } from "../../src/workflow/instance";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
-const DIAGRAM = join(INSTANCE_ROOT, "processes/sdlc/options-analysis.bpmn");
+const DIAGRAM = join(INSTANCE_ROOT, "sdlc/processes/options-analysis.bpmn");
 
 const names = (ids: string[]): string[] => [...ids].sort();
 

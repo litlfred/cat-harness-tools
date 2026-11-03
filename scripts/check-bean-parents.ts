@@ -357,7 +357,7 @@ export function formatReport(r: BeanParentsReport): string {
     out.push("");
     out.push("  Set `parent: <epic-id>` in the bean's front matter, or open an epic for it.");
     out.push("  An epic's parent, if it has one, is the `milestone` bean for the goal it serves");
-    out.push("  — skills/sdlc/sdlc-core/todo-manager.md §\"A GOAL is a `milestone` bean\".");
+    out.push("  — work-plan/skills/work-plan/todo-manager.md §\"A GOAL is a `milestone` bean\".");
     out.push("  `beans roadmap` shows the current structure.");
   }
   /* LISTED, NEVER FAILED, and never silent either. A defect the baseline

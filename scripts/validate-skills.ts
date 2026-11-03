@@ -10,7 +10,7 @@
 
 import type { z } from "zod";
 import { readFileSync, readdirSync, existsSync } from "fs";
-import { join, dirname } from "path";
+import { join, dirname, relative } from "path";
 import { fileURLToPath } from "url";
 import { kgRoots } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
@@ -38,7 +38,7 @@ import {
   SkillDefinitionSchema,
 } from "../schemas/kg/skill-package.js";
 import { actorsDir, capabilitiesDir } from "../schemas/process/role-graph.js";
-import { repoRootFor } from "../schemas/kg/cat-harness.js";
+import { instanceDirectoriesForGraph, repoRootFor } from "../schemas/kg/cat-harness.js";
 import { skillDefinitionDirs } from "../schemas/kg/skill-definitions-dir.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -110,31 +110,33 @@ for (const dir of skillDefinitionDirs(rootDir)) {
 
 // Validate skill package manifests
 //
-// NOTE the path is the CONVENTION, not the declared graph root that
-// `requirements` above resolves through `kgRoot()`. One file answering "where
-// are the skills" two ways is a defect in its own right, reported rather than
-// changed here because it is not this bean's subject.
-const skillsDir = join(rootDir, "skills");
-// Topic-aware (bean `9umr`): a package may sit one level down, inside a topic
-// `skills/skills.json` declares.
-const pkgDirs = packageDirsIn(skillsDir);
-sources.push({
-  label: "packages",
-  dir: skillsDir,
-  present: existsSync(skillsDir),
-  found: pkgDirs.filter((d) => existsSync(join(d.dir, "package-manifest.json"))).length,
-});
-if (existsSync(skillsDir)) {
+// Every skills graph the instance declares, its opt-in sub-graphs' included
+// (cat-harness#991 step 23.2: `sdlc/skills/` and `work-plan/skills/` hold
+// packages too). The convention only when nothing is declared.
+const declaredSkillDirs = instanceDirectoriesForGraph(rootDir, "skills");
+const skillsDirs = declaredSkillDirs.length > 0 ? declaredSkillDirs : [join(rootDir, "skills")];
+for (const skillsDir of skillsDirs) {
+  // Topic-aware (bean `9umr`): a package may sit one level down, inside a topic
+  // `skills/skills.json` declares.
+  const pkgDirs = packageDirsIn(skillsDir);
+  sources.push({
+    label: `packages (${relative(rootDir, skillsDir)})`,
+    dir: skillsDir,
+    present: existsSync(skillsDir),
+    found: pkgDirs.filter((d) => existsSync(join(d.dir, "package-manifest.json"))).length,
+  });
+  if (!existsSync(skillsDir)) continue;
   for (const pkg of pkgDirs) {
     const manifestPath = join(pkg.dir, "package-manifest.json");
+    const shown = relative(rootDir, manifestPath);
     if (existsSync(manifestPath)) {
       try {
         const data = JSON.parse(readFileSync(manifestPath, "utf-8"));
         SkillPackageManifestSchema.parse(data);
-        console.log(`  ✓ skills/${pkg.rel}/package-manifest.json`);
+        console.log(`  ✓ ${shown}`);
         validated++;
       } catch (e) {
-        console.error(`  ✗ skills/${pkg.rel}/package-manifest.json: ${e instanceof Error ? e.message : String(e)}`);
+        console.error(`  ✗ ${shown}: ${e instanceof Error ? e.message : String(e)}`);
         errors++;
       }
     }

@@ -3,7 +3,7 @@
  * its responsibilities, against any Tool.
  *
  * The contract is `work-plan-store` in cat-harness
- * (`skills/sdlc/sdlc-core/work-plan-store.md`): operations every Tool must
+ * (`work-plan/skills/work-plan/work-plan-store.md`): operations every Tool must
  * provide, and seven responsibilities "each something a test can check
  * against any Tool". This file is those checks, written against
  * {@link StoreUnderTest} and nothing else, so a second Tool (a beans server,

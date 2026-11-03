@@ -41,11 +41,14 @@ import {
 import { auditTestPlans, dmnRefResolves, type SutActor } from "../test-plan-audit";
 import { openTrackedBean } from "../test-plan-execution";
 import { KG_CRITERIA_BY_ID } from "../../schemas/sdlc/kg-qa.ts";
+import { ownDirectoryById } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { drainSubprocess } from "./helpers.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
-const WF = join(ROOT, "processes", "sdlc");
+// The `sdlc` sub-graph's processes graph, by its declared id (cat-harness#991 step 23.2).
+// declared-path-literal: the fallback only — the directory is read by its declared id `sdlc-processes`.
+const WF = ownDirectoryById(ROOT, "sdlc-processes", "sdlc/processes");
 const DMN = join(WF, "decisions/test-certification.dmn");
 const FIXTURE = join(import.meta.dir, "fixtures/test-plan-execution/tiny.test-plan.json");
 
@@ -379,7 +382,7 @@ describe("kg-audit: the four test-plan criteria", () => {
 
   test("the plan's exit DMN resolves from the instance root", () => {
     expect(dmnRefResolves(plan.exitCriteria.decision, [ROOT])).toBe(true);
-    expect(dmnRefResolves("processes/sdlc/decisions/test-certification.dmn#Decision_Nope", [ROOT])).toBe(false);
+    expect(dmnRefResolves("sdlc/processes/decisions/test-certification.dmn#Decision_Nope", [ROOT])).toBe(false);
   });
 
   test("test-plan-resolves: a dangling plan, an undeclared SUT, and a kind mismatch", () => {

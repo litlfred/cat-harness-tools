@@ -3,7 +3,7 @@
  * the Beans store implements, and the engine calls.
  *
  * The contract is `work-plan-store` in cat-harness
- * (`skills/sdlc/sdlc-core/work-plan-store.md`); its conformance suite is
+ * (`work-plan/skills/work-plan/work-plan-store.md`); its conformance suite is
  * `scripts/tests/sdlc/work-plan-store-conformance.ts`. A process or a module
  * names the operation it performs ("note the bean", "claim it"), never the
  * command a Tool performs it with: that is cat-harness#991, step 3.

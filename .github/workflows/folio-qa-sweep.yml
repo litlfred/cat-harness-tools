@@ -8,7 +8,7 @@ name: Folio QA sweep
 #
 # Derived QA verdicts live in the working copy under test/results/ and are
 # stored on the orphan `qa-reports` branch, keyed by commit (arc 3fva, skill
-# skills/sdlc/sdlc-core/qa-reports.md). Judgements stay on the default branch
+# sdlc/skills/sdlc-core/qa-reports.md). Judgements stay on the default branch
 # in test/attestations/.
 #
 #   - Mounts the layers the caller's index.lock.json pins.

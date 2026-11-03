@@ -11,7 +11,7 @@
  * nothing. Copies drift, and nothing said when one had.
  *
  * So the ops now live in two called processes in `cat-harness`
- * (`processes/sdlc/bean-open.bpmn`, `bean-close.bpmn`), and this check holds
+ * (`sdlc/processes/bean-open.bpmn`, `bean-close.bpmn`), and this check holds
  * the corpus to them. It fails on three things:
  *
  * 1. **`claim`, `resolve` or `archive` outside OPEN and CLOSE**, on an activity

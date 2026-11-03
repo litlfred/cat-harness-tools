@@ -90,7 +90,7 @@ describe.skipIf(NOT_GENERATED)("generated skill instruction pages", () => {
     // `hloc` box 2 says a target the generator cannot place is left exactly as
     // written, because a plausible-looking rewrite turns a broken link into an
     // undetectable one. `.claude/skills/local/todo-manager.md` links
-    // `../../../skills/sdlc/sdlc-core/todo-manager.md`, which resolves nowhere
+    // `../../../work-plan/skills/work-plan/todo-manager.md`, which resolves nowhere
     // from its own source either — so it is a SOURCE defect, correctly
     // published untouched, and an earlier draft of this test wrongly called it
     // a generator failure.

@@ -15,7 +15,7 @@ import { HARNESS_ROOT } from "../lib/roots.ts";
 import { roleGraphFor } from "../known-skills.ts";
 
 const ROOT = join(HARNESS_ROOT);
-const TODO_MANAGER = "skills/sdlc/sdlc-core/todo-manager.md";
+const TODO_MANAGER = "work-plan/skills/work-plan/todo-manager.md";
 
 /**
  * The map for one changed skill, built ONCE at module scope and read by every

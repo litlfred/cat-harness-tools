@@ -94,7 +94,7 @@ describe("criterion 1 — both hashes, neither derivable from the other", () => 
       skill: "crdm-detect",
       subject: "crdm-detect phrase signals against the issue corpus",
       dataInputs: ["cat-harness-tools/scripts/eval/crdm-detect-corpus.json"],
-      processInputs: ["cat-harness-tools/scripts/eval-crdm-detect.ts", "cat-harness/skills/sdlc/crdm/crdm-detect.md"],
+      processInputs: ["cat-harness-tools/scripts/eval-crdm-detect.ts", "cat-harness/sdlc/skills/crdm/crdm-detect.md"],
       outcome: {},
     });
     expect(run.data.hash).not.toBe(UNKNOWN_HASH);

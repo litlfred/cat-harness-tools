@@ -4,7 +4,7 @@
  *
  * `test-plan/v1` allows a plan to declare its own `exitCriteria.decision`
  * table reference (e.g. `path/to/custom.dmn#Decision_Custom`).
- * `GW_ExitCriteria` in `processes/sdlc/test-plan-execution.bpmn` evaluates that
+ * `GW_ExitCriteria` in `sdlc/processes/test-plan-execution.bpmn` evaluates that
  * decision table dynamically rather than always using the platform default.
  *
  * Rules:

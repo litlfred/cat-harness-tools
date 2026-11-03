@@ -41,7 +41,7 @@ import { holdInForce, readQueueStore, recordDecision } from "./merge-queue-store
 export const EXIT = { ok: 0, absent: 1, usage: 2, unreachable: 4, write: 5 } as const;
 
 /** The decision table a computed placement cites, derived rather than retyped. */
-export const DEFAULT_DECISION = `processes/sdlc/decisions/merge-priority.dmn#${PRIORITY_DECISION}`;
+export const DEFAULT_DECISION = `sdlc/processes/decisions/merge-priority.dmn#${PRIORITY_DECISION}`;
 
 function flag(argv: readonly string[], name: string): string | undefined {
   const at = argv.indexOf(`--${name}`);

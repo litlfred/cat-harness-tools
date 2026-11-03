@@ -27,10 +27,13 @@ import {
   completeExitCriteriaGateway,
   openTrackedBean,
 } from "../../test-plan-execution.js";
+import { ownDirectoryById } from "../../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
-const WF = join(ROOT, "processes", "sdlc");
+// The `sdlc` sub-graph's processes graph, by its declared id (cat-harness#991 step 23.2).
+// declared-path-literal: the fallback only — the directory is read by its declared id `sdlc-processes`.
+const WF = ownDirectoryById(ROOT, "sdlc-processes", "sdlc/processes");
 const FIXTURE_TINY = join(import.meta.dir, "../fixtures/test-plan-execution/tiny.test-plan.json");
 
 const CUSTOM_DMN_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -147,7 +150,7 @@ describe("per-plan exitCriteria DMN resolution and execution (folio-assistant-4i
       ...basePlan,
       id: "unresolvable-file-plan",
       exitCriteria: {
-        decision: "processes/sdlc/decisions/nonexistent.dmn#Decision_Missing",
+        decision: "sdlc/processes/decisions/nonexistent.dmn#Decision_Missing",
         description: "Points to non-existent DMN file",
       },
     });
@@ -156,7 +159,7 @@ describe("per-plan exitCriteria DMN resolution and execution (folio-assistant-4i
       ...basePlan,
       id: "unresolvable-decision-plan",
       exitCriteria: {
-        decision: "processes/sdlc/decisions/test-certification.dmn#Decision_NoSuchDecisionId",
+        decision: "sdlc/processes/decisions/test-certification.dmn#Decision_NoSuchDecisionId",
         description: "Points to existing DMN file but invalid decision ID",
       },
     });

@@ -16,7 +16,7 @@ describe("classifyFilePath — file categorization", () => {
 
   test("identifies prose and knowledge graph documentation files", () => {
     expect(classifyFilePath("README.md")).toBe("prose_kg");
-    expect(classifyFilePath("cat-harness/skills/sdlc/spec-kit/spec-kit.md")).toBe("prose_kg");
+    expect(classifyFilePath("cat-harness/sdlc/skills/spec-kit/spec-kit.md")).toBe("prose_kg");
     expect(classifyFilePath("skills/authoring/intro.md")).toBe("prose_kg");
     // declared-path-literal: fixture path to test classifier on real documentation files
     expect(classifyFilePath("docs/guides/agent-onboarding.md")).toBe("prose_kg");

@@ -59,7 +59,7 @@ describe("cross-instance figure edit URLs (bean 4z5o)", () => {
     const asset: WebPageAsset = {
       kind: "bpmn",
       // declared-path-literal: fixture data for editTarget, never read — it only has to look instance-local.
-      source: "processes/sdlc/bean-lifecycle.bpmn",
+      source: "sdlc/processes/bean-lifecycle.bpmn",
       rendered: "assets/img/workflows/bean-lifecycle.svg",
       alt: "Local figure",
     };

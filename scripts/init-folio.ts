@@ -963,7 +963,7 @@ node_modules/
 bib-qa.json
 
 # The QA working copy: machine-written, and recorded on the orphan qa-reports
-# branch, not on main (skills/sdlc/sdlc-core/qa-reports.md). Attestations
+# branch, not on main (sdlc/skills/sdlc-core/qa-reports.md). Attestations
 # under test/attestations/ ARE committed. (bean 5qy8)
 test/results/
 

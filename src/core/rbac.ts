@@ -17,7 +17,7 @@
  * Authentication is unchanged and is still the auth-gateway's: it injects
  * `X-User-Role`, `X-User-Email`, `X-User-Name`, and may inject `X-User-Actor`
  * once it maps a login to a declared actor. See
- * `skills/sdlc/sdlc-core/deployment-auth.md` and `task-authorization.md`.
+ * `sdlc/skills/sdlc-core/deployment-auth.md` and `task-authorization.md`.
  *
  * @module folio-assistant/core/rbac
  */

@@ -27,7 +27,7 @@ import {
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
 
 const root = resolve(HARNESS_ROOT);
-const skillPath = join(root, "skills/sdlc/crdm/crdm-detect.md");
+const skillPath = join(root, "sdlc/skills/crdm/crdm-detect.md");
 const skillMarkdown = readFileSync(skillPath, "utf-8");
 const skill = parseSkillExclusions(skillMarkdown);
 const skillCategories = parseSkillCategories(skillMarkdown);

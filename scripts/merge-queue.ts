@@ -5,7 +5,7 @@
  *
  * Bean `hfag`. The queue STORES decisions (`schemas/sdlc/merge-queue.ts`); this
  * module COMPUTES the facts a decision is made from, at the moment it is
- * made, and hands them to `processes/sdlc/decisions/merge-priority.dmn`. It
+ * made, and hands them to `sdlc/processes/decisions/merge-priority.dmn`. It
  * writes nothing: what the steward acts on is recorded as a queue entry by
  * the steward, and the facts it was computed from stay GitHub's.
  *
@@ -42,11 +42,16 @@ import {
   type PriorityClass,
   type Readiness,
 } from "../schemas/sdlc/merge-queue.ts";
+import { ownDirectoryById } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
-/** The table, beside the diagram whose gateway reads it. */
-// declared-path-literal: bean 70lx — this was a self-relative URL; the code moved to cat-harness-tools and the content it names did not
-export const PRIORITY_DMN = join(HARNESS_ROOT, "processes", "sdlc", "decisions", "merge-priority.dmn");
+/**
+ * The table, beside the diagram whose gateway reads it: in the `sdlc`
+ * sub-graph's processes graph, looked up by its declared id (cat-harness#991
+ * step 23.2), with the conventional path as the fallback.
+ */
+// declared-path-literal: the fallback only — the directory is read by its declared id `sdlc-processes`; the literal is the convention when the `sdlc` sub-graph is not declared, at the call site so the choice is visible.
+export const PRIORITY_DMN = join(ownDirectoryById(HARNESS_ROOT, "sdlc-processes", "sdlc/processes"), "decisions", "merge-priority.dmn");
 export const PRIORITY_DECISION = "Decision_MergePriority";
 
 /**

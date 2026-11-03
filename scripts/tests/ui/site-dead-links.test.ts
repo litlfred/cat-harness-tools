@@ -75,11 +75,11 @@ describe("--fix repoints what has one answer and reports the rest", () => {
   });
 
   it("a source file goes to GitHub at the pinned commit", () => {
-    const idx = tailIndex(["cat-harness/skills/sdlc/crdm/crdm-detect.md", "cat-harness/AGENTS.md", "smart-base/AGENTS.md"]);
-    const file = sourceFor("docs/skills/sdlc/crdm/crdm-detect.md", idx)!;
-    expect(file).toBe("cat-harness/skills/sdlc/crdm/crdm-detect.md");
+    const idx = tailIndex(["cat-harness/sdlc/skills/crdm/crdm-detect.md", "cat-harness/AGENTS.md", "smart-base/AGENTS.md"]);
+    const file = sourceFor("docs/sdlc/skills/crdm/crdm-detect.md", idx)!;
+    expect(file).toBe("cat-harness/sdlc/skills/crdm/crdm-detect.md");
     const origins = [{ path: "cat-harness", repository: "litlfred/cat-harness", ref: "abc", upstreamRoot: "" }];
-    expect(blobUrl(file, origins)).toBe("https://github.com/litlfred/cat-harness/blob/abc/skills/sdlc/crdm/crdm-detect.md");
+    expect(blobUrl(file, origins)).toBe("https://github.com/litlfred/cat-harness/blob/abc/sdlc/skills/crdm/crdm-detect.md");
   });
 
   it("an unrendered page is looked up as its .md, a folder as its README, a translation as its source", () => {

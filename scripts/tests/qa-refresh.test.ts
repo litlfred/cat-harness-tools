@@ -412,14 +412,14 @@ describe("only what a writer declares it rewrites is restored, and each restore 
       ["docs:pages", "cat-harness/docs/assets/beans/index.json"],
       ["docs:pages", "cat-harness/docs/assets/qa/index.json"],
       ["skill:register", "cat-harness/docs/payload/sha256/7b1ee0297bbdc1d7862337edaec241fc172949576789705938798ce345a80c2c.json"],
-      ["skill:register", "cat-harness/docs/subgraph/cat-harness/skills/sdlc/sdlc-core/index.jsonld"],
+      ["skill:register", "cat-harness/docs/subgraph/cat-harness/sdlc/skills/sdlc-core/index.jsonld"],
       ["readme:subgraphs", "folio-assistant-core/scripts/README.md"],
     ];
     for (const [w, path] of restoredThen) expect([w, mayRestore(by.get(w)!, path)]).toEqual([w, true]);
     const lostThen: [string, string][] = [
       ["kg:audit:all", "folio-assistant-core/scripts/document-rendered-impact.ts"],
       ["kg:audit:all", "folio-assistant-core/scripts/document-rendered-impact.test.ts"],
-      ["docs:pages", "cat-harness/skills/sdlc/sdlc-core/rendered-impact.md"],
+      ["docs:pages", "cat-harness/sdlc/skills/sdlc-core/rendered-impact.md"],
     ];
     for (const [w, path] of lostThen) expect([w, mayRestore(by.get(w)!, path)]).toEqual([w, false]);
   });

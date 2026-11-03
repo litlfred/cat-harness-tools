@@ -472,7 +472,7 @@ export const MemberFactsSchema = z
      * under `authored` on the strength of `package.json` alone, which is
      * precisely the train nobody needed.
      *
-     * By contrast `cat-harness/skills/sdlc/sdlc-core/merge-queue.md` is
+     * By contrast `cat-harness/sdlc/skills/sdlc-core/merge-queue.md` is
      * `refuse` and NOT a shared declaration — a real content collision, and
      * the only one of the three that a train is the right answer to.
      *

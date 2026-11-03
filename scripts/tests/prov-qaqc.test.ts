@@ -32,7 +32,7 @@ import { loadProcessModel } from "../../src/workflow/process-model.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const ROOT = join(HARNESS_ROOT);
-const SOURCE = "cat-harness/processes/sdlc/code-change-review.bpmn";
+const SOURCE = "cat-harness/sdlc/processes/code-change-review.bpmn";
 const MODEL = await loadProcessModel(workflowFile(ROOT, "code-change-review.bpmn"));
 const GRAPH = roleGraphFor(ROOT);
 
@@ -187,7 +187,7 @@ describe("prov-qaqc: outputs", () => {
     // PROV-JSONLD since 2026-10-01 (beans jcet, 9y9j): the plan is a LINK at
     // the process's release address, under the context's `plan` term.
     expect(readFileSync(log, "utf-8")).toContain(
-      '"plan": "https://litlfred.github.io/cat-harness/v0/processes/sdlc/code-change-review/Task_ClaimBean"',
+      '"plan": "https://litlfred.github.io/cat-harness/v0/sdlc/processes/code-change-review/Task_ClaimBean"',
     );
     writeFileSync(log, "{}\n");
     expect(staleness(files, site.assets).stale).toEqual([log]);

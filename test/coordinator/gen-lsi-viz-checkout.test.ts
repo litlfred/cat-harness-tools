@@ -13,8 +13,8 @@ import { renderCommitted } from "../../scripts/gen-lsi-viz.ts";
 import { type LsiSidecar } from "../../scripts/lsi.ts";
 
 /** Two real skill files, so "every unit it names is a file" has something true to check. */
-const UNIT_A = "cat-harness/skills/sdlc/sdlc-core/qa-reports.md";
-const UNIT_B = "cat-harness/skills/sdlc/sdlc-core/qa-witness.md";
+const UNIT_A = "cat-harness/sdlc/skills/sdlc-core/qa-reports.md";
+const UNIT_B = "cat-harness/sdlc/skills/sdlc-core/qa-witness.md";
 
 const FIXTURE: LsiSidecar = {
   $schema: "folio-lsi-index/v1",

@@ -18,7 +18,7 @@
  * run; it is not a queue, and it cannot coalesce a burst. A steward can.
  *
  * The discipline is in the skill, not here —
- * `skills/sdlc/sdlc-core/ref-stewardship.md` carries what makes a ref need a
+ * `sdlc/skills/sdlc-core/ref-stewardship.md` carries what makes a ref need a
  * steward, why a window is a different object from a hold, and the composition
  * rule with the case that must still be reported.
  *
