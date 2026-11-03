@@ -64,7 +64,10 @@ describe("every declared graph reaches the navbar, linked or not", () => {
     // who-iris declared the IRIS CDN exporter's BPMN and its library node
     // (who-iris#103, 2026-10-30), and `scenarios`, the roles those BPMN
     // lanes bind (folio-assistant#2781). Same reason again.
-    expect(kinds()).toEqual(["catalogue", "code", "docs", "folio", "glossary", "health", "library", "processes", "qa", "scenarios", "schemas", "skills", "software-library", "themes", "tools", "translation-sources", "uploads", "voices"].map(K));
+    // NINETEEN with `attestations`, which joined when who-iris moved its
+    // translation round-trip TSVs onto `cat/who-iris/attestations`
+    // (who-iris#175, 2026-11-03). Same reason again.
+    expect(kinds()).toEqual(["attestations", "catalogue", "code", "docs", "folio", "glossary", "health", "library", "processes", "qa", "scenarios", "schemas", "skills", "software-library", "themes", "tools", "translation-sources", "uploads", "voices"].map(K));
   });
 
   it("links exactly the kinds it was told are published", () => {
@@ -73,6 +76,8 @@ describe("every declared graph reaches the navbar, linked or not", () => {
     // ...and everything else carries no href, which the renderer draws as a
     // non-link. `harness-tiles`: declared and not rendered is a GAP.
     expect(got.filter((i) => i.href === undefined).map((i) => i.label)).toEqual([
+      // `attestations` (who-iris#175): a state-branch graph, no page passed in here.
+      "attestations",
       "catalogue",
       // `code` is declared and publishes no page — which is exactly the state
       // this assertion exists to keep visible, rather than a gap to hide.
