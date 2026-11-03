@@ -26,6 +26,9 @@ const XML = readFileSync(join(ROOT, "processes/process/crdm-requirements.bpmn"),
  * because it is not connected to anything.
  */
 const PHASE_XML = readFileSync(join(ROOT, "processes/process/crdm-deliver.bpmn"), "utf-8");
+// A diagram that still draws its work-plan steps: since cat-harness#991 step
+// 17 only the `sdlc` diagrams do (proposal §4.13), so this fixture is one of them.
+const SDLC_XML = readFileSync(join(ROOT, "processes/sdlc/merge-refusal.bpmn"), "utf-8");
 
 describe("extractBpmn", () => {
   test("finds the labels a reader sees", () => {
@@ -68,10 +71,9 @@ describe("injectBpmn", () => {
     expect(out).toContain("<bpmn:flowNodeRef>BA_Submit</bpmn:flowNodeRef>");
     expect(out).toContain('<bootstrap.processes:skill ref="crdm-detect"/>');
 
-    // A bean operation is structure too, and this diagram's are in its phases.
-    // The phase's own op is a `note`: its claim is bean-open.bpmn's (bean m8gz).
-    const phase = injectBpmn(PHASE_XML, new Map([["Agent", "Agent (fr)"]]));
-    expect(phase).toContain('<cat-harness.processes:bean op="note"/>');
+    // A work-plan operation is structure too, and survives translation.
+    const sdlc = injectBpmn(SDLC_XML, new Map([["Agent", "Agent (fr)"]]));
+    expect(sdlc).toContain('<cat-harness.processes:bean op="note"/>');
   });
 
   test("an untranslated msgid keeps its source text", () => {
