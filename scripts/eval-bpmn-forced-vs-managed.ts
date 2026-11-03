@@ -61,6 +61,7 @@ import {
   summarizeSelfManagedArm,
 } from "../src/workflow/arm-self-managed.js";
 import { assertBenchmarkOutputPath } from "./benchmark-guard.ts";
+import { harnessRel } from "./lib/harness-layout.ts";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const TOOLS_ROOT = resolve(SCRIPT_DIR, "..");
@@ -146,7 +147,7 @@ export async function evaluateForcedVsManaged(opts?: {
   // The sdlc diagrams sit in the `sdlc` sub-graph (cat-harness#991 step 23.2); both graphs looked up by id,
   // since `processes` and `skills` now have more than one directory each.
   // declared-path-literal: the fallback only — the directory is read by its declared id `sdlc-processes`; the literal is the convention when the `sdlc` sub-graph is not declared, at the call site so the choice is visible.
-  const processesDir = ownDirectoryById(HARNESS_ROOT, "sdlc-processes", "sdlc/processes");
+  const processesDir = ownDirectoryById(HARNESS_ROOT, "sdlc-processes", harnessRel("sdlc/processes"));
   const scenariosDir = directoryForGraph(HARNESS_ROOT, "scenarios");
   const skillsDir = ownDirectoryById(HARNESS_ROOT, "skills", "skills");
   if (!processesDir || !scenariosDir || !skillsDir) {

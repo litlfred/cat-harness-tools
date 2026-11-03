@@ -42,6 +42,7 @@ import {
   type PayloadLink,
 } from "../../schemas/kg/subgraph-manifest.js";
 import { ownDirectoryById } from "../../schemas/kg/cat-harness.ts";
+import { harnessLayout } from "../lib/harness-layout.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { toolsOf } from "../../tools/discover.js";
 import { toolIri } from "../../schemas/tools/tool-folders.js";
@@ -71,6 +72,16 @@ const read = (rel: string, name: string): Record<string, unknown> => {
 };
 const iriOf = (rel: string): string => `${plan.rootIri}${rel}`;
 
+// TRANSITIONAL (cat-harness#991 step 23; remove after cat-harness#1014 merges):
+// the sdlc skills are the `sdlc` sub-graph's `sdlc/skills/` in the new layout,
+// and the `sdlc` topic `skills/sdlc/` in the legacy one; the work-plan Tools
+// sit in `work-plan/tools/` only in the new one. Expectations follow the
+// layout the harness checkout has (scripts/lib/harness-layout.ts).
+const SUBGRAPHS = harnessLayout(ROOT) === "subgraphs";
+// declared-path-literal: subgraph-relative publication paths of the two layouts, not files read.
+const SDLC_SKILLS = SUBGRAPHS ? "sdlc/skills/" : "skills/sdlc/";
+const SDLC_PARENT = SUBGRAPHS ? "sdlc/" : "skills/";
+
 /**
  * The sdlc nodes, by source path — independent of the generator's placement.
  * THIS instance's nodes only: since bean `4ak5` item 2 a stacked instance's
@@ -85,7 +96,7 @@ function expectedSdlc(): Set<string> {
     for (const k of ["instructionsPath", "module", "sourcePath", "path"]) {
       const v = n[k];
       if (typeof v !== "string" || v.length === 0) continue;
-      if (`${v.replace(/\/$/, "")}/`.startsWith("sdlc/skills/")) out.add(n["@id"]);
+      if (`${v.replace(/\/$/, "")}/`.startsWith(SDLC_SKILLS)) out.add(n["@id"]);
       break;
     }
   }
@@ -117,11 +128,11 @@ describe("gen-subgraph-jsonld", () => {
     expect(plan.problems).toEqual([]);
   });
 
-  test("sdlc/skills: index (followed down) and hydrated hold exactly the sdlc nodes", () => {
+  test("the sdlc skills: index (followed down) and hydrated hold exactly the sdlc nodes", () => {
     const expected = [...expectedSdlc()].sort();
     expect(expected.length).toBeGreaterThan(0);
-    expect([...indexMembers("sdlc/skills/")].sort()).toEqual(expected);
-    const hydrated = read("sdlc/skills/", SUBGRAPH_HYDRATED_FILE);
+    expect([...indexMembers(SDLC_SKILLS)].sort()).toEqual(expected);
+    const hydrated = read(SDLC_SKILLS, SUBGRAPH_HYDRATED_FILE);
     expect([...hydratedMembers(hydrated)].sort()).toEqual(expected);
   });
 
@@ -130,12 +141,17 @@ describe("gen-subgraph-jsonld", () => {
     // instance defines, and the IRI kg-export gives each.
     // The Tools of the opt-in `work-plan` sub-graph sit in ITS tools graph,
     // `work-plan/tools/` (cat-harness#991 step 23.2), and are checked below.
-    const workPlanIds = new Set(readdirSync(ownDirectoryById(ROOT, "work-plan-tools", "work-plan/tools"), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name));
-    expect(workPlanIds.size).toBeGreaterThan(0);
+    // declared-path-literal: the fallback only — read by the declared id `work-plan-tools`.
+    const workPlanIds = new Set(
+      SUBGRAPHS
+        ? readdirSync(ownDirectoryById(ROOT, "work-plan-tools", "work-plan/tools"), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name)
+        : [],
+    );
+    expect(workPlanIds.size > 0).toBe(SUBGRAPHS);
     const expected = toolsOf(ROOT).filter((t) => !workPlanIds.has(t.id)).map((t) => toolIri(HOST_DOC, t.id)).sort();
     const workPlanExpected = toolsOf(ROOT).filter((t) => workPlanIds.has(t.id)).map((t) => toolIri(HOST_DOC, t.id)).sort();
     expect(workPlanExpected.length).toBe(workPlanIds.size);
-    expect([...indexMembers("work-plan/tools/")].filter((id) => workPlanExpected.includes(id)).sort()).toEqual(workPlanExpected);
+    if (SUBGRAPHS) expect([...indexMembers("work-plan/tools/")].filter((id) => workPlanExpected.includes(id)).sort()).toEqual(workPlanExpected);
     expect(expected.length).toBeGreaterThan(0);
     expect(read("", SUBGRAPH_INDEX_FILE).hasSubgraph).toContain(iriOf("tools/"));
     const tools = read("tools/", SUBGRAPH_INDEX_FILE);
@@ -156,23 +172,23 @@ describe("gen-subgraph-jsonld", () => {
   });
 
   test("the hydrated file carries whole nodes; the index carries pointers", () => {
-    const hydrated = read("sdlc/skills/", SUBGRAPH_HYDRATED_FILE);
+    const hydrated = read(SDLC_SKILLS, SUBGRAPH_HYDRATED_FILE);
     const core = (hydrated.hasSubgraph as Array<Record<string, unknown>>).find(
-      (c) => c["@id"] === iriOf("sdlc/skills/sdlc-core/"),
+      (c) => c["@id"] === iriOf(`${SDLC_SKILLS}sdlc-core/`),
     )!;
     const skill = (core.hasMember as Array<Record<string, unknown>>).find((m) => "instructionsPath" in m);
     expect(skill).toBeDefined();
-    const index = read("sdlc/skills/sdlc-core/", SUBGRAPH_INDEX_FILE);
+    const index = read(`${SDLC_SKILLS}sdlc-core/`, SUBGRAPH_INDEX_FILE);
     for (const m of index.hasMember as Array<Record<string, unknown>>) {
       expect(Object.keys(m).every((k) => ["@id", "@type", "name", "title", "payload"].includes(k))).toBe(true);
     }
   });
 
-  test("the parent sdlc/ index lists sdlc/skills/ as a child IRI", () => {
-    const parent = read("sdlc/", SUBGRAPH_INDEX_FILE);
-    expect(parent["@id"]).toBe(iriOf("sdlc/"));
-    expect(parent.hasSubgraph).toContain(iriOf("sdlc/skills/"));
-    expect(read("sdlc/skills/", SUBGRAPH_INDEX_FILE)["@id"]).toBe(iriOf("sdlc/skills/"));
+  test("the parent index lists the sdlc skills as a child IRI", () => {
+    const parent = read(SDLC_PARENT, SUBGRAPH_INDEX_FILE);
+    expect(parent["@id"]).toBe(iriOf(SDLC_PARENT));
+    expect(parent.hasSubgraph).toContain(iriOf(SDLC_SKILLS));
+    expect(read(SDLC_SKILLS, SUBGRAPH_INDEX_FILE)["@id"]).toBe(iriOf(SDLC_SKILLS));
   });
 
   test("the root has index.jsonld and no hydrated file", () => {
@@ -248,7 +264,7 @@ describe("gen-subgraph-jsonld", () => {
     }
     expect(n).toBe(files.size - 1);
     // …and the schema refuses an inline context.
-    const doc = read("sdlc/skills/", SUBGRAPH_INDEX_FILE);
+    const doc = read(SDLC_SKILLS, SUBGRAPH_INDEX_FILE);
     expect(SubgraphIndexSchema.safeParse({ ...doc, "@context": { x: "http://x/" } }).success).toBe(false);
   });
 

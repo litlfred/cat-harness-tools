@@ -37,11 +37,13 @@ import { spawnSync } from "node:child_process";
 import { MERGE_QUEUE_ENTRY_TAG, MergeQueueEntrySchema, PRIORITY_CLASSES, type MergeQueueEntry } from "../schemas/sdlc/merge-queue.ts";
 import { PRIORITY_DECISION } from "./merge-queue.ts";
 import { holdInForce, readQueueStore, recordDecision } from "./merge-queue-store.ts";
+import { harnessRel } from "./lib/harness-layout.ts";
 
 export const EXIT = { ok: 0, absent: 1, usage: 2, unreachable: 4, write: 5 } as const;
 
 /** The decision table a computed placement cites, derived rather than retyped. */
-export const DEFAULT_DECISION = `sdlc/processes/decisions/merge-priority.dmn#${PRIORITY_DECISION}`;
+// declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
+export const DEFAULT_DECISION = `${harnessRel("sdlc/processes/decisions/merge-priority.dmn")}#${PRIORITY_DECISION}`;
 
 function flag(argv: readonly string[], name: string): string | undefined {
   const at = argv.indexOf(`--${name}`);

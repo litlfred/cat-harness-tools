@@ -42,6 +42,7 @@ import {
 import { TestDataRefSchema, isEvidence } from "./test-plan";
 
 import { requireHarnessRoot } from "../harness-root.ts";
+import { harnessPath } from "../../scripts/lib/harness-layout.ts";
 const ROOT = requireHarnessRoot();
 const SHA_A = "a".repeat(64);
 
@@ -409,7 +410,7 @@ describe("BPMN processes and `judgementOnly` SME role (`vm6m`, `vljz`)", () => {
   test("`test-data-curation.bpmn` calls content-type specialisation and SME review subprocesses, and `sme-test-data-review.bpmn` puts `Task_SmeJudge` in the `judgementOnly` `clinical-sme` lane", () => {
     // declared-path-literal: a contract test whose subject IS this diagram — the subprocess
     // calls and the lane binding it asserts are what the file is made of.
-    const curationXml = readFileSync(join(ROOT, "sdlc/processes/test-data-curation.bpmn"), "utf-8");
+    const curationXml = readFileSync(harnessPath("sdlc/processes/test-data-curation.bpmn", ROOT), "utf-8");
     expect(curationXml).toContain('id="Process_TestDataCuration"');
     expect(curationXml).toContain('<bpmn:callActivity id="Call_ContentTypeSpecialisation"');
     expect(curationXml).toContain('calledElement="Process_SmeTestDataReview"');
@@ -417,7 +418,7 @@ describe("BPMN processes and `judgementOnly` SME role (`vm6m`, `vljz`)", () => {
 
     // declared-path-literal: a contract test whose subject IS this diagram — the SME lane
     // and the skill-less judge task it asserts are what the file is made of.
-    const reviewXml = readFileSync(join(ROOT, "sdlc/processes/sme-test-data-review.bpmn"), "utf-8");
+    const reviewXml = readFileSync(harnessPath("sdlc/processes/sme-test-data-review.bpmn", ROOT), "utf-8");
     expect(reviewXml).toContain('id="Process_SmeTestDataReview"');
     expect(reviewXml).toContain('<bpmn:lane id="Lane_SME" name="Clinical / scientific SME" partitionElementRef="clinical-sme">');
     expect(reviewXml).toContain("<bpmn:flowNodeRef>Task_SmeJudge</bpmn:flowNodeRef>");

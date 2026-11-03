@@ -29,14 +29,16 @@
  * @module scripts/tests/options-analysis-trigger.test
  */
 import { describe, expect, test } from "bun:test";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 
 import { loadProcessModel } from "../../src/workflow/process-model";
 import { complete, enabled, startInstance } from "../../src/workflow/instance";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { harnessPath } from "../lib/harness-layout.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
-const DIAGRAM = join(INSTANCE_ROOT, "sdlc/processes/options-analysis.bpmn");
+// declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
+const DIAGRAM = harnessPath("sdlc/processes/options-analysis.bpmn", INSTANCE_ROOT);
 
 const names = (ids: string[]): string[] => [...ids].sort();
 

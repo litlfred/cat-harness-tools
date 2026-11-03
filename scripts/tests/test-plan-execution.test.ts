@@ -44,13 +44,17 @@ import { KG_CRITERIA_BY_ID } from "../../schemas/sdlc/kg-qa.ts";
 import { ownDirectoryById } from "../../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { drainSubprocess } from "./helpers.ts";
+import { harnessLayoutText, harnessRel } from "../lib/harness-layout.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 // The `sdlc` sub-graph's processes graph, by its declared id (cat-harness#991 step 23.2).
 // declared-path-literal: the fallback only — the directory is read by its declared id `sdlc-processes`.
-const WF = ownDirectoryById(ROOT, "sdlc-processes", "sdlc/processes");
+const WF = ownDirectoryById(ROOT, "sdlc-processes", harnessRel("sdlc/processes"));
 const DMN = join(WF, "decisions/test-certification.dmn");
-const FIXTURE = join(import.meta.dir, "fixtures/test-plan-execution/tiny.test-plan.json");
+// The fixture names its exit DMN in the sub-graph layout; respelled for the
+// harness this checkout has (transitional, cat-harness#991 step 23).
+const FIXTURE = join(mkdtempSync(join(tmpdir(), "tiny-plan-")), "tiny.test-plan.json");
+writeFileSync(FIXTURE, harnessLayoutText(readFileSync(join(import.meta.dir, "fixtures/test-plan-execution/tiny.test-plan.json"), "utf-8"), ROOT));
 
 const plan: TestPlan = TestPlanSchema.parse(JSON.parse(readFileSync(FIXTURE, "utf-8")));
 
@@ -382,7 +386,8 @@ describe("kg-audit: the four test-plan criteria", () => {
 
   test("the plan's exit DMN resolves from the instance root", () => {
     expect(dmnRefResolves(plan.exitCriteria.decision, [ROOT])).toBe(true);
-    expect(dmnRefResolves("sdlc/processes/decisions/test-certification.dmn#Decision_Nope", [ROOT])).toBe(false);
+    // declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
+    expect(dmnRefResolves(`${harnessRel("sdlc/processes/decisions/test-certification.dmn")}#Decision_Nope`, [ROOT])).toBe(false);
   });
 
   test("test-plan-resolves: a dangling plan, an undeclared SUT, and a kind mismatch", () => {

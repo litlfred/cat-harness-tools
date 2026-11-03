@@ -44,6 +44,7 @@ import {
 } from "../schemas/sdlc/merge-queue.ts";
 import { ownDirectoryById } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { harnessRel } from "./lib/harness-layout.ts";
 
 /**
  * The table, beside the diagram whose gateway reads it: in the `sdlc`
@@ -51,7 +52,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
  * step 23.2), with the conventional path as the fallback.
  */
 // declared-path-literal: the fallback only — the directory is read by its declared id `sdlc-processes`; the literal is the convention when the `sdlc` sub-graph is not declared, at the call site so the choice is visible.
-export const PRIORITY_DMN = join(ownDirectoryById(HARNESS_ROOT, "sdlc-processes", "sdlc/processes"), "decisions", "merge-priority.dmn");
+export const PRIORITY_DMN = join(ownDirectoryById(HARNESS_ROOT, "sdlc-processes", harnessRel("sdlc/processes")), "decisions", "merge-priority.dmn");
 export const PRIORITY_DECISION = "Decision_MergePriority";
 
 /**

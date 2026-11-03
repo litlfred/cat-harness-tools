@@ -30,9 +30,11 @@ import type { AccessContext } from "../../src/core/access.js";
 import type { HistoryEntry } from "../../src/workflow/instance.js";
 import { loadProcessModel } from "../../src/workflow/process-model.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { harnessRel } from "../lib/harness-layout.ts";
 
 const ROOT = join(HARNESS_ROOT);
-const SOURCE = "cat-harness/sdlc/processes/code-change-review.bpmn";
+// declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
+const SOURCE = `cat-harness/${harnessRel("sdlc/processes/code-change-review.bpmn")}`;
 const MODEL = await loadProcessModel(workflowFile(ROOT, "code-change-review.bpmn"));
 const GRAPH = roleGraphFor(ROOT);
 
@@ -187,7 +189,8 @@ describe("prov-qaqc: outputs", () => {
     // PROV-JSONLD since 2026-10-01 (beans jcet, 9y9j): the plan is a LINK at
     // the process's release address, under the context's `plan` term.
     expect(readFileSync(log, "utf-8")).toContain(
-      '"plan": "https://litlfred.github.io/cat-harness/v0/sdlc/processes/code-change-review/Task_ClaimBean"',
+      // declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
+      `"plan": "https://litlfred.github.io/cat-harness/v0/${harnessRel("sdlc/processes")}/code-change-review/Task_ClaimBean"`,
     );
     writeFileSync(log, "{}\n");
     expect(staleness(files, site.assets).stale).toEqual([log]);

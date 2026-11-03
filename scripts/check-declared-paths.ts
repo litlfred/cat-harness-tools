@@ -164,6 +164,7 @@ import { docsSourceDirFor, readDeclaration, resolveDirectories } from "../schema
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
 import { resolveImplementingPath } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { subgraphHarnessPath } from "./lib/harness-layout.ts";
 import { isJsonManifest } from "../pipeline/json-manifest.ts";
 
 const root = resolve(HARNESS_ROOT);
@@ -668,7 +669,11 @@ export function isTestFile(file: string): boolean {
  * noise.
  */
 export function witnessesOf(scan: Scan): string[] {
-  return [...new Set(scan.artefacts.map((a) => `${a.file}::${a.literal}`))].sort();
+  // TRANSITIONAL (cat-harness#991 step 23; remove after cat-harness#1014
+  // merges): a witness is recorded in the sub-graph layout, so a harness
+  // checkout still in the legacy one (`processes/sdlc/…`, `skills/sdlc/…`)
+  // holds the same witnesses rather than losing every one of them.
+  return [...new Set(scan.artefacts.map((a) => `${subgraphHarnessPath(a.file)}::${subgraphHarnessPath(a.literal)}`))].sort();
 }
 
 /**

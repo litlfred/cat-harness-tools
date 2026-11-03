@@ -11,10 +11,12 @@
 import { describe, expect, test } from "bun:test";
 import { renderCommitted } from "../../scripts/gen-lsi-viz.ts";
 import { type LsiSidecar } from "../../scripts/lsi.ts";
+import { harnessRel } from "../../scripts/lib/harness-layout.ts";
 
 /** Two real skill files, so "every unit it names is a file" has something true to check. */
-const UNIT_A = "cat-harness/sdlc/skills/sdlc-core/qa-reports.md";
-const UNIT_B = "cat-harness/sdlc/skills/sdlc-core/qa-witness.md";
+// declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
+const UNIT_A = `cat-harness/${harnessRel("sdlc/skills/sdlc-core/qa-reports.md")}`;
+const UNIT_B = `cat-harness/${harnessRel("sdlc/skills/sdlc-core/qa-witness.md")}`;
 
 const FIXTURE: LsiSidecar = {
   $schema: "folio-lsi-index/v1",

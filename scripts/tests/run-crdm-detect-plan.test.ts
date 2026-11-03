@@ -19,6 +19,7 @@ import { complete, enabled, startInstance } from "../../src/workflow/instance.ts
 import { completeExitCriteriaGateway, openTrackedBean } from "../test-plan-execution.ts";
 import { SUT, TESTER, checkSample, exitFacts, measure, verdictsFor, type CorpusItem } from "../run-crdm-detect-plan.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { harnessRel } from "../lib/harness-layout.ts";
 
 const plan = TestPlanSchema.parse(JSON.parse(readFileSync(join(HARNESS_ROOT, "test", "plans", "crdm-detect-evaluation.test-plan.json"), "utf-8")));
 const corpus = JSON.parse(readFileSync(join(TOOLS_ROOT, "scripts", "eval", "crdm-detect-corpus.json"), "utf-8")) as CorpusItem[];
@@ -28,7 +29,8 @@ const AT = "2026-10-11T08:00:00Z";
 // Resolved on first use, not at module scope: a throw from a malformed
 // declaration would otherwise abort the module and surface elsewhere
 // (check:module-scope-resolution, bean `95s1`).
-const sdlc = (): string => ownDirectoryById(HARNESS_ROOT, "sdlc-processes", "sdlc/processes");
+// declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
+const sdlc = (): string => ownDirectoryById(HARNESS_ROOT, "sdlc-processes", harnessRel("sdlc/processes"));
 
 const reportFor = (cases: ReturnType<typeof verdictsFor>) =>
   TestReportSchema.parse({
