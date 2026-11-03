@@ -37,14 +37,18 @@
  */
 import type { MemoryEntryKind } from "../../schemas/kg/memory-record.ts";
 import type { ProcessModel } from "./process-model.js";
-import { TERMINAL_STATUSES, type WorkPlanStore } from "./work-plan-store.js";
+import { FileMemoryStore } from "./memory-file-store.js";
+import { TERMINAL_STATUSES, type MemoryStore, type WorkPlanStore } from "./work-plan-store.js";
 import type { ChosenStore } from "./work-plan-store-select.js";
 
 /** The store Role, as a deployment's `stores` map names it. */
 export const WORK_CONTEXT_ROLE = "work-context";
 
 /** The `stores["work-context"]` values this toolset implements. */
-export const WORK_CONTEXT_TOOLS = ["work-plan", "none"] as const;
+export const WORK_CONTEXT_TOOLS = ["work-plan", "run-files", "none"] as const;
+
+/** Where `run-files` keeps a run's memory: set by the run's launcher (the ITB). */
+export const MEMORY_DIR_ENV = "CAT_MEMORY_DIR";
 
 /** What the engine and the agent keep: the memory record's entry kinds (§4.14, Q17). */
 export type WorkContextKind = MemoryEntryKind;
@@ -58,17 +62,26 @@ export interface WorkContextMeta {
   by: string;
 }
 
-/** Where the engine keeps work context here: the store, or nothing (`none`). */
-export type WorkContextTarget = { store: WorkPlanStore; tool: string } | { none: true; tool: "none" };
+/**
+ * Where the engine keeps work context here: a memory store — with the work
+ * plan beside it when the Tool is the work plan's, so taking up and closing
+ * also move the item's status — or nothing (`none`).
+ */
+export type WorkContextTarget = { store: MemoryStore; workPlan?: WorkPlanStore; tool: string } | { none: true; tool: "none" };
 
 /**
  * The work-context store, from the work-plan store already chosen for the
  * deployment. Throws on a Tool this toolset does not implement.
  */
-export function workContextFrom(chosen: ChosenStore): WorkContextTarget {
+export function workContextFrom(chosen: ChosenStore, env: Readonly<Record<string, string | undefined>> = {}): WorkContextTarget {
   const tool = chosen.stores?.[WORK_CONTEXT_ROLE] ?? "work-plan";
   if (tool === "none") return { none: true, tool: "none" };
-  if (tool === "work-plan") return { store: chosen.store, tool: `work-plan:${chosen.tool}` };
+  if (tool === "work-plan") return { store: chosen.store, workPlan: chosen.store, tool: `work-plan:${chosen.tool}` };
+  if (tool === "run-files") {
+    const dir = env[MEMORY_DIR_ENV]?.trim();
+    if (!dir) throw new Error(`deployment ${chosen.deployment ?? "(none)"} keeps work context in run files, but ${MEMORY_DIR_ENV} names no directory`);
+    return { store: new FileMemoryStore(dir), tool: "run-files" };
+  }
   throw new Error(
     `deployment ${chosen.deployment ?? "(none)"} keeps work context in "${tool}", which this toolset does not implement ` +
       `(it has: ${WORK_CONTEXT_TOOLS.join(", ")}). Refused rather than keeping it somewhere else.`,
@@ -123,17 +136,20 @@ function keep(
 ): WorkContextResult {
   if ("none" in target) return { summary: "work context not kept: this deployment keeps none" };
   if (!item) return { summary: "work context not kept: this instance tracks no item" };
-  const { store } = target;
-  const got = store.get(item);
-  if (got.state !== "hit") return { summary: `work context not kept: item ${item} is not in the store` };
-  const to = change(store, got.bean);
+  const { store, workPlan } = target;
   let moved = "";
-  if (to) {
-    const r = store.update(item, to, got.version);
-    if (r.state !== "updated") {
-      return { summary: `work context for ${item} not kept: ${r.state === "refused" ? `${r.why}: ${r.detail}` : "the item is gone"}` };
+  if (workPlan) {
+    // The work plan's Tool: the item is a bean, and taking up and closing move its status.
+    const got = workPlan.get(item);
+    if (got.state !== "hit") return { summary: `work context not kept: item ${item} is not in the store` };
+    const to = change(workPlan, got.bean);
+    if (to) {
+      const r = workPlan.update(item, to, got.version);
+      if (r.state !== "updated") {
+        return { summary: `work context for ${item} not kept: ${r.state === "refused" ? `${r.why}: ${r.detail}` : "the item is gone"}` };
+      }
+      moved = `, ${got.bean.status} → ${to.status}`;
     }
-    moved = `, ${got.bean.status} → ${to.status}`;
   }
   // input-site: inert #a3e3d49c — the moment an entry is kept; a write, never a check's input
   const at = new Date().toISOString();
@@ -146,6 +162,6 @@ function keep(
     instance: meta.instance,
     ...(meta.node ? { step: meta.node } : {}),
   });
-  if (kept.state !== "kept") return { summary: `work context not kept: item ${item} is gone` };
+  if (kept.state !== "kept") return { summary: `work context not kept: item ${item} is not in the store` };
   return { summary: `work context kept on ${item} (${meta.kind}${moved})` };
 }

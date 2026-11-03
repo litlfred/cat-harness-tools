@@ -58,7 +58,7 @@ function repo(): { root: string; store: MountedGitBranchStore } {
   return { root: r, store };
 }
 
-const target = (store: MountedGitBranchStore) => ({ store, tool: "work-plan:beans-git-branch" });
+const target = (store: MountedGitBranchStore) => ({ store, workPlan: store, tool: "work-plan:beans-git-branch" });
 const meta = { process: "Process_Plain", instance: "plain--a", by: "workflow" };
 
 describe("work context: what the engine keeps", () => {

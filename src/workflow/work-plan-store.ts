@@ -47,9 +47,10 @@ export type Refusal = {
    * `stale`: `ifMatch` is not the current version. `exists`: the id is taken.
    * `dangling-link`: a link names no bean. `closed-list`: a value outside the
    * schema's list. `not-terminal`: archiving a bean that is not completed or
-   * scrapped.
+   * scrapped. `invalid`: a record a memory store cannot keep as given (an id
+   * that is not a plain name, a field outside its schema).
    */
-  why: "stale" | "exists" | "dangling-link" | "closed-list" | "not-terminal";
+  why: "stale" | "exists" | "dangling-link" | "closed-list" | "not-terminal" | "invalid";
   detail: string;
 };
 
