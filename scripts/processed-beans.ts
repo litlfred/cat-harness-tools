@@ -437,9 +437,18 @@ const PB_SCRIPT = String.raw`<script>
     var F = { q: $("pb-q"), process: $("pb-process"), state: $("pb-state"), bean: $("pb-beanstatus"), stale: $("pb-stale"), beans: $("pb-open") };
     // The combined page's store tick boxes (owner, 2026-11-03): every store on by default.
     var storeBoxes = [].slice.call(document.querySelectorAll("[data-pb-store-box]"));
+    // "Include the stores it depends on" (owner, 2026-11-03: "needs dependencies"):
+    // the ticked stores, widened by their needs, and theirs, all the way down.
+    var needsEl = document.getElementById("pb-needs");
+    var NEEDS = needsEl ? JSON.parse(needsEl.textContent) : {};
+    var depsBox = $("pb-deps");
     var storeOn = function (name) {
       if (!storeBoxes.length || !name) return true;
-      return storeBoxes.some(function (b) { return b.checked && b.value === name; });
+      var on = storeBoxes.filter(function (b) { return b.checked; }).map(function (b) { return b.value; });
+      if (depsBox && depsBox.checked) {
+        for (var i = 0; i < on.length; i++) (NEEDS[on[i]] || []).forEach(function (n) { if (on.indexOf(n) < 0) on.push(n); });
+      }
+      return on.indexOf(name) >= 0;
     };
     var unplacedEl = document.getElementById("pb-unplaced-data");
     var UNPLACED = unplacedEl ? JSON.parse(unplacedEl.textContent) : null;
@@ -523,6 +532,7 @@ const PB_SCRIPT = String.raw`<script>
     };
     Object.keys(F).forEach(function (k) { F[k].addEventListener("input", render); });
     storeBoxes.forEach(function (b) { b.addEventListener("change", render); });
+    if (depsBox) depsBox.addEventListener("change", render);
     document.querySelectorAll("[data-pb-sort]").forEach(function (b) {
       b.addEventListener("click", function () { var k = b.getAttribute("data-pb-sort"); sortDir = sortKey === k ? -sortDir : 1; sortKey = k; render(); });
     });
@@ -727,6 +737,8 @@ export function processedBeansBody(
   unplaced?: readonly UnplacedBean[],
   /** The combined page: the stores it joins, each with a tick box (owner, 2026-11-03). */
   stores?: readonly string[],
+  /** The combined page: each store's dependencies among `stores`, for "include what it depends on". */
+  needs?: Readonly<Record<string, readonly string[]>>,
 ): string {
   const procs = [...new Set(rows.map((r) => r.process))].sort();
   const beanStates = [...new Set(rows.flatMap((r) => r.beans.map((b) => (b.found ? b.status! : "not in this store"))))].sort();
@@ -754,7 +766,9 @@ export function processedBeansBody(
     (stores
       ? `<fieldset class="pb-stores"><legend>Stores</legend>${stores
           .map((st) => `<label><input type="checkbox" data-pb-store-box value="${esc(st)}" checked> ${esc(st)}</label>`)
-          .join("")}</fieldset>`
+          .join("")}` +
+        `<label class="pb-deps"><input type="checkbox" id="pb-deps"> and the stores each ticked store depends on (its <code>needs</code>)</label></fieldset>` +
+        `<script type="application/json" id="pb-needs">${scriptJson(needs ?? {})}</script>`
       : "") +
     `<ul class="pb-chips" id="pb-chips"></ul>` +
     `<section class="pb-card pb-detail" id="pb-detail" tabindex="-1" aria-live="polite" hidden></section>` +
@@ -821,6 +835,8 @@ export interface StoreRows {
   store: string;
   rows: readonly ProcessedRow[];
   unplaced: readonly UnplacedBean[];
+  /** The instances this store's instance `needs` (its declaration): the stores it depends on. */
+  needs?: readonly string[];
 }
 
 /**
@@ -832,7 +848,8 @@ export function processedBeansCombinedBody(parts: readonly StoreRows[], now: Dat
   const stores = parts.map((p) => p.store).sort();
   const rows = parts.flatMap((p) => rebase(p.rows, `../${p.store}/`).map((r) => ({ ...r, store: p.store, up: `../${p.store}/` })));
   const unplaced = parts.flatMap((p) => p.unplaced.map((b) => ({ ...b, store: p.store })));
-  return processedBeansBody("every store", rows, now, "../", undefined, unplaced, stores);
+  const needs = Object.fromEntries(parts.map((p) => [p.store, [...(p.needs ?? [])].filter((n) => stores.includes(n))]));
+  return processedBeansBody("every store", rows, now, "../", undefined, unplaced, stores, needs);
 }
 
 /**

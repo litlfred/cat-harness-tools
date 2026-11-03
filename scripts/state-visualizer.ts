@@ -3082,7 +3082,7 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
   const unplaced = unplacedBeans(beans, rows, beanSource);
   emit(join(all, "index.html"), shell(`${store} — beans by process`, processedBeansBody(store, rebase(rows, "../"), NOW, "../", undefined, unplaced)));
   // Kept for the combined page every store's rows go on (owner, 2026-11-03).
-  combinedParts.push({ store, rows, unplaced });
+  combinedParts.push({ store, rows, unplaced, needs: readDeclaration(instanceRoot)?.needs ?? [] });
   const routes = processedBeansRoutes(rows);
   for (const p of routes.processes) {
     const mine = rebase(rows.filter((r) => r.process === p), "../../");

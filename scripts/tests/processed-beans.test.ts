@@ -255,6 +255,19 @@ describe("the combined page, every store at …/beans/beans-processed/ (owner, 2
     expect(html).toContain('"store":"folio-assistant-core"');
   });
 
+  test("each store's needs go to the page, kept to the stores on it, for \"and what it depends on\"", () => {
+    const withNeeds = processedBeansCombinedBody(
+      [
+        { store: "cat-harness", rows: a, unplaced: [], needs: ["bootstrap"] },
+        { store: "folio-assistant-core", rows: b, unplaced: [], needs: ["cat-harness", "bootstrap"] },
+      ],
+      NOW,
+    );
+    const needs = JSON.parse(/<script type="application\/json" id="pb-needs">([\s\S]*?)<\/script>/.exec(withNeeds)![1]!);
+    expect(needs).toEqual({ "cat-harness": [], "folio-assistant-core": ["cat-harness"] });
+    expect(withNeeds).toContain('id="pb-deps"');
+  });
+
   test("no live refresh: the local server serves one store, not every store", () => {
     expect(html).not.toContain('id="pb-live"');
   });
