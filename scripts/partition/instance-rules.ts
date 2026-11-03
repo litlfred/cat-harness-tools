@@ -440,6 +440,7 @@ export const RULES: Rule[] = [
       "schemas/kg/detangle.ts",                 // the detangle criterion — folded in from its own instance (bean `byql`)
       "schemas/kg/detangle-sidecar.ts",         // what a detangle measurement pins (bean `byql`)
       "schemas/kg/node-kind.ts",                // node kinds declare their parents; composed by that walk (bean `a1lq`)
+      "schemas/kg/memory-record.ts",            // the memory record a bean extends (cat-harness#991 Q17) — read by bean-graph.ts
       "schemas/ui/diff-renderers.ts",           // the review page's diff renderers, declared as data (bean `d903`)
       // What a graph TILE shows. Same argument as `scripts/graph-tiles.ts`
       // twenty lines up, and it arrived the same way: classified core first
