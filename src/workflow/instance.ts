@@ -29,8 +29,9 @@
  * @module folio-assistant/workflow/instance
  */
 
+import type { MemoryEntry } from "../../schemas/kg/memory-record.ts";
 import type { BeanInContext } from "./work-plan-store.js";
-import { isActivity, type ProcessModel, type ProcessNode } from "./process-model.js";
+import { isActivity, MEMORY_STORE, type ProcessModel, type ProcessNode } from "./process-model.js";
 import { evaluate } from "./decision-table.js";
 import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from "../../schemas/process/role-graph.js";
 import type { ConventionScope } from "../../schemas/process/convention.js";
@@ -251,6 +252,16 @@ export interface TaskContext {
    * `workflow_next` tool fills it in.
    */
   beans?: BeanInContext[];
+  /**
+   * The step is drawn reading or writing the `memory` data store
+   * (cat-harness#991 §4.14): a checkpoint read when work resumes, a record
+   * written before an agent stops, a space a swarm shares. Absent when the
+   * diagram draws no such association.
+   */
+  readsMemory?: boolean;
+  writesMemory?: boolean;
+  /** What was kept, read through the memory store when the step reads it. Filled by `workflow_next`. */
+  memory?: MemoryEntry[];
 }
 
 export interface EnabledActivity {
@@ -711,6 +722,10 @@ export function enabled(
       skills: effectiveSkills,
       conventions: combinedConventions,
       carriedBeans: taskCarriedBeans,
+      // A step drawn reading the memory store (§4.14: only where the process
+      // needs memory) is handed what was kept; `workflow_next` reads it.
+      ...(node.reads.includes(MEMORY_STORE) ? { readsMemory: true } : {}),
+      ...(node.writes.includes(MEMORY_STORE) ? { writesMemory: true } : {}),
     };
 
     if (node.kind === "exclusive") {
