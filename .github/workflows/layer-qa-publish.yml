@@ -33,7 +33,9 @@
 #   3. Run the knowledge-graph audit for that ONE instance
 #      (`kg-audit.ts --instance ./<instance>`), which writes its sidecars into
 #      the instance's own declared `qa` home (`kgQaHomeFor` "own").
-#   4. Publish that home with `qa:publish` to the CALLER's repository
+#   4. Run the caller's own QA `writers`, if it lists any (derived reports
+#      only the layer knows how to compute), into the same home.
+#   5. Publish that home with `qa:publish` to the CALLER's repository
 #      (`QA_STORE_REMOTE`), under `main/<sha>` for a push to main and
 #      `pr/<n>/<head sha>` for a pull request — the keys a reader asks for at
 #      the commit an index pins (`scripts/layer-qa.ts`, `readQaTreeAtCommit`).
@@ -64,6 +66,11 @@ on:
         required: false
         type: string
         default: "main"
+      writers:
+        description: "The instance's OWN QA writers, one command per line, run from the index checkout after kg-audit (e.g. `bun run who-iris/scripts/translation-roundtrip-report.ts`). Each must write under the instance's qa home; a failing writer fails the job, so a partial record is never published."
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -184,6 +191,22 @@ jobs:
           n="$(find "${{ steps.home.outputs.home }}" -name '*.kg-qa.json' 2>/dev/null | wc -l)"
           echo "kg-audit sidecars written: $n"
           [ "$n" -gt 0 ] || { echo "::error::kg-audit wrote no sidecar under ${{ steps.home.outputs.home }}: nothing to publish"; exit 1; }
+      - name: Run the instance's own QA writers
+        if: steps.key.outputs.skip != 'true' && steps.home.outputs.skip != 'true' && inputs.writers != ''
+        working-directory: fa
+        env:
+          WRITERS: ${{ inputs.writers }}
+        run: |
+          set -euo pipefail
+          # Derived results a layer computes itself (a report over its own
+          # attestations, say). Listed by the caller, because only the layer
+          # knows them; run in order, each to exit 0.
+          while IFS= read -r cmd; do
+            [ -n "${cmd// }" ] || continue
+            echo "::group::$cmd"
+            bash -c "$cmd"
+            echo "::endgroup::"
+          done <<< "$WRITERS"
       - name: Publish to this repository's qa-reports branch
         if: steps.key.outputs.skip != 'true' && steps.home.outputs.skip != 'true'
         working-directory: fa
