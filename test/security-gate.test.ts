@@ -34,6 +34,15 @@ describe("security:gate", () => {
     expect(r.detail).not.toContain("pins");
     expect(blocks([r])).toHaveLength(1);
   });
+
+  test("a check NOT APPLICABLE here (exit 78) is UNKNOWN with its reason, never a refusal, and still blocks", () => {
+    const cmd = "echo 'no corpus here'; exit 78";
+    const root = repo(undefined, { "check:not-here": cmd });
+    const r = runCheck("check:not-here", true, root, { "check:not-here": cmd });
+    expect(r.state).toBe("unknown");
+    expect(r.detail).toBe("not applicable in this root — no corpus here");
+    expect(blocks([r])).toHaveLength(1);
+  });
 });
 
 describe("each gate check is pinned to its command (roast 1ygp L4.5)", () => {

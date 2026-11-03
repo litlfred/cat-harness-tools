@@ -87,11 +87,14 @@ def main():
             verdict = "pass"
         elif b is None and h in UNDETERMINED:
             verdict = f"{UNDETERMINED[h]}; main did not run it, so not counted"
+        elif h == 2 and b in (0, 1):
+            # Before the generic branch, so 2 against a base that passed is
+            # labelled for what it is: head lost an answer base had. Counted
+            # exactly as before.
+            verdict = "NEW: could not determine"
+            new.append(name)
         elif b == 0 or b is None:
             verdict = "NEW FAILURE"
-            new.append(name)
-        elif h == 2 and b in (0, 1):
-            verdict = "NEW: could not determine"
             new.append(name)
         elif new_diagnostics(base.get(name), head[name]):
             added[name] = new_diagnostics(base.get(name), head[name])

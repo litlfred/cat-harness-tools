@@ -64,6 +64,19 @@
  *   is NOT judged — no entry is called stale over a corpus nobody looked at;
  * - zero verdict-bearing entries examined is exit 2 through `vacuityRefusal`.
  *
+ * ## A root that does not own the derived corpus: not applicable (78)
+ *
+ * Owner, 2026-11-03 (decision card, "(b) policy: 78 downstream"). Exit 2 says
+ * "this root should have the corpus and could not read it". That is true of a
+ * HARNESS root (`rootProfile`, `lib/root-gate-set.ts`): it carries the gates
+ * workflow whose run publishes the derived corpus to `qa-reports`. It is not
+ * true of a CONTENT root, a downstream that mounts the harness: the derived
+ * corpus is not its own, and there is no fetch it was expected to run. So
+ * there, with the derived tree absent and nothing forbidden found, the gate
+ * exits 78 (`lib/not-applicable.ts`) with the reason — neither a pass nor a
+ * failure. A harness root with the tree absent still exits 2, and a
+ * `forbidden` entry still exits 1 in either.
+ *
  * @module scripts/check-qa-reviewer-permission
  * @covers policies, scenarios
  */
@@ -75,7 +88,28 @@ import { join, relative, resolve } from "node:path";
 import { findDeclarationFile, instanceRootNamed } from "../schemas/kg/instance-roots.ts";
 import type { QaCriterionEntry, QaReviewer } from "../schemas/sdlc/block-qa.ts";
 import { vacuityRefusal, type Source } from "./vacuity-refusal.ts";
+import { exitNotApplicable } from "./lib/not-applicable.ts";
+import { rootProfile } from "./lib/root-gate-set.ts";
 const TOOLS_ROOT = resolve(import.meta.dir, "..");
+
+/**
+ * True when the derived tree is absent and `root` is a CONTENT root
+ * (`rootProfile`): the corpus is not this root's, so the gate does not apply
+ * (exit 78). False for a harness root, which owns the corpus and exits 2 when
+ * it is absent, and whenever the tree is present.
+ */
+export function absentCorpusIsNotOurs(derivedPresent: boolean, root: string): boolean {
+  return !derivedPresent && rootProfile(root) === "content";
+}
+
+/** Why the gate does not apply in a root that does not own the derived corpus — printed with exit 78. */
+export function notOwnedReason(results: string, baselined: number, attested: number): string {
+  return (
+    `${results} is absent and this is a content root (no gates workflow publishes the derived QA corpus here), ` +
+    `so the corpus is not this root's to judge; ${baselined} baselined reviewer id(s) were not evaluated and none is stale. ` +
+    `${attested} attested entr(y/ies) were examined and none is forbidden`
+  );
+}
 
 function isCheckerWitness(entry: QaCriterionEntry): boolean {
   return entry.result === "n/a" && entry.metrics?.role === "checker";
@@ -366,6 +400,16 @@ if (import.meta.main) {
       `  · ${total} entr(y/ies) not yet permitted; a "could not dispatch" record is exempt by design`,
     );
     process.exit(1);
+  }
+
+  // A downstream (content) root does not own the derived corpus: its absence
+  // there is not an unread corpus but one this root never had (owner,
+  // 2026-11-03, "(b) policy: 78 downstream"). See the module header.
+  if (absentCorpusIsNotOurs(derived.present, ROOT)) {
+    exitNotApplicable(
+      "check:qa-reviewer-permission",
+      notOwnedReason(relative(ROOT, RESULTS), base.known.length, judged.examined),
+    );
   }
 
   const refusal = vacuityRefusal({ script: "check:qa-reviewer-permission", covers: "policies, scenarios" }, looked);
