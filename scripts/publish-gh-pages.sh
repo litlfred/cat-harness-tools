@@ -56,7 +56,8 @@
 # otherwise — it publishes, and something else checks.
 #
 # Env: SITE, STATE, COMMIT_SHA, PAGES_DIR (all required; no defaults, because a
-# silent default here publishes the wrong directory to the live site).
+# silent default here publishes the wrong directory to the live site). STATE is
+# restore-staging's record file; `$STATE.keep` is keep-shared-payloads' directory.
 set -euo pipefail
 
 for v in SITE STATE COMMIT_SHA PAGES_DIR; do
@@ -92,7 +93,10 @@ for attempt in 1 2 3; do
   # Payload blobs this build drops but an older preview may still borrow
   # (staging-share.ts) are carried over from the branch being replaced, until
   # those previews rotate off (keep-shared-payloads.ts, bean fwtz Q-S2-2).
-  bun run cat-harness-tools/scripts/keep-shared-payloads.ts --site "$SITE" --pages "$PAGES_DIR" --state "$STATE"
+  # STATE is restore-staging's record, a FILE; keep-shared-payloads keeps a
+  # DIRECTORY of its own beside it. Handing it STATE made it mkdir over the
+  # file (EEXIST), which failed every main deploy from 2026-11-02.
+  bun run cat-harness-tools/scripts/keep-shared-payloads.ts --site "$SITE" --pages "$PAGES_DIR" --state "$STATE.keep"
 
   git -C "$PAGES_DIR" rm -r --ignore-unmatch -q '*'
   # `/.` copies the CONTENTS including dotfiles — `.nojekyll` is one, and
