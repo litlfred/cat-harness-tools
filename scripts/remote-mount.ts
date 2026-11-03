@@ -194,6 +194,7 @@ import {
   checkMountPathCollisions,
 } from "../schemas/kg/remote-mount.js";
 import { contentIsOffCheckout, HydratedSourceSchema, type HydratedSource, type SubgraphSource } from "../schemas/kg/subgraph-source.js";
+import { enabledSubgraphs, isSubgraphEnabled, qualifiedSubgraphId, type EnabledSubgraphs } from "../schemas/kg/opt-in-subgraphs.js";
 import { publishedSubgraphDir, SUBGRAPH_HYDRATED_FILE, SubgraphHydratedSchema } from "../schemas/kg/subgraph-manifest.js";
 import { treeDigest, treeEntries } from "./kg-parts.ts";
 import { builtAtPublishOf, installDependencies, isInstallArtefact, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
@@ -307,6 +308,31 @@ const UpstreamDeclarationSchema = z
   })
   .passthrough();
 type UpstreamDeclaration = z.infer<typeof UpstreamDeclarationSchema>;
+
+/**
+ * The directory ids a downstream mounts of `name` when its override names
+ * none: the harness's `mountDefaults.directories`, else every declared
+ * in-checkout directory — less each OPT-IN sub-graph the downstream has not
+ * switched on (cat-harness#991 step 23.1). The DOWNSTREAM decides, as the
+ * folio root does everywhere else (`opt-in-subgraphs.ts`): `cat-harness.sdlc`
+ * stays upstream for a content layer, and comes down for one that enables it.
+ * An explicit override naming the id still mounts it.
+ */
+export function defaultMountDirectoryIds(
+  name: string,
+  decl: Pick<UpstreamDeclaration, "directories" | "mountDefaults">,
+  enabled: EnabledSubgraphs,
+): string[] {
+  const off = new Set(
+    decl.directories
+      .filter((d) => (d as { optIn?: unknown }).optIn === true && !isSubgraphEnabled(enabled, qualifiedSubgraphId(name, d.id)))
+      .map((d) => d.id),
+  );
+  const ids =
+    decl.mountDefaults?.directories ??
+    decl.directories.filter((d) => !contentIsOffCheckout({ source: d.source as SubgraphSource | undefined, storage: d.storage })).map((d) => d.id);
+  return ids.filter((id) => !off.has(id));
+}
 
 // ── The plan ─────────────────────────────────────────────────────────────────
 
@@ -573,6 +599,8 @@ function planHydrated(a: {
   pkgFor: (harness: string) => SubgraphIndexFetch;
   /** Tools the override chose; refused here, since metadata brings no code. */
   tools?: readonly string[];
+  /** The downstream's switched-on opt-in sub-graphs: a switched-off one is not offered, even as metadata. */
+  enabled: EnabledSubgraphs;
 }): { instance: PlannedInstance } | { outcome: InstanceOutcome } {
   const { q, tree, found, path, named } = a;
   const { decl } = found;
@@ -587,7 +615,9 @@ function planHydrated(a: {
   if (!docs) {
     return { outcome: { instance: q.name, state: "missing", path, detail: `\`${q.name}\` at ${at} declares no \`docs\` directory, so it publishes no subgraph files to mount hydrated` } };
   }
-  const ids = named ?? decl.directories.filter((d) => !contentIsOffCheckout({ source: d.source as SubgraphSource | undefined, storage: d.storage })).map((d) => d.id);
+  const ids =
+    named ??
+    defaultMountDirectoryIds(q.name, { directories: decl.directories }, a.enabled);
   const lookup = directoriesById(tree, found, ids);
   if ("unknown" in lookup) {
     return { outcome: { instance: q.name, state: "could-not-determine", detail: `\`${lookup.unknown.join("`, `")}\` named for mounting but not declared by \`${q.name}\` at ${q.sha.slice(0, 12)} — ${lookup.why}` } };
@@ -679,6 +709,8 @@ function planHydrated(a: {
  */
 function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>, packages: Map<string, SubgraphIndexFetch> = new Map()): Plan {
   const ds = downstreamOf(opts);
+  // The downstream decides which opt-in sub-graphs come down by default.
+  const dsEnabled = enabledSubgraphs(ds.instanceRoot);
   const plan: Plan = { instanceRoot: ds.instanceRoot, downstream: ds.name, mounts: ds.mounts, approvers: ds.approvers, instances: [], outcomes: [] };
   if (ds.mounts.length === 0) return plan;
 
@@ -815,7 +847,7 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
       // The entry's own `hydrated` is its harness's; an override decides for any instance.
       const hydrated = override?.hydrated ?? (q.name === m.harness && m.hydrated === true);
       if (hydrated) {
-        const h = planHydrated({ q, via: m.harness, tree, found, path, named: override?.directories, whole: override?.whole, pkgFor: pkgAt(q.repository, q.sha), tools: override?.tools });
+        const h = planHydrated({ q, via: m.harness, tree, found, path, named: override?.directories, whole: override?.whole, pkgFor: pkgAt(q.repository, q.sha), tools: override?.tools, enabled: dsEnabled });
         if ("outcome" in h) plan.outcomes.push(h.outcome);
         else plan.instances.push(h.instance);
         continue;
@@ -842,8 +874,7 @@ function resolveClosure(opts: RemoteMountOptions, trees: Map<string, RemoteTree>
         ? []
         : override?.directories ??
         (choosesTools ? [] : undefined) ??
-        decl.mountDefaults?.directories ??
-        decl.directories.filter((d) => !contentIsOffCheckout({ source: d.source as SubgraphSource | undefined, storage: d.storage })).map((d) => d.id);
+        defaultMountDirectoryIds(q.name, decl, dsEnabled);
       const lookup = directoriesById(tree, found, ids);
       if ("unknown" in lookup) {
         plan.outcomes.push({

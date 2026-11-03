@@ -38,6 +38,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { declarationChain, resolveImplementingPath } from "../schemas/kg/harness-config.js";
+import { enabledSubgraphs } from "../schemas/kg/opt-in-subgraphs.js";
 import type { ToolDefinition } from "../schemas/tools/tool.js";
 import { discoverTools } from "../tools/discover.js";
 
@@ -233,6 +234,12 @@ export interface InstanceToolGroups {
  * resolved against ITS instance's root, never the folio's, because a Tool
  * node's `inProcess.module` is instance-relative. A tools graph that cannot be
  * loaded is a `failures` entry, never an instance with no tools (`dh4f`).
+ *
+ * **Opt-in sub-graphs are the FOLIO's to switch on** (cat-harness#991 step
+ * 23.1): a Tool node inside a switched-off one — `work-plan`'s bean Tool in a
+ * layer that has not enabled it — is not served, by any instance, the
+ * `always` ones included. The folio root's `enableSubgraphs` (and
+ * `CAT_SUBGRAPHS`) decides, never the declaring layer's.
  */
 export function servedToolGroups(
   folioRoot: string,
@@ -246,6 +253,7 @@ export function servedToolGroups(
   const sets: InstanceToolGroups[] = [];
   const failures: string[] = [];
   const seen = new Set<string>();
+  const enabled = enabledSubgraphs(folioRoot);
   const chain = declarationChain(folioRoot).map((l) => ({ ...l, root: resolve(l.root) }));
   for (const link of [...always.map((a) => ({ ...a, root: resolve(a.root) })), ...chain]) {
     if (seen.has(link.root)) continue;
@@ -253,7 +261,7 @@ export function servedToolGroups(
     // The instance's PARENT is scanned, restricted to this instance: discovery
     // walks one level of instance roots, and this one is a root beside its
     // siblings there whether it is a platform layer or the folio itself.
-    const d = discoverTools(dirname(link.root), undefined, link.root);
+    const d = discoverTools(dirname(link.root), undefined, link.root, { enabledSubgraphs: enabled });
     for (const f of d.failures) failures.push(`${f.dir ?? f.instance}: ${f.reason}`);
     const groups = toolGroupsFromNodes(d.tools, link.name);
     if (groups.length > 0) sets.push({ instance: link.name, root: link.root, groups });

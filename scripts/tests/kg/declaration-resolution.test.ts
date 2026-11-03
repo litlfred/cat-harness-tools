@@ -59,7 +59,7 @@ describe("checkDeclarationResolution over a checkout", () => {
       needs: "check:instance-graph",
     });
     expect(r.findings.find((f) => f.field === "directories")!.subject).toContain("gone");
-    expect(r.examined).toEqual({ declaration: 1, directories: 2, assets: 1, visualisers: 1, needs: 1 });
+    expect(r.examined).toEqual({ declaration: 1, directories: 2, assets: 1, visualisers: 1, needs: 1, enableSubgraphs: 0 });
     // A certain finding is never hidden behind "no Tool loaded".
     expect(exitCodeOf(r)).toBe(1);
   });

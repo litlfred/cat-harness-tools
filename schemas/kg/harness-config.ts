@@ -410,6 +410,7 @@ import {
   type ContentTypeRegistry,
 } from "../content/content-type";
 import { INDEX_CONFIG_FILENAME, LEGACY_HARNESS_CONFIG, rootConfigStems } from "./instance-roots";
+import { enabledSubgraphs as enabledSubgraphs_, type EnabledSubgraphs } from "./opt-in-subgraphs";
 import {
   HUB_LANDING,
   importedConfigFilename,
@@ -1386,10 +1387,19 @@ function safeDeclaration(root: string): unknown {
   }
 }
 
-export function checkoutDirectories(start: string, opts: { stackedOn?: string } = {}): ResolvedDirectory[] {
+export function checkoutDirectories(
+  start: string,
+  /**
+   * `enabledSubgraphs`: the opt-in sub-graphs switched on for EVERY instance
+   * resolved — a folio's, when the question is what that folio is given.
+   * Absent, each instance resolves with its own (`opt-in-subgraphs.ts`).
+   */
+  opts: { stackedOn?: string; enabledSubgraphs?: EnabledSubgraphs } = {},
+): ResolvedDirectory[] {
   const root = checkoutRootFor(start);
   const base = opts.stackedOn === undefined ? undefined : resolve(opts.stackedOn);
-  const key = `${root}\0${base ?? ""}`;
+  const en = opts.enabledSubgraphs;
+  const key = `${root}\0${base ?? ""}${en === undefined ? "" : `\0${en === "all" ? "*" : [...en].sort().join(",")}`}`;
   const cached = checkoutCache.get(key);
   if (cached !== undefined) return cached.map((d) => ({ ...d }));
   const graph = checkoutGraph(root);
@@ -1414,7 +1424,7 @@ export function checkoutDirectories(start: string, opts: { stackedOn?: string } 
   for (const inst of instances) {
     let mine: ResolvedDirectory[];
     try {
-      mine = resolveDirectories(chainIn(graph, inst));
+      mine = resolveDirectories(chainIn(graph, inst), undefined, en === undefined ? {} : { enabledSubgraphs: en });
     } catch {
       continue; // an unreadable declaration is `check:harness-dirs`'s to report
     }
@@ -1973,14 +1983,24 @@ export function materialiseDeclaredDirectories(
  */
 export function resolveSkillDirs(folioRoot: string): string[] {
   const dirs: string[] = [];
+  // OPT-IN SUB-GRAPHS (cat-harness#991 step 23.1): the FOLIO decides for every
+  // instance it reads, so a dependency's switched-off `sdlc` adds no skills.
+  const enabledSubgraphs = enabledSubgraphs_(folioRoot);
+  const withOptIn = { enabledSubgraphs };
+  /** The skill graphs an instance holds inside its switched-on opt-in sub-graphs — none while nothing is opt-in. */
+  const optInSkills = (root: string): string[] =>
+    resolveDirectories([{ name: "(local)", root, own: true }], undefined, withOptIn)
+      .filter((d) => d.own && d.optInSubgraph !== undefined && isKgOnlyDirectory(d) && existsSync(d.absPath))
+      .map((d) => d.absPath);
 
   for (const dep of orderedDependencies(folioRoot)) {
     if (dep.dependency.provides && !dep.dependency.provides.includes("skills")) {
       continue;
     }
-    for (const d of ownDirectories({ name: dep.dependency.name, root: dep.rootPath })) {
+    for (const d of ownDirectories({ name: dep.dependency.name, root: dep.rootPath }, undefined, withOptIn)) {
       if (isKgOnlyDirectory(d) && existsSync(d.absPath)) dirs.push(d.absPath);
     }
+    dirs.push(...optInSkills(dep.rootPath));
   }
 
   // THE OTHER INSTANCES IN THIS CHECKOUT (bean `cmsl` step 3, issue #1694).
@@ -1991,17 +2011,18 @@ export function resolveSkillDirs(folioRoot: string): string[] {
   // checkout answers instead. A folio in its own repository has no sibling
   // instances, so this adds nothing there.
   const own = new Set(
-    ownDirectories({ name: "(root)", root: resolve(folioRoot), own: true }).map((d) => resolve(d.absPath)),
+    ownDirectories({ name: "(root)", root: resolve(folioRoot), own: true }, undefined, withOptIn).map((d) => resolve(d.absPath)),
   );
-  for (const d of checkoutDirectories(resolve(folioRoot), { stackedOn: resolve(folioRoot) })) {
+  for (const d of checkoutDirectories(resolve(folioRoot), { stackedOn: resolve(folioRoot), enabledSubgraphs })) {
     if (own.has(resolve(d.absPath))) continue;
     if (isKgOnlyDirectory(d) && existsSync(d.absPath)) dirs.push(d.absPath);
   }
 
   // The root last, so its skills win on a name collision.
-  for (const d of ownDirectories({ name: "(root)", root: resolve(folioRoot), own: true })) {
+  for (const d of ownDirectories({ name: "(root)", root: resolve(folioRoot), own: true }, undefined, withOptIn)) {
     if (isKgOnlyDirectory(d) && existsSync(d.absPath)) dirs.push(d.absPath);
   }
+  dirs.push(...optInSkills(resolve(folioRoot)));
 
   // De-duplicated: a diamond dependency reaches the same instance twice, and a
   // directory scanned twice reports every skill in it twice.

@@ -404,6 +404,7 @@ export const RULES: Rule[] = [
       "schemas/harness-root.ts",                // declared-path-literal: a partition plan names modules by path. Where the harness is, for code that moved out of it (bean `8lcl`)
       "schemas/kg/harness-config.ts",           // cross-instance dependency resolution
       "schemas/kg/subgraph-source.ts",          // where a declared subgraph gets its content (bean `l4ay`) — read by the declaration schema itself
+      "schemas/kg/opt-in-subgraphs.ts",         // declared-path-literal: a partition plan names modules by path. Opt-in named sub-graphs (cat-harness#991 step 23.1) — read by the directory resolvers themselves
       "schemas/kg/remote-mount.ts",             // declared-path-literal: a partition plan names modules by path. Remote mounts (bean `0mpw`): mountDefaults, remoteMounts, the lock
       "schemas/kg/mount-trust.ts",              // declared-path-literal: a partition plan names modules by path. What a remote mount needs to be trusted (bean `ieum`, H8) — read by remote-mount.ts
       "schemas/kg/index-config.ts",             // declared-path-literal: a partition plan names modules by path. The root index.config.json (bean `ymvt`): instantiated harnesses, their sources, the landing — read by harness-config.ts
