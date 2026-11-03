@@ -441,6 +441,47 @@ export function mountScopeFor(instanceRoot: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Whether the mount that placed {@link instanceRoot} CHOSE its declared
+ * directory {@link absDir}.
+ *
+ * A downstream mounts a chosen subset of an upstream instance's directories,
+ * and the declaration it lays down still names all of them. So a declared
+ * directory that is not on disk is one of two different facts: the upstream
+ * keeps it and this mount did not choose it (nothing here to examine), or it
+ * was chosen and is gone (a corpus that should be here and is not). The lock
+ * records which (`instances[].directories`); this asks it.
+ *
+ * - `undefined` — no lock placed the instance (the checkout's own, or a plain
+ *   directory), or the lock cannot be read: no answer, and a caller must not
+ *   treat that as "not chosen".
+ * - `{ chosen: true }` — a whole-instance mount, or a locked directory equals,
+ *   encloses or lies inside `absDir` (a partly chosen directory is chosen).
+ * - `{ chosen: false, lock }` — the lock records the instance and none of its
+ *   directories reaches `absDir`.
+ */
+export function mountChoiceOf(instanceRoot: string, absDir: string): { chosen: boolean; lock: string } | undefined {
+  const inst = resolve(instanceRoot);
+  const dir = resolve(absDir);
+  const scope = mountScopeFor(inst);
+  if (scope === undefined) return undefined;
+  const within = (a: string, b: string): boolean => a === b || a.startsWith(`${b}/`);
+  for (const name of lockFilesIn(scope).files) {
+    const file = join(scope, name);
+    const r = readMountLock(file);
+    if (!r.ok) continue;
+    const entry = r.lock.instances.find((i) => resolve(scope, i.path) === inst);
+    if (entry === undefined) continue;
+    const chosen = entry.directories.some((d) => {
+      if (d.id === WHOLE_INSTANCE_ID) return true;
+      const locked = resolve(scope, d.path);
+      return within(dir, locked) || within(locked, dir);
+    });
+    return { chosen, lock: name };
+  }
+  return undefined;
+}
+
 /** Parse a lock file: absent, unreadable and malformed are three different answers. */
 export function readMountLock(file: string): { ok: true; lock: MountLock } | { ok: false; absent: boolean; why: string } {
   if (!existsSync(file)) return { ok: false, absent: true, why: `${file} does not exist` };

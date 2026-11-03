@@ -55,6 +55,7 @@ import { HARNESS_ROOT, REPO_ROOT } from "./lib/roots.ts";
 import { ContributionRegistry } from "../schemas/content/contributions.js";
 import { loadContributionsSync } from "../schemas/kg/harness-config.js";
 import { resolveSubgraphSource } from "../schemas/kg/subgraph-source.js";
+import { mountChoiceOf } from "../schemas/kg/remote-mount.js";
 import { graphReadPath } from "./graph-read.ts";
 import { ownedOutside, typologyOwner } from "../schemas/kg/node-kind-index.js";
 
@@ -206,6 +207,18 @@ export interface FamilySweep {
    * in `test-run-conformance`).
    */
   derivedNotComputed?: { id: string; at: string; branch: string }[];
+  /**
+   * Declared directories of this kind that the mount which placed their
+   * instance did NOT choose: the upstream declares them, the lock
+   * (`instances[].directories`) does not record them, and they are not on
+   * disk. **Not examined — never `EXAMINED NOTHING`.** A downstream that
+   * mounts only an upstream's `glossary/` has no `references/` to read, and
+   * that is its choice, not an empty corpus. A directory the lock DOES record,
+   * mounted and empty, is still `EXAMINED NOTHING`.
+   */
+  notMounted?: { id: string; path: string; lock: string }[];
+  /** How many directories of this kind were actually read. */
+  read?: number;
   /** Directories of this kind stored on a branch FAMILY: by declaration not in the checkout (bean lehh). */
   onFamily?: number;
 }
@@ -341,6 +354,16 @@ export async function sweepFamilies(
       for (const d of directoryEntriesForGraph(inst, kind)) {
         if (onFamily.has(d.absPath.replace(/\/$/, ""))) continue;
         declared++;
+        // Declared upstream, not chosen by the mount that placed this
+        // instance, and not on disk: there is nothing here to read, and that
+        // is not the same answer as an empty directory (see `notMounted`).
+        if (!existsSync(d.absPath)) {
+          const choice = mountChoiceOf(inst, d.absPath);
+          if (choice !== undefined && !choice.chosen) {
+            (s.notMounted ??= []).push({ id: d.id, path: relative(repoRoot, d.absPath) || ".", lock: choice.lock });
+            continue;
+          }
+        }
         const src = (() => {
           try {
             return resolveSubgraphSource(d);
@@ -371,6 +394,7 @@ export async function sweepFamilies(
       }
     }
     s.onFamily = onFamily.size;
+    s.read = dirs.size;
     if (declared === 0 && onFamily.size > 0) {
       out.push(s);
       continue;
@@ -490,6 +514,13 @@ async function main(): Promise<number> {
       console.log(`  · no instance declares a ${f.kind} directory — its nodes above were met in a parent kind's directory`);
     } else if (f.noDirectory) {
       console.log(`  · no instance declares a ${f.kind} directory — nothing to route (a nested kind is reached through its parent)`);
+    } else if (f.notMounted && nodes === 0 && !f.read && !f.unreachable) {
+      // NOT EXAMINED: every directory of this kind is one the mount did not
+      // choose. Not a pass, and not `EXAMINED NOTHING` either — nothing here
+      // was there to read. A chosen directory that is empty still fails below.
+      for (const m of f.notMounted) {
+        console.log(`  · not examined — ${f.kind} at \`${m.id}\` (${m.path}) is declared upstream and not mounted here: ${m.lock} does not choose it`);
+      }
     } else if (f.unreachable && nodes === 0) {
       // COULD NOT DETERMINE. Never printed as a pass, and never as
       // `EXAMINED NOTHING`: nothing read this graph, so "no node was found" is
@@ -522,6 +553,9 @@ async function main(): Promise<number> {
     } else if (nodes === 0) {
       console.log(`  ✗ EXAMINED NOTHING — ${f.kind} declares nodeSchemas and no node was found`);
       familyFail = true;
+    }
+    if (f.notMounted && (nodes > 0 || f.read || f.unreachable)) {
+      for (const m of f.notMounted) console.log(`  · ${m.id} (${m.path}) is declared upstream and not mounted here (${m.lock} does not choose it) — not examined`);
     }
     for (const u of f.projected ?? [])
       console.log(`  · ${u.tag}: another instance's node in a checkout-built projection (e.g. ${u.example}), judged where its source is declared`);
