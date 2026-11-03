@@ -396,7 +396,7 @@ describe("an instance declaring `enabled: false` is not planned", () => {
 });
 
 describe("a layer's own code lists are published beside its document (#960)", () => {
-  test("each concept is a fragment of that document; a layer with none writes nothing", () => {
+  test("each concept is a path under that document (slash IRIs, #1379); a layer with none writes nothing", () => {
     const dir = mkdtempSync(join(tmpdir(), "own-code-lists-"));
     try {
       writeDeclaration(dir, {
@@ -421,7 +421,7 @@ describe("a layer's own code lists are published beside its document (#960)", ()
       );
       const built = ownCodeListsDocument(dir, "demo", doc)!;
       expect(built["@id"]).toBe(doc);
-      expect((built["@graph"] as Array<{ "@id": string }>).map((n) => n["@id"])).toEqual([`${doc}#level`, `${doc}#level/high`]);
+      expect((built["@graph"] as Array<{ "@id": string }>).map((n) => n["@id"])).toEqual([`${doc}/level`, `${doc}/level/high`]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
