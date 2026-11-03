@@ -28,7 +28,21 @@ workPlanStoreConformance({
     const repo = mkdtempSync(join(tmpdir(), "wps-mount-"));
     made.push(repo);
     mkdirSync(join(repo, "beans", "defs"), { recursive: true });
-    writeFileSync(join(repo, "beans", "beans.json"), JSON.stringify({ name: "f", directories: [{ id: "defs", path: "defs", graphTypologies: ["bean-defs"] }] }));
-    return { a: new MountedGitBranchStore(repo, { cli: false }), b: new MountedGitBranchStore(repo, { cli: false }) };
+    mkdirSync(join(repo, "beans", "workflows"), { recursive: true });
+    writeFileSync(
+      join(repo, "beans", "beans.json"),
+      JSON.stringify({
+        name: "f",
+        directories: [
+          { id: "defs", path: "defs", graphTypologies: ["bean-defs"] },
+          { id: "workflows", path: "workflows", graphTypologies: ["workflow-state"] },
+        ],
+      }),
+    );
+    return {
+      a: new MountedGitBranchStore(repo, { cli: false }),
+      b: new MountedGitBranchStore(repo, { cli: false }),
+      seedInstance: (s) => writeFileSync(join(repo, "beans", "workflows", `${s.id}.json`), `${JSON.stringify({ $schema: "folio-workflow-instance/v1", ...s }, null, 2)}\n`),
+    };
   },
 });

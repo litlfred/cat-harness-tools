@@ -23,7 +23,7 @@ import { describe, expect, test } from "bun:test";
 
 import { BeanStatusSchema } from "../../../schemas/tools/tool-types.ts";
 
-import type { BeanFields, BeanFilter, Got, WorkPlanStore } from "../../../src/workflow/work-plan-store.ts";
+import type { BeanFields, BeanFilter, Got, InstanceLike, WorkPlanStore } from "../../../src/workflow/work-plan-store.ts";
 
 export type { BeanChange, BeanFields, BeanFilter, Got, Refusal } from "../../../src/workflow/work-plan-store.ts";
 
@@ -36,7 +36,12 @@ export type StoreUnderTest = WorkPlanStore;
  */
 export interface ToolUnderTest {
   name: string;
-  fresh(): { a: StoreUnderTest; b: StoreUnderTest };
+  fresh(): {
+    a: StoreUnderTest;
+    b: StoreUnderTest;
+    /** Write a workflow instance into the store, as the engine does when a process starts or moves. */
+    seedInstance(s: InstanceLike & { source: string; subject: string; startedAt: string; arrivals: Record<string, string[]>; history: Array<{ at: string; node?: string }> }): void;
+  };
   /** Per-test budget, for Tools whose operations are real I/O. */
   timeoutMs?: number;
 }
@@ -282,17 +287,66 @@ export function workPlanStoreConformance(tool: ToolUnderTest): void {
       }, t);
     });
 
-    describe("7. know where a bean is", () => {
-      const probe = tool.fresh().a;
-      if (!probe.positions || !probe.beansAt) {
-        test.todo(`positions(id) and beansAt(process, step) — not provided by ${tool.name} yet (cat-harness#991 step 4)`, () => {});
-        return;
-      }
+    describe("7. know where a bean is (Q-BSD-1 B: read from the instances)", () => {
+      const at = "2026-11-02T10:00:00Z";
+      const inst = (id: string, extra: Partial<Pick<InstanceLike, "bean" | "carriedBeans" | "tokens" | "status" | "children">> = {}) => ({
+        id,
+        processId: "code-change-review",
+        // declared-path-literal: a fixture instance's `source`, written into a temporary store and never read as a file
+        source: "processes/code-change-review.bpmn",
+        subject: id,
+        tokens: ["Task_Review"],
+        arrivals: {},
+        history: [{ at, node: "Start" }],
+        status: "running",
+        startedAt: at,
+        updatedAt: at,
+        ...extra,
+      });
+
       test("a bean no instance names has no position, and is at no step", () => {
         const { a } = tool.fresh();
         created(a.create(bean("fx-aaaa")));
-        expect(a.positions!("fx-aaaa")).toEqual([]);
-        expect(a.beansAt!("code-change-review")).not.toContain("fx-aaaa");
+        expect(a.positions("fx-aaaa")).toEqual([]);
+        expect(a.beansAt("code-change-review")).toEqual([]);
+      }, t);
+
+      test("a bean an instance names is at that instance's tokens, and nowhere else", () => {
+        const { a, seedInstance } = tool.fresh();
+        created(a.create(bean("fx-aaaa")));
+        created(a.create(bean("fx-bbbb")));
+        seedInstance(inst("ccr--a", { bean: "fx-aaaa", carriedBeans: ["fx-bbbb"] }));
+        expect(a.positions("fx-aaaa")).toEqual([
+          { process: "code-change-review", instance: "ccr--a", nodes: ["Task_Review"], status: "running", lastMoved: at },
+        ]);
+        expect(a.positions("fx-bbbb").map((p) => p.instance)).toEqual(["ccr--a"]);
+        expect(a.beansAt("code-change-review", "Task_Review")).toEqual(["fx-aaaa", "fx-bbbb"]);
+        expect(a.beansAt("code-change-review", "Task_Merge")).toEqual([]);
+        expect(a.beansAt("merge-train")).toEqual([]);
+      }, t);
+
+      test("a bean travels into the phase its instance calls", () => {
+        const { a, seedInstance } = tool.fresh();
+        created(a.create(bean("fx-aaaa")));
+        seedInstance(inst("ccr--a", {
+          bean: "fx-aaaa",
+          tokens: ["Call_Close"],
+          children: { Call_Close: { id: "bean-close--a", processId: "bean-close", tokens: ["Close_Complete"], status: "running", updatedAt: at } },
+        }));
+        expect(a.positions("fx-aaaa").map((p) => [p.process, p.instance, p.nodes])).toEqual([
+          ["code-change-review", "ccr--a", ["Call_Close"]],
+          ["bean-close", "ccr--a/Call_Close", ["Close_Complete"]],
+        ]);
+        expect(a.beansAt("bean-close", "Close_Complete")).toEqual(["fx-aaaa"]);
+      }, t);
+
+      test("a finished instance keeps the bean's position, but the bean is no longer in the process", () => {
+        const { a, seedInstance } = tool.fresh();
+        created(a.create(bean("fx-aaaa", { status: "completed" })));
+        seedInstance(inst("ccr--a", { bean: "fx-aaaa", tokens: ["End_Done"], status: "completed" }));
+        expect(a.positions("fx-aaaa")).toMatchObject([{ status: "completed", nodes: ["End_Done"] }]);
+        expect(a.beansAt("code-change-review")).toEqual([]);
+        expect(a.beansAt("code-change-review", "End_Done")).toEqual(["fx-aaaa"]);
       }, t);
     });
   });

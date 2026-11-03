@@ -29,8 +29,11 @@ import { inputSiteReached } from "../../schemas/sdlc/input-trace.ts";
 import { BeanStatusSchema } from "../../schemas/tools/tool-types.ts";
 import { setFieldInText } from "../../scripts/beans-fallback.ts";
 import { resolveBeanDefs } from "../../scripts/beans.ts";
+import { listInstances } from "./store.ts";
 import {
   admits,
+  beansAtIn,
+  positionsIn,
   parseBeanText,
   refuseWrite,
   renderBeanText,
@@ -42,6 +45,7 @@ import {
   type BeanFields,
   type BeanFilter,
   type Got,
+  type Position,
   type Refusal,
   type WorkPlanStore,
 } from "./work-plan-store.ts";
@@ -182,6 +186,16 @@ export class MountedGitBranchStore implements WorkPlanStore {
     if (!e) return { state: "none" };
     if (!this.cli(["update", e.bean.id, "--body-append", text])) appendToFile(e.path, text);
     return { state: "noted", version: versionOf(readFileSync(e.path, "utf8")) };
+  }
+
+  /** Read from the instances in the mounted `workflows/` (Q-BSD-1 B). A short id resolves as `get` does. */
+  positions(id: string): Position[] {
+    const key = resolveId(this.all().keys(), id) ?? id;
+    return positionsIn(listInstances(this.repoRoot), key);
+  }
+
+  beansAt(process: string, step?: string): string[] {
+    return beansAtIn(listInstances(this.repoRoot), process, step);
   }
 
   /** Into `archive/` beside the bean's directory, or back out of it. */
