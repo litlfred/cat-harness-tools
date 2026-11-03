@@ -152,8 +152,9 @@ const LOG_FORMAT = "--format=%H%x1f%aI%x1f%an";
 
 /**
  * The store's branch, with its whole history: the store's own reads fetch the
- * tip alone (`--depth=1`), so this fetches every commit, without blobs, under
- * a private ref, and each version's blob only when it is shown.
+ * tip alone (`--depth=1`), so this fetches every commit, blobs included, under
+ * a private ref. A work-plan branch is small text, and one fetch costs less
+ * than one round trip per version when a site build reads every bean's history.
  */
 export function branchReader(s: BranchStore): GitReader {
   const tip = s.fetchTip();
@@ -162,7 +163,7 @@ export function branchReader(s: BranchStore): GitReader {
   }
   const ref = s.privateRef("history");
   const shallow = s.git(["rev-parse", "--is-shallow-repository"]).stdout.toString().trim() === "true";
-  s.must(["fetch", "-q", "--no-tags", "--filter=blob:none", ...(shallow ? ["--unshallow"] : []), "origin", `+refs/heads/${tip.branch}:${ref}`]);
+  s.must(["fetch", "-q", "--no-tags", ...(shallow ? ["--unshallow"] : []), "origin", `+refs/heads/${tip.branch}:${ref}`]);
   return {
     log: (paths) => parseLog(s.must(["log", "--reverse", LOG_FORMAT, ref, "--", ...paths])),
     show: (commit, path) => {

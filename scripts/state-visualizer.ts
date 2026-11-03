@@ -190,7 +190,8 @@ import {
 import { positionOf, type InstanceState } from "../src/workflow/instance.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { branchKeptHref, branchKeptLocation } from "./branch-kept-href.ts";
-import { PB_CSS, processedBeanBody, processedBeansBody, processedBeansRoutes, processedBeansRows, rebase } from "./processed-beans.ts";
+import { PB_CSS, processedBeanBody, processedBeansBody, processedBeansRoutes, processedBeansRows, rebase, type ProcessedBeanHistory } from "./processed-beans.ts";
+import { MountedGitBranchStore } from "../src/workflow/work-plan-store-git-mount.ts";
 import { loadProcessModel, type ProcessModel } from "../src/workflow/process-model.js";
 import { roleGraphFor, workflowFiles } from "./known-skills.js";
 import { readMemoryNodes } from "./agent-memory.ts";
@@ -3032,16 +3033,17 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
   const diagrams = new Map(
     [...models].flatMap(([id, m]) => ("model" in m ? [[id, { nodes: new Set(m.model.nodes.keys()), ends: endNodesOf(m.model) }] as const] : [])),
   );
+  // Relative to the STORE page; each page below re-anchors them to its own depth.
+  const drawingFor = (bpmn: string): string | undefined => {
+    const svg = join(SITE, "assets", "img", "workflows", `${basename(bpmn, ".bpmn")}.svg`);
+    return existsSync(svg) ? relative(storeDir, svg).split(sep).join("/") : undefined;
+  };
   const rows = processedBeansRows({
     instances,
     beans,
     now: NOW,
     diagrams,
-    // Relative to the STORE page; each page below re-anchors them to its own depth.
-    drawingFor: (bpmn) => {
-      const svg = join(SITE, "assets", "img", "workflows", `${basename(bpmn, ".bpmn")}.svg`);
-      return existsSync(svg) ? relative(storeDir, svg).split(sep).join("/") : undefined;
-    },
+    drawingFor,
     instanceHref: (id) => (ROUTE_SEGMENT.test(id) ? `workflows/${id}/` : undefined),
     // A bean links to its file on the branch that keeps it (beans live on a state branch, not main).
     beanSource: (b) => (web ? branchKeptHref(branchKeptLocation(instanceRoot, b.file, web)) : undefined),
@@ -3054,6 +3056,25 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
   });
   const shell = (title: string, body: string) =>
     withRenderedByFrontMatter(page({ title, noLiquid: true, body: `<style>\n${PB_CSS}\n</style>\n${body}` }), VIEWER_TOOL);
+  // Each bean's history, through the work-plan store (cat-harness#991 step 5),
+  // with a drawing for every process its instances ran, phases included.
+  const wps = new MountedGitBranchStore(instanceRoot);
+  const drawings: Record<string, string> = {};
+  const collect = (st: InstanceState): void => {
+    if (!drawings[st.processId] && st.source) {
+      const d = drawingFor(st.source);
+      if (d) drawings[st.processId] = `../../${d}`;
+    }
+    Object.values(st.children ?? {}).forEach(collect);
+  };
+  instances.forEach(collect);
+  const historyOf = (id: string): ProcessedBeanHistory => {
+    try {
+      return { events: wps.history(id), drawings };
+    } catch (e) {
+      return { unknown: e instanceof Error ? e.message.split("\n")[0]! : String(e) };
+    }
+  };
   const all = join(storeDir, "processed-beans");
   emit(join(all, "index.html"), shell(`${store} — beans by process`, processedBeansBody(store, rebase(rows, "../"), NOW, "../")));
   const routes = processedBeansRoutes(rows);
@@ -3064,7 +3085,7 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
   const one = join(storeDir, "processed-bean");
   for (const b of routes.beans) {
     const mine = rebase(rows.filter((r) => r.beans.some((x) => x.id === b)), "../../");
-    emit(join(one, b, "index.html"), shell(`${store} — bean ${b} by process`, processedBeanBody(store, b, mine, NOW, "../../")));
+    emit(join(one, b, "index.html"), shell(`${store} — bean ${b} by process`, processedBeanBody(store, b, mine, NOW, "../../", historyOf(b))));
   }
   if (routes.beans.length > 0 || rows.length > 0) {
     emit(join(one, "index.html"), shell(`${store} — one bean by process`, processedBeanIndex(store, routes.beans)));

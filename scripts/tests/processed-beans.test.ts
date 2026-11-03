@@ -144,3 +144,35 @@ describe("routes are path IRIs", () => {
     expect(processedBeansBody("s", out, NOW, "../")).not.toContain("</script><b>");
   });
 });
+
+describe("one bean's history (cat-harness#991 step 5; owner, 2026-11-03)", () => {
+  const events = [
+    { at: "2026-11-01T09:00:00Z", by: "author", kind: "created" as const, what: "created: Do it (todo)" },
+    { at: "2026-11-01T10:00:00Z", by: "workflow", kind: "step-reached" as const, what: "code-change-review: Task_Review", instance: "ccr--a", node: "Task_Review" },
+    { at: "2026-11-01T11:00:00Z", by: "agent", kind: "claimed" as const, what: "todo → in-progress" },
+  ];
+
+  test("the stepper: buttons for first, previous, play, next and last, a slider over every event, and the keys named", () => {
+    const html = processedBeanBody("fixture", "fx-aaaa", [], new Date("2026-11-03T00:00:00Z"), "../../", { events, drawings: {} });
+    for (const go of ["first", "prev", "play", "next", "last"]) expect(html).toContain(`data-pb-go="${go}"`);
+    expect(html).toContain('id="pb-at" min="0" max="2" value="2"');
+    expect(html).toContain("<kbd>Space</kbd> play or pause");
+    expect(html).toContain('aria-live="polite"');
+    expect(html).toContain('id="pb-history"');
+  });
+
+  test("a history that could not be read says so, with the reason — never an empty timeline", () => {
+    const html = processedBeanBody("fixture", "fx-aaaa", [], new Date(), "../../", { unknown: "the beans branch could not be fetched" });
+    expect(html).toContain("The history could not be read");
+    expect(html).toContain("the beans branch could not be fetched");
+    expect(html).not.toContain('<button type="button" data-pb-go="play"');
+  });
+
+  test("an event's text cannot close the script it is embedded in", () => {
+    const html = processedBeanBody("fixture", "fx-aaaa", [], new Date(), "../../", {
+      events: [{ at: "2026-11-01T09:00:00Z", by: "x", kind: "noted", what: "</script><script>alert(1)</script>" }],
+      drawings: {},
+    });
+    expect(html).not.toContain("</script><script>alert(1)");
+  });
+});
