@@ -719,8 +719,16 @@ function lead(store: string, now: Date, up: string): string {
   );
 }
 
-function nav(store: string, up: string): string {
-  return `<p class="sv-sub"><a href="${up}">${esc(store)}'s work plan</a> · <a href="${up}beans-processed/">beans by process</a> · <a href="${up}workflows/">every instance</a></p>`;
+/**
+ * The links every page leads with. `instances` is false when the store has no
+ * workflow instance: its `workflows/` hub is then never written (it is drawn
+ * only over instances), so the link is left out rather than left dead. A
+ * store with beans and no instance is a content layer mounted in an IG's site
+ * (found 2026-11-03 rendering a newly harnessed IG: `../workflows/` from
+ * `folio-assistant-core/beans-processed/` was the one dead chrome link).
+ */
+function nav(store: string, up: string, instances = true): string {
+  return `<p class="sv-sub"><a href="${up}">${esc(store)}'s work plan</a> · <a href="${up}beans-processed/">beans by process</a>${instances ? ` · <a href="${up}workflows/">every instance</a>` : ""}</p>`;
 }
 
 /**
@@ -747,7 +755,7 @@ export function processedBeansBody(
     `<h1 id="${esc(id)}">${process ? `Beans in <code>${esc(process)}</code>` : "Beans by process"}: ${esc(store)}</h1>` +
     (stores
       ? `<p class="sv-sub"><a href="${up}">the bean stores</a> · ${stores.map((st) => `<a href="${up}${esc(st)}/beans-processed/">${esc(st)}</a>`).join(" · ")}</p>`
-      : nav(store, up)) +
+      : nav(store, up, rows.length > 0)) +
     lead(store, now, up) +
     `<div data-pb="all" data-pb-stall="${STUCK_AFTER_DAYS}" data-pb-up="${esc(up)}" data-pb-store="${esc(store)}"${process ? ` data-pb-process="${esc(process)}"` : ""}>` +
     // Shown only on a page opened from localhost: the refresh reads the local
