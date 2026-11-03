@@ -9,7 +9,7 @@
 # that branch in any layer repository: the declarations date from the
 # monorepo, where "the same repository" was folio-assistant, and no step of
 # layer initialisation or of the separation cutover gave a layer a publisher.
-# When folio-assistant-core and folio-assistant-sci stopped committing
+# When the content layers stopped committing
 # `test/results/`, their kg-audit sidecars existed nowhere a reader looked
 # (folio-assistant re-pin train 20261103-0041, `kg:validate over nested
 # instances`).
@@ -67,7 +67,7 @@ on:
         type: string
         default: "main"
       writers:
-        description: "The instance's OWN QA writers, one command per line, run from the index checkout after kg-audit (e.g. `bun run who-iris/scripts/translation-roundtrip-report.ts`). Each must write under the instance's qa home; a failing writer fails the job, so a partial record is never published."
+        description: "The instance's OWN QA writers, one command per line, run from the index checkout after kg-audit (e.g. `bun run <instance>/scripts/<writer>.ts`). Each must write under the instance's qa home; a failing writer fails the job, so a partial record is never published."
         required: false
         type: string
         default: ""

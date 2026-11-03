@@ -11,7 +11,7 @@
  * layer's own repository, keyed by the layer's commit. A layer's QA is that
  * repository's to write (bean `nn8e`, `kg-audit-all.ts`). The index used to
  * find a layer's sidecars only because the layer still committed them; once
- * folio-assistant-core and folio-assistant-sci stopped (`7mwa`), the index's
+ * the content layers stopped (`7mwa`), the index's
  * own store held cat-harness's sidecars alone and every reader of a nested
  * instance's QA read nothing (folio-assistant re-pin train 20261103-0041).
  *
