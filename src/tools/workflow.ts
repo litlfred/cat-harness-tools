@@ -42,7 +42,7 @@ import { describePreflight, preflight, preflightRefusal } from "../workflow/pref
 import { describeCapture, writeLogEntry } from "../logging/log-writer.js";
 import { instanceId, listInstances, loadInstance, saveInstance } from "../workflow/store.js";
 import { applyWorkPlanOp, onlyArchiveLeft } from "../workflow/bean-link.js";
-import { MountedGitBranchStore } from "../workflow/work-plan-store-git-mount.js";
+import { workPlanStoreFor } from "../workflow/work-plan-store-select.js";
 import { describeBeans, withBeans } from "../workflow/work-plan-store.js";
 import { checkGate, loadRelaxations, validateRelaxations, type GateVerdict } from "../workflow/gate.js";
 import { type RoleGraph } from "../../schemas/process/role-graph.js";
@@ -399,7 +399,18 @@ export async function workflowNextAnswer(
   // The beans themselves, not only their ids (cat-harness#991 step 4b): read
   // through the work-plan store, so an agent handed a step reads its bean's
   // title, status, body and position without a second call.
-  const pos = withBeans(position(model, state, r), new MountedGitBranchStore(root));
+  // The store is the deployment's (Q-BSD-2 A). One it cannot open does not
+  // stop the answer: the position stands, and the text says why no bean was read.
+  let chosen: ReturnType<typeof workPlanStoreFor>;
+  try {
+    chosen = workPlanStoreFor(root, opts?.env ?? process.env);
+  } catch (e) {
+    return {
+      text: `${describe(model, state, r)}\n\n  beans not read: ${e instanceof Error ? e.message : String(e)}`,
+      result: position(model, state, r),
+    };
+  }
+  const pos = withBeans(position(model, state, r), chosen.store);
   const beans = [...new Map(pos.enabled.flatMap((e) => e.context?.beans ?? []).map((b) => [b.id, b])).values()];
   return { text: describe(model, state, r) + describeBeans(beans), result: pos };
 }
@@ -558,16 +569,30 @@ export async function workflowCompleteAnswer(
   const authz = lastVerdict(next, node);
   const stepNode = findInModel(model, node)?.model.nodes.get(node);
   const op = stepNode?.workPlanOp;
-  const plan = op
-    ? applyWorkPlanOp(root, next.bean, op, {
-        note,
-        claimIfNotStarted: stepNode?.worksBean === true,
-        // `resolve` also fires when only archive steps are left, so a
-        // diagram can end in one (`onlyArchiveLeft`). `archive` itself
-        // still needs the instance to have completed.
-        instanceCompleted: op === "resolve" ? onlyArchiveLeft(model, next) : next.status === "completed",
-      })
-    : undefined;
+  // The deployment chooses the Tool (Q-BSD-2 A); unset, the git branch. The
+  // step is already recorded, so a deployment naming a store this toolset
+  // lacks is REPORTED as the work plan left untouched, never thrown past.
+  let chosen: ReturnType<typeof workPlanStoreFor> | { refused: string } | undefined;
+  if (op) {
+    try {
+      chosen = workPlanStoreFor(root, opts?.env ?? process.env);
+    } catch (e) {
+      chosen = { refused: e instanceof Error ? e.message : String(e) };
+    }
+  }
+  const plan = !op || !chosen
+    ? undefined
+    : "refused" in chosen
+      ? { summary: `work plan not touched: ${chosen.refused}` }
+      : applyWorkPlanOp(root, next.bean, op, {
+          note,
+          store: chosen.store,
+          claimIfNotStarted: stepNode?.worksBean === true,
+          // `resolve` also fires when only archive steps are left, so a
+          // diagram can end in one (`onlyArchiveLeft`). `archive` itself
+          // still needs the instance to have completed.
+          instanceCompleted: op === "resolve" ? onlyArchiveLeft(model, next) : next.status === "completed",
+        });
 
   // `task-end` for the step just recorded. The EVENT is task-end even
   // when the instance runs on: the unit an agent starts and ends is the
