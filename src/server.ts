@@ -59,6 +59,7 @@ export const SERVER_ROUTES: readonly RouteDeclaration[] = [
   { id: "feedback",  module: "src/routes/feedback.ts",  mount: "mountFeedbackRoutes",  layer: "core",    needs: ["feedbackStore"] },
   { id: "glossary",  module: "src/routes/glossary.ts",  mount: "mountGlossaryRoutes",  layer: "core" },
   { id: "relevance", module: "src/routes/relevance.ts", mount: "mountRelevanceRoutes", layer: "core" },
+  { id: "work-plan", module: "src/routes/work-plan.ts", mount: "mountWorkPlanRoutes",  layer: "harness" },
   { id: "chat",      module: "src/routes/chat.ts",      mount: "mountChatRoutes",      layer: "harness" },
 ];
 
@@ -184,7 +185,7 @@ export class FolioServer {
 
   // ── GET request handler ──────────────────────────────────────
 
-  private async handleGet(url: URL): Promise<Response | null> {
+  private async handleGet(url: URL, req?: Request): Promise<Response | null> {
     const path = url.pathname;
 
     // Folio SPA
@@ -196,7 +197,7 @@ export class FolioServer {
     }
 
     // Declared routes, in declaration order (see SERVER_ROUTES).
-    const routed = await dispatchGet(this.routes, url);
+    const routed = await dispatchGet(this.routes, url, req);
     if (routed) return routed;
 
     // Content adapter routes
@@ -248,7 +249,7 @@ export class FolioServer {
     }
 
     // GET
-    const getRes = await this.handleGet(url);
+    const getRes = await this.handleGet(url, req);
     if (getRes) {
       logDebug("http", `${req.method} ${url.pathname}`, `→ ${getRes.status} (${Date.now() - start}ms)`);
       return getRes;

@@ -274,9 +274,11 @@ describe("HTTP routes", () => {
     expect(routes).toHaveLength(SERVER_ROUTES.length);
   });
 
-  test("the declaration covers all five routes the server used to import", () => {
+  test("the declaration covers all five routes the server used to import, and the work-plan route added since", () => {
+    // `work-plan` (cat-harness#991 §4.9) is the read-only, localhost-only
+    // beans-by-process route; it is GET-only and sits before `chat`.
     expect(SERVER_ROUTES.map((r) => r.id)).toEqual(
-      ["branches", "feedback", "glossary", "relevance", "chat"],
+      ["branches", "feedback", "glossary", "relevance", "work-plan", "chat"],
     );
   });
 
@@ -287,10 +289,11 @@ describe("HTTP routes", () => {
     expect(SERVER_ROUTES.at(-1)!.id).toBe("chat");
   });
 
-  test("chat is POST-only, so GET dispatch is one shorter than POST", async () => {
+  test("chat is POST-only and work-plan GET-only, so each dispatch is one shorter than the list", async () => {
     const { routes } = await mountDeclaredRoutes(SERVER_ROUTES, SERVER_ROOT, deps());
-    expect(routes.filter((r) => r.get).length).toBe(routes.length - 1);
-    expect(routes.filter((r) => r.post).length).toBe(routes.length);
+    const ids = SERVER_ROUTES.map((r) => r.id);
+    expect(ids.filter((_, i) => !routes[i]!.get)).toEqual(["chat"]);
+    expect(ids.filter((_, i) => !routes[i]!.post)).toEqual(["work-plan"]);
   });
 
   test("the three content routes are declared `core`", () => {

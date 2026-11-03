@@ -272,6 +272,8 @@ export const PB_CSS = `.pb-filters { display: grid; grid-template-columns: repea
 .pb-list details { margin: 0.2rem 0 0; }
 .pb-list details p, .pb-detail details p { white-space: pre-wrap; font-size: 0.85rem; margin: 0.3rem 0; }
 .pb-detail { border-left: 4px solid #0d6e78; }
+.pb-live { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; font-size: 0.9rem; margin: 0 0 0.8rem; }
+.pb-live input { width: 1.25rem; height: 1.25rem; }
 .pb-detail button { font: inherit; min-height: 2.75rem; padding: 0.3rem 0.7rem; border-radius: 6px; border: 1px solid rgba(127,127,127,0.6); background: transparent; color: inherit; cursor: pointer; }`;
 
 /**
@@ -500,6 +502,59 @@ const PB_SCRIPT = String.raw`<script>
       b.addEventListener("click", function () { var k = b.getAttribute("data-pb-sort"); sortDir = sortKey === k ? -sortDir : 1; sortKey = k; render(); });
     });
     render();
+
+    // The 5-second refresh (owner, 2026-11-03): only on a page served from this
+    // machine, from the local store server's read-only route. The page keeps the
+    // drawings and links it was built with; only the positions and beans move.
+    var LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+    if (LOCAL && $("pb-live")) {
+      $("pb-live").hidden = false;
+      var STORE = root.getAttribute("data-pb-store"), PROC = root.getAttribute("data-pb-process");
+      var liveBox = $("pb-live-on"), liveState = $("pb-live-state");
+      var bases = [location.origin, "http://localhost:8080"], base = null, lastSig = "", timer = null;
+      var merge = function (fresh) {
+        var byInst = {}, byProc = {}, src = {};
+        ROWS.forEach(function (r) {
+          byInst[r.instance] = r;
+          if (r.drawing && !byProc[r.process]) byProc[r.process] = r;
+          r.beans.forEach(function (b) { if (b.source) src[b.id] = b.source; });
+        });
+        (UNPLACED || []).forEach(function (b) { if (b.source) src[b.id] = b.source; });
+        var keepSrc = function (b) { if (src[b.id] && !b.source) b.source = src[b.id]; return b; };
+        ROWS = fresh.rows.filter(function (r) { return !PROC || r.process === PROC; }).map(function (r) {
+          var mine = byInst[r.instance], like = mine || byProc[r.process] || {};
+          ["drawing", "processPage", "sourceHref"].forEach(function (k) { if (like[k]) r[k] = like[k]; });
+          if (mine && mine.href) r.href = mine.href;
+          r.beans.forEach(keepSrc);
+          return r;
+        });
+        if (UNPLACED) UNPLACED = fresh.unplaced.map(keepSrc);
+      };
+      var tick = function () {
+        var tryAt = base ? [base] : bases;
+        (function attempt(i) {
+          if (i >= tryAt.length) { base = null; liveState.textContent = "Live updates off: no local store server answered; showing the page as built."; return; }
+          fetch(tryAt[i] + "/api/work-plan/beans-processed", { cache: "no-store" })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (x) {
+              base = tryAt[i];
+              if (!x.ok) { liveState.textContent = "Live: the local store could not be read (" + (x.j.error || "no reason given") + "); showing the last answer."; return; }
+              if (x.j.store !== STORE) { liveState.textContent = "Live: the local server holds " + x.j.store + "'s work plan, not " + STORE + "'s."; return; }
+              liveState.textContent = "Live · " + x.j.tool + " · checked " + String(x.j.at).slice(11, 19) + " UTC";
+              var sig = JSON.stringify([x.j.rows, x.j.unplaced]);
+              if (sig === lastSig) return;
+              lastSig = sig;
+              merge(x.j);
+              render();
+            })
+            .catch(function () { attempt(i + 1); });
+        })(0);
+      };
+      var start = function () { if (!timer) { tick(); timer = setInterval(tick, 5000); } };
+      var stop = function () { if (timer) { clearInterval(timer); timer = null; } liveState.textContent = "Live updates paused."; };
+      liveBox.addEventListener("change", function () { if (liveBox.checked) start(); else stop(); });
+      start();
+    }
   } else {
     var show = function () {
       var id = root.getAttribute("data-pb-bean");
@@ -646,7 +701,10 @@ export function processedBeansBody(store: string, rows: readonly ProcessedRow[],
     `<h1 id="${esc(id)}">${process ? `Beans in <code>${esc(process)}</code>` : "Beans by process"}: ${esc(store)}</h1>` +
     nav(store, up) +
     lead(store, now, up) +
-    `<div data-pb="all" data-pb-stall="${STUCK_AFTER_DAYS}" data-pb-up="${esc(up)}">` +
+    `<div data-pb="all" data-pb-stall="${STUCK_AFTER_DAYS}" data-pb-up="${esc(up)}" data-pb-store="${esc(store)}"${process ? ` data-pb-process="${esc(process)}"` : ""}>` +
+    // Shown only on a page opened from localhost: the refresh reads the local
+    // store server; on the published site there is nothing to refresh from.
+    `<p class="pb-live" id="pb-live" hidden><label><input type="checkbox" id="pb-live-on" checked> Refresh every 5 s from the local bean store</label> <span id="pb-live-state" role="status"></span></p>` +
     `<form class="pb-filters" onsubmit="return false">` +
     `<label for="pb-q">Search<input id="pb-q" type="search" placeholder="bean, title, step, instance"></label>` +
     (process
