@@ -3077,7 +3077,7 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
   };
   const all = join(storeDir, "beans-processed");
   // Every bean, not only the ones an instance names: a store with beans and no instance
-  // (folio-assistant-core, 2026-11-03) otherwise read as an empty page.
+  // (a content layer, 2026-11-03) otherwise read as an empty page.
   const beanSource = (b: BeanNode): string | undefined => (web ? branchKeptHref(branchKeptLocation(instanceRoot, b.file, web)) : undefined);
   const unplaced = unplacedBeans(beans, rows, beanSource);
   emit(join(all, "index.html"), shell(`${store} — beans by process`, processedBeansBody(store, rebase(rows, "../"), NOW, "../", undefined, unplaced)));
