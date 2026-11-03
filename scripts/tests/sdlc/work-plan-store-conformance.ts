@@ -10,9 +10,8 @@
  * an MCP service, a run-scoped store) passes or fails the same tests the git
  * branch does (cat-harness#991, step 2).
  *
- * {@link StoreUnderTest} is the operations as this suite calls them. Step 3
- * of the proposal lifts it into the `WorkPlanStore` interface the engine
- * calls; until then it lives here, beside its only callers.
+ * The operations are `WorkPlanStore` (`src/workflow/work-plan-store.ts`,
+ * step 3); {@link StoreUnderTest} is its name here.
  *
  * `history`, `positions` and `beansAt` are optional on the type. A Tool that
  * does not yet provide one gets a `todo` naming the step that adds it, never a
@@ -24,65 +23,12 @@ import { describe, expect, test } from "bun:test";
 
 import { BeanStatusSchema } from "../../../schemas/tools/tool-types.ts";
 
-/** A bean as the contract speaks of it: fields, not a file. */
-export interface BeanFields {
-  id: string;
-  title: string;
-  status: string;
-  type: string;
-  parent?: string;
-  blockedBy?: string[];
-  tags?: string[];
-  body: string;
-}
+import type { BeanFields, BeanFilter, Got, WorkPlanStore } from "../../../src/workflow/work-plan-store.ts";
 
-/** A change to a bean's fields. The id never changes; the body changes only through `note`. */
-export type BeanChange = Partial<Omit<BeanFields, "id" | "body">>;
-
-export type Refusal = {
-  state: "refused";
-  /** `stale`: `ifMatch` is not the current version. `exists`: the id is taken. `dangling-link`: a link names no bean. `closed-list`: a value outside the schema's list. */
-  why: "stale" | "exists" | "dangling-link" | "closed-list";
-  detail: string;
-};
-
-export type Got = { state: "hit"; bean: BeanFields; version: string } | { state: "none" };
-
-export interface BeanFilter {
-  status?: string;
-  type?: string;
-  tag?: string;
-  parent?: string;
-}
-
-/** One entry of `history(id)`, oldest first. */
-export interface HistoryEvent {
-  at: string;
-  by: string;
-  what: string;
-  instance?: string;
-  node?: string;
-}
-
-/** One entry of `positions(id)`. */
-export interface Position {
-  process: string;
-  instance: string;
-  nodes: string[];
-  status: string;
-}
+export type { BeanChange, BeanFields, BeanFilter, Got, Refusal } from "../../../src/workflow/work-plan-store.ts";
 
 /** The contract's operations, as this suite calls them. */
-export interface StoreUnderTest {
-  get(id: string): Got;
-  list(filter?: BeanFilter): BeanFields[];
-  create(bean: BeanFields): { state: "created"; version: string } | Refusal;
-  update(id: string, change: BeanChange, ifMatch: string): { state: "updated"; version: string } | Refusal | { state: "none" };
-  note(id: string, text: string, by: string): { state: "noted"; version: string } | { state: "none" };
-  history?(id: string): HistoryEvent[];
-  positions?(id: string): Position[];
-  beansAt?(process: string, step?: string): string[];
-}
+export type StoreUnderTest = WorkPlanStore;
 
 /**
  * A Tool under test. `fresh` returns two writers on ONE new, empty store, so
@@ -283,6 +229,37 @@ export function workPlanStoreConformance(tool: ToolUnderTest): void {
         const { a } = tool.fresh();
         expect(a.note("fx-zzzz", "x", "w").state).toBe("none");
         expect(a.list()).toEqual([]);
+      }, t);
+    });
+
+    describe("archiving is a field set by update (Q-BSD-7 B)", () => {
+      test("an archived bean is still found by get, and left out of list unless asked for", () => {
+        const { a } = tool.fresh();
+        const v = created(a.create(bean("fx-aaaa", { status: "completed" })));
+        created(a.create(bean("fx-bbbb")));
+        expect(a.update("fx-aaaa", { archived: true }, v).state).toBe("updated");
+        const got = hit(a.get("fx-aaaa"));
+        expect(got.bean.archived).toBe(true);
+        expect(got.bean.status).toBe("completed");
+        expect(a.list().map((b) => b.id)).toEqual(["fx-bbbb"]);
+        expect(a.list({ archived: true }).map((b) => b.id)).toEqual(["fx-aaaa"]);
+      }, t);
+
+      test("archiving a bean that is not completed or scrapped is refused, and it stays where it was", () => {
+        const { a } = tool.fresh();
+        const v = created(a.create(bean("fx-aaaa", { status: "in-progress" })));
+        expect(a.update("fx-aaaa", { archived: true }, v)).toMatchObject({ state: "refused", why: "not-terminal" });
+        expect(hit(a.get("fx-aaaa")).bean.archived).toBeUndefined();
+        expect(a.list().map((b) => b.id)).toEqual(["fx-aaaa"]);
+      }, t);
+
+      test("an archived bean can be brought back", () => {
+        const { a } = tool.fresh();
+        const v = created(a.create(bean("fx-aaaa", { status: "scrapped" })));
+        const r = a.update("fx-aaaa", { archived: true }, v);
+        if (r.state !== "updated") throw new Error(JSON.stringify(r));
+        expect(a.update("fx-aaaa", { archived: false }, r.version).state).toBe("updated");
+        expect(a.list().map((b) => b.id)).toEqual(["fx-aaaa"]);
       }, t);
     });
 
