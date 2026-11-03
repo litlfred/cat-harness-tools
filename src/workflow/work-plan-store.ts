@@ -301,3 +301,77 @@ export function beansAtIn(instances: Iterable<InstanceLike>, process: string, st
   }
   return [...out].sort();
 }
+
+// ---------------------------------------------------------------------------
+// The bean in the task's context (cat-harness#991 step 4b; proposal §4.4).
+
+/** A carried bean as an agent receives it with its step: the bean itself, not only its id. */
+export interface BeanInContext {
+  id: string;
+  /** False when the store holds no such bean: an instance naming a deleted bean, or another store's. */
+  found: boolean;
+  title?: string;
+  status?: string;
+  type?: string;
+  parent?: string;
+  blockedBy?: string[];
+  tags?: string[];
+  archived?: boolean;
+  body?: string;
+  /** Where the bean is, from the instances (Q-BSD-1 B). */
+  positions?: Position[];
+  /** Set instead of `positions` when the instances could not be read: could not determine is not "nowhere". */
+  positionsUnknown?: string;
+}
+
+/** Each id, read through `get` and `positions`. Never throws for one bean. */
+export function beansInContext(store: WorkPlanStore, ids: readonly string[]): BeanInContext[] {
+  return ids.map((id): BeanInContext => {
+    const got = store.get(id);
+    if (got.state !== "hit") return { id, found: false };
+    const { id: _id, ...fields } = got.bean;
+    let where: Pick<BeanInContext, "positions" | "positionsUnknown">;
+    try {
+      where = { positions: store.positions(got.bean.id) };
+    } catch (e) {
+      where = { positionsUnknown: e instanceof Error ? e.message : String(e) };
+    }
+    return { id: got.bean.id, found: true, ...fields, ...where };
+  });
+}
+
+/**
+ * The same position with each enabled step's context carrying its beans.
+ * Each bean is read once, however many steps carry it.
+ */
+export function withBeans<P extends { enabled: Array<{ context?: { carriedBeans: string[]; beans?: BeanInContext[] } }> }>(
+  pos: P,
+  store: WorkPlanStore,
+): P {
+  const ids = [...new Set(pos.enabled.flatMap((e) => e.context?.carriedBeans ?? []))].sort();
+  const read = new Map(beansInContext(store, ids).map((b, i) => [ids[i]!, b]));
+  return {
+    ...pos,
+    enabled: pos.enabled.map((e) =>
+      e.context ? { ...e, context: { ...e.context, beans: e.context.carriedBeans.map((id) => read.get(id)!) } } : e,
+    ),
+  };
+}
+
+/** One line per bean, for the text an agent reads. */
+export function describeBeans(beans: readonly BeanInContext[]): string {
+  if (beans.length === 0) return "";
+  const lines = ["", "  beans:"];
+  for (const b of beans) {
+    if (!b.found) {
+      lines.push(`    ${b.id} — not in the work plan`);
+      continue;
+    }
+    const where = b.positionsUnknown
+      ? `position could not be read: ${b.positionsUnknown}`
+      : (b.positions ?? []).filter((p) => p.status === "running").map((p) => `${p.process} at ${p.nodes.join(", ") || "(no token)"}`).join("; ") ||
+        "in no running process";
+    lines.push(`    ${b.id} — ${b.title} (${b.status}${b.archived ? ", archived" : ""}); ${where}`);
+  }
+  return lines.join("\n");
+}
