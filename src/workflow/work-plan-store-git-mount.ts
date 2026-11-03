@@ -24,12 +24,14 @@
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, relative, sep } from "node:path";
 import { inputSiteReached } from "../../schemas/sdlc/input-trace.ts";
 import { BeanStatusSchema } from "../../schemas/tools/tool-types.ts";
 import { setFieldInText } from "../../scripts/beans-fallback.ts";
+import { BranchStore, branchPathOf, tipLocations } from "../../scripts/branch-store.ts";
 import { resolveBeanDefs } from "../../scripts/beans.ts";
 import { listInstances } from "./store.ts";
+import { beanVersions, branchReader, checkoutReader, historyFrom, type GitReader } from "./work-plan-store-history.ts";
 import {
   admits,
   beansAtIn,
@@ -45,6 +47,7 @@ import {
   type BeanFields,
   type BeanFilter,
   type Got,
+  type HistoryEvent,
   type Position,
   type Refusal,
   type WorkPlanStore,
@@ -186,6 +189,35 @@ export class MountedGitBranchStore implements WorkPlanStore {
     if (!e) return { state: "none" };
     if (!this.cli(["update", e.bean.id, "--body-append", text])) appendToFile(e.path, text);
     return { state: "noted", version: versionOf(readFileSync(e.path, "utf8")) };
+  }
+
+  /**
+   * The bean's history (Q-BSD-4 A): `git log` of its file where it is kept —
+   * the `beans` branch when the graph has moved there, else this checkout —
+   * merged with the steps of every instance naming it. A write on the mount
+   * that has not been pushed yet is not history until it is (`state:push`).
+   * An unknown id has no history. A history that cannot be read throws: it
+   * is never answered with an empty list.
+   */
+  history(id: string): HistoryEvent[] {
+    const e = this.find(id);
+    if (!e) return [];
+    const rel = relative(this.repoRoot, e.path).split(sep).join("/");
+    let loc: ReturnType<typeof tipLocations>[number] | undefined;
+    try {
+      loc = tipLocations(this.repoRoot).find((l) => rel === l.path || rel.startsWith(`${l.path}/`));
+    } catch {
+      loc = undefined;
+    }
+    let reader: GitReader;
+    let path = rel;
+    if (loc) {
+      reader = branchReader(BranchStore.open(loc.branch, { repoRoot: this.repoRoot, log: () => {} }));
+      path = `${branchPathOf(loc)}${rel.slice(loc.path.length)}`;
+    } else {
+      reader = checkoutReader(this.repoRoot);
+    }
+    return historyFrom(e.bean.id, beanVersions(reader, path), listInstances(this.repoRoot));
   }
 
   /** Read from the instances in the mounted `workflows/` (Q-BSD-1 B). A short id resolves as `get` does. */
