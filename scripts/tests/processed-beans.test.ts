@@ -9,10 +9,12 @@ import type { InstanceState } from "../../src/workflow/instance.js";
 import {
   PB_SEGMENT,
   processedBeanBody,
+  processedBeanIndexBody,
   processedBeansBody,
   processedBeansRoutes,
   processedBeansRows,
   rebase,
+  unplacedBeans,
 } from "../processed-beans.ts";
 
 const NOW = new Date("2026-11-02T00:00:00Z");
@@ -59,7 +61,7 @@ describe("processedBeansRows", () => {
     expect(r.finished).toBe(false);
     expect(r.ageDays).toBe(30);
     expect(r.stuck).toContain("enabled-not-taken");
-    expect(r.beans).toEqual([{ id: "fa-aaaa", found: true, title: "title of fa-aaaa", status: "in-progress", updatedAt: "2026-10-01T00:00:00Z" }]);
+    expect(r.beans).toEqual([{ id: "fa-aaaa", found: true, title: "title of fa-aaaa", status: "in-progress", updatedAt: "2026-10-01T00:00:00Z", closed: false }]);
     expect(r.done).toEqual(["Start", "Task_1"]);
     expect(r.drawing).toBe("../../assets/img/workflows/a.svg");
     expect(r.href).toBe("workflows/i1/");
@@ -174,5 +176,50 @@ describe("one bean's history (cat-harness#991 step 5; owner, 2026-11-03)", () =>
       drawings: {},
     });
     expect(html).not.toContain("</script><script>alert(1)");
+  });
+});
+
+describe("finished instances, beans in no process, open and closed (owner, 2026-11-03)", () => {
+  test("a finished instance with no token is marked where it ended, its last step; a running one is not", () => {
+    const [fin, run] = rows(
+      [
+        instance("done", { bean: "fa-aaaa", status: "completed", tokens: [], history: [{ at: "2026-10-01T00:00:00Z", node: "Start" }, { at: "2026-10-02T00:00:00Z", node: "Task_2" }] } as Partial<InstanceState>),
+        instance("live", { bean: "fa-bbbb", tokens: ["Task_1"] }),
+      ],
+      [bean("fa-aaaa", "completed"), bean("fa-bbbb", "todo")],
+    ).sort((a, b) => a.instance.localeCompare(b.instance));
+    expect(fin!.endedAt).toEqual(["Task_2"]);
+    expect(run!.endedAt).toEqual([]);
+  });
+
+  test("a finished instance resting on an end event ends there", () => {
+    const [r] = rows([instance("i", { bean: "fa-aaaa", tokens: ["End"], status: "completed" })], [bean("fa-aaaa", "completed")]);
+    expect(r!.endedAt).toEqual(["End"]);
+  });
+
+  test("a bean says whether it is closed, and carries the start of its body", () => {
+    const b = { ...bean("fa-aaaa", "scrapped"), body: "Why it was dropped." } as BeanNode;
+    const [r] = rows([instance("i", { bean: "fa-aaaa", tokens: ["Task_1"] })], [b]);
+    expect(r!.beans[0]).toMatchObject({ closed: true, excerpt: "Why it was dropped." });
+  });
+
+  test("beans no instance names are listed, so a store with beans and no instance is not an empty page", () => {
+    const placed = rows([instance("i", { bean: "fa-aaaa", tokens: ["Task_1"] })], [bean("fa-aaaa", "todo")]);
+    const un = unplacedBeans([bean("fa-aaaa", "todo"), bean("fa-bbbb", "todo"), bean("fa-cccc", "completed")], placed);
+    expect(un.map((b) => [b.id, b.closed])).toEqual([
+      ["fa-bbbb", false],
+      ["fa-cccc", true],
+    ]);
+    const html = processedBeansBody("core", placed, NOW, "../", undefined, un);
+    expect(html).toContain('id="pb-unplaced"');
+    expect(html).toContain('id="pb-unplaced-data"');
+    expect(html).toContain('<option value="open" selected>Open</option>');
+  });
+
+  test("the bean index filters open and closed, open by default", () => {
+    const html = processedBeanIndexBody("cat-harness", [{ id: "fa-aaaa", title: "t", status: "todo", closed: false }], "../");
+    expect(html).toContain('data-pb="index"');
+    expect(html).toContain('<option value="open" selected>Open</option>');
+    expect(html).toContain('<option value="closed">Closed</option>');
   });
 });

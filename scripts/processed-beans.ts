@@ -50,6 +50,34 @@ export interface ProcessedBean {
   updatedAt?: string;
   /** The bean's source file on the forge, on the branch that keeps it. */
   source?: string;
+  /** Completed or scrapped: what the open/closed filter reads (owner, 2026-11-03). */
+  closed?: boolean;
+  /** The start of the bean's body, so a reader can read it from the diagram. */
+  excerpt?: string;
+}
+
+/** A bean no instance names: listed on the store's all-beans page so an empty diagram is not an empty store. */
+export interface UnplacedBean {
+  id: string;
+  title: string;
+  status: string;
+  closed: boolean;
+  updatedAt?: string;
+  source?: string;
+  excerpt?: string;
+  /** Its page under `processed-bean/`, when it has one, relative to the store page. */
+  href?: string;
+}
+
+/** The statuses a bean is closed in. */
+export const CLOSED_STATUSES: ReadonlySet<string> = new Set(["completed", "scrapped"]);
+
+const EXCERPT = 600;
+/** The body's first {@link EXCERPT} characters, front matter already gone. */
+export function excerptOf(body: string | undefined): string | undefined {
+  const t = (body ?? "").trim();
+  if (!t) return undefined;
+  return t.length > EXCERPT ? `${t.slice(0, EXCERPT - 1)}…` : t;
 }
 
 /** One instance, joined with its beans and its diagram. */
@@ -79,6 +107,13 @@ export interface ProcessedRow {
   stuck: string[];
   /** Tokens on steps the current diagram does not have. */
   missingNodes: string[];
+  /**
+   * Where a FINISHED instance ended: its tokens when they rest on an end event,
+   * else the last step in its history. Empty while it runs. A finished instance
+   * holds no live token, and without this its beans vanished from the diagram
+   * (Process_SampleImport, owner, 2026-11-03).
+   */
+  endedAt: string[];
 }
 
 /**
@@ -120,7 +155,17 @@ export function processedBeansRows(input: ProcessedBeansInput): ProcessedRow[] {
         const b = byId.get(id);
         if (!b) return { id, found: false };
         const source = input.beanSource?.(b);
-        return { id, found: true, title: b.title, status: b.status, updatedAt: b.updatedAt, ...(source ? { source } : {}) };
+        const excerpt = excerptOf(b.body);
+        return {
+          id,
+          found: true,
+          title: b.title,
+          status: b.status,
+          updatedAt: b.updatedAt,
+          closed: CLOSED_STATUSES.has(b.status),
+          ...(source ? { source } : {}),
+          ...(excerpt ? { excerpt } : {}),
+        };
       });
       const missingNodes = diagram ? s.tokens.filter((t) => !diagram.nodes.has(t)) : [];
       const stuck = [...new Set(stuckStatesOf(s, input.beans, input.now, ends).map((x) => x.kind as string))];
@@ -151,9 +196,31 @@ export function processedBeansRows(input: ProcessedBeansInput): ProcessedRow[] {
         beans,
         stuck,
         missingNodes,
+        endedAt: !finished ? [] : atEnd ? [...s.tokens] : (s.history ?? []).map((h) => h.node).filter((n): n is string => typeof n === "string").slice(-1),
       };
     })
     .sort((a, b) => (a.lastMoved ?? "").localeCompare(b.lastMoved ?? "") || a.instance.localeCompare(b.instance));
+}
+
+/** The store's beans that no row names, newest first. */
+export function unplacedBeans(beans: readonly BeanNode[], rows: readonly ProcessedRow[], beanSource?: (b: BeanNode) => string | undefined): UnplacedBean[] {
+  const named = new Set(rows.flatMap((r) => r.beans.map((b) => b.id)));
+  return beans
+    .filter((b) => !named.has(b.id))
+    .map((b): UnplacedBean => {
+      const source = beanSource?.(b);
+      const excerpt = excerptOf(b.body);
+      return {
+        id: b.id,
+        title: b.title,
+        status: b.status,
+        closed: CLOSED_STATUSES.has(b.status),
+        ...(b.updatedAt ? { updatedAt: b.updatedAt } : {}),
+        ...(source ? { source } : {}),
+        ...(excerpt ? { excerpt } : {}),
+      };
+    })
+    .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "") || a.id.localeCompare(b.id));
 }
 
 function esc(s: string): string {
@@ -197,7 +264,15 @@ export const PB_CSS = `.pb-filters { display: grid; grid-template-columns: repea
 .pb-events { list-style: none; padding: 0; margin: 0.5rem 0 0; max-height: 18rem; overflow-y: auto; font-size: 0.85rem; }
 .pb-events li::before { content: none; }
 .pb-events li { padding: 0.2rem 0.4rem; border-radius: 4px; cursor: pointer; }
-.pb-events li[aria-current="step"] { outline: 2px solid #0d6e78; font-weight: 600; }`;
+.pb-events li[aria-current="step"] { outline: 2px solid #0d6e78; font-weight: 600; }
+.pb-diagram .pb-ended .djs-visual > :first-child { stroke: #555 !important; stroke-width: 4px !important; }
+.pb-list { list-style: none; padding: 0; margin: 0.5rem 0; }
+.pb-list li::before { content: none; }
+.pb-list li { border-top: 1px solid rgba(127,127,127,0.3); padding: 0.4rem 0; font-size: 0.9rem; }
+.pb-list details { margin: 0.2rem 0 0; }
+.pb-list details p, .pb-detail details p { white-space: pre-wrap; font-size: 0.85rem; margin: 0.3rem 0; }
+.pb-detail { border-left: 4px solid #0d6e78; }
+.pb-detail button { font: inherit; min-height: 2.75rem; padding: 0.3rem 0.7rem; border-radius: 6px; border: 1px solid rgba(127,127,127,0.6); background: transparent; color: inherit; cursor: pointer; }`;
 
 /**
  * The client: reads the embedded rows, filters them from the form (kept in the
@@ -241,31 +316,44 @@ const PB_SCRIPT = String.raw`<script>
         var m = marks[node];
         var g = svg.querySelector('g.djs-element[data-element-id="' + CSS.escape(node) + '"]');
         if (!g) return;
-        if (!m.rows.length) { g.classList.add("pb-done"); return; }
+        var fin = m.fin || [];
+        if (!m.rows.length && !fin.length) { g.classList.add("pb-done"); return; }
         var late = m.rows.some(stalled);
-        g.classList.add("pb-token");
+        g.classList.add(m.rows.length ? "pb-token" : "pb-ended");
         if (late) g.classList.add("pb-stalled");
         var bb = g.getBBox(), t = g.transform.baseVal.consolidate();
         var tx = t ? t.matrix.e : 0, ty = t ? t.matrix.f : 0;
-        var label = m.rows.length + (late ? " stalled" : "");
+        var label = m.rows.length ? m.rows.length + (late ? " stalled" : "") : fin.length + " finished";
         var w = 24 + label.length * 11, x = tx + bb.x + bb.width - w / 2, y = ty + bb.y - 30;
         var ns = "http://www.w3.org/2000/svg";
         var mk = document.createElementNS(ns, "g");
         mk.setAttribute("class", "pb-mark"); mk.setAttribute("tabindex", "0"); mk.setAttribute("role", "button");
         var title = document.createElementNS(ns, "title");
-        title.textContent = m.rows.map(function (r) { return r.beans.map(function (b) { return b.id + " — " + (b.title || "bean not in this store"); }).join("\n"); }).join("\n");
+        title.textContent = m.rows.concat(fin).map(function (r) { return r.beans.map(function (b) { return b.id + " — " + (b.title || "bean not in this store"); }).join("\n"); }).join("\n");
         var rect = document.createElementNS(ns, "rect");
         rect.setAttribute("x", x); rect.setAttribute("y", y); rect.setAttribute("rx", 13); rect.setAttribute("width", w); rect.setAttribute("height", 26);
-        rect.setAttribute("fill", late ? "#b86a00" : "#0d6e78");
+        rect.setAttribute("fill", !m.rows.length ? "#555" : late ? "#b86a00" : "#0d6e78");
         var text = document.createElementNS(ns, "text");
         text.setAttribute("x", x + 12); text.setAttribute("y", y + 19); text.textContent = label;
         mk.append(title, rect, text);
         if (onMark) {
-          mk.addEventListener("click", function () { onMark(node); });
-          mk.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onMark(node); } });
+          mk.setAttribute("aria-label", label + " at " + node + ": open the beans");
+          mk.addEventListener("click", function () { onMark(node, m); });
+          mk.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onMark(node, m); } });
         }
         svg.append(mk);
       });
+      // A badge sits above its step; on a step at the top of the drawing it
+      // was cut off by the viewBox (owner, 2026-11-03). Grow the viewBox to hold it.
+      try {
+        var vb = svg.viewBox.baseVal, all = svg.getBBox();
+        if (vb && vb.width) {
+          var x0 = Math.min(vb.x, all.x - 4), y0 = Math.min(vb.y, all.y - 4);
+          var x1 = Math.max(vb.x + vb.width, all.x + all.width + 4), y1 = Math.max(vb.y + vb.height, all.y + all.height + 4);
+          svg.setAttribute("viewBox", [x0, y0, x1 - x0, y1 - y0].join(" "));
+          svg.removeAttribute("height");
+        }
+      } catch (e) { /* a drawing without a viewBox keeps its own size */ }
     }).catch(function () { host.textContent = "The drawing could not be loaded; the steps are listed in the table."; });
   }
   function lazy(host, fn) {
@@ -296,10 +384,55 @@ const PB_SCRIPT = String.raw`<script>
     var ph = procHref(proc);
     return ph ? '<a href="' + esc(ph) + '"><code>' + esc(proc) + "</code></a>" : "<code>" + esc(proc) + "</code>";
   }
+  var isOpen = function (b) { return !b.closed; };
+  var openMatch = function (sel, b) { return !sel || (sel === "closed" ? !!b.closed : isOpen(b)); };
+  // One bean, readable where it is shown: status, links, and its body behind a disclosure.
+  function beanDetail(b, extra) {
+    // A bean in a process has a page; one in no process has none, so it is not linked to one.
+    var h = b.href ? b.href : b.found !== undefined ? beanHref(b.id) : null;
+    return "<li>" + (h ? '<a href="' + esc(h) + '"><code>' + esc(b.id) + "</code></a> " : "<code>" + esc(b.id) + "</code> ") +
+      (b.found === false ? '<span class="pb-chip is-broken">not in this store</span>' : esc(b.title) + ' <span class="pb-chip">' + esc(b.status) + "</span>") +
+      (b.updatedAt ? " · updated " + esc(String(b.updatedAt).slice(0, 10)) : "") +
+      (b.source ? ' · <a href="' + esc(b.source) + '">source</a>' : "") + (extra || "") +
+      (b.excerpt ? "<details><summary>Read the bean</summary><p>" + esc(b.excerpt) + "</p></details>" : "") + "</li>";
+  }
   function moved(r) { return r.lastMoved ? esc(r.lastMoved.slice(0, 10)) + " (" + r.ageDays + " days)" : "unknown"; }
 
+  if (MODE === "index") {
+    var FI = { q: $("pb-q"), beans: $("pb-open") };
+    var ALL = JSON.parse(document.getElementById("pb-unplaced-data").textContent);
+    var renderIndex = function () {
+      var q = FI.q.value.trim().toLowerCase();
+      var shown = ALL.filter(function (b) { return openMatch(FI.beans.value, b) && (!q || (b.id + " " + b.title).toLowerCase().indexOf(q) >= 0); });
+      $("pb-chips").innerHTML = '<li class="pb-chip">' + shown.length + " of " + ALL.length + " beans</li>" +
+        '<li class="pb-chip">' + ALL.filter(isOpen).length + " open</li>" +
+        '<li class="pb-chip">' + ALL.filter(function (b) { return b.closed; }).length + " closed</li>";
+      $("pb-index").innerHTML = shown.map(function (b) { return beanDetail(b); }).join("") || "<li>No bean matches these filters.</li>";
+    };
+    Object.keys(FI).forEach(function (k) { FI[k].addEventListener("input", renderIndex); });
+    renderIndex();
+    return;
+  }
   if (MODE === "all") {
-    var F = { q: $("pb-q"), process: $("pb-process"), state: $("pb-state"), bean: $("pb-beanstatus"), stale: $("pb-stale") };
+    var F = { q: $("pb-q"), process: $("pb-process"), state: $("pb-state"), bean: $("pb-beanstatus"), stale: $("pb-stale"), beans: $("pb-open") };
+    var unplacedEl = document.getElementById("pb-unplaced-data");
+    var UNPLACED = unplacedEl ? JSON.parse(unplacedEl.textContent) : null;
+    var detail = $("pb-detail");
+    // A badge opens the beans at its step: read them, open their pages, or narrow the table.
+    var openDetail = function (node, m) {
+      var rs = m.rows.concat(m.fin || []);
+      detail.innerHTML = "<h2>At <code>" + esc(node) + "</code>: " + rs.length + " instance(s)</h2>" +
+        '<ul class="pb-list">' + rs.map(function (r) {
+          var extra = " · " + (r.href ? '<a href="' + esc(r.href) + '">' + esc(r.instance) + "</a>" : esc(r.instance)) +
+            " · " + (r.finished ? "finished" : "running") + " · last moved " + moved(r) + " " + stuckCell(r);
+          return r.beans.map(function (b) { return beanDetail(b, extra); }).join("");
+        }).join("") + "</ul>" +
+        '<p><button type="button" id="pb-narrow">Show only these in the table</button> <button type="button" id="pb-close">Close</button></p>';
+      detail.hidden = false;
+      detail.focus();
+      $("pb-narrow").addEventListener("click", function () { F.q.value = node; render(); $("pb-table").scrollIntoView(); });
+      $("pb-close").addEventListener("click", function () { detail.hidden = true; });
+    };
     var sortKey = "lastMoved", sortDir = 1;
     var match = function (r) {
       var q = F.q.value.trim().toLowerCase();
@@ -309,6 +442,7 @@ const PB_SCRIPT = String.raw`<script>
         (!F.process.value || r.process === F.process.value) &&
         (!F.state.value || (F.state.value === "running" ? !r.finished : F.state.value === "finished" ? r.finished : r.stuck.length > 0)) &&
         (!F.bean.value || r.beans.some(function (b) { return (b.found ? b.status : "not in this store") === F.bean.value; })) &&
+        r.beans.some(function (b) { return openMatch(F.beans.value, b); }) &&
         (!st || (!r.finished && (r.ageDays == null || r.ageDays > st)));
     };
     var render = function () {
@@ -326,7 +460,10 @@ const PB_SCRIPT = String.raw`<script>
       procs.forEach(function (proc) {
         var its = rows.filter(function (r) { return r.process === proc; });
         var marks = {};
-        its.forEach(function (r) { r.tokens.forEach(function (t) { (marks[t] = marks[t] || { rows: [] }).rows.push(r); }); });
+        its.forEach(function (r) {
+          if (!r.finished) r.tokens.forEach(function (t) { (marks[t] = marks[t] || { rows: [], fin: [] }).rows.push(r); });
+          else r.endedAt.forEach(function (t) { (marks[t] = marks[t] || { rows: [], fin: [] }).fin.push(r); });
+        });
         var missing = [];
         its.forEach(function (r) { r.missingNodes.forEach(function (n) { if (missing.indexOf(n) < 0) missing.push(n); }); });
         var withDrawing = its.filter(function (r) { return r.drawing; })[0];
@@ -334,13 +471,13 @@ const PB_SCRIPT = String.raw`<script>
         card.className = "pb-card";
         card.innerHTML = "<h2>" + procName(proc) + '</h2><p class="sv-sub"><code>' + esc(its[0].source) + "</code>" + procLinks(its[0]) + " · " +
           its.filter(function (r) { return !r.finished; }).length + " running, " + its.filter(function (r) { return r.finished; }).length +
-          " finished. A badge counts the beans waiting at a step; select it to filter the table.</p>" +
+          " finished. A badge counts the beans at a step (running, stalled, or finished there); select it to read them.</p>" +
           (withDrawing ? '<div class="pb-diagram"><p class="sv-sub">The drawing loads when this card scrolls into view.</p></div>' : '<p class="sv-sub">No drawing of this process is published, so the positions are in the table only.</p>') +
           (missing.length ? '<p class="sv-sub"><strong>node-missing</strong>: a token sits on ' + missing.map(function (n) { return "<code>" + esc(n) + "</code>"; }).join(", ") + ", which the current diagram does not have.</p>" : "");
         cards.append(card);
         if (withDrawing) {
           var host = card.querySelector(".pb-diagram");
-          lazy(host, function () { draw(host, withDrawing.drawing, marks, function (node) { F.q.value = node; render(); $("pb-table").scrollIntoView(); }); });
+          lazy(host, function () { draw(host, withDrawing.drawing, marks, openDetail); });
         }
       });
       rows.sort(function (a, b) { return String(a[sortKey] == null ? "" : a[sortKey]).localeCompare(String(b[sortKey] == null ? "" : b[sortKey])) * sortDir; });
@@ -349,6 +486,14 @@ const PB_SCRIPT = String.raw`<script>
           (r.href ? '<a href="' + esc(r.href) + '">' + esc(r.instance) + "</a>" : esc(r.instance)) + " · " + (r.finished ? "finished" : "running") +
           "</td><td>" + moved(r) + "</td><td>" + stuckCell(r) + "</td></tr>";
       }).join("") || '<tr><td colspan="6">No instance matches these filters.</td></tr>';
+      if (UNPLACED) {
+        var q = F.q.value.trim().toLowerCase();
+        var un = UNPLACED.filter(function (b) {
+          return openMatch(F.beans.value, b) && (!F.bean.value || b.status === F.bean.value) && (!q || (b.id + " " + b.title).toLowerCase().indexOf(q) >= 0);
+        });
+        $("pb-unplaced").innerHTML = un.map(function (b) { return beanDetail(b); }).join("") || "<li>No bean outside a process matches these filters.</li>";
+        $("pb-chips").insertAdjacentHTML("beforeend", '<li class="pb-chip">' + un.length + " of " + UNPLACED.length + " beans in no process</li>");
+      }
     };
     Object.keys(F).forEach(function (k) { F[k].addEventListener("input", render); });
     document.querySelectorAll("[data-pb-sort]").forEach(function (b) {
@@ -374,7 +519,8 @@ const PB_SCRIPT = String.raw`<script>
         if (!r.drawing) return;
         var marks = {};
         r.done.forEach(function (n) { marks[n] = { rows: [] }; });
-        r.tokens.forEach(function (n) { marks[n] = { rows: [r] }; });
+        if (!r.finished) r.tokens.forEach(function (n) { marks[n] = { rows: [r] }; });
+        else r.endedAt.forEach(function (n) { marks[n] = { rows: [], fin: [r] }; });
         var host = $("pb-d" + i);
         lazy(host, function () { draw(host, r.drawing, marks); });
       });
@@ -478,8 +624,8 @@ function lead(store: string, now: Date, up: string): string {
   return (
     `<p class="sv-sub">BPMN workflow instances recorded in <code>${esc(store)}</code>'s work plan, joined with the beans they name. ` +
     `Ages are measured on ${esc(dayOf(now))} (UTC, the day this page was built); an instance is <strong>stalled</strong> when it is running ` +
-    `and has not moved for more than ${STUCK_AFTER_DAYS} days. A bean that no instance names is not on these pages: see ` +
-    `<a href="${up}">the store page</a>. A running subprocess is followed on each instance's own page.</p>`
+    `and has not moved for more than ${STUCK_AFTER_DAYS} days. A finished instance is marked where it ended. Beans that no instance names ` +
+    `are listed under "Beans in no process"; <a href="${up}">the store page</a> has every bean. A running subprocess is followed on each instance's own page.</p>`
   );
 }
 
@@ -492,7 +638,7 @@ function nav(store: string, up: string): string {
  * processes with an instance, the beans on each diagram, filters. `rows` are
  * this page's rows, hrefs relative to it; `up` is the store page relative to it.
  */
-export function processedBeansBody(store: string, rows: readonly ProcessedRow[], now: Date, up: string, process?: string): string {
+export function processedBeansBody(store: string, rows: readonly ProcessedRow[], now: Date, up: string, process?: string, unplaced?: readonly UnplacedBean[]): string {
   const procs = [...new Set(rows.map((r) => r.process))].sort();
   const beanStates = [...new Set(rows.flatMap((r) => r.beans.map((b) => (b.found ? b.status! : "not in this store"))))].sort();
   const id = process ? `processed-beans-${process}` : "processed-beans";
@@ -506,15 +652,23 @@ export function processedBeansBody(store: string, rows: readonly ProcessedRow[],
     (process
       ? `<select id="pb-process" hidden><option value=""></option></select>`
       : `<label for="pb-process">Process<select id="pb-process"><option value="">All processes</option>${procs.map((p) => `<option>${esc(p)}</option>`).join("")}</select></label>`) +
+    `<label for="pb-open">Beans<select id="pb-open"><option value="open" selected>Open</option><option value="closed">Closed</option><option value="">Open and closed</option></select></label>` +
     `<label for="pb-state">Instance<select id="pb-state"><option value="">Any</option><option value="running">Running</option><option value="finished">Finished</option><option value="stuck">Any stuck state</option></select></label>` +
     `<label for="pb-beanstatus">Bean status<select id="pb-beanstatus"><option value="">Any</option>${beanStates.map((s) => `<option>${esc(s)}</option>`).join("")}</select></label>` +
     `<label for="pb-stale">Not moved for<select id="pb-stale"><option value="">Any time</option><option value="${STUCK_AFTER_DAYS}">More than ${STUCK_AFTER_DAYS} days</option><option value="30">More than 30 days</option><option value="60">More than 60 days</option></select></label>` +
     `</form><ul class="pb-chips" id="pb-chips"></ul>` +
+    `<section class="pb-card pb-detail" id="pb-detail" tabindex="-1" aria-live="polite" hidden></section>` +
     (rows.length === 0 ? `<p class="sv-sub">No BPMN instance is recorded in this store, so no bean sits at any step.</p>` : "") +
     `<div id="pb-cards"></div>` +
     `<h2 class="sv-h2" id="pb-table">Beans in processes</h2>` +
     `<div class="pb-table"><table><thead><tr><th>bean</th><th><button type="button" data-pb-sort="process">process</button></th><th>step</th><th>instance</th><th><button type="button" data-pb-sort="lastMoved">last moved</button></th><th>stuck</th></tr></thead><tbody id="pb-tbody"></tbody></table></div>` +
+    (unplaced
+      ? `<h2 class="sv-h2" id="pb-unplaced-h">Beans in no process</h2>` +
+        `<p class="sv-sub">Beans of this store that no workflow instance names, so no diagram shows them. The filters above apply.</p>` +
+        `<ul class="pb-list" id="pb-unplaced"></ul>`
+      : "") +
     `</div><script type="application/json" id="pb-rows">${scriptJson(rows)}</script>` +
+    (unplaced ? `<script type="application/json" id="pb-unplaced-data">${scriptJson(unplaced)}</script>` : "") +
     PB_SCRIPT
   );
 }
@@ -559,6 +713,27 @@ function historySection(history?: ProcessedBeanHistory): string {
     `<div class="pb-diagram" id="pb-hist-diagram" hidden></div>` +
     `<ol class="pb-events" id="pb-events"></ol>` +
     `</section>`
+  );
+}
+
+/**
+ * `processed-bean/`: every bean with a page of its own, filterable by open or
+ * closed (default open; owner, 2026-11-03) and by text. `up` is the store page.
+ */
+export function processedBeanIndexBody(store: string, beans: readonly UnplacedBean[], up: string): string {
+  return (
+    `<h1 id="processed-bean">Beans in processes: ${esc(store)}</h1>` +
+    nav(store, up) +
+    (beans.length === 0
+      ? `<p class="sv-sub">No workflow instance in this store names a bean.</p>`
+      : `<div data-pb="index" data-pb-up="${esc(up)}" data-pb-stall="${STUCK_AFTER_DAYS}">` +
+        `<form class="pb-filters" onsubmit="return false">` +
+        `<label for="pb-q">Search<input id="pb-q" type="search" placeholder="bean or title"></label>` +
+        `<label for="pb-open">Beans<select id="pb-open"><option value="open" selected>Open</option><option value="closed">Closed</option><option value="">Open and closed</option></select></label>` +
+        `</form><ul class="pb-chips" id="pb-chips"></ul><ul class="pb-list" id="pb-index"></ul></div>` +
+        `<script type="application/json" id="pb-rows">[]</script>` +
+        `<script type="application/json" id="pb-unplaced-data">${scriptJson(beans)}</script>` +
+        PB_SCRIPT)
   );
 }
 

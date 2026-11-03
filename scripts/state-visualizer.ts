@@ -190,7 +190,7 @@ import {
 import { positionOf, type InstanceState } from "../src/workflow/instance.js";
 import { detectRepoUrl } from "../src/core/git-refs.js";
 import { branchKeptHref, branchKeptLocation } from "./branch-kept-href.ts";
-import { PB_CSS, processedBeanBody, processedBeansBody, processedBeansRoutes, processedBeansRows, rebase, type ProcessedBeanHistory } from "./processed-beans.ts";
+import { PB_CSS, processedBeanBody, processedBeanIndexBody, processedBeansBody, processedBeansRoutes, processedBeansRows, rebase, unplacedBeans, type ProcessedBeanHistory } from "./processed-beans.ts";
 import { MountedGitBranchStore } from "../src/workflow/work-plan-store-git-mount.ts";
 import { loadProcessModel, type ProcessModel } from "../src/workflow/process-model.js";
 import { roleGraphFor, workflowFiles } from "./known-skills.js";
@@ -3076,7 +3076,11 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
     }
   };
   const all = join(storeDir, "processed-beans");
-  emit(join(all, "index.html"), shell(`${store} — beans by process`, processedBeansBody(store, rebase(rows, "../"), NOW, "../")));
+  // Every bean, not only the ones an instance names: a store with beans and no instance
+  // (folio-assistant-core, 2026-11-03) otherwise read as an empty page.
+  const beanSource = (b: BeanNode): string | undefined => (web ? branchKeptHref(branchKeptLocation(instanceRoot, b.file, web)) : undefined);
+  const unplaced = unplacedBeans(beans, rows, beanSource);
+  emit(join(all, "index.html"), shell(`${store} — beans by process`, processedBeansBody(store, rebase(rows, "../"), NOW, "../", undefined, unplaced)));
   const routes = processedBeansRoutes(rows);
   for (const p of routes.processes) {
     const mine = rebase(rows.filter((r) => r.process === p), "../../");
@@ -3088,7 +3092,12 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
     emit(join(one, b, "index.html"), shell(`${store} — bean ${b} by process`, processedBeanBody(store, b, mine, NOW, "../../", historyOf(b))));
   }
   if (routes.beans.length > 0 || rows.length > 0) {
-    emit(join(one, "index.html"), shell(`${store} — one bean by process`, processedBeanIndex(store, routes.beans)));
+    const placed = new Set(routes.beans);
+    const listed = beans
+      .filter((b) => placed.has(b.id))
+      .map((b) => ({ ...unplacedBeans([b], [], beanSource)[0]!, href: `${b.id}/` }))
+      .sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "") || a.id.localeCompare(b.id));
+    emit(join(one, "index.html"), shell(`${store} — one bean by process`, processedBeanIndexBody(store, listed, "../")));
   }
   // Pages for a process or bean no instance names any more: the caller prunes them with the store's other orphans.
   return ([[all, routes.processes], [one, routes.beans]] as const).flatMap(([dir, keep]) =>
@@ -3098,16 +3107,6 @@ function drawProcessedBeans(store: string, instanceRoot: string, storeDir: strin
   );
 }
 
-/** `processed-bean/`: the beans that have a page, so the route has a page of its own. */
-function processedBeanIndex(store: string, beans: readonly string[]): string {
-  return (
-    `<h1 id="processed-bean">Beans in processes: ${esc(store)}</h1>` +
-    `<p class="sv-sub"><a href="../">${esc(store)}'s work plan</a> · <a href="../processed-beans/">beans by process</a></p>` +
-    (beans.length === 0
-      ? `<p class="sv-sub">No workflow instance in this store names a bean.</p>`
-      : `<ul>${beans.map((b) => `<li><a href="${esc(b)}/"><code>${esc(b)}</code></a></li>`).join("")}</ul>`)
-  );
-}
 const ownName = readDeclaration(ROOT)?.name ?? basename(ROOT);
 for (const v of mine.filter((x) => x.subgraphs === "instance")) {
   const { kinds, beans, code, memory, unread, candidates, subjects, unrouted } = perInstanceSubjects(v, ROOT, harnessOf());
