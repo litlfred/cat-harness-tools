@@ -678,7 +678,18 @@ export const DEFINITION_POINTS_TO_IMPLEMENTATION_JSON: ReferenceExemption = {
 // a hole, and these are COUNTED in the summary rather than disappearing, so
 // an exemption doing more work than anyone intended is visible.
 
+/**
+ * An instance's `uploads/` is its data store, not part of the KG (owner,
+ * 2026-11-03, bean folio-assistant-djj5), so its intakes are not references.
+ */
+export const INSTANCE_UPLOADS_DATA: ReferenceExemption = {
+  file: /(^|\/)uploads\//,
+  reason:
+    "an instance's UPLOADS data store. Owner, 2026-11-03: *\"instantiated harnesses can have an uploads/ but that is data store for that repo, not part of the KG\"*. An intake records where a capture came from and who cited it (a DAK's reference list, the repository it moved from), which names other instances as provenance, not as a dependency; while `uploads/` was declared it was a state graph this axis never read, and an undeclared one is the same data",
+};
+
 const EXEMPTIONS: readonly ReferenceExemption[] = [
+  INSTANCE_UPLOADS_DATA,
   {
     pattern: /https?:\/\/\S+/,
     reason:
