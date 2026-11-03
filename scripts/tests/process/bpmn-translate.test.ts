@@ -28,6 +28,7 @@ const XML = readFileSync(join(ROOT, "processes/process/crdm-requirements.bpmn"),
 const PHASE_XML = readFileSync(join(ROOT, "processes/process/crdm-deliver.bpmn"), "utf-8");
 // A diagram that still draws its work-plan steps: since cat-harness#991 step
 // 17 only the `sdlc` diagrams do (proposal §4.13), so this fixture is one of them.
+// declared-path-literal: a diagram of the harness's own corpus, read as a translation fixture
 const SDLC_XML = readFileSync(join(ROOT, "processes/sdlc/merge-refusal.bpmn"), "utf-8");
 
 describe("extractBpmn", () => {
