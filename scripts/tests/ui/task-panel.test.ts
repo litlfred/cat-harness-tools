@@ -20,6 +20,7 @@ import {
   diagramBlock,
   diagramBounds,
   markersFor,
+  expandMarkerBox,
   methodologyPageDir,
   PANEL_SCRIPT,
   svgViewBox,
@@ -50,7 +51,13 @@ describe("marker placement", () => {
     const bounds = await diagramBounds(BPMN);
     expect(bounds.get("T1")).toEqual({ x: 200, y: 100, width: 100, height: 80 });
     const m = markersFor([{ id: "T1", name: "One" }, { id: "T2", name: "Two" }], bounds, { x: 100, y: 50, width: 400, height: 200 });
-    expect(m).toEqual([{ id: "T1", name: "One", left: 50, top: 25, box: { left: 25, top: 25, width: 25, height: 40 } }]);
+    // The click box is the [+] marker's 24 × 24 hit area, never the whole shape (cat-harness#991).
+    expect(m).toEqual([{ id: "T1", name: "One", left: 50, top: 25, box: { left: 34.38, top: 52.5, width: 6, height: 12 } }]);
+  });
+
+  test("the [+] hit area is centred on bpmn-js's marker, 24 square", () => {
+    // bpmn-js: marker box at (width/2 - 7.5, height - 20), 14 × 14.
+    expect(expandMarkerBox({ x: 0, y: 0, width: 120, height: 120 })).toEqual({ x: 47.5, y: 95, width: 24, height: 24 });
   });
 });
 
