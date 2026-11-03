@@ -581,6 +581,7 @@
     "skills:docs:check": "bun run cat-harness-tools/scripts/publish-check.ts skills:docs",
     "stakeholder-map": "bun run cat-harness-tools/scripts/stakeholder-map.ts",
     "state:mount": "bun run cat-harness-tools/scripts/state-mount.ts",
+    "harness:instantiate": "bun run cat-harness-tools/scripts/instantiate-harness.ts",
     "mount:remote": "bun run cat-harness-tools/scripts/remote-mount.ts",
     "mount:remote:check": "bun run cat-harness-tools/scripts/remote-mount.ts --check",
     "workflow-pins": "bun run cat-harness-tools/scripts/workflow-pins.ts --write",
