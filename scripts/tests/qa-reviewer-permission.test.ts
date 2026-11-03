@@ -14,7 +14,9 @@ import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
 
 import {
+  absentCorpusIsNotOurs,
   baselineKey,
+  notOwnedReason,
   readActors,
   report,
   reviewerOutcome,
@@ -248,5 +250,42 @@ describe("the population travels with the verdict (bean `c8uq`)", () => {
     expect(r.present).toBe(true);
     expect(r.examined).toBe(2);
     expect(r.findings.map((f) => f.outcome)).toEqual(["unresolved"]);
+  });
+});
+
+/**
+ * Owner, 2026-11-03 ("(b) policy: 78 downstream"): with the derived tree
+ * absent, a content root (no gates workflow publishes the corpus there) does
+ * not own it, so the gate does not apply (78); a harness root owns it and
+ * still exits 2. A present tree is judged in either.
+ */
+describe("absentCorpusIsNotOurs — whose derived corpus is absent", () => {
+  function root(harness: boolean): string {
+    const r = mkdtempSync(join(tmpdir(), "qa-perm-root-"));
+    if (harness) {
+      mkdirSync(join(r, ".github", "workflows"), { recursive: true });
+      writeFileSync(join(r, ".github", "workflows", "code-quality-gates.yml"), "name: gates\n");
+    }
+    return r;
+  }
+
+  test("a content root with the tree absent: not ours, not applicable", () => {
+    expect(absentCorpusIsNotOurs(false, root(false))).toBe(true);
+  });
+
+  test("a harness root with the tree absent: ours, still could not determine", () => {
+    expect(absentCorpusIsNotOurs(false, root(true))).toBe(false);
+  });
+
+  test("a present tree is judged in either root", () => {
+    expect(absentCorpusIsNotOurs(true, root(false))).toBe(false);
+    expect(absentCorpusIsNotOurs(true, root(true))).toBe(false);
+  });
+
+  test("the reason says what was and was not examined", () => {
+    const why = notOwnedReason("cat-harness/test/results", 3, 8);
+    expect(why).toContain("cat-harness/test/results is absent and this is a content root");
+    expect(why).toContain("3 baselined reviewer id(s) were not evaluated and none is stale");
+    expect(why).toContain("8 attested entr(y/ies) were examined and none is forbidden");
   });
 });
