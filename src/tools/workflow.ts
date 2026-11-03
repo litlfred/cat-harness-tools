@@ -42,6 +42,8 @@ import { describePreflight, preflight, preflightRefusal } from "../workflow/pref
 import { describeCapture, writeLogEntry } from "../logging/log-writer.js";
 import { instanceId, listInstances, loadInstance, saveInstance } from "../workflow/store.js";
 import { applyWorkPlanOp, onlyArchiveLeft } from "../workflow/bean-link.js";
+import { MountedGitBranchStore } from "../workflow/work-plan-store-git-mount.js";
+import { describeBeans, withBeans } from "../workflow/work-plan-store.js";
 import { checkGate, loadRelaxations, validateRelaxations, type GateVerdict } from "../workflow/gate.js";
 import { type RoleGraph } from "../../schemas/process/role-graph.js";
 import { roleGraphFor } from "../../scripts/known-skills.js";
@@ -394,7 +396,12 @@ export async function workflowNextAnswer(
   if (!state) throw new Error(`No instance "${instance}". Try workflow_list.`);
   const model = await loadProcessModel(resolve(root, state.source));
   const r = roles();
-  return { text: describe(model, state, r), result: position(model, state, r) };
+  // The beans themselves, not only their ids (cat-harness#991 step 4b): read
+  // through the work-plan store, so an agent handed a step reads its bean's
+  // title, status, body and position without a second call.
+  const pos = withBeans(position(model, state, r), new MountedGitBranchStore(root));
+  const beans = [...new Map(pos.enabled.flatMap((e) => e.context?.beans ?? []).map((b) => [b.id, b])).values()];
+  return { text: describe(model, state, r) + describeBeans(beans), result: pos };
 }
 
 /** Shared implementation of `workflow_gate` for MCP and CLI (`workflow:gate`). */

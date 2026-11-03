@@ -29,6 +29,7 @@
  * @module folio-assistant/workflow/instance
  */
 
+import type { BeanInContext } from "./work-plan-store.js";
 import { isActivity, type ProcessModel, type ProcessNode } from "./process-model.js";
 import { evaluate } from "./decision-table.js";
 import { roleForLane, resolveRoleSkills, resolveRoleStack, type RoleGraph } from "../../schemas/process/role-graph.js";
@@ -243,6 +244,13 @@ export interface TaskContext {
    * Bean IDs associated with this task/token/instance, deterministically sorted.
    */
   carriedBeans: string[];
+  /**
+   * The carried beans themselves, read through the work-plan store
+   * (cat-harness#991 step 4b; `withBeans` in `work-plan-store.ts`). Absent
+   * where nothing read the store — `enabled` is pure and never does; the
+   * `workflow_next` tool fills it in.
+   */
+  beans?: BeanInContext[];
 }
 
 export interface EnabledActivity {
