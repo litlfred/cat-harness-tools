@@ -24,12 +24,16 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import type { MemoryEntry, MemoryScope } from "../../../schemas/kg/memory-record.ts";
 import { BranchStore } from "../../branch-store.ts";
 import { appendNoteToText, setFieldInText } from "../../beans-fallback.ts";
 import { BeanStatusSchema } from "../../../schemas/tools/tool-types.ts";
 import {
   admits,
   beansAtIn,
+  keepOn,
+  openOn,
+  recallOn,
   positionsIn,
   parseBeanText,
   refuseWrite,
@@ -229,6 +233,18 @@ class GitBranchStore implements StoreUnderTest {
    * append. So the Tool retries it — re-read, append, write against what it
    * read — until it lands on an unchanged blob.
    */
+  keep(id: string, entry: MemoryEntry) {
+    return keepOn(this, id, entry);
+  }
+
+  recall(id: string) {
+    return recallOn(this, id);
+  }
+
+  open(record: { id: string; title: string; scope: MemoryScope; about?: string[] }) {
+    return openOn(this, record);
+  }
+
   note(id: string, text: string, by: string): { state: "noted"; version: string } | { state: "none" } {
     for (let attempt = 0; attempt < 5; attempt++) {
       const all = this.all();

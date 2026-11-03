@@ -12,7 +12,8 @@ import { join } from "node:path";
 
 import { registerWorkContextTools, WORK_INSTANCE_ENV, workContextNote } from "../../../src/tools/work-context.ts";
 import { loadProcessModel } from "../../../src/workflow/process-model.ts";
-import { closeOut, contextLine, drawsWorkPlan, record, takeUp, workContextFrom } from "../../../src/workflow/work-context.ts";
+import { entriesInBody } from "../../../schemas/kg/memory-record.ts";
+import { closeOut, drawsWorkPlan, record, takeUp, workContextFrom } from "../../../src/workflow/work-context.ts";
 import { MountedGitBranchStore } from "../../../src/workflow/work-plan-store-git-mount.ts";
 
 const made: string[] = [];
@@ -66,7 +67,9 @@ describe("work context: what the engine keeps", () => {
     expect(takeUp(target(store), "fx-aaaa", meta, "Plain work started").summary).toContain("todo → in-progress");
     const got = store.get("fx-aaaa");
     expect(got.state === "hit" && got.bean.status).toBe("in-progress");
-    expect(got.state === "hit" && got.bean.body).toContain("[work context: taken-up · Process_Plain · plain--a · workflow] Plain work started");
+    expect(got.state === "hit" && entriesInBody(got.bean.body)).toMatchObject([
+      { kind: "taken-up", by: "workflow", process: "Process_Plain", instance: "plain--a", text: "Plain work started" },
+    ]);
   });
 
   test("a step done and a note are kept on one line each; closing resolves the item once", () => {
@@ -77,7 +80,11 @@ describe("work context: what the engine keeps", () => {
     const got = store.get("fx-aaaa");
     if (got.state !== "hit") throw new Error("lost");
     expect(got.bean.status).toBe("completed");
-    expect(got.bean.body).toContain("[work context: step-done · Process_Plain/Task_Do · plain--a · workflow] Do the work done with a second line");
+    expect(entriesInBody(got.bean.body).map((e) => [e.kind, e.step, e.text])).toEqual([
+      ["step-done", "Task_Do", "Do the work done with a second line"],
+      ["closed", undefined, "Plain work completed"],
+      ["closed", undefined, "again"],
+    ]);
   });
 
   test("no item, an unknown item, or a deployment that keeps none: said, never thrown", () => {
@@ -94,9 +101,6 @@ describe("work context: what the engine keeps", () => {
     expect(() => workContextFrom({ store, tool: "beans-git-branch", deployment: "d", stores: { "work-context": "elsewhere" } })).toThrow(/does not implement/);
   });
 
-  test("contextLine is one line", () => {
-    expect(contextLine({ ...meta, kind: "note" }, "a\n\nb")).not.toContain("\n");
-  });
 
   test("a diagram that still draws an op is left to its markup; a plain one is the engine's", async () => {
     const { root } = repo();
@@ -141,7 +145,9 @@ describe("work_context_note: the agent's own Tool", () => {
     const answer = await workContextNote(root, { note: "chose the smaller fix" }, { env: { [WORK_INSTANCE_ENV]: "plain--a" } });
     expect(answer).toBe("Kept.");
     const got = store.get("fx-aaaa");
-    expect(got.state === "hit" && got.bean.body).toContain("[work context: note · Process_Plain/Task_Do · plain--a · agent] chose the smaller fix");
+    expect(got.state === "hit" && entriesInBody(got.bean.body)).toMatchObject([
+      { kind: "note", by: "agent", process: "Process_Plain", step: "Task_Do", instance: "plain--a", text: "chose the smaller fix" },
+    ]);
   });
 
   test("not bound, or bound to nothing: not kept, in words that name no backend", async () => {

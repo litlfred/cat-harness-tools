@@ -75,6 +75,7 @@
 import { z } from "zod";
 
 import { nodeKind } from "../kg/node-kind";
+import { MemoryRecordCoreKind } from "../kg/memory-record.ts";
 import {
   GraphNodeDirectorySchema,
   defaultGraphTypologies,
@@ -196,7 +197,17 @@ export type BeanFrontMatter = z.infer<typeof BeanFrontMatterSchema>;
  * for two things made `schemas/sdlc/bean-graph.ts#BeanNodeKind` resolve to the type
  * in the schema index and to this value in `validators/bean-node.json`.
  */
-export const BeanKind = nodeKind("bean/1.0.0", [], BeanFrontMatterSchema.shape);
+export const BeanKind = nodeKind("bean/1.0.0", [MemoryRecordCoreKind], beanOwnFields());
+
+/**
+ * The bean's own fields: the front matter minus the memory record's shared
+ * core, which the bean inherits (cat-harness#991 §4.14, Q17 — a bean is a
+ * memory record with more structure). The set of fields is unchanged.
+ */
+function beanOwnFields() {
+  const { id: _i, title: _t, tags: _g, created_at: _c, updated_at: _u, ...own } = BeanFrontMatterSchema.shape;
+  return own;
+}
 
 /** The `$schema` tag every bean carries in its front matter. */
 export const BEAN_SCHEMA_TAG = "bean/1.0.0";

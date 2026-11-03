@@ -32,9 +32,13 @@ import { BranchStore, branchPathOf, tipLocations } from "../../scripts/branch-st
 import { resolveBeanDefs } from "../../scripts/beans.ts";
 import { listInstances } from "./store.ts";
 import { beanVersions, branchReader, checkoutReader, historyFrom, type GitReader } from "./work-plan-store-history.ts";
+import type { MemoryEntry, MemoryScope } from "../../schemas/kg/memory-record.ts";
 import {
   admits,
   beansAtIn,
+  keepOn,
+  openOn,
+  recallOn,
   positionsIn,
   parseBeanText,
   refuseWrite,
@@ -48,6 +52,7 @@ import {
   type BeanFilter,
   type Got,
   type HistoryEvent,
+  type MemoryRecordView,
   type Position,
   type Refusal,
   type WorkPlanStore,
@@ -184,6 +189,18 @@ export class MountedGitBranchStore implements WorkPlanStore {
     if (text !== edited) writeFileSync(path, text, "utf8");
     if (change.archived !== undefined && change.archived !== (e.bean.archived === true)) path = this.move(path, change.archived);
     return { state: "updated", version: versionOf(readFileSync(path, "utf8")) };
+  }
+
+  keep(id: string, entry: MemoryEntry): { state: "kept"; version: string } | { state: "none" } {
+    return keepOn(this, id, entry);
+  }
+
+  recall(id: string): { state: "hit"; record: MemoryRecordView } | { state: "none" } {
+    return recallOn(this, id);
+  }
+
+  open(record: { id: string; title: string; scope: MemoryScope; about?: string[] }): { state: "opened"; version: string } | Refusal {
+    return openOn(this, record);
   }
 
   note(id: string, text: string, _by: string): { state: "noted"; version: string } | { state: "none" } {

@@ -18,8 +18,9 @@
  * | the agent records | *note*: `work_context_note`, mid-task |
  * | the instance completes | *closed*: the item is resolved |
  *
- * The backend is the work-plan store's bean, and each line carries its
- * metadata (what, process, step, instance, who) wrapped here. The agent sees
+ * The backend is the memory store (`keep`, §4.14): for the beans Tool, an
+ * entry line in the bean's body, carrying its metadata (what, process, step,
+ * instance, who) as the `memory-record` schema structures it. The agent sees
  * none of it: it gets "what was done before on this work" and a neutral tool.
  *
  * **Which processes the engine does this for.** A diagram that still draws
@@ -34,6 +35,7 @@
  *
  * @module folio-assistant/workflow/work-context
  */
+import type { MemoryEntryKind } from "../../schemas/kg/memory-record.ts";
 import type { ProcessModel } from "./process-model.js";
 import { TERMINAL_STATUSES, type WorkPlanStore } from "./work-plan-store.js";
 import type { ChosenStore } from "./work-plan-store-select.js";
@@ -44,7 +46,8 @@ export const WORK_CONTEXT_ROLE = "work-context";
 /** The `stores["work-context"]` values this toolset implements. */
 export const WORK_CONTEXT_TOOLS = ["work-plan", "none"] as const;
 
-export type WorkContextKind = "taken-up" | "step-done" | "note" | "closed";
+/** What the engine and the agent keep: the memory record's entry kinds (§4.14, Q17). */
+export type WorkContextKind = MemoryEntryKind;
 
 export interface WorkContextMeta {
   kind: WorkContextKind;
@@ -72,12 +75,6 @@ export function workContextFrom(chosen: ChosenStore): WorkContextTarget {
   );
 }
 
-/** One line: the metadata the backend keeps, then the text. Never more than one line. */
-export function contextLine(meta: WorkContextMeta, text: string): string {
-  const where = meta.node ? `${meta.process}/${meta.node}` : meta.process;
-  const body = text.replace(/\s+/g, " ").trim();
-  return `[work context: ${meta.kind} · ${where} · ${meta.instance} · ${meta.by}]${body ? ` ${body}` : ""}`;
-}
 
 /**
  * Whether a process (or any phase it calls) still draws the work plan itself:
@@ -138,7 +135,17 @@ function keep(
     }
     moved = `, ${got.bean.status} → ${to.status}`;
   }
-  const noted = store.note(item, contextLine(meta, text), meta.by);
-  if (noted.state !== "noted") return { summary: `work context not kept: item ${item} is gone` };
+  // input-site: inert #a3e3d49c — the moment an entry is kept; a write, never a check's input
+  const at = new Date().toISOString();
+  const kept = store.keep(item, {
+    at,
+    by: meta.by,
+    kind: meta.kind,
+    text: text.replace(/\s+/g, " ").trim(),
+    process: meta.process,
+    instance: meta.instance,
+    ...(meta.node ? { step: meta.node } : {}),
+  });
+  if (kept.state !== "kept") return { summary: `work context not kept: item ${item} is gone` };
   return { summary: `work context kept on ${item} (${meta.kind}${moved})` };
 }

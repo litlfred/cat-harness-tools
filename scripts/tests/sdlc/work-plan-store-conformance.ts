@@ -23,6 +23,7 @@ import { describe, expect, test } from "bun:test";
 
 import { BeanStatusSchema } from "../../../schemas/tools/tool-types.ts";
 
+import type { MemoryEntry } from "../../../schemas/kg/memory-record.ts";
 import type { BeanFields, BeanFilter, Got, InstanceLike, WorkPlanStore } from "../../../src/workflow/work-plan-store.ts";
 
 export type { BeanChange, BeanFields, BeanFilter, Got, Refusal } from "../../../src/workflow/work-plan-store.ts";
@@ -396,6 +397,47 @@ export function workPlanStoreConformance(tool: ToolUnderTest): void {
         expect(a.positions("fx-aaaa")).toMatchObject([{ status: "completed", nodes: ["End_Done"] }]);
         expect(a.beansAt("code-change-review")).toEqual([]);
         expect(a.beansAt("code-change-review", "End_Done")).toEqual(["fx-aaaa"]);
+      }, t);
+    });
+
+    describe("8. remember: the memory layer every work-plan Tool also is (Q17, §4.14)", () => {
+      const at = "2026-11-03T07:00:00Z";
+      const entry = (text: string, extra: Partial<MemoryEntry> = {}): MemoryEntry => ({ at, by: "agent-1", kind: "note", text, ...extra });
+
+      test("what is kept is recalled, in order, with its metadata; the body's prose is not an entry", () => {
+        const { a } = tool.fresh();
+        created(a.create(bean("fx-aaaa")));
+        a.keep("fx-aaaa", entry("took it up", { kind: "taken-up", process: "code-change-review", instance: "ccr--a" }));
+        a.keep("fx-aaaa", entry("chose the smaller fix\nbecause it is reversible", { step: "Task_Review", role: "reviewer" }));
+        const r = a.recall("fx-aaaa");
+        if (r.state !== "hit") throw new Error("expected a record");
+        expect(r.record.scope).toBe("item");
+        expect(r.record.entries).toEqual([
+          entry("took it up", { kind: "taken-up", process: "code-change-review", instance: "ccr--a" }),
+          entry("chose the smaller fix because it is reversible", { step: "Task_Review", role: "reviewer" }),
+        ]);
+      }, t);
+
+      test("a shared space: opened once, every agent's entries land", () => {
+        const { a, b, settle } = tool.fresh();
+        const o = a.open({ id: "fx-swrm", title: "Swarm notes", scope: "shared", about: ["run-7"] });
+        if (o.state !== "opened") throw new Error(`open refused: ${o.why}`);
+        settle?.();
+        a.keep("fx-swrm", entry("found the parser bug", { by: "agent-1", kind: "checkpoint" }));
+        settle?.();
+        b.keep("fx-swrm", entry("fixed the test fixture", { by: "agent-2" }));
+        settle?.();
+        const r = a.recall("fx-swrm");
+        if (r.state !== "hit") throw new Error("expected a record");
+        expect([r.record.scope, r.record.about]).toEqual(["shared", ["run-7"]]);
+        expect(r.record.entries.map((e) => [e.by, e.kind])).toEqual([["agent-1", "checkpoint"], ["agent-2", "note"]]);
+      }, t);
+
+      test("keeping to or recalling an unknown record is none, and creates nothing", () => {
+        const { a } = tool.fresh();
+        expect(a.keep("fx-gone", entry("x")).state).toBe("none");
+        expect(a.recall("fx-gone").state).toBe("none");
+        expect(a.get("fx-gone").state).toBe("none");
       }, t);
     });
   });
