@@ -1754,6 +1754,37 @@ jobs:
 }
 
 /**
+ * The caller of the tools layer's QA publisher (bean folio-assistant-7mwa;
+ * owner, 2026-11-03, "2. Each layer publishes"). An instance that declares a
+ * `qa` directory with `storage` keeps its results on that branch of its OWN
+ * repository, and before this no initialisation step gave it a writer, so a
+ * layer's declared store never existed. The reusable workflow skips with a
+ * notice while the instance declares no `qa` directory of its own.
+ */
+export function publishQaWorkflow(slug: string): string {
+  return `# Publish this instance's QA results (its declared \`qa\` directory) to the
+# cat/cat-harness/qa-reports branch of THIS repository, keyed by commit:
+# main/<sha> on a push to main, pr/<n>/<sha> on a pull request. An index that
+# mounts this instance reads them at the commit its lock pins. The branch is
+# created on the first run; nothing is published while no \`qa\` directory
+# of this instance's own is declared.
+name: Publish QA results
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    uses: litlfred/cat-harness-tools/.github/workflows/layer-qa-publish.yml@main
+    with:
+      instance: ${slug}
+`;
+}
+
+/**
  * Turn on the context's publishing (bean folio-assistant-63q4, owner
  * 2026-10-15: *"this should be a part of cat-harness initiation process"*).
  * Only at a repository's root, where GitHub reads workflows.
@@ -1769,6 +1800,7 @@ function writePublishContext(s: Scaffold, enclosing: string | null): void {
     return;
   }
   write(".github/workflows/publish-context.yml", publishContextWorkflow(o.slug));
+  write(".github/workflows/publish-qa.yml", publishQaWorkflow(o.slug));
   result.notes.push(
     o.iriBase === undefined
       ? "No iriBase was declared (no GitHub origin remote to derive one from), so .github/workflows/publish-context.yml " +
