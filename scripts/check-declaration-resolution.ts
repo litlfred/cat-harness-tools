@@ -16,6 +16,7 @@
  * | `assets` | `check:declared-assets` → `auditInstance` | the file exists |
  * | `visualisers[].renderedBy` | `check:visualiser-routes` → `checkVisualiserRoutes` | names a discovered Tool node |
  * | `needs` | `check:instance-graph` → `resolveInstanceGraph` | every dependency resolves, no cycle |
+ * | `enableSubgraphs` | here → `enableSubgraphsProblems` | each id names an opt-in sub-graph of this instance or its `needs` closure |
  *
  * This gate CALLS those four rather than restating them, and adds only the
  * one reference none of them resolves: `visualisers[].coversKinds`, a graph
@@ -52,9 +53,10 @@
 import { spawnSync } from "node:child_process";
 import { basename, relative, resolve } from "node:path";
 
-import { readDeclaration, nestedDirectories, type CatHarnessDeclaration } from "../schemas/kg/cat-harness.js";
+import { instanceDirectories, readDeclaration, nestedDirectories, type CatHarnessDeclaration } from "../schemas/kg/cat-harness.js";
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
-import { resolveInstanceGraph } from "../schemas/kg/harness-config.js";
+import { orderedDependencies, resolveInstanceGraph } from "../schemas/kg/harness-config.js";
+import { enableSubgraphsProblems, type DeclaredOptIns } from "../schemas/kg/opt-in-subgraphs.js";
 import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.js";
 import "../schemas/kg/folio-graph-typology.js";
 
@@ -63,7 +65,7 @@ import { auditInstance as auditAssets } from "./check-declared-assets.ts";
 import { checkVisualiserRoutes } from "./check-visualiser-routes.ts";
 
 /** The fields a declaration names paths or instances in, and the declaration itself (it must parse for any to be read). */
-export const RESOLVED_FIELDS = ["declaration", "directories", "assets", "visualisers", "needs"] as const;
+export const RESOLVED_FIELDS = ["declaration", "directories", "assets", "visualisers", "needs", "enableSubgraphs"] as const;
 export type ResolvedField = (typeof RESOLVED_FIELDS)[number];
 
 export interface ResolutionFinding {
@@ -118,7 +120,7 @@ export function coverageFindings(
 export function checkDeclarationResolution(rootArg: string): ResolutionReport {
   const root = resolve(rootArg);
   const roots = instanceRootsIn(root);
-  const examined: Record<ResolvedField, number> = { declaration: 0, directories: 0, assets: 0, visualisers: 0, needs: 0 };
+  const examined: Record<ResolvedField, number> = { declaration: 0, directories: 0, assets: 0, visualisers: 0, needs: 0, enableSubgraphs: 0 };
   const findings: ResolutionFinding[] = [];
   const undetermined: string[] = [];
   const names = new Map<string, string>();
@@ -196,6 +198,25 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
       }
     } catch (e) {
       undetermined.push(`${name}: the dependency graph could not be resolved — ${(e as Error).message.split("\n")[0]}`);
+    }
+
+    // enableSubgraphs — each id names an opt-in sub-graph (`optIn: true`) of
+    // this instance or one in its `needs` closure, top level or from within.
+    const enable = decl.enableSubgraphs ?? [];
+    examined.enableSubgraphs += enable.length;
+    if (enable.length > 0) {
+      try {
+        const closure: DeclaredOptIns[] = [{ name, directories: instanceDirectories(inst, decl) }];
+        for (const dep of orderedDependencies(inst)) {
+          const dd = readDeclaration(dep.rootPath);
+          if (dd !== undefined) closure.push({ name: dd.name, directories: instanceDirectories(dep.rootPath, dd) });
+        }
+        for (const p of enableSubgraphsProblems(name, enable, closure)) {
+          findings.push({ instance: name, field: "enableSubgraphs", subject: p.id, by: "check:declaration-resolution", detail: p.detail });
+        }
+      } catch (e) {
+        undetermined.push(`${name}: its enableSubgraphs could not be resolved — ${(e as Error).message.split("\n")[0]}`);
+      }
     }
   }
 

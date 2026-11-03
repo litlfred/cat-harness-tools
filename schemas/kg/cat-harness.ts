@@ -470,6 +470,9 @@ export interface ContentDirectory extends GraphNodeDirectory {
    */
   storage?: DirectoryStorage;
 
+  /** A named sub-graph that is OFF in every layer, its own included, unless that layer enables it. See the schema field and `opt-in-subgraphs.ts`. */
+  optIn?: true;
+
   /**
    * What this directory's content is COMPUTED FROM: the declared directory ids
    * of the graphs whose change can invalidate it, resolved across `needs`
@@ -909,6 +912,12 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
    * than computed, and why it is optional.
    */
   needs?: string[];
+  /**
+   * The opt-in sub-graphs this instance switches on FOR ITSELF, qualified
+   * `<instance>.<directory id>` — see the schema field and
+   * `schemas/kg/opt-in-subgraphs.ts`. Not inherited by the layers above.
+   */
+  enableSubgraphs?: string[];
   /**
    * What this instance's own package tasks read and write, keyed by task name
    * — the same {@link ScriptIO}-shaped facts `cat-harness-tools/scripts/task-io.ts`
@@ -1886,6 +1895,18 @@ export type DirectoryStorage = z.infer<typeof DirectoryStorageSchema>;
 
 const ContentDirectoryShape = GraphNodeDirectoryShape.extend({
   coverage: SubgraphCoverageSchema.optional(),
+  /**
+   * A named sub-graph that is OFF in every layer — including the one that
+   * declares it — unless that layer enables it, by listing
+   * `<instance>.<id>` in its own `enableSubgraphs` (cat-harness#991 step
+   * 23.1; owner, 2026-11-03: `sdlc` and `work-plan` are off in every layer
+   * above cat-harness unless it enables them). Switched off, it and
+   * everything declared from within it are invisible to the resolved
+   * directories, the skill overlay, the served Tools and a mount's default
+   * list. `true` or absent: an entry that is on everywhere says nothing.
+   * See `schemas/kg/opt-in-subgraphs.ts`.
+   */
+  optIn: z.literal(true).optional(),
   /** How this directory's tile looks. See {@link TileSchema}. */
   tile: TileSchema.optional(),
   /**
@@ -3680,6 +3701,19 @@ const catHarnessDeclarationShape = {
    */
   needs: z.array(z.string().min(1)).optional(),
   /**
+   * The opt-in sub-graphs (`optIn: true` directory entries) this instance
+   * switches on FOR ITSELF, each qualified `<instance>.<directory id>`
+   * (`cat-harness.sdlc`) and naming an entry declared by this instance or
+   * one in its `needs` closure. Not inherited: a layer above that wants one
+   * lists it too (owner, 2026-11-03, cat-harness#991 step 23.1). The
+   * development override `CAT_SUBGRAPHS` adjusts it per process.
+   *
+   * An id that names nothing opt-in is REFUSED, never ignored: the shape and
+   * this instance's own top-level entries here, the `needs` closure and the
+   * entries declared from within by `check:declaration-resolution`.
+   */
+  enableSubgraphs: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]*\.[^\s]+$/, "`<instance>.<directory id>`, e.g. `cat-harness.sdlc`")).optional(),
+  /**
    * What this instance's own package tasks read and write, keyed by task name
    * — the same {@link ScriptIO}-shaped facts `cat-harness-tools/scripts/task-io.ts`
    * holds for the harness's own tasks: `outputs: []` (measured to write
@@ -3808,6 +3842,27 @@ function refineCatHarnessDeclaration(
         });
       }
     });
+  });
+  // cat-harness#991 step 23.1: an enable id names an opt-in sub-graph. Of
+  // this instance's OWN top-level entries that is decidable here; the rest
+  // (the `needs` closure, entries declared from within) is
+  // `check:declaration-resolution`'s, which reads the other declarations.
+  const enabled = new Set<string>();
+  (d.enableSubgraphs ?? []).forEach((q, i) => {
+    if (enabled.has(q)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["enableSubgraphs", i], message: `\`${q}\` is listed twice` });
+    }
+    enabled.add(q);
+    const dot = q.indexOf(".");
+    if (q.slice(0, dot) !== d.name) return;
+    const own = (d.directories ?? []).find((x) => x.id === q.slice(dot + 1));
+    if (own !== undefined && own.optIn !== true) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["enableSubgraphs", i],
+        message: `\`${q}\` names this instance's \`${own.id}\`, which is not an opt-in sub-graph (\`optIn: true\`): it is on everywhere and needs no enabling`,
+      });
+    }
   });
   // Issue #1146: an associated harness is referenced, never held. A name that
   // is also in `needs` would make it both, and the overlay would load it.
@@ -5275,6 +5330,23 @@ export interface ResolvedDirectory extends ContentDirectory {
    * shape, not a root declaration reaching down.
    */
   within?: string;
+  /**
+   * The nearest opt-in sub-graph this entry is, or sits within, qualified
+   * `<instance>.<id>` (`opt-in-subgraphs.ts`). Absent for an entry outside
+   * every opt-in sub-graph — which, while nothing is opt-in, is every entry.
+   * Only entries of sub-graphs switched ON are ever resolved at all.
+   */
+  optInSubgraph?: string;
+}
+
+/** What {@link resolveDirectories} is asked to resolve FOR. */
+export interface ResolveOptions {
+  /**
+   * The opt-in sub-graphs switched on. Absent: the chain ROOT's own
+   * `enableSubgraphs`, adjusted by `CAT_SUBGRAPHS` — the root is who the
+   * resolution is for. `"all"` for a reader enumerating what is declared.
+   */
+  enabledSubgraphs?: EnabledSubgraphs;
 }
 
 /**
@@ -5330,6 +5402,7 @@ export function ownDirectoryById(root: string, id: string, fallback: string): st
 export function resolveDirectories(
   chain: Array<{ name: string; root: string; own?: boolean }>,
   registry: GraphTypologyRegistry = defaultGraphTypologies,
+  opts: ResolveOptions = {},
 ): ResolvedDirectory[] {
   const byId = new Map<string, ResolvedDirectory>();
 
@@ -5341,6 +5414,16 @@ export function resolveDirectories(
   // an instance chose, and `own` is false: a default is not the instance's own
   // declaration, it is what it did not have to write.
   const rootLink = chain.find((l) => l.own === true) ?? chain[chain.length - 1];
+  // OPT-IN SUB-GRAPHS (cat-harness#991 step 23.1): the ROOT decides, from its
+  // own list — a dependency's `enableSubgraphs` is that layer's, for itself.
+  const enabled: EnabledSubgraphs =
+    opts.enabledSubgraphs ?? enabledSubgraphsFrom(rootLink ? readDeclaration(rootLink.root, registry)?.enableSubgraphs : undefined);
+  /** The entry's nearest opt-in sub-graph, given its parent's; `null` when that one is switched off. */
+  const optInOf = (e: ResolvedDirectory, parent?: string): string | undefined | null => {
+    const own = ownOptInId(e);
+    const q = own ?? parent;
+    return q !== undefined && !isSubgraphEnabled(enabled, q) ? null : q;
+  };
   if (rootLink) {
     for (const dir of DEFAULT_DIRECTORIES) {
       const absPath = resolve(rootLink.root, dir.path);
@@ -5373,6 +5456,14 @@ export function resolveDirectories(
     }
     }
 
+  // A switched-off opt-in sub-graph is left out here, before anything is
+  // promoted from within it or gets a member: invisible, with everything in it.
+  for (const [id, d] of [...byId]) {
+    const q = optInOf(d);
+    if (q === null) byId.delete(id);
+    else if (q !== undefined) byId.set(id, { ...d, optInSubgraph: q });
+  }
+
   // Directories declared FROM WITHIN (bean `cmsl`, owner 2026-09-30, round 4):
   // an entry in a resolved directory's declaration file (`skills/skills.json`)
   // that answers the `dependents` question is an INSTANCE directory, declared
@@ -5382,7 +5473,7 @@ export function resolveDirectories(
   // instance directories, and stay out of this list exactly as before.
   // An instance-level entry with the same id wins, so a declaration can move
   // inward without two answers existing at once.
-  for (const d of [...byId.values()]) promoteFromWithin(d, byId, registry, new Set(), rootLink);
+  for (const d of [...byId.values()]) promoteFromWithin(d, byId, registry, new Set(), rootLink, optInOf);
 
   // MEMBERS (option A, owner 2026-09-30). A subgraph declared once is
   // inherited by every instance in the chain: each whose `<root>/<path>`
@@ -5431,6 +5522,10 @@ export function resolveDirectories(
           member,
           within: d.id,
         } as ResolvedDirectory;
+        const q = optInOf(e, d.optInSubgraph);
+        if (q === null) continue;
+        if (q !== undefined) e.optInSubgraph = q;
+        else delete e.optInSubgraph;
         out.push(e);
         work.push(e);
       }
@@ -5517,7 +5612,9 @@ export function instanceDirectories(
   if (!decl) return [];
   const authored = decl.directories ?? [];
   const ids = new Set(authored.map((d) => d.id));
-  const inward = resolveDirectories([{ name: decl.name, root, own: true }], registry)
+  // `"all"`: what the instance DECLARES, opt-in sub-graphs included — this
+  // enumerates sub-graphs, it does not decide what a folio is given.
+  const inward = resolveDirectories([{ name: decl.name, root, own: true }], registry, { enabledSubgraphs: "all" })
     .filter((d) => d.own && d.within !== undefined && !ids.has(d.id))
     .map(({ declaredBy: _b, absPath: _a, own: _o, ...rest }) => rest as ContentDirectory & { within?: string });
   return [...authored, ...inward];
@@ -5549,6 +5646,7 @@ function promoteFromWithin(
   registry: GraphTypologyRegistry,
   seen: Set<string>,
   rootLink: { name: string; root?: string; own?: boolean } | undefined,
+  optInOf: (e: ResolvedDirectory, parent?: string) => string | undefined | null = () => undefined,
 ): void {
   if (seen.has(d.absPath)) return;
   seen.add(d.absPath);
@@ -5612,8 +5710,13 @@ function promoteFromWithin(
         own: fromDefault ? rootLink.own === true : d.own,
         within: d.id,
       } as ResolvedDirectory;
+      // Within a switched-off opt-in sub-graph: not promoted, nor anything below it.
+      const q = optInOf(entry, d.optInSubgraph);
+      if (q === null) continue;
+      if (q !== undefined) entry.optInSubgraph = q;
+      else delete entry.optInSubgraph;
       byId.set(nd.id, entry);
-      promoteFromWithin(entry, byId, registry, seen, rootLink);
+      promoteFromWithin(entry, byId, registry, seen, rootLink, optInOf);
     }
   }
 }
@@ -6126,8 +6229,15 @@ export function isKgContentDirectory(d: ContentDirectory): boolean {
 export function ownDirectories(
   link: { name: string; root: string; own?: boolean },
   registry: GraphTypologyRegistry = defaultGraphTypologies,
+  /**
+   * The opt-in sub-graphs switched on. Absent: this instance's own list (and
+   * `CAT_SUBGRAPHS`). A caller resolving a DEPENDENCY for a folio passes the
+   * folio's, since the folio decides (`opt-in-subgraphs.ts`).
+   */
+  opts: ResolveOptions = {},
 ): ResolvedDirectory[] {
   const decl = readDeclaration(link.root, registry);
+  const enabled: EnabledSubgraphs = opts.enabledSubgraphs ?? enabledSubgraphsFrom(decl?.enableSubgraphs);
 
   // The conventional set FIRST, existence-filtered, and then declared entries
   // override it by id — which is `resolveDirectories`' order, and now this
@@ -6171,6 +6281,8 @@ export function ownDirectories(
     // checkout, so inheriting its entry points every consumer at somebody
     // else's store. Stated in both resolvers because both are entry points.
     .filter((dir) => dir.scope !== "repository" || link.own === true)
+    // A switched-off opt-in sub-graph is not this instance's to offer.
+    .filter((dir) => !switchedOff({ ...dir, declaredBy: decl.name }, enabled))
     .map((dir) => ({
       ...dir,
       // Read a renamed id as its new one, as `resolveDirectories` does, or the
@@ -7076,8 +7188,11 @@ export function instanceDirectoryForGraph(
   graph: string,
   registry: GraphTypologyRegistry = defaultGraphTypologies,
 ): string | undefined {
+  // Not one inside an opt-in sub-graph: that is an ADDITIONAL graph of its
+  // kind, found by `optInDirectoriesForGraph`, and a switched-on `work-plan`
+  // holding a `tools` graph must not make the instance's one `tools` two.
   const here = matchingDirectories(root, graph, registry).filter(
-    (d) => d.own && d.scope !== "repository",
+    (d) => d.own && d.scope !== "repository" && d.optInSubgraph === undefined,
   );
   if (here.length > 1) {
     throw new Error(
@@ -7086,6 +7201,25 @@ export function instanceDirectoryForGraph(
     );
   }
   return here[0]?.absPath;
+}
+
+/**
+ * The `graph` directories an instance holds INSIDE its switched-on opt-in
+ * sub-graphs — the ones {@link instanceDirectoryForGraph} leaves out. Empty
+ * while nothing is opt-in, or while every opt-in sub-graph is off.
+ *
+ * @param enabled what is switched on; absent, the instance's own list. A
+ *   reader serving a FOLIO passes the folio's (`opt-in-subgraphs.ts`).
+ */
+export function optInDirectoriesForGraph(
+  root: string,
+  graph: string,
+  enabled?: EnabledSubgraphs,
+  registry: GraphTypologyRegistry = defaultGraphTypologies,
+): string[] {
+  return resolveDirectories([{ name: "(local)", root, own: true }], registry, enabled === undefined ? {} : { enabledSubgraphs: enabled })
+    .filter((d) => d.own && d.scope !== "repository" && d.optInSubgraph !== undefined && d.graphTypologies.includes(graph as GraphTypology))
+    .map((d) => d.absPath);
 }
 
 /**
@@ -7470,6 +7604,7 @@ import "./folio-graph-typology.js";
 import { ThemeRefSchema, type ThemeRef } from "../ui/theme";
 import { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, instanceRootsIn, isForeignCheckout, lockFilesIn } from "./instance-roots";
 import { projectedRead } from "../sdlc/read-projections";
+import { enabledSubgraphsFrom, isSubgraphEnabled, ownOptInId, switchedOff, type EnabledSubgraphs } from "./opt-in-subgraphs";
 // Instance DISCOVERY lives in a leaf module (bean dmx1), so the graph-typology
 // registry can find each harness's declared `kinds/` without importing this
 // file, which imports the registry. Re-exported here so no caller moves.

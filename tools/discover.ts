@@ -43,7 +43,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, relative, resolve } from "node:path";
 
-import { declarationPathIn, instanceDirectoryForGraph, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { declarationPathIn, instanceDirectoryForGraph, instanceRootsIn, optInDirectoriesForGraph } from "../schemas/kg/cat-harness.js";
+import type { EnabledSubgraphs } from "../schemas/kg/opt-in-subgraphs.js";
 import { ToolDefinitionSchema, type ToolDefinition } from "../schemas/tools/tool.js";
 import { toolsFromFolders } from "../schemas/tools/tool-folders.js";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
@@ -119,6 +120,13 @@ export function discoverTools(
   repoRoot: string = REPO,
   baseUrl: string | undefined = harnessBase(),
   onlyInstance?: string,
+  /**
+   * `enabledSubgraphs`: the opt-in sub-graphs switched on — a `tools` graph
+   * inside one is loaded beside the instance's own, one inside a switched-off
+   * one is not. Absent, each instance's own list decides; a server pass the
+   * FOLIO's (`src/tool-groups.ts`, `opt-in-subgraphs.ts`).
+   */
+  opts: { enabledSubgraphs?: EnabledSubgraphs } = {},
 ): ToolDiscovery {
   const out: ToolDiscovery = { tools: [], sources: [], failures: [] };
   const seen = new Map<string, string>();
@@ -126,79 +134,82 @@ export function discoverTools(
 
   for (const inst of instanceRootsIn(repoRoot)) {
     if (onlyInstance !== undefined && resolve(inst) !== resolve(onlyInstance)) continue;
-    let dir: string | undefined;
+    let dirs: string[];
     try {
-      dir = instanceDirectoryForGraph(inst, "tools");
+      const own = instanceDirectoryForGraph(inst, "tools");
+      // A `tools` graph inside a switched-on opt-in sub-graph (a `work-plan`
+      // holding the bean Tool): loaded too. None while nothing is opt-in.
+      dirs = [...(own === undefined ? [] : [own]), ...optInDirectoriesForGraph(inst, "tools", opts.enabledSubgraphs)];
     } catch (e) {
       out.failures.push({ instance: rel(inst), reason: `declaration could not be resolved: ${(e as Error).message}` });
       continue;
     }
-    if (!dir) continue;
+    for (const dir of dirs) {
+      const mod = join(dir, "index.ts");
+      const where = { instance: rel(inst), dir: rel(dir) };
+      const hostBase = baseUrl ? hostSchemaBase(baseUrl) : baseUrl;
 
-    const mod = join(dir, "index.ts");
-    const where = { instance: rel(inst), dir: rel(dir) };
-    const hostBase = baseUrl ? hostSchemaBase(baseUrl) : baseUrl;
+      let defs: unknown;
+      if (!existsSync(mod)) {
+        // A tools directory of data only — `<id>/<id>.json` folders, no loader
+        // module (bean `8lcl`: cat-harness holds no code). Load the folders
+        // directly, against the harness base when no base is given.
+        try {
+          defs = toolsFromFolders(dir, hostBase ?? harnessBase() ?? "");
+        } catch (e) {
+          out.failures.push({ ...where, reason: `tool folders did not load: ${(e as Error).message}` });
+          continue;
+        }
+        // A declared graph holding neither a loader nor a Tool folder is a
+        // failure, not zero tools: a moved or emptied directory must not read
+        // as an instance that simply declares none.
+        if (Array.isArray(defs) && defs.length === 0) {
+          out.failures.push({ ...where, reason: "declares a tools graph that holds no index.ts and no `<id>/<id>.json` Tool folder" });
+          continue;
+        }
+      } else {
+        let ns: Record<string, unknown>;
+        try {
+          ns = load(mod) as Record<string, unknown>;
+        } catch (e) {
+          out.failures.push({ ...where, reason: `index.ts did not load: ${(e as Error).message}` });
+          continue;
+        }
+        if (typeof ns.tools !== "function") {
+          out.failures.push({ ...where, reason: "index.ts exports no `tools()` function" });
+          continue;
+        }
+        try {
+          defs = (ns.tools as (b?: string) => unknown)(hostBase);
+        } catch (e) {
+          out.failures.push({ ...where, reason: `tools() threw: ${(e as Error).message}` });
+          continue;
+        }
+      }
+      if (!Array.isArray(defs)) {
+        out.failures.push({ ...where, reason: "tools() did not return an array" });
+        continue;
+      }
 
-    let defs: unknown;
-    if (!existsSync(mod)) {
-      // A tools directory of data only — `<id>/<id>.json` folders, no loader
-      // module (bean `8lcl`: cat-harness holds no code). Load the folders
-      // directly, against the harness base when no base is given.
-      try {
-        defs = toolsFromFolders(dir, hostBase ?? harnessBase() ?? "");
-      } catch (e) {
-        out.failures.push({ ...where, reason: `tool folders did not load: ${(e as Error).message}` });
-        continue;
+      let count = 0;
+      for (const d of defs) {
+        const parsed = ToolDefinitionSchema.safeParse(d);
+        const id = (d as { id?: unknown })?.id;
+        if (!parsed.success) {
+          out.failures.push({ ...where, reason: `Tool ${String(id)} fails its schema: ${parsed.error.issues[0]?.message}` });
+          continue;
+        }
+        const prior = seen.get(parsed.data.id);
+        if (prior) {
+          out.failures.push({ ...where, reason: `Tool id "${parsed.data.id}" is also declared by ${prior}` });
+          continue;
+        }
+        seen.set(parsed.data.id, where.instance);
+        out.tools.push(d as ToolDefinition);
+        count++;
       }
-      // A declared graph holding neither a loader nor a Tool folder is a
-      // failure, not zero tools: a moved or emptied directory must not read
-      // as an instance that simply declares none.
-      if (Array.isArray(defs) && defs.length === 0) {
-        out.failures.push({ ...where, reason: "declares a tools graph that holds no index.ts and no `<id>/<id>.json` Tool folder" });
-        continue;
-      }
-    } else {
-      let ns: Record<string, unknown>;
-      try {
-        ns = load(mod) as Record<string, unknown>;
-      } catch (e) {
-        out.failures.push({ ...where, reason: `index.ts did not load: ${(e as Error).message}` });
-        continue;
-      }
-      if (typeof ns.tools !== "function") {
-        out.failures.push({ ...where, reason: "index.ts exports no `tools()` function" });
-        continue;
-      }
-      try {
-        defs = (ns.tools as (b?: string) => unknown)(hostBase);
-      } catch (e) {
-        out.failures.push({ ...where, reason: `tools() threw: ${(e as Error).message}` });
-        continue;
-      }
+      out.sources.push({ ...where, count });
     }
-    if (!Array.isArray(defs)) {
-      out.failures.push({ ...where, reason: "tools() did not return an array" });
-      continue;
-    }
-
-    let count = 0;
-    for (const d of defs) {
-      const parsed = ToolDefinitionSchema.safeParse(d);
-      const id = (d as { id?: unknown })?.id;
-      if (!parsed.success) {
-        out.failures.push({ ...where, reason: `Tool ${String(id)} fails its schema: ${parsed.error.issues[0]?.message}` });
-        continue;
-      }
-      const prior = seen.get(parsed.data.id);
-      if (prior) {
-        out.failures.push({ ...where, reason: `Tool id "${parsed.data.id}" is also declared by ${prior}` });
-        continue;
-      }
-      seen.set(parsed.data.id, where.instance);
-      out.tools.push(d as ToolDefinition);
-      count++;
-    }
-    out.sources.push({ ...where, count });
   }
   return out;
 }
