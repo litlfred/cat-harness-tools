@@ -321,9 +321,9 @@ describe("HTTP routes", () => {
     const failed = outcomes.filter((o) => o.state === "failed");
     expect(failed.map((o) => o.id).sort()).toEqual(["branches", "feedback"]);
     for (const f of failed) expect((f as { detail: string }).detail).toMatch(/gitHelper|feedbackStore/);
-    // The three that need nothing still mount: one route's missing service
-    // must not take the others down.
-    expect(routes).toHaveLength(3);
+    // The four that need nothing (glossary, relevance, work-plan, chat) still
+    // mount: one route's missing service must not take the others down.
+    expect(routes).toHaveLength(4);
   });
 
   test("an absent module is `absent`, a broken one is `failed`", async () => {
