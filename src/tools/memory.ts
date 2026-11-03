@@ -36,7 +36,7 @@ import { loadProcessModel } from "../workflow/process-model.js";
 import { loadInstance } from "../workflow/store.js";
 import { workContextFrom } from "../workflow/work-context.js";
 import { workPlanStoreFor } from "../workflow/work-plan-store-select.js";
-import type { WorkPlanStore } from "../workflow/work-plan-store.js";
+import type { MemoryStore } from "../workflow/work-plan-store.js";
 
 /** The instance a launcher bound this session to. */
 export const WORK_INSTANCE_ENV = "CAT_WORK_INSTANCE";
@@ -59,10 +59,10 @@ async function bound(
   root: string,
   env: Env,
   shared: boolean,
-): Promise<{ store: WorkPlanStore; record: string; meta: Pick<MemoryEntry, "process" | "step" | "instance"> } | { not: string }> {
-  let store: WorkPlanStore;
+): Promise<{ store: MemoryStore; record: string; meta: Pick<MemoryEntry, "process" | "step" | "instance"> } | { not: string }> {
+  let store: MemoryStore;
   try {
-    const target = workContextFrom(workPlanStoreFor(root, env));
+    const target = workContextFrom(workPlanStoreFor(root, env), env);
     if ("none" in target) return { not: "this session has no memory" };
     store = target.store;
   } catch {

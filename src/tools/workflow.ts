@@ -314,7 +314,9 @@ export async function workflowListAnswer(repoRoot: string): Promise<WorkflowAnsw
 function keepContext(root: string, opts: WorkflowToolEnv | undefined, act: (t: WorkContextTarget) => { summary: string }): string | undefined {
   let target: WorkContextTarget;
   try {
-    target = workContextFrom(workPlanStoreFor(root, opts?.env ?? process.env));
+    // input-site: env CAT_WORK_INSTANCE #f4c974e2 — the deployment and memory directory the run's launcher set
+    const env = opts?.env ?? process.env;
+    target = workContextFrom(workPlanStoreFor(root, env), env);
   } catch (e) {
     return `work context not kept: ${e instanceof Error ? e.message : String(e)}`;
   }
@@ -330,12 +332,13 @@ function withMemory(
   pos: { enabled: Array<{ node: string; context?: { readsMemory?: boolean; memory?: MemoryEntry[] } }> },
   chosen: ReturnType<typeof workPlanStoreFor>,
   item: string | undefined,
+  env: Readonly<Record<string, string | undefined>>,
 ): string {
   const readers = pos.enabled.filter((e) => e.context?.readsMemory);
   if (!readers.length) return "";
   let target: WorkContextTarget;
   try {
-    target = workContextFrom(chosen);
+    target = workContextFrom(chosen, env);
   } catch (e) {
     return `\n\n  memory not read: ${e instanceof Error ? e.message : String(e)}`;
   }
@@ -468,7 +471,7 @@ export async function workflowNextAnswer(
   const pos = withBeans(position(model, state, r), chosen.store);
   const beans = [...new Map(pos.enabled.flatMap((e) => e.context?.beans ?? []).map((b) => [b.id, b])).values()];
   // A step drawn reading the memory store is handed what was kept (§4.14).
-  const memory = withMemory(pos, chosen, state.bean);
+  const memory = withMemory(pos, chosen, state.bean, opts?.env ?? process.env);
   return { text: describe(model, state, r) + describeBeans(beans) + memory, result: pos };
 }
 
