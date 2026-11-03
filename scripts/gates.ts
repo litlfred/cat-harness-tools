@@ -1490,6 +1490,15 @@ export interface ScriptExemption {
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   {
+    script: "check:context-leak",
+    kind: "report",
+    reason:
+      "JUDGES A BUILT AGENT CONTEXT, not this tree (cat-harness#991 step 22, proposal §4.13): it is given the context " +
+      "directory, tool list and prompt of a bean-blind run and has no default input, since reading nothing is never clean. " +
+      "It runs in report mode until the clean-up (steps 23-25) lands; it then becomes a gate in the ITB, which refuses a " +
+      "bean-blind run whose context fails it, and in each content layer's CI over that layer's bean-blind context",
+  },
+  {
     script: "check:workflow-pins",
     kind: "report",
     reason:
