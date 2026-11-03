@@ -26,13 +26,16 @@
  * | `label-overlap` | two drawn labels intersect (e.g. "Satisfied with changes?" over "No") |
  * | `label-on-edge` | a label sits on a flow, its own included |
  * | `label-on-shape` | a label covers a task, event or gateway that is not its own |
- * | `label-on-lane-line` | a label is drawn across the line between two lanes, or a pool's edge |
+ * | `label-on-lane-line` | a label is drawn across the line between two lanes, or a pool's top, bottom or right edge |
  * | `header-overflow` | a pool or lane name spills out of its 30-wide header strip |
  * | `text-overflow` | a task's name spills out of its box (16px text in a box drawn for 12px), or runs under its type icon or [+] marker |
  * | `edge-diagonal` | a flow runs at a slant (owner, 2026-10-31: *"straight angled arrows ugly"*) |
  * | `edge-crossing` | two flows cross |
  * | `shape-overlap` | two steps drawn on top of each other (a boundary event on its task, or a step inside its subprocess, does not count) |
  * | `edge-through-shape` | a flow is drawn through a task, event or gateway that is neither its source nor its target |
+ * | `edge-through-own-end` | a flow starts inside the box it leaves or runs on inside the box it enters (waypoints laid for a box of another size) |
+ * | `edge-detached` | a flow's first or last waypoint is more than 6 from its own shape |
+ * | `shape-outside-pool` | a step is drawn outside every pool of a diagram that has pools |
  * | `lane-order` | another order of the lanes makes the cross-lane flows shorter |
  *
  * Label positions come from where bpmn-js DREW them (`DrawnLayout`), because
@@ -245,6 +248,72 @@ export function edgesThroughShapes(di: DiLayout): [string, string][] {
     }
   }
   return out;
+}
+
+/** How far a flow's end may sit from its shape's box and still be drawn as touching it. */
+const END_SLACK = 6;
+/** How deep into its own source or target a flow may run (a gateway's or event's corner is inside its box). */
+const OWN_INSET = 4;
+
+const gap = (p: Pt, b: Box): number =>
+  Math.hypot(Math.max(b.x - p.x, 0, p.x - (b.x + b.width)), Math.max(b.y - p.y, 0, p.y - (b.y + b.height)));
+
+/**
+ * Every flow drawn THROUGH its own source or target, as `[flow, shape]`: it
+ * starts inside the box it leaves, or runs on inside the box it enters.
+ * `edgesThroughShapes` skips a flow's own ends, so a flow whose waypoints
+ * were laid for a smaller box (a task resized to `TASK_SIZE`, the flow left
+ * where it was) was invisible to it: the arrow from "Commit, push, open the
+ * PR" up through "Run the gates against the merge…" in `code-change-review`
+ * (owner's screenshot, 2026-11-03, cat-harness#991).
+ */
+export function edgesThroughOwnEnds(di: DiLayout): [string, string][] {
+  const out: [string, string][] = [];
+  for (const [eid, e] of di.edges) {
+    const f = di.flows.get(eid);
+    if (!f) continue;
+    for (const sid of new Set([f.source, f.target])) {
+      const b = di.shapes.get(sid);
+      if (!b) continue;
+      if (segments(e.points).some(([p, q]) => segmentHitsBox(p, q, b, OWN_INSET))) out.push([eid, sid]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Every flow whose first or last waypoint is not on its own shape, as
+ * `[flow, shape]`: the arrow stops short of the box it enters, or starts in
+ * empty space beside the box it leaves.
+ */
+export function detachedEdges(di: DiLayout): [string, string][] {
+  const out: [string, string][] = [];
+  for (const [eid, e] of di.edges) {
+    const f = di.flows.get(eid);
+    if (!f || e.points.length < 2) continue;
+    const ends: [string, Pt][] = [[f.source, e.points[0]!], [f.target, e.points[e.points.length - 1]!]];
+    for (const [sid, p] of ends) {
+      const b = di.shapes.get(sid);
+      if (b && gap(p, b) > END_SLACK) out.push([eid, sid]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Every step drawn outside every pool, when the diagram has pools: an end
+ * event left above the pool by a retrofit (`test-plan-execution`'s "Not yours
+ * — left alone", cat-harness#991), or end events past the pool's right edge.
+ */
+/** Artefacts BPMN lets sit outside a pool: a data store, a data object, a note, a group. */
+const OUTSIDE_OK = new Set(["dataStoreReference", "dataObjectReference", "textAnnotation", "group"]);
+
+export function shapesOutsidePools(di: DiLayout): string[] {
+  if (di.pools.size === 0) return [];
+  const pools = [...di.pools.values()];
+  return [...di.shapes]
+    .filter(([id, b]) => !OUTSIDE_OK.has(di.kinds?.get(id) ?? "") && !pools.some((p) => holds(p, b)))
+    .map(([id]) => id);
 }
 
 // ── Lane order ───────────────────────────────────────────────────────────
@@ -773,6 +842,9 @@ function laneLines(di: DiLayout): [string, [Pt, Pt]][] {
     out.push([id, [{ x: b.x, y: b.y }, { x: b.x + b.width, y: b.y }]]);
     out.push([id, [{ x: b.x, y: b.y + b.height }, { x: b.x + b.width, y: b.y + b.height }]]);
   }
+  // A pool's right edge is drawn too: an end label run across it was the
+  // owner's screenshot (test-plan-execution, 2026-11-03, cat-harness#991).
+  for (const [id, b] of di.pools) out.push([id, [{ x: b.x + b.width, y: b.y }, { x: b.x + b.width, y: b.y + b.height }]]);
   return out;
 }
 
@@ -946,6 +1018,9 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
     "edge-diagonal": [],
     "edge-crossing": [],
     "edge-through-shape": [],
+    "edge-through-own-end": [],
+    "edge-detached": [],
+    "shape-outside-pool": [],
     "shape-overlap": [],
     "lane-order": [],
   };
@@ -1041,6 +1116,22 @@ export function diagramFit(xml: string, drawn?: DrawnLabels): Record<string, Fin
       where: `${eid}/${sid}`,
       detail: `flow ${eid} is drawn through ${q(di.names.get(sid) ?? sid)}, which it neither leaves nor enters. Route it around the box.`,
     });
+  }
+  for (const [eid, sid] of edgesThroughOwnEnds(di)) {
+    out["edge-through-own-end"]!.push({
+      where: `${eid}/${sid}`,
+      detail: `flow ${eid} is drawn through ${q(di.names.get(sid) ?? sid)}, its own ${di.flows.get(eid)?.source === sid ? "source" : "target"}: ` +
+        `its waypoints were laid for a box of another size. Start it on the side of the box it leaves and end it on the side it enters.`,
+    });
+  }
+  for (const [eid, sid] of detachedEdges(di)) {
+    out["edge-detached"]!.push({
+      where: `${eid}/${sid}`,
+      detail: `flow ${eid} ${di.flows.get(eid)?.source === sid ? "starts" : "ends"} more than ${END_SLACK} from ${q(di.names.get(sid) ?? sid)}. Move that waypoint onto the box's edge.`,
+    });
+  }
+  for (const id of shapesOutsidePools(di)) {
+    out["shape-outside-pool"]!.push({ where: id, detail: `${q(di.names.get(id) ?? id)} is drawn outside its pool. Move it inside its lane, or widen the pool and its lanes to hold it.` });
   }
   const best = bestLaneOrder(di);
   if (best.cost < best.current) {

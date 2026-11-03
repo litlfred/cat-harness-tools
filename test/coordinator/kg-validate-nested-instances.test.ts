@@ -33,7 +33,10 @@
  * is swept in the `qa-reports` store's newest `main` entry instead, at the
  * same checkout paths and by the same validator, because that is what every
  * reader then reads. An unreachable store is reported in the anti-vacuity
- * message, never read as clean.
+ * message, never read as clean. A MOUNTED layer's home is read from that
+ * layer's OWN store at the commit the lock pins (`scripts/layer-qa.ts`;
+ * owner, 2026-11-03, "2. Each layer publishes"): its QA is its repository's
+ * to write (bean `nn8e`), published by `layer-qa-publish.yml`.
  *
  * @module test/kg-validate-nested-instances
  *
@@ -53,6 +56,7 @@ import { join, relative, resolve } from "node:path";
 
 import { instanceRootsIn, kgQaHomeFor, readDeclaration } from "../../schemas/kg/cat-harness.js";
 import { owningInstanceRoot, validatePath, validateText } from "../../scripts/kg-validate.js";
+import { readLayerQaTree } from "../../scripts/layer-qa.ts";
 import { readQaTree, type QaStoreOptions } from "../../scripts/qa-store.js";
 
 /** The directory this test was written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move to the checkout's test home (bean `7zz1`). */
@@ -105,6 +109,33 @@ function readSidecars(): { byInstance: Map<string, Sidecar[]>; storeState: strin
     else absent.push({ key, home: relative(REPO, home).split("\\").join("/") });
   }
   if (absent.length === 0) return { byInstance: out, storeState: "not read: every qa home is in the working copy" };
+  // A MOUNTED layer's QA is its own repository's (bean `7mwa`; owner,
+  // 2026-11-03, "2. Each layer publishes"): it is read from that layer's
+  // store at the commit the lock pins, never from this index's store.
+  const states: string[] = [];
+  const indexOwned: typeof absent = [];
+  for (const a of absent) {
+    // cat-harness's own home, and the homes it HOSTS (`kgQaHomeFor` "hosted",
+    // under cat-harness's), are written by the index's QA job (`qa-refresh.ts`),
+    // so they stay the index's store's to answer.
+    const root = join(REPO, a.key);
+    const ownLayer = resolve(root) !== resolve(HARNESS) && kgQaHomeFor(root, HARNESS).by === "own";
+    const { source, read } = ownLayer ? readLayerQaTree(REPO, root, a.home) : { source: undefined, read: undefined };
+    if (source === undefined || read === undefined) {
+      indexOwned.push(a);
+      continue;
+    }
+    if (read.state === "corrupt") throw new Error(`${source.instance}'s qa-reports store is corrupt: ${read.reason}`);
+    if (read.state !== "hit") {
+      states.push(`${source.instance}: ${read.state} (${read.reason})`);
+      continue;
+    }
+    const files: Sidecar[] = [];
+    for (const [rel, text] of read.files) if (isKgQaFile(rel, a.home)) files.push({ path: join(REPO, rel), text });
+    if (files.length) out.set(a.key, files);
+    states.push(`${source.instance}: read ${source.repository} ${read.key}`);
+  }
+  if (indexOwned.length === 0) return { byInstance: out, storeState: states.join("; ") };
   // The store is reached the way every reader reaches it: the checkout's
   // `origin`, or QA_STORE_REMOTE / QA_STORE_DIR where the checkout has none.
   const opts: QaStoreOptions = { repoRoot: REPO, log: () => {} };
@@ -112,19 +143,19 @@ function readSidecars(): { byInstance: Map<string, Sidecar[]>; storeState: strin
   try {
     read = readQaTree("main", "", opts);
   } catch (e) {
-    return { byInstance: out, storeState: `unknown: ${e instanceof Error ? e.message : String(e)}` };
+    return { byInstance: out, storeState: [...states, `index: unknown: ${e instanceof Error ? e.message : String(e)}`].join("; ") };
   }
   if (read.state !== "hit") {
     // A corrupt entry is a finding about what readers read, not an absence.
     if (read.state === "corrupt") throw new Error(`the qa-reports store is corrupt: ${read.reason}`);
-    return { byInstance: out, storeState: `${read.state}: ${read.reason}` };
+    return { byInstance: out, storeState: [...states, `index: ${read.state}: ${read.reason}`].join("; ") };
   }
-  for (const { key, home } of absent) {
+  for (const { key, home } of indexOwned) {
     const files: Sidecar[] = [];
     for (const [rel, text] of read.files) if (isKgQaFile(rel, home)) files.push({ path: join(REPO, rel), text });
     if (files.length) out.set(key, files);
   }
-  return { byInstance: out, storeState: `read ${read.key}` };
+  return { byInstance: out, storeState: [...states, `index: read ${read.key}`].join("; ") };
 }
 
 /** Read once per run: the store read is slow, and two tests share it. */
@@ -165,11 +196,18 @@ describe("kg:validate over nested instances (bean `676g`)", () => {
     // Since bean `7mwa` the core no longer commits test/results/ either, so the
     // sidecar is read where the sweep below reads it: on disk, or from the
     // qa-reports store.
-    const NESTED = "folio-assistant-core";
-    const nested = join(REPO, NESTED, "test/results/kg-qa/scenarios/kg.kg-qa.json");
+    //
+    // Chosen, not named (2026-11-02, folio-assistant#2781): the core's
+    // sidecar left the qa-reports store, and a named path breaks each time
+    // one does. Any kg-audit sidecar of a nested instance other than the
+    // auditor serves, so the first one the sweep finds is taken.
     const { byInstance, storeState } = sidecarsByInstance();
-    const found = (byInstance.get(NESTED) ?? []).find((f) => resolve(f.path) === resolve(nested));
-    expect(found, `fixture sidecar moved — pick another nested one (qa-reports store: ${storeState})`).toBeDefined();
+    const candidates = [...byInstance.entries()]
+      .filter(([instance]) => instance !== "cat-harness")
+      .flatMap(([instance, files]) => files.filter((f) => f.path.endsWith(".kg-qa.json")).map((f) => ({ instance, f })));
+    expect(candidates.length, `no nested kg-audit sidecar to falsify with (qa-reports store: ${storeState})`).toBeGreaterThan(0);
+    const { instance: NESTED, f: found } = candidates[0]!;
+    const nested = resolve(found.path);
     const check = (root: string, schemaRoot?: string) =>
       found!.text === undefined ? validatePath(nested, root, schemaRoot) : validateText(nested, found!.text, root, schemaRoot);
     expect((await check(HARNESS)).state).toBe("undetermined");

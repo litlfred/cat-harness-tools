@@ -616,6 +616,9 @@ describe("a contentless instance (mer2)", () => {
     // Bean folio-assistant-63q4 (owner, 2026-10-15): initiation turns on the
     // publishing of the instance's JSON-LD context.
     ".github/workflows/publish-context.yml",
+    // Bean folio-assistant-7mwa (owner, 2026-11-03, "2. Each layer
+    // publishes"): and the publishing of its QA results to its own store.
+    ".github/workflows/publish-qa.yml",
   ];
 
   test("writes every instance-level artefact, and nothing an adapter owns", () => {
@@ -630,8 +633,26 @@ describe("a contentless instance (mer2)", () => {
       expect(existsSync(join(d, absent))).toBe(false);
     }
     expect(r.created.some((f) => f.startsWith("folio/"))).toBe(false);
-    // The one workflow is the context publisher: no staging or QA workflow.
-    expect(r.created.filter((f) => f.startsWith(".github/"))).toEqual([".github/workflows/publish-context.yml"]);
+    // The two publishers, the context and the QA store: no staging or QA-sweep workflow.
+    expect(r.created.filter((f) => f.startsWith(".github/")).sort()).toEqual([
+      ".github/workflows/publish-context.yml",
+      ".github/workflows/publish-qa.yml",
+    ]);
+  });
+
+  test("the publish-qa workflow calls the tools layer's QA publisher for THIS instance, on main and on pull requests", () => {
+    const d = tmp();
+    initInstance(instanceOpts(d));
+    const wf = parseYaml(readFileSync(join(d, ".github/workflows/publish-qa.yml"), "utf-8")) as {
+      on: { push: { branches: string[] }; pull_request: unknown };
+      permissions: Record<string, string>;
+      jobs: { publish: { uses: string; with: Record<string, string> } };
+    };
+    expect(wf.on.push.branches).toEqual(["main"]);
+    expect("pull_request" in wf.on).toBe(true);
+    expect(wf.permissions).toEqual({ contents: "write" });
+    expect(wf.jobs.publish.uses).toBe("litlfred/cat-harness-tools/.github/workflows/layer-qa-publish.yml@main");
+    expect(wf.jobs.publish.with).toEqual({ instance: SLUG });
   });
 
   test("the publish-context workflow calls the harness's reusable workflow for THIS instance, on push to main", () => {
@@ -717,7 +738,7 @@ describe("a contentless instance (mer2)", () => {
     const r = initFolio(opts(folio));
     // Except the context publisher: a folio's gh-pages is its staging site's,
     // which the folio's own publish workflow writes.
-    for (const f of INSTANCE_LEVEL.filter((x) => !x.endsWith("publish-context.yml"))) expect(r.created).toContain(f);
+    for (const f of INSTANCE_LEVEL.filter((x) => !x.endsWith("publish-context.yml") && !x.endsWith("publish-qa.yml"))) expect(r.created).toContain(f);
     // The files with no content-type dependence are byte-identical.
     for (const f of [".mcp.json", ".claude/settings.json", ".beans.yml"]) {
       expect(readFileSync(join(folio, f), "utf-8")).toBe(readFileSync(join(bare, f), "utf-8"));

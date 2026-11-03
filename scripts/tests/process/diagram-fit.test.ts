@@ -8,8 +8,11 @@ import {
   bestLaneOrder,
   crossings,
   diagramFit,
+  detachedEdges,
+  edgesThroughOwnEnds,
   edgesThroughShapes,
   FIT_WIDTH,
+  shapesOutsidePools,
   fixTaskSize,
   offSizeTasks,
   TASK_SIZE,
@@ -223,6 +226,25 @@ describe("flows through boxes", () => {
     expect(diagramFit(xml)["edge-through-shape"]!.map((f) => f.where)).toEqual(["F/B"]);
   });
 
+  test("a flow drawn through its OWN source and target is reported (cat-harness#991)", () => {
+    // code-change-review's f6: laid for smaller boxes, it starts in the middle of
+    // "Commit, push, open the PR" and runs up through "Run the gates…" to its top.
+    const xml = bpmn(LANES, [["Commit", 50, 220, 120, 60], ["Gates", 40, 20, 140, 60]],
+      [["F", "Commit", "Gates", [[110, 250], [110, 20]]]]);
+    expect(edgesThroughOwnEnds(readDi(xml))).toEqual([["F", "Commit"], ["F", "Gates"]]);
+    expect(diagramFit(xml)["edge-through-own-end"]!.map((f) => f.where)).toEqual(["F/Commit", "F/Gates"]);
+    // Side to side, it is clean.
+    const fixed = bpmn(LANES, [["Commit", 50, 220, 120, 60], ["Gates", 40, 20, 140, 60]],
+      [["F", "Commit", "Gates", [[110, 220], [110, 80]]]]);
+    expect(edgesThroughOwnEnds(readDi(fixed))).toEqual([]);
+    expect(detachedEdges(readDi(fixed))).toEqual([]);
+  });
+
+  test("a flow that stops short of its target is detached", () => {
+    const xml = bpmn(LANES, [["A", 50, 120, 100, 60], ["B", 300, 120, 100, 60]], [["F", "A", "B", [[150, 150], [260, 150]]]]);
+    expect(detachedEdges(readDi(xml))).toEqual([["F", "B"]]);
+  });
+
   test("a lane swap keeps a loop-back flow's bends rather than drawing it through the lane's steps", () => {
     // D (lane One) loops back to A (lane Two) over the top of B and C.
     const xml = bpmn(LANES,
@@ -286,5 +308,25 @@ describe("tasks are one square size (TASK_SIZE)", () => {
   test("a diagram already at TASK_SIZE is left byte for byte", () => {
     const xml = bpmn([["L1", "One", 0, 200]], [["A", 50, 40, TASK_SIZE.width, TASK_SIZE.height]], []);
     expect(fixTaskSize(xml).xml).toBe(xml);
+  });
+});
+
+describe("pools", () => {
+  const pooled = (shapes: S[]): string =>
+    bpmn([["L1", "One", 0, 200]], shapes, [])
+      .replace("<bpmn:process", `<bpmn:collaboration><bpmn:participant id="Pool" processRef="P"/></bpmn:collaboration><bpmn:process`)
+      .replace("<bpmndi:BPMNPlane bpmnElement=\"P\">", `<bpmndi:BPMNPlane bpmnElement="P"><bpmndi:BPMNShape bpmnElement="Pool"><dc:Bounds x="0" y="0" width="600" height="200"/></bpmndi:BPMNShape>`);
+
+  test("a step outside every pool is reported; a data store is not (cat-harness#991)", () => {
+    const xml = pooled([["In", 50, 50, 100, 60], ["Above", 200, -50, 36, 36], ["Past", 620, 80, 36, 36]])
+      .replace('<bpmn:task id="Past" name="Past"/>', '<bpmn:task id="Past" name="Past"/><bpmn:dataStoreReference id="Store"/>')
+      .replace("</bpmndi:BPMNPlane>", `<bpmndi:BPMNShape bpmnElement="Store"><dc:Bounds x="100" y="260" width="50" height="50"/></bpmndi:BPMNShape></bpmndi:BPMNPlane>`);
+    expect(shapesOutsidePools(readDi(xml))).toEqual(["Above", "Past"]);
+    expect(diagramFit(xml)["shape-outside-pool"]!.map((f) => f.where)).toEqual(["Above", "Past"]);
+  });
+
+  test("a label across the pool's right edge is on a lane line", () => {
+    const xml = pooled([["E", 540, 80, 36, 36, [560, 120, 90, 20]]]);
+    expect(diagramFit(xml)["label-on-lane-line"]!.map((f) => f.where)).toContain("E/Pool");
   });
 });
