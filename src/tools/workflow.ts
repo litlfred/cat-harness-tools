@@ -43,6 +43,7 @@ import { describeCapture, writeLogEntry } from "../logging/log-writer.js";
 import { instanceId, listInstances, loadInstance, saveInstance } from "../workflow/store.js";
 import { applyWorkPlanOp, onlyArchiveLeft } from "../workflow/bean-link.js";
 import { workPlanStoreFor } from "../workflow/work-plan-store-select.js";
+import { closeOut, drawsWorkPlan, record, takeUp, workContextFrom, type WorkContextTarget } from "../workflow/work-context.js";
 import { describeBeans, withBeans } from "../workflow/work-plan-store.js";
 import { checkGate, loadRelaxations, validateRelaxations, type GateVerdict } from "../workflow/gate.js";
 import { type RoleGraph } from "../../schemas/process/role-graph.js";
@@ -305,6 +306,20 @@ export async function workflowListAnswer(repoRoot: string): Promise<WorkflowAnsw
   };
 }
 
+/**
+ * Keep work context through the deployment's store (§4.13). The step is
+ * already recorded, so a store that cannot be opened is reported, never thrown.
+ */
+function keepContext(root: string, opts: WorkflowToolEnv | undefined, act: (t: WorkContextTarget) => { summary: string }): string | undefined {
+  let target: WorkContextTarget;
+  try {
+    target = workContextFrom(workPlanStoreFor(root, opts?.env ?? process.env));
+  } catch (e) {
+    return `work context not kept: ${e instanceof Error ? e.message : String(e)}`;
+  }
+  return act(target).summary;
+}
+
 /** Shared implementation of `workflow_start` for MCP and CLI (`workflow:start`). */
 export async function workflowStart(
   repoRoot: string,
@@ -348,6 +363,13 @@ export async function workflowStartAnswer(
   if (refusal) throw new Error(refusal);
   const state = startInstance(model, { id, subject, bean });
   const path = saveInstance(root, state);
+  // Work context (§4.13): a process that no longer draws the work plan has
+  // its item taken up by the engine, as Process_BeanOpen did for one that does.
+  const kept = drawsWorkPlan(model)
+    ? undefined
+    : keepContext(root, opts, (t) =>
+        takeUp(t, bean, { process: model.id, instance: id, by: "workflow" }, `${model.name || model.id} started for ${subject}`),
+      );
   // The activity log's `task-start`. Reported on the tool's own output
   // rather than written silently: the skill requires the capture state to
   // be SAID, and a caller that has to go and look at a directory to find
@@ -371,7 +393,9 @@ export async function workflowStartAnswer(
       // state is: a caller that has to go and look somewhere else to find
       // out whether the gate ran does not have one it can rely on.
       `${describePreflight(gate)}\n` +
-      `${describeCapture(log)}\n\n${describe(model, state, r)}`,
+      `${describeCapture(log)}\n` +
+      (kept ? `  ${kept}\n` : "") +
+      `\n${describe(model, state, r)}`,
     result: { started: true, position: position(model, state, r) },
   };
 }
@@ -594,6 +618,24 @@ export async function workflowCompleteAnswer(
           instanceCompleted: op === "resolve" ? onlyArchiveLeft(model, next) : next.status === "completed",
         });
 
+  // Work context (§4.13): in a process that no longer draws the work plan,
+  // the engine keeps what an `op="note"` step and Process_BeanClose kept.
+  // A step that still carries its own op was handled just above.
+  const contextKept: string[] = [];
+  if (!drawsWorkPlan(model)) {
+    const stepName = stepNode?.name || node;
+    const meta = { process: model.id, instance: next.id, node, by: actor ?? principal.account ?? "workflow" };
+    if (!op && stepNode?.kind === "activity") {
+      const said = [outcome ? `→ ${outcome}` : "", note ?? ""].filter(Boolean).join(" ");
+      const k = keepContext(root, opts, (t) => record(t, next.bean, { ...meta, kind: "step-done" }, `${stepName} done${said ? ` ${said}` : ""}`));
+      if (k) contextKept.push(k);
+    }
+    if (next.status === "completed") {
+      const k = keepContext(root, opts, (t) => closeOut(t, next.bean, meta, `${model.name || model.id} completed`));
+      if (k) contextKept.push(k);
+    }
+  }
+
   // `task-end` for the step just recorded. The EVENT is task-end even
   // when the instance runs on: the unit an agent starts and ends is the
   // step, and waiting for the whole process would lose every intermediate
@@ -622,6 +664,7 @@ export async function workflowCompleteAnswer(
       describe(model, next, r) +
       (authz ? `\n\n  authorization: ${describeVerdict(authz)}` : "") +
       (plan ? `\n\n  work plan: ${plan.summary}` : "") +
+      contextKept.map((k) => `\n  ${k}`).join("") +
       `\n  ${describeCapture(log)}`,
     result: {
       position: position(model, next, r),

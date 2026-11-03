@@ -41,6 +41,8 @@ export interface ChosenStore {
   tool: string;
   /** The deployment it was read from; absent when {@link DEPLOYMENT_ENV} is unset. */
   deployment?: string;
+  /** The deployment's whole `stores` map, for the other store Roles (work context, §4.13). */
+  stores?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -74,5 +76,5 @@ export function workPlanStoreFor(
         `(it has: ${Object.keys(WORK_PLAN_TOOLS).join(", ")}). Refused rather than writing to another store.`,
     );
   }
-  return { store: make(repoRoot), tool, deployment: id };
+  return { store: make(repoRoot), tool, deployment: id, ...(d.stores ? { stores: d.stores } : {}) };
 }
