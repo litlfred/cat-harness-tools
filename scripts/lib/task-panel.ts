@@ -69,11 +69,17 @@ export interface Marker {
   name: string;
   left: number;
   top: number;
-  /** The whole shape, in percent of the drawn diagram: the click target when the step links somewhere. */
+  /**
+   * The shape's [+] marker and the 24 × 24 hit area around it, in percent of
+   * the drawn diagram: the click target when the step links somewhere. Never
+   * the whole shape (owner, 2026-11-03, cat-harness#991: "the subprocess
+   * should be opened by the [+] not the whole box"), so the title keeps its
+   * own link and the box is not one big target.
+   */
   box?: { left: number; top: number; width: number; height: number };
   /**
-   * Where a click on the SHAPE goes: for a call activity, the called
-   * process's page. Absent → the shape is not a link and only the ⓘ opens.
+   * Where a click on the [+] goes: for a call activity, the called
+   * process's page. Absent → the step has no [+] link and only the ⓘ opens.
    */
   href?: string;
 }
@@ -160,6 +166,23 @@ export async function diagramBounds(xml: string): Promise<Map<string, Box>> {
 
 const round = (n: number): number => Math.round(n * 100) / 100;
 
+/**
+ * Where bpmn-js draws a collapsed activity's [+]: a 14 × 14 box across the
+ * middle of the shape, its top 20 above the bottom edge. The hit area around it
+ * is {@link MIN_TARGET} square.
+ */
+export const EXPAND_MARKER = { size: 14, fromBottom: 20 } as const;
+/** The smallest hit area of a link, in drawing units (WCAG 2.2 SC 2.5.8). */
+export const MIN_TARGET = 24;
+
+/** The [+] marker's hit area of a shape at `b`, in drawing units. */
+export function expandMarkerBox(b: Box): Box {
+  // bpmn-js puts the box's left edge at `width / 2 - 7.5`, half a unit left of centre.
+  const cx = b.x + b.width / 2 - 0.5;
+  const cy = b.y + b.height - EXPAND_MARKER.fromBottom + EXPAND_MARKER.size / 2;
+  return { x: cx - MIN_TARGET / 2, y: cy - MIN_TARGET / 2, width: MIN_TARGET, height: MIN_TARGET };
+}
+
 /** Markers for `tasks`, on each shape's top-right corner. A task with no shape gets none. */
 export function markersFor(
   tasks: readonly { id: string; name: string }[],
@@ -173,11 +196,12 @@ export function markersFor(
     const left = ((b.x + b.width - viewBox.x) / viewBox.width) * 100;
     const top = ((b.y - viewBox.y) / viewBox.height) * 100;
     if (left < 0 || left > 100 || top < 0 || top > 100) continue;
+    const plus = expandMarkerBox(b);
     const box = {
-      left: round(((b.x - viewBox.x) / viewBox.width) * 100),
-      top: round(top),
-      width: round((b.width / viewBox.width) * 100),
-      height: round((b.height / viewBox.height) * 100),
+      left: round(((plus.x - viewBox.x) / viewBox.width) * 100),
+      top: round(((plus.y - viewBox.y) / viewBox.height) * 100),
+      width: round((plus.width / viewBox.width) * 100),
+      height: round((plus.height / viewBox.height) * 100),
     };
     out.push({ id: t.id, name: t.name, left: round(left), top: round(top), box });
   }
@@ -364,13 +388,14 @@ export const PANEL_CSS = [
   ".pt-mark{position:absolute;transform:translate(-50%,-50%);width:1.35em;height:1.35em;padding:0;border-radius:50%;" +
     "border:1px solid #1f6feb;background:#fff;color:#1f6feb;font:bold 0.8em/1 sans-serif;cursor:pointer;" +
     "display:flex;align-items:center;justify-content:center;box-shadow:0 1px 2px rgba(0,0,0,.25)}",
-  // A call activity's shape is a link to the process it calls (owner,
-  // 2026-10-31: "i thought i would be able click to follow to a subprocess").
-  // Under the ⓘ, which stays the way to the details.
+  // A call activity's [+] is a link to the process it calls (owner,
+  // 2026-10-31: "i thought i would be able click to follow to a subprocess";
+  // 2026-11-03: "the subprocess should be opened by the [+] not the whole
+  // box"). The ⓘ stays the way to the details.
   // The layer is laid over the drawing by the client; with no script it is the whole block.
   ".pt-layer{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:2}",
   ".pt-layer>*{pointer-events:auto}",
-  ".pt-go{position:absolute;display:block;border-radius:8px;cursor:pointer}",
+  ".pt-go{position:absolute;display:block;border-radius:3px;cursor:pointer}",
   ".pt-go:hover,.pt-go:focus-visible{outline:2px solid #1f6feb;outline-offset:1px;background:rgba(31,111,235,.07)}",
   ".pt-mark{z-index:1}",
   ".pt-mark:hover,.pt-mark[aria-expanded=true]{background:#1f6feb;color:#fff}",

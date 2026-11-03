@@ -14,11 +14,12 @@
  * Never hand-edit `docs/assets/img/workflows/*.svg` — regenerate instead.
  *
  * The drawing itself — bpmn-js in headless Chromium, made byte-stable and
- * responsive, and a shape wrapped in a link — is bootstrap-tools'
+ * responsive — is bootstrap-tools'
  * `scripts/render-bpmn.ts` (one copy of the writers, in the tools
  * repository: bean `xsqm`). This is the SITE half: every instance's
- * diagrams, into this site's `workflows/`, with call activities linking to
- * this site's pages.
+ * diagrams, into this site's `workflows/`, with each step's title linking to
+ * its page and each call activity's [+] to the process it calls
+ * (`src/workflow/diagram-links.ts`).
  *
  * @covers processes
  *
@@ -34,10 +35,10 @@ import {
   drawing,
   openRenderer,
   VIEWER_BUNDLE,
-  wrapShapeInLink,
 } from "@litlfred/bootstrap-tools/scripts/render-bpmn.ts";
 import { checkXmlComments } from "./xml-comment-check";
 import { diagramFit, type DrawnLabels } from "../src/workflow/diagram-fit.ts";
+import { countLinks, EXPAND_LINK_CLASS, linkSteps, stepsOf, TITLE_LINK_CLASS } from "../src/workflow/diagram-links.ts";
 import {
   siteDirFor,
   repoRootFor,
@@ -285,17 +286,27 @@ for (const file of sources) {
     continue;
   }
 
-  // A subprocess box is a navigation affordance, not decoration: clicking it
-  // should take the reader to that subprocess. Only useful once the SVG is live
-  // in the DOM — inside an `<img>` it is inert — which docs-ui.js arranges by
-  // inlining these figures.
-  const links = subprocessLinks(xml);
-  let linked = responsive;
-  for (const [id, href] of links) linked = wrapShapeInLink(linked, id, href);
-  const wrapped = (linked.match(/class="fa-subprocess-link"/g) ?? []).length;
-  if (wrapped !== links.size) {
+  // Each link on the part of the shape it names (owner, 2026-11-03,
+  // cat-harness#991: "linked tasks should be on the task title only, not the
+  // whole box. the subprocess should be opened by the [+] not the whole box"):
+  // a step's TITLE opens the step's own page, `process/P/node/T`, and a call
+  // activity's [+] opens the process it calls. Only live once the SVG is in the
+  // DOM — inside an `<img>` it is inert — which docs-ui.js arranges by
+  // inlining these figures. `diagram-links.ts` says why each is shaped so.
+  const steps = stepsOf(xml);
+  const stepName = new Map(steps.map((s) => [s.id, s.name]));
+  const titles = new Map<string, { href: string; name: string }>();
+  for (const s of steps) {
+    const href = subjectHref(file, "process", `${s.process}/node/${s.id}`);
+    if (href) titles.set(s.id, { href, name: s.name });
+  }
+  const expands = new Map([...subprocessLinks(xml)].map(([id, href]) => [id, { href, name: stepName.get(id) ?? id }]));
+  const linked = linkSteps(responsive, titles, expands);
+  const nTitles = countLinks(linked, TITLE_LINK_CLASS);
+  const nExpands = countLinks(linked, EXPAND_LINK_CLASS);
+  if (nExpands !== expands.size || nTitles !== titles.size) {
     console.error(
-      `✗ ${file}: ${links.size} call activit(ies) to link but ${wrapped} wrapped — ` +
+      `✗ ${file}: ${expands.size} [+] and ${titles.size} title link(s) to place but ${nExpands} and ${nTitles} placed — ` +
         `bpmn-js shape markup changed, so the links would be silently missing`,
     );
     process.exitCode = 1;
