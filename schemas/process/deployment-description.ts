@@ -162,7 +162,16 @@ export interface DeploymentDescription {
   placements: Placement[];
   jurisdiction?: Jurisdiction;
   liveData: LiveData;
+  /**
+   * The Tool that backs each store Role in this deployment, keyed by the
+   * Role's id: `{ "work-plan": "beans-git-branch" }` (owner, 2026-11-02,
+   * cat-harness#991 Q-BSD-2 A). A Role left out uses its default Tool.
+   */
+  stores?: Record<string, string>;
 }
+
+/** A Role or Tool id: lower-case words joined by hyphens. */
+const StoreIdSchema = z.string().regex(/^[a-z][a-z0-9-]*$/);
 
 /**
  * A secret or mechanism name: letters, digits, `_`, `-`, `.`. It refuses a
@@ -206,6 +215,7 @@ export const DeploymentDescriptionSchema = z
     placements: z.array(PlacementSchema),
     jurisdiction: JurisdictionSchema.optional(),
     liveData: z.enum(LIVE_DATA),
+    stores: z.record(StoreIdSchema, StoreIdSchema).optional(),
   })
   .strict();
 
