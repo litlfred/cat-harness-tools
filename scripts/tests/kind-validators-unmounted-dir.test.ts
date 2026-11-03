@@ -101,3 +101,40 @@ describe("a chosen directory, mounted and empty", () => {
     expect(beans.read).toBe(1);
   });
 });
+
+/**
+ * A directory whose content the declaration says is BUILT AT PUBLISH
+ * (`builtAtPublish` names a path inside it): gitignored and never committed,
+ * so no checkout holds it until the writer runs. Not examined, never
+ * `EXAMINED NOTHING`. The same absent directory WITHOUT that claim still fails.
+ */
+describe("a declared directory built at publish and not built here", () => {
+  function instance(builtAtPublish: boolean): string {
+    const parent = mkdtempSync(join(tmpdir(), "kv-built-"));
+    made.push(parent);
+    const inst = join(parent, "fixture");
+    mkdirSync(inst, { recursive: true });
+    writeDeclaration(inst, {
+      name: "fixture",
+      directories: [{ id: "fixture-beans", path: "beans/", graphTypologies: ["beans"] }],
+      ...(builtAtPublish
+        ? { builtAtPublish: [{ path: "beans/index.json", writer: ["beans:build"], because: "checkout", reason: "written at publish, never committed" }] }
+        : {}),
+    });
+    return inst;
+  }
+
+  test("is reported as built at publish, and nothing was read", async () => {
+    const beans = (await sweepFamilies(instance(true))).find((f) => f.kind === "beans")!;
+    expect(nodesOf(beans)).toBe(0);
+    expect(beans.builtNotHere).toEqual([{ id: "fixture-beans", path: "fixture/beans", writers: ["beans:build"] }]);
+    expect(beans.read ?? 0).toBe(0);
+  });
+
+  test("without a builtAtPublish claim, an absent directory gets no excuse", async () => {
+    const beans = (await sweepFamilies(instance(false))).find((f) => f.kind === "beans")!;
+    expect(beans.builtNotHere).toBeUndefined();
+    expect(beans.notMounted).toBeUndefined();
+    expect(beans.read).toBe(1);
+  });
+});

@@ -217,6 +217,14 @@ export interface FamilySweep {
    * mounted and empty, is still `EXAMINED NOTHING`.
    */
   notMounted?: { id: string; path: string; lock: string }[];
+  /**
+   * Declared directories of this kind whose content the declaration says is
+   * BUILT AT PUBLISH (`builtAtPublish` names a path inside them) and that hold
+   * no node in this checkout: gitignored, never committed, so no checkout has
+   * them until the writer runs. **Not examined — never `EXAMINED NOTHING`.**
+   * A directory with no `builtAtPublish` claim gets no such allowance.
+   */
+  builtNotHere?: { id: string; path: string; writers: string[] }[];
   /** How many directories of this kind were actually read. */
   read?: number;
   /** Directories of this kind stored on a branch FAMILY: by declaration not in the checkout (bean lehh). */
@@ -379,6 +387,14 @@ export async function sweepFamilies(
         // two instances' `glossary` would both resolve to one of them — only a
         // branch-stored graph needs it, to find its mount.
         if (src?.kind !== "branch") {
+          // Built at publish and not built here: nothing committed to read.
+          const rel = relative(inst, d.absPath).replace(/\/+$/, "");
+          const built = (readDeclaration(inst)?.builtAtPublish ?? []).filter((b) => b.path.replace(/\/+$/, "").startsWith(`${rel}/`) || b.path.replace(/\/+$/, "") === rel);
+          if (built.length > 0 && (!existsSync(d.absPath) || jsonFiles(d.absPath).length === 0)) {
+            const writers = [...new Set(built.flatMap((b) => b.writer))];
+            (s.builtNotHere ??= []).push({ id: d.id, path: relative(repoRoot, d.absPath) || ".", writers });
+            continue;
+          }
           dirs.add(d.absPath);
           continue;
         }
@@ -514,6 +530,13 @@ async function main(): Promise<number> {
       console.log(`  · no instance declares a ${f.kind} directory — its nodes above were met in a parent kind's directory`);
     } else if (f.noDirectory) {
       console.log(`  · no instance declares a ${f.kind} directory — nothing to route (a nested kind is reached through its parent)`);
+    } else if (f.builtNotHere && nodes === 0 && !f.read && !f.unreachable) {
+      // NOT EXAMINED: the declaration says this content is written at publish
+      // and never committed, so no checkout holds it until the writer runs.
+      for (const b of f.builtNotHere) {
+        console.log(`  · not examined — ${f.kind} at \`${b.id}\` (${b.path}) is built at publish${b.writers.length ? ` by ${b.writers.join(", ")}` : ""} (\`builtAtPublish\`) and holds no node in this checkout`);
+      }
+      for (const m of f.notMounted ?? []) console.log(`  · not examined — ${f.kind} at \`${m.id}\` (${m.path}) is declared upstream and not mounted here: ${m.lock} does not choose it`);
     } else if (f.notMounted && nodes === 0 && !f.read && !f.unreachable) {
       // NOT EXAMINED: every directory of this kind is one the mount did not
       // choose. Not a pass, and not `EXAMINED NOTHING` either — nothing here
