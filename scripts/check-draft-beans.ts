@@ -280,7 +280,7 @@ export function formatReport(report: DraftBeansReport): string {
     }
     out.push("");
     out.push("  A draft ruling request on an unmerged branch is invisible to sibling sessions.");
-    out.push('  See skills/sdlc/sdlc-core/bean-coordination.md §"A DECISION bean you will not land soon".');
+    out.push('  See work-plan/skills/work-plan/bean-coordination.md §"A DECISION bean you will not land soon".');
   }
 
   if (report.findings.length === 0 && report.undetermined.length === 0) {

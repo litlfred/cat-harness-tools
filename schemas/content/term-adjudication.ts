@@ -19,8 +19,8 @@
  *    the authorised vocabulary spells differently, or does not carry at all.
  *    That is a CONTENT decision, and it is this file.
  * 2. **Two judges disagree about a mapping.** That is
- *    [`adjudication`](../skills/sdlc/sdlc-core/adjudication.md) plus
- *    [`untainted-verification`](../skills/sdlc/sdlc-core/untainted-verification.md),
+ *    [`adjudication`](../sdlc/skills/sdlc-core/adjudication.md) plus
+ *    [`untainted-verification`](../sdlc/skills/sdlc-core/untainted-verification.md),
  *    and it is NOT built. The owner's ruling keeps it waiting until
  *    something maps. Rejecting an automated match as wrong is a judgement
  *    about a mapping, so it belongs to leg 2 and has no outcome here.

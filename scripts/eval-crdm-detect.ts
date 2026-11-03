@@ -8,7 +8,7 @@
  *
  * ## What this measures, and what it does not
  *
- * `skills/sdlc/crdm/crdm-detect.md` is prose for a model to read. It lists
+ * `sdlc/skills/crdm/crdm-detect.md` is prose for a model to read. It lists
  * five categories of phrasing plus an explicit "what is NOT a feature request"
  * list. This script implements the PHRASE SIGNALS mechanically. That makes it
  * a LOWER BOUND on an agent that also applies judgement — an agent can catch a
@@ -47,13 +47,15 @@ import { detect, parseSkillExclusions } from "../src/crdm/detect-signals.ts";
 import { buildTestRun, hashesReproduce, TestRunSchema } from "../schemas/sdlc/test-run.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 import { TEST_RUN_OUT_ENV } from "./test-run-compute.ts";
+import { harnessPath, harnessRel } from "./lib/harness-layout.ts";
 
 const root = resolve(HARNESS_ROOT);
 const verbose = process.argv.includes("--verbose");
 
 interface Item { number: number; title: string; isFeature: boolean; why: string; text: string }
 
-const SKILL = join(root, "skills/sdlc/crdm/crdm-detect.md");
+// declared-path-literal: written in the new layout and answered in whichever the harness has — transitional, cat-harness#991 step 23 (scripts/lib/harness-layout.ts); remove after cat-harness#1014 merges.
+const SKILL = harnessPath("sdlc/skills/crdm/crdm-detect.md", root);
 const skillExclusions = parseSkillExclusions(readFileSync(SKILL, "utf-8"));
 
 const corpus: Item[] = JSON.parse(
@@ -156,7 +158,7 @@ const run = buildTestRun({
     "cat-harness-tools/scripts/eval-crdm-detect.ts",
     "cat-harness-tools/src/crdm/detect-signals.ts",
     // declared-path-literal: a provenance record (`processInputs`), written into the evaluation report as repo-relative names; it is not read from disk here.
-    "cat-harness/skills/sdlc/crdm/crdm-detect.md",
+    `cat-harness/${harnessRel("sdlc/skills/crdm/crdm-detect.md", root)}`,
   ],
   outcome: {
     population: corpus.length,

@@ -36,7 +36,7 @@
  *
  * How a recipe synthesises records or how a fixed set's payload is structured
  * depends on the folio's `contentType`. The general curation workflow
- * (`processes/sdlc/test-data-curation.bpmn`) delegates the content-type step
+ * (`sdlc/processes/test-data-curation.bpmn`) delegates the content-type step
  * to a called subprocess (`specialisation`):
  *
  * - `"fhir-templating"` (`FHIR_TEMPLATING_SPECIALISATION`) is **one named
@@ -69,7 +69,7 @@
  * identity** (`reviewer`: `kind: "human"`, `provider`, `handle`, `role`) and
  * the **review date** (`reviewedAt`), because an audited review without an
  * attributable reviewer and date is not audited. The review is governed by
- * `processes/sdlc/sme-test-data-review.bpmn`, where the SME sits in a lane
+ * `sdlc/processes/sme-test-data-review.bpmn`, where the SME sits in a lane
  * whose role (`clinical-sme`) is `judgementOnly: true` — no procedure yields
  * the answer, which is the whole reason a person is in the lane.
  */

@@ -218,7 +218,7 @@ describe("classify", () => {
     expect(classify("cat-harness/docs/reference/skill-instructions/merge-conflict-patterns.md").strategy).toBe(
       "take-base",
     );
-    expect(classify("cat-harness/skills/sdlc/sdlc-core/merge-conflict-patterns.md").strategy).toBe("refuse");
+    expect(classify("cat-harness/sdlc/skills/sdlc-core/merge-conflict-patterns.md").strategy).toBe("refuse");
   });
 
   test("every generated docs page classifies to `docs-pages` — read from the tree, not listed", () => {
@@ -981,7 +981,7 @@ describe("owned-tree: subgraph indexes and content-addressed payloads (#2176)", 
   });
 
   test("the neighbours stay refused: the authored skill a subgraph is built FROM, and the rest of docs/payload", () => {
-    expect(classify("cat-harness/skills/sdlc/sdlc-core/merge-conflict-patterns.md").strategy).toBe("refuse");
+    expect(classify("cat-harness/sdlc/skills/sdlc-core/merge-conflict-patterns.md").strategy).toBe("refuse");
     expect(classify("cat-harness/docs/payload/README.txt").strategy).toBe("refuse");
   });
 

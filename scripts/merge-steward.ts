@@ -4,7 +4,7 @@
  * was written for and never got.
  *
  * `merge-queue.ts` derives each candidate's facts, evaluates
- * `processes/sdlc/decisions/merge-priority.dmn` and orders the result. Its own
+ * `sdlc/processes/decisions/merge-priority.dmn` and orders the result. Its own
  * docblock calls it "a library the merge steward and the tile call". Measured
  * 2026-10-04: **nothing called it.** It is wired to no `package.json` script,
  * so the ordering a declared decision table exists to give could not be asked

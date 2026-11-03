@@ -39,7 +39,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { directoryForGraph } from "../schemas/kg/cat-harness.ts";
+import { directoryForGraph, ownDirectoryById } from "../schemas/kg/cat-harness.ts";
 import { requireHarnessRoot } from "../schemas/harness-root.ts";
 import { readRoleGraph } from "../schemas/process/role-graph.js";
 import {
@@ -61,6 +61,7 @@ import {
   summarizeSelfManagedArm,
 } from "../src/workflow/arm-self-managed.js";
 import { assertBenchmarkOutputPath } from "./benchmark-guard.ts";
+import { harnessRel } from "./lib/harness-layout.ts";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const TOOLS_ROOT = resolve(SCRIPT_DIR, "..");
@@ -143,19 +144,22 @@ function toTestRunCase(metrics: ArmCaseMetrics): TestCase {
 export async function evaluateForcedVsManaged(opts?: {
   now?: Date;
 }): Promise<ForcedVsManagedEvaluation> {
-  const processesDir = directoryForGraph(HARNESS_ROOT, "processes");
+  // The sdlc diagrams sit in the `sdlc` sub-graph (cat-harness#991 step 23.2); both graphs looked up by id,
+  // since `processes` and `skills` now have more than one directory each.
+  // declared-path-literal: the fallback only — the directory is read by its declared id `sdlc-processes`; the literal is the convention when the `sdlc` sub-graph is not declared, at the call site so the choice is visible.
+  const processesDir = ownDirectoryById(HARNESS_ROOT, "sdlc-processes", harnessRel("sdlc/processes"));
   const scenariosDir = directoryForGraph(HARNESS_ROOT, "scenarios");
-  const skillsDir = directoryForGraph(HARNESS_ROOT, "skills");
+  const skillsDir = ownDirectoryById(HARNESS_ROOT, "skills", "skills");
   if (!processesDir || !scenariosDir || !skillsDir) {
     throw new Error(`Missing declared directories in ${HARNESS_ROOT}`);
   }
 
-  const mainDiagramPath = join(processesDir, "sdlc", "test-plan-execution.bpmn");
-  const childDiagramPath = join(processesDir, "sdlc", "qa-report-signing.bpmn");
-  const certDmnPath = join(processesDir, "sdlc", "decisions", "test-certification.dmn");
-  const signingDmnPath = join(processesDir, "sdlc", "decisions", "signing-route.dmn");
-  const beanOpenPath = join(processesDir, "sdlc", "bean-open.bpmn");
-  const beanClosePath = join(processesDir, "sdlc", "bean-close.bpmn");
+  const mainDiagramPath = join(processesDir, "test-plan-execution.bpmn");
+  const childDiagramPath = join(processesDir, "qa-report-signing.bpmn");
+  const certDmnPath = join(processesDir, "decisions", "test-certification.dmn");
+  const signingDmnPath = join(processesDir, "decisions", "signing-route.dmn");
+  const beanOpenPath = join(processesDir, "bean-open.bpmn");
+  const beanClosePath = join(processesDir, "bean-close.bpmn");
   const rolesPath = join(scenariosDir, "roles.json");
   const bankPath = join(TOOLS_ROOT, "scripts", "eval", "bpmn-forced-vs-managed-bank.json");
 

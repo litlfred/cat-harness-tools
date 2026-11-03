@@ -1,5 +1,5 @@
 /**
- * Process_BeanDrain (cat-harness `processes/sdlc/bean-drain.bpmn`, bean
+ * Process_BeanDrain (cat-harness `sdlc/processes/bean-drain.bpmn`, bean
  * `bssi`) walked through the engine: build the queue, then per bean OPEN →
  * work → CLOSE, then refill.
  *

@@ -1,9 +1,9 @@
 {
   "$schema": "https://litlfred.github.io/folio-assistant/schemas/bpmn-forced-vs-managed-bank/v1",
   "bankId": "bpmn-forced-vs-managed-v1",
-  "diagram": "processes/sdlc/test-plan-execution.bpmn",
-  "subprocessDiagram": "processes/sdlc/qa-report-signing.bpmn",
-  "beanDiagrams": ["processes/sdlc/bean-open.bpmn", "processes/sdlc/bean-close.bpmn"],
+  "diagram": "sdlc/processes/test-plan-execution.bpmn",
+  "subprocessDiagram": "sdlc/processes/qa-report-signing.bpmn",
+  "beanDiagrams": ["sdlc/processes/bean-open.bpmn", "sdlc/processes/bean-close.bpmn"],
   "description": "Independent task bank for bean folio-assistant-502c comparing Arm 1 (forced along a BPMN by the token machine) against Arm 2 (self-managed with the full diagram in context) on test-plan-execution.bpmn and the processes it calls: qa-report-signing.bpmn, and bean-open.bpmn / bean-close.bpmn around the work (bean m8gz). Each case's agentProposal is a SIMULATED agent: a hand-written step script that both arms replay. It exercises the runner and the engine's refusals; it is not a model, and results produced with it are not evidence about model behaviour.",
   "cases": [
     {

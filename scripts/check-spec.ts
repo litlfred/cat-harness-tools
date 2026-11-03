@@ -5,7 +5,7 @@
  * ## What this script does
  *
  * Verifies that a specification adheres to the declared template
- * (`cat-harness/skills/sdlc/spec-kit/spec-template.md`):
+ * (`cat-harness/sdlc/skills/spec-kit/spec-template.md`):
  * - Contains all mandatory sections:
  *   - "User Scenarios & Testing"
  *   - "Requirements"
@@ -28,6 +28,8 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+
+import { harnessRel } from "./lib/harness-layout.ts";
 import {
   MANDATORY_SPEC_SECTIONS,
   loadDeclaredSpecTemplate,
@@ -36,12 +38,10 @@ import {
 } from "../schemas/sdlc/spec-template.ts";
 
 /** Default path to the declared spec template relative to repo root. */
-// declared-path-literal: the spec template is one fixed FILE inside cat-harness's own spec-kit skill, not a directory any instance declares; the two spellings are the composed and standalone layouts.
-export const DEFAULT_TEMPLATE_PATH = existsSync(
-  join("cat-harness", "skills", "sdlc", "spec-kit", "spec-template.md")
-)
-  ? join("cat-harness", "skills", "sdlc", "spec-kit", "spec-template.md")
-  : join("skills", "sdlc", "spec-kit", "spec-template.md");
+// declared-path-literal: the spec template is one fixed FILE inside cat-harness's own spec-kit skill, not a directory any instance declares; the two spellings are the composed and standalone layouts. Written in the sub-graph layout and answered in whichever the harness has (transitional, scripts/lib/harness-layout.ts, cat-harness#991 step 23).
+export const DEFAULT_TEMPLATE_PATH = existsSync(join("cat-harness", harnessRel("sdlc/skills/spec-kit/spec-template.md")))
+  ? join("cat-harness", harnessRel("sdlc/skills/spec-kit/spec-template.md"))
+  : harnessRel("sdlc/skills/spec-kit/spec-template.md");
 
 export interface FetchResult {
   state: "ok" | "unknown";

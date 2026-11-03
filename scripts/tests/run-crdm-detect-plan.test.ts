@@ -10,7 +10,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { directoryForGraph } from "../../schemas/kg/cat-harness.ts";
+import { ownDirectoryById } from "../../schemas/kg/cat-harness.ts";
 import { TestPlanSchema } from "../../schemas/sdlc/test-plan.ts";
 import { TEST_REPORT_SCHEMA_ID, TestReportSchema, computeRollup } from "../../schemas/sdlc/test-report.ts";
 import { detect } from "../../src/crdm/detect-signals.ts";
@@ -19,16 +19,18 @@ import { complete, enabled, startInstance } from "../../src/workflow/instance.ts
 import { completeExitCriteriaGateway, openTrackedBean } from "../test-plan-execution.ts";
 import { SUT, TESTER, checkSample, exitFacts, measure, verdictsFor, type CorpusItem } from "../run-crdm-detect-plan.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
+import { harnessRel } from "../lib/harness-layout.ts";
 
 const plan = TestPlanSchema.parse(JSON.parse(readFileSync(join(HARNESS_ROOT, "test", "plans", "crdm-detect-evaluation.test-plan.json"), "utf-8")));
 const corpus = JSON.parse(readFileSync(join(TOOLS_ROOT, "scripts", "eval", "crdm-detect-corpus.json"), "utf-8")) as CorpusItem[];
 const outputs = corpus.map((it) => detect(it.text));
 const AT = "2026-10-11T08:00:00Z";
-// The harness's declared processes graph, as the runner asks it.
+// The `sdlc` sub-graph's processes graph, by its declared id, as the runner asks it.
 // Resolved on first use, not at module scope: a throw from a malformed
 // declaration would otherwise abort the module and surface elsewhere
 // (check:module-scope-resolution, bean `95s1`).
-const sdlc = (): string => join(directoryForGraph(HARNESS_ROOT, "processes")!, "sdlc");
+// declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
+const sdlc = (): string => ownDirectoryById(HARNESS_ROOT, "sdlc-processes", harnessRel("sdlc/processes"));
 
 const reportFor = (cases: ReturnType<typeof verdictsFor>) =>
   TestReportSchema.parse({

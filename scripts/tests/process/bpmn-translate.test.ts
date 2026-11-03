@@ -13,6 +13,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { extractBpmn, injectBpmn, decodeLabel } from "../../../pipeline/bpmn-translate.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
+import { harnessPath } from "../../lib/harness-layout.ts";
 
 const ROOT = join(HARNESS_ROOT);
 const XML = readFileSync(join(ROOT, "processes/process/crdm-requirements.bpmn"), "utf-8");
@@ -29,7 +30,7 @@ const PHASE_XML = readFileSync(join(ROOT, "processes/process/crdm-deliver.bpmn")
 // A diagram that still draws its work-plan steps: since cat-harness#991 step
 // 17 only the `sdlc` diagrams do (proposal §4.13), so this fixture is one of them.
 // declared-path-literal: a diagram of the harness's own corpus, read as a translation fixture
-const SDLC_XML = readFileSync(join(ROOT, "processes/sdlc/merge-refusal.bpmn"), "utf-8");
+const SDLC_XML = readFileSync(harnessPath("sdlc/processes/merge-refusal.bpmn", ROOT), "utf-8");
 
 describe("extractBpmn", () => {
   test("finds the labels a reader sees", () => {

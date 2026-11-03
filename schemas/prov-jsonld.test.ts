@@ -23,6 +23,7 @@ import {
 import { agreementDistribution, grantCredential, stampProvDecisionRecord, type ProvActivity } from "./content/prov.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { dirname } from "node:path";
+import { harnessRel } from "../scripts/lib/harness-layout.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 const P = "http://www.w3.org/ns/prov#";
@@ -62,7 +63,8 @@ describe("provJsonldDocument — a real checkout's actors, roles and plans", () 
     expect(assoc[`${P}agent`]).toEqual([{ "@id": "https://litlfred.github.io/cat-harness/v0/scenarios/actors/owner" }]);
     expect(assoc[`${P}hadRole`]).toEqual([{ "@id": "https://litlfred.github.io/cat-harness/v0/scenarios/roles/authoring-agent" }]);
     expect(assoc[`${P}hadPlan`]).toEqual([
-      { "@id": "https://litlfred.github.io/cat-harness/v0/processes/sdlc/code-change-review/Task_ClaimBean" },
+      // declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
+      { "@id": `https://litlfred.github.io/cat-harness/v0/${harnessRel("sdlc/processes")}/code-change-review/Task_ClaimBean` },
     ]);
   });
 

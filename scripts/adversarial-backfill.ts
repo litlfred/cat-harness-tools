@@ -62,6 +62,7 @@ import {
   serialiseAttestations,
   type AdversarialReviewAttestations,
 } from "../schemas/sdlc/qa-attestations.ts";
+import { harnessRel } from "./lib/harness-layout.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -120,7 +121,7 @@ export const GATE_PATH_NODES: readonly { id: string; kind: AdversarialContentKin
   { id: "gates", kind: "tool", path: "scripts/gates.ts" },
   { id: "merge-base", kind: "tool", path: "scripts/merge-base.ts" },
   { id: "regen-after-merge", kind: "tool", path: "scripts/regen-after-merge.ts" },
-  { id: "merge-conflict-patterns", kind: "skill", path: "skills/sdlc/sdlc-core/merge-conflict-patterns.md" },
+  { id: "merge-conflict-patterns", kind: "skill", path: harnessRel("sdlc/skills/sdlc-core/merge-conflict-patterns.md") },
   { id: "kg-qa", kind: "schema", path: "schemas/sdlc/kg-qa.ts" },
 ] as const;
 

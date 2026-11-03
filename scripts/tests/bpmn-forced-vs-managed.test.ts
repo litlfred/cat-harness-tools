@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { directoryForGraph } from "../../schemas/kg/cat-harness.ts";
+import { ownDirectoryById } from "../../schemas/kg/cat-harness.ts";
 import {
   basisOverlap,
   hashesReproduce,
@@ -137,7 +137,7 @@ describe("bean 502c — forced along a BPMN vs managing it (two-arm experiment)"
 
     // A graph directory inside HARNESS_ROOT: the guard judges paths relative to
     // the root it is given, and `beans` is declared at the checkout root, outside it.
-    const processesDir = directoryForGraph(HARNESS_ROOT, "processes");
+    const processesDir = ownDirectoryById(HARNESS_ROOT, "processes", "processes");
     if (!processesDir) throw new Error("processes directory not declared");
     expect(() => writeForcedVsManagedOutputs(result, processesDir, HARNESS_ROOT)).toThrow(
       /resolves inside declared graph directory/,

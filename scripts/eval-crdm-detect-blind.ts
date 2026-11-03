@@ -30,14 +30,16 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { kgRoots } from "./known-skills.ts";
+import { ownDirectoryById } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { harnessRel } from "./lib/harness-layout.ts";
 
 const INSTANCE = join(HARNESS_ROOT);
 const CORPUS = join(TOOLS_ROOT, "scripts", "eval", "crdm-detect-corpus.json");
 // The skill is found through the DECLARED knowledge graph, not a spelled
 // `skills/` — the declared-path rule, and a relocation-proof lookup.
-const SKILL = join(kgRoots(INSTANCE)[0] ?? INSTANCE, "sdlc", "crdm", "crdm-detect.md");
+// declared-path-literal: the fallback only — the directory is read by its declared id `sdlc-skills`; the literal is the convention when the `sdlc` sub-graph is not declared, at the call site so the choice is visible.
+const SKILL = join(ownDirectoryById(INSTANCE, "sdlc-skills", harnessRel("sdlc/skills", INSTANCE)), "crdm", "crdm-detect.md");
 
 export interface Item { number: number; title: string; isFeature: boolean; why: string; text: string }
 export interface SecondLabel { id: string; isFeature: boolean; why: string }

@@ -83,7 +83,7 @@ describe("ownedInstalls", () => {
 
 describe("readChecklistSkill (bean folio-assistant-cy4p)", () => {
   const CHECKLIST = [
-    "<!-- GENERATED from cat-harness/processes/sdlc/activity-log.bpmn by cat-harness-tools/scripts/bpmn-checklist.ts. Do not edit: change the diagram and regenerate (bun run cat bpmn:checklist). -->",
+    "<!-- GENERATED from cat-harness/sdlc/processes/activity-log.bpmn by cat-harness-tools/scripts/bpmn-checklist.ts. Do not edit: change the diagram and regenerate (bun run cat bpmn:checklist). -->",
     "",
     "# Checklist — Agent \"activity\" log: runs",
     "",
@@ -106,7 +106,7 @@ describe("readChecklistSkill (bean folio-assistant-cy4p)", () => {
     // Double-quoted YAML is JSON string syntax, so the quotes and colon in the title survive.
     const parsed = JSON.parse(description) as string;
     expect(parsed).toContain('"Agent "activity" log: runs"');
-    expect(parsed).toContain("cat-harness/processes/sdlc/activity-log.bpmn");
+    expect(parsed).toContain("cat-harness/sdlc/processes/activity-log.bpmn");
     expect(parsed).toContain("next:");
     expect(parsed.endsWith("What an agent writes down about its own run.")).toBe(true);
   });

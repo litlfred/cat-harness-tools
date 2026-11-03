@@ -234,7 +234,7 @@ export function formatReport(r: BeanIssuesReport): string {
     for (const p of r.problems) out.push(`  ✗ ${p}`);
     out.push("");
     out.push("  Add `issue: <number|string>` in the bean's front matter, or reference the issue in the body.");
-    out.push("  Features and work requiring human adjudication owe an issue link (skills/sdlc/sdlc-core/bean-coordination.md).");
+    out.push("  Features and work requiring human adjudication owe an issue link (work-plan/skills/work-plan/bean-coordination.md).");
   }
   for (const o of r.outstanding) out.push(`  · outstanding (baselined): ${o}`);
   for (const k of r.stale) out.push(`  ✗ baseline entry \`${k}\` matches nothing — remove it from ${BASELINE_FILE}`);

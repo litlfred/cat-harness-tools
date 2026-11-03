@@ -373,7 +373,7 @@ interface Group {
    *
    * The output directory is flat, so two groups' identical basenames would have
    * one silently overwrite the other. `.claude/skills/local/todo-manager.md`
-   * and `skills/sdlc/sdlc-core/todo-manager.md` collide that way.
+   * and `work-plan/skills/work-plan/todo-manager.md` collide that way.
    *
    * **The divergence that made this urgent is RESOLVED (bean `tdmg`,
    * 2026-09-19); the prefix is still required.** They were 369 and 396 lines
@@ -476,7 +476,9 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   "conduct-core": "Agent conduct (conduct-core)",
   "process-core": "Process model — roles, authorization, methodology (process-core)",
   "authoring-core": "Content authoring and editorial review (authoring-core)",
-  "sdlc-core": "Software delivery practice — work plan, review, merge, CI, coordination (sdlc-core)",
+  "sdlc-core": "Software delivery practice — review, merge, CI, coordination (sdlc-core)",
+  // Split out of `sdlc-core` into the opt-in `work-plan` sub-graph of cat-harness (cat-harness#991 step 23.2).
+  "work-plan": "The work plan — beans, claiming, blocking, draining, the store (work-plan)",
   theming: "Theming (theming)",
   // Keyed by basename: a package subdirectory of the declared `skills/`,
   // like `theming` above. Bean `6bhf`, owner 2026-09-25 — "bean as
@@ -543,9 +545,9 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   // instead. The old keys would not have failed loudly — they would simply
   // never match, and the generator throws naming the id it wanted, which is
   // how this was caught rather than shipped as two uncategorised packages.
-  crdm: "CRDM requirements methodology (skills/sdlc/crdm)",
+  crdm: "CRDM requirements methodology (sdlc/skills/crdm)",
   raci: "RACI involvement model (skills/process/raci)",
-  "spec-kit": "Spec Kit spec-driven development (skills/sdlc/spec-kit)",
+  "spec-kit": "Spec Kit spec-driven development (sdlc/skills/spec-kit)",
   // Synced from claude-scientific-skills at a pinned commit (issue #556):
   // somebody else's bytes, one package per skill so upstream's relative links
   // resolve. `remote-stubs` was retired when these arrived.

@@ -33,7 +33,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { directoryForGraph } from "../schemas/kg/cat-harness.ts";
+import { ownDirectoryById } from "../schemas/kg/cat-harness.ts";
 import { TestPlanSchema, type TestPlan } from "../schemas/sdlc/test-plan.ts";
 import { buildTestRun, UNKNOWN_HASH, type SutRef, type TestRun } from "../schemas/sdlc/test-run.ts";
 import {
@@ -52,6 +52,7 @@ import { saveInstance } from "../src/workflow/store.ts";
 import { completeExitCriteriaGateway, openTrackedBean } from "./test-plan-execution.ts";
 import { renderTestReport, testReportBadge } from "./render-test-report.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { harnessRel } from "./lib/harness-layout.ts";
 
 export interface CorpusItem { number: number; title: string; isFeature: boolean; why: string; text: string }
 
@@ -170,7 +171,7 @@ if (import.meta.main) {
       "cat-harness-tools/scripts/run-crdm-detect-plan.ts",
       "cat-harness-tools/src/crdm/detect-signals.ts",
       // declared-path-literal: provenance records written into the run as repo-relative names; read through the plan path above, not here.
-      "cat-harness/skills/sdlc/crdm/crdm-detect.md",
+      `cat-harness/${harnessRel("sdlc/skills/crdm/crdm-detect.md")}`,
       "cat-harness/test/plans/crdm-detect-evaluation.test-plan.json",
     ],
     outcome: measure(corpus, outputs),
@@ -208,9 +209,9 @@ if (import.meta.main) {
 
   // The process instance, driven as `workflow_complete` would drive it.
   // The diagram from the harness's DECLARED processes graph, never a spelled path.
-  const processes = directoryForGraph(HARNESS_ROOT, "processes");
-  if (processes === undefined) throw new Error("the harness declares no processes graph, so test-plan-execution.bpmn cannot be found");
-  const sdlc = join(processes, "sdlc");
+  // The `sdlc` sub-graph's processes graph, by its declared id (cat-harness#991 step 23.2).
+  // declared-path-literal: the fallback only — the directory is read by its declared id `sdlc-processes`; the literal is the convention when the `sdlc` sub-graph is not declared, at the call site so the choice is visible.
+  const sdlc = ownDirectoryById(HARNESS_ROOT, "sdlc-processes", harnessRel("sdlc/processes"));
   const model = await loadProcessModel(join(sdlc, "test-plan-execution.bpmn"));
   let state: InstanceState = startInstance(model, { id: `${plan.id}-${runId}`, subject: `${plan.id}@${plan.version} vs ${SUT.actor}`, bean: "folio-assistant-ff09" });
   // The bean is opened first, in bean-open.bpmn (bean `m8gz`); `ff09` exists and is this runner's.

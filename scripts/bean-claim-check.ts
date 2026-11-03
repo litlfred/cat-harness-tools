@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Check a bean is free, then claim it on every copy — the `bean-claim-check`
- * Tool (cat-harness `tools/bean-claim-check/`), skill `bean-drain` step 2,
+ * Tool (cat-harness `work-plan/tools/bean-claim-check/`), skill `bean-drain` step 2,
  * bean `n7x7`.
  *
  * The case it exists for is f1e1, 2026-10-24: agy opened cat-harness-tools#686

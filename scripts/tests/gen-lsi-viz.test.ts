@@ -23,12 +23,14 @@ import { renderCommitted, renderFrom, type IndexesRead } from "../gen-lsi-viz.ts
 import { INDEX_DIR, proseGraphs, sourceFromFiles, type LsiSidecar } from "../lsi.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { dirname } from "node:path";
+import { harnessRel } from "../lib/harness-layout.ts";
 
 const REPO = resolve(dirname(HARNESS_ROOT));
 
 /** Two real skill files, so "every unit it names is a file" has something true to check. */
-const UNIT_A = "cat-harness/skills/sdlc/sdlc-core/qa-reports.md";
-const UNIT_B = "cat-harness/skills/sdlc/sdlc-core/qa-witness.md";
+// declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
+const UNIT_A = `cat-harness/${harnessRel("sdlc/skills/sdlc-core/qa-reports.md")}`;
+const UNIT_B = `cat-harness/${harnessRel("sdlc/skills/sdlc-core/qa-witness.md")}`;
 
 const FIXTURE: LsiSidecar = {
   $schema: "folio-lsi-index/v1",

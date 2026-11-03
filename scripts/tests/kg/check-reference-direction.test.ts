@@ -911,7 +911,7 @@ describe("X4 — Markdown in cat-harness may name a cat-harness-tools script (ow
   };
   const verdict = (file: string, text: string, to = "cat-harness-tools") =>
     classifyReference(occ("cat-harness", to, text, file), LAYER_RULE, never, [DEFINITION_NAMES_IMPLEMENTATION]).verdict;
-  const SKILL = "cat-harness/skills/sdlc/sdlc-core/x.md";
+  const SKILL = "cat-harness/sdlc/skills/sdlc-core/x.md";
 
   test("a skill's command line naming a tools script is exempt", () => {
     expect(verdict(SKILL, "bun run cat-harness-tools/scripts/qa-refresh.ts --check")).toBe("exempt");

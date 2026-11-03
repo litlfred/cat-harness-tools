@@ -259,7 +259,7 @@ if (import.meta.main) {
     if (bad.length > 0) {
       console.error(
         "\nA block with no expiry cannot be told from abandoned work. " +
-          "See `skills/sdlc/sdlc-core/bean-blocking.md` for the four fields.",
+          "See `work-plan/skills/work-plan/bean-blocking.md` for the four fields.",
       );
     }
     process.exit(1);

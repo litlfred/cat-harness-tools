@@ -24,6 +24,7 @@ import {
   hashesReproduce,
 } from "./sdlc/test-run.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { harnessRel } from "../scripts/lib/harness-layout.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const temps: string[] = [];
@@ -94,7 +95,8 @@ describe("criterion 1 — both hashes, neither derivable from the other", () => 
       skill: "crdm-detect",
       subject: "crdm-detect phrase signals against the issue corpus",
       dataInputs: ["cat-harness-tools/scripts/eval/crdm-detect-corpus.json"],
-      processInputs: ["cat-harness-tools/scripts/eval-crdm-detect.ts", "cat-harness/skills/sdlc/crdm/crdm-detect.md"],
+      // declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
+      processInputs: ["cat-harness-tools/scripts/eval-crdm-detect.ts", `cat-harness/${harnessRel("sdlc/skills/crdm/crdm-detect.md")}`],
       outcome: {},
     });
     expect(run.data.hash).not.toBe(UNKNOWN_HASH);

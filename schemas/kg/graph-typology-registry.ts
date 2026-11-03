@@ -1713,7 +1713,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // content, never from the directory path.
   "test-data-fixed": {
     description:
-      "fixed test data sets — one `test-data-fixed/1.0.0` document per curated set (`kind: \"fixed\"`, committed records, citations, and optional SME review sign-off). Separate graph typology from `test-data-generated` (bean `vm6m`) so fixed sets live in their own declared directory, and self-identifying from the file content (`$schema` and `kind`) rather than from the path. `content`: a test run reads a fixed set and never overwrites it, and once SME-reviewed it stands as certification evidence. Shape in `schemas/sdlc/test-data.ts`; curated via `processes/sdlc/test-data-curation.bpmn`.",
+      "fixed test data sets — one `test-data-fixed/1.0.0` document per curated set (`kind: \"fixed\"`, committed records, citations, and optional SME review sign-off). Separate graph typology from `test-data-generated` (bean `vm6m`) so fixed sets live in their own declared directory, and self-identifying from the file content (`$schema` and `kind`) rather than from the path. `content`: a test run reads a fixed set and never overwrites it, and once SME-reviewed it stands as certification evidence. Shape in `schemas/sdlc/test-data.ts`; curated via `sdlc/processes/test-data-curation.bpmn`.",
     title: "Fixed test data sets",
     renderable: false,
     holds: "content",
@@ -1728,12 +1728,12 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // `contentType`, `specialisation`, `template`, `params`, `seed`, and the
   // canonical `sha256` digest of that recipe. Never stored materialised: the
   // test run synthesises the records from the recipe at execution time via the
-  // content-type specialisation subprocess (`processes/sdlc/test-data-curation.bpmn`).
+  // content-type specialisation subprocess (`sdlc/processes/test-data-curation.bpmn`).
   // FHIR templating (`specialisation: "fhir-templating"`) is one named
   // specialisation, not the platform design.
   "test-data-generated": {
     description:
-      "generated test data set recipes — one `test-data-generated/1.0.0` document per recipe (`kind: \"generated\"`, `contentType`, `specialisation`, `template`, `params`, `seed`, and canonical `sha256`), never stored materialised. Separate graph typology from `test-data-fixed` (bean `vm6m`) so synthetic recipes live in their own declared directory, and self-identifying from the file content (`$schema` and `kind`) rather than from the path. FHIR templating (`specialisation: \"fhir-templating\"`) is one named content-type specialisation, not the design. `content`: a test run reads the recipe to synthesise inputs and records the digest on `folio-test-run/v1`. Shape in `schemas/sdlc/test-data.ts`; curated via `processes/sdlc/test-data-curation.bpmn`.",
+      "generated test data set recipes — one `test-data-generated/1.0.0` document per recipe (`kind: \"generated\"`, `contentType`, `specialisation`, `template`, `params`, `seed`, and canonical `sha256`), never stored materialised. Separate graph typology from `test-data-fixed` (bean `vm6m`) so synthetic recipes live in their own declared directory, and self-identifying from the file content (`$schema` and `kind`) rather than from the path. FHIR templating (`specialisation: \"fhir-templating\"`) is one named content-type specialisation, not the design. `content`: a test run reads the recipe to synthesise inputs and records the digest on `folio-test-run/v1`. Shape in `schemas/sdlc/test-data.ts`; curated via `sdlc/processes/test-data-curation.bpmn`.",
     title: "Generated test data recipes",
     renderable: false,
     holds: "content",
@@ -1750,7 +1750,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // (`subjectKind: "indicator-definition"`).
   "sme-case-verdict": {
     description:
-      "SME review case/verdict pairs for decision support (worked `case`) and indicator definitions (`cohort` plus `expectedValue`) — one `sme-case-verdict/1.0.0` document per reviewed unit, recording the attributable human SME identity (`reviewer`) and review date (`reviewedAt`) alongside `verdict` and `rationale` (bean `vljz`). `content`: authored by a person in the `judgementOnly` SME lane of `processes/sdlc/sme-test-data-review.bpmn` so a fixed test data set can stand as audited evidence. Shape in `schemas/sdlc/test-data.ts`.",
+      "SME review case/verdict pairs for decision support (worked `case`) and indicator definitions (`cohort` plus `expectedValue`) — one `sme-case-verdict/1.0.0` document per reviewed unit, recording the attributable human SME identity (`reviewer`) and review date (`reviewedAt`) alongside `verdict` and `rationale` (bean `vljz`). `content`: authored by a person in the `judgementOnly` SME lane of `sdlc/processes/sme-test-data-review.bpmn` so a fixed test data set can stand as audited evidence. Shape in `schemas/sdlc/test-data.ts`.",
     title: "SME case/verdict pairs",
     renderable: false,
     holds: "content",

@@ -53,7 +53,7 @@ const kinds = (prs: LivePr[], c: FactContext = ctx) =>
 
 // An authored, non-declaration path: `refuse` strategy, not a shared
 // declaration. Measured 2026-10-02 — this is the only kind a train is for.
-const AUTHORED = "cat-harness/skills/sdlc/sdlc-core/merge-queue.md";
+const AUTHORED = "cat-harness/sdlc/skills/sdlc-core/merge-queue.md";
 // `refuse` AND a shared declaration, which is why the partition needs four
 // values rather than three.
 const DECLARATION = "package.json";
@@ -140,7 +140,7 @@ describe("merge-priority.dmn — readiness and CI, evaluated", () => {
   const HEAD = "e75895610c4aaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
   /** A PR that is finished in every respect, so one field at a time can be broken. */
   const done = (over: Partial<LivePr> = {}): LivePr => ({
-    ...pr(1, ["cat-harness/skills/sdlc/sdlc-core/x.md"]),
+    ...pr(1, ["cat-harness/sdlc/skills/sdlc-core/x.md"]),
     ownCi: "green",
     headShaMatchesCi: true,
     readySha: HEAD.slice(0, 11),

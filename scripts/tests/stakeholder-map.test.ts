@@ -13,9 +13,11 @@ import { join } from "node:path";
 import { stakeholderMap, formatStakeholderMap } from "../../src/impact/stakeholder-map.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 import { roleGraphFor } from "../known-skills.ts";
+import { harnessRel } from "../lib/harness-layout.ts";
 
 const ROOT = join(HARNESS_ROOT);
-const TODO_MANAGER = "skills/sdlc/sdlc-core/todo-manager.md";
+// declared-path-literal: written in the sub-graph layout and answered in whichever the harness has — transitional (scripts/lib/harness-layout.ts, cat-harness#991 step 23; remove after cat-harness#1014 merges).
+const TODO_MANAGER = harnessRel("work-plan/skills/work-plan/todo-manager.md");
 
 /**
  * The map for one changed skill, built ONCE at module scope and read by every

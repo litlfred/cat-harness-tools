@@ -28,7 +28,7 @@ describe("judgeBlobMainPath", () => {
     expect(judgeBlobMainPath("legacy/test/results/a.json", DIRS)).toBeUndefined();
   });
   test("an authored file is none of this gate's business", () => {
-    expect(judgeBlobMainPath("cat-harness/skills/sdlc/sdlc-core/qa-reports.md", DIRS)).toBeUndefined();
+    expect(judgeBlobMainPath("cat-harness/sdlc/skills/sdlc-core/qa-reports.md", DIRS)).toBeUndefined();
   });
 });
 
