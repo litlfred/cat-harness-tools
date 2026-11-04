@@ -175,7 +175,7 @@ report these two heads as findings, verified: exit **1**, `! Code-quality gates
 required — DID NOT EXECUTE`. Teaching the broad sweep to answer the same
 question a second way, in an unattended CI job, is the *"two answers to one
 question are free to disagree"* failure that
-[`github-state-inspection`](../../../cat-harness/skills/sdlc/sdlc-core/github-state-inspection.md)
+[`github-state-inspection`](https://github.com/litlfred/cat-harness/blob/main/sdlc/skills/sdlc-core/github-state-inspection.md)
 §"A clean check set and a COMPLETE check set are different questions" names
 explicitly — *"Do not build a second reconciliation"*. The sweep's own docblock
 scopes it to *"no CI run of any kind"*, and that scope is deliberate: it is a

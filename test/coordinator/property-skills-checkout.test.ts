@@ -19,10 +19,16 @@ const ORIGIN_DIR = join(import.meta.dir, "../../../cat-harness/schemas");
 
 const REPO = resolve(ORIGIN_DIR, "../..");
 
-/** Every skill stem in the tree: `<instance>/skills/**\/<name>.md`, and `SKILL.md` packages by directory. */
+/**
+ * Every skill stem in the tree: `<instance>/skills/**\/<name>.md`, the same
+ * under a named sub-graph (`<instance>/<sub-graph>/skills/**`, e.g.
+ * `cat-harness/sdlc/skills/`, cat-harness#991 step 23.2), and `SKILL.md`
+ * packages by directory.
+ */
 function skillNames(): Set<string> {
   const out = new Set<string>();
-  for (const p of new Glob("*/skills/**/*.md").scanSync({ cwd: REPO, onlyFiles: true })) {
+  const paths = ["*/skills/**/*.md", "*/*/skills/**/*.md"].flatMap((g) => [...new Glob(g).scanSync({ cwd: REPO, onlyFiles: true })]);
+  for (const p of paths) {
     if (p.includes("node_modules")) continue;
     const parts = p.split("/");
     const file = parts[parts.length - 1];
