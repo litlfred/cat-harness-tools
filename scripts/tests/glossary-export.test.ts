@@ -461,7 +461,7 @@ describe("graph kinds, node kinds and the harness are glossary terms", () => {
   test("a graph kind belongs to the instance that declares it, never to every instance that sees it", () => {
     const own = kindsDeclaredBy(HARNESS);
     expect(own).toContain("bean-defs");
-    expect(own).toContain("skills");
+    expect(own).toContain("beans");
     // bootstrap's base kinds are bootstrap's.
     for (const k of kindsDeclaredBy(BOOTSTRAP)) expect(own).not.toContain(k);
     // A directory that declares no instance owns nothing.
