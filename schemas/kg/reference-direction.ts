@@ -1,85 +1,49 @@
 /**
  * reference-direction.ts — does this PROSE reference follow the dependency arrow?
  *
- * The owner's rule, 2026-09-23:
+ * If A depends on B (directly or through a chain), nothing in B may reference
+ * A: B is lower and must not know what sits on top of it.
+ * `bootstrap-tools/schemas/graph.test.ts` enforces this for ONE instance
+ * (`bootstrap/`); this module is the same invariant over every declared
+ * instance.
  *
- * > if sub1 depends (directly or through chain) stub0, no references/context
- * > etc points stub0 → sub1.
+ * ## One arrow — this does NOT recompute direction
  *
- * If A depends on B, nothing in B may reference A. B is lower; it must not
- * know about what sits on top of it. `bootstrap-tools/schemas/graph.test.ts`
- * enforces exactly this for ONE instance (`bootstrap/`, bean `iwtn`). This
- * module is the same invariant over every declared instance.
+ * An import and a sentence are the SAME arrow. Direction is
+ * {@link directionOf} in `layer-direction.ts`, shared with `check:partition`
+ * (import edges) and `kg-detangle` (KG edges); this module asks the identical
+ * question of a NAME OCCURRENCE in a file.
  *
- * ## One arrow, two axes — this does NOT recompute direction
- *
- * An import and a sentence are the SAME arrow, so this module decides no part
- * of it. Direction is {@link directionOf} in `layer-direction.ts`, already
- * shared by `check:partition` (import edges between proposed repos) and
- * `kg-detangle` (KG edges between instances). This is its third consumer and
- * it asks the identical question of a NAME OCCURRENCE in a file.
- *
- * That is the whole point of absorbing `check:partition` into this rule
- * rather than writing a second checker: two computations of "does A depend on
- * B" are two answers free to drift, and `zlmp`'s history is what drift costs
- * — a count that ROSE from 43 to 49 because the measurement improved, which
- * is only legible because ONE tool owned the number.
- *
- * ## Five verdicts, because four of them are not "clean"
+ * ## Five verdicts
  *
  * `allowed`, `exempt`, `wrong-direction`, `names-repository` and
- * `undetermined` — the first four mirroring `layer-direction.ts`
- * deliberately, so a reader who knows one knows both, plus the one this axis
- * needs that the import axis cannot: a NAME can name a repository, an import
- * path cannot.
+ * `undetermined` — mirroring `layer-direction.ts`, plus `names-repository`,
+ * since a name (unlike an import path) can name a repository.
  *
- * `undetermined` is the load-bearing one and it carries `zlmp`'s discipline
- * verbatim: *"these are not cross-edges — they are edges this tool declined
- * to judge. Do not read them as clean."* Two distinct things land there, and
- * neither may be silently bucketed:
+ * `undetermined` means the tool declined to judge — never clean. Two things
+ * land there:
  *
  *   - an instance that declares no `needs` (absent is nobody-has-said, never
  *     "may reach nothing" and never "may reach anything"), which
  *     `allowedFromNeeds` already reports; and
- *   - a target whose name is ALSO the repository's name AND whose occurrence
- *     gives nothing to tell the two apart — see below, because the blanket
- *     version of this test was 78 % of every occurrence in this repository
- *     and getting it wrong is the difference between a report somebody acts
- *     on and one they switch off on the first run.
+ *   - a bare mention of a name that is ALSO the repository's name, with
+ *     nothing in the occurrence to tell the two apart (below).
  *
- * ## The repository-name collision, and why it is no longer a blanket
+ * ## The repository-name collision, decided per occurrence
  *
  * An instance rooted AT the repository root shares its name with the
- * repository. Here that is `folio-assistant`: the repository, the published
- * product, and the root instance all carry that string, so the STRING alone
- * cannot tell the three apart. Every relative path in the tree resolves
- * inside that instance's root too, so even "does the reference resolve into
- * its files?" — the test that would settle any other instance — answers yes
- * for all of them.
- *
- * Until 2026-09-29 the conclusion drawn from that was that the whole question
- * was undecidable, and every occurrence of a colliding name returned
- * `undetermined` in one move. Measured on main that day: **11,090 of 14,299
- * occurrences**, 78 % of everything the checker read. And it was measurably
- * wrong about nearly all of them, because the occurrence carries more than
- * the name. Of 13,160 word-bounded occurrences of `folio-assistant` under
- * `cat-harness/`, 11,419 sit inside an `http(s)` URL, 11,831 appear as the
- * path prefix `folio-assistant/`, 4,909 as `litlfred/folio-assistant` — and
- * **14** as a path into a directory the root instance actually declares. A
- * URL is an address and `<owner>/<name>` is a repository slug; the repository
- * is not a layer, so it owes no direction, and saying so is not a guess.
- *
- * Hence {@link NameCollision}, decided per OCCURRENCE rather than per name:
+ * repository and the product, and every relative path resolves inside its
+ * root, so the name alone cannot tell them apart. The occurrence usually can:
+ * a URL is an address and `<owner>/<name>` is a repository slug. So
+ * {@link NameCollision} is decided per OCCURRENCE:
  *
  *   - `"instance"` — the occurrence points INTO a directory the colliding
  *     instance declares, so it is a reference to the instance and is judged
  *     by the arrow like any other, `wrong-direction` included;
  *   - `"repository"` — it names the repository or the product address, and
  *     {@link ReferenceVerdict}'s `names-repository` says exactly that;
- *   - `"unknown"` — a bare prose mention, with no path and no URL. **This is
- *     the honest residue and it stays `undetermined`.** It is not dead code
- *     and must not be optimised away: the ambiguity was real, it was just
- *     never 78 % of the corpus.
+ *   - `"unknown"` — a bare prose mention, with no path and no URL. It stays
+ *     `undetermined`; the ambiguity is real.
  *
  * The resolver is passed IN rather than derived here, so this module stays
  * free of paths and its tests need no tree on disk. Which occurrence shapes

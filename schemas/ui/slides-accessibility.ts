@@ -1,7 +1,6 @@
 /**
  * `accessibility.json`: a slide deck's accessibility report, written by
- * `scripts/slides-structure.py` beside its `structure.json`. Bean `scfh`,
- * issue #1614.
+ * `scripts/slides-structure.py` beside its `structure.json`.
  *
  * Per check, never an overall score: one number would weigh a missing slide
  * title against a missing alt text, and nothing supports that weighting. The

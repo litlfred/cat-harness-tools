@@ -4,10 +4,10 @@
  * `CONTENT_CONTEXT` (`jsonld.ts`) is the context cat-harness PUBLISHES, so it
  * binds only cat-harness's own prefix and the external vocabularies. A block's
  * kind class is minted in the namespace of the instance that declares the
- * kind (owner ruling 2026-10-06, bean `0r7u`), and cat-harness may not name
- * the instances above it. So each document binds the prefixes its own `@type`s use, in the
- * local half of its context, read from the declaring instance's declaration
- * (`instanceNamespace`) rather than from a list here.
+ * kind, and cat-harness may not name the instances above it. So each document
+ * binds the prefixes its own `@type`s use, in the local half of its context,
+ * read from the declaring instance's declaration (`instanceNamespace`) rather
+ * than from a list here.
  *
  * Node-only: it reads declarations from disk, which is why it is not in
  * `jsonld.ts`.

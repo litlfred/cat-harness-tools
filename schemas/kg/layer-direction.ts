@@ -1,8 +1,7 @@
 /**
  * layer-direction.ts — is this edge pointing the way its layers allow?
  *
- * ONE answer to one question, asked by two tools that used to answer it
- * separately or not at all (bean `j79e`):
+ * ONE answer to one question, asked by two tools:
  *
  * - `scripts/partition/engine.ts` (`check:partition`) asks it of every import
  *   between modules, where the layers are the repos a module is assigned to.
@@ -10,37 +9,25 @@
  *   candidate group, where the layers are the instances a node lives in and
  *   the allowed relation is each instance's declared `needs`.
  *
- * Until this module the second one never asked: `detangle.ts` declared
- * `CUT_KINDS` with `wrong-direction` among them and not one edge in the
- * pinned results was classified, while the partition engine computed exactly
- * that verdict inline with `spec.allowed[from].includes(to)`. Two tools, one
- * question, and the one that had a name for the answer had no function.
- *
  * ## What it decides, and what it refuses to
  *
  * It decides DIRECTION and nothing else. An edge from layer A to layer B is
  * wrong-direction exactly when B is not among what A declares it may reach
- * and no permit names that edge. That is mechanical: it reads two
- * declarations and a list, and a person can re-check it by reading the same
- * three things.
+ * and no permit names that edge — mechanical, re-checkable from two
+ * declarations and a list.
  *
- * It does NOT decide whether a permitted edge is a restatement (a rename away
- * from gone) or essential (a real dependency). Those need judgement about
- * what the target MEANS, and `detangle.ts` says the carve is an adjudication.
- * A function that guessed would turn a reason to look into a finding.
+ * It does NOT decide whether a permitted edge is a restatement or essential:
+ * that needs judgement, and `detangle.ts` makes the carve an adjudication.
  *
  * ## Four verdicts, not a boolean
  *
- * `allowed`, `permitted`, `wrong-direction` and `undetermined`. The last is
- * the three-state rule: an instance with no `needs` has not declared its
- * layer, and absent is UNDETERMINED, never "may reach nothing" and never
- * "may reach anything" (`cat-harness.ts`, `needs`). Collapsing it into either
- * would make every undeclared instance look either tangled into everything or
- * clean, and the report would look the same as when the analysis is right.
+ * `allowed`, `permitted`, `wrong-direction` and `undetermined`. An instance
+ * with no `needs` has not declared its layer, so its edges are UNDETERMINED,
+ * never "may reach nothing" and never "may reach anything" (`cat-harness.ts`,
+ * `needs`).
  *
- * Self is not implicit. A caller whose layers may reach themselves says so
- * in `allowed` — the partition's `ALLOWED` lists each repo first — so the
- * rule a reader checks is the rule that ran.
+ * Self is not implicit: a caller whose layers may reach themselves says so in
+ * `allowed`, so the rule a reader checks is the rule that ran.
  *
  * @module schemas/layer-direction
  * @graphNode none — a classification function: it defines no schema

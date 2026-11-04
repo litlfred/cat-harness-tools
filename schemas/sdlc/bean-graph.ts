@@ -1,8 +1,8 @@
 /**
  * The bean graph — what `beans/` is, rather than where it happens to be.
  *
- * `beans/` is not a directory that incidentally holds markdown. It is a
- * **graph** with named nodes, each node a store with its own kind and path:
+ * `beans/` is a **graph** with named nodes, each node a store with its own
+ * kind and path:
  *
  * ```jsonc
  *  // beans/beans.json
@@ -15,58 +15,33 @@
  * }
  * ```
  *
- * ## Why this file exists rather than a block in the harness config
+ * The graph states the layout; the harness config does not restate it. The
+ * path is also written in `.beans.yml`, because the third-party `beans`
+ * binary reads only that; that duplication stays checked.
  *
- * The predecessor (bean `8xzw`) declared both paths in `harness.config.json`
- * under `harness.workPlan` / `harness.workflowState`. That was one source of
- * truth too many: the same path was already written in `.beans.yml`, which the
- * third-party `beans` binary reads, so `check:harness-dirs` existed to stop the
- * two drifting.
- *
- * Moving the declaration here does not add a third place — it **removes one**.
- * The graph states the layout; the harness config no longer restates it.
- *
- * **The `.beans.yml` duplication survives and is not a defect of this design.**
- * `beans` is third-party and will never read our schema, so its path must be
- * written where it looks. That duplication stays checked, because an unchecked
- * duplication is the thing this repository has paid for repeatedly.
- *
- * ## Paths are relative to the graph root, deliberately
+ * ## Paths are relative to the graph root
  *
  * A node's `path` is resolved against the directory holding `beans.json`, not
- * against the repo root. So the graph is **relocatable**: moving `beans/` to
- * `work/` requires editing nothing inside it. A path escaping its own root
- * (`..`, or absolute) is rejected — a store outside the graph it belongs to is
- * not a node of that graph, and silently accepting one would let a folio scan
- * a directory its graph does not own.
+ * against the repo root, so moving `beans/` to `work/` requires editing
+ * nothing inside it. A path escaping its own root (`..`, or absolute) is
+ * rejected: a folio must not scan a directory its graph does not own.
  *
- * ## Three states, as everywhere here
+ * ## Three states
  *
  * - **Absent** → `undefined`. An unmigrated repo falls back to the documented
  *   defaults; this is ordinary, not an error.
- * - **Present but unreadable** → **throws**. A graph nobody can parse leaves
- *   every consumer guessing where the work plan is, which is worse than having
- *   no graph at all — the fallback is at least documented.
+ * - **Present but unreadable** → **throws**, rather than leave every consumer
+ *   guessing where the work plan is.
  * - **Unknown node kind** → rejected, not accepted and ignored. A node whose
  *   kind nothing understands is a store nothing will read.
  *
- * ## It defers to `cat-harness.ts`, and does not restate it
+ * ## It defers to `cat-harness.ts`
  *
  * A bean-graph entry IS a {@link ContentDirectory}: an id, a path, and the
- * graph typologies found there. Same schema, same open registry, same JSON-LD
- * projection.
- *
- * This file briefly had its own parallel vocabulary — `nodes` with
- * `kinds: BeanNodeKind[]`, a closed Zod enum — which said exactly what
- * `directories` with `graphs: GraphTypology[]` already said, in different words.
- * Two spellings of one concept is the drift this repository keeps paying for,
- * so the kinds moved into `BASE_GRAPH_TYPOLOGIES` and the shape is now imported
- * rather than redeclared.
- *
- * What remains here is only what is SPECIFIC to the bean graph and not true
- * of declarations generally: paths resolve against this file's own directory
- * rather than the instance root, and at most one directory may hold
- * `workflow-state`.
+ * graph typologies found there (`BASE_GRAPH_TYPOLOGIES`). Same schema, same
+ * open registry, same JSON-LD projection. Only what is SPECIFIC to the bean
+ * graph is here: paths resolve against this file's own directory rather than
+ * the instance root, and at most one directory may hold `workflow-state`.
  *
  * @module schemas/bean-graph
  * @graphNode schema

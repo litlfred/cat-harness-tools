@@ -1,17 +1,13 @@
 /**
  * Actors, Roles and Skills — who does a BPMN task, and what they need to know.
  *
- * Three things were being conflated across this repository, and the conflation
- * is why nothing could be audited. Separated:
- *
  * - **Actor** — a concrete participant. Human or agentic. `litlfred` is an
  *   actor; so is the ingestion engine. An actor exists independently of any
  *   process and persists across all of them.
  * - **Role** — a persona an actor **takes on** because of the lane it is
- *   acting in. `Reviewer` is a role; nobody *is* a reviewer outside a process,
- *   they are acting as one inside it. A role carries a collection of
- *   **Skills**. A lane is not the role: **a lane names the Role its tasks are
- *   performed in** (owner, 2026-10-16: *"Lane names Role, not Actor"*).
+ *   acting in. `Reviewer` is a role; nobody *is* a reviewer outside a process.
+ *   A role carries a collection of **Skills**. **A lane names the Role its
+ *   tasks are performed in**, not the actor.
  * - **Skill** — a responsibility an actor carries out to complete a task: as
  *   instructions to follow, as a contract to be tested against, or both.
  *
@@ -19,40 +15,29 @@
  * skills.** Every word in that sentence is a distinct object here, and the
  * audit in `scripts/kg-audit.ts` checks each join in it.
  *
- * ## Why a lane names a role and not the person
+ * A lane names a role because the same actor acts in different lanes of
+ * different diagrams (`Lane_Agent` in `crdm-requirements.bpmn`,
+ * `Lane_Sibling` in `bean-lifecycle.bpmn`), and its skills differ with the
+ * lane.
  *
- * Because the same actor is a different thing in two diagrams, and because two
- * different actors are the same thing in one. In `crdm-requirements.bpmn` the
- * session agent acts in `Lane_Agent`; in `bean-lifecycle.bpmn` the very same
- * session agent acts in `Lane_Sibling` from the other diagram's point of view,
- * where its beans are explicitly *not its own to close*. The skills differ
- * because the **lane** differs, not because the actor did.
+ * ## Actors carry roles, not `inherits`
  *
- * The prior modelling had this backwards. `.claude/skills/actors/*.json` held
- * eighteen entries with an `inherits` chain — `author` inherits `reviewer`
- * inherits `viewer` — which is a **role** lattice wearing an actor's name: the
- * things it described (can review, can push) are properties of a position, not
- * of a person. Those entries now carry `roles[]` instead, naming the roles each
- * actor may take on, and the lattice lives in the role graph where `inherits`
- * means what it says.
- *
- * {@link readActors} still reports an entry carrying `inherits` via
- * {@link LoadedActor.looksLikeRole}, and the `actor-is-not-a-role` criterion
- * still fails on one. The migration is done here; the check stays, because the
- * next registry to be written by hand will reach for `inherits` again.
+ * An actor names the roles it may take on in `roles[]`; the `inherits`
+ * lattice belongs to roles. {@link readActors} reports an actor carrying
+ * `inherits` via {@link LoadedActor.looksLikeRole}, and the
+ * `actor-is-not-a-role` criterion fails on one.
  *
  * `roles: []` and an absent `roles` are **different**: `[]` says the actor
- * takes on no role, which is the honest value for a read-only identity that
- * never appears in a swimlane, while absent says nothing has been asserted.
+ * takes on no role (a read-only identity that never appears in a swimlane),
+ * while absent says nothing has been asserted.
  *
  * ## Hierarchy: roles compose down a subprocess chain
  *
  * A process calls a subprocess, and the actor keeps acting. It does not stop
  * being the outer role; it **additionally** takes on the inner lane's role. So
- * the skills available at a task are the union along the whole call path, not
- * just the innermost lane's set. {@link resolveRoleStack} computes that union
- * and keeps the path, because a reader needs to know not only *that* a skill
- * was available but *which* role supplied it.
+ * the skills available at a task are the union along the whole call path.
+ * {@link resolveRoleStack} computes that union and keeps the path, so a reader
+ * sees *which* role supplied each skill.
  *
  * Two distinct compositions, deliberately not merged:
  *
@@ -61,41 +46,23 @@
  * - the subprocess **stack** — a role is acting INSIDE another role's task.
  *   Dynamic, and only for the duration of that call.
  *
- * Collapsing them would make `reviewer` permanently hold every skill any
- * caller ever had, which is precisely the over-broad closure that makes an
- * audit worthless.
+ * Merging them would give `reviewer` every skill any caller ever had.
  *
- * ## Lanes are free text, and that is the defect this module addresses
+ * ## A lane binds its role explicitly
  *
- * Measured on 2026-09-18 across the twenty diagrams in `processes/`:
- * **60 distinct lane names for roughly two dozen actual roles.** "Reviewer /
- * SME", "Reviewer / subject-matter expert", "Reviewer (SME or editor)" and
- * "Review Committee" are four spellings of one position; "Work plan — beans
- * (shared by humans and agents)", "Work plan — beans (shared)" and "Work plan
- * (beans)" are three of another. Nothing joined any of them to anything, so
- * no tool could answer "which skills does this task's performer have" and no
- * check could find a lane nobody had defined.
+ * Lane names are free text, so a LANE names the role it binds — see
+ * {@link laneRoleRef}. The role does not list its lanes: a general node never
+ * names its users (`data-modelling` step 8). An unbound lane is a finding.
  *
- * A LANE therefore names the role it binds — see {@link laneRoleRef}. The role
- * does not list its lanes: a role is the general node and a lane the dependent
- * one, and a general node never names its users (`data-modelling` step 8;
- * owner, 2026-09-23, #1168). Until then roles carried a `lanes[]` of exact lane
- * names, and about 140 lanes bound only by that name match; every one was
- * migrated to an explicit ref, so an unbound lane is a finding rather than a
- * silence.
- *
- * The binding is BPMN's own since 2026-10-16 (owner): the lane's
- * `partitionElementRef` points at a top-level `<bpmn:resource>` whose `id` IS
- * the role id. `<bootstrap.processes:role ref>` said the same thing in an
- * extension no BPMN tool reads; it is accepted for one release with a warning.
+ * The binding is BPMN's own: the lane's `partitionElementRef` points at a
+ * top-level `<bpmn:resource>` whose `id` IS the role id.
+ * `<bootstrap.processes:role ref>` is still accepted, with a warning.
  *
  * ## Roles played by mechanical actors are real roles
  *
  * A build pipeline, a data store, a log or a registry plays a role, and that
  * role's skills are its **contract**: the responsibilities it must perform,
- * which a test can hold it to (owner, 2026-10-16). There used to be an
- * `actedUpon` flag saying such a lane "takes no part"; it contradicted the
- * diagrams, which hand those lanes tasks, and it is retired.
+ * which a test can hold it to.
  *
  * ## Three states
  *

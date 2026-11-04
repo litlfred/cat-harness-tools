@@ -4,23 +4,13 @@
  * @module schemas/panel-chrome
  * @graphNode schema
  *
- * ## The owner's sentence, and the question it forced
+ * Each content type controls its own rendering, avatar (`avatars.ts`) and
+ * zoom threshold (`semantic-zoom.ts`), and can open a full-screen panel. **The
+ * kind declares its controls (`[linksrc]`, `[edit]`, …); the platform fixes
+ * the chrome.** `[x]` is in the same place with the same behaviour on every
+ * panel, so a reader learns the frame once.
  *
- * > each content type controls its own avatar, visualtion/rendering. but
- * > assume they can open a full screen panel w/ fixed controls like [x] or
- * > [linksrc] or [edit] or what not depedning on conent.
- *
- * Two halves that pull opposite ways: *"each content type controls its own
- * rendering"* and *"fixed controls"*. CRDM Q7 settled the line between them —
- * **the kind declares its controls, the platform fixes the chrome.** `[x]` is
- * in the same place with the same behaviour on every panel, so a reader learns
- * the frame once; everything else is the kind's to offer.
- *
- * That extends Q4 rather than contradicting it. Kind already owned the avatar
- * (`avatars.ts`) and the zoom threshold (`semantic-zoom.ts`); it now owns its
- * whole rendering, under a frame it cannot reach.
- *
- * ## Three states, and collapsing any two of them loses a fact
+ * ## Three states
  *
  * | | what it means | how a reader sees it |
  * |---|---|---|
@@ -28,20 +18,14 @@
  * | declared, servable | offered and usable | the control |
  * | declared, unservable | offered, and this deployment cannot | no control, **and a reason** |
  *
- * The third is the one that gets lost. `pb04` is the case already paid for: an
- * `[edit]` the pipeline cannot perform is worse than no button, because on a
- * private repository it 404s for exactly the reader who cannot edit, which
- * reads as *"this page is broken"* rather than *"you cannot do this"*. So a
- * declared-but-unservable control is HIDDEN — and {@link servableControls}
- * returns why, rather than dropping it, because "this kind does not offer
- * edit" and "this deployment cannot serve edit" are different facts and only
- * one of them is somebody's to fix.
+ * An `[edit]` the pipeline cannot perform would 404 on a private repository
+ * for the reader who cannot edit, so a declared-but-unservable control is
+ * HIDDEN — and {@link servableControls} returns why, because "this kind does
+ * not offer edit" and "this deployment cannot serve edit" are different facts.
  *
  * ## Validated against a KNOWN LIST, so a typo is a finding
  *
- * Without that, `"edti"` is a control that never appears and nothing says so —
- * which is indistinguishable from a kind that chose not to offer it. The whole
- * value of declaring the set is that the declaration can be wrong out loud.
+ * Otherwise `"edti"` would be a control that silently never appears.
  */
 
 /** What a control needs the environment to be able to do. */

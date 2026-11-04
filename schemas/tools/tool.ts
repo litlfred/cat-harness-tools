@@ -3,39 +3,31 @@
  *
  * A **skill** states a capability generically; a **Tool** is one concrete way
  * to exercise it, and names the skills it satisfies. That separation is the
- * SOP in `skills/tools/folio-core/skills-and-tools.md`; this is the schema that makes
- * it something a machine can check rather than a convention prose asserts.
+ * SOP in `skills/tools/folio-core/skills-and-tools.md`; this schema makes it
+ * checkable.
  *
  * ## Authoritative, and the only authority
  *
  * Zod here, JSON Schema and JSON-LD generated from it — the carrier decision in
  * `skills/kg/kg-core/directory-conventions.md` §"What lives in the `schemas`
- * graph". The TypeScript type is `z.infer`, never declared alongside, because
- * two declarations of one shape drift and the drift is invisible until
- * something reads the stale one.
+ * graph". The TypeScript type is `z.infer`, never declared alongside.
  *
- * ## Three constraints the strawperson did not have
- *
- * The version in `docs/architecture/cat-harness-minimum.md` flagged two
- * fields as too loose to build on. Both are tightened here, and a third
- * constraint fell out of writing the first real Tools.
+ * ## Three constraints
  *
  * **1. `invoke` must offer an arm the harness can run.** `agentic-harness`
  * assumes no MCP server, so a Tool whose only invocation is `invoke.mcp` is not
  * usable by the layer that defines it — and would also make the MCP projector
- * emit a server that proxies itself. The refinement below rejects it at parse
- * time rather than leaving it to a reviewer.
+ * emit a server that proxies itself. It is rejected at parse time.
  *
  * **2. `io.*.schema` is an absolute IRI**, not a bare string. A relative
  * reference resolves differently depending on where a consumer fetched the
- * Tool, so two consumers can disagree about what a tool accepts. Absolute or
- * nothing — the same rule `kg-export` follows for `@id` and
+ * Tool. Absolute or nothing — the same rule `kg-export` follows for `@id` and
  * `harness-schema-export` for `$id`.
  *
  * **3. `satisfies` must be non-empty.** A Tool that satisfies no skill is a
- * mechanism nothing asks for. Whether the named skills *exist* is not something
- * a schema can know — that is `scripts/check-tools.ts`, which resolves them
- * against the real skill locations.
+ * mechanism nothing asks for. Whether the named skills *exist* is checked by
+ * `scripts/check-tools.ts`, which resolves them against the real skill
+ * locations.
  *
  * @module schemas/tool
  * @graphNode schema

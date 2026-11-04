@@ -3,56 +3,36 @@
  *
  * @module schemas/carried-note
  *
- * ## Two things that looked unrelated and are one
+ * ## Todos and memory are one thing
  *
- * A **todo** records that a person has something outstanding. A **memory
- * entry** records what an agent learned. They were built as separate
- * mechanisms, and the author's framing is what joins them:
- *
- * > todos = human memory, the agent's `MEMORY.md` is agent memory. beans are
- * > agent workflow management. no human workflow management.
- *
- * So the axes are **memory** and **workflow management**, not "human thing"
- * and "agent thing":
+ * A **todo** records that a person has something outstanding; a **memory
+ * entry** records what an agent learned. The axes are **memory** and
+ * **workflow management**, not human and agent:
  *
  * | | memory | workflow management |
  * |---|---|---|
  * | human actor | **todos** | *— nothing —* |
  * | agent actor | **`MEMORY.md`** | **beans** |
  *
- * Both halves of the memory column answer one question — *what do I carry into
- * the next task?* — and differ only in **storage** and **trigger point**. That
- * is what this module is: the metadata they share, so a consumer can ask "what
- * is outstanding here" without caring which actor kind left it.
+ * Both halves of the memory column answer *what do I carry into the next
+ * task?* and differ only in **storage** and **trigger point**. This module is
+ * the metadata they share, so a consumer can ask "what is outstanding here"
+ * without caring which actor kind left it. Beans are agent workflow
+ * management, not a human todo list.
  *
- * Getting that pairing wrong is easy and was got wrong once here: beans reads
- * like the human's todo list because `AGENTS.md` calls it "the single todo
- * mechanism". It is not. It is the agent's workflow management, and naming it
- * after a quadrant it does not occupy is the same coincidence-not-contract
- * drift this repo keeps paying for, in vocabulary rather than in layout.
- *
- * ## The reference vocabulary is shared, and it has THREE kinds
- *
- * A note points at three different sorts of thing, and collapsing any two
- * loses something a consumer needs:
+ * ## The reference vocabulary has THREE kinds
  *
  * - a **knowledge-graph node** — {@link KgRefSchema}: a kind and an id;
  * - a **person** — {@link ExternalIdentitySchema}: provider-qualified, because
  *   `litlfred` is not an identity and `github:litlfred` is;
  * - an **external artefact** — {@link ArtefactRefSchema}: an issue, a pull
- *   request, a commit. New here, and it closes a real gap: an issue is neither
- *   a node of this graph nor a person, so before this there was nowhere to put
- *   one. Agent memory has been recording them in **prose** — an entry reading
- *   "Bean `lq7e`" is a string in a paragraph, which nothing can resolve and
- *   nothing can audit.
+ *   request, a commit — neither a node of this graph nor a person.
  *
- * ## Why the base carries no status
+ * ## The base carries no status
  *
  * A todo has a lifecycle: open, done, scrapped. A memory entry does not — a
  * TRAP is not "open", and marking one "done" would say the failure it records
- * has stopped being possible. So `status` lives on the todo, not here, and a
- * consumer that wants "everything outstanding" filters the todos rather than
- * reading a status field that memory would have to fake.
+ * has stopped being possible. So `status` lives on the todo, not here.
  *
  * @graphNode schema
  */

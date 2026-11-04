@@ -1,44 +1,33 @@
 /**
  * What a state machine tracks across a SESSION, as opposed to an instance.
  *
- * The owner's requirement, 2026-09-20: *"the state machine (which could being
- * played by the agent) should be keeping track of session context including
- * the actor is a required input"*.
- *
- * ## A session is not a process instance, and that is the whole reason this
- * exists
+ * ## A session is not a process instance
  *
  * `workflow-state` answers **where one instance got to**: a token's position in
  * one diagram. A session **spans** processes — it starts before any instance,
- * may open several, switches between them, and outlives each. Modelling it as a
- * field on an instance would mean the first process opened owns facts that
- * belong to the actor, and a session with no instance open would be
- * unrepresentable while being the commonest state there is.
+ * may open several, switches between them, and outlives each; a session with
+ * no instance open is the commonest state. So it is a separate record,
+ * referencing instances rather than containing them.
  *
- * So: a separate record, referencing instances rather than containing them.
- *
- * ## `actor` is required, and it is the point of the record
+ * ## `actor` is required
  *
  * Every other field here can be derived by looking at the repository. WHO is
  * acting cannot: the machine keeping the session cannot infer it, the same way
  * the Logger cannot infer who wrote a log line (`bootstrap/skills/log-message.md`).
- * A session record that cannot name its actor records that something is
- * happening and nothing about who is answerable for it — which is precisely the
- * question a sibling session needs answered before it touches the same bean.
+ * A sibling session needs to know who is answerable before it touches the same
+ * bean.
  *
  * It is `actorRef` rather than an `ActorDefinition`: an agent may act without a
- * declared node under `cat-harness/scenarios/actors/`, and requiring one would make
- * the field unfillable in exactly the cold-start case a session record is most
- * useful for. The reference is resolved where one exists and is a bare name
- * where it does not — **stated, so a consumer knows which it is holding.**
+ * declared node under `cat-harness/scenarios/actors/` (the cold-start case).
+ * The reference is resolved where one exists and is a bare name where it does
+ * not — **stated, so a consumer knows which it is holding.**
  *
- * ## NOT a store, deliberately
+ * ## NOT a store
  *
- * This is the shape. Nothing writes it yet: `3nfv` is the state machine, and a
- * declared-but-absent directory is the `dh4f` defect, where a consumer scans
- * nothing and reports a clean run. The `session-state` graph typology is
- * registered ahead of its directory — the `folio` and `memory` situation, not
- * `dh4f`, because nothing scans a kind.
+ * This is the shape; nothing writes it yet, so no directory is declared (a
+ * declared-but-absent directory would let a consumer scan nothing and report
+ * a clean run). The `session-state` graph typology is registered ahead of its
+ * directory, which is safe because nothing scans a kind.
  *
  * @module schemas/session-context
  * @graphNode schema

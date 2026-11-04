@@ -4,48 +4,20 @@
  * @module cat-harness/schemas/artifact-store
  * @graphNode schema
  *
- * ## The instruction
+ * The pipeline step is **"publish a large artifact"**, and *how* is a property
+ * of the instance, not of the step; a GitHub Release is one implementation, a
+ * CDN such as Cloudflare another. As with `publication.host`, an instance that
+ * has not said is `undefined`, and must never be read as `github-pages`.
  *
- * The owner, 2026-09-20, on publishing a search index outside the site tree:
+ * A store holds what is too large for the site tree (e.g. a search index for a
+ * large catalogue), somewhere the site budget does not reach.
  *
- * > *"2 + make tool that can be done anothr way potentially if not github cdn"*
+ * ## Staging gets NO index
  *
- * and earlier, on the hosting itself:
- *
- * > *"using ghpages as CDN is a tool choice, other tools possible like
- * > cloudflare, doucment that in process/BPMNS/skills"*
- *
- * So the pipeline step is **"publish a large artifact"**, and *how* is a
- * property of the instance, not of the step. A GitHub Release is one
- * implementation. Writing the release API into the pipeline would make every
- * downstream instance that does not use GitHub unable to publish at all, which
- * is the same failure `publication.host` already exists to prevent — and which
- * `harness.json` already guards with a third state: *"an instance that has not
- * said is `undefined`, and must never be read as `github-pages`."*
- *
- * ## Why a large artifact needs a store at all
- *
- * Measured on this repository, 2026-09-20:
- *
- * | | bytes | |
- * |---|---|---|
- * | 7 staging previews | 304,159,961 | ~43.5 MB each |
- * | warning threshold | 104,857,600 | the owner's own instruction, 2026-09-19 |
- * | GitHub Pages limit | 1 GB | documented |
- *
- * The previews are already **2.9×** the warning. A search index for a large
- * catalogue — 53 MB is the measured floor for full IRIS at title-and-url only —
- * cannot go in the site tree beside them. A store is what lets it live
- * somewhere the site budget does not reach.
- *
- * ## Staging gets NO index, and that is a correctness rule
- *
- * Not a saving — a correctness rule, and the saving is incidental. If staging
- * inherited a release-built index it would return hits for pages that have
- * since changed: a **wrong pass, believed**, which is the failure this
- * repository names in `readme-sections`, in `repo-partition` and in
- * `ci-health` alike. Absent is honest; stale is not. So staging disables
- * search and SAYS SO — silence would read as "no results".
+ * A correctness rule: a release-built index on staging would return hits for
+ * pages that have since changed — a wrong pass, believed. Absent is honest;
+ * stale is not. So staging disables search and SAYS SO, since silence would
+ * read as "no results".
  */
 import { z } from "zod";
 

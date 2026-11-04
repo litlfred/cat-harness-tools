@@ -1,37 +1,28 @@
 /**
- * What makes a dataset findable — bean `p67i`.
+ * What makes a dataset findable.
  *
  * A CSV or spreadsheet in `uploads/` is stored but not findable: a grep for a
- * column header finds nothing, and that absence is indistinguishable from the
- * dataset not having that column. `tabular.jsonld` records sheet names,
- * headers and shape, so the header vocabulary joins the L1 source graph.
+ * column header finds nothing. `tabular.jsonld` records sheet names, headers
+ * and shape, so the header vocabulary joins the L1 source graph.
  *
  * ## The narrative is a state machine, and starts empty
  *
- * The bean also asks for "a narrative description of what the data is about".
- * That cannot be produced mechanically — it is somebody's account and it needs
- * an author. `narrative` is a {@link module:schemas/narrative} record, which
- * starts `not-authored` with no text, moves to `draft` when an agent writes
- * one, and reaches `confirmed` only when a HUMAN accepts it (bean `ju0u`).
- *
- * Generating a summary from the header names and shipping it as the answer
- * would be a claim nobody made, which is the failure the provenance arm exists
- * to prevent. Drafting one and saying so is not — that is what `draft` is.
+ * `narrative` (what the data is about) is a {@link module:schemas/narrative}
+ * record, which starts `not-authored` with no text, moves to `draft` when an
+ * agent writes one, and reaches `confirmed` only when a HUMAN accepts it.
  *
  * ## A null shape is not an empty sheet
  *
  * `rows`/`columns` are nullable and `shape_source` says which case it is. A
- * sheet whose `<dimension>` is absent or unparseable has an UNKNOWN shape, and
- * reporting `0 × 0` would say it is empty — a different fact, and one a reader
- * would act on.
+ * sheet whose `<dimension>` is absent or unparseable has an UNKNOWN shape;
+ * `0 × 0` would say it is empty.
  *
- * ## No longer written for csv, xlsx or ods — bean `urat`
+ * ## Only `fixed-width` is still written as v1
  *
  * Delimited text and workbooks are read as CSVW (`folio-tabular-csvw/v1`) by
- * core's extractors through the `tabular-csvw` slot, and the tools' v1 writer
- * is retired (5c-ii, option 1). This schema still accepts those formats so
- * that records folios already committed keep validating; the one format
- * still written as v1 is `fixed-width`.
+ * core's extractors through the `tabular-csvw` slot. This schema still accepts
+ * csv, xlsx and ods so already-committed records keep validating; the one
+ * format still written as v1 is `fixed-width`.
  *
  * @module schemas/tabular-records
  * @graphNode schema

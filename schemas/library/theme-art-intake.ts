@@ -4,49 +4,31 @@
  * @module schemas/theme-art-intake
  * @graphNode schema
  *
- * The owner, 2026-09-20: *"make skills for avatar theme ingestion (need 3
- * meeting certain formatting constraints), return sucches or explnation of
- * falire"*, and then, scoping it: *"make as part of docuemtn ingestion
- * skill...."*
+ * Part of document ingestion, not a second process: theme art is an arrival
+ * with a different payload, so this adds a **check keyed on the payload** to
+ * the same completeness gate.
  *
- * So this is **not a second ingestion process.** Document ingestion already
- * answers the question this poses — *something unstructured has arrived; is it
- * acceptable, and if not, why not* — and already has the shape of the answer: a
- * pipeline with a completeness gate. Theme art is the same event with a
- * different payload, so what is added is a **check keyed on the payload**, not a
- * parallel pipeline free to disagree with the first.
+ * ## The constraints
  *
- * ## Every constraint here was paid for, not invented
- *
- * Each is a failure this repository actually took, in the two commits that
- * delivered theme art during the session that prompted the ask:
- *
- * | constraint | what went wrong |
+ * | constraint | why |
  * |---|---|
- * | {@link THEME_ART_LAYOUTS} complete | `landing-architecture` is declared with **laptop and card only**. `resolveThemeBackdrop` refuses an incomplete backdrop wholesale, so the theme silently renders with no art at all. |
- * | distinct content | commit `1b62b57` supplied 3 files for 3 avatars of which **two were byte-identical** — same sha256, same 1,606,269 bytes. Two distinct images for three named roles. |
+ * | {@link THEME_ART_LAYOUTS} complete | `resolveThemeBackdrop` refuses an incomplete backdrop wholesale, so the theme renders with no art at all. |
+ * | distinct content | byte-identical files for different roles are refused. |
  * | orientation per layout | a portrait crop is not a landscape crop scaled down; the quiet area a sticky's text sits in moves. |
- * | dimensions **measured** | `landing-engineer` is 1672×941 where its siblings are 1671×941. One pixel, retyped from a neighbour, and `images[].width` becomes a false declaration. |
- * | weight and format | the arriving PNGs were ~1.6 MB against ~100 KB webp siblings — **16×**. |
- * | a declared destination | commit `0301fbd2` put three PNGs at the **repository root**, undeclared, with spaces and commas in their names. No gate saw them: `check-declared-assets` walks declared→disk, and the root is not an instance. |
+ * | dimensions **measured** | a retyped width makes `images[].width` a false declaration. |
+ * | weight and format | large PNGs are refused where webp siblings are expected. |
+ * | a declared destination | art outside a declared directory is seen by no gate (`check-declared-assets` walks declared→disk). |
  *
  * ## The contract: success, or a NAMED failure
  *
- * The ask's own words, and the contract this repository already uses for its
- * `--check` gates and its kg-audit sidecars. A refusal that says *invalid*
- * teaches nobody what to fix, so every {@link ThemeArtFailure} carries the
- * layout it is about, what was found, and **what to do about it**.
- *
- * All failures are collected rather than thrown one at a time: art arrives as a
- * batch, and reporting the first problem in a set of three means three round
- * trips to learn three things.
+ * Every {@link ThemeArtFailure} carries the layout it is about, what was
+ * found, and **what to do about it**. All failures are collected rather than
+ * thrown one at a time, because art arrives as a batch.
  *
  * ## Dimensions are READ, never accepted
  *
- * {@link measureImage} parses the file header. The 1px drift is what happens
- * when a declaration is composed by copying a neighbour's numbers, so this
- * module takes bytes and emits the declaration — the caller is never asked for
- * a width, and therefore cannot supply a wrong one.
+ * {@link measureImage} parses the file header. This module takes bytes and
+ * emits the declaration; the caller is never asked for a width.
  */
 import { z } from "zod";
 

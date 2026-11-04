@@ -1,62 +1,44 @@
 /**
- * A generated narrative, and who stands behind it — bean `ju0u`.
+ * A generated narrative, and who stands behind it.
  *
- * An image description, a transcript, a dataset summary. The owner chose
- * **agent-drafted, human-confirmed** (2026-09-19) over plain agent attribution
- * and over writing every one by hand, so this is a state machine rather than
- * the boolean dressed as an enum it replaces (`not-authored | authored`).
+ * An image description, a transcript, a dataset summary: **agent-drafted,
+ * human-confirmed**, so the state is a state machine, not a boolean.
  *
  * ## Two attributions, because they are two acts
  *
  * `drafted_by` is who wrote the words; `confirmed_by` is who accepted them.
- * Different actors doing different things, and collapsing them loses which is
- * which — the question a reader of a narrative most wants answered is not "did
- * a machine touch this" but "has a person agreed to it".
+ * A reader of a narrative most wants to know whether a person has agreed to
+ * it.
  *
  * ## An agent cannot confirm its own draft
  *
- * `confirmed_by.kind` must be `"human"`, structurally. That single refinement
- * is the whole difference between the option the owner chose and the one they
- * did not: without it, "confirmed" degrades silently into "an agent said so
- * twice", and the state carries no more information than `draft` did.
+ * `confirmed_by.kind` must be `"human"`, structurally. Without it,
+ * "confirmed" degrades into "an agent said so twice".
  *
  * ## `rejected` is a state, and it keeps its reasons
  *
- * A rejected draft that is silently re-offered wastes the reviewer's time; one
- * that vanishes lets the next agent redraft the identical thing. That is the
- * argument `scrapped` wins on for beans — deletion loses the fact that someone
- * already decided — and `schemas/sdlc/qa-review.ts`'s `Decision` makes the same
- * demand one layer over: at least one note saying why this outcome, not
- * another.
+ * A rejected draft is kept, with a reason, so it is neither silently
+ * re-offered nor redrafted identically — the same demand
+ * `schemas/sdlc/qa-review.ts`'s `Decision` makes.
  *
- * ## One narrative per language (owner ruling 2026-10-20, bean `cat-tools-e1lo`)
+ * ## One narrative per language
  *
  * A narrative carries its language as a BCP 47 `lang`, and a slot holds one
  * narrative PER language, each with its own author, model version and review
  * state: a translation is drafted and confirmed like any other narrative, and
  * a missing language is visibly absent rather than silently the source text.
  *
- * Landing in stages, so no stored record is invalid at any point:
- *
- * 1. (here) `lang` is optional on {@link NarrativeSchema}, and
- *    {@link NarrativeSlotSchema} accepts the old single narrative OR a list of
- *    them with distinct languages. {@link narrativesOfSlot} reads either.
- * 2. Readers (the review queue, `narrativesIn`) go through `narrativesOfSlot`.
- * 3. The slot schemas switch to `NarrativeSlotSchema`, and stored narratives
- *    are migrated to lists.
- * 4. (here) `lang` becomes required on every WRITTEN narrative, and the single
- *    form survives only as the empty slot, {@link NOT_AUTHORED}. Owner ruling
- *    2026-10-22, "1A 2A 3A": an empty slot claims no language (1A); the
- *    `superseded` history of block summaries requires `lang` like any written
- *    narrative (2A); and authored figures carry a slot like every other
- *    record (3A, `constraints.ts`).
+ * `lang` is required on every WRITTEN narrative; the empty slot,
+ * {@link NOT_AUTHORED}, claims no language. {@link NarrativeSlotSchema}
+ * accepts the single form or a list with distinct languages, and readers go
+ * through {@link narrativesOfSlot}. The `superseded` history of block
+ * summaries requires `lang` too, and authored figures carry a slot
+ * (`constraints.ts`).
  *
  * ## Not a second review model
  *
  * `Attribution` and its `script | agent | human` vocabulary come from
- * `schemas/content/attribution.ts` (bean `iqim`), which `block-qa.ts` also re-exports.
- * One vocabulary for who did a thing, whether the thing was reviewing a block
- * or writing a description. `rlp5` records what a second spelling costs.
+ * `schemas/content/attribution.ts`, which `block-qa.ts` also re-exports.
  *
  * @module schemas/narrative
  * @graphNode schema

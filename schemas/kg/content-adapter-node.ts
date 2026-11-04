@@ -1,17 +1,14 @@
 /**
  * A content adapter's block VOCABULARY as a KG node: `folio-content-adapter/v1`,
  * one JSON file per adapter in a `content-adapters/` graph the owning harness
- * declares (bean riit, step 5).
+ * declares.
  *
- * Owner, 2026-10-05 (option 1 of 3): the vocabulary — the `adapter` every
- * block-kind node names — is a node; the server adapter CLASS is not. The two
- * do not line up: `document` has a class (`DocumentContentAdapter`) and no
- * vocabulary of its own, its kinds being `paper` kinds whose profile is
- * `document`; `dak` has a vocabulary and no class. So the classes stay where
- * they are, as `contentAdapters` data in each `<instance>.json`, and this node
- * replaces the two central tables keyed on the vocabulary: `CONTENT_ADAPTERS`
- * in `block-kinds.ts` and `ADAPTER_COMPANION_ROLES` in `block-qa.ts`, plus the
- * `adapter` the DAK layer contributed through code.
+ * The vocabulary — the `adapter` every block-kind node names — is a node; the
+ * server adapter CLASS is not. The two do not line up: `document` has a class
+ * (`DocumentContentAdapter`) and no vocabulary of its own, its kinds being
+ * `paper` kinds whose profile is `document`; `dak` has a vocabulary and no
+ * class. So the classes stay as `contentAdapters` data in each
+ * `<instance>.json`, and the vocabulary is read from these nodes.
  *
  * A LEAF: Zod only, so `block-kinds.ts` and `block-qa.ts` can parse with it.
  *

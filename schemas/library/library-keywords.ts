@@ -1,6 +1,6 @@
 /**
  * `library/<slug>/keywords.json` — an entry's keywords, read from the LSI
- * index's own log-entropy term weights (issue #2302). Written by
+ * index's own log-entropy term weights. Written by
  * `scripts/library-keywords.ts`; read by the library viewer's Document panel.
  *
  * `evidence: ["heading"]` when every word of the keyword appears in a heading

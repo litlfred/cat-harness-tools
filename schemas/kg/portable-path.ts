@@ -2,68 +2,38 @@
  * Path segments a checkout can actually create — on every filesystem, not only
  * the one that wrote them.
  *
- * ## The failure this exists to stop
+ * A repository is portable only if every path in its tree can be CREATED on
+ * the filesystems people clone it onto. NTFS reserves `:` inside a path
+ * component, so one file named `req:<slug>` makes Git abort the whole
+ * checkout on Windows — while the author's machine and Linux CI see nothing
+ * wrong.
  *
- * A repository is not portable because its code is portable. It is portable
- * because every path in its tree can be CREATED on the filesystems people clone
- * it onto, and that is a property of the filenames, checked by nothing here
- * until 2026-09-21.
+ * ## ENCODE rather than substitute
  *
- * Measured that day, from a user's terminal: `git clone` of this repository
- * fetched all 647,920 objects and then refused to check out —
- *
- * ```
- * error: invalid path 'cat-harness/test/results/kg-qa/skills/requirements/req:agent-workflow.kg-qa.json'
- * fatal: unable to checkout working tree
- * ```
- *
- * Seven files, one per requirement, named from a subject id of the form
- * `req:<slug>`. NTFS reserves `:` inside a path component for alternate data
- * streams, so Git will not create the file and aborts the whole checkout —
- * **the repository was unclonable on Windows**, for everybody, for every file,
- * not just the seven. The fetch succeeding is what makes this shape so easy to
- * ship: nothing fails for the author, on the machine that wrote the name, and
- * CI runs on Linux where the name is fine.
- *
- * ## Why ENCODE rather than substitute
- *
- * The obvious repair — `:` becomes `-` — is not available here.
- * {@link kgQaSidecarPath} promises collision-freedom, and substitution breaks
- * it: `req:agent-workflow` and a future `req-agent-workflow` would compose the
- * same sidecar, and one verdict would silently overwrite the other. That is the
- * exact defect the mirrored results tree was built to remove, reintroduced one
- * character at a time.
- *
- * Percent-encoding is reversible, so it cannot collide: `%` is itself encoded,
- * which is what makes the mapping injective. `req:agent-workflow` becomes
- * `req%3Aagent-workflow` — legible enough to recognise, and decodable back to
- * the id it names.
+ * {@link kgQaSidecarPath} promises collision-freedom, and substitution (`:`
+ * → `-`) breaks it: `req:agent-workflow` and `req-agent-workflow` would share
+ * a sidecar. Percent-encoding is reversible (`%` is itself encoded), so
+ * `req:agent-workflow` becomes `req%3Aagent-workflow` — legible, and
+ * decodable back to the id.
  *
  * ## The encoder is not the gate, and the gate does not cover everything
  *
- * Encoding only protects the names a caller routes through here. A
- * hand-authored file lands in the tree unchecked — which is how the seven got
- * there — so {@link unportableSegment} is also the predicate a repository-wide
- * gate runs (`scripts/check-portable-paths.ts`), and a clone-breaking name
- * fails on the day it is committed rather than on the day somebody on Windows
- * tries.
+ * A hand-authored file bypasses the encoder, so {@link unportableSegment} is
+ * also the predicate a repository-wide gate runs
+ * (`scripts/check-portable-paths.ts`), failing a clone-breaking name when it
+ * is committed.
  *
  * **That gate reads `git ls-files`, so it sees TRACKED paths only.** Output a
- * generator writes into an ignored build directory is outside it, and an
- * unportable name there breaks a Windows *build* rather than a clone. Nothing
- * here closes that; it is named so the next reader does not assume otherwise.
- * The cover for those writers is this module's encoding at the composer, which
- * is why the id-to-filename call sites route through {@link portableSegment}
- * rather than relying on the gate to catch them.
+ * generator writes into an ignored build directory is outside it; the cover
+ * for those writers is encoding at the composer, which is why id-to-filename
+ * call sites route through {@link portableSegment}.
  *
  * ## Encoding is not always the right tool
  *
  * Where a segment is also a PUBLIC ROUTE — `scripts/state-visualizer.ts`
  * builds a site directory from a declared graph id — encoding would silently
- * publish `/req%3Ax/` and the declaration would stop saying where the page is.
- * There the id is refused with a message naming the remedy, exactly as a
- * reserved device name is: `aux` has nothing to encode, and some ids simply
- * have to be renamed.
+ * publish `/req%3Ax/`. There the id is refused with a message naming the
+ * remedy, as a reserved device name is (`aux` has nothing to encode).
  *
  * @graphNode none — a predicate and an encoder over path strings, not a schema
  * @module schemas/portable-path

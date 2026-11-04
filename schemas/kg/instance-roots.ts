@@ -2,10 +2,9 @@
  * Instance DISCOVERY: which directories are instances, and which file in a
  * directory is its declaration. Filesystem only, and deliberately a LEAF:
  * it imports nothing from the schema layer, so `graph-typology-registry.ts` can
- * find each harness's declared `typologies/` graph (bean dmx1, owner 2026-10-04:
- * "there should not be a central registry for declaring mount tools and
- * subgraph types") without importing `cat-harness.ts`, which imports the
- * registry. Moved verbatim from `cat-harness.ts`, which re-exports all four.
+ * find each harness's declared `typologies/` graph without importing
+ * `cat-harness.ts`, which imports the registry. `cat-harness.ts` re-exports
+ * all four.
  *
  * @module cat-harness/schemas/instance-roots
  * @graphNode none — constants and functions that locate an instance's declaration; no schema

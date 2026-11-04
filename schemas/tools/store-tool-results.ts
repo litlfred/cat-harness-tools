@@ -1,14 +1,12 @@
 /**
  * Typed results of the tools that read and write the harness's data stores —
- * the work plan, the activity log and the session record (owner, 2026-11-01,
- * Q-DS-10 A: "store tools first").
+ * the work plan, the activity log and the session record.
  *
  * Each tool keeps its human-readable report and ALSO declares a `result`
- * output of one of these types, printed when the tool's `json` flag is set.
- * Until now that JSON was typed only as a TypeScript interface in the script,
- * so a caller, a BPMN gateway or an MCP client could read it but not check it.
- * Each schema here is held to its script's interface in both directions by
- * `scripts/tests/store-tool-results.test.ts`, so the two cannot drift.
+ * output of one of these types, printed when the tool's `json` flag is set,
+ * so a caller, a BPMN gateway or an MCP client can check it. Each schema here
+ * is held to its script's interface in both directions by
+ * `scripts/tests/store-tool-results.test.ts`.
  *
  * @module schemas/tools/store-tool-results
  * @graphNode schema

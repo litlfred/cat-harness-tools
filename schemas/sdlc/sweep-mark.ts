@@ -2,30 +2,23 @@
 /**
  * WHEN A SWEEP STEP WAS LAST RUN — so skipping it leaves a trace.
  *
- * Bean `rq8s`. The session-start sweep asks the agent to run
- * `check:session-staleness` (a session stopped holding a question for the owner
- * is otherwise invisible). The sweep cannot run it: the input is a
- * `list_sessions` listing only an agent holds. So the step is a rule in prose,
- * and a session that skips it leaves nothing behind — the next sweep cannot
- * tell "nobody checked" from "checked, nothing waiting".
- *
- * The owner ruled on 2026-10-10 (drain session ml9h): **timestamp.** The check
- * writes a last-checked mark to the state branch, so a skipped sweep is
- * visible after the terminal scrolls.
+ * The session-start sweep asks the agent to run `check:session-staleness` (a
+ * session stopped holding a question for the owner is otherwise invisible).
+ * The sweep cannot run it itself: the input is a `list_sessions` listing only
+ * an agent holds. So the check writes a last-checked mark to the state
+ * branch, and the next sweep can tell "nobody checked" from "checked, nothing
+ * waiting".
  *
  * ## One file per check, overwritten
  *
  * A mark answers one question — when did this check last read its input —
  * so it is a single file per check (`<check>.json`), replaced on each
- * determined run. A history of marks would answer a question nobody asked,
- * and grow on every session.
+ * determined run.
  *
  * ## Only a DETERMINED run writes one
  *
- * A run that could not read its input did not check anything. Writing a mark
- * for it would make "could not determine" look like "checked", which is the
- * defect this record exists to expose (`1xhc`: absence taken for a clean
- * result).
+ * A run that could not read its input did not check anything; a mark for it
+ * would make "could not determine" look like "checked".
  *
  * @module cat-harness/schemas/sweep-mark
  * @graphNode schema

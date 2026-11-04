@@ -8,24 +8,13 @@
  * file `<folio>/bib-qa-verifications.json`, and the same reader falls back to
  * it. The shapes below are the ROW shape either way.
  *
- * This file is the typed contract for the per-paper verification roster.
  * Each entry records a single examination of a reference against either a
- * local PDF or an external source.  Until 2026-05-31 the `verified_by`
- * field was free-text ("Claude (claude-opus-4-7)" etc.) and downstream
- * tools had no way to distinguish an agent claim from a human
- * adjudication.  The discriminated `Verifier` union below makes that
- * distinction first-class so the dashboard, `validate-bib`, and the
- * authors-note disclosure can treat the two cases differently.
- *
- * Migration history:
- *   2026-05-19  initial roster with free-text `verified_by`
- *   2026-05-20  `_verified_by_caveat` schema-level annotation
- *   2026-05-31  Verifier discriminated union (this commit)
- *
- * Backward-compat note: `bib-qa.ts` and `validate-bib.ts` parse the new
- * shape strictly.  The migration script
- * `pipeline/migrate-bib-verifier.ts` converts every legacy
- * free-text entry to the structured shape in one pass.
+ * local PDF or an external source. The discriminated `Verifier` union
+ * distinguishes an agent claim from a human adjudication, so the dashboard,
+ * `validate-bib`, and the authors-note disclosure can treat them differently.
+ * `bib-qa.ts` and `validate-bib.ts` parse this shape strictly;
+ * `pipeline/migrate-bib-verifier.ts` converts legacy free-text `verified_by`
+ * entries.
  * @graphNode schema
  */
 

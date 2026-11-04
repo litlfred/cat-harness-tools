@@ -3,29 +3,16 @@
  *
  * Several node kinds here declare themselves in front matter — memory entries
  * (`folio-memory/v1`), fsh-guts nodes (`folio-fsh-guts/v1`), beans, skills.
- * This is the reader they share.
- *
- * ## Why it is extracted rather than copied
- *
- * It was private to `scripts/agent-memory.ts`, whose own comment says it is
- * "a small hand-rolled one with no block-scalar support". That is a fine
- * thing for one caller to say about its own parser and a bad thing for a
- * second caller to discover: `fsh-guts/proposals/*.md` carry
- * `summary: >-` with the text on following lines, which that parser reads as
- * the literal string `>-` and then silently drops the prose. A second
- * hand-rolled parser beside the first is the two-answers-to-one-question
- * drift this repository keeps paying for, so the parser moved and grew the
- * one feature the new caller needs.
+ * This is the reader they share, so there is one parser, not several that
+ * disagree.
  *
  * ## What it deliberately does NOT do
  *
  * It is not a YAML implementation and must not become one. It reads scalars,
- * `- ` lists, and folded/literal block scalars, because that is what the
- * corpus uses. Anything richer — anchors, flow mappings, nested maps — should
- * make a caller reach for a real parser rather than make this grow, because a
- * half-YAML that handles most documents is worse than an obvious limit: it
- * fails on the document nobody tested and looks like data loss rather than
- * like an unsupported feature.
+ * `- ` lists, and folded/literal block scalars (e.g. `summary: >-`), because
+ * that is what the corpus uses. Anything richer — anchors, flow mappings,
+ * nested maps — should make a caller reach for a real parser rather than make
+ * this grow: a half-YAML fails on the document nobody tested.
  *
  * @module schemas/front-matter
  * @graphNode schema

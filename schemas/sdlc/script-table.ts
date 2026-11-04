@@ -1,32 +1,26 @@
 /**
- * The checkout's script table, read from where each script now lives.
+ * The checkout's script table, read from where each script lives.
  *
- * Until bean `ar1s` phase 4 every script sat in the ROOT `package.json`, 509
- * of them, and that file named every layer — the aggregate a split cannot
- * divide. Now each layer carries the scripts whose command runs ITS code, in
- * its own `package.json` under `checkoutScripts`; the root keeps only the few
- * that run no layer's code (the whole-checkout `test` and `typecheck`, and the
+ * Each layer carries the scripts whose command runs ITS code, in its own
+ * `package.json` under `checkoutScripts`; the root keeps only the few that
+ * run no layer's code (the whole-checkout `test` and `typecheck`, and the
  * `bootstrap-tools` submodule's own commands) plus `cat`, the runner.
  *
  * ## Why `checkoutScripts` and not `scripts`
  *
- * Every command here is written relative to the CHECKOUT ROOT, exactly as it
- * was in the root manifest, and `bun run cat <name>` runs it there. A layer's
- * `scripts` key, by the convention `bootstrap-tools` already keeps, is run from
- * the LAYER's directory (`cd <layer> && bun run <name>`), so putting
- * root-relative commands under it would make every one of them fail that way.
- * A separate key says which root the command expects; converting a layer to
- * its own `scripts` is that layer's split step, not this one.
+ * Every command here is written relative to the CHECKOUT ROOT, and
+ * `bun run cat <name>` runs it there. A layer's `scripts` key, by the
+ * convention `bootstrap-tools` already keeps, is run from the LAYER's
+ * directory (`cd <layer> && bun run <name>`), where root-relative commands
+ * would fail.
  *
  * ## How a script is found
  *
  * By asking the declared instances, never by naming one: this module is the
- * LOWEST layer's, and every layer above it may hold scripts, so a literal list
- * here would be the reference-direction violation the move exists to end.
+ * LOWEST layer's, so a literal list here would point up the layer order.
  * {@link instanceRootsIn} answers which directories are instances; each one's
  * `package.json` is read for `checkoutScripts`. A name defined twice is an
- * error, not a precedence rule — two answers to one name is the drift this
- * table must not hide.
+ * error, not a precedence rule.
  *
  * @graphNode none — functions that read the script table; no schema
  * @covers none — a reader of the script table, not a graph audit

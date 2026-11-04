@@ -1,10 +1,6 @@
 /**
- * What a change does to a RENDERED site: the contract every renderer answers
- * (bean `bnjs`, issue #971).
- *
- * Owner, 2026-10-06: *"each renderer should be able to give you from list of
- * input changed files, the list of output changed rendered files ... from the
- * dependency cone"*, and a Change Set's PR is reviewed against that list.
+ * What a change does to a RENDERED site: the contract every renderer answers.
+ * A Change Set's PR is reviewed against this list.
  *
  * ## The contract
  *
@@ -25,11 +21,10 @@
  * 1. **Could-not-determine is never "no change".** An input the renderer cannot
  *    place goes in `undetermined` with its reason; an empty `files` with a
  *    non-empty `undetermined` means "not known", and a consumer must say so.
- * 2. **Index files are listed, and marked, not dropped.** The owner reviews
- *    content pages, not search indexes, so a list for review filters on
- *    `role !== "index"`; but a page that is an index for one renderer is
- *    content for another, so the renderer marks the role and the reader
- *    filters, never the other way round.
+ * 2. **Index files are listed, and marked, not dropped.** A list for review
+ *    filters on `role !== "index"`; a page that is an index for one renderer
+ *    is content for another, so the renderer marks the role and the reader
+ *    filters.
  * 3. **A page whose BYTES do not change can still change.** An AST artefact
  *    page loads its resource in the browser, so a changed resource changes
  *    what the page shows while its HTML stays identical. The cone names the

@@ -1,8 +1,6 @@
 /**
  * Spec template schema and validator for platform feature specifications (spec-kit).
  *
- * ## What this module is
- *
  * A feature specification in spec-kit follows upstream's `spec-template.md`.
  * Upstream marks three sections as mandatory:
  * - `User Scenarios & Testing`
@@ -15,10 +13,9 @@
  *
  * Plus a metadata header carrying `Feature Branch`, `Created`, and `Status`.
  *
- * This module defines the machine-readable contract for the spec template
- * (FR-002), provides validation functions to ensure specs conform to the template
- * (SC-002, SC-003), and enforces that no spec carrying unresolved clarification
- * markers reaches adjudicated status (SC-004).
+ * This module defines the machine-readable contract for the spec template,
+ * validates that specs conform to it, and refuses adjudicated status for a
+ * spec that still carries unresolved clarification markers.
  *
  * @module schemas/spec-template
  * @graphNode schema

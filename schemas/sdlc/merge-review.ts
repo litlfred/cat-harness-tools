@@ -3,7 +3,7 @@
  * Agentic pre-merge review and would-have-blocked counterfactual schemas.
  *
  * Re-exports the merge review, counterfactual record schemas, and promotion
- * criteria formalized for bean `folio-assistant-h1uq`.
+ * criteria.
  *
  * @module cat-harness/schemas/merge-review
  * @graphNode schema

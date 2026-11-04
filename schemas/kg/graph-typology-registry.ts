@@ -7,39 +7,18 @@
  *
  * ## Why this is its own module
  *
- * It was inside `schemas/kg/cat-harness.ts`, and that made ONE import impossible:
- * `folio-graph-typology.ts` — core's registration of the only renderable kind —
- * imported `cat-harness.ts` for `defaultGraphTypologies`, so `cat-harness.ts` could
- * not import it back to trigger the registration. A cycle.
+ * `folio-graph-typology.ts` — core's registration of the only renderable
+ * kind — imports only this file (core importing the harness, the allowed
+ * direction), and `cat-harness.ts` triggers the registration itself. So the
+ * kind is registered before anything can call a declaration reader, and
+ * whether a declaration is accepted never depends on the process's import
+ * order.
  *
- * The cost of that cycle was paid by every caller instead. Whether
- * `readDeclaration` accepted this repository's own declaration depended on
- * whether the process had happened to import core's module — **an import-order
- * property of the process, not a property of the declaration**, which is valid
- * either way. PR #465 hit it five times in a row, enumerated **52 modules**
- * calling a declaration reader without the import, put four options to the
- * owner and merged with the item unchecked. Bean `q2wn` re-opened it by
- * measuring that the partition's own regex could not see a bare side-effect
- * import, so all 25 of those edges were invisible to the one tool that
- * computes this repository's module graph.
- *
- * With the registry on a leaf, `folio-graph-typology.ts` imports only this file —
- * **core importing the harness, the allowed direction** — and `cat-harness.ts`
- * triggers the registration itself. So the kind is registered by the time
- * anything can call a reader, because you cannot reach a reader without
- * loading `cat-harness.ts`. The failure stops being a thing callers must
- * remember and becomes **structurally impossible**.
- *
- * ## What did NOT change, deliberately
- *
- * Core still OWNS `folio`. The definition, its `renderable: true` and the
- * argument for both stay in `schemas/kg/folio-graph-typology.ts`, and a bare harness
- * registry still does not know the kind — `cat-harness.test.ts` asserts that
- * and still passes, because it seeds its own registry. This moves WHERE THE
- * MECHANISM LIVES, not who owns the kind; option 2 on #465 (adding `folio` to
- * `BASE_GRAPH_TYPOLOGIES`) is the one that would have overturned the boundary, and
- * `GraphTypologyDef.renderable` carries the reason it must not: *"a layer that
- * cannot render must not own the renderable kind."*
+ * Core still OWNS `folio`: the definition and its `renderable: true` stay in
+ * `schemas/kg/folio-graph-typology.ts`, and a bare harness registry does not
+ * know the kind (`cat-harness.test.ts` asserts it). `folio` must not be added
+ * to `BASE_GRAPH_TYPOLOGIES`: *"a layer that cannot render must not own the
+ * renderable kind."*
  *
  * @module schemas/graph-typology-registry
  * @graphNode schema

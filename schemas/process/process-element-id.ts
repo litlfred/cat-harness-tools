@@ -1,12 +1,11 @@
 /**
  * The id a BPMN `<process>` element declares — `Process_CRDM`,
- * `Process_Editing` — as a typed reference (#1168 B8).
+ * `Process_Editing` — as a typed reference.
  *
- * Owner, 2026-09-30 (*"BPMN element id"*): a process is referred to by the id
- * its diagram declares, which is what BPMN's own `calledElement` names and what
- * every committed reference already used. Not the file stem
- * (`crdm-requirements`), which is {@link ProcessIdSchema} in `tool-types.ts`
- * and names the DIAGRAM FILE.
+ * A process is referred to by the id its diagram declares, which is what
+ * BPMN's own `calledElement` names. Not the file stem (`crdm-requirements`),
+ * which is {@link ProcessIdSchema} in `tool-types.ts` and names the DIAGRAM
+ * FILE.
  *
  * A leaf module — zod only — so a schema low in the import graph
  * (`carried-note.ts`) can use it without reaching `cat-harness.ts`.

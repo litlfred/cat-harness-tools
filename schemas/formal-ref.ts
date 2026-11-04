@@ -2,76 +2,35 @@
  * Dependency injection point for FORMAL REFERENCES — the `lean:` field's
  * grammar and the package list it resolves against.
  *
- * ## Why this module exists
+ * The grammar is science-layer vocabulary even though the `lean` field sits
+ * on shared kinds (remark, example, algorithm, simulator). Core reaches it
+ * only through this module, so it has no `core → sci` import edge.
  *
- * 🟧 **Owner ruling, 2026-09-27**, verbatim across two messages:
+ * ## What core needs is NOT the grammar
  *
- * > *"f-a-sci __should__ have scehams for math/science papers."*
- * > *"field sits on shared kinds (remark, example, algorithm, simulator), so
- * > the grammar genuinely is  vocabulary that goes tp f-a-sci"*
- *
- * `schemas/lean-packages.ts` argued the other way in its own docstring —
- * *"the field is on shared block kinds by design … So the grammar belongs
- * wherever the field does"*, i.e. core — and `scripts/partition/instance-rules.ts`
- * applied that test **five times** to keep five modules in core. The ruling
- * rejects it at the premise: a `lean` field appearing on a shared kind does not
- * make the grammar core, it makes *that field on those kinds* part of the
- * science vocabulary.
- *
- * Reassigning `lean-packages.ts` and `lean-signature.ts` to `sci` without this
- * module yields **six** measured `core → sci` wrong-direction edges:
- *
- * ```
- * schemas/constraints.ts        -> schemas/lean-packages.ts
- * adapters/mcp-server/server.ts -> schemas/lean-packages.ts
- * adapters/document/resolver.ts -> schemas/lean-packages.ts
- * adapters/manifest-entries.ts  -> schemas/lean-packages.ts
- * pipeline/qa-utils.ts  -> schemas/lean-packages.ts
- * pipeline/qa-utils.ts  -> pipeline/lean-signature.ts
- * ```
- *
- * This is the injection that removes them.
- *
- * ## What core actually needed, which is NOT the grammar
- *
- * Read at the five call sites rather than at the imports, every one of them
- * does the same three steps: `parseLeanRef(ref)`, `leanPackageByName(pkg)`,
- * then build source paths from the package's `lakeRoot` and the parsed
- * `module` / `decl` / `name`. **Core never wants the grammar — it wants
- * candidate source paths**, which it then tries with its own file access
+ * Every core call site does the same three steps: `parseLeanRef(ref)`,
+ * `leanPackageByName(pkg)`, then build source paths from the package's
+ * `lakeRoot` and the parsed `module` / `decl` / `name`. **Core wants
+ * candidate source paths**, which it tries with its own file access
  * (`ctx.fileExists`, `readFileBranch`, `existsSync`, a `grep`).
  *
  * So {@link FormalRefResolution} is a *resolution record*, and the grammar,
- * the package registry and the path convention all stay behind it in the layer
- * that owns them. Core gains no new vocabulary: it does not learn what a Lake
- * root is, what a module path is, or that the separator is a dot.
+ * the package registry and the path convention stay behind it in the layer
+ * that owns them. Core does not learn what a Lake root is, what a module path
+ * is, or that the separator is a dot.
  *
- * ## Third instance of an established pattern, deliberately
+ * ## The same shape as the other DI points
  *
  * `pipeline/references-registry-di.ts` (the bibliography) and
- * `value-registry-di.ts` (the values registry) are the same shape, and this
- * module copies it down to the names: a `configure…`, a `…Configured()`
- * predicate, and a getter that returns `undefined` rather than throwing.
+ * `value-registry-di.ts` (the values registry) have the same shape: a
+ * `configure…`, a `…Configured()` predicate, and a getter that returns
+ * `undefined` rather than throwing.
  *
- * The `configured` predicate is not decoration, and the bibliography DI's own
- * docstring states the argument: *"a caller that can legitimately proceed
- * without references needs to ASK rather than catch … Without this predicate
- * the validator could not tell 'this folio has no bibliography' from 'the
- * citation check did not run', and reported the same clean result either way."*
- *
- * **That is the live latent defect this fixes, recorded as qou bean
- * `qou-i2ed`.** `lean-packages.ts` has exactly such a predicate,
- * `leanPackagesConfigured()`, and it has **zero callers anywhere** —
- * measured — so `leanPackageByName()` returns `undefined` at all eight
- * production sites in every real run and two load-bearing checks fail in
- * OPPOSITE directions: `definition-lean-exists` fails closed (a false
- * "requires Lean formalization"), the §3b-cond propagation audit fails open
- * (a false "not class-axiomatised"). It bites nothing today only because
- * every block with a `lean.ref` also has a sibling `.lean`, which is itself a
- * deviation from qou AGENTS.md §0a. Draining those stubs would make it live.
- *
- * Every consumer here is therefore written to distinguish the two states, and
- * to say "not checked" rather than silently taking the `undefined` branch.
+ * The predicate lets a caller tell "nothing configured" from "the check did
+ * not run". Every consumer must distinguish the two and say "not checked"
+ * rather than silently take the `undefined` branch — otherwise a lookup that
+ * returns `undefined` makes checks fail closed or open in opposite
+ * directions.
  *
  * @module schemas/formal-ref
  * @graphNode schema

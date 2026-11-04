@@ -1,15 +1,12 @@
 /**
- * A source's licence, as one record wherever it is written — bean `7bg9`.
+ * A source's licence, as one record wherever it is written.
  *
  * @module schemas/source-licence
  * @graphNode schema
  *
- * The record `check:source-licence` has read from a library entry's
- * `manifest.jsonld` since issue #1023 — as `licenceRecord` since finding D4
- * (bean `gzkt`, 2026-10-03), `meta.licence` before — moved here unchanged so
- * that an upload's `intake.json` can carry the SAME record rather than a second
- * licence vocabulary (the bean's own rule: read the existing vocabulary before
- * designing a field).
+ * The record `check:source-licence` reads from a library entry's
+ * `manifest.jsonld` (as `licenceRecord`); an upload's `intake.json` carries
+ * the SAME record rather than a second licence vocabulary.
  *
  * ## Three states, never two
  *

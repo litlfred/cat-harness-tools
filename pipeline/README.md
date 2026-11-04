@@ -7,7 +7,7 @@ generated: "scripts/subgraph-readmes.ts of the bootstrap toolset (https://github
 
 # cat-harness-tools-pipeline
 
-The content pipeline — build, render, QA checkers and generators over a folio's content graph — moved here from `cat-harness/content/pipeline/` by bean `70lx` (stage 1a). Its QA script sidecars stayed in the harness, under `test/results/script-sidecars/`, because they are the harness's QA state.
+The content pipeline — build, render, QA checkers and generators over a folio's content graph. Its QA script sidecars stay in the harness, under `test/results/script-sidecars/`, because they are the harness's QA state.
 
 Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-pipeline`, holding `code`.
 

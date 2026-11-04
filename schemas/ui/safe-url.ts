@@ -4,54 +4,37 @@
  * @module schemas/safe-url
  * @graphNode schema
  *
- * ## R17, and what it actually asks for here
+ * A URL rendered into an `href` is the classic XSS hole (`javascript:`).
  *
- * The owner, 2026-09-20: *"skill tool hints for XSSrsiction., usse laxy load
- * XSS, assume assets in KG accessible, dynamic render where can"*. Bean
- * `q2wm` breaks the first out by output schema, and singles out the case this
- * module is: *"`Url` — rendered into an `href`, `javascript:` is the classic
- * hole"*.
+ * ## The hazard here is LATENT
  *
- * ## The hazard here is LATENT, and saying which it is matters
- *
- * Measured 2026-09-21, on the render points this PR added. Every URL that
- * reaches an `href` today is composed rather than taken:
- * `gen-docs-pages.ts` interpolates authored values into
- * `https://github.com/…`, `sourceLinks` builds from the git origin, and
- * `publishedHref` returns a `/`-prefixed path. **No `javascript:` is
- * reachable.**
- *
- * So this is not a fix for a live hole, and claiming one would be the same
- * dishonesty in the other direction. It is the difference between a property
- * that is EMERGENT and one that is ENFORCED:
+ * Today every URL that reaches an `href` is composed rather than taken
+ * (`gen-docs-pages.ts` interpolates authored values into
+ * `https://github.com/…`, `sourceLinks` builds from the git origin,
+ * `publishedHref` returns a `/`-prefixed path). But that safety is emergent,
+ * not enforced:
  *
  * - `TodoRelationSchema.href` is `z.string()`. The schema permits
- *   `javascript:alert(1)` and always has.
- * - `escapeHtml` closes tags and does nothing about a scheme — an escaper is
- *   the wrong tool for this and looks like the right one.
+ *   `javascript:alert(1)`.
+ * - `escapeHtml` closes tags and does nothing about a scheme.
  * - The composition that makes it safe is spread across three files and
  *   stated in none of them.
  *
- * An edit that passed an authored URL straight through would open the hole
- * and look like a simplification. This module is what makes that edit fail.
+ * An edit that passed an authored URL straight through would open the hole;
+ * this module is what makes that edit fail.
  *
- * ## DEFAULT-DENY, and it is the only defensible default
+ * ## DEFAULT-DENY
  *
- * A blocklist has to enumerate every dangerous scheme — `javascript:`,
- * `data:`, `vbscript:`, whatever a browser ships next — and is wrong the day
- * one is added. An allow-list is wrong only about things it refuses, and a
- * refusal is visible: the link is not rendered, somebody notices, and the
- * scheme is added deliberately. That asymmetry is the whole argument.
+ * A blocklist must enumerate every dangerous scheme — `javascript:`,
+ * `data:`, `vbscript:`, whatever a browser ships next. An allow-list is wrong
+ * only about things it refuses, and a refusal is visible.
  *
  * ## `data:` IS NOT ALLOWED, including for images
  *
- * It is tempting for an inline asset, and R17's third instruction points the
- * other way: *"assume assets in KG accessible"* — an asset reachable from the
- * knowledge graph is ADDRESSABLE, so it is referenced where it lives rather
- * than copied into the page. `data:text/html` is a navigable document with a
- * same-origin-ish reputation it does not deserve, and allowing the scheme for
- * images would mean parsing the media type to decide — a parser in the middle
- * of a security boundary.
+ * An asset reachable from the knowledge graph is ADDRESSABLE, so it is
+ * referenced where it lives rather than copied into the page.
+ * `data:text/html` is a navigable document, and allowing the scheme for
+ * images only would mean parsing the media type inside a security boundary.
  */
 
 /**

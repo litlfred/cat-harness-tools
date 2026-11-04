@@ -1,43 +1,29 @@
 /**
  * The Python packages this repository's scripts need — declared once.
  *
- * Bean `68dt`. Measured 2026-09-20: `pdf-structure.py` imports `pymupdf`,
- * `pdf-ocr.py` shells to tesseract, image extraction wants `pypdf` + `Pillow`,
- * and **nothing in the repository said so**. There was no `requirements.txt`
- * and no `pyproject.toml`, and CI installed `ruff` and nothing else.
- *
- * The cost of that is not inconvenience. A Python tool can only be tested in
- * CI if CI has its backend, so an arm needing one either ships an UNTESTED
- * path — the `5rfy` defect, a gate that never fires — or does not ship. That
- * is what `d5f1`, `1r0p` and `ktt2` were blocked on.
+ * E.g. `pdf-structure.py` imports `pymupdf`, `pdf-ocr.py` shells to
+ * tesseract, image extraction wants `pypdf` + `Pillow`. A Python tool can only
+ * be tested in CI if CI installs its backend, so every such need is declared
+ * here.
  *
  * ## Authoritative here, `requirements*.txt` generated
  *
- * The carrier convention this repository already follows for schemas: the
- * TypeScript is definitional and the published artefact is downstream
+ * The TypeScript is definitional and the published artefact is downstream
  * (`directory-conventions` §"What lives in the `schemas` graph"). A flat
- * `requirements.txt` cannot carry the two facts a checker needs — which import
- * name a distribution provides, and why a declared package has no import at
- * all — so it is the OUTPUT, not the source.
+ * `requirements.txt` cannot carry which import name a distribution provides,
+ * or why a declared package has no import at all, so it is the OUTPUT, not
+ * the source.
  *
- * ## Two tiers, because one package costs more than the other eight together
- *
- * Measured by installing each set into a scratch target, 2026-09-20:
+ * ## Two tiers
  *
  * | set | wheels | size |
  * |---|---|---|
  * | `lean` | 12 wheels | **144 MB** |
  * | `lean` + `extended` | 16 wheels | **467 MB** |
  *
- * `camelot-py` is 912 KB of that 323 MB difference. The rest is numpy, pandas
- * and OpenCV, which it pulls transitively, for ONE script — `pdf-tables.py`.
- * That script is not dead (two skills document it, bean `fj94` has 38 tests
- * for it), so the answer is not to drop it; it is to say what it costs and
- * install it separately.
- *
- * **Those timings are a LOWER BOUND, not a CI figure.** They were taken here
- * against a warm index with every wheel cached. A cold runner pays more, and
- * quoting 6 s as the CI cost would be a measurement laundered into a promise.
+ * `extended` is `camelot-py` and what it pulls transitively (numpy, pandas,
+ * OpenCV), for ONE script — `pdf-tables.py` — so it is installed separately.
+ * The sizes were measured with a warm cache; a cold CI runner pays more.
  *
  * @module schemas/python-deps
  * @graphNode schema

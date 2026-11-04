@@ -1,43 +1,23 @@
 /**
- * A TEST RUN — what was measured, with what, and whether it can be redone.
+ * A TEST RUN — what was measured, with what, and whether it can be redone:
+ * repeatable, hashable test data and processes.
  *
- * Bean `folio-assistant-zz0a`, issue #363: *"need repeatable
- * (hasvake/signable) test data and processes"*, read as hashable/signable.
- *
- * ## Why two hashes and not one
+ * ## Two hashes
  *
  * A result is evidence only if a third party can establish **what was
- * tested** and **with what**. Those are different questions and a single
- * hash answers neither cleanly:
+ * tested** and **with what**:
  *
  * - the **data** hash — this exact data set produced this result;
  * - the **process** hash — this exact runner, scenario bank and
  *   configuration produced this result.
  *
- * This repository has already paid for collapsing them, twice, and the two
- * cases are mirror images:
+ * One hash would let a change to the judge, or to the subject, go unseen.
  *
- * - `folio-assistant-cv10`: a QA verdict keyed on the depended-on files, the
- *   checker's `script_hash` and `deps_hash` — but **not** on the criterion
- *   definition. Scoping a criterion left every cached verdict in place and
- *   the sweep reported `fresh-skip`. The subject was unchanged and the thing
- *   that JUDGED it had changed.
- * - `folio-assistant-nytj`: a sidecar that did not record its auditor's
- *   hash, so a PR editing the auditor and a PR adding a subject were each
- *   green alone and red merged.
+ * ## The two bases must be disjoint
  *
- * `nytj` names the family: **the state that breaks is the one neither party
- * evaluates.** Two hashes exist so that neither party can be the one not
- * evaluating.
- *
- * ## "Neither derivable from the other" is enforced, not asserted
- *
- * The bean's first criterion is that the two hashes are independent. That
- * reads like a property to promise in prose; it is a property of the INPUT
- * SETS, and it is decidable: the two bases must be **disjoint**. If a file
- * feeds both hashes then changing it moves both, and the pair carries no
- * more information than one hash would. {@link buildTestRun} refuses such a
- * run rather than recording a distinction that is not there.
+ * If a file feeds both hashes then changing it moves both, and the pair
+ * carries no more information than one hash would. {@link buildTestRun}
+ * refuses such a run.
  *
  * ## `unknown` is never equal to `unknown`
  *
@@ -46,35 +26,24 @@
  * hash of nothing compares equal to every other hash of nothing.
  *
  * {@link hashesReproduce} therefore treats `unknown` as reproducing NOTHING,
- * including another `unknown`. Two runs that both failed to read their
- * inputs have not been shown to agree — they have both failed to answer, and
- * rendering that as "reproduced" is the third-state defect this repository
- * keeps re-finding (`ci-health`'s "could not check is never green", a QA
- * result's determined-empty, `publication.host`'s absent).
+ * including another `unknown`: two runs that both failed to read their inputs
+ * have not been shown to agree.
  *
  * ## Whole-file hashing over-invalidates, which is the safe direction
  *
- * `cv10`'s fix hashed only a criterion's RUN-AFFECTING fields, excluding
- * `description`, so that prose churn could not invalidate a corpus. That is
- * available for a DECLARATIVE criterion and not for a script: there is no
- * way to separate a runner's run-affecting parts from its comments without
- * parsing it, and a parser that got it wrong would under-invalidate.
- *
- * So a basis hashes whole files. Editing a comment in a runner moves the
- * process hash and the run reads as changed when nothing about it was. That
- * is a real cost and it is the one worth paying: **over-invalidation says
- * "changed" when it may not have, under-invalidation says "same" when it is
- * not** — and the second is `cv10` itself, a check reporting fresh and being
- * wrong. Prefer a separate configuration file over a constant in the runner
- * where the distinction matters.
+ * A runner's run-affecting parts cannot be separated from its comments
+ * without parsing it, and a parser that got it wrong would under-invalidate.
+ * So a basis hashes whole files: editing a comment in a runner moves the
+ * process hash. Over-invalidation says "changed" when it may not have;
+ * under-invalidation says "same" when it is not. Prefer a separate
+ * configuration file over a constant in the runner where the distinction
+ * matters.
  *
  * ## What this does NOT do
  *
- * **Signing.** The bean flags it as needing a key and an identity that
- * differ per deployment — a sovereign-cloud jurisdiction may require its
- * own. Since `folio-assistant-g7vb` landed, the topology axes exist to say
- * so, which makes signing answerable rather than guessable; it is its own
- * work and not a rider here.
+ * **Signing.** It needs a key and an identity that differ per deployment (a
+ * sovereign-cloud jurisdiction may require its own); the topology axes say
+ * which, and signing is separate work.
  *
  * @module schemas/test-run
  * @graphNode schema

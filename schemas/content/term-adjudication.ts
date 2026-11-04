@@ -2,48 +2,39 @@
  * @graphNode schema
  *
  * What was decided when a minted glossary term and an authorised terminology
- * DISAGREE. This is leg 1 of bean `2i5f`, under `5yhm`.
+ * DISAGREE.
  *
- * Owner, 2026-10-02 (issue #1836): *"split: build leg 1 now as a skill + an
- * outcome schema."* The skill is
- * [`term-disagreement`](../skills/library/library-core/term-disagreement.md).
- * It says when a disagreement needs a decision and how to choose between the
- * outcomes. This file says what each outcome WRITES and WHERE, and refuses a
- * record that cannot be acted on.
+ * The skill
+ * [`term-disagreement`](../skills/library/library-core/term-disagreement.md)
+ * says when a disagreement needs a decision and how to choose. This file says
+ * what each outcome WRITES and WHERE, and refuses a record that cannot be
+ * acted on.
  *
- * ## Which disagreement this is, and which it is not
+ * ## Which disagreement
  *
- * `2i5f` names two disagreements, and they stay apart:
- *
- * 1. **The extractor and the terminology disagree.** The corpus uses a word
- *    the authorised vocabulary spells differently, or does not carry at all.
- *    That is a CONTENT decision, and it is this file.
- * 2. **Two judges disagree about a mapping.** That is
- *    [`adjudication`](../sdlc/skills/sdlc-core/adjudication.md) plus
- *    [`untainted-verification`](../sdlc/skills/sdlc-core/untainted-verification.md),
- *    and it is NOT built. The owner's ruling keeps it waiting until
- *    something maps. Rejecting an automated match as wrong is a judgement
- *    about a mapping, so it belongs to leg 2 and has no outcome here.
+ * Only **the extractor vs. the terminology**: the corpus uses a word the
+ * authorised vocabulary spells differently or does not carry. Two judges
+ * disagreeing about a mapping is
+ * [`adjudication`](../sdlc/skills/sdlc-core/adjudication.md) plus
+ * [`untainted-verification`](../sdlc/skills/sdlc-core/untainted-verification.md),
+ * not built yet; rejecting an automated match belongs there.
  *
  * ## The subject: a DETERMINED disagreement, as the check reported it
  *
  * A record names the candidate `(scheme, term)`, the `target` it was checked
- * on, and the `exact` / `concept` pair `check:term-mapping` reported when the
- * decision was taken. Two pairs are disagreements:
+ * on, and the `exact` / `concept` pair `check:term-mapping` reported:
  *
  * | observed | what it means |
  * |---|---|
  * | `exact: unmapped`, `concept: mapped` | the right concept under a label that is not its authorised one |
  * | `exact: unmapped`, `concept: unmapped` | the vocabulary carries no such label |
  *
- * `exact: mapped` is agreement, so there is nothing to decide. `undetermined`
- * is refused: a terminology that could not be reached has said nothing, and
- * deciding against its silence is bean `dh4f` in a new place. The observed
- * pair is kept so a reader can tell when the record has gone stale. When the
- * check later reports something different, the decision was taken against a
- * state that no longer holds.
+ * `exact: mapped` is agreement. `undetermined` is refused: an unreachable
+ * terminology has said nothing. The observed pair is kept so a reader can
+ * tell when the check now reports something different and the record is
+ * stale.
  *
- * ## Three outcomes, each saying what is written and where
+ * ## Three outcomes
  *
  * {@link OUTCOME_WRITES} is the table, as data, so the skill and a test read
  * one copy. In short:
@@ -57,16 +48,15 @@
  * - `vocabulary-wrong`: nothing in the corpus changes. The record itself is
  *   the finding: this vocabulary is not authoritative for this domain.
  *
- * `local-term` may not use `exactMatch`. If the authority's concept IS the
- * term, the outcome is `change-prose`. A local term that is exactly somebody
- * else's concept is the duplicate `vocabulary-authority` exists to prevent.
+ * `local-term` may not use `exactMatch`: if the authority's concept IS the
+ * term, the outcome is `change-prose`.
  *
  * ## Where a record lives
  *
  * In a `*.term-adjudications.json` file beside the glossary schemes that
  * `check:term-mapping` reads. That check validates every such file and fails
- * on one that does not satisfy this schema. No file exists yet: a record is
- * written when somebody decides, never seeded.
+ * on one that does not satisfy this schema. A record is written when somebody
+ * decides, never seeded.
  */
 import { z } from "zod";
 

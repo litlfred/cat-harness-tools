@@ -1,14 +1,14 @@
 /**
  * `structure.json`: the structure of an ingested PDF, tagged `_schema: pdf-structure/v1`.
  *
- * Issue #1112. Two rungs write this file and, until now, nothing defined it:
+ * Two rungs write this file:
  *
  * - `scripts/pdf-structure.py` writes the whole artefact: `source`, `metadata`,
  *   `toc`, `toc_source`, `sections` and `diagnostics`.
  * - `scripts/pdf-pages.py`, the no-outline rung, MERGES into whatever is there.
  *   It sets `granularity: "page"`, `source.text_source` and a `structure_note`,
  *   rewrites `sections` at page granularity, and adds the rest of `source` only
- *   when it is absent (`setdefault`, bean `nso8`).
+ *   when it is absent (`setdefault`).
  *
  * So the fields a page-granularity entry carries depend on whether
  * `pdf-structure` ran on it first. That is why `metadata`, `toc` and
@@ -16,22 +16,15 @@
  *
  * ## One section shape, strictly
  *
- * `pdf-pages.py` writes "EXACTLY the section shape `pdf-structure.py` writes,
- * field for field", because `gen-library-jsonld.ts` reads `sec.id`,
- * `page_start` and `page_end`, and an invented `section_id` crashed it once.
- * {@link PdfSectionSchema} is therefore `.strict()`. A second spelling of a
- * field is exactly the drift this schema exists to catch.
+ * `pdf-pages.py` writes exactly the section shape `pdf-structure.py` writes,
+ * because `gen-library-jsonld.ts` reads `sec.id`, `page_start` and
+ * `page_end`. {@link PdfSectionSchema} is therefore `.strict()`.
  *
  * ## The text origin: one field, one vocabulary
  *
  * Where the section text came from is `source.text_source`: `"embedded"` (the
- * PDF's own text layer) or `"ocr"`. Until issue #1121, `pdf-pages.py` wrote it
- * as a top-level `text_source` spelled `"text-layer" | "ocr"`, which is one question
- * in two vocabularies. The committed files were migrated, and a top-level
- * `text_source` is now rejected (the object is `.strict()`).
- *
- * Measured 2026-09-23: all 22 committed `structure.json` files conform
- * (scripts/tests/pdf-structure-schema.test.ts).
+ * PDF's own text layer) or `"ocr"`. A top-level `text_source` is rejected
+ * (the object is `.strict()`).
  *
  * @module schemas/pdf-structure
  * @graphNode schema

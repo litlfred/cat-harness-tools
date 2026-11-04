@@ -1,38 +1,22 @@
 /**
  * @graphNode schema
  *
- * An image placed on a page of an ingested document — bean `d5f1`.
+ * An image placed on a page of an ingested document.
  *
- * ## Why a verdict is not enough
+ * ## Every image carries a role and its basis
  *
- * The bean asks for a narrative description of every image. Measured on this
- * corpus 2026-09-20, that would be wrong six times out of seven: of 164 placed
- * images, **140 are page scans** — one near-full-bleed image per page, which is
- * the page itself, not a figure in it — against **24 candidate figures**.
- *
- * | document | pages | images | coverage | what they are |
- * |---|---|---|---|---|
- * | `WHO_PUB_TPS_93.1` | 121 | 121 | 0.998, one per page | page scans |
- * | `milnorlink` | 20 | 20 | 19 full-bleed | page scans |
- * | `9789241548960_eng` | 179 | 2 | ~0.50 | figures |
- * | `WPR-RDO-2020-003-eng` | 33 | 21 on 7 pages | median 0.013 | figures |
- *
- * So every entry carries a {@link ImageRole}. And it carries the **basis** for
- * that role, not only the role: `coverage` and `imagesOnPage` are the two
- * numbers the verdict was computed from, stored so the next reader can check
- * it rather than believe it.
- *
- * That is the `nso8` discipline, and this bean has already been burned by its
- * absence: `library/milnorlink/structure.json` carried a conclusion ("this PDF
- * carries no embedded outline") whose reason was false and unverifiable, and
- * it cost a full investigation under bean `8shg` before anyone could tell.
+ * Most placed images in an ingested corpus are page scans — one
+ * near-full-bleed image per page, which is the page itself — not figures. So
+ * every entry carries a {@link ImageRole}, and the **basis** for it:
+ * `coverage` and `imagesOnPage` are the two numbers the verdict was computed
+ * from, stored so a reader can check it rather than believe it.
  *
  * ## The third state is `undetermined`, and it is not `scan`
  *
  * A role is only ever `page-scan` or `figure` when the geometry was actually
  * read. A backend that could not place an image yields `undetermined`, never a
  * default — an image wrongly filed as `page-scan` is silently dropped from
- * every description pass, which is the expensive direction to be wrong in.
+ * every description pass.
  */
 import { z } from "zod";
 

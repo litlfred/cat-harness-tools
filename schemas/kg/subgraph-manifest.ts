@@ -3,25 +3,20 @@
  * `index.hydrated.jsonld` (dereferenced) — as one schema with two forms.
  *
  * The contract is `skills/kg/kg-core/kg-export.md` §"Named subgraphs — one
- * IRI, two files, framed from one graph" (bean `c1m4`). This module is what a
- * consumer validates against; `scripts/gen-subgraph-jsonld.ts` writes the
- * files and validates every one it writes against this before it writes it.
+ * IRI, two files, framed from one graph". This module is what a consumer
+ * validates against; `scripts/gen-subgraph-jsonld.ts` validates every file
+ * against it before writing.
  *
- * ## One base with the harness, not a parallel "directory with members" type
+ * ## One base with the harness
  *
- * A harness instance IS a named subgraph — the root of its own tree — and a
- * subgraph is a directory of a declared graph. Both are what
- * {@link GraphNodeDirectoryShape} already describes, so the subgraph node is
- * that shape, PICKED rather than restated: `path` and the label fields come
- * from it unchanged. Two of its fields are deliberately not carried, and each
- * has the JSON-LD form instead:
+ * A harness instance IS a named subgraph, and a subgraph is a directory of a
+ * declared graph — both what {@link GraphNodeDirectoryShape} describes. The
+ * subgraph node PICKS that shape: `path` and the label fields come from it
+ * unchanged. Two fields are not carried, each replaced by its JSON-LD form:
  *
- * - `id` — the node's identity is its `@id`, the directory IRI. A second,
- *   local identifier beside it is two answers to "which subgraph is this?".
- * - `graphTypologies` — the KG carries kinds as `holdsGraph` LINKS to GraphTypology
- *   nodes (kg-export removed `graphTypologies` from its directory nodes as
- *   denormalised for exactly this reason), so a literal list here would be a
- *   second, unlinked spelling of one fact.
+ * - `id` — the node's identity is its `@id`, the directory IRI.
+ * - `graphTypologies` — the KG carries kinds as `holdsGraph` LINKS to
+ *   GraphTypology nodes, not a literal list.
  *
  * ## The two forms differ only in what a member IS
  *

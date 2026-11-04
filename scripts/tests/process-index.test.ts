@@ -12,6 +12,7 @@
  * @module scripts/tests/process-index
  */
 import { HARNESS_ROOT } from "../lib/roots.ts";
+import { harnessLayout } from "../lib/harness-layout.ts";
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -189,7 +190,14 @@ describe("the committed subgraph JSON-LD", () => {
   test("with no `seeAlso`, an unframed instance's diagrams are NOT counted", () => {
     expect(unframedProcesses([], framed, REPO).byPath.size).toBe(0);
   });
-  const VIEWED = ["cat-harness/processes", "folio-assistant-core/processes"];
+  // The viewer reads each root's top `processes` subgraphs, and those one
+  // level inside a named sub-graph: `sdlc/processes/` since cat-harness#1014
+  // (cat-harness#991 step 23.2).
+  const VIEWED = [
+    "cat-harness/processes",
+    ...(harnessLayout(HARNESS) === "subgraphs" ? ["cat-harness/sdlc/processes"] : []),
+    "folio-assistant-core/processes",
+  ];
   // Standing alone the hydrated subgraphs are not built: `subgraph:jsonld`
   // writes them at publish and the subgraph tree is gitignored (bean w1gy F18).
   test.skipIf(

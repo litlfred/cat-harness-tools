@@ -1,31 +1,24 @@
 /**
- * The viewer-navbar audit — **what the owner's rule looks like as data**.
+ * The viewer-navbar audit — the common navbar rail as data.
  *
- * Owner, 2026-09-23: *"common fixture unless explicty removed in harness
- * visualtion."* Two clauses, and the second is why this file exists. A page
- * with no rail is not automatically a defect — it may be one a visualisation
- * deliberately removed — and a checker that could not tell those apart would
- * either block a legitimate page or pass all of them.
- *
- * So the audit records a VERDICT PER PAGE rather than a count, and the count
- * is derived from the verdicts. A count alone is the `1xhc` shape: it cannot
- * say which page regressed, and "45 of 46" reads identically whether the
- * missing one is a deliberate removal or a generator nobody wired.
+ * Every page carries the rail unless a harness visualisation explicitly
+ * removes it, so a page with no rail is not automatically a defect. The audit
+ * therefore records a VERDICT PER PAGE rather than a count, and the count is
+ * derived from the verdicts: a count alone cannot say which page regressed,
+ * or whether a missing rail was deliberate.
  *
  * ## A sidecar rather than a console report
  *
- * Same reason `kg:audit` writes one: a printed verdict is gone when the job
- * ends, which makes "unrailed since it was drawn" and "lost its rail in the
- * commit under review" indistinguishable. Committed, the diff says which.
+ * As with `kg:audit`: committed, the diff tells "unrailed since it was drawn"
+ * from "lost its rail in the commit under review".
  *
  * ## What this does NOT audit
  *
  * **Whether the rail's links resolve.** They cannot be checked from the source
- * tree and it is not close: the `/<instance>/` roots of mounted instances are mount routes
+ * tree: the `/<instance>/` roots of mounted instances are mount routes
  * `mount-instance-docs.ts` creates AFTER Jekyll, and `/bootstrap/initialization.html`
- * is a `.md` Jekyll renders. A resolver run against the committed tree calls
- * all three dead. `check:subgraphs` and the site-link tests own that question
- * against the built site; this one owns presence.
+ * is a `.md` Jekyll renders. `check:subgraphs` and the site-link tests own
+ * that question against the built site; this one owns presence.
  *
  * @graphNode schema
  * @module schemas/viewer-nav-qa

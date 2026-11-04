@@ -5,24 +5,7 @@
  * @module schemas/built-at-publish
  * @graphNode none — a declaration shape and two pure readers over it
  *
- * ## The ruling (owner, 2026-10-14, "B1")
- *
- * cat-harness committed pages whose bytes depended on WHICH version of every
- * other instance a consuming index had pinned — the auto-docs indexes, the UML
- * overview, the named-subgraph JSON-LD and its payloads, the process pages and
- * BPMN drawings of other instances' diagrams. Their `:check` gates then failed
- * in the index whenever its pins differed from the ones cat-harness was last
- * regenerated against, so every re-pin needed another regeneration PR here, and
- * the pair never converged. The ruling: stop committing them; build them at
- * publish time.
- *
- * The owner widened it the same day ("fix all, in proper way") to the
- * projections of a BRANCH-KEPT graph — the beans and todos counts, the todo
- * listings — which are the same defect on a different clock: the committed
- * `harness.json` said 190 open beans while the committed `count.json` said 179,
- * two snapshots of `cat/cat-harness/beans` taken at different times.
- *
- * ## The rule, so the list can be checked rather than remembered
+ * ## The rule
  *
  * An artefact may be committed in an instance only if every input it is
  * computed from is pinned BY THAT INSTANCE'S OWN COMMIT: its own tree, plus the
@@ -33,35 +16,26 @@
  *   Those are ABOVE it (they `need` it), so it cannot pin them, and the bytes
  *   are a function of the consuming index's lock, not of this commit.
  * - `state` — computed from a graph kept on a branch (`beans`, `todos`, `qa`),
- *   which moves without a commit. This is `check:derived-from`'s storage clock
- *   (bean `0b8c`), stated for artefacts that are not a declared directory.
+ *   which moves without a commit (`check:derived-from`'s storage clock,
+ *   for artefacts that are not a declared directory).
  *
- * ## Why a list in the declaration, and not only `.gitignore`
+ * ## A list in the declaration, not only `.gitignore`
  *
- * `.gitignore` says "never committed". It does not say who builds the file, so
- * a page that is ignored and never built would read as absent rather than as
- * broken. The declaration names the WRITER (a package script, run as
+ * `.gitignore` says "never committed" but not who builds the file. The
+ * declaration names the WRITER (a package script, run as
  * `bun run cat <script>` — a script NAME, because the generators live in a layer
- * above this one and this layer may not name its paths), so the publish step
- * can run it and a gate can refuse an entry nobody builds. The two are kept
- * equal by `built-at-publish.test.ts`: every declared path is ignored, and
- * nothing declared is tracked.
+ * above this one), so the publish step can run it and a gate can refuse an
+ * entry nobody builds. `built-at-publish.test.ts` keeps the two equal: every
+ * declared path is ignored, and nothing declared is tracked.
  *
- * ## Writer order, and the one edge that must be declared
+ * ## Writer order
  *
- * Owner, 2026-10-15 ("A1"). `derive:publish` runs every instance's writers
- * lowest layer first (dependency order), each instance's entries in their
- * declared order, a writer named twice running once, at its first mention.
- * That is right whenever a writer reads what it reads at the checkout's pins.
- * It is wrong for a `checkout` artefact computed over what an instance ABOVE
- * builds at publish: cat-harness's `docs/_data/harness.json` (`docs:harness`)
- * tiles every instance's site directory, and an IG instance's `docs/` is
- * that instance's own publish-time artefact, so lowest-first wrote the tiles
- * before the directory existed. The ruling: a writer is ordered AFTER the
- * writers of other instances' outputs it reads, by an edge it DECLARES
- * (`reads`, the kinds of directory it reads), never by a guess at which
- * direction reads which. `derive:publish` sorts by those edges and refuses a
- * cycle.
+ * `derive:publish` runs every instance's writers lowest layer first
+ * (dependency order), each instance's entries in their declared order, a
+ * writer named twice running once, at its first mention. A writer that reads
+ * another instance's publish-time output declares it (`reads`, the kinds of
+ * directory it reads) and is ordered AFTER that writer. `derive:publish`
+ * sorts by those edges and refuses a cycle.
  */
 import { z } from "zod";
 

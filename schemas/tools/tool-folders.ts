@@ -1,25 +1,19 @@
 /**
- * One Tool per folder: `<tools dir>/<id>/<id>.ts`, and the loader that reads them.
- *
- * Bean `tdir`. The owner, 2026-10-15, asked why the tools were not each in
- * their own folder, as a content layer's DAK-extraction tool already is — and, on how: *"make sure the
- * Tool schema is used and conventions of dirname and declaration like
- * `<tool>/<tool>.ts` are followed. dont externalize the json on main, only
- * when rendered in gh-pages."*
+ * One Tool per folder: `<tools dir>/<id>/<id>.json` or `<id>/<id>.ts`, and the
+ * loader that reads them.
  *
  * ## The convention, held here rather than in prose
  *
  * | rule | refused with |
  * |---|---|
- * | every folder in the tools directory is one Tool | a folder with no `<folder>/<folder>.ts` |
+ * | every folder in the tools directory is one Tool | a folder with neither `<folder>/<folder>.json` nor `<folder>/<folder>.ts`, or with both |
  * | the folder, the file stem and the Tool's `id` are one string | a Tool whose `id` differs from its folder |
- * | the file default-exports a {@link ToolFactory} | a module with no default export, or one that is not a function |
+ * | a `.ts` file default-exports a {@link ToolFactory} | a module with no default export, or one that is not a function |
  * | what it returns is a Tool node | `defineTool`'s own parse, which the factory calls |
  *
- * The source stays TypeScript, so a malformed Tool still fails at `tsc` and in
- * the editor (the carrier decision, `tool.ts`). The JSON-LD of each Tool and
- * the JSON Schema of each of its types are RENDERINGS, written when the site is
- * published, never committed beside the source.
+ * The JSON-LD of each Tool and the JSON Schema of each of its types are
+ * RENDERINGS, written when the site is published, never committed beside the
+ * source.
  *
  * ## Why a factory, not a constant
  *
@@ -32,7 +26,7 @@
  * `tools()` is synchronous and every consumer calls it that way
  * (`cat-harness-tools/tools/discover.ts`). The module path is a variable read
  * from the directory, so it adds no import edge (`repo-partition` counts only
- * a literal specifier), which is the same reason discovery itself is safe.
+ * a literal specifier).
  *
  * @module schemas/tool-folders
  * @graphNode none — the folder convention and its loader: the Tool node's schema is `tool.ts`

@@ -1,9 +1,9 @@
 /**
  * One harness's state as `harness:state` publishes it (`folio-harness-state/v1`).
  *
- * Moved out of `scripts/harness-state.ts` so the Tool I/O vocabulary
- * (`tool-types.ts`) can name it as the `HarnessStates` result type
- * without importing a script (issue litlfred/cat-harness-tools#1259, group 1).
+ * A schema module, not part of `scripts/harness-state.ts`, so the Tool I/O
+ * vocabulary (`tool-types.ts`) can name it as the `HarnessStates` result type
+ * without importing a script.
  *
  * @graphNode schema
  * @module cat-harness-tools/schemas/sdlc/harness-state

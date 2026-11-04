@@ -1,6 +1,5 @@
 /**
- * The typed reports of `bun run cat gates` and `bun run cat check:merged`
- * (issue litlfred/cat-harness-tools#1259, group 2; owner card Q-DS-14 A).
+ * The typed reports of `bun run cat gates` and `bun run cat check:merged`.
  *
  * Both tools keep their text and their three exit codes. With
  * `--report <path>` they also write one of these, so a program or BPMN

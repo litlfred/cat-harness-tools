@@ -6,39 +6,20 @@
  * @covers none — a schema module, not a gate. `check:kind-validators` is what
  *   runs it, and this file is the thing it runs.
  *
- * ## Why this needed a runnable schema, measured rather than supposed
+ * `cat-harness/memory/interaction.json` is read at the start of every session
+ * by `scripts/session-start-coord-sweep.sh` (jq), which on a parse failure
+ * only prints a line — so a malformed node degrades silently. This schema is
+ * what catches it.
  *
- * `cat-harness/memory/interaction.json` is read at the start of every session, and the
- * reader is **jq inside a shell script** — `scripts/session-start-coord-sweep.sh`,
- * whose failure branch prints `(could not parse … — read it by hand)`. So a
- * malformed node does not fail: it degrades to a line nobody acts on, in the one
- * file every sibling session reads before doing anything. Bean `46uh` already
- * records that whole section silently not printing after the repository split,
- * for a different reason and with the same shape.
- *
- * The kind declared `schema: "schemas/kg/harness-config.ts"` and that was wrong in
- * a way worth naming: `harness-config.ts` holds the PATH to this file
- * (`interaction: z.string().default("cat-harness/memory/interaction.json")`), not its
- * shape. A pointer to where a fact is *not* written is worse than none, because
- * a reader who follows it concludes the shape is undeclared on purpose.
- *
- * Bean `3oqj`, and `audit-coverage` is what surfaced it: the kind held a file
- * that no criterion, no gate and no validator reached.
- *
- * ## What is REQUIRED, and what deliberately is not
+ * ## What is required
  *
  * A profile list is required and may be **empty** — an empty list is a person
- * who has said nothing, which is a different fact from a person with no entry,
- * and the `default` block exists to carry exactly that. `note` and `source` are
- * optional because a preference stated in passing is still a preference; what
- * must not be optional is the list, since a missing one would read as "no
- * accommodations" rather than "not recorded".
+ * who has said nothing, which differs from a person with no entry (the
+ * `default` block carries that). `note` and `source` are optional.
  *
- * Unknown keys are ALLOWED (a non-strict object), on the rule
- * `KgAssetSchema` states: a downstream instance may carry a key this layer has
- * not learned about yet. The cost of that leniency is recorded on
- * `check-asset-roles` — a silently stripped key — so anything this layer relies
- * on is named here rather than left to be inferred.
+ * Unknown keys are ALLOWED (a non-strict object), on the rule `KgAssetSchema`
+ * states: a downstream instance may carry a key this layer does not know yet.
+ * Anything this layer relies on is named here.
  */
 import { z } from "zod";
 

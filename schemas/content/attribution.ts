@@ -1,39 +1,25 @@
 /**
- * Who wrote a piece of derived content — bean `iqim`.
+ * Who wrote a piece of derived content.
  *
- * ## A narrative is a claim by someone, not a property of the file
+ * Text lifted verbatim out of a PDF has no author: `provenance: "ingested"`
+ * says so. A *narrative* — an image description, a transcript, a translation,
+ * a dataset summary — is somebody's account of the thing, and a reader needs
+ * to know whether a human curator or a model (and which version) wrote it.
+ * Recording it also lets everything a superseded model wrote be re-generated
+ * or re-reviewed as a set.
  *
- * Text lifted verbatim out of a PDF has no author: it is the source document's,
- * and `provenance: "ingested"` says exactly that. A *narrative* — an image
- * description, a transcript, a translation, a dataset summary — is somebody's
- * account of the thing, and the difference between "a human curator described
- * this figure" and "a model described it, version X" is precisely what a reader
- * needs in order to weigh it. It is also unrecoverable once lost.
+ * ## The vocabulary is the QA reviewer's
  *
- * It makes staleness findable too: when a model is superseded, everything it
- * wrote can be re-generated or re-reviewed **as a set**, which is impossible if
- * the attribution was never recorded.
- *
- * ## The vocabulary is the QA reviewer's, not a second one
- *
- * `script | agent | human` is already how this repository names the three sorts
- * of participant, in `schemas/sdlc/block-qa.ts`. That constant now lives here and is
- * re-exported there, so there is ONE spelling. `rlp5` is the standing record of
- * what a second spelling costs: three copies of `slugify`, already drifted, one
- * of them producing a different document id from the same filename.
- *
- * What is NOT reused is `QaReviewer` itself. Most of it (`script_hash`,
- * `deps_hash`, `def_hash`) is about whether a CRITERION's cached verdict is
- * stale, which has nothing to do with authoring a narrative. Sharing the
- * vocabulary is one fact in one place; sharing the whole interface would drag
- * QA machinery into content attribution to save a type.
+ * `script | agent | human` is the participant vocabulary of
+ * `schemas/sdlc/block-qa.ts`. The constant lives here and is re-exported
+ * there, so there is ONE spelling. `QaReviewer` itself is not reused: its
+ * hash fields concern criterion staleness, not authorship.
  *
  * ## `agent` requires a model, structurally
  *
- * The bean asks for "an agent together with its **model version**". An agent
- * attribution with no model is the case the field exists to prevent — it
- * records that a machine wrote it while losing the only part that lets anyone
- * act on that later. So it is a refinement on the schema, not a convention.
+ * An agent attribution with no model is refused by a schema refinement: it
+ * would record that a machine wrote the text while losing the part that lets
+ * anyone act on it later.
  *
  * @module schemas/attribution
  * @graphNode schema

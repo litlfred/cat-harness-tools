@@ -4,34 +4,24 @@
  *
  * @module schemas/code-list
  *
- * Owner, 2026-09-23, on the adjudication answers bean `bvuk` had just written
- * into six diagrams as bare strings: *"we need an expandable option, not just
- * declared in code. list of codes and corresponding narrative desc and source
- * should be part of a node/asset."* And, choosing between the existing tools:
- * SKOS, as the glossary already publishes it.
+ * A code list replaces a bare string in an attribute (`codes="stands withdrawn"`)
+ * or a constant in a `.ts` file (`WORKFLOWS_NS`), which name a value and say
+ * nothing about it. It is one JSON file a person can read, extend and cite,
+ * and the code that needs the values reads them from it.
  *
- * ## What it replaces
+ * ## SKOS predicates
  *
- * A string in an attribute (`codes="stands withdrawn"`) or a constant in a
- * `.ts` file (`WORKFLOWS_NS`). Both name a value and say nothing about it: not
- * what it means, not who decided it, not what else it may be. Extending one
- * meant editing code. A code list is one JSON file a person can read, extend
- * and cite, and the code that needs the values reads them from it.
- *
- * ## Why SKOS, and which predicates
- *
- * A code list IS a `skos:ConceptScheme` and each code a `skos:Concept`, so the
- * published form needs no house vocabulary: `notation` for the code,
- * `prefLabel`, `definition`, `dcterms:source`, and `owl:deprecated` for a
- * retired code — the predicates the swimlane glossary already emits
- * (`scripts/glossary-export.ts`), which writes this document in the same run.
+ * A code list IS a `skos:ConceptScheme` and each code a `skos:Concept`:
+ * `notation` for the code, `prefLabel`, `definition`, `dcterms:source`, and
+ * `owl:deprecated` for a retired code — the predicates the swimlane glossary
+ * already emits (`scripts/glossary-export.ts`), which writes this document in
+ * the same run.
  *
  * ## Retired, never removed
  *
  * A code a recorded outcome carries must stay resolvable after it stops being
- * offered, or every record judged under it points at nothing — the rule the
- * glossary ledger and `deletion-requires-confirmation` apply elsewhere. So a
- * code is `retired`, and only `active` codes count as the list's values.
+ * offered. So a code is `retired`, and only `active` codes count as the
+ * list's values.
  *
  * @graphNode none — the node shape; the nodes are `code-lists/*.json`
  */

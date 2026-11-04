@@ -1,50 +1,35 @@
 /**
  * @graphNode schema
  *
- * What a person or agent SAYS a drawn figure shows — bean `a8wy`, under
- * `m4xy`. The judgement half of the vector arm.
+ * What a person or agent SAYS a drawn figure shows — the judgement half of the
+ * vector arm.
  *
- * ## Why this is a third file
+ * ## A third file
  *
- * The corpus already keeps measurement and judgement apart for raster images,
- * and this is the same split one layer over:
+ * Measurement and judgement are kept apart:
  *
  * | | measurement, machine-derived | judgement, someone looked |
  * |---|---|---|
  * | raster | `<entry>/images.json` | `<library>/image-verdicts.json` |
  * | vector | `<entry>/vector-labels.json` | `<library>/figure-descriptions.json` |
  *
- * `vector-labels.json` records where every text line sits and whether it
- * intersects a drawing. Putting a narrative in it would make one file both the
- * measurement and the opinion about the measurement, which is exactly what
- * `image-verdicts.json` exists to avoid — and it would be overwritten on the
- * next extraction, since the arm opens its sidecar with `"w"`.
+ * A narrative in `vector-labels.json` would mix measurement and opinion, and
+ * would be overwritten on the next extraction. It is not `images.json` either:
+ * a drawn figure places no image object, so there is no entry to hang a
+ * narrative on.
  *
- * It is NOT `images.json`, either, for a blunter reason: a drawn figure places
- * no image object, so there is no entry to hang a narrative on. That absence
- * is the whole of `m4xy`.
+ * ## `basis` is required
  *
- * ## `basis` is required, and it is the point of the schema
- *
- * Bean `a8wy` describes one figure from its labels alone and then renders the
- * page. Measured on `arxiv-2504.19675v2` Figure 2: every proper name, heading
- * and run number came out right, and the RELATION came out wrong on all three
- * rows — the labels line up as a table reading "one ensemble per base
- * project", while the drawn arrows cross, as the paper's own prose says. A
- * whole column of cylinder glyphs carried no text at all, so it was invisible
- * below its heading.
- *
- * So a labels-only description is safe as an INVENTORY and unsafe as an
- * ACCOUNT, and a reader has to be able to tell which one they are holding.
- * {@link FigureDescriptionSchema.basis} makes that structural rather than a
- * convention somebody remembers.
+ * A description from labels alone can name every part correctly and still get
+ * the RELATION wrong (labels line up as a table while the drawn arrows cross),
+ * and miss glyphs that carry no text. So a labels-only description is safe as
+ * an INVENTORY and unsafe as an ACCOUNT, and
+ * {@link FigureDescriptionSchema.basis} records which one the reader holds.
  *
  * ## Only a human confirms
  *
- * Same rule as every other narrative here: the state machine is
- * `NarrativeSchema`'s, `confirmed_by.kind` must be `"human"`, and an
- * agent cannot confirm its own draft. This file carries the draft and the
- * basis; nothing in it is settled until a person says so.
+ * The state machine is `NarrativeSchema`'s: `confirmed_by.kind` must be
+ * `"human"`, and an agent cannot confirm its own draft.
  */
 import { z } from "zod";
 

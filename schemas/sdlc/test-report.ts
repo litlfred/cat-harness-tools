@@ -1,37 +1,31 @@
 /**
  * A TEST REPORT — the verdicts one run of one plan reached against one system
- * under test. STRAWPERSON (bean `ygzh`, arc `3fva`).
+ * under test. STRAWPERSON.
  *
  * @module schemas/test-report
  * @graphNode schema
  *
- * Proposal §3.2: *"`test-report/v1` has per-case verdicts plus a per-plan
- * rollup. It is written to `qa-reports` under `tests/<plan-id>/<sut>/<run-id>/`.
- * A signed certification is a separate node."* So this is a RECORD of what was
- * found, never the decision taken on it: certification is a Decision by an
- * accountable role, applying the DMN the plan's `exitCriteria` names.
+ * Per-case verdicts plus a per-plan rollup, written to `qa-reports` under
+ * `tests/<plan-id>/<sut>/<run-id>/`. A RECORD of what was found, never the
+ * decision taken on it: certification is a separate, signed node — a Decision
+ * by an accountable role, applying the DMN the plan's `exitCriteria` names.
  *
  * ## Per-case verdicts are the block-qa entry shape
  *
  * `{result, reviewer{kind,id,…}, reviewed_at}` — the shape `block-qa/v1` uses
  * for a criterion, with the same `result` spellings (`pass | fail | warn |
- * n/a`). Bean `py74` found `n/a` spelled `na` in one family and `n/a` in
- * another; a sixth spelling of not-applicable is the one thing this module
- * must not add. It adds ONE value, `skipped`, because a test process needs a
- * distinction QA does not: `n/a` says the case does not apply to this system,
- * `skipped` says it applies and was not executed — and §3.2's audit criterion
- * is that every case was *executed or explicitly skipped with a reason*. So a
- * `skipped` entry must carry its `reason`.
+ * n/a`); no new spelling of not-applicable. It adds ONE value, `skipped`:
+ * `n/a` says the case does not apply to this system, `skipped` says it
+ * applies and was not executed. Every case must be executed or explicitly
+ * skipped, so a `skipped` entry must carry its `reason`.
  *
  * Several entries per case are allowed, as in block-qa (a script verdict, then
  * a human override). The CURRENT verdict is the last entry.
  *
- * ## A rollup per plan, never a total across plans (`py74`)
+ * ## A rollup per plan, never a total across plans
  *
- * The owner, 2026-09-21: *"Separate family panels, never one total."* A plan
- * is the test-side family: each one supplies its own criteria, and a pass on
- * `crdm-detect` case 4 is not the same kind of fact as a pass on a FHIR IG's
- * profile check. So:
+ * A plan is the test-side family: a pass on `crdm-detect` case 4 is not the
+ * same kind of fact as a pass on a FHIR IG's profile check. So:
  *
  * - a report names exactly ONE plan, and there is no field to name a second;
  * - the top level and the rollup are STRICT, so a `total` or `plans` key is
@@ -42,14 +36,12 @@
  *
  * ## Three things enforced structurally, mirroring `qa-report.ts`
  *
- * 1. **The rollup may not disagree with the cases it counts.** A count
- *    authored apart from the list it counts can lie about itself, invisibly.
+ * 1. **The rollup may not disagree with the cases it counts.**
  * 2. **`running` is never a pass.** `completed_at` is present exactly when the
  *    status is terminal, and {@link testReportVerdict} returns `unknown` for a
  *    running report even when every case so far passed.
- * 3. **The system under test never wrote its own verdict** (§3.2's last audit
- *    criterion). Decidable from the file — a reviewer whose `actor` or `id` is
- *    the SUT's actor — so it is refused here rather than left to a checker.
+ * 3. **The system under test never wrote its own verdict.** A reviewer whose
+ *    `actor` or `id` is the SUT's actor is refused here.
  *
  * What needs the PLAN as well as the report — that every plan case has a
  * verdict, and no verdict names a case the plan lacks — is

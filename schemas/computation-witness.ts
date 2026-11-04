@@ -6,24 +6,11 @@
  * @module schemas/computation-witness
  * @graphNode schema
  *
- * ## Two schemas, because the corpus is not one shape
+ * ## Two schemas
  *
- * The contract a witness producer is MEANT to meet was written down in
- * litlfred/qou's `schemas/witness-schema/js/index.ts` (and the TypeScript
- * interface `ComputationWitness` in `types.ts`). Measured over all of qou's
- * witnesses on 2026-10-04 (bean `qou-qb6t`), that contract accepts **1,685 of
- * 3,834** strict-JSON files (44 %), plus 5 that are not strict JSON at all:
- *
- * | divergence | witnesses |
- * |---|---|
- * | no `engine` | 517 |
- * | `engine` outside the 11-value enum (about 40 spellings) | most of the rest of the engine failures |
- * | no `assertions` list | 867 |
- * | `auditOnly` a boolean, where the contract says string | 144 |
- * | an assertion's `computed`/`expected` a boolean, list, object or null | ~2,600 values |
- *
- * So one schema would have to choose between describing what IS and what is
- * MEANT, and either choice makes it lie about the other half. Hence two:
+ * Most existing witnesses do not meet the producer contract (missing
+ * `engine` or `assertions`, a boolean `auditOnly`, non-numeric assertion
+ * values), so the module describes both what is and what is meant:
  *
  * - {@link ComputationWitnessSchema} — the **envelope**: what every witness
  *   actually is. Every field optional and typed as the corpus types it, so a
@@ -35,16 +22,13 @@
  *   `scripts/witness-conformance.ts` and never repaired by editing the
  *   witness, which is generator output.
  *
- * Neither changes a witness. Owner hard rule on the qou migration: no
- * mathematics or physics content is changed, and a witness's numbers are
- * exactly that.
+ * Neither changes a witness: a witness's numbers are never edited.
  *
  * ## No reliable `$schema` tag
  *
- * 22 of qou's witnesses carry a `$schema`, in seven spellings, and the rest
- * carry none. So the kind names one `validator` rather than per-tag
- * `nodeSchemas`, and a reader selects witnesses by the `.witness.json` suffix
- * the producers have always written ({@link WITNESS_SUFFIX}).
+ * Few witnesses carry a `$schema`, and not in one spelling. So the kind names
+ * one `validator` rather than per-tag `nodeSchemas`, and a reader selects
+ * witnesses by the `.witness.json` suffix ({@link WITNESS_SUFFIX}).
  */
 import { z } from "zod";
 

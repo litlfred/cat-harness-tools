@@ -4,79 +4,51 @@
  * @module schemas/staging-preview
  * @graphNode schema
  *
- * ## Why this is a trashcan node and not a first-class one
+ * ## A trashcan node
  *
- * A staging preview is SDLC churn by definition: it exists for one review and
- * is meant to die. `fsh-guts` is the declared non-renderable graph for exactly
- * that (bean `t0i3`), and `UNPUBLISHED_GRAPH_TYPOLOGIES` keeps it out of every other
- * published artefact while `<base>/fsh-guts.jsonld` stays reachable BY NAME.
- * So these records are addressable without a crawler ever arriving at one by
- * following an edge — which is the property you want for something whose whole
- * point is that it is temporary.
+ * A staging preview exists for one review and is meant to die. `fsh-guts` is
+ * the declared non-renderable graph for that: it is kept out of every other
+ * published artefact while `<base>/fsh-guts.jsonld` stays reachable BY NAME,
+ * so these records are addressable but no crawler reaches one by following an
+ * edge.
  *
- * ## The node owns its lifecycle — that is the whole design
+ * ## The node owns its lifecycle
  *
- * Owner, 2026-09-19, on where the write and remove logic belongs: *"that's part
- * of the behaviour of that node type."*
+ * Creation, enrichment and retirement are functions HERE, and the things that
+ * touch a preview — the deploy, the label cleanup, the dispatch cleanup, the
+ * health sweep — invoke them rather than reimplementing the rule, so there is
+ * one answer to "is this preview still live" (as `previewLiveness` in
+ * `test/health/checks.ts` serves both the sweep and the removal preflight).
  *
- * So creation, enrichment and retirement are functions HERE, and the things
- * that happen to touch a preview — the deploy, the label cleanup, the dispatch
- * cleanup, the health sweep — invoke them rather than each reimplementing the
- * rule. Put the rule in the workflow and there are three answers to "is this
- * preview still live", free to disagree.
- *
- * **This shape is already latent in the code, arrived at from the other
- * direction.** `previewLiveness` in `test/health/checks.ts` is a single
- * function called from both the sweep and the removal preflight, written that
- * way precisely so the two cannot disagree. What is missing is the declaration
- * saying the node type owns it, and a published document letting anything else
- * read the answer.
- *
- * ## Two moments know different things, and neither knows everything
+ * ## Two moments know different things
  *
  * | | knows | does not know |
  * |---|---|---|
- * | deploy (`feature-staging.yml`) | branch, commit, PR, issue, host, built-at | size, liveness |
+ * | deploy | branch, commit, PR, issue, host, built-at | size, liveness |
  * | sweep (`test/health/probes.ts`) | size, file count, liveness | the PR and issue |
  *
  * Hence {@link createStagingPreview} takes the first set and
  * {@link enrichStagingPreview} adds the second. The record exists from the
- * moment the preview does, which is what makes "cannot outlive the preview"
- * enforceable rather than aspirational: a record that only appears at the next
- * sweep cannot be checked against a preview that was removed before it.
+ * moment the preview does, so "cannot outlive the preview" is checkable.
  *
  * ## Retirement is a state, never a deletion
  *
- * Same rule as a bean's `scrapped` and a memory node's `archived`, and for the
- * same reason: a removed record leaves the next reader unable to tell
- * "deliberately cleaned up" from "lost". {@link retireStagingPreview} sets
- * `retiredOn` and a reason and keeps everything else, so the record of a
- * preview that is gone still says what it was for.
+ * Same rule as a bean's `scrapped` and a memory node's `archived`: a removed
+ * record cannot be told from a lost one. {@link retireStagingPreview} sets
+ * `retiredOn` and a reason and keeps everything else.
  *
- * ## Two measured facts about the trashcan — one since fixed, one still real
+ * ## The carrier is JSON
  *
- * Both were probed rather than assumed. When this module shipped they were
- * why it carried its own reader; one of them is now gone.
+ * `schemas/kg/front-matter.ts` is a FLAT parser
+ * (`Record<string, string | string[]>`): a nested `staging:` block parses to
+ * `[]` before any schema sees it, so a markdown node would lose the data while
+ * looking like an answer. `<base>/fsh-guts.jsonld` carries these records: the
+ * exporter reads a JSON node of this graph and emits a kind's own fields under
+ * `data`. Membership is still `$schema`, so a `folio-log/v1` entry is excluded
+ * by what it says it is.
  *
- * 1. **FIXED 2026-09-20.** `FshGutsNodeSchema` was a plain `z.object`, so zod
- *    dropped unknown keys and `readFshGutsNode` returned a node with no
- *    `staging` at all, silently. It now carries `.passthrough()`: `kind` is
- *    open, so the field set could not stay closed.
- * 2. **STILL TRUE.** `schemas/kg/front-matter.ts` is a FLAT parser
- *    (`Record<string, string | string[]>`). A nested `staging:` block parses
- *    to `[]` before any schema sees it — so a markdown node survives the
- *    schema and still loses the data, which is worse than losing it outright
- *    because `[]` looks like an answer.
- *
- * (2) is why the carrier is JSON, and that has not changed. What has changed
- * is that `<base>/fsh-guts.jsonld` now DOES carry these records: the exporter
- * reads a JSON node of this graph and emits a kind's own fields under `data`.
- * The log exclusion is untouched — membership is still `$schema`, so a
- * `folio-log/v1` entry is excluded by what it says it is.
- *
- * {@link readStagingPreview} therefore stays as a TYPED reader — it returns a
- * `StagingPreviewNode` and refuses another kind by name — rather than as a
- * workaround for a reader that could not see the fields.
+ * {@link readStagingPreview} is a TYPED reader — it returns a
+ * `StagingPreviewNode` and refuses another kind by name.
  */
 
 import { z } from "zod";

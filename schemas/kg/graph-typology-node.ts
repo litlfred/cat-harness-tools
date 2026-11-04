@@ -1,8 +1,6 @@
 /**
  * A GRAPH TYPOLOGY as a node of the knowledge graph, declared by the harness that
- * owns it (bean dmx1). Owner, 2026-10-04: *"there should not be a central
- * registry for declaring mount tools and subgraph types"*, and, asked where a
- * kind is declared, a `typologies/` graph of one node per kind (option 1 of 3) —
+ * owns it — no central registry; a `typologies/` graph of one node per kind,
  * the way `tools/` holds Tool definitions as nodes.
  *
  * A harness declares a directory of graph typology `typologies`; each `*.json` in it is
@@ -12,9 +10,9 @@
  * files is refused, naming both.
  *
  * The fields are `GraphTypologyDef`'s, one for one, plus `kind` (the file says what
- * it declares) and `avatar` (so the kind's mark travels with the kind, rather
- * than in a second central table). A compile-time check below keeps the two in
- * step: a field added to `GraphTypologyDef` and not here fails to typecheck.
+ * it declares) and `avatar` (so the kind's mark travels with the kind). A
+ * compile-time check below keeps the two in step: a field added to
+ * `GraphTypologyDef` and not here fails to typecheck.
  *
  * A LEAF: Zod only, so the registry can import it without a cycle.
  *

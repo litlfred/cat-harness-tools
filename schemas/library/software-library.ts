@@ -6,14 +6,8 @@
  * @module schemas/software-library
  * @graphNode schema
  *
- * Option D of bean `jbvi` (owner, 2026-10-24 08:25Z, "D. Shared core"). The
- * gap it closes: `tool-release` records the outside programs the platform
- * RUNS, and nothing recorded the libraries its code imports — bpmn-moddle,
- * dmn-moddle, katex, playwright, zod. Their range was in each `package.json`,
- * their exact version and integrity in each `bun.lock`, their licence nowhere
- * a gate could read, and the shim that types one (`types/bpmn-moddle.d.ts`)
- * linked to nothing. So no gate or page could ask "which licence does this
- * library carry, which files import it, and which shim types it".
+ * A node answers "which licence does this library carry, which files import
+ * it, and which shim types it" (e.g. `types/bpmn-moddle.d.ts`).
  *
  * ## The core, extended
  *
@@ -26,19 +20,14 @@
  * - `usedBy` — the layer's files that import it, layer-relative and sorted;
  * - `shim` — the `types/*.d.ts` that declares it, when one exists;
  * - `vendored` (1.1.0) — the directory its bytes are kept in, for a bundle the
- *   layer keeps rather than installs, which then has no `range` and no `dev`
- *   (§"A vendored bundle is a library too").
+ *   layer keeps rather than installs, which then has no `range` and no `dev`.
  *
- * It is a NODE KIND (`nodeKind()`, issue #2195) whose one parent is the core's
- * mixin, {@link OutsideSoftwareKind}, so the class it belongs to is declared
- * rather than inferred from a spread. `tool-release` predates node kinds and
- * keeps its `folio-tool-release/v1` tag; it extends the same core with Zod's
- * `.extend()`, which changes none of its files.
- *
- * Two core fields are narrowed. `name` is an npm package name, which may be
- * scoped (`@scope/pkg`), so its ref splits at the LAST `@`. `source` is a URL:
- * a library comes from a registry tarball, never an OCI image. The digest is
- * the core's own, so it may be sha512 — what `bun.lock` records.
+ * It is a NODE KIND (`nodeKind()`) whose one parent is the core's mixin,
+ * {@link OutsideSoftwareKind}. Two core fields are narrowed. `name` is an npm
+ * package name, which may be scoped (`@scope/pkg`), so its ref splits at the
+ * LAST `@`. `source` is a URL: a library comes from a registry tarball, never
+ * an OCI image. The digest is the core's own, so it may be sha512 — what
+ * `bun.lock` records.
  *
  * ## Generated, never hand-written
  *
@@ -46,15 +35,12 @@
  * `package.json` (range, dev), its `bun.lock` (version, integrity, tarball)
  * and the installed package's own `package.json` (licence). The writer is
  * `libraries:derive` and the gate `libraries:check`, both in the tools layer.
- * Hand-writing them is option A's failure: every `bun update` would churn
- * dozens of files by hand.
  *
  * ## One node per layer per library
  *
  * Each layer keeps its own `libraries/`, declared in its own `<name>.json`,
  * because each layer pins its own version in its own lockfile. A library two
- * layers share has two nodes, one in each, which may disagree on the version
- * — and that disagreement is a fact worth seeing rather than one to hide.
+ * layers share has two nodes, one in each, which may disagree on the version.
  *
  * ## The file name is not the `name`
  *
@@ -64,53 +50,36 @@
  * marker"). The version is not in the file name, so a bump rewrites one file
  * rather than renaming it.
  *
- * ## A vendored bundle is a library too (1.1.0)
+ * ## A vendored bundle (1.1.0)
  *
- * Bean `jbvi`, owner 2026-10-26 ("A. Record as vendored"). Some layers keep a
- * library's prebuilt bytes in the repository rather than installing them —
- * the FHIR layer serves LHC-Forms and the NLM Form Builder from
- * `scripts/assets/vendor/<name>/<version>/` so a page makes no request to a
- * CDN. No `package.json` declares such a bundle, so before 1.1.0 there was
- * nothing to record it as, and the imports INSIDE its bytes (a polyfill the
- * bundle was built with) read as imports the layer forgot to declare.
+ * Some layers keep a library's prebuilt bytes in the repository rather than
+ * installing them — e.g. `scripts/assets/vendor/<name>/<version>/`, so a page
+ * makes no request to a CDN. The imports INSIDE those bytes are not imports
+ * the layer must declare.
  *
- * A vendored node is the same kind with `vendored: { path }` — the bundle's
- * directory, layer-relative — and the same core: the name and version the
- * bundle was taken at, the registry tarball it was taken from, that tarball's
- * digest, and its licence with where that was read. What it does NOT have is
- * what only a `package.json` entry has: no `range` and no `dev`, because no
- * manifest asks for it. The refinement holds that both ways — a vendored node
- * carries neither, and any other node carries both — so a missing `range` is
- * never silently "vendored".
- *
- * `vendored` is a 1.1.0 field, so a vendored node is stamped 1.1.0 and the
- * refinement refuses one stamped 1.0.0 (a file cannot use a field its version
- * does not have). Every other node is still stamped 1.0.0
- * ({@link librarySchemaTag}): its fields are all 1.0.0 fields, so a layer's
- * existing nodes do not churn when the kind gains one. Both families are
- * listed in the typology, each with its validator.
+ * A vendored node has `vendored: { path }` — the bundle's directory,
+ * layer-relative — and the same core: the name and version the bundle was
+ * taken at, the registry tarball, its digest, and its licence with where that
+ * was read. It has no `range` and no `dev`; every other node has both, so a
+ * missing `range` is never silently "vendored". A vendored node is stamped
+ * 1.1.0 (one stamped 1.0.0 is refused); a layer's own installed nodes are
+ * stamped 1.0.0 ({@link librarySchemaTag}). Both families are listed in
+ * the typology.
  *
  * Its file is {@link vendoredLibraryFileName} — the version IS in the name,
- * because a layer may keep two versions of one bundle side by side, and a
- * vendored copy is never "bumped" in place: a new version is a new directory.
+ * because a layer may keep two versions of one bundle side by side; a new
+ * version is a new directory.
  *
  * ## A layer below the kind is held by the writer's layer (1.2.0)
  *
- * Bean `jbvi`, bootstrap-tools#44, owner 2026-10-30 ("A. Holder records,
- * keyed by layer"). A layer that sits below this kind's layer (bootstrap-tools
- * needs only bootstrap) may not name it, so it cannot declare a `libraries/`
- * of its own. Its nodes are held instead by the layer that owns the writer,
- * under `libraries/held/<layer>/`, the way core holds the glossary schemes of
- * the layers below its `glossary` typology, keyed by their owning instance
- * (bean `q3n9`).
+ * A layer below this kind's layer (bootstrap-tools needs only bootstrap) may
+ * not name it, so it cannot declare a `libraries/`. Its nodes are held by the
+ * layer that owns the writer, under `libraries/held/<layer>/`.
  *
- * A held node says which layer it describes in `layer`: the instance name, as
- * `needs` names it. That is the graph's edge from the library to the layer
- * that imports it, and pages place the node under that layer. `usedBy` and
- * `shim` stay relative to that layer, not to the holder. A layer's own nodes
- * carry no `layer`: their directory's declaring instance is the layer, and
- * stamping it on every node would churn every layer for nothing. So `layer` is
- * present exactly on a held node, which is stamped 1.2.0 ({@link librarySchemaTag}).
+ * A held node names the layer it describes in `layer` (the instance name, as
+ * `needs` names it); pages place the node under that layer. `usedBy` and
+ * `shim` stay relative to that layer, not to the holder. `layer` is present
+ * exactly on a held node, which is stamped 1.2.0 ({@link librarySchemaTag}).
  */
 import { z } from "zod";
 

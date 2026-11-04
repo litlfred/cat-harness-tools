@@ -1,34 +1,25 @@
 /**
- * `structure.json` as a BASE with VARIANTS — bean `rkqp`, owner 2026-09-30
- * ("A+B", after a measured analysis).
+ * `structure.json` as a BASE with VARIANTS.
  *
  * @module schemas/document-structure
  * @graphNode schema
  *
- * ## Why a base, and why `pdf-structure/v1` is not renamed
+ * The base holds the fields every format has (a section's id, number, title,
+ * level and sizes; the document's title). `pdf-structure/v1` is unchanged, as
+ * one variant.
  *
- * Measured before this was written: 17 readers take `structure.json`. Nine
- * read only fields every format has (a section's id, number, title, level and
- * sizes; the document's title). Three read `page_start` / `page_end` and
- * already treat them as optional. One (`check-l1-complete`) validates strictly
- * against the PDF schema. Four are PDF-only tools. So the base mostly WRITES
- * DOWN what the readers already assume, and nothing in the 43 committed PDF
- * files changes: `pdf-structure/v1` stays exactly as it is, as one variant.
+ * ## A variant adds where a section IS
  *
- * ## The one thing a variant must add: where a section IS
- *
- * A PDF section is located by pages; a notebook section by cells. The two are
- * not the same unit and must not be read as one, so {@link structureOf}
- * returns a `locator` that says which it is. A reader that wants pages asks
- * for `kind: "pages"` and gets nothing from a notebook, rather than a cell
- * index mistaken for a page number.
+ * A PDF section is located by pages; a notebook section by cells. They are
+ * not the same unit, so {@link structureOf} returns a `locator` that says
+ * which it is. A reader that wants pages asks for `kind: "pages"` and gets
+ * nothing from a notebook.
  *
  * ## Read it through the accessor
  *
  * {@link structureOf} is the one way to read a `structure.json` whose format
- * is not known in advance. A reader that parses the file itself learns one
- * variant and silently misreads the next, which is the drift this exists to
- * stop. A third format (HTML, DOCX) is a new variant here and no reader
+ * is not known in advance; a reader that parses the file itself misreads the
+ * next variant. A new format (HTML, DOCX) is a new variant here and no reader
  * changes.
  */
 import { existsSync, readFileSync } from "node:fs";

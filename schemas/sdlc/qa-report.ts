@@ -4,28 +4,18 @@
  * @module schemas/qa-report
  * @graphNode schema
  *
- * The **fifth** committed QA-shaped artefact family here, after the block
- * sweep's `*.qa.json`, the script sweep's `*.script-qa.json`, the KG audit's
- * `*.kg-qa.json` and `health-report/v1`. It shares their one load-bearing
- * contract: **the file declares what it is**, with a `$schema` tag, rather
- * than being duck-typed by its extension or by the directory it was found in
- * (#263).
+ * Like the other committed QA artefacts (`*.qa.json`, `*.script-qa.json`,
+ * `*.kg-qa.json`, `health-report/v1`), **the file declares what it is** with a
+ * `$schema` tag, not by its extension or directory.
  *
- * ## Why it exists: the data is already produced and already thrown away
+ * The shape already exists upstream: every DAK pre- and post-processing script
+ * in WHO's SMART Base repository instantiates a `QAReporter` and writes a phase
+ * report — successes, warnings, errors, the files it processed, the files it
+ * EXPECTED, and the files that were missing — and the IG Publisher writes
+ * `qa.json`, uploaded as a workflow artifact. This kind gives it somewhere to
+ * live.
  *
- * Every DAK pre- and post-processing script in
- * WHO's SMART Base repository instantiates a `QAReporter` and writes
- * a phase report — successes, warnings, errors, the files it processed, the
- * files it EXPECTED, and the files that were missing — and the IG Publisher
- * writes `qa.json`, uploaded as a workflow artifact.
- *
- * **Nothing downstream reads either.** So this kind is not a design; it is a
- * shape that already exists, given somewhere to live. The owner ruled for it
- * on exactly that basis.
- *
- * ## Why not the existing `qa` kind
- *
- * Same argument that separates `health` from `qa`, one step further out:
+ * ## Not the `qa` kind
  *
  * - a **`qa` witness** judges an ARTEFACT this repository produced, against
  *   criteria that artefact is supposed to meet;
@@ -33,43 +23,21 @@
  * - a **`qa-report`** records what a TOOL did on one run. Its subject is an
  *   execution, not an artefact and not a repository.
  *
- * Folding it into `qa` would put "generate_valueset_schemas.py processed 198
- * files and expected 199" beside "this lane binds no role", and hand a
- * consumer asking for verdicts about content a fact about a subprocess. Bean
- * `py74` already found six schemas with three incompatible verdict shapes, so
- * a fifth family needs the argument made rather than assumed — this is it.
- *
- * ## The field names are UPSTREAM's, on purpose
+ * ## The field names are UPSTREAM's
  *
  * `total_successes`, `files_expected`, `completion_timestamp` — snake_case,
- * against this repository's own convention.
- *
- * That is the point. The owner chose the evidence-led option: *the shape is
- * what these scripts already emit*. Renaming the fields would insert a
- * translation step between a producer we do not control and a consumer we do,
- * and a translation step is a place for the two to drift silently. Keeping
- * them means an upstream report validates here **byte for byte**, and a change
- * upstream fails validation instead of being quietly re-mapped.
- *
- * The wrapper fields this module ADDS — `$schema`, `producer`, `source`,
- * `toolchain` — are ours and are camelCase where they are compound. The line
- * between the two halves is therefore visible in the spelling, which is worth
- * more here than uniformity.
+ * against this repository's own convention, so an upstream report validates
+ * here **byte for byte** and a change upstream fails validation instead of
+ * being quietly re-mapped. The wrapper fields this module ADDS — `$schema`,
+ * `producer`, `source`, `toolchain` — are ours, camelCase where compound.
  *
  * ## Three things enforced structurally
  *
- * Each is a rule this repository has already paid for once in prose:
- *
  * 1. **A summary cannot disagree with its own details.** `total_errors` must
- *    equal `details.errors.length`, and so on. A report whose counts are
- *    authored separately from the list they count is a report that can lie
- *    about itself, and the lie is invisible — a reader sees a plausible
- *    number.
+ *    equal `details.errors.length`, and so on.
  * 2. **`files_missing` must be a subset of `files_expected`.** A file cannot
- *    be missing if nobody expected it. This is what keeps "the DMN directory
- *    held no decisions" distinguishable from "the DMN directory was not
- *    found", which is the single most valuable property the upstream reporter
- *    already has.
+ *    be missing if nobody expected it. This keeps "the DMN directory held no
+ *    decisions" distinguishable from "the DMN directory was not found".
  * 3. **`running` is never a pass.** A report that never finalised carries no
  *    `completion_timestamp`, and a consumer must not read its zero errors as a
  *    clean run. Same rule as `check-ci-health.ts`, `restore-staging.ts`,

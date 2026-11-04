@@ -5,54 +5,45 @@
  * @module schemas/vocab-mapping
  * @graphNode schema
  *
- * Bean `k74z`, issue #1872. The owner, 2026-09-23, choosing to keep a glossary
- * scheme's name in both `skos:prefLabel` and `dcterms:title` (bean `sl9u`):
- * *"need Tools for this type of ETL procedure depending on source / target
- * content type and other metadata"*. Ruled 2026-10-02: option 1 of
- * `docs/proposals/vocabulary-mappings-2026-10-02.md`, mapping tables as KG
- * data applied by one in-process Tool, and they must interoperate with FHIR
- * ConceptMaps. The owner's words, verbatim and in order, are in that
- * proposal's Decision section.
+ * Mapping tables are KG data applied by one in-process Tool, and they
+ * interoperate with FHIR ConceptMaps. Design:
+ * `docs/proposals/vocabulary-mappings-2026-10-02.md`.
  *
- * ## The shape is a ConceptMap's, on purpose
+ * ## The shape is a ConceptMap's
  *
  * A table is a map → group → element → target tree, with the field names FHIR
  * R5 `ConceptMap` uses. A group pairs one SOURCE vocabulary with one TARGET
  * vocabulary (`source` and `target`, each an IRI or a CURIE). An element's
  * `code` is the source field. Each `target` names the target term (`code`) and
- * the relationship between them. That is what makes the owner's requirement
- * cheap: an existing ConceptMap, R5 or R4, is representable here without loss
- * (`fromConceptMap` in the FHIR IG layer's `schemas/vocab-mapping-fhir.ts`), and a table can be produced as
- * a ConceptMap, lossily, with the loss reported (`toConceptMap`).
+ * the relationship between them. An existing ConceptMap, R5 or R4, is
+ * representable here without loss (`fromConceptMap` in the FHIR IG layer's
+ * `schemas/vocab-mapping-fhir.ts`), and a table can be produced as a
+ * ConceptMap, lossily, with the loss reported (`toConceptMap`).
  *
- * ## Where the schema goes beyond a ConceptMap, and why
+ * ## Beyond a ConceptMap
  *
- * A generator needs four things a ConceptMap does not say. They are the
- * **only** fields `toConceptMap` cannot carry, and it reports each one it
- * drops:
+ * A generator needs fields a ConceptMap does not carry; `toConceptMap`
+ * reports each one it drops:
  *
  * | field | why a generator needs it |
  * |---|---|
  * | `target.key` | the JSON term written, where it differs from the target code (`usage` for `cat-harness:hasLaneUsage`) |
- * | `target.authority: "derived"` + `derivedFrom` | `vocabulary-authority`'s rule: one predicate is the fact, another a rendering of it. The derived value is COPIED from the authoritative output, so the two cannot drift (`sl9u`) |
+ * | `target.authority: "derived"` + `derivedFrom` | `vocabulary-authority`'s rule: one predicate is the fact, another a rendering of it. The derived value is COPIED from the authoritative output, so the two cannot drift |
  * | `target.transform` | `copy` (the default), `flag` (true or nothing), or `code` (the value is prepared in code before the mapping; the row says so rather than hiding it) |
  *
- * ## Where it holds MORE than R5, and why
+ * ## More than R5
  *
- * Most published maps are R4, and R4 says some things R5 cannot: ten
- * `equivalence` codes where R5 has five relationships, and a `dependsOn` with
- * a `system` and a `display`. Those are kept verbatim beside the R5 field
- * (`equivalence`, `dependsOn[].system`), because dropping them would make an
- * R4 map unrecoverable from its representation. `relationship` is always
- * present: for an R4 map it is derived from `equivalence` by
- * {@link R4_TO_R5_RELATIONSHIP}.
+ * R4 says things R5 cannot: ten `equivalence` codes where R5 has five
+ * relationships, and a `dependsOn` with a `system` and a `display`. Those are
+ * kept verbatim beside the R5 field (`equivalence`, `dependsOn[].system`) so
+ * an R4 map stays recoverable. `relationship` is always present: for an R4
+ * map it is derived from `equivalence` by {@link R4_TO_R5_RELATIONSHIP}.
  *
  * Every ConceptMap key this schema does not interpret (`extension`, `id` on a
  * backbone element, `contact`, `jurisdiction`, `text`, …) is carried in the
- * `extra` bag at its level, or in `metadata` at the map level, so nothing is
- * lost silently. `vocab-mapping-fhir.test.ts` asserts the interpreted fields
- * do not leak into those bags on real maps, so the bags cannot be what makes
- * the round trip pass.
+ * `extra` bag at its level, or in `metadata` at the map level.
+ * `vocab-mapping-fhir.test.ts` asserts the interpreted fields do not leak into
+ * those bags on real maps.
  *
  * @conformsTo hl7-fhir
  * @conformsTo w3c-skos

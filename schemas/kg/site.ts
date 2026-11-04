@@ -4,23 +4,20 @@
  * @module schemas/site
  * @graphNode schema
  *
- * Two kinds, one per capability tier (owner, 2026-10-05, bean `lehh`):
+ * Two kinds, one per capability tier:
  *
  * - **`basic-cdn-site`** — a CDN that serves files by path and nothing else:
  *   no MIME-type mapping, no redirects, no headers. GitHub Pages is one (its
  *   `gh-pages` Tool says so: *"Pages cannot serve server-side redirects or
  *   custom headers"*).
- * - **`cdn-site`** — the same, plus the three a real CDN adds. Declared now so
- *   a downstream instance's CDN deployment (beans `l9v6`, `xies`) has a kind to land in
- *   rather than widening this one later.
+ * - **`cdn-site`** — the same, plus the three a real CDN adds, for a
+ *   downstream instance's CDN deployment.
  *
  * ## A site is an archive with routes
  *
- * The owner: *"gh-pages is almost like an archive (e.g. zip, tgz) for which
- * we have a schema"*. So a site's files are {@link ArchiveEntrySchema}
- * entries, picked up rather than restated, and what a site adds over an
- * archive is the ROUTE layout: the release root, where staging previews sit,
- * and the per-instance sub-sites.
+ * A site's files are {@link ArchiveEntrySchema} entries, and what a site adds
+ * over an archive is the ROUTE layout: the release root, where staging
+ * previews sit, and the per-instance sub-sites.
  *
  * ## Where a site comes from, and where it goes
  *

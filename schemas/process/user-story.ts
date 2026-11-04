@@ -2,9 +2,7 @@
  * User stories — what a reader acting in a role is trying to do.
  *
  * A story is told AS a role, so it points at the role and the role names no
- * story (#1168, B2; data-modelling step 8). Until then each role carried its
- * stories as `useCases`, free-text strings on the role itself: a story could
- * not be pointed at, and adding one meant editing the role.
+ * story (data-modelling step 8).
  *
  * The file is `scenarios/stories.json`, beside `roles.json` in the same
  * `scenarios` graph — the kind the registry names for "Actors, the Roles they

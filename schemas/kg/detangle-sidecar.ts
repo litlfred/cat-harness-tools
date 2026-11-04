@@ -4,22 +4,13 @@
  * @module schemas/detangle-sidecar
  * @graphNode schema
  *
- * ## Why a committed file rather than a console report
+ * `kg-detangle` writes its measurement to a committed sidecar, so a
+ * regression in the authority map, the boundary arithmetic or the cohesion
+ * computation shows as a diff against the last recorded value.
  *
- * `kg-detangle` computes the arrow-direction model and, until 2026-09-21,
- * nothing recorded its output: no npm script, no gate, no workflow (bean
- * `sb6z`). So a regression in the authority map, the boundary arithmetic or
- * the cohesion computation was invisible until somebody happened to run it by
- * hand AND happened to remember what the numbers were last time.
+ * ## What is pinned
  *
- * That last clause is the real gap. A printed verdict is gone the moment the
- * terminal scrolls, which makes "this has been wrong since it was written" and
- * "this broke in the commit under review" indistinguishable — the same
- * argument `kg:audit` records for writing sidecars instead of printing.
- *
- * ## WHAT IS PINNED, and the owner's ruling on it
- *
- * Owner, 2026-09-21: *"pin size, cohesion, authority counts. not verdict"*.
+ * Size, cohesion, the authority and direction counts — not the verdict.
  *
  * | field | pinned | why |
  * |---|---|---|
@@ -29,52 +20,22 @@
  * | `enforcedBoundary`, `recordedBoundary`, `proseMentions` | yes | the authority counts |
  * | `wrongDirection`, `undeterminedDirection` | yes | the DIRECTION counts — see below |
  * | `role` | **no** | derived from the counts above; pinning it duplicates them |
- * | `verdict`, `clauses` | **no** | the ruling's explicit exclusion |
+ * | `verdict`, `clauses` | **no** | a threshold comparison that flips on unrelated edits |
  *
- * ## The direction counts were added AFTER the ruling, and nobody went back
+ * **`verdict` is excluded** because a group near a threshold flips on a change
+ * that moved nothing about it, and a sidecar that churns stops being read.
  *
- * The ruling above is 2026-09-21. `wdir` and `undet` did not exist then —
- * bean `j79e` added them on 2026-09-23, when `layer-direction.ts` gave
- * `check:partition` and `kg-detangle` one shared verdict. So they were never
- * weighed against the ruling; they were simply printed and dropped.
+ * **The direction counts are pinned** because they are not thresholds:
+ * `wrongDirection` counts edges whose `directionOf` said `wrong-direction`,
+ * which changes only when an edge or a declaration changes — the event worth
+ * failing on. `undeterminedDirection` (an edge whose instance declares no
+ * `needs`) rides with it, so an edge moving from `wrong-direction` to
+ * `undetermined` does not read as a fix.
  *
- * **What that cost, measured 2026-09-26.** `j79e` records *"0 wrong-direction
- * outbound edges across 26 groups"* on 2026-09-23. Three days later it was
- * **1 across 28 groups** — `cat-harness/schemas/library/intake.ts` importing
- * the content core's `schemas/materialization.js`, against a `cat-harness`
- * that declares only `bootstrap`. An inversion reached `main` and `kg:detangle
- * --check` could not fail on it, because the field it would have had to
- * compare was not in the file. That is bean `1xhc` exactly: a gate that cannot
- * fire is indistinguishable from one that passed.
- *
- * **Why these two are pinned when `verdict` is not.** The case against
- * `verdict` is churn: it is a threshold comparison, so a group sitting near a
- * boundary flips on a change that moved nothing about it. Neither of these is
- * a threshold. `wrongDirection` counts edges whose `directionOf` said
- * `wrong-direction`, which changes only when an edge or a declaration changes
- * — precisely the event worth failing on. They are the same KIND of fact as
- * the authority counts already pinned: both classify boundary edges, one by
- * authority and one by direction.
- *
- * **And `undeterminedDirection` rides with `wrongDirection` for the reason the
- * raw counts ride with `cohesion`.** An undetermined edge is one whose
- * instance declares no `needs` — the third state, which is not clean. Pinning
- * the wrong-direction count alone would let an edge move from
- * `wrong-direction` to `undetermined` and read as a fix.
- *
- * **Why `verdict` is excluded is worth keeping.** It is the field a reviewer
- * most wants pinned and the one most likely to churn on unrelated edits: it is
- * a threshold comparison, so a group sitting near a boundary flips on a change
- * that moved nothing about that group. A sidecar that churns is a sidecar
- * people stop reading, and then the staleness check is noise rather than a
- * signal.
- *
- * **The raw counts ride with `cohesion` because this package says they must.**
- * `detangle.ts` on `oneWayness`: *"Reported with the raw counts, never instead
- * of them."* `cohesion` is `internal / (internal + inbound + outbound)`, so
- * pinning the ratio alone would let a change that preserves it — three edges
- * becoming thirty, say — pass unrecorded. That is not a widening of the
- * ruling; it is what pinning `cohesion` MEANS under this package's own rule.
+ * **The raw counts ride with `cohesion`**, per `detangle.ts`'s rule for
+ * `oneWayness`: *"Reported with the raw counts, never instead of them."*
+ * `cohesion` is `internal / (internal + inbound + outbound)`, so pinning the
+ * ratio alone would let three edges becoming thirty pass unrecorded.
  */
 
 import { join } from "node:path";

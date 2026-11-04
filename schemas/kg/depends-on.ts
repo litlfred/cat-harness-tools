@@ -2,33 +2,19 @@
  * depends-on.ts — `instance-versioning.md` §3.4's record, and the gaps it
  * cannot fill.
  *
- * > `kg-export` emits, per publishable instance, `{packageId, version, uri}`
- * > per dependency. An external consumer then reads this instance's dependency
- * > set the same way it reads a FHIR IG's, which is what "align downstream"
- * > means in practice.
- *
- * Three fields, deliberately FHIR's and not this repository's: `packageId`,
- * `version`, `uri` are what `ImplementationGuide.dependsOn` carries, and the
- * whole purpose of the record is that a consumer already knows how to read it.
- * Renaming them to this repository's spellings would mean a downstream
- * translating a structure it can otherwise consume directly — and `qa-report.ts`
- * already settled that argument the same way, keeping upstream's snake_case.
+ * `kg-export` emits, per publishable instance, `{packageId, version, uri}`
+ * per dependency — the fields FHIR's `ImplementationGuide.dependsOn` carries,
+ * so an external consumer reads this instance's dependency set as it reads a
+ * FHIR IG's.
  *
  * ## A dependency that cannot be expressed is REPORTED, never dropped
  *
- * Most instances here are not publishable and §3.1 says that is correct, so
- * most edges out of a publishable instance will be to something that has no
- * `id` and no `version`. Emitting `dependsOn: []` in that case would state
- * that the instance depends on nothing, which is false. Emitting a partial
- * record with an empty `version` would be worse: a consumer resolves it and
- * fails. So each such edge becomes a {@link DependsOnGap} carrying WHICH of
- * the reasons applies, and a reader can tell "depends on nothing" from
- * "depends on four things none of which is publishable".
- *
- * That is the `dh4f` rule applied to an edge rather than a directory, and the
- * distinction it preserves is exactly the one §3.1 spent a third state on:
- * `undecided` (nobody said) and `internal` (somebody said no) are different
- * gaps with different remedies.
+ * Most instances are not publishable (§3.1), so many edges point at something
+ * with no `id` and no `version`. Emitting `dependsOn: []` would say the
+ * instance depends on nothing; a partial record with an empty `version` would
+ * fail a consumer. So each such edge becomes a {@link DependsOnGap} carrying
+ * WHICH reason applies — `undecided` (nobody said) and `internal` (somebody
+ * said no) are different gaps with different remedies.
  *
  * @graphNode schema
  * @module schemas/depends-on

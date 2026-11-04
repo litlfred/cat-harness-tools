@@ -1,13 +1,10 @@
 /**
  * The published index files the site's viewers read — each `$schema` family
  * typed, so the graph-typology registry names a validator instead of the script
- * that writes it (#1168 B6b, bean `dv8v`).
+ * that writes it.
  *
- * Until then each family was registered as `writtenBy: "scripts/…"`: the
- * registry, a `@general` node, naming its dependent, and the file checked by
- * nothing. Every schema here was taken from what its writer emits — the object
- * literal serialised by the generator — and cross-checked against the
- * committed file, so it describes the file as written rather than as intended.
+ * Every schema here was taken from what its writer emits and cross-checked
+ * against the committed file, so it describes the file as written.
  *
  * Two conventions hold throughout, because the writers share them:
  *

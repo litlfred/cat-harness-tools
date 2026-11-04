@@ -3,12 +3,6 @@
  * The MERGE QUEUE — what the merge steward DECIDED about each open pull
  * request, and nothing GitHub already knows.
  *
- * Bean `hfag` (the merge-pipeline epic), owner's ruling 2026-10-02. Until then
- * the queue's order lived in prose — the `merge-manager` SOP's step 2, *"oldest
- * first, unless the owner names an order"* (PR #1802) — so nothing recorded
- * WHY one PR jumped ahead of another, and a second steward session could not
- * see the first one's decisions.
- *
  * ## The core rule: decisions are stored, facts are read live
  *
  * **A queue entry records a decision. It never records a fact GitHub owns.**
@@ -22,8 +16,7 @@
  * | an ejection from a train, with its evidence link | the PR's own CI verdict, and whether CI saw the head |
  * | links to beans and epics | the changed-file list, and what it touches |
  *
- * A stored copy of a GitHub fact is a second answer to a question GitHub
- * already answers, and it goes stale the moment anybody pushes. The steward
+ * A stored GitHub fact goes stale the moment anybody pushes. The steward
  * computes the right-hand column at decision time (`scripts/merge-queue.ts`
  * `deriveFacts`), and the queue tile joins it in the reader's browser at view
  * time; neither writes it back.
@@ -31,47 +24,37 @@
  * {@link MergeQueueEntrySchema} enforces it structurally: the object is
  * `strict`, and the keys a well-meaning writer would reach for first
  * ({@link FORBIDDEN_FACT_KEYS}) are refused by name with this rule as the
- * message, rather than as an anonymous "unrecognised key".
+ * message.
  *
- * **Where a fact MAY be written down:** as an evidence snapshot on a FINISHED
- * train run — a workflow instance of `Process_MergeTrain` under
- * `beans/workflows/` — dated, and only as the record of what the steward saw
- * when it acted ({@link TrainMemberEvidenceSchema}). A snapshot on a finished
- * run is history; the same value on a live queue entry would be a claim about
- * now.
+ * **Where a fact MAY be written down:** as a dated evidence snapshot on a
+ * FINISHED train run — a workflow instance of `Process_MergeTrain` under
+ * `beans/workflows/` — recording what the steward saw when it acted
+ * ({@link TrainMemberEvidenceSchema}).
  *
  * ## Where the fields come from
  *
- * Fields drawn from the merge-queue literature cite the requirements note on
- * branch `claude/merge-pipeline-library`
- * (`cat-harness/docs/proposals/merge-pipeline-requirements.md`, R-numbers and
- * T-numbers) and the paper section behind it:
- *
- * - `ejection` — technique **T1**, *eject a failing member and re-run the
- *   rest*; requirement **R3** (SQ19 §2.2, p. 3: a failed batch is split and
- *   retried without the faulty change, not rejected whole) and **R4** (SQ19
- *   §3.2, p. 4: a refused change returns to its author *with the reason*).
- *   `evidenceUrl` is that reason's evidence.
- * - {@link MemberFactsSchema}`.authoredPaths` / `.touchesShared` — technique
- *   **T3**, *predict which PRs conflict, cheap form*; requirements **R6**
- *   (SQ19 §5.2, pp. 7–8: decide independence from the build graph) and **R7**
- *   (generated paths are excluded, or every pair predicts as conflicting).
- *   COMPUTED live from the PR's file list, never stored.
- * - {@link MemberFactsSchema}`.ownCi` / `.headShaMatchesCi` — technique **T2**,
- *   *attribute a red train from each member's own CI before bisecting*. GitHub
- *   facts: read live, or snapshotted on a finished run only.
+ * - `ejection` — *eject a failing member and re-run the rest* (SQ19 §2.2:
+ *   a failed batch is split and retried without the faulty change; §3.2: a
+ *   refused change returns to its author *with the reason*). `evidenceUrl` is
+ *   that reason's evidence.
+ * - {@link MemberFactsSchema}`.authoredPaths` / `.touchesShared` — *predict
+ *   which PRs conflict, cheap form* (SQ19 §5.2: decide independence from the
+ *   build graph); generated paths are excluded, or every pair predicts as
+ *   conflicting. COMPUTED live from the PR's file list, never stored.
+ * - {@link MemberFactsSchema}`.ownCi` / `.headShaMatchesCi` — *attribute a
+ *   red train from each member's own CI before bisecting*. GitHub facts: read
+ *   live, or snapshotted on a finished run only.
  *
  * SQ19 = Ananthanarayanan et al., *Keeping Master Green at Scale*, EuroSys '19.
  *
  * ## What it is not
  *
  * Not GitHub's merge queue — that is unavailable on a personal-account
- * repository (bean `1hjm`). Not the order itself: the order is COMPUTED, by
+ * repository. Not the order itself: the order is COMPUTED, by
  * `processes/decisions/merge-priority.dmn` over live facts, and an entry
  * records the outcome the steward acted on, or an owner override with its
- * reason. Not the merge SOP (`merge-manager`, PR #1802) nor the gates
- * (`nok9`, PR #1887): those say how a merge is done and what it must prove;
- * this says which PR goes next and why.
+ * reason. Not the merge SOP (`merge-manager`) nor the gates: those say how a
+ * merge is done and what it must prove; this says which PR goes next and why.
  *
  * @module cat-harness/schemas/merge-queue
  * @graphNode schema

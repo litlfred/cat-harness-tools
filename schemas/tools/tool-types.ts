@@ -1,21 +1,17 @@
 /**
  * The shared I/O type vocabulary Tool ports reference.
  *
- * `ToolDefinition.io.*.schema` is an **absolute IRI**, which means the types it
- * names have to exist somewhere fetchable. This is that somewhere: one
- * published JSON Schema per type (`tool-types/<Name>.schema.json`, bean
- * `tdir`) and a combined document of `$defs`, generated from Zod like every
- * other schema here, so a Tool's contract resolves rather than merely looking
- * like it does.
+ * `ToolDefinition.io.*.schema` is an **absolute IRI**, so the types it names
+ * have to exist somewhere fetchable. This is that somewhere: one published
+ * JSON Schema per type (`tool-types/<Name>.schema.json`) and a combined
+ * document of `$defs`, generated from Zod like every other schema here.
  *
- * ## Why a shared document rather than a schema per tool
+ * ## A shared document rather than a schema per tool
  *
- * Because the point of `io` is that a Task's inputs can be checked against the
- * Tool that will execute it. Two tools satisfying one skill — `beans-cli` and
- * `beans-manual` — must declare the *same* input type, or "these are
- * interchangeable" is an assertion nothing can verify. Per-tool schemas make
- * that a string comparison between two structurally-identical definitions;
- * a shared `$defs` makes it identity.
+ * A Task's inputs are checked against the Tool that will execute it, so two
+ * tools satisfying one skill — `beans-cli` and `beans-manual` — must declare
+ * the *same* input type for "these are interchangeable" to be verifiable. A
+ * shared `$defs` makes that identity rather than a structural comparison.
  *
  * It is also what `mcp-contract` checks against: a served MCP tool's
  * `inputSchema` must agree with the Tool node's `io`, and agreement is only

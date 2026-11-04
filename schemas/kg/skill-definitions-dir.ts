@@ -1,15 +1,12 @@
 /**
  * Where the JSON workflow-skill definitions and the conventions live.
  *
- * Both were under `.claude/skills/` (`local/` and `conventions/`), a
- * vendor-named directory no declaration reached. The owner split them BY
- * THEME across the harnesses that own the subject (2026-09-30, bean `rqao`):
- * WHO SMART / FHIR to the DAK and FHIR IG layers, the content lifecycle
- * and document authoring to the content core, mathematical papers to
- * the science layer, BPMN/DMN authoring and the conventions to
- * `cat-harness`. So there is no single directory: each instance keeps its own
- * `skill-definitions/` inside a declared `skills` directory, and every reader
- * asks this module for all of them.
+ * They are split BY THEME across the harnesses that own the subject: WHO
+ * SMART / FHIR in the DAK and FHIR IG layers, the content lifecycle and
+ * document authoring in the content core, mathematical papers in the science
+ * layer, BPMN/DMN authoring and the conventions in `cat-harness`. Each
+ * instance keeps its own `skill-definitions/` inside a declared `skills`
+ * directory, and every reader asks this module for all of them.
  *
  * @module schemas/skill-definitions-dir
  * @graphNode schema

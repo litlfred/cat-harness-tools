@@ -1,6 +1,6 @@
 /**
  * BIBLIOGRAPHY ATTESTATIONS — the ONE reader and the ONE writer for a folio's
- * two bibliography judgement ledgers (qou C9 stories B3 and B4).
+ * two bibliography judgement ledgers.
  *
  * | ledger | legacy file (under the folio directory) | attestations family |
  * |---|---|---|
@@ -21,9 +21,7 @@
  * - `none`   — neither: an empty ledger.
  *
  * Every read returns a `note` naming which, for the caller to print. A file
- * in the store that is `corrupt` or `unknown` THROWS ({@link BibAttestationError}):
- * a reader cannot tell what an unreadable judgement held, so it does not
- * answer with the rest.
+ * in the store that is `corrupt` or `unknown` THROWS ({@link BibAttestationError}).
  *
  * ## Writes go where the read came from
  *
@@ -36,17 +34,14 @@
  * as an EMPTY file (a retraction is recorded, never a deletion), and reads
  * the store back and compares every row before returning.
  *
- * ## The review ledger's `_meta`
+ * ## The review ledger's rules
  *
- * The legacy `references.review.json` carried a `_meta` block documenting the
- * format: its `statusEnum` is {@link BIB_REVIEW_STATUSES}, its `fields` are the
- * keys of a review, its default is "a reference with no review is
- * `unreviewed`", and its staleness rule is "an entry is stale when its
- * `entryHash` — a 12-char SHA-256 prefix of the canonical-JSON-serialised
- * `references.ts` entry, recursively key-sorted — drifts from the current
- * entry" (computed by `validate-references-human-review.ts`). That
- * documentation is now this schema; the migration refuses a `_meta` whose
- * `statusEnum` disagrees with it.
+ * Status values are {@link BIB_REVIEW_STATUSES}; a reference with no review is
+ * `unreviewed`; an entry is stale when its `entryHash` — a 12-char SHA-256
+ * prefix of the canonical-JSON-serialised `references.ts` entry, recursively
+ * key-sorted — drifts from the current entry (computed by
+ * `validate-references-human-review.ts`). The migration refuses a legacy
+ * `_meta` whose `statusEnum` disagrees.
  *
  * @module schemas/bib-attestations
  * @graphNode schema

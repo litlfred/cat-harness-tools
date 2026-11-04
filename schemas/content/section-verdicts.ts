@@ -1,5 +1,5 @@
 /**
- * Section verdicts — which ingested sections are not PROSE. Bean `fnqn`.
+ * Section verdicts — which ingested sections are not PROSE.
  *
  * @module schemas/section-verdicts
  * @graphNode schema
@@ -9,23 +9,16 @@
  * library root's `section-verdicts.json`), so it can be reviewed line by line
  * and read by every consumer rather than re-decided by each.
  *
- * ## Why a section can be non-prose at all
- *
- * A style guide shows what a page LOOKS like by printing one: the WPRO
- * Publication and Information Products Style Guide carries Lorem-ipsum cover
- * samples (pp. 29–31), font specimens (pp. 14–15), table and graph samples
- * (pp. 20–22) and a Latin-filler margin sample (p. 28). They are the source's
- * own content, faithfully extracted, and they are not prose: a summary of them
- * describes filler, a translation translates filler, and an index learns
- * filler's vocabulary as a theme (LSI found them as two narrow dimensions).
+ * A style guide prints sample pages — Lorem-ipsum covers, font specimens,
+ * table samples. They are the source's own content but not prose: a summary,
+ * translation or index of them describes filler.
  *
  * ## Roles
  *
  * - `specimen` — the page exhibits a typographic or layout sample; its words
  *   are placeholder or sample text, not the document speaking.
  *
- * One role for now, and the enum is closed on purpose: a role nobody reads is
- * a label, and each new one should arrive with the consumer that honours it.
+ * The enum is closed: each new role arrives with the consumer that honours it.
  *
  * ## Who reads it
  *

@@ -2,24 +2,17 @@
  * **Deployment descriptions**: which declared actors run where, in one
  * deployment.
  *
- * Bean `folio-assistant-23a3`, under `o1by`. The design is
- * `docs/proposals/deployment-descriptions.md` §3.1, and the owner's answers
- * of 2026-10-24 are its §5:
- *
- * 1. Descriptions live in a `deployments/` folder, several per instance
- *    (option A). One instance already runs in at least two deployments: cloud
- *    agent sessions and the owner's workstation.
- * 2. Jurisdiction is four optional fields now (option A).
- * 3. The resolver only reports, and never fails (option C). That is the
- *    resolver's rule (bean `v3zw`). The checks here are about a description
- *    being well formed, not about whether every task can be run.
+ * 1. Descriptions live in a `deployments/` folder, several per instance (one
+ *    instance may run as cloud agent sessions and on a workstation).
+ * 2. Jurisdiction is four optional fields.
+ * 3. The resolver only reports, and never fails. The checks here are about a
+ *    description being well formed, not about whether every task can be run.
  *
  * ## What is new, and what is reused
  *
  * Only {@link Placement}, {@link Jurisdiction} and `liveData` are new. The
  * aggregate is the existing {@link Topology}, and every axis a placement
- * carries uses that axis's existing values. A second spelling of a value would
- * be free to disagree with the first.
+ * carries uses that axis's existing values.
  *
  * ## A placement is not an actor
  *

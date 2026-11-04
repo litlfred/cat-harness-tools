@@ -2,10 +2,9 @@
  * version-bump.ts — `instance-versioning.md` §4: what a version MEANS, and
  * what makes it go up.
  *
- * > **A version governs a surface.** For a code library that is the exported
- * > API. For an instance it is the **declared** surface, and this repository
- * > already knows how to enumerate it: graph typologies, skill ids, tool ids, block
- * > kinds, asset roles, declared directories — everything `kg-export` walks.
+ * A version governs the instance's **declared** surface: graph typologies,
+ * skill ids, tool ids, block kinds, asset roles, declared directories —
+ * everything `kg-export` walks.
  *
  * | bump | when |
  * |---|---|
@@ -13,43 +12,22 @@
  * | **minor** | something **added** that a consumer may use |
  * | **patch** | everything else, prose included |
  *
- * ## Why a diff rather than a commit message
+ * ## A diff, not a commit message
  *
- * §4.1, and it is the argument for the whole section: **a commit message is a
- * claim about a change; an exported-graph diff IS the change.** A `feat:`
- * prefix on a commit that removed a skill id yields a minor bump under
- * `release-please`'s heuristic, and a broken consumer. The diff cannot make
- * that mistake.
+ * **A commit message is a claim about a change; an exported-graph diff IS the
+ * change.** A `feat:` prefix on a commit that removed a skill id would yield a
+ * minor bump under `release-please`'s heuristic; the diff cannot.
  *
- * ## §4.1's falsifier was run before this module was written
+ * Measuring the bump over history must walk the mainline
+ * (`--first-parent`); without it, consecutive entries are not parent→child
+ * and the surface appears to churn.
  *
- * The proposal refused to have §4 built on trust:
+ * ## A rename reads as major
  *
- * > **The falsifier, and it should be tested before this is built:** if the
- * > exported surface churns on changes that are not consumer-visible … then
- * > the computed bump is noise and every release reads as major. Measure the
- * > surface diff across the last twenty commits on `main` before committing to
- * > this.
- *
- * Measured 2026-09-23 over the last 20 commits on `main`, following
- * `--first-parent`: **18 patch, 1 minor, 1 major**, and both non-patch calls
- * correct on inspection. The surface does not churn, so this exists.
- *
- * **The first run of that measurement said the opposite, and the reason is
- * worth carrying here.** `git log -21` without `--first-parent` interleaves
- * sibling branch tips, so consecutive entries are not parent→child; it read
- * 3 major / 5 minor / 12 patch, which would have failed the falsifier, and
- * every bit of that signal was one branch's five nodes oscillating in and out
- * of the comparison. Anyone re-running it must walk the mainline.
- *
- * ## One known characteristic, reported rather than hidden
- *
- * A **rename reads as major** — the old id is removed and a new one added.
- * That is the conservative direction and it is honest (a consumer resolving
- * the old id does break), but it means a major does not imply that capability
- * was withdrawn. {@link SurfaceDiff} carries `added` and `removed` separately
- * so a caller can see a rename for what it is rather than inferring it from
- * the verdict.
+ * The old id is removed and a new one added. That is conservative and honest
+ * (a consumer resolving the old id does break), but a major does not imply
+ * capability was withdrawn. {@link SurfaceDiff} carries `added` and `removed`
+ * separately so a caller can see a rename for what it is.
  *
  * @graphNode schema
  * @module schemas/version-bump

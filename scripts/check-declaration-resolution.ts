@@ -56,7 +56,7 @@ import { basename, relative, resolve } from "node:path";
 import { instanceDirectories, readDeclaration, nestedDirectories, type CatHarnessDeclaration } from "../schemas/kg/cat-harness.js";
 import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js";
 import { orderedDependencies, resolveInstanceGraph } from "../schemas/kg/harness-config.js";
-import { enableSubgraphsProblems, type DeclaredOptIns } from "../schemas/kg/opt-in-subgraphs.js";
+import { declaredEnableSubgraphs, enableSubgraphsProblems, type DeclaredOptIns } from "../schemas/kg/opt-in-subgraphs.js";
 import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roots.js";
 import "../schemas/kg/folio-graph-typology.js";
 
@@ -216,6 +216,28 @@ export function checkDeclarationResolution(rootArg: string): ResolutionReport {
         }
       } catch (e) {
         undetermined.push(`${name}: its enableSubgraphs could not be resolved — ${(e as Error).message.split("\n")[0]}`);
+      }
+    }
+  }
+
+  // An index root declares no instance, so its `enableSubgraphs` is in its
+  // index.config.json (step 23.4). Each id names an opt-in sub-graph of an
+  // instance in this checkout, held to the same rule as a declaration's list.
+  if (findDeclarationFile(root) === undefined) {
+    const enable = declaredEnableSubgraphs(root);
+    examined.enableSubgraphs += enable.length;
+    if (enable.length > 0) {
+      try {
+        const closure: DeclaredOptIns[] = [];
+        for (const r of roots) {
+          const d = readDeclaration(r);
+          if (d !== undefined) closure.push({ name: d.name, directories: instanceDirectories(r, d) });
+        }
+        for (const p of enableSubgraphsProblems("this index", enable, closure)) {
+          findings.push({ instance: "(index)", field: "enableSubgraphs", subject: p.id, by: "check:declaration-resolution", detail: p.detail });
+        }
+      } catch (e) {
+        undetermined.push(`(index): its enableSubgraphs could not be resolved — ${(e as Error).message.split("\n")[0]}`);
       }
     }
   }
