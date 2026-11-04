@@ -29,6 +29,12 @@ describe("every declared graph reaches the navbar, linked or not", () => {
   // Rows say the kind's DISPLAY name since bean `ob3m` finding 6 ("One name
   // everywhere"), so a kind word is compared through the same function.
   const K = (kind: string): string => kindTitle(kind);
+  // Kinds who-iris is gaining or dropping across layer pins (see the first
+  // test). Expected exactly when the mounted who-iris declares them.
+  const IN_TRANSIT = ["attestations", "uploads"];
+  const declaredNow = new Set(kinds());
+  const expectedKinds = (pinned: string[]): string[] =>
+    [...pinned, ...IN_TRANSIT.filter((k) => declaredNow.has(K(k)))].sort().map(K);
 
   it("lists every kind the instance declares, not only the published ones", () => {
     // SEVEN declared, and the seventh arrived by this test doing its job.
@@ -64,7 +70,14 @@ describe("every declared graph reaches the navbar, linked or not", () => {
     // who-iris declared the IRIS CDN exporter's BPMN and its library node
     // (who-iris#103, 2026-10-30), and `scenarios`, the roles those BPMN
     // lanes bind (folio-assistant#2781). Same reason again.
-    expect(kinds()).toEqual(["catalogue", "code", "docs", "folio", "glossary", "health", "library", "processes", "qa", "scenarios", "schemas", "skills", "software-library", "themes", "tools", "translation-sources", "uploads", "voices"].map(K));
+    // NINETEEN with `attestations`, which joined when who-iris moved its
+    // translation round-trip TSVs onto `cat/who-iris/attestations`
+    // (who-iris#175, 2026-11-03), and `uploads` leaves with who-iris#176. A
+    // kind in IN_TRANSIT is expected exactly when who-iris's mounted
+    // declaration has it: this layer's CI mounts the index's pins and the
+    // re-pin train mounts who-iris's main, so a fixed list fails one of them
+    // whenever who-iris gains or drops a graph. Every other kind is pinned.
+    expect(kinds()).toEqual(expectedKinds(["catalogue", "code", "docs", "folio", "glossary", "health", "library", "processes", "qa", "scenarios", "schemas", "skills", "software-library", "themes", "tools", "translation-sources", "voices"]));
   });
 
   it("links exactly the kinds it was told are published", () => {
@@ -72,7 +85,9 @@ describe("every declared graph reaches the navbar, linked or not", () => {
     expect(got.find((i) => i.label === K("docs"))?.href).toBe("../docs/who-iris/");
     // ...and everything else carries no href, which the renderer draws as a
     // non-link. `harness-tiles`: declared and not rendered is a GAP.
-    expect(got.filter((i) => i.href === undefined).map((i) => i.label)).toEqual([
+    // The IN_TRANSIT kinds (`attestations`, a state-branch graph since
+    // who-iris#175, and `uploads`) are expected exactly when declared.
+    expect(got.filter((i) => i.href === undefined).map((i) => i.label)).toEqual(expectedKinds([
       "catalogue",
       // `code` is declared and publishes no page — which is exactly the state
       // this assertion exists to keep visible, rather than a gap to hide.
@@ -105,9 +120,8 @@ describe("every declared graph reaches the navbar, linked or not", () => {
       // `translation-sources`: who-iris carries its own glossary catalogues
       // since bean riit ("move things to semantically appropriate place").
       "translation-sources",
-      "uploads",
       "voices",
-    ].map(K));
+    ]));
   });
 
   it("carries the generator's REASON onto the rows that have no href", () => {
