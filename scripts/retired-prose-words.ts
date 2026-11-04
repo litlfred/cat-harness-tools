@@ -35,6 +35,9 @@
  * no Markdown read), which is never reported as clean.
  *
  * Usage: bun run cat-harness-tools/scripts/retired-prose-words.ts [--instance ROOT]
+ *
+ * Enforced by `scripts/tests/retired-prose-words.test.ts`, which CI runs over
+ * the harness, rather than by a `check:` script no gates workflow runs yet.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
