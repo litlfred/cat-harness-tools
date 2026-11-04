@@ -10,7 +10,8 @@
  * ## Why a script rather than a shell function
  *
  * A shell function copied into several `run:` bodies is several
- * implementations, free to drift. This calls {@link waitFor} directly, so the
+ * implementations, free to drift, as copies of `stripLeanComments` once did.
+ * This calls {@link waitFor} directly, so the
  * workflows and `withBackoff` compute the same number from the same code.
  * The cost is a `bun` start per wait, in jobs that already run `bun`.
  *

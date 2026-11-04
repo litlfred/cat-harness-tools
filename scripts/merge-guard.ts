@@ -56,9 +56,9 @@
  * 8. `mergeable` — GitHub says the head still merges cleanly into its base:
  *    check 5's runs tested the head merged with main as main was when the
  *    head was pushed. `mergeable: false` (or `mergeable_state: dirty`) refuses
- *    not-ready; `null` — GitHub has not computed it yet — is `unknown`, after
- *    {@link fetchSnapshot} re-asks a few times. `unstable` and `blocked` pass
- *    here: they are about checks, which check 5 judges.
+ *    not-ready; `null` — GitHub has not finished computing it — is `unknown`,
+ *    after {@link fetchSnapshot} re-asks a few times. `unstable` and
+ *    `blocked` pass here: they are about checks, which check 5 judges.
  *
  * ## Exit codes
  *
