@@ -42,7 +42,7 @@ relative paths.
 ## The libraries of the layers below the kind are held here
 
 `libraries/` holds this layer's own `software-library` nodes, and
-`libraries/held/<layer>/` holds the nodes of each layer below the kind
+`libraries/held/<layer>/` holds the nodes of each layer below the kind.
 bootstrap-tools needs only bootstrap, so it may not name cat-harness's
 `software-library` kind or declare a `libraries/` of its own. This layer owns
 the writer and the gate (`scripts/libraries.ts`), so it records them, keyed by
