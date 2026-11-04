@@ -1,56 +1,40 @@
 /**
  * The `CatHarness` declaration — what an instance IS, at its root.
  *
- * Named for the **harness**, not for folio-assistant, and the distinction is
- * the point: `agentic-harness` is the layer that defines Roles, Skills, Tools
- * and the conventional directories, and every other instance — including
- * `folio-assist-core` — inherits from it. Calling this a "FolioAssistant"
- * declaration would put the platform family's name on a harness-layer concept
- * and imply that an instance must be a folio-assistant to have one. It need
- * not: a Tool repo or a Test repo carries the same declaration.
+ * Named for the **harness**: `agentic-harness` is the layer that defines
+ * Roles, Skills, Tools and the conventional directories, and every other
+ * instance inherits from it. An instance need not be a folio-assistant to
+ * have one — a Tool repo or a Test repo carries the same declaration.
  *
- * Issue #223, Phase 0.3. Every folio-assistant instance carries one of these
- * at its repository root (`harness.json`). It declares the directories
- * the instance scans for content, and what **kind of graph** each one holds.
+ * Every instance carries one at its repository root (`harness.json`). It
+ * declares the directories the instance scans for content, and what **kind
+ * of graph** each one holds.
  *
- * ## Why a directory declaration rather than a content-type field
+ * ## Directories, not a content-type field
  *
- * The obvious reading of "a folio holds zero or more Content instances" is a
- * list of instances under one `contentType`. That is the wrong shape, for a
- * reason that only shows up once the five-repo split is real: the instances an
- * `agentic-harness` holds are not folios at all. They are **Tool definitions**
- * under `tools/`, a **knowledge graph** of skills and workflows under `kg/`,
- * and the **schema graph** under `schemas/`. None of those renders as a
- * document, and none has a `contentType` in the `document | paper` sense.
- *
- * So the general object is not "a folio with instances" but **an instance with
- * directories, each holding a graph**. `folio` is then one graph typology among
+ * The general object is **an instance with directories, each holding a
+ * graph**: Tool definitions under `tools/`, a knowledge graph under `kg/`,
+ * the schema graph under `schemas/`. `folio` is one graph typology among
  * several — distinguished only by being renderable to a website (see
- * {@link GRAPH_TYPOLOGIES}). An instance with no `folio/` directory is completely
- * ordinary; `agentic-harness` is exactly that.
+ * `BASE_GRAPH_TYPOLOGIES` in `./graph-typology-registry.ts`). An instance with no `folio/` directory is
+ * ordinary.
  *
  * ## Inheritance
  *
- * An instance inherits its dependencies' directory conventions. `agentic-
- * harness` declares `tools/`, `kg/` and `schemas/`; `folio-assist-core`
- * declares `folio/` and **also scans the three it inherits**, without
- * restating them. This is the same depth-first walk as
- * `schemas/kg/harness-config.ts`, and the same overlay order — deepest dependency
- * first, root last, so the root wins.
+ * An instance inherits its dependencies' directory conventions without
+ * restating them, by the same depth-first walk as
+ * `schemas/kg/harness-config.ts` and the same overlay order — deepest
+ * dependency first, root last, so the root wins.
  *
  * Overriding is by graph **id**, not by path: an instance that wants its
  * knowledge graph somewhere other than `kg/` redeclares the `kg` id with a
  * different path, and the inherited entry is replaced rather than duplicated.
- * Matching on path instead would make two directories out of one relocation,
- * and every consumer would scan a directory that is not there.
  *
- * ## Self-declarative, in the WHO SMART Base sense
+ * ## Self-declarative
  *
- * The declaration is itself a small graph instance: each directory is a node
- * with an `@id` and an `@type` drawn from the folio namespace, so the set of
- * directories an instance scans is queryable by the same machinery as anything
- * else in the knowledge graph, rather than being configuration that only this
- * module understands.
+ * Each directory is a node with an `@id` and an `@type`, so the set of
+ * directories an instance scans is queryable like anything else in the
+ * knowledge graph.
  *
  * @module schemas/cat-harness
  * @graphNode schema

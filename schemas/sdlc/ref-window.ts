@@ -3,38 +3,22 @@
  * A COALESCING WINDOW over a watched ref — the writes a steward batched into
  * one push, and nothing the host already knows.
  *
- * Bean `xp5j`. `gh-pages` had **5** workflows pushing it in bursts (three
- * pushes in 46 seconds, measured 2026-10-04), each push triggering GitHub's
- * built-in Pages deployment, whose concurrency group cancels the build in
- * flight: **72 of 100** deployments cancelled over 14.0 h, the published site
- * up to **396.2 minutes** behind `main` across a streak of **24**.
- *
- * A concurrency policy cannot fix it, and this repository had already measured
- * why — the comment lives in `.github/workflows/feature-staging.yml`,
- * 2026-09-19: `cancel-in-progress: false` governs the RUNNING job, not the
- * pending one, and GitHub **cancels a PENDING job when a newer one queues for
- * the same group**. Three staging runs from three different branches inside 17
- * seconds gave two cancelled and one run. So a group keeps at most one pending
- * run; it is not a queue, and it cannot coalesce a burst. A steward can.
+ * Several workflows pushing `gh-pages` in a burst each trigger a Pages
+ * deployment, and each cancels the one in flight. A concurrency group cannot
+ * coalesce a burst: GitHub **cancels a PENDING job when a newer one queues for
+ * the same group** (`cancel-in-progress: false` governs only the RUNNING
+ * job). A steward can.
  *
  * The discipline is in the skill, not here —
  * `sdlc/skills/sdlc-core/ref-stewardship.md` carries what makes a ref need a
  * steward, why a window is a different object from a hold, and the composition
  * rule with the case that must still be reported.
  *
- * ## Why this is a SIBLING of the merge queue rather than a field on it
+ * ## A SIBLING of the merge queue's hold
  *
- * {@link HoldSchema} in `./merge-queue.ts` already has this object's shape, and
- * for the same reason: *"a hold with no expiry cannot be told from an abandoned
- * one"*. Read that sentence with "window" in it and nothing needs re-deriving.
- *
- * But a hold is keyed by `repository` + `pr` — it is a decision about one pull
- * request — and a window is keyed by **ref**. Hanging a window off a queue
- * entry would make it a statement about that PR, which is not what it says.
- * Hence a sibling type, and {@link refWindowLeaseFieldsMatchHold} is the test
- * that keeps the two from drifting once they are apart.
- *
- * The mapping is exact but for one field, and the exception is a narrowing:
+ * {@link HoldSchema} in `./merge-queue.ts` already has this object's shape:
+ * a lease with an expiry. But a hold is keyed by `repository` + `pr` and a
+ * window by **ref**, so it is a sibling type.
  *
  * | `HoldSchema` | here | why |
  * |---|---|---|
@@ -46,8 +30,7 @@
  * ## Decisions are stored; facts are read live
  *
  * The rule {@link MergeQueueEntrySchema} enforces applies here unchanged, and
- * the temptation arrives with it, so {@link FORBIDDEN_REF_FACT_KEYS} refuses
- * the tempting keys **by name** rather than as an anonymous unrecognised key.
+ * {@link FORBIDDEN_REF_FACT_KEYS} refuses the tempting keys **by name**.
  *
  * | stored here (a decision) | read live, never stored (the host's fact) |
  * |---|---|
@@ -55,27 +38,17 @@
  * | who holds it, and who takes over | whether the last deployment succeeded |
  * | which routes were requested, by whom, when | whether the site is currently live |
  *
- * ## `expires` is load-bearing TWICE, with opposite polarity
+ * ## `expires` is set once, at open
  *
- * For a hold, the expiry stops it outliving its justification — measured
- * 2026-10-03, a hold survived three sweeps past its reason while four clean
- * PRs waited roughly forty minutes.
+ * A window waits for the absence of a future event, so the clock is the only
+ * thing that can end it. A window that extends on every arrival never closes,
+ * which is why {@link RefWindowSchema} has no "extend".
  *
- * For a window the expiry **is** the justification: a window waits for the
- * absence of a future event, which has no observation, so the clock is the only
- * thing that can end it. And it stops the mirror-image failure — **a hold that
- * never ends and a window that never closes are the same outage.** A window
- * that extends on every arrival is an outage with a timer, which is why
- * {@link RefWindowSchema} has no "extend" and `expires` is set once, at open.
+ * ## Committed state, for handover
  *
- * ## HANDOVER is why this is committed state
- *
- * A window that lives in one agent's head is lost the moment that agent hands
- * over, and the next steward then either waits on a window that will never
- * close or opens a second one and double-pushes. So an instance of this lives
- * in the declared `workflow-state` graph under `beans/workflows/`, committed,
- * where a sibling session reads the same position — the same reason a workflow
- * instance lives there rather than in a variable.
+ * An instance lives in the declared `workflow-state` graph under
+ * `beans/workflows/`, committed, so a steward that takes over reads the same
+ * window rather than waiting forever or opening a second one.
  *
  * @module schemas/ref-window
  * @graphNode schema
