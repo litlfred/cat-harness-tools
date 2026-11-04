@@ -39,12 +39,12 @@
 #     gate is judged error by error (`gate_diagnostics.py`), so one already
 #     red on main still fails the PR that adds a finding to it. Each of these
 #     passed a layer's own PR and broke the index at re-pin:
-#     folio-assistant-core#630 and cat-harness-tools#1445 (a wrong-direction
-#     doc comment, against a gate red on main for other reasons).
+#     a content layer's PR and cat-harness-tools#1445 (a wrong-direction doc
+#     comment, against a gate red on main for other reasons).
 #   - Tests, in layer mode: the other instances' test files that name the
 #     caller run with its own (`reader-tests.py`, input `reader-tests`), on
-#     both sides (folio-assistant-core#630 broke cat-harness-tools'
-#     standalone-fixture test; who-iris#175 its navbar-checkout test).
+#     both sides (two content layers' PRs broke cat-harness-tools'
+#     standalone-fixture and navbar-checkout tests this way).
 # And one report that never blocks: the caller's directory READMEs, stale or
 # current, as a QA warning (owner, 2026-10-16: "QA report, but not gate").
 #
@@ -217,7 +217,7 @@ on:
         type: string
         default: ""
       reader-tests:
-        description: "layer mode, with test-path empty: also run the test files of OTHER instances that name this one (`reader-tests.py`), at most this many; more, or 0, runs none of them. They used to run first in the index at re-pin (folio-assistant-core#630, who-iris#175)."
+        description: "layer mode, with test-path empty: also run the test files of OTHER instances that name this one (`reader-tests.py`), at most this many; more, or 0, runs none of them. They used to run first in the index at re-pin."
         required: false
         type: number
         default: 150
