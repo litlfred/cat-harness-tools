@@ -27,8 +27,8 @@ against it is NEW, exactly as against a base that exited 0, because base's
 inputs were that green run's.
 
 A gate that carries `diagnostics` on both sides (`run-root-gates.py`: the
-errors it printed, line numbers left out; `run-gates.py`: the `✗` findings it
-printed) is judged finer when it is red on
+errors and findings it printed, line numbers and counts left out, by
+`gate_diagnostics.py`, which `run-gates.py` uses too) is judged finer when it is red on
 both: a diagnostic head holds more times than base is NEW, so a gate already
 red on main still fails the PR that adds an error to it. Without them on both
 sides, red on both stays "failing on main too".

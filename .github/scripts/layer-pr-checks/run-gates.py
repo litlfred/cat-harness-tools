@@ -105,6 +105,11 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+# Beside this file, found by its path: the tests and `python3 -I` put no
+# script directory on sys.path.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from gate_diagnostics import diagnostics  # noqa: E402
+
 # Scoped to the instance where the check takes a scope (kg-audit, kg-export,
 # import-direction). check-tools and declaration-resolution read the whole
 # checkout; the base/head comparison is what attributes a change in them to
@@ -136,6 +141,24 @@ CHECKOUT_SCRIPTS = {
     "index-config:inline:check": "cat-harness-tools",
     "skill:commands:check": "cat-harness-tools",
 }
+# The index's own gates that read every mounted layer (`index-gates.json`, the
+# one list, shared with pr-tests.yml): run for every caller too, so a layer
+# below the declaring instance (cat-harness, bootstrap, bootstrap-tools) is
+# judged on them with its head swapped in. A caller above it already derives
+# them under the same names, so for it nothing changes but their diagnostics.
+INDEX_GATES_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index-gates.json")
+
+
+def index_scripts(path=INDEX_GATES_JSON):
+    """script -> declaring instance, from `index-gates.json`; {} when it is absent or unreadable."""
+    try:
+        gates = json.load(open(path))["gates"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+    return {script: name.split(":", 1)[0] for name, script in gates.items()
+            if isinstance(script, str) and ":" in name}
+
+
 TIMEOUT_S = 1200
 # Gates that judge the REMOTE's live state, not the checkout: which workflows
 # are red on the default branch, whether a commit has a run, which advisories
@@ -779,41 +802,19 @@ def cone_plan(root, gates, runner, caller, env):
     return mode, note, cands, unchanged, traced
 
 
-# A finding a gate prints: a `✗` line, or an item listed under a `✗ N finding(s):`
-# header. A bare count (`✗ 6 finding(s):`, `✗ 1 kind JSON Schema finding(s) —`)
-# is left out, so a PR that fixes one finding does not read as adding one, and
-# every number is read as `#`, so a count inside a finding that only went down
-# (`3 contract(s)` to `2`) is not new either. Repeats are counted, so two
-# findings that differ only in a number still count as two.
-FINDING = re.compile(r"^\s*✗\s*(?P<msg>.+)$")
-COUNT = re.compile(r"^\d+\b")
-NUMBER = re.compile(r"\d+")
-ANSI = re.compile(r"\x1b\[[0-9;]*m")
-
-
-def findings(text):
-    """Every finding `text` prints, in order (repeats kept): the `diagnostics` compare-gates.py judges.
+def findings(text, root=None):
+    """Every finding `text` prints, in order (repeats kept): the `diagnostics`
+    compare-gates.py judges. One parser, `gate_diagnostics.py`, shared with
+    run-root-gates.py; this name is kept for its callers (#1457).
 
     Without them a gate already red on main judged nothing: a PR that made one
     more file stale passed, because the gate was "failing on main too". That is
     how folio-assistant main stayed red on `libraries:check`,
     `bpmn:checklist:check`, `render:bpmn:check` and `kind:json-schemas:check`
-    while each layer's own PRs added to them (2026-11-04). With them, a gate red
-    on both sides still fails the PR that adds a finding main does not have.
+    while each layer's own PRs added to them (2026-11-04), and how
+    folio-assistant-core#630 added a wrong-direction reference unjudged.
     """
-    out, listing = [], False
-    for raw in text.splitlines():
-        line = ANSI.sub("", raw).rstrip()
-        m = FINDING.match(line)
-        if m:
-            listing = bool(COUNT.match(m["msg"])) and m["msg"].endswith(":")
-            if not COUNT.match(m["msg"]):
-                out.append(NUMBER.sub("#", m["msg"]))
-        elif listing and line.startswith((" ", "\t")) and line.strip():
-            out.append(NUMBER.sub("#", line.strip()))
-        else:
-            listing = False
-    return out
+    return diagnostics(text, root)
 
 
 def run(root, name, command):
@@ -856,8 +857,10 @@ def derive(root, given, tmp, env=None):
     gates.update({f"graph:{k}": v for k, v in CHECKOUT_GATES.items()})
     seen_scripts = set()
     runner = script_runner(root)
-    for script, owner in CHECKOUT_SCRIPTS.items():
+    for script, owner in {**CHECKOUT_SCRIPTS, **index_scripts()}.items():
         command = f"{runner} {script}"
+        if command in seen_scripts:
+            continue
         seen_scripts.add(command)
         gates[f"{owner}:{script}"] = command
     skipped = {}
@@ -1047,8 +1050,10 @@ def main():
         print(f"::group::{name}: exit {code} in {seconds} s — {command}", flush=True)
         print(text[-4000:], flush=True)
         print("::endgroup::", flush=True)
+        # The findings it printed, so a gate red on main too still fails the
+        # PR that adds one (compare-gates.py; folio-assistant-core#630, #1457).
         results[name] = {"command": command, "exit": code, "tail": text[-1500:], "seconds": seconds,
-                         "diagnostics": findings(text)}
+                         "diagnostics": diagnostics(text, root)}
     ran = list(results)
     for name, entry in unchanged.items():
         print(f"{name}: SKIPPED — {entry['skipped']} — {entry['command']}", flush=True)

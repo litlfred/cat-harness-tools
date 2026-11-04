@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the index's own gates over a composed root and record each result.
 
-Usage: run-root-gates.py <root> <root-gates.json> <out.json>
+Usage: run-root-gates.py <root> <root-gates.json> <out.json> [<serial-gates.json>...]
 
 The gap this closes (owner, 2026-10-23, item 2): a layer's PR was judged on
 its own gates, and on the `check:*` gates of its dependency harness, in the
@@ -27,13 +27,21 @@ names today: ESLint's default (stylish) report and `tsc`'s
 `file(line,col): error TSnnnn: message`. A gate that printed neither is judged
 by its exit code alone, as before.
 
+Each further data file names gates that run ONE AT A TIME, after the pooled
+ones: `index-gates.json`, the index's generated-file `--check`s and
+`check:reference-direction:check`. Several of those run their writer and hash
+the tree around it (`publish-check.ts`), so beside a neighbour that writes
+they would blame it on themselves. They keep their `<instance>:<script>` names,
+the names `run-gates.py` gives them as declared gates.
+
+The diagnostics parser is `gate_diagnostics.py`, shared with `run-gates.py`.
+
 Exits 0 whatever the gates did: the compare step judges head against base.
 A missing or unreadable <root-gates.json> exits 2, since running nothing
 would read as a pass.
 """
 import json
 import os
-import re
 import shlex
 import subprocess
 import sys
@@ -41,50 +49,12 @@ import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
+# Beside this file, found by its path: the tests and `python3 -I` put no
+# script directory on sys.path.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from gate_diagnostics import diagnostics  # noqa: E402
+
 TIMEOUT_S = 1200
-
-# `path(line,col): error TS1234: message`, and tsc's file-less `error TS5083: ...`.
-TSC = re.compile(r"^(?P<file>\S.*?)\((?P<line>\d+),(?P<col>\d+)\): error (?P<code>TS\d+): (?P<msg>.*)$")
-TSC_GLOBAL = re.compile(r"^error (?P<code>TS\d+): (?P<msg>.*)$")
-# ESLint stylish: a file line, then `  90:31  error  message  rule` under it. A
-# parse error carries no rule.
-ESLINT_FILE = re.compile(r"^(?P<file>/\S.*)$")
-ESLINT_ERROR = re.compile(r"^\s+(?P<line>\d+):(?P<col>\d+)\s+error\s+(?P<msg>.+?)(?:\s{2,}(?P<rule>\S+))?\s*$")
-ANSI = re.compile(r"\x1b\[[0-9;]*m")
-
-
-def rel(path, root):
-    """`path` relative to `root` when it lies under it, so both sides' keys agree."""
-    root = os.path.abspath(root)
-    if os.path.isabs(path) and (path == root or path.startswith(root + os.sep)):
-        return os.path.relpath(path, root)
-    return path
-
-
-def diagnostics(text, root):
-    """Every error `text` reports, as line-free keys, in the order printed (repeats kept)."""
-    out, current = [], None
-    for raw in text.splitlines():
-        line = ANSI.sub("", raw).rstrip()
-        m = TSC.match(line)
-        if m:
-            out.append(f"{rel(m['file'], root)}: {m['code']}: {m['msg'].strip()}")
-            continue
-        m = TSC_GLOBAL.match(line)
-        if m:
-            out.append(f"-: {m['code']}: {m['msg'].strip()}")
-            continue
-        m = ESLINT_FILE.match(line)
-        if m:
-            current = rel(m["file"], root)
-            continue
-        m = ESLINT_ERROR.match(line)
-        if m and current:
-            out.append(f"{current}: {m['rule'] or 'parse'}: {m['msg'].strip()}")
-            continue
-        if not line.strip():
-            current = None
-    return out
 
 
 def run(root, name, script):
@@ -103,19 +73,29 @@ def run(root, name, script):
                   "diagnostics": diagnostics(text, root)}, text
 
 
-def main():
-    if len(sys.argv) != 4:
-        print(__doc__.split("\n\n")[1], file=sys.stderr)
-        sys.exit(2)
-    root, data, out_path = sys.argv[1:]
+def read_gates(data):
+    """The `gates` map of one data file; exit 2 when it names none, since running nothing would read as a pass."""
     try:
         gates = json.load(open(data))["gates"]
         assert isinstance(gates, dict) and gates and all(isinstance(v, str) for v in gates.values())
     except (OSError, ValueError, KeyError, TypeError, AssertionError) as e:
         print(f"::error::{data} names no gates ({e.__class__.__name__}): nothing would be judged")
         sys.exit(2)
+    return gates
+
+
+def main():
+    if len(sys.argv) < 4:
+        print(__doc__.split("\n\n")[1], file=sys.stderr)
+        sys.exit(2)
+    root, data, out_path, *serial_data = sys.argv[1:]
+    gates = read_gates(data)
+    serial = {}
+    for extra in serial_data:
+        serial.update(read_gates(extra))
     with ThreadPoolExecutor(max_workers=len(gates)) as pool:
         outcomes = list(pool.map(lambda kv: run(root, *kv), gates.items()))
+    outcomes += [run(root, *kv) for kv in serial.items()]
     results = {}
     for name, entry, text in outcomes:
         n = Counter(entry["diagnostics"])

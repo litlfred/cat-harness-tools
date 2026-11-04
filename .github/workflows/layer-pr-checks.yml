@@ -32,6 +32,19 @@
 #     `.github/scripts/layer-pr-checks/root-gates.json`; they are judged
 #     error by error, so a gate already red on main still fails the PR that
 #     adds an error to it (`run-root-gates.py`, `compare-gates.py`).
+#   - The INDEX's gates that read every mounted layer (`index-gates.json`:
+#     `check:reference-direction:check`, `check:prov-qaqc` and the
+#     generated-file `--check`s) are among the declared gates of EVERY
+#     caller, the layers below cat-harness-tools included, and every declared
+#     gate is judged error by error (`gate_diagnostics.py`), so one already
+#     red on main still fails the PR that adds a finding to it. Each of these
+#     passed a layer's own PR and broke the index at re-pin:
+#     a content layer's PR and cat-harness-tools#1445 (a wrong-direction doc
+#     comment, against a gate red on main for other reasons).
+#   - Tests, in layer mode: the other instances' test files that name the
+#     caller run with its own (`reader-tests.py`, input `reader-tests`), on
+#     both sides (two content layers' PRs broke cat-harness-tools'
+#     standalone-fixture and navbar-checkout tests this way).
 # And one report that never blocks: the caller's directory READMEs, stale or
 # current, as a QA warning (owner, 2026-10-16: "QA report, but not gate").
 #
@@ -203,6 +216,11 @@ on:
         required: false
         type: string
         default: ""
+      reader-tests:
+        description: "layer mode, with test-path empty: also run the test files of OTHER instances that name this one (`reader-tests.py`), at most this many; more, or 0, runs none of them. They used to run first in the index at re-pin."
+        required: false
+        type: number
+        default: 150
       gate-jobs:
         description: "Gates run at once within one shard (the dependency harness is ~300 gates)."
         required: false
@@ -1223,6 +1241,7 @@ jobs:
           LAYERS: ${{ inputs.layers-at-main }}
           SUBDIR: ${{ inputs.path-in-repo }}
           TEST_PATH: ${{ inputs.test-path }}
+          READERS: ${{ inputs.reader-tests }}
           PIN_AT: ${{ steps.pins.outputs.layers-at }}
         run: |
           set -euo pipefail
@@ -1255,15 +1274,18 @@ jobs:
             python3 -c 'import json,sys; sys.exit(0 if sys.argv[2] in json.load(open(sys.argv[1])) else 1)' "$RUNNER_TEMP/pin/state.json" "$repo" \
               || state="$state $repo=unreadable-$(date +%s%N)"
           done
-          raw="v4|$MODE|$INSTANCE|$root_tree|$src_tree|$lower|$scripts|$TEST_PATH|$state"
+          raw="v5|$MODE|$INSTANCE|$root_tree|$src_tree|$lower|$scripts|$TEST_PATH|$READERS|$state"
           echo "main's answer is computed from: $raw"
           hash="$(printf '%s' "$raw" | sha256sum | cut -d' ' -f1)"
-          # The caller's own tree leads the hash (v4), so a PR can find main's
+          # The caller's own tree leads the hash, so a PR can find main's
           # stored answer for its own base commit by prefix when the rest
-          # moved (the header's "main's STORED answer").
+          # moved (the header's "main's STORED answer"). The judging scripts
+          # lead it too (v5): an answer made by other judging scripts has
+          # other gates, tests and diagnostics, and a head gate main's answer
+          # never ran would read as NEW.
           own_tree="$src_tree"; own_dir=src
           [ "$MODE" = "layer" ] || { own_tree="$root_tree"; own_dir=fa; }
-          any="layer-pr-checks-main-v4-${GITHUB_REPOSITORY}-"
+          any="layer-pr-checks-main-v5-${GITHUB_REPOSITORY}-${scripts:0:16}-"
           key="${any}${own_tree}-$hash"
           {
             echo "key=$key"
@@ -1568,8 +1590,16 @@ jobs:
         # reports. `check:test-budgets` (a gate) reads this shard's report.
         env:
           TEST_PATH: ${{ inputs.test-path != '' && inputs.test-path || (inputs.mode == 'layer' && format('./{0}', env.INSTANCE) || '') }}
+          # Layer mode with no test-path: the other instances' tests that name
+          # this one too (reader-tests.py), on both sides, so a test another
+          # layer keeps about this one fails on its PR, not at re-pin.
+          READERS: ${{ inputs.mode == 'layer' && inputs.test-path == '' && inputs.reader-tests || 0 }}
           BUN_OPTIONS: ${{ inputs.gate-shards > 1 && format('--shard={0}/{1}', matrix.shard, inputs.gate-shards) || '' }}
         run: |
+          if [ "${READERS:-0}" -gt 0 ] 2>/dev/null; then
+            readers="$(python3 ../ci/.github/scripts/layer-pr-checks/reader-tests.py . "$INSTANCE" "$READERS" | tr '\n' ' ')"
+            [ -n "$readers" ] && { echo "with the tests of other instances that name $INSTANCE: $readers"; TEST_PATH="$TEST_PATH $readers"; }
+          fi
           if [ -z "$TEST_PATH" ]; then
             echo "no test-path in index mode: no tests run"
             echo '<?xml version="1.0"?><testsuites tests="0" failures="0"></testsuites>' > "$RUNNER_TEMP/junit.xml"
