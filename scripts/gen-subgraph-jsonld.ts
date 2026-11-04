@@ -353,6 +353,22 @@ type Node = { "@id": string; "@type": string | string[]; [k: string]: unknown };
  * which expands to the identical triple: the N-Quads do not move, only the
  * spelling does. The reach is computed the way the gate computes it
  * (`readInstanceDecls`, `needs`), so the two cannot disagree.
+ *
+ * ## A needed instance the checkout does not hold is still in reach (bean `cat-tools-d5j0`)
+ *
+ * The reach is a property of the declarations, not of what else happens to be
+ * checked out beside `root`. In the sibling-clone layout `checkoutRootFor`
+ * stops at cat-harness's own `.git`, so `bootstrap`, which cat-harness
+ * `needs`, is not among the checkout's instances. It used to be skipped, so
+ * the `bootstrap` prefix fell out of cat-harness's `ns/subgraph/v1.jsonld`
+ * and `publish-check` called the committed file, which is correct, stale.
+ *
+ * A `needs` name with no instance here is kept when it is an own prefix
+ * ({@link ownPrefixTable}, keyed by stub). An absent instance has no
+ * declaration to read, so its stub is taken to be its name, which is the
+ * default `readInstanceDecls` applies. Its own `needs` cannot be followed. A
+ * name that is neither in the checkout nor an own prefix binds nothing, as
+ * before.
  */
 export function prefixesInScope(root: string = ROOT): Set<string> | undefined {
   const own = resolve(root);
@@ -365,15 +381,20 @@ export function prefixesInScope(root: string = ROOT): Set<string> | undefined {
   const byName = new Map(decls.map((d) => [d.name, d]));
   const start = decls.find((d) => resolve(d.root) === own);
   if (start === undefined) return undefined;
+  const ownPrefixes = ownPrefixTable() as Readonly<Record<string, string>>;
   const reached = new Set<string>();
+  const absent = new Set<string>();
   const stack = [start.name];
   while (stack.length > 0) {
     const n = stack.pop()!;
     if (reached.has(n)) continue;
     reached.add(n);
-    for (const m of byName.get(n)?.needs ?? []) if (byName.has(m)) stack.push(m);
+    for (const m of byName.get(n)?.needs ?? []) {
+      if (byName.has(m)) stack.push(m);
+      else if (Object.hasOwn(ownPrefixes, m)) absent.add(m);
+    }
   }
-  return new Set([...reached].map((n) => byName.get(n)!.stub));
+  return new Set([...[...reached].map((n) => byName.get(n)!.stub), ...absent]);
 }
 
 /**

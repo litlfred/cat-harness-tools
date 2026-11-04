@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { resolve } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerBeanQueryTool } from "./bean-query.ts";
+import { buildBeanStore, NAMED_QUERIES, queryBeanStore } from "../../scripts/beans-query.ts";
 
 describe("bean-query MCP tool", () => {
   test("registers bean_query tool on McpServer", async () => {
@@ -26,7 +27,15 @@ describe("bean-query MCP tool", () => {
     expect(result.content[0].type).toBe("text");
     const parsed = JSON.parse(result.content[0].text);
     expect(Array.isArray(parsed)).toBe(true);
-    expect(parsed.length).toBeGreaterThan(0);
+    // The tool's contract is "run the named query over the real store and return
+    // its rows", so compare with that query run directly. Asserting a NON-EMPTY
+    // result asserted the work plan instead: closing the last open bean that
+    // qualifies turned this red with the tool unchanged (cat-harness-tools#1461).
+    // The query's own logic is tested on fixture beans in
+    // scripts/tests/beans-query.test.ts.
+    const { store, beans } = buildBeanStore(resolve("."));
+    expect(beans.length).toBeGreaterThan(0); // vacuity: the store was read
+    expect(parsed).toEqual(queryBeanStore(store, NAMED_QUERIES.safe_drain_candidates!.sparql));
   });
 
   test("returns the rows as structuredContent in every format", async () => {
