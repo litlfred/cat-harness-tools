@@ -6,10 +6,9 @@ registrars, and the routes that serve them. The definitions themselves — the
 
 ## The one rule
 
-**Definitions there, implementations here.** It is the split `bootstrap` and
-`bootstrap-tools` already use, and the owner chose it for this layer on
-2026-09-30 (bean `w2gr`, option A). A new tool's contract goes in the harness;
-the code that runs it comes here.
+**Definitions there, implementations here**, the split `bootstrap` and
+`bootstrap-tools` already use. A new tool's contract goes in the harness; the
+code that runs it comes here.
 
 ## Which way the dependencies run
 
@@ -18,42 +17,37 @@ bootstrap → bootstrap-tools → cat-harness → cat-harness-tools → (the con
 ```
 
 This layer may import `cat-harness` and `bootstrap-tools`, and **nothing above
-it** — the owner's ruling C1 of 2026-10-01 (epic `7x5n`, bean `rmi6`) put the
-tools BELOW the content core. The content core may import this layer; this
-layer does not name it, since a lower layer naming a higher one is itself the
-wrong direction (`check:reference-direction`). The order is declared, not
-written here: it is the `needs` of each `<instance>.json`, and
-`check:import-direction` enforces it from them.
+it**. The content core may import this layer; this layer does not name it,
+since a lower layer naming a higher one is itself the wrong direction
+(`check:reference-direction`). The order is declared, not written here: it is
+the `needs` of each `<instance>.json`, and `check:import-direction` enforces it
+from them.
 
-It was the other way round for a few hours: this layer needed the content
-core, and the core was forbidden to import it, which is why core's document adapter was cut into a
-server-free `DocumentContent` and a server wrapper. Under C1 the rule reads
-*core must not depend on the MCP server*; any part of the server that needs
-the core moves up into the core rather than coming here, and a content
-package's own server half lives with that package.
+Any part of the server that needs the content core moves up into the core
+rather than coming here, and a content package's own server half lives with
+that package.
 
 ## What is here
 
-`adapters/mcp-server/` — the standalone MCP server and its Dockerfile, moved
-in step 3a. `src/` — the HTTP server and the rest of what was
-`cat-harness/src/`, moved in step 3b. `test/` — the tests of what is here. The
-declaration names only what exists, because a declared-but-absent directory is
-the `dh4f` defect.
+Every directory is declared in `cat-harness-tools.json`, and each has a
+generated README saying what it holds. The main ones: `adapters/mcp-server/`
+(the standalone MCP server and its Dockerfile), `src/` (the MCP and HTTP
+server), `scripts/`, `pipeline/` (the content pipeline), `schemas/` (the Zod
+schema corpus) and `test/`. Declare only directories that exist: a declared
+but absent directory is a defect.
 
-The layout mirrors `cat-harness/` on purpose: as `src/` moves here, imports
-between modules that move together stay the same.
+The layout mirrors `cat-harness/`, so imports between modules keep the same
+relative paths.
 
 ## The libraries of the layers below the kind are held here
 
 `libraries/` holds this layer's own `software-library` nodes, and
 `libraries/held/<layer>/` holds the nodes of each layer below the kind
-(owner, 2026-10-30, bootstrap-tools#44: "A. Holder records, keyed by layer").
 bootstrap-tools needs only bootstrap, so it may not name cat-harness's
 `software-library` kind or declare a `libraries/` of its own. This layer owns
 the writer and the gate (`scripts/libraries.ts`), so it records them, keyed by
-the layer each node describes (`layer`, `software-library/1.2.0`). It is the
-same rule core uses for the glossary schemes of the layers below its typology
-(bean `q3n9`).
+the layer each node describes (`layer`, `software-library/1.2.0`), the same
+rule core uses for the glossary schemes of the layers below its typology.
 
 The held set is derived, not listed: every instance with a `package.json` that
 declares no `software-library` directory and does not reach cat-harness

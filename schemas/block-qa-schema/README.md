@@ -15,13 +15,11 @@ All three describe the same two sidecar shapes emitted by the folio QA pipeline 
 - **`<block>.qa.json`** (`$schema: "block-qa/v1"`) — one per content block. Under each QA criterion sits an append-only array of reviewer verdicts (script / agent / human), each pinned to the content hashes it judged so it auto-stales on edit.
 - **`<criterion-id>.script.json`** (`$schema: "qa-script/v1"`) — one per automated criterion, recording the checker's own source hash so a checker bug fix invalidates every verdict it ever wrote, corpus-wide.
 
-The JSON Schema is the authoritative interchange spec; the Pydantic and Zod schemas are hand-maintained mirrors kept in sync with it. The producing implementation lives in-repo at [`schemas/sdlc/block-qa.ts`](../sdlc/block-qa.ts).
+The JSON Schema is the authoritative interchange spec; the Pydantic and Zod schemas are hand-maintained mirrors kept in sync with it.
 
 ## Why a standalone package?
 
-The QOU corpus carries 2,250+ block sidecars holding 100k+ recorded verdicts across ~60 criteria on nine audit axes (proof integrity, structural/detangler, canonical-discipline, compute, voice, parameter-regime, bibliography, …). Downstream consumers — dashboards, external QA tooling, other corpora adopting the same multi-reviewer audit pattern — can read or emit those files without porting any of the pipeline; they just need the schema. The format and its role in a human–machine co-authoring loop are described in the [symbiotic proof-authoring note](https://github.com/litlfred/qou/blob/main/docs/outreach/symbiotic-proof-authoring-note.md) (Appendix B–D).
-
-Both models were validated against the full live corpus (2,250 block sidecars + 62 script sidecars) at packaging time.
+Downstream consumers — dashboards, external QA tooling, other corpora adopting the same multi-reviewer audit pattern — can read or emit sidecar files without porting any of the pipeline; they need only the schema. The format and its role in a human–machine co-authoring loop are described in the [symbiotic proof-authoring note](https://github.com/litlfred/qou/blob/main/docs/outreach/symbiotic-proof-authoring-note.md) (Appendix B–D).
 
 ## Python (Pydantic)
 

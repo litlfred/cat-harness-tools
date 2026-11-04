@@ -57,13 +57,6 @@ Add these five repository secrets:
 
 Done. Caddy auto-provisions TLS. Self-updater handles all future updates.
 
-### Updating secrets
-
-If you rotate OAuth credentials:
-
-1. Update the GitHub secrets
-2. Run **Actions > Deploy Folio** → action: **update**
-
 ### Destroying
 
 Run **Actions > Deploy Folio** → action: **destroy**. Remove the DNS record.
