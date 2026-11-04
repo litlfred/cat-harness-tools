@@ -3,48 +3,36 @@
  *
  * @module schemas/todo
  *
- * ## What a todo is, and why it is content
+ * ## What a todo is
  *
- * A todo records that a **person** has something outstanding. That is not the
- * agent work plan: `beans/` is the agent work plan, and `AGENTS.md` is emphatic
- * that no second store may be stood up beside it. A todo is the other thing
- * `AGENTS.md` already carves out beside beans — *"the content-review feedback
- * workflow … a separate domain feature, not the agent work-plan"* — and it is
- * **content**, authored and owned by the folio, not by the harness.
+ * A todo records that a **person** has something outstanding. It is not the
+ * agent work plan (`beans/`); it belongs to the content-review feedback
+ * workflow, and it is **content**, authored and owned by the folio, not by the
+ * harness.
  *
  * ## It carries the four coordinates of the role model
  *
- * `AGENTS.md` states the model in one sentence, and every word of it is a
- * distinct declared object:
- *
  * > **An actor performs a task in a process as a role, using that role's skills.**
  *
- * A todo is a piece of that sentence left unfinished, so it is tagged by the
- * same four things: who ({@link ExternalIdentity}), acting as what
- * ({@link TodoTags.roles}), in which process ({@link TodoTags.processes}), on
- * which task ({@link TodoTags.tasks}). Tagging it any other way invents a
- * second vocabulary for facts the knowledge graph already names.
+ * A todo is tagged by the same four things: who ({@link ExternalIdentity}),
+ * acting as what ({@link TodoTags.roles}), in which process
+ * ({@link TodoTags.processes}), on which task ({@link TodoTags.tasks}).
  *
  * ## A task reference carries its process
  *
  * A BPMN activity id is unique only **within** its process — `A_Implement`
  * names one thing in `crdm-requirements` and could name another anywhere else.
- * So {@link TaskRef} is a pair, never a bare string. The same lesson the
- * subprocess interpreter learned: a step id without its phase is not an
- * address, and resolving one by guessing is how a token lands in the wrong
- * diagram.
+ * So {@link TaskRef} is a pair, never a bare string.
  *
  * ## An identity is provider-qualified
  *
  * `litlfred` is not an identity; `github:litlfred` is. A bare handle cannot be
  * compared across systems, and two providers' namespaces are free to collide.
  *
- * The link to a declared {@link ActorDefinition} is **optional on purpose**.
- * Somebody who comments on a pull request is a real person with a real
- * outstanding item whether or not `cat-harness/scenarios/actors/` has heard of them,
- * and refusing to record the todo until they are declared would lose exactly
- * the feedback that arrives from outside. `actor: undefined` means **not
- * linked**, which is a third state — never "anonymous", and never silently
+ * The link to a declared {@link ActorDefinition} is **optional**: somebody who
+ * comments on a pull request has a real outstanding item whether or not
+ * `cat-harness/scenarios/actors/` declares them. `actor: undefined` means
+ * **not linked**, a third state — never "anonymous", and never silently
  * resolved to a default actor.
  * @graphNode schema
  */

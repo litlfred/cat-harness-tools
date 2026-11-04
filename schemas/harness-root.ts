@@ -1,11 +1,10 @@
 /**
  * Where the cat-harness instance lives: the directory holding `cat-harness.json`.
  *
- * The schema modules were written inside cat-harness and found its data files
- * (`code-lists/`, `test/fixtures/`, the declaration) by walking up from their
- * own file. They now live in cat-harness-tools (bean `8lcl`), so that walk
- * would land in the tools repository instead. This is the one place that says
- * where the harness is.
+ * Schema modules that need cat-harness's data files (`code-lists/`,
+ * `test/fixtures/`, the declaration) cannot find them by walking up from
+ * their own file, since they live in cat-harness-tools. This is the one place
+ * that says where the harness is.
  *
  * Tried in order:
  *
@@ -13,16 +12,10 @@
  * 2. A `cat-harness/` directory beside this repository.
  * 3. The `@litlfred/cat-harness` package, as a composed index links it.
  *
- * The sibling comes before the package (bean `g7ls`). In a composed index
- * the two are the same directory. Where they differ, the package is the
- * wrong one: the standalone rehearsal (`probeStandalone`) lays the closure
- * out as siblings in a scratch directory and links the index's
- * `node_modules` beside them, so `@litlfred/cat-harness` resolved, through
- * that link, to the INDEX's cat-harness. The checkout was then the whole
- * index, the test preload saw every fixture instance "present" and did not
- * set `FOLIO_FIXTURE_CHECKOUT`, and `fhir-harness.json` (outside the
- * closure) was read against a registry that never scanned the core that
- * contributes its `glossary` kind: about 250 tests failed to load.
+ * The sibling comes before the package: in a composed index they are the same
+ * directory, and where they differ (the standalone rehearsal,
+ * `probeStandalone`, links the index's `node_modules` beside a scratch
+ * closure) the package resolves to the wrong cat-harness.
  *
  * Does not throw at import: a module that only needs the harness for one
  * function should still load where the harness is absent.

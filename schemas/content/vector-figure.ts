@@ -1,9 +1,8 @@
 /**
  * @graphNode schema
  *
- * A DRAWN figure, assembled and rendered — bean `ay3x`, under `m4xy`. The step
- * above `vector-labels.json` that `a8wy` stopped short of, built on the
- * owner's ruling of 2026-10-03: *"Yes, build it."*
+ * A DRAWN figure, assembled and rendered — the step above
+ * `vector-labels.json`.
  *
  * ## Where it sits
  *
@@ -13,39 +12,29 @@
  * | vector labels | `<entry>/vector-labels.json` | `<library>/figure-descriptions.json` |
  * | vector figures | `<entry>/vector-figures.json` + `figures/*.png` | `<library>/image-verdicts.json`, keyed `vfig-pNNN` |
  *
- * The figures share the RASTER verdict file rather than gaining a fourth,
- * because the call made about them is the raster call — figure or furniture,
- * and if figure, what it shows. `apply-image-verdicts.ts` writes both, through
- * the same `inspection` basis, so the two kinds of image cannot come to be
- * judged by different rules.
+ * The figures share the RASTER verdict file, because the call made about them
+ * is the raster call — figure or furniture, and if figure, what it shows.
+ * `apply-image-verdicts.ts` writes both through the same `inspection` basis.
  *
  * ## The basis is ALWAYS present, and the extractor never assigns a role
  *
- * `d5f1` closed a silently placed image: an image whose role nobody could
- * account for. A render is the same risk with a new source, so every entry
- * carries a basis naming who or what looked:
+ * Every entry carries a basis naming who or what looked:
  *
  * - `assembly` — `pdf-vector-figures.py` grouped the page and rendered it. It
- *   names itself, and it **assigns no role**: `role` is `undetermined`. That
- *   is the whole of the refusal `m4xy` makes — no coverage threshold separates
- *   a figure from furniture across this corpus (`j820`, 29 documents), so the
- *   arm does not pretend one does.
- * - `inspection` — somebody looked at the render and said what it is. The
- *   raster schema's own {@link InspectionBasisSchema}, reused rather than
- *   restated.
+ *   **assigns no role**: `role` is `undetermined`, since no coverage threshold
+ *   separates a figure from furniture.
+ * - `inspection` — somebody looked at the render and said what it is
+ *   (the raster schema's {@link InspectionBasisSchema}).
  *
- * So `undetermined` ⇔ `assembly`, structurally. Unlike `images.json`, where
- * `undetermined` means NO basis, here it means "the machine looked and decided
- * nothing" — which is a different fact, and recorded as one.
+ * So `undetermined` ⇔ `assembly`, structurally: here it means "the machine
+ * looked and decided nothing", unlike `images.json` where it means no basis.
  *
  * ## `shows` is how a figure is reached, and it is the inspector's to set
  *
  * {@link VectorFigureSchema.captionLabels} are CANDIDATES: every line-start
- * `Fig. N` on the page, cross-references included, the same lower bound
- * `vector-labels.json` keeps. A page that mentions Fig. 4 in passing does not
- * show Fig. 4. Only an inspector, looking, can say which figure the render
- * holds — so `image-descriptions` counts a declared figure as reached by this
- * arm only through `shows` on an inspected entry, never through a candidate.
+ * `Fig. N` on the page, cross-references included. Only an inspector can say
+ * which figure the render holds, so `image-descriptions` counts a declared
+ * figure as reached by this arm only through `shows` on an inspected entry.
  *
  * ## The assembly is structure, not prose
  *
@@ -53,10 +42,8 @@
  * closed shapes holding a label, with `parent` by containment; connectors are
  * open strokes whose two ends land in labelled boxes. Every rule is a fact
  * about the drawing — the only length used is the stroke's own width — and
- * `pdf-vector-figures.py` carries each, with the page it was checked on.
- * A connector end that lands in no box is `null`, not snapped to the nearest:
- * `a8wy`'s Annif case shows a relation guessed from layout reading wrong on
- * every row.
+ * `pdf-vector-figures.py` carries each. A connector end that lands in no box
+ * is `null`, not snapped to the nearest.
  */
 import { z } from "zod";
 

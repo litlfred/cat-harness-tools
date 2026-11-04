@@ -6,51 +6,29 @@
  * several, and the union of their rules applies on top of the base house voice
  * in `skills/authoring/authoring-core/one-voice-style-guide.md`.
  *
- * ## A voice is a third axis, and conflating it with the other two is costly
+ * ## A voice is a third axis
  *
- * `AGENTS.md` already warns about the first conflation: **adapters partition
- * block KINDS** (`adapterForKind` must stay total and unambiguous) while
- * **profiles nest** (every document kind is also a paper kind). A voice does
- * neither. It partitions HOW PROSE READS — spelling, punctuation, terminology,
- * register, citation form, and for a design voice the visual conventions around
- * the prose.
+ * **Adapters partition block KINDS** and **profiles nest**; a voice does
+ * neither. It governs HOW PROSE READS — spelling, punctuation, terminology,
+ * register, citation form, and for a design voice the visual conventions
+ * around the prose. Two folios can share an adapter and a profile and still
+ * speak differently.
  *
- * Two folios can share an adapter and a profile and still speak differently: a
- * WHO guideline and a ministry-of-health policy document are both the
- * `document` profile, and only one of them wants `-ize` endings and "Member
- * State" capitalised.
+ * ## Voices are OPT-IN
  *
- * ## Voices are OPT-IN, and this instance activates none
- *
- * Issue #208, in the owner's words: *"we shouldnt autmoatically apply voices.
- * not all authors will want to use the who voice (e.g. a mministry of health)"*
- * and *"the folio-asst's own docuemtnation conent doesnt have any voice"*.
- *
- * So the default is the empty set, and `harness.config.json` opts in:
+ * The default is the empty set, and `harness.config.json` opts in:
  *
  *     { "voices": { "active": ["who-editorial", "who-guideline-development"] } }
  *
- * That default is the opposite of the one `profiles` takes, deliberately.
- * `criterionProfiles` defaults to EVERY profile because narrowing silently
- * stops criteria running, and "a wrong pass is believed where a wrong fail is
- * argued with". A voice inverts the argument: applying an editorial register
- * nobody asked for produces confident findings against prose that was never
- * written to that standard, and the author has to argue every one of them back.
- * An unasked-for voice is a wrong FAIL at scale.
+ * This is the opposite of `criterionProfiles`, which defaults to EVERY
+ * profile: an unasked-for voice produces confident findings against prose
+ * never written to that standard — a wrong FAIL at scale.
  *
- * ## Every rule cites its source, and that is enforced
+ * ## Every rule cites its source
  *
- * {@link VoiceRuleSource} is REQUIRED on every rule. This is the whole reason
- * issue #208 asks for the documents to be ingested before the voices are
- * written, and the reason PR #210 could not be merged as it stood: its three
- * WHO profiles carried ten plausible rules each and `source: null`. Plausible
- * is not the same as right — its first rule asserts `-ise/-isation` as WHO's
- * spelling baseline, and the WHO Editorial Style Manual says the opposite in as
- * many words ("`-ize`, derived from the Greek “-izo”, is preferred", p14).
- *
- * A rule that cannot name the passage it comes from is an assertion wearing a
- * citation's clothes. Same discipline as a BASELINE measurement carrying its
- * command and date.
+ * {@link VoiceRuleSource} is REQUIRED on every rule. A plausible rule without
+ * the passage it comes from can be plainly wrong about the style guide it
+ * claims to follow.
  *
  * @module schemas/voices
  * @graphNode schema

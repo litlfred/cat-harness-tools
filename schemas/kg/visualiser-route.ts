@@ -5,18 +5,7 @@
  * @module schemas/visualiser-route
  * @graphNode none — a function library: the one route every visualiser URL is computed with
  *
- * ## The owner's rule, 2026-10-09
- *
- * > I still want the harness to be where specific visualizers/pages are
- * > declared for the harness at the level. And that they are all compliant of
- * > `<base URL>/<harness>/<visualizer>` (which is for the full KG) and
- * > `<base URL>/<harness>/<visualizer>/<sub-graph>`,
- * > `<base URL>/<harness>/<visualizer>/<sub-graph>/<path to asset>` rules.
- * > Why `renders: [fsh-guts]` in visualizer? Could have multiple visualizers
- * > contending for same url... so not good. Need harness to declare visualizer
- * > is renderedBy ....
- *
- * So a page never chooses its URL and never claims a directory. The HARNESS
+ * A page never chooses its URL and never claims a directory. The HARNESS
  * declares each visualiser in its own `<instance>.json` (`visualisers`, see
  * `HarnessVisualiserSchema` in `cat-harness.ts`), and the route is a pure
  * function of that declaration:
@@ -30,41 +19,30 @@
  *
  * `<harness>` is the declaring instance's `name`, `<visualiser>` the entry's
  * `id`. Both are URL segments, checked by {@link ROUTE_SEGMENT}, never encoded:
- * an id that is not a portable segment is a defect in the declaration, and
- * encoding it would publish a URL the declaration no longer spells.
+ * an id that is not a portable segment is a defect in the declaration.
  *
  * ## The locale segment
  *
- * The owner, 2026-10-05: every rendered page on the CDN lives under
- * `/<locale>/…`. So a route may carry a `locale`, and then it is
- * `<locale>/<harness>/<visualiser>/…`. The locale is the FIRST segment, above
- * the harness, so one locale's site is one subtree and a translation is a
- * sibling of it.
+ * Every rendered page on the CDN lives under `/<locale>/…`, so a route may
+ * carry a `locale`, and then it is `<locale>/<harness>/<visualiser>/…` — one
+ * locale's site is one subtree. It is optional: every caller names
+ * `DEFAULT_LOCALE` (`translation.ts`) explicitly, and the unlocalised route
+ * keeps working for the alias below.
  *
- * It is optional here so that adding it changes nothing until the generators
- * pass it: every caller names `DEFAULT_LOCALE` (`translation.ts`) explicitly,
- * and the unlocalised route is what the t4xb rule below keeps working.
+ * ## Collisions are DECLARATION errors
  *
- * ## Why collisions are now DECLARATION errors
+ * Two claims on one URL are two declarations naming one
+ * `(harness, visualiser)` pair, checkable before anything is drawn:
+ * {@link routeCollisions}, run by `check:visualiser-routes`.
  *
- * Under page-derived discovery (#1168 B7a-2b) a page said which directories it
- * drew and where it was, so two generators could write one URL and each page
- * could claim the same directory — and nothing could tell which claim was the
- * declaration. With the route derived from `(harness, visualiser)`, two claims
- * on one URL are two declarations naming one pair, which is checkable before
- * anything is drawn: {@link routeCollisions}, run by
- * `check:visualiser-routes`.
+ * ## The opt-in alias
  *
- * ## The opt-in alias — bean `t4xb`
- *
- * > `<base_url>/<visualizer>` is an opt-in (for prettiness or so), but
- * > `<base_url>/<harness>/<visualizer>` always works.
- *
- * A visualiser may declare `alias`. The page is still drawn ONCE, at its
- * canonical route; the composed site carries a redirect at `<base>/<alias>/`
- * (`compose-docs.ts`). An alias that collides with another alias, with a
- * harness's own route or with anything the site already publishes at its top
- * level is refused by the gate, naming both claimants.
+ * `<base>/<harness>/<visualiser>` always works; a visualiser may also declare
+ * an `alias`. The page is still drawn ONCE, at its canonical route; the
+ * composed site carries a redirect at `<base>/<alias>/` (`compose-docs.ts`).
+ * An alias that collides with another alias, with a harness's own route or
+ * with anything the site already publishes at its top level is refused by the
+ * gate, naming both claimants.
  *
  * This module is pure — no filesystem — so the schema layer, the generators
  * and the gate can all import it without an edge to any of them.

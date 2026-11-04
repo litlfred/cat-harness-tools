@@ -2,34 +2,26 @@
  * A confirmation the owner has given **in advance**, scoped and dated.
  *
  * Skill: [`confirmation-waiver`](../skills/conduct/conduct-core/confirmation-waiver.md).
- * Owner, 2026-09-20: *"human can waive confirmation rights (e.g. for session,
- * for process run)"*, and *"context dependent, should be in memories"*.
+ * A person may waive confirmation rights for a session or a process run; the
+ * waiver is context-dependent and kept with memory.
  *
- * ## Why a kind of its own rather than a memory label
+ * ## A kind of its own, not a memory label
  *
- * A waiver is `context` by exactly the test that made `memory` one — a running
- * process READS it and no step writes it; it changes when a person acts,
- * outside any instance. That is why it is declared over the same directory.
+ * A waiver is `context` like `memory` — a running process READS it and no step
+ * writes it — so it is declared over the same directory. It is a separate kind
+ * because {@link MemoryNodeSchema} carries **no status by design**, and a
+ * waiver's entire content is that it expires.
  *
- * It is nevertheless a separate kind, because {@link MemoryNodeSchema} carries
- * **no status by design** — `schemas/memory.ts` says so in as many words: *"a
- * TRAP is not 'open', and marking one 'done' would assert that the failure it
- * records has stopped being possible."* A waiver's entire content is that it
- * expires. Filing one as a memory entry labelled `stable` would assert the
- * opposite of what the node says.
+ * ## Every field is required
  *
- * ## Every field is required, and the reason is the same one each time
- *
- * A waiver exists to move a decision from the agent to the person. Each field
- * below is a way that move can be faked, closed off:
+ * A waiver moves a decision from the agent to the person; each field closes
+ * off a way to fake that move:
  *
  * - no `grantedBy` → an agent's own decision wearing a hat;
  * - no `quote` → the agent's paraphrase, which can widen a scope silently;
  * - no `gate` → a blanket permission nobody can audit;
  * - no `scope` → a grant that outlives the situation that justified it;
- * - no `expires` → **indistinguishable from one nobody remembered to
- *   withdraw**, which is the argument `bean-blocking.md` makes for a block and
- *   it transfers without modification.
+ * - no `expires` → indistinguishable from one nobody remembered to withdraw.
  *
  * So the schema has no `.optional()` anywhere, and a malformed waiver is not a
  * lenient waiver — it is **no waiver**, and the gate it named still stands.

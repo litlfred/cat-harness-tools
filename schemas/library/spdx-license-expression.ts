@@ -4,11 +4,8 @@
  * @module schemas/spdx-license-expression
  * @graphNode schema
  *
- * Bean `sd5v`. `licence.json`'s `id` has said "SPDX where one exists" since
- * issue #1023, and nothing checked it: a mistyped `CC-BY-3.O` and a real id
- * were the same string to every gate. The owner, 2026-10-03: *"go ahead with
- * licence-id validation, that's it for now"* — the License List as a VALUE
- * VOCABULARY, with no SPDX documents produced.
+ * Checks `licence.json`'s `id` ("SPDX where one exists"). The License List is
+ * used as a VALUE VOCABULARY; no SPDX documents are produced.
  *
  * ## The grammar is the held specification's, not a recollection of it
  *
@@ -38,10 +35,10 @@
  *
  * ## Deprecated is reported, not refused
  *
- * A deprecated id (`GPL-2.0`, say) is still on the list and still names a
- * licence; the list only asks that it not be used in NEW records. So a record
- * carrying one is valid, and the id comes back in `deprecated` for the check
- * to report as its own family rather than fold into `malformed`.
+ * A deprecated id (`GPL-2.0`, say) still names a licence; the list only asks
+ * that it not be used in NEW records. So a record carrying one is valid, and
+ * the id comes back in `deprecated` for the check to report as its own family
+ * rather than fold into `malformed`.
  *
  * @conformsTo spdx-license-list
  */

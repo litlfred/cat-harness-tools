@@ -4,25 +4,21 @@
  * @module schemas/tool-profile
  * @graphNode schema
  *
- * Step 1 of `docs/proposals/tool-releases-2026-10-07.md` (issue #2481, bean
- * `3sbm`), §2. The owner, 2026-10-07: *"in testing scenarios we will need to
- * load different sets/releases of tools easily"*. A test scenario selects a
- * profile (`default`, `ci-2026-10`, `lean-4.35-test`); the resolver (step 2,
- * not built here) provisions every release it names.
+ * A test scenario selects a profile (`default`, `ci-2026-10`,
+ * `lean-4.35-test`) to load a different set of tool releases; a resolver (not
+ * built yet) is to provision every release it names.
  *
  * ## A profile names tools, never a runtime
  *
  * Runtimes come in transitively, through each release's own `runtimes[]`.
- * A profile that named a JRE would be pinning java for every tool in it — the
- * global pin the owner ruled out (*"different tools may need different
- * instances of java"*). So:
+ * A profile that named a JRE would pin java for every tool in it, and
+ * different tools may need different javas. So:
  *
  * - **structurally**, every key of `tools` must equal the name of the release
  *   it maps to. `plantuml: "temurin-jre@21.0.4+7"` is refused by the schema;
  * - **against the graph**, {@link toolReleaseGraphProblems} refuses a profile
- *   whose ref resolves to a release declared `role: "runtime"`. The schema
- *   alone cannot see that, because which releases are runtimes is a fact
- *   about OTHER files.
+ *   whose ref resolves to a release declared `role: "runtime"` — a fact about
+ *   OTHER files, which the schema alone cannot see.
  *
  * ## Why the graph checks live here
  *

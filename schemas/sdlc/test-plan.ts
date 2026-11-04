@@ -1,15 +1,13 @@
 /**
  * A TEST PLAN — what a system under test must do, case by case, and the rule
- * that decides whether it did. STRAWPERSON (bean `ygzh`, arc `3fva`).
+ * that decides whether it did. STRAWPERSON.
  *
  * @module schemas/test-plan
  * @graphNode schema
  *
- * Proposal: `docs/proposals/qa-reports-branch-and-test-process-2026-10-01.md`
- * §3.2. The owner's remark that *"QA reports and test/certification/compliance
- * reports are very similar"* holds structurally: QA judges an artefact against
- * a criterion registry, a test judges a SYSTEM UNDER TEST against a plan. This
- * module is the plan half — the thing that supplies the criteria.
+ * QA judges an artefact against a criterion registry; a test judges a SYSTEM
+ * UNDER TEST against a plan. This module is the plan half — the thing that
+ * supplies the criteria.
  *
  * ## Shaped after FHIR R5 TestPlan, not copied from it
  *
@@ -21,43 +19,37 @@
  * |---|---|---|
  * | `id`, `title`, `status`, `version`, `description` | `name`, `title`, `status`, `version`, `description` | `status` keeps FHIR's four codes verbatim |
  * | `scope` | `scope` (Reference) | FHIR's is a bare reference; here it is the SUT KIND plus a VERSION RANGE, because a certification is of a version, and a plan that cannot say which versions it applies to cannot be re-run against the next one |
- * | `requirements[]` | — | `req:` refs, the shape `test-run.ts` already uses (issue #1164) |
+ * | `requirements[]` | — | `req:` refs, the shape `test-run.ts` already uses |
  * | `testCases[].id` | `testCase.sequence` | an id rather than an ordinal: a verdict must name its case, and renumbering must not reassign verdicts |
- * | `testCases[].assertions[]` | `testCase.assertion` | the assertion's id IS a criterion id, so a test case and a QA criterion are one vocabulary (§3.1); `type` keeps FHIR's `required` / `informative` |
- * | `testCases[].testData[]` | `testCase.testData` | FHIR's `content` / `source[x]` split becomes `vm6m`'s FIXED vs GENERATED — see below |
+ * | `testCases[].assertions[]` | `testCase.assertion` | the assertion's id IS a criterion id, so a test case and a QA criterion are one vocabulary; `type` keeps FHIR's `required` / `informative` |
+ * | `testCases[].testData[]` | `testCase.testData` | FHIR's `content` / `source[x]` split becomes FIXED vs GENERATED — see below |
  * | `testCases[].feature` | `testCase.testRun.script` (`language: gherkin`) | only the Gherkin case is carried, as a path |
  * | `testCases[].dependsOn[]` | `testCase.dependency` | resolved to sibling case ids, and refused when it does not resolve |
  * | `dependencies[]` | `dependency` (`description`, `predecessor`) | verbatim in shape |
  * | `exitCriteria` | `exitCriteria` (markdown) | FHIR's is NARRATIVE; here it is a DMN reference, because a certification rule a person reads and a different person applies is two rules |
  *
- * ## Fixed and generated test data are not degrees of one thing (`vm6m`)
+ * ## Fixed and generated test data
  *
- * A **fixed** set is committed, reviewed and cited. Its value is that it has
- * NOT changed since somebody looked at it, so it can count as evidence.
- *
- * A **generated** set is a template plus parameters plus a seed, and is
- * NEVER stored materialised. A materialised copy beside its recipe is two
- * answers to "what was tested", free to disagree — and a fixed record
- * silently regenerated has lost the review that made it evidence.
+ * A **fixed** set is committed, reviewed and cited; it counts as evidence
+ * because it has NOT changed since somebody looked at it. A **generated** set
+ * is a template plus parameters plus a seed, and is NEVER stored materialised.
  *
  * So the two are a DISCRIMINATED union on `kind`, and a consumer tells them
- * apart from the record, never from the path (`vm6m`'s first done-when).
- * Both are strict objects: a generated ref carrying a `path`, or a fixed ref
- * carrying a `seed`, is refused rather than quietly stripped, because a
- * stripped field is a claim the file made and nobody can see.
+ * apart from the record, never from the path. Both are strict objects: a
+ * generated ref carrying a `path`, or a fixed ref carrying a `seed`, is
+ * refused rather than quietly stripped.
  *
- * The seed is REQUIRED. `zz0a` makes a run's data hash part of its evidence,
- * and a generator without a fixed seed cannot reproduce the bytes it hashed.
+ * The seed is REQUIRED: a run's data hash is part of its evidence, and a
+ * generator without a fixed seed cannot reproduce the bytes it hashed.
  *
- * ## The plan names no run (direction)
+ * ## The plan names no run
  *
  * A run points at its plan (`folio-test-run/v1`'s `plan`), never the reverse
- * — the same direction as a run's `skill` and `requirements`. Plans are
- * reused across runs, systems and versions; a plan listing its runs would be
- * rewritten by every execution, which would make authored content into live
- * state. That is the `content` / `state` line in
- * `skills/kg/kg-core/content-context-and-state-graphs.md`, and it is why this
- * kind `holds: "content"` while `test-report` `holds: "state"`.
+ * — the same direction as a run's `skill` and `requirements`. A plan listing
+ * its runs would be rewritten by every execution, turning authored content
+ * into live state (the `content` / `state` line in
+ * `skills/kg/kg-core/content-context-and-state-graphs.md`). So this kind
+ * `holds: "content"` while `test-report` `holds: "state"`.
  *
  * ## What is enforced structurally
  *
@@ -69,11 +61,10 @@
  * 4. `exitCriteria.decision` has the `file.dmn#Decision_Id` shape the BPMN
  *    gateways here already use.
  *
- * NOT enforced here, deliberately: that a `req:` ref, an assertion's
- * criterion id, a DMN file or a fixed data path RESOLVES. Those are facts
- * about the rest of the graph, and a schema that read the filesystem would
- * answer differently on every checkout. They are `kg-audit` criteria (§3.2:
- * "the plan resolves").
+ * NOT enforced here: that a `req:` ref, an assertion's criterion id, a DMN
+ * file or a fixed data path RESOLVES. Those are facts about the rest of the
+ * graph, and a schema that read the filesystem would answer differently on
+ * every checkout. They are `kg-audit` criteria ("the plan resolves").
  */
 import { z } from "zod";
 

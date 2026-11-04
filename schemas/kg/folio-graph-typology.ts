@@ -2,26 +2,15 @@
  * The `folio` graph typology — registered by **core**, not declared by the harness.
  *
  * A `folio` graph is authored content that the just-the-docs pipeline renders
- * to a website. It is the only **renderable** kind, and that is precisely why
- * it does not live in `schemas/kg/cat-harness.ts`:
+ * to a website. It is the only **renderable** kind, and everything that
+ * depends on that pipeline belongs to core, so it does not live in
+ * `schemas/kg/cat-harness.ts`. The harness declares the three kinds it can
+ * serve — `tools`, `kg`, `schemas` — and core adds this one on top, through
+ * the same load-time registration the contribution mechanism uses.
  *
- * > `cat-harness` is **not** self-documenting; `folio-assist-core` is.
- * > Everything that depends on the just-the-docs rendering pipeline belongs to
- * > core.
- *
- * A layer that cannot render must not own the renderable kind. The harness
- * declares the three kinds it can actually serve — `tools`, `kg`, `schemas` —
- * and core adds this one on top, through the same load-time registration the
- * contribution mechanism uses.
- *
- * ## Why this is a registration and not a constant
- *
- * The alternative was to leave `folio` in the harness's table and simply
- * document that core owns it. That is the version that reads fine and means
- * nothing: the harness would still have to know the string, the closed enum
- * would still gate on it, and the boundary would exist only in prose. Here the
- * harness genuinely does not know the kind exists until core says so, and an
- * unregistered kind is a hard error naming what *is* known.
+ * Because it is a registration and not a constant, the harness does not know
+ * the kind exists until core registers it, and an unregistered kind is a hard
+ * error naming what *is* known.
  *
  * @module schemas/folio-graph-typology
  * @graphNode schema

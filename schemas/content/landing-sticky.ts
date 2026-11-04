@@ -4,79 +4,30 @@
  * @module schemas/landing-sticky
  * @graphNode schema
  *
- * The owner's ask, 2026-09-20: *"i want the landing page to be a sticky note …
- * it creates an empty folio (if none exists) and attaches to the folio a sticky
- * note with grumpy cat background that adds content of the intiatized harness'
- * description"* — the description **and the four onboarding links**, confirmed
- * the same day. Then, refining it: *"each intiator should create its own
- * sticky."*
+ * Initiation creates an empty folio (if none exists) and attaches a sticky
+ * per initiator, carrying the initiated harness's description and the four
+ * onboarding links.
  *
  * ## The set is COMPOSED, not enumerated here
  *
- * This module shipped the board as a fixed set of three — `landingSticky()`,
- * `catHarnessSticky()`, `subgraphsSticky()` and a `LANDING_STICKY_IDS` constant
- * listing them. That was a list this repository owned, and the second ask
- * inverts the ownership. What is left here is the **node type and one
- * projection**: {@link stickyFromContribution} turns a layer's declared
+ * This module holds the **node type and one projection**:
+ * {@link stickyFromContribution} turns a layer's declared
  * {@link StickyContribution} into a sticky. The layers declare; this builds.
+ * Where each sticky comes from, and why it is a declaration rather than a
+ * code registry, is in `schemas/content/sticky-contribution.ts`.
  *
- * Where each sticky comes from now, and why that file rather than this one, is in
- * `schemas/content/sticky-contribution.ts` — including why a declaration beats a code
- * registry (bootstrap holds no TypeScript and may not import the layer composed
- * on top of it) and why the text itself belongs in the declaration
- * (`AGENTS.md`: subject matter in this repository *"belongs in the folio as
- * data"*, and a sticky's words are subject matter).
+ * ## A note, not a todo
  *
- * ## Why this is a note and not a todo
- *
- * `5oai` proposed the landing panel as a **`ThemedTodo`**, and that was the
- * right shape when the only themed thing was a sticky on a board. It is the
- * wrong one here: a landing description is not a task. It has no status to
- * advance, nothing to check off, and nobody completes it. Filing it in the
- * `todos` graph would put a page's furniture in the store that answers *what is
- * being worked on* — the same conflation the owner's *"beans no anchor"* rule
- * refuses one level over, and that `theme.ts` already refuses when it keeps
- * themes in the harness layer while their todos stay in `todos/`.
- *
- * So it extends {@link CarriedNoteSchema} directly — the general "note somebody
- * carries, attached to the graph" — which is what `TodoNodeSchema` also extends.
- * Everything that reads a carried note keeps working; nothing has to pretend
- * this is a unit of work.
+ * A landing description is not a task: no status, nothing to complete. So it
+ * extends {@link CarriedNoteSchema} directly — the general "note somebody
+ * carries, attached to the graph" that `TodoNodeSchema` also extends — and
+ * stays out of the `todos` graph.
  *
  * ## The anchor is NARROWED, not merely set
  *
  * `CarriedNote.anchor` is optional across three states. Here it is
- * `PageAnchorSchema` and required, because a landing sticky is **definitionally**
- * page-global: there is no block for it to sit on. `note-anchor.ts` was written
- * with this exact case as the argument that settled its design —
- *
- * > the landing page is to carry a page-global sticky, **and the landing page
- * > has no block to point at.** There is nothing for a sentinel to stand in for.
- *
- * Narrowing states that in the type rather than in a comment, so a landing
- * sticky carrying a block anchor does not parse. Leaving it optional would
- * admit the two states that cannot be true of this object and push the check
- * to whatever reads it.
- *
- * ## The geometry constraint DISSOLVES here, and that is worth knowing
- *
- * Bean `alox` measured the declared text region at **53% × 28% of the laptop
- * crop** — a few lines — with overflow *rendered rather than clipped*, which is
- * why the four onboarding links live below the panel today rather than in it.
- * That looks like a reason this object cannot carry them. It is not:
- *
- * > **A sticky note is not a thought cloud.**
- *
- * `textRegion` exists because the description is composited into the quiet
- * interior of the cat's thought-cloud, and that interior is a fixed shape in a
- * fixed crop. Once the landing page **is** the sticky, the sticky is the
- * container and the art is its background. A sticky sizes to its content.
- *
- * **So nothing here reads `textRegion`, deliberately.** Carrying it over would
- * reimpose the geometry the change removes, and the failure would be quiet —
- * words clipping or spilling against a box nobody meant to keep. The field stays
- * declared in `harness.json` for the old composited path and for any instance
- * that still wants it.
+ * `PageAnchorSchema` and required: a landing sticky is page-global, with no
+ * block to sit on, so one carrying a block anchor does not parse.
  */
 import { z } from "zod";
 

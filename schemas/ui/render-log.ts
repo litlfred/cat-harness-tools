@@ -1,54 +1,37 @@
 /**
- * The render log — what was published to the publish branch, when, and why.
+ * The render log — what was published to the publish branch, when, and why:
+ * each staging rendering added or deleted, logged on the publish branch.
  *
  * @module schemas/render-log
  * @graphNode schema
  *
- * Owner, 2026-09-20: *"a specialised Logger skill for the gh-pages rendering
- * context … log all staging rendering (when added, when deleted) to a logging
- * directory/file on gh-pages."*
- *
- * ## It is a SPECIALISATION of `folio-log/v1`, not a second logger
+ * ## A SPECIALISATION of `folio-log/v1`, not a second logger
  *
  * `schemas/sdlc/log-entry.ts` already answers "what does an entry look like":
  * `id`, `at`, `summary`, `detail`, `references`, and a three-state `capture`.
- * Re-spelling those here would be two vocabularies for one concept, and the
- * first divergence would be silent. So a render entry IS a log entry, with a
- * rendering event and a rendering subject.
- *
- * **Three things make it a different store, and each is a deliberate
- * difference rather than an accident:**
+ * A render entry IS a log entry, with a rendering event and a rendering
+ * subject. It is a different store:
  *
  * | | activity log (`folio-log/v1`) | render log (this) |
  * |---|---|---|
  * | subject | what an AGENT did | what was PUBLISHED |
  * | store | `fsh-guts/logs/`, in the repo | the publish branch itself |
- * | published | **no**, by owner decision | **yes**, deliberately |
+ * | published | **no** | **yes** |
  *
- * That last row is the one to read twice. The activity log is unpublished
- * because it is an agent's audit trail; this one lives on the publish branch
- * because it describes what is ON the publish branch, and a record of a
- * deleted artefact is worthless anywhere the artefact's absence cannot be
- * seen. Neither decision overrides the other — they are different logs.
+ * It lives on the publish branch because it describes what is ON that
+ * branch: a record of a deleted artefact is useful only where the absence can
+ * be seen.
  *
- * ## Append-only, and that is the point
+ * ## Append-only
  *
- * The design this replaces wrote one record per preview and then had to stop
- * three separate paths from deleting it. A log does not need that: an entry
- * is never rewritten, a removal is a NEW entry rather than the erasure of an
- * old one, and "what happened to `STAGING/x`" is answered by reading forward
- * rather than by hoping a file survived.
- *
- * So `removed` does not delete the `rendered` entry that precedes it. The
- * pair IS the history, and a log holding only the survivors is a log that has
- * lost the thing it was kept for.
+ * An entry is never rewritten, and a removal is a NEW entry, so `removed`
+ * does not delete the `rendered` entry that precedes it; "what happened to
+ * `STAGING/x`" is answered by reading forward.
  *
  * ## What is NOT here
  *
- * No size, no liveness. Those are the health sweep's knowledge, and
- * `health-check.yml` is `contents: read` deliberately — "It reports and never
- * acts". A log entry records an EVENT at the moment it happened; a measured
- * property that changes afterwards belongs to whatever measures it.
+ * No size, no liveness: those belong to the health sweep, which reports and
+ * never acts. A log entry records an EVENT at the moment it happened.
  */
 
 import { z } from "zod";

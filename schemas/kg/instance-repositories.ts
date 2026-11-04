@@ -1,13 +1,10 @@
 /**
- * The `owner/repo ↔ instance` map — DERIVED, never kept by hand (bean `6rmv`).
+ * The `owner/repo ↔ instance` map — DERIVED, never kept by hand.
  *
- * Owner, 2026-09-30: instance references are `owner/repo` everywhere, keyed by
- * each instance's PLANNED repository, with an `owner/repo → IRI` map
- * "dynamic generated based on overlays". Each declaration says what it is
- * (`repository`) and, pre-split, where it sits today (`livesAt`); this module
- * reads those over a checkout and over the folio's dependency overlay and
- * answers the lookups. A hand-kept table would be a second answer to the
- * question the declarations already answer, free to drift from them.
+ * Instance references are `owner/repo` everywhere, keyed by each instance's
+ * PLANNED repository. Each declaration says what it is (`repository`) and,
+ * pre-split, where it sits today (`livesAt`); this module reads those over a
+ * checkout and over the folio's dependency overlay and answers the lookups.
  *
  * Every entry keeps `name` alongside `repository` because the name is still
  * what `needs` edges, filenames and `declaredBy` resolve against; the

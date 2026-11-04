@@ -1,9 +1,7 @@
 /**
  * **The memory record**: the base every kept memory shares, and the layer a
- * bean extends (cat-harness#991 proposal §4.14, owner ruling Q17 of
- * 2026-11-03: *"bean is a memory note w/ additional structure for
- * process/role/ etc... formalize this a bit more in schema"*; option 1,
- * layered).
+ * bean extends — a bean is a memory note with additional structure for
+ * process, role and the like.
  *
  * | layer | kind | adds |
  * |---|---|---|
@@ -12,10 +10,10 @@
  * | a bean | `bean/1.0.0` (`schemas/sdlc/bean-graph.ts`) | status, type, priority, parent, blocking |
  *
  * A bean extends the core rather than `memory-record/1.0.0` itself, so the
- * bean's own file format is unchanged (no re-tagging of every bean): its
- * entries are the lines of its body that {@link parseEntryLine} reads, and its
- * scope is always `item`. The store interface is layered the same way:
- * `WorkPlanStore` extends `MemoryStore` (`src/workflow/work-plan-store.ts`).
+ * bean's own file format is unchanged: its entries are the lines of its body
+ * that {@link parseEntryLine} reads, and its scope is always `item`. The
+ * store interface is layered the same way: `WorkPlanStore` extends
+ * `MemoryStore` (`src/workflow/work-plan-store.ts`).
  *
  * The curated agent memory (the `memory` kind, "read during a process, never
  * written by one") is a different thing and stays separate.

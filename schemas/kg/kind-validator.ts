@@ -2,28 +2,16 @@
  * Resolving a graph typology's **validator** — the one parameter that turns
  * "validate a node" from one case per schema into a lookup.
  *
- * Bean `folio-assistant-i31r`, route A of `folio-assistant-3lbz`, issue #223
- * (*"must constrain Skills i/o with schemas (json,.ts)"*).
+ * Skills' inputs and outputs are constrained by schemas through one common
+ * pattern, not a Tool per Zod schema. The parameter is the **graph
+ * typology**: `harness.json` already says which directory holds which kind,
+ * and {@link GraphTypologyDef.validator} supplies the schema.
  *
- * ## Why a lookup at all
+ * A downstream instance inherits the platform's `tools/` graph but not its CI
+ * workflows, so this is how a folio built on the platform validates its own
+ * graph.
  *
- * 199 exported Zod schemas, and a Tool per schema would be 199 nodes nobody
- * invokes. The owner, 2026-09-20: *"a Tool per Zod schema... no, but there
- * should be common patterns (single pattern?) with some parameters more or
- * less"*. The parameter is the **graph typology**: `harness.json` already says
- * which directory holds which kind, so "what is this file" is already
- * answerable, and {@link GraphTypologyDef.validator} supplies the other half.
- *
- * ## The business case, since it is not this repository's
- *
- * `tools/` is a declared graph with INHERITED scope; `.github/workflows/` is
- * declared nowhere. So a downstream instance inherits the platform's Tool
- * nodes and inherits none of its 41 gates. Today folio-assistant validates
- * its own graph in CI and a folio built on it validates nothing — and #363's
- * self-sovereign topology (*"no github, local git only"*) has no CI to
- * inherit from in the first place.
- *
- * ## Three states, and the middle one is the point
+ * ## Three states
  *
  * | | |
  * |---|---|
@@ -31,11 +19,9 @@
  * | **undeclared** | the kind declares none — *could not determine*, never "valid" |
  * | **unresolvable** | it declares one that does not load — a defect, and loud |
  *
- * 13 of the 16 base kinds are `undeclared`, and one of them is `qa`, the
- * largest generated graph here. A resolver that collapsed `undeclared` into
- * success would report a clean sweep over the majority of the corpus. That
- * is the `dh4f` shape and this module refuses it structurally: the result is
- * a union, so a caller cannot read a verdict without handling the middle.
+ * Many kinds are `undeclared`, so collapsing it into success would report a
+ * clean sweep over most of the corpus. The result is a union, so a caller
+ * cannot read a verdict without handling the middle state.
  *
  * @graphNode schema
  * @module folio-assistant/schemas/kind-validator

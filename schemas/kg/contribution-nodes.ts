@@ -1,25 +1,23 @@
 /**
  * Contributions as KG nodes: a harness's QA checkers and pipeline-plugin
- * implementations, each a node in a graph of its own (bean riit, step 3b).
+ * implementations, each a node in a graph of its own.
  *
- * Owner, 2026-10-04: every contribution is a node; one graph per contribution
- * type (option 1 of 2); a folio sees the nodes of the instances it depends on
- * (option 1 of 3). `loadContributions` registers them through the same
- * `orderedDependencies` walk it finds `contributes` modules by.
+ * One graph per contribution type, and a folio sees the nodes of the
+ * instances it depends on. `loadContributions` registers them through the
+ * same `orderedDependencies` walk it finds `contributes` modules by.
  *
  * ## What a node names, and what it does not
  *
  * The DATA is the node: which criterion a checker answers, which slot a plugin
  * fills. The CODE is referenced as `path#Export`, relative to the CONTRIBUTING
  * instance's root, and the export is a TABLE keyed by the node's `criterion`
- * or `slot`. The table is the one each harness already keeps so `tsc` checks
- * every entry against the contract it fills (`PipelinePlugins`, the checker
- * signature); the node is what says the entry exists, so a criterion or slot
- * is named in data, once, and discoverable without loading code.
+ * or `slot`, so `tsc` checks every entry against the contract it fills
+ * (`PipelinePlugins`, the checker signature). The node says the entry exists,
+ * discoverable without loading code.
  *
  * A contribution's code is its OWN: an `instance:` prefix is refused. A slot
- * whose implementation still lives in a lower layer is wrapped by a module in
- * the contributing instance, as the science layer's `plugin-slots.ts` does.
+ * whose implementation lives in a lower layer is wrapped by a module in the
+ * contributing instance, as the science layer's `plugin-slots.ts` does.
  *
  * A LEAF: Zod only.
  *

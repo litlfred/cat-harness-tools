@@ -2,23 +2,11 @@
  * QA ATTESTATIONS — the judgement half of a QA verdict, kept on `main` where a
  * `git rm` of derived results cannot reach it.
  *
- * Bean `2gst` (arc `3fva`, reader audit family F1). Owner rulings that bind
- * it, 2026-10-01: **D2 (a)** — every non-script verdict stays on main; derived
- * script verdicts move to the `qa-reports` branch — and **the 26 `baseline`
- * pair attestations count as judgements**, because a regenerated baseline
- * forgets the drift it recorded (that is defect C4 in
- * `docs/proposals/qa-readers-audit-2026-10-01.md`).
- *
- * ## Why a separate tree rather than a field in the sidecar
- *
- * Until this module, `pair_attestations` and `voice_reviews` lived INSIDE the
- * `kg-qa/v1` sidecars beside script verdicts. A mixed file has no home under
- * D2: moving it to the branch takes the judgements with it, and keeping it on
- * main keeps the derived half the arc exists to move. Worse, every reader
- * treated an absent sidecar as "no attestation yet", so deleting the derived
- * tree re-baselined every pair and the `prose-reviewed-since-code-changed`
- * findings went 13 → 0 (measured, C4). Split by provenance, each half has one
- * home and the derived half can be deleted without touching the other.
+ * Every non-script verdict stays on main; derived script verdicts live on the
+ * `qa-reports` branch. `baseline` pair attestations count as judgements,
+ * because a regenerated baseline forgets the drift it recorded. Split by
+ * provenance, the derived half can be deleted without touching the
+ * judgements.
  *
  * ## Layout — ONE convention for every QA family
  *
@@ -27,13 +15,13 @@
  * └── <family>/<mirrored subject path>/<stem>.attestations.json
  * ```
  *
- * `<family>` is the derived family the judgements sit beside — `kg-qa` here,
- * `block-qa` and `translation-qa` for bean `8wj1` — and the mirror below it is
- * EXACTLY the one that family's derived tree uses, so the attestation for a
- * subject is found by swapping the tree root and the suffix, never by a second
- * path rule. A hosted instance (one with no `attestations` directory of its
- * own, audited from a host) lives under `<host>/test/attestations/<stub>/`,
- * the same three answers {@link attestationsHomeFor} shares with `kgQaHomeFor`.
+ * `<family>` is the derived family the judgements sit beside — `kg-qa`,
+ * `block-qa` or `translation-qa` — and the mirror below it is EXACTLY the one
+ * that family's derived tree uses, so the attestation for a subject is found
+ * by swapping the tree root and the suffix. A hosted instance (one with no
+ * `attestations` directory of its own, audited from a host) lives under
+ * `<host>/test/attestations/<stub>/`, the same three answers
+ * {@link attestationsHomeFor} shares with `kgQaHomeFor`.
  *
  * ## The envelope — `qa-attestations/v1`
  *
@@ -54,7 +42,7 @@
  * Entries are stored byte-for-byte as their writer produced them (same keys,
  * same order); `scripts/migrate-qa-attestations.ts` verifies that against the corpus.
  *
- * ## Five read states, and a miss is not "nothing attested" unless it is
+ * ## Five read states
  *
  * {@link readAttestationFile} answers `hit` / `miss` / `absent` / `corrupt` /
  * `unknown`, the vocabulary `scripts/qa-store.ts` uses plus `absent`:
@@ -65,29 +53,24 @@
  *   had one.
  * - `unknown` — the store path is there and could not be read.
  * - `corrupt` — the file is there and does not parse or validate. Never `[]`,
- *   and never overwritten: the next writer refuses it (the `de9k` leftover,
- *   which C1's conflict markers made live).
+ *   and never overwritten: the next writer refuses it.
  *
- * ## Auto-move on first save (owner ruling 2, 2026-10-01)
+ * ## Auto-move on first save
  *
  * On `miss` or `absent`, a WRITER looks at the prior derived file before it
- * treats the subject as first sight. Judgements still inside that file have no
- * store entry, so the writer MOVES them into the store as it saves — it does
- * not refuse and wait for a manual migration. The store file is written
- * before the derived one, and on `kg-qa` the derived sidecar it then writes
- * carries no judgement. `absent` was `unknown`, a refusal, until that ruling.
+ * treats the subject as first sight. Judgements still inside that file are
+ * MOVED into the store as it saves. The store file is written before the
+ * derived one, and on `kg-qa` the derived sidecar it then writes carries no
+ * judgement.
  *
- * What still refuses: `corrupt` and `unknown` — a writer cannot tell what an
- * unreadable file held, so it writes nothing and exits non-zero — and a prior
- * derived file that cannot be parsed while the store has no entry, for the
- * same reason. A `hit` is the source: the prior derived file is never read for
- * judgements then.
+ * What still refuses (writes nothing, exits non-zero): `corrupt` and
+ * `unknown`, and a prior derived file that cannot be parsed while the store
+ * has no entry. On a `hit` the store is the source: the prior derived file is
+ * never read for judgements. If a store and a prior derived file are BOTH
+ * gone, nothing can say a judgement existed; the store is committed on main,
+ * so its deletion is a diff a reviewer sees.
  *
- * One case no rule can see: a store AND a prior derived file that are BOTH
- * gone. Nothing is left to read, so nothing can say a judgement existed. The
- * store is committed on main, so its deletion is a diff a reviewer sees.
- *
- * ## The other two families: `block-qa` and `translation-qa` (bean `8wj1`)
+ * ## `block-qa` and `translation-qa`
  *
  * Their judgements are `criteria` entries whose `reviewer.kind` is not
  * `script` — an agent's adjudication or a human ruling. Their member of the
@@ -99,11 +82,10 @@
  * built from); `translation-qa` adds `locale`.
  *
  * Unlike `kg-qa`, a derived block or translation report still carries a
- * PROJECTION of its judgements, because ~30 readers (and the published site)
+ * PROJECTION of its judgements, because readers (and the published site)
  * take `criteria[id][0]` as the operative verdict. A writer composes that
  * projection from the store ({@link resolvePrior}, {@link finalizeCriteria});
- * it is never the source once the store holds the subject. Retiring the
- * projection is reader work for bean `5hox`, not a writer's.
+ * it is never the source once the store holds the subject.
  *
  * @module schemas/qa-attestations
  * @graphNode schema

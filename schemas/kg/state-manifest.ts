@@ -1,22 +1,15 @@
 #!/usr/bin/env bun
 /**
  * The ROOT MANIFEST of a special branch — what the branch is, where it came
- * from, and whether it is the store or a copy. Bean `esz4`.
+ * from, and whether it is the store or a copy.
  *
- * Owner, 2026-10-03: *"make sure each of the special branches has a read me
- * file explaining what they are how they are generated when they were
- * generated, etc. … that should be in KG too"*. The facts a README states that
- * a reader cannot recover from the branch's files — its status, the commit it
- * was seeded from, when, and how it is written — are already written down, in
- * the root `manifest.json` every `state-manifest/v1` branch carries. Until this
- * module that file had no schema: `branch-store.ts` checked `$schema` and
- * `keyedBy` and nothing else, so two branches could spell the same fact two
- * ways and both pass. This is the field set, declared once, so a README can be
- * RENDERED from it (`branch:readme`) rather than kept by hand beside it.
+ * Every `state-manifest/v1` branch carries a root `manifest.json` stating the
+ * facts a reader cannot recover from the branch's files: its status, the
+ * commit it was seeded from, when, and how it is written. This is that field
+ * set, so the branch README is RENDERED from it (`branch:readme`) rather than
+ * kept by hand.
  *
  * ## Two shapes, discriminated by the keying
- *
- * Measured over every `cat/*` branch on litlfred/folio-assistant, 2026-10-12:
  *
  * | keyedBy | branches | carries |
  * |---|---|---|
@@ -26,7 +19,7 @@
  * They differ because the WRITE differs (`subgraph-source.ts`): a tip-keyed
  * branch is somebody's state, seeded once from `main` and then edited; a
  * route-keyed one is regenerable output with one named generator and the gate
- * that checks it. A shape that forced one onto the other would invent a field.
+ * that checks it.
  *
  * `qa-reports` is commit-keyed and carries no manifest at all; it is not a
  * `state-manifest/v1` branch, and its README is rendered from its declaration
@@ -34,10 +27,9 @@
  *
  * ## Extra keys are kept, not refused
  *
- * `cat/cat-harness/state` is RETIRED and its manifest records why
- * (`retiredAt`, `retiredReason`, `supersededBy`) alongside `_comment`-style
- * notes. Those are the record of a decision; a schema that stripped or refused
- * them would make the retirement unreadable. So both shapes are `passthrough`.
+ * Both shapes are `passthrough`, so recorded notes such as a retired branch's
+ * `retiredAt`, `retiredReason`, `supersededBy` and `_comment` entries
+ * survive.
  *
  * @module cat-harness/schemas/state-manifest
  * @graphNode schema

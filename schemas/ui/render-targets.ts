@@ -2,44 +2,24 @@
  * Which render target a content profile validates against — declared as data,
  * resolved at runtime.
  *
- * ## The defect this replaces
+ * `pipeline/validate.ts` Phase 3 ("AST validation (render → parse)") renders
+ * each block to its profile's target, not to LaTeX for everyone: a document
+ * folio's render path takes no TeX, and the LaTeX renderer belongs to the
+ * science layer, which the generic validator must not name.
  *
- * `pipeline/validate.ts` Phase 3 is "AST validation (render → parse)",
- * and it read:
+ * ## A table, not an import
  *
- * ```ts
- * const latex = renderBlock(block, mdContent);
- * const astResult = validateLatexAst(latex);
- * ```
- *
- * The GENERIC validator, rendering every block to LaTeX. That is wrong twice:
- *
- * 1. **On a document folio it is a category error.** `AGENTS.md` is explicit
- *    that the document render path takes no TeX — `render-markdown.ts`
- *    assembles one Markdown file and `document_render_*` takes it through
- *    pandoc, never falling back to `latexmk`, deliberately, so that a PDF
- *    cannot silently misreport what the folio needs to build. A `LaTeX AST:`
- *    error raised against output the folio will never produce is noise a
- *    document author cannot act on.
- * 2. **It is a wrong-direction dependency.** The LaTeX renderer belongs to the
- *    science layer, and the generic validator naming it is core → sci.
- *
- * ## Why a table and not an import
- *
- * The same reasoning as `pipeline/qa-checker-discovery.ts`: a module
- * path held as DATA is resolved with a variable specifier, so this file
- * depends on neither renderer and `repo-partition` records no edge. The
- * platform's own targets are declared here for the same reason the platform's
- * own block kinds are declared in `block-kinds.ts` — a dependency contributes
- * *additional* targets through `RendererContribution`, and the built-ins are
- * not a special case of that mechanism but the thing it extends.
+ * As in `pipeline/qa-checker-discovery.ts`, a module path held as DATA is
+ * resolved with a variable specifier, so this file depends on neither
+ * renderer and `repo-partition` records no edge. The platform's own targets
+ * are declared here (as its block kinds are in `block-kinds.ts`); a
+ * dependency contributes *additional* targets through
+ * `RendererContribution`.
  *
  * ## No target is a real state
  *
  * A profile absent from this table has **no structural check**, and a caller
- * must report that as not-checked rather than as a pass. Same rule as
- * `readme-sections`' third state and `ci-health`'s: "could not determine" is
- * never rendered as green.
+ * must report that as not-checked rather than as a pass.
  *
  * @module schemas/render-targets
  * @graphNode schema

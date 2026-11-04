@@ -1,16 +1,13 @@
 /**
  * Per-script QA report schema.
  *
- * Where `folio-assistant/schemas/block-qa.ts` audits **content
- * blocks** (`.ts` + `.md` + optional `.lean` triples under
- * `content/`), this schema audits **scripts** — Python files under
- * `folio-assistant/computations/`, TypeScript files under
- * `pipeline/`, and (later) Rust files under any compiled
- * compute backend. Criteria like `does_not_default_to_float` and
- * `respects_archimedean_wall` apply to script source code; they
- * have no meaning for narrative `.md` content, so they live in
- * this dedicated subject-axis sidecar rather than being shoehorned
- * into block sidecars.
+ * Where the block-QA schema audits **content blocks** (`.ts` + `.md` +
+ * optional `.lean` triples under `content/`), this schema audits
+ * **scripts** — Python files under `folio-assistant/computations/`,
+ * TypeScript files under `pipeline/`, and (later) Rust files under any
+ * compiled compute backend. Criteria like `does_not_default_to_float` and
+ * `respects_archimedean_wall` apply to script source code and have no meaning
+ * for narrative `.md` content.
  *
  * Layout:
  *
@@ -19,10 +16,8 @@
  *
  * One sidecar per script, sitting in a `script-qa/` subdirectory of
  * the script's parent dir. Mirrors the per-block `<block>.qa.json`
- * convention but keeps script-QA bookkeeping clearly separated from
- * `*.witness.json` (compute outputs) and `*.script.json` (per-
- * criterion checker version pins from
- * `pipeline/script-sidecars/`).
+ * convention but stays separate from `*.witness.json` (compute outputs)
+ * and `*.script.json` (per-criterion checker version pins).
  *
  * @module schemas/script-qa
  * @graphNode schema

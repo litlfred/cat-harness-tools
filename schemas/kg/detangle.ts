@@ -4,99 +4,48 @@
  * @module schemas/detangle
  * @graphNode schema
  *
- * ## The criterion, in the owner's words
+ * ## The criterion
  *
- * 2026-09-20:
+ * A candidate subgraph is a large collection of thematically related content
+ * that the rest of the graph references while it references little outside
+ * itself: a near-**sink**, arrows mostly one way. That is **not** a small cut:
+ * ten edges in and ten out cannot be lifted, fifty in and zero out lifts
+ * cleanly. A near-sink is a node set with no wrong-direction edges out of it.
  *
- * > *"candidate subgraph = large collection of thematiactally related content
- * > that is diconnected (maybe some light detagling) from other parts of the
- * > KG. (part of larger process detangle knwoedlge graph. look in lean, paper
- * > layout for related. generalize, make subprocess, deangle heuristics...)"*
+ * ## Four numbers
  *
- * and, sharpening it:
- *
- * > *"other parts of graph are only referencing it... arrows mostly one way."*
- *
- * That second sentence is the one that turns a vague "disconnected" into
- * something checkable, and it is **not** the same as a small cut. A candidate
- * is a near-**sink**: the rest of the graph depends on it, and it depends on
- * almost nothing outside itself. A cluster with ten edges in and ten out has a
- * cut of twenty and cannot be lifted; one with fifty in and zero out has a cut
- * of fifty and lifts cleanly. **Cut size alone gets this backwards.**
- *
- * The same asymmetry is already encoded one graph over, in
- * `scripts/repo-partition.ts`'s `ALLOWED` table — each repo may import itself
- * plus its ancestors, and everything else is a "wrong-direction edge". A
- * near-sink is exactly a node set with no wrong-direction edges out of it.
- *
- * ## Four numbers, and only three of them are about size
- *
- *   - **size** — |S|. "Large" is in the definition; a two-node candidate is a
- *     file move and does not need a declaration.
- *   - **cohesion** — internal / (internal + boundary). "Thematically related"
- *     is a hypothesis; cohesion is the evidence for it. A directory whose files
- *     never reference each other is a folder, not a subgraph.
- *   - **inbound** — edges from the rest into S. High is GOOD: it is what makes
- *     the subgraph worth naming rather than deleting.
+ *   - **size** — |S|. A two-node candidate is a file move and does not need a
+ *     declaration.
+ *   - **cohesion** — internal / (internal + boundary): the evidence for
+ *     "thematically related". A directory whose files never reference each
+ *     other is a folder, not a subgraph.
+ *   - **inbound** — edges from the rest into S. High is GOOD.
  *   - **outbound** — edges from S to the rest. **This is the one that must be
  *     near zero**, and every outbound edge is an item on the detangling
  *     worklist.
  *
- * `oneWayness = inbound / (inbound + outbound)` collapses the last two, and is
- * reported ALONGSIDE them rather than instead: 1.0 from `5/(5+0)` and 1.0 from
- * `500/(500+0)` are the same ratio and very different facts.
+ * `oneWayness = inbound / (inbound + outbound)` is reported ALONGSIDE the
+ * counts, never instead: 1.0 from `5/(5+0)` and from `500/(500+0)` are very
+ * different facts.
  *
- * ## The cut classification is the actual work
+ * ## The cut classification
  *
- * The numbers say whether to look; the classification says what it would cost.
- * Every outbound edge is one of three things and only the first is free —
- * mirroring `repo-partition.ts`'s own worklist, whose entries are "a module
- * that must move, a dependency that must invert, or a documented exception".
+ * Every outbound edge is a module that must move, a dependency that must
+ * invert, or a documented exception — only the first is free. An edge whose
+ * kind cannot be determined is `unclassified` and counted separately, never
+ * quietly called essential.
  *
- * ## Three states, not two
+ * ## Nothing here decides — judgement is a declared step
  *
- * Taken verbatim from `repo-partition.ts`, and for the same reason it gives:
- * *"A module this tool cannot classify is reported as `unassigned`, never
- * silently bucketed into core… collapsing the two is how a wrong partition
- * looks like a clean one."* An edge whose kind cannot be determined is
- * `unclassified` and is counted separately — it is never quietly called
- * essential, because an unclassified edge is a question and an essential one
- * is an answer.
+ * This module is a **mechanical reviewer** (the severity/weight split of
+ * `schemas/sdlc/qa-review.ts`). It emits {@link DetangleFinding} with a
+ * `script` reviewer and a `severity`, and has no opinion about whether to
+ * carve. The carve is a `Decision` by a human or agentic adjudicator, which
+ * may **overrule** any finding; the numbers make that decision reviewable
+ * ("carved anyway, cohesion 0.31, because X").
  *
- * ## Nothing here decides anything — taste is a declared step
- *
- * The owner, correcting a first draft of this module that had set "measured"
- * against "chosen by taste":
- *
- * > *"taste matters as judgement=human/agentic adjudication."*
- *
- * That is not a softening, it is the repository's existing model, and this
- * module was briefly at odds with it. `schemas/sdlc/qa-review.ts` already separates
- * the two axes and says why: a `severity` is what a script can compute, a
- * `weight` is what only a reviewer with judgement can assign, and *"Only a
- * reviewer with judgement can speak here; a checker cannot, which is exactly
- * why this axis exists alongside the other."* `role-model.md` draws the same
- * line between an agentic actor and a mechanical one — *"an agent exercises
- * judgement; a mechanical system executes a procedure"*.
- *
- * So this module is a **mechanical reviewer**. It emits {@link DetangleFinding}
- * with a `script` reviewer and a `severity`, and it has no opinion about
- * whether to carve. The carve is a `Decision` by a human or agentic
- * adjudicator, in the shape `qa-review.ts` already defines, and it may
- * **overrule** any finding here — a theme a scanner cannot see is a real
- * reason, and so is a boundary somebody intends to enforce before the edges
- * exist to prove it.
- *
- * What the numbers buy is not authority. It is that the adjudication becomes
- * **reviewable**: "carved anyway, cohesion 0.31, because X" is a durable claim
- * somebody can disagree with later, and "it felt right" is not. Same argument
- * `kg:audit` makes for writing sidecars instead of printing a verdict — a
- * printed objection is gone, and "nobody raised this" and "somebody raised it
- * and it was answered" become indistinguishable.
- *
- * Consequently a failing clause is **never** a refusal. `failingClauses`
- * returns the clauses, not a boolean, precisely so the adjudicator can answer
- * them one at a time.
+ * So a failing clause is **never** a refusal: `failingClauses` returns the
+ * clauses, not a boolean, so the adjudicator can answer them one at a time.
  */
 import type { DirectionVerdict } from "./layer-direction.js";
 

@@ -1,12 +1,10 @@
 /**
- * Test data sets (fixed and generated) and SME review case/verdict pairs —
- * beans `folio-assistant-vm6m` and `folio-assistant-vljz`, issue #363,
- * proposal `docs/proposals/qa-reports-branch-and-test-process-2026-10-01.md` §3.2.
+ * Test data sets (fixed and generated) and SME review case/verdict pairs.
  *
  * @module schemas/test-data
  * @graphNode schema
  *
- * ## Why fixed and generated sets are separate node kinds in separate directories (`vm6m`)
+ * ## Fixed and generated sets are separate node kinds
  *
  * A test plan (`test-plan/v1`, `schemas/sdlc/test-plan.ts`) binds each case to test
  * data of one of two kinds, and the two do NOT have the same audit standing:
@@ -21,10 +19,8 @@
  *   (`contentType`, `specialisation`, `template`, `params`, `seed`, and the
  *   canonical `sha256` digest of that recipe). It is **never stored
  *   materialised**: a test run synthesises the records from the recipe at
- *   execution time and records the recipe's digest on `folio-test-run/v1`.
- *   Keeping a thousand generated records in git makes every template edit an
- *   unreviewable diff and invites hand-patching one generated file so the
- *   suite tests an artefact the generator can no longer produce.
+ *   execution time and records the recipe's digest on `folio-test-run/v1`,
+ *   so no generated file can be hand-patched away from its generator.
  *
  * The two kinds live in separately declared graph directories
  * (`test-data-fixed` vs `test-data-generated`), AND each file carries both its
@@ -32,7 +28,7 @@
  * discriminator. A consumer (`discriminateTestDataSet`) tells which it is
  * reading from the **file content**, never from the directory path.
  *
- * ## Per-content-type specialisation — FHIR templating is one specialisation, not the design (`vm6m`)
+ * ## Per-content-type specialisation
  *
  * How a recipe synthesises records or how a fixed set's payload is structured
  * depends on the folio's `contentType`. The general curation workflow
@@ -49,7 +45,7 @@
  * Nothing in this schema hardcodes FHIR resources or DAK fields at the platform
  * layer.
  *
- * ## SME review of decision support and indicator definitions (`vljz`)
+ * ## SME review of decision support and indicator definitions
  *
  * For domain logic — clinical or scientific decision-support rules and
  * indicator definitions — "passing" means a subject-matter expert agrees the
@@ -67,11 +63,10 @@
  *
  * Every `sme-case-verdict/1.0.0` node records the **SME's attributable human
  * identity** (`reviewer`: `kind: "human"`, `provider`, `handle`, `role`) and
- * the **review date** (`reviewedAt`), because an audited review without an
- * attributable reviewer and date is not audited. The review is governed by
- * `sdlc/processes/sme-test-data-review.bpmn`, where the SME sits in a lane
- * whose role (`clinical-sme`) is `judgementOnly: true` — no procedure yields
- * the answer, which is the whole reason a person is in the lane.
+ * the **review date** (`reviewedAt`), because a review without them is not
+ * audited. The review is governed by `sdlc/processes/sme-test-data-review.bpmn`,
+ * where the SME sits in a lane whose role (`clinical-sme`) is
+ * `judgementOnly: true` — no procedure yields the answer.
  */
 import { createHash } from "node:crypto";
 import { z } from "zod";

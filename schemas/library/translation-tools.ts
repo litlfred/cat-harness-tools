@@ -7,7 +7,7 @@
  * po-resolve) and the content-type-specific scripts ported from
  * WHO's SMART Base repository.
  *
- * ## Architecture (issue #223 separation of concerns)
+ * ## Architecture
  *
  * ```
  * adapters/<type>/tools/translation.ts  — adapter-specific extract/inject
@@ -24,9 +24,8 @@
  * ## Which content types are translatable
  *
  * Not listed here. Each instance that owns a content type declares its
- * profile under `contentTranslations` in its own `<instance>.json` (bean
- * `0r7u`), and {@link CONTENT_TYPE_TRANSLATIONS} collects whatever instances
- * are present.
+ * profile under `contentTranslations` in its own `<instance>.json`, and
+ * {@link CONTENT_TYPE_TRANSLATIONS} collects whatever instances are present.
  *
  * @module schemas/translation-tools
  * @graphNode schema

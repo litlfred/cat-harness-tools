@@ -1,34 +1,23 @@
 /**
  * The agent activity log — what an agent did, when, and in which process.
  *
- * Owner, 2026-09-19: *"an agent whenever it starts or ends a task or has a
- * log message, they should add an entry to a log entry in the trash […] by
- * default commit audit log to git data store is turned off."*
- *
- * Entries live under `fsh-guts/logs/`. That placement is the whole reason
- * they are safe to write freely: `fsh-guts` is stripped from every published
- * graph (`UNPUBLISHED_GRAPH_TYPOLOGIES`, bean `folio-assistant-uv09`), so a log
- * cannot leak into the folio's linked data however verbose it gets.
+ * An agent adds an entry whenever it starts or ends a task or has a log
+ * message. Entries live under `fsh-guts/logs/`. `fsh-guts` is a kind kept out
+ * of every published graph, so a log cannot leak into the folio's linked data
+ * however verbose it gets.
  *
  * ## Persistence is OFF by default, and that is not the same as "no log"
  *
- * `fsh-guts/logs/` sits inside the repository, so writing there would be
- * committing unless something stops it. The default is **write locally,
- * ignored by git**: the agent can read back what it wrote this session, and
- * nothing reaches the data store until a workflow or the config asks for it.
+ * The default is **write locally, ignored by git**: the agent can read back
+ * what it wrote this session, and nothing reaches the data store until a
+ * workflow or the config asks for it.
  *
- * **The state must be reported, never assumed.** A logging system that
- * silently keeps nothing is worse than none, because the agent believes it
- * has an audit trail and acts accordingly. `LogCapture` is therefore a
- * three-valued answer rather than a boolean — see below.
+ * The state must be reported, never assumed, so the agent never believes it
+ * has an audit trail it lacks: `LogCapture` is a three-valued answer rather
+ * than a boolean.
  *
- * ## Why a schema at all
- *
- * The same contract every other store here uses: a directory says what to
- * EXPECT and the files declare what they ARE. Without `$schema` on the file,
- * a log entry would be told apart from a discarded proposal by its directory
- * alone, which is the "coincidence of the current layout, not a contract"
- * problem `#263` named and the bean and workflow stores already fixed.
+ * Each file carries `$schema`, so a log entry is identified by what it
+ * declares, not by its directory.
  *
  * @module schemas/log-entry
  * @graphNode schema

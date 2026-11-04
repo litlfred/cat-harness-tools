@@ -1,14 +1,6 @@
 /**
  * Contribution registry — what a folio-assistant *dependency* may add to the
- * root instance.
- *
- * Phase 0.1 of the separation-of-concerns migration (issue #223). Until this
- * existed, `dependencies.folioAssistant` resolved translations and nothing
- * else: the model was explicit that schemas and MCP tools come "always from
- * the root folio-assistant". That is fine for one platform and fatal for the
- * proposed five-repo split, because `folio-asst-sci` exists precisely to own
- * the math block kinds, the paper adapter and the Lean tools. A dependency
- * that can contribute none of them can only ship prose.
+ * root instance: block kinds, adapters and MCP tools, not only translations.
  *
  * ## Shape: load-time registration
  *
@@ -19,37 +11,21 @@
  * ```
  *
  * That module's default export is called as the root walks the dependency
- * tree, and returns what it adds. Load ORDER is therefore significant, which
- * is the acknowledged cost of this shape over a manifest that is validated
- * before anything loads.
+ * tree, and returns what it adds. Load ORDER is therefore significant.
  *
  * **Collisions do not resolve by order.** A kind claimed by two contributors
- * throws, naming both. Last-writer-wins would make `adapterForKind` ambiguous
- * — the one property `schemas/content/block-kinds.ts` states it must keep — and would
- * make the ambiguity depend on the order dependencies happen to be listed in,
- * which is exactly the failure that is hardest to reproduce from a bug report.
+ * throws, naming both, so `adapterForKind` stays unambiguous (as
+ * `schemas/content/block-kinds.ts` requires).
  *
- * ## Why the diamond is not a collision
+ * **The diamond is not a collision.** A depth-first walk can reach the same
+ * dependency twice; registering the same contribution twice from the same
+ * contributor is a no-op.
  *
- * The proposed dependency graph is a diamond: `<DAK layer> → smart-kg → core`
- * and `folio-asst-sci → core`, so a depth-first walk reaches `core` twice.
- * Registering the same contribution twice from the same contributor is
- * therefore a **no-op**, not an error. Without that rule every realistic
- * dependency tree would throw a false collision on its first load — and the
- * obvious fix (dropping the collision check) is the one that must not be made.
- *
- * ## Why this module is in `schemas/` and not `src/core/`
- *
- * It is about the content model — which kinds exist and which adapter owns
- * them — so it belongs with the model. Putting it under `src/` would have
- * added another `agentic-harness → folio-assist-core` import, already the
- * largest wrong-direction group in `bun run cat check:partition` (20 edges). A
- * mechanism built to enable the split should not deepen the thing the split
- * has to undo.
- *
- * MCP tool contributions are carried as opaque registrar callbacks for the
- * same reason: this module never imports the MCP SDK, so the server type does
- * not leak into the content model.
+ * The module lives in `schemas/` because it is about the content model;
+ * under `src/` it would add a wrong-direction edge to
+ * `bun run cat check:partition`.
+ * MCP tool contributions are opaque registrar callbacks, so this module never
+ * imports the MCP SDK.
  *
  * @module schemas/contributions
  * @graphNode schema

@@ -1,27 +1,22 @@
 /**
  * The JSON-LD nodes a library entry holds: its `manifest.jsonld` (a
  * SourceDocument), its sections and sheets (`doco:Section`) and its blocks.
- *
  * `cat-harness-tools/pipeline/gen-library-jsonld.ts` and `tabular-nodes.ts`
- * write them, and until these schemas nothing checked what they wrote: 61
- * blocks of one instance's library sat with no `@type` for a day, because
- * they were generated before the block-kind nodes that name a block's types
- * were mounted (litlfred/aai-programme, 2026-10-21).
+ * write them.
  *
  * ## How a node is routed here
  *
- * JSON-LD nodes carry no `$schema` (one in 5,824 in this repository does), so
- * the family is the content-model class the node instantiates
- * ({@link libraryNodeClass}): a `SourceDocument` by its `@type`; a `Block` by
- * the block `kind` it carries, since its own `@type` is the instance's class
- * for that kind (`folio-assistant-core:Prose`) and this layer cannot read the
- * block-kind nodes that name it; and a section by `@type` exactly
- * `doco:Section`, which a prose block also carries as its second type.
+ * JSON-LD nodes carry no `$schema`, so the family is the content-model class
+ * the node instantiates ({@link libraryNodeClass}): a `SourceDocument` by its
+ * `@type`; a `Block` by the block `kind` it carries, since its own `@type` is
+ * the instance's class for that kind (`folio-assistant-core:Prose`) and this
+ * layer cannot read the block-kind nodes that name it; and a section by
+ * `@type` exactly `doco:Section`, which a prose block also carries as its
+ * second type.
  *
- * Whether a block's types are the ones its block-kind node names is not
- * checked here, because those nodes live in the layer above. It is checked
- * where they are read: `gen-library-jsonld.ts --check` regenerates each block
- * from its block-kind node and reports any that differ.
+ * Whether a block's types are the ones its block-kind node names is checked
+ * where those nodes are read: `gen-library-jsonld.ts --check` regenerates each
+ * block from its block-kind node and reports any that differ.
  *
  * ## Strict, except the manifest's licence keys
  *

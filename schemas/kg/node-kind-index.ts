@@ -1,15 +1,10 @@
 /**
- * Every node kind a checkout declares, found THROUGH the graph typologies —
- * issue #2195, PR 1.
+ * Every node kind a checkout declares, found THROUGH the graph typologies.
  *
  * @module cat-harness/schemas/node-kind-index
  * @graphNode none — a function library over the typology registry; it defines no schema
  *
  * ## Two concepts, no third
- *
- * The owner, 2026-10-05, on a proposed JSON `node-kinds/` graph: *"i thought
- * we consolidated to two kinds? why a third? i thought node kind = tpyscpt
- * kind."* So:
  *
  * - a **graph typology** is what a DIRECTORY holds — its `$schema` families
  *   (`nodeSchemas`), each naming the TypeScript that validates it;
@@ -18,34 +13,27 @@
  *
  * This module joins them and adds nothing: where a family's (or a typology's)
  * `validator` names a `nodeKind()` export, that kind is the family's node kind.
- * There is no list of kinds to keep, because the typologies already list every
- * family a directory holds, and no source scan, because a scan finds kinds that
- * hold nothing.
+ * There is no list of kinds to keep and no source scan.
  *
  * ## The declaring harness is not written down
  *
  * It is the instance the validator ref names — `core:schemas/x.ts#XKind` is
  * declared by `core` — or, for an unqualified ref, the instance the ref
- * resolves against (cat-harness). A second field saying the same thing would
- * be free to disagree with the path.
+ * resolves against (cat-harness).
  *
  * ## UNKINDED is a third state, not a failure
  *
- * Most families predate node kinds: their validator is a bare Zod schema, or
- * they name none. Each is reported as unkinded with the reason, so the gate can
- * hold the existing ones as a baseline and fail only on a NEW one — the owner's
- * *"QA check on new kinds"*.
+ * A family whose validator is a bare Zod schema, or that names none, is
+ * reported as unkinded with the reason, so the gate holds existing ones as a
+ * baseline and fails only on a NEW one.
  *
- * ## One baseline per layer, and the table built at publish
+ * ## One baseline per layer
  *
- * Owner, 2026-10-15 (option 2 of the node-kinds ruling). The baseline was the
- * `unkinded` half of `docs/_data/node-kinds.json`, one cat-harness file spanning
- * every layer: it went stale at every re-pin, and it named the families of
- * layers above this one. Now each family is OWNED by the instance that declares
- * its typology ({@link typologyOwner}), each instance keeps its own families in
- * a declared asset of role `unkinded-baseline` ({@link UnkindedBaselineKind}),
- * and {@link ratchet} judges each instance against its own. The combined table
- * is still written, for the node-kind pages, but at publish (cat-harness's
+ * Each family is OWNED by the instance that declares its typology
+ * ({@link typologyOwner}), each instance keeps its own families in a declared
+ * asset of role `unkinded-baseline` ({@link UnkindedBaselineKind}), and
+ * {@link ratchet} judges each instance against its own. The combined table
+ * for the node-kind pages is built at publish (cat-harness's
  * `builtAtPublish`), never committed.
  */
 import { existsSync } from "node:fs";

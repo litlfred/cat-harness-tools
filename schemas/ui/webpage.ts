@@ -2,20 +2,15 @@
  * `webpage` — a published documentation page, modelled as a graph node that
  * composes other nodes.
  *
- * WHY THIS IS A STRUCTURAL TYPE AND NOT A 16th `BlockKind`.
+ * WHY THIS IS A STRUCTURAL TYPE AND NOT A NEW `BlockKind`.
  *
- * `AGENTS.md` prices a new block kind exactly: "a builder, a Zod schema, a
- * label prefix, viewer registration, constraint rows and QA criteria — about
- * thirty files". It also records that the repo has already declined that price
- * once: there is no `recommendation` kind, and a normative statement is carried
- * by a labelled, titled `prose` block instead.
- *
- * A page is not a new KIND of content. It is a new way of COMPOSING content,
- * which is what `Chapter` and `Section` already are. So `WebPage` sits beside
- * them: its children are ordinary `prose` / `table` / `diagram` blocks, which
- * already have builders, Zod schemas, JSON-LD projection and a `--check` gate.
- * Nothing here touches `BLOCK_KINDS`, the `Block` union, its exhaustiveness
- * proof, or the viewer registry.
+ * A new block kind costs about thirty files (builder, Zod schema, label
+ * prefix, viewer registration, constraint rows, QA criteria). A page is not a
+ * new KIND of content; it is a new way of COMPOSING content, like `Chapter`
+ * and `Section`. So `WebPage` sits beside them: its children are ordinary
+ * `prose` / `table` / `diagram` blocks, and nothing here touches
+ * `BLOCK_KINDS`, the `Block` union, its exhaustiveness proof, or the viewer
+ * registry.
  *
  * WHAT IT ADDS THAT `Section` DOES NOT HAVE.
  *
@@ -25,19 +20,15 @@
  *
  *   - a STABLE ID per node, independent of the heading text. The docs site runs
  *     `heading_anchors: true`, which derives `#extract-structure` from the
- *     heading's words — so retitling a section silently breaks every inbound
- *     link, including the subprocess links `render-bpmn.ts` derives from an
- *     asset's `source` (bean `xl55`; they were hand-authored on the BPMN
- *     sources until then). An explicit id is what the
- *     emitter pins with kramdown's `{: #id }`, and what a graph node's `@id`
- *     is minted from.
+ *     heading's words, so retitling a section would break every inbound link,
+ *     including the subprocess links `render-bpmn.ts` derives from an asset's
+ *     `source`. An explicit id is what the emitter pins with kramdown's
+ *     `{: #id }`, and what a graph node's `@id` is minted from.
  *   - an ASSET as a first-class child, with its own title, its own narrative
- *     and — critically — its own EDIT TARGET. A BPMN figure's source of truth
- *     is the `.bpmn`; the `.svg` beside it is generated and must never be
- *     hand-edited. A per-node edit link that pointed at the SVG would be
- *     actively wrong.
- *   - a NAV SLOT. `nav_order` / `parent` are just-the-docs front matter and are
- *     not modelled anywhere in the schema today; they are hand-written.
+ *     and its own EDIT TARGET. A BPMN figure's source of truth is the `.bpmn`;
+ *     the `.svg` beside it is generated and must never be hand-edited, so an
+ *     edit link must not point at the SVG.
+ *   - a NAV SLOT: `nav_order` / `parent`, just-the-docs front matter.
  * @graphNode schema
  */
 

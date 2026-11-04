@@ -1,22 +1,17 @@
 /**
  * Projected reads: a reader that uses only part of a file says so, and a
- * writer's record keeps only that part (owner card Q-SPD-9b A, 2026-11-01).
+ * writer's record keeps only that part.
  *
  * @module schemas/sdlc/read-projections
  * @graphNode none — a table of pure functions and the hook that reports them
  *
- * ## Why
- *
  * A writer's record (`writer-cone.ts`) keeps the content digest of every file
  * its traced run opened. Some files are opened by nearly every writer and used
- * for almost nothing: instance discovery opens every `*.json` beside a
- * declaration only to read its `name` (`build/qa-refresh.json`, a report that
- * moves on every run), the nested-declaration walk opens `docs/todos.json`
- * only for its `directories` (that file is a generated JSON-LD export with
- * none), and `contentAt` opens every mount marker only for where the mount
- * lives (`.git/branch-mounts/beans.json` also lists a blob per bean, so it
- * moves whenever any bean does). In fa#2867's preview, 41 of 43 writers ran,
- * and those three files were the first reason given for 15 of them.
+ * for almost nothing, e.g. every `*.json` beside a declaration read only for
+ * its `name` (`build/qa-refresh.json`), `docs/todos.json` read only for its
+ * `directories`, and a mount marker such as `.git/branch-mounts/beans.json`
+ * read only for where the mount lives. Their whole digest would make writers
+ * re-run when an unused part changes.
  *
  * ## The rule
  *
@@ -25,13 +20,11 @@
  * input trace (`input-trace.ts`). The writer's record then stores
  * `proj <name> <digest of the projection>` for that file instead of its whole
  * digest, but only when every open of the file in the strace trace is matched
- * by a report. A file that is also opened by code that did not report it (to
- * read a declaration it found, say) keeps its whole digest. So a projection
- * can only narrow the reads it covers, and it covers only the code that names it.
+ * by a report. A file that is also opened by code that did not report it keeps
+ * its whole digest, so a projection covers only the code that names it.
  *
  * A projection must return everything its reader derives from the file. It is
- * reviewed like an `inert` input-site annotation: it is a claim about the code
- * beside it, and a wrong one is a wrong skip.
+ * reviewed like an `inert` input-site annotation: a wrong one is a wrong skip.
  */
 import { createHash } from "node:crypto";
 import { appendFileSync } from "node:fs";

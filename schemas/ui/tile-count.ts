@@ -1,90 +1,49 @@
 /**
  * The number a graph tile shows, DECLARED BY THE PROJECTION.
  *
- * ## Why this is declared and not computed
+ * ## Declared, not computed
  *
- * `graph-tiles.ts` builds a tile from the DECLARATION and never from the
- * projection — `flh4`, where *"no projection at my path"* had been collapsed
- * into *"nothing renders this"*, two different facts. A badge has to read the
- * projection, so the split is restated rather than crossed: a tile's
- * EXISTENCE stays declaration-derived, and only its NUMBER is read from here.
- * A live projection with no declared visualiser is still a finding, not a
- * tile.
+ * `graph-tiles.ts` builds a tile from the DECLARATION, never from the
+ * projection: a tile's EXISTENCE stays declaration-derived, and only its
+ * NUMBER is read from here. A live projection with no declared visualiser is
+ * still a finding, not a tile.
  *
- * The number itself is declared rather than inferred because **there is no
- * uniform entry count**. Measured across every projection this site published
- * on 2026-09-22:
- *
- * | projection | arrays it holds |
- * |---|---|
- * | `beans` | `items` 459, `findings` 7 |
- * | `library` | `entries` 8, `uploads` 28, `queues` 3 |
- * | `qa` | `families` 7, plus `files`, `unclassified`, `unreadable` |
- * | `schemas` | `roots` 5, `modules` 121, `decls` 842, `edges` 525 |
- * | `todos` | `items` 3 |
- * | `voices` | `directories` 4, `voices` 5 |
- *
- * `schemas` has four plausible answers and `library` three. Worse, `uploads`'
- * meaningful number is not an array length at all — it is WAITING, 20 of 28,
- * and that distinction is the whole of #836. A reader that picked an array by
- * name per graph would be a table of guesses: right the day it was written,
- * and silently wrong the first time a projection changed shape. Only the
- * generator knows which number is the one, so the generator says.
+ * There is **no uniform entry count**: a projection holds several arrays
+ * (`schemas` has `roots`, `modules`, `decls`, `edges`), and a meaningful
+ * number may not be an array length at all (uploads WAITING, not uploads).
+ * Only the generator knows which number is the one, so the generator says.
  *
  * ## KEYED BY DIRECTORY, because one projection can serve two tiles
  *
- * This is not a generalisation kept for later — it is the corpus today.
- * `uploads` and `library` are **two tiles over one dataset**: `flh4` settled
- * that the queue block lives in `assets/library/index.json`, *"since two
- * projections over it would be two answers to how many are queued"*, and
- * `gen-uploads-viz.ts` therefore publishes a viewer and no projection of its
- * own. So `assets/library/index.json` owes two different numbers — 8 entries
- * for the corpus tile and 20 waiting for the queue tile — and a single
- * `{count, unit}` per file could serve only one of them.
- *
- * A bare count would also have forced exactly the mistake the split exists to
- * prevent: whichever tile lost would have grown a second projection to hold
- * its number.
+ * `uploads` and `library` are **two tiles over one dataset**: the queue lives
+ * in `assets/library/index.json`, and `gen-uploads-viz.ts` publishes a viewer
+ * and no projection of its own. So that file owes two numbers — entries for
+ * the corpus tile, waiting for the queue tile — which a single
+ * `{count, unit}` per file could not carry.
  *
  * ## `unit` is not decoration
  *
- * `8` on a tile is ambiguous in a way `8 entries` is not, and the ambiguity is
- * load-bearing here: `library` publishes 8 entries beside 28 uploads, so a
- * bare number on that tile is a number the reader cannot check. The unit is
- * also what reaches the accessible name.
+ * `8` on a tile is ambiguous in a way `8 entries` is not, when the same
+ * projection also lists uploads. The unit also reaches the accessible name.
  *
  * ## Absent is a THIRD STATE
  *
  * {@link readTileCounts} yields nothing for a projection that declares no
  * counts, declares malformed ones, or cannot be read — and **never `0`**. An
- * absent count and an empty graph are opposite facts, and `dh4f` is this
- * repository's name for scanning nothing and reporting it clean. Every
- * consumer must render the two differently; the UI does it by drawing no
- * badge at all.
+ * absent count and an empty graph are opposite facts; the UI draws no badge
+ * at all for the first.
  *
  * A malformed entry is dropped WITHOUT dropping its siblings, so one bad
  * declaration in a shared projection cannot silence the tile beside it.
  *
- * ## A badge is exactly as fresh as its projection, and that is the point
+ * ## A badge is exactly as fresh as its projection
  *
- * The count is read from the projection, so it inherits whatever freshness the
- * projection has. That is the correct coupling rather than a weakness: the
- * badge and the page it opens read the SAME document, so they cannot disagree.
- * A tile that recomputed its own number would be a second answer, which is the
- * `flh4` defect arriving through the badge.
- *
- * It does mean a committed projection's lag shows on the tile. Measured
- * 2026-09-22: `beans/defs/` held 478 files while the committed
- * `assets/beans/index.json` projected 466. That projection is EXISTENCE-gated
- * on purpose — every session writes to `beans/`, so a content gate would go
- * red on a projection fresh on the branch and fresh on main and stale only
- * against their union (bean `d2kp`) — and `docs-site.yml` regenerates before
- * publishing, so a reader fetches the current number even while the committed
- * copy lags.
- *
- * The consequence for anyone checking a badge: a number read from a LOCAL
- * checkout is the committed projection's, not the site's. Compare against the
- * deployed page, or regenerate first.
+ * The badge and the page it opens read the SAME document, so they cannot
+ * disagree. A committed projection's lag therefore shows on the tile:
+ * `assets/beans/index.json` is existence-gated, and `docs-site.yml`
+ * regenerates before publishing. A number read from a LOCAL checkout is the
+ * committed projection's, not the site's; compare against the deployed page,
+ * or regenerate first.
  *
  * @graphNode schema
  * @module schemas/tile-count

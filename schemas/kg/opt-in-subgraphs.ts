@@ -4,18 +4,15 @@
  *
  * @module schemas/kg/opt-in-subgraphs
  *
- * ## The rule (cat-harness#991 step 23.1, proposal §4.13)
+ * ## The rule
  *
- * Owner, 2026-11-03: `sdlc` becomes a named sub-graph of cat-harness, with a
- * `work-plan` one beside it, and both are *off by default in every layer
- * above cat-harness; folio-assistant switches them on*. A directory entry
- * marked `optIn: true` is such a sub-graph. It is off in EVERY layer —
- * including the one that declares it — unless that layer lists it, qualified
+ * A directory entry marked `optIn: true` is an opt-in sub-graph (e.g.
+ * cat-harness's `sdlc` and `work-plan`). It is off in EVERY layer — including
+ * the one that declares it — unless that layer lists it, qualified
  * `<instance>.<directory id>`, in its own `enableSubgraphs`.
  *
  * **The folio root decides, and nothing is inherited.** A layer's list
- * enables the sub-graphs for ITSELF: a layer mounted by a folio-assistant
- * that enabled `cat-harness.sdlc` still has it off. So every reader asks
+ * enables the sub-graphs for ITSELF. So every reader asks
  * {@link enabledSubgraphs} of the root it is resolving FOR — the folio, the
  * downstream of a mount, the instance whose own resolution it is — never of
  * the layer that declared the sub-graph.
@@ -29,11 +26,11 @@
  * of what the agent is given: the resolved directories, the skill overlay,
  * the served Tool groups and a mount's default directory list. An explicit
  * mount override naming it still mounts it, and the harness's own machinery
- * may still use it (§4.13, "two switches, not one").
+ * may still use it.
  *
  * An `enableSubgraphs` id that names nothing opt-in is refused by
  * `check:declaration-resolution` ({@link enableSubgraphsProblems}), never
- * ignored: a typo would otherwise read as "the switch does not work".
+ * ignored.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

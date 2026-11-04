@@ -5,14 +5,11 @@
  * @module cat-harness/schemas/id-lookup
  * @graphNode schema
  *
- * ## Where it sits in the search decision
+ * ## Where it sits in search
  *
- * Bean `folio-assistant-4pm8` records a decision made before it: search
- * indexes only MATERIALISED content (lunr, in the plain docs pipeline), a
- * prefix-sharded identifier lookup covers REFERENCED nodes, and delegation to
- * the source is the fallback wherever `canDelegateSearch` allows. This module
- * is the second of the three. The owner chose, 2026-09-24, to build it before
- * any engine decision, because that decision turns on what it measures.
+ * Search indexes only MATERIALISED content (lunr, in the plain docs pipeline),
+ * this prefix-sharded lookup covers REFERENCED nodes, and delegation to the
+ * source is the fallback wherever `canDelegateSearch` allows.
  *
  * ## The shape
  *
@@ -25,19 +22,11 @@
  * ## The prefix length is measured, not chosen
  *
  * {@link choosePrefixLength} takes the smallest length at which no shard in
- * that namespace exceeds the budget. It is computed per namespace from the
- * identifiers actually present, because the namespaces are not alike: IRIS
- * item UUIDs are uniform hex, so each extra character divides a shard by 16,
- * while a slug namespace is skewed by its common words. A fixed length would
- * be too long for one and too short for the other.
+ * that namespace exceeds the budget, per namespace: uniform hex UUIDs and
+ * word-skewed slugs need different lengths.
  *
- * ## Why the budget is 64 KiB
- *
- * The large-datasets README (bean `4pm8`; that instance dissolved into
- * cat-harness with bean `j7ql`) stated the target as "~50 KB in memory at a time
- * regardless of corpus size". 64 KiB is that target rounded up to a power of
- * two, and it is a CEILING: the chooser takes the smallest prefix length that
- * fits under it, so a typical shard is well below it.
+ * The budget (64 KiB) is a CEILING — a ~50 KB in-memory target rounded up to
+ * a power of two — so a typical shard is well below it.
  */
 import { z } from "zod";
 

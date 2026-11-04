@@ -4,67 +4,38 @@
  * @module schemas/note-anchor
  * @graphNode schema
  *
- * ## The state that did not exist
- *
- * `CarriedNoteSchema` already carries `targetLabel` — *"Block label this is
- * attached to, when it is attached to one"* — and it is live, not merely
- * declared: `test/sticky-todos.e2e.ts` exercises it across two pages and an
- * orphan label. **Attachment to a block already works.**
- *
- * What it cannot say is the difference between two things that are not the
- * same:
+ * `CarriedNoteSchema` already carries `targetLabel` (the block label a note is
+ * attached to), exercised by `sticky-todos.e2e.ts`. What it cannot say is the
+ * difference between:
  *
  * | | meaning |
  * |---|---|
  * | **`block`** | attached to one block, named by its label |
- * | **`page`** | deliberately page-global — the owner's *"be global at top of page"* |
+ * | **`page`** | deliberately page-global, at the top of the page |
  * | **`none`** | attached to nothing, and nobody has said otherwise |
  *
- * With an optional string, `page` and `none` are both `undefined`. A sticky
- * somebody deliberately floated to the top of a page is indistinguishable from
- * one that fell off a block — and the second is a defect while the first is a
- * choice, so a tool that cannot tell them apart can only guess which to report.
+ * With an optional string, `page` and `none` are both `undefined`, though the
+ * second is a defect and the first a choice.
  *
  * ## Page-global is an ABSENCE of block, not a reserved block id
  *
- * The obvious shortcut — a sentinel like `__page__` in `targetLabel` — puts a
- * value that is not a block label in a field that means "block label", so every
- * reader has to know the exception. It also collides the day somebody writes a
- * block with that label.
+ * A sentinel like `__page__` in `targetLabel` would put a non-label in a
+ * label field and collide with a real block of that label; and a page-global
+ * sticky (e.g. on the landing page) may have no block to point at.
  *
- * The owner's own first consumer settles it: the landing page is to carry a
- * page-global sticky, **and the landing page has no block to point at.** There
- * is nothing for a sentinel to stand in for.
+ * ## Beans get NO anchor — a rule
  *
- * ## Beans get NO anchor — a rule, not an omission
- *
- * The owner, 2026-09-19: *"beans no anchor. no change bean schema. RULE."*
- *
- * This is a boundary rather than a shortcut, and it is worth saying why it
- * holds so nobody "finishes the job" later. A bean says **what is being worked
- * on**; a sticky says **where a note sits on a page**. The ask that reads like
- * it wants both anchored — *"same behaviour applies to beans"* — is answered
- * by the sentence right after it: *"beans can be used as an audit log of what
- * happened with agent as they moved through."* A bean records that a move
- * HAPPENED. It is not itself a thing pinned to a block.
- *
- * So a move is written to a bean as a **note**, which `workflow/bean-link.ts`
- * already does and which needs no new field. Giving a bean an `anchor` would
- * put a rendering position in the work plan, which is the same conflation
- * `schemas/ui/theme.ts` refuses for themed todos — two stores with one vocabulary
- * is the drift this repository keeps paying for.
- *
- * Practically, too: a bean's front matter is written by a **third-party CLI**
- * this repo does not own, so a field added here is a field nothing guarantees
- * survives a round-trip.
+ * A bean says **what is being worked on**; a sticky says **where a note sits
+ * on a page**. A move is recorded on a bean as a **note**, which
+ * `workflow/bean-link.ts` already writes, needing no new field. The bean
+ * schema is not changed: a bean's front matter is written by a third-party
+ * CLI, so an added field is not guaranteed to survive a round-trip.
  *
  * ## `targetLabel` stays
  *
- * This does not replace it. An anchor of kind `block` **is** a `targetLabel`
- * with its state made explicit, and `anchorOf` derives one from a note that has
- * only the old field — so every existing todo, and the e2e fixtures that
- * exercise them, keep working untouched. Read-forward, write-forward: new
- * writers set `anchor`, every reader can answer from either.
+ * An anchor of kind `block` **is** a `targetLabel` with its state made
+ * explicit, and `anchorOf` derives one from a note that has only the old
+ * field. New writers set `anchor`; every reader can answer from either.
  */
 import { z } from "zod";
 

@@ -1,10 +1,10 @@
 /**
  * The files of every declared directory of one graph typology, across the
  * instances of a checkout: the one scan behind each node graph a harness
- * declares instead of a central table (`typologies/`, bean dmx1; `validators/`,
- * bean riit). Reads each declaration RAW (`directories[].graphTypologies`, `path`,
- * `scope`) because the declaration's Zod schema lives in `cat-harness.ts`,
- * which imports the registry that calls this. A LEAF: filesystem and
+ * declares instead of a central table (`typologies/`, `validators/`). Reads
+ * each declaration RAW (`directories[].graphTypologies`, `path`, `scope`)
+ * because the declaration's Zod schema lives in `cat-harness.ts`, which
+ * imports the registry that calls this. A LEAF: filesystem and
  * `instance-roots.ts` only.
  *
  * @module cat-harness/schemas/declared-nodes

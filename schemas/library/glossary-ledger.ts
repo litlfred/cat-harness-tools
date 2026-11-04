@@ -4,14 +4,11 @@
  * @module schemas/glossary-ledger
  * @graphNode schema
  *
- * cat-harness's, since 2026-09-30 (owner, bean `xsqm`): the ledger is harness
- * state — `glossary-export` writes it, nothing in bootstrap reads it — so it
- * is hosted in cat-harness (`glossaryHomeFor`) and its kind and shape live
- * with it. bootstrap published this schema from 2026-09-29 (bean `r3gy`, D2)
- * until then; a role's own names are now authored on the role
- * (`otherNames`, `formerNames`), which is what bootstrap's README shows. The
- * tag was `folio-glossary-ledger/v1`; it is accepted on read for one release
- * so a dependent instance's committed ledger is not refused mid-migration.
+ * Harness state: `glossary-export` writes it and it is hosted in cat-harness
+ * (`glossaryHomeFor`). A role's own names are authored on the role
+ * (`otherNames`, `formerNames`). The old tag `folio-glossary-ledger/v1` is
+ * still accepted on read, so a dependent instance's committed ledger is not
+ * refused.
  */
 import { z } from "zod";
 

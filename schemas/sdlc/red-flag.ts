@@ -1,14 +1,10 @@
 /**
  * RED FLAG taxonomy, adversarial review sidecar schema, and recorded override path.
  *
- * Implements child (c) of merge gate epic (bean `folio-assistant-abmq`, proposal
- * `cat-harness/docs/proposals/merge-gate-2026-10-02.md` §6).
- *
  * ## What is a RED FLAG?
  *
- * A RED FLAG is a finding the reviewer asserts **would block the merge**
- * (amended 2026-10-03 by owner ruling; it asserted "blocks the merge" until
- * the warn-only ruling). It reuses the two existing axes in `schemas/sdlc/qa-review.ts`:
+ * A RED FLAG is a finding the reviewer asserts **would block the merge**. It
+ * reuses the two existing axes in `schemas/sdlc/qa-review.ts`:
  * - `FindingSeverity` (critical | major | minor: what kind of breakage)
  * - `FindingWeight` (blocking | suggestion | praise: what the reviewer asks of the gate)
  *
@@ -19,15 +15,12 @@
  * Evidence is strictly REQUIRED for any `blocking` finding: a finding without
  * reproducible observation cannot be blocking (it is demoted to `suggestion`).
  *
- * ## The 2026-10-03 owner ruling: warn-only review
+ * ## Warn-only review
  *
- * The review warns, it does not block:
- * > dont want hard gate (at least not for now, lots of backlog on content nodes)
- * > but do want warn.
- *
- * An open red flag is evaluated by the gate as `would-have-blocked` rather than
- * holding the merge. This preserves the taxonomy and the `blocking` weight
- * while producing the data needed for future gate promotion decisions.
+ * The review warns; it does not block. An open red flag is evaluated by the
+ * gate as `would-have-blocked` rather than holding the merge, which keeps the
+ * taxonomy and the `blocking` weight and records the data needed to decide on
+ * promoting it to a gate later.
  *
  * ## The human override path
  *

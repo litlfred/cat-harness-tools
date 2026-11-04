@@ -4,32 +4,13 @@
  * @module cat-harness/schemas/source-descriptor
  * @graphNode schema
  *
- * ## The question `materialize-remote` does not answer
- *
- * The owner, 2026-09-20, generalising away from IRIS:
- *
- * > *"someone may want to pull in a few nodes of a large data set, IRIS,
- * > CODATA, cosomological, weather, whatever, need to know sources and how to
- * > get subsets of data, not acquire all. IRIS is one concrete example.
- * > lean-mathlib is another large corpus example. genealize processes."*
- *
  * `materialize-remote` answers *"may we take this, and what does holding it
- * cost"*. It does not answer the question **before** that one: how do you
- * enumerate a corpus, and how do you ask it for a part? Every source answers
- * differently and none of it is guessable, so without a descriptor an agent
- * asked for "the WPRO style guides" must be told the API by a human every
- * single time, and that answer is written down nowhere.
+ * cost"*. A descriptor answers the question before that: how do you enumerate
+ * a corpus, and how do you ask it for a part? Every source answers
+ * differently, so the answer is written down here rather than told to an agent
+ * each time.
  *
- * Why it matters here in numbers: IRIS is **1,057,223 files and 361.55 GB**
- * across 8 communities, measured from its own storage report on 2026-09-20.
- * Acquiring all of it is not a bigger version of acquiring three items; it is a
- * different activity with different everything.
- *
- * ## Two worked descriptors, and the second is what makes it an abstraction
- *
- * One example is a special case with an interface drawn round it. The second
- * has to be genuinely unlike the first or the interface is a disguise, so the
- * pair here is deliberately far apart:
+ * ## Two worked descriptors
  *
  * | | WHO IRIS | Lean mathlib |
  * |---|---|---|
@@ -39,31 +20,19 @@
  * | identifiers | UUID, Handle, govdoc — three systems | fully-qualified name — one |
  * | is a subset self-contained? | **yes** — an item stands alone | **no** — a declaration needs its closure |
  *
- * That last row is the one a single-example design would have missed entirely,
- * and it is why {@link SubsetStrategy} carries `closure`. Asking mathlib for
- * "this declaration" and getting only that declaration produces something that
- * does not compile — a subset that is not a usable corpus.
+ * The last row is why {@link SubsetStrategy} carries `closure`: a mathlib
+ * declaration without its closure does not compile.
  *
- * ## Cost is declared, because "just enumerate it" is a decision
+ * ## Cost is declared
  *
- * Enumerating 1,057,223 items over a paged REST API at 100 per page is **10,572
- * requests**. That is not free, it is rate-limited, and it may be refused. So a
- * descriptor states what enumeration COSTS, and {@link enumerationCost} exists
- * so the size gate can be answered before anything is fetched rather than
- * after.
+ * Enumerating a large corpus over a paged, rate-limited API may be refused. A
+ * descriptor states what enumeration COSTS, so {@link enumerationCost} can
+ * answer the size gate before anything is fetched.
  *
- * ## Characterising a source is what decides how it may be REFERENCED
+ * ## Characterising a source decides how it may be REFERENCED
  *
- * The owner, 2026-09-20:
- *
- * > *"should be a part of 'ingesting new data source' process, is it remote,
- * > large, cotunally changin, etc... all impact how referneced. need to archive
- * > imperative?"*
- *
- * Yes — and the imperative falls out of the characterisation rather than being
- * a separate judgement. **A reference is a promise that the thing will still be
- * there, and will still be the same thing.** Three properties decide whether
- * that promise can be kept:
+ * A reference is a promise that the thing will still be there, and still be
+ * the same thing. Three properties decide whether that promise can be kept:
  *
  * | remote | large | volatile | how it may be referenced |
  * |---|---|---|---|
@@ -72,22 +41,17 @@
  * | yes | yes | no | reference the whole, materialise a subset |
  * | yes | – | **yes** | **archive, or do not cite it** |
  *
- * The last row is the finding. A reference to a moving target resolves LATER to
- * something that is not what was cited, and nothing in the citation records
- * that it changed — which is strictly worse than a broken link, because a
- * broken link announces itself and a silently-changed one does not. So
- * {@link archivalImperative} returns `required` on a volatile source, and the
- * `sourceLoss` gate can then only be discharged by an archival copy.
+ * A reference to a moving target silently resolves to something other than
+ * what was cited. So {@link archivalImperative} returns `required` on a
+ * volatile source, and the `sourceLoss` gate can then only be discharged by an
+ * archival copy.
  *
- * ## Delegating search is a fallback, and "if possible" is load-bearing
+ * ## Delegating search is a fallback
  *
- * The owner's preferred default for search over what is NOT materialised is to
- * send the reader to the source itself — it is always current, complete, and
- * costs nothing to keep fresh. But it is only available when the source is
- * reachable, has a search of its own, and is stable enough that a link composed
- * today still means the same thing. {@link canDelegateSearch} answers that from
- * the characterisation instead of leaving it to be assumed, because a
- * delegation to an unreachable source is a dead end presented as an answer.
+ * Search over what is NOT materialised may be sent to the source itself, but
+ * only when the source is reachable, has a search of its own, and is stable
+ * enough that a link composed today still means the same thing.
+ * {@link canDelegateSearch} answers that from the characterisation.
  */
 import { z } from "zod";
 

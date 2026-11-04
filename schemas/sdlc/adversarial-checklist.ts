@@ -1,9 +1,6 @@
 /**
  * Per-content-block adversarial checklists for tools, schemas, skills, and processes.
  *
- * Implements child (d) of the merge gate epic (bean `folio-assistant-lvlv`, proposal
- * `cat-harness/docs/proposals/merge-gate-2026-10-02.md` §7).
- *
  * ## Extending, not forking
  *
  * The adversarial review runs per **content block** (not per diff) so the existing

@@ -1,28 +1,15 @@
 /**
  * Where a note sits on a board — a layer ON TOP of the notes, never inside them.
  *
- * ## The ruling this encodes, and the word that decides the design
+ * ## Notes sit below the folio
  *
- * The owner, 2026-09-20, choosing between four options with the merge hazard
- * stated, then clarifying twice:
- *
- * > Committed, one positions file per board.
- *
- * > **it lives on top of notes, not data within notes.**
- *
- * > it can be one file...
- *
- * > **notes exist lower down than folio. make sure arrows correct.**
- *
- * The second is the one that constrains the code. A note gains no `x`, no `y`,
- * no `board`, no `order`. This layer names notes BY ID and the relation points
- * one way:
+ * A note gains no `x`, no `y`, no `board`, no `order`. This layer names notes
+ * BY ID and the relation points one way:
  *
  *     folio  ──▶  board  ──▶  position  ──▶  note        allowed
  *     note   ──▶  position / board / folio                REFUSED
  *
- * Four things follow, and each is a property the per-note alternative could
- * not have had:
+ * So:
  *
  * 1. **A note is complete with no board.** `readTodoFiles`, the todo index,
  *    the sticky board and the QA sidecars are untouched, and a folio that
@@ -30,75 +17,39 @@
  *    ADDITIVE and REMOVABLE: delete this file and every note is what it was.
  * 2. **One note may sit on several boards**, at different places, without the
  *    note arbitrating between them.
- * 3. **The layers stay clean.** A note is `content` or `state` depending on
- *    its graph; this is unambiguously `state`, written by a running process.
- *    A coordinate on a note would make a `content` node carry `state`, which
+ * 3. **The layers stay clean.** This is `state`, written by a running process;
+ *    a coordinate on a `content` note would make it carry `state`, which
  *    `content-context-and-state-graphs` refuses.
- * 4. **An orphan is swept from the LAYER**, which is the easy direction: one
- *    file, one pass, and nothing edited out of a note a person owns.
+ * 4. **An orphan is swept from the LAYER**: one file, one pass, and nothing
+ *    edited out of a note a person owns.
  *
- * It is the same one-way shape `uses[]` already enforces between the editorial
- * relation and the derived dependency graph, and for the same reason: mixing
- * the two destroys the signal each carries.
+ * ## ONE committed file, with the board as a key
  *
- * ## ONE file, with the board as a key
+ * The board is a key inside this document, so a new board adds lines rather
+ * than a file.
  *
- * Not one file per board. The board is a key inside this document, so a new
- * board adds lines rather than a file, and the merge property below holds the
- * same whether there is one board or twenty.
+ * ## Mergeability
  *
- * ## Mergeability is the whole reason for the shape
+ * Two sessions moving two notes is the ordinary case, and git merges by line,
+ * so a minified one-line file conflicts on every concurrent change. So:
+ * **indented, one position per line, sorted by board then note id.** Two
+ * sessions moving DIFFERENT notes merge untouched. Two notes that sort
+ * ADJACENT can still conflict: this removes the guaranteed conflict, not
+ * every conflict.
  *
- * Positions are the most concurrently-edited state a folio has — two sessions
- * moving two notes is the ordinary case, not the exceptional one. The fix is
- * the one `gen-docs-pages.ts` proved on 2026-09-20 and recorded:
- *
- * > Minified, this file is ONE LINE of ~12 KB. Git merges text by line, so a
- * > single line means any change on both sides of a merge is a whole-file
- * > conflict — two branches adding two different todos cannot both win. That
- * > is not hypothetical: it conflicted on three consecutive merges of one
- * > branch on 2026-09-20, every time.
- *
- * So: **indented, one position per line, sorted by board then note id.** Two
- * sessions moving DIFFERENT notes merge untouched.
- *
- * **It is a partial fix and the limit is known.** Two notes that sort ADJACENT
- * still conflict, because the inserted lines overlap. This removes the
- * guaranteed conflict, not every conflict, and saying so is the point — a
- * mergeability claim nobody bounded is one somebody will over-trust.
- *
- * **The ordering must be deterministic or the property is worthless**: a
- * writer that emitted positions in map order would reshuffle on every save and
- * conflict anyway. {@link sortPositions} is that guarantee, and it is tested
- * rather than assumed.
+ * The ordering must be deterministic, or a writer would reshuffle on every
+ * save; {@link sortPositions} guarantees it, and it is tested.
  *
  * @graphNode schema
  * @module schemas/board-positions
  *
- * ## ONE position per note per board, in the TYPE rather than in one function
+ * ## ONE position per note per board, in the TYPE
  *
- * The owner, 2026-09-20, choosing between three: **"One per board — make it
- * structural."**
- *
- * The first draft stored an ARRAY of `{note, x, y}` per board, so the type
- * admitted a note twice while `place()` filtered by note before appending, so
- * the code forbade it. **One fact with two answers and nothing asserting they
- * agree** — which is the exact shape of the failures `data-modelling` cites as
- * its own worked examples (`sym3`, `85e8`). A hand-written file, a merge that
- * kept both sides, or any writer that did not go through `place()` produced a
- * document the schema accepted and every consumer then had to decide about.
- *
- * Keyed by note id, the question cannot be asked. `boards[board][note]` is one
- * position or none, and "which of the two is the real one?" stops being a
- * state anybody has to handle.
- *
- * **It costs nothing in mergeability, which was the reason for the shape.**
- * Keys still sort, each note still occupies its own lines under an indented
- * write, and two sessions placing two different notes still merge untouched.
- * If anything it is better: a note's position now has a stable ADDRESS in the
- * text rather than a place in a sequence, so a move edits one line-block in
- * situ instead of potentially reordering its neighbours.
- *
+ * Positions are keyed by note id: `boards[board][note]` is one position or
+ * none, so no file — hand-written, merged, or from a writer that bypassed
+ * `place()` — can hold a note twice on one board. Each note still occupies
+ * its own lines under an indented write, so a move edits one line-block in
+ * situ.
  */
 import { z } from "zod";
 

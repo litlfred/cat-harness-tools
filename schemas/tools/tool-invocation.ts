@@ -1,23 +1,18 @@
 /**
  * What happened when a Tool ran, and under whose authority.
  *
- * ## Why this reuses the review vocabulary instead of inventing one
+ * ## It reuses the review vocabulary
  *
  * `schemas/sdlc/qa-review.ts` already models "an act, by someone with the standing
  * to make it, with a rationale that cites its evidence" — `Decision`,
  * `AuditNote`, `ReviewerRef` — and `schemas/process/role-graph.ts` already models who
  * may act: skills belong to the **lane** (what the performer must know),
- * permissions travel with the **actor** (what the participant may do).
+ * permissions travel with the **actor** (what the participant may do). An
+ * invocation is the same shape one level down: something was *done*, by an
+ * actor, in a role, at a step of a process, exercising a skill, through a
+ * Tool.
  *
- * An invocation is the same shape one level down. Something was *done*, by an
- * actor, in a role, at a step of a process, exercising a skill, through a Tool.
- * Minting a second vocabulary for that would give the repository two answers to
- * "who did this and why", free to disagree — the defect `AGENTS.md` records
- * everywhere else it has appeared.
- *
- * ## What an invocation record has to answer
- *
- * Not "what ran" — a shell history answers that. The questions an audit asks:
+ * ## What an invocation record answers
  *
  * - **Which task?** A BPMN node id, so the run is locatable in a process.
  * - **In which process instance?** So a sequence of runs is one story.
@@ -28,11 +23,11 @@
  * - **With what inputs?** Recorded as the parsed, type-checked values, never
  *   the raw request.
  *
- * ## The one thing deliberately not recorded
+ * ## Output is not recorded
  *
- * Output is not stored here. A Tool's stdout may be large, may contain
- * credentials a caller passed to it, and is already the caller's to handle. The
- * record carries an outcome and a digest; whoever needs the bytes keeps them.
+ * A Tool's stdout may be large, may contain credentials a caller passed to
+ * it, and is already the caller's to handle. The record carries an outcome
+ * and a digest; whoever needs the bytes keeps them.
  *
  * @module schemas/tool-invocation
  * @graphNode schema

@@ -12,9 +12,7 @@
  * still matches the current source files is the "fresh" entry for
  * that criterion.
  *
- * Authoritative reference for the architecture: the integration-
- * watcher skill family — see
- * `.claude/skills/local/one-voice-integration-watcher.md`.
+ * The architecture is described by the integration-watcher skill family.
  *
  * @module schemas/block-qa
  * @graphNode schema

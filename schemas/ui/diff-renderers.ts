@@ -1,25 +1,19 @@
 /**
- * The diff renderers a reviewer chooses between on the review page. Bean
- * `d903`, epic `q4jm`.
+ * The diff renderers a reviewer chooses between on the review page.
  *
  * @module schemas/diff-renderers
  * @graphNode schema
  *
  * ## Why a registry
  *
- * The owner asked to *"select different diff rednerers/viz"*. A single "the
- * diff" gets it wrong for at least one block kind: a word diff of a table's
- * Markdown is unreadable, and a side-by-side view of a one-word edit hides the
- * word. So each renderer is declared here as DATA (what it needs, which block
- * kinds it defaults for), and the page offers every renderer that can run on
- * a block, with a default chosen by that block's kind.
+ * No single diff suits every block kind: a word diff of a table's Markdown is
+ * unreadable, and a side-by-side view of a one-word edit hides the word. So
+ * each renderer is declared here as DATA (what it needs, which block kinds it
+ * defaults for), and the page offers every renderer that can run on a block,
+ * with a default chosen by that block's kind.
  *
- * ## Why here and not in core
- *
- * The epic's design review (R5) settled that the registry describes RENDERING
- * TOOLS, and core's own AGENTS.md puts schemas for skills, workflows, roles
- * and tools in the harness. The page that uses it (`gen-review-page.ts`) is
- * harness code too.
+ * It lives in the harness because it describes RENDERING TOOLS, and the page
+ * that uses it (`gen-review-page.ts`) is harness code too.
  *
  * ## What a renderer NEEDS decides whether it is offered
  *
@@ -27,17 +21,16 @@
  * - `pages`: a URL for each side (the preview, and `main` from
  *   `staging.json`).
  * - `screenshots`: a picture of the block on each side, from the
- *   `folio-block-screenshots` Tool's `visual-diff.json` (bean `0rxe`).
+ *   `folio-block-screenshots` Tool's `visual-diff.json`.
  *
  * A renderer whose input is missing for a block is still LISTED, disabled,
- * with the reason. An option that silently vanishes reads as "this renderer
- * does not exist".
+ * with the reason, so it does not read as nonexistent.
  *
- * ## Shipped, and not
+ * ## Shipped
  *
- * Word diff, inline rendered diff, side-by-side and the visual diff ship.
- * The DAK structural diff is a child bean, and is NOT listed here: a
- * registry entry with nothing behind it is a declared-but-absent Tool.
+ * Word diff, inline rendered diff, side-by-side and the visual diff. A DAK
+ * structural diff is NOT listed: a registry entry with nothing behind it is a
+ * declared-but-absent Tool.
  */
 import { z } from "zod";
 

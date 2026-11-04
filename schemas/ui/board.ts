@@ -4,49 +4,29 @@
  * @module schemas/board
  * @graphNode schema
  *
- * ## The entity that already had an id and nothing behind it
+ * `board-positions.ts` keys its document by board id; this is the object
+ * that id names: what a board is called and what it shows.
  *
- * `board-positions.ts` keys its document by board id, so a board has been
- * addressable since that layer merged — as a **key naming no object**. Nothing
- * said what a board is, what it is called, or what it shows. This is that
- * object, and it is the only genuinely new entity the whole of issue #602
- * turned out to need.
+ * ## What a board SHOWS
  *
- * ## What a board SHOWS — the owner's ruling, 2026-09-20 (CRDM Q3)
+ * Everything by default, with an optional declared filter: `filter` absent
+ * means *the whole folio*. The filter is **a query, not a stored list**,
+ * re-evaluated against the folio every time the board is rendered, so a board
+ * never goes stale and an empty folio still has a board to open.
  *
- * > **Everything by default, optional declared filter.**
+ * ## The layering
  *
- * So `filter` absent means *the whole folio*, and a board that declares
- * nothing can never go stale: content added later appears by itself, and an
- * empty folio still has a board to open.
- *
- * **A query, not a stored list**, and the difference is the whole reason the
- * default is what it is. A list of content nodes needs a staleness check —
- * something has to notice that a listed node was renamed and that a new node
- * was never added — and this repository's own health rules would then require
- * that check to report `could-not-determine` as a finding rather than as
- * clean. A query has nothing to fall behind: it is re-evaluated against the
- * folio every time the board is rendered.
- *
- * ## The layering, which is the hard part of the ask
- *
- * The owner: *"the todos/miro board is a static content overlays, so new
- * content type that sits under todos/ but scema and behavhoir of folio=miro
- * board is in cat-harness. carefull separte tools and schema."*
- *
- * So: this SCHEMA lives here, in the platform. A board INSTANCE lives under a
- * folio's `todos/`. And the tools that operate a board are kept separate from
- * this file — which is also why the only functions here are readers over a
- * declared document, and why nothing in this module writes, fetches or mounts
- * anything.
+ * This SCHEMA lives in the platform. A board INSTANCE lives under a folio's
+ * `todos/`. The tools that operate a board are kept separate, so the only
+ * functions here are readers over a declared document; nothing in this module
+ * writes, fetches or mounts anything.
  *
  * ## The arrows run one way
  *
- * `folio → board → position → note`, the owner's *"notes exist lower down
- * than folio, make sure arrows correct"*. A board names content by page and
- * node id and names notes not at all — the positions layer does that, one
- * level down. Asserted at the import level in the tests, the same way
- * `board-positions.ts` is.
+ * `folio → board → position → note`. A board names content by page and node
+ * id and names notes not at all — the positions layer does that, one level
+ * down. Asserted at the import level in the tests, as for
+ * `board-positions.ts`.
  */
 import { z } from "zod";
 

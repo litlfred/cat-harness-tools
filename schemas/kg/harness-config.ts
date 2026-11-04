@@ -4,40 +4,21 @@
  * A folio-assistant instance can depend on other instances for content,
  * skills, and translation resolution. Dependencies are declared in
  * `harness.config.json` under `dependencies.folioAssistant` and walked
- * depth-first in listed order.
+ * depth-first in listed order, overlaying content and skills on the root —
+ * later overlays earlier, as in FHIR/SUSHI.
  *
- * ## The dependency model
+ * ## The pin differs from SUSHI
  *
- * When loading skills and content, the folio-assistant agent starts with
- * the root folio and walks the dependency tree depth-first, in the order
- * dependencies are listed, overlaying content and skills on top. This
- * is the same methodology as FHIR/SUSHI dependencies **for the WALK** —
- * declared upstream, walked deterministically, later overlays earlier.
- *
- * **It is NOT the same for the PIN, and the unqualified claim was wrong**
- * (bean `dhvf`). SUSHI names a dependency as `packageId: version` and
- * resolves it against a registry; {@link FolioAssistantDependencySchema}
- * names a git `ref` that DEFAULTS TO THE DEFAULT BRANCH. A dependency pinned
- * to a branch is a different dependency on Tuesday and nothing notices —
- * the `xom7` shape, a thing that changes under you with nothing in the
- * repository saying so.
- *
- * The owner ruled 2026-09-20: *"sha is for staging, regernecing in published
- * SEMVER"*, with alignment to FHIR/SUSHI a hard constraint because some
- * instances ARE consumed from outside this monorepo. So the two tiers differ
- * and the rule lives where declarations are governed —
+ * SUSHI names a dependency as `packageId: version`;
+ * {@link FolioAssistantDependencySchema} names a git `ref` that DEFAULTS TO THE
+ * DEFAULT BRANCH, which can change silently. A SHA may stage, only a
+ * published semver version may publish:
  * [`directory-conventions`](../skills/kg/kg-core/directory-conventions.md)
- * §"Pinning a reference — a SHA may stage, only a version may publish" —
- * with `bun run cat check:published-refs` as its mechanical half. The full scheme
+ * §"Pinning a reference — a SHA may stage, only a version may publish",
+ * enforced by `bun run cat check:published-refs`. The full scheme
  * is `cat-harness/docs/proposals/instance-versioning.md`.
  *
  * ## What gets resolved across dependencies
- *
- * This table states what is WIRED, not what is intended. It was previously
- * optimistic in both directions — it claimed content blocks resolve (no such
- * function has ever existed) and that schemas and MCP tools never can (issue
- * #223 needs them to, and `schemas/content/contributions.ts` is how). Measured
- * 2026-09-18; re-measure before quoting it.
  *
  * | Resource | Resolved? | How |
  * |---|---|---|
@@ -48,8 +29,8 @@
  * | Block kinds | ✅ | {@link loadContributions} → `schemas/content/contributions.ts` |
  * | Adapters | ✅ | {@link loadContributions}, as a module specifier |
  * | MCP tools | ✅ | {@link loadContributions}, as registrar callbacks |
- * | Content blocks | ❌ | no resolver — the directory overlay was never written |
- * | QA criteria | ❌ | criterion definitions are still root-only |
+ * | Content blocks | ❌ | no resolver |
+ * | QA criteria | ❌ | criterion definitions are root-only |
  *
  * @module schemas/folio-config
  * @graphNode schema

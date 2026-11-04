@@ -1,25 +1,18 @@
 /**
  * A node of the trashcan — what `fsh-guts/` holds, and what may leave it.
  *
- * Owner, 2026-09-19: *"jsonld accessible via `<base-url>/fsh-guts.jsonld`."*
- * This is the shape that document serialises.
- *
- * ## The two properties that are not obvious from the shape
+ * This is the shape of the document served at `<base-url>/fsh-guts.jsonld`.
  *
  * **It is reachable BY NAME and never by an edge.** `UNPUBLISHED_GRAPH_TYPOLOGIES`
  * strips `fsh-guts` from every other published graph, so a consumer may fetch
  * this document deliberately and must never ARRIVE at it by following a link.
- * That is the owner's rule — *"references to fsh-guts stripped out of KG
- * before sending to publication"* — and it is why this is a separate
- * document rather than a subgraph of the main export.
+ * That is why it is a separate document rather than a subgraph of the main
+ * export.
  *
- * **Logs are inside `fsh-guts/` and must NOT be in it.** Owner, on the
- * activity log: *"dont get published"*. `fsh-guts/logs/` is git-ignored, so a
- * CI checkout happens not to contain any — which is luck, not a property.
- * {@link isFshGutsNode} therefore admits a file only if it DECLARES itself
- * `folio-fsh-guts/v1`, so a log entry is excluded because of what it says it
- * is, not because of where the build ran. Same contract the sweep uses when
- * it refuses to delete a non-log, pointed the other way.
+ * **Logs are inside `fsh-guts/` and must NOT be published.** `fsh-guts/logs/`
+ * is git-ignored, but that is not enough: {@link isFshGutsNode} admits a file
+ * only if it DECLARES itself `folio-fsh-guts/v1`, so a log entry is excluded
+ * by what it says it is, not by where the build ran.
  *
  * @module schemas/fsh-guts
  * @graphNode schema

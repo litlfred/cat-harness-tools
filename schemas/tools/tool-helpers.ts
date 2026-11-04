@@ -1,10 +1,6 @@
 /**
  * Helpers the harness's Tool folders share. Not a Tool, and declares none: a
- * Tool is one folder, `<id>/<id>.json` (bean `tdir`), loaded through
- * `toolsFromFolders`.
- *
- * Was cat-harness `tools/lib.ts`; it moved here with the schemas (bean
- * `8lcl`), since the harness holds no code.
+ * Tool is one folder, `<id>/<id>.json`, loaded through `toolsFromFolders`.
  *
  * @graphNode none — helpers the Tool folders share; no schema
  * @module schemas/tools/tool-helpers

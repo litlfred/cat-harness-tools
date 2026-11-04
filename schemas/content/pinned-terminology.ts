@@ -1,36 +1,24 @@
 /**
  * @graphNode schema
  *
- * The codes a PUBLISHED IG carries at ONE pinned version — bean `7wou`.
+ * The codes a PUBLISHED IG carries at ONE pinned version.
  *
- * Owner, 2026-09-30, choosing what `check:term-mapping`'s `fhir` half
- * asserts: **"this code is in the published base IG at version X"**, not
- * "this code is in the collection this organisation curates today". The two
- * can disagree, and only the first is reproducible from the repository.
- *
- * So the codes are snapshotted rather than fetched. Three reasons, and the
- * first is the ruling: resolving against whatever a host serves today would
- * quietly turn the claim back into the live-collection one. Then
- * reachability — this environment refuses `smart.who.int:443` exactly as it
- * refuses `api.openconceptlab.org:443`, and a gate that needs the network
- * fails for the wrong reason. Then size: 585 concepts, ~120 KB.
+ * `check:term-mapping`'s `fhir` half asserts **"this code is in the published
+ * base IG at version X"**, not "this code is in the collection this
+ * organisation curates today"; only the first is reproducible from the
+ * repository. So the codes are snapshotted rather than fetched (which also
+ * keeps the gate off the network).
  *
  * ## It is DERIVED, and the version is not its own to state
  *
  * {@link PinnedTerminologySchema.pin} names the external-schema record the
  * version comes from, and the `pin-ig-terminology` Tool refuses to
- * write unless the clone's own `sushi-config.yaml` declares that version. A
- * snapshot of one version labelled another is the single way this file could
- * assert something false, so it is refused at the point of writing rather
- * than reported afterwards.
+ * write unless the clone's own `sushi-config.yaml` declares that version, so
+ * a snapshot cannot be labelled with another version.
  *
- * ## Why it lives beside the record it pins
+ * ## It lives beside the record it pins
  *
- * `external-schemas/` is a place to look, not a type — and until this file
- * arrived, `loadSpecs` globbed `*.json` there and parsed every one as an
- * external-schema record, so the directory could hold nothing else. That was
- * classification by directory where `directory-conventions` asks for
- * classification by declaration; the loader now reads `$schema` and skips a
+ * In `external-schemas/`. `loadSpecs` reads each file's `$schema` and skips a
  * different declared kind, while still parsing strictly anything that claims
  * to be a record or declares nothing.
  */

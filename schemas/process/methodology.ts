@@ -1,35 +1,17 @@
 /**
  * A methodology node's front matter — `folio-methodology/v1`.
  *
- * ## Why this did not exist, and what its absence cost
+ * `methodology-adoption` requires an adopted methodology to be "external and
+ * named", with "an origin: authors, a publication, a standards body"; a method
+ * without one is a house process and is written as a skill. That distinction
+ * rests on the front-matter fields checked here.
  *
- * The tag `$schema: folio-methodology/v1` was introduced on 2026-09-20 and
- * carried by four files. Measured 2026-09-22: it appeared in **no `.ts` file in
- * the repository**. So the nodes declared a schema that nothing had written —
- * the `declaration nothing checks` failure this repository keeps naming, in its
- * purest form, because here the declaration was a *version number*. A malformed
- * methodology, a missing `origin`, an `applies-when` phrased so the selection
- * question cannot reach it: none of it was detectable.
+ * ## `evidence` is optional
  *
- * That matters more for this kind than for most. `methodology-adoption`
- * requires an adopted methodology to be "external and named", with "an origin:
- * authors, a publication, a standards body", and states that a method without
- * one "is a house process — write it as a skill and do not dress it as an
- * adoption". The whole distinction rests on a front-matter field, and until now
- * that field could simply be absent.
- *
- * ## `evidence` is optional, and that is the point of the QA axis
- *
- * A node may cite an origin whose source is not in any library. Making
- * `evidence` required would have made every existing methodology invalid on the
- * day this schema landed, which is the "check that cries wolf" failure
- * `known-skills.ts` names: a gate that fails on six things nobody has decided
- * about is a gate somebody switches off.
- *
- * So the schema permits its absence and `check-methodology-evidence.ts` REPORTS
- * it as a finding. Optional in the schema, visible in the sidecar, gated by
- * nobody — which is the same division `check:subgraphs` uses for cross-subgraph
- * edges, and for the same reason.
+ * A node may cite an origin whose source is not in any library. The schema
+ * permits its absence and `check-methodology-evidence.ts` REPORTS it as a
+ * finding, gated by nobody — the same division `check:subgraphs` uses for
+ * cross-subgraph edges.
  *
  * @graphNode schema
  * @module schemas/methodology

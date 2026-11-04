@@ -4,51 +4,32 @@
  * @module schemas/semantic-zoom
  * @graphNode schema
  *
- * ## The requirement, and the question it does not answer
+ * As the board shrinks, a card stops rendering its words and renders its
+ * avatar instead. The threshold is declared data, not a literal in the
+ * renderer.
  *
- * R2 of issue #602: *"As the board shrinks, a card SHALL stop rendering its
- * words and render its avatar instead. The threshold SHALL be declared data,
- * not a literal in the renderer."*
+ * ## Folio default, a kind may override
  *
- * That says the number must be declared. It does not say **whose** number it
- * is, and the answer is not obvious: `data-modelling`'s disappearance test —
- * *would this fact still be true if the entity went away?* — cuts both ways.
- * The number survives any one board and any one kind, which argues for the
- * folio; but *"when does **this** become unreadable"* is plainly a fact about
- * the thing being read.
- *
- * ## The owner's ruling, 2026-09-20 (CRDM Q4)
- *
- * > **Folio default, a kind may override.**
- *
- * Which is this repository's own inheritance rule applied unchanged: *inherit
- * everything, override anything; a variant states only what it CHANGES.* So
- * the folio always has a number, every kind resolves to one, and a kind that
- * states nothing is **complete rather than invalid** — requiredness is checked
- * after resolution, never on the declaration.
+ * This repository's inheritance rule, unchanged: the folio always has a
+ * number, every kind resolves to one, and a kind that states nothing is
+ * **complete rather than invalid** — requiredness is checked after
+ * resolution, never on the declaration.
  *
  * ## An override CITES WHY, and the resolver says where the number came from
  *
  * `because` is required on an override, and {@link zoomThresholdFor} returns
- * the `source` alongside the value. Both exist for the same reason, which
- * `data-modelling` states outright: *an inherited value is still a fact
- * somebody must be able to trace.* A resolver that returned a bare number
- * would record what the value is and lose where it came from — and a reviewer
- * looking at a card that flipped too early could not tell a deliberate
- * override from the default landing somewhere it does not fit.
+ * the `source` alongside the value, so a reviewer can tell a deliberate
+ * override from the default.
  *
  * **It is not an entity.** ZoomThreshold has no identifier of its own and
- * cannot exist apart from the folio or the kind that states it, which is the
- * test that also demoted `NoteAnchor` and `Avatar` to attributes.
+ * cannot exist apart from the folio or the kind that states it.
  *
- * ## PIXELS, and why the unit is not board units
+ * ## PIXELS, not board units
  *
- * `board-positions.ts` stores positions in board units precisely so a file
- * does not bake in the viewport it was written on. This is the opposite kind
- * of fact: legibility is a property of what reaches the reader's eye, so the
- * threshold is the card's RENDERED width in CSS pixels, after zoom. A card at
- * 40 board units is legible or not depending on the scale, and the scale is
- * what the reader is changing.
+ * Legibility is a property of what reaches the reader's eye, so the threshold
+ * is the card's RENDERED width in CSS pixels, after zoom — unlike
+ * `board-positions.ts`, which stores board units so a file does not bake in
+ * a viewport.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

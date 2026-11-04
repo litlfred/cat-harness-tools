@@ -1,10 +1,7 @@
 /**
  * An intake record — what one capture put into `uploads/<doc>/`, and where it
- * came from. `folio-intake/v1`, rebuilt from schemas this repository already
- * has (#1168 B6b-2, bean `d4lb`).
- *
- * Owner, 2026-09-24: *"look to existing standards to restructure schema"*,
- * then *"reduce reuse recycle"*. So nothing here is new vocabulary:
+ * came from. `folio-intake/v1`, built only from schemas this repository
+ * already has:
  *
  * | part | reused from | not repeated here |
  * |---|---|---|
@@ -13,12 +10,6 @@
  * | where the capture came from | `SourceProvenanceSchema` (`upstream` / `local`) | `system` / `instance`: the upstream URL's host says it |
  * | when and by whom | `capturedAt` as `folio-extraction/v1` means it — the capture moment | |
  * | each file's bytes | `ArchiveEntrySchema`'s `path` / `bytes` / `sha256` / `mimetype_sniffed` | |
- *
- * Until then there were TWO shapes under one filename: four hand-written IRIS
- * captures tagged `folio-intake/v1`, and the document adapter's untagged
- * `intake.json` whose `pipeline`, `chapters`, `blockCount` and `targetPaper`
- * were written once and never updated. The registry recorded
- * `writtenBy: scripts/library-graph.ts`, which only reads them.
  *
  * @graphNode schema
  * @module schemas/intake

@@ -1,9 +1,9 @@
 /**
  * A minimal gettext reader: `(msgctxt, msgid) → msgstr` for one `.po` file.
  * Enough for the short UI strings the translation graph holds beside the
- * prose catalogues — block-kind headings (bean riit, step 2b) — and a LEAF
- * (filesystem only), so `schemas/content/translation.ts` can read them without
- * importing the content pipeline's injector.
+ * prose catalogues — block-kind headings — and a LEAF (filesystem only), so
+ * `schemas/content/translation.ts` can read them without importing the
+ * content pipeline's injector.
  *
  * Handles continuation lines and the C escapes gettext writes (`\"`, `\\`,
  * `\n`, `\t`). Plural forms and fuzzy flags are not read: an entry marked
