@@ -32,8 +32,10 @@ import {
   GLOSSARY_DIR,
   LEDGER_FILENAME,
   LEDGER_SCHEMA,
+  buildFullGlossary,
   buildGlossary,
   glossaryIri,
+  kindsDeclaredBy,
   liveLedgerEntry,
   readLanes,
   type Ledger,
@@ -187,7 +189,10 @@ describe("bootstrap — the instance with the one varying performer", () => {
     // `7u3g`: two earlier sessions widened a scan instead of running a second
     // pass, and published one instance's content under another's identity.
     expect(report.concepts).toBeGreaterThan(0);
-    expect(report.concepts).toBeLessThan(10);
+    // ROLES, not every concept: since work item folio-assistant-dkqd the
+    // glossary also defines bootstrap's own graph kinds, which are bootstrap's
+    // and so belong here. What `7u3g` guards is the PERSONAS.
+    expect(report.families.roles).toBeLessThan(10);
     expect(String(doc["@id"])).toContain("/bootstrap/");
   });
 
@@ -443,5 +448,72 @@ describe("the vocabulary-mapping tables agree with the document's @context", () 
     // 27: `glossary-role-concept` lost its `actedUpon` row when the flag was
     // retired (owner, 2026-10-16; cat-harness `vocab-mappings/`).
     expect(checked).toBe(27);
+  });
+});
+
+// ── Graph kinds, node kinds and the harness (work item folio-assistant-dkqd) ──
+
+/** Whether the harness carries the newer families' tables: they are authored in cat-harness. */
+const hasTable = (id: string): boolean => existsSync(join(HARNESS, "vocab-mappings", `${id}.json`));
+const NO_KIND_TABLES = !hasTable("glossary-kind-concept") || !hasTable("glossary-harness-concept") || !hasTable("glossary-node-kind-concept");
+
+describe("graph kinds, node kinds and the harness are glossary terms", () => {
+  test("a graph kind belongs to the instance that declares it, never to every instance that sees it", () => {
+    const own = kindsDeclaredBy(HARNESS);
+    expect(own).toContain("bean-defs");
+    expect(own).toContain("skills");
+    // bootstrap's base kinds are bootstrap's.
+    for (const k of kindsDeclaredBy(BOOTSTRAP)) expect(own).not.toContain(k);
+    // A directory that declares no instance owns nothing.
+    expect(kindsDeclaredBy(mkdtempSync(join(tmpdir(), "glossary-kinds-")))).toEqual([]);
+  });
+
+  test("the families with no table are REPORTED, not silently empty", () => {
+    const { report } = buildGlossary({ today: () => "2026-09-21" });
+    for (const id of ["glossary-kind-concept", "glossary-harness-concept", "glossary-node-kind-concept"]) {
+      expect(report.notBuilt.includes(id)).toBe(!hasTable(id));
+    }
+  });
+
+  test.skipIf(NO_KIND_TABLES)("Work item is a node kind, narrower than Memory record, and Bean still finds it", async () => {
+    const { doc, report } = await buildFullGlossary({ today: () => "2026-09-21" });
+    const all = concepts(doc);
+    const item = all.find((c) => c.notation === "node-kind/bean");
+    expect(item?.prefLabel).toBe("Work item");
+    expect(item?.altLabel).toContain("Bean");
+    expect(String(item?.definition)).toMatch(/memory record/);
+    const core = all.find((c) => c.notation === "node-kind/memory-record-core");
+    expect(core?.prefLabel).toBe("Memory record");
+    expect(item?.broader).toEqual([core?.["@id"]]);
+    // A node kind is a fragment of the glossary document, which holds it.
+    expect(String(item?.["@id"]).startsWith(`${String(doc["@id"])}#`)).toBe(true);
+    expect(report.families.nodeKinds).toBeGreaterThan(0);
+  });
+
+  test.skipIf(NO_KIND_TABLES)("a graph kind keeps the IRI it already has, and its title is its label", () => {
+    const { doc } = buildGlossary({ today: () => "2026-09-21" });
+    const defs = concepts(doc).find((c) => c.notation === "kind/bean-defs");
+    expect(defs?.prefLabel).toBe("Work items");
+    expect(String(defs?.["@id"])).toMatch(/\/graphTypology\/bean-defs$/);
+  });
+
+  test.skipIf(NO_KIND_TABLES)("the harness is one term, labelled by its title, at its own address", () => {
+    const { doc, report } = buildGlossary({ today: () => "2026-09-21" });
+    const h = concepts(doc).filter((c) => String(c.notation).startsWith("harness/"));
+    expect(h.map((c) => c.notation)).toEqual(["harness/cat-harness"]);
+    expect(h[0]!.prefLabel).toBe("C@T Harness");
+    expect(h[0]!.altLabel).toContain("cat-harness");
+    expect(report.families.harnesses).toBe(1);
+  });
+
+  test.skipIf(NO_KIND_TABLES)("no two live concepts share a label — SKOS allows one prefLabel per scheme", async () => {
+    const { doc } = await buildFullGlossary({ today: () => "2026-09-21" });
+    const labels = concepts(doc).filter((c) => c.deprecated !== true).map((c) => String(c.prefLabel).toLowerCase());
+    const dupes = labels.filter((l, i) => labels.indexOf(l) !== i);
+    expect([...new Set(dupes)]).toEqual([]);
+  });
+
+  test.skipIf(NO_KIND_TABLES || NO_HIGHER_ROLES)("the committed ledger is current with every family built", async () => {
+    expect((await buildFullGlossary({ today: () => "2026-09-21" })).report.ledgerStale).toBe(false);
   });
 });

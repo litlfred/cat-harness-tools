@@ -71,7 +71,15 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { ownElementPattern, termIri } from "../schemas/kg/namespaces.js";
-import { ownPrefixTable } from "../schemas/kg/graph-typology-registry.js";
+import {
+  declaringInstanceOf,
+  defaultGraphTypologies,
+  graphTypologyIri,
+  graphTypologyLayer,
+  kindTitle,
+  ownPrefixTable,
+  type GraphTypologyRegistry,
+} from "../schemas/kg/graph-typology-registry.js";
 import { laneBinding, readRoleGraph, type LaneBinding, type RoleDef, type RoleGraph } from "../schemas/process/role-graph.js";
 import { glossaryHomeFor, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.js";
 import { kgRoots } from "./known-skills.js";
@@ -82,7 +90,9 @@ import { codeListDirs, loadCodeLists } from "../schemas/library/code-list.js";
 import { gitFiles } from "../schemas/sdlc/git-corpus.ts";
 import { buildCodeListsDoc } from "./code-lists.js";
 import { applyVocabMapping, vocabMapping } from "../schemas/content/vocab-mapping.js";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { HARNESS_NAME, HARNESS_ROOT } from "./lib/roots.ts";
+import { nodeKindIndex } from "../schemas/kg/node-kind-index.js";
+import { isNodeKind, type NodeKind } from "../schemas/kg/node-kind.js";
 
 const ROOT = resolve(HARNESS_ROOT);
 const SKOS = "http://www.w3.org/2004/02/skos/core#";
@@ -259,6 +269,124 @@ export function readLedger(instanceRoot: string, stub: string): Ledger {
   return { ...raw, $schema: LEDGER_SCHEMA };
 }
 
+// ── Node kinds and harnesses ────────────────────────────────────
+
+/**
+ * The node kinds an instance DECLARES — the ones its glossary defines.
+ *
+ * Work item folio-assistant-dkqd (2026-11-04): the glossary held roles only,
+ * so "Work item", "Skills", "Library" and the rest of the words a reader meets
+ * for what a harness keeps were defined nowhere a reader looks a word up.
+ *
+ * One glossary per instance, as for roles (`7u3g`): a kind is defined by the
+ * instance that declares it, never by every instance that can see it. A kind
+ * read from a `typologies/` graph carries its declarer; a base kind belongs to
+ * the layer whose namespace names it ({@link graphTypologyLayer}): bootstrap's
+ * to `bootstrap`, the harness's to this harness. A `core` kind with no
+ * declarer belongs to nobody here, and is left for the instance that declares it.
+ */
+export function kindsDeclaredBy(
+  instanceRoot: string,
+  registry: GraphTypologyRegistry = defaultGraphTypologies,
+): string[] {
+  const root = resolve(instanceRoot);
+  const name = readDeclaration(root)?.name;
+  if (name === undefined) return [];
+  const own: string[] = [];
+  for (const kind of registry.names()) {
+    const def = registry.get(kind);
+    const by = declaringInstanceOf(def);
+    if (by !== undefined) {
+      if (resolve(by.root) === root) own.push(kind);
+      continue;
+    }
+    const layer = graphTypologyLayer(kind, def);
+    if ((layer === "harness" && name === HARNESS_NAME) || (layer === "bootstrap" && name === "bootstrap")) own.push(kind);
+  }
+  return own.sort((a, b) => a.localeCompare(b, "en"));
+}
+
+/** One node kind, as the glossary defines it. */
+export interface NodeKindTerm {
+  /** `nodeKind()`'s id: `bean`, `memory-record-core`. */
+  readonly id: string;
+  /** The `$schema` a node carries, for a kind whose nodes are files. */
+  readonly tag?: string;
+  /** {@link NodeKind.term}: what one node is called. */
+  readonly term?: string;
+  /** {@link NodeKind.summary}: what a node is. */
+  readonly summary?: string;
+  /** Direct parents, by id, in declared order. */
+  readonly parents: readonly string[];
+}
+
+/**
+ * The node kinds an instance declares, with the ancestors nothing else
+ * declares, read from the node-kind index (`schemas/kg/node-kind-index.ts`).
+ *
+ * A node kind is the schema a FILE is written against (`bean/1.0.0`), as a
+ * graph kind is the schema of a directory. The index already finds them and
+ * their parents; the label and definition are read off the kind itself, by
+ * importing the module the index names, so the index file's format is
+ * unchanged. An ancestor that no typology names (`memory-record-core`, a
+ * mixin) has no declarer, and is defined by the instance whose kind inherits
+ * it, so "Work item" has a broader term to point at.
+ *
+ * Async because the index imports the validator modules; {@link buildGlossary}
+ * stays synchronous and takes the result.
+ */
+export async function nodeKindTerms(instanceRoot: string, repoRoot: string): Promise<NodeKindTerm[]> {
+  const root = resolve(instanceRoot);
+  const name = readDeclaration(root)?.name;
+  if (name === undefined) return [];
+  const index = await nodeKindIndex(defaultGraphTypologies, root, repoRoot);
+  const byId = new Map(index.kinds.map((k) => [k.id, k]));
+  const kinds = new Map<string, NodeKind>();
+  const walk = (k: NodeKind): void => {
+    if (kinds.has(k.id)) return;
+    kinds.set(k.id, k);
+    for (const p of k.parents) walk(p);
+  };
+  const own = index.kinds.filter((k) => k.declaredBy === name && k.module !== undefined && k.exportName !== undefined);
+  for (const e of own) {
+    try {
+      // input-site: imports */schemas/**/*.ts,schemas/**/*.ts #771876e3 — the validator modules the node-kind index already named
+      const mod = (await import(resolve(repoRoot, e.module!))) as Record<string, unknown>;
+      const k = mod[e.exportName!];
+      if (isNodeKind(k)) walk(k);
+    } catch {
+      // The index resolved this module a moment ago; a failure here is the
+      // index's to report (`unkinded: unresolvable`), not a missing term.
+    }
+  }
+  const ownIds = new Set(own.map((e) => e.id));
+  const out: NodeKindTerm[] = [];
+  for (const [id, k] of kinds) {
+    // An ancestor another instance declares is THAT instance's term.
+    if (!ownIds.has(id) && byId.get(id)?.declaredBy !== undefined) continue;
+    out.push({
+      id,
+      ...(k.tag !== undefined ? { tag: k.tag } : {}),
+      ...(k.term !== undefined ? { term: k.term } : {}),
+      ...(k.summary !== undefined ? { summary: k.summary } : {}),
+      parents: k.parents.map((p) => p.id),
+    });
+  }
+  return out.sort((a, b) => a.id.localeCompare(b.id, "en"));
+}
+
+/** `memory-record-core` → "Memory record core": a label for a kind that declares no term. */
+function humanise(id: string): string {
+  const w = id.replace(/-/g, " ").trim();
+  return w === "" ? id : w.charAt(0).toUpperCase() + w.slice(1);
+}
+
+/** The first sentence of a declaration's free text, for a definition. */
+function firstParagraph(s: string | undefined): string | undefined {
+  const t = s?.split(/\n\s*\n/)[0]?.trim();
+  return t === undefined || t === "" ? undefined : t;
+}
+
 // ── The document ────────────────────────────────────────────────
 
 export interface GlossaryReport {
@@ -272,6 +400,10 @@ export interface GlossaryReport {
   readonly restored: string[];
   /** Lane occurrences that became usage nodes. */
   readonly usages: number;
+  /** Mapping tables absent from the harness, so their family was not built — reported, never read as empty. */
+  readonly notBuilt: readonly string[];
+  /** Live concepts by family: roles (with the varying lanes), graph kinds, node kinds, harnesses. */
+  readonly families: { readonly roles: number; readonly kinds: number; readonly nodeKinds: number; readonly harnesses: number };
   /** Declared roles no task-containing lane in this instance draws. */
   readonly undrawn: string[];
   /**
@@ -322,6 +454,13 @@ export function buildGlossary(opts: {
   instanceRoot?: string;
   baseUrl?: string;
   today?: Today;
+  /**
+   * The node kinds to define ({@link nodeKindTerms}). Absent: none, and the
+   * ledger keeps any `node-kind/…` keys it already holds as they are rather
+   * than retiring them, because a caller that did not ask is not evidence the
+   * kinds are gone. {@link buildFullGlossary} asks.
+   */
+  nodeKinds?: readonly NodeKindTerm[];
 } = {}): GlossaryBuild {
   const instanceRoot = resolve(opts.instanceRoot ?? ROOT);
   const repoRoot =
@@ -446,6 +585,28 @@ export function buildGlossary(opts: {
   const retiredMap = table("glossary-retired-concept");
   const schemeNaming = table("concept-scheme-naming");
   const schemeMap = table("glossary-concept-scheme");
+  // The three newer families (work item folio-assistant-dkqd) are built only
+  // where their table exists. The tables are authored in the harness and this
+  // code in the tools layer, so for one merge the code is ahead of the tables:
+  // a family with no table is REPORTED as not built (`notBuilt`), never
+  // silently empty, and its ledger keys are kept as they are rather than
+  // retired, because a missing table is not evidence the terms are gone.
+  const notBuilt: string[] = [];
+  const optionalTable = (tableId: string) => {
+    try {
+      return table(tableId);
+    } catch {
+      notBuilt.push(tableId);
+      return undefined;
+    }
+  };
+  const kindMap = optionalTable("glossary-kind-concept");
+  const harnessMap = optionalTable("glossary-harness-concept");
+  const nodeKindMap = optionalTable("glossary-node-kind-concept");
+  const familyOff = (key: string): boolean =>
+    (key.startsWith("kind/") && kindMap === undefined) ||
+    (key.startsWith("harness/") && harnessMap === undefined) ||
+    (key.startsWith("node-kind/") && (nodeKindMap === undefined || opts.nodeKinds === undefined));
 
   const emitUsages = (conceptIri: string, ls: readonly LaneOccurrence[]): number => {
     let n = 0;
@@ -534,6 +695,106 @@ export function buildGlossary(opts: {
     usages += emitUsages(iri, ls);
   }
 
+  // The IRI a ledger key names. A role and a lane are minted by `makeIri`, as
+  // kg-export mints them; a kind and a harness already HAVE an IRI, so the
+  // glossary uses it rather than minting a second name for one thing.
+  const iriOfKey = new Map<string, string>();
+  const keyIri = (key: string): string => {
+    const known = iriOfKey.get(key);
+    if (known !== undefined) return known;
+    const [family, ...rest] = key.split("/");
+    if (family === "kind") {
+      try {
+        return graphTypologyIri(rest.join("/"));
+      } catch {
+        // A retired `core` kind has no declarer left to name its namespace.
+      }
+    }
+    if (family === "node-kind") return `${schemeIri}#${key}`;
+    return makeIri(id.docIri, family!, rest.join("/"));
+  };
+  const roleConcepts = live.size;
+
+  // Node kinds: one concept per kind this instance declares.
+  let kinds = 0;
+  for (const kind of kindMap === undefined ? [] : kindsDeclaredBy(instanceRoot)) {
+    const def = defaultGraphTypologies.get(kind);
+    if (def === undefined) continue;
+    const localPart = `kind/${kind}`;
+    const iri = graphTypologyIri(kind, def);
+    // The kind's display name ("Work items"). The word for ONE node ("Work
+    // item") is the node kind's term, defined below; two concepts with one
+    // label would break SKOS's one-prefLabel-per-scheme rule.
+    const label = kindTitle(kind);
+    const definition = def.summary?.trim() || def.description?.trim() || undefined;
+    iriOfKey.set(localPart, iri);
+    live.set(localPart, label);
+    nodes.push({
+      "@id": iri,
+      "@type": "skos:Concept",
+      ...applyVocabMapping(kindMap!, {
+        label,
+        id: localPart,
+        definition,
+        altLabels: [],
+        scheme: schemeIri,
+      }),
+    });
+    kinds += 1;
+  }
+
+  // Node kinds: the schemas files are written against, with their parents as
+  // broader terms, so "Work item" reads as a narrower "Memory record".
+  let nodeKinds = 0;
+  // A node kind has no published address of its own: no export mints one and
+  // no page serves one. So, like a lane usage, it is a fragment of the
+  // GLOSSARY document, which is the document that holds it and so resolves.
+  const nodeKindIri = (k: string) => `${schemeIri}#node-kind/${k}`;
+  for (const k of nodeKindMap === undefined ? [] : (opts.nodeKinds ?? [])) {
+    const localPart = `node-kind/${k.id}`;
+    const iri = nodeKindIri(k.id);
+    const label = k.term?.trim() || humanise(k.id);
+    iriOfKey.set(localPart, iri);
+    live.set(localPart, label);
+    nodes.push({
+      "@id": iri,
+      "@type": "skos:Concept",
+      ...applyVocabMapping(nodeKindMap!, {
+        label,
+        id: localPart,
+        definition: k.summary?.trim() || undefined,
+        altLabels: [...new Set([humanise(k.id), ...(k.tag !== undefined ? [k.tag] : [])])].filter((a) => a !== label).sort(),
+        broader: k.parents.map(nodeKindIri),
+        scheme: schemeIri,
+      }),
+    });
+    nodeKinds += 1;
+  }
+
+  // The harness itself: one concept, from its own declaration.
+  let harnesses = 0;
+  if (decl !== undefined && harnessMap !== undefined) {
+    const raw = decl as { name: string; title?: string; summary?: string; description?: string; iriBase?: string; alsoWritten?: string[] };
+    const localPart = `harness/${raw.name}`;
+    const label = raw.title?.trim() || raw.name;
+    const iri = raw.iriBase ?? makeIri(id.docIri, "harness", raw.name);
+    const altLabels = [...new Set([raw.name, ...(raw.alsoWritten ?? [])])].filter((n) => n !== label).sort();
+    iriOfKey.set(localPart, iri);
+    live.set(localPart, label);
+    nodes.push({
+      "@id": iri,
+      "@type": "skos:Concept",
+      ...applyVocabMapping(harnessMap!, {
+        label,
+        id: localPart,
+        definition: raw.summary?.trim() || firstParagraph(raw.description),
+        altLabels,
+        scheme: schemeIri,
+      }),
+    });
+    harnesses += 1;
+  }
+
   // ── Retirement ────────────────────────────────────────────────
   // A retired name a role now lists among its `formerNames` was RENAMED, not
   // dropped: its deprecated concept says which role replaced it, so a reader
@@ -559,16 +820,28 @@ export function buildGlossary(opts: {
   }
   for (const [key, was] of Object.entries(prior.concepts).sort(([a], [b]) => a.localeCompare(b))) {
     if (live.has(key)) continue;
+    if (familyOff(key)) {
+      concepts[key] = was;
+      continue;
+    }
     const retiredOn = was.retiredOn ?? now;
     if (was.retiredOn === null) newlyRetired.push(key);
     retired.push(key);
     concepts[key] = { ...was, retiredOn };
-    const [kind, ...rest] = key.split("/");
+    const [family, ...rest] = key.split("/");
     // REPORTED, NEVER DELETED. `owl:deprecated` is the machine-readable
     // half; the change note is the half a person reads.
-    const to = renamedTo.get(was.prefLabel.trim().toLowerCase());
+    const to = family === "role" ? renamedTo.get(was.prefLabel.trim().toLowerCase()) : undefined;
+    const gone =
+      family === "kind"
+        ? "this instance no longer declares this graph kind"
+        : family === "node-kind"
+          ? "this instance no longer declares this node kind"
+        : family === "harness"
+          ? "this instance no longer declares this harness"
+          : "no swimlane in this instance derives this term";
     nodes.push({
-      "@id": makeIri(id.docIri, kind!, rest.join("/")),
+      "@id": keyIri(key),
       "@type": "skos:Concept",
       ...applyVocabMapping(retiredMap, {
         prefLabel: was.prefLabel,
@@ -577,7 +850,7 @@ export function buildGlossary(opts: {
         retired: true,
         changeNote:
           to === undefined
-            ? `Retired ${retiredOn}: no swimlane in this instance derives this term.`
+            ? `Retired ${retiredOn}: ${gone}.`
             : `Retired ${retiredOn}: renamed ${to.title}.`,
         replacedBy: to?.iri,
       }),
@@ -589,8 +862,7 @@ export function buildGlossary(opts: {
   // role declared itself (`formerNames`).
   for (const [key, entry] of Object.entries(concepts)) {
     if (entry.retiredOn !== null || !entry.formerLabels?.length) continue;
-    const [kind, ...rest] = key.split("/");
-    const node = nodes.find((n) => n["@id"] === makeIri(id.docIri, kind!, rest.join("/")));
+    const node = nodes.find((n) => n["@id"] === keyIri(key));
     if (node === undefined) continue;
     const hidden = new Set([...((node["hiddenLabel"] as string[] | undefined) ?? []), ...entry.formerLabels]);
     node["hiddenLabel"] = [...hidden].sort();
@@ -622,7 +894,7 @@ export function buildGlossary(opts: {
     }
   }
 
-  const schemeLabel = `${id.stub} swimlane glossary`;
+  const schemeLabel = `${id.stub} glossary`;
   const doc = {
     "@context": {
       skos: SKOS,
@@ -644,6 +916,7 @@ export function buildGlossary(opts: {
       isPartOf: { "@id": "dcterms:isPartOf", "@type": "@id" },
       deprecated: "owl:deprecated",
       inScheme: { "@id": "skos:inScheme", "@type": "@id" },
+      broader: { "@id": "skos:broader", "@type": "@id" },
       usage: { "@id": termIri("hasLaneUsage"), "@type": "@id" },
       ofConcept: { "@id": termIri("ofConcept"), "@type": "@id" },
       inProcess: { "@id": termIri("inProcess"), "@type": "@id" },
@@ -668,9 +941,12 @@ export function buildGlossary(opts: {
     ...applyVocabMapping(schemeNaming, { label: schemeLabel, isDocument: true }),
     ...applyVocabMapping(schemeMap, {
       definition:
-        "Every persona this instance's BPMN diagrams place in a swimlane, one concept each. " +
-        "Labels come from the lanes, definitions from the role registry, and scope notes " +
-        "from each lane's own <bpmn:documentation>. Generated by scripts/glossary-export.ts.",
+        "The words this instance defines: every persona its BPMN diagrams place in a swimlane, " +
+        "every graph kind and node kind it declares, and the harness itself, one concept each. A persona's labels " +
+        "come from the lanes, its definition from the role registry and its scope notes from each " +
+        "lane's own <bpmn:documentation>; a graph kind's label and definition from its graph typology; " +
+        "a node kind's from the kind, with its parents as broader terms; " +
+        "the harness's from its declaration. Generated by scripts/glossary-export.ts.",
     }),
     "@graph": nodes,
   };
@@ -684,12 +960,25 @@ export function buildGlossary(opts: {
       newlyRetired,
       restored,
       usages,
+      families: { roles: roleConcepts, kinds, nodeKinds, harnesses },
+      notBuilt,
       undrawn,
       drawnElsewhere,
       problems,
       ledgerStale,
     },
   };
+}
+
+/** The repository root this module reads diagrams from — `buildGlossary`'s own answer. */
+function glossaryRepoRoot(): string {
+  return [repoRootFor(ROOT), join(repoRootFor(ROOT), "..", "..")].find((d) => existsSync(join(d, ".git"))) ?? repoRootFor(ROOT);
+}
+
+/** {@link buildGlossary} with the node kinds asked for: what the CLI writes and `--check` compares. */
+export async function buildFullGlossary(opts: Omit<Parameters<typeof buildGlossary>[0] & object, "nodeKinds"> = {}): Promise<GlossaryBuild> {
+  const instanceRoot = resolve(opts.instanceRoot ?? ROOT);
+  return buildGlossary({ ...opts, nodeKinds: await nodeKindTerms(instanceRoot, glossaryRepoRoot()) });
 }
 
 if (import.meta.main) {
@@ -702,7 +991,7 @@ if (import.meta.main) {
   const instanceRoot = arg("--instance");
   const baseUrl = arg("--base-url") ?? process.env.KG_BASE_URL;
 
-  const { doc, ledger, report } = buildGlossary({ instanceRoot, baseUrl });
+  const { doc, ledger, report } = await buildFullGlossary({ instanceRoot, baseUrl });
   const instanceDir = resolve(instanceRoot ?? ROOT);
   // `_kg/` stands for the site root: the glossary sits beside its graph
   // document, `<name>/<stub>-glossary.jsonld` (#603 decision 1b).
@@ -718,8 +1007,12 @@ if (import.meta.main) {
   );
   if (outMoved) console.log(`--out ${asked} is the old root address; writing the glossary at ${out}`);
 
-  console.log(`${ledger.instance} swimlane glossary`);
+  console.log(`${ledger.instance} glossary`);
   console.log(`  ${report.concepts} concept(s), ${report.usages} lane usage(s)`);
+  console.log(
+    `  live: ${report.families.roles} role(s), ${report.families.kinds} graph kind(s), ${report.families.nodeKinds} node kind(s), ${report.families.harnesses} harness(es)`,
+  );
+  for (const t of report.notBuilt) console.log(`  NOT BUILT: no vocab-mapping table "${t}" in the harness, so that family is absent from this run (not empty)`);
   if (report.restored.length > 0) console.log(`  ${report.restored.length} restored: ${report.restored.join(", ")}`);
   if (report.retired.length > 0) console.log(`  ${report.retired.length} retired (kept, never deleted)`);
   for (const k of report.newlyRetired) console.log(`    NEWLY RETIRED: ${k}`);
