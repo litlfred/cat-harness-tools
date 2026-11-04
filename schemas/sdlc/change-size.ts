@@ -1,40 +1,31 @@
 /**
  * The change-size rule: thresholds, basis, and prose/KG versus code weighting.
  *
- * ## What this module is
+ * A report-only advisory limit of ~400 lines of non-generated, non-lockfile
+ * code, prose and KG documentation weighted lower; it becomes a blocking CI
+ * gate once calibrated against PR history.
  *
- * Owner ruling (2026-10-07, issue #754 / FR-009):
- * "The change-size rule should be a report-only advisory limit initially at ~400
- * lines of non-generated/non-lockfile code, weighting prose and KG documentation
- * lower, transitioning to a blocking CI gate once calibrated against PR history."
- *
- * This module defines the structured contract for change sizing, modeled after
- * `test/health/` thresholds. Every threshold structurally carries its basis
- * (source and reasoning) so that a check cannot ship a bare constant.
+ * Modeled after `test/health/` thresholds: every threshold structurally
+ * carries its basis (source and reasoning), so a check cannot ship a bare
+ * constant.
  *
  * ## Prose & Knowledge Graph vs Code
  *
- * A 600-line skill or documentation change and a 600-line logic refactor have
- * vastly different adjudication complexities. Code carries branching logic,
- * invariants, type constraints, and execution side-effects. Prose and KG
- * documentation read linearly with lower defect density.
- *
- * Therefore, prose and KG changes are weighted at 0.25x (or 4x the allowance):
+ * Prose and KG documentation read linearly and are easier to adjudicate than
+ * code, so they are weighted at 0.25x (or 4x the allowance):
  * 1 line of prose/KG documentation = 0.25 effective lines.
  *
  * ## Mechanical and Generated Exemptions
  *
- * A change that is large but uniform and mechanical is not hard to adjudicate:
+ * Excluded from the effective line count:
  * - Lockfiles (`bun.lock`, `package-lock.json`)
  * - Machine-generated files / build artifacts (`*.jsonld`, `*.qa.json`, etc.)
  * - File renames and migrations with recorded justification
  *
- * These are excluded from the effective line count.
+ * ## Reporting Format
  *
- * ## SC-005 Reporting Format
- *
- * SC-005 requires reporting as a count with its denominator, never as a bare
- * percentage (e.g., "4 of 32 PRs (12.5%) exceeded the threshold").
+ * Report as a count with its denominator, never as a bare percentage (e.g.,
+ * "4 of 32 PRs (12.5%) exceeded the threshold").
  *
  * @module schemas/change-size
  * @graphNode schema

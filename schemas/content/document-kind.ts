@@ -5,31 +5,27 @@
  * @graphNode schema
  * @module schemas/document-kind
  *
- * ## Why this is not a content profile
+ * ## Not a content profile
  *
  * A profile (`CONTENT_PROFILES` in `block-kinds.ts`) says which BLOCK KINDS a
- * folio may contain, and it is a compile-time union in core. A document kind
+ * folio may contain, and is a compile-time union in core. A document kind
  * says what a publication's STRUCTURE is: which sections it has, which are
- * required, and what each is derived from. They are different questions — a
- * document with a fixed structure may use any block kind its profile allows —
- * and only this one can be contributed by a harness as DATA, without core
- * naming the kind.
+ * required, and what each is derived from. Only a document kind can be
+ * contributed by a harness as DATA, without core naming it.
  *
  * Core knows that document kinds exist; it never knows which. A harness
  * declares its kinds in a `document-kinds` directory of its `<instance>.json`,
- * one JSON file per kind. Stage D5 of the smart-* separation (#1767, bean
- * `qvxh`), where the first two are a WHO DAK and an L1 document.
+ * one JSON file per kind.
  *
  * ## Two rules the schema enforces
  *
  * - **A structure is never invented.** Every kind names its `sources`, and every
  *   section may name its own — a kind whose sections come from several
  *   publications says which section came from which.
- * - **"Computed from" is a claim to check, not a description.** A section's
- *   `computedFrom` names DECLARED graph ids (e.g. `library`), so a reader can
- *   ask whether the graph exists rather than take the prose's word for it.
- *   `modelledBy` is the same discipline for the other question — what kind of
- *   thing the section holds, in a pinned external model (bean `pebe`).
+ * - **"Computed from" is a claim to check.** A section's `computedFrom` names
+ *   DECLARED graph ids (e.g. `library`), so a reader can check the graph
+ *   exists. `modelledBy` names what kind of thing the section holds, in a
+ *   pinned external model.
  */
 import { z } from "zod";
 

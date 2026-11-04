@@ -1,25 +1,18 @@
 /**
  * Roles, actors and capabilities EXTENDED BY ID from a higher instance's own
- * `scenarios/` (placement PR0b, bean `ejye`; owner rulings 2026-09-30).
+ * `scenarios/`.
  *
  * @module schemas/scenario-overlay
  * @graphNode schema
  *
- * ## The problem it removes
- *
- * The harness's `scenarios/roles.json` held 54 role→skill edges naming skills
- * that belong above it (core 28, sci 20, the FHIR IG layer 4, the DAK layer 2), and 5
- * actor→role bindings naming roles that move up (placement proposal §5). Moving
- * a skill up while its role edge stays down leaves an UPWARD reference in the
- * harness; moving the whole role up moves 34 harness roles' neighbours with it.
- * Neither is acceptable, so the edge has to be able to live in the higher
- * instance, pointing down.
+ * A role→skill edge naming a skill that belongs above the harness has to live
+ * in the higher instance, pointing down; otherwise the harness holds an UPWARD
+ * reference.
  *
  * ## The rule — the dependent holds the pointer
  *
- * The same shape #1168 settled for voices (a voice points at the role it
- * addresses, so the role names no voice) and stories (a story points at the
- * role it is told as). A higher instance's `scenarios/` may:
+ * As a story points at the role it is told as, a higher instance's
+ * `scenarios/` may:
  *
  * | what | how | what it may change |
  * |---|---|---|
@@ -32,36 +25,29 @@
  * | add a POLICY | `policies/<file>.jsonld`, a NEW `uid` | its own ODRL rules, e.g. the grants of the actors it adds |
  *
  * Id-matching is the same rule as a directory override and as `inherits`.
- * **Redeclaring a lower id is refused**, not merged: an override that could
- * change a lower role's title or description would make the lower instance's
- * own audit and the checkout's disagree about what the role IS. And an
- * extension may only name something declared BELOW it — a pointer at an
- * equal or higher layer is the upward edge this module exists to remove.
+ * **Redeclaring a lower id is refused**, not merged, so the lower instance's
+ * audit and the checkout's agree on what the role IS. An extension may only
+ * name something declared BELOW it.
  *
- * ### The one exception: a move in flight (owner, 2026-10-23, "Relax the rule")
+ * ### The one exception: a move in flight
  *
- * Moving a role, actor, capability or policy UP is two pull requests in two
- * repositories: the higher layer adds it, then the lower layer removes it.
- * Between them both declare the id. A redeclaration that **only adds** is
- * therefore accepted, with a warning, and the higher declaration is used:
- * every field the lower declaration carries is in the higher one unchanged
- * (the same scalar; every member of an array; a nested object by the same
- * rule, recursively), and the higher may carry more — more skills, say, where
- * it folded in its own extension of the role. `_`-keys are documentation and
- * are not compared. The warning names the id and both layers and says what
- * finishes the move: remove the lower copy. A redeclaration that changes or
- * drops anything the lower layer declared is still refused, because that one
- * WOULD make the two audits disagree ({@link onlyAdds}).
+ * Moving a role, actor, capability or policy UP is two pull requests: the
+ * higher layer adds it, then the lower layer removes it. A redeclaration that
+ * **only adds** ({@link onlyAdds}) is therefore accepted with a warning, and
+ * the higher declaration is used: every field of the lower one is present
+ * unchanged (scalars equal, array members kept, nested objects recursively),
+ * and the higher may carry more. `_`-keys are not compared. The warning names
+ * the id and both layers and says to remove the lower copy. A redeclaration
+ * that changes or drops anything is refused.
  *
- * It does NOT restore `roles:` in skill front matter (beans `tuvg`, `v625`):
- * the edge stays on the role graph, which is now spread across instances.
+ * Skill front matter does not carry `roles:`; the edge stays on the role
+ * graph, spread across instances.
  *
  * ## Where the layers come from
  *
  * The base is the instance asked about; the layers are the CHECKOUT's
  * instances that depend on it ({@link checkoutDependentsOf}), deepest first.
- * Resolved alone, an instance sees only its own graph — the cmsl falsifier:
- * a split checkout sees less.
+ * Resolved alone, an instance sees only its own graph.
  *
  * Auditing ONE instance asks the other direction: which actors may its
  * requirements and lanes name? Those are the platform's, every instance it
@@ -70,12 +56,10 @@
  * ## Policies travel with the actors they grant
  *
  * An actor a higher instance adds holds its grants in THAT instance's
- * `policies/`, not in a rule the harness's policy would have to carry for an
- * actor it does not declare. {@link checkoutPolicies} and
- * {@link neededPolicies} read the same layers as the actor overlay, by the
- * same rule: a new `uid` is added, a redeclared one is refused unless it only
- * adds (a move in flight, above). A policy may `inheritFrom` a lower one; it
- * cannot edit it.
+ * `policies/`. {@link checkoutPolicies} and {@link neededPolicies} read the
+ * same layers as the actor overlay, by the same rule: a new `uid` is added, a
+ * redeclared one is refused unless it only adds. A policy may `inheritFrom` a
+ * lower one; it cannot edit it.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";

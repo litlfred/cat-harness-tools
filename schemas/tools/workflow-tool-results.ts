@@ -1,7 +1,5 @@
 /**
- * Typed results of the workflow engine's tools (issue
- * litlfred/cat-harness-tools#1259, group 2 of the tool-output plan, owner card
- * Q-DS-10 A).
+ * Typed results of the workflow engine's tools.
  *
  * `workflow_list`, `workflow_start`, `workflow_next`, `workflow_gate` and
  * `workflow_complete` keep their text and also return the same answer as

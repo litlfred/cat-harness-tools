@@ -3,10 +3,9 @@
  *
  * @module schemas/todo-graph
  *
- * Deliberately the same shape as `bean-graph.ts`, reusing
- * `ContentDirectorySchema` and the same open kind registry. A second spelling
- * of "a directory and what it holds" is the drift this repository keeps paying
- * for, so this file carries only what is SPECIFIC to the todo graph.
+ * The same shape as `bean-graph.ts`, reusing `ContentDirectorySchema` and the
+ * same open kind registry; this file carries only what is SPECIFIC to the
+ * todo graph.
  *
  * ```jsonc
  *  // todos/todos.json
@@ -21,20 +20,17 @@
  *
  * ## It is content, and the folio owns it
  *
- * This is the one real difference from the bean graph, and it decides who may
- * write here. `beans/` is the AGENT work plan and lives in every instance.
- * `todos/` records what **people** have outstanding, so it belongs to the
- * folio — the platform ships the kind and the schema and declares no directory
- * of its own. This repo carries no folio, and declaring an absent directory is
- * the bean `dh4f` defect, where a consumer scans nothing and reports a clean
- * run over it.
+ * `beans/` is the AGENT work plan and lives in every instance. `todos/`
+ * records what **people** have outstanding, so it belongs to the folio — the
+ * platform ships the kind and the schema and declares no directory of its
+ * own, since a declared-but-absent directory would let a consumer scan
+ * nothing and report a clean run.
  *
  * ## Paths resolve against the graph root
  *
  * As in the bean graph: a node's `path` is relative to the directory holding
  * `todos.json`, so the whole graph relocates by moving one folder, and a path
- * that is absolute or escapes its root is rejected. A store outside the graph
- * is not a node of it.
+ * that is absolute or escapes its root is rejected.
  *
  * ## Three states
  *

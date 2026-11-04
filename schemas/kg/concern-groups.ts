@@ -1,8 +1,7 @@
 /**
  * The shape of a kind's FROM-WITHIN declaration file when it names concern
  * groups: `processes/processes.json`, `schemas/schemas.json`,
- * `library/library.json`, `uml/uml.json`, a test directory's `code.json`
- * (placement PR0c, bean `ejye`; the eight groups of bean `9umr`).
+ * `library/library.json`, `uml/uml.json`, a test directory's `code.json`.
  *
  * @module schemas/concern-groups
  * @graphNode schema
@@ -10,12 +9,9 @@
  * ## Codes, not restated labels
  *
  * A group is NAMED by its code from `code-lists/concern-group.json`, which
- * carries the title and definition once. `skills/skills.json` predates the
- * list and carries a title and description per topic; restating those in
- * every other kind's file would make five copies of one definition free to
- * drift (AGENTS.md, "one fact, one place"). So here a group is its code, and
- * its directory is the code: `processes/sdlc/`. Location is the grouping
- * (owner, 2026-09-29: "built into location").
+ * carries the title and definition once, and its directory is the code:
+ * `processes/sdlc/`. Location is the grouping. (`skills/skills.json` keeps a
+ * title and description per topic; other kinds do not restate them.)
  *
  * ## Two lists, one node — the `skills.json` shape
  *

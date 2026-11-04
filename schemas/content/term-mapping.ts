@@ -2,101 +2,65 @@
  * @graphNode schema
  *
  * Whether a glossary term the extractor MINTED already exists as a concept
- * somebody else is authoritative for — bean `7wou`, under `5yhm`.
- *
- * ## The gap this closes
+ * somebody else is authoritative for.
  *
  * `glossary-extract.ts` mints a `candidate` from every knowledge-graph asset
- * carrying a title and a description: 2 594 of them across five schemes here,
- * against 7 authored terms. Every one of those candidates is asserted by the
- * extraction and checked against nothing. The owner's sentence, 2026-09-29:
- * *"extracting exsiting glossary needs compaision to existing
- * termonology/coding."*
- *
- * The MODEL for a mapping already existed —
- * [`vocabulary-authority`](../skills/kg/kg-core/vocabulary-authority.md) names
- * SKOS the hub and `exactMatch` / `closeMatch` / `broadMatch` / `relatedMatch`
- * the predicates, and authored terms already carry `exactMatch` to ODRL URIs.
- * What did not exist is anything that performs the comparison.
+ * carrying a title and a description, asserted by the extraction and checked
+ * against nothing. This compares each one against existing terminology, using
+ * the model
+ * [`vocabulary-authority`](../skills/kg/kg-core/vocabulary-authority.md)
+ * defines: SKOS the hub, `exactMatch` / `closeMatch` / `broadMatch` /
+ * `relatedMatch` the predicates.
  *
  * ## TWO targets, and they are not interchangeable
- *
- * Owner, 2026-09-30: **"OCL is only for FHIR. not a constraint on SKOS."**
- * That is `vocabulary-authority`'s table, enforced:
  *
  * | target | authoritative for | resolved against |
  * |---|---|---|
  * | `skos` | what a term MEANS | SKOS concept schemes — the instance's own authored terms, plus any external scheme it declares |
- * | `fhir` | a clinical code's OPERATIONAL semantics | the pinned published IG snapshot (`cat-harness/external-schemas/who-smart-base.terminology.json`, `who-smart-base@v1.0.0`, 12 CodeSystems / 585 concepts; owner ruling 2026-09-30, bean `ejug`: a published IG at a version, not a live collection; OCL remains the terminology-management tool for the SMART Guidelines side) |
+ * | `fhir` | a clinical code's OPERATIONAL semantics | the pinned published IG snapshot (`cat-harness/external-schemas/who-smart-base.terminology.json`), a published IG at a version, not a live collection |
  *
- * A term matched in SKOS and a term matched in FHIR are **different
- * assertions with different authorities**, so a result carries which target
- * it came from and the two are never merged into one verdict. Collapsing them
- * would be the composite `vocabulary-authority` exists to prevent: OCL would
- * silently become an authority on meaning, which it is not.
+ * A SKOS match and a FHIR match are **different assertions with different
+ * authorities**, so a result carries which target it came from and the two
+ * are never merged into one verdict. OCL is for FHIR only, never an authority
+ * on meaning.
  *
- * ## Three states, and the third is the whole point
+ * ## Three states
  *
  * `mapped` · `unmapped` · `undetermined`. The third is NEVER rendered as
- * `unmapped`: a terminology that could not be reached has said nothing, and
- * recording silence as "no match" is bean `dh4f` — a consumer that reports a
- * clean run over a check that never ran.
+ * `unmapped`: a terminology that could not be reached has said nothing. The
+ * `fhir` half resolves offline against the pinned snapshot, so both targets
+ * return determined verdicts whenever the pin and snapshot are present and
+ * valid; an absent or unusable snapshot yields `undetermined` with its
+ * reason.
  *
- * Measured 2026-09-30 (`7wou`), cloud sessions are refused
- * `api.openconceptlab.org:443` by network policy (`403 to CONNECT`); measured
- * 2026-10-24 (`q7ds`) from an open internet connection, `api.openconceptlab.org`
- * (`v2.3.234-3e606025`) itself answers HTTP 403 (`"Authentication required.
- * Anonymous API access is disabled."`) on `/orgs/`, `/sources/`,
- * `/collections/`, `/concepts/`, and `/orgs/WHO/*`. On the owner's 2026-09-30
- * ruling (`ejug`), the `fhir` half resolves offline against the pinned
- * `who-smart-base@v1.0.0` snapshot (`external-schemas/who-smart-base.terminology.json`,
- * 12 code systems, 585 concepts), so both targets return determined verdicts
- * (`0 undetermined`) whenever the pin and snapshot are present and valid, while
- * an absent or unusable snapshot still yields `undetermined` with its reason.
- * Probing all 33 published CodeSystems (1 892 concepts) across
- * `smart.who.int/{base,trust,immunizations}` on 2026-10-24 (`q7ds`) likewise
- * returned 0 matches against the extracted glossary candidates.
- *
- * ## `exact` and `concept` are a PAIR, from the start
+ * ## `exact` and `concept` are a PAIR
  *
  * Both are always present, and the GAP between them is the finding. From
  * [`consensus-grounded-subject-evaluation`](../methodologies/consensus-grounded-subject-evaluation.md):
  * a high concept score with a low exact score means the right idea under the
- * wrong authorised label — a different and specifiable outcome from no match
- * at all. A single boolean cannot express it, and widening one later is how a
- * measurement loses the distinction it was built for.
- *
- * **What each means here is SKOS's own, not LCSH's.** That benchmark splits on
- * the subdivision separator `--`, which these labels do not have. So:
+ * wrong authorised label — a different outcome from no match at all. The
+ * meanings are SKOS's own:
  *
  * - `exact` — the normalised `prefLabel` matches a concept's `prefLabel`.
  * - `concept` — the normalised label matches that concept's `prefLabel` **or
  *   any of its `altLabel`s**: the same concept reached by a different name.
  *
- * Normalisation is stated rather than assumed, and is the benchmark's:
- * NFC, lower-case, whitespace collapsed, a trailing period stripped — so a
- * term is judged on substance rather than typography.
+ * Normalisation: NFC, lower-case, whitespace collapsed, a trailing period
+ * stripped.
  *
  * ## Validated in memory, committed as a projection
  *
- * The full file — two rows per candidate — is built and validated
- * against this schema on every run, and then PROJECTED into
+ * The full file — two rows per candidate — is built and validated against
+ * this schema on every run (so an `undetermined` row with no reason is
+ * refused), then PROJECTED into
  * `test/results/term-mapping.qa-results.json`, which keeps the per-target
- * summaries and only the rows a reader can act on. Committing thousands of
- * per-candidate rows that all say `unmapped` (or, when a target is
- * unreachable, the same `undetermined_reason`) would bury the handful that are
- * findings, and the per-scheme counts and scope already state that fact once.
- *
- * The schema still earns its place: it is what refuses an `undetermined` row
- * with no reason, and that refusal runs before the projection rather than
- * after, so the defect cannot reach the committed file.
+ * summaries and only the rows a reader can act on.
  *
  * ## It reports and never grades
  *
- * No ratio of mapped to total is computed, and none should be. `m4xy`'s rule
- * carries over: an unmapped candidate may be a term this corpus is right to
- * coin, and a mapped one may be a coincidence of wording. The counts are for
- * a reader, not for a threshold.
+ * No ratio of mapped to total is computed: an unmapped candidate may be a
+ * term this corpus is right to coin, and a mapped one a coincidence of
+ * wording.
  */
 import { z } from "zod";
 

@@ -1,35 +1,19 @@
 /**
  * What each term in the folio namespace MEANS — one brief gloss apiece.
  *
- * ## Why this file exists
+ * A term's IRI must dereference to a definition, since READMEs link words to
+ * their definitions.
  *
- * `FOLIO_NS` is `https://litlfred.github.io/folio-assistant/ns/`, and every
- * class and property the graph projects hangs off it. **Nothing served that
- * stem.** `scripts/tests/kg-export.test.ts` exempted it from the dead-link
- * check BY NAME, commenting "an IRI stem, not a file — nothing serves it and
- * nothing should try to." That was right while a term only had to be an
- * IDENTIFIER. It stopped being right when the owner asked, 2026-09-19, that
- * the bootstrap README link almost every word to its definition: a definition
- * has to dereference.
- *
- * Fourth instance of the defect bean `blv9` records — a link-shaped value that
- * does not resolve — after the `/kg/` literal, a Skill's `instructions` path,
- * and the templates' asset paths.
- *
- * ## What is NOT here, deliberately
+ * ## What is NOT here
  *
  * **The graph typologies.** `tools`, `cat-harness`, `beans` and the rest are
- * `GraphTypology` individuals, not classes (bean `3r47`), and each already carries
- * a `summary` in `BASE_GRAPH_TYPOLOGIES`, so `ns-export` reads it from there. Restating them here would be a second answer to one question,
- * free to disagree — the drift this repository keeps paying for. A gloss below
+ * `GraphTypology` individuals, not classes, and each already carries a
+ * `summary` in `BASE_GRAPH_TYPOLOGIES`, which `ns-export` reads. A gloss here
  * for a term the registry already describes is a bug, and the completeness
  * test says so.
  *
- * **Rich description.** One sentence each, per the owner: "each of these
- * schemas should have BRIEF definitions. rich descriptions and
- * interpretations in cat-harness/ docs." A gloss says what the term IS so a
- * reader following a link from the README knows what word they just met. It
- * does not explain the design; that is what the prose pages are for.
+ * **Rich description.** One sentence each: a gloss says what the term IS;
+ * rich descriptions and interpretation belong in the cat-harness docs.
  *
  * @module schemas/vocabulary
  * @graphNode schema

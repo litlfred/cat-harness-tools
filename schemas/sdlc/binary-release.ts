@@ -10,94 +10,46 @@
  * and the schema is `.strict()` throughout so a field carrying a payload
  * cannot be added by accident.
  *
- * Registered on the owner's ruling, 2026-09-30 — **Option A** of bean `rjug`:
- * *"a `binary-release` kind, `holds: "state"`, one node per release, recording
- * id, version, digest, size and where it is fetched from, never the bytes."*
+ * ## Not a `materialization`
  *
- * ## Why not `materialization` — and what `gpdo` changed about that question
+ * Every `MATERIALIZATION_PURPOSES` value (`working | archival | both |
+ * compiled`) is about a **copy this instance holds**. A release is about a
+ * **publication upstream**, true whether or not a byte was ever fetched and
+ * after every local copy is deleted. The two compose: a release node says
+ * *v1.8.0 published `package.tgz`, 41 MB, sha256 …, at this URL*; a
+ * materialization record says *and a copy of it is here, taken for this
+ * purpose*.
  *
- * Option B was to reuse `materialization`, which already answers *are any of
- * its bytes actually here*. The bean stated its own reservation and asked for
- * it to be decided rather than assumed:
+ * ## `state`, and `recordsWork: false`
  *
- * > Option B is attractive and **may be wrong: a release is an EVENT with a
- * > version and a digest, not a materialisation state.** Worth deciding rather
- * > than assuming.
- *
- * **Bean `gpdo` has since landed** (owner's pick 2026-09-23, "Third purpose";
- * issue #1194, still open), and it sharpens the mismatch rather than softening
- * it. `MATERIALIZATION_PURPOSES` is now `working | archival | both | compiled`
- * — and all four are purposes of a **copy this instance holds**:
- *
- * | purpose | the question it answers | about |
- * |---|---|---|
- * | `working` | may I re-fetch this if it rots? | a copy here |
- * | `archival` | are these the bytes we stored? | a copy here |
- * | `both` | both of the above | a copy here |
- * | `compiled` | was this built from the inputs we have NOW? | a copy here |
- *
- * A release is about none of those. Its subject is a **publication upstream**,
- * which happened whether or not this instance ever fetched a byte of it, and
- * which stays true after every local copy is deleted. `gpdo` added a third
- * question to materialization — validity against inputs — and a release does
- * not answer that one either: it has no inputs, it has a version.
- *
- * So the two compose rather than substitute. A release node says *v1.8.0
- * published `package.tgz`, 41 MB, sha256 …, at this URL*; a materialization
- * record says *and a copy of it is here, taken for this purpose*. Asking a
- * materialization node "what was released" would get an answer about what was
- * FETCHED, which is the `catalogue`-vs-`library` confusion one corpus over.
- *
- * ## Why `state`, and why `recordsWork: false`
- *
- * The ruling gives `holds`, and the axis's one question agrees: a running
- * process WRITES it — the release pipeline appends a node when it publishes.
- * It fails the stand-alone test outright, the way `qa` and `health` do:
- * detached from the thing released, a digest asserts nothing.
- *
- * It is not `derived`, and that is the interesting call now that `derived`
- * exists. A derived graph is REGENERATED from a source that still exists;
- * re-running a release pipeline produces a **different release**, with a new
- * version and a new digest. Same reasoning that put `qa-report` on `state`
- * rather than `derived`, and the same reasoning that puts its sibling
- * {@link module:schemas/ig-metadata-index | `ig-metadata-index`} on `derived`,
- * where re-harvesting an unchanged IG DOES give the same file back.
- *
- * `recordsWork: false`. Live state, but nothing anybody is partway through: a
- * published release is a completed fact, and an arriving agent cannot pick one
- * up. `check:graph-typology-work` refuses a `state` kind that has not decided,
- * and it is right to — "state" alone does not say whether a reader is looking
- * at a queue or at a ledger.
+ * The release pipeline appends a node when it publishes, so it is `state`. It
+ * is not `derived`: re-running a release pipeline produces a **different
+ * release** (unlike {@link module:schemas/ig-metadata-index | `ig-metadata-index`},
+ * where re-harvesting an unchanged IG gives the same file back).
+ * `recordsWork: false`: a published release is a completed fact, nothing an
+ * arriving agent can pick up. `check:graph-typology-work` refuses a `state`
+ * kind that has not decided.
  *
  * ## The case the kind exists for: the deploy purge
  *
- * `rjug` names *"the >100 MB files the WHO deploy phase DELETES before
- * deployment"*. Those files are published, then removed from the deployed
- * tree, and after the purge **nothing anywhere records that they existed** —
- * not the deployed site, not the repository, not a materialization record,
- * because no copy was kept. A release node is the only place that fact can
- * live, which is why {@link ASSET_DISPOSITIONS} has a value for it and why an
- * asset in that state must still say where it is fetched from: the record is
- * worthless if it cannot get the file back.
+ * Files larger than 100 MB are deleted from the deployed tree before
+ * deployment, after which nothing else records that they existed. A release
+ * node is the only place that fact can live, which is why
+ * {@link ASSET_DISPOSITIONS} has a value for it and why an asset in that state
+ * must still say where it is fetched from.
  *
  * ## Three things enforced structurally
  *
  * 1. **Never the bytes.** Every object is `.strict()`, so a `content` or
  *    `data` key fails validation rather than being carried, and `fetchedFrom`
- *    is required on every asset — including a purged one. A release node that
- *    cannot say where to get the file is a size and a hash with no referent.
+ *    is required on every asset — including a purged one.
  * 2. **A deletion must say why.** `deleted-before-deploy` requires
- *    `dispositionReason`. "Deleted" with no reason cannot be told from "lost",
- *    which is `deletion-requires-confirmation`'s concern written into a shape:
- *    a removal nobody recorded a reason for leaves the next reader unable to
- *    distinguish a decision from an accident.
+ *    `dispositionReason`, so a decision can be told from an accident.
  * 3. **Could-not-determine is never clean.** `verifiedAt` lives INSIDE
  *    {@link ReleaseDigestSchema}, so a verification time with no digest is
- *    unrepresentable rather than merely refused — you cannot have verified
- *    what you did not record. And {@link binaryReleaseVerdict} returns
- *    `unknown`, never `ok`, for a release with any undigested asset or any
- *    disposition nobody has established. An unverifiable release is not an
- *    intact one.
+ *    unrepresentable. And {@link binaryReleaseVerdict} returns `unknown`,
+ *    never `ok`, for a release with any undigested asset or any disposition
+ *    nobody has established.
  */
 import { z } from "zod";
 

@@ -4,31 +4,16 @@
  *
  * @module @folio-assistant/schemas/skill-package
  *
- * ## Why this is its own module
- *
- * It was the first 240 lines of `constraints.ts`, above the content model that
- * file is named for. Nothing in it is about a folio's content: an actor, a
- * capability probe, a skill's validator list and a package's Docker
- * requirements describe the HARNESS — who is working, on what machine, with
- * which skills installed — and they were in that file because it was where
- * Zod schemas went, not because they belong beside `LeanRefSchema`.
- *
- * The cost was measured. Four harness modules imported `constraints.ts` or
- * `types.ts` for these symbols alone — `scripts/validate-skills.ts`,
- * `scripts/generate-registry.ts`, `schemas/conduct/assistant-types.ts`,
- * `schemas/process/assistant-workflow.ts` — and every one of those reads, in the
- * repository split, as the harness depending on the content layer. It does
- * not: it is the harness depending on its own vocabulary, filed in the
- * content layer's drawer.
+ * Nothing here is about a folio's content: an actor, a capability probe, a
+ * skill's validator list and a package's Docker requirements describe the
+ * HARNESS — who is working, on what machine, with which skills installed.
  *
  * ## Direction
  *
  * The harness is the base repository: core may import it, it may not import
- * core. So this module must not grow a dependency on `types.ts`,
- * `block-kinds.ts` or anything else that describes content — and today it has
- * none, importing only `zod`. `constraints.ts` re-exports everything here, so
- * existing importers are unaffected; new harness code should import this
- * module directly, which is what keeps the edge from coming back.
+ * core. So this module must not depend on `types.ts`, `block-kinds.ts` or
+ * anything else that describes content. `constraints.ts` re-exports everything
+ * here; new harness code should import this module directly.
  * @graphNode schema
  */
 

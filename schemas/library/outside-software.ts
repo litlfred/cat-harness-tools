@@ -6,33 +6,24 @@
  * @module schemas/outside-software
  * @graphNode schema
  *
- * Option D of bean `jbvi`, chosen by the owner 2026-10-24 08:25Z ("D. Shared
- * core", after asking to merge options A and B). Two kinds record outside
- * software, and both extend this core:
+ * Two kinds record outside software, and both extend this core:
  *
  * | kind | `$schema` | what the platform does with it | adds |
  * |---|---|---|---|
  * | `tool-release` | `folio-tool-release/v1` | RUNS it | `role`, `kind`, `entry`, `runtimes`, `platform`, `note` |
  * | `software-library` | `software-library/1.2.0` | IMPORTS it, or keeps it vendored | `range`, `dev`, `usedBy`, `shim`, `vendored`, `layer` |
  *
- * ## Why a core, and not one kind
- *
- * Option A was one kind — `tool-release` with a `library` role. It would have
- * bent two of the four rules `tool-release` enforces by design: the digest
- * would have widened past sha256, because a lockfile's integrity is sha512,
- * and the entry would have become optional for one role, because a library is
- * never run. So the two stay two kinds, and what they really share — every
- * field below — is written once, here. Each kind NARROWS a core field where
- * its own rule needs it: `tool-release` narrows `name` to a tool name and
- * `digest` to sha256 (so its four rules are unchanged); `software-library`
- * narrows `name` to an npm package name and `source` to a URL.
+ * They stay two kinds because their rules differ (a library is never run, and
+ * a lockfile's integrity is sha512). Each kind NARROWS a core field where its
+ * own rule needs it: `tool-release` narrows `name` to a tool name and `digest`
+ * to sha256; `software-library` narrows `name` to an npm package name and
+ * `source` to a URL.
  *
  * ## What is written once against the core
  *
  * - {@link outsideSoftwareRef} and {@link parseOutsideSoftwareRef} — the
  *   `name@version` ref. Split at the LAST `@`, because a scoped npm name
- *   (`@scope/pkg`) starts with one; a tool name has none, so a tool ref splits
- *   the same way it always did.
+ *   (`@scope/pkg`) starts with one.
  * - {@link outsideSoftwareLicenceProblem} — the licence checked against the
  *   PINNED SPDX License List with `check:source-licence`'s own
  *   `checkLicenceExpression`, never a second parser.

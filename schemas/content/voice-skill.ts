@@ -1,18 +1,14 @@
 /**
  * A VOICE SKILL — a voice as a first-class member of the knowledge graph.
  *
- * ## Why a voice is a skill and not a data file beside one
+ * ## A voice is a skill, not a data file beside one
  *
- * A voice already carries everything a skill carries: it tells an actor what to
- * do, it is bound to processes by name, and it is versioned with the graph. It
- * was kept as a bare `voices/<id>.json` only because it started as data, and
- * that split has a cost the rest of this file is about — the INSTRUCTIONS for
- * writing in a voice ended up in `skills/authoring/authoring-core/voice-authoring-guidance.md`
- * in the PLATFORM, restating another instance's rules without their citations
- * (bean `btuv`). A voice that is a skill has nowhere to leak to: its
- * instructions and its rules are the same node, owned by the same instance.
+ * A voice tells an actor what to do, is bound to processes by name, and is
+ * versioned with the graph — what a skill does. As a skill, its instructions
+ * and its rules are the same node, owned by the same instance, so writing
+ * guidance cannot drift away from the rules and their citations.
  *
- * So a voice skill lives at `<instance>/skills/voices/<id>/`, inside the `kg`
+ * A voice skill lives at `<instance>/skills/voices/<id>/`, inside the `kg`
  * graph, and the instance that holds it is the instance that DERIVED it.
  *
  * ## Three consumers, and the schema says which field serves which
@@ -24,16 +20,9 @@
  * | **QA** | `patterns`, `terminology`, `judgementOnly`, {@link VoiceSkillSchema} `overlaySeverity` | the mechanical half, and the weight of the derived overlay criterion |
  *
  * **No field serves two of those by restatement.** The instruction body must
- * not enumerate rules: a rule stated in prose beside the same rule stated as
- * data is one fact in two places, and the prose copy is the one carrying no
- * citation and no pattern. `scripts/check-voice-skills.ts` enforces it, on
- * four signals — a rule's id, its title, its citation's quote, and both sides
- * of a terminology pair.
- *
- * That sentence named a gate that **did not exist** from the day this file was
- * written until 2026-09-21 (bean `n8br`), and four `SKILL.md` files repeated
- * the claim. It is named by PATH here rather than by npm script for that
- * reason: a path is something a reader can open and find absent.
+ * not enumerate rules. `scripts/check-voice-skills.ts` enforces it, on four
+ * signals — a rule's id, its title, its citation's quote, and both sides of a
+ * terminology pair.
  *
  * @module schemas/voice-skill
  * @graphNode schema

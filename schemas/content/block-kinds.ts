@@ -2,25 +2,15 @@
  * The block kinds, as a runtime value — in a leaf module so anything can
  * read it.
  *
- * This list used to live in `types.ts`, which is where its consumers
- * mostly are. But `types.ts` imports schemas from `constraints.ts` at
- * module scope, so `constraints.ts` could not import back without a
- * runtime cycle — and its `appliesTo` arrays are built during module
- * initialisation, exactly when a cycle leaves the import undefined.
+ * It must not live in `types.ts`: `types.ts` imports schemas from
+ * `constraints.ts` at module scope, so `constraints.ts` could not import back
+ * without a runtime cycle. This module imports only leaves (the filesystem
+ * scan, the node schema, and `types.ts` for a TYPE, which is erased). No list
+ * of kinds is written out anywhere: the kinds are DISCOVERED from the
+ * `block-kinds/` graphs their owning harnesses declare.
  *
- * That is why `constraints.ts` spelled its kind lists out by hand, and
- * why several of them ended up narrower than the rule they gated: a
- * kind missing from `appliesTo` is skipped by `validate.ts` without a
- * word. This module imports only leaves (the filesystem scan, the node
- * schema, and `types.ts` for a TYPE, which is erased), so there is no
- * reason for any list of kinds to be written out anywhere — and since bean
- * riit, step 2, none is: the kinds are DISCOVERED from the `block-kinds/`
- * graphs their owning harnesses declare.
- *
- * `types.ts` re-exports `BLOCK_KINDS` and `BlockKind`, so existing
- * importers are unaffected. The compile-time proof that a list and the
- * `Block` union cover each other is gone with the list: `BlockKind` IS
- * `Block["kind"]`, and the runtime half (every typed kind discovered, every
+ * `types.ts` re-exports `BLOCK_KINDS` and `BlockKind`. `BlockKind` IS
+ * `Block["kind"]`, and the runtime check (every typed kind discovered, every
  * discovered kind typed) is `block-kind-nodes.test.ts`.
  *
  * @module schemas/block-kinds

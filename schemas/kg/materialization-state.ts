@@ -5,54 +5,40 @@
  * @module schemas/materialization-state
  * @graphNode schema
  *
- * ## Why only this half lives in the harness
+ * ## Only the vocabulary lives in the harness
  *
- * Bean `tlat` (placement PR5, owner ruling 2, 2026-09-30, option A): only the
- * VOCABULARY moved down from the content core's `schemas/materialization.ts`
- * — the three states and {@link FixitySchema}. The rest of that module stays
- * in core: the five gates (size, restrictions, retention, source loss,
- * copyright), the purposes, and the record that binds them, because each gate
- * is a decision a person makes about CONTENT, and the five-gate process
- * (`sample-import.bpmn`) is where it is asked. Core imports these two names
- * from here and re-exports them, so its own consumers did not change.
+ * The three states and {@link FixitySchema} are here because harness modules
+ * speak them (`schemas/library/referenced-source.ts`, `cat-harness.ts`,
+ * `binary-release.ts`). The rest — the five gates (size, restrictions,
+ * retention, source loss, copyright), the purposes, and the record that binds
+ * them — stays in the content core's `schemas/materialization.ts`, because
+ * each gate is a decision a person makes about CONTENT, asked in
+ * `sample-import.bpmn`. Core re-exports these names.
  *
- * The split is the harness's own need, not tidiness: the harness already
- * spoke this vocabulary without being able to import it —
- * `schemas/library/referenced-source.ts` names state `referenced`, `cat-harness.ts`
- * names the three states, and `binary-release.ts` restates the fixity shape —
- * each by prose reference to a module one layer UP.
- *
- * ## Three states, and the third is not a degraded second
+ * ## Three states
  *
  *   - **`referenced`** — the node exists, we know where, we hold no bytes.
  *   - **`materialized`** — the bytes are here.
  *   - **`unknown`** — we have not established which.
  *
- * Collapsing `unknown` into `referenced` is how a catalogue reports a clean
- * scan over content nobody ever looked for. Collapsing `referenced` into
- * `materialized` is worse: `corpus-grep` searches `library/` only, so a
- * referenced-but-not-materialised node reads as ABSENT to every consumer, and
- * a clean grep then means "nobody has done this" when the source is sitting on
- * a server.
+ * Collapsing `unknown` into `referenced` reports a clean scan over content
+ * nobody looked for. Collapsing `referenced` into `materialized` is worse:
+ * `corpus-grep` searches `library/` only, so a referenced node reads as
+ * ABSENT.
  *
  * There is deliberately **no default**. A node that does not declare its state
- * is invalid, not `unknown` — "the author did not say" and "the author said
- * they could not tell" are different facts, and only the second is a finding
- * somebody can act on.
+ * is invalid, not `unknown`.
  *
  * ## A remote-KG subscription is a materialization
  *
- * The same ruling's addition. Subscribing to an external knowledge graph
- * (`kg-subscribe`, `subscribe-kg.bpmn`, the `kg-subscription` skill) is not a separate concept with
- * its own state machine: it is a materialization whose MINIMUM is the chosen
- * subgraphs' METADATA, held under `library/<source>/`. The subgraphs chosen
- * are `materialized` as metadata; everything else the remote declares is
- * `referenced`; and a subgraph whose declaration could not be read is
- * `unknown`, never silently `referenced`. Taking more than the metadata — the
- * nodes' bodies, their blobs — is an ordinary materialization of those nodes,
- * with core's five gates, and nothing about having subscribed discharges them.
- * This is recorded as vocabulary, not built: no subscription feature reads it
- * yet.
+ * Subscribing to an external knowledge graph (`kg-subscribe`,
+ * `subscribe-kg.bpmn`, the `kg-subscription` skill) is a materialization
+ * whose MINIMUM is the chosen subgraphs' METADATA, held under
+ * `library/<source>/`. The chosen subgraphs are `materialized` as metadata;
+ * everything else the remote declares is `referenced`; a subgraph whose
+ * declaration could not be read is `unknown`. Taking more than the metadata
+ * is an ordinary materialization of those nodes, with core's five gates. No
+ * subscription feature reads this yet.
  */
 import { z } from "zod";
 

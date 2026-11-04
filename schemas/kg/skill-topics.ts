@@ -1,6 +1,6 @@
 /**
  * The shape of `skills.json`, the labelling node that says which
- * subdirectories of a skills directory are TOPICS (bean `9umr`).
+ * subdirectories of a skills directory are TOPICS.
  *
  * @module schemas/skill-topics
  * @graphNode schema

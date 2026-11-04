@@ -1,14 +1,12 @@
 /**
  * Which skill edits which declaration property: the "edit skills" column of the
- * harness config panel (issue #1146).
+ * harness config panel.
  *
- * Owner, 2026-09-23: *"add in to render appropraite edit skills as well"*, and,
- * on QA: *"make sure all node types/schemas have QA. it is a QA in and of
- * itself if there are missing"*. So this map is TOTAL over the declaration's
- * keys, and `property-skills.test.ts` fails when a key is added to
- * {@link CatHarnessDeclarationSchema} without a row here. A row either names
- * the skills that edit the property or records, in words, that none does yet.
- * A recorded gap is shown in the panel as a finding. It is never left blank.
+ * This map is TOTAL over the declaration's keys: `property-skills.test.ts`
+ * fails when a key is added to {@link CatHarnessDeclarationSchema} without a
+ * row here. A row either names the skills that edit the property or records,
+ * in words, that none does yet. A recorded gap is shown in the panel as a
+ * finding. It is never left blank.
  *
  * Skills are named by their file stem, which is how `reference/skill-instructions/`
  * publishes them. The test checks every name resolves to a skill file.

@@ -1,19 +1,15 @@
 /**
  * A block kind as a KG node: `folio-block-kind/v1`, one JSON file per kind in
- * a `block-kinds/` graph the OWNING harness declares (bean riit, step 2; sod4
- * finding #1).
+ * a `block-kinds/` graph the OWNING harness declares.
  *
- * Owner, 2026-10-04: every contribution is a node; *"block kinds first"*; the
- * nodes live with their owners now (document kinds in the content core,
- * the math kinds in the science layer's paper adapter, option 2 of 3); and
- * *"kinds need to be discoverable … not centrally managed"*. So no module
- * lists the kinds: `block-kinds.ts` DISCOVERS them by scanning every
- * instance's declared `block-kinds` graph, and each per-kind fact the old
- * parallel tables held (label prefix, RDF types, builder, profile, whether a
- * label is provable, whether the definition index lists it) is a field here.
+ * Kinds are discoverable, not centrally managed: no module lists them, and
+ * `block-kinds.ts` DISCOVERS them by scanning every instance's declared
+ * `block-kinds` graph. Each per-kind fact (label prefix, RDF types, builder,
+ * profile, whether a label is provable, whether the definition index lists
+ * it) is a field here.
  *
- * Headings are NOT here beyond the English source string: the owner put
- * locale headings in the translation graph (option 1 of 2).
+ * Headings are NOT here beyond the English source string: locale headings
+ * live in the translation graph.
  *
  * A LEAF: Zod only, so `block-kinds.ts` (itself a leaf every schema imports
  * at module load) can parse with it without a cycle.

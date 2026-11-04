@@ -2,58 +2,30 @@
  * dependency-order.ts — flatten a dependency hierarchy into ONE ordered list,
  * with the failure policy attached to each step rather than to the runner.
  *
- * ## Why this is a module and not four hand-written orderings
+ * One implementation for every "run these in dependency order" caller (the
+ * render pipeline, the instances table, the work-plan roadmap, the skill
+ * graph): they differ only in what the nodes are, never in what ordering
+ * MEANS.
  *
- * The owner, 2026-09-20, asking for the README render to be placed in the
- * rendering pipeline:
- *
- * > dynamic parts (kg vierwe, visaluzers, etc) render in flattened depndency
- * > order, failures = skip/log/qa or so
- *
- * and immediately after, generalising it:
- *
- * > readme epid need to flattening of depndency hieracy, rulles + tools. as do
- * > other skills. this is a repeable subprocess
- *
- * **A repeatable subprocess is a thing with one implementation.** Four callers
- * wanting "run these in dependency order" is four topological sorts, three of
- * which are subtly different and none of which is tested. The orderings this
- * repository already needs are the render pipeline, the instances table, the
- * work-plan roadmap and the skill graph — and they differ only in what the
- * nodes are, never in what ordering MEANS.
- *
- * ## The four rules, and each one is a decision rather than a default
+ * ## The four rules
  *
  * 1. **A node runs after everything it declares `needs`.** Nothing else
  *    implies order. A node that needs nothing is free to run first.
- * 2. **Ties break on declaration order, not on id.** Sorting ties
- *    alphabetically makes the flattened list churn when a node is renamed,
- *    which turns a no-op rename into a pipeline diff nobody can read. The
- *    input order is an authored fact and it is kept.
- * 3. **A cycle is reported, never broken.** Breaking one picks a winner
- *    silently, and the pipeline then runs in an order no one chose. Every
- *    node in the cycle is named — naming one of them sends the reader to fix
- *    the wrong edge.
+ * 2. **Ties break on declaration order, not on id**, so a rename does not
+ *    churn the flattened list.
+ * 3. **A cycle is reported, never broken.** Every node in the cycle is named.
  * 4. **A missing dependency is reported, never dropped.** `needs: ["x"]` with
- *    no `x` is a claim that failed, and a runner that silently ran the node
- *    anyway would report a clean pass over a broken graph. This is the `dh4f`
- *    defect in ordering form.
+ *    no `x` is a claim that failed.
  *
- * ## `fatal` is per step, and that is the owner's design
+ * ## `fatal` is per step
  *
- * > current state of KG renderered as json/jsonld failuer = fatal, readme
- * > updated faliure = fatal , dynamic parts (kg vierwe, visaluzers, etc)
- * > render in flattened depndency order, failures = skip/log/qa or so
- *
- * So the runner cannot own one policy: two steps must stop the build and the
- * rest must not. Carrying it on the STEP means the policy is declared beside
- * the thing it governs and is visible in the flattened list, rather than
- * living in whichever `if` the runner happens to have.
+ * Some steps (e.g. the KG rendered as JSON/JSON-LD, the README) must stop the
+ * build; dynamic parts (KG viewer, visualisers) skip, log and raise QA. So the
+ * policy is declared on the STEP, visible in the flattened list.
  *
  * A `fatal` step that fails ends the run. A non-fatal one is recorded as
- * `skipped` — and so is every step that needed it, because running a step
- * whose input never rendered produces output that LOOKS complete. That
- * cascade is the whole reason skip is not the same as "carry on".
+ * `skipped` — and so is every step that needed it, because a step whose input
+ * never rendered produces output that LOOKS complete.
  *
  * @module schemas/dependency-order
  * @graphNode none — an ordering function library: it defines no schema

@@ -1,9 +1,8 @@
 /**
  * The cat-harness instance's Tool nodes — its `tools` graph.
  *
- * Was cat-harness `tools/index.ts`. The harness holds no code (bean `8lcl`),
- * so its tools directory is folders of `<id>/<id>.json` and nothing else; this
- * is the loader those folders used to carry beside them. Discovery
+ * The harness holds no code, so its tools directory is folders of
+ * `<id>/<id>.json` and nothing else; this is their loader. Discovery
  * (`tools/discover.ts`) loads a directory with no `index.ts` the same way.
  *
  * @graphNode none — a reader over the harness's Tool folders; the Tool node's schema is `tool.ts`

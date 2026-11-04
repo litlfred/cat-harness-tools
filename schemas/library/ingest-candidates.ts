@@ -5,9 +5,8 @@
  * typed block each by `pipeline/gen-library-jsonld.ts`.
  *
  * Proposals only: nothing here is folio content. The whole-document fields
- * (`document_class`, `validated`, `disposition`) are optional, because an
- * aspect run or a hand-written record says nothing about the whole document
- * and the manifest reads them as if it did (cat-harness-tools#1356).
+ * (`document_class`, `validated`, `disposition`) are optional: an aspect run
+ * or a hand-written record says nothing about the whole document.
  *
  * Each candidate is open beyond the fields every reader relies on: an
  * extractor carries what its class knows (`grade_nearby`, `label_prefix`).

@@ -1,119 +1,53 @@
 /**
  * @graphNode schema
  *
- * The positioned TEXT on a page that declares a figure — bean `a8wy`, under
- * `m4xy`. The labels of a figure that is DRAWN rather than placed.
+ * The positioned TEXT on a page that declares a figure: the labels of a
+ * figure that is DRAWN rather than placed.
  *
- * ## Why this is not `images.json`
+ * ## Not `images.json`
  *
- * `pdf-images.py` recovers the RASTER layer: an image object the PDF places on
- * a page, with a rectangle, a coverage and a role. WHO's conceptual figures —
- * frameworks, maturity models, taxonomies, process flows — are **drawn**, in
- * path operators and text, so there is no image object and nothing for that arm
- * to place. `9789240120747-eng` declares six captioned figures and places zero
- * images; `check-l1-complete` reported *"0 image(s), 0 describable and all
- * described"* over it, which is true about raster and misleading about figures.
+ * `pdf-images.py` recovers the RASTER layer: image objects the PDF places.
+ * Conceptual figures — frameworks, maturity models, process flows — are
+ * **drawn** in path operators and text, with no image object. Forcing them
+ * into `DocumentImageSchema` would make `role` and `basis` mean two things
+ * (no rectangle, no `xref`, no pixel). So this is its own sidecar,
+ * `vector-labels.json`, joined to images by page number only.
  *
- * A vector figure is not a placed raster image, and forcing it into
- * `DocumentImageSchema` would make `role` and `basis` mean two things:
- * there is no rectangle to measure coverage on, no `xref` to dedupe by, and no
- * pixel to inspect. So this is its own sidecar, `vector-labels.json`, and the
- * two are joined by the page number and by nothing else.
+ * ## What it refuses to do
  *
- * ## What it refuses to do, and the measurement behind each refusal
+ * **It does not decide which labels belong to the figure.** Intersection with
+ * a drawing is not a reliable test (labels, axis titles and legends often sit
+ * in the white space between boxes), so every line on a qualifying page is
+ * recorded, and {@link VectorLabelSchema.intersectsDrawing} is stored as a
+ * measurement, not used as a filter.
  *
- * **It does not decide which labels belong to the figure.** The obvious rule —
- * a text line is figure content when its rectangle intersects a drawing's —
- * was tested before it was rejected. On `9789240120747-eng` page 34 it
- * separates perfectly: of 153 labels, 149 intersect and the four that do not
- * are the running head, the page number, the caption and the source line. On
- * `9789240010567-eng` page 25 it is false for **33 labels of which only three
- * are furniture** — it would drop the four architecture names `SILOED`, `MUD`,
- * `INTEGRATED` and `EXCHANGED`, every line of their glosses, both axis labels
- * (`TECHNICAL DEBT`, `ECONOMIES OF SCALE`, `ALIGNMENT WITH DIGITAL HEALTH
- * STRATEGY`) and the three-entry legend, because those sit in the white space
- * BETWEEN the drawn boxes rather than on them. Rendered and checked by eye,
- * 2026-09-24.
- *
- * So every line on a qualifying page is recorded, and
- * {@link VectorLabelSchema.intersectsDrawing} is stored as the **measurement it
- * is** rather than used as a filter. Same rule this repository applies to any
- * number it prints: reported, never graded.
- *
- * **It does not group.** A label is one MuPDF *line*, and nothing above that.
- * Which labels form a box, which box sits inside which layer, and which arrow
- * runs where are all inference; `m4xy` is explicit that a threshold chosen
- * after seeing this corpus is a number chosen to fit the answer.
- *
- * The line rather than the BLOCK is a correction, not a preference. MuPDF's
- * block segmentation merges labels that are nowhere near each other: on
- * `9789240010567-eng` page 25 one block holds six circled numerals spread over
- * 200 pt across three separate architecture diagrams, and another holds
- * `HEALTH USE CASE` and `HEALTH PROGRAMME` — the titles of two DIFFERENT
- * architectures, 130 pt apart. A consumer reading those blocks' bounding boxes
- * would place both titles in one rectangle spanning half the figure.
- *
- * **Demonstrated, not only asserted — 2026-09-30.** Figure 2 of
- * `arxiv-2504.19675v2` was described from this sidecar alone and then
- * rendered. Every proper name, heading and run number came out right; the
- * relation did not. Its 13 in-drawing labels line up as three rows, which
- * reads as "one ensemble per base project", and the dashed arrows in fact
- * CROSS — the paper's own text says the two BM ensembles each combine Bonsai
- * and MLLM while BMX combines all three. A whole column (`trained on`) is
- * cylinder glyphs with no text, so it is invisible here beyond its heading.
- * A description written from labels alone is safe as an INVENTORY and unsafe
- * as an ACCOUNT; bean `a8wy` carries the worked case.
+ * **It does not group.** A label is one MuPDF *line*, and nothing above that:
+ * MuPDF's blocks merge labels that are far apart. Boxes, layers and arrows are
+ * inference. A description from labels alone is safe as an INVENTORY and
+ * unsafe as an ACCOUNT.
  *
  * **It does not claim reading order.** {@link VectorFigurePageSchema.labels} is
  * ordered by top edge then left edge: a deterministic, stated convention so a
- * re-run diffs cleanly, and not a claim about how a reader's eye moves through
- * a diagram that has none.
+ * re-run diffs cleanly.
  *
- * **It does not count.** No ratio of labels to declared figures is computed,
- * for `m4xy`'s reason: declared figures and recovered labels are not
- * commensurable.
+ * **It does not count.** No ratio of labels to declared figures is computed;
+ * they are not commensurable.
  *
- * ## Which pages qualify — and the over-inclusion is chosen
+ * ## Which pages qualify — over-inclusion is chosen
  *
  * A page is recorded when it carries a **line-start `Fig.`/`Fig`/`Figure` + number**
  * that is not a table-of-contents entry, **and has a vector layer at all**.
- * That is looser than `declaredFigureCaptions`, which additionally requires a
- * period and whitespace before the caption text, and the looseness is paid for
- * twice over:
+ * That is looser than `declaredFigureCaptions` (which also requires a period
+ * and whitespace): captions such as `Fig. 13<tab>Example` have no period, and
+ * a false positive costs a page of prose while a false negative loses a
+ * figure's labels.
  *
- * - Requiring the period drops **14 of `9789240093362-eng`'s 15 figure pages**,
- *   whose captions read `Fig. 13\t Example decision-support logic matrix` — a
- *   tab, no period.
- * - Not requiring it admits pages whose only match is a cross-reference
- *   (`Fig. 4.5.1 highlights the major considerations`). A false positive costs
- *   a page of prose in the sidecar; a false negative loses a figure's labels
- *   entirely, which is the one thing this arm exists to prevent. The same
- *   asymmetry `document-image.ts` argues for `chrome`.
+ * **The table-of-contents guard is structural.** A figure-list entry carries a
+ * DOT LEADER — two periods separated by nothing but space. It is NOT "the
+ * line ends in a number", which would drop real captions ending in a year.
  *
- * **The table-of-contents guard is structural, not numeric.** A figure-list
- * entry carries a DOT LEADER — two periods separated by nothing but space —
- * and nothing else in this corpus does. Checked against every candidate in the
- * six WHO PDFs: it excludes both of `9789240010567-eng`'s figure-list pages,
- * 42 entries, and no real caption. It is deliberately NOT "the line ends in a
- * number", which drops `Figure 2.13. m4RH monitoring data … August 2010 to
- * April 2012`.
- *
- * Measured 2026-09-24 over the six WHO PDFs under `uploads/`:
- *
- * | document | pages | qualifying | labels | on a drawing |
- * |---|---:|---:|---:|---:|
- * | `9789240010567-eng` | 182 | 44 | 4 071 | 3 145 |
- * | `9789240081949-eng` | 66 | 1 | 124 | 98 |
- * | `9789240093362-eng` | 98 | 15 | 1 926 | 1 424 |
- * | `9789240120747-eng` | 84 | 6 | 783 | 574 |
- * | `9789241509510_eng` | 106 | 3 | 251 | 175 |
- * | `9789241511766-eng` | 144 | 26 | 1 851 | 899 |
- *
- * The two columns on the right are **not** a coverage: see the refusal above.
- *
- * **Known limit, stated rather than left to be discovered:** a figure whose
- * caption sits on the facing page is not recorded at all. That is a page this
- * arm does not reach, not a page it found nothing on.
+ * **Known limit:** a figure whose caption sits on the facing page is not
+ * recorded at all.
  */
 import { z } from "zod";
 

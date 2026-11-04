@@ -2,9 +2,7 @@
  * What an EXTRACTION produced, and when — provenance for assets pulled out of
  * a container.
  *
- * ## The fact this exists to keep separate
- *
- * Three timestamps sit near each other and mean entirely different things:
+ * ## Three timestamps, three meanings
  *
  * | | says |
  * |---|---|
@@ -12,43 +10,21 @@
  * | `materializedAt` | when WE brought the bytes local (core's `materialization.ts`) |
  * | `extractedAt` here | when a TOOL produced this file out of something else |
  *
- * Measured on the WHO IRIS capture, 2026-09-20, which is why this is a schema
- * rather than a convention. Every one of the four captured files carries
- * `2026-09-20 07:42`-ish — the zip entries, the page PDF, the info PDF — and
- * not one of those is a date about the WORK. The style guide was published in
- * 2020. The `07:42` is the moment somebody pressed save.
- *
- * The page PDF carries `Producer: Skia/PDF m152`, which is Chrome's
- * print-to-PDF. That single string is what distinguishes "the publisher's PDF"
- * from "a screenshot of a web page shaped like a PDF" — and the difference is
- * invisible in a file listing, a byte count or a checksum.
- *
- * **An extraction timestamp is never a publication date.** Folding the two
- * would date a 2020 publication to 2026 and lose the only evidence that the
- * artefact is second-hand.
+ * **An extraction timestamp is never a publication date.** A captured file's
+ * dates are when it was saved, not when the work was published, and its
+ * producer string (e.g. a browser's print-to-PDF) is often the only evidence
+ * that the artefact is second-hand.
  *
  * ## Metadata, not contents
  *
- * Owner, 2026-09-20: *"make sure you have zip ingestion skills to extract
- * metadata of assets into KG. don't extract contents unless explict ask by
- * user."*
+ * The default product of reading a container is this record — a list of what
+ * is inside, with sizes, types and digests — and NOT the files. Contents are
+ * extracted only on explicit request. An {@link ExtractedAsset} describes an
+ * entry; `localPath` is present only where that entry was asked for, and its
+ * absence is the normal state.
  *
- * So the default product of reading a container is this record — a list of
- * what is inside, with sizes, types and digests — and NOT the files. An
- * {@link ExtractedAsset} describes an entry; `localPath` is present only where
- * the owner asked for that entry specifically, and its absence is the normal
- * state rather than a gap.
- *
- * ## Why it lives in the harness
- *
- * Bean `tlat` (placement PR5, owner ruling 2, 2026-09-30, option A): this is
- * the contract behind the harness's own `asset-extraction` skill, so it moved
- * DOWN from the content core's `schemas/` together with the tool that writes
- * it (the tools layer's `scripts/extract-assets.ts`). Nothing here names a
- * content concept — a container, its entries, three timestamps — and nothing
- * in core imported it, so the move left no upward edge behind. Like every Zod
- * module in this directory it follows to `cat-harness-tools/schemas/` at
- * separation stage 1b (bean `8lcl`).
+ * It is the contract behind the harness's `asset-extraction` skill, written
+ * by `scripts/extract-assets.ts`.
  *
  * @graphNode schema
  * @module schemas/extraction

@@ -1,22 +1,9 @@
 /**
  * Node kinds with more than one parent, composed by the platform's one
- * resolve-then-walk. Bean `a1lq`.
+ * resolve-then-walk.
  *
  * @module schemas/node-kind
  * @graphNode none — a composition function over other modules' schemas, not a schema
- *
- * ## Why this exists
- *
- * The owner, 2026-09-23, on a review comment being built as a todo:
- *
- * > thhemed todo? we didnt discuss mult-iheritence of harness or node kinds.
- * > we need to have that. once depedencies of (orderd) dependecy tree are
- * > full resolve, walk tree in order starting w/ deepest depenencies
- *
- * and then *"make sure consistent"*. Instances already had a walk. Node kinds
- * had none: a kind with two parents was a Zod `.extend()` with a spread, and
- * when two parents defined one field, whichever spread came last won, silently.
- * Nothing declared a kind's parents, so nothing could walk them.
  *
  * ## The rule is the instances' rule, from the same module
  *
@@ -24,28 +11,24 @@
  * them with `flattenDependencies` from `schemas/kg/dependency-order.ts` (deepest
  * first, ties on declared parent order), and composes each ancestor's OWN shape
  * in that order. The instance resolver in `harness-config.ts` calls the same
- * flattener. Two answers to "what order do layers compose in" would be free to
- * disagree, so there is one.
+ * flattener, so layers and kinds compose in one order.
  *
  * ## Refused, at the moment the kind is defined
  *
  * - **A field two unrelated ancestors define** (`findConflicts`): the order
  *   between them means nothing, so it must not pick a value.
  * - **A redefinition the child did not declare.** Overriding an inherited field
- *   is allowed and must be said, in `overrides`, so a field that shadows a
- *   parent's by accident is caught rather than shipped.
+ *   is allowed and must be said, in `overrides`.
  * - **A declared override that overrides nothing**, which is a stale claim.
  *
- * All three throw where the kind is defined, i.e. on module load, so the first
- * test that imports the kind fails. A composition error that surfaced only when
- * a file was validated would ship.
+ * All three throw on module load, so the first test that imports the kind
+ * fails.
  *
  * ## Parents are objects, not ids
  *
  * A kind names its parents by reference, so the graph is the import graph and
- * there is no global registry to be loaded in the wrong order — a failure this
- * repository has paid for (`bunfig.toml`, 2026-09-20). A parent may be a
- * tagged kind (`todo/1.0.0`) or a named mixin (`themed`), which has no
+ * there is no global registry to be loaded in the wrong order. A parent may be
+ * a tagged kind (`todo/1.0.0`) or a named mixin (`themed`), which has no
  * `$schema` of its own. Both are kinds here, because both are layers.
  */
 import { z } from "zod";

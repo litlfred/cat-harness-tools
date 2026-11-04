@@ -4,17 +4,9 @@
  * @module schemas/subgraph-source
  * @graphNode schema
  *
- * The owner, 2026-10-03, verbatim:
- *
- * > *"It's the same pattern. One of them is mounting the directory while one
- * > of them is mounting a branch. Another mount type could come in the future.
- * > A sub graph declares where it's getting its content.. It could also be a
- * > graph database in the future. That same information can be overwritten by
- * > the harness instance config."*
- *
- * So a "declared directory subgraph" and a "declared branch subgraph" are not
- * two things. Both are a declared Subgraph; they differ in their SOURCE, and
- * the source is a discriminated union on `kind`:
+ * A declared subgraph says where it gets its content, and the instance config
+ * may override that. Directory, branch and remote subgraphs are one thing
+ * differing in SOURCE, a discriminated union on `kind`:
  *
  * | kind | content comes from | the entry's `path` is |
  * |---|---|---|
@@ -22,36 +14,30 @@
  * | `branch` | a declared repository branch, keyed by `commit` or `tip` | where a mount of it lands |
  * | `family` | a family of branches, one per key | where a mount of ONE member lands |
  * | `remote` | another repository's tree, at a pinned 40-character commit | where the remote mount lands |
-| `hydrated` | another instance's published `index.hydrated.jsonld` for one subgraph, at a pinned commit — metadata, no files | where that one file lands |
+ * | `hydrated` | another instance's published `index.hydrated.jsonld` for one subgraph, at a pinned commit — metadata, no files | where that one file lands |
  *
- * A third kind (a graph database) is a new MEMBER of the union — an additive
- * change every `switch` on `kind` is then forced by the compiler to answer —
- * never a reinterpretation of an existing field.
+ * A new kind (e.g. a graph database) is a new MEMBER of the union, which every
+ * `switch` on `kind` is then forced by the compiler to answer — never a
+ * reinterpretation of an existing field.
  *
- * ## How the older fields map onto it
+ * ## The legacy `storage` field
  *
- * `storage: { branch, keyedBy }` (arc `3fva`, #1764; `keyedBy: "tip"` added by
- * #1937) is EXACTLY `source: { kind: "branch", branch, keyedBy }`. It stays
- * as the LEGACY spelling: the resolver reads it and reports the answer as
- * `declaredIn: "storage"`, the presence checks ask {@link contentIsOffCheckout}
- * (which honours both), and an entry carrying both is refused, because two
- * answers to one question is the defect this module exists to remove.
- * `qa-store.ts` and `branch-store.ts` still read `storage` directly; moving
- * them onto the resolver is their owners' change (#1957 takes `branch-store`'s
- * `mount`/`push` onto it), not this module's. The DECLARATION is the only
- * source of a branch's name (bean rva2, owner 2026-10-04: special-branches.json
- * leaves infrastructure). The resolver attaches no table row any more, and a
- * branch no directory declares is a health finding (`state:drift`), not a
+ * `storage: { branch, keyedBy }` is EXACTLY
+ * `source: { kind: "branch", branch, keyedBy }`, kept as the LEGACY spelling:
+ * the resolver reads it and reports `declaredIn: "storage"`, the presence
+ * checks ask {@link contentIsOffCheckout} (which honours both), and an entry
+ * carrying both is refused. `qa-store.ts` and `branch-store.ts` still read
+ * `storage` directly. The DECLARATION is the only source of a branch's name;
+ * a branch no directory declares is a health finding (`state:drift`), not a
  * resolver failure.
  *
  * ## Overridable by the instance config, matched on id
  *
  * `<instance>.config.json` → `subgraphSources: { "<dir-id>": <source> }`. The
  * declaration says what the subgraph IS; the config says how THIS
- * instantiation is set up, and where a subgraph is mounted from is that kind
- * of fact (an IG folio may mount `fsh-guts` from a branch while a fresh clone
- * reads it from the checkout). Matched on the entry's `id`, never its `path` —
- * the override rule `resolveDirectories` already applies to whole entries.
+ * instantiation is set up (an IG folio may mount `fsh-guts` from a branch
+ * while a fresh clone reads it from the checkout). Matched on the entry's
+ * `id`, never its `path`.
  *
  * ## One resolver
  *

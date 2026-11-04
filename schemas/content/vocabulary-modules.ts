@@ -2,16 +2,9 @@
  * A typed vocabulary's own module: the code a layer above cat-harness ships
  * so that it, not cat-harness, types its block kinds.
  *
- * ## Why
- *
- * `BlockSchema` (`constraints.ts`) typed every kind the platform knew, the
- * science layer's `theorem`, `lemma` and the rest included. A composition
- * that does not mount that layer (litlfred/aai-programme, which holds no
- * mathematics) then had seven kinds typed in code and declared by no node,
- * and `check:kind-validators` failed on every one. The owner's ruling of
- * 2026-10-22 (option C): the math kinds' schemas move to the layer that
- * declares them. The vocabulary already moved there on 2026-10-12 (bean
- * `bzwk`); its code was left behind.
+ * A kind's schema belongs to the layer that declares it, so a composition
+ * that does not mount that layer has no kinds typed in code and declared by
+ * no node (which `check:kind-validators` would fail).
  *
  * ## The contract
  *
@@ -24,14 +17,13 @@
  * - `constraintRules` (optional) — {@link ConstraintRule}s, run beside
  *   `CONSTRAINT_RULES`.
  * - `constraintContext` (optional) — a {@link ConstraintContextContributor}:
- *   what its rules read beyond the generic context (the science layer's
- *   sibling `.lean` and Lake-tree lookup, bean `saqd`).
+ *   what its rules read beyond the generic context (e.g. the science layer's
+ *   sibling `.lean` and Lake-tree lookup).
  * - `builders` (optional) — the manifest builders for its kinds, by name.
  *
- * A kind is typed either by `BlockSchema` or by a module. While one moves, a
- * module's schema takes precedence over a built-in one for the same kind, and
- * a module's rule over a built-in rule with the same `id`, so the layer above
- * can take a kind over before cat-harness deletes its copy.
+ * A kind is typed either by `BlockSchema` or by a module. A module's schema
+ * takes precedence over a built-in one for the same kind, and a module's rule
+ * over a built-in rule with the same `id`.
  *
  * ## Loaded lazily
  *

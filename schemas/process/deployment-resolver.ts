@@ -2,22 +2,16 @@
  * **The deployment resolver**: for each task of a process, who may run it in
  * a deployment, and with which Tool.
  *
- * Bean `folio-assistant-v3zw`, under `o1by`. The design is
- * `docs/proposals/deployment-descriptions.md` §3.2.
- *
  * ## It reports, and never fails
  *
- * Owner, 2026-10-24, §5 question 3, option C: "a task no placement can run"
- * appears in the report and never blocks a merge. So this module returns a
- * report and has no gate. A caller that turns a finding into an exit code is
- * going against that ruling.
+ * "A task no placement can run" appears in the report and never blocks a
+ * merge. This module returns a report and has no gate; a caller must not turn
+ * a finding into an exit code.
  *
  * ## A pure function over what the caller reads
  *
  * It takes the description, the actors, the tasks and the Tools as values and
- * reads no files. Reading the process and Tool graphs is the job of the layer
- * that implements commands (the tools layer); the rule for matching them is
- * here, where it can be tested without a corpus.
+ * reads no files; the tools layer reads the process and Tool graphs.
  *
  * ## What it can decide, and what it says it cannot
  *
@@ -30,12 +24,11 @@
  *
  * ## A skill with no Tool is judgement, not a gap
  *
- * Most skills have no Tool node, and that is by design: they are exercised by
- * the actor in the lane (`check:tools` reports uncovered skills and does not
- * fail on them). So only a skill that HAS Tools is judged here, and a task is
- * held up only when every Tool of one of its skills fails for every candidate.
- * A skill with no Tool is listed under `judgement`, never counted against the
- * task: a deployment cannot change whether a Tool exists.
+ * Most skills have no Tool node; they are exercised by the actor in the lane
+ * (`check:tools` reports uncovered skills and does not fail on them). Only a
+ * skill that HAS Tools is judged, and a task is held up only when every Tool
+ * of one of its skills fails for every candidate. A skill with no Tool is
+ * listed under `judgement`, never counted against the task.
  *
  * @graphNode schema
  * @module folio-assistant/schemas/deployment-resolver

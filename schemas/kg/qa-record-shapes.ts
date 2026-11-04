@@ -3,7 +3,7 @@
  * `qa-witness/v1`, `qa-results/v1`, `translation-qa/v1`, `folio-lsi-index/v1`.
  *
  * Definitions, so they live here; the code that writes and reads these records
- * is in the tools layer above this one and re-exports them (bean 70lx). The graph-typology
+ * is in the tools layer above this one and re-exports them. The graph-typology
  * registry's `nodeSchemas` names these by `module#Export`, and a reference from
  * the harness can only resolve inside the harness.
  *

@@ -4,54 +4,32 @@
  * @module schemas/content-type
  * @graphNode schema
  *
- * ## The question nothing could answer
- *
- * `getting-started.md` asked it like this:
- *
- * ```sh
- * test -f harness.config.json && echo isFolio=true
- * ```
- *
- * One filename, one boolean, and no type behind it. A repository cannot be two
- * things that way, and the DAK layer already is two — a DAK *and* a SUSHI
- * project — so the boolean is wrong about the first repository anybody asks it
- * about. Bean `79t3`.
- *
  * ## A repository is a SET, and the marker is the assertion
  *
  * **A repository declares itself an instance of a content type by carrying a
  * file named after that type.** The filename is the assertion; the type's IRI
- * is the resolvable reference to what the assertion MEANS. Several markers
- * coexist, so the answer is a set rather than a value, and each marker stays
- * owned by whoever defined it — `sushi-config.yaml` is SUSHI's and is
- * not ours to rename. `dak.config.json` IS ours (bean `cz17`), and was renamed
- * from `dak.json` on 2026-09-22 for consistency with `<name>.config.json`; the
- * claim that it was WHO's and unrenameable stood here until then.
+ * is the resolvable reference to what the assertion MEANS. A repository may
+ * be several things at once (a DAK *and* a SUSHI project), so the answer is a
+ * set, not a one-file boolean. Each marker stays
+ * owned by whoever defined it — `sushi-config.yaml` is SUSHI's and is not
+ * ours to rename; `dak.config.json` is ours.
  *
- * That is why this is a registry rather than an enum, and why each entry
- * carries its own `filename`: the owner's rule, 2026-09-20 —
- * **each type declares its own filename** — recorded in
- * `skills/kg/kg-core/directory-conventions.md`.
+ * So this is a registry, not an enum, and **each type declares its own
+ * filename** (`skills/kg/kg-core/directory-conventions.md`).
  *
- * ## Deliberately the same shape as `GraphTypologyRegistry`
+ * ## The same shape as `GraphTypologyRegistry`
  *
  * Open, seeded with a base table, `register` refusing a conflicting redefinition
  * and tolerating an identical one (a diamond reaches the same type twice). A
- * layer that owns a type registers it at load time, exactly as
- * `folio-graph-typology.ts` registers `folio` rather than the harness declaring a
- * kind it cannot serve.
- *
- * A second registry shape would be a second set of rules about redefinition,
- * lookup and diamonds — all of which this one has already been through.
+ * layer that owns a type registers it at load time, as
+ * `folio-graph-typology.ts` registers `folio`.
  *
  * ## Reported, never resolved
  *
  * Two markers may state the same fact differently — both naming a
  * `canonicalUrl`, say. {@link describeRepository} REPORTS the disagreement and
- * resolves nothing. That is `79t3` question 2, and the bean's own "Done when"
- * had already answered it: *"a disagreement between two markers **reported
- * rather than silently resolved**"*. Ranking the markers or letting ours win
- * would make one repository's truth depend on which layer happened to load.
+ * resolves nothing; ranking the markers would make one repository's truth
+ * depend on which layer happened to load.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

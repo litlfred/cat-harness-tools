@@ -1,15 +1,13 @@
 /**
- * The NODES of a node kind, found where its typologies say they are — issue
- * #2195, PR 2.
+ * The NODES of a node kind, found where its typologies say they are.
  *
  * @module cat-harness/schemas/node-kind-nodes
  * @graphNode none — a reader over declared directories; it defines no schema
  *
- * A kind's page lists its own nodes and its subclasses' (owner, 2026-10-05:
- * *"i want to see node that subclass a given node kind"*). Where to look is
- * already declared twice over: the node-kind index says which typologies hold
- * each kind, and each instance's `<instance>.json` says which of its
- * directories have that typology. This joins the two and reads the files.
+ * A kind's page lists its own nodes and its subclasses'. The node-kind index
+ * says which typologies hold each kind, and each instance's `<instance>.json`
+ * says which of its directories have that typology; this joins the two and
+ * reads the files.
  *
  * A file belongs to a kind when the kind ACCEPTS its `$schema` — same name,
  * same major, no newer minor (`acceptsSchemaTag`) — so a node written under an
@@ -18,20 +16,16 @@
  *
  * Each node is filed under the HARNESS that holds it — the instance whose
  * declaration names the directory — with a path relative to that instance's
- * root and without its extension. That path is the node's stable address:
- * `<declaring>/<kind>/<harness>/<path>`. A repository-scoped directory sits
- * OUTSIDE its declaring instance's root, so its nodes are addressed relative
- * to the repository instead; an instance-relative path would start `../`.
+ * root and without its extension: `<declaring>/<kind>/<harness>/<path>`. A
+ * repository-scoped directory sits OUTSIDE its declaring instance's root, so
+ * its nodes are addressed relative to the repository.
  *
- * ## Two things this does NOT read (bean `ujiv`, issue #88)
+ * ## What this does NOT read
  *
  * - **A directory whose content is off the checkout** — a `source` other than
- *   `directory`, e.g. beans and todos kept at the tip of a state branch. What a
- *   checkout holds there is a mount of a branch that moves on its own, so a
- *   page committed from it is stale the moment the branch moves, and no commit
- *   can keep up. The state viewer renders those nodes live. A NESTED entry
- *   (`within`) inherits its parent's source, since the nested entry itself
- *   carries none.
+ *   `directory`, e.g. beans and todos kept at the tip of a state branch, which
+ *   moves without a commit. The state viewer renders those nodes live. A
+ *   NESTED entry (`within`) inherits its parent's source.
  * - Nothing else is skipped. A kind with no typology (an instance declaration)
  *   is found by its NAME RULE instead: see `NAME_RULE_KINDS` in `node-kind-index.ts`.
  */

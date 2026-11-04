@@ -1,49 +1,36 @@
 /**
  * A BEAN NOTE — one pull request's addendum to a bean, in a file of its own.
  *
- * Bean `m61r`, issue #1853. `ob3m` (the navbar wireframe findings) was appended
- * to by one sibling pull request per finding. Each merge put every other open
- * pull request in conflict on that one bean, and the merge-main bot refuses a
- * bean conflict on purpose (`beans: refuse` in `merge-conflict-patterns.ts`),
- * so each needed a hand-merge: #1798, #1805, #1807, #1808 and #1819 within a
- * few hours on 2026-10-02.
- *
- * The owner chose per-PR notes over appends (option 1 of 3; teaching the bot to
- * union that one bean was rejected). A note is a file of its own, so two pull
+ * Appending to one bean from several pull requests conflicts on every merge,
+ * and the merge-main bot refuses a bean conflict (`beans: refuse` in
+ * `merge-conflict-patterns.ts`). A note is a file of its own, so two pull
  * requests adding notes touch two different paths and git merges them with
  * nothing to resolve.
  *
- * ## The naming rule is the whole design
+ * ## The naming rule
  *
  * ```
  * <bean-id>--<YYYY-MM-DD>--<branch slug>.md
  * ```
  *
- * The **branch** is the key that makes two writers disjoint. Git refuses two
- * branches of one name on one remote, and one branch is one pull request's
- * head, so two pull requests open at the same time can never share it. It is
- * also known at the FIRST commit, which a pull request number is not — and the
- * rule is to open the pull request after that commit, not before it.
- *
- * A **date + finding slug** was considered and refused as the key: two
- * sessions working the same finding on the same day choose the same slug, which
- * is exactly the collision this exists to remove. The date stays, as a prefix
- * after the bean id, because it sorts a bean's notes in the order they were
- * started.
+ * The **branch** is the key that makes two writers disjoint: one branch is one
+ * pull request's head, so two open pull requests never share it. It is also
+ * known at the FIRST commit, which a pull request number is not — open the
+ * pull request after that commit, not before it. The date prefix sorts a
+ * bean's notes in the order they were started.
  *
  * One branch writes one file per bean. A second note from the same branch is a
  * new section in the same file, found by its front matter (`bean` + `branch`)
  * rather than recomputed from today's date — so a branch that runs over
- * midnight does not split its notes. Only that branch ever writes the file, so
- * appending to it cannot conflict with a sibling.
+ * midnight does not split its notes.
  *
  * ## The file declares what it is
  *
  * Front matter carries `$schema: folio-bean-note/v1`, the bean, the branch and
  * the date the note was started. A file in the notes directory that does not
  * carry the tag is a finding, never silently skipped, and the check recomputes
- * each file's name from its own front matter: a note whose name does not match
- * is one somebody named by hand, which is how the rule would be lost.
+ * each file's name from its own front matter: a name that does not match is a
+ * finding.
  *
  * @module cat-harness/schemas/bean-note
  * @graphNode schema

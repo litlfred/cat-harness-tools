@@ -1,8 +1,6 @@
 /**
  * Model capabilities and single-model capability refusal schema.
  *
- * ## Why this exists — bean `folio-assistant-2ngl`
- *
  * In developer mode (and any single-model deployment topology), one model is
  * configured for every workflow. A workflow lane or role may require specific
  * model capabilities — e.g. high reasoning tier, tool use, large context window.

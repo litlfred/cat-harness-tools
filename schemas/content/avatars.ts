@@ -2,42 +2,25 @@
  * An avatar for every declared kind — in and out of the trash, in both
  * schemes.
  *
- * Owner, 2026-09-19: *"each content type should have an avatar in and out of
- * trash. dark and light mode"*, and then: *"all kinds need an avatary.
- * bootstrap has avatar, so does cat-harness, folio-asst, sticky/todo, etc."*
- *
  * ## The glyph is a MASK, not an image or an inline `<svg>`
  *
  * Each avatar is one path, served through `mask-image`, so the colour comes
- * from `background-color` — which means a scheme swap is a CSS custom
- * property and not a second set of assets. Two schemes times two trash
- * states times sixteen kinds would otherwise be 64 files to keep in step,
- * and the one that fell behind would be invisible until somebody looked at
- * it in the wrong mode.
+ * from `background-color` and a scheme swap is a CSS custom property, not a
+ * second set of assets. `docs-ui.js` sets `data-fa-kind` and the stylesheet
+ * does the rest, so it works with no script.
  *
- * It also keeps the glyph out of JavaScript: `docs-ui.js` sets
- * `data-fa-kind` and the stylesheet does the rest, so the fan works with no
- * script at all.
+ * ## The trash state is DERIVED
  *
- * ## The trash state is DERIVED, and that is deliberate
- *
- * Not sixteen more drawings. An item in the trash is the same thing, discarded
- * — so it is the same glyph, muted, under the crumple overlay that
- * `d1r6` already established as the discard mark. Drawing each one twice
- * would let the pair drift, and a "discarded proposal" that looked like a
- * different object than a "proposal" would be saying something false.
- *
- * What that costs: trash coverage is automatic, so the QA axis cannot find a
- * missing trash cell. It checks the thing that CAN be missing — a kind with
- * no glyph — and asserts the derivation exists rather than pretending to
- * measure it. A criterion that cannot fail is worse than no criterion,
- * because it reads as coverage.
+ * An item in the trash is the same glyph, muted, under the crumple overlay
+ * that marks a discard — never a second drawing that could drift. So trash
+ * coverage is automatic: the QA axis checks only that every kind has a glyph,
+ * and asserts the derivation exists.
  *
  * ## `kind` is open, so there is a fallback and it is reported
  *
  * `BASE_GRAPH_TYPOLOGIES` is an open registry and `fsh-guts` node kinds are open
  * by design. An unknown kind gets {@link GENERIC} and shows up as a QA
- * finding — never as a blank, which is the third-state rule applied to art.
+ * finding — never as a blank.
  *
  * @module schemas/avatars
  * @graphNode schema

@@ -4,42 +4,27 @@
  * @module schemas/reader-filter
  * @graphNode schema
  *
- * ## Two filters, and the whole value of this module is that they are two
+ * ## Two filters
  *
- * CRDM Q3 gave a board a DECLARED filter — {@link module:schemas/board}'s
- * `pages` and `kinds` — which says what the board IS. The owner's later
- * *"be able to filter out by kind properties things on miror board"* is a
- * different object: a reader narrowing their own view, at view time.
- *
- * **Conflating them would make one reader's temporary view edit the board
- * everyone else opens.** That is not a hypothetical about this codebase; it is
- * what happens the moment a "filter" control writes to `boards/<id>.json`
- * because that is where the other filter lives. So this module holds no
- * `$schema` tag, no file name, no reader and no writer — like
- * `window-stack.ts`, **it is state, not a document**, and the absence is the
- * design rather than an omission.
+ * A board's DECLARED filter — {@link module:schemas/board}'s `pages` and
+ * `kinds` — says what the board IS. A reader's filter narrows their own view
+ * at view time. Conflating them would let one reader's view edit the board
+ * everyone opens, so this module holds no `$schema` tag, no file name, no
+ * reader and no writer: like `window-stack.ts`, **it is state, not a
+ * document**.
  *
  * ## The reader's filter can only NARROW
  *
- * Composition is `boardContent` first, then this. A reader cannot use their
- * filter to see something the board does not show, which keeps the declared
- * filter meaningful: a board scoped to one page stays scoped to one page
- * however its reader is filtering. {@link visibleOn} enforces the order so no
- * caller has to remember it, and `reader-filter.test.ts` asserts the subset
- * property over generated cases rather than trusting the composition to stay
- * written that way.
+ * Composition is `boardContent` first, then this, so a reader never sees
+ * something the board does not show. {@link visibleOn} enforces the order,
+ * and `reader-filter.test.ts` asserts the subset property over generated
+ * cases.
  *
- * ## Same logic as the declared filter, deliberately
+ * ## Same logic as the declared filter
  *
- * OR within an axis, AND across them. A reader who has learned what the
- * board's filter means has learned what theirs means; two filters with two
- * logics on one surface is a thing nobody can predict the result of.
- *
- * An axis that is ABSENT does not filter. An axis present but EMPTY is
- * refused by {@link readerFilterProblem} rather than treated as "match
- * nothing": an empty selection is a control in a state its reader did not
- * choose deliberately, and silently showing them a blank board is the least
- * useful reading of it.
+ * OR within an axis, AND across them. An axis that is ABSENT does not filter.
+ * An axis present but EMPTY is refused by {@link readerFilterProblem} rather
+ * than treated as "match nothing".
  */
 
 /** What a reader is narrowing by. Absent axes do not filter. */

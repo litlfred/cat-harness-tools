@@ -6,18 +6,9 @@
  * package a folio has declared. It does not know which packages exist — a
  * folio injects those with {@link configureLeanPackages}.
  *
- * ## Why this is core and not the science layer
- *
- * `BlockBase` carries an optional `lean` field, in `schemas/types.ts`, and
- * `schemas/constraints.ts` validates its `ref` against
- * {@link LEAN_REF_PATTERN}. The field is on shared block kinds by design —
- * `remark`, `example`, `algorithm` and `simulator` all declare it and the
- * document profile forbids its use (`pipeline/profile-check.ts`). So
- * the **grammar belongs wherever the field does**, which is core; only the
- * package list is a property of a particular folio.
- *
- * Seven core modules import from here for exactly that reason — the ref
- * grammar and the lookup, never the list.
+ * The `lean` field sits on shared block kinds (`remark`, `example`,
+ * `algorithm`, `simulator`) and the document profile forbids its use
+ * (`pipeline/profile-check.ts`). The pattern is {@link LEAN_REF_PATTERN}.
  *
  * ## Unconfigured is not empty
  *
@@ -25,17 +16,7 @@
  * those two states are different facts: **nobody has said** is not **there are
  * none**. {@link leanPackagesConfigured} is how a caller tells them apart, so
  * a pipeline can report "not checked" rather than silently skipping every
- * library-tree `lean.ref` and looking clean while doing so.
- *
- * That distinction replaces a hardcoded default. Until 2026-09-18 this module
- * shipped three qou-family folios — `qou`, `ugb`, `fred2005`, with their
- * content directories — as `DEFAULT_LEAN_PACKAGES`, applied at import. Its own
- * comment said the list "is injected by the content repo; keeping it here as a
- * default unbreaks the pipeline without a config-discovery mechanism". It was
- * one folio family's data living in the platform, which is the genericity
- * failure this repository is organised against, and no platform test covered
- * it: the whole suite passes with the defaults removed, because the platform
- * carries no corpus to skip.
+ * library-tree `lean.ref`. There is no built-in default package list.
  *
  * @module schemas/lean-packages
  * @graphNode schema

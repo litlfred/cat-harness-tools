@@ -1,10 +1,8 @@
 /**
- * W3C PROV-O: the record of a task or decision being performed. Issue #1180,
- * extended for computable Data Sharing Agreements (DSA B4, bean `3z44`,
- * issue #2702).
+ * W3C PROV-O: the record of a task or decision being performed, extended for
+ * computable Data Sharing Agreements.
  *
- * Owner, 2026-09-23: *"W3C ODRL 2.2 and W3C PROV-O for logging"*. The
- * deterministic BPMN engine checks a policy BEFORE a task and refuses; the
+ * The deterministic BPMN engine checks a policy BEFORE a task and refuses; the
  * agentic swarm acts, and a QA/QC report checks the policy AFTER, from this
  * log (`docs/agentic-harness.html#bpmn-execution`). Both need the same
  * record, so it is PROV-O's, not ours.
@@ -20,22 +18,19 @@
  * | `prov:used` / `prov:generated` | the graph nodes read and written |
  * | `prov:wasInformedBy` | the activity this one was part of: a Tool activity names its workflow step's |
  * | `prov:used` → `dcat:Distribution` + `spdx:checksum` | the DSA agreement text the decision was made under (DCAT 3) |
- * | `prov:used` → `cred:VerifiableCredential` | the grant, by its W3C VC Data Model 2.0 credential `id` (DSA B5) |
+ * | `prov:used` → `cred:VerifiableCredential` | the grant, by its W3C VC Data Model 2.0 credential `id` |
  * | `cat-harness:underPolicy` | the ODRL policy (or policies) it acted under |
  * | `cat-harness:previousHash` | **local extension**: SHA-256 hex digest of the preceding record in the chain (`null` at genesis) |
  * | `cat-harness:recordHash` | **local extension**: SHA-256 hex digest of this record's canonical JSON |
  *
- * `hadPlan` is PROV-O's own term for "the plan an agent followed". A BPMN task
- * is exactly that, so no new term is minted for it.
+ * `hadPlan` is PROV-O's term for "the plan an agent followed", which a BPMN
+ * task is.
  *
- * **The agreement and the grant are cited with existing open terms, not ours**
- * (owner card 2026-10-30 19:16Z, bean `yy40`). A decision record names the
- * agreement as a `prov:used` entity whose `@id` is the DCAT 3 `dcat:Distribution`
- * of the agreement's legal text, carrying that text's `spdx:checksum`
- * (`spdx:algorithm` + `spdx:checksumValue`, the property DCAT 3 gives
- * `dcat:Distribution`).
- * The grant is a further `prov:used` entity whose `@id` is the W3C VC Data
- * Model 2.0 credential `id`. No agreement or grant fields of our own remain.
+ * **The agreement and the grant use existing open terms.** The agreement is a
+ * `prov:used` entity whose `@id` is the DCAT 3 `dcat:Distribution` of its
+ * legal text, carrying that text's `spdx:checksum` (`spdx:algorithm` +
+ * `spdx:checksumValue`). The grant is a further `prov:used` entity whose
+ * `@id` is the W3C VC Data Model 2.0 credential `id`.
  *
  * **The hash chain is a local extension.** No open standard defines a
  * hash-chained PROV log, so `cat-harness:previousHash` and

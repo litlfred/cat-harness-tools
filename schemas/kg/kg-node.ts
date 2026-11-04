@@ -2,45 +2,28 @@
  * The two labels every knowledge-graph node may carry.
  *
  * A node here is anything the graph names: a declared directory, a role, an
- * actor, a bean-graph node, a skill, a process. They arrived with four
- * different spellings of the same two ideas — `name` + `summary` on a role,
- * `name` + `description` on an actor, bare `summary` on a directory, `title` in
- * a bean's front matter — which is three renames waiting to happen and, worse,
- * three things a consumer has to know before it can print a node.
- *
- * So: **`title` is what a reader sees, `description` is the sentence under it.**
- * Both optional in general; a node type may require either, and several do —
- * `kg-audit` reports a role with no narrative, because a role nobody can
- * describe is a lane nobody can fill.
+ * actor, a bean-graph node, a skill, a process. **`title` is what a reader
+ * sees, `description` is the sentence under it** — one spelling for every
+ * node type. Both optional in general; a node type may require either, and
+ * `kg-audit` reports a role with no narrative.
  *
  * ## `title` is not `id`, and not `name`
  *
  * `id` is the handle other nodes reference. `name` — where a node still has one
  * — is the instance's own identifier, the thing `harness.json` calls
- * `folio-assistant` and publishes artefacts under. `title` is neither: it is
- * display text, it may contain punctuation an identifier could not, and it is
- * **translatable**. `C@T Harness` is a title; `cat-harness` is a name.
+ * `folio-assistant` and publishes artefacts under. `title` is display text,
+ * may contain punctuation an identifier could not, and is **translatable**.
+ * `C@T Harness` is a title; `cat-harness` is a name.
  *
- * **Having one is a decision, and the default is not to.** {@link displayTitle}
- * falls back to `name`, and `cat-harness.ts` requires `name` to be the
- * identifier every artefact is stub-named after — so an instance whose display
- * text should match its repository wants no `title` at all, rather than a
- * `title` repeating the `name` and free to drift from it.
- *
- * This example used to be `c@t-harness` / `folio-assistant`, drawn from this
- * repository's own declaration, and that was the wrong illustration twice
- * over: the title it cited labelled THIS repository with the brand of the
- * harness layer still to be split out of it, and the sidebar showed a name
- * that matched neither the repository nor the URL people arrive at. Removed
- * 2026-09-19; the derivation it named survives in the `description`, which is
- * where a tagline belongs.
+ * **The default is no title.** {@link displayTitle} falls back to `name`, so
+ * an instance whose display text should match its repository omits `title`
+ * rather than repeating `name`.
  *
  * ## Translatable means extractable
  *
- * {@link KG_NODE_LABEL_FIELDS} is the list a translation extractor reads, so
- * adding a third label later is one edit here rather than a sweep through every
- * extractor. Nothing else in a KG declaration is offered for translation: an
- * id, a path or a graph typology is structure, and translating structure is how a
+ * {@link KG_NODE_LABEL_FIELDS} is the list a translation extractor reads.
+ * Nothing else in a KG declaration is offered for translation: an id, a path
+ * or a graph typology is structure, and translating structure is how a
  * reference goes dangling — the same rule `bpmn-translate.ts` follows.
  *
  * @module schemas/kg-node

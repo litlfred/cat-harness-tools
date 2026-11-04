@@ -1,9 +1,7 @@
 /**
- * A VALIDATOR as a node of the knowledge graph (bean riit). Owner, 2026-10-04:
- * every contribution becomes a node, and *"validators need to be in KG too"*.
- * Asked which way the edge points: **the validator names the family it
- * validates** (option 1 of 2), so the harness that writes the code declares
- * what it checks, and a kind lists only its `$schema` families.
+ * A VALIDATOR as a node of the knowledge graph. **The validator names the
+ * family it validates**, so the harness that writes the code declares what it
+ * checks, and a kind lists only its `$schema` families.
  *
  * Declared in a `validators/` graph of the harness whose code it references.
  * The registry joins each node onto the kind it names: a kind's family with no
@@ -12,7 +10,7 @@
  * family that already has one.
  *
  * `id`, not `name`: a JSON file whose `name` equals its stem is how
- * `findDeclarationFile` recognises an INSTANCE declaration (measured on dmx1).
+ * `findDeclarationFile` recognises an INSTANCE declaration.
  *
  * A LEAF: Zod only.
  *

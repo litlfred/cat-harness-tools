@@ -1,36 +1,16 @@
 /**
  * A coding convention — context attached to a PROCESS, not loaded everywhere.
  *
- * ## The requirement, in the owner's words (2026-09-18, bean `3190`)
- *
- * > coding conventions should also be part of KG. its a specific type of
- * > context that should be set depending on the process/workflow (e.g. in
- * > software development under CRDM) but not all contexts should have it.
- *
- * ## Why this is not another skill, and not more `AGENTS.md`
- *
- * `AGENTS.md` says of itself that a rule living only there is a rule with no
- * home — not in the generated reference, not in the published skill docs, and
- * not found by an agent that went looking for the skill first. Conventions are
- * today exactly that: prose, loaded unconditionally whatever the agent is
- * doing.
- *
  * A SKILL is what you need in order to perform a task; a CONVENTION is how the
- * output must look while you are inside a particular process. An agent
- * implementing under CRDM has them; an agent adjudicating a translation does
- * not. That is the same scoping the subprocess stack already gives roles, and
- * conventions resolve the same way — the union along the call path.
+ * output must look while you are inside a particular process (e.g. software
+ * development under CRDM). An agent implementing under CRDM has them; an agent
+ * adjudicating a translation does not. Conventions resolve like roles in the
+ * subprocess stack — the union along the call path.
  *
- * ## ABSENT BINDING MEANS NONE, and that is the load-bearing rule
+ * ## Absent binding means none
  *
- * The bean states it and it is the whole design: *"Absent binding means no
- * conventions, not all of them: a convention that fires everywhere is the
- * unconditional prose this bean exists to replace."*
- *
- * A default of "all" would reproduce the problem with extra machinery — every
- * step would carry every rule and the scoping would be decoration. So the
- * resolver returns `[]` for an unbound step, and a test asserts exactly that
- * rather than asserting some count.
+ * The resolver returns `[]` for an unbound step, never "all": a convention
+ * that fires everywhere is unconditional prose again.
  *
  * @module schemas/convention
  * @graphNode schema

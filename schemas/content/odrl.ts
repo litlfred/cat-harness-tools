@@ -1,25 +1,19 @@
 /**
  * W3C ODRL 2.2 policies: what an Actor may do, scoped by Process, Task and Role.
  *
- * Owner, 2026-09-23 (issue #1180), choosing the permission language: *"W3C
- * ODRL 2.2 and W3C PROV-O for logging"*, after asking for *"more granular
- * permissions, can inherit. options for existing json open standards. doensnt
- * necc need to be rooted acyclic graph."* The design is
- * `docs/proposals/odrl-prov-actor-model.md`, and the owner's answers to its
- * open questions: policies are their own **graph typology**; an unauthenticated
- * reader may **visualize and render only**; a relationship engine (OpenFGA)
- * is **later**.
+ * Policies are their own **graph typology**; an unauthenticated reader may
+ * **visualize and render only**. The design is
+ * `docs/proposals/odrl-prov-actor-model.md`.
  *
- * ## The subset, and why only this much
+ * ## The subset
  *
- * ODRL is large. This is the part a folio reads today: a Policy (`Set`,
- * `Offer`, `Agreement`) holding `permission` and `prohibition` rules (plus
- * optional `duty` obligations), each naming an `assignee`, an `action`, an
- * optional `target`, optional `constraint`s and optional `duty` rules.
- * Refinements and party collections are ODRL too; none has a reader here yet,
- * so none is accepted. A key outside the subset is refused rather than dropped
- * (`.strict()`), because a rule that silently means less than it says is
- * exactly the failure a permission file must not have.
+ * A Policy (`Set`, `Offer`, `Agreement`) holding `permission` and
+ * `prohibition` rules (plus optional `duty` obligations), each naming an
+ * `assignee`, an `action`, an optional `target`, optional `constraint`s and
+ * optional `duty` rules. Refinements and party collections have no reader
+ * yet, so they are not accepted. A key outside the subset is refused rather
+ * than dropped (`.strict()`): a permission rule must never silently mean less
+ * than it says.
  *
  * Terms are written as compact IRIs, as ODRL's own JSON-LD context writes
  * them: `odrl:display`, `cat-harness:perform-task`, and a bare action id for one
@@ -30,9 +24,8 @@
  * The folio profile is `skills/permissions/permissions.json`: every action
  * says which broader actions it is `includedIn`, ending at ODRL's own common
  * vocabulary. A permission to a broader action permits every action included
- * in it, which is ODRL's reading of `includedIn`. The graph is walked with a
- * visited set, so it need not be a tree and need not be acyclic (the owner's
- * words), and a cycle cannot hang a decision.
+ * in it. The graph is walked with a visited set, so it need not be a tree or
+ * acyclic, and a cycle cannot hang a decision.
  *
  * @module schemas/odrl
  * @graphNode schema

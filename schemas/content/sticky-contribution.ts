@@ -4,23 +4,12 @@
  * @module schemas/sticky-contribution
  * @graphNode schema
  *
- * The owner's ask, 2026-09-20: *"each intiator should create its own sticky.
- * bootstrap sticky will have link back to the source code + ghpaghes for boot
- * strrap."*
+ * Each initiator creates its own sticky; the landing set is **composed from
+ * the layers present** rather than enumerated in one place — *a layer owns
+ * what it can serve, and the layer above does not enumerate it*
+ * (`folio-graph-typology.ts`).
  *
- * ## What this replaces, and why it is a change of shape
- *
- * `landing-sticky.ts` shipped the board as a **fixed set of three**, returned by
- * `landingStickies()`. That is a list this repository owns, and the ask inverts
- * the ownership: the set is **composed from the layers present** rather than
- * enumerated in one place. `folio-graph-typology.ts` already states the principle —
- * *a layer owns what it can serve, and the layer above does not enumerate it.*
- *
- * ## Why a DECLARATION and not a code registry
- *
- * The obvious design is `registerStickyContributor()`, matching
- * `registerFolioGraphTypology`. It cannot work here, and the reason is the one that
- * motivates the whole change:
+ * ## A DECLARATION, not a code registry
  *
  * | | code registry | declaration |
  * |---|---|---|
@@ -29,60 +18,30 @@
  * | inheritance | hand-wired | already resolved, `resolveDirectories`-style |
  * | expressiveness | arbitrary | the fields below, and no more |
  *
- * The first row settles it. CatBootstrap contributing its own sticky is the
- * requirement, and a registry it cannot call is not a seam it can reach. The
- * cost is the last row — a declaration needs a small vocabulary for *"my
- * description"* and *"the four onboarding links"* instead of running code — and
- * that cost is paid deliberately below, kept as small as it can be.
+ * The first row settles it. The cost is a small vocabulary for *"my
+ * description"* and *"the four onboarding links"*. A sticky's text is subject
+ * matter, which `AGENTS.md` puts in the folio as data.
  *
- * It is also the more correct home for the words. `AGENTS.md`: *"If you are
- * about to write subject matter here … you are writing something that belongs in
- * the folio as data."* A sticky's text is subject matter, and it was living in
- * `schemas/`.
+ * ## When a sticky is minted, and its docs link
  *
- * ## WHEN a sticky is minted, and the RTFM link it must carry
+ * 1. **A harness's sticky is its initiation's last act.** Each layer declares
+ *    its own card in its own `harness.json`. The minting is not yet split:
+ *    `scripts/ensure-landing-sticky.ts` runs at the end of cat-harness's
+ *    initiation and writes every layer's card. `contributingRoots` already
+ *    takes a LIST of roots, so per-harness minting is a caller change.
+ * 2. **Every sticky links to ITS OWN harness's docs**, not the composing
+ *    instance's — bootstrap's card points at `bootstrap/README.md` on the
+ *    forge.
  *
- * The owner, 2026-09-20: *"all sticky notes should be at end of initiation
- * process for that harnes and provife links to that harness's docs
- * (RTFM=...)"*.
+ * ## Harness vocabulary, not core
  *
- * Two rules, and only one of them is fully structural today:
- *
- * 1. **A harness's sticky is its initiation's last act.** That is already true
- *    of the contribution — each layer declares its own card in its own
- *    `harness.json`, so nothing above it decides what it says. What is NOT yet
- *    split is the MINTING: `scripts/ensure-landing-sticky.ts` runs at the end of
- *    cat-harness's initiation and writes every layer's card, because pre-split
- *    (issue #223) cat-harness's initiation is the one that runs last and the
- *    only one with TypeScript to run. After the split each harness mints its own
- *    at the end of its own initiation, and `contributingRoots` already takes a
- *    LIST of roots rather than walking one, so that change is a caller change
- *    rather than a rewrite.
- *
- *    Stated rather than left to be inferred, because "bootstrap's card is
- *    written by cat-harness" looks like a layering violation until you know it
- *    is a pre-split accommodation with a named end.
- *
- * 2. **Every sticky links to ITS OWN harness's docs.** Not to the composing
- *    instance's — bootstrap's card points at `bootstrap/README.md` on the forge,
- *    because this site is cat-harness's and bootstrap has no site of its own
- *    yet. A card that sent a reader to the wrong layer's documentation would be
- *    worse than one with no link, since it looks like it worked.
- *
- * ## Why this module is HARNESS and not CORE
- *
- * `schemas/kg/cat-harness.ts` is classified `agentic-harness` and
- * `schemas/content/landing-sticky.ts` is `folio-assist-core`. The declaration field that
- * carries these lives on `CatHarnessDeclarationSchema`, so defining the shape in
- * `landing-sticky.ts` would make the harness import core — a **wrong-direction
- * edge**, which `check:partition:edges` reports and which is the falsifier this
- * design was measured against. `repo-partition.ts` therefore classifies this
- * module `agentic-harness`, on the same test it applies to `note-anchor.ts` and
- * `front-matter.ts`: it is declaration vocabulary, it imports only `zod`, and it
- * carries no part of the content model.
- *
- * {@link StickyLinkSchema} moved here from `landing-sticky.ts` for that reason
- * and is re-exported there, so nothing that imported it has to change.
+ * The declaration field lives on `CatHarnessDeclarationSchema`
+ * (`schemas/kg/cat-harness.ts`), so defining the shape in
+ * `landing-sticky.ts` would make the harness import core, which
+ * `check:partition:edges` reports. `repo-partition.ts` classifies this module
+ * `agentic-harness`: it is declaration vocabulary and imports only `zod`.
+ * {@link StickyLinkSchema} is defined here and re-exported from
+ * `landing-sticky.ts`.
  */
 import { z } from "zod";
 import { ThemeRefSchema } from "../ui/theme.js";

@@ -1,24 +1,20 @@
 /**
- * PROV activities as PROV-JSONLD — links, not strings (beans `jcet`, `9y9j`).
+ * PROV activities as PROV-JSONLD — links, not strings.
  *
- * ## Why this exists
- *
- * Measured 2026-10-01: every activity in the committed PROV-O QA/QC reports
- * carried `prov:agent`, `prov:hadRole` and `prov:hadPlan` as bare strings, and
- * jsonld.js expanded all of them to `{"@value": …}` — literals. PROV-O defines
- * all three as object properties, so the graph said an activity was done by
- * the TEXT "owner" and nothing joined it to the actor. The `linked-data` voice
- * (in the content core's `skills/voices/linked-data`) states the rules this module
- * follows; each is cited there to the held W3C text.
+ * PROV-O defines `prov:agent`, `prov:hadRole` and `prov:hadPlan` as object
+ * properties; emitted as bare strings they expand to literals and nothing
+ * joins an activity to its actor. The `linked-data` voice (in the content
+ * core's `skills/voices/linked-data`) states the rules this module follows;
+ * each is cited there to the held W3C text.
  *
  * ## What it emits
  *
  * PROV-JSONLD's shape (W3C Member Submission 2024-08-25, held at
- * `cat-harness/library/kg/w3c-2024-prov-jsonld/`), owner's decision: an `Activity`
- * node, and each qualified association as its own `Association` node whose
- * `activity`, `agent`, `role` and `plan` are the context's TERMS — so its
- * coercions and its `@reverse` mapping to `prov:qualifiedAssociation` apply
- * (rule `ld-coercion-belongs-to-the-term`).
+ * `cat-harness/library/kg/w3c-2024-prov-jsonld/`): an `Activity` node, and
+ * each qualified association as its own `Association` node whose `activity`,
+ * `agent`, `role` and `plan` are the context's TERMS — so its coercions and
+ * its `@reverse` mapping to `prov:qualifiedAssociation` apply (rule
+ * `ld-coercion-belongs-to-the-term`).
  *
  * ## Where a link points
  *
@@ -27,35 +23,29 @@
  * the OWNING instance's declaration (`releaseIris`). An actor is
  * `scenarios/actors/<id>`, a role `scenarios/roles/<id>`, a plan step
  * `<dir>/<process file stem>/<task>`. A node inside a document is a path
- * segment under it, never a `#` fragment, so each has its own page (#1379,
- * card Q-SLASH-2 B; IRIs use slashes, never `#`).
+ * segment under it, never a `#` fragment, so each has its own page.
  *
  * **Three states, never two.** When the owner is found and declares an
- * `iriBase`, the value is a link. When it is found and declares none, or is not
- * found at all, the value stays a LITERAL — written as an explicit
- * `{"@value": …}` so the term's coercion cannot turn it into a relative IRI
- * resolved against an unrelated `@base` — and the reason is returned, for the
- * report to carry as a finding. An invented address is worse than an honest
- * string (rule `ld-link-is-the-node-release-address`).
+ * `iriBase`, the value is a link. Otherwise the value stays a LITERAL —
+ * written as an explicit `{"@value": …}` so the term's coercion cannot turn
+ * it into a relative IRI — and the reason is returned, for the report to
+ * carry as a finding (rule `ld-link-is-the-node-release-address`).
  *
- * `prov:used` values are catalogue items (`item/<uuid>`, a DSpace id). Owner
- * 2026-10-01, option A: each is linked at its record's HANDLE through the
- * global resolver (`https://hdl.handle.net/<handle>`), the identifier built to
- * outlive the publishing host — not at our catalogue record, which has no
- * release address while its instance declares no `iriBase`. A record with no
- * Handle, or an id nobody catalogues, stays a literal with its reason.
+ * `prov:used` values are catalogue items (`item/<uuid>`, a DSpace id), each
+ * linked at its record's HANDLE through the global resolver
+ * (`https://hdl.handle.net/<handle>`), which outlives the publishing host. A
+ * record with no Handle, or an id nobody catalogues, stays a literal with its
+ * reason.
  *
- * A decision record's agreement and grant are `prov:used` entities that are
- * already described (bean `yy40`): the agreement's DCAT 3 `dcat:Distribution`
- * with its `spdx:checksum`, and the grant's W3C VC 2.0 credential `id`. They
- * are absolute IRIs, so they are emitted as they are, under the `dcat`,
- * `spdx` and `cred` prefixes, with no address-book lookup.
+ * A decision record's agreement and grant are `prov:used` entities already
+ * described as absolute IRIs — the agreement's DCAT 3 `dcat:Distribution`
+ * with its `spdx:checksum`, and the grant's W3C VC 2.0 credential `id` — so
+ * they are emitted as they are, under the `dcat`, `spdx` and `cred` prefixes.
  *
  * The hash-chain terms `cat-harness:previousHash` / `cat-harness:recordHash`
  * are a **local extension** — no open standard defines a hash-chained PROV
  * log. A document that uses them also describes each in its `@graph` as an
- * `rdf:Property` with an `rdfs:comment` saying so, so the label travels with
- * the data rather than living only in this source.
+ * `rdf:Property` with an `rdfs:comment` saying so.
  *
  * @module schemas/prov-jsonld
  * @graphNode schema

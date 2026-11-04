@@ -1,17 +1,11 @@
 /**
  * `jsonldPrefixes`: the external vocabularies an instance's JSON-LD speaks, as
- * declared data — prefix → namespace IRI (bean folio-assistant-63q4, owner
- * 2026-10-14, "1 3").
+ * declared data — prefix → namespace IRI.
  *
- * Why declared, and why per instance. The one published `@context`
- * (`CONTENT_CONTEXT`, `ns/content/v1.jsonld`) was a hand-kept list in this
- * layer, so a vocabulary that belongs to a layer above (BIBO and FaBiO for
- * core's references, say) could only be bound here, and a prefix nobody spoke
- * needed a "forward-declared" excuse in the emission gate. The owner ruled
- * both out: each instance declares the namespaces it speaks, and its published
- * context is GENERATED from the prefixes its documents actually use, flattened
- * with the contexts of the instances it `needs`. A bound-but-unused prefix then
- * cannot exist, so there is nothing to excuse.
+ * Each instance declares the namespaces it speaks, and its published context
+ * is GENERATED from the prefixes its documents actually use, flattened with
+ * the contexts of the instances it `needs`. So a vocabulary belonging to a
+ * higher layer is bound there, and a bound-but-unused prefix cannot exist.
  *
  * This module is the declaration and the pure merge. It reads no files and runs
  * no generator: the generator and the gate live in the tools layer, and they

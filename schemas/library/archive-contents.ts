@@ -1,28 +1,24 @@
 /**
- * An archive's entry list, as data — bean `twqe`.
+ * An archive's entry list, as data.
  *
- * A tar or zip in `uploads/` is opaque to every grep in the corpus: a search
- * for a filename inside one finds nothing, and that absence is
- * indistinguishable from the file not being there. `contents.jsonld` is the
- * listing that closes the gap, one shape whatever the container format, so a
- * consumer reads archives without knowing whether it was tar or zip.
+ * A tar or zip in `uploads/` is opaque to every grep in the corpus.
+ * `contents.jsonld` lists its entries, one shape whatever the container
+ * format, so a consumer reads archives without knowing whether it was tar or
+ * zip.
  *
- * ## An archive entry is not a different kind of thing from a loose file
+ * ## An archive entry is described like a loose file
  *
  * `bytes`, `sha256`, `mtime`, `mimetype_sniffed`, `mimetype_source` are the
- * vocabulary `_tech_meta.py` defines for a file on disk (bean `nso8`), reused
- * verbatim. The mimetype is sniffed from the entry's OWN leading bytes and
- * never from its name, for the reason it is sniffed outside an archive too:
- * the name is a claim by whoever built the archive.
+ * vocabulary `_tech_meta.py` defines for a file on disk, reused verbatim. The
+ * mimetype is sniffed from the entry's OWN leading bytes and never from its
+ * name, which is only a claim by whoever built the archive.
  *
  * ## Three entry states, not two
  *
- * A `directory` carries no size and no digest — it has neither, and a zero
- * would be a measurement nobody made. An entry that could not be read carries
- * `mimetype_source: "unreadable"`, which is NOT the same as an empty file, and
- * a `symlink` or `special` is listed with its kind rather than dropped:
- * silently omitting them makes the listing wrong, and an archive of empty
- * directories would become indistinguishable from an empty archive.
+ * A `directory` carries no size and no digest (a zero would be a measurement
+ * nobody made). An entry that could not be read carries
+ * `mimetype_source: "unreadable"`, which is NOT the same as an empty file,
+ * and a `symlink` or `special` is listed with its kind rather than dropped.
  *
  * @module schemas/archive-contents
  * @graphNode schema

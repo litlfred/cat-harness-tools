@@ -6,20 +6,13 @@
  * matches a `DecisionContext` against each methodology's `applies-when` and the
  * method-family criteria tables.
  *
- * ## Relationship to decision-request.ts
+ * You pick a method with this schema, then use it to produce a decision
+ * request (`decision-request.ts`).
  *
- * `decision-request.ts` shapes a decision already handed to a person — the
- * options, their pros/cons, the recommendation. THIS module shapes the question
- * BEFORE that: "what method should I use to analyse those options?" One runs
- * before the other: you pick a method (this schema), then you use it to
- * produce a decision request (that schema).
- *
- * ## Why every dimension is optional
- *
- * An agent provides what it knows. A context with only `questionType` still
- * routes via methodology-adoption's four-question protocol. Adding dimensions
- * narrows the ranking. A schema that required all of them would be unusable at
- * the point it is most needed — the early stage when the problem is half-formed.
+ * Every dimension is optional: an agent provides what it knows, and the
+ * problem is often half-formed. A context with only `questionType` still
+ * routes via methodology-adoption's four-question protocol; more dimensions
+ * narrow the ranking.
  *
  * @graphNode schema
  * @module folio-assistant/schemas/decision-methodology-context

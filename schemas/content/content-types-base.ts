@@ -4,16 +4,13 @@
  * @module schemas/content-types-base
  * @graphNode schema
  *
- * Separate from `content-type.ts` for the reason `folio-graph-typology.ts` is
- * separate from `cat-harness.ts`: the registry is a mechanism and the entries
- * are a layer's opinion. A layer that does not own a type must not be the
- * place it is declared, and the split is what makes that enforceable rather
- * than merely stated.
+ * Separate from `content-type.ts` as `folio-graph-typology.ts` is separate
+ * from `cat-harness.ts`: the registry is a mechanism and the entries are a
+ * layer's opinion, declared only by the layer that owns them.
  *
- * Two are registered here — `harness` and `folio` — because they are the two
- * this layer owns.
+ * Two are registered here — `harness` and `folio`.
  *
- * ## They are NOT the same type, and this repository is the proof
+ * ## They are NOT the same type
  *
  * `harness` says *this is an instance*: a name, a stub, the directories it
  * holds. `folio` says *this authors folio content*: it carries `contentType`,
@@ -25,54 +22,18 @@
  *   the repository root     yes         yes
  * ```
  *
- * So `cat-harness/` is a harness and is **not** a folio — which is exactly
- * right, and is the platform-not-content rule `AGENTS.md` opens with, showing
- * up as a measurable fact rather than as a slogan.
- *
- * ## ONE FILE now states both, so the DISCRIMINATOR MOVED INSIDE IT
- *
- * This table used to have `harness.json` and `harness.config.json` as its
- * columns, and the two memberships were simply two files. `harness.json` was
- * excised on 2026-09-21 — both are `<name>.config.json` — and for a few
- * minutes that made **every declared instance a folio**, because one marker
- * answered both questions.
- *
- * The distinction survived the merge by moving from the FILENAME into the
+ * Both are stated by one `<name>.config.json`, so the discriminator is its
  * CONTENT: `folioMarkerFilename` returns the file only when it declares a
- * `contentType`, which is what this type's own summary always said it meant.
- * A bare `{"name":"x"}` is an instance and not a folio, exactly as before.
+ * `contentType`. A bare `{"name":"x"}` is an instance and not a folio. This
+ * is what `isFolio` in `folio-intent.dmn` means.
  *
- * This is also what `isFolio` in `folio-intent.dmn` has always meant. That
- * input is documented as *"harness.config.json exists in the working
- * directory"* — so it was never "is this an instance", it is one membership of
- * the set, and `getting-started.md` now says so. The file it names has been
- * renamed twice since; the question it asks has not changed.
+ * ## `dak`, `sushi` and `ig` are NOT here
  *
- * ## `dak` and `sushi` are NOT here, and the partition gate is why
- *
- * They were, for about ten minutes, under a comment saying *"registering a
- * type is not claiming it … when a WHO adapter becomes its own layer, those
- * two entries move there."* `check:partition:edges` disagreed, immediately and
- * correctly:
- *
- * ```
- * schemas/content/content-types-base.ts [folio-assist-core] -> schemas/dak.ts [the DAK layer]
- * A repo may not import one that depends on it.
- * ```
- *
- * The DAK layer depends on core, so core recognising a DAK means core importing
- * downstream. The comment was right about the destination and wrong that it
- * could wait: recognising `dak.config.json` needs `DAK_TYPE`, and reaching for it is
- * the edge. They live in {@link module:schemas/dak-content-type}, registered by
- * the layer that owns the model — exactly as `folio-graph-typology.ts` registers
- * `folio` rather than the harness declaring a kind it cannot serve.
- *
- * `ig` is registered nowhere, and that is also deliberate. `79t3` records it as
- * half-formalised — `l3-fhir` exists as a translation content type with `fsh`
- * and `fhir-json` formats, but **nothing declares an IG instance**, so there is
- * no marker file to recognise. An entry for it would mint a type whose
- * membership can never be asserted: something that looks like coverage and
- * detects nothing.
+ * The DAK layer depends on core, so core recognising a DAK would be core
+ * importing downstream (`check:partition:edges` refuses it). `dak` and `sushi`
+ * live in {@link module:schemas/dak-content-type}, registered by the layer that
+ * owns the model. `ig` is registered nowhere: nothing declares an IG
+ * instance, so there is no marker file to recognise.
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";

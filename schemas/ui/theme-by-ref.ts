@@ -1,36 +1,26 @@
 /**
  * A theme by REFERENCE — `{instance?, themeId}` — resolved against the
- * instance that owns it, not only against the platform's own table.
+ * instance that owns it, not only against the platform's own table
+ * ({@link THEMES}).
  *
  * @module cat-harness/schemas/theme-by-ref
  * @graphNode none — a resolver over theme nodes declared elsewhere; it defines no schema of its own
  *
- * Bean `v8n5`. #1168 B8 (owner, 2026-09-30: *"migrate to ThemeRef"*) gave
- * every theme reference an `instance`, so *"a cross-instance theme now says
- * whose theme it is"* — and every consumer then went on reading `themeId`
- * alone and looking it up in {@link THEMES}, the platform's table. An IRIS replica
- * card citing `{instance: <its name>, themeId: "iris-web"}` therefore resolved
- * to nothing, and the harness surfaces rendered on the avatar's hue instead of
- * the theme the IRIS replica measured off its own sources.
- *
  * ## The platform finds an instance's themes; it never holds them
  *
- * The IRIS replica's `themes/themes.ts` says why its palette is not in
- * `cat-harness/schemas/`: *"a palette read off a WHO style guide is subject
- * matter."* So nothing here names that instance or copies a colour. The owner is
- * found by its declared `name`, its themes by the directory it declares with
- * graph typology `themes`, and the module there by one convention: a `themes.ts`
- * exporting `INSTANCE_THEMES`, already resolved. That is the same shape as
- * the tool groups — the harness loads a layer by what its declaration says,
- * rather than importing it, which is what keeps the harness able to build
- * alone.
+ * A palette read off an organisation's style guide is subject matter, so it
+ * lives in its instance, not in `cat-harness/schemas/`. Nothing here names an
+ * instance or copies a colour. The owner is found by its declared `name`, its
+ * themes by the directory it declares with graph typology `themes`, and the
+ * module there by one convention: a `themes.ts` exporting `INSTANCE_THEMES`,
+ * already resolved. The harness loads a layer by what its declaration says
+ * rather than importing it, so it still builds alone.
  *
  * ## Absent is not the platform's
  *
  * A reference with no `instance` means the CITING instance's own
  * ({@link ThemeRefSchema}). The platform table is the answer only when the
- * owner is the platform itself or nobody is named — which is every reference
- * that existed before B8, so nothing that resolved yesterday stops resolving.
+ * owner is the platform itself or nobody is named.
  */
 import { existsSync } from "node:fs";
 import { join } from "node:path";

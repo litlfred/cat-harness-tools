@@ -9,14 +9,10 @@
  * ## Why a mark is needed
  *
  * `BLOCK_KINDS` is read at import from every mounted instance's `block-kinds/`
- * graph (bean `riit`): the content core declares the document kinds, the
- * science layer the math kinds, the harness none. So `z.enum(BLOCK_KINDS)` is
- * right at runtime in whatever composition runs it, and it is a different enum
- * in each one. A JSON Schema written from it says which repositories happened
- * to be mounted when the generator ran: with the harness alone it is
- * `{ "not": {} }`, which rejects every value, and in a full mount it lists the
- * core's and the science layer's kinds, which a harness file may not name
- * (bean `8lcl`, folio-assistant#2812).
+ * graph, so `z.enum(BLOCK_KINDS)` is a different enum in each composition. A
+ * JSON Schema written from it would record which repositories were mounted
+ * (with the harness alone, `{ "not": {} }`, rejecting every value; in a full
+ * mount, kinds a harness file may not name).
  *
  * The vocabulary is OPEN by design — a higher layer adds a kind by adding a
  * node — so the only schema a lower layer can publish for it is the open type.

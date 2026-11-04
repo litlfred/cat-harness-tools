@@ -4,73 +4,38 @@
  * @module schemas/theme
  * @graphNode schema
  *
- * ## Why a theme is a node and not a stylesheet
+ * ## A node, not a stylesheet
  *
- * The owner's ask, 2026-09-19: *"try to use named css assets in KG rather than
- * hardcoded colors so themeing is easier."* The reason that matters here is
- * measurable rather than aesthetic — `site-chrome/assets/css/docs-ui.css`
- * carried **106 hardcoded hex colours against 22 custom properties** when this
- * was written, so changing a theme meant a find-and-replace across the file.
- * That is how one state keeps the wrong shade: the hover, the dark-scheme
- * variant or the focus ring is missed, and nothing reports it.
+ * A theme declares **named roles**: a rule says `var(--fa-sticky-surface)`
+ * and what that resolves to is the theme's business, so changing a theme is
+ * not a find-and-replace of hex colours that misses a hover or dark-scheme
+ * variant.
  *
- * A theme declaring **named roles** fixes the failure rather than the symptom.
- * A rule says `var(--fa-sticky-surface)`; what that resolves to is the theme's
- * business. A rule naming `#8fa58b` has hardcoded a decision at the point of
- * use, where the next person cannot see the other twelve places that made the
- * same one.
- *
- * ## A theme lives in the harness layer, its todos do not
- *
- * The owner, confirming 2026-09-19: cat-harness is *"a layer/home of content"*.
- * So the **type and the themes** are harness-layer nodes, while the todos that
- * reference them stay in the `todos` graph. Moving todo content under the
- * knowledge graph to get it themed would conflate the work plan with the
- * knowledge graph — two stores with one vocabulary is the drift this repository
- * keeps paying for.
+ * The **type and the themes** are harness-layer nodes, while the todos that
+ * reference them stay in the `todos` graph.
  *
  * ## All three layouts, or the theme is invalid
  *
- * The owner: *"themes need all three layouts to be defined to be considered
- * valid."* The three are `laptop`, `mobile` and `card`, which is not a new
- * vocabulary — it is exactly the set `harness.json`'s `images[].layout` already
- * uses, where each carries its own `textRegion` because the crop genuinely
- * differs.
+ * The three are `laptop`, `mobile` and `card` — the set `harness.json`'s
+ * `images[].layout` already uses, each with its own `textRegion` because the
+ * crop differs. **Missing a layout is invalid, never degraded**: there is no
+ * fallback to another layout's geometry, because a theme that renders wrong
+ * on a phone ships while one that refuses to load is noticed.
  *
- * **Missing a layout is invalid, never degraded.** There is deliberately no
- * fallback to another layout's geometry: a theme that renders wrong on a phone
- * is worse than one that refuses to load, because the first ships and the
- * second is noticed. Same reason `resolveGraphTypology` refuses an unknown kind
- * rather than guessing.
- *
- * ## One EXCEPTION, and it is a convention rather than a derivation
- *
- * The owner, 2026-09-20: *"each harness hould have its own unique theme (by
- * convention)"*, and then the assignment itself: *"cat-harness=gumpy hoddie.
- * test=engineer. bootstrap coming."*
- *
- * That does not reopen what the section below closes, and the difference is
- * exact:
+ * ## Each harness has its own theme, by convention
  *
  * | | |
  * |---|---|
  * | **refused** | deriving a theme from a ROLE, process, skill or graph typology — a note's appearance would depend on which lane happened to be reading it |
  * | **this** | a HARNESS picking one theme and keeping it, written in that harness's own declaration |
  *
- * A harness is a fixed thing that owns its declaration, not a lane an actor
- * steps into, so "this harness looks like this" is a choice made once by an
- * author and recorded — which is what the rule below asks for. **Nothing
- * computes it**: `harness.json` still names an id, and no code maps a harness to
- * a theme. The convention lives in the declarations and in this comment.
+ * **Nothing computes it**: `harness.json` names an id, and no code maps a
+ * harness to a theme.
  *
- * **A THEME IS REQUIRED; ART IS NOT.** The owner, 2026-09-20: *"who-voice-styess
- * and iris, will have its own theme (eaech harness gets one, but maybe not
- * avatar)"*. `backdrop` is already optional, so a palette-only theme is a
- * COMPLETE theme rather than an unfinished one — it names the harness's colours
- * and carries no cat. That is the right default for a layer whose art has not
- * been drawn, and it is not the same state as a theme whose backdrop is
- * declared but whose crops are missing, which `resolveThemeBackdrop` refuses
- * wholesale.
+ * **A THEME IS REQUIRED; ART IS NOT.** `backdrop` is optional, so a
+ * palette-only theme is COMPLETE. That is a different state from a theme
+ * whose backdrop is declared but whose crops are missing, which
+ * `resolveThemeBackdrop` refuses wholesale.
  *
  * Today: `grumpy-cyborg-agents` (the sage hoodie on a sled pulled by robot cats) is
  * cat-harness's, `grumpy-cat` (the plain sage hoodie) is folio-assist-core's,
@@ -79,50 +44,23 @@
  *
  * ## Choosing a theme is an AUTHORING judgement — there is no mapping
  *
- * The owner, 2026-09-20: *"no formal role/theme mapping per se. that is
- * authoring (human/agentic) decision/judgement."*
- *
- * So a theme is picked by whoever writes the note, and **nothing derives one**
+ * A theme is picked by whoever writes the note, and **nothing derives one**
  * from a role, a process, a skill or a graph typology. `ThemedTodoFields.theme` and
- * the landing sticky's required `theme` are the whole selection surface: an id,
- * set by an author.
+ * the landing sticky's required `theme` are the whole selection surface: an
+ * id, set by an author. This is a rule, not a gap: a role is a swimlane, not a
+ * property of a thing (`role-model.md`), so a role→theme table would make a
+ * note's look depend on which process reads it and put presentation into the
+ * role graph.
  *
- * **This is a rule, not a gap**, and it is worth saying so because the absence
- * reads like one. It did to this agent twice: shipping the `library` and
- * `analyst` themes, I recorded that "no per-role, per-process or per-kind theme
- * SELECTION exists" and pointed at two beans as the mechanism that would supply
- * it. There is no such mechanism to supply.
+ * The optional `theme` on {@link ThemedTodoFieldsSchema} encodes this: absent
+ * means *nobody has chosen*.
  *
- * Three reasons the mapping would be wrong rather than merely absent:
+ * ## What the palette may NOT carry
  *
- * 1. **A role is a swimlane, not a property of a thing.** `role-model.md`:
- *    nothing *is* a reviewer; somebody *acts as* one for the duration of a lane,
- *    and the same actor is a different role in another diagram. A theme keyed on
- *    role would make one note's appearance depend on which process happened to
- *    be reading it.
- * 2. **It makes the choice unarguable and invisible.** With a table, "this one
- *    should look different" requires editing something that governs everything
- *    else; without one, it is a field on the note and the argument is local.
- * 3. **It is the conflation this file already refuses.** Themes live in the
- *    harness layer while the todos referencing them stay in `todos/`, and the
- *    owner's *"beans no anchor"* rule keeps a rendering position out of the work
- *    plan. A role→theme table would put presentation back into the role graph.
- *
- * The optional `theme` on {@link ThemedTodoFieldsSchema} already encodes this:
- * absent means *nobody has chosen*, which is a statement about an author rather
- * than about a lookup that failed.
- *
- * ## What the palette may NOT be asked to carry
- *
- * The sticky CSS already records the constraint, and a theme must not break it:
- *
- * > The priority stripe is the only per-card differentiator, and it is a WIDTH
- * > as well as an opacity — colour alone would carry the whole signal, which
- * > SC 1.4.1 forbids and a monochrome reader cannot see at all.
- *
- * So a theme sets the stripe's **hue**; it never sets its width to zero, and
- * {@link ThemeSchema} has no field with which to try. A theme is a palette and
- * a geometry, not a licence to remove a non-colour channel.
+ * The priority stripe is a WIDTH as well as a colour, so colour alone never
+ * carries the signal (WCAG SC 1.4.1). A theme sets the stripe's **hue**; it
+ * never sets its width to zero, and {@link ThemeSchema} has no field with
+ * which to try.
  */
 import { z } from "zod";
 import { RepoFullNameSchema } from "../kg/repo-full-name.js";

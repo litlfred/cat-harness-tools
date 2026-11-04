@@ -1,83 +1,45 @@
 /**
  * @graphNode schema
  *
- * A tabular source as CSVW, annotated with what CSVW cannot say — bean `eief`.
+ * A tabular source as CSVW, annotated with what CSVW cannot say.
  *
- * ## Why CSVW, and why annotated rather than replaced
- *
- * Bean `ulqj`, decided by the owner: *"not new/custom thing"*. This graph
- * BINDS eight published vocabularies — doco, deo, cito, oa, prov, skos,
- * dcterms, fhir — and zero folio inventions. `folio-tabular-records/v1` was
- * the exception, and CSVW is a W3C Recommendation that is already JSON-LD,
- * which the rest of this graph already is.
- *
- * **It said "already speaks" until 2026-09-21, and that was false** — bean
- * `fd6i`. Measured over the 1086 published `.jsonld` documents in this
- * repository, three of the eight are emitted (`dcterms` 1551, `prov` 952,
- * `cito` 2) and five are not. The decision the sentence records is untouched
- * by that: reusing a published vocabulary rather than inventing one is a
- * MODELLING choice, and it was made. What was not true was the claim about
- * what this instance emits.
- *
- * The gap is not a defect either, and that is the third state `fd6i` asked
- * for. This is the PLATFORM; the unemitted five describe what a FOLIO holds,
- * and this instance holds none. Those reasons lived in `FORWARD_DECLARED`
- * until bean `folio-assistant-63q4` retired it: each instance's context is now
- * generated from what its documents use (`jsonld:contexts`), so a prefix
- * nothing emits is simply never bound, and needs no reason.
- *
- * It models table → column → datatype and **nothing else**: no formulas, no
- * merged cells, no styling. The owner's "no full Excel complexity" is
- * therefore a property of the vocabulary rather than a rule anyone has to
- * enforce.
+ * CSVW is a W3C Recommendation that is already JSON-LD, so a tabular source
+ * reuses a published vocabulary rather than a folio invention. It models
+ * table → column → datatype and **nothing else**: no formulas, no merged
+ * cells, no styling.
  *
  * **What CSVW cannot express is WHERE a table is**, because in CSVW the table
  * IS the file. A real workbook breaks that three ways: tables that do not
  * start at A1, headers that are not row 1, and several tables on one sheet.
- * The owner asked for exactly this — *"location on sheet, row, col"*.
  *
  * So {@link SheetAnchorSchema} and friends are annotations on the CSVW
  * shape, carried in a record that is **plain JSON** — `tabular.csvw.json`,
  * not `.jsonld` — and {@link toCsvw} derives the genuine CSVW metadata
  * document from it. A CSVW reader is handed that, and only that.
  *
- * ## Why the record is JSON and not JSON-LD — bean `792y`
+ * ## Why the record is JSON and not JSON-LD
  *
- * It was named `tabular.csvw.jsonld` and claimed to BE a valid CSVW document
- * carrying `fac:` annotations a standard reader would ignore. Neither half was
- * true. It had no `@context`, so a CSVW parser rejects it outright and a
- * JSON-LD processor keeps only the `fac:` keys — read as IRIs in a URI scheme
- * called `fac`, the `zaqn` defect. And no spelling of the prefix can fix that
- * inside CSVW: its metadata documents may put only `@language` and `@base` in
- * a local context, so a prefix of ours can never be bound there.
- *
- * The owner chose, 2026-09-23, between that and full-IRI annotation terms: the
- * record is JSON, and the CSVW is DERIVED. Two reasons carried it. Nothing
- * reads these annotations as linked data — the graph projection
- * (`pipeline/tabular-nodes.ts`) reads `anchor.sheet` from the JSON —
- * and `directory-conventions` says to generate as many renderings as have a
- * consumer and no more. And JSON-LD DROPS `null`, while the three-state rule
- * below depends on a DETERMINED null: a CSV's sheet is `null` because a CSV
- * has none, which RDF could not tell from "never recorded".
- *
- * The `fac:` spelling of the keys is kept as a plain JSON name marking our
- * fields apart from CSVW's. In a JSON file it is a name, not a compact IRI —
- * which is the whole reason the extension had to change.
+ * CSVW metadata documents may put only `@language` and `@base` in a local
+ * context, so a prefix of ours can never be bound there. Nothing reads these
+ * annotations as linked data — the graph projection
+ * (`pipeline/tabular-nodes.ts`) reads `anchor.sheet` from the JSON — and
+ * JSON-LD DROPS `null`, while the three-state rule below depends on a
+ * DETERMINED null (a CSV's sheet is `null` because a CSV has none). The
+ * `fac:` spelling of the keys is a plain JSON name marking our fields apart
+ * from CSVW's, not a compact IRI.
  *
  * ## "As best as can" is the three-state rule
  *
- * The owner's phrase. Every field is determined, or explicitly undetermined
- * WITH A REASON. Nothing defaults. A column that will not classify gets
- * `datatype: "any"` and `fac:datatypeSource: "undetermined"` — never a guess
- * that reads as a measurement, which is the failure this repository has paid
- * for repeatedly (bean `nso8`, and `6xaz` in a different format).
+ * Every field is determined, or explicitly undetermined WITH A REASON.
+ * Nothing defaults. A column that will not classify gets `datatype: "any"`
+ * and `fac:datatypeSource: "undetermined"` — never a guess that reads as a
+ * measurement.
  *
  * ## No extractor ships with this
  *
- * The owner: *"no tooling needed, stub out, make QA to catch absence."* So the
- * tools are declared and STUBBED, and {@link TabularStubSchema} is what makes
- * a stub impossible to mistake for a result. A stub is never `met`; it is
- * `not-derivable` naming the tool that would fill it.
+ * The tools are declared and STUBBED, and {@link TabularStubSchema} is what
+ * makes a stub impossible to mistake for a result. A stub is never `met`; it
+ * is `not-derivable` naming the tool that would fill it.
  */
 import { z } from "zod";
 

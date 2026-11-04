@@ -1,39 +1,23 @@
 /**
  * Knowledge-graph QA sidecars — what is dangling in the process/role/skill graph.
  *
- * The content pipeline already audits two subject kinds with sidecars:
- * `<block>.qa.json` beside a content block (`schemas/sdlc/block-qa.ts`) and
- * `<script>.script-qa.json` beside a computation (`schemas/sdlc/script-qa.ts`).
- * This is the third subject kind — the **knowledge graph itself**: the BPMN
- * processes, the DMN decisions, the roles that own their lanes and the skills
- * their activities name.
+ * The third audit subject kind, after `<block>.qa.json` beside a content block
+ * (`schemas/sdlc/block-qa.ts`) and `<script>.script-qa.json` beside a
+ * computation (`schemas/sdlc/script-qa.ts`): the **knowledge graph itself** —
+ * the BPMN processes, the DMN decisions, the roles that own their lanes and
+ * the skills their activities name.
  *
- * ## What goes wrong here, and why a report was not enough
- *
- * The joins in "an actor performs a task in a process as a role, using that
- * role's skills" were, until this module, checked at exactly one point:
- * `scripts/check-workflow-refs.ts` verified that a `<bootstrap.processes:skill ref>` names a
- * skill that exists. Everything else was unjoined, and the numbers say so —
- * measured 2026-09-18 across twenty diagrams: **60 distinct lane names**, bound
- * to nothing, for roughly two dozen actual positions; four `.dmn` files whose
- * decision ids nothing cross-checked from the BPMN side; and no direction of
- * check at all from a skill back to the role that is supposed to carry it.
- *
- * A sidecar rather than a console report, for the same reason the block sweep
- * writes one: the audit's **previous** answer has to be durable. Without it,
- * "this lane has been unbound since it was added" and "this lane broke in the
- * commit under review" look identical, and a reviewer cannot tell a new defect
- * from inherited debt. The sidecar is committed, so a diff shows exactly which
- * findings the change introduced.
+ * The sidecar is committed, so the audit's previous answer is durable and a
+ * diff shows exactly which findings a change introduced, telling a new defect
+ * from inherited debt.
  *
  * ## Three states, and `unknown` is never rendered as a pass
  *
  * A criterion returns `pass`, `fail`, `n/a` (it does not apply to this
  * subject) or `unknown` (it could not be evaluated — the file would not parse,
  * a dependency was absent). `unknown` is not `pass` and not `fail`: a diagram
- * the loader choked on has not been audited, and reporting it clean is how a
- * whole file silently leaves the gate. Same rule as `check-ci-health.ts` and
- * `pages-bootstrap.ts`.
+ * the loader choked on has not been audited. Same rule as
+ * `check-ci-health.ts` and `pages-bootstrap.ts`.
  *
  * ## Severity decides the gate, not the finding count
  *

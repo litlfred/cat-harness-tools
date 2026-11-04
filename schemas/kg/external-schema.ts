@@ -1,60 +1,26 @@
 /**
  * A specification this repository DEPENDS ON and does not hold.
  *
- * ## Why a record rather than a transcription
- *
- * Owner, 2026-09-20: *"if you import scheam (e.g DC, ingest it through the
- * proper pipline, bean up to: OMG DMN specs, BPMN etc.)"*, and then the
- * constraint that shapes this file: *"(dont need to materalize, but should
- * reference specific version being used)"*.
- *
- * So an imported schema is `referenced`, in exactly the sense
- * `materialization.ts` means it: we know it exists, we know WHICH VERSION we
- * are conforming to, and we hold none of its bytes. That is the same posture
- * as the WHO IRIS catalogue — 1,057,223 files known, three held.
- *
- * ## The failure this exists to end
- *
- * Measured 2026-09-20, which is why this is a schema and not a README:
- *
- * - every `.bpmn` here declares `http://www.omg.org/spec/BPMN/20100524/MODEL`
- *   and three sibling namespaces, and **nothing in the repository said which
- *   specification that is** — no version, no title, no XSD, nothing to check a
- *   diagram against;
- * - `dublin-core.ts` was transcribed from ONE captured DSpace record. It
- *   carries the prefix string `dc` and **no namespace URI and no DCMI
- *   version**, so it records what one deployment SPELLS rather than what the
- *   standard DEFINES.
+ * An imported schema (DC, OMG DMN, BPMN, …) is `referenced`, in the sense
+ * `materialization.ts` means it: we know it exists and WHICH VERSION we
+ * conform to, and hold none of its bytes.
  *
  * A transcription with no cited edition cannot be checked, cannot be updated
  * deliberately, and cannot tell a reader whether a field it lacks is missing
- * or simply not in that edition.
+ * or simply not in that edition — e.g. `dublin-core.ts` carries the prefix
+ * `dc` but no namespace URI or DCMI version.
  *
  * ## A version is part of the IDENTITY
  *
  * `{authority, id, version}` together, never `{authority, id}`. BPMN 1.2 and
- * BPMN 2.0 are different specifications that share a name, and a record that
- * cannot tell them apart is the thing this file exists to prevent.
+ * BPMN 2.0 are different specifications that share a name.
  *
  * @graphNode schema
  * ## Why this lives in cat-harness and not in core
  *
- * Moved 2026-09-27, bean `yj6r`. It sat in the content core's `schemas/` and
- * its only three importers were all in `cat-harness/scripts/` — so cat-harness,
- * which declares `needs: ['bootstrap']` and not core, was importing UP into a
- * layer above it. After a repository cut that is a circular dependency.
- *
- * The direction of the fix follows from what this file is ABOUT, which is the
- * test that matters and not who imports it. Its subject is the specifications
- * **this repository** conforms to — BPMN, DMN, DCMI — so it is a fact about the
- * platform's own conformance, not about any folio's content. A content schema
- * consumed by platform tooling would have been the other case, and its
- * consumers would have moved up instead.
- *
- * Same defect `zlmp` records one layer out: *"schemas/, a directory claimed
- * wholesale by a core prefix rule while holding schemas from all three
- * layers."* That reclassified four harness-owned schemas without moving them;
- * this MOVES one, because here the path was wrong and not just the label.
+ * Its subject is the specifications the platform itself conforms to — BPMN,
+ * DMN, DCMI — not any folio's content, and its importers are platform
+ * tooling.
  *
  * @module cat-harness/schemas/external-schema
  */

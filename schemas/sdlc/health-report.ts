@@ -1,41 +1,28 @@
 /**
  * Repository health reports — what the daily sweep under `test/health/` wrote.
  *
- * This is the **fourth** committed QA-shaped artefact family in this
- * repository, after the block sweep's `*.qa.json`, the script sweep's
- * `*.script-qa.json` and the KG audit's `*.kg-qa.json`. It shares their
- * contract in the one respect that matters: **the file declares what it is**,
- * with a `$schema` tag, rather than being duck-typed by its extension or by
- * the directory it was found in. Extension is a coincidence of the current
- * layout; a declaration inside the file is the contract (#263).
+ * Like the other committed QA artefacts (`*.qa.json`, `*.script-qa.json`,
+ * `*.kg-qa.json`), **the file declares what it is** with a `$schema` tag,
+ * rather than being typed by its extension or directory.
  *
  * ## Why it is not `qa-results/v1`
  *
- * `qa-results/v1` (`test/results/kg-export.qa-results.json`) carries families
- * of findings and a total. That shape cannot express the two things a health
- * check is entirely about:
+ * `qa-results/v1` carries families of findings and a total. It cannot express
+ * what a health check is about:
  *
- * - **A threshold, with the basis it was chosen on.** A number with no basis
- *   is received wisdom wearing a decimal point. {@link HealthThreshold}
- *   requires `basis`, structurally, for the same reason `schemas/conduct/memory.ts`
- *   refuses a `baseline` with no `measured`: the rule was prose, and prose
- *   does not fail a build.
+ * - **A threshold, with the basis it was chosen on.** {@link HealthThreshold}
+ *   requires `basis`, structurally, as `schemas/conduct/memory.ts` refuses a
+ *   `baseline` with no `measured`.
  * - **Three states.** `ok`, `finding` and **`unknown`** are different answers,
- *   and the third is never rendered as the first. "Could not read `gh-pages`"
- *   must not become "0 MB of previews" — that reading is how a watchdog goes
- *   blind and reports good news. Same rule as `check-ci-health.ts`,
+ *   and the third is never rendered as the first: "could not read `gh-pages`"
+ *   must not become "0 MB of previews". Same rule as `check-ci-health.ts`,
  *   `restore-staging.ts` and `kg-qa.ts`.
  *
- * Both rules are enforced here rather than left to the checker, so a check
- * added later cannot quietly opt out of them:
+ * Enforced here, so a check added later cannot opt out:
  *
  * - a result in state `unknown` **must** carry a `reason`;
  * - a result in state `finding` **must** carry at least one finding;
  * - a result in state `ok` **must** carry none.
- *
- * The third is the load-bearing one. Without it a check could report `ok`
- * while holding findings, which is precisely the false pass every other
- * three-state module in this repository exists to refuse.
  *
  * @module schemas/health-report
  * @graphNode schema

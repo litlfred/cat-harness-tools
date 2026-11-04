@@ -2,14 +2,13 @@
  * A TOOL RUN RECORD — did the downstream tool run, did it succeed, and over
  * which inputs.
  *
- * Bean `fq5u`, owner 2026-09-29: *"how do we know tools like LSI are run
- * succesfully... not primary to pieple, but downstream. should be part of QA
- * process (dependences = stall QA)"* — and the design the owner chose: one QA
- * criterion family generalising `lsi-index-fresh`. Every downstream tool is a
- * Tool node declaring `downstream` (`schemas/tools/tool.ts#ToolDownstreamSchema`),
- * and each run writes one of these.
+ * Downstream tools (e.g. LSI indexing) are not part of the primary pipeline,
+ * so their success is a QA criterion family (generalising `lsi-index-fresh`):
+ * a stalled dependency stalls QA. Every downstream tool is a Tool node
+ * declaring `downstream` (`schemas/tools/tool.ts#ToolDownstreamSchema`), and
+ * each run writes one of these.
  *
- * ## The three states, and why "no record" is not a fourth kind of green
+ * ## Three states
  *
  * {@link downstreamState} reads a record against the current input
  * fingerprint:
@@ -18,26 +17,21 @@
  *   current one. The only state that is a pass.
  * - **stale** — a successful run over inputs that have since changed. The
  *   dependency moved, so the QA over it is stale.
- * - **not-run / failed** — no record, or the last run failed. Never green:
- *   the three-state rule this repository keeps re-finding (`ci-health`'s
- *   "could not check is never green", `test-run.ts`'s `unknown` that equals
- *   nothing). An output with no evidence that it was produced has not been
- *   shown to be current, however plausible the file on disk looks.
+ * - **not-run / failed** — no record, or the last run failed. Never green: an
+ *   output with no evidence that it was produced has not been shown to be
+ *   current, however plausible the file on disk looks.
  *
- * ## Why the fingerprint is the tool's, not a generic file hash
+ * ## The fingerprint is the tool's
  *
- * A generic hash over the declared input paths would disagree with the tool
- * about what counts as a change — LSI ignores files that yield no unit, so a
- * whole-directory hash would call an index stale that the tool itself would
- * rebuild identically. The member computes its own fingerprint and the
- * record carries it; one answer per member, not two.
+ * The member computes its own fingerprint and the record carries it, because
+ * only the tool knows what counts as a change (LSI ignores files that yield
+ * no unit, so a whole-directory hash would call an unchanged index stale).
  *
- * ## No timestamp, deliberately
+ * ## No timestamp
  *
  * The record is committed and rewritten by generators that `skill:register`
- * checks for staleness. A time field would make every re-run a diff with no
- * change in what the record asserts. What the run was OVER is the identity;
- * when it happened is `git log`'s answer.
+ * checks for staleness; a time field would make every re-run a diff. What the
+ * run was OVER is the identity; when it happened is `git log`'s answer.
  *
  * @module schemas/tool-run
  * @graphNode schema

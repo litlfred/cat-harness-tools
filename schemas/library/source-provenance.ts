@@ -2,40 +2,11 @@
 /**
  * WHERE BYTES CAME FROM — the source-side provenance pair, and a signature.
  *
- * Bean `bf5l`. These two lived in the content core's `schemas/materialization.ts`
- * and `cat-harness/schemas/library/intake.ts` imported the second one across the
- * instance boundary — **up** the declared dependency order, since
- * the content core declares `needs: ['cat-harness']` while `cat-harness`
- * declares only `needs: ['bootstrap']`. The code pointed one way and the
- * declarations the other, and `kg:detangle` pinned `wrongDirection: 1` on
- * `main` for it (#1375 made that count visible rather than silent).
- *
- * ## Why DOWN rather than moving `intake.ts` up
- *
- * Moving the intake record up into core was the obvious-looking alternative and
- * measurement ruled it out: `cat-harness` itself consumes it.
- * `cat-harness/adapters/document/intake-records.ts` imports
- * `../../schemas/intake.js`, and `cat-harness/schemas/kg/graph-typology-registry.ts`
- * registers `"folio-intake/v1"` against `schemas/library/intake.ts#IntakeSchema`. Move
- * the file up and those become harness→core imports — one wrong-direction edge
- * traded for another, plus a validator path pointing out of the instance.
- *
- * Moving the SCHEMA down inverts nothing: a source pointer is generic, the
- * harness is the base layer, and core may import downward freely.
- *
- * ## The rename is not cosmetic — it resolves a real collision
- *
- * `cat-harness/schemas/content/attribution.ts` already exports a `ProvenanceSchema`,
- * and it is a DIFFERENT shape: `INGESTED | Attribution`, answering *who wrote
- * this*. This one answers *where these bytes came from*. While they sat in
- * different instances the clash was survivable; bringing this one into
- * `cat-harness` puts both names in one instance, so one had to change. The one
- * that moved is the one renamed — `SourceProvenance`, which says which
- * question it answers.
- *
- * That collision is why the layering could not be judged when `bf5l` was
- * filed: a reader asking "could `intake.ts` just import locally?" got a
- * COMPILING, WRONG answer from the other schema of the same name.
+ * Not to be confused with `ProvenanceSchema` in
+ * `cat-harness/schemas/content/attribution.ts` (`INGESTED | Attribution`),
+ * which answers *who wrote this*; `SourceProvenance` answers *where these
+ * bytes came from*. It lives in the harness so both the harness's intake
+ * record and the content core can use it.
  *
  * @module cat-harness/schemas/source-provenance
  * @graphNode schema

@@ -5,61 +5,47 @@
  * @module schemas/tool-release
  * @graphNode schema
  *
- * Step 1 of `docs/proposals/tool-releases-2026-10-07.md` (issue #2481, bean
- * `3sbm`), signed off by the owner 2026-10-07. The case it exists for: a local
- * render in PR #2454 produced no PlantUML SVGs because the container had no
- * `java`, the renderer said "rendered 0", and nothing else noticed. The owner:
- *
- * > need named/versioned releases + sha of software. it's not a gate per se,
- * > but a logging of what version of the Tool was used for audit purpose.
- *
- * > different tools may need different instances of java, so cannot "pin"
- * > java globally on a diverse tool-chain
+ * Named, versioned releases with the sha of the software: not a gate, but a
+ * log of which version of a Tool was used, for audit. A renderer that ran
+ * without its runtime (e.g. no `java` for PlantUML) is visible as such.
  *
  * ## A sibling of `binary-release`, not a reuse of it
  *
  * {@link module:schemas/binary-release | `binary-release`} records releases this
- * repository PUBLISHES; this records one it CONSUMES. They share the one thing
- * that is the same claim — a sha256 over an artefact's bytes — so
- * {@link ReleaseDigestSchema} is imported rather than restated. The rest differs:
- * a consumed release has one artefact rather than a list of assets, and it
- * carries how to RUN it and what runtime it runs on, which a publication record
- * has no reason to know.
+ * repository PUBLISHES; this records one it CONSUMES. They share
+ * {@link ReleaseDigestSchema} (a sha256 over an artefact's bytes). A consumed
+ * release has one artefact rather than a list of assets, and it carries how to
+ * RUN it and what runtime it runs on.
  *
  * ## Runtimes are per release, never global
  *
- * The owner's second sentence above is the design. `runtimes[]` names another
- * tool release by `name@version`, and a JRE is itself a release with its own
- * digest. Two tools needing two JREs name two releases, and both sit side by
- * side in the cache. The runtime is INJECTED into the tool's environment
- * (`JAVA_HOME` or `PATH`), never inherited from the host — inheriting is how
- * "rendered 0" happened.
+ * `runtimes[]` names another tool release by `name@version`, and a JRE is
+ * itself a release with its own digest. Two tools needing two JREs name two
+ * releases, and both sit side by side in the cache. The runtime is INJECTED
+ * into the tool's environment (`JAVA_HOME` or `PATH`), never inherited from
+ * the host.
  *
  * `role` says which releases are ONLY runtimes, by declaration rather than by
- * inference from who points at whom. A profile names tools; a profile that
- * named a runtime would be pinning java globally by another name, and
- * {@link module:schemas/tool-profile | `tool-profile`} refuses it. A `tool`
- * may still be injected into another tool — graphviz is run on its own and is
- * also how PlantUML finds `dot` — so a `runtimes[]` entry may point at either
- * role; what it needs is an `entry.home` to inject.
+ * inference. A profile names tools, never a runtime, and
+ * {@link module:schemas/tool-profile | `tool-profile`} refuses one that does. A
+ * `tool` may still be injected into another tool — graphviz is run on its own
+ * and is also how PlantUML finds `dot` — so a `runtimes[]` entry may point at
+ * either role; what it needs is an `entry.home` to inject.
  *
- * ## The shared core — what changed in bean `jbvi`, and what did not
+ * ## The shared core
  *
  * The fields every record of outside software has — name, version, digest,
  * source, licence and `licenceSource` — are
  * {@link module:schemas/outside-software | `outside-software`}'s core, and
- * {@link ToolReleaseSchema} EXTENDS it (option D, owner 2026-10-24). The
- * other kind on the core is `software-library`, for a library code IMPORTS
- * rather than runs. This module narrows two core fields so that nothing below
- * changes: `name` to a tool name, and `digest` to sha256 alone — the core also
- * accepts sha512, because a lockfile records that, and a tool release does
- * not. Every rule, every message and every seeded file is as it was.
+ * {@link ToolReleaseSchema} EXTENDS it (as `software-library` does for a
+ * library code IMPORTS rather than runs). This module narrows `name` to a tool
+ * name and `digest` to sha256 alone (the core also accepts sha512, for
+ * lockfiles).
  *
  * ## Four things enforced structurally
  *
- * 1. **A digest is required.** The resolver (step 2) refuses a download whose
- *    hash does not match, and a record with no digest gives it nothing to
- *    compare. Every seeded record's digest was computed over downloaded bytes
+ * 1. **A digest is required**, so a download whose hash does not match can be
+ *    refused. Every seeded record's digest was computed over downloaded bytes
  *    or read from the publisher's own checksum file; none is a placeholder.
  * 2. **An OCI image is identified by digest, never by tag.** A tag moves under
  *    the reader; `name@sha256:<hex>` does not. And the reference's digest must

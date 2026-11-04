@@ -1,47 +1,21 @@
 /**
  * A decision handed to a person, as a shape rather than as a habit.
  *
- * Skills: [`interaction-modality`](../skills/conduct/conduct-core/interaction-modality.md)
- * §4 and [`decision-comparison`](../skills/conduct/conduct-core/decision-comparison.md).
- * Both were written before this module and both are complete; what was missing
- * is any way for a rule stated in prose to be **checked**.
- *
- * ## The failure this exists for, measured on the agent that wrote it
- *
- * On 2026-09-20 this session asked the owner four questions through a selection
- * tool. Each option carried a sentence of context, which felt like a
- * comparison and was not one: `interaction-modality` §4.1 part 3 says the
- * options must be compared **in the prose, where the rows can be read against
- * each other**, precisely because *"a selection tool shows one option at a
- * time"*. No recommendation was marked on one of them, and none said what would
- * happen if the owner said nothing. The owner's reply was
- * *"ask specific questiosn w/ context/ recommendations/pros/cons (see skills,
- * why not invoked?)"*.
- *
- * The rule was not unclear. It was **unenforceable**: nothing sat between an
- * agent and the question tool, and `AGENTS.md`'s summary of the skill omits
- * exactly the clause that was broken.
- *
- * ## Why a schema fixes what a longer skill cannot
+ * Enforces the `interaction-modality` (§4) and `decision-comparison` skills:
+ * the options are compared in prose, one is recommended, and the question
+ * says what happens if nobody answers.
  *
  * **There are no optionals below.** A decision with three options and two
  * comparisons does not parse; one with no `ifSilent` does not parse; one whose
- * recommendation names an option that is not in the list does not parse. That
- * is the same property {@link WaiverNodeSchema} gets from the same technique,
- * and it is the only one that survives an agent in a hurry: the comparison is
- * not *required*, it is **unomittable**.
+ * recommendation names an option that is not in the list does not parse — the
+ * same technique as {@link WaiverNodeSchema}.
  *
- * And one object renders BOTH halves — {@link renderDecision} emits the prose
+ * One object renders BOTH halves — {@link renderDecision} emits the prose
  * table, and the same `options` array is what a selection tool is given — so
- * the table and the offered choices cannot drift apart. Two hand-written
- * copies of one list is how they disagree.
+ * the table and the offered choices cannot drift apart.
  *
- * ## What it deliberately does NOT do
- *
- * It cannot tell a good `con` from a lazy one, and it does not try. A schema
- * checks that the question was *asked*, never that the answer is honest — the
- * same boundary `check:bean-bodies` draws when it checks that a bean HAS a
- * body without judging the body.
+ * It checks that the question was *asked*, never that the answer is honest:
+ * it cannot tell a good `con` from a lazy one.
  *
  * @graphNode schema
  * @module folio-assistant/schemas/decision-request

@@ -1,8 +1,5 @@
 /**
- * Where a published thing is served: one resolver for the site's URL space
- * (bean `nbal`, the producer half of `cat-tools-sthf`).
- *
- * ## The rulings it encodes (owner, 2026-09-20, recorded on `sthf`)
+ * Where a published thing is served: one resolver for the site's URL space.
  *
  * | case | path | what it is |
  * |---|---|---|
@@ -10,22 +7,18 @@
  * | `instance` | `<base>/<instance>/<path>` | the instance presented as itself, on its own theme |
  * | `viewer` | `<base>/<locale>/<owner>/<graph>/<subject>/<path>` | a viewer of one instance's assets, rendered by another instance's machinery; `<locale>/` only when one is given |
  *
- * - The host is no exception (owner, 2026-10-23, decision 1b of the
- *   subject-IRI migration: one rule for every layer, subjects beside their
- *   document): its graph document, Tools and subjects are the
+ * - The host is no exception: its graph document, Tools and subjects are the
  *   `instance` case, `<base>/cat-harness/…`, like every layer's. `root` is the
  *   index's own docs rendering, never a layer's graph.
  * - The segment is the instance's `name`, never its `stub`: the stub names
  *   published FILES (`<stub>.jsonld`), the name names the instance.
  * - The declared graph is a segment, because an instance may declare more
  *   than one renderable graph and two would otherwise collide on one URL.
- * - A locale is a segment of VIEWER pages only (owner, 2026-10-20, "Viewers
- *   only", recorded on `o7eq`), placed first as the 2026-10-05 ruling places it
- *   for every visualiser page (`/<locale>/<declaring>/<kind>/…`,
- *   folio-assistant#2527). The root and an instance as itself carry none, so an
- *   instance's `.jsonld` identifier does not change with a reader's language.
- *   With a locale the viewer case is exactly `visualiserRoute`'s route, which
- *   its test asserts.
+ * - A locale is a segment of VIEWER pages only, placed first as for every
+ *   visualiser page (`/<locale>/<declaring>/<kind>/…`). The root and an
+ *   instance as itself carry none, so an instance's `.jsonld` identifier does
+ *   not change with a reader's language. With a locale the viewer case is
+ *   exactly `visualiserRoute`'s route, which its test asserts.
  *
  * Paths here are site-relative and start with `/` unless `base` is given;
  * a directory path ends with `/` exactly when the caller's `path` does (or is

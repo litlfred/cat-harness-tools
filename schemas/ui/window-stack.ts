@@ -4,50 +4,38 @@
  * @module schemas/window-stack
  * @graphNode schema
  *
- * ## Two mechanisms, and this module is deliberately only one of them
+ * ## Two mechanisms; this module is one of them
  *
  * | | trigger | who |
  * |---|---|---|
  * | **semantic zoom** | the card's rendered width crosses a declared threshold | automatic |
  * | **open / close** | opening a card, or `[x]` | a person |
  *
- * {@link module:schemas/semantic-zoom} owns the first. This owns the second,
- * and the split is the whole finding: the owner, 2026-09-20 —
- *
- * > open is like window, avatar/tiles project open panels onto window. sum
- * > functionality, need to handle z-order.. selecting any part raises
- *
- * **An open card is a WINDOW, not a zoom state.** It is projected ON TO the
- * board rather than being the card grown large. That is why nothing in
+ * {@link module:schemas/semantic-zoom} owns the first; this owns the second.
+ * **An open card is a WINDOW, not a zoom state**: it is projected ON TO the
+ * board, and selecting any part of it raises it. Nothing in
  * `semantic-zoom.ts` mentions windows and nothing here mentions widths: the
  * card goes on becoming its avatar as the board shrinks, and the window it
- * spawned is a different object that simply stays. An implementation that
- * needed the zoom path to ask "…unless it is open" would have conflated them,
- * and the flag would be the conflation made permanent.
+ * spawned stays.
  *
- * ## SESSION-ONLY, and the reason is a file-write per raise
+ * ## SESSION-ONLY
  *
  * `board-positions.ts` carries `x` and `y` and deliberately no `z` —
  * *"stacking order is a rendering decision the board makes from the
  * document."* Raising is the most frequent gesture on a board, so a committed
- * `z` would make every selection a write and every two concurrent readers a
- * merge conflict, to record something neither of them chose deliberately.
+ * `z` would make every selection a write and a merge conflict.
  *
  * So the stack lives for as long as the page does, and this module holds no
- * schema, no `$schema` tag and no file: **it is state, not a document**, and
- * saying so in the type is cheaper than a reader inferring it from the absence
- * of a Zod object. The owner's default, stated with the alternative: if it
- * should persist, it is one optional field in the DI document and this module
- * gains a serialiser — which is why the shape below is already a plain array
- * of ids.
+ * `$schema` tag and no file: **it is state, not a document**. If it should
+ * ever persist, it becomes one optional field in the DI document plus a
+ * serialiser, which is why the shape is already a plain array of ids.
  *
- * ## Why an ARRAY rather than a map of z-numbers
+ * ## An ARRAY rather than a map of z-numbers
  *
  * The array IS the order, bottom to top, so there is no second fact to keep in
- * step. A `Record<id, number>` can hold two cards at the same z, or a gap, or
- * a z for a card that is not open — three states that mean nothing and that
- * every consumer would have to defend against. `zIndexOf` derives the number
- * on the way out, which is the only place it is needed.
+ * step. A `Record<id, number>` could hold two cards at the same z, a gap, or a
+ * z for a card that is not open. `zIndexOf` derives the number on the way
+ * out.
  */
 
 /** The open cards, bottom of the stack first. A card appears at most once. */

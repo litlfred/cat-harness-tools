@@ -11,65 +11,22 @@
  *
  * `memory: project` is a Claude Code **harness** feature: it injects the first
  * 200 lines of `.claude/agent-memory/<agent>/MEMORY.md` into a subagent's
- * system prompt. The harness decides where it looks, so that path is not ours
- * to move, and this module does not try. The relation is the one
- * `docs/reference/skill-instructions/` already has to `skills/` — entries are
- * authored here, scoped, and **assembled** into the file the harness reads.
+ * system prompt. That path is fixed by the harness. Entries are authored here,
+ * scoped, and **assembled** into the file the harness reads, as
+ * `docs/reference/skill-instructions/` is to `skills/`.
  *
- * ## Why scope by role, and not by agent
+ * ## Scoped by role, not by agent
  *
- * Memory is bound to the agent today, and the agent is an **actor**.
- * `AGENTS.md` states the rule for knowledge: *"A skill is what the performer
- * needs to KNOW and belongs to the lane; a permission is what the participant
- * may DO and travels with them."* Memory is knowledge, so it belongs to the
- * lane.
+ * Memory is knowledge, and `AGENTS.md` puts knowledge with the lane (role),
+ * not the actor. Agent-scoping duplicates a fact two agents both need into two
+ * files that drift. {@link memoryForRoles} selects the entries for a set of
+ * roles.
  *
- * **{@link memoryForRoles} is not dead code, and this comment briefly implied
- * it was.** The lane for at least one of the three memory-carrying subagents
- * is already declared: `ci-health-watcher` is a mechanical participant in the
- * CI process, and `roles.json` carries `build-pipeline` and
- * `validation-pipeline` — both `actorKind: "system"`, both described as
- * running a fixed program and exercising no judgement — with the `ci-pipeline`
- * actor already taking both. Owner, 2026-09-19: *"ci watchers are
- * agents/mechanical roles that are part of the CI process."* Bean `29ij`.
+ * ## `BASELINE` must carry its provenance
  *
- * The judgement-free property is doing the work there, which is why it does
- * NOT settle the other two: a platform-boundary guard exercises judgement, and
- * a `system` lane excludes exactly that.
- *
- * That is not a tidiness argument. Measured 2026-09-19 across
- * `.claude/agent-memory/`, by parsing all three files rather than reading
- * them: **28 entries over 3 agents, with 3 subject areas duplicated** between
- * `content-pipeline-navigator` and `platform-boundary-guard` — the document
- * render path taking no TeX (near-verbatim), adapter-vs-profile, and what the
- * schema structurally cannot catch. One fact, two files, free to drift apart,
- * and that duplication is *caused by* agent-scoping: there is nowhere shared
- * to put a thing two agents both need.
- *
- * **An earlier revision of this comment said 5, and named the BASELINE
- * "re-measure, do not quote" as one of the two near-verbatim pairs. Both
- * claims were wrong**, and the second is the instructive one: the two files DO
- * carry that heading identically, and their bodies are **disjoint** — one
- * tabulates pipeline entrypoints and sidecar staleness, the other
- * folio-specific literals and README staleness. Same title, two different
- * facts, and merging them would have destroyed one.
- *
- * The number came from reading the files; the correction came from parsing
- * them. That is this module's own BASELINE rule turned on its own
- * documentation — a count in prose is a claim, not evidence — and it is
- * recorded here rather than quietly amended because the failure is the point.
- *
- * ## `BASELINE` must carry its provenance, and now structurally
- *
- * `AGENTS.md` says a BASELINE is *"a measured number, stored **with the command
- * that produced it and the date**, and never quoted as a current answer."*
- * That has been prose discipline, and prose discipline is what
- * `judgementOnly` was invented to replace after a stakeholder rule stated only
- * in a summary came within one commit of being overturned.
- *
- * So {@link MemoryNodeSchema} **refuses a `baseline` entry without `measured`**.
- * A number whose command and date are missing is a claim, not evidence, and
- * the schema is where that stops being a thing somebody has to remember.
+ * A BASELINE is a measured number, stored with the command that produced it
+ * and the date, never quoted as a current answer. {@link MemoryNodeSchema}
+ * **refuses a `baseline` entry without `measured`**.
  *
  * @graphNode schema
  */

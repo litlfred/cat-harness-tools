@@ -1,6 +1,5 @@
 /**
- * A recorded meeting or talk as a library entry, and its transcripts. Bean
- * `folio-assistant-1r0p`.
+ * A recorded meeting or talk as a library entry, and its transcripts.
  *
  * Two records:
  *
@@ -14,28 +13,24 @@
  *
  * ## A transcript is a narrative
  *
- * A recogniser's output is somebody's account of the speech, not the speech,
- * so a transcript carries the narrative review state
+ * A transcript carries the narrative review state
  * (`schemas/content/narrative.ts`): who drafted it, and whether a human has
- * confirmed it. The narrative's rules are applied by parsing the transcript
- * AS a narrative (its segments joined), so they are not restated here and
- * cannot drift: anything written names its drafter, an agent names its
- * model, and only a human confirms.
+ * confirmed it. It is validated by parsing it AS a narrative (its segments
+ * joined): anything written names its drafter, an agent names its model, and
+ * only a human confirms.
  *
  * ## The recogniser is recorded, not inferred
  *
  * A source-language transcript names the recogniser that produced it: the
  * tool, its version, the model file and that file's sha256. The same audio
- * through a different model is a different transcript, and the comparison
- * the `audio-transcription` skill asks for is only meaningful when each side
- * says what produced it.
+ * through a different model is a different transcript.
  *
  * ## A translation says what it was translated from
  *
  * `translated_from` names the source-language transcript's language and the
- * sha256 of that file's segments, so a translation of a transcript that has
- * since been corrected reads as stale rather than current. Segment timings
- * are the source's, one for one: a translation re-times nothing.
+ * sha256 of that file's segments, so a translation of a since-corrected
+ * transcript reads as stale. Segment timings are the source's, one for one:
+ * a translation re-times nothing.
  *
  * @module schemas/library/recording
  * @graphNode schema

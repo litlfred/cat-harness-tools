@@ -1,9 +1,8 @@
 /**
  * QA review — findings, decisions, and the audit notes that justify them.
  *
- * Three entities, deliberately not one. The corpus arrived at this module
- * carrying **two vocabularies for what looked like a single act**, and the
- * obvious move — pick one, migrate the other — is the wrong one:
+ * Three entities, not one. Two vocabularies exist for what looks like a
+ * single act:
  *
  * ```
  * content-review skill output:  decision: approve | request-changes | reject
@@ -16,9 +15,8 @@
  *
  * Neither determines the other. A `critical` mechanical finding can be
  * overruled by someone with the standing to overrule it, and an `approve` can
- * be issued over findings that are still open. Collapsing the two makes the
- * gate unable to express the only two situations that actually need a record:
- * a defect nobody is going to fix, and an approval granted in spite of one.
+ * be issued over findings that are still open: a defect nobody is going to
+ * fix, and an approval granted in spite of one, both need a record.
  *
  * ## The two severity vocabularies are two axes, not two spellings
  *
@@ -27,13 +25,8 @@
  * is a property of the defect and a machine can assign it.
  *
  * {@link FindingWeight} (`blocking | suggestion | praise`) says **what the
- * reviewer asks of the gate**. It is a stance, not a measurement.
- *
- * The proof they are different axes is `praise`, which has no image at all
- * under the machine axis: a mechanical criterion's only good outcome is
- * silence, so "this is well done, keep it" is unsayable there. That is the
- * human axis doing something the machine axis cannot, and mapping it onto
- * `minor` would have deleted it.
+ * reviewer asks of the gate**. It is a stance, not a measurement; `praise`
+ * has no equivalent on the machine axis.
  *
  * So a finding carries whichever axis its reviewer can speak on, and
  * {@link checkReview} requires the right one rather than defaulting a
@@ -43,19 +36,16 @@
  *
  * Overruling is not deletion. The {@link Finding} is immutable once raised;
  * the {@link Decision} records the overrule, and every overrule of a
- * **mechanical** finding carries an {@link AuditNote} saying why. A gate whose
- * findings vanish when somebody disagrees with them cannot be audited — the
- * next reader cannot tell a defect that was considered and accepted from one
- * that was never seen.
+ * **mechanical** finding carries an {@link AuditNote} saying why.
  *
  * ## An audit note cites
  *
- * A rationale with no citation is an assertion. {@link AuditNote.cites} carries
- * {@link Citation}s into the corpus — a witness, another finding, a QA report,
- * a block, a file range, a bibliographic key, a workflow instance. Agents are
- * expected to *propose* those citations from corpus evidence
- * ({@link AuditNote.proposed_by}); a human confirming a proposed note is
- * recorded as its author, because the reasoning is theirs.
+ * {@link AuditNote.cites} carries {@link Citation}s into the corpus — a
+ * witness, another finding, a QA report, a block, a file range, a
+ * bibliographic key, a workflow instance. Agents are expected to *propose*
+ * those citations from corpus evidence ({@link AuditNote.proposed_by}); a
+ * human confirming a proposed note is recorded as its author, because the
+ * reasoning is theirs.
  *
  * ## Citation resolution has three outcomes, and one of them is not a pass
  *
@@ -63,8 +53,7 @@
  * `not-checked` is what you get when no corpus resolver was supplied, or when
  * the resolver itself could not answer — a shallow clone, an absent submodule.
  * It is never rendered as `resolved`. Same rule as `check-ci-health.ts`,
- * `readme-sections.ts` and `kg-qa.ts`: "could not determine" is a third state
- * everywhere in this repo.
+ * `readme-sections.ts` and `kg-qa.ts`.
  *
  * @module schemas/qa-review
  * @graphNode schema

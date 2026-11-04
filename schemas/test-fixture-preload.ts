@@ -9,11 +9,8 @@
  *
  * cat-harness's code types the paper vocabulary, whose nodes live with their
  * owners — document kinds in the content core, math kinds and the `paper`
- * adapter in the science layer (owner, 2026-10-04 and 2026-10-05). In the
- * monorepo every test sees them. Standing alone, as
- * `check:cat-harness-standalone` runs it, none is there, and 205 tests of
- * cat-harness's own code had nothing to read. The owner chose, 2026-10-05,
- * to fixture the tests rather than grow the standalone baseline.
+ * adapter in the science layer. Standing alone, as
+ * `check:cat-harness-standalone` runs it, none of them is there.
  *
  * So: when no instance in this checkout declares a `block-kinds` graph,
  * `FOLIO_FIXTURE_CHECKOUT` names `test/fixtures/standalone-checkout/`, which

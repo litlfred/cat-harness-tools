@@ -4,14 +4,10 @@
  * @module schemas/mount-trust
  * @graphNode schema
  *
- * Bean `ieum`, issue #2389, rule H8 of `skills/conduct/security/zero-trust-handover.md`.
- * The owner, 2026-10-07: *"mounting remote KG needs trusted provenance sources
- * (digitally signed e.g. verifiable via GDHCN), or explicit user consent"*,
- * and, the same day, *"staging doesnt need signature"*.
- *
- * A remote mount brings in skills, voices, processes and code. A mounted skill
- * steers an agent, and mounted code runs, so mounting is a supply-chain
- * decision, not a fetch.
+ * Rule H8 of `skills/conduct/security/zero-trust-handover.md`: a remote mount
+ * needs a trusted, signed provenance source or explicit user consent; staging
+ * needs neither. A mounted skill steers an agent and mounted code runs, so
+ * mounting is a supply-chain decision, not a fetch.
  *
  * ## Three ways a mount may proceed, and one it may not
  *
@@ -22,55 +18,45 @@
  * | `signature` | a signature verifiable through a declared trust network | **could not determine**: no verifier exists yet, so a recorded signature is reported and NOT trusted |
  * | none | unsigned and unconsented | **refused** |
  *
- * **Consent is scoped to the pin.** It records the `ref` it was given for. A
- * moved pin is a different commit and different code, so it asks again rather
- * than inheriting yesterday's yes — unless a STANDING consent the site
- * declared covers it, in which case the repin tool records that consent for
- * the new pin, by name (see "Standing consent" below).
+ * **Consent is scoped to the pin.** A moved pin is different code, so it asks
+ * again — unless a declared STANDING consent covers it (below).
  *
- * **An unverified signature is not trust.** Accepting a signature this code
- * cannot check would turn "signed" into a label anyone can write. Until a
- * verifier for the declared network exists (GDHCN is the named example; its
- * trust-list model belongs to an instance above this layer), a signature-only mount is `could-not-determine`, which
- * never mounts.
+ * **An unverified signature is not trust.** Until a verifier for the declared
+ * network exists (GDHCN is the named example; its trust-list model belongs to
+ * an instance above this layer), a signature-only mount is
+ * `could-not-determine`, which never mounts.
  *
- * ## What the lock keeps of it, and who may consent (roast `1ygp` L4.2)
+ * ## What the lock keeps, and who may consent
  *
  * - **The basis is recorded.** Every locked instance carries the basis it was
  *   mounted on ({@link MountTrustBasisSchema}): `staging` (the caller's
- *   `--staging` flag, recorded precisely because the caller chooses it) or
- *   `consent` with who and when. `mount:remote:check` re-runs
- *   {@link mountTrust} against the CURRENT declaration and reports a mount
- *   whose recorded basis no longer holds.
+ *   `--staging` flag) or `consent` with who and when. `mount:remote:check`
+ *   re-runs {@link mountTrust} against the CURRENT declaration and reports a
+ *   mount whose recorded basis no longer holds.
  * - **Who consented is checked when the instance says who may.** An instance
  *   may declare `mountApprovers`; then `consent.by` must be one of them. With
- *   no list, `by` is a free string nobody checked, and the verdict says
- *   `approver: "unverified"`, which callers report as its own state, never
- *   as clean.
+ *   no list, the verdict says `approver: "unverified"`, which callers report
+ *   as its own state, never as clean.
  * - **A gitlink is not covered by its parent's consent.** An instance reached
- *   through a gitlink is another repository at another commit; it needs
- *   consent of its own, given on the downstream's override for that instance.
+ *   through a gitlink needs consent of its own, given on the downstream's
+ *   override for that instance.
  *
- * ## Standing consent (owner, 2026-10-16)
+ * ## Standing consent
  *
- * Pins stay DECENTRALIZED: each site keeps its own lock. A site may say, once,
- * per upstream instance, *"keep me on `<branch>` of this upstream"* — a
- * {@link StandingConsentSchema} on that instance's `trust.standing` (the
- * remote source's own `trust`, or `overrides.<instance>.trust` for an instance
- * reached through a gitlink, so the `instance` it is for is the entry it sits
- * on). It names the person who gave it and when.
+ * Each site keeps its own lock. A site may say, once, per upstream instance,
+ * *"keep me on `<branch>` of this upstream"* — a {@link StandingConsentSchema}
+ * on that instance's `trust.standing` (the remote source's own `trust`, or
+ * `overrides.<instance>.trust` for an instance reached through a gitlink). It
+ * names the person who gave it and when.
  *
- * A standing consent does NOT make a pin trusted by itself, and a hand-moved
- * pin is still refused: what it allows is for the repin tool, having resolved
- * the followed branch's newest (or, with `require: "green"`, newest green)
- * commit, to WRITE a per-pin consent for the new pin, attributed to the
- * standing rule's person and marked `consent.standing` ({@link withStandingConsent}).
- * {@link mountTrust} accepts that moved pin only while the rule it names is
- * still declared, unchanged, on the same instance — withdraw or edit the rule
- * and every pin recorded under it asks again. A named person's consent is
- * therefore recorded for every pin, and none is anonymous. A pin with no
- * standing rule, or whose consent is for another ref, asks again exactly as
- * before.
+ * A standing consent does not trust a pin by itself, and a hand-moved pin is
+ * still refused. It lets the repin tool, having resolved the followed
+ * branch's newest (or, with `require: "green"`, newest green) commit, WRITE a
+ * per-pin consent for the new pin, attributed to the standing rule's person
+ * and marked `consent.standing` ({@link withStandingConsent}). {@link mountTrust}
+ * accepts that pin only while the rule it names is still declared, unchanged,
+ * on the same instance; withdraw or edit the rule and every pin recorded under
+ * it asks again.
  */
 import { z } from "zod";
 

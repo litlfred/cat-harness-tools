@@ -4,12 +4,11 @@
  * @module schemas/withheld
  * @graphNode schema
  *
- * Bean `cw35`. The site mount (`scripts/mount-instance-docs.ts`) copies an
- * instance's directory wholesale, so a publication whose licence refuses
- * redistribution stayed reachable BY URL after every link to it was removed.
- * The platform cannot know an instance's licence rules; the instance's own
- * generator writes this list from its own data (the IRIS replica: the catalogue's
- * publication gates), and the mount honours it for every instance alike.
+ * The site mount (`scripts/mount-instance-docs.ts`) copies an instance's
+ * directory wholesale, so a publication whose licence refuses redistribution
+ * would stay reachable BY URL. The platform cannot know an instance's licence
+ * rules; the instance's own generator writes this list from its own data, and
+ * the mount honours it for every instance alike.
  *
  * Each entry names a path relative to the directory the file sits in — a
  * trailing `/` for a directory, which is withheld with its whole subtree — and

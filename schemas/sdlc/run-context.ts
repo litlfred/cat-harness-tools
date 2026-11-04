@@ -4,23 +4,9 @@
  * @module schemas/run-context
  * @graphNode schema
  *
- * The third schema of `docs/proposals/tool-releases-2026-10-07.md`,
- * §"Scope widened" (issue #2481, bean `3sbm`). The owner, 2026-10-07:
- *
- * > test plan execution (the ITB …), internal QA reports should also have the
- * > same versioning information attached along with it. how can we
- * > consolidate these various needs into single (small set of) schema(s)
- * > referenced by these processes/skills
- *
- * ## Why one record rather than a field per report
- *
- * A survey of nine run and report families found the same few facts under
- * different names — the checker's hash as `script_hash`; its version as
- * `engine_version`, `reviewer.version` or `by.version`; the commit under test
- * as `source.commit`, `reviewed_sha`, `script_commit_sha` or `last_run_sha` —
- * and no sub-schema shared between them. No record held a runtime, the
- * platform commit or the mount-lock digest, and none linked to a PROV
- * activity. This states each fact once:
+ * Test-plan executions, QA reports and tool runs all need the same version
+ * facts (the checker's hash and version, the commit under test, runtimes, the
+ * platform commit, the mount lock). This record states each fact once:
  *
  * | field | the fact | reused from |
  * |---|---|---|
@@ -32,29 +18,24 @@
  * | `inputs[]` | hash bases | `HashBasisSchema` |
  * | `prov` | the PROV activity that records this context as `prov:used` | — |
  *
- * ## Referenced by sha256, written once per run (owner, C1 = a)
+ * ## Referenced by sha256, written once per run
  *
  * A report carries {@link RunContextRefSchema} — `{ sha256 }` — and never the
- * context itself. One sweep writes thousands of `block-qa` sidecars, and they
- * all cite one context rather than each repeating it. The digest is over
- * {@link canonicalRunContext}'s bytes, so two writers of one context agree on
- * its reference. Wiring the run-level records (tool-run, test-run, the
- * qa-reports manifest — C3) is NOT done here; this is the schema.
+ * context itself, so thousands of `block-qa` sidecars from one sweep cite one
+ * context. The digest is over {@link canonicalRunContext}'s bytes, so two
+ * writers of one context agree on its reference.
  *
  * ## Three states, never two
  *
  * - A release that could not be provisioned is `could-not-provision` WITH a
- *   reason. That is today's "rendered 0 SVGs" made into a logged fact; a
- *   context that simply omitted the release would read as one that never
- *   needed it.
+ *   reason; a context that omitted it would read as one that never needed it.
  * - `mounts` is `none`, `locked` or `could-not-determine`. "No mount lock was
  *   found" and "this run mounts nothing" are different facts.
  * - A `system` invoker must give its `script_hash`; the token `unknown` is
- *   allowed and is not a hash. A script that cannot say what it was is the gap
- *   the four `script_hash` spellings were each trying to close.
+ *   allowed and is not a hash.
  *
  * Run-context records are produced per run and have no directory: the
- * run-level record that writes one says where (C3).
+ * run-level record that writes one says where.
  */
 import { createHash } from "node:crypto";
 

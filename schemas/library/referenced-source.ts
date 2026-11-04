@@ -1,15 +1,15 @@
 /**
  * `referenced.json`: a library entry that RECORDS a source and holds none of
- * its text, written by `scripts/referenced-source.py`. Bean `scfh`, issue #1614.
+ * its text, written by `scripts/referenced-source.py`.
  *
  * For a source whose licence forbids posting copies (the OMG BPMN and DMN
  * specifications). The entry identifies the exact bytes (`source.sha256`), its
  * clause outline so a citation can name a clause and a page, and why the text
  * is withheld. `materialization` is a `folio-materialization/v1` record in
- * state `referenced` — the vocabulary `materialization-state.ts` defines in
- * this instance since bean `tlat`; the rest of the record (gates, purpose) is
- * core's `materialization.ts`, restated here only as far as this harness module
- * may (harness does not depend on core).
+ * state `referenced` — the vocabulary `materialization-state.ts` defines; the
+ * rest of the record (gates, purpose) is core's `materialization.ts`, restated
+ * here only as far as this harness module may (harness does not depend on
+ * core).
  *
  * @module schemas/referenced-source
  * @graphNode schema

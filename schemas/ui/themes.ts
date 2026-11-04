@@ -1,39 +1,25 @@
 /**
- * The themes this instance ships, and the default.
+ * The themes this instance ships, and the default: grumpy-cat, white and
+ * black (with high-contrast variants), pale sages and dusty carolina blues in
+ * several gradations.
  *
  * @module schemas/themes
  * @graphNode schema
  *
- * The owner's list, 2026-09-19: *"grumpy-cat, white black (and whatever needed
- * accessability), a couple pale sages and dusty carolina blues, in a couple of
- * fading gradations"*, with the default *"one of the sages (to match the
- * staging bar)"*.
+ * ## The high-contrast pair is the accessibility answer
  *
- * ## The high-contrast pair is the accessibility answer, not a decoration
+ * `high-contrast-light` and `high-contrast-dark` are a **pair**, so the
+ * reader's own scheme preference picks one. Both clear WCAG AA on body text
+ * against their own surface by construction — pure black on pure white, and
+ * the reverse. **They carry no gradient**: a gradated surface has a range of
+ * contrast ratios, and the worst point governs.
  *
- * `high-contrast-light` and `high-contrast-dark` are the "whatever needed
- * accessibility" clause, and they are listed as a **pair** rather than one
- * theme, because a single high-contrast theme forces a choice that the reader's
- * own scheme preference has already made. Both clear WCAG AA on body text
- * against their own surface by construction — pure black on pure white, and the
- * reverse.
+ * ## The default matches the staging bar
  *
- * **They deliberately carry no gradient.** A gradated surface has a *range* of
- * contrast ratios against its ink, so the worst point governs, and the whole
- * point of a high-contrast theme is that there is no worst point to find.
- *
- * ## The default was checked on staging, which is the only place it could be
- *
- * `DEFAULT_THEME_ID` is a sage because the owner asked for one that matches the
- * staging bar. **That match cannot be verified from a checkout** — the sticky
- * and the staging banner appear together on exactly one surface, the deployed
- * staging site, and picking a value from a palette in isolation is how a
- * default ends up almost-matching.
- *
- * So it was shipped provisionally and **looked at on the staging preview for
- * PR #405; the owner confirmed it 2026-09-19**. If the banner's colour ever
- * changes, this is a judgement to re-make there rather than a number to
- * recompute here — no test asserts the match, because none can.
+ * `DEFAULT_THEME_ID` is a sage chosen to match the staging bar. That match can
+ * only be seen on the deployed staging site, where the sticky and the banner
+ * appear together, so no test asserts it. If the banner's colour changes,
+ * re-make the choice there rather than recomputing a number here.
  */
 import {
   THEME_SCHEMA_TAG,

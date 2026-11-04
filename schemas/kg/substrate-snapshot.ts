@@ -1,29 +1,25 @@
 /**
  * A SUBSTRATE SNAPSHOT: the root declaration of a subscribed Knowledge Graph,
- * cached at the commit the subscription pins. Issue #1719, epic bean `fnx4`,
- * slice 4 of `docs/proposals/kg-subscriptions.md`.
+ * cached at the commit the subscription pins. See
+ * `docs/proposals/kg-subscriptions.md`.
  *
  * @module schemas/substrate-snapshot
  * @graphNode schema
  *
- * ## Why a wrapper and not a copy of `<name>.json`
+ * ## A wrapper, not a copy of `<name>.json`
  *
- * A bare copy of the substrate's `<name>.json` would carry a `name` equal to
- * its file stem, and that is exactly the rule bootstrap and this harness use
- * to recognise a directory's declaration (`declarationFileIn`,
- * `findDeclarationFile`). A cached copy would then BE a declaration to every
- * scanner that walks the tree: a second instance nobody installed, with the
- * substrate's directories resolving into a checkout that does not hold them.
- * So the snapshot declares what it is (`$schema`), and the upstream bytes sit
- * in `raw`, untouched, where no scanner reads them as a declaration.
+ * A bare copy would carry a `name` equal to its file stem — the rule that
+ * marks a directory's declaration (`declarationFileIn`, `findDeclarationFile`)
+ * — so every scanner would see a second instance nobody installed. So the
+ * snapshot declares what it is (`$schema`), and the upstream bytes sit in
+ * `raw`, untouched, where no scanner reads them as a declaration.
  *
- * ## Why `raw` and a digest, not a parsed object
+ * ## `raw` and a digest, not a parsed object
  *
- * Somebody else's bytes, pinned: the `sync-remote-skills` rule. The digest is
- * over `raw` exactly as fetched, so "is this still what the pin says" is a
- * question a re-fetch can answer byte for byte. `summary` is the part a reader
- * or the visualizer needs without parsing `raw`, and it is DERIVED from `raw`
- * by the same code that judged it, so the two cannot disagree at write time.
+ * The digest is over `raw` exactly as fetched, so a re-fetch can check the
+ * pin byte for byte (the `sync-remote-skills` rule). `summary` is what a
+ * reader or the visualizer needs without parsing `raw`, DERIVED from `raw` by
+ * the same code that judged it.
  */
 import { z } from "zod";
 
