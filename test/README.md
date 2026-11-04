@@ -7,7 +7,7 @@ generated: "scripts/subgraph-readmes.ts of the bootstrap toolset (https://github
 
 # cat-harness-tools-tests
 
-Tests of the code this layer holds, moved with their subjects so the harness keeps no test importing upward into this layer: `composition-roots` (the declared tool groups and route mounting) and `mcp-graph-tools`.
+Tests of the code this layer holds, among them `composition-roots` (the declared tool groups and route mounting) and `mcp-graph-tools`.
 
 Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-tests`, holding `code`.
 

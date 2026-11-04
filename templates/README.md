@@ -7,7 +7,7 @@ generated: "scripts/subgraph-readmes.ts of the bootstrap toolset (https://github
 
 # folio-templates
 
-Files `folio_init` WRITES INTO a new folio, kept as real files rather than strings inside `scripts/init-folio.ts`. Moved here from `cat-harness/templates/` by bean `70lx`; the id is kept, because `init-folio.ts` looks the directory up by it (`TEMPLATES_ID`).
+Files `folio_init` WRITES INTO a new folio, kept as real files rather than strings inside `scripts/init-folio.ts`. `init-folio.ts` looks the directory up by this id (`TEMPLATES_ID`), so the id must not change.
 
 Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `folio-templates`, holding `code`.
 

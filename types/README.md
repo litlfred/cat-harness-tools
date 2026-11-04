@@ -7,7 +7,7 @@ generated: "scripts/subgraph-readmes.ts of the bootstrap toolset (https://github
 
 # cat-harness-tools-types
 
-Ambient type declarations for untyped dependencies: `bpmn-moddle.d.ts` and `dmn-moddle.d.ts`. This layer's `tsconfig.json` includes `types/**/*.d.ts`, and so does the content core's (`../cat-harness-tools/types/**/*.d.ts`), so the path is a contract with a layer above and stays where it is. Declared 2026-10-24 under bean `0uu2`, where the owner ruled to keep it in place and declare it rather than fold it into `src/`.
+Ambient type declarations for untyped dependencies: `bpmn-moddle.d.ts` and `dmn-moddle.d.ts`. This layer's `tsconfig.json` includes `types/**/*.d.ts`, and so does the content core's (`../cat-harness-tools/types/**/*.d.ts`), so the path is a contract with a layer above and must not move.
 
 Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-types`, holding `code`.
 
