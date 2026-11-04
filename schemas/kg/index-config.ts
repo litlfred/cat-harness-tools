@@ -474,7 +474,7 @@ export function addIndexInstance(root: string, entry: IndexInstance): boolean {
 
 /** The canonical text of an index: two-space JSON, `$schema` first, a trailing newline. */
 export function formatIndexConfig(config: IndexConfig): string {
-  const { $schema, _comment, title, description, instances, site, gateExemptions, contentTypes, mountApprovers } = config;
+  const { $schema, _comment, title, description, instances, site, gateExemptions, contentTypes, mountApprovers, enableSubgraphs } = config;
   const ordered = {
     $schema,
     ...(_comment !== undefined ? { _comment } : {}),
@@ -489,6 +489,10 @@ export function formatIndexConfig(config: IndexConfig): string {
     // dropping these would delete who may consent and what the content
     // types declare (folio-assistant#2389).
     ...(mountApprovers !== undefined ? { mountApprovers } : {}),
+    // Kept too: dropping it here would switch the checkout's opt-in
+    // sub-graphs off on the next re-pin (cat-harness#991 step 23.4, which
+    // lost it to exactly that, folio-assistant#2926).
+    ...(enableSubgraphs !== undefined ? { enableSubgraphs } : {}),
     ...(contentTypes !== undefined ? { contentTypes } : {}),
     // Last, and kept: dropping it here would make every rewrite of the index
     // silently delete the exemptions of its own workflows.
