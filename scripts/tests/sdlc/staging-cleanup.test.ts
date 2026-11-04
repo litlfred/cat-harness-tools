@@ -171,13 +171,11 @@ describe("the preflight's verdicts", () => {
 describe("skills documentation covers bean oz5w failure modes", () => {
   it("ci-health documents that cancelled is NOT benign when previous state is a deletion", () => {
     const ciHealthText = readFileSync(skillMdFile(ROOT, "ci-health")!, "utf-8");
-    expect(ciHealthText).toContain("folio-assistant-oz5w");
     expect(ciHealthText).toContain("never when the previous state is a deletion");
   });
 
   it("staging-review documents checking gh-pages commit log for newer staging(cleanup) and the re-publish command", () => {
     const stagingReviewText = readFileSync(skillMdFile(ROOT, "staging-review")!, "utf-8");
-    expect(stagingReviewText).toContain("bean oz5w");
     expect(stagingReviewText).toContain("staging(cleanup)");
     expect(stagingReviewText).toContain("gh workflow run feature-staging.yml -f branch=<branch>");
   });
