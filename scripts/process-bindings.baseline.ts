@@ -1,8 +1,8 @@
 /**
- * The wrong-direction process bindings `check-process-bindings` found when it
- * was turned on, 2026-10-03. Each says why it is here and which bean clears
- * it. The baseline only shrinks: lower it with `--shrink` after a fix, and
- * never add an entry to admit a new binding.
+ * The wrong-direction process bindings `check-process-bindings` tolerates.
+ * Each entry says why it is here and which bean clears it. The baseline only
+ * shrinks: lower it with `--shrink` after a fix, and never add an entry to
+ * admit a new binding.
  *
  * Keyed by file, activity id and ref, which are stable across unrelated edits.
  *

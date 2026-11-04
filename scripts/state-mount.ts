@@ -4,92 +4,58 @@
  *
  * @module scripts/state-mount
  * @graphNode none — a session-start step over a declared `storage` directory
- * @covers none — it MAKES graphs readable and judges none of them. It became a
- * gate in `code-quality-gates.yml` (bean `9ofm`), where it runs before the
- * bean gates, and `audit:coverage` correctly asked what it covers. The honest
- * answer is nothing: a mount that reported coverage of `beans` would let the
- * nine gates that actually judge the store be removed without the census
- * noticing — coverage by the step that merely fetched it.
+ * @covers none — it MAKES graphs readable and judges none of them. It runs as
+ * a gate in `code-quality-gates.yml` before the bean gates, but claiming
+ * `beans` coverage would let the gates that actually judge the store be
+ * removed without the census noticing.
  *
- * Bean `2h76` part 4, arc `fs43`. The session-start hook calls this; it is also
- * `bun run cat state:mount` by hand.
+ * The session-start hook calls this; it is also `bun run cat state:mount` by
+ * hand.
  *
- * ## The failure this exists to make impossible
+ * ## Every failure is LOUD
  *
- * The proposal names it as a falsifier: *"If the session-start hook's fetch
- * fails silently and `beans list` returns empty, the agent reads 'no work' —
- * the third state collapsing into zero."* An empty work-plan and an unreachable
- * work-plan look identical to an agent, and the agent acts on the first
- * reading. So every failure here is LOUD: a non-zero exit, and a block on
- * stdout — the hook's stdout IS the agent's context — that says in as many
- * words that an empty `beans list` must not be believed.
+ * An empty work-plan and an unreachable work-plan look identical to an agent.
+ * So every failure here is a non-zero exit and a block on stdout — the hook's
+ * stdout IS the agent's context — that says in as many words that an empty
+ * `beans list` must not be believed.
  *
- * ## One implementation (bean `nij4`)
+ * ## A branch PER GRAPH
  *
- * This module used to check the whole branch out as a detached worktree at
- * `state/`. Main then carried two mount implementations, that one and
- * {@link mountTip}. Owner ruling 2026-10-03 (bean `nij4`): keep ONE. The
- * worktree path is gone; every mount is {@link mountTip}'s, which round-trips
+ * Each declared tip-keyed directory lives on the branch ITS OWN declaration
+ * names, and is mounted at ITS OWN declared path. This module contributes only
+ * the FAN-OUT: every mount is {@link mountTip}'s (`branch-store.ts`, reached
+ * by hand as `branch-store.ts mount --id <directory-id>`), which round-trips
  * bytes, modes and symlinks and keeps a per-worktree marker. `beans` reads
- * `beans/defs` off a disk, and a mount at the declared path serves it the
- * same way the worktree did.
+ * `beans/defs` off a disk, and a mount at the declared path serves it.
  *
  * ## Which graphs: the RESOLVED source
  *
  * {@link tipLocations} reads each declaration's resolved source — a config
- * override, then `source`, then the legacy `storage` (bean `doy3`) — so a
- * graph declared `source: { kind: "branch", keyedBy: "tip" }` is mounted, a
- * `directory` source is the checkout itself, and a `commit`-keyed branch is
- * qa-store's, not a mount's.
+ * override, then `source`, then the legacy `storage` — so a graph declared
+ * `source: { kind: "branch", keyedBy: "tip" }` is mounted, a `directory`
+ * source is the checkout itself, and a `commit`-keyed branch is qa-store's,
+ * not a mount's.
  *
  * ## It is inert until the cutover, and that is not a failure
  *
  * While no declaration keeps a graph at a branch tip, {@link tipLocations} is
- * empty and this reports `not-enabled` and exits 0. A mount that treated
- * "nothing is kept on a branch" as an error would fail every session over a
- * branch nothing reads — which is the same crying-wolf that teaches an agent
- * to ignore the loud case.
+ * empty and this reports `not-enabled` and exits 0, so the loud case stays
+ * meaningful.
  *
  * ## It never discards work
  *
  * A mount holding unpushed edits is left exactly as it is and reported
- * `stale`, never re-read over. Its files are somebody's work in progress, and
- * this module's whole purpose is that state is not lost silently.
+ * `stale`, never re-read over. `stale` is NOT a failure: the graph is still on
+ * disk and readable.
  *
- * ## A branch PER GRAPH — the fan-out (owner ruling 2026-10-03)
+ * ## One graph failing must not let the others read clean
  *
- * This module used to mount ONE branch at one `state/` directory, and refused
- * outright above one declared branch, because decision D4 had chosen a single
- * `state` branch with the graphs as directories inside it. The owner reversed
- * that default on 2026-10-03:
- *
- * > *"Keep per-graph branches"*
- *
- * > *"i dont think we need a speciifc "state" branch or mount, several
- * > potnential subgraphs can be a part of state"*
- *
- * So each declared tip-keyed directory lives on the branch ITS OWN
- * declaration names, and is mounted at ITS OWN declared path. What this
- * function contributes is only the FAN-OUT: the per-directory mount already
- * exists as {@link mountTip} (`branch-store.ts`, reached by hand as
- * `branch-store.ts mount --id <directory-id>`), and it is reused rather than
- * reimplemented — it round-trips bytes, modes and symlinks, and keeps a
- * per-worktree marker, none of which this module should own a second copy of.
- *
- * ## One graph failing must not let the others read clean (bean `1xhc`)
- *
- * A fan-out invites exactly the defect `1xhc` is about: a step that did not
- * fire looks like one that passed. So the aggregate keeps the three answers
- * apart — every graph mounted, SOME mounted and these named ones did not, and
- * "could not determine" — a failing graph never stops its siblings being
- * mounted, and the process exits non-zero when anything failed, because
- * `session-start-coord-sweep.sh` calls this with `|| true` and the printed
- * block and the exit status are then the only carriers of the finding.
- *
- * `stale` is deliberately NOT a failure: it means a prior mount with unpushed
- * edits was left untouched, so the graph is still on disk and readable. That
- * is the per-graph form of the `dirty` state below, and for the same reason —
- * nothing was discarded.
+ * The aggregate keeps three answers apart — every graph mounted, SOME mounted
+ * and these named ones did not, and "could not determine". A failing graph
+ * never stops its siblings being mounted, and the process exits non-zero when
+ * anything failed, because `session-start-coord-sweep.sh` calls this with
+ * `|| true` and the printed block and the exit status are then the only
+ * carriers of the finding.
  */
 
 import { spawnSync } from "node:child_process";

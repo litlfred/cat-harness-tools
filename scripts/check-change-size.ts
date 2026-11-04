@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Change-size checker script (spec-kit Child 4 / issue #754).
+ * Change-size checker script.
  *
  * ## What this script does
  *

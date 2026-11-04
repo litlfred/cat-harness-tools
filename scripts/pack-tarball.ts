@@ -1,15 +1,11 @@
 #!/usr/bin/env bun
 /**
  * pack-tarball — build an npm .tgz tarball of an instance using `bun pm pack`,
- * compute its size and SHA-256 digest, and emit a `folio-binary-release/v1` state node.
+ * compute its size and SHA-256 digest, and emit a `folio-binary-release/v1` state node
+ * conforming to `schemas/sdlc/binary-release.ts` (BinaryReleaseSchema).
  *
  * @module scripts/pack-tarball
  * @graphNode none — a tool script implementing the `pack-tarball` Tool
- *
- * Packaging & binary release tooling for the Knowledge Graph:
- * - Builds the npm .tgz tarball via `bun pm pack`.
- * - Records size in bytes and sha256 digest into a `folio-binary-release/v1` state document.
- * - Conforms to `schemas/sdlc/binary-release.ts` (BinaryReleaseSchema).
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";

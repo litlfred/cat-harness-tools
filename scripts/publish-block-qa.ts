@@ -1,15 +1,9 @@
 #!/usr/bin/env bun
 /**
  * publish-block-qa — a folio's per-block QA verdicts, summarised into ONE
- * file a staging preview can publish. Bean `qbfi`, option 2.
- *
- * ## Why
- *
- * The review page's heat map had a QA column that could only say "not
- * published yet": the verdicts exist, as committed `block-qa/v1` sidecars in
- * the folio's repository, but no preview carried them. The owner chose to
- * publish them ("1 2"). This reads the committed sidecars; it runs no
- * checker and writes no verdict. It reports what the sweep last recorded.
+ * file a staging preview can publish for the review page's heat map. It reads
+ * the committed `block-qa/v1` sidecars; it runs no checker and writes no
+ * verdict. It reports what the sweep last recorded.
  *
  * ## Four states per block, and a stale verdict is NOT a pass
  *
@@ -19,45 +13,35 @@
  * - `passing`: every criterion's latest verdict is fresh, and none failed.
  * - `unaudited`: no sidecar at all.
  *
- * ## "Passing" says what was judged (bean `9791`)
+ * Freshness is the sweep's own rule (`summariseFreshness`: the criterion's
+ * dependency hashes against the block's current files), not a second one.
  *
- * The sweep runs only criteria a script can check. The ones that need an
- * agent's judgement (voice traps, exposition clarity, adversarial review) are
- * reported as `needs-agent` and never written, so a block could read
- * "passing" with a third of its criteria never given a verdict. Each block
- * therefore also carries `needsAgent`: the applicable criteria DECLARED
+ * ## "Passing" says what was judged
+ *
+ * The sweep runs only criteria a script can check; those that need an
+ * agent's judgement are reported as `needs-agent` and never written. Each
+ * block therefore also carries `needsAgent`: the applicable criteria DECLARED
  * `automated: false` that have no fresh verdict. Which criteria those are
  * comes from each criterion's own declaration, gated as the sweep gates it
  * (`applies_to` and the folio's active voices), never from a list here. A
  * verdict never given is not a pass.
  *
- * Freshness is the sweep's own rule (`summariseFreshness`: the criterion's
- * dependency hashes against the block's current files), not a second one.
- * A verdict older than its block rendered as a pass is the exact failure
- * this repository's QA design exists to prevent.
- *
- * ## Where the verdicts are: the instance root, and one transition read
+ * ## Where the verdicts are
  *
  * `blockQaPath` puts verdicts under `test/results/block-qa/` relative to the
- * INSTANCE root, and since bean `s3p2` (2026-09-23) the sweep anchors there.
- * Before that fix, a sweep of `folio/` anchored at `folio/` itself, because
- * the old walk stopped at the first directory whose ANCESTORS had a config,
- * and wrote `folio/test/results/block-qa/…`. A folio swept before the fix
- * still has its verdicts there. So this reads the instance root first and the
- * swept directory second. A summary that looked in one place would report
- * every such block unaudited, which reads as "nobody checked" when somebody
- * did. The legacy sibling beside each block is read by `existingBlockQaPath`
- * in both cases.
+ * INSTANCE root. A folio swept by an older sweep may still have them under
+ * the swept directory (e.g. `folio/test/results/block-qa/…`), so this reads
+ * the instance root first and the swept directory second. The legacy sibling
+ * beside each block is read by `existingBlockQaPath` in both cases.
  *
- * ## Whether there was a corpus at all (bean `tfqf`, R60)
+ * ## Whether there was a corpus at all
  *
  * `unaudited` says nobody ruled on a block. It is NOT what an absent corpus
- * means: once derived verdicts live on the folio's `qa-reports` branch, a
- * preview whose fetch missed has no verdicts for ANY block, and reporting every
- * one "unaudited" reads as "nobody checked" when somebody may have. So the file
- * carries `corpus`: `present` when a results tree was there or any block had a
- * verdict, `absent` otherwise — and the review page renders `absent` as "QA
- * not available for this build" rather than as a column of unaudited blocks.
+ * means: a preview whose fetch of the folio's `qa-reports` branch missed has
+ * no verdicts for ANY block. So the file carries `corpus`: `present` when a
+ * results tree was there or any block had a verdict, `absent` otherwise — and
+ * the review page renders `absent` as "QA not available for this build"
+ * rather than as a column of unaudited blocks.
  *
  * ## Output
  *

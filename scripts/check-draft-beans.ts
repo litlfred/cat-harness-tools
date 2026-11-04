@@ -7,9 +7,9 @@
  * When such a bean exists ONLY on an unmerged feature branch, it is invisible
  * to sibling sessions reading the committed store on main.
  *
- * Bean `folio-assistant-3432`: reports beans that are `status: draft` AND carry
- * a recommendation/default section AND exist on no ancestor of the default branch,
- * reporting with a denominator. `could not determine` is a finding, never green (`dh4f`).
+ * Reports beans that are `status: draft` AND carry a recommendation/default
+ * section AND exist on no ancestor of the default branch, with a denominator.
+ * `could not determine` is a finding, never green.
  *
  * Usage:
  *   bun run cat check:draft-beans

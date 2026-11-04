@@ -3,17 +3,13 @@
  * Build ONE instance's JSON-LD `@context` and publish it to that instance's
  * own GitHub Pages, at `<iriBase>ns/context/v1.jsonld` — or, for an instance
  * whose `ns` is a document (bootstrap's `ns.jsonld`), BESIDE it at
- * `<iriBase>ns.context.v1.jsonld` (owner, 2026-10-15, "D1";
- * `contextPathFor` in `gen-instance-contexts.ts`). The path is the build's
- * `path`, and `publish --path` takes it, so the workflow never spells it.
+ * `<iriBase>ns.context.v1.jsonld` (`contextPathFor` in
+ * `gen-instance-contexts.ts`). The path is the build's `path`, and
+ * `publish --path` takes it, so the workflow never spells it.
  *
- * Bean `folio-assistant-63q4`, owner 2026-10-15: each instance's context is
- * published by its own repository, through one reusable workflow
- * (`.github/workflows/layer-publish-context.yml`), and placeholder `gh-pages`
- * branches are created so Pages can be switched on. Before this, the contexts
- * were "built at publish" (`gen-instance-contexts.ts`, f94bae4) and nothing
- * published them: every per-instance context URL a document named resolved to
- * a 404.
+ * Each instance's context is published by its own repository, through one
+ * reusable workflow (`.github/workflows/layer-publish-context.yml`), and
+ * placeholder `gh-pages` branches are created so Pages can be switched on.
  *
  * ## Two subcommands, so the network half is testable on its own
  *

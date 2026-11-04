@@ -2,50 +2,31 @@
 /**
  * Where the docs site's action tiles point — RESOLVED, never composed.
  *
- * Bean `udx8`, from the owner: *"in icon tile on top navbar, the graph view
- * icon does not work, goes to 404."* It did, and it had from the day the tile
- * was added.
- *
- * ## The defect, exactly
- *
- * `docs/_includes/head_custom.html` wrote the knowledge-graph tile's target as
- * `{{ '/kg/' | relative_url }}`, which on this site resolves to
- * `/folio-assistant/kg/`. **Nothing has ever been published there.**
  * `renderingPath` in `schemas/kg/cat-harness.ts` says where an instance's
- * renderings actually land, and has said so since the layout moved off `kg/`:
+ * renderings land:
  *
  * ```
  * <base>/<stub>.jsonld   the knowledge graph
  * <base>/<stub>/         the viewer
  * ```
  *
- * The href was a string somebody wrote by convention and checked against
- * nothing — the same defect `AGENTS.md` records against the README's chapter
- * PDFs, where all twenty-three links were 404 and always had been. A link
- * built by convention is a claim; only a link checked against the tree that
- * ships is evidence.
- *
- * So this module does two things and they are deliberately separate:
+ * This module does two things, deliberately separate:
  *
  * 1. **`siteLinks()` computes the targets from the declaration** through
  *    `artefactStub` and `renderingPath` — the same functions the exporter and
  *    the workflow use, so the tile cannot disagree with what is published.
- * 2. **`verifySiteLinks()` checks each one against a BUILT TREE.** The
- *    generator is not trusted on its own; a path is `ok` because a file is
- *    there, not because the arithmetic looked right.
+ * 2. **`verifySiteLinks()` checks each one against a BUILT TREE.** A path is
+ *    `ok` because a file is there, not because the arithmetic looked right.
  *
  * ## "Could not determine" is a third state
  *
  * An absent or unreadable site directory yields `unknown`, never `ok` and
  * never `dead`. The CLI exits **2** for it, distinct from the **1** it exits
- * for a link it has positively established is broken. A checkout with no build
- * in it must not report a wall of dead links, and a watchdog that has gone
- * blind must not read as good news — the same rule `check-ci-health` and
- * `readme-links` already follow.
+ * for a link it has positively established is broken, so a checkout with no
+ * build does not report a wall of dead links.
  *
  * An **external** link (the forge) is `unknown` too, always: nothing here
- * fetches the network, and reporting a URL as live because it is well-formed
- * would be exactly the composed-link claim this module exists to retire.
+ * fetches the network.
  *
  * Usage:
  * ```sh

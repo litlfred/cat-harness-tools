@@ -2,46 +2,34 @@
  * Every declared harness visualiser has a wireframe, and every wireframe has
  * passed its mechanical checks at BOTH a web and a mobile viewport.
  *
- * Owner, 2026-09-23 (issue #1023): *"make sure wireframes for existing harness
- * visualizers etc. are complete in docs/ (QA sidecar need). put wireframe in
- * cat-harness"*, and *"need both web and mobile layouts in usability reviews"*.
+ * Reads:
  *
- * ## What it reads
- *
- * - **The declarations.** Every harness's `visualisers` (owner, 2026-10-09:
- *   *"the harness [is] where specific visualizers/pages are declared"*),
- *   through `declaredVisualisers` in `viewer-declarations.ts`, so there is
- *   no second list of visualisers free to disagree with the navbar's. Each
- *   is named by its ROUTE KEY, `<harness>/<visualiser>` — the route
- *   `visualiserRoute` computes, without the base — never by a page path: a
- *   page path is where a generator happened to write, and the route is the
- *   declaration.
+ * - **The declarations.** Every harness's `visualisers`, through
+ *   `declaredVisualisers` in `viewer-declarations.ts`, each named by its ROUTE
+ *   KEY `<harness>/<visualiser>` (the route `visualiserRoute` computes, without
+ *   the base), never by a page path.
  * - **`cat-harness/docs/wireframes/index.json`**, and the same file in the
  *   `wireframes/` of every other instance's declared `docs` directories
- *   ({@link wireframeSources}). Which wireframe covers which visualiser. A `covers` entry is a route key, or a route key and a
- *   sub-graph (`cat-harness/auto-docs/index/skills`) when the wireframe is of
- *   one sub-graph's view; either covers the visualiser. One wireframe may
- *   cover several, because one template renders several views.
+ *   ({@link wireframeSources}): which wireframe covers which visualiser. A
+ *   `covers` entry is a route key, or a route key and a sub-graph
+ *   (`cat-harness/auto-docs/index/skills`); one wireframe may cover several.
  * - **Each wireframe directory.** It must hold `intent.md`, at least one
  *   candidate `.html`, and `checks/report.json` written by `wireframe:check`
  *   (the Tool `wireframe-check`).
  *
- * ## What fails
+ * Fails on:
  *
  * - a declared visualiser that no wireframe covers
  * - a wireframe with no intent, or no candidate
  * - a candidate with no check report
  * - a candidate whose report lacks a viewport, or holds a `fail`
  *
- * A review done at one width is incomplete, not passed. That is the rule the
- * missing-viewport family enforces.
- *
  * Usage:
  *   bun run cat check:wireframes            # report, write the sidecar, exit 1 on any gap
  *   bun run cat check:wireframes -- --json  # print the sidecar document
  *   bun run cat check:wireframes:check      # JUDGE: compute and judge, write nothing (the gate)
  *
- * Judge mode (`--check`, bean `bo44`): 0 no gap · 1 any gap · 2 no visualiser
+ * Judge mode (`--check`): 0 no gap · 1 any gap · 2 no visualiser
  * declared (could not determine), an unknown flag, or the run threw.
  *
  * @module scripts/check-wireframes

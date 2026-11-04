@@ -2,61 +2,18 @@
 /**
  * A change may not PUBLISH a translated page without its `.po` catalogue.
  *
- * ## Why this is not `translation:drift:check`
- *
- * The drift gate asks whether the CORPUS is consistent, and it already owns the
- * catalogue question there: *"published with no `.po` catalogue and not in
- * UNCATALOGED"*. It is also **deliberately red** — the owner's decision, bean
- * `ngxj`, issue #206 — and that is exactly why a second question is needed.
- *
- * **A gate held red by decision stops being a ratchet.** A job stops at its
- * first failing step, so once the drift is red its own conclusion cannot change:
- * a batch that publishes a translated page with no catalogue adds to the very
- * set the red gate reports, the job is red either way, and no reviewer sees a
- * NEW red.
- *
- * **A measurement in an earlier revision of this docblock is RETRACTED** — kept
- * named rather than deleted, because it was the stated justification for building
- * this gate. It read: *"the `t8g3` campaign closed 24 of `f6r1`'s original 25 and
- * opened 35 new ones, so the count went 25 -> 36."* Three errors. 35 and 15 are the
- * counts of added files that **publish a translation**, not findings — the findings
- * on those ranges are **5** and **2**, and 35 is what a hand-mutation returns once
- * the `existsSync` check below is dropped, which is where the figure came from.
- * `f6r1`'s population was **27**, not 25 (25 was #1364's `UNCATALOGED` entries, a
- * different set). And the corpus backlog went **27 -> 8**, downward: the campaign
- * cleared the mechanical cases and left the 8 that need a human decision. Full
- * correction on bean `3sm2`.
- *
- * The argument that survives never rested on a count, which is why the gate stands:
- * a job stops at its first failing step, so a gate held red by decision cannot
- * report GROWTH in its own subject. A change-keyed gate can; a corpus-keyed one
- * cannot.
- *
- * So this gate asks a different question, over a different unit:
- *
  * | gate | unit | question |
  * |---|---|---|
  * | `translation:drift:check` | the corpus | is every published translation catalogued and structurally current? |
  * | this | the CHANGE | does what you are about to merge publish a translation with no catalogue? |
  *
- * That is why it is not a second answer to one question. It reports on the diff,
- * so the existing backlog is invisible to it — and it therefore keeps working
- * while that backlog stands, which the corpus gate cannot.
- *
- * ## Why not simply record the 36 as the baseline
- *
- * That is what `UNCATALOGED` is for, and it is **not available**: #1364 merged 25
- * such entries, #1384 reverted them on the owner's instruction, and the list is
- * #1374's author's call. A second baseline of my own would be two records of one
- * backlog, free to disagree the moment either is edited. The diff needs no
- * baseline at all, which is the reason to key on it rather than a convenience.
- *
- * ## One answer, not a copy
+ * The drift gate may be held red by decision, and a red step cannot report
+ * growth in its own subject. Keying on the diff needs no baseline and keeps
+ * working while the corpus backlog stands.
  *
  * The file -> (locale, page) mapping is `fileForUrl` from `translation-drift.ts`
  * applied over `buildTranslationIndex`, and the catalogue path is that module's
- * own `catalogueFor`. Composing either here would let this gate and the drift
- * gate disagree about which file is which page.
+ * own `catalogueFor`, so this gate and the drift gate cannot disagree.
  *
  * ## Exit codes
  *
@@ -65,10 +22,6 @@
  *     1  at least one does
  *     2  could not determine: git would not answer, there is no site root, or
  *        the translation index is empty
- *
- * Exit 2 is a distinct state on purpose. A sweep that compared nothing exits
- * clean and reads as coverage, which is the defect `1xhc` is about and which
- * `translation-drift.ts` guards with its own `NothingCompared`.
  *
  * ```sh
  * bun run cat translation:catalogue:check                 # against origin/main
@@ -79,14 +32,8 @@
  * bun run cat translation:catalogue:check -- --warn       # report, exit 0
  * ```
  *
- * ## Why there is no `--check` flag, and no `artefact-verification` entry
- *
- * `check:artefact-verification` selects its population by *"a check counts as
- * generated-artefact currency when its script is invoked with `--check`"*. This
- * gate verifies no artefact's currency — it has no generator and writes nothing —
- * so it is correctly out of that population, and adding an entry would be a claim
- * about an artefact that does not exist. The flags are `--since` / `--staged`
- * because the subject is a range of history, not a file on disk.
+ * There is no `--check` flag and no `artefact-verification` entry: this gate
+ * generates and writes nothing; its subject is a range of history.
  *
  * @covers translation-sources
  * @graphNode tool

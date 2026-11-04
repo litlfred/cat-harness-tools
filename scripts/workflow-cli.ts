@@ -1,21 +1,16 @@
 #!/usr/bin/env bun
 /**
  * CLI surface for the BPMN workflow engine (`workflow:start`, `workflow:next`,
- * `workflow:complete`, plus `list` and `gate`) — issue #1031.
+ * `workflow:complete`, plus `list` and `gate`).
  *
- * ## Why this exists
- *
- * `workflow_start`, `workflow_next` and `workflow_complete` existed only as MCP
- * tools of the folio-assistant server. A session that clones a harness
- * repository mid-session (as project threads do) has no MCP server, so it
- * could not record or advance a process instance even when it knew which
- * process it was in (`cat-harness/skills/process/workflow/process-state.md`
- * §"Arriving without the sweep").
- *
- * This script wraps the exact same functions in `src/tools/workflow.ts` that
- * `registerWorkflowTools` registers on the MCP server, so CLI and MCP calls run
- * the same precondition gate, hand-over screen, strict GitHub authorization,
- * refusal recording, work-plan operations and `beans/workflows/` store writes.
+ * A session that clones a harness repository mid-session (as project threads
+ * do) has no MCP server, so this is how it records and advances a process
+ * instance (`cat-harness/skills/process/workflow/process-state.md`
+ * §"Arriving without the sweep"). It wraps the exact same functions in
+ * `src/tools/workflow.ts` that `registerWorkflowTools` registers on the MCP
+ * server, so CLI and MCP calls run the same precondition gate, hand-over
+ * screen, strict GitHub authorization, refusal recording, work-plan
+ * operations and `beans/workflows/` store writes.
  *
  * Usage:
  *   bun run cat workflow:start <process> <subject> [--bean <id>] [--root <dir>]

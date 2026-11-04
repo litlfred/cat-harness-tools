@@ -1,72 +1,42 @@
 #!/usr/bin/env bun
 /**
  * Render the `tools` graph — Tool nodes, how each is installed and invoked,
- * and which skill each one satisfies.
+ * and which skill each one satisfies. Tools and skills get separate pages.
  *
  * @module cat-harness/scripts/gen-tools-viz
  * @covers tools
  *
- * ## Why this is its own page, and not a section of the skills page
- *
- * Owner, 2026-09-21: **"keep tools and skills separate!"**
- *
- * They were not. `cat-harness.json`'s `tools` entry declared
- * `coverage.docs: "cat-harness/docs/concepts/skills.md"` — a page titled *"Skills &
- * roles"* whose headings are Skills, Roles, Capabilities, with no tools
- * section anywhere in it. The tools graph had no documentation of its own and
- * pointed at a page about something else.
- *
- * That is worse than an absent page, and it is worth being precise about why:
- * an absent `docs` ref is a legible gap, while a ref that RESOLVES reports
- * coverage. The check in force asks only whether the path exists — it does —
- * so nothing had ever flagged it. `pb04` one level up: the link works and
- * points at the wrong thing.
- *
- * ## What a Tool is, against a skill — the distinction the page exists to keep
+ * ## A Tool against a skill
  *
  * A **skill** states a capability generically: what an actor needs to know to
  * perform a task. A **Tool** is one concrete way to exercise it — with an
  * installation, an invocation, and typed inputs and outputs. One skill may be
- * satisfied by several Tools, and a Tool may satisfy several skills.
+ * satisfied by several Tools, and a Tool may satisfy several skills. The
+ * relation is `satisfies`, FROM a Tool TO a skill, and this page renders it
+ * from the tool side.
  *
- * So the relation is `satisfies`, and it runs FROM a Tool TO a skill. This
- * page renders it from the tool side, which is the direction that does not
- * conflate them: it says "this tool is one way to do that", never "this skill
- * is a tool".
+ * It imports the graph rather than parsing it: the nodes are TypeScript
+ * calling `defineTool`, so a malformed one fails at `tsc`, and a second reader
+ * could disagree with the server's.
  *
- * ## It imports the graph rather than parsing it
+ * ## One page per instance
  *
- * The nodes are authored as TypeScript calling `defineTool`, precisely so a
- * malformed one fails at `tsc`. A generator that re-parsed the source would
- * throw that away and invent a second, weaker reader of the same file —
- * which would then be free to disagree with the one the server uses.
- *
- * ## One page per instance — bean `folio-assistant-1nu0`
- *
- * Owner, 2026-10-15: *"per-instance pages"*. The page used to import
- * `cat-harness/tools/index.ts`, which holds cat-harness's own Tools and no
- * one else's, and its visualiser `covers` only cat-harness's `tools`
- * directory by id — so six instances that declare a `tools` graph read
- * *"no viewer yet"* in the navbar. It now reads every declared `tools` graph
- * through auto-discovery (`tools/discover.ts`, bean `p0za`), the reader
- * `check:tools` gates, and draws the way the schemas viewer does: the full KG
- * at `<locale>/<harness>/tools/`, and one sub-graph page per instance at
+ * It reads every declared `tools` graph through auto-discovery
+ * (`tools/discover.ts`, the reader `check:tools` gates), and draws the full KG
+ * at `<locale>/<harness>/tools/` and one sub-graph page per instance at
  * `<locale>/<harness>/tools/<instance>/`. The visualiser covers the KIND with
  * `subgraphs: "instance"`, and `viewersOf` covers a directory by kind only
- * where its sub-graph page exists — so an instance whose graph yields no
- * Tool gets no page and stays reported, never an empty page claiming to
- * show it.
+ * where its sub-graph page exists — so an instance whose graph yields no Tool
+ * gets no page and stays reported.
  *
- * ## Built at publish, not committed (owner, 2026-10-14, "B1")
+ * ## Built at publish, not committed
  *
- * Every page here is a function of the checkout, not of cat-harness's commit:
- * the Tools of every instance the index mounts, the skills each `satisfies`
- * resolves against, and whether that skill's published page is on disk (a
- * `skills:docs` output, itself built at publish). So the committed pages went
- * stale at every re-pin. cat-harness declares the route `builtAtPublish` with
- * this script as its writer, and `derive:publish` runs it; under `--check` a
- * declared page has no committed bytes to compare, so it is skipped there (the
- * `folio:viz` rule) and written otherwise.
+ * Every page is a function of the checkout: the Tools of every mounted
+ * instance, the skills each `satisfies` resolves against, and whether that
+ * skill's published page (a `skills:docs` output) is on disk. cat-harness
+ * declares the route `builtAtPublish` with this script as its writer, and
+ * `derive:publish` runs it; under `--check` a declared page has no committed
+ * bytes to compare, so it is skipped (the `folio:viz` rule).
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-tools-viz.ts

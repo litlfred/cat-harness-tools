@@ -3,55 +3,37 @@
  *
  * @module scripts/todo-listing
  *
- * ## Why this exists at all
+ * **The tile listing is the artefact and the board is the overlay.** Without
+ * this, a reader with JavaScript off gets no note at all. It is an
+ * accessibility floor, not a fallback: a board that cannot be read linearly
+ * cannot be read by a screen reader, printed, or translated, and this
+ * instance's declared interaction profile is **low-dexterity**.
  *
- * Owner, 2026-09-21: *"this dymanic moving state is overlayed, its an 'extra'.
- * on stndard folio just simple tile based listing"*, and from the original ask
- * *"but ALWAYS collapsable to linearly rendablee/just the docs."*
- *
- * **The tile listing is the artefact and the board is the overlay**, which is
- * the opposite of how it was built. Measured on `main`, 2026-09-21:
- * `docs-ui.js` reads `meta[name="fa-todo-src"]`, `fetch`es
- * `assets/todos/index.json` and builds every sticky in the DOM. With
- * JavaScript off, a reader gets **nothing** — no note, no count, no hint that
- * notes exist. That is not a degraded board; it is an absent artefact.
- *
- * This is an accessibility floor rather than a fallback. A board that cannot
- * be read linearly cannot be read by a screen reader, printed, or translated,
- * and this instance's declared interaction profile is **low-dexterity**, which
- * is why the Pin control is already a button rather than a drag.
- *
- * ## One function, two callers, and why that is not drift
+ * ## One function, two callers
  *
  * `gen-docs-pages.ts` emits this into the site as a generated include; the
  * e2e that loads a page with `javaScriptEnabled: false` renders the same
  * function and serves the result. **Everything that could drift — the field
- * set, the order, the escaping, the element structure — is this function's**,
- * so the test and the site cannot disagree about any of it.
+ * set, the order, the escaping, the element structure — is this function's**.
  *
- * The ONE thing that differs is the attachment link, and it differs because
- * Jekyll owns `baseurl`: on the site the href must go through
- * `relative_url`, which is a Liquid filter and means nothing to a static
- * server. So the caller supplies {@link TodoListingOptions.pageHref} and
- * nothing else. Stating the limit rather than hiding it: the e2e proves the
- * LISTING is served and readable without JavaScript, not that Jekyll's
- * `baseurl` resolution is correct — `site-links.test.ts` is what covers that.
+ * The ONE thing that differs is the attachment link: on the site the href
+ * must go through Jekyll's `relative_url`, which means nothing to a static
+ * server, so the caller supplies {@link TodoListingOptions.pageHref}. The e2e
+ * therefore proves the LISTING is served and readable without JavaScript, not
+ * that `baseurl` resolution is correct — `site-links.test.ts` covers that.
  *
- * ## Document order is the input's order, and it is already deterministic
+ * ## Document order is the input's order
  *
  * `readTodoFiles` sorts, so the array this receives is stable across
- * regenerations. This function must therefore **never** sort, filter or
- * reverse: the board may stack by BPMN subprocess depth, and the floor
- * deliberately does not, because "document order" is the property a screen
- * reader and a printout depend on.
+ * regenerations. This function must **never** sort, filter or reverse: the
+ * board may stack by BPMN subprocess depth, but "document order" is the
+ * property a screen reader and a printout depend on.
  *
- * ## Everything is escaped, and the reason is not hypothetical
+ * ## Everything is escaped
  *
- * A note's `summary` and `comment` are authored — by a person, or by an agent
- * on their behalf — and land in HTML here. `docs-ui.js` reaches the DOM
- * through `textContent` for exactly this reason; a string renderer has no
- * such affordance, so {@link escapeHtml} is applied to every interpolated
- * value without exception, including ones that "cannot" contain markup.
+ * A note's `summary` and `comment` are authored and land in HTML here, so
+ * {@link escapeHtml} is applied to every interpolated value without
+ * exception, including ones that "cannot" contain markup.
  */
 import type { TodoIndexItem } from "../schemas/sdlc/todo-index.js";
 import { safeHref } from "../schemas/ui/safe-url.js";

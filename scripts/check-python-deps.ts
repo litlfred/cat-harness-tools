@@ -2,38 +2,17 @@
 /**
  * Every third-party Python import is declared, and nothing declared is dead.
  *
- * Bean `68dt`. The declaration is `schemas/sdlc/python-deps.ts`; this is what stops
- * it becoming a list somebody once wrote. `scripts/ci-gates.ts` was retired
- * this week for being exactly that — a hand-transcribed list that missed 3 of
- * 33 gates — so the set is DERIVED from the source and compared, never typed
- * twice.
+ * The declaration is `schemas/sdlc/python-deps.ts`; the import set is DERIVED
+ * from the source and compared against it.
  *
- * ## What counts as third-party, and the correction that shaped it
- *
- * The first scan reported 13 packages. Four of them were not packages at all:
- * `translation_config`, `translation_security` and the three
- * `pull_*_translations` modules are FILES BESIDE THE IMPORTER inside
- * `scripts/translation/`, imported flat because that directory is on the path
- * when those scripts run. A module that resolves to a sibling file is local,
- * and declaring it would have put five phantom packages into
- * `requirements.txt`.
- *
- * So a name is third-party only when it is not in `sys.stdlib_module_names`,
- * not underscore-prefixed (this repo's convention for its own helpers —
+ * A name is third-party only when it is not in `sys.stdlib_module_names`, not
+ * underscore-prefixed (this repo's convention for its own helpers —
  * `_tech_meta`, `_pdf_doc_id`, `_pypdf_compat`), and **not a `.py` beside the
- * file importing it**.
+ * file importing it** (e.g. the flat imports inside `scripts/translation/`).
  *
- * ## Both directions, and why the second one needs an escape hatch
- *
- * An UNDECLARED import is the gap that existed before this bean: a script that
- * dies on a machine nobody warned. A DECLARED package with no import is dead
- * weight — except when it is genuinely required by something that does import
- * it, which no `import` statement will ever reveal. `Pillow` is that case, so
- * `transitive: true` is the declared form of it and this check honours it
- * rather than reporting a package the repository truly needs.
- *
- * Absent that flag, "declared and unimported" would be ambiguous, and an
- * ambiguous finding gets suppressed rather than fixed.
+ * Both directions are findings: an UNDECLARED import, and a DECLARED package
+ * nothing imports. A package needed only by another dependency (e.g.
+ * `Pillow`) is declared `transitive: true` and is not reported.
  *
  * @covers code
  */

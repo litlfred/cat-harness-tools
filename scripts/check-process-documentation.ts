@@ -5,47 +5,15 @@
  * @module scripts/check-process-documentation
  * @covers processes
  *
- * Bean `7rna`. The sibling of `check-lane-documentation`, one level up: that
- * one asks whether a swimlane says what its persona is accountable for, this
- * one asks whether the PROCESS says what the whole thing is for.
+ * The sibling of `check-lane-documentation`, one level up: each `<process>`
+ * must carry its own direct-child `<documentation>`. A lane's documentation is
+ * never taken as the process's summary.
  *
- * ## Why it exists, and the order the two defects arrived in
+ * Exit 0 on a finding by default; `--strict` exits 1 and is what CI runs once
+ * the count is zero. An empty corpus is exit 2, never a pass.
  *
- * `gen-auto-docs.ts`'s process index took the first `<documentation>` after
- * the `<process>` open tag as the process's summary. Correct for a process
- * carrying its own; for one that does not, it took **the first lane's** and
- * presented it as what the process is for.
- *
- * It was right until 2026-09-20. Bean `sqtq` wrote **157 lane
- * `<documentation>` elements**, and every diagram whose process carried none
- * began borrowing a lane's. A fix to one defect created another, and nothing
- * went red, because the index is generated and its check compares the page
- * against its own generator — both wrong, both agreeing (`6tkl`).
- *
- * The extractor was fixed to take only a DIRECT child. That made the gap
- * honest and left it a gap: **16 of 61 diagrams** then read *"no description
- * in the artefact"*. This is what makes the number visible and keeps it at
- * zero once it gets there.
- *
- * ## REPORTS, and does not gate — until it can
- *
- * Exit 0 on a finding, by design. A gate that lands red on 16 known blanks is
- * a gate somebody switches off, and `check-lane-documentation` earned its
- * place in the gate set the same way: it reported 0 of 157 first, the
- * documentation was written, and only then did red mean something. `--strict`
- * is what CI runs once the number is zero, and the bean says so.
- *
- * **An empty corpus is exit 2, never a pass.** No diagrams found means the
- * scan broke, and reporting that as "every process is documented" is `6tkl`
- * in the check written to prevent it.
- *
- * ## `(?:bpmn:)?` on every element, and the reason is measured
- *
- * `translation-workflow.bpmn` declares BPMN as the DEFAULT namespace and
- * writes `<process>`, `<lane>`, `<documentation>` with no prefix. Valid, and
- * invisible to a prefixed regex — which is how `check:lane-documentation`
- * reported "157 of 157 documented" over a corpus holding 159. Three readers
- * had the same blind spot before this one was written.
+ * Every element is matched with an optional `bpmn:` prefix, since a diagram
+ * may declare BPMN as the default namespace.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/check-process-documentation.ts

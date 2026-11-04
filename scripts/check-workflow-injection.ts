@@ -2,35 +2,9 @@
  * Workflow expression injection — free text must not reach a shell.
  *
  * A `${{ }}` expression is substituted into the script **text** before bash
- * parses it. So a value containing a quote closes the surrounding string and
- * the rest executes. Demonstrated rather than asserted, 2026-09-22:
- *
- * ```
- * VALUE="'; echo INJECTED-COMMAND-RAN; :'"
- * # renders to:  sel=''; echo INJECTED-COMMAND-RAN; :''
- * # runs:        INJECTED-COMMAND-RAN
- * ```
- *
- * The remedy is not quoting — it is not putting the value in the text at all.
- * Pass it through `env:` and read `"$VAR"`, where bash sees a value rather
- * than source.
- *
- * ## What this repository looked like when the gate was written
- *
- * 38 interpolations sit inside `run:` blocks across 16 workflows. Every
- * `github.event` one was a **constrained** value — `pull_request.number` (an
- * integer), `repository.name`, `event_name` and `workflow_run.conclusion`
- * (enums GitHub sets) — with one exception:
- *
- * `lake-cache-refresh.yml` interpolated a `workflow_dispatch` input straight
- * into `sel='...'`. Fixed in the same change, the same way
- * `feature-staging.yml`'s banner step already handled PR title and body — and
- * that step's comment shows somebody had understood this hazard exactly.
- * **Nothing checked it**, so the correctness was one edit from gone. That is
- * `tyyc`'s lesson: a hand-maintained property drifts, and the symptom of
- * forgetting is invisible.
- *
- * ## Three states, because "controllable" is not one question
+ * parses it, so a value containing a quote closes the surrounding string and
+ * the rest executes. The remedy is not quoting: pass the value through `env:`
+ * and read `"$VAR"`, where bash sees a value rather than source.
  *
  * | class | example | verdict |
  * |---|---|---|
@@ -38,92 +12,30 @@
  * | **constrained** | `pull_request.number`, `head_ref`, `repository.name` | reported, baselined; a ref or an integer cannot carry a quote |
  * | **safe** | `github.workspace`, `matrix.*`, `secrets.*` | not reported |
  *
- * `head_ref` is in the middle band on purpose. Git refuses a ref containing a
- * space, a quote or a semicolon, so it cannot carry this payload — but it is
- * attacker-chosen on a fork PR, so it is reported rather than ignored. Calling
- * it safe would be asserting a property of git that this gate does not check.
+ * `head_ref` is constrained, not safe: git refuses a ref with a space, quote
+ * or semicolon, but it is attacker-chosen on a fork PR.
  *
- * ## `steps.*.outputs` is not a class — it is a PIPE (bean `6bhf`, 2026-09-26)
+ * ## `steps.*.outputs` inherits its source's class
  *
- * The table above listed `steps.*.outputs` as safe **unconditionally** until
- * 2026-09-26, and that was not a property of the expression: a step output
- * holds whatever the step put in it. A step that binds a free-text value to
- * `env:` correctly, reads it as `"$VAR"` correctly, and then writes it to
- * `$GITHUB_OUTPUT` has laundered free text into the band this gate does not
- * report.
+ * A step output holds whatever the step put in it, so free text written to
+ * `$GITHUB_OUTPUT` stays free text. `resolveProvenance` reads each step that
+ * writes `$GITHUB_OUTPUT`, takes the worst severity among the expressions that
+ * step binds, and a consumption of that output inherits it (keyed by
+ * `job.stepId`; a job's `outputs:` block is followed one more hop, so
+ * `needs.<job>.outputs.<name>` inherits it too). A sanitised value (e.g. a
+ * slug reduced by `sed`) is still graded free text: the gate does not judge
+ * sanitisers, and the remedy is one `env:` line either way.
  *
- * **It was live in this repository, not latent.** `release-folio-assistant.yml`
- * bound `github.event.inputs.version` to `INPUT_VERSION`, wrote it out as the
- * `version` output, and a later step interpolated
- * `${{ steps.version.outputs.version }}` into `mv *.tgz "folio-assistant-….tgz"`.
- * A dispatch of `1.0";id;"` renders `mv *.tgz "folio-assistant-1.0";id;".tgz"`
- * and runs `id`. The gate reported nothing, and the step that handled the value
- * correctly is the one that leaked it.
+ * ## Two surfaces
  *
- * **What this file measured before, and why that was the wrong measurement.**
- * The finding was first recorded as a latent gap, on the evidence that *"every
- * `>> $GITHUB_OUTPUT` write of a reason or title is a literal"*. True — and it
- * asked about two members of the free-text band while a third, the dispatch
- * input, was the one being written. A measurement over the instances an audit
- * happened to name is the same defect as a fix aimed at them; `6bhf` paid for
- * that lesson twice in one day, once here and once in `path-containment`.
+ * `actions/github-script` `script:` blocks are JavaScript and are graded by the
+ * same bands; there the remedy is `process.env.X`. Inside a template literal
+ * `${…}` is evaluated, so a value (even a legal git ref) need not close a
+ * quote to run. Position is not modelled; the bands grade the VALUE.
  *
- * So provenance is resolved rather than assumed: `resolveProvenance` reads each
- * step that writes `$GITHUB_OUTPUT`, takes the worst severity among the
- * expressions that step binds, and a consumption of that step's output inherits
- * it. Keyed by `job.stepId`, because step outputs are job-scoped and two jobs
- * may use the same id. A job's `outputs:` block is followed one more hop, so
- * `needs.<job>.outputs.<name>` inherits the same taint.
- *
- * **Graded free text, not constrained, and deliberately so.** `feature-staging.yml`
- * reduces its slug to `[A-Za-z0-9._-]` with a `sed`, so that value genuinely
- * cannot carry a payload — and recognising that here would mean this gate
- * deciding, per site, whether somebody's sanitiser was good enough. It refuses
- * the shape instead, the way the archive guard whitelists member types rather
- * than enumerating the hostile ones: the remedy is one `env:` line either way,
- * and the three slug sites took it.
- *
- * ## TWO surfaces, because `run:` is not the only thing that parses text
- *
- * `actions/github-script` `script:` blocks are JavaScript, and a `${{ }}` is
- * substituted into their source the same way — so the same values are graded by
- * the same bands there. What differs is the REMEDY, which is why they are a
- * separate surface rather than a wider regex: a `script:` block is Node, so the
- * step's `env:` arrives as `process.env.X`, and telling somebody to write
- * `"$VAR"` in JavaScript is advice that does not apply.
- *
- * **And one position there is worse than any in bash** (bean `j0zs`, measured
- * 2026-09-26). Inside a template literal, `${…}` is EVALUATED, so a value does
- * not need to close a quote to become program:
- *
- * ```
- * git check-ref-format --branch 'a${process.exit(1)}b'   → LEGAL
- * git check-ref-format --branch 'x`id`'                  → LEGAL
- * git check-ref-format --branch 'x${7*7}'                → refused (the `*`)
- * ```
- *
- * `feature-staging.yml` interpolated the RAW fork branch name into a template
- * literal, in a step whose own sibling two jobs down binds the same value to
- * `env:` and says why. So this was arbitrary JavaScript execution reachable by
- * opening a fork PR — and `folio-staging.yml`, doing the same job, had used
- * `process.env` all along. **The corpus held the defect and its own remedy side
- * by side, and nothing checked which one a file used.** That is `1wef`'s lesson
- * a third time, in the surface this gate had declared out of scope.
- *
- * Position is NOT modelled. Deciding whether an interpolation sits inside a
- * template literal means tracking backticks across lines, and a detector that
- * quietly misses the multi-line case would be worse than none — so the bands
- * grade the VALUE, as everywhere else, and this paragraph carries the fact that
- * a `script:` position can be more dangerous than the equivalent shell one.
- *
- * ## What it does NOT claim
- *
- * An expression in `with:`, `env:` or `if:` is not graded — `env:` is the
- * REMEDY, and flagging it would push people back toward interpolation. The one
- * exception is `script:`, which lives *under* `with:` and is code: that
- * collision is what bean `j0zs` settled. Template injection in generated pages
- * and prompt injection are the other two surfaces of bean `1wef` and are not
- * this file's.
+ * Not graded: an expression in `with:`, `env:` or `if:` (`env:` is the
+ * remedy), except `script:` under `with:`. Template injection in generated
+ * pages and prompt injection are out of scope.
  *
  * @module scripts/check-workflow-injection
  * @covers none — .github/workflows/ is not a declared graph typology

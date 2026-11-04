@@ -9,8 +9,7 @@
  * @covers none — it moves pins; the mount (`remote-mount.ts`) and its trust
  * check judge what it moved, exactly as they judge a pin a person moved.
  *
- * Issue #401. Owner, 2026-10-16: pins stay DECENTRALIZED (each site keeps its
- * own lock) with STANDING CONSENT. The rule and its trust semantics are the
+ * Each site keeps its own lock. The rule and its trust semantics are the
  * harness's (`cat-harness/schemas/kg/mount-trust.ts`, "Standing consent"); this is
  * the implementation.
  *

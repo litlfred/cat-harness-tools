@@ -1,32 +1,25 @@
 #!/usr/bin/env bun
 /**
  * split-baseline.ts — what the cat-harness / cat-harness-tools split must not
- * change, recorded before the first file moves (bean `pyds`, stage 0).
+ * change, recorded before the first file moves.
  *
- * ## Why a recorded baseline, not "the gates are green"
+ * Green gates after a move say each gate agrees with the tree it ran on, not
+ * that the tree serves the same tools or resolves the same skills; that needs
+ * a comparison against a baseline written down first.
  *
- * Stage 1a (`70lx`) moves ≈1,340 files. Green gates after a move say each
- * gate agrees with the tree it ran on; they do not say the tree serves the
- * same tools or resolves the same skills as before. 70lx's falsifiers are
- * comparisons — *"`mcp:capture` tool list identical"*, *"`bun test` pass count
- * equal to the stage-0 baseline"* — and a comparison needs its left-hand side
- * written down before the right-hand side exists.
- *
- * ## What it records, and what it deliberately does not
+ * ## What it records, and what it does not
  *
  * - **`mcpTools`** — every tool `mcp:capture` mounts, with its required and
  *   optional inputs. A tool that disappears, or whose contract changes, in a
  *   change that only moved files is a defect.
- * - **`knownSkills`** — the checkout-scope skill set. ejye's falsifier 1 is the
- *   same set; a move that changes it changed resolution, not location.
+ * - **`knownSkills`** — the checkout-scope skill set; a move that changes it
+ *   changed resolution, not location.
  * - **`bunTest`** — the pass count, taken from CI on `main` at `sha` and
- *   entered by hand with the run it came from. A local run is not used: local
- *   `bun test` under load times out tests CI passes, so its count measures the
- *   machine.
+ *   entered by hand with the run it came from (local `bun test` under load
+ *   times out tests CI passes).
  * - **Generator output is NOT hashed here.** The generated files are committed,
- *   so the baseline for every generator is the tree at `sha` itself:
- *   `git diff <sha> -- <generated paths>` after a regen on the move branch is
- *   the comparison, and a second copy of it here would be free to drift.
+ *   so `git diff <sha> -- <generated paths>` after a regen on the move branch
+ *   is the comparison.
  *
  * ```sh
  * bun run cat split:baseline           # write split-baseline.json (keeps bunTest)

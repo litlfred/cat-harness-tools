@@ -5,11 +5,8 @@
  * @module cat-harness/scripts/merge-queue-cli
  * @covers none — a command over the `merge-queue` graph; `merge-queue-store.ts` judges it
  *
- * Bean `najo`. `merge-queue.ts` computes an order and writes nothing by design;
- * `merge-steward.ts` reads GitHub and prints that order. Neither could RECORD
- * what the steward decided, because the graph was on `main` and the steward may
- * not open a pull request. This is the write path, and the read that pairs with
- * it.
+ * `merge-queue.ts` computes an order and `merge-steward.ts` prints it; this
+ * RECORDS what the steward decided, and reads it back.
  *
  * ```sh
  * bun run cat merge:queue:read                 # the recorded decisions
@@ -20,16 +17,14 @@
  * bun run cat merge:queue:record --file entry.json      # or `-` for stdin
  * ```
  *
- * ## Exit codes, and why a read has three failures rather than one
+ * ## Exit codes
  *
  * `0` read (or recorded) · `1` the queue is `declared-but-absent` · `2` usage
  * · `4` **unreachable** · `5` the write was refused or conflicted.
  *
- * `1` and `4` are different because their remedies are: one says the
- * declaration and the disk disagree, the other says this checkout has not
- * mounted the branch (`bun run cat state:mount`). Collapsing them prints the wrong
- * one, and a reader acting on it would "fix" a declaration that is correct —
- * `dh4f`. Neither is ever exit 0 with an empty table.
+ * `1` and `4` have different remedies: `1` means the declaration and the disk
+ * disagree, `4` that this checkout has not mounted the branch
+ * (`bun run cat state:mount`). Neither is ever exit 0 with an empty table.
  */
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";

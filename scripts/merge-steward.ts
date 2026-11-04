@@ -1,23 +1,14 @@
 #!/usr/bin/env bun
 /**
- * The merge queue's ORDER, as a command — the entry point `merge-queue.ts`
- * was written for and never got.
+ * The merge queue's ORDER, as a command.
  *
  * `merge-queue.ts` derives each candidate's facts, evaluates
- * `sdlc/processes/decisions/merge-priority.dmn` and orders the result. Its own
- * docblock calls it "a library the merge steward and the tile call". Measured
- * 2026-10-04: **nothing called it.** It is wired to no `package.json` script,
- * so the ordering a declared decision table exists to give could not be asked
- * for, and a steward ordered the queue by hand instead — clean-and-green in PR
- * number order, which is not any of the table's four inputs.
+ * `sdlc/processes/decisions/merge-priority.dmn` and orders the result; this
+ * is its command-line entry point.
  *
- * That is the defect this file closes, and it is worth naming as a class: a
- * decision table with no caller is indistinguishable, from outside, from a
- * decision nobody takes. The table was not wrong; it was unreachable.
- *
- * This command READS and prints. It merges nothing and writes no queue entry,
- * because `merge-queue.ts` is explicit that what the steward acts on is
- * recorded by the steward and the facts stay GitHub's.
+ * This command READS and prints. It merges nothing and writes no queue entry:
+ * what the steward acts on is recorded by the steward, and the facts stay
+ * GitHub's.
  *
  * Usage:
  *   bun run cat merge:steward              # the ordered queue, as a table

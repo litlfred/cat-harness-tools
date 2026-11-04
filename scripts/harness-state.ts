@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Where each harness got to in its initialization, and how healthy it is —
- * worked out from the checkout, never committed. Bean `supn`, boxes 1 and 2.
+ * worked out from the checkout at publish time, never committed.
  *
  * @covers none — writer — it writes one state file per harness into the built site; it judges nothing
  *
@@ -10,26 +10,19 @@
  * bun run cat harness:state --json                            # print, write nothing
  * ```
  *
- * Owner, 2026-10-24 (supn card, option A, "Work out at publish time"): a Tool
- * runs bootstrap's read-only setup check on every harness when the site is
- * built and publishes one state file per harness. Nothing is committed, so
- * nothing goes stale or drifts between the bean copies.
- *
  * ## Where the answer comes from
  *
  * The steps are bootstrap-tools' `initSteps` — the tool half of bootstrap's
  * `complete-initialization.bpmn` — run with `dryRun` and the `offlineProbe`,
  * so this writes nothing into any instance and touches no network. A step that
  * needs the network (the documents answering at their IRIs, Pages being live)
- * is therefore `could-not-determine` here, and is reported as that, never as
- * done. There is no second list of what a harness needs: the declarations
- * name the steps.
+ * is therefore `could-not-determine` here, never done. The declarations name
+ * the steps; there is no second list.
  *
  * ## What one file says (`folio-harness-state/v1`)
  *
  * - `initialization.position`: the first `not-done` step, or `complete` when
  *   none is. `next` is that step's `action`: what to do, said and not done.
- *   A recommendation stays one (bean `supn` §"The rule this must not break").
  * - `initialization.counts`: steps per state.
  * - `health.badges`: one per health notion that is the HARNESS's, not the
  *   repository's. `initialization` is red on any `not-done` step, unknown when
@@ -44,9 +37,8 @@
  * ## A partial mount is not a missing directory
  *
  * An index mounts some instances in part: `index.lock.json` lists the
- * directories it brought (two content instances, today). A
- * file the lock did not bring is absent from the checkout and may well exist
- * upstream, so for such an instance every step that looks for a file is
+ * directories it brought. A file the lock did not bring may exist upstream,
+ * so for such an instance every step that looks for a file is
  * `could-not-determine` here, never `not-done` ({@link partiallyMounted}).
  *
  * Deterministic: instances in name order, steps in the order `initSteps`

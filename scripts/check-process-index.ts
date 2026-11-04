@@ -3,12 +3,8 @@
  * The workflow page's process table covers every declared BPMN — read from the
  * published named-subgraph JSON-LD, the only store it has.
  *
- * The "Every workflow in the repo" table was hand-written until bean `ax6r`
- * and drifted. It was then drawn from a plain-JSON projection; the owner's
- * ruling of 2026-10-03 ("Move to JSON-LD") retired that second store, and the
- * page now walks `docs/subgraph/index.jsonld` down to every `processes`
- * subgraph's `index.hydrated.jsonld`. This gate asks the same questions of
- * the same files:
+ * The page walks `docs/subgraph/index.jsonld` down to every `processes`
+ * subgraph's `index.hydrated.jsonld`; this gate checks the same files:
  *
  *   1. the repository index, every harness root and every `processes`
  *      subgraph it reaches exist and validate against `schemas/kg/subgraph-manifest.ts`;
@@ -23,17 +19,13 @@
  *
  * ## Diagrams of instances this graph does not frame
  *
- * `bootstrap` and `bootstrap-tools` sit below this instance, and the `pve3`
- * ruling keeps their processes out of its graph (#432). They publish their
- * OWN subgraphs at their own sites (bootstrap-tools#7), and the repository
- * index links each with `seeAlso` (bean `t8c4`). Such a diagram is covered
- * when that link is there AND the build that publishes those subgraphs —
- * bootstrap-tools' `buildSubgraphs`, run here in process, nothing fetched —
- * holds a documented Process node for it, keyed by its `source` IRI (those
- * files carry no `sourcePath`). An unframed instance with no such link is
- * LISTED as not covered, with the reason, and never folded into a clean
- * total. Which instances are unframed is computed (`framedInstances`, the
- * generator's own answer), not named here.
+ * Lower layers (`bootstrap`, `bootstrap-tools`) publish their own subgraphs
+ * at their own sites, linked from the repository index with `seeAlso`. Such a
+ * diagram is covered when that link is there AND bootstrap-tools'
+ * `buildSubgraphs` (run here in process, nothing fetched) holds a documented
+ * Process node for it, keyed by its `source` IRI. An unframed instance with
+ * no such link is LISTED as not covered, with the reason, never folded into a
+ * clean total. Which instances are unframed is computed (`framedInstances`).
  *
  * Staleness (the files differ from what the generator writes now) is
  * `subgraph:jsonld:check`'s, not this gate's.

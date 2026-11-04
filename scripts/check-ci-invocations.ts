@@ -2,31 +2,15 @@
 /**
  * Every `--check` CI runs that is NOT a `package.json` script.
  *
- * ## Why this exists
- *
- * A contributor — and an agent — verifies by sweeping `package.json`'s
- * `check:*` and `*:check` entries. That sweep is complete about the scripts
- * and says nothing about the workflows, and the workflows invoke generators
- * DIRECTLY:
+ * Sweeping `package.json`'s `check:*` and `*:check` entries says nothing
+ * about the workflows, which also invoke generators DIRECTLY:
  *
  *     run: bun run cat-harness-tools/scripts/gen-skill-docs.ts --check
  *
- * Measured 2026-09-20: **seven** such invocations across
- * `code-quality-gates.yml` and `docs-site.yml`, none reachable from
- * `package.json`. A 65-script local sweep came back clean and CI failed on
- * `gen-skill-docs --check` — a generated skill page left stale by an edit to
- * its source, which is the one class of defect a generator check exists for.
+ * This runs those, so a local sweep covers what CI will run.
  *
- * The gap is not that the check was missing. It is that the check was
- * UNREACHABLE by the only complete enumeration anybody had.
- *
- * ## It DISCOVERS rather than lists
- *
- * The invocations are read out of the workflow YAML, so a new one is covered
- * the day it is added. A hardcoded list here would be the
- * `check-declared-assets` defect a third time — that file's own comment
- * records a hardcoded list of instances going stale twice, and being "fixed"
- * once by correcting the list.
+ * The invocations are DISCOVERED in the workflow YAML, not listed here, so a
+ * new one is covered the day it is added.
  *
  * Usage:  bun run cat-harness-tools/scripts/check-ci-invocations.ts [--list]
  * Exit:   0 all pass · 1 one failed · 2 nothing found, which is not a pass.

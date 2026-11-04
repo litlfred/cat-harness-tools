@@ -1,13 +1,12 @@
 #!/usr/bin/env bun
 /**
- * Write and read a sweep step's last-checked mark — bean `rq8s`.
+ * Write and read a sweep step's last-checked mark.
  *
  * The session-start sweep asks the agent to run `check:session-staleness`,
  * which it cannot run itself (the input is a `list_sessions` listing only an
- * agent holds). A session that skipped it left no trace. The owner ruled on
- * 2026-10-10: **timestamp** — the check writes a last-checked mark to the
- * state branch, and the sweep reads it back, so a skipped step is visible
- * after the terminal scrolls. Shape: `@litlfred/cat-harness/schemas/sdlc/sweep-mark.ts`.
+ * agent holds). The check writes a last-checked **timestamp** to the state
+ * branch and the sweep reads it back, so a skipped step is visible after the
+ * terminal scrolls. Shape: `@litlfred/cat-harness/schemas/sdlc/sweep-mark.ts`.
  *
  * The directory is the bean graph's `sweep-marks` node, asked of the graph
  * and never composed here. Reading has five answers, and only one of them is
@@ -20,12 +19,10 @@
  * ## The gate: `sweep:mark:check`
  *
  * A validator TYPES a mark (`cat-harness/validators/sweep-marks-sweep-mark.json`);
- * until 2026-10-20 nothing JUDGED one, so the first mark ever written turned
- * `audit:coverage:require-all` red on every PR as a new `kinds-typed-only`
- * finding (bean `rq8s`). `--check` judges every mark in the store: it must
- * parse, name the check its file is named for, and not be dated in the
- * future. A store that declares no marks node has nothing to judge; one that
- * cannot be reached is UNKNOWN, never a pass.
+ * `--check` JUDGES every mark in the store: it must parse, name the check its
+ * file is named for, and not be dated in the future. A store that declares no
+ * marks node has nothing to judge; one that cannot be reached is UNKNOWN,
+ * never a pass.
  *
  * @module scripts/sweep-mark
  * @covers sweep-marks

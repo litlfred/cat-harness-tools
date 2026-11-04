@@ -11,18 +11,10 @@
  * bun run cat-harness-tools/scripts/staging-push-gate.ts comment --state queued --dir pages --out body.md
  * ```
  *
- * ## Why this exists — issues #1868 and #1956, bean `j27s`
- *
  * GitHub's `pages build and deployment` keeps only the NEWEST run: every push
- * to `gh-pages` cancels the build in flight. A build takes about three minutes
- * (successful runs on 2026-10-03 took 2m20s to 3m40s), and staging previews
- * were pushed every one to two minutes in a busy stretch — 07:50Z to 08:00Z
- * that day, ten builds cancelled in a row. A main-site publish pushed into
- * that stretch was cancelled with them and stayed unpublished until a quiet
- * gap came.
- *
- * **Owner ruling, 2026-10-03, option 1:** push staging previews to `gh-pages`
- * less often — batched or rate-limited. This is the rate limit.
+ * to `gh-pages` cancels the build in flight (a build takes about three
+ * minutes). Frequent staging pushes would keep cancelling builds, including a
+ * main-site publish.
  *
  * ## The rule, and why it is enough
  *
@@ -37,30 +29,18 @@
  *   builds this exists to protect, and the commit is made minutes before the
  *   push completes on a full-site replace, so they get the wider margin.
  *
- * **The fast-forward check is what makes it a guarantee and not a hope.** Two
- * stage jobs that both find the window open both build a commit on the SAME
- * tip; only one push can fast-forward, and the other is rejected, re-reads, and
- * finds a tip younger than the window. So at most ONE staging push lands per
- * window, however many jobs wait — no lock, no shared state, nothing to
- * expire. The same rejection protects the main site: a staging push racing a
- * main-site publish either lands BEFORE it (and is harmless, because the main
- * push then cancels the staging build, and the build that runs carries both)
- * or is rejected and waits out the main-site window.
+ * **The fast-forward check makes it a guarantee.** Two stage jobs that both
+ * find the window open both build a commit on the SAME tip; only one push can
+ * fast-forward, and the other is rejected, re-reads, and finds a tip younger
+ * than the window. So at most ONE staging push lands per window — no lock, no
+ * shared state. A staging push racing a main-site publish either lands BEFORE
+ * it (harmless: the main push cancels the staging build, and the build that
+ * runs carries both) or is rejected and waits out the main-site window.
  *
- * ## Why not a single "flush" job instead
- *
- * The alternative was to have each stage job upload its preview as an
- * artifact and a scheduled job push every pending preview in one commit. It
- * batches harder, but it costs a second workflow, an artifact round trip of
- * 200–500 MB per preview, a record of which artifact is already deployed, and
- * a schedule GitHub only runs best-effort — and the flush job would hold a
- * write token over content built from a pull request, which no job here does
- * today. The rate limit is one script and one loop, and its safety argument
- * is git's own fast-forward rule.
- *
+ * A single scheduled "flush" job would batch harder but needs artifact round
+ * trips, best-effort scheduling and a write token over PR-built content.
  * Coalescing still happens: the workflow's per-branch concurrency group has
- * `cancel-in-progress: true`, so a job waiting here is cancelled by the next
- * push to the same branch, and a superseded preview is never pushed at all.
+ * `cancel-in-progress: true`, so a superseded preview is never pushed.
  *
  * ## Exit codes of `gate`
  *
@@ -68,8 +48,7 @@
  * - `75` (`EX_TEMPFAIL`) — the window was closed; this script SLEPT until it
  *   should open (plus jitter, so waiters do not wake together) and the caller
  *   must re-read `gh-pages` and ask again. Sleeping here rather than printing
- *   a number is `backoff-sleep.ts`'s reason: a failure is then an exit code,
- *   never an empty `sleep` operand.
+ *   a number keeps a failure an exit code (as in `backoff-sleep.ts`).
  * - `1` — the job has waited longer than {@link MAX_WAIT_MS}. Something is
  *   pushing `gh-pages` continuously; the preview is NOT deployed and the job
  *   fails, because a lost staging deploy must stay visible.

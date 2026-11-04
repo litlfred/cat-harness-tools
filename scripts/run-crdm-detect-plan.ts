@@ -1,30 +1,28 @@
 #!/usr/bin/env bun
 /**
- * Execute dogfood test plan #1 — `crdm-detect-evaluation` — through
+ * Execute the `crdm-detect-evaluation` test plan through
  * `test-plan-execution.bpmn`, up to the step no program may take.
  *
- * Bean `folio-assistant-ff09`. The plan (cat-harness `test/plans/`) has one
- * case per issue of the adjudicated 27-issue corpus: a REQUIRED assertion that
- * the detector classifies the issue and an INFORMATIVE one that it matches the
- * label. The owner ruled 2026-10-11 (option 4) that no threshold applies, so a
- * mismatch is a `warn` — recorded, counted into precision and recall, and never
- * a failed case.
+ * The plan (cat-harness `test/plans/`) has one case per issue of the
+ * adjudicated 27-issue corpus: a REQUIRED assertion that the detector
+ * classifies the issue and an INFORMATIVE one that it matches the label. No
+ * threshold applies, so a mismatch is a `warn` — recorded, counted into
+ * precision and recall, and never a failed case.
  *
  * What this does, in the diagram's order:
  *
  * | step | here |
  * |---|---|
- * | `Call_BeanOpen`, `GW_BeanYours` | {@link openTrackedBean}: claim bean `ff09`, which already exists |
+ * | `Call_BeanOpen`, `GW_BeanYours` | {@link openTrackedBean}: claim the plan's existing tracking bean |
  * | `A_Request` … `A_BindData` | load and parse the plan; bind the fixed corpus |
  * | `A_Execute` | run `detect` on every issue; a verdict per case |
  * | `A_WriteRun` | `folio-test-run/v1` (data and process hashed apart) + `test-report/v1` |
  * | `A_ReExecuteSample` | {@link checkSample}: re-run a sample blind to the tester's verdicts |
  * | `GW_ExitCriteria` | the plan's own DMN, fed facts READ OFF the two records |
  *
- * and stops at **`A_RecordCertification`**, a user task: *"the certifier
- * records, under their own name … A user task, so no agent or pipeline can
- * fill it."* The instance is saved where `workflow_next` finds it, so the
- * certifier resumes it rather than re-running anything.
+ * and stops at **`A_RecordCertification`**, a user task the certifier fills
+ * under their own name. The instance is saved where `workflow_next` finds it,
+ * so the certifier resumes it rather than re-running anything.
  *
  * Usage: `bun run cat-harness-tools/scripts/run-crdm-detect-plan.ts [--no-save]`
  *

@@ -1,63 +1,22 @@
 /**
- * Leaked-credential scanning — which this repository had **none** of.
+ * Leaked-credential scanning.
  *
- * Measured 2026-09-21: no gitleaks, no trufflehog, no detect-secrets, no push
- * protection, no pre-commit hook. Every `secret` match across
- * `.github/workflows/` was `secrets.GITHUB_TOKEN` being *consumed*, which is
- * the opposite of a scan.
- *
- * ## The paths a credential can reach a commit here
- *
- * Enumerated rather than assumed, because "add a scanner" answers none of them
- * on its own:
- *
- * | path | covered? |
+ * | path a credential can reach a commit | covered? |
  * |---|---|
  * | an authored source file | **yes** — every text file under the scanned roots |
- * | a committed QA sidecar or witness (bulk, agent-authored) | **yes**, and it is the adversarial case — see below |
+ * | a committed QA sidecar or witness (bulk, agent-authored) | **yes** |
  * | an ingested foreign corpus under `uploads/` | **yes** when committed as text |
- * | a workflow file interpolating a secret into a `run:` block | **yes** for a literal; expression injection is `1wef`, not this |
+ * | a workflow file interpolating a secret into a `run:` block | **yes** for a literal; expression injection is a separate check |
  * | a published site artefact under a docs directory | **yes** for text; generated binaries are out of scope |
- * | a git object from an earlier commit | **NO — deliberately out of scope.** A history sweep is a different job with a different remedy (rotation, not deletion), and claiming it here would be the over-claim this gate exists to avoid. From here forward, and said so. |
+ * | a git object from an earlier commit | **NO — out of scope.** History needs rotation, not deletion; this scans from here forward. |
  *
- * ## Why precision comes first, and is measured before anything gates
+ * The detector is **prefix-anchored**: every pattern matches a credential
+ * format that announces itself. Entropy scanning is not used: this corpus
+ * (SHA prefixes, base64 witness payloads, `@id` URIs, hyphenated identifiers)
+ * gives it a near-100 % false-positive rate.
  *
- * This corpus is adversarial input to every entropy-based detector: it is full
- * of 12-char SHA-256 prefixes, base64 witness payloads, git SHAs and `@id`
- * URIs. **A gate nobody can keep green is a gate that gets disabled**, so the
- * rule here is the bean's: measure the false-positive rate on this corpus
- * BEFORE gating, and let the number decide.
- *
- * So the detector is deliberately **prefix-anchored**, not entropy-based.
- * Every pattern matches a credential format that announces itself.
- *
- * **Entropy scanning is not "not implemented yet" — it is measured unusable
- * here.** Probed over the same roots, 2026-09-21, Shannon entropy > 3.5
- * bits/char on tokens of 20+ characters:
- *
- * | | |
- * |---|---|
- * | files | 3,614 |
- * | high-entropy tokens | **68,337** |
- * | credentials among them | **0** |
- * | false-positive rate | **100 %** |
- *
- * 43,405 of them are in `.json` — the committed QA sidecars, whose 12-char
- * hashes are the point of the file. And the shape of the rest is the real
- * lesson: `source=orphan-branch`, `folio-assistant/scripts/lake-cache`,
- * `content/quantum-observable-universe/lean`. **Ordinary hyphenated
- * identifiers clear the threshold**, so raising it does not rescue the
- * approach; it just moves the arbitrary line.
- *
- * That is a finding, not a gap. A gate nobody can keep green gets disabled,
- * and a disabled gate is worse than an honest narrow one.
- *
- * ## Three states
- *
- * `clean`, `findings`, and **`could-not-scan`** — a root that does not exist
- * or cannot be read. The third is never folded into the first: a scanner that
- * could not run reporting "no secrets found" is the false pass this whole
- * epic is about.
+ * States: `clean`, `findings`, and **`could-not-scan`** (a root that does not
+ * exist or cannot be read), never folded into `clean`.
  *
  * @module scripts/check-secret-leaks
  * @covers code

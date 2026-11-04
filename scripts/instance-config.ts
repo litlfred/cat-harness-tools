@@ -6,14 +6,9 @@
  * @module scripts/instance-config
  * @graphNode none — a reader over `cat-harness/schemas/kg/index-config.ts`; the schema stays there
  *
- * Owner, bean `ymvt` (2026-10-07, restated 2026-10-14: *"i thought ONLY
- * index.config.json"*): a checkout's root `index.config.json` is the ONE
- * authoritative config, each instance's config is inline in its `instances[]`
- * entry, and a `<name>.config.json` is imported only as a migration step and
- * then retired. `build-instance-site.ts`'s `recipeFromConfig` read
- * `${instance}.config.json` directly, so the publish path REQUIRED the legacy
- * file — https://github.com/litlfred/smart-trust/pull/33 created one on
- * 2026-10-14 for exactly that reason.
+ * A checkout's root `index.config.json` is the ONE authoritative config, each
+ * instance's config is inline in its `instances[]` entry, and a
+ * `<name>.config.json` is only a migration step.
  *
  * `readHarnessConfig` / `readEffectiveConfig` in cat-harness answer the same
  * question from a DIRECTORY (they find the instance that owns it); the

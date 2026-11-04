@@ -5,35 +5,22 @@
  * @module scripts/gen-themes-css
  * @covers none — it reads `THEMES`, the PLATFORM's themes, which are declared
  * in code (`schemas/ui/themes.ts`) rather than in a graph directory — the same
- * reason `gen-avatars-css` declares none. It resolves no `themes` directory.
- * This line said `@covers themes` until 2026-09-30 (bean `z6xd`): written
- * from this script's TITLE rather than its scan set, and then copied to two
- * siblings. An instance's own `themes` declaration is explicit that the two
- * are different things — *"These are NOT the platform's twelve themes"*.
+ * reason `gen-avatars-css` declares none. It resolves no `themes` directory;
+ * an instance's own `themes` declaration is a different thing.
  *
- * **The knowledge graph is the source; the stylesheet is a rendering of it.**
- * That is the whole of the owner's *"named css assets in KG rather than
- * hardcoded colors"* — hand-authoring the CSS beside the nodes would give two
- * places to change a colour and no check that they agree, which is the same
- * shape as the 106 hardcoded literals this replaces.
+ * **The knowledge graph is the source; the stylesheet is a rendering of it**,
+ * so a colour has one place to change. `--check` fails when the committed file
+ * is stale.
  *
- * `--check` fails when the committed file is stale, so an edited node that was
- * never regenerated fails the build rather than quietly never reaching a
- * reader. Same contract as the skill-docs mirror.
+ * ## Instance-declared sticky themes are emitted too
  *
- * ## Instance-declared sticky themes are emitted too (bean `v8n5`)
- *
- * An instance may declare its own sticky theme in a `themes` graph directory
- * (a palette derived from the instance's own sources, say). Before
- * this, `themeByRef` could RESOLVE such a theme for a card while this file
- * emitted no CSS for it, so the card named a theme and rendered on the
- * default. They are found through `instanceStickyThemes` — the same
- * declaration-driven discovery `themeByRef` uses — so this file names no
- * instance and holds no instance's colour: the values arrive from the
- * instance's own `themes.ts` when the generator runs. An instance theme id
- * that collides with a platform id or another instance's is REFUSED with a
- * finding (exit 1), because a card writes the bare id and one selector cannot
- * serve two themes.
+ * An instance may declare its own sticky theme in a `themes` graph directory.
+ * They are found through `instanceStickyThemes` — the same declaration-driven
+ * discovery `themeByRef` uses — so this file names no instance and holds no
+ * instance's colour: the values arrive from the instance's own `themes.ts`
+ * when the generator runs. An instance theme id that collides with a platform
+ * id or another instance's is REFUSED with a finding (exit 1), because a card
+ * writes the bare id and one selector cannot serve two themes.
  *
  * Exit codes: 0 written or up to date · 1 stale under `--check`, or an
  * instance sticky theme id collides.

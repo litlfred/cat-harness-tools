@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * resolve-subgraph — where a declared subgraph gets its content, as the ONE
- * resolver answers it (bean `l4ay`).
+ * resolver answers it.
  *
  *   bun run cat subgraph:resolve <dir-id> [--from <instance-root>] [--json]
  *   bun run cat subgraph:resolve --all [--json]
@@ -15,8 +15,8 @@
  *
  * Exit: 0 resolved; 1 no instance declares the id; 2 the declaration
  * contradicts itself (both `source` and `storage`, a tip-keyed `qa`), or a
- * declaration cannot be resolved. A branch source no longer needs a
- * table row (special-branches.json is gone): the declaration is the authority (bean rva2).
+ * declaration cannot be resolved. The declaration is the authority for a
+ * branch source.
  *
  * @module scripts/resolve-subgraph
  */

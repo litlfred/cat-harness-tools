@@ -3,21 +3,16 @@
  * Which build produced this file, for the artefacts that can say so in-band.
  *
  * A staging preview publishes a whole site under `STAGING/<slug>/`, and the
- * only question a reviewer actually has about any file in it is *which commit
- * am I looking at*. HTML answers with the injected banner. Everything else is
- * data, and data needs the answer written into the document.
+ * question a reviewer has about any file in it is *which commit am I looking
+ * at*. HTML answers with the injected banner. Everything else is data, and
+ * data needs the answer written into the document.
  *
  * ## One function, because two stamps can disagree
  *
- * This was an inline `bun -e` block in `feature-staging.yml` that stamped the
- * JSON-LD export and nothing else, so `harness-schema-export.ts` published
- * `<stub>.schema.json`, `tool.schema.json`, `tool-types.schema.json` and 44
- * skill I/O contracts beside it with no build identity at all — measured on
- * `main` at 2026-09-19 (bean `lx2s`). Adding a second stamp in the second
- * script would have given the two documents independent notions of the same
- * build, which is the failure the workflow's own comment guards against when
- * it copies the `.json` alias *after* the stamp "so the two documents cannot
- * disagree about which build they came from". One function, one answer.
+ * The JSON-LD export, `<stub>.schema.json`, `tool.schema.json`,
+ * `tool-types.schema.json` and the skill I/O contracts are all stamped by this
+ * one function, so no two documents have independent notions of the same
+ * build.
  *
  * ## Previews only
  *
@@ -28,12 +23,9 @@
  * ## Absent rather than fabricated
  *
  * Outside CI there is no build, so there is no stamp: this returns `undefined`
- * and callers write no key. The tempting alternative — `sha` from
- * `git rev-parse HEAD`, `branch` from the current checkout — produces a
- * document that *claims* to be a build artefact of a commit that was never
- * built, and a reader has no way to tell it from one that was. Same rule
- * `harness-schema-export` follows for `$id`: absolute or absent, never a
- * plausible-looking stand-in.
+ * and callers write no key — never a `git rev-parse HEAD` stand-in that claims
+ * a build that never happened. Same rule `harness-schema-export` follows for
+ * `$id`: absolute or absent.
  *
  * @module scripts/staging-stamp
  */

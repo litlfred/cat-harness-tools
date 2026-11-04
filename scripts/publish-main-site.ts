@@ -1,29 +1,21 @@
 #!/usr/bin/env bun
 /**
  * Publish a folio's `main` site at the root of its publish branch, so a
- * preview has a "before" side. Bean `5uuf`, epic `q4jm`.
+ * preview has a "before" side: the visual diff pictures each changed block on
+ * it, and the review page links "view on main" to it.
  *
  * @module scripts/publish-main-site
- *
- * The visual diff pictures each changed block on the published main site, and
- * the review page links "view on main" to it. Until this script, nothing
- * published a folio's `main` at all: every before picture read "its page is
- * not in the published site" and every such link 404'd (found by `ojcx`'s real
- * run on litlfred/folio-test#6).
  *
  * ## It deletes only what it wrote
  *
  * The root of the publish branch is shared: `STAGING/` holds every open PR's
  * preview, `PC/` the frozen public comment releases, `_render-log/` the render history, and a folio may keep files there
- * by hand (a `CNAME`, a verification file). Replacing the root wholesale would
- * delete all of it, which is the `plj1` failure. Overlaying without deleting
- * keeps pages `main` stopped producing, so a reviewer checking a removal is
- * told it did not happen (`85im`).
- *
- * So every publish writes a manifest, `_main-site.json`, listing the files it
- * put there, and the next publish removes exactly those before copying. A
- * file the manifest does not name is never touched. The first publish has no
- * manifest, so it removes nothing, and says how many files it found and left.
+ * by hand (a `CNAME`, a verification file). So every publish writes a
+ * manifest, `_main-site.json`, listing the files it put there, and the next
+ * publish removes exactly those before copying — so a page `main` stopped
+ * producing disappears. A file the manifest does not name is never touched.
+ * The first publish has no manifest, so it removes nothing, and says how many
+ * files it found and left.
  *
  * It refuses a site that would write into a reserved path, before touching
  * anything.

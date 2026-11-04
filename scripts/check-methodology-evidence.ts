@@ -2,44 +2,21 @@
 /**
  * Does each methodology's cited source actually exist in a library?
  *
- * ## The measurement this exists for
+ * Every methodology node carries an `origin` naming authors and a
+ * publication (what `methodology-adoption` uses to tell an adoption from a
+ * house process). This reports each origin whose source no declared library
+ * holds.
  *
- * Every methodology node carries an `origin` naming authors and a publication,
- * because `methodology-adoption` makes that the line between an adoption and a
- * house process. Measured 2026-09-22, across all four declared libraries:
- * **six methodologies cited an origin and ZERO had that source ingested.** The
- * citations resolved against nothing — the shape the retired skill `roles:`
- * field cost 260 dangling values (bean `qif9`), reappearing on the kind whose
- * whole justification is being somebody else's named, external work.
+ * It REPORTS by default (exit 0 with findings); whether a methodology without
+ * a reachable source may be used is not this script's call. `--strict` exits
+ * 1 on any finding.
  *
- * There was no way to see it. `test/results/` held eight QA axes and none was
- * about methodologies, so "this methodology rests on a citation nobody can
- * follow" was not a finding anything could report.
+ * **Two things always fail:** front matter that does not validate, and an
+ * `evidence` reference pointing at a bib-slug no declared library holds (a
+ * citation that claims to resolve and does not).
  *
- * ## It REPORTS; it does not gate
- *
- * Default exit is 0 **with findings**. That is deliberate and it is the same
- * division `check:subgraphs` uses: a gate that fails on things nobody has
- * decided about is the "check that cries wolf is a check somebody switches
- * off" failure `known-skills.ts` names, and on the day this landed it would
- * have failed on five of six methodologies at once.
- *
- * Whether a methodology with no reachable source may still be used is the
- * owner's call, not this script's. `--strict` exits 1 for a caller that has
- * decided.
- *
- * **Two things DO fail by default**, because neither is an open question:
- * front matter that does not validate, and an `evidence` reference pointing at
- * a bib-slug no declared library holds. The first is a malformed node; the
- * second is a citation that claims to resolve and does not, which is strictly
- * worse than having none — it reads as evidence in every listing.
- *
- * ## Could-not-determine is a third state and exits 2
- *
- * If no directory declares a `methodology` graph, this reports `undetermined`
- * and exits 2 rather than printing a clean run over a corpus it never found.
- * An empty sweep and a clean sweep must not share a spelling — the `dh4f`
- * defect, which is about exactly this.
+ * If no directory declares a `methodology` graph, it reports `undetermined`
+ * and exits 2 rather than printing a clean run.
  *
  * Usage:
  *   bun run cat check:methodology-evidence
@@ -48,7 +25,7 @@
  *   bun run cat check:methodology-evidence:check          # JUDGE: compute and judge, write nothing (the gate)
  *
  * Exit: 0 reported, 1 a hard finding (or any finding under --strict),
- *       2 could not determine. Judge mode (`--check`, bean `bo44`) keeps the
+ *       2 could not determine. Judge mode (`--check`) keeps the
  *       same table (`--strict` included) and adds 2 for an unknown flag or a
  *       run that threw.
  *

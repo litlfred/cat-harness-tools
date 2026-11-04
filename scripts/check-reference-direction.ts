@@ -1,129 +1,47 @@
 #!/usr/bin/env bun
 /**
- * Nothing names an instance that depends on it.
+ * Nothing names an instance that depends on it: if sub1 depends (directly or
+ * through a chain) on stub0, no reference or context points stub0 → sub1.
  *
- * Owner, 2026-09-23: *"if sub1 depends (directly or through chain) stub0, no
- * references/context etc points stub0 → sub1."*
+ * The rule is `schemas/kg/reference-direction.ts`; the direction is
+ * `schemas/kg/layer-direction.ts`, the same computation `check:partition`
+ * uses. What is here is discovery, this instance's exemptions, and the
+ * report.
  *
- * `bootstrap-tools/schemas/graph.test.ts` enforces this for ONE instance
- * (`bootstrap/`, bean `iwtn`). This is the same invariant over all of them,
- * through the direction computation `check:partition` already uses, so the
- * import axis and the prose axis cannot give two answers (bean `zhg2`).
+ * ## The repository-name collision ({@link collisionOf})
  *
- * The rule itself is `schemas/kg/reference-direction.ts`; the direction is
- * `schemas/kg/layer-direction.ts`. What is here is discovery, this instance's
- * exemptions, and the report — the parts that are genuinely about running the
- * tool over a checkout, split the way `repo-partition.ts` splits from
- * `partition/engine.ts`.
+ * The root instance's name is also the repository's name. Each occurrence is
+ * classified by its shape (inside a URL, after an owner, before a path segment
+ * into a directory the root DECLARES): `names-repository` for the repository
+ * case, `undetermined` for the ambiguous residue. A file cannot exempt itself
+ * by what it says about itself; like {@link GENERATOR_WRITTEN}, the decision
+ * reads declarations, so a newly declared directory needs no edit here.
  *
- * ## The repository-name collision, and what {@link collisionOf} decides
+ * ## The committed sidecar
  *
- * The root instance's name IS the repository's name, and until 2026-09-29 that
- * made every occurrence of it `undetermined` in one move: **11,090 of 14,299
- * occurrences on main, 78 % of everything read.** The ambiguity was in the
- * INSTRUMENT rather than in the architecture. An occurrence carries more than
- * the name it matched — a URL around it, an owner in front of it, a path
- * segment after it — and of 13,160 word-bounded occurrences of the root's name
- * under `cat-harness/`, 11,419 sit inside an `http(s)` URL and 14 point into a
- * directory the root instance actually declares. So the resolver built here
- * answers, per occurrence, which of three things the string is; the verdict
- * `names-repository` carries the answer for the repository case, and the
- * genuinely ambiguous residue is still `undetermined`.
+ * `cat-harness/test/results/reference-direction.qa-results.json` holds the
+ * axis's answer in the `qa-results/v1` shape:
  *
- * It reads the root's DECLARED directories to decide, which is the same
- * discipline as {@link GENERATOR_WRITTEN} below and holds for the same reason:
- * a directory added to the declaration tomorrow is recognised without an edit
- * here. **The file's own principle is unchanged** — a file that merely
- * MENTIONS a name cannot exempt itself, and nothing here lets it: the three
- * collision answers are read off the occurrence's shape, not off anything the
- * file claims about itself.
+ *  - **Verdict** counts (wrong-direction, exempt, `names-repository`,
+ *    undetermined) are RECORDED, in {@link CENSUS_FAMILY}.
+ *  - **File** counts (skipped, generator output, walked) are a census:
+ *    printed, never recorded.
  *
- * ## It writes a COMMITTED sidecar, and until 2026-09-30 it did not
+ * The `wrong-direction` family records ONE entry per file and per instance
+ * above it that the file names. It is in `failOnNew`, so `--check` is a
+ * one-way ratchet: a pair the baseline does not hold fails, a pair that
+ * disappears is resolved. The fix is to reword in place.
  *
- * The axis printed a verdict and committed nothing, which is the one failure
- * this repository has already named twice. `kg:audit`: *"a printed verdict is
- * gone, which makes 'unbound since it was drawn' and 'broken in the commit
- * under review' indistinguishable"*. `audit:coverage` exists for the same
- * reason one level out. For this axis both readings were available and
- * nothing chose between them: **"never audited" and "audited clean" looked
- * identical**, because there was nothing to look at. Bean `yj6r` recorded it
- * as the third of three gaps.
+ * ## `--check`
  *
- * So `cat-harness/test/results/reference-direction.qa-results.json` now holds
- * what the axis says, in the `qa-results/v1` shape every other whole-corpus
- * result here uses.
- *
- * ### What is RECORDED, and what stays in the printed report
- *
- * The line is drawn between **a count of verdicts** and **a count of files**,
- * and it is drawn there because those two answer different questions:
- *
- *  - A **verdict** count — wrong-direction, exempt, `names-repository`,
- *    undetermined — IS this axis's answer. "1,206 occurrences point up the
- *    arrow" is the measurement, not an incidental fact about the tree, and a
- *    reader holding only the file needs it to tell a clean axis from an
- *    unaudited one. It moves when the corpus's references move, which is when
- *    a reader WANTS to see it move. Recorded, in {@link CENSUS_FAMILY}.
- *  - A **file** count — how many files were skipped because their directory
- *    declares a machine-written graph, how many declared themselves generator
- *    output, how many files were walked — is a CENSUS. It moves when somebody
- *    adds a page, says nothing about direction, and `audit-coverage` already
- *    paid for committing one: *"a census moves on any commit and a gate keyed
- *    on it is stale by default"*, and worse, *"regenerating the L1 verdicts
- *    under `library/` made this report stale, so a QA writer in one graph
- *    turned another graph's coverage gate red."* Printed, never recorded.
- *
- * ### Freshness: `--check` grades the STATES, never the counts
- *
- * A committed sidecar goes stale, and the question every one of them has to
- * answer is what its `--check` fails on. This one fails on a graded **state**
- * that is NEW against a baseline — a (file, instance-above-it) pair that
- * holds a wrong-direction reference (A.10), an entry that no longer
- * qualifies, an instance that declares no `needs`. (A multi-destination file
- * nobody has listed is still RECORDED, but A.10 subsumes it as a gate.) Bean `0dav`: the baseline is the committed working copy until QA
- * results leave `main`, and `--against <ref>` on the `qa-reports` branch
- * after; a missing one is UNKNOWN and not gated (proposal §2.3). It used to
- * fail on the committed states merely DISAGREEING, which has no subject once
- * nothing is committed. Those move when a RULING moves: somebody adds a file with no single
- * destination, or an entry stops qualifying. That is exactly the diff a
- * reviewer has to see, and it is not produced by an unrelated merge.
- *
- * It answers that ONE question and only that: `--check` does not also fail on
- * the backlog. `audit:coverage --check` settled the same trade — a gate that
- * refused every push until somebody drained a backlog is a gate switched off
- * within a week. The backlog exit stays on the plain form, and the `✗` lines
- * print on both, so a `--check` that returns 0 cannot be read as a clean axis.
- *
- * ### A.10 — the backlog is the BASELINE, so a new pair fails (owner, Q-B 2026-10-01)
- *
- * The `wrong-direction` family records every file holding a wrong-direction
- * reference, ONE entry per file and per instance above it that the file
- * names — single-destination files as well as multi-destination ones. It is
- * in `failOnNew`, so `--check` is a one-way ratchet without a second store:
- * every pair in the baseline sidecar is inherited, a pair the baseline does not
- * hold (a new file, or a known file naming a further instance) fails, and a
- * pair that disappears is resolved. The fix is to REWORD in place (Q1).
- *
- * The baseline is the `qa-reports` entry `--against` names; CI passes
- * `--against main`. Without one the comparison is UNKNOWN and not gated, so
- * the regenerated sidecar is committed in the same change that alters what
- * this axis records — that copy is what the next `main` entry publishes.
- *
- * It does **not** fail on the verdict counts moving, even though it records
- * them. Grading a number that changes whenever anybody writes a paragraph
- * makes a gate that is stale by default, and a gate that is stale by default
- * is one people learn to regenerate without reading — `audit-coverage`'s
- * finding, applied here rather than rediscovered. {@link comparableDirection}
- * is where the line is enforced, and the `--check` message SAYS what it
- * compared, so nobody reads a pass as a guarantee about the counts.
- *
- * ### `--check` does not write, and that is bean `ymsu`
- *
- * A gate that repairs the tree the rest of the run is judging makes a later
- * gate's verdict meaningless — `kg:detangle` repairs `schemas.detangle.json`
- * and both `kg:detangle:check` and `uml:overview:check` then read the repaired
- * copy, which is two witnesses already. A third was not going to come from
- * here. `--check` reads, compares and returns; the plain run is the writer.
+ * Fails only on a graded **state** that is NEW against the baseline: a new
+ * wrong-direction pair, an entry that no longer qualifies, an instance that
+ * declares no `needs`. It never grades the verdict counts
+ * ({@link comparableDirection} enforces this) and does not fail on the
+ * backlog; the `✗` lines still print. The baseline is the `qa-reports` entry
+ * `--against` names (CI passes `--against main`); without one the comparison
+ * is UNKNOWN and not gated, so commit the regenerated sidecar in the same
+ * change. `--check` never writes; the plain run is the writer.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/check-reference-direction.ts            # summary, and WRITE the sidecar

@@ -7,14 +7,10 @@
  * @covers schemas
  * @graphNode none — a generator over the harness's kind validators, not a schema itself
  *
- * ## Why the source and the output are in different instances
- *
- * Bean `8lcl` (stage 1b of the split, owner ruling `xsqm` 1): the Zod moved
- * here, and `cat-harness/schemas/` keeps GENERATED JSON Schema, one per kind,
- * `$id` under the harness's `iriBase`, "as bootstrap does". So this is
- * bootstrap-tools' `gen-bootstrap-schemas.ts` one layer up: the content layer
- * holds a file a reader opens with nothing installed, and does not know how it
- * got there.
+ * The Zod lives here; `cat-harness/schemas/` keeps the GENERATED JSON Schema,
+ * one per kind, `$id` under the harness's `iriBase`, as bootstrap-tools'
+ * `gen-bootstrap-schemas.ts` does for bootstrap: a reader opens it with
+ * nothing installed.
  *
  * ## Which kinds, and what each document holds
  *
@@ -32,32 +28,20 @@
  * A family typed only as a TypeScript shape is not runnable, so it constrains
  * nothing here and the document's `$comment` names it. A Zod schema in another
  * repository (bootstrap-tools' `models`) is published by that repository. A kind
- * with nothing runnable gets NO file, and this says why, as
- * `check:kind-validators` does: a schema that accepts everything would read as
- * coverage.
+ * with nothing runnable gets NO file, and this says why: a schema that accepts
+ * everything would read as coverage.
  *
  * ## The same output whatever is mounted beside the harness
  *
- * Bean `8lcl`, folio-assistant#2812: run in a full folio-assistant mount, this
- * generator wrote four files differently from the harness on its own, so the
- * committed files could never match downstream. Two things leaked in from the
- * layers above:
- *
  * - **Validator nodes.** A higher instance may answer a harness kind's family
- *   from its own `validators/` graph — core does for `uploads`'
- *   `folio-intake/v1`, `folio-extraction/v1` and `folio-dublin-core/v1`. The
- *   shared registry joins every mounted instance's nodes, so the document grew
- *   three `$defs` in a mount. Here the kinds are read from a PRIVATE registry
- *   ({@link harnessRegistry}) that loads the `typologies/` and `validators/`
- *   graphs of the harness and of what it `needs`, transitively, and of no other
- *   instance ({@link harnessInstances}). A family a higher layer answers is
- *   that layer's to publish.
+ *   from its own `validators/` graph. The kinds are read from a PRIVATE
+ *   registry ({@link harnessRegistry}) that loads the `typologies/` and
+ *   `validators/` graphs of the harness and of what it `needs`, transitively,
+ *   and of no other instance ({@link harnessInstances}).
  * - **Discovered enums.** `BLOCK_KINDS` is read at import from every mounted
- *   `block-kinds/` graph, so `appliesTo` was `{ "not": {} }` standalone and the
- *   core's and science layer's kinds in a mount. Neither is the harness's: the
- *   vocabulary is open, extended by the layers above, so a schema in a
- *   {@link DISCOVERED_VOCABULARIES} entry is written as the open type
- *   `{ "type": "string" }` ({@link body}).
+ *   `block-kinds/` graph, an open vocabulary extended by the layers above, so
+ *   a schema in a {@link DISCOVERED_VOCABULARIES} entry is written as the open
+ *   type `{ "type": "string" }` ({@link body}).
  *
  * `scripts/tests/gen-kind-json-schemas.test.ts` mounts a synthetic higher
  * instance contributing both and asserts the output does not move.
@@ -65,9 +49,8 @@
  * ## The `$id` is the file's path
  *
  * `<iriBase>v<major>/<path in cat-harness>`, minted by bootstrap-tools'
- * `releaseIri` from the declaration, never typed; it is the rule
- * bootstrap-tools' `check:node-iris` enforces over every Knowledge Graph with
- * an `iriBase` (owner, 2026-09-29).
+ * `releaseIri` from the declaration, never typed; bootstrap-tools'
+ * `check:node-iris` enforces it over every Knowledge Graph with an `iriBase`.
  *
  * Usage:
  *   bun run cat kind:json-schemas          # write

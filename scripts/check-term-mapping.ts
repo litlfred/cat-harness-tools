@@ -2,34 +2,21 @@
 /**
  * Is a minted glossary candidate already somebody else's concept?
  *
- * Bean `7wou`, under `5yhm`. The check the owner asked for on 2026-09-29:
- * *"extracting exsiting glossary needs compaision to existing
- * termonology/coding."* The contract, the three states and why `exact` and
- * `concept` are a pair are in `schemas/content/term-mapping.ts` and are not restated
- * here. Three things decide what the code below does:
+ * The contract, the three states and why `exact` and `concept` are a pair are
+ * in `schemas/content/term-mapping.ts`. Here:
  *
  *   * TWO TARGETS, NEVER MERGED. `skos` is authoritative for meaning, `fhir`
- *     for a clinical code's operational semantics, and the owner was explicit
- *     2026-09-30: "OCL is only for FHIR. not a constraint on SKOS." So there
- *     are two resolvers and two sets of results, and a term can be mapped in
- *     one and unmapped in the other without contradiction.
+ *     for a clinical code's operational semantics (OCL constrains only
+ *     `fhir`). A term can be mapped in one and unmapped in the other.
  *
  *   * A RESOLVER THAT CANNOT BE REACHED RETURNS `undetermined`, WITH ITS
- *     REASON — never `unmapped`. Before `who-smart-base@v1.0.0` was pinned
- *     (2026-09-30, bean `ejug`), cloud sessions were refused
- *     `api.openconceptlab.org:443` by proxy policy (`403 to CONNECT`), and a
- *     direct connected-agent probe on 2026-10-24 (`q7ds`) confirmed that
- *     `api.openconceptlab.org` (`v2.3.234-3e606025`) itself refuses anonymous
- *     reads with HTTP 403 (`"Authentication required. Anonymous API access is
- *     disabled."`). With `who-smart-base@v1.0.0` snapshotted offline in
- *     `cat-harness/external-schemas/who-smart-base.terminology.json` (12 code
- *     systems, 585 concepts), both `skos` and `fhir` resolve locally and return
- *     determined verdicts (`0 undetermined`), while an absent or unusable
- *     snapshot still returns `undetermined` with its reason.
+ *     REASON — never `unmapped`. Both resolve locally against the
+ *     `who-smart-base@v1.0.0` snapshot in
+ *     `cat-harness/external-schemas/who-smart-base.terminology.json`; an
+ *     absent or unusable snapshot returns `undetermined` with its reason.
  *
  *   * IT REPORTS AND NEVER GRADES. No ratio, no threshold, no exit code that
- *     depends on how many mapped. An unmapped candidate may be a term this
- *     corpus is right to coin.
+ *     depends on how many mapped.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/check-term-mapping.ts

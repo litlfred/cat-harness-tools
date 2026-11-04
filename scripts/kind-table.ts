@@ -5,16 +5,9 @@
  * @module scripts/kind-table
  * @graphNode none — a reader over one authored table
  *
- * ## Why this is a module and not two functions in a test
- *
- * It was both functions in `tests/graph-typology-docs.test.ts`, which was the right
- * home while only that test asked. `kind:register` asks the same question — a new
- * kind owes a table ROW, and the row is **authored**, so the command reports it
- * rather than writing it — and a second copy of a parser over a hand-written
- * table is two answers that drift the first time a column moves. Bean `uoij`.
- *
- * Moved rather than duplicated: the test imports these, so there is still one
- * reader of the table, and its own assertions did not change.
+ * The one parser of the table, shared by `kind:register` (a new kind owes an
+ * authored ROW, which the command reports rather than writes) and
+ * `tests/graph-typology-docs.test.ts`, so the two cannot drift.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";

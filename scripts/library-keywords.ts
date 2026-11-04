@@ -1,12 +1,7 @@
 /**
  * library-keywords — keywords for every section and every document of every
- * declared library, from the LSI term weights. Issue #2302.
- *
- * Owner, 2026-10-06: *"is there keyword extraction for sections, document?
- * that should be part of process... maybe use lsi skills?"* There was none,
- * though the LSI index already weighted every term of every library section
- * (log-entropy: frequent here, rare across the corpus) and then discarded the
- * per-section view. This keeps it.
+ * declared library, from the LSI term weights (log-entropy: frequent here,
+ * rare across the corpus).
  *
  * Per library root, the units are exactly the LSI tool's (`unitsOf` in
  * `scripts/lsi.ts`: one per `sections/*.md`, specimen pages excluded), and the
@@ -19,8 +14,7 @@
  *   tool's minimum length, which the index does not take either);
  * - `evidence` on each keyword: `heading` when every word of it appears in a
  *   heading the extraction found — the section's own title for a section
- *   keyword, any TOC title or figure caption for a document keyword. A
- *   keyword a heading also names is the document saying it of itself.
+ *   keyword, any TOC title or figure caption for a document keyword.
  *
  * Derived and deterministic: re-running on an unchanged library writes
  * nothing. `--check` reports a missing or stale file and exits 1.

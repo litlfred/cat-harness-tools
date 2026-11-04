@@ -5,28 +5,17 @@
  * @module scripts/gen-landing-data
  * @covers folio, docs
  *
- * ## Why this is a separate script from `sync-docs-harness.ts`
- *
- * It was part of it, and that was a **layering violation I introduced**.
- * `repo-partition --edges` reported two wrong-direction edges out of
- * `sync-docs-harness.ts` (agentic-harness) into `ensure-landing-sticky.ts` and
- * `schemas/content/landing-sticky.ts` (folio-assist-core): the harness reaching up into
- * core's content nodes.
- *
- * The fix is not an exemption, it is the right owner. **Core owns the folio
- * graph**, so core writes the folio content's data file; the harness keeps
- * writing the instance's own declaration data. Each script now imports only
- * downward.
+ * Core owns the folio graph, so this (not `sync-docs-harness.ts`, which writes
+ * the instance's declaration data) writes the folio content's data file; each
+ * imports only downward.
  *
  * ## Resolved HERE, not in Liquid
  *
  * A sticky names a theme by id; the theme names an image ROLE; the instance's
- * `images[]` answers what that role's three crops are. Following that chain in
- * a template means a `where` over two collections per sticky per layout, and
- * Liquid cannot REPORT a broken link in it — it renders empty.
- * `resolveThemeBackdrop` returns the three-state answer and refuses a partial
- * resolution wholesale, so the template gets a flat already-decided structure
- * and the decisions stay where they can be tested.
+ * `images[]` answers what that role's three crops are. Liquid cannot report a
+ * broken link in that chain — it renders empty. `resolveThemeBackdrop` returns
+ * the three-state answer and refuses a partial resolution wholesale, so the
+ * template gets a flat, already-decided structure.
  *
  * `--check` fails when the committed file is stale, the same contract
  * `sync-docs-harness.ts` and the CSS generators use.

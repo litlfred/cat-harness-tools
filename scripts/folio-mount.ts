@@ -1,67 +1,33 @@
 /**
  * The folio mount: how a page that is NOT folio-assistant's carries the
- * reader's folio. Bean `jpjt`, requirements F8/F9 on issue #796.
+ * reader's folio, so every harness offers the same folio.
  *
- * Owner, 2026-09-21:
+ * The glass (R25) comes down OVER whatever is being browsed, so `mountGlass()`
+ * appends to `document.body` and is called from `init()` unconditionally; it
+ * needs no `<main>`, `.main-content` or sidebar header, which a replica page
+ * must not grow. `test/content/glass.e2e.ts` proves it against such a
+ * fixture. This module ships the mount and nothing else.
  *
- * (paraphrased) the folio visualisation should by convention be available on
- * any harness for a consistent feel: the content instances are libraries a
- * user browses, and the "folio" the cat-harness gives them is consistent
- * across them.
- *
- * ## What was measured, and why this is possible now and was not before
- *
- * `jpjt` measured the gap on the IRIS replica's pages: `docs-ui.js` on
- * **0** of them, and loading it there would have mounted **nothing**, because
- * every folio surface was bound to just-the-docs page furniture — the
- * launcher wants a sidebar header, the board wants `<main>`, the language bar
- * wants `.main-content`. A replica page has none of those and must not grow
- * them: the IRIS replica exists to look like WHO.
- *
- * R25's glass is the surface that does not care. It comes down OVER whatever
- * is being browsed, so `mountGlass()` appends to `document.body` and is
- * called from `init()` unconditionally, outside the guards that decide
- * whether a board mounts. `test/content/glass.e2e.ts` proves it against a fixture
- * with no `<main>`, no `.main-content`, no sidebar header and a todo index
- * that 404s — every condition a replica page meets.
- *
- * So this module ships the mount and nothing else. The glass is already
- * there.
- *
- * ## ONE folio, not a good one
- *
- * `board-windows` §"The folio belongs to the HARNESS" states the test, and it
- * is the reason this is a fragment rather than a port:
- *
- * > The test is not *"is this folio good"* but *"is this the same folio"*.
- *
- * Two harnesses that each build a good folio have both failed. So a page gets
- * the platform's own stylesheet and the platform's own script, by reference,
- * and there is no second implementation to drift.
+ * It is a fragment, not a port: a page gets the platform's own stylesheet and
+ * script by reference (`board-windows` §"The folio belongs to the HARNESS":
+ * the test is *"is this the same folio"*), so there is no second
+ * implementation to drift.
  *
  * ## Why the root is derived in the browser
  *
  * These pages are served from **two** mount routes — `/<instance>/` and
- * `/docs/<instance>/` — so one generated file sits at two different depths
- * below the site root. A document-relative `href` is therefore correct under
- * one mount and 404s under the other, and `gen-iris-pages.ts` already says so
- * about its architecture drawing. An absolute site URL is the other obvious
- * answer and is worse: it bakes the publication base into a generated page,
- * which is what `canonicalUrl` exists to stop, and it breaks every staging
- * preview, which is served under `/STAGING/<branch>/`.
+ * `/docs/<instance>/` — so a document-relative `href` 404s under one of them,
+ * and an absolute site URL would bake in the publication base (what
+ * `canonicalUrl` exists to stop) and break staging previews under
+ * `/STAGING/<branch>/`. `siteRootOf` below derives the root and the inlined
+ * `client` applies the SAME pattern object, passed in by the caller, so there
+ * is one expression. `folio-mount.test.ts` runs the shipped bytes to check it.
  *
- * The browser knows its own path. `siteRootOf` below derives the root and the
- * inlined `client` below applies the SAME pattern object, passed in by the
- * caller — so there is one expression rather than a function and a string
- * that must agree. `folio-mount.test.ts` runs the shipped bytes to check it,
- * the mechanism `staging-banner`'s `previewRootOf` already uses.
+ * ## The route shape is the CALLER's
  *
- * ## Why the route shape is the CALLER's
- *
- * A generic module that hard-coded the replica's name would be the platform knowing
- * about one library, which is the boundary this repository exists to keep.
- * The caller passes the pattern that finds its own instance root; the
- * platform owns the mount, the marker and the gate.
+ * The caller passes the pattern that finds its own instance root, so the
+ * platform names no library; the platform owns the mount, the marker and the
+ * gate.
  *
  * @module scripts/folio-mount
  */

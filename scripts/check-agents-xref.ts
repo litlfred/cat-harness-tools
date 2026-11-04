@@ -5,28 +5,15 @@
  * @module scripts/check-agents-xref
  * @covers skills, docs
  *
- * ## Why this has to exist before anything is migrated
+ * Moving a section out of `AGENTS.md` silently breaks every skill that cited
+ * it; this reports those breaks.
  *
- * Bean `1hsf` moves substantive rules out of `AGENTS.md` into the skills that
- * govern them. Moving a section silently breaks every skill that cited it, and
- * measured on `main` 2026-09-19 — **before** a single line was moved — 18 of
- * the 20 section-naming citations already failed to resolve against this
- * repository's `AGENTS.md`. Nothing reported that, so nobody could tell an
- * inherited break from one the migration had just caused. A migration run
- * without this check is a migration whose damage is indistinguishable from the
- * damage already there.
- *
- * ## The third state, and why collapsing it would be wrong
+ * ## The third state
  *
  * **There are two `AGENTS.md` files and a citation does not say which it
  * means.** The platform carries one; every folio built on it carries its own,
  * and skills are *synced into* a folio, where the same sentence resolves
- * against a different file. This repository's own `AGENTS.md` says so
- * explicitly — *"`litlfred/qou`'s `AGENTS.md` carries the same first two rules
- * for that folio — §'Branch + PR workflow'"* — and `continual-progress.md`
- * cites exactly that section.
- *
- * So a citation is one of three things, never two:
+ * against a different file. So a citation is one of three things:
  *
  * | verdict | meaning |
  * |---|---|
@@ -36,22 +23,10 @@
  *
  * `unresolved` is **not** "dead". A platform-only checkout cannot read a
  * folio's `AGENTS.md`, so it cannot prove absence — it can only report that
- * nothing here accounts for the reference. Rendering that as a dead link would
- * produce a wall of false findings in exactly the checkout this usually runs in.
+ * nothing here accounts for the reference.
  *
- * ## How the backlog reached zero, and what it cost to find out
- *
- * 16 of the 20 original citations sat `unresolved`. Guessing which were the
- * folio's would have been a claim about a repository this checkout cannot see,
- * so `litlfred/qou` was cloned and **checked**. Of the seven that survived
- * repointing, five named real sections of its 6,036-line `AGENTS.md` — four
- * headings and one bullet — and **two, `be frugal` and `Executing actions with
- * care`, were in neither repository** and became plain rules with no citation.
- *
- * The lesson is in `OWNED_CITATION`: a citing file must be able to declare
- * which `AGENTS.md` it means. Before that, a correct citation could only leave
- * `unresolved` if the PLATFORM's prose happened to mention it, which would have
- * meant restating a folio's contents here to clear a backlog.
+ * A citing file declares which `AGENTS.md` it means through the form
+ * `OWNED_CITATION` matches.
  *
  * Exit codes: 0 clean · 1 unresolved citations found · 2 could not check.
  */

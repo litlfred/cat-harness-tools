@@ -1,33 +1,21 @@
 #!/usr/bin/env bun
 /**
  * check-qa-result-links — no link to a QA result points where the result is
- * not. Bean `bejf`, issue #2217 (arc #1763).
+ * not.
  *
- * ## The defect it exists for
- *
- * Every QA panel on the site linked its result files as
- * `https://github.com/<repo>/blob/main/` + a path relative to the INSTANCE.
- * The owner found one on `/fr/` (`…/blob/main/test/results/translation-qa/…`,
- * a 404). The same renderer drew every panel in every family, so it was every
- * link. It was wrong twice: the path lacked `cat-harness/`, and a derived
- * result's record is the `qa-reports` branch, keyed by commit, not `main`.
- * The address now comes from ONE place, `cat-harness-tools/scripts/qa-result-link.ts`.
- * This gate keeps a second one from appearing.
- *
- * ## What it judges
+ * The forge address of a QA result comes from ONE place,
+ * `cat-harness-tools/scripts/qa-result-link.ts`; this gate keeps a second one
+ * from appearing.
  *
  * **Sources** (the default). Every tracked renderer and generator file, and
  * every committed page, is scanned for a forge URL of the form
  * `blob/main/<path>`. A finding is either of two cases:
  *
- * - `<path>` lies inside a `qa` directory that declares `storage`. Its record
- *   is the branch, so a `main` address is wrong BY DECLARATION. This is asked
- *   of `resolveQaLocation`, never of a hand-written list, so a directory moves
- *   when its declaration does, and one that does not declare storage keeps its
- *   `blob/main` links legitimately.
+ * - `<path>` lies inside a `qa` directory that declares `storage`: its record
+ *   is the `qa-reports` branch, so a `main` address is wrong by declaration
+ *   (asked of `resolveQaLocation`, never a hand-written list).
  * - `<path>` has a `test/results/` segment that no declared `qa` directory
- *   holds. That is the instance-relative defect: a path that is not in the
- *   repository at all.
+ *   holds: an instance-relative path that is not in the repository.
  *
  * **`--site <dir>`**, run after a site build. The same scan runs over the
  * built HTML, JS and JSON. On top of it, every published witness projection
@@ -35,15 +23,10 @@
  * `sidecarLinks`, because without them the panel shows no link. None of those
  * links may address a stored result on `main`.
  *
- * ## Four states
- *
- * `ok` 0, `finding` 1, `unknown` 2 (the declarations would not resolve, or
- * `--site` found no projection to judge), `error` 2. **An empty site is
- * UNKNOWN, never clean**: a build that published no witnesses has not shown
- * that its links are right. One exception: when the site's own
- * `assets/qa/availability.json` says `unavailable`, the empty set is
- * determined and already stated, and `qa-site-assets` keeps that from failing
- * a deploy. This gate does the same.
+ * Exit: `ok` 0, `finding` 1, `unknown` 2 (the declarations would not resolve,
+ * or `--site` found no projection to judge), `error` 2. An empty site is
+ * UNKNOWN, never clean, except when the site's own
+ * `assets/qa/availability.json` says `unavailable`.
  *
  * Usage:
  *   bun run cat check:qa-result-links                 # sources

@@ -2,18 +2,10 @@
  * Every ingested source document says what licence it came under, or says
  * that nobody could find out and where they looked.
  *
- * Owner, 2026-09-23 (issue #1023), when the WireGen paper (arXiv:2312.07755)
- * arrived with no licence in its PDF and every registry that would state one
- * was unreachable: *"Make qa report, no known source. Try to find"*.
- *
- * ## Three states, never two
- *
  * A library entry's `manifest.jsonld` may carry `licenceRecord` (beside the
- * `dcterms:license` it backs; `meta.licence` until finding D4). It is AUTHORED in
- * `licence.json` beside the entry and carried verbatim by `gen-library-jsonld`,
- * because the manifest is generated: a record written into it directly is
- * erased by the next regeneration (folio-assistant#1492).
- *
+ * `dcterms:license` it backs). It is AUTHORED in `licence.json` beside the
+ * entry and carried verbatim by `gen-library-jsonld`; never write it into the
+ * generated manifest.
  *
  * | `status`  | means                                                     | must carry |
  * |-----------|-----------------------------------------------------------|------------|
@@ -21,54 +13,23 @@
  * | `unknown` | somebody looked and could not establish it                | `searched`: one entry per place tried, with what it returned |
  * | (absent)  | nobody has recorded anything                              | nothing, and it is reported as such |
  *
- * `unknown` and absent are different facts. "We looked in five places and none
- * said" is a finding somebody can act on. "Nobody looked" is a gap. Folding
- * them together would make an entry that was searched for read the same as one
- * that was never considered.
- *
- * ## Reports, and fails only on a malformed record
- *
- * Almost no entry recorded a licence before this check existed. Gating on
- * absence would turn the corpus red for a field that did not exist yesterday.
- * So absence and `unknown` are REPORTED in the sidecar, and the check exits
- * non-zero only for a record that claims something it cannot back: `stated`
- * with no `basis`, or `unknown` with no `searched`. The same reasoning as
- * `check:methodology-evidence`: a citation that claims to resolve and does not
- * is worse than none.
- *
- * ## `--check` compares the committed sidecar and writes NOTHING (bean `i2kp`)
+ * `unknown` and absent are different facts and are reported apart. Both are
+ * REPORTED in the sidecar; the check fails only on a malformed record
+ * (`stated` with no `basis`, or `unknown` with no `searched`).
  *
  * Without `--check` this script is the WRITER of
- * `test/results/source-licence.qa-results.json`. It used to be the only form,
- * and CI ran it as the gate — so the gate rewrote the very record it should
- * have judged, the committed sidecar could be arbitrarily stale, and no gate
- * anywhere failed. Only the local runner's mutation guard noticed. `--check`
- * is the remedy `qaResultState`'s docblock prescribes: **compute and COMPARE,
- * never repair**. Each state is decided here, where it is decided:
- *
- * | state        | exit | why |
- * |--------------|------|-----|
- * | `current`    | 0    | the committed record is what the corpus produces |
- * | `stale`      | 1    | regenerate (`bun run cat check:source-licence`) and commit |
- * | `absent`     | 1    | nothing committed is nothing to compare — a vacuous pass otherwise (`dh4f`) |
- * | `unreadable` | 2    | the question could not be ASKED; 2 is this script's existing could-not-determine code |
- * | `unknown`    | 2    | the store could not say (bean `c8uq`: a fetch miss is never a pass); could-not-determine, as `unreadable` |
- *
- * `malformed` keeps exit 1 in BOTH modes: it gates on CONTENT, `--check` gates
- * on FRESHNESS, and folding one into the other would hide either.
+ * `test/results/source-licence.qa-results.json`.
  *
  * Usage:
  *   bun run cat check:source-licence            # report, write the sidecar (the author's command)
- *   bun run cat check:source-licence:check      # the gate: compare, write nothing
  *   bun run cat check:source-licence -- --json  # print the sidecar document
  *   bun run cat check:source-licence:check      # JUDGE: compute and judge, write nothing (the gate)
  *
- * Judge mode (`--check`, beans `bo44` and `i2kp`): 0 no malformed record · 1 a
- * malformed record · 2 no library entry found (could not determine), an
- * unknown flag, or the run threw. It judges the FRESH computation and writes
- * nothing; it does not gate on whether the committed sidecar is current,
- * because that copy leaves `main` with arc `3fva` (proposal §2.3). Staleness is
- * printed as an advisory instead — see `concludeJudgement`.
+ * Writer exit: 0 · 1 a malformed record · 2 no library entry found.
+ * Judge mode (`--check`): 0 no malformed record · 1 a malformed record ·
+ * 2 no library entry found (could not determine), an unknown flag, or the run
+ * threw. It judges the FRESH computation; staleness of the committed sidecar
+ * is printed as an advisory (see `concludeJudgement`), not gated.
  *
  * @module scripts/check-source-licence
  * @covers library, uploads

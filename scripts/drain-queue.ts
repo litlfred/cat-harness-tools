@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Build a bean drain's queue — the `drain-queue` Tool (cat-harness
- * `tools/drain-queue/`), skill `bean-drain` step 1, bean `n7x7`.
+ * `tools/drain-queue/`), skill `bean-drain` step 1.
  *
  * Reads every copy, merges them (newest `updated_at` wins, disagreements
  * listed), leaves out goals, epics, blocked, closed, drafts and owner-held
@@ -11,9 +11,9 @@
  * ## How a bean gets an owner
  *
  * A bean listed in `--holdings` goes to its holder. Otherwise it goes to the
- * owner holding a bean with the same parent, since that is the owner already
- * working in the area. Otherwise it is spare. This is a proposal: the queue
- * keeper moves beans by editing the holdings file and re-running.
+ * owner holding a bean with the same parent. Otherwise it is spare. This is a
+ * proposal: the queue keeper moves beans by editing the holdings file and
+ * re-running.
  *
  * It never claims. Every bean taken from the queue goes through
  * `bean-claim-check`.

@@ -1,18 +1,11 @@
 /**
  * Do the files a general node's PROSE names still exist?
  *
- * The arrow rule (data-modelling step 8) governs data: a reference is held by
- * the dependent. Prose is different. A process's documentation may say
- * "`feature-staging.yml` publishes the branch" to explain a step, and the
- * owner ruled (2026-09-24, bean `epbt`) that such explanations stay — they are
- * written for a reader, and stripping them loses the reason a step exists.
- *
- * What prose cannot do is notice a rename. A name that no longer resolves
- * reads as authoritative in every rendering and points nowhere, so this lists
- * each one. It is ADVISORY: it says a name went stale, not that naming it was
- * wrong.
- *
- * Four states, because collapsing any two would lie about one of them:
+ * A process's documentation may name a file to explain a step
+ * ("`feature-staging.yml` publishes the branch"); that stays, unlike a data
+ * reference (data-modelling step 8). But prose cannot notice a rename, so
+ * this lists each name that no longer resolves. It is ADVISORY: it says a
+ * name went stale, not that naming it was wrong.
  *
  * | state | means |
  * |---|---|
@@ -20,11 +13,6 @@
  * | `not-a-path` | a glob or a placeholder (`<slug>.md`, `*.bpmn`) — not checkable, not a finding |
  * | `undetermined` | a BARE name nothing here carries — a run's output (`qa.json`), a folio's file (`AtomicMass.lean`) or an example (`file.dmn`) as often as a stale one, and prose does not say which |
  * | `missing` | a path whose DIRECTORY is here and whose file is not — the one finding |
- *
- * Measured before the split into four: 13 "missing" over 144 names, of which
- * 11 were bare output, folio or example names and 2 were real — two proposals
- * `ig-incremental-build.bpmn` cites that do not exist. A check that cried
- * wolf eleven times in thirteen would be switched off (bean `77ex`).
  *
  * @module scripts/prose-names
  */

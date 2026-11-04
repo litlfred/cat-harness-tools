@@ -2,53 +2,19 @@
 /**
  * No rendered diagram label shows an XML character reference as literal text.
  *
- * ## What it measures, and why the SUBJECT is the SVG rather than the BPMN
+ * A BPMN `name` written `&amp;#10;` is DOUBLE-escaped: XML resolves it to
+ * `&#10;` and the renderer draws those five characters in the box.
  *
- * A BPMN `name` written `&amp;#10;` is DOUBLE-escaped. XML resolves it to the
- * five characters `&#10;`, and the renderer then draws them, so a reader sees
+ * The check reads the RENDERED SVG, not the `.bpmn`: it catches every
+ * spelling of a character reference that survives into drawn text, and it
+ * ignores `<bpmn:documentation>`, which is prose rather than a label.
+ * `render:bpmn:check` cannot catch this: it only asks whether the SVG is
+ * current, and the renderer faithfully draws the wrong text.
  *
- *     Dependency advisories&#10;(WARN-ONLY)
- *
- * inside the box. Measured 2026-09-26: 74 workflow SVGs, **6** carrying at
- * least one such label, **68** labels in all. Bean `li5y`.
- *
- * The check reads the RENDERED SVG on purpose. Two reasons, and the second is
- * the one that matters:
- *
- * 1. A grep over `.bpmn` for `&amp;#10;` finds the one form somebody already
- *    knows about. `&amp;#8212;`, `&amp;#x2014;` and every future variant are
- *    the same defect and would slip past it. What is wrong is a character
- *    reference surviving INTO the drawn text, whatever its spelling.
- * 2. A source-level check cannot tell a label from documentation.
- *    `docs-site-publish.bpmn` carries eight `&amp;#10;` and its SVG carries
- *    none — they are all in `<bpmn:documentation>`, which is prose on a page
- *    rather than text in a box. Those want a different remedy (`li5y` keeps
- *    them separate), and a check that conflated the two would demand the wrong
- *    fix for eight of them.
- *
- * ## Why `render:bpmn:check` cannot do this job
- *
- * It asks whether the committed SVG is what the renderer would produce. It was
- * GREEN across all 68 of these, and correctly so: the renderer faithfully
- * produced the wrong thing. Currency is not validity — the distinction
- * `check-artefact-verification` exists for, arriving in the diagrams. This
- * check asks about the OUTPUT's content, which is the question a reader has.
- *
- * ## Enforcement is a RATCHET
- *
- * Six files are already affected and fixing them is a corpus sweep with a
- * five-locale translation consequence (`li5y`). Failing on them would make
- * this the "check that cries wolf is a check somebody switches off" failure on
- * its first run. So known counts sit in a committed baseline and **anything
- * beyond them fails**: a new file, or an existing file gaining a label.
- *
- * Keyed on file AND count, unlike `check-layout-norms`' set of pair strings.
- * A file already on the list can gain a seventh bad label, and a presence-only
- * baseline would say nothing — the baseline must shrink, never drift.
- *
- * Removing labels is progress and is NOT a failure: it prints as fixed, and
- * `--update` rewrites the baseline so the diff somebody reviews is the
- * shrinking list. `code-quality-gates.svg` left the list that way.
+ * Enforcement is a RATCHET keyed on file AND count: known counts sit in a
+ * committed baseline and **anything beyond them fails** (a new file, or an
+ * existing file gaining a label). Removing labels prints as fixed; `--update`
+ * rewrites the baseline.
  *
  * Usage:
  *   bun run cat check:rendered-labels
@@ -57,8 +23,8 @@
  *   bun run cat check:rendered-labels:check          # JUDGE: compute and judge, write nothing (the gate)
  *
  * Exit: 0 clean (or only known labels), 1 a label beyond the baseline,
- *       2 could not determine — no SVG was read. Judge mode (`--check`, bean
- *       `bo44`) keeps the same table and adds 2 for an unknown flag or a run
+ *       2 could not determine — no SVG was read. Judge mode (`--check`)
+ *       keeps the same table and adds 2 for an unknown flag or a run
  *       that threw.
  *
  * @module scripts/check-rendered-labels

@@ -13,15 +13,9 @@
  * bun run cat-harness-tools/scripts/preview-record.ts compare --claimed <file> --rebuilt <file> [--slug <slug>] [--run <url>] [--out <file>]
  * ```
  *
- * ## Why (owner, 2026-11-01, Q-SPD-9 B and Q-SPD-9b A; folio-assistant#2881)
- *
- * An agent's session has the checkout and the tools in hand, so it can build
- * a preview itself and put it live at once, instead of waiting 25 to 50
- * minutes for a runner. The owner chose that for PREVIEWS ONLY (main and
- * release stay CI-built), checked by a FULL rebuild in CI afterwards, off the
- * critical path, rather than by a random sample: *"why random sample? what is
- * the intent?"*. A full rebuild is a complete check, with nothing left to
- * chance.
+ * An agent session may build a PREVIEW itself and put it live at once (main
+ * and release stay CI-built); CI then checks it by a FULL rebuild, off the
+ * critical path, compared through these records.
  *
  * ## What a record holds
  *
@@ -29,9 +23,8 @@
  *   the branch merged into its base, and a clean merge of the same two commits
  *   gives the same tree, so this is the one exact identity of "the same
  *   input". The head and base commits are kept beside it to rebuild from.
- * - `lock`: the sha256 of `index.lock.json`, so a re-pin is a different input
- *   even when someone hand-edits around it. (The tree already covers it; the
- *   field makes a mismatch readable.)
+ * - `lock`: the sha256 of `index.lock.json` (the tree already covers it; the
+ *   field makes a mismatch readable).
  * - `files`: every file of the built site, path to sha256, before
  *   `staging-share` prunes it. HTML is hashed after the per-preview edits
  *   are set aside ({@link normalisePreviewHtml}), so the record says the same
@@ -47,8 +40,7 @@
  *
  * Any other difference counts. When a writer turns out to stamp a time or a
  * run into its output, the fix is to make that writer reproducible, not to
- * add its file here: a file left out of the check is a file an agent build
- * could get wrong unseen.
+ * add its file here.
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";

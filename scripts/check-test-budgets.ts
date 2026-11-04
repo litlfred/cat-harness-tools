@@ -1,77 +1,20 @@
 /**
  * Which tests are closest to a timeout budget they never declared.
  *
- * Bean `sff8`. Four tests in this repository have timed out under load and every
- * one was found the same way: a red run on somebody's machine, with nothing in the
- * repository saying it was close. This names them instead.
+ * The population is tests that are **expensive AND silently inherit bun's
+ * 5000 ms default**. A test that passes an explicit budget (a third argument,
+ * read from the AST, never evaluated) is reported as `declared` and given no
+ * share.
  *
- * ## The distinction the whole tool rests on
+ * The share is a **ranking of exposure, not a prediction**: junit's `time`
+ * includes work the timeout does not count, so a share over 100 % does not
+ * mean the test will fail.
  *
- * A test's budget is **not** uniformly bun's 5000 ms default, and assuming it is
- * makes the measurement worthless. Measured 2026-09-27 on two loaded full-suite
- * runs: **12 cases exceeded 5000 ms and only 3 failed**; 10 exceeded it and only 1
- * failed. So at least nine tests run past the default and are correct, because they
- * pass an explicit budget — `declared-directory-resolves.test.ts` spawns a process
- * per module and passes `modules.length * SPAWN_BUDGET_MS`, running 22 s green.
- *
- * So the population is not "slow tests". It is tests that are **expensive AND
- * silently inheriting the default**, and separating those two requires reading the
- * source, not just the timings.
- *
- * ## Why the budget is read from the AST rather than evaluated
- *
- * A declared budget is an arbitrary expression — `modules.length * 600` — so its
- * VALUE is not statically knowable. It does not need to be. The only question is
- * whether the author budgeted this test at all, which is a question about the
- * presence of a third argument, and that the AST answers exactly. Anything with a
- * declared budget is reported as `declared` and never given a share, because
- * dividing its cost by 5000 would invent a number about a budget that is not 5000.
- *
- * ## Why this writes no sidecar
- *
- * Every other auditing tool here commits one, for a reason this file accepts:
- * a printed verdict cannot tell "never measured" from "measured clean". It does not
- * apply, because **a timing is a fact about the machine, not about the
- * repository.** Committing the milliseconds would pin this container's numbers as
- * the corpus's, which is the `3vc1` defect — a local environment recorded as a
- * repository invariant — and they would be wrong on the next runner and staler on
- * every commit after.
- *
- * `check:ci-health` already carries the precedent and the same reasoning: a fact
- * *about* the repository rather than one the repository *holds* is "asked externally
- * every run and cached nowhere".
- *
- * ## Why it is a report and not a pass/fail gate
- *
- * ~50 tests sit at half the default under load. A threshold gate would need all of
- * them acknowledged on day one, and declaring 50 exemptions nobody has read is the
- * empty exemption such a check exists to refuse (`xd1g` removed a gate for exactly
- * this). Whether CI should fail on this is a decision to take WITH the numbers, and
- * it is deliberately left open rather than settled here by whoever wrote the tool.
- *
- * ## A share over 100 % does NOT predict a timeout, and that is measured
- *
- * The obvious reading of this report is wrong, so it is stated before the usage.
- * In the loaded run of 2026-09-27 that timed out three tests, **four**
- * default-budget cases exceeded 5000 ms. The fourth,
- * `tests/tools/tools.test.ts:204` at **5.22 s**, declares no budget anywhere in its file
- * and **passed** — in that run and again at 4.23 s in the next.
- *
- * So junit's `time` and the quantity bun charges against the timeout are not the
- * same thing: `time` is the outer measurement and includes work the budget does not.
- * A share is therefore a **ranking of exposure**, not a prediction, and this tool
- * deliberately reports it as one. Treating >100 % as "will fail" would have made a
- * confident false claim about a passing test on the very run that motivated the
- * tool.
- *
- * What the ranking is still good for is the thing that was missing: the three
- * highest-share default-budget tests in that run were exactly the three that timed
- * out, and the next two names down the list are where the next failure comes from.
+ * It writes no sidecar: a timing is a fact about the machine, not the
+ * repository. It is a report, not a pass/fail gate.
  *
  * Exit codes: **0** when a report was produced, **2** when it could not be — a
- * missing report, zero cases, or source that would not parse. Never 1: nothing here
- * is a defect in this repository's source (`nytj`). Zero cases is exit 2 rather than
- * a clean run over nothing (`6tkl`).
+ * missing report, zero cases, or source that would not parse. Never 1.
  *
  * Usage:
  *   bun test --reporter=junit --reporter-outfile=/tmp/junit.xml

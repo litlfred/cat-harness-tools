@@ -1,100 +1,37 @@
 #!/usr/bin/env bun
 /**
- * A path to an instance's declaration is built from `RETIRED_DECLARATION`,
- * not from a string literal.
+ * No path or message still names the RETIRED declaration file,
+ * `harness.json`; `<name>.config.json` is the single declaration at an
+ * instantiation root.
  *
- * Bean `jijc`, under the owner's REPLACE ruling on `b5f0` (2026-09-21):
- * `<name>.config.json` becomes the single declaration at an instantiation
- * root and `harness.json` goes, with `bootstrap/` and the
- * `folio-assistant-*` instances in scope.
+ * ## What FAILS
  *
- * ## The defect this exists for
+ * - **A path literal**: a quoted string literal whose whole value is the
+ *   retired filename (or a template literal building a path to it), in a
+ *   non-test `.ts` file, outside the definition site. Matching the *whole*
+ *   literal keeps this free of judgement: prose is never a whole-string
+ *   literal.
+ * - **A user-visible string**: the retired name, as a whole token, in a
+ *   NON-comment line of a non-test `.ts` file that is not a path (a log
+ *   line, a thrown `Error`, a tool description). An operator reads it and
+ *   looks for the file, so name the file actually used (a computed path, or
+ *   `<name>.config.json`), or the Jekyll file by its `_data/` path. This
+ *   fails outside the owning instance too.
+ * - **A workflow `use`**: {@link classifyWorkflowLine} splits each `.yml`
+ *   line into `prose` (reworded by a rename), `jekyll-data` (must never be
+ *   renamed) and `use`, which fails.
+ * - **A Markdown `use`**: a skill tells a reader where to look, so prose
+ *   naming the retired file fails unless it is `jekyll-data`, a `record`
+ *   under a declared historical directory, `generated`, or `historical` (the
+ *   same paragraph names the current declaration beside it).
  *
- * `RETIRED_DECLARATION` has been exported from `schemas/kg/cat-harness.ts` the
- * whole time, and call sites built the path from a literal instead. That is
- * not a style complaint. A constant nothing uses is a constant that does not
- * do its job: the rename it exists to make cheap costs a hand-edit at every
- * one of them, and the next site somebody adds costs another.
+ * ## COUNTED, not failed
  *
- * *Measured 2026-09-21, and left as a dated observation rather than a
- * present-tense claim* (bean `8nzu`, whose whole subject is a provenance
- * number read later as guidance): **20 non-test bypasses across 10 files** —
- * 18 inside this instance, 2 outside it. **Run the check for today's figure;
- * do not quote this one.**
- *
- * The substitution is a morning's work. **Without this check it regresses the
- * first time anyone types the filename**, which is why the check came first
- * and the substitution second.
- *
- * ## What FAILS, and why the rule is definitional rather than a guess
- *
- * > A quoted string literal whose whole value is the declaration filename, in
- * > a non-test `.ts` file, outside the constant's own definition.
- *
- * Matching the *whole* literal is what keeps this free of judgement. A path is
- * built by `join(root, "harness.json")` — the filename is the entire string.
- * Prose that happens to mention the file is never a whole-string literal; it
- * is a sentence.
- *
- * ## What else FAILS: a user-visible string naming the retired file
- *
- * > The retired name, as a whole token, in a NON-comment line of a non-test
- * > `.ts` file that is not a path (a log line, a thrown `Error`, a tool
- * > description, any message string).
- *
- * Owner ruling, 2026-10-20 (bean `k8rc`, option 1). The `prose` exemption's
- * argument, *"a rename REWORDS these"*, is right for a doc comment beside the
- * code it describes and wrong for output: a log line or an error message is
- * read by an operator who then goes and looks for the file it names. `k8rc`
- * measured 40 of them pointing at a file that no longer exists, fixed them,
- * and this class keeps the count at zero. It is not a constant-substitution
- * rule: the fix is to name the file actually used (a computed path, or
- * `<name>.config.json`), or the Jekyll file by its `_data/` path.
- *
- * Unlike a bypass, it fails OUTSIDE the owning instance too: a message needs
- * no import to be right, so the boundary reason below does not apply to it.
- *
- * ## Three classes are COUNTED and do not fail, each for a stated reason
- *
- * | class | today | why not a failure |
- * |---|---|---|
- * | prose — the name inside a doc comment | see report | a rename REWORDS these; it does not substitute a constant into them |
- * | test fixtures | counted, see report | **a judgement, not a measurement.** A fixture writing `join(root, "harness.json")` is constructing the file the code under test looks for. Route it through the constant and the test passes vacuously after a rename — the fixture moves with the code and nobody learns the contract changed. Pinning is defensible; so is the hand-edit count being unacceptable. `jijc` carries the call as an open item rather than this check deciding it silently |
- * | template literals building a path | 0 on 2026-09-21 | measured, not assumed: every backtick occurrence in this corpus is message text. Implemented anyway and proven against a planted case, because "zero today" is not "impossible" |
- *
- * ## What it does NOT catch, stated because a checker that hides its blind
- * spots is worse than none
- *
- * **Non-TypeScript readers used to be a blind spot and are not one now.** A
- * `.yml` cannot import a constant, so the TypeScript rule does not transfer —
- * but "cannot import a constant" was doing double duty as "cannot be wrong",
- * and those are different claims. The YAML side had ONE bucket, *does the file
- * contain the string*, against the TypeScript side's careful four, and the
- * asymmetry hid two things at once:
- *
- *   - `run: cat cat-harness/harness.json` — a step that reads a file which no
- *     longer exists — was reported under `✓ no call site names the retired
- *     name`, exit 0. **Measured by planting exactly that line**, before any of
- *     this was written.
- *   - the count was per FILE, so a second occurrence in an already-counted
- *     file did not move the number either.
- *
- * {@link classifyWorkflowLine} gives it the same three-way split the
- * TypeScript side has, and a `use` now FAILS. `prose` is reworded by a rename,
- * exactly as on the TypeScript side; `jekyll-data` must never be renamed at
- * all, which is the one thing a bare count most needed to say and could not.
- *
- * **Call sites outside the instance that owns the constant.** Measured: two,
- * both in the content core's `schemas/library-ref.ts`, and
- * the content core imports **nothing** from `cat-harness` today. Making
- * these use the constant would create this repository's first cross-instance
- * code dependency, and giving core its own copy would make two constants —
- * which is the defect this check exists to stop, one layer up.
- *
- * That is a boundary decision belonging to the split (`vke6`), not to a
- * refactor, so they are **counted and not failed**. Silently excluding them
- * would be the `dh4f` shape: a consumer reporting a clean run over something
- * it never examined.
+ * | class | why not a failure |
+ * |---|---|
+ * | prose — the name inside a doc comment | a rename REWORDS these; it does not substitute a constant into them |
+ * | test fixtures | a fixture writing `join(root, "harness.json")` constructs the file the code under test looks for; routing it through a constant would make the test pass vacuously after a rename. An open judgement, not decided here |
+ * | path literals outside the owning instance | making them use the constant would add a cross-instance code dependency, and a second copy would be two constants; a boundary decision, so counted rather than silently excluded |
  *
  * @covers cat-harness
  */

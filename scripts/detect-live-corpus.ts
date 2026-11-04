@@ -3,25 +3,11 @@
  * detect-live-corpus.ts — does a generator's COMMITTED OUTPUT change when
  * gitignored content is present?
  *
- * ## The question everything before this could not answer
- *
- * `xd1g` converted twelve scanners from filesystem walks to git's corpus, and
- * `qrlc` three more. Every one of those was verified at the CORPUS level: the
- * files it stopped reading are gitignored, and it lost nothing. That is a real
- * check and it is not the one that matters.
- *
- * A sibling session put the objection precisely: counting walks counts a
- * SHAPE, not an EFFECT. Across `xd1g`'s lifetime exactly one scanner was ever
- * measured live — `kg-detangle`, 233 nodes read as 1443 — and a sweep of
- * shapes risks being *"unfalsifiable work: no test could show it fixing
- * anything."* They proposed this detector instead, and they were right that it
- * is the layer above.
- *
  * LIVE means the artefact a contributor commits depends on what is installed
  * on their machine. LATENT means the walk is contaminated and a later filter
- * happens to save it. Only the first is a defect somebody can see.
+ * happens to save it. Only the first is a visible defect.
  *
- * ## How it decides, and why it needs no roster
+ * ## How it decides
  *
  * Twice per writer, with the tree restored between:
  *
@@ -29,37 +15,26 @@
  *   2. plant gitignored content, run it again, record what it changed
  *
  * Different change-sets ⇒ LIVE. The comparison is `git status` plus the
- * content of each changed path, so nothing here needs to know where a writer
- * puts its artefact. That matters beyond convenience: a table of
- * writer→artefact would be one more list kept by hand beside the thing it
- * tracks, which is the class `qrlc` has now paid for three times (a dead
- * `SKILLS_CATEGORIES` key, stale `coverage.visualiser` refs, and this file's
- * own sibling census keeping a hardcoded helper roster).
+ * content of each changed path, so no writer→artefact table is kept. The
+ * writers are derived too: a `package.json` script `X` is a writer when
+ * `X:check` also exists.
  *
- * The writers are derived too: a `package.json` script `X` is a writer when
- * `X:check` also exists. 62 of them today, and a new one is covered the day
- * it is added.
+ * ## Where it plants
  *
- * ## Where it plants, and why two places
- *
- * `_kg/` — gitignored at the repository ROOT. This is what `biz4` measured:
- * top-level discovery admitting a directory a clean checkout does not have.
+ * `_kg/` — gitignored at the repository ROOT: top-level discovery admitting a
+ * directory a clean checkout does not have.
  *
  * `cat-harness/schemas/block-qa-schema/dist/` — gitignored INSIDE a declared
- * graph directory. A scanner that reads only declared directories never sees
- * the first site and does see this one; it is the exact shape that took
- * `cat-harness/schemas` from 227 nodes to 1441.
+ * graph directory, which a scanner reading only declared directories still
+ * sees.
  *
  * Both are existing ignored trees, so planting adds nothing tracked and
  * `git status` stays clean throughout.
  *
- * ## LATENT is never a proof, and the report says so
+ * ## LATENT is never a proof
  *
- * A writer is latent *for the content planted here*. A different plant — a
- * different extension, a different directory — could still reach it. The
- * output states that rather than implying a clearance, because "measured
- * clean" and "not reached by this probe" are different facts and this can only
- * establish the second.
+ * A writer is latent only *for the content planted here*; a different plant
+ * could still reach it, and the report says so.
  *
  * Usage:
  *   bun run detect:live-corpus                  # every derived writer

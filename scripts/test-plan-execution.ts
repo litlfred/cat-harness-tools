@@ -1,6 +1,6 @@
 /**
  * Test plan execution engine — dynamically resolves and evaluates per-plan
- * exit criteria DMN tables (bean `folio-assistant-4iey`, follow-up from `3o5b`).
+ * exit criteria DMN tables.
  *
  * `test-plan/v1` allows a plan to declare its own `exitCriteria.decision`
  * table reference (e.g. `path/to/custom.dmn#Decision_Custom`).

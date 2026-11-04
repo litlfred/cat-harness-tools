@@ -1,114 +1,48 @@
 /**
  * Which gate CHANGED THE REPOSITORY while it was being judged.
  *
- * ## The defect this exists for
- *
- * `bun run cat gates` runs its gates in order, and the FIRST is `bun test`; somewhere
- * in that suite the detangle WRITER runs and repairs
- * `test/results/detangle/**.detangle.json`. `kg:detangle:check` is near the end,
- * ~1140 lines of output later, and it reads the file the first gate just
- * repaired. (No count here on purpose: this said "152 gates" while the set was
- * 170, and the gap between the two is the argument.)
- *
- * Measured on one tree with `internal` deliberately stale (bean `ymsu`):
+ * `bun run cat gates` runs `bun test` first, and somewhere in that suite the
+ * detangle WRITER repairs `test/results/detangle/**.detangle.json`;
+ * `kg:detangle:check`, near the end, then reads the repaired file:
  *
  *     bun run cat kg:detangle:check   alone      ->  exit 1, "STALE … — internal"
- *     bun run cat gates               same tree  ->  exit 0, "152 gate(s) pass"
+ *     bun run cat gates               same tree  ->  exit 0, "every gate passed"
  *
- * The checker is not broken — run alone it catches the defect exactly as
- * designed. What is broken is that inside `gates` its subject no longer exists
- * by the time it looks. All 28 pinned measurements sit in that blind spot, and
- * three separate artefacts reached `main` carrying wrong values through it.
+ * No gate can observe what another gate did; only the runner loop sees
+ * between them, so the guard lives there and knows nothing about any one
+ * gate.
  *
- * ## Why the answer lives in the RUNNER and cannot live in a gate
+ * ## The predicate is a per-gate delta, not "the tree is dirty"
  *
- * No gate can observe what another gate did. That is not an oversight in any
- * individual check; it is the definition of the blind spot. Only the loop that
- * invokes them sees between them, so this is the one place the question can be
- * asked at all.
+ * Running `gates` on your own uncommitted work is the normal case. The
+ * question is *"did a gate change a path it did not find changed when it
+ * started?"*; your own edits are in the baseline and stay there. A generator
+ * rewriting IDENTICAL BYTES does not show up in `git status`, so the guard
+ * fires exactly when a gate's write changed a committed artefact. One
+ * `git status --porcelain` per gate is nearly free against a run of minutes.
  *
- * It is also why this is the general fix rather than a fourth answer: it knows
- * nothing about detangle, about tile counts, or about dashboards. It would have
- * caught all three of `ymsu`'s instances, and the `327 -> 345` bean badge that
- * went stale again five beans later, without being told any of them existed.
+ * ## Raw porcelain lines are the key
  *
- * ## The predicate is NOT "the tree is dirty"
- *
- * Running `gates` on your own uncommitted work is the normal case — it is what
- * you do before pushing. A guard that failed on a dirty tree would be wrong and
- * hostile, and it would be switched off within a day.
- *
- * So the question is *"did a gate change a path it did not find changed when it
- * started?"* — a per-gate delta, never an absolute state. Your own edits are in
- * the baseline and stay there.
- *
- * ## Why this is green on a healthy tree, which is what makes it shippable
- *
- * A generator rewriting IDENTICAL BYTES does not show up in `git status`.
- * Measured 2026-09-26 on a clean `main`: a full `bun test` left the tree
- * byte-identical. So the guard fires exactly when a gate's write CHANGED
- * something — which is to say, exactly when a committed artefact was stale and
- * the gate that checks it was about to be handed the repaired copy.
- *
- * Cost, measured rather than assumed before choosing per-gate over
- * once-per-run: `git status --porcelain` over this repository's 13,529 tracked
- * files is **~29ms** (five runs: 29, 27, 29, 27, 29). At the 152 gates of the
- * day that was ~4.4s, and the conclusion does not depend on the count — it is
- * one snapshot per gate against a run of several minutes. So attribution — the
- * part that turns "the tree changed" into "the first gate changed what the last
- * one reads" — is nearly free.
- *
- * ## Raw porcelain lines are the key, on purpose
- *
- * Git quotes paths containing special characters and writes renames as
- * `R  old -> new`, so a parser that wants the real path has to unquote C-style
- * escapes and split on an arrow that may legally appear in a filename. None of
- * that is needed here: to notice that a snapshot CHANGED, the line git printed
- * is already a stable key, and to report it, the line git printed is already
- * what a reader wants to see. The only field read out of it is the two-char
- * status code, which is fixed-width and needs no parsing.
- *
- * A parser this code does not contain is a parser that cannot be wrong.
+ * To notice that a snapshot CHANGED, and to report it, the line git printed
+ * is already the right key, so quoted paths and `R  old -> new` renames need
+ * no parsing. The only field read out of it is the fixed-width two-char status
+ * code.
  *
  * ## Known limitation: do not CHANGE the tree while the gates run, by any means
  *
- * The snapshots are of the working tree as git reports it, so anything that
- * moves a porcelain line during a run moves the thing being measured, and this
- * code will attribute it to whichever gate happened to be running — a finding
- * that names an innocent gate.
+ * Anything that moves a porcelain line during a run is attributed to
+ * whichever gate was running — a finding that names an innocent gate. That
+ * includes git operations (`git add` turns `??` into `A ` and ` M` into
+ * `M `; a commit makes entries vanish) and an ordinary editor write to a
+ * tracked file. It is documented rather than defended against: the only safe
+ * defence is to void the run. Commit before the run or after it.
  *
- * **Git operations are one way.** `git add` turns `??` into `A ` and ` M` into
- * `M `; a commit makes those entries vanish entirely. Found the honest way,
- * 2026-09-26: the session writing this guard wanted to commit it mid-run and
- * realised it would fabricate the finding it was trying to measure.
- *
- * **An ordinary write to a tracked file is another, and this section named only
- * the first until it fired that way.** Measured 2026-09-27: an agent appended a
- * paragraph to a bean file while a background `gates` run was in flight, and the
- * run ended *"every gate passed, and the run is NOT clean — 1 gate(s) changed
- * the tree"*, attributing ` M beans/defs/…-9v4m….md` to `bun test`. Nothing was
- * wrong with `bun test` and no git command had been run. The heading said
- * *"do not run git"*, the agent had not run git, and it read the finding as a
- * gate's defect before checking.
- *
- * The condition is therefore not "a git operation" but "a tree change from
- * outside the gate", and an editor write is the easier one to commit by
- * accident, because it does not feel like operating on the repository at all.
- *
- * It is documented rather than defended against, and the reason is that the
- * defence is worse than the disease. Detecting "did HEAD or the index move?"
- * means reading `.git/HEAD` and the index mtime between gates and deciding what
- * to do about a change — and the only safe answer is to void the run, which
- * hands every reader a could-not-determine in exchange for a case that only
- * arises when somebody edits the repository while judging it. Commit before the
- * run or after it.
- *
- * **Partly narrowed since bean `v3nf`.** The runner records when each gate ran,
- * and each changed path's mtime is checked against those windows: a write that
- * landed while NO gate was running is reported as an outside change rather
- * than pinned on a gate, and a write inside a parallel batch names only the
- * gates running at that instant. An outside write made DURING a gate still
- * names the gate — see {@link attributeWrite}.
+ * The runner records when each gate ran, and each changed path's mtime is
+ * checked against those windows: a write that landed while NO gate was
+ * running is reported as an outside change rather than pinned on a gate, and
+ * a write inside a parallel batch names only the gates running at that
+ * instant. An outside write made DURING a gate still names the gate — see
+ * {@link attributeWrite}.
  */
 
 import { spawnSync } from "node:child_process";

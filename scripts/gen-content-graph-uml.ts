@@ -3,19 +3,11 @@
  * A paper's block graph as UML: chapters as packages, one box per block,
  * editorial and formal edges drawn apart, and each block filled by its
  * formalization status. The `graph-rendering` skill applied to papers and to
- * Lean proofs at once (issue #1137, beans `o3p3` and `ukfw`).
+ * Lean proofs at once.
  *
- * Owner, 2026-09-23: *"make skill that applies to graphs in general.... then
- * apply to papers, shcemas, math proofs/lean etc"*.
- *
- * ## Why one generator for papers AND Lean
- *
- * `buildContentGraph` already holds both relations over the same nodes:
- * `editorial` edges from `uses[]` and `interprets` (what a READER needs first)
- * and `formal` edges from the Lean dependency cache (what the PROOF needs). The
- * two drawings it replaces each re-parsed the sources on their own
- * (`content-graph-analysis.py` for blocks, `generate_dependency_graph.py` for
- * Lean), neither drew the other's edges, and neither had a staleness check.
+ * `buildContentGraph` holds both relations over the same nodes: `editorial`
+ * edges from `uses[]` and `interprets` (what a READER needs first) and
+ * `formal` edges from the Lean dependency cache (what the PROOF needs).
  *
  * The relations stay distinct (rule 4): editorial is solid and black, formal is
  * dashed and purple, and neither is ever derived from the other. `uses[]` is
@@ -34,8 +26,7 @@
  *   bun run cat-harness-tools/scripts/gen-content-graph-uml.ts --root <content dir> --out <dir> \
  *     [--status proof-objects.json] [--check]
  *
- * The platform carries no paper, so it is run from a folio, against that
- * folio's content directory.
+ * Run it from a folio, against that folio's content directory.
  *
  * @module scripts/gen-content-graph-uml
  */

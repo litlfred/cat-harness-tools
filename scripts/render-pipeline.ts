@@ -3,20 +3,7 @@
  * render-pipeline.ts — the repository's renders, in the order their
  * dependencies imply, with the failure policy declared per step.
  *
- * ## The order is the owner's, and it is two stages rather than one
- *
- * Asked where the README render belongs, 2026-09-20:
- *
- * > bootsterap rended in main as exception. json/jsonld rendered last as
- * > intermeridaay renderes may add to dynamic KG. means maybe two stage
- * > rendering.... current state of KG renderered as json/jsonld failuer =
- * > fatal, readme updated faliure = fatal , dynamic parts (kg vierwe,
- * > visaluzers, etc) render in flattened depndency order, failures =
- * > skip/log/qa or so. dynamic content then hets get json/jsonld export
- * > avaiable under cat-harness/state.jsonld or so
- *
- * Two exports, not one, and that is what resolves the apparent contradiction
- * in "json/jsonld first" and "json/jsonld last": they are different documents.
+ * ## Two exports, three stages
  *
  * | stage | what it renders | on failure |
  * |---|---|---|
@@ -24,31 +11,25 @@
  * | 2 | the dynamic parts: viewers, visualisers, doc pages, diagrams | skip + log |
  * | 3 | the dynamic state, exported once the stage-2 renderers have contributed | fatal |
  *
- * **Stage 1 is fatal because everything downstream is derived from it.** A KG
- * that does not render is not a degraded build, it is an unknown one, and a
+ * **Stage 1 is fatal because everything downstream is derived from it**: a
  * README generated from a half-read graph states a wrong fact in the file a
  * reader opens first. **Stage 2 is not fatal** because a missing visualiser
- * costs one rendering and nothing else — the `skip/log/qa` the owner asked
- * for. That policy lives on each {@link OrderedStep}, not in this runner: see
- * `dependency-order.ts` for why.
+ * costs one rendering and nothing else. That policy lives on each
+ * {@link OrderedStep}, not in this runner: see `dependency-order.ts` for why.
  *
  * ## Bootstrap is the exception, and it is declared as one
  *
- * *"bootsterap rended in main as exception"* — bootstrap renders before
- * the graph is read at all, because it is what an agent reads when no harness
- * is installed and therefore cannot depend on one having rendered. It is the
- * same exemption `check:subgraph-coverage` already grants it from the
- * `visualiser` criterion, and it is a SECOND criterion rather than a hole:
- * bootstrap owes its own .json/.jsonld instead.
+ * Bootstrap renders before the graph is read at all, because it is what an
+ * agent reads when no harness is installed. It is the same exemption
+ * `check:subgraph-coverage` grants it from the `visualiser` criterion, and it
+ * is a SECOND criterion rather than a hole: bootstrap owes its own
+ * .json/.jsonld instead.
  *
  * ## What this file is NOT
  *
  * It is not a second CI workflow. `docs-site.yml` remains what publishes; this
- * declares the ORDER and the policy in one readable place, runs it locally,
- * and gives CI one thing to call per stage. A pipeline order that exists only
- * as the sequence of steps in a YAML file is an order nobody can test — and
- * this repository has a bean (`xom7`) about exactly what a workflow's
- * behaviour costs when the repository holds no statement of it.
+ * declares the ORDER and the policy in one readable, testable place, runs it
+ * locally, and gives CI one thing to call per stage.
  *
  * @module scripts/render-pipeline
  */

@@ -1,28 +1,23 @@
 #!/usr/bin/env bun
 /**
- * The site has a landing page that was DECIDED, not guessed (issue #1904).
+ * The site's landing page (the instance published at `/`) is decided, not
+ * guessed.
  *
  * @module scripts/check-landing-instance
  * @covers cat-harness — the instance axis: which instantiated harness the published site puts at `/`
  *
- * The owner's ruling, 2026-10-02, verbatim:
+ * Rule: the chosen instance's `<name>.config.json` carries
+ * `"site": { "landing": true }`. If exactly one harness is instantiated it is
+ * the landing page and needs no flag. Several and none flagged fails; more
+ * than one flagged gives a neutral hub listing the harnesses.
  *
- * > "Flag it, with a default (recommended). The chosen instance's own
- * > `<name>.config.json` carries `"site": { "landing": true }`. If exactly one
- * > harness is instantiated, it is the landing page and no flag is needed.
- * > That covers [a single-IG repository]. If there are several and none is flagged, a gate
- * > fails. If more than one is flagged, then neutral hub with listing of
- * > harnesses, todos,"
- *
- * This is that gate. The resolution is `resolveLandingInstance` in
- * `schemas/kg/harness-config.ts`, the only reader of the flag; this script
- * reports its answer and fails on `ambiguous`. `none` passes: a checkout with
- * nothing instantiated has no site landing to decide, and failing there
- * would make every bare fixture red.
+ * The resolution is `resolveLandingInstance` in `schemas/kg/harness-config.ts`,
+ * the only reader of the flag; this script reports its answer and fails on
+ * `ambiguous`. `none` (nothing instantiated) passes.
  *
  * It also reports every legacy `<name>.config.json` an index entry still
- * imports ({@link legacyImports}, bean `ymvt`): a pending migration is said,
- * a file that disagrees with its entry fails.
+ * imports ({@link legacyImports}): a pending migration is reported, a file
+ * that disagrees with its entry fails.
  *
  * Exit codes: 0 decided (an instance, a hub, or nothing instantiated) · 1
  * several harnesses and none flagged, a config that cannot be read, or a

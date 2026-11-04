@@ -6,44 +6,16 @@
  * @graphNode none — a checker over the `bean-defs` graph
  * @covers bean-defs
  *
- * The `@covers` line is required by bean `3srh`, which landed on `main` after
- * this branch forked: every gate in the CI set declares which graph typology it
- * audits, or declares `none`. Without it `audit:coverage:require-all` counts
- * this gate as "has NOT said", and every kind it actually audits reads as
- * uncovered — so the report's "unaudited" figure becomes an upper bound rather
- * than a verdict. `bean-defs` is what it reads: `readBeans` and
- * `resolveBeanDefs`, per the imports below.
+ * It reuses `readBeans`, `resolveBeanDefs`, `hasExpiry` and `beanFindings`
+ * from `scripts/beans.ts` rather than restating them. `beanFindings` emits
+ * **`blocked-without-expiry`**, but its other consumer, `gen-docs-pages.ts`,
+ * only publishes it; this is what FAILS.
  *
- * ## What was already here, and what was missing
+ * There is no `status: blocked`: `beans update --status` accepts only
+ * in-progress, todo, draft, completed and scrapped (`BeanStatusSchema`). A
+ * block is declared with a `## Blocked on` section.
  *
- * Almost all of this existed. `scripts/beans.ts` carries `readBeans`,
- * `hasExpiry` and `beanFindings`, and `beanFindings` already emits
- * **`blocked-without-expiry`** — firing on 4 of the 4 beans that hold a
- * relation-block. This module imports all three rather than restating any:
- * two answers to "where are the beans" or "does this bean state an expiry"
- * would be two answers free to disagree, which is the defect this repository
- * keeps paying for.
- *
- * **What was missing is that nothing FAILS.** `beanFindings`' only consumer is
- * `gen-docs-pages.ts`, which publishes it to a docs page. A finding that
- * reaches a page nobody is required to read is a finding with no teeth, and
- * `blocked-without-expiry` firing on 100 % of its subjects for as long as it
- * has existed is what that looks like.
- *
- * ## And the reason compliance was zero: the prescribed form did not parse
- *
- * `bean-blocking.md`'s worked example said to write **`status: blocked`**.
- * That status does not exist — `beans update --help` accepts *"in-progress,
- * todo, draft, completed, scrapped"*, and `BeanStatusSchema` is the same five,
- * describing itself as *"Exactly what `beans update --status` accepts"*.
- *
- * Measured over the 99 in-progress beans on `main`, 2026-09-22: **0** carried
- * `expires`, **0** carried `status: blocked`, **4** asserted a block
- * structurally (a `## Blocked on` heading, invented independently by those
- * four), and **26** used blocking language in prose only. A prescribed form
- * the tool refuses is a rule with a **0 % compliance ceiling**. Bean `zldg`.
- *
- * ## What this gates, and what it deliberately only reports
+ * ## What this gates, and what it only reports
  *
  * | shape | treatment |
  * |---|---|
@@ -51,17 +23,8 @@
  * | a relation-block with no expiry (`beanFindings`) | surfaced on every run |
  * | blocking language in prose only | counted, never failed |
  *
- * **Prose is not gated, and that is not timidity.** The corpus contains
- * *"page wiring is genuinely blocked"* beside *"this unblocked `68dt`"* and
- * *"the block was re-measured and is still real"* — one asserts a block, one
- * retracts one, one reports on another's. A gate firing on the word would go
- * red on beans that are not blocked, and **a gate nobody can keep green is a
- * gate that gets switched off** — the argument `check-secret-leaks` used to
- * reject entropy scanning on this same corpus.
- *
- * So the structured form is enforceable and the prose is visible. That split
- * is the point: it gives a block a way to be checkably stale, without
- * pretending to adjudicate the ones that are not.
+ * Prose is not gated: the same words assert, retract or report on a block,
+ * so a gate firing on them would go red on beans that are not blocked.
  *
  * Usage:
  *   bun run cat check:bean-blocks

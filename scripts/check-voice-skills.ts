@@ -6,29 +6,9 @@
  * @covers voices, skills
  * @graphNode none — a checker over the voices graph
  *
- * ## The promise this makes good on
- *
- * `schemas/content/voice-skill.ts` has said, since the day it was written:
- *
- * > **No field serves two of those by restatement.** The instruction body must
- * > not enumerate rules … `check:voice-skills` enforces it.
- *
- * **It did not exist.** Bean `n8br`. Four `SKILL.md` files repeat the claim in
- * their own prose, so the promise was made in five places and kept in none.
- *
- * That is worse than an unstated rule in one specific way: an absent gate
- * nobody was told about leaves a reviewer reading carefully, while an absent
- * gate a doc comment promises leaves them reading PAST. The same shape as a
- * stale `AGENTS.md` entry, which this repository has paid for repeatedly.
- *
- * ## What restatement IS, and the four ways it gets in
- *
- * A rule lives in `voice.json` with the page and the quote it was read from,
- * and with the patterns a checker runs. Copied into `SKILL.md` as prose it
- * arrives with **neither** — an uncited assertion beside a cited one, free to
- * drift, and the uncited copy is the one a drafter reads first.
- *
- * So four signals, one per way a rule leaks across:
+ * Enforces the rule in `schemas/content/voice-skill.ts`: a rule lives in
+ * `voice.json` with its cited page, quote and checker patterns; copied into
+ * `SKILL.md` as prose it loses its citation and is free to drift.
  *
  * | signal | what it catches |
  * |---|---|
@@ -37,27 +17,13 @@
  * | the citation's **quote** | the source passage moved into the prose |
  * | a **terminology pair**, both sides | "write X, never Y" lifted out of the data |
  *
- * ## Why this can be mechanical at all
+ * This works mechanically because rule titles are specific editorial claims
+ * (*"-ize, not -ise"*) while instructions describe what an actor does.
  *
- * Because the two halves are not written in the same register. A rule title is
- * a specific editorial claim — *"-ize, not -ise"*, *"Roman numerals for the
- * front matter, Arabic for the body"* — and instructions are about what an
- * actor DOES. Measured 2026-09-21 over the four voices this repository ships,
- * 37 rules: **zero hits on any of the four signals**. A check that fires on
- * every one of its subjects is a check that is wrong, and so is one that can
- * never fire — the falsification below is what separates them.
- *
- * ## The structural half
- *
- * A voice declaring `$schema: "folio-voice-skill/v1"` promises an
- * `instructions.file`. That the file RESOLVES is checkable and Zod cannot
- * check it, which is the same gap `check:declared-assets` fills one level up.
- *
- * **A voice that promises NOTHING is not missing anything.** A bare
- * `folio-voice/v1` profile may carry no instruction body at all — its guidance
- * may be a separate skill it cites — and `voiceFilesIn` reads that layout
- * deliberately. This check asked every voice for a `SKILL.md` until
- * 2026-09-21, which made a legitimate shape CRITICAL.
+ * Structural half: a voice declaring `$schema: "folio-voice-skill/v1"`
+ * promises an `instructions.file`, and that file must RESOLVE. A bare
+ * `folio-voice/v1` profile may carry no instruction body (`voiceFilesIn`
+ * reads that layout) and is not missing anything.
  *
  * Usage:
  *   bun run cat check:voice-skills

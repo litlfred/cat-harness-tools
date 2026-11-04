@@ -9,27 +9,22 @@
  *   [--root main] [--title "Draft for Public Comment v0.9"] [--map PC/v0.9/line-map.json]
  * ```
  *
- * ## Why
- *
- * A public comment draft is cited as "page 22, lines 618-624". Those numbers
- * must be the same for everyone who reads the draft, and the comment sheet,
- * the form and the triage all key on them. The DPI-H draft got them from
- * Word. A folio document has no Word layout, so this script makes them.
+ * A public comment draft is cited as "page 22, lines 618-624", and the comment
+ * sheet, the form and the triage all key on those numbers, so they must be
+ * the same for every reader.
  *
  * ## How
  *
  * The page is laid out in Chromium at the PDF's own content width, with print
  * styles on. Each line start of the document's text is found from the layout
- * (a text range's rectangle moves down), and the first letter of the line is
- * wrapped in a marker. The marker carries its number and draws it in the
- * left gutter. Because the marker is inside the line, it moves with the line
- * when the page breaks, so the printed number is always beside its own line.
- * The marker wraps the line's first letter, and a letter in its own inline
- * adds no break opportunity, so the line breaks do not change.
+ * (a text range's rectangle moves down), and the line's first letter is
+ * wrapped in a marker that draws its number in the left gutter. The marker
+ * moves with its line across page breaks, and a single-letter inline adds no
+ * break opportunity, so the line breaks do not change.
  *
- * Numbering runs through the whole document, as Word's "continuous" setting
- * does. Tables, figures and code are not numbered: a comment on one cites its
- * number and page, as on the DPI-H draft.
+ * Numbering runs through the whole document (Word's "continuous"). Tables,
+ * figures and code are not numbered: a comment on one cites its number and
+ * page.
  *
  * After printing, `pdftotext -layout` reads the PDF back, and every number
  * must be found, in order, at the start of a line. A miss fails the run, so a

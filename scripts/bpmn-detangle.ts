@@ -4,8 +4,7 @@
  * too wide or too tall, labels on labels, flows or boxes, crossing flows, and a
  * lane order that sends flows across lanes they do not stop in.
  *
- * Owner, 2026-10-31: *"bpmn detangle skill including swap lanes"*, *"add as QA
- * and author check"*. The criteria and the budget are
+ * Runs as both a QA and an author check. The criteria and the budget are
  * `src/workflow/diagram-fit.ts`; the procedure is the `bpmn-detangle` skill.
  *
  * Usage:
@@ -17,16 +16,15 @@
  *
  * Labels are checked where bpmn-js DRAWS them, so the browser is used when it
  * is there: a diagram with no `BPMNLabel` bounds leaves label placement to
- * bpmn-js, and only the drawing says whether "Satisfied with changes?" lands
- * on "No". Without a browser, or with `--di-only`, only labels the file
+ * bpmn-js. Without a browser, or with `--di-only`, only labels the file
  * places itself are checked, and the report says so.
  *
  * `--write` moves labels off flows, shapes, other labels and lane lines,
  * draws every task box at one square size (`TASK_SIZE`, growing the lane;
- * a name that does not fit is shortened, never given a bigger box), changes the lane order (re-routing the flows between lanes as
- * elbows) and re-routes slanted flows at right angles (owner, 2026-10-31:
- * *"straight angled arrows ugly"*). Moving steps is the author's
- * judgement, so it is reported, never guessed. Re-render and look.
+ * a name that does not fit is shortened, never given a bigger box), changes
+ * the lane order (re-routing the flows between lanes as elbows) and re-routes
+ * slanted flows at right angles. Moving steps is the author's judgement, so
+ * it is reported, never guessed. Re-render and look.
  *
  * @module scripts/bpmn-detangle
  */

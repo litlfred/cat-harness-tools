@@ -2,22 +2,12 @@
 /**
  * Every recorded waiver is well formed, in a gate class that exists, and dated.
  *
- * Skill: `skills/conduct/conduct-core/confirmation-waiver.md`. Owner, 2026-09-20:
- * *"human can waive confirmation rights (e.g. for session, for process run)"*.
+ * Skill: `skills/conduct/conduct-core/confirmation-waiver.md` (a person may
+ * waive confirmation, e.g. for a session or a process run).
  *
- * ## Why a waiver is checked rather than trusted
- *
- * A waiver moves a decision from the agent to the person. Every field on
- * {@link WaiverNodeSchema} is a way that move can be faked, and a malformed
- * waiver is the most dangerous artefact in this repository: it reads as
- * permission and carries none. So a node that does not parse is not a lenient
- * waiver — it is **no waiver**, reported loudly, and the gate it named stands.
- *
- * The other half is the vocabulary. `gate` is a closed enum, so a waiver over
- * something that is not a waivable gate — a rule whose text is *never*, bean
- * deletion — fails to parse at the schema, before any judgement is involved.
- *
- * ## Three states, and the middle one is the point
+ * A node that does not parse against {@link WaiverNodeSchema} is **no
+ * waiver**, reported loudly, and the gate it named stands. `gate` is a closed
+ * enum, so a waiver over a non-waivable rule fails at the schema.
  *
  * | | |
  * |---|---|
@@ -25,19 +15,11 @@
  * | **inert** | parses, expired — history, kept and never deleted, never a finding |
  * | **malformed** | does not parse, or the clock cannot be read — a defect, and loud |
  *
- * An expired waiver is NOT a finding. It is the record of what was permitted,
- * to whom and when, which is what makes the next grant reviewable — the same
- * argument `AGENTS.md` makes for a `scrapped` bean over a deleted one.
+ * A declared directory holding no waiver node is a **determined empty** (no
+ * waiver granted). A directory that cannot be READ exits 2, unknown.
  *
- * A declared directory holding no waiver node is a **determined empty**: no
- * waiver has been granted, which is a real answer and the commonest one. A
- * directory that cannot be READ is not — that exits 2, unknown.
- *
- * ## Where it looks
- *
- * At the directories declaring the `waiver` graph — **asked, never composed**.
- * That graph is declared over the same directory as `memory`, so a file is a
- * waiver by its `$schema` tag and by nothing else.
+ * It reads the directories declaring the `waiver` graph (shared with
+ * `memory`), so a file is a waiver by its `$schema` tag and nothing else.
  *
  * @module folio-assistant/scripts/check-waivers
  * @covers waiver

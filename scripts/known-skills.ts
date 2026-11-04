@@ -1,10 +1,6 @@
 /**
- * Where a skill lives, and therefore what "this skill exists" means.
- *
- * Extracted from `check-workflow-refs.ts` so that the reference checker and
- * `kg-audit.ts` cannot disagree about it. Two checkers with two copies of this
- * list is how one of them ends up reporting a wall of false dangling refs —
- * and a check that cries wolf is a check somebody switches off.
+ * Where a skill lives, and therefore what "this skill exists" means — shared
+ * by `check-workflow-refs.ts` and `kg-audit.ts` so the two cannot disagree.
  *
  * Kept in step with `GROUPS` in `gen-skill-docs.ts`, plus the two homes that
  * file does not generate from: `schemas/skills/<name>/` (a directory of JSON

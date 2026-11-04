@@ -4,32 +4,15 @@
  *
  * @module scripts/docs-route
  *
- * ## The rule this implements, in the owner's words
+ * cat-harness's documentation pages publish under
+ * `<base-url>/docs/cat-harness/<page>.html`, not at the site root — the same
+ * `<base-url>/<kind>/<instance>/` rule that puts a mounted instance's
+ * documentation at `/docs/<instance>/` (`mount-instance-docs.ts`).
  *
- * 2026-10-05 (issue #2188, bean `kc7k`): cat-harness's documentation pages
- * publish under `<base-url>/docs/cat-harness/<page>.html`, not at the site
- * root — *"we dont need redirects for old way. clean break/migration"*. The
- * root had become 108 entries mixing doc pages, instance mounts, graph-kind
- * directories, locale directories and JSON-LD exports, and `architecture` and
- * `skills` were each both a page and a directory there.
- *
- * It is the addressing rule of 2026-09-20 applied to the one instance it had
- * not reached: `<base-url>/<kind>/<instance>/`. A mounted instance's documentation
- * was already at `/docs/<instance>/` (`mount-instance-docs.ts`); the built
- * instance's is now at `/docs/<built>/` by the same rule, rather than being
- * the exception that owned the root.
- *
- * ## One answer, read rather than written down
- *
- * The route is the `docs` KIND and the built instance's declared NAME — the
- * same two facts `mount-instance-docs.ts` composes `/docs/<instance>/` from. A
- * literal `docs/cat-harness` in each workflow step would be a second answer to
- * "where are the docs", free to disagree with the declaration the day the
- * instance is renamed.
- *
- * The one place the route IS written as a literal is `_config.yml`'s
- * `baseurl`, because Jekyll reads nothing else. `docs-route.test.ts` checks
- * that literal against this function, so the two cannot drift silently.
+ * The route is read, not written down: the `docs` KIND and the built
+ * instance's declared NAME, so it follows a rename. The one literal copy is
+ * `_config.yml`'s `baseurl`, because Jekyll reads nothing else;
+ * `docs-route.test.ts` checks it against this function.
  *
  * Usage (prints the route and nothing else, for `ROUTE=$(…)`):
  *   bun run cat-harness-tools/scripts/docs-route.ts --built cat-harness

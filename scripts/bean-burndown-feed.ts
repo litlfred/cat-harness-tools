@@ -6,35 +6,31 @@
  * @graphNode none — a read-only projection of the bean store's git history
  * @covers none — it measures the work plan; the verdicts on it live in `check-bean-*`
  *
- * Bean `cat-tools-tk99` / `folio-assistant-hf2q`, slice 3. Slice 1
- * (`epic-burndown.ts`) computes one epic's series in a terminal; this writes
+ * `epic-burndown.ts` computes one epic's series in a terminal; this writes
  * every open milestone's and epic's series into `assets/beans/burndown.json`
  * so the board can draw them without computing anything.
  *
- * ## Where the history comes from (owner, 2026-10-24: option C)
+ * ## Where the history comes from
  *
  * The publish checkout is shallow and the bean store is mounted as files, so
  * neither holds the store's past. At publish the generator FETCHES the store's
  * branch back `days` days ({@link fetchBeanHistory}) and reads each day's
- * snapshot with slice 1's `snapshotsFromGit`. Nothing about the history is
- * committed: a committed series would be stale on the next bean edit, which is
- * every session.
+ * snapshot with `snapshotsFromGit`. Nothing about the history is committed:
+ * it would be stale on the next bean edit.
  *
  * So the feed exists only in a publish build (`gen-docs-pages.ts
  * --burndown-history`). Elsewhere the file is not written, and the board reads
- * its absence as "no history in this build", which is what it is.
+ * its absence as "no history in this build".
  *
  * ## No data is not zero
  *
  * A fetch that fails writes `available: false` with the reason, never an empty
  * series. A day before an epic existed is `null` in every column, never 0.
  *
- * ## Columnar, because the file is mostly repetition
+ * ## Columnar
  *
  * The day axis is shared, so it is written once (`days`) and each series is
- * three arrays aligned with it. With a few hundred epics over 90 days, one
- * object per point would put the field names in the file tens of thousands of
- * times.
+ * three arrays aligned with it, rather than one object per point.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";

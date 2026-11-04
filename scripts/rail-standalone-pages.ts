@@ -1,32 +1,13 @@
 /**
- * Rail the standalone pages, as a LAST step over the finished site — bean `oi1y`.
+ * Rail the standalone pages, as a LAST step over the finished site.
  *
- * ## Why this is its own entry point rather than a line in `mount-instance-docs`
+ * It is its own step, run last, because a pass over every page the site
+ * publishes needs the site finished: pages such as bootstrap's are generated
+ * by `publish-instance-files.ts --instance ./bootstrap` after
+ * `mount-instance-docs.ts` has run.
  *
- * Because ordering is the whole of it, and the first version got it wrong in a
- * way no unit test could see.
- *
- * `mount-instance-docs.ts` runs at line 284 of `docs-site.yml`.
- * `publish-instance-files.ts --instance ./bootstrap` writes bootstrap's pages
- * at line 426. So a pass hosted inside the mount script walks the site **142
- * lines before ten of its subjects exist**, rails the 23 wireframes (committed,
- * therefore present) and silently misses the 10 bootstrap pages (generated,
- * therefore not yet there).
- *
- * The fixture could not catch that: it hands the pass a finished directory,
- * which is precisely the state the real build is not in at that moment. It was
- * caught by opening the STAGED BUILD and counting — 1 of 11 bootstrap pages
- * navigated, unchanged from `main`, while the wireframes had moved.
- *
- * **A pass over "every page the site publishes" has a precondition, and the
- * precondition is that the site is finished.** Naming that in a separate step
- * placed last is what makes it checkable; burying it inside a script that runs
- * for other reasons is what made it invisible.
- *
- * ## It is idempotent, which is what makes running it last safe
- *
- * `injectRail` refuses a page that already carries a navigation, so pages the
- * mount pass railed earlier are left byte-identical here.
+ * It is idempotent: `injectRail` refuses a page that already carries a
+ * navigation, so pages the mount pass railed earlier are left byte-identical.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/rail-standalone-pages.ts --site ./_site --built cat-harness

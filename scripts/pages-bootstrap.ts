@@ -2,20 +2,17 @@
 /**
  * Where will this folio be published, and is it there yet?
  *
- * The last thing the content core's `processes/conduct/getting-started.bpmn` does is hand the author
- * a link, because a folio that has just been scaffolded is worth very little to
- * its author until they can see it. This derives the address, reports whether
- * anything is set up to publish to it, and — with `--wait` — probes until the
- * site answers.
+ * The content core's `processes/conduct/getting-started.bpmn` ends by handing
+ * the author a link. This derives the address, reports whether anything is
+ * set up to publish to it, and — with `--wait` — probes until the site
+ * answers.
  *
  * ## Four states — the branch first, then the address
  *
  * `unprovisioned` is checked **before anything else**: `git ls-remote --heads
  * <remote> gh-pages` found no `gh-pages` branch, and the publish route deploys
  * from that branch. GitHub Pages cannot be switched on to serve a branch that
- * does not exist, so every later step is moot until it does. Owner, 2026-10-01:
- * *"need to create gh-pages branch before can turn on"*; repeated 2026-10-07:
- * *"need to create gh-pages before can deploy"* (issue #2417). The report
+ * does not exist, so every later step is moot until it does. The report
  * prints the exact command, and `--provision` runs it. This is `A_Provision` in
  * bootstrap-tools' `render-kg-to-github-pages.bpmn`, and `A_ProvisionGhPages`
  * in `getting-started.bpmn`.
@@ -25,14 +22,8 @@
  * `live` is a success response. `not-yet` is a **measured** 404: the server
  * answered and said there is nothing there, which is the ordinary state for the
  * first minutes after a scaffold. `unknown` is the absence of a measurement —
- * no URL could be derived, nothing was probed, or the request failed.
- *
- * Collapsing `unknown` into `not-yet` would mean telling an author their site
- * is "still building" when in fact nothing was ever checked. That is the defect
- * this repository has already paid for twice in other guises — the README
- * contents table rendering an unreadable publish ref as an empty table, and the
- * simulators section rendering an absent directory as "no simulators". Both
- * replaced a correct answer with a confident wrong one.
+ * no URL could be derived, nothing was probed, or the request failed. It is
+ * never reported as `not-yet` ("still building" when nothing was checked).
  *
  * `decisions/pages-live-gate.dmn` holds the same three states as a decision
  * table, and `--json` emits exactly the facts that table reads.
@@ -41,8 +32,7 @@
  *
  * Publishing is a GitHub Actions workflow's job. This reports whether such a
  * workflow exists and what it is called; it never dispatches a workflow or
- * configures Pages. An author who has no publish workflow is told so, which is
- * more useful than a script that silently invents one.
+ * configures Pages. An author who has no publish workflow is told so.
  *
  * The ONE write it can make is `--provision`: an orphan `gh-pages` holding a
  * placeholder `index.html` and `.nojekyll`, built with git plumbing (the
@@ -51,9 +41,8 @@
  * the flag nothing is pushed, whatever the state.
  *
  * It also says which Pages **source** it expects. A publish workflow that
- * pushes `gh-pages` needs "Deploy from a branch: gh-pages, / (root)"; picking
- * "GitHub Actions" there is the litlfred/test#3 mistake, where the workflow
- * pushed a branch that Pages was never told to serve.
+ * pushes `gh-pages` needs "Deploy from a branch: gh-pages, / (root)", not
+ * "GitHub Actions", or Pages never serves the branch.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/pages-bootstrap.ts               # derive + report, no probe

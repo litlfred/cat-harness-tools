@@ -2,8 +2,7 @@
  * Ask one or more GitLab users to review a merge request, keeping the
  * reviewers it already has.
  *
- * The implementation of the `gitlab-mr-request-review` Tool (bean
- * `folio-assistant-4dbr`, owner ruling 2026-10-24 "Fill both gaps").
+ * The implementation of the `gitlab-mr-request-review` Tool.
  * `glab mr update --reviewer name` REPLACES the reviewers; `--reviewer +name`
  * adds one (glab's documented prefix). A Tool input cannot carry that prefix,
  * so this script adds it, after each name has parsed as a `GitLabUsername`.

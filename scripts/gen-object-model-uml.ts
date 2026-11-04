@@ -4,9 +4,8 @@
  * DERIVED from the JSON Schema behind it.
  *
  * Five packages — schema, scenario, process, state, test — and the classes in
- * them. The picture is the one on the "Harness Object Model" deck; what this
- * adds is that nothing inside a class box is transcribed. Each box is read
- * from a schema, and the stereotype names which one:
+ * them. Nothing inside a class box is transcribed: each box is read from a
+ * schema, and the stereotype names which one:
  *
  * - `«json: X»` — a JSON Schema generated from the Zod schema `X` in
  *   `schemas/` (`toJsonSchema` in `schemas/kg/to-json-schema.ts`, Zod 4's native
@@ -22,14 +21,13 @@
  * attributes `folio:role`, `folio:skill` and `folio:bean`, and a skill's
  * `input:` and `output:` front matter) are drawn dashed and say where.
  *
- * Every arrow runs from the dependent to the general node (#1168, plan C):
- * a Task REALISES the Skill it implements (UML realisation, `..|>`), a Voice
- * and a User Story point at their Role, and a Test Run points at the Skill it
- * tests and at the contracts its cases are checked against.
+ * Every arrow runs from the dependent to the general node: a Task REALISES
+ * the Skill it implements (UML realisation, `..|>`), a Voice and a User Story
+ * point at their Role, and a Test Run points at the Skill it tests and at the
+ * contracts its cases are checked against.
  *
  * Every class names its glossary term, and the generator REFUSES to write if
- * the rendered glossary page has no entry for it — so a class cannot be drawn
- * without a definition a reader can reach.
+ * the rendered glossary page has no entry for it.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-object-model-uml.ts           # write

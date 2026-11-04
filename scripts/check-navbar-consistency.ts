@@ -6,16 +6,10 @@
  * @module scripts/check-navbar-consistency
  * @covers none — its subjects are the `<instance>.json` DECLARATIONS and the
  * client that renders them, neither of which is a node in a declared graph.
- * `@covers themes` would be the bean `z6xd` defect: a gate naming a kind it
- * never resolves a directory of.
+ * `@covers themes` would name a kind it never resolves a directory of.
  *
- * The owner, 2026-09-30: *"i want QA check that each harness LHS navbar header
- * and menus are themed appropriately and has consitent layout/icon/navgation"*.
- *
- * ## The two questions, and why they are not one check
- *
- * A navbar entry gets its picture from one of **two unrelated namespaces**, and
- * conflating them is the mistake this module was written after making:
+ * A navbar entry's picture comes from one of **two unrelated namespaces**,
+ * reported as separate families because the repairs differ:
  *
  * 1. An instance's own `icon` is an **id into that instance's `images` list** —
  *    `sync-docs-harness.ts` resolves it with
@@ -24,62 +18,20 @@
  *    registry** — `glyphFor` in `docs/assets/js/docs-ui.js` looks it up in
  *    `TILE_GLYPHS` and falls back to the net when it misses.
  *
- * So "the icon does not resolve" means two different failures with two
- * different repairs, and a check that reported them as one would send the
- * reader to the wrong file. They are separate families below.
- *
- * ## Why the FALLBACK is not a finding, and the tile that takes it is
- *
- * `glyphFor` falling back is deliberate and its docblock defends it: a folio
- * may name a glyph a slightly older platform has not got, and a tile that
- * vanished over that would turn a cosmetic mismatch into a missing navigation
- * entry. So this never grades the fallback.
- *
- * What it grades is a tile name declared **in this repository** against **this
- * repository's** registry. That is not the cross-version case the fallback
- * exists for: it is a name with no drawing, here, now, and the consequence is
- * two different artefacts wearing one picture — which is what the owner
- * reported and what `ob3m` finding 11 measured on a render (18 of 20 tiles
- * drawing the identical outline path).
- *
- * ## Two registries draw the same ids, so they can disagree
+ * The fallback itself is never graded (it covers a folio naming a glyph an
+ * older platform lacks). What is graded is a tile name declared in this
+ * repository that this repository's registry does not draw.
  *
  * `ROW_GLYPHS` (the navbar row, in `navbar-row.js`) and `TILE_GLYPHS` (the
- * glass tile panel, in `docs-ui.js`) are separate literals. `ROW_GLYPHS`'s own comment insists on
- * **five distinct drawings** because *"a row where four slots are
- * indistinguishable is a row that says nothing"* — an argument that applies
- * verbatim to the panel and is not enforced there. Where an id appears in both,
- * the two must name the same glyph constant, or one artefact has two pictures
- * depending on which surface you opened.
+ * glass tile panel, in `docs-ui.js`) are separate literals; where an id
+ * appears in both, they must name the same glyph constant.
  *
- * ## Not a second answer to either navbar gate already here
+ * Related gates: `navbar:geometry:check` (widths, from
+ * `lib/navbar-geometry.ts`) and `check:viewer-nav` (which pages carry a rail).
+ * This one checks iconography only.
  *
- * Two sibling gates touch the navbar, and this asks neither of their
- * questions. Checked by reading them, 2026-09-30, after `bun run cat gates`
- * surfaced both — a hand-picked check list had hidden them:
- *
- * | gate | its question | bean |
- * |---|---|---|
- * | `navbar:geometry:check` | do the WIDTHS agree between `lib/navbar-geometry.ts` and the stylesheet rendered from it | `sjic` |
- * | `check:viewer-nav` | WHICH PAGES carry a nav rail at all, gated on regressions only | `edx7` |
- * | this | are the ICONS registered, and do the registry and the instance declaration AGREE | — |
- *
- * Geometry, presence, iconography. They come apart in every direction: a
- * navbar can be the right width with an unregistered icon, a page can be
- * railed with no icon at all, and an icon can be registered on a page that
- * carries no rail. So none subsumes another, and a reader who finds one
- * should not conclude the other two are covered.
- *
- * This paragraph exists because "a second answer to the same question, free
- * to disagree with the first" is the defect this repository names most often,
- * and a gate that has not said which question it is answering leaves the next
- * author to guess.
- *
- * ## Could-not-determine is never green (bean `dh4f`)
- *
- * If either registry literal cannot be located, this **refuses** rather than
- * reporting the families clean. A check blind on its own input has not cleared
- * anything, and a zero it prints in that state is indistinguishable from a pass.
+ * If either registry literal cannot be located, this refuses rather than
+ * reporting the families clean.
  *
  * Exit codes: 0 report only, or `--check` with no blocking finding · 1
  * `--check` (or `--strict`) with one · 2 could not determine, which includes

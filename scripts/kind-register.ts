@@ -6,61 +6,39 @@
  * @module scripts/kind-register
  * @covers cat-harness, typologies — it loads every declared kind node (which parses each against folio-graph-typology/v1) and checks each owes nothing
  *
- * ## The measurement that made this a command rather than a list
+ * ## What a new kind owes
  *
- * Adding the `auto-docs` kind (#2022, bean `06e3`) I ran **six hand-picked
- * `check:*` commands** and every one passed. `bun run cat gates` then found **5
- * failures across 217**, and `bun test` found two more. Seven obligations, of
- * which a careful hand-picked subset found none:
+ * | obligation | kind |
+ * |---|---|
+ * | `readme:subgraphs` — READMEs whose regions count files | generated |
+ * | `handler:index` — `published-graphs.md` | generated |
+ * | `docs:harness` — `docs/_data/harness.json`, read by the navbar | generated |
+ * | `navbar:include` — the generated nav partial | generated |
+ * | `avatars:css` — the stylesheet, both schemes | generated |
+ * | the **avatar** — glyph, hue, a sentence | **authored** |
+ * | the **row** in `directory-conventions.md` | **authored** |
  *
- * | obligation | found by | kind |
- * |---|---|---|
- * | `readme:subgraphs` — READMEs whose regions count files | `gates` | generated |
- * | `handler:index` — `published-graphs.md` | `gates` | generated |
- * | `docs:harness` — `docs/_data/harness.json`, read by the navbar | `gates` | generated |
- * | `navbar:include` — the generated nav partial | `gates` | generated |
- * | `avatars:css` — the stylesheet, both schemes | **`bun test`** | generated |
- * | the **avatar** — glyph, hue, a sentence | `gates` | **authored** |
- * | the **row** in `directory-conventions.md` | **`bun test`** | **authored** |
+ * It is a command rather than a list because each stale artefact's failure
+ * names a generated file, never the kind you added, so the cause is
+ * invisible from the symptom.
  *
- * `skill-registration`'s own record is that its equivalent list *"was recalled
- * wrong four times before it was measured"* (beans `v625`, `nfv3`). A command
- * is the remedy because **each stale artefact's failure names a generated file,
- * never the kind you added** — so the cause is invisible from the symptom.
+ * ## Each check is run on its own, never through `gates`
  *
- * ## Why each check is run on its own, never through `gates`
- *
- * Bean `ymsu`: `bun test` runs some of these writers, so a `gates` run can
- * repair an artefact and then report it current. `skill:register` already
- * answers this by invoking each `--check` separately against the identical
- * tree, and this does the same. Two of the seven were found by `bun test` and
- * not by `gates`, which is that hazard from the other side.
+ * `bun test` runs some of these writers, so a `bun run cat gates` run can
+ * repair an artefact and then report it current. As `skill:register` does,
+ * this invokes each `--check` separately against the identical tree.
  *
  * ## The two AUTHORED artefacts are reported, never written
  *
- * An avatar's hue is a design decision and a table row is prose. A command that
- * invented either would be worse than one that names them.
+ * An avatar's hue is a design decision and a table row is prose.
  *
- * ## The hue check this command DOES NOT have, and why
+ * ## Hue is reported, never graded
  *
- * It was going to fail on an exact hue collision — the one unambiguous case —
- * because the `auto-docs` glyph was first given tone **164**, 16° from
- * `requirements` at 148, and two green page-glyphs told apart only by bullets
- * versus ticks. No gate caught it; rendering them side by side did.
- *
- * **Running that rule over the real corpus killed it.** 11 exact collisions
- * across 58 kinds, and every one is deliberate: a shared hue marks a FAMILY.
- * Tone 28 is the work plan (`beans`, `bean-defs`, `attestations`,
- * `issue-marks`); tone 268 is the harness and its sources; and tone 199 settles
- * it beyond inference, because the convention is written into the data — both
- * the IRIS replica and the DAK base layer say *"in WHO blue"* in their own `reads` string.
- *
- * So hue is **reported and never graded**, all of it. A gate failing on 11
- * deliberate decisions is not a strict gate, it is a wrong one. And the
- * `auto-docs` defect was never "same hue" anyway: it was two similar GLYPHS at
- * similar hues, which no number over one field expresses. The clearance table
- * earns its place as input to the person choosing a tone — which is exactly
- * where {@link authoredGaps} sends them.
+ * A shared hue deliberately marks a FAMILY of kinds (e.g. the work-plan kinds
+ * `beans`, `bean-defs`, `attestations`, `issue-marks`), so an exact collision
+ * is not a defect, and two similar glyphs at similar hues are not something
+ * one number can express. The clearance table is input to the person choosing
+ * a tone — which is where {@link authoredGaps} sends them.
  *
  * Exit codes: 0 clean · 1 any stale artefact or any authored gap.
  */

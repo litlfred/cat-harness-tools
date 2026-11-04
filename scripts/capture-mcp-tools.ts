@@ -2,27 +2,18 @@
 /**
  * What this instance's MCP server actually serves, read from the registrars.
  *
- * ## Why introspection rather than parsing the source
- *
- * The first attempt read `server.tool("name", "desc", {shape}, handler)` with a
- * regular expression and produced **wrong** input lists: words followed by a
- * colon inside the description string came back as parameter names, so
- * `skill_fetch` appeared to take `Examples`, `Local` and `Reference`, and
- * `paper_preferences` an `Action`. Authoring a Tool node's `io` from that would
- * have shipped a contract that agrees with nothing — worse than no contract,
- * because a contract is what the next check trusts.
- *
  * Mounting each registrar against a capture object gives the **real** Zod
  * shapes, including which keys are optional, because it asks the same objects
- * the server asks.
+ * the server asks. Parsing `server.tool("name", "desc", {shape}, handler)`
+ * with a regular expression is wrong: words followed by a colon in a
+ * description come back as parameter names.
  *
  * ## What it is for
  *
- * Two things. It is the source data for migrating `src/tools/` into Tool nodes
- * (bean `ce65`, and the owner's instruction to move the current MCP surface
- * into `tools/`). And it is the comparison side `mcp-contract` needs: that
- * skill's schema-equivalence check compares a Tool node's `io` against what is
- * served, and this is what "what is served" means before a projector exists.
+ * It is the source data for describing `src/tools/` as Tool nodes, and the
+ * comparison side `mcp-contract` needs: that skill's schema-equivalence check
+ * compares a Tool node's `io` against what is served, and this is what "what
+ * is served" means before a projector exists.
  *
  * @module scripts/capture-mcp-tools
  */

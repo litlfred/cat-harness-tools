@@ -7,10 +7,10 @@
  * @covers basic-cdn-site
  * @graphNode none — a generator over the site graph, not a schema itself
  *
- * Owner, 2026-10-20 (bean `folio-assistant-6gme`): "Build route listing". The
- * site is never in the checkout — `storage.branch` (`gh-pages`) keeps it, keyed
- * by route — so this reads that branch's TREE with git (fetched shallow, trees
- * only, through `branch-store.ts`'s `BranchStore`) and never a network API.
+ * The site is never in the checkout — `storage.branch` (`gh-pages`) keeps it,
+ * keyed by route — so this reads that branch's TREE with git (fetched shallow,
+ * trees only, through `branch-store.ts`'s `BranchStore`) and never a network
+ * API.
  *
  * Three states, never a zero standing in for "could not look": `present` (the
  * tree was read: one row per top-level route and per staging preview, with

@@ -5,47 +5,31 @@
  * @module scripts/state-drift
  * @covers cat-harness
  *
- * ## The defect this exists for — bean `9ofm`
- *
  * `cat/cat-harness/beans`, `cat/cat-harness/todos` and
  * `cat/cat-harness/fsh-guts` are **seeds**: each says so in its own
  * `manifest.json` (`status: "seed"`, `authoritative: false`), and each is a
  * copy of one subgraph of `main` taken at a recorded `source.sha`. `main`
  * stays the store until the cutover moves every reader onto the branch.
  *
- * A seed is only useful if it is CURRENT, and nothing kept it current. Two
- * measurements, both on 2026-10-03:
- *
- * - The `beans` seed was **173 commits and 14 files** behind `main` when I came
- *   back to it, and I refreshed it by hand. Nothing had reported it.
- * - Having refreshed it to *exact* tree parity at 15:27, it was **8 files**
- *   behind again within the hour — one of them the bean I had just claimed.
- *   `todos` was 1 file behind, `fsh-guts` 5, two of those binary PDFs.
- *
- * This is not bookkeeping. A cutover from a stale seed does not fail: it
- * silently resurrects whatever the seed still holds and loses whatever landed
- * on `main` since. For the work plan that means closed beans reopening and
- * claimed beans unclaiming, with no diff anywhere to read afterwards — the
- * cutover commit replaces a whole subtree at once.
+ * A cutover from a stale seed does not fail: it silently resurrects whatever
+ * the seed still holds and loses whatever landed on `main` since, with no
+ * diff to read afterwards.
  *
  * ## It compares TREES, not commits
  *
- * `source.sha` going stale is expected and harmless: `main` moves on every
- * merge, and a merge that touched nothing under the subgraph leaves the seed
- * perfectly current. Reporting a commit distance would cry wolf on every
- * merge. What matters is whether the two trees differ, so that is what is
- * compared — and the file list is the remedy, because "refresh the seed" and
- * "somebody wrote to the branch directly" are different problems with the same
- * tree mismatch.
+ * `source.sha` going stale is expected: a merge that touched nothing under
+ * the subgraph leaves the seed current. So the two trees are compared, and
+ * the differing file list is reported, because "refresh the seed" and
+ * "somebody wrote to the branch directly" are different problems with the
+ * same tree mismatch.
  *
- * ## Reading the branch is the whole job, so it needs the network
+ * ## It needs the network, so it is not a CI gate
  *
- * Deliberately NOT a CI gate: `check:declared-dirs` and `audit:coverage` are
- * local and offline by construction (bean `9ofm` row B), and a gate that can
- * go red because a fetch failed teaches contributors to re-run gates until
- * they pass. This is a command the cutover must run and quote. `unknown` is
- * its own exit code for the same reason: "could not reach the branch" is never
- * reported as "in sync".
+ * `check:declared-dirs` and `audit:coverage` are local and offline by
+ * construction, and a gate that goes red because a fetch failed teaches
+ * contributors to re-run gates until they pass. This is a command the cutover
+ * must run and quote. "Could not reach the branch" is never reported as
+ * "in sync".
  *
  * Exit codes: 0 every seed current · 1 drift · 4 could not determine.
  */

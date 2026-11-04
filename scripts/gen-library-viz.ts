@@ -6,43 +6,30 @@
  * @graphNode none — a generator over the library graph, not a schema itself
  * @covers none — writer — regenerates the visualisation; judges nothing
  *
- * Sibling of `gen-schema-viz.ts` and deliberately the same three pieces: a
- * reader (`library-graph.ts`), a projection under `<site>/assets/<graph>/`,
- * and a zero-dependency viewer under `<site>/<graph>/` that fetches the
- * projection relative to its own location. The published segment is the
- * DECLARED directory's own name, read rather than written down, so a rename
- * moves the source and the URL together.
+ * The same three pieces as `gen-schema-viz.ts`: a reader
+ * (`library-graph.ts`), a projection under `<site>/assets/<graph>/`, and a
+ * zero-dependency viewer under `<site>/<graph>/` that fetches the projection
+ * relative to its own location. The published segment is the DECLARED
+ * directory's own name, so a rename moves the source and the URL together.
  *
- * ## Two views, because the owner asked for two
+ * ## Two views of ONE projection
  *
- * > need (srotable) lisiting (w/ metadata) and folio/desktop view
+ * - **Listing** — every column sortable, every metadatum visible ("which is
+ *   the biggest", "which has no OCR", "which came from which upload").
+ * - **Desktop** — the corpus as tiles, the folio board metaphor ("what is in
+ *   here").
  *
- * - **Listing** — every column sortable, every metadatum visible. This is the
- *   view that answers "which is the biggest", "which has no OCR", "which
- *   came from which upload".
- * - **Desktop** — the corpus as tiles, the folio/Miro-board metaphor `yj32`
- *   describes. This is the view that answers "what is in here" before you
- *   know what you are looking for.
+ * ## Read-only
  *
- * They are two renderings of ONE projection, not two pages. A reader who
- * sorts in the listing and switches to the desktop is looking at the same set.
+ * Nothing here edits a section, a structure or an OCR page; materialising
+ * into a folio and uploading are writes and live elsewhere.
  *
- * ## Read-only on assets, on purpose
+ * ## Three ingestion states
  *
- * The owner, 2026-09-20: *"just on that subgraph w/o edit functionality"*.
- * Nothing here edits a section, a structure or an OCR page — and that is what
- * lets this ship before the write-path question on `yj32` is answered.
- * `jbx2`'s materialise-into-a-folio action and `v1hw`'s upload affordance are
- * writes and are not in this file.
- *
- * ## The three-state ingestion display, which is the point of the bean
- *
- * `jbx2` requires ingestion state as THREE states rather than a tick or a
- * cross, and OCR is the case that forces it: **0 OCR pages because the source
- * was never scanned is not a failure**, and an `ocr/` directory that exists
- * and is empty is a third answer again. The viewer renders `scanned`,
- * `not scanned` and `empty` as three different things, and none of them is
- * styled as an error.
+ * **0 OCR pages because the source was never scanned is not a failure**, and
+ * an `ocr/` directory that exists and is empty is a third answer. The viewer
+ * renders `scanned`, `not scanned` and `empty` distinctly, none styled as an
+ * error.
  *
  * Usage:
  *   bun run cat library:viz          # write

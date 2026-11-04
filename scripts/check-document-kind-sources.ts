@@ -1,24 +1,22 @@
 #!/usr/bin/env bun
 /**
  * check:document-kind-sources — a section's `computedFrom` names a graph its
- * instance can actually reach. Bean `qvxh`.
+ * instance can actually reach.
  *
  * `computedFrom` is how a document kind says *"this section is computable from
- * these assets"* (`schemas/content/document-kind.ts`). The schema says it names
- * DECLARED graph ids "so a reader can ask whether the graph exists rather than
- * take the prose's word for it" — and until this check nothing asked. A typo,
- * a renamed directory, or a graph that was never declared (the external
- * evidence a guideline cites, say) would read as a computable claim.
+ * these assets"* (`schemas/content/document-kind.ts`). It names DECLARED
+ * graph ids so a reader can ask whether the graph exists; this asks. A typo,
+ * a renamed directory, or a graph never declared would otherwise read as a
+ * computable claim.
  *
  * An id resolves when it is a directory id declared by the kind's own instance
  * or by an instance it `needs`, transitively — the same `allowedFromNeeds`
  * direction `check:import-direction` and `check:process-bindings` use, because
  * an instance inherits its dependencies' directories and nothing above it.
  *
- * Owner, 2026-10-04 (qvxh, option 1): name what is not yet a graph rather than
- * fake one. A section whose content needs evidence nobody has ingested says so
- * in its description and carries NO `computedFrom` — an empty declared graph
- * would be the `dh4f` defect, a scan over nothing reported clean.
+ * Name what is not yet a graph rather than fake one: a section whose content
+ * needs evidence nobody has ingested says so in its description and carries
+ * NO `computedFrom`.
  *
  * @module cat-harness/scripts/check-document-kind-sources
  * @covers document-kinds

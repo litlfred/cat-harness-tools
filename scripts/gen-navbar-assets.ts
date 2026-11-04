@@ -1,10 +1,7 @@
 /**
  * Publish the rail's shared assets — `assets/css/navbar.css` and
- * `assets/js/navbar.js`. Bean `lnoy`.
- *
- * Owner, 2026-10-05: *"1. Shared rail style first"*, then *"4. Option 3
- * everywhere"* — the rail drawn in the browser from shared data, so a page
- * carries ~0.1 KB of rail instead of ~21 KB of markup.
+ * `assets/js/navbar.js`. The rail is drawn in the browser from shared data,
+ * so a page carries almost no rail markup.
  *
  * - `navbar.css` is `navbarCss()` from `lib/navbar.ts`, verbatim.
  * - `navbar.js` is `navbar-client.ts` bundled: `renderRailRegions` and
@@ -12,9 +9,8 @@
  *   the browser cannot draw a different rail from the build's audit.
  *
  * Both are GENERATED, never edited, and committed; `navbar-assets.test.ts`
- * fails when either differs from what this writes. Bun is pinned (1.4.4,
- * `.bun-version` and every workflow), which is what makes a committed bundle
- * checkable byte for byte.
+ * fails when either differs from what this writes. The pinned Bun version is
+ * what makes a committed bundle checkable byte for byte.
  *
  *   bun run cat navbar:assets           write them
  *   bun run cat navbar:assets:check     exit 1 if either is stale

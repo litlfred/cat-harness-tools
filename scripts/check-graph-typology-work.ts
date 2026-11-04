@@ -6,31 +6,17 @@
  * `recordsWork` answers the question an arriving agent asks first: is there
  * something here somebody is partway through, that I could pick up? The
  * root README's cold-start section computes its ACTIVE/STATIC verdict from
- * it, so a kind that has not decided makes that verdict quietly wrong rather
- * than loudly absent.
+ * it, so a kind that has not decided makes that verdict quietly wrong. Not
+ * all live state is work: an ingestion queue such as `uploads` is state
+ * nobody is partway through.
  *
  * ## Why a gate rather than a required field
  *
  * `renderable` and `holds` are required on {@link GraphTypologyDef}, so a kind
  * cannot compile without deciding them. `recordsWork` is **optional in the
  * type on purpose**: it is meaningless for `content`, `context` and
- * `derived` — a record of what the instance IS records no position — and
- * requiring it would force three layers to answer a question that does not
- * apply to them, which is how a field gets a meaningless default nobody
- * reads.
- *
- * So the "cannot ship undecided" property lives here, narrowed to the layer
- * where the question means something.
- *
- * ## What it would have caught
- *
- * The first cut of the ACTIVE/STATIC rule read "declares any `state` graph",
- * which made the repository root and the IRIS replica ACTIVE on `uploads` alone.
- * An ingestion queue is live state and is not work anybody is partway
- * through, so an agent told the graph was active would have arrived looking
- * for something to prioritise and found a directory of unprocessed files.
- * Deciding per kind is what separates the two; this makes the decision
- * mandatory.
+ * `derived` — a record of what the instance IS records no position. So the
+ * "cannot ship undecided" property lives here, narrowed to the `state` layer.
  *
  * @module scripts/check-graph-typology-work
  * @covers cat-harness

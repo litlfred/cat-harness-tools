@@ -2,13 +2,9 @@
 /**
  * The CHANGED ASSETS a staging preview's knowledge graph carries: every node
  * the branch adds, changes or removes against the graph `main` publishes, each
- * with the deep links that let a reviewer open it on both sides.
- *
- * Owner, 2026-10-14: *"In addition to staging links in the output contracts,
- * we should also have a list of changed assets in the staging knowledge
- * graph."* The staging links (cat-harness `schemas/sdlc/staging.ts`,
- * `StagingComparison`) say which PAGES changed; this says which GRAPH NODES
- * did, inside the graph a reviewer is inspecting.
+ * with the deep links that let a reviewer open it on both sides. The staging
+ * links (cat-harness `schemas/sdlc/staging.ts`, `StagingComparison`) say which
+ * PAGES changed; this says which GRAPH NODES did.
  *
  * ## What it writes
  *

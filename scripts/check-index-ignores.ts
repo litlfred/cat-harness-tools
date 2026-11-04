@@ -6,7 +6,7 @@
  * @module scripts/check-index-ignores
  * @covers cat-harness — the instance axis: every remote instance index.config.json declares is ignored by the committed .gitignore block generated from it
  *
- * Owner-approved 2026-10-07: the root `.gitignore` carries a marked block,
+ * The root `.gitignore` carries a marked block,
  * `# BEGIN index mounts (generated from index.config.json — do not edit)` …
  * `# END index mounts`, one `/<path>/` per remote instance (its
  * `overrides.<name>.path`, else `<name>/`). `mount:remote`,

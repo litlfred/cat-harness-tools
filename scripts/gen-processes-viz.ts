@@ -5,65 +5,28 @@
  * @module cat-harness/scripts/gen-processes-viz
  * @covers processes
  *
- * Bean `prhr`. Owner, 2026-09-21: *"we also need a processes/ visualization as
- * it is controlled.... its basically a bpmn searcher tool or so. with various
- * filters."*
+ * These diagrams are executable — `workflow_start` / `workflow_next` /
+ * `workflow_complete` run them, and `workflow_complete` refuses a step that is
+ * not enabled — so their index is generated, not hand-kept.
  *
- * **"As it is controlled" is the argument.** These diagrams are executable —
- * `workflow_start` / `workflow_next` / `workflow_complete` run them and
- * `workflow_complete` refuses a step that is not enabled. A corpus that governs
- * what agents may do, whose only index is a hand-maintained markdown page, is
- * controlled in name. That page's own history is the proof: it once opened
- * *"Nineteen BPMN 2.0 files"* and listed eight.
+ * It reads them with the real parser, `loadProcessModel` (bpmn-moddle), never
+ * a regex: legal markup variants (an attribute order, a wrapped line) defeat
+ * one.
  *
- * ## It consumes the real parser, and that is not a preference
- *
- * `loadProcessModel` (bpmn-moddle) is the oracle, and the first measurement
- * here was taken with a regex instead. The regex found **30** `folio:bean` ops;
- * there are **49**. It missed two markup variants that are both legal and both
- * in the corpus — a `store=` attribute before `op=`, and attributes wrapped
- * onto the next line. `check:workflow-refs` already says *"the real parser is
- * the oracle for the generator's regex"*; this is that sentence, measured
- * again, on the generator written to index the corpus it is about.
- *
- * ## Declared vs defaulted — the distinction the engine does not need
+ * ## Declared vs defaulted enforcement
  *
  * `ProcessModel.enforcement` is `"strict" | "advisory"`, never absent, because
- * `loadProcessModel` reads an undeclared policy as `strict`. That is right for
- * the ENGINE, and its comment says why: *"A process that forgot to say is
- * governed, not exempt — the failure mode of defaulting the other way is that
- * forgetting silently turns the gate off."*
- *
- * It is NOT right for a reader. "Somebody chose strict" and "nobody said, so
- * the engine assumed strict" are different facts, and this index reports them
- * apart. The engine keeps one answer; the reader gets the provenance of it.
- *
- * **No count is given here, on purpose.** This paragraph carried one — and it
- * was wrong, by one, in the module whose argument is that a figure belongs in
- * generated output rather than in prose beside it (bean `osyc`, 2026-09-22).
- * The page computes it every run; read it there.
- *
- * ## What is asked of the file, exactly
- *
- * Whether a policy declares an **enforcement value** — not whether a policy
- * ELEMENT is present. The two differ, and the corpus contains the case:
- * `crdm-signoff.bpmn:83` is `<cat-harness.processes:policy relaxable="false"/>`, an element
- * deliberately authored, carrying no `enforcement`. It counts as *defaulted*
- * here and that is the right answer for the question being asked — *somebody
- * chose an enforcement* vs *nobody said* — but it means this is NOT the same
- * measurement as `grep -L 'folio:policy'`, which bean `30hn` takes and which
- * gives a figure one smaller. Saying which of the two is meant is the whole
- * value of the column.
+ * `loadProcessModel` reads an undeclared policy as `strict` — right for the
+ * ENGINE. For a reader, "somebody chose strict" and "nobody said" are
+ * different facts, so this index reports them apart. It asks whether a policy
+ * declares an **enforcement value**, not whether a policy ELEMENT is present:
+ * a policy element with no `enforcement` counts as *defaulted*.
  *
  * ## What it is NOT
  *
  * Not a re-render: `render:bpmn` owns the SVGs and `render:bpmn:check` fails if
- * they are stale, so this consumes that art and generates none.
- *
- * And not a second answer to "where are we". Workflow STATE lives in committed
- * instances under `beans/workflows/`; an index that displayed its own idea of
- * position would be a second store free to disagree with the first, which
- * `workflow-state` names explicitly.
+ * they are stale. Not a second store of position: workflow STATE lives in
+ * committed instances under `beans/workflows/`.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-processes-viz.ts

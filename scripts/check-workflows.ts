@@ -2,32 +2,24 @@
 /**
  * Workflow YAML that GitHub will actually parse.
  *
- * ## Why a local check, when CI already runs the workflows
+ * A workflow GitHub cannot parse does not fail loudly: it produces a run
+ * named by its file path instead of its `name:`. And `yaml.safe_load`
+ * accepts duplicate keys (most loaders keep the last), so "it parses
+ * locally" is not evidence.
  *
- * Because a workflow GitHub cannot parse does not fail loudly — it produces a
- * run **named by its file path instead of its `name:`**, because there is no
- * `name:` to read. `AGENTS.md` records two workflows that failed this way on
- * 2026-08-07 and stayed red for a day. I reproduced it on 2026-09-18 by adding
- * a second `env:` block to a step that already had one.
+ * Checked:
  *
- * The trap is that **`yaml.safe_load` accepts duplicate keys** — the YAML spec
- * says they are invalid, but most loaders take the last one silently. So
- * "it parses locally" is not evidence, and that is exactly what I relied on.
- *
- * ## What is checked
- *
- * - **Duplicate keys at any level.** The failure above.
+ * - **Duplicate keys at any level.**
  * - **`${{ }}` inside a `run:` body**, where the expression is substituted into
  *   the script TEXT before the shell parses it. Trusted contexts are allowed;
  *   anything attacker-controlled is an error. See
  *   `skills/conduct/conduct-core/untrusted-input.md`.
  * - **A job that pushes `gh-pages` with no protection against the race.**
- *   Either the shared `gh-pages-push` concurrency group, or a retry. One or
- *   the other, because they all contend for a single ref.
+ *   Either the shared `gh-pages-push` concurrency group, or a retry.
  * - **A job that REPLACES the whole publish branch without carrying the open
- *   PRs' `STAGING/` previews across.** Bean `plj1`.
- * - **A push to `qa-reports` that does not go through `qa-store.ts`.** Bean
- *   `16ei`: `qa-reports-unretried`.
+ *   PRs' `STAGING/` previews across.**
+ * - **A push to `qa-reports` that does not go through `qa-store.ts`**
+ *   (`qa-reports-unretried`).
  *
  * @module scripts/check-workflows
  * @covers none — .github/workflows/ is not a declared graph typology

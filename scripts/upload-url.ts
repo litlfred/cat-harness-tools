@@ -4,40 +4,23 @@
  *
  * @module scripts/upload-url
  *
- * ## The 404 this exists to stop
- *
- * The owner, 2026-09-20, pointing at
- * `github.com/litlfred/folio-assistant/upload/main/uploads`:
- *
- * > were it to exist, but it doesmt on main!!!!!
- *
- * Measured, and they are right. `git ls-tree origin/main` has **no root-level
- * `uploads/`**; what exists is `cat-harness/uploads/`. So that URL 404s, and a
- * person sent to it has been sent nowhere.
- *
- * ## Why the obvious composition produces exactly that broken URL
+ * ## Why the obvious composition is wrong
  *
  * `harness.json` declares `{ id: "uploads", path: "uploads/" }` with no
  * `scope`, and absent scope means **instance**. So the declared path resolves
- * against the INSTANCE root — `cat-harness/` since the move — while a GitHub
- * URL needs the path relative to the **repository** root. Pasting the declared
- * `path` straight into `/upload/<branch>/` drops the `cat-harness/` segment and
- * mints the 404.
+ * against the INSTANCE root (e.g. `cat-harness/`), while a GitHub upload URL
+ * needs the path relative to the **repository** root. Pasting the declared
+ * `path` straight into `/upload/<branch>/` drops the instance segment and
+ * mints a 404. `rootForScope` resolves it, and this module is one more caller.
  *
- * That is bean `wggr` again: the instance root and the repository root were the
- * same directory until the move, so every declared path answered both questions
- * at once, and afterwards four directories and both assets resolved one level
- * too deep. `rootForScope` exists for this, and this module is one more caller.
- *
- * **So the path is never written down.** A literal here would be correct today
- * and wrong at the next relocation, which is the whole of bean `blv9`.
+ * **So the path is never written down**: a literal would be wrong at the next
+ * relocation.
  *
  * ## Every failure is NAMED, never a broken link
  *
- * A URL is believed. An agent that guesses one when it cannot resolve the
- * pieces sends a person somewhere that does not exist, and they have no way to
- * tell a wrong link from an empty directory. Each of the four resolution steps
- * reports what it could not determine instead.
+ * A person sent to a wrong link cannot tell it from an empty directory, so
+ * each of the four resolution steps reports what it could not determine
+ * instead of guessing.
  */
 import { existsSync } from "node:fs";
 import { relative, resolve } from "node:path";

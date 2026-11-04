@@ -1,7 +1,6 @@
 /**
  * Resolve a directory's DECLARED governing process to the diagram that draws it.
  *
- * Owner, 2026-09-29: *"show highlevel (sub)process bpmn on the uploads page."*
  * A directory names its process in `coverage.process`
  * ({@link SubgraphCoverageSchema}); this module turns that name into the
  * `.bpmn` source, the rendered SVG, and the call activities the diagram hands
@@ -12,20 +11,17 @@
  * ## It resolves a NAME, never a path
  *
  * `coverage.visualiser` and `coverage.serialisations` hold repository-relative
- * PATHS. This holds a diagram's basename, because a diagram already has a home
- * the knowledge graph knows — `workflowDirs` finds every instance's
- * `processes/` from its declaration — and a path here would be a second answer
- * to "where do diagrams live", free to go stale on the next relocation. The
- * basename is also what `render-bpmn` names its output after, which is the
- * only reason an SVG can be found at all.
+ * PATHS. This holds a diagram's basename: `workflowDirs` finds every
+ * instance's `processes/` from its declaration, and `render-bpmn` names its
+ * output after the basename.
  *
- * ## Three states, and the middle one is the point
+ * ## Three states
  *
  * - **not declared** — the caller never asks; a directory owes no process.
  * - **declared, no diagram of that name** — `undetermined`, with a reason.
  * - **declared, diagram found, no rendered SVG** — still `undetermined`, with
- *   a different reason. A page that dropped the section here would make a
- *   missing render look exactly like a directory that declared nothing.
+ *   a different reason, so a missing render never looks like a directory that
+ *   declared nothing.
  *
  * @module scripts/governing-process
  * @covers cat-harness

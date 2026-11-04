@@ -1,12 +1,11 @@
 /**
  * List the paths one GitLab merge request changes, one per line.
  *
- * The implementation of the `gitlab-mr-files` Tool (bean
- * `folio-assistant-4dbr`, owner ruling 2026-10-24 "Fill both gaps"). `glab`
- * has no `--name-only` (`gh pr diff --name-only` is the GitHub twin), so this
- * runs `glab mr diff --raw` with an argument array and reads the paths out of
- * the diff: the `+++ b/` side of each file, the `--- a/` side when the file
- * was deleted, and the `diff --git` header when a file has no hunks (a pure
+ * The implementation of the `gitlab-mr-files` Tool. `glab` has no
+ * `--name-only` (`gh pr diff --name-only` is the GitHub twin), so this runs
+ * `glab mr diff --raw` with an argument array and reads the paths out of the
+ * diff: the `+++ b/` side of each file, the `--- a/` side when the file was
+ * deleted, and the `diff --git` header when a file has no hunks (a pure
  * rename, a mode change, a binary file). Git's quoted form of an unusual path
  * (`"b/a\tb"`) is unquoted.
  *

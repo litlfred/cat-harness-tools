@@ -1,63 +1,40 @@
 /**
  * One fat, themed navbar tile per INITIATED HARNESS, with its stats and its
- * existing visualisations.
+ * existing visualisations, bootstrap at the bottom.
  *
  * @module scripts/harness-tiles
  *
- * The owner, 2026-09-20:
- *
- * > I still want to see for every initiated harness a themed fat navbar tile,
- * > boot strap at bottom, that user can click on. And basic stats/info via
- * > icon + bafges. Use existing harness vaiyalizaiin(s).
- *
- * Four requirements, and the last one is the constraint that shapes the rest:
- * **nothing here renders a graph.** A tile LINKS to a viewer that already
+ * **Nothing here renders a graph.** A tile LINKS to a viewer that already
  * exists, and where none exists it says so rather than linking somewhere.
  *
  * ## "Bootstrap at bottom" is DECLARED, not a name literal
  *
- * `bootstrap/harness.json` carries a `renderExemption` whose reason says
- * it in those words — *"bootstrap IS the navbar footer"* — so the ordering
- * reads {@link isExemptFrom}`(decl, "visualiser")` rather than testing for the
- * string `bootstrap`. A checker that names one instance states a rule true
- * only for the instance somebody remembered, which is the argument that put
- * the exemption in the declaration in the first place (bean `hfkl`).
- *
- * And it falls out correctly rather than by coincidence: an instance exempt
- * from owing a visualiser is exactly an instance whose tile cannot link to
- * one, so the tiles that go to the bottom are the tiles with nothing to open.
+ * Bootstrap's declaration carries a `renderExemption` (*"bootstrap IS the
+ * navbar footer"*), so the ordering reads {@link isExemptFrom}`(decl,
+ * "visualiser")` rather than testing for the string `bootstrap`. An instance
+ * exempt from owing a visualiser is exactly one whose tile has nothing to
+ * open.
  *
  * ## A link is DECLARATION-driven and PRESENCE-checked
  *
- * Bean `zsah`, on the owner's tile ruling, and bean `flh4`, which paid for the
- * distinction: a graph's **declaration** and a **published projection** are
- * two different facts, and `uploads` once rendered as *"nothing publishes a
- * projection for it"* while a working page sat at its declared path.
- *
- * So: the declaration supplies the CANDIDATES — an instance's declared graphs
- * are the only things a tile may claim to show — and the disk decides whether
+ * The declaration supplies the CANDIDATES — an instance's declared graphs are
+ * the only things a tile may claim to show — and the disk decides whether
  * each one is a LINK or a gap. A candidate with no page is reported, never
- * linked. That is `pb04`'s lesson as a rule: a dead link is worse than no
- * link, because it invites a click and then reads as "this site is broken".
+ * linked: a dead link is worse than none.
  *
  * ## The tone comes from the instance's OWN THEME, else the AVATAR's
  *
- * Bean `v8n5`: when the sticky an instance contributes about itself resolves
- * to a theme THE INSTANCE DECLARES ITSELF (by reference, owner first —
- * `themeByRef`; not one of the platform's shared themes), the tile's `tone` is
- * the HUE of that theme's `accent` (`hexHue`), so the tile and navbar entry
- * sit on the palette the instance declared rather than on a second hue written
- * down in the avatar registry. `toneFrom` says which answer was used.
- *
- * Otherwise the avatar's tone, as before: inventing a palette per instance
- * would put a second colour vocabulary beside `schemas/ui/theme.ts`, and
- * `schemas/content/avatars.ts` already gives every kind a **hue angle**. An instance
- * with no avatar of its own takes `GENERIC`, which is reported as a finding
- * rather than rendered as a blank.
+ * When the sticky an instance contributes about itself resolves to a theme
+ * THE INSTANCE DECLARES ITSELF (by reference, owner first — `themeByRef`; not
+ * one of the platform's shared themes), the tile's `tone` is the HUE of that
+ * theme's `accent` (`hexHue`). Otherwise it is the avatar's hue angle
+ * (`schemas/content/avatars.ts`), so there is no second colour vocabulary
+ * beside `schemas/ui/theme.ts`. `toneFrom` says which answer was used. An
+ * instance with no avatar of its own takes `GENERIC`, which is reported as a
+ * finding rather than rendered as a blank.
  *
  * A tone is a HUE and nothing more: the tile's words (title, counts, viewer
- * names) carry its state, so no theme can remove the second channel (WCAG
- * SC 1.4.1, the `j66n` rule).
+ * names) carry its state, so colour is never the only channel (WCAG SC 1.4.1).
  */
 import { existsSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";

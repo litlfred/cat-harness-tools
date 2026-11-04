@@ -1,7 +1,7 @@
 /**
  * Where each skill's input and output contracts are — read from the skill.
  *
- * A skill names its own contracts in its front matter (#1168, B3b):
+ * A skill names its own contracts in its front matter:
  *
  * ```yaml
  * input: schemas/skills/content-validate/input.schema.json
@@ -9,12 +9,9 @@
  * ```
  *
  * The value is either a path relative to the declaring instance's root — a
- * node of this knowledge graph — or an external `https://` IRI. Until B3b the
- * contract was found by DIRECTORY NAME (`schemas/skills/<skill>/`), a
- * convention checked against nothing: a skill could not say its contract was
- * elsewhere, and a directory could claim a skill that did not exist. The JSON
- * Schema files themselves are the contract; how they are authored is not
- * (bean `319n`).
+ * node of this knowledge graph — or an external `https://` IRI. No contract
+ * is found by directory name. The JSON Schema files themselves are the
+ * contract; how they are authored is not.
  *
  * @module scripts/skill-contracts
  */

@@ -9,8 +9,7 @@
  * @module scripts/tool-releases
  * @covers tool-release
  *
- * Steps 1–8 of `docs/proposals/tool-releases-2026-10-07.md` (issue #2481, bean
- * `3sbm`).
+ * Design: `docs/proposals/tool-releases-2026-10-07.md`.
  *
  *   bun run cat-harness-tools/scripts/tool-releases.ts --check
  *   bun run cat-harness-tools/scripts/tool-releases.ts use [profile|ref] [--dry-run]

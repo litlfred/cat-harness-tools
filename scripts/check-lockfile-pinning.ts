@@ -2,66 +2,19 @@
  * A pinned install must not fall back to an unpinned one.
  *
  * `bun install --frozen-lockfile` exists to FAIL when the lockfile does not
- * satisfy the manifest. `|| bun install` converts exactly that failure into an
- * unpinned resolve — silently, with a green step. **A check that degrades to a
- * pass when it fails is not a check**, and this is that defect in
- * supply-chain clothing.
- *
- * ## What was there, measured 2026-09-21
- *
- * **11 of 18** install steps carried the fallback, in two classes that look
- * alike and are not:
- *
- * **Class A — `cd content && bun install --frozen-lockfile 2>/dev/null || bun
- * install`** (4 sites). Worse than a defeated pin. In bash, when `cd content`
- * fails the `&&` short-circuits with cd's exit status, so `||` fires and `bun
- * install` runs in the **current** directory — the repository root. The
- * `2>/dev/null` hides cd's "No such file or directory". This repository has no
- * `content/`, so those four steps silently installed the wrong project's
- * dependencies, unpinned, and reported success. Verified by running it, not by
- * reading it.
- *
- * **Class B — `bun install --frozen-lockfile || bun install`** (7 sites) at the
- * repository root, where `bun.lock` exists. Here the fallback is purely the
- * defeated pin. Seven OTHER steps pin with no fallback at all, which is the
- * evidence it was never load-bearing.
- *
- * Class A is now a guard with three reported states — no folio, pinned, or
- * unpinned **with a `::warning::`** — because "there is no lockfile" and "the
- * lockfile did not match" are different facts and only one of them is fine.
- * Class B simply lost the fallback.
- *
- * ## The gap this gate shipped with, found by re-deriving its own number
- *
- * The first version reported *"11 of 18 install steps"*. Re-derived
- * adversarially: **18 was the count of LINES carrying `--frozen-lockfile`,
- * not of install steps.** 25 lines mention `bun install`, so the denominator
- * was the wrong set, and choosing it that way hid the rows it excluded —
- * **three install steps that never pinned at all**, one of them in the
- * RELEASE workflow, which is the worst possible place for an unpinned
- * resolve.
- *
- * Counting what matched a SHAPE rather than what satisfied the CONTRACT,
- * which is bean `w4tq`'s lesson arriving one workflow over.
- *
- * So the gate now asks both questions, and keeps them apart:
+ * satisfy the manifest; `|| bun install` turns that failure into a silent,
+ * green, unpinned resolve. (With `cd dir && ... || bun install`, a failed `cd`
+ * also runs the fallback in the wrong directory.)
  *
  * | | |
  * |---|---|
  * | a pin that DEGRADES (`--frozen-lockfile \|\|`) | **fails, always, never baselined** |
  * | an install with NO pin | baselined; a NEW one fails |
  *
- * The split is not squeamishness. A degrading pin is a defect with no
- * defensible instance — the failure it swallows is the one it exists to
- * raise. An unpinned install sometimes IS right: the guarded blocks this
- * repository now uses fall back to one deliberately, and say so with a
- * `::warning::`. Failing on those would make the honest branch unreachable.
+ * An unpinned install is sometimes right: a guarded block may fall back to one
+ * deliberately and say so with a `::warning::`.
  *
- * ## What this gate does NOT claim
- *
- * It does not verify that any lockfile is *current*, or audit a single
- * dependency. Those are separate questions with separate evidence, and
- * answering them here would be the over-claiming this gate exists to catch.
+ * Not checked: that any lockfile is current, or any single dependency.
  *
  * @module scripts/check-lockfile-pinning
  * @covers code

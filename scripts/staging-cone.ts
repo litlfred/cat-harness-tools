@@ -1,9 +1,7 @@
 /**
  * The staging CONE, at file level: which rendered directories a branch's
- * changed files can reach. Bean `4j86`; owner, 2026-10-04: *"staging rebuild
- * only what is dependency cone of changes (general rule)"*, at FILE level
- * (option 1 of 3), with the generator named by `writer` on the directory
- * (option 1 of 3).
+ * changed files can reach, so staging rebuilds only those. The generator is
+ * the one named by `writer` on the directory.
  *
  * A directory is HIT when a changed file is
  *
@@ -13,13 +11,12 @@
  *      they are declared as a directory rather than discovered).
  *
  * and the cone is every hit directory plus everything `derivedFrom` makes
- * downstream of it (`downstreamOf`, bean `nama`).
+ * downstream of it (`downstreamOf`).
  *
  * ## Any doubt carries
  *
- * No file list carries everything. A writer whose closure cannot be read
- * carries its directory with the reason said, and the two causes are not the
- * same doubt:
+ * A writer whose closure cannot be read carries its directory with the reason
+ * said, and the two causes are not the same doubt:
  *
  * - a closure file that is MISSING, or a specifier that does not resolve, is
  *   unbounded — anything could be behind it — so any change carries;
@@ -27,14 +24,11 @@
  *   (code or JSON), never a page or a skill. So it carries on a changed module
  *   file and on nothing else.
  *
- * And one computed site is not a doubt at all, because its targets are
- * DECLARED. `harness-config.ts` loads each dependency's `contributes` module,
- * and `block-module.ts` loads a folio's block manifests from its `folio`
- * directories. They were the only two in gen-ig-pages' closure (measured
- * 2026-10-04), and both are read from the declarations and walked like any
- * import, so a change to a contributions module carries exactly what reaches
- * it. Under-carrying misleads a reviewer; over-carrying costs bytes
- * (`carriedInstances`' rule, bean `ga8a`, kept).
+ * Computed imports whose targets are DECLARED are not a doubt:
+ * `harness-config.ts` loads each dependency's `contributes` module, and
+ * `block-module.ts` loads a folio's block manifests from its `folio`
+ * directories; both are read from the declarations and walked like any
+ * import. Under-carrying misleads a reviewer; over-carrying only costs bytes.
  *
  * @module cat-harness/scripts/staging-cone
  * @covers none — it computes over declarations and code, and judges nothing

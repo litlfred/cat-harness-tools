@@ -3,24 +3,20 @@
  * When `origin` is an EMPTY repository, put `main` on it before anything else
  * is pushed, without switching the branch the caller is on.
  *
- * GitHub makes the first branch pushed to an empty repository its default.
- * `litlfred/dth-hrh` was created empty and scaffolded by `init-folio
- * --skip-vcs` in a cloud checkout on a feature branch; `--skip-vcs` skipped
- * `seedMainIfEmpty`, the feature branch was pushed first, and it became the
- * default instead of `main` (owner, 2026-10-14). So `init-folio` calls this
- * whenever it does not link the platform itself, and it can be run by hand:
+ * GitHub makes the first branch pushed to an empty repository its default, so
+ * a feature branch pushed first would become the default instead of `main`.
+ * `init-folio` calls this whenever it does not link the platform itself, and
+ * it can be run by hand:
  *
  *   bun run cat-harness-tools/scripts/seed-main-if-remote-empty.ts [<checkout>]
  *
  * It costs one `ls-remote` when the remote has branches. The session-start
- * primer does not run it (a repository that has the hook has been pushed
- * already); it WARNS instead when the remote's default is not `main`.
+ * primer does not run it; it WARNS instead when the remote's default is not
+ * `main`.
  *
  * Three rules a caller can rely on:
  *
- * - **It never fails its caller.** Every outcome exits 0. A guard that blocks
- *   the session over a remote it could not reach has made a small risk into
- *   an outage.
+ * - **It never fails its caller.** Every outcome exits 0.
  * - **It never force-pushes.** `main` is pushed with a plain push, so a remote
  *   that gained a `main` between the question and the push refuses it.
  * - **It does nothing when the remote has any branch**, or when the remote
@@ -30,21 +26,14 @@
  *
  * - **No commits yet.** An EMPTY "Seed main" commit, as `seedMainIfEmpty`
  *   makes, and the branch HEAD names is pointed at it too, so the session's
- *   first commit sits on top of `main` rather than beginning a history of its
- *   own. Plumbing (`commit-tree`, `update-ref`) rather than `commit`, so the
- *   index and working tree are left exactly as the session had them.
- * - **Commits already, on a feature branch** — the dth-hrh case. `main` is the
- *   ROOT commit of HEAD. An empty seed commit would be a second root: the
- *   feature branch shares no history with it, GitHub cannot open a pull
- *   request between them, and the only way to base the branch on the seed is
- *   to rewrite commits that may already be pushed, which needs the force-push
- *   this guard is forbidden. The root keeps ONE root and makes the feature
- *   branch a descendant of `main`, so its pull request shows every commit
- *   after the first. The cost is that the first commit lands on `main`
- *   without review; when the branch has only that one commit, its pull
- *   request is empty. That is reported, not hidden.
- * - **A local `main` already**: that is what is pushed. It is the history the
- *   person called `main`, and the guard has no grounds to choose another.
+ *   first commit sits on top of `main`. Plumbing (`commit-tree`, `update-ref`)
+ *   rather than `commit`, so the index and working tree are left untouched.
+ * - **Commits already, on a feature branch.** `main` is the ROOT commit of
+ *   HEAD, so the feature branch descends from `main` and a pull request can be
+ *   opened (an empty seed commit would be a second, unrelated root). The first
+ *   commit lands on `main` without review; when the branch has only that one
+ *   commit, its pull request is empty. That is reported, not hidden.
+ * - **A local `main` already**: that is what is pushed.
  *
  * A HEAD with more than one root (unrelated histories merged) has no single
  * answer and is reported, not seeded.

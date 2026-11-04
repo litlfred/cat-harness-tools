@@ -1,14 +1,11 @@
 #!/usr/bin/env bun
 /**
  * Check a bean is free, then claim it on every copy — the `bean-claim-check`
- * Tool (cat-harness `work-plan/tools/bean-claim-check/`), skill `bean-drain` step 2,
- * bean `n7x7`.
+ * Tool (cat-harness `work-plan/tools/bean-claim-check/`), skill `bean-drain` step 2.
  *
- * The case it exists for is f1e1, 2026-10-24: agy opened cat-harness-tools#686
- * at 07:47:35Z and a cloud thread made its first commit at 07:50:08Z. Both bean
- * copies said `in-progress` since 2026-10-16, so status said nothing; the open
- * PR said everything. So this reads activity on every copy, then open PRs, and
- * only then claims.
+ * A bean's status alone does not show whether someone is working on it, so
+ * this reads recent activity on every copy, then open PRs, and only then
+ * claims.
  *
  * ## How the claim is written
  *

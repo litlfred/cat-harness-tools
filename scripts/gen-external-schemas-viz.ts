@@ -6,34 +6,16 @@
  * @module cat-harness/scripts/gen-external-schemas-viz
  * @covers external-schema
  *
- * ## The gap this closes
+ * It reads the registry through `external-schemas.ts` (`loadSpecs`, which
+ * finds it from the declaration and refuses a malformed record;
+ * `undeclaredNamespaces` and `unusedNamespaces`), never with its own reader,
+ * so it cannot render a record the checker never validated.
  *
- * `external-schema` was one of the declared graph typologies with no published
- * viewer, so the navbar listed it disabled. Four records — BPMN 2.0, Diagram
- * Definition 1.0, DCMI Metadata Terms, SKOS — each naming an authority, an
- * edition, its namespace IRIs, the files that depend on it and the operative
- * terms this repository actually branches on, and no way to see any of it
- * short of opening four JSON files.
- *
- * ## It reads the registry through `external-schemas.ts`, not past it
- *
- * `loadSpecs` already finds the registry FROM THE DECLARATION, parses every
- * record and refuses a malformed one; `undeclaredNamespaces` and
- * `unusedNamespaces` already reconcile what is declared against what the
- * corpus uses. All of it is imported. A generator with its own reader would be
- * a second answer to "what is in this registry", free to render a record the
- * checker never validated — the rule bean `zw4a` states for the adjacent case
- * and the one `gen-methodologies-viz.ts` follows for its own graph.
- *
- * ## The one thing this adds: who DECLARES each specification
- *
- * What depends on a specification is the blast radius of a version bump. It
- * was a hand-written `usedBy` list on each record until bean `u63y` — the
- * specification naming its dependents, 36 entries nothing kept current. Now
- * each user declares the spec (`scripts/spec-users.ts`): a `@conformsTo` tag,
- * a `conformsTo:` front-matter list, an `xmlns` binding, or — for a graph
- * kind's files — the declaration of the module that types them. The page
- * lists those, and a declaration naming a spec no record has is a finding.
+ * It adds who DECLARES each specification — the blast radius of a version
+ * bump. Each user declares the spec (`scripts/spec-users.ts`): a
+ * `@conformsTo` tag, a `conformsTo:` front-matter list, an `xmlns` binding, or
+ * — for a graph kind's files — the declaration of the module that types them.
+ * A declaration naming a spec no record has is a finding.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-external-schemas-viz.ts

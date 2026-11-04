@@ -1,31 +1,23 @@
 #!/usr/bin/env bun
 /**
  * An epic's burn-down: how much of the work beneath it was open, and how much
- * closed, on each day of the bean store's history.
+ * closed, on each day of the bean store's history. It draws nothing.
  *
  * @module scripts/epic-burndown
  * @graphNode none — a read-only report over the bean store's git history
  * @covers none — it measures the work plan; the verdicts on it live in `check-bean-*`
  *
- * Bean `cat-tools-tk99`, first slice: the burn-down only. The math-progress
- * heat map and the board feed are later slices, and nothing here draws.
- *
  * ## Why the history and not `updated_at`
  *
- * A bean's front matter cannot say when it closed. `updated_at` is the last
- * edit, which is often not the close, and an edit made outside the `beans` CLI
- * does not bump it at all: measured 2026-10-22, the index store's
- * `folio-assistant-1l13` closed on 10-22 and still reads `updated_at:
- * 2026-10-10`. A series built from it would move closes to the wrong day. The
- * store's own commits are the record of what it said when, so each point here
- * is the store AS IT WAS at one commit.
+ * A bean's front matter cannot say when it closed: `updated_at` is the last
+ * edit, often not the close, and an edit made outside the `beans` CLI does not
+ * bump it at all. So each point here is the store AS IT WAS at one commit.
  *
  * ## No data is not zero
  *
  * A day on which the epic did not exist yet is reported with `present: false`
- * and null counts, never as an epic with nothing open. The same holds for a day
- * with no commit to the store: the series has no point for it, rather than a
- * point repeated from the day before, so a gap in the record stays a gap.
+ * and null counts, never as an epic with nothing open. A day with no commit to
+ * the store has no point, rather than one repeated from the day before.
  *
  * ## The closure is the one `milestone-rollup.ts` counts
  *
@@ -33,7 +25,7 @@
  * status in neither `OPEN_STATUSES` nor `CLOSED_STATUSES` counted as
  * `unclassified` rather than folded into either side. The archive
  * (`defs/archive/`) is read too: a closed bean moved there is still closed
- * work, and dropping it would read as the epic's scope shrinking.
+ * work.
  */
 import { spawnSync } from "node:child_process";
 

@@ -1,41 +1,19 @@
 /**
- * Wait before a retry, using the ONE backoff the repository has. Bean `06kg`.
+ * Wait before a retry, using the ONE backoff the repository has.
  *
- * ## Why this exists at all
- *
- * `cat-harness/skills/conduct/conduct-core/retry-backoff.md` records an owner rule —
- * *"as rule, use logarithmic fall-off on all errors. core best practice."* —
- * and `src/core/retry.ts` is that rule as code. The skill is explicit that a
- * call site should use it rather than write a loop, because *"a retry policy
- * invented per call site is a policy nobody can change in one place"*.
- *
- * A workflow's `run:` body cannot import TypeScript. So every retry loop in
- * `.github/workflows/` wrote its own, and all four wrote the same wrong one:
- *
- *     sleep $((attempt * 5))        # 5s, 10s — linear, no jitter
- *
- * That is the schedule the skill names as the thundering herd, on the ref it
- * cites as the contended one (`gh-pages`), written by the very sessions it
- * says contend on it — four of them pushing inside ninety minutes on
- * 2026-09-20, bean `bm6d`.
- *
- * Nothing caught it because the rule had an implementation and a test **in
- * TypeScript** and four call sites **in bash** that no check read. `retry.ts`
- * passing said nothing at all about `feature-staging.yml`. That is the `dh4f`
- * shape: a consumer scans nothing and the absence reads as compliance.
+ * `src/core/retry.ts` implements the retry rule in
+ * `cat-harness/skills/conduct/conduct-core/retry-backoff.md` (logarithmic
+ * fall-off on all errors, never a loop written per call site). A workflow's
+ * `run:` body cannot import TypeScript, so retry loops in `.github/workflows/`
+ * call this script instead of writing their own `sleep`.
  *
  * ## Why a script rather than a shell function
  *
- * A shell function copied into four `run:` bodies is still four
- * implementations, free to drift — which is exactly how six copies of
- * `stripLeanComments` ended up with three of them broken and nothing saying
- * so (bean `bqrg`). This calls {@link waitFor} directly, so the workflows and
- * `withBackoff` compute the same number from the same code, and changing the
- * policy is one edit.
- *
- * The cost is a `bun` start per wait. It is paid inside a loop that is already
- * sleeping seconds, in a job that already runs `bun` (`render-log.ts`) in the
- * same block, so `bun` being absent is not a new failure mode.
+ * A shell function copied into several `run:` bodies is several
+ * implementations, free to drift, as copies of `stripLeanComments` once did.
+ * This calls {@link waitFor} directly, so the
+ * workflows and `withBackoff` compute the same number from the same code.
+ * The cost is a `bun` start per wait, in jobs that already run `bun`.
  *
  * ## Why it sleeps rather than printing a number
  *
@@ -44,12 +22,11 @@
  * would then take as its own. Sleeping here means a fault is this script's
  * exit code, which the calling loop can see.
  *
- * ## The defaults, and why they are not `retry.ts`'s
+ * ## The defaults
  *
  * `waitFor`'s own defaults (1 s base) are tuned for an HTTP call. A rejected
  * push to `gh-pages` is a lost race against another session's whole job, so
- * the base is 5 s — the value the linear version started at, kept so this is a
- * change of SHAPE and not a change of scale. The cap stays `retry.ts`'s 16 s.
+ * the base here is 5 s. The cap stays `retry.ts`'s 16 s.
  */
 import { waitFor } from "../src/core/retry.js";
 

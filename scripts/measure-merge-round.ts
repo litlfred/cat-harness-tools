@@ -1,19 +1,12 @@
 #!/usr/bin/env bun
 /**
- * Time one merge round — the yardstick every regen/gates speed-up reports
- * against (bean `xpcu`, umbrella of `f017`, `v3nf`, `7how`).
+ * Time one merge round with fixed steps, so regen/gates speed-ups are
+ * measured against the same yardstick: the same steps, the same two commits,
+ * and the box's load written beside each wall time.
  *
  * @module scripts/measure-merge-round
  * @graphNode none — a measurement command over a scratch worktree
  * @covers none — it times commands and judges nothing
- *
- * ## Why a script and not a paragraph
- *
- * Three sessions are cutting the same ~13-minute round from three sides, and
- * a wall time is only comparable to another taken with the same steps, the
- * same two commits and the box's load written beside it. Measured by hand on
- * 2026-10-06 the numbers already disagreed by recipe: "regen" meant one run
- * to one session and the six-step recipe to another. This fixes the steps.
  *
  * ## What it does
  *
@@ -24,9 +17,9 @@
  * 2. commits whatever that wrote (in the scratch worktree only);
  * 3. **merge**: merges `--target` and runs the recipe again, timing each step.
  *
- * Two recipes, so a change can be measured against today's:
+ * Two recipes:
  *
- * - `manual` — the six steps PRs ran on 2026-10-06:
+ * - `manual` — six steps:
  *   `git merge`, `state:mount`, `regen`, `qa:working-copy`, `kg:detangle`, `regen`;
  * - `merge-main` — `bun run cat merge:main` against `--target` (it mounts,
  *   resolves declared conflicts and runs `regen --changed <fork point>`).

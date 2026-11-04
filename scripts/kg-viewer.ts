@@ -2,75 +2,53 @@
 /**
  * A page that makes the published knowledge graph legible.
  *
- * Bean `1dfh`, outstanding item 1: "**No viewer.** This is the dump only, as
- * asked. `kg.json` is the input a viewer would take. Unblocked now."
+ * ## Generated, not committed
  *
- * ## Why this is generated rather than committed as a static file
- *
- * The page must fetch the graph document, and that document is named after the
- * repository — `<stub>.jsonld`. A committed page would have to either hardcode
- * one instance's stub (the genericity failure `AGENTS.md` catalogues, where a
- * platform script carried `quantum-observable-universe`), or COMPOSE the name
- * from something at runtime, which is the "resolve, do not compose" rule this
- * project keeps re-learning. Generating it means the exporter — which already
- * knows the stub — writes it in, and the page resolves nothing.
+ * The page fetches the graph document, which is named after the repository
+ * (`<stub>.jsonld`). The exporter already knows the stub and writes it in, so
+ * the page neither hardcodes one instance's stub nor composes a name at
+ * runtime.
  *
  * It fetches the graph **relative to its own location**, so the same bytes work
  * at `<canonical>/<stub>/` and at `STAGING/<slug>/<stub>/` with no
- * configuration. A staging build that needed a different page would be a
- * staging build testing something other than what ships.
+ * configuration.
  *
  * **The graph is found from the SITE ROOT, never as a neighbour.** The page
  * climbs to the root and descends the document's own path, `exportIdentity`'s
- * `docPath`. That path has moved twice: a sibling while both lived in `kg/`,
- * then the parent `<base>/<stub>.jsonld`, and since 2026-10-23
- * `<base>/<name>/<stub>.jsonld`, every layer's document beside its subjects
- * (litlfred/cat-harness-tools#603, decision 1b). The viewer's own route
- * moved separately (`kgViewerRoute`), so neither is written here as an
- * assumption about the other.
+ * `docPath` (currently `<base>/<name>/<stub>.jsonld`, beside its subjects).
+ * The viewer's own route is separate (`kgViewerRoute`), so neither is written
+ * here as an assumption about the other.
  *
- * ## Why no dependencies, and no force-directed graph
+ * ## No dependencies, and no force-directed graph
  *
- * **No CDN, no framework, no build step.** A page that needs a network fetch
- * to render cannot be opened from a file, cannot be reviewed offline, and adds
- * a third party to the trust boundary of a page whose whole job is to display
- * this repository's own data. Everything here is one HTML file.
+ * **No CDN, no framework, no build step**: one HTML file that opens from disk,
+ * can be reviewed offline, and adds no third party to the trust boundary.
  *
- * **1111 nodes and ~2000 edges do not want to be a force-directed graph.**
- * That renders as a hairball: it looks like a knowledge graph and answers no
- * question about one. The questions people actually bring — what is this node,
- * what does it point at, what points at it, what else is of this kind — are
- * answered by a faceted index with a detail panel, and by a ONE-HOP
- * neighbourhood diagram for the selected node, which is small enough to read.
+ * A graph of this size renders as a hairball when force-directed. The
+ * questions people bring — what is this node, what does it point at, what
+ * points at it, what else is of this kind — are answered by a faceted index
+ * with a detail panel, and by a ONE-HOP neighbourhood diagram for the
+ * selected node.
  *
  * ## The viewer reports the graph's own gaps
  *
  * `undeclaredTerms` is rendered, and every property the `@context` does not
- * declare is marked in the detail panel. The first real consumer of a document
- * is the right place to surface what the document is missing: 34 property
- * names, 3461 occurrences, all silently dropped by a JSON-LD processor. A
- * viewer that quietly displayed them as though they were part of the graph
- * would be hiding exactly what it exists to reveal.
+ * declare is marked in the detail panel, since a JSON-LD processor silently
+ * drops them.
  *
  * ## The chrome is translated; the graph is not, and the page says so
  *
  * Every word the viewer itself says is lifted into `scripts/kg-viewer-strings.ts`
- * and extracted from THERE, never from this page. Extracting from the generated
- * HTML would make the generator OUTPUT the translation source: regenerate, and
- * every reference in the POT churns while no string has changed, and every
- * sign-off is invalidated by the regeneration rather than by an edit.
+ * and extracted from THERE, never from this page's generated HTML.
  *
  * Each locale's `translations/<locale>/kg-viewer.po` is read at generate time
  * and embedded, so the page still fetches nothing but its own graph document.
  * The reader's language comes from a "lang" query parameter, then the
- * "fa-locale" key the docs site writes, then the browser — the same key rather
- * than a second one.
+ * "fa-locale" key the docs site writes, then the browser.
  *
  * **The graph's own words are NOT translated.** Node titles, descriptions and
- * property names arrive in the JSON-LD document in whatever language the corpus
- * is written in, and no catalogue here can reach them. A page that translated
- * its frame and stayed silent about its contents would claim more than it did,
- * so the boundary is drawn on screen, in the reader's language.
+ * property names arrive in whatever language the corpus is written in, and
+ * the page says so on screen, in the reader's language.
  *
  * @covers none — a page writer, not an audit of a declared graph
  * @module scripts/kg-viewer

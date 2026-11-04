@@ -3,34 +3,24 @@
  * Which uncovered skills warrant a Tool — triaged by evidence, not by grep.
  *
  * `check:tools` reports that N skills have no Tool and deliberately does not
- * fail on it, because many skills are pure judgement and a Tool for them would
- * be an invention. That leaves a real question it cannot answer: **which of the
- * uncovered ones still have their mechanism inlined in their prose?**
+ * fail on it, because many skills are pure judgement. This answers the
+ * question it cannot: **which of the uncovered ones still have their
+ * mechanism inlined in their prose?**
  *
  * ## Why a grep is the wrong instrument
  *
- * Searching bodies for backticks or `gh `/`bun run` over-reports badly. A skill
- * may legitimately QUOTE a command as an example while stating its capability
- * generically — `one-voice-style-guide` shows a `grep` invocation and is pure
- * judgement. Measured here: 52 uncovered skills contain a fenced shell block,
- * which is 44 % of them and far too many to be a finding.
+ * Searching bodies for backticks or `gh `/`bun run` over-reports badly: a
+ * skill may legitimately QUOTE a command as an example while stating its
+ * capability generically.
  *
  * ## The discriminator the corpus already carries
  *
- * BPMN task **type**. A process step is not just "implemented by" a skill — it
- * is a `serviceTask` (automated) or a `userTask` (performed by a person), and
- * the diagrams already say which.
- *
- * `interaction-modality` is the case that proved it. It was the standing
- * example of a "pure judgement" skill, and it turns out **two** activities name
- * it: `Task_DetectModality`, a `serviceTask` that reads the preferences file —
- * a mechanism — and `Task_AskIntent`, a `userTask` about how to frame the
- * question — judgement.
- *
- * **So the question is not "is this skill a Tool?" but "which PART of it is."**
- * Nine of the sixteen strongest candidates are `serviceTask` *and* `userTask`.
- * A skill with both is not mis-modelled; it is a skill whose mechanical half
- * should move to a Tool and whose judgement half never will.
+ * BPMN task **type**. A process step is a `serviceTask` (automated) or a
+ * `userTask` (performed by a person), and the diagrams already say which.
+ * One skill can be named by both (e.g. `interaction-modality`:
+ * `Task_DetectModality` reads a preferences file, `Task_AskIntent` frames a
+ * question). **So the question is "which PART of it is a Tool"**: the
+ * mechanical half should move to a Tool and the judgement half never will.
  *
  * ## The tiers
  *
@@ -43,25 +33,15 @@
  *   genuinely ambiguous.
  * - **D** — nothing. Almost certainly judgement.
  *
- * The point is not that A and D are certain. It is that C is the only tier
- * needing a read, which is the difference between an afternoon and a week.
+ * C is the only tier needing a read.
  *
- * ## `D` meant "no evidence IN THE BODY", and that is not the same thing
+ * ## A declared script is evidence too
  *
- * The fenced-block test reads the skill's own prose, so a skill that states its
- * rules without ever SHOWING its command landed in D — the tier whose label
- * tells you not to look. `ci-health` was the case that proved it: a real
- * command (`check:ci-health`, declared in `package.json`), documented in
- * `AGENTS.md`, no Tool node, and **tier D with an empty evidence list**, because
- * its own markdown never puts the command in a fence.
- *
- * So a declared script counts as evidence too, matched strictly — a colon
- * segment of the script's key equals the skill name, or the command runs a file
- * literally called `<skill>.ts`. Loose substring matching was tried first and
- * rejected: a short skill name matches unrelated keys. Measured: the strict rule
- * moves **6** skills from D to C (`agent-memory`, `ci-health`, `crdm-detect`,
- * `kg-viewer`, `raci`, `readme-sections`) and reclassifies **nothing** already in
- * A or B.
+ * A skill that states its rules without ever SHOWING its command in a fence
+ * would otherwise land in D. So a declared script counts, matched strictly —
+ * a colon segment of the script's key equals the skill name, or the command
+ * runs a file literally called `<skill>.ts`. Loose substring matching is not
+ * used: a short skill name matches unrelated keys.
  *
  * @module scripts/tool-coverage
  */

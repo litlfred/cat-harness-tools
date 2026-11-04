@@ -7,71 +7,40 @@
  *   those two declared graphs. The built-tree mode judges a rendered site,
  *   which is not a declared graph and is covered by `docs-site.yml` instead.
  *
- * ## The failure this exists for, measured rather than imagined
+ * ## The failure
  *
- * `docs/_includes/landing.html` builds its `<article>` opening tag across many
- * lines, and one Liquid `{% endif -%}` right-stripped the newline before the next
- * attribute. The emitted tag was `…--fa-text-scale:0.74;"aria-labelledby=…` — no
- * whitespace between two attributes, which is unparseable. `index.md` is
- * MARKDOWN, so Kramdown stopped recognising the block as HTML and escaped the
- * whole of it: the published landing page carried
+ * A malformed opening tag emitted by an include into a MARKDOWN page (e.g.
+ * two attributes with no whitespace between them, after a Liquid `-%}`
+ * strips a newline) stops Kramdown recognising the block as HTML, so it
+ * escapes the whole block and the page shows
  *
  *     <div class="fa-sticky-board fa-landing-board">&lt;article class="fa-sticky …"
  *
- * as visible text, with `&lt;/article&gt;` to match. **3 escaped, 0 real.** Every
- * `.fa-landing-sticky--fixed` rule was dead — the fixed aspect, the text box
- * positioned in the cloud, all of it — and the raw tag printed on screen.
+ * as visible text. The template is valid source; only the built tree shows
+ * the defect, so source checks, `bun test` and declaration checks all pass.
+ * This asks the general question — does the built tree contain an escaped
+ * block-level tag — for any include and any page.
  *
- * ## Why no existing check saw it
+ * Inline elements are NOT scanned: `&lt;picture&gt;` in a code span or a
+ * prose mention of `&lt;source&gt;` is legitimate documentation. A
+ * BLOCK-level tag rendered as text never is.
  *
- * Every one of them looks at a *source* artefact, and the source was **correct
- * HTML**. The template is valid; what Kramdown then did to it is only visible
- * after the build. `bun test` never builds the site, the e2e suite serves the
- * repository root and no spec asserts the board, and `landing:sticky:check`
- * validates the DECLARATION. So the whole gate wall passed — TypeScript, e2e,
- * accessibility, 12 gates green — over a page whose stickies did not exist as
- * elements. A template that is correct and a page that is correct are different
- * claims, and only the second one is what a reader loads.
+ * ## `<code>` and `<pre>` are excluded
  *
- * ## Why it is general rather than a test for one tag
+ * Escaped markup inside them is DISPLAYED markup (e.g. a path template like
+ * `&lt;section&gt;/&lt;block&gt;/translations/&lt;locale&gt;/block.po`);
+ * outside them it is LEAKED markup. Code and pre regions are blanked before
+ * scanning.
  *
- * The mechanism is not specific to `<article>` or to that one `-%}`. ANY
- * malformed opening tag in ANY include, emitted into ANY markdown page, escapes
- * the same way and fails silently in the same place. So this asks the general
- * question — does the built tree contain an escaped block-level tag — and it
- * would have caught this instance without having been written for it.
- *
- * Inline elements are deliberately NOT scanned: `&lt;picture&gt;` inside a code
- * span or a prose mention of `&lt;source&gt;` is legitimate documentation, and
- * this repository's pages are full of both. A BLOCK-level tag rendered as text
- * is never intentional prose formatting — nothing here documents HTML by pasting
- * an unfenced `&lt;article class="…"&gt;` into a paragraph.
- *
- * ## `<code>` and `<pre>` are excluded, and that is not a loophole
- *
- * The first run of this check found the landing defect **and** two pages that are
- * simply correct: `translation-support.html` documents the path template
- * `&lt;section&gt;/&lt;block&gt;/translations/&lt;locale&gt;/block.po`, and
- * `md-authoring.html` quotes `&lt;table class="md-table"&gt;`. Both sit inside a
- * `<code>` element, which is exactly how a document shows markup to a reader.
- *
- * Firing on those would have made this a check somebody switches off, and this
- * repository has already written down why: *a check that fires on every one of
- * its subjects is a check that is wrong, not a repository that is.* So code and
- * pre regions are blanked before scanning — escaped markup inside them is
- * DISPLAYED markup, and escaped markup outside them is LEAKED markup. That line
- * is the whole discrimination, and it is also what makes the check falsifiable:
- * it must fail on the built page that shipped and pass on the fixed one.
- *
- * ## Three states, and the third is the point
+ * ## Three states
  *
  * - **clean** — no page carries an escaped block tag.
  * - **found** — at least one does. A reader sees markup as words.
  * - **could not determine** — there is no tree to look in. **Not a pass.**
  *
- * Exit 2 on could-not-determine, distinct from exit 1 on a real finding, for the
- * reason `check-maintained-artefacts` gives: a check that quietly passes where
- * nobody built the site is green exactly where it is blind.
+ * Exit 2 on could-not-determine, distinct from exit 1 on a real finding: a
+ * check that passes where nobody built the site is green exactly where it is
+ * blind.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/check-escaped-markup.ts ./_site

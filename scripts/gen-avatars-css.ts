@@ -7,25 +7,16 @@
  *   stylesheet is generated from a module rather than from a graph directory. Whether every
  *   declared KIND has one is `check-avatar-coverage`'s question, and it is not in the gate set
  *
- * Same contract as `gen-themes-css.ts`, and for the same reason: the graph is
- * the source and the stylesheet is a rendering of it, so a colour or a glyph
- * has one home. `--check` fails when the committed file is stale.
+ * Same contract as `gen-themes-css.ts`: the stylesheet is a rendering of the
+ * nodes, and `--check` fails when the committed file is stale.
  *
- * ## Why one stylesheet rather than 64 assets
+ * One stylesheet, not one asset per kind × scheme × trash state: the glyph is
+ * a `mask-image`, the colour is `background-color`, a scheme is a custom
+ * property and the trash state is one extra selector.
  *
- * Sixteen kinds × two schemes × in/out of trash is 64 cells. As files they
- * would drift, and the one that fell behind would be invisible until somebody
- * opened the site in the other mode. Here the glyph is a `mask-image` and the
- * colour is `background-color`, so a scheme is a custom property and the
- * trash state is one extra selector — 64 cells out of 16 declarations.
- *
- * ## Both schemes are DERIVED from one hue, which is the point
- *
- * A kind declares a hue angle, not a colour. This builds the light pair and
- * the dark pair from it with fixed lightness targets, so a kind cannot be
- * legible in one mode and invisible in the other. That is the `y8cm` /
- * `rptk` failure, which this repo has already shipped twice by choosing two
- * colours independently and checking one.
+ * A kind declares a hue angle, not a colour. Both the light and the dark pair
+ * are derived from it with fixed lightness targets, so a kind cannot be
+ * legible in one mode and invisible in the other.
  *
  * Exit codes: 0 written or up to date · 1 stale under `--check`.
  */

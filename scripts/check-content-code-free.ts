@@ -5,33 +5,28 @@
  * @module cat-harness-tools/scripts/check-content-code-free
  * @covers code — every tracked file under the cat-harness instance, read by extension only
  *
- * Bean `y9r6` (FR-7, owner D2 2026-10-01): the harness is content, so its
- * manifests, Tool definitions and skill records are JSON data that the tools
- * validate on read, and code lives in cat-harness-tools. The bean's done-when
- * names this gate: no tracked `.ts/.js/.py/.sh` under `cat-harness/`.
+ * The harness is content: its manifests, Tool definitions and skill records
+ * are JSON data that the tools validate on read, and code lives in
+ * cat-harness-tools. So no tracked `.ts/.js/.py/.sh` belongs under
+ * `cat-harness/`.
  *
- * It cannot be green by that wording yet. About 470 of the files it counts are
- * `schemas/`, which bean `8lcl` moves, so the gate is a ratchet. The committed
- * list (`content-code-free-baseline.json`) names every code file still allowed.
- * A code file NOT on the list is red: that is new code in content. A listed
- * file that is gone is reported with the command that shortens the list, and
- * is not red, so a move landing elsewhere never turns an unrelated PR red. The
- * list only ever shrinks; a longer one is a diff somebody reviews.
+ * The gate is a ratchet. The committed list
+ * (`content-code-free-baseline.json`) names every code file still allowed. A
+ * code file NOT on the list is red: new code in content. A listed file that
+ * is gone is reported with the command that shortens the list, and is not
+ * red, so a move landing elsewhere never turns an unrelated PR red. The list
+ * only ever shrinks.
  *
- * Code is decided by extension: `.ts .tsx .mts .cts .js .mjs .cjs .py .sh .rb`.
- * The bean names four; the module variants are the same languages, and `.rb`
- * is how Jekyll plugins are written. Git decides what is tracked.
+ * Code is decided by extension: `.ts .tsx .mts .cts .js .mjs .cjs .py .sh .rb`
+ * (`.rb` is how Jekyll plugins are written). Git decides what is tracked.
  *
- * Browser assets are not code in this sense, by rule (owner card 2026-10-30,
- * option A, keeping the 2026-10-09 chrome-subgraph layout): a `.js`/`.mjs`
- * under `site-chrome/assets/`, `site-chrome/_includes/` or `docs/assets/` is a
- * file the site ships to the browser, sitting next to the include that loads
- * it.
+ * Exempt by rule:
  *
- * Two build helpers stay by rule too (owner card 2026-10-30, option A):
- * the folio file-list renderer (`folio-render/`, owner ruling 2026-10-10:
- * cat-harness carries its own minimal renderer) and the Jekyll plugins
- * (`_plugins/*.rb`), which belong to the same chrome layout as the assets.
+ * - browser assets: a `.js`/`.mjs` under `site-chrome/assets/`,
+ *   `site-chrome/_includes/` or `docs/assets/` is a file the site ships to
+ *   the browser, next to the include that loads it;
+ * - two build helpers: the folio file-list renderer (`folio-render/`) and the
+ *   Jekyll plugins (`_plugins/*.rb`), part of the same chrome layout.
  *
  * Usage: bun run cat check:content-code-free [--update] [--no-baseline]
  * Exit:  0 when every code file is listed · 1 otherwise

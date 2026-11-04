@@ -1,23 +1,20 @@
 #!/usr/bin/env bun
 /**
  * `secrets:check` — declared credential needs against what the workflows use
- * and what is present, by NAME ONLY (bean `folio-assistant-jzba`; spec:
- * cat-harness `docs/proposals/credentials-needs-and-supply.md` §6.2).
+ * and what is present, by NAME ONLY.
  *
  * **It never reads a value.** Its inputs are workflow text (the
  * `${{ secrets.NAME }}` references), the `credentials/needs.json` and
  * `credentials/registry.json` declarations, and — when a token allows it —
  * the secret NAMES GitHub lists, which the API returns without values.
  *
- * Three states, as `check-ci-health` and `check-secret-leaks` have them:
- * exit 0 clean, 1 findings, **2 could not determine, which outranks clean and
- * is never shown green**. Today every run exits 2, and correctly: no
- * `needs.json` exists yet (bean 9hxd), so "declared needs" is reported as
- * could-not-determine rather than as an empty, passing set.
+ * Exit 0 clean, 1 findings, **2 could not determine, which outranks clean and
+ * is never shown green**. With no `needs.json`, "declared needs" is reported
+ * as could-not-determine (exit 2) rather than as an empty, passing set.
  *
- * Findings (§6.2): used-not-declared, declared-not-used, declared-not-present,
+ * Findings: used-not-declared, declared-not-used, declared-not-present,
  * present-not-declared (orphans, reported and NEVER deleted), naming-rule
- * advisories (§4: a name says the capability, never `_TOKEN`/`_PAT`/`_KEY`/
+ * advisories (a name says the capability, never `_TOKEN`/`_PAT`/`_KEY`/
  * `_APP`), and expiry from the registry at 30 / 7 / 0 days.
  *
  * Usage:

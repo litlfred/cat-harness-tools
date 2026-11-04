@@ -1,22 +1,20 @@
 /**
- * A word diff small enough to ship inside a static page. Bean `d903`.
+ * A word diff small enough to ship inside a static page.
  *
- * The repository had no diff library, and adding one is a dependency and a
- * NOTICE entry for what is about forty lines. This is the classic LCS over
+ * About forty lines instead of a diff-library dependency: the classic LCS over
  * word tokens, with the common prefix and suffix trimmed first, so a one-word
  * edit in a long paragraph costs almost nothing.
  *
- * It is written as ONE self-contained function on purpose. `gen-review-page`
- * embeds it in the page with `wordDiff.toString()`, so the function the tests
- * exercise is byte for byte the one the reviewer's browser runs. A second copy
- * in the page's script would be free to drift.
+ * It is ONE self-contained function on purpose: `gen-review-page` embeds it in
+ * the page with `wordDiff.toString()`, so the function the tests exercise is
+ * byte for byte the one the reviewer's browser runs.
  *
  * Tokens keep their whitespace, so joining the tokens of either side gives
  * that side back exactly.
  *
  * Too large a table (more than `limit` cells after trimming) returns `null`,
- * and the caller SAYS the block is too long for a word diff. A frozen tab is
- * the alternative, and it reads as a broken page.
+ * and the caller SAYS the block is too long for a word diff rather than
+ * freezing the tab.
  */
 export type DiffOp = { op: "same" | "ins" | "del"; text: string };
 

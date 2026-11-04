@@ -3,11 +3,8 @@
  * render-changed-blocks.ts — Render per-block standalone PDFs for every
  * content block touched by the current branch (or an explicit file list),
  * scrape the LaTeX logs for human-relevant feedback, and optionally push
- * the clean PDFs to Google Drive.
- *
- * This script is the key loop in the `block_pdf_render` prepare-merge gate
- * (see .claude/commands/prepare-merge.md) and is also called from the
- * render-on-change hook after every content edit.
+ * the clean PDFs to Google Drive. The render-on-change hook calls it after
+ * every content edit.
  *
  * By default output is local: PDFs land under `build/block-pdfs/` with a
  * JSON report beside them, and nothing leaves the machine. `--upload-drive`
@@ -18,7 +15,7 @@
  *   bun run cat-harness-tools/scripts/render-changed-blocks.ts
  *   bun run cat-harness-tools/scripts/render-changed-blocks.ts --paper quantum-observable-universe
  *   bun run cat-harness-tools/scripts/render-changed-blocks.ts --base main
- *   bun run cat-harness-tools/scripts/render-changed-blocks.ts --files content/paper/ch/block.ts
+ *   bun run cat-harness-tools/scripts/render-changed-blocks.ts content/paper/ch/block.ts
  *   bun run cat-harness-tools/scripts/render-changed-blocks.ts --upload-drive
  *   bun run cat-harness-tools/scripts/render-changed-blocks.ts --upload-drive --drive-folder "QOU/blocks"
  *   bun run cat-harness-tools/scripts/render-changed-blocks.ts --all   # render every block in paper

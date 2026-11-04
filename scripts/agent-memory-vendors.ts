@@ -1,20 +1,17 @@
 /**
  * Per-agent definition files for the other agent hosts, each carrying the
- * same memory as Claude's (bean `31ni`; targets `4682`, `5zs1`, `uvfs`, `xxh4`).
+ * same memory as Claude's.
  *
  * @module scripts/agent-memory-vendors
  * @covers memory
  *
- * ## Why a whole definition, not just memory
- *
  * Only Claude Code has per-agent memory (`memory: project` injects
  * `.claude/agent-memory/<agent>/MEMORY.md`). The other hosts have per-agent
- * DEFINITION files whose body is the agent's prompt. So the only way to give
- * one of their agents the same memory is to write its whole definition: the
+ * definition files whose body is the prompt, so each is written whole: the
  * Claude definition's prompt (`.claude/agents/<agent>.md`), then the memory
- * nodes inline. Imports are not portable across hosts, so nothing is linked in.
+ * nodes inline. Nothing is imported, since imports are not portable.
  *
- * ## The formats, verified 2026-10-24 against each vendor's docs
+ * ## The formats
  *
  * | host | file | front matter / keys | prompt | limit |
  * |---|---|---|---|---|
@@ -28,25 +25,22 @@
  * and docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/create-custom-agents-for-cli.
  *
  * Cursor also reads `.claude/agents/` and `.codex/agents/`, but `.cursor/`
- * wins on a name clash. That is why a Cursor file is still written: the
- * `.claude/agents/` copy it would otherwise read has no memory in it.
+ * wins on a name clash, and the Claude copy carries no memory.
  *
  * ## Tools
  *
  * A Claude agent's `tools:` list is translated where the host has a
  * documented equivalent (Gemini tool names, Copilot aliases, Cursor's
  * `readonly`). A Claude tool with no equivalent (e.g. `ToolSearch`) is left
- * out, not guessed. Codex agent files cannot restrict tools beyond feature
- * switches, so a Codex agent without `Bash` gets `features.shell_tool = false`
- * and nothing else.
+ * out, not guessed. Codex cannot restrict tools beyond feature switches, so
+ * a Codex agent without `Bash` gets `features.shell_tool = false` only.
  *
  * ## Budgets
  *
- * Copilot's 30,000-character prompt limit is the vendor's. The other three
- * state no limit; they get the harness's own 32 KiB cap, the same as the
- * repo-wide `AGENTS.md` section, so no target grows without bound. Over
- * budget, the lowest-priority nodes are dropped and REPORTED (never silent
- * truncation), exactly as for the Antigravity targets.
+ * Copilot's limit is 30,000 characters; the other three get the harness's
+ * 32 KiB cap, the same as the repo-wide `AGENTS.md` section. Over budget, the
+ * lowest-priority nodes are dropped and reported (never silent truncation),
+ * as for the Antigravity targets.
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";

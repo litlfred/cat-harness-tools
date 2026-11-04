@@ -9,20 +9,13 @@
  * bun run cat check:session-staleness --warn listing.json   # report, never fail
  * ```
  *
- * **It takes the listing as INPUT and does not fetch it.** Probed 2026-09-21
- * from inside a session container: no session credential in the environment,
- * `api.anthropic.com/v1/sessions` → 401, `claude.ai/api/code/sessions` → 403.
- * `list_sessions` is an MCP tool an AGENT holds, not an endpoint a script can
- * call — the same wall that makes `sibling-sessions.ts` infer sessions from
- * commit trailers.
- *
- * **So this is not a CI gate and must not be wired in as one.** A gate whose
- * input CI cannot obtain would examine nothing and report a clean run over
- * everything — the `dh4f` defect. It belongs in the session-start sweep, run
- * by an agent that can produce the listing.
+ * It takes the listing as INPUT and does not fetch it: `list_sessions` is an
+ * MCP tool an agent holds, not an endpoint a script can call. So it is not a
+ * CI gate (CI cannot obtain the input); it belongs in the session-start
+ * sweep, run by an agent.
  *
  * The rules, their thresholds and every threshold's basis are in
- * `src/sessions/staleness.ts`. Bean `rq8s`.
+ * `src/sessions/staleness.ts`.
  *
  * @module folio-assistant/scripts/check-session-staleness
  */

@@ -2,12 +2,8 @@
 /**
  * Render each library entry's COVER — page 1 of its held PDF — into the
  * entry, as `cover.png` (`COVER_FILENAME`), where `avatarOf` takes it before
- * any figure.
- *
- * Owner, 2026-10-16: a folio card's picture was the entry's first figure, and
- * for one paper that was a black game screenshot from page 11. New ingests
- * get a cover from `ingest-document`'s cover arm; this is the backfill for
- * entries ingested before it.
+ * any figure. New ingests get a cover from `ingest-document`'s cover arm; this
+ * backfills older entries.
  *
  * It can only render what this checkout HOLDS. Upload PDFs are pinned by
  * sha256 and not committed, so run it where the PDFs are (the checkout that

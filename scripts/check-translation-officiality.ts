@@ -1,26 +1,22 @@
 #!/usr/bin/env bun
 /**
- * Officiality is recorded in TWO places, and they must agree — bean
- * `cat-tools-bbnd`, owner ruling 2026-10-10 ("both, checked to agree").
+ * Officiality is recorded in TWO places, and they must agree.
  *
- * A translation is official only when a person signed it off (issue #206).
- * That is written per catalogue, as the PO header `X-Folio-Official: yes`
- * (read by `kg-viewer-strings.ts`), and per locale, as `official: true` with
+ * A translation is official only when a person signed it off. That is written
+ * per catalogue, as the PO header `X-Folio-Official: yes` (read by
+ * `kg-viewer-strings.ts`), and per locale, as `official: true` with
  * `signedOffBy`/`signedOffAt` in `translations/<locale>/status.json`
- * (`schemas/content/translation.ts`). The translation drawer shows officiality from
- * both, so a disagreement would show a reader two answers to one question.
+ * (`schemas/content/translation.ts`). The translation drawer shows both.
  *
- * ## What disagrees
+ * Disagreements:
  *
  * - `status.json` says official, but a catalogue in that locale does not say
  *   `X-Folio-Official: yes`;
  * - a catalogue says `yes`, but its locale has no `status.json`, or one that
  *   is not official;
- * - `status.json` says official with no `signedOffBy` or `signedOffAt`: an
- *   official translation with nobody named is the claim #206 exists to stop.
+ * - `status.json` says official with no `signedOffBy` or `signedOffAt`.
  *
- * Silence on both sides is consistent: unofficial. That is the state of
- * every catalogue today, and saying so is the point of the check, not a gap.
+ * Silence on both sides is consistent: unofficial.
  *
  * Exit 0 agree · 1 a disagreement · 2 could not determine, which is never a pass.
  * @covers qa

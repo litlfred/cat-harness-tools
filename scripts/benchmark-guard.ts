@@ -1,17 +1,11 @@
 /**
  * Guard against benchmark runs writing into declared knowledge-graph directories.
  *
- * Bean: folio-assistant-wp49 ("TEST MODE: benchmarking output is a report, and deliberately not KG content")
- * Issue: #363
- *
- * Every other verdict in the platform lands inside a declared graph (`test/results/` for
- * `qa`, `test/attestations/` for `attestations`, `test/health/results/` for `health`).
- * Benchmark outputs are the deliberate exception: they are assertions about the model
- * and runner configuration at a single point in time, not facts about the subject folio.
- *
- * Admitting benchmark metrics into the knowledge graph would make graph contents depend
- * on which model happened to run. Therefore, benchmark outputs must land in `build/`
- * (e.g. `build/benchmarks/`) or `reports/`, and are forbidden from writing into any
+ * Every other verdict lands inside a declared graph (`test/results/` for
+ * `qa`, `test/attestations/` for `attestations`, `test/health/results/` for
+ * `health`). Benchmark outputs describe the model and runner at one point in
+ * time, not the subject folio, so they must land in `build/` (e.g.
+ * `build/benchmarks/`) or `reports/`, and are forbidden from writing into any
  * declared graph directory.
  *
  * @module scripts/benchmark-guard

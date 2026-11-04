@@ -3,16 +3,14 @@
  *
  * @module scripts/todo-source
  *
- * Issue #1908 (owner, 2026-10-02): the todo graph's source of truth is moving
- * to the special branch NAMED AFTER THE SUBGRAPH, `cat/cat-harness/todos`,
- * under the `cat/<harness>/<name>` naming ruling (#1928). It has not moved yet:
- * today the todos live on `main`, in `todos/items/*.md`.
+ * Today the todos live on `main`, in `todos/items/*.md`; their source of truth
+ * is planned to move to the branch named after the subgraph,
+ * `cat/cat-harness/todos`.
  *
  * So every generator that PUBLISHES todos — the JSON index, the JSON-LD graph,
  * the per-todo pages, the no-JS listing — reads them through
  * {@link publishedTodoFiles} and nothing else. When the branch becomes the
- * source, the body of that function is the one line that changes; no
- * generator learns where todos live.
+ * source, the body of that function is the one line that changes.
  *
  * Not a second reader: it delegates to `readTodoFiles`, which owns parsing and
  * validation. This module owns only the SOURCE.

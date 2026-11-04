@@ -1,6 +1,5 @@
 /**
  * The review heat map's numbers: one row per section, one column per metric.
- * Bean `qbfi`, epic `q4jm`.
  *
  * ## What each column MEANS, and what it must not be read as
  *
@@ -9,12 +8,11 @@
  * | changed | blocks in the section the ChangeSet lists | how much text changed; a one-word edit counts 1 |
  * | open | review comments not yet closed (`open` or `addressed`); defects counted apart | how bad the section is; one comment may cover a whole section |
  * | stale | open comments whose block changed AFTER the comment was made | wrong; it means "re-read before replying" |
- * | coverage | changed (added or changed) blocks with a reviewer VERDICT on their CURRENT hash, of those needing one (bean px0t) | "every comment resolved": resolved comments are not a verdict. A verdict on an older version does not count |
- * | qa | the section's blocks whose latest QA verdicts FAIL, and those whose verdicts are STALE (older than the block), from `block-qa.json` | a pass when it is empty of failures: stale and unaudited blocks are counted and said, never read as passing. Nor is "passing" a full pass: a block whose agent-judged criteria have no verdict is said to pass on SCRIPTS ONLY, with the number of criteria that need an agent (bean `9791`) |
+ * | coverage | changed (added or changed) blocks with a reviewer VERDICT on their CURRENT hash, of those needing one | "every comment resolved": resolved comments are not a verdict. A verdict on an older version does not count |
+ * | qa | the section's blocks whose latest QA verdicts FAIL, and those whose verdicts are STALE (older than the block), from `block-qa.json` | a pass when it is empty of failures: stale and unaudited blocks are counted and said, never read as passing. Nor is "passing" a full pass: a block whose agent-judged criteria have no verdict is said to pass on SCRIPTS ONLY, with the number of criteria that need an agent |
  *
- * A column with no data is SAID, per row, never shown as 0 or blank. Zero
- * would read as "measured, and nothing there", which is the one thing it
- * does not know.
+ * A column with no data is SAID, per row, never shown as 0 or blank, which
+ * would read as "measured, and nothing there".
  *
  * ## One self-contained function
  *

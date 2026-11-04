@@ -7,26 +7,9 @@
  * bun run cat check:stale-paths --json
  * ```
  *
- * Bean `k59d`. `check:bean-bodies` already reports a prose ``blocked on `id` ``
- * whose target is closed, and it is right about what it does — but it reads a
- * SENTENCE. A milestone does not write sentences about its blockers. It writes
- * a **route**:
- *
- * ```
- * `b5f0` → `603s` → `hfkl` → `2krx` → (`6lb8` ‖ `ivfw` + `5y4b`) → `pb04` → `supn`
- * ```
- *
- * Measured on `main` the day this shipped: `p5wm` routes through **four**
- * `completed` beans and `yg29`'s numbered "Shortest path" names four more. Both
- * are GOAL milestones — the first thing any *what is next* reader opens — and
- * both were wrong. Two delegated agents sent to read them this morning each had
- * to correct the milestone before they could start.
- *
- * `bean-blocking` says a block whose blocker is gone reads to the next agent as
- * abandoned work. On a leaf bean that costs one agent one read. On a milestone
- * it costs every agent that asks what the goal needs next.
- *
- * ## Two rules, both narrow on purpose
+ * `check:bean-bodies` reports a prose ``blocked on `id` `` whose target is
+ * closed; this checks the **routes** milestones write instead, e.g.
+ * `` `a` → `b` → (`c` ‖ `d`) → `e` ``.
  *
  * | rule | shape |
  * |---|---|
@@ -34,37 +17,16 @@
  * | **numbered step** | a numbered list item under a heading naming a path/order/sequence |
  * | **done-when** | an **unchecked** `- [ ]` clause naming a closed bean as a **precondition** |
  *
- * ## The two false-positive classes, measured and closed
+ * False positives excluded:
+ * - an arrow that is not a dependency (*"97 → 66 lines"*): the closed id must
+ *   be **an operand of the arrow**, not merely on the same line
+ *   ({@link chainRefs});
+ * - a bean quoting another bean's path: a known bean id before the chain,
+ *   outside it, attributes the path to that bean ({@link attributedTo}).
  *
- * Both were found by running the first draft over the whole store — three
- * findings, of which **two were wrong**, which is the ratio that makes a rule
- * worth narrowing rather than shipping.
- *
- * **An arrow is not always a dependency.** `x3bd` contains *"README is 97 → 66
- * lines"* in a paragraph that also mentions `lv3j` some hundreds of characters
- * away. The first draft asked only "does this line have an arrow and a closed
- * id", and reported it. So the closed id must be **an operand of the arrow** —
- * immediately beside one — not merely present on the same line. See
- * {@link chainRefs}.
- *
- * **A bean describing another bean's stale path is not stale.** `k59d` — this
- * check's own bean — quotes `p5wm`'s chain verbatim as its evidence, and the
- * first draft reported it as `k59d`'s own defect. That is exactly the shape
- * `check-bean-bodies` closed with a quotation guard, and exactly the shape that
- * flagged `jijc` a few hours earlier. Here the tell is **attribution**: a known
- * bean id appearing before the chain, outside it, names whose path it is. See
- * {@link attributedTo}.
- *
- * ## What it does NOT claim
- *
- * It does **not** distinguish *"this waits on `x`"* from *"this unblocks `x`"*.
- * A chain position is directional by construction, so the distinction does not
- * arise for the chain rule; for anything looser it would, and that is why
- * nothing looser is implemented. `k59d`'s own second Done-when asks for exactly
- * this: draw the line where it can be drawn, and report the rest as
- * **could not determine** rather than guess. Prose that merely mentions a
- * closed bean is neither reported nor counted as clean — it is not examined,
- * and this paragraph is how a reader knows.
+ * Not claimed: it does not distinguish "waits on `x`" from "unblocks `x`"
+ * outside these rules. Prose that merely mentions a closed bean is not
+ * examined (neither reported nor counted clean).
  *
  * @module folio-assistant/scripts/check-stale-paths
  * @covers bean-defs, beans

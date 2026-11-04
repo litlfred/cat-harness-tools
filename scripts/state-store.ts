@@ -5,47 +5,35 @@
  * @module scripts/state-store
  * @graphNode none — a reader/writer over a declared `storage` directory
  *
- * Bean `2h76` part 3, arc `fs43`. {@link BranchStore} knows how to read and
- * splice a branch; this knows WHICH branch, from the declaration, and talks in
- * paths relative to the directory rather than to the branch root.
+ * {@link BranchStore} knows how to read and splice a branch; this knows WHICH
+ * branch, from the declaration, and talks in paths relative to the directory
+ * rather than to the branch root.
  *
- * ## Why a second module and not more methods on `BranchStore`
- *
- * `BranchStore` takes a branch NAME. Every caller that hardcodes one is a
- * caller that has to be edited when a branch is renamed — and one rename is
- * already in flight (`state` to `cat/cat-harness/state`, bean `32f6`), which
- * is why `BranchStore.open` takes ordered candidates at all. A caller here
- * names a DIRECTORY ID, {@link resolveTipLocation} answers with the branch its
- * declaration gives, and the rename becomes a one-line change to the
- * declaration.
- *
- * It also fixes the path frame. On a tip-keyed branch the paths mirror the
- * checkout, so `beans/defs/x.md` in the working tree is `beans/defs/x.md` on
- * the branch. A caller holding a bean id should not have to know its
- * directory's prefix to read it, so everything here is relative to the
- * directory and {@link StateStore.branchPath} does the joining.
+ * A caller names a DIRECTORY ID, not a branch name: {@link resolveTipLocation}
+ * answers with the branch its declaration gives, so renaming a branch is a
+ * one-line change to the declaration. On a tip-keyed branch the paths mirror
+ * the checkout (`beans/defs/x.md` is `beans/defs/x.md` on the branch);
+ * everything here is relative to the directory and
+ * {@link StateStore.branchPath} does the joining.
  *
  * ## What it deliberately does NOT do
  *
  * No manifest validation, no tip verification, no JSON parsing, no retry over
- * a moved tip: `BranchStore` does all of that, and a second copy of a
- * correctness check is a second thing to get wrong. Bean `2h76` part 1 removed
- * one such duplicate from this arc already.
+ * a moved tip: `BranchStore` does all of that.
  *
- * It also never merges content. A write carries `expect` — the blob id its
- * author read — and a tip that disagrees comes back `conflict` with the paths
- * named. {@link StateStore.update} is the one place a retry happens, and it
- * retries by RE-READING and re-applying the caller's function, so the new
- * content is computed from what is actually on the branch. That is the
- * difference between resolving a race and silently winning one.
+ * It never merges content. A write carries `expect` — the blob id its author
+ * read — and a tip that disagrees comes back `conflict` with the paths named.
+ * {@link StateStore.update} is the one place a retry happens, and it retries
+ * by RE-READING and re-applying the caller's function, so the new content is
+ * computed from what is actually on the branch.
  *
  * ## Not wired to anything yet
  *
  * No declaration sets `storage` (see `DirectoryStorageSchema`), so
  * {@link StateStore.openFor} throws for every id today and that is correct:
- * `main` stays authoritative until the cutover (Phase 3, bean `9ofm`).
- * {@link StateStore.at} takes an explicit location, which is what the tests
- * and the cutover use before any declaration exists.
+ * `main` stays authoritative until the cutover. {@link StateStore.at} takes
+ * an explicit location, which is what the tests and the cutover use before
+ * any declaration exists.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/state-store.ts where --id <directory-id>

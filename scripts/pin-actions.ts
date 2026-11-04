@@ -1,21 +1,15 @@
 /**
  * Pin every third-party GitHub Action to a full commit SHA, keeping the
  * human-readable ref as a trailing comment: `uses: owner/repo@<sha> # v4`.
- * Bean `ieum`, issue #2389.
  *
- * GitHub's Secure use reference: *"Pinning an action to a full-length commit
- * SHA is currently the only way to use an action as an immutable release."* A
- * tag can be moved, and a branch is moved by design. Measured 2026-10-07: 0 of
- * 240 `uses:` lines here were pinned. Dependabot keeps a `@<sha> # <tag>` pair
- * current when the comment is on the same line, so pinning does not freeze a
- * version.
+ * A full-length SHA is the only immutable way to use an action: a tag can be
+ * moved, and a branch is moved by design. Dependabot keeps a `@<sha> # <tag>`
+ * pair current when the comment is on the same line, so pinning does not
+ * freeze a version.
  *
- * ## Which workflows must pin: the owner's rulings, 2026-10-07
+ * ## Which workflows must pin
  *
- * First *"when published, make it unpinned on staging"*; then, once the roast
- * (bean `1ygp`, L4.1) found a staging workflow holding `contents: write` on
- * `pull_request_target` and pushing to the branch that serves the live site,
- * *"pin write-token workflows"*. So every workflow pins, except one listed in
+ * Every workflow pins, except one listed in
  * {@link STAGING_ONLY_WORKFLOWS} that also passes {@link stagingExempt}: no
  * write permission, and no `pull_request_target` trigger. The list is a
  * reviewed one-line change, and the list alone never grants the exemption.
@@ -28,7 +22,7 @@
  * A ref resolves to the PEELED commit of a tag (`refs/tags/v4^{}`) when the
  * tag is annotated, else the tag, else a branch head. A ref that resolves to
  * nothing, or to more than one commit, is REFUSED: the line is left unpinned
- * and reported, because pinning to a guess would be a silent repair.
+ * and reported.
  *
  * Usage:
  *   bun run cat actions:pin            # rewrite workflows in place

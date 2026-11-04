@@ -8,69 +8,34 @@
  * bun run cat check:bean-rollup -- --json
  * ```
  *
- * Bean `kpcl`, issue #956. `in-progress` is the status every sibling session
- * reads before deciding whether a bean is free, and on 2026-09-22 it carried
- * almost no information: **99 in-progress, 77 untouched for a day or more**.
- *
- * ## The obvious sweep is wrong, and the measurement says so
- *
- * The reading that suggests itself — *76 abandoned claims, release them* —
- * assumes its own answer. Partitioning those 77 by what the claim actually
- * ASSERTS (measured 2026-09-22T18:45Z, `beans list --json` plus 325 PRs from
- * the REST API, 25 of them open):
- *
- * | bucket | n | what `in-progress` means there |
- * |---|---|---|
- * | container (≥1 child) with an open child | **16** | the claim is **TRUE** |
- * | container with no open child | 9 | reviewable — but see below |
- * | leaf named by an OPEN PR | 10 | live work, mid-flight |
- * | leaf named by no open PR | **42** | the candidate set |
- *
- * **35 of the 77 are not stale claims at all.** Nobody edits a milestone when
- * one of its children moves, so a container's `updated_at` measures EDITING
- * and the sweep read it as LIVENESS. The headline number was an instrument
- * that did not tell the truth about the instrument that did not tell the
- * truth.
- *
- * And the nine were a second false reading in the same pass: every one of them
- * has **zero children**, so "no open child" was vacuous — they are leaves that
- * happen to be typed `feature`. {@link rollupFindings} therefore requires
- * `children.length > 0` before it judges a container at all.
+ * `in-progress` is the status every sibling session reads before deciding
+ * whether a bean is free. An old `updated_at` does not make a claim stale:
+ * nobody edits a milestone when a child moves, so a container's `updated_at`
+ * measures EDITING, not liveness. And a bean with no children is a leaf
+ * whatever its type, so {@link rollupFindings} requires `children.length > 0`
+ * before it judges a container at all.
  *
  * ## What the GATE checks, and why it owns no clock
  *
- * `beans.ts` §`beanFindings` declines a stale-`in-progress` finding for a
- * reason that binds here too: anything computed against the clock changes on
- * every run. There it would rewrite a committed projection forever; here it
- * would turn CI red at an arbitrary hour with nobody having changed anything —
- * a gate firing for reasons unrelated to the change, which is `1xhc`'s own
- * complaint pointed backwards.
- *
- * So the gate is the half that is **pure graph**: a bean's status against its
- * children's. Two directions, both self-refuting without reference to a date:
+ * Anything computed against the clock changes on every run and would turn CI
+ * red with nobody having changed anything (the reason `beans.ts`
+ * §`beanFindings` declines a stale-`in-progress` finding). So the gate is the
+ * **pure graph** half: a bean's status against its children's.
  *
  * | rule | the contradiction |
  * |---|---|
  * | `open-container-closed-subtree` | open, has children, **none** open — it asserts live work its own subtree denies |
  * | `closed-container-open-subtree` | closed, and **some** child is open — the roadmap reads the area as finished |
  *
- * Measured on the store the day this shipped: **0** and **1**. The one is
- * `5a3l` (DEPLOYMENT), `completed` with **12** open children — baselined,
- * because whether those twelve are unfinished work or should be re-parented is
- * a judgement about `5a3l`, and that belongs to its owner.
- *
- * A rule that fires on nothing is not a rule with no value: `check-bean-parents`
- * calls that shape *locking in a property the corpus HAS rather than demanding
- * work to reach one*, and the first direction is exactly that.
+ * Existing contradictions whose resolution is the bean owner's judgement are
+ * baselined.
  *
  * ## What `--sweep` reports, and what it refuses to conclude
  *
- * The sweep carries the clock, so it **never sets the exit code**. It also
- * does not pretend to know a leaf's liveness from the store: a leaf claim is
- * held by a session, a branch or a PR, and none of those is committed here.
- * Without `--github` the leaf buckets are reported as one **unjudged** group,
- * on `check-ci-health`'s rule that *could-not-check is never green* — inverted
- * to its equally load-bearing form: could-not-check is never GUILTY either.
+ * The sweep carries the clock, so it **never sets the exit code**. A leaf
+ * claim is held by a session, a branch or a PR, none committed here, so
+ * without `--github` the leaf buckets are one **unjudged** group:
+ * could-not-check is never green, and never GUILTY either.
  *
  * `--github` (needs `GH_TOKEN`) asks the API for open PRs and splits the
  * leaves by whether one names the bean. That is a fact GitHub holds ABOUT this
@@ -79,11 +44,10 @@
  *
  * ## What it does NOT claim
  *
- * A leaf with no open PR is a **candidate**, never a verdict. The falsifier
- * for the whole sweep is that such a bean is real work on an unpushed branch,
- * in which case the answer is `bean-blocking`'s four-field record rather than
- * a release — and `check:bean-blocks` (#951) owns that form. Nothing here
- * changes a status, and nothing here deletes a bean: unwanted work is
+ * A leaf with no open PR is a **candidate**, never a verdict: it may be real
+ * work on an unpushed branch, in which case the answer is `bean-blocking`'s
+ * four-field record (the form `check:bean-blocks` owns) rather than a
+ * release. Nothing here changes a status or deletes a bean: unwanted work is
  * `scrapped`, with its reasons.
  *
  * @covers bean-defs, beans

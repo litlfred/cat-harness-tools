@@ -1,10 +1,6 @@
 /**
  * The four kg-audit criteria over TEST PLANS, the runs that execute them and
- * the reports those runs produce — bean `3o5b`, arc `3fva`, proposal §3.2:
- *
- * > *"the plan resolves, every case was executed or explicitly skipped with a
- * > reason, the data hash is present, and the system under test never wrote
- * > its own verdict."*
+ * the reports those runs produce:
  *
  * | criterion | asks |
  * |---|---|
@@ -18,10 +14,10 @@
  * The rules already exist in the schemas — `TestPlanSchema`, `TestRunSchema`
  * (`plan` without `sut` is refused), `TestReportSchema` (a self-judged verdict
  * is refused) and `checkAgainstPlan`. This module FOLLOWS the files to each
- * other and calls those; it re-derives nothing. The one place it reads raw
- * JSON before the schema is `test-sut-not-self-judged`, and only so that a
- * report the schema refuses for exactly that reason is reported under the
- * criterion that names it rather than as an anonymous parse failure.
+ * other and calls those. The one place it reads raw JSON before the schema is
+ * `test-sut-not-self-judged`, so that a report the schema refuses for exactly
+ * that reason is reported under that criterion rather than as an anonymous
+ * parse failure.
  *
  * ## Third states
  *

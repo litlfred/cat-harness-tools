@@ -2,40 +2,25 @@
 /**
  * A QA RESULT — what a QA process found about a whole produced artefact.
  *
- * ## The distinction this exists to hold
+ * VERDICTS (`*.qa.json` beside a block, `kg-qa/*.kg-qa.json` beside a process
+ * or role) and WITNESSES (those verdicts flattened for the docs site) are
+ * **per authored subject**. A result's subject is a document the build just
+ * PRODUCED, and its findings are whole-corpus ("these property names are
+ * undeclared across the graph"), so there is no subject to file it under.
  *
- * The repository already has VERDICTS (`*.qa.json` beside a block,
- * `kg-qa/*.kg-qa.json` beside a process or role) and WITNESSES (those verdicts
- * flattened for the docs site). Both are **per authored subject**: one file
- * answers "is this block / this diagram sound".
+ * ## Where it lives
  *
- * A result is the third thing. Its subject is a document the build just
- * PRODUCED, and its findings are whole-corpus — "these eleven property names
- * are undeclared across the graph", not "this node is wrong". Filing that as a
- * per-subject verdict would mean inventing a subject that does not exist.
+ * Under `test/results/`, declared in `cat-harness.json` as `qa-results`:
+ * placement follows **provenance**, so everything a QA process emits belongs
+ * under one declared root. Declare a directory when you make it, or consumers
+ * scanning the declared directories will not see it.
  *
- * ## Why it lives in `test/results/`
- *
- * The owner's rule, 2026-09-19: *"if the witnesses were generated as a QA
- * reviewer primarily then it should be under `test/results/` as part of a QA
- * process."* Placement follows **provenance** — what produced it and why — not
- * the file family and not who fetches it afterwards. Everything a QA process
- * emits belongs under one declared root.
- *
- * The directory is declared in `cat-harness.json` as `qa-results`, on the day
- * it was created. That is deliberate: the 134 witnesses under
- * `docs/assets/qa/` spent their entire existence undeclared, so a consumer
- * scanning the declared directories saw none of them and reported a clean run
- * over the lot — the `dh4f` defect in reverse. The remedy is to declare a
- * directory when you make it.
- *
- * ## Self-declaring, like every other node here
+ * ## Self-declaring
  *
  * `$schema: "qa-results/v1"`, following the `qa-witness/v1`, `script-qa/v1`
- * and `folio-workflow-instance/v1` convention. `AGENTS.md`: a directory is a
- * PLACE TO LOOK and may hold more than one kind, so the file says what it is
- * rather than being told apart by its extension — "extension is a
- * coincidence; a declaration inside the file is the contract".
+ * and `folio-workflow-instance/v1` convention: a directory may hold more than
+ * one kind (`AGENTS.md`), so the file says what it is rather than being told
+ * apart by its extension.
  *
  * @module scripts/qa-results
  */

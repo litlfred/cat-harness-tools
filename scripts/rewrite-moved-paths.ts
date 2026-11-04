@@ -6,7 +6,7 @@
  * @module scripts/rewrite-moved-paths
  * @graphNode none — a command-line tool; the method is skill `kg-separation` §"After a move lands"
  *
- * ## The rule, and why each half of it is needed
+ * ## The rule
  *
  * A mention `<from-name>/<prefix>/<rest>` is rewritten to
  * `<to-name>/<prefix>/<rest>` when, and only when,
@@ -14,30 +14,22 @@
  * 1. the file EXISTS under the destination root (`<to-root>/<prefix>/<rest>`), and
  * 2. it does NOT exist under the source root (`<from-root>/<prefix>/<rest>`).
  *
- * Half 1 alone would rewrite a mention of a file that never existed anywhere —
- * a placeholder in an example, or a typo — into a different wrong path. Half 2
- * alone would rewrite a mention of a file that moved AND was later re-created
- * in the source, which is a different file. Both were measured in the 70lx
- * sweep (bean `folio-assistant-beaf`, 2026-10-10): of 1,148 candidate mentions
- * in the harness, one named a placeholder and was correctly left alone.
+ * Half 1 alone would turn a placeholder or a typo into a different wrong
+ * path; half 2 alone would retarget a mention of a file re-created in the
+ * source, which is a different file.
  *
  * ## Records are never rewritten
  *
  * A record says what was true when it was written: a proposal, a todo, an
  * agent memory, a bean, a provenance record, an upstream pin, a test fixture,
- * a QA result. Rewriting one makes it say something that was never true.
- * {@link DEFAULT_RECORD_GLOBS} names the shapes the 70lx sweep left as
- * written; `--keep <glob>` adds more, and nothing here can remove one.
+ * a QA result. {@link DEFAULT_RECORD_GLOBS} names those shapes;
+ * `--keep <glob>` adds more, and nothing here can remove one.
  *
  * ## Generated files are their generator's
  *
- * A generated page that names a moved path is rewritten by re-running its
- * generator after the sources are fixed, not by this tool: a hand-edited
- * generated file is the next `--check` failure. Pass the generated trees as
- * `--keep` (on cat-harness after 70lx, `docs/assets/**`, `docs/payload/**`,
- * `docs/reference/**`, `docs/uml/**`, `uml/**`, `docs/subgraph/**` and
- * `translations/**` held all 1,852 of the remaining mentions, and
- * `bun run cat regen` rewrote them).
+ * A generated page that names a moved path is fixed by re-running its
+ * generator (`bun run cat regen`) after the sources are fixed, not by this
+ * tool. Pass the generated trees (e.g. `docs/assets/**`) as `--keep`.
  *
  * ## It reports by default
  *

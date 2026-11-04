@@ -1,15 +1,14 @@
 /**
  * Does a recorded test run test the skill it names, as that skill specifies?
  *
- * A test run points at the skill it tests (`TestRun.skill`, #1168 B4); the
- * skill points at its contracts (`input:`/`output:` in its front matter, B3b).
- * Following the two pointers gives the question this module answers for every
- * recorded case: does what went in fit the skill's input contract, and does
- * what came out fit its output contract? A run whose cases do not fit measured
- * something other than the skill it claims.
+ * A test run points at the skill it tests (`TestRun.skill`); the skill points
+ * at its contracts (`input:`/`output:` in its front matter). Following the
+ * two pointers gives the question this module answers for every recorded
+ * case: does what went in fit the skill's input contract, and does what came
+ * out fit its output contract?
  *
- * Three answers, kept apart, because a check that folds "could not check"
- * into "passed" reports a clean run over nothing:
+ * Three answers, kept apart, so "could not check" is never folded into
+ * "passed":
  *
  * - `unresolved` — the run does not parse, or names no skill that exists;
  * - `nonconforming` — a case violates the contract;
@@ -17,8 +16,7 @@
  *   (not fetched here), or the run records no cases.
  *
  * The contract is read as JSON Schema by Zod's own `fromJSONSchema`: the JSON
- * files are the contract, and no second schema is authored beside them
- * (bean `319n`).
+ * files are the contract, and no second schema is authored beside them.
  *
  * @module scripts/test-run-conformance
  */

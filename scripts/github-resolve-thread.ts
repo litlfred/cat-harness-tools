@@ -1,8 +1,7 @@
 /**
  * Resolve one review thread on a GitHub pull request.
  *
- * The implementation of the `github-pr-resolve-thread` Tool (bean
- * `folio-assistant-4dbr`, owner ruling 2026-10-20 "Add the type"). `gh` has no
+ * The implementation of the `github-pr-resolve-thread` Tool. `gh` has no
  * command for this; it is the GraphQL mutation `resolveReviewThread`. That
  * mutation's text contains `$id`, which a shell expands, so a command an agent
  * types would silently send an empty id. Here `gh` is called with an argument

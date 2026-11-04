@@ -1,11 +1,11 @@
 /**
  * The browser half of the rail from shared data — bundled into
- * `assets/js/navbar.js` by `gen-navbar-assets.ts`. Bean `lnoy`.
+ * `assets/js/navbar.js` by `gen-navbar-assets.ts`.
  *
- * It runs `renderRailRegions` — the SAME function the build runs for an audit —
+ * It runs `renderRailRegions` — the same function the build runs for an audit —
  * over the page's own `#fa-rail` block and the shared data the page loaded just
  * before it (`assets/navbar/rail-<hash>.js`). Loaded `defer`, so it runs after
- * the document is parsed and BEFORE `DOMContentLoaded`: `navbar-row.js` and
+ * the document is parsed and before `DOMContentLoaded`: `navbar-row.js` and
  * `docs-ui.js`, which start at `DOMContentLoaded`, find the rail already drawn.
  *
  * @module cat-harness/scripts/navbar-client

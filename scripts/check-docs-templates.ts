@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * A Liquid interpolation feeding a URL attribute resolves, or says it cannot
- * be told. Bean `blv9`.
+ * be told.
  *
  * ## The defect class
  *
@@ -11,20 +11,13 @@
  * file has to stay baseurl-agnostic for a downstream instance at a different
  * baseurl. A template that interpolates such a path without `| relative_url`
  * emits `/assets/x.webp` where the site serves
- * `/folio-assistant/assets/x.webp`, and the asset 404s.
- *
- * That is the FIFTH shape of one class in this repository — a link-shaped
- * value that does not dereference — and every previous instance was found by
- * a person asking whether a URL resolved, never by a test. `readme-links.ts`
- * does this for README links against a real `git ls-tree`; nothing did it for
- * the templates.
+ * `/folio-assistant/assets/x.webp`, and the asset 404s. (`readme-links.ts`
+ * does the equivalent for README links.)
  *
  * ## Three states, because only one of them is decidable
  *
- * The bean specified *"flag any that resolve to a site-root-absolute path
- * without a filter"*. **Only a LITERAL can be judged that way.** A variable
- * (`st.art.card.src`, `t.href`) holds a value the template cannot see, and
- * the corpus contains both kinds at once:
+ * Only a LITERAL can be judged. A variable (`st.art.card.src`, `t.href`)
+ * holds a value the template cannot see:
  *
  * | | |
  * |---|---|
@@ -32,16 +25,13 @@
  * | `st.art.card.src` | variable, site-root-absolute in practice — cannot be seen here |
  * | `st.viewHref` | variable holding `https://…/blob/…` — the filter would BREAK it |
  *
- * Measured 2026-09-22, and the last row is why a naive rule is wrong rather
- * than merely imprecise: `viewHref`/`editHref` come from
- * `schemas/kg/cat-harness.ts` as `${repoUrl}/blob/${branch}/${path}`. A check
- * that demanded a filter everywhere would report two working links as
- * defects, and the obvious "fix" would 404 them both.
+ * `viewHref`/`editHref` come from `schemas/kg/cat-harness.ts` as
+ * `${repoUrl}/blob/${branch}/${path}`, so demanding a filter everywhere would
+ * break working links.
  *
  * So: a literal is **judged**, a variable is **declined**, and the declined
- * ones are COUNTED and listed rather than passed over in silence — the same
- * third state `check:partition` names in its own output, and the same reason:
- * an unexaminable case and an examined-clean case must not look alike.
+ * ones are COUNTED and listed — the same third state `check:partition` names
+ * in its own output.
  *
  * @module cat-harness/scripts/check-docs-templates
  * @covers docs

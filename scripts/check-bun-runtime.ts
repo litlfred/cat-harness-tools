@@ -2,67 +2,37 @@
 /**
  * Is the Bun RUNNING HERE the one `.bun-version` pins?
  *
- * ## What this said until #1452 landed, and why it was retracted
+ * ## What it reports
  *
- * **This check was built to warn that a mismatched bun would rewrite 72 of the
- * 86 committed script sidecars on any sweep. It no longer does, and that claim
- * is withdrawn rather than quietly edited out.**
- *
- * The owner chose "keep the pin at 1.3.14, add a local guard" on bean `3ozg`,
- * because #1442's pin fixes the churn where CI observes it and cannot reach a
- * container image the repository does not control. Hours later #1452 fixed the
- * same defect at the WRITER: `saveQaScriptSidecar`'s write-skip comparison no
- * longer includes `engine_version`, so all three run-provenance fields are now
- * excluded and a sweep from any bun rewrites nothing. Measured here after
- * merging it — sidecars clean, `init-folio-qa.test.ts` (the sweep #1452 names as
- * the trigger) run, sidecars clean again: **0 rewritten, where this container
- * had produced 72.**
- *
- * So the consequence this check was created to announce is gone. What remains is
- * smaller, still true, and still worth saying at session start.
- *
- * ## What it reports now
- *
- * 1. **The runtime differs from CI's.** `check:bun-pin` asserts all 22
- *    `setup-bun` sites install `.bun-version`, so CI runs exactly that. An agent
- *    on another bun is running different code than the gate that will judge its
- *    push — a test that passes here can fail there, and the reverse. That is a
- *    reproducibility fact no commit can change.
+ * 1. **The runtime differs from CI's.** `check:bun-pin` asserts the
+ *    `setup-bun` sites install `.bun-version`, so CI runs exactly that. An
+ *    agent on another bun is running different code than the gate that will
+ *    judge its push — a test that passes here can fail there, and the
+ *    reverse.
  * 2. **A sidecar whose CONTENT changes here will be stamped with the local
- *    engine.** Because `engine_version` is no longer compared, it is now a
- *    record of the last content change's engine. Change a checker on an older
- *    bun and the sidecar's stamp goes BACKWARDS relative to the 72 that carry
- *    CI's — the "downgrade stamped as a fresh measurement" concern from `rmcf`
- *    and `#1430`'s `sfjo` rule. Rare, because it needs a real content change,
- *    and no longer the every-run event it was.
+ *    engine.** `saveQaScriptSidecar` does not compare `engine_version`, so it
+ *    records the engine of the last content change; changing a checker on an
+ *    older bun stamps the sidecar BACKWARDS relative to those carrying CI's.
  *
- * The count it prints is therefore **not a prediction of churn**. It is how many
- * committed sidecars record an engine other than the one running, which means
- * "their last content change was made elsewhere" — nothing more.
+ * The count it prints is **not a prediction of churn**: it is how many
+ * committed sidecars record an engine other than the one running, i.e. their
+ * last content change was made elsewhere.
  *
  * ## Why this is not part of `check:bun-pin`, and not a gate at all
  *
- * `check:bun-pin` asks a question about the CORPUS: do the 22 `setup-bun` sites
- * agree with `.bun-version`? Every checkout answers that identically, so it is
- * gateable, and it belongs in `bun run cat gates`.
+ * `check:bun-pin` asks about the CORPUS, which every checkout answers
+ * identically, so it is gateable. This asks about the ENVIRONMENT: the
+ * answer differs per container and no commit can change it, so as a gate it
+ * would be always red on agent containers, and in CI (which installs the
+ * pin) it would exercise nothing. It is declared in `SCRIPT_EXEMPTIONS` for
+ * that reason, and `session-start-coord-sweep.sh` runs it with `--markdown`
+ * at every session start.
  *
- * This asks about the ENVIRONMENT. The answer differs per container and no
- * commit can change it, so as a gate it would go red on every agent container
- * while every reviewer read it as a verdict on the diff — a second always-red
- * signal, which is what #1442 removed the first one for. In CI it is worse than
- * useless: the runner installs the pin, so `running === pinned` always and the
- * gate would exercise nothing. It is declared in `SCRIPT_EXEMPTIONS` for exactly
- * that reason, and it is not unrun: `session-start-coord-sweep.sh` runs it with
- * `--markdown` at every session start.
- *
- * ## `bun-` is a prefix, and getting it wrong would make the count meaningless
+ * ## `bun-` is a prefix
  *
  * A sidecar records `engine_version: "bun-1.3.14"`; `.bun-version` holds the
- * bare `1.3.14`. Comparing them directly never matches, so a naive version would
- * report every sidecar as stamped elsewhere in every container, a matched one
- * included. That is the same shape as the `PinDef.tagPrefix` defect #1442 found
- * in the pin machinery while using it (`setup-bun` takes `1.3.14`, upstream tags
- * `bun-v1.3.14`), which is why the prefix is a named constant with its own test.
+ * bare `1.3.14`. Comparing them directly never matches, so the prefix is a
+ * named constant with its own test.
  *
  * ## Three states, and `cannot-tell` is not `match`
  *
@@ -70,8 +40,8 @@
  *     mismatch     they differ                                     exit 1
  *     cannot-tell  no pin, unparseable pin, or no Bun to ask       exit 2
  *
- * `cannot-tell` exits 2 rather than 0 for the reason the rest of this repository
- * does: an unanswered question rendered as a clean answer is the `dh4f` defect.
+ * `cannot-tell` exits 2 rather than 0: an unanswered question is not a clean
+ * answer.
  *
  * @module folio-assistant/scripts/check-bun-runtime
  */

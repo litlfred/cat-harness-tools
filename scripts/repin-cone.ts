@@ -9,11 +9,9 @@
  * @graphNode none — a read-only planning report over the fleet's index.lock.json files
  * @covers none — it moves no pin; `mount:remote --seed` (or `repin-standing.ts`) does, and the trust check judges it
  *
- * Owner, 2026-11-01: re-pins happen a lot in rapid development, and a re-pin is
- * also a REVIEW step. A country adopting a new version of a guideline compares
- * the old guideline, the new one and its own adaptations, then decides what to
- * revise. This tool produces the technical half of that review; the people
- * half is the "Guideline Updates" process.
+ * A re-pin is also a REVIEW step, like a country comparing an old guideline,
+ * the new one and its own adaptations. This tool produces the technical half
+ * of that review; the people half is the "Guideline Updates" process.
  *
  *   bun run cat mount:repin:cone --fleet fleet.json --changed litlfred/cat-harness
  *   bun run cat mount:repin:cone --fleet a/x,a/y --changed litlfred/cat-harness --impact
@@ -40,11 +38,9 @@
  * default-branch head NOW; a dependency still waiting on its own re-pin is
  * marked so), the report lists the files that changed between the two, kept
  * to the directories the site actually mounts from that dependency (the
- * lock's `instances[].directories[].upstreamPath`). A changed file outside
- * them cannot reach the site. Then, for each kept file, the site's own files
- * that share its path or file name are listed as POSSIBLE adaptations: the
- * candidates a reviewer checks against the change. "Possible" because a name
- * match is a hint, never a verdict.
+ * lock's `instances[].directories[].upstreamPath`). Then, for each kept file,
+ * the site's own files that share its path or file name are listed as
+ * POSSIBLE adaptations — a hint for the reviewer, never a verdict.
  *
  * Exit: 0 when the report was made; 2 when the fleet or a dependency could not
  * be read.

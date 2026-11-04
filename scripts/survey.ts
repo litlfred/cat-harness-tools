@@ -2,39 +2,30 @@
 /**
  * Publish a survey of a commit window, and ask what a later session still owes.
  *
- * Bean `6ptx`. Eight sessions surveyed the same ~2435-commit window in one
- * minute and that day produced ONE authored commit. The remedy the owner chose
- * is to publish the sweep so the next session reads it instead of re-deriving
- * it — and the thing that makes a published survey safe is that its window's
- * two edge commits are recorded, so staleness is DECIDABLE rather than
- * guessed.
+ * A published sweep lets the next session read it instead of re-deriving it.
+ * The window's two edge commits are recorded, so staleness is DECIDABLE
+ * rather than guessed.
  *
  * ```sh
  * bun run cat survey:owed                     # what is NOT covered, against origin/main
  * bun run cat survey:publish --from <sha> --axis beans="…" --axis ci="…"
  * ```
  *
- * ## `survey:owed` is the whole point, and it answers in three states
+ * ## `survey:owed` answers in three states
  *
  * - **no survey** — nothing published; the full window is yours. Not an error.
  * - **covered** — `to` is at or ahead of the branch tip; read the survey.
  * - **a delta** — `to..origin/main`, the commits published surveys do not
  *   cover. Normally a handful. Survey THOSE.
  *
- * The third is the one that repays the design. A session arriving after eight
- * hours does not re-read 2435 commits; it reads the survey and then the 40
- * that landed since.
- *
  * ## An unreachable `to` is COULD NOT DETERMINE, never "covered"
  *
  * If the recorded upper edge is not an ancestor of the branch tip — history
  * rewritten, the survey taken on a different branch, the object gone — then
- * the delta cannot be computed and the survey says nothing about today. That
- * is reported as unusable and the caller surveys the whole window.
- *
- * Reporting it as covered would be the worst failure this tool can have: a
- * sibling would skip the sweep on the strength of a survey of a history that
- * no longer exists. The falsification test plants exactly that.
+ * the delta cannot be computed and the survey says nothing about today. It is
+ * reported as unusable and the caller surveys the whole window; a sibling
+ * must never skip the sweep on a survey of a history that no longer exists.
+ * The falsification test plants exactly that.
  *
  * @module folio-assistant/scripts/survey
  * @covers session-survey

@@ -1,66 +1,21 @@
 /**
  * A gate that may be red BY DECISION must be the last step of its job.
  *
- * Bean `cpss`. This is the enforcing half of that bean: moving
- * `translation:drift:check` to the end of the `gates` job fixed the corpus, and
- * a comment saying "last on purpose" fixes nothing the next time somebody
- * appends a step.
- *
- * ## The defect this refuses
- *
  * A GitHub job stops at its first failing step, and a `run: |` block under
- * `set -e` stops at its first failing command. So a gate that is red on purpose
- * silently deletes every check after it. `translation:drift:check` was the THIRD
- * of 107 `bun run` lines inside one step, and while it was red — the owner's
- * decision, bean `ngxj`, issue #206 — the 104 after it executed on no PR and no
- * push to `main`.
+ * `set -e` at its first failing command, so a gate that is red on purpose
+ * silently skips every check after it (e.g. `translation:drift:check`).
  *
- * Eighteen of those 104 have no test anywhere referencing the same script, so
- * for those eighteen the masked gate was the only thing watching. Measured
- * 2026-09-26, and stated as a BOUND rather than a count: the twin was matched on
- * script basename, so a test merely mentioning the name counted as protection.
+ * For each declared gate it asserts:
  *
- * ## Why a check rather than the three fixes that came before it
+ *   1. It is FOUND. A renamed or deleted gate fails here rather than passing
+ *      by absence.
+ *   2. It occupies a step ALONE, since bundling it with other `bun run` lines
+ *      re-creates the masking inside the step.
+ *   3. Its step is the LAST in its job. Reported with the steps that follow it.
  *
- * Three earlier changes each moved ONE gate to just above the red one
- * (`ee964c7411` for `translated-links:check`, then `docs:pages:check` and
- * `check:available-locales`). Every one of them was correct, and none of them
- * scaled: *"put your gate above the drift check"* is a rule each future author
- * has to be told, and the cost of not being told is invisible — a green PR.
- * *"The deliberate red is last"* is a rule a file can enforce, which is the
- * difference between a convention and a gate.
- *
- * ## What it asserts, and why each part is separate
- *
- *   1. Each declared script is FOUND. A renamed or deleted gate must fail here
- *      rather than pass by absence — otherwise this check reports clean the day
- *      its subject stops existing, which is the failure shape it exists to
- *      prevent one level up.
- *   2. It occupies a step ALONE. Bundling it with other `bun run` lines
- *      re-creates the masking INSIDE the step, where job-level ordering cannot
- *      see it. That is exactly the state bean `cpss` was opened about, so a
- *      check that only looked at step order would have passed on the defect.
- *   3. Its step is the LAST in its job. Reported with what follows it, because
- *      "not last" is not actionable and "three steps follow it, named" is.
- *
- * ## The list is hardcoded, deliberately
- *
- * Two entries. A declaration file for a list this size would be a second place
- * to look, and `directory-conventions` is clear that an unavoidable duplicate is
- * fine while an unchecked one is not — this list IS the check.
- *
- * The second entry is the invitation above being taken up, and it cost more than
- * a row. `bun test` runs the SAME drift assertion as `translation:drift:check`,
- * so it was a deliberate-red gate from the day the first entry was written — and
- * it was **undeclarable**, because `invocations` only knew how to name a
- * `bun run` target. It sat last in its job by coincidence rather than by rule,
- * which is exactly the distinction this file was written to collapse. A list
- * that cannot express its own second member is worth noting for the next one:
- * check that the matcher can NAME a gate before concluding the gate is fine.
- *
- * `tools` is the graph typology this audits: the subject is the workflow's own step
- * order, which is harness state rather than any folio's content. Declared rather
- * than inferred, per `3srh`.
+ * The list is hardcoded (two entries, `translation:drift:check` and `bun
+ * test`, which runs the same drift assertion); this list IS the check. Make
+ * sure the matcher can NAME a new gate before adding it.
  *
  * Usage:
  *   bun run cat check:red-gate-is-last

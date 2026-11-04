@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Measure a staging build against its published before side, and check the
- * prediction (bean `bnjs`, issue #971).
+ * prediction.
  *
  * The renderers PREDICT which rendered files a change alters, from their
  * dependency cones (`rendered-impact.json`). This compares the site the

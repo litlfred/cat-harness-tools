@@ -1,12 +1,9 @@
 /**
  * The QA/QC report over PROV-O: the agentic engine's after-check.
  *
- * Issue #1180, step 5 of `docs/proposals/odrl-prov-actor-model.md`. The
- * deterministic engine checks the ODRL policy BEFORE a task and refuses
- * (`src/workflow/authorize.ts`, issue #1207). An agent swarm acts first, so
- * the same policy has to be checked AFTER, from the record of what was done
- * (`docs/source/concepts-agentic-harness/bpmn-execution.md`: "one skill, two
- * engines"). This script is that check.
+ * The deterministic engine checks the ODRL policy BEFORE a task and refuses
+ * (`src/workflow/authorize.ts`). An agent swarm acts first, so the same
+ * policy is checked AFTER, from the record of what was done.
  *
  * For every workflow instance in `beans/workflows/` (and every subprocess
  * instance inside it), for each history entry whose node is an activity or a
@@ -20,27 +17,22 @@
  *    `docs/assets/prov/<instance>.prov.jsonld`.
  * 2. **The check.** `authorizeTask`, the before-check itself, re-run with the
  *    principal `asserted`, because history records only a name. Nothing is
- *    re-implemented here: a second copy of the rule would be a second answer
- *    free to disagree with the first.
+ *    re-implemented here.
  *
  * ## Nothing is invented
  *
- * `ProvAssociationSchema` requires `prov:agent` and `prov:hadRole`. An entry
- * with no actor, or in a lane that binds no role, cannot honestly fill them,
- * so NO activity is emitted for it and the gap is a finding (`no-actor`,
- * `no-role`). PROV-O itself makes `hadRole` optional; the schema does not,
- * and filling it with a guess to satisfy the schema is the fabrication this
- * report exists to catch.
- *
- * Owner, 2026-09-24, asked whether to relax that to PROV-O's optional
- * `hadRole`: *"Keep required"*. The page says so.
+ * `ProvAssociationSchema` requires `prov:agent` and `prov:hadRole` (stricter
+ * than PROV-O, where `hadRole` is optional; the page says so). An entry with
+ * no actor, or in a lane that binds no role, cannot honestly fill them, so NO
+ * activity is emitted for it and the gap is a finding (`no-actor`,
+ * `no-role`).
  *
  * ## Advisory: findings do not fail the build
  *
- * Owner, 2026-09-23: advisory first (see `authorize.ts`). So a finding is
- * reported, never fatal. `--check` fails only on stale outputs, a
- * `prov:Activity` that does not validate, or an internal error (a process
- * model that cannot be loaded). `unknown` is never read as permit.
+ * A finding is reported, never fatal (as in `authorize.ts`). `--check` fails
+ * only on stale outputs, a `prov:Activity` that does not validate, or an
+ * internal error (a process model that cannot be loaded). `unknown` is never
+ * read as permit.
  *
  * Usage:  bun run cat-harness-tools/scripts/prov-qaqc.ts [--check]
  *

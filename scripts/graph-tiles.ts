@@ -3,51 +3,21 @@
  *
  * @module scripts/graph-tiles
  *
- * ## The owner's correction, which is the whole model
+ * A tile is not a function of nodes: if a harness declares visualisers for a
+ * directory it watches, each gets a tile (with a title, themed by default),
+ * which opens the existing visualisation. A harness may declare one or more.
  *
- * The question put to them was whether each *graph* gets a create action. The
- * answer rejected the framing:
+ * The tile set is the visualiser obligation made reachable:
+ * `SubgraphCoverageSchema.visualiser` is where an instance says what renders a
+ * directory, and `check:subgraph-coverage` reports the ones that owe one. No
+ * second list exists to disagree with it. Nothing here builds a viewer; a tile
+ * carries the declared ref and opens it.
  *
- * > no, its not a function of nodes, its a function of a harness watching a
- * > directort in repo root/ … basially if harness declares visaluzers, those
- * > should have tile. defaults to theme, but new can be changed. harness can
- * > declare >= 1 visualiztion (which then has a title)
+ * ## DECLARATION, not projection
  *
- * and, earlier: *"those should open their exisiting visualzaiton"*.
- *
- * **So the tile set is not a new registry — it is the visualiser obligation
- * made reachable.** `SubgraphCoverageSchema.visualiser` is where an instance
- * already says what renders a directory, and `check:subgraph-coverage` already
- * reports the ones that owe a visualiser and have none. A second list of
- * "things that get tiles" would be free to disagree with the one that is
- * already audited, and the disagreement would be invisible: a tile missing
- * because nobody added it to the second list looks exactly like a graph nobody
- * declared.
- *
- * Nothing here builds a viewer. A tile carries the declared ref and opens it.
- *
- * ## DECLARATION, not projection — and `flh4` is why that had to be decided
- *
- * `flh4` found `uploads` reported as *"nothing renders this"* while a
- * visualiser was declared, the page existed, and it rendered live counts —
- * because *"no projection at my path"* had been collapsed into *"nothing
- * renders this"*. Two different facts.
- *
- * The same split decides what a tile derives from, and the corpus made it
- * concrete (measured 2026-09-20, before `beans` and `todos` were declared):
- *
- * | | declared | live projection |
- * |---|---|---|
- * | `uploads`, `library` | yes | yes |
- * | `beans`, `todos` | **no** | yes |
- * | `fsh-guts`, `qa`, `health`, … | no | no |
- *
- * A tile derived from the PROJECTION appears for a graph nobody declared a
- * visualiser for; derived from the DECLARATION it is missing for two graphs
- * that visibly have one. Neither is a bug to code around — so the tile derives
- * from the declaration, and **a live projection with no declaration is a
- * FINDING** ({@link undeclaredProjections}), which closes the gap rather than
- * papering over it.
+ * "No projection at my path" and "nothing renders this" are different facts.
+ * A tile derives from the declaration, and **a live projection with no
+ * declaration is a FINDING** ({@link undeclaredProjections}).
  */
 import { existsSync } from "node:fs";
 import { join } from "node:path";

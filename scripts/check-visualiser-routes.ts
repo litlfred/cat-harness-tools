@@ -7,48 +7,29 @@
  * @covers cat-harness — the `visualisers` of every instance declaration in the
  *   checkout, and the pages under the site directory that name a `rendered-by`
  *
- * ## The rule, in the owner's words (2026-10-09)
- *
- * > I still want the harness to be where specific visualizers/pages are
- * > declared for the harness at the level. And that they are all compliant of
- * > `<base URL>/<harness>/<visualizer>` … Could have multiple visualizers
- * > contending for same url... so not good. Need harness to declare
- * > visualizer is renderedBy ....
- *
- * The route is `visualiserRoute({ harness, visualiser })`
- * (`schemas/kg/visualiser-route.ts`). This gate is what makes a collision a
- * DECLARATION error rather than a page that silently wins.
- *
- * ## The locale goes in front (folio-assistant#2527)
- *
- * Owner, 2026-10-05: *"ALL rendered visualizer pages for the CDN need to
- * follow /<locale>/<declaring>/<kind>/…"*. A page is drawn at
- * `<locale>/<harness>/<visualiser>/` for each published locale
- * (`PUBLISHED_LOCALES`), and the old `<harness>/<visualiser>/` address is
- * where compose-docs writes a forwarding page. So the routes claimed and
- * checked here are the LOCALISED ones; a locale's top-level segment is a claim
- * an alias may not take; and a page still committed at the old address — a
- * site not yet regenerated — is COUNTED and printed (`legacyPages`), never a
- * finding, because the generators that move it run in the site's own
- * repository.
+ * A harness declares its visualisers and each one's `renderedBy` Tool. The
+ * route is `visualiserRoute({ harness, visualiser })`
+ * (`schemas/kg/visualiser-route.ts`), drawn at
+ * `<locale>/<harness>/<visualiser>/` for each locale in `PUBLISHED_LOCALES`;
+ * the unlocalised address holds a forwarding page. A collision is a
+ * DECLARATION error, not a page that silently wins. A locale's top-level
+ * segment may not be taken by an alias. A page still committed at the old
+ * address is COUNTED and printed (`legacyPages`), never a finding.
  *
  * | finding | what it means |
  * |---|---|
  * | `route-collision` | two declarations resolve to one route, or one inside another's subtree |
- * | `alias-collision` | an alias (bean `t4xb`) names another alias, a harness, or something the site already carries at its top level |
+ * | `alias-collision` | an alias names another alias, a harness, or something the site already carries at its top level |
  * | `unknown-tool` | `renderedBy` names no discovered Tool node |
  * | `kind-not-rendered` | the visualiser covers a kind its Tool does not declare it `renders` |
  * | `outside-route` | a page names a `rendered-by` Tool, and lies under no route that Tool is declared to render |
  * | `foreign-page` | a page under a declared route names a different Tool than the route's `renderedBy` |
  * | `harness-docs-collision` | a harness's own docs already publish something at `<harness>/<visualiser>` |
- * | `page-declares-renders` | a page still carries `renders:` / `<meta name="renders">`, retired 2026-10-09 |
- * | `directory-declares-visualiser` | a declaration still carries `coverage.visualiser` on disk, retired 2026-10-09 |
+ * | `page-declares-renders` | a page still carries the retired `renders:` / `<meta name="renders">` |
+ * | `directory-declares-visualiser` | a declaration still carries the retired `coverage.visualiser` |
  *
- * ## Exit codes
- *
- * 0 clean · 1 any finding · 2 could not determine (no declared visualiser at
- * all, or the Tools would not load). 2 is never a pass: a gate that found
- * nothing to check has not checked anything.
+ * Exit: 0 clean · 1 any finding · 2 could not determine (no declared
+ * visualiser at all, or the Tools would not load); 2 is never a pass.
  *
  * Usage: bun run cat check:visualiser-routes [--json]
  */

@@ -1,35 +1,19 @@
 #!/usr/bin/env bun
 /**
- * QA that catches ABSENCE — bean `eief`.
+ * QA that catches ABSENCE: a tool declared as a stub (`tabular-csv`,
+ * `tabular-xlsx`) must not read as one that runs.
  *
- * The owner: *"no tooling needed, stub out, make QA to catch absence."* This
- * is the second half. Declaring `tabular-csv` and `tabular-xlsx` as Tool nodes
- * makes the capability visible; without this check, a reader of `tools/` sees
- * two tools and has no way to learn that neither runs.
- *
- * ## Three things it refuses, each one paid for
+ * Refused:
  *
  * 1. **A stub reported as a result.** A stubbed table is `not-derivable`
  *    naming the tool, never `met`.
  * 2. **A HALF-STUB** — `fac:stub` alongside real columns. The schema refuses
- *    it, and this reports it too, because the schema only fires when somebody
- *    validates. A thin-but-present extraction reads as a working one: bean
- *    `6xaz`'s shape, where sheet names were right and every header list was
- *    empty, so the output looked like a workbook that simply had no headers.
+ *    it too, but only when somebody validates; a thin-but-present extraction
+ *    reads as a working one.
  * 3. **AN EXPIRED STUB** — the tool now exists and `fac:stub` is still there.
- *    This is the ratchet, and it is the rule that rots if nobody writes it
- *    down. This session fixed the same defect four times (a restated bearing
- *    list, a reason in a YAML comment, a backlog keyed to a page, a third
- *    state with no expiry) and then introduced a fifth: a probe that looked
- *    for `transcript.json` when the arm writes `transcript/`, so it could
- *    never have fired.
  *
- * ## Why the probe is read from the TOOL, not written here
- *
- * That fifth defect is exactly why. A stub's expiry is decided by whether the
- * named tool has an implementation, and the only honest source for that is the
- * tool's own declaration — `install: { none: true }` and no invoke path. A
- * literal restated here would be a sixth instance of the same mistake.
+ * Whether a tool exists is read from the TOOL's own declaration
+ * (`install: { none: true }` and no invoke path), never restated here.
  *
  * Exit 0 clean · 1 a finding · 2 could not determine, which is never a pass.
  *

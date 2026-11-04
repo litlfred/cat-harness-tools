@@ -5,65 +5,25 @@
  * @module cat-harness/scripts/check-read-only-graphs
  * @covers cat-harness
  *
- * ## Why a gate and not a derivation
- *
- * The owner, 2026-09-22, chose **declare it, and gate that it matches** over
- * deriving read-only from the content. Both halves earn their place:
- *
- * - the **declaration** is what a listing reads. Deriving it would mean
- *   scanning every node of every directory to draw a navbar, and a tile
- *   generator that has to parse a corpus is a tile generator that stops being
- *   run;
- * - the **gate** is what stops the declaration drifting from the bytes. A
- *   declaration nothing checks reads as coverage while the content says
- *   otherwise, which is the failure this repository has paid for repeatedly
- *   (`dh4f` — a probe that sweeps nothing and reports clean).
- *
- * ## Three states, and the third is the interesting one
+ * Read-only is DECLARED (listings read the declaration without scanning the
+ * corpus) and this gate checks the declaration against the bytes.
  *
  * - **agrees** — declared `true` over materialized nodes, or declared `false`
  *   over none.
  * - **contradicts** — declared `true` while nothing there is materialized, or
  *   declared `false` over materialized nodes **with no stated basis**.
- * - **exception** — declared `false` over materialized nodes, WITH a basis.
+ * - **exception** — declared `false` over materialized nodes, WITH a
+ *   `readOnlyBasis` (e.g. an ingestion drop zone that is a write target), the
+ *   same way {@link GateSchema}'s `basis` is required on `permitted`.
  * - **undeclared** — the directory holds materialized nodes and says nothing.
+ *   Reported, not failed; absent is not `false`.
  * - **not-applicable** — nothing to compare: silence over nothing materialized,
  *   or a read-only directory whose materialized content the instance BUILDS AT
- *   PUBLISH (`builtAtPublish` names a path inside it). Such content is never
- *   committed, so a checkout holds none of it before the publish writer runs;
- *   zero nodes there is the declared state, not a contradiction. Only
- *   read-only over zero nodes is excused this way, and only when a
- *   `builtAtPublish` entry lies inside the directory: the check is unchanged
- *   for every directory nothing builds.
+ *   PUBLISH (a `builtAtPublish` entry lies inside it), so zero committed nodes
+ *   is the declared state.
  *
- * ## `exception` exists because the corpus falsified the binary immediately
- *
- * The first version had three kinds, and "declared writable over materialized
- * content" was flatly a contradiction. It fired on the IRIS replica's `uploads/` — the
- * ingestion DROP ZONE, which `adapters/document/paths.ts` creates on a first
- * ingest precisely so somebody can write there, and which holds a materialized
- * node. The declaration was right and the gate was wrong.
- *
- * The bytes are materialized; the directory is a write target. Those are
- * different questions, and a boolean comparison cannot ask the second. What
- * separates a deliberate exception from a declaration that is simply wrong is
- * whether anybody said why — so `readOnlyBasis` is what moves a case out of
- * `contradicts`, the same way {@link GateSchema}'s `basis` is required on
- * `permitted` and not only on `refused`.
- *
- * `undeclared` is a finding and never a pass. Absent is not `false`: a
- * directory that has not answered has not asserted it is writable. But it is
- * also not an ERROR, because the field is new and every declaration predates
- * it — so it reports and does not fail, and the count is what says whether the
- * migration is finished.
- *
- * ## What it does NOT check
- *
- * Whether anything actually enforces the read-only-ness at write time. That is
- * `check:materialized-fixity`'s job, and it answers a different question — it
- * catches an edit that HAPPENED, where this catches a declaration that would
- * let one happen unremarked. Saying so here because a gate whose name suggests
- * enforcement and which only compares two labels is worse than none.
+ * Not checked: whether anything enforces read-only-ness at write time; that
+ * is `check:materialized-fixity` (an edit that happened).
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/check-read-only-graphs.ts

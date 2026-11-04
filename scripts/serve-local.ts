@@ -2,8 +2,7 @@
 /**
  * serve-local — one command that gets each repo's rendered site and serves
  * them together at http://127.0.0.1:4007, with published IRIs opening the
- * local copy. Local server Phase 3 (issue #1179; Phases 1–2 were #1164 and
- * #1167).
+ * local copy.
  *
  * ```sh
  * bun run cat-harness-tools/scripts/serve-local.ts --repos folio-assistant,dth-pc
@@ -17,9 +16,8 @@
  *   cache (`$XDG_CACHE_HOME/cat-harness/serve-local/<repo>`, else
  *   `~/.cache/...`): a shallow, blob-less, sparse clone, so only the files
  *   checked out are downloaded. A later run updates it. `STAGING/` is left
- *   out, because previews are most of a large gh-pages branch
- *   (folio-assistant's held 156,803 files on 2026-10-31); `--staging <branch>`
- *   adds the previews you name.
+ *   out, because previews are most of a large gh-pages branch;
+ *   `--staging <branch>` adds the previews you name.
  * - `--site <repo>=<dir>` serves a directory you built yourself, for changes
  *   not published yet. This script does not run builds: each repo builds its
  *   own way, and the build tools share folio-assistant's pins.
@@ -30,7 +28,7 @@
  * (a template with `{owner}` and `{repo}`) override it.
  *
  * Git runs through `node:child_process`, so nothing here needs Bun beyond the
- * server launcher it hands off to (owner, 2026-10-31: Bun now, Node later).
+ * server launcher it hands off to.
  *
  * @module scripts/serve-local
  */

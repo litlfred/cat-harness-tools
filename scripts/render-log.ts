@@ -1,33 +1,27 @@
 #!/usr/bin/env bun
 /**
- * Append an entry to the render log on the publish branch.
+ * Append an entry to the render log on the publish branch: every staging
+ * render, when added and when removed. The discipline is in
+ * `skills/ui/ui-core/render-logging.md` and the process is
+ * `processes/ui/staging-render-log.bpmn`.
  *
  * @module scripts/render-log
- *
- * Owner, 2026-09-20: *"log all staging rendering (when added, when deleted)
- * to a logging directory/file on gh-pages."* This is the tool half; the
- * discipline is in `skills/ui/ui-core/render-logging.md` and the process is
- * `processes/ui/staging-render-log.bpmn`.
  *
  * ## APPEND, and nothing else
  *
  * There is no `--remove`, no `--edit`, no `--id` to overwrite. A takedown is
- * an `removed` ENTRY, not the erasure of the `rendered` one before it. That
- * is what makes the never-delete rule structural here rather than a guard
- * three separate cleanup paths have to remember: the tool offers no verb that
- * could lose history, so no caller can be written wrongly.
+ * a `removed` ENTRY, not the erasure of the `rendered` one before it: the
+ * tool offers no verb that could lose history.
  *
- * Emptying a log is a person's decision, taken deliberately, with the same
- * confirmation every durable artefact here requires
- * (`deletion-requires-confirmation`). It is not something this tool does.
+ * Emptying a log is a person's decision, with the confirmation every durable
+ * artefact here requires (`deletion-requires-confirmation`); this tool never
+ * does it.
  *
- * ## Why it writes into a directory rather than pushing
+ * ## It writes into a directory, never pushes
  *
  * `--dir` is a checkout of the publish branch, or a publish directory about
- * to become one. The tool never fetches, commits or pushes: the workflows
- * that call it already hold a `gh-pages` checkout with their own retry and
- * concurrency handling, and a second pusher racing those would be a new way
- * to lose a deploy. One job knows how to push; this one knows what to write.
+ * to become one. The tool never fetches, commits or pushes: the calling
+ * workflows hold the `gh-pages` checkout and own retry and concurrency.
  *
  * Usage:
  *   render-log.ts --dir DIR --event rendered --kind staging-preview \

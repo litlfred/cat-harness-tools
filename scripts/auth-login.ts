@@ -3,14 +3,12 @@
  * Print the GitHub login of whoever this session acts for — one line, or
  * nothing — for the session-start sweep's "who is typing" step.
  *
- * Part of the user authentication and authorization Tool (`auth_whoami`,
- * issue #1207): it asks the same resolver, `githubIdentity`, rather than a
- * second answer to the same question. Owner, 2026-10-06: a person may hold
- * more than one Claude account, so the GitHub handle is the identity the
- * interaction preferences are keyed by, and resolving it belongs to the
- * authentication process and its GitHub-specific tools, not to the sweep.
+ * Part of the user authentication and authorization Tool (`auth_whoami`); it
+ * asks the same resolver, `githubIdentity`. The GitHub handle is the identity
+ * interaction preferences are keyed by, since one person may hold more than
+ * one Claude account.
  *
- * `--all` (bean f1e1) prints every identity the session can see instead,
+ * `--all` prints every identity the session can see instead,
  * provider-neutral: see `src/core/identity.ts`.
  *
  * Exits 0 with the login on stdout when GitHub named one; exits 2 (could not

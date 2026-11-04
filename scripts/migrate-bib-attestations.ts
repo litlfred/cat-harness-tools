@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * IDEMPOTENT: move a folio's two bibliography judgement ledgers into the
- * attestation store (qou C9 stories B3, B4).
+ * attestation store.
  *
  * | legacy file (under the folio directory) | family |
  * |---|---|
@@ -23,7 +23,7 @@
  *
  * For the review ledger the round trip covers `reviews`; its `_meta` block is
  * format documentation and is refused unless its `statusEnum` is the schema's
- * own (see `schemas/library/bib-attestations.ts`).
+ * own.
  *
  * Nothing is deleted: the legacy files stay until a person removes them, and
  * the reader ignores them (saying so) once the store holds the family. A

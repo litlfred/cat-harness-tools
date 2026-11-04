@@ -2,33 +2,13 @@
 /**
  * check-process-bindings.ts — a process binds only skills it can reach.
  *
- * Owner, 2026-10-03: a process may bind only skills (and, through them, Tools)
- * from its own instance or from an instance it `needs` — *"general rule, not
- * just fhir-harness"*. The sentence is `check:import-direction`'s, applied to
- * the third kind of edge an instance has: not a module it loads, not a name
- * its prose mentions, but a SKILL one of its BPMN activities says implements
- * a step.
- *
- * ## Why the existing checks did not catch it
- *
- * The FHIR IG harness's `processes/content/l3-fhir-pipeline.bpmn` bound the DAK base layer's
- * `l2-dak-authoring` from inside the bare FHIR layer, and three checks were
- * green over it:
- *
- * - `kg-audit`'s `skill-ref-resolves` PASSED. Its resolvable set starts from
- *   `knownSkills(root)`, which in this pre-split checkout is CHECKOUT-scoped,
- *   so every skill in the repository resolves from every instance. "Resolves"
- *   answered "exists somewhere", not "is reachable from here".
- * - `check:workflow-refs` asks the same existence question.
- * - `check:fhir-harness-exclusions` reads text, and a skill id names nothing
- *   WHO's by its spelling.
- *
- * So this asks the reachability question directly. It uses the SAME direction
- * computation as `check:import-direction` and `check:reference-direction`
- * (`allowedFromNeeds` over `ancestorsOf`), so the three axes cannot give three
- * answers about which way an arrow may point.
- *
- * ## What is judged, and the states that are not folded into a zero
+ * A process may bind only skills (and, through them, Tools) from its own
+ * instance or from an instance it `needs`. It is `check:import-direction`'s
+ * rule applied to a SKILL a BPMN activity says implements a step. It uses the
+ * same direction computation as `check:import-direction` and
+ * `check:reference-direction` (`allowedFromNeeds` over `ancestorsOf`).
+ * Existence checks (`skill-ref-resolves`, `check:workflow-refs`) answer
+ * "exists somewhere", not "reachable from here".
  *
  * Each `<bootstrap.processes:skill ref>` on an activity, in every `.bpmn`
  * under a declared instance, is resolved against every instance's OWN skill
@@ -40,19 +20,15 @@
  *   cannot reach. GRADED;
  * - **dangling**: no instance in this checkout holds it. That is
  *   `check:workflow-refs`' finding, so it is counted here and never graded;
- * - **undetermined**: the process's instance declares no `needs`. Absent is
- *   nobody-has-said, not `[]`, so it is printed as COULD NOT DETERMINE.
+ * - **undetermined**: the process's instance declares no `needs` (absent is
+ *   not `[]`), printed as COULD NOT DETERMINE.
  *
- * A Tool is reached THROUGH its skill (`satisfies`), and a BPMN activity binds
- * no Tool directly, so judging the skill judges the Tool too.
+ * A BPMN activity binds no Tool directly, so judging the skill judges the
+ * Tool too.
  *
- * ## Ratchet
- *
- * The bindings that already point the wrong way are listed with reasons in
+ * Ratchet: existing wrong-direction bindings are listed with reasons in
  * `process-bindings.baseline.ts`. A new one fails, and so does a cleared one
  * the baseline still allows; `--shrink` lowers the list and never raises it.
- * The same shape as `check:fhir-harness-exclusions`, for the same reason: a
- * gate turned on red teaches the next agent `|| true`.
  *
  * ```sh
  * bun run cat check:process-bindings            # report + gate

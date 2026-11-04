@@ -1,19 +1,17 @@
 #!/usr/bin/env bun
 /**
  * gen-schema-docs.ts — Generate human-readable Markdown reference pages from the
- * JSON Schema files that define each skill's input/output contract.
+ * JSON Schema files that define each skill's input/output contract (the
+ * `skills/` directory under the instance's schemas root).
  *
- * Source of truth:  schemas/skills/<skill>/{input,output}.schema.json
  * Output:           docs/reference/skills/<skill>.md  (+ docs/reference/skills/index.md)
  *
- * The generated pages are committed to the repo (so they are browsable on
- * GitHub directly) and re-generated in CI before the docs site is deployed to
- * GitHub Pages. Run locally with:
+ * The pages are committed and regenerated in CI before the docs site is
+ * deployed; `--check` reports drift without writing. Run locally with:
  *
  *     bun run cat-harness-tools/scripts/gen-schema-docs.ts
  *
- * This generator is intentionally dependency-free (no external JSON-Schema
- * tooling) so it runs in any environment that has `bun`.
+ * Dependency-free (no external JSON-Schema tooling): it needs only `bun`.
  *
  * @module scripts/gen-schema-docs
  * @covers schemas, docs

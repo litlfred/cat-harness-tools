@@ -1,16 +1,10 @@
 /**
  * Where a repository-relative file can be READ on the forge.
  *
- * A published page links each bean, todo or milestone to its source file.
- * Until this module those links were composed as `<repo>/blob/main/<file>`,
- * which was right while every graph lived on `main`. The state cutover
- * (`8f55441`, 2026-10-08) moved `beans/` to its own branch,
- * `cat/cat-harness/beans`, and untracked it on `main` — so every link on the
- * Beans page went on rendering, looked correct in the generated JSON, and
- * answered 404. Found by the owner clicking one.
- *
- * The class of defect: **a link that names a branch the file is not on.** The
- * fix is to ask the declaration — the same `tipLocations` the state mount
+ * A published page links each bean, todo or milestone to its source file,
+ * and some graphs live on their own branch rather than `main` (e.g. `beans/`
+ * on `cat/cat-harness/beans`). A link must not name a branch the file is not
+ * on, so this asks the declaration — the same `tipLocations` the state mount
  * reads — which branch keeps the directory the file is in, and where the file
  * sits on that branch. A file in no branch-kept directory is on `main`.
  */

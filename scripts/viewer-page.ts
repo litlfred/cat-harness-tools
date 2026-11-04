@@ -1,61 +1,36 @@
 /**
  * The viewer page's COMMON FIXTURE — one `emit`, and the navbar comes with it.
  *
- * Owner, 2026-09-23, naming three pages and then the rule:
- *
- * (paraphrased) the navbar should be on sub pages such as
- * `/cat-harness/catalogue/<instance>/`, `/cat-harness/auto-docs/index/docs/<instance>-docs/`
- * or library pages — **a common fixture unless explicitly removed in the
- * harness visualisation.**
- *
- * The last clause inverts the default. The rail is PRESENT unless a
- * visualisation explicitly removes it, rather than absent unless a generator
- * remembers to add it — and that difference is the whole of this module,
- * because the measurement it was written from was **0 of 46**.
+ * The navbar is on every viewer sub page (e.g.
+ * `/cat-harness/catalogue/<instance>/`, `/cat-harness/auto-docs/index/docs/<instance>-docs/`,
+ * library pages) — **a common fixture unless explicitly removed in the
+ * harness visualisation**: PRESENT unless a visualisation removes it, rather
+ * than absent unless a generator remembers to add it.
  *
  * ## Why this is an `emit`, not a helper each generator calls
  *
- * A `withNavbar(html)` that every generator pipes its output through would fix
- * today's 46 and leave the next generator free to forget, which is the failure
- * already paid for: nine generators each wrote their own `<html>` shell and
- * not one of them reached {@link injectRail}. The chokepoint has to be the
- * thing a generator cannot avoid using, and that is the write.
- *
- * Five of those nine already had a BYTE-IDENTICAL `emit` — same check-or-write
- * contract, same messages, same counter, copied five times. So the fixture is
- * not new machinery bolted on; it is the function they were all already
- * calling, hoisted once and given one more job.
+ * A `withNavbar(html)` helper leaves the next generator free to forget it. The
+ * chokepoint has to be the thing a generator cannot avoid using — the write,
+ * with its check-or-write contract — so `emit` also reaches
+ * {@link injectRail}.
  *
  * ## What this module does NOT decide
  *
  * Nothing about how the navbar looks, or what its three regions are. That is
- * `lib/navbar.ts`, and `sjic` is in flight on it. This module composes a MODEL
- * from the declarations and hands it to {@link injectRail}, exactly as
- * `mount-instance-docs.ts` does for mounted pages — so when `sjic` changes the
- * component, these 46 pages change with it and nothing here moves. That is the
- * test of whether the boundary was drawn in the right place, and it is the
- * same test `harness-rail.ts` applies to `603s`'s avatars.
- *
- * Two callers, one component, and no third answer to "what does the harness's
- * navigation look like".
+ * `lib/navbar.ts`. This module composes a MODEL from the declarations and
+ * hands it to {@link injectRail}, exactly as `mount-instance-docs.ts` does for
+ * mounted pages, so a change to the component changes these pages and nothing
+ * here moves. Two callers, one component.
  *
  * ## The opt-out is a DECLARATION IN THE PAGE, not a list here
  *
  * {@link NAVBAR_OPT_OUT} is a `<meta>` the generator writes. A list of exempt
- * paths in this file would be a second answer to "does this page want a rail",
- * free to disagree with the generator that draws it and invisible to anyone
- * reading the page. It would also go stale the first time a path moved — the
- * `check:declared-assets` defect, which this repository has now paid for more
- * than once.
+ * paths in this file would be a second answer to "does this page want a
+ * rail", and would go stale the first time a path moved.
  *
- * **Nothing in the committed tree uses it today**, and that is stated rather
- * than hidden: the owner named the IRIS replica's `catalogue/` page as one that SHOULD
- * carry the rail, so the obvious candidate is not a candidate. The real one is
- * the mounted IRIS replica at its `/<instance>/` root, which is not a generated viewer
- * page and so is not in this family at all. An opt-out with no user is still
- * the difference between "this page deliberately has no rail" and "nobody
- * wired it", and those two must not render the same — `check-viewer-nav.ts`
- * is what reads the difference.
+ * Nothing in the committed tree uses it today. It still separates "this page
+ * deliberately has no rail" from "nobody wired it", and
+ * `check-viewer-nav.ts` reads the difference.
  *
  * @module scripts/viewer-page
  */

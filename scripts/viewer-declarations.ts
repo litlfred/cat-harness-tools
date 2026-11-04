@@ -2,25 +2,11 @@
  * Which visualiser renders a declared directory — read from the HARNESS
  * declarations, never from the pages.
  *
- * The owner, 2026-10-09: *"I still want the harness to be where specific
- * visualizers/pages are declared for the harness at the level. And that they
- * are all compliant of `<base URL>/<harness>/<visualizer>` … Why
- * `renders: [fsh-guts]` in visualizer? Could have multiple visualizers
- * contending for same url... so not good. Need harness to declare visualizer
- * is renderedBy …"*
- *
- * ## What this replaced
- *
- * Since #1168 B7a-2b (owner, 2026-09-24, *"page derived"*) a generated page
- * carried `renders:` (front matter) or `<meta name="renders">`, and this module
- * read every tracked page to learn which page drew which directory. That made
- * the page the declaration: a page could be written anywhere and claim any
- * directory, two pages could claim one, and a remote mount's pages had to be
- * re-read with every `renders` entry prefixed by the mount path to be found at
- * all. None of that survives. A visualiser is declared in `<instance>.json`
- * (`visualisers`, `HarnessVisualiserSchema`), its URL is
+ * A visualiser is declared in `<instance>.json` (`visualisers`,
+ * `HarnessVisualiserSchema`), its URL is
  * `visualiserRoute({ harness, visualiser })` (`schemas/kg/visualiser-route.ts`),
- * and a page is found because the declaration says where it is.
+ * and a page is found because the declaration says where it is — so no two
+ * pages can contend for one URL.
  *
  * ## What a page still carries
  *
@@ -29,22 +15,21 @@
  * through it. `check:visualiser-routes` uses it to refuse a generator that
  * wrote OUTSIDE the routes its Tool is declared to render.
  *
- * ## The locale segment (folio-assistant#2527)
+ * ## The locale segment
  *
- * The owner, 2026-10-05: *"ALL rendered visualizer pages for the CDN need to
- * follow /<locale>/<declaring>/<kind>/…"*. So a visualiser's pages are written
- * at `<site>/<locale>/<harness>/<visualiser>/…`, and {@link pageParts} is the
- * ONE place the locale is supplied: every helper here that answers "where is
- * this page" goes through it, and so does every generator that builds its own
- * route parts. A second locale is one change there, not one per caller.
+ * A visualiser's pages are written at
+ * `<site>/<locale>/<harness>/<visualiser>/…`, and {@link pageParts} is the ONE
+ * place the locale is supplied: every helper here that answers "where is this
+ * page" goes through it, and so does every generator that builds its own
+ * route parts.
  *
- * The address without the locale, `<harness>/<visualiser>/…`, keeps working
- * (bean `t4xb`: it "always works"): `compose-docs.ts` writes a forwarding page
- * there for every page under the localised route ({@link forwardingParts}).
+ * The address without the locale, `<harness>/<visualiser>/…`, keeps working:
+ * `compose-docs.ts` writes a forwarding page there for every page under the
+ * localised route ({@link forwardingParts}).
  *
- * A page committed at that old address and not yet regenerated is still READ
- * where it is ({@link existingPageDir}), so a tile keeps opening a page that
- * exists while its writer has not run since the move.
+ * A page committed at that unlocalised address and not yet regenerated is
+ * still READ where it is ({@link existingPageDir}), so a tile keeps opening a
+ * page that exists while its writer has not run.
  *
  * @module scripts/viewer-declarations
  */

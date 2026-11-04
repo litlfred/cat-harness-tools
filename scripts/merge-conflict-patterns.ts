@@ -1,47 +1,40 @@
 /**
  * The declared merge-conflict patterns: which conflicted paths a merge may
- * resolve WITHOUT a person, and how (bean `y7b3`, issue #1707).
+ * resolve WITHOUT a person, and how.
  *
  * @module scripts/merge-conflict-patterns
  * @graphNode none — data and a classifier, read by `merge-base.ts`
  *
- * ## Why a registry, and why it refuses by default
+ * ## A registry that refuses by default
  *
- * Measured 2026-09-30 over 300 `main`-into-branch merges: 235 conflicted, and
- * 147 (63 %) conflicted ONLY on generated files, whose resolution is always the
- * same mechanical step: take the base's copy, regenerate. Owner, 2026-10-01:
- * *"1 + new skills/tools for each common churn/conflict pattern"* — so each
- * pattern is DECLARED, with why it churns and how it resolves, and the skill
+ * Most conflicts are on generated files, whose resolution is always the same
+ * mechanical step: take the base's copy, regenerate. Each pattern is
+ * DECLARED, with why it churns and how it resolves, and the skill
  * `merge-conflict-patterns` carries one section per entry.
  *
- * **A path no pattern names is refused**, and so is the whole merge: resolving
- * nine generated files and leaving one authored conflict half-done is worse
- * than leaving all ten to a person, because a half-resolved merge reads as
- * progress. `refuse` entries exist only to say WHY a common path is not
- * automatic (so the next agent does not add it on a hunch).
+ * **A path no pattern names is refused**, and so is the whole merge, because
+ * a half-resolved merge reads as progress. `refuse` entries exist only to say
+ * WHY a common path is not automatic (so the next agent does not add it on a
+ * hunch).
  *
  * ## The four strategies
  *
  * | strategy | resolution | safe because |
  * |---|---|---|
  * | `take-base` | the base's copy, then regenerate | the file is wholly generated; the gate set regenerates it from the merged inputs |
- * | `owned-tree` | the base's COMMITTED copy, else the branch's; removed only when neither side has it; then regenerate | one writer (`prunedBy`) owns the whole directory and deletes every file it did not write, so a kept orphan is pruned by regen, and the resolution never drops a path (beans `vsv7`, `8j9e`) |
+ * | `owned-tree` | the base's COMMITTED copy, else the branch's; removed only when neither side has it; then regenerate | one writer (`prunedBy`) owns the whole directory and deletes every file it did not write, so a kept orphan is pruned by regen, and the resolution never drops a path |
  * | `generated-regions` | each hunk takes the base's side, then regenerate | EVERY hunk lies inside a `<!-- x:begin -->`…`<!-- x:end -->` region, which the generator rewrites; a hunk in authored text refuses |
  * | `refuse` | none | authored, or carries judgement a generator cannot reproduce |
  *
- * A fifth, `qa-sidecar`, delegated each instance's `test/results/kg-qa/` to
- * `qa:resolve-conflicts`. Bean `7mwa` retired both once cat-harness and the
- * content core stopped committing `test/results/` (cat-harness#857 and its
- * content-core counterpart): the sidecars live on the `qa-reports` store, so a
- * conflict on one is a branch still carrying a stale copy. `derived-results`
- * takes the base's side of it, as it does for the other untracked QA families.
- * The attestations a sidecar once carried live in `test/attestations/` since
- * bean `2gst`, and no pattern names that tree, so a conflict there is refused.
+ * QA sidecars live on the `qa-reports` store, so a conflict on one under
+ * `test/results/` is a branch carrying a stale copy, and `derived-results`
+ * takes the base's side, as for the other untracked QA families.
+ * Attestations live in `test/attestations/`; no pattern names that tree, so a
+ * conflict there is refused.
  *
  * Verification is NOT per pattern: after resolving, `merge-base.ts` runs
  * `regen`, which derives every check/writer pair from the CI workflow and so
- * cannot drift from what CI enforces. A pattern names no check of its own on
- * purpose — a hand-kept list of check names is the list that rots.
+ * cannot drift from what CI enforces. A pattern names no check of its own.
  */
 
 import { join, resolve } from "node:path";

@@ -3,17 +3,15 @@
  * Actor reach — is every declaration consistent with the site it runs in, and
  * does anything declare it at all?
  *
- * Bean `folio-assistant-r0rq`. `reach` is what the signing gateway branches
- * on, so two failure modes matter and they are not the same:
+ * `reach` is what the signing gateway branches on, so two failure modes are
+ * kept apart:
  *
  * 1. **A conflict** — an actor claiming more reach than its deployment
  *    declares. That is a declaration error and fails the check.
  * 2. **Nothing declared** — the third state. It does NOT fail: undeclared
- *    reach resolves to `unknown`, `unknown` routes to the human signer, and
- *    that is a correct, safe outcome. But it is REPORTED, because a repo
- *    where nothing declares reach gets the human route every time, and a
- *    tick that hid that would be the vacuity failure this repository has
- *    paid for three times.
+ *    reach resolves to `unknown`, which routes to the human signer, a safe
+ *    outcome. But it is REPORTED, since nothing declared means the human
+ *    route every time.
  *
  * `--require-declaration` turns state 2 into a failure, for a deployment that
  * means to exercise the API route and wants to be told it never will.

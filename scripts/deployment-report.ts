@@ -3,8 +3,8 @@
  * Deployment report: for each deployment description, which process tasks
  * no placement can run.
  *
- * Bean `folio-assistant-v3zw`. The rule is cat-harness's
- * `schemas/deployment-resolver.ts`; this script only reads the corpus into it:
+ * The rule is cat-harness's `schemas/deployment-resolver.ts`; this script only
+ * reads the corpus into it:
  *
  * - the descriptions in `scenarios/deployments/`;
  * - the checkout's actors (`checkoutActors`, so a dependent's actors count);
@@ -13,9 +13,8 @@
  * - every Tool, with `satisfies` and `requires`;
  * - the role graph's IS-A closure (`inherits`).
  *
- * **It reports and never fails** (owner, 2026-10-24, proposal §5 question 3,
- * option C). It exits 0 whatever it finds. It exits 1 only when it could not
- * read its inputs, because a report over nothing is not a report.
+ * **It reports and never fails**: it exits 0 whatever it finds, and 1 only
+ * when it could not read its inputs.
  *
  * Usage: `bun run cat deployments:report [--repo <dir>] [--deployment <id>] [--all] [--json]`
  *

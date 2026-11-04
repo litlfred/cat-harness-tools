@@ -6,8 +6,7 @@
  * @module scripts/vocab-mappings
  * @covers vocab-mapping
  *
- * Bean `k74z`, owner 2026-10-02: option 1 of
- * `docs/proposals/vocabulary-mappings-2026-10-02.md`. The shape is
+ * Design: `docs/proposals/vocabulary-mappings-2026-10-02.md`. The shape is
  * `schemas/content/vocab-mapping.ts`; this is its gate.
  *
  *   bun run cat-harness-tools/scripts/vocab-mappings.ts --check
@@ -22,7 +21,7 @@
  *    that first applies it.
  * 2. A derived target whose `derivedFrom` names no AUTHORITATIVE target in the
  *    same table. The applier would write nothing for it, which a reader cannot
- *    tell apart from "not mapped". That is the `sl9u` drift this exists to stop.
+ *    tell apart from "not mapped".
  * 3. A group `source` or `target` written as a CURIE whose prefix nobody
  *    declares. It would produce a ConceptMap with a system no consumer can
  *    resolve.

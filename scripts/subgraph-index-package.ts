@@ -2,20 +2,19 @@
 /**
  * The subgraph index PACKAGE: one pin's `index.jsonld` and
  * `index.hydrated.jsonld` files, packed (publish half) and fetched and
- * verified (fetch half) — bean `mo75` G2b.
+ * verified (fetch half).
  *
  * @module scripts/subgraph-index-package
  * @graphNode none — a tool script implementing the `subgraph-index-package` Tool (pack) and the package half of `remote-mount` (fetch)
  *
  * ## Why a package
  *
- * Owner, 2026-10-24 (decision card, option A): *the subgraph index files are
- * published per pin in a package, and a hydrated mount fetches them through
- * the Tool its source names.* The files are `builtAtPublish` — computed over
- * the checkout's other instances — so no commit carries them, and a hydrated
- * mount reading the git tree at a pin (G2) always found nothing. Committing
- * them (B) and generating them at mount time (C) were rejected; the contract,
- * every name included, is `subgraphIndexPackage` in
+ * The subgraph index files are `builtAtPublish` — computed over the
+ * checkout's other instances — so no commit carries them, and a hydrated
+ * mount reading the git tree at a pin finds nothing. So they are published
+ * per pin in a package, and a hydrated mount fetches them through the Tool
+ * its source names. The contract, every name included, is
+ * `subgraphIndexPackage` in
  * `@litlfred/cat-harness/schemas/kg/subgraph-manifest.ts`.
  *
  * ## Reuse

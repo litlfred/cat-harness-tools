@@ -8,8 +8,6 @@
  * @graphNode none — a check over a built site, not a schema
  * @covers none — it reads the built site's HTML, not a declared graph
  *
- * litlfred/folio-assistant#2741: a link check of the published tree found 262
- * missing targets linked from 399 places, and nothing in CI had ever looked.
  * `site-links.ts` checks the navbar tiles only. This checks every `href` and
  * `src` of every page, after the build, against the tree that ships.
  *
@@ -46,12 +44,12 @@
  *    link to a layer's file at the commit `index.lock.json` pins, or to this
  *    repository at `--sha`, becomes `…/blob/HEAD/…` with `data-fa-pin`, and
  *    the browser puts the commit back from one `pins.json`. A re-pin then
- *    changes that one file, not every page linking into the layer (bean
- *    `fwtz`, "Shrinking the cone itself"). Links at any other commit stay.
+ *    changes that one file, not every page linking into the layer. Links at
+ *    any other commit stay.
  *
- * Everything else is reported, never guessed at. The report is the check:
- * exit 1 when any internal link is still dead, so the workflow can carry it as
- * "reported, not blocking" the way it carries the tiles check.
+ * Everything else is reported, never guessed at: exit 1 when any internal
+ * link is still dead, so the workflow can carry it as "reported, not
+ * blocking" the way it carries the tiles check.
  *
  * Usage (or `bun run cat site:dead-links`):
  *   bun run cat-harness-tools/scripts/site-dead-links.ts --site  ./_site --root . [--fix] [--repo litlfred/folio-assistant --sha <commit>] [--report dead.tsv]

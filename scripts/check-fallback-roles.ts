@@ -2,49 +2,23 @@
 /**
  * Every `degradation: "fallback"` has something real to fall back TO.
  *
- * Bean `folio-assistant-85e8`. The degradation model could express *use a
- * different tool* and not *use a different kind of participant* — the
- * owner's case, 2026-09-20: an air-gapped actor whose API cannot be
- * reached, where a person signs instead.
+ * A fallback may be a different tool or a different kind of participant
+ * (e.g. an air-gapped actor whose API cannot be reached, where a person
+ * signs instead). A `fallback` must resolve to a declared capability OR to a
+ * derivable human lane.
  *
- * ## What this checked before, and why it changed
+ * ## The human lane is derived, not declared
  *
- * It checked that a declared `fallbackRole: "…"` named a real role. The
- * owner asked the better question the same day — *"do we need fallbackRole,
- * can it be computed, i dont like duplicate data maintenace issues"* — and
- * it can, exactly. The diagram already carries the fact executably:
- * `Task_HumanSign` is a `userTask` in `Lane_Human`, which binds
- * `publication-manager`. The declaration was a second copy with nothing
- * asserting the two agreed.
- *
- * So the field is gone and this checks the property the field was standing
- * in for, which is **strictly stronger**: a `fallback` must resolve to a
- * declared capability OR to a derivable human lane. The old check could
- * only catch a misspelt role; this catches a fallback with nothing behind
- * it at all — including the case the old one was blind to, a `fallback`
- * that declared neither.
- *
- * ## Why a human-only lane is the right derivation
- *
- * `fulfilmentKindsForBpmnType` maps `bpmn:UserTask` to `person` alone. The
- * signing diagram's own documentation already leans on it — *"will not let
- * a system actor fill it, which is what stops the air-gapped route quietly
- * becoming another machine route"*. Reusing that join means the fallback
- * role and the thing that enforces the route cannot disagree, because they
- * are the same fact.
- *
- * Measured before the field was removed: the derivation returns exactly the
- * declared value for `qa-report-signing`, and is unambiguous — 3 of 3
- * skills with any human-only lane have exactly one such role.
+ * The diagram already carries the fact executably: e.g. `Task_HumanSign` is
+ * a `userTask` in `Lane_Human`, which binds `publication-manager`.
+ * `fulfilmentKindsForBpmnType` maps `bpmn:UserTask` to `person` alone, so
+ * the fallback role and the rule that stops the air-gapped route becoming
+ * another machine route are the same fact and cannot disagree.
  *
  * ## The vacuity guard
  *
- * A check over a corpus it never loaded passes trivially, which is not the
- * same as passing. This repository has paid for that three times: a `grep`
- * over zero Lean files printing OK, a `ruff` scan of missing paths
- * reporting a baseline it never computed, and `readme:sync:check` passing
- * over a README with no markers. So the run states what it examined, and
- * refuses when the corpus is empty rather than reporting a clean sweep.
+ * The run states what it examined, and refuses when the corpus is empty
+ * rather than reporting a clean sweep.
  *
  * Usage:
  *   bun run cat check:fallback-roles

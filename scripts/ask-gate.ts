@@ -3,18 +3,16 @@
  * @module scripts/ask-gate
  * @covers none — a Claude Code hook, not a graph writer
  *
- * The asking rule as a gate on decision cards, failing open. Bean `hajp`.
+ * The asking rule as a gate on decision cards, failing open.
  *
- * `ask-well.sh` reminds on every card and can't see what came before it. On
- * 2026-10-23 the owner hit exactly that gap: a card posted with no written
- * question before it. This reads the session transcript the hook is given,
- * and refuses a `request_decision` card unless a `post_message` written since
- * the person's last message names every option the card offers.
+ * Reads the session transcript the hook is given, and refuses a
+ * `request_decision` card unless a `post_message` written since the person's
+ * last message names every option the card offers. (`ask-well.sh` only
+ * reminds, and cannot see earlier messages.)
  *
- * It FAILS OPEN. The reason `hajp` deferred gating is that a blocking hook
- * that misfires leaves the agent unable to ask anything, even "the gate is
- * broken". So any error, unreadable transcript or unexpected shape lets the
- * card through. Only a positive finding (the transcript was read, and the
+ * It FAILS OPEN, since a misfiring blocking hook would leave the agent unable
+ * to ask anything: any error, unreadable transcript or unexpected shape lets
+ * the card through. Only a positive finding (the transcript was read, and the
  * options are missing from the prose) blocks.
  *
  * Exit 0 lets the call through. Exit 2 blocks it, and stderr tells the agent why.

@@ -1,6 +1,5 @@
 /**
- * Input-hash staleness skipping for `bun run cat regen` and `bun run cat gates` —
- * beans `xpcu`, `f017`.
+ * Input-hash staleness skipping for `bun run cat regen` and `bun run cat gates`.
  *
  * @module scripts/input-hash
  * @graphNode none — a local-only cache helper for `regen-after-merge.ts` and `gates.ts`
@@ -8,8 +7,7 @@
  * ## What it answers
  *
  * *"Has anything this verify/write pair depends on changed since the last time
- * it came back green?"* If not, asking it again cannot produce a different
- * answer, and `regen` skips it.
+ * it came back green?"* If not, `regen` skips it.
  *
  * The fingerprint of a pair is a hash over:
  *
@@ -26,16 +24,14 @@
  *
  * ## A baseline is an input that is not in the tree
  *
- * Eight gates run `--check --against main`: they judge the fresh run against
- * the latest `main` entry on the `qa-reports` branch and fail only on what is
- * NEW against it. That entry moves every time `main` publishes, while nothing
- * in the working tree changes — so a fingerprint over files alone would skip a
- * pair whose verdict the moved baseline could change. The baseline's identity
- * (the resolved entry key and its verified payload tree) is therefore hashed
- * like any other input, and a baseline that cannot be resolved — offline, no
- * branch, a corrupt entry — is undetermined, so the pair runs.
+ * Gates run with `--check --against main` judge the fresh run against the
+ * latest `main` entry on the `qa-reports` branch, which moves while the tree
+ * does not. So the baseline's identity (the resolved entry key and its
+ * verified payload tree) is hashed like any other input, and a baseline that
+ * cannot be resolved — offline, no branch, a corrupt entry — is undetermined,
+ * so the pair runs.
  *
- * ## What it cannot see is AUDITED, not assumed (bean `f017`)
+ * ## What it cannot see is AUDITED, not assumed
  *
  * Every fingerprint also walks the script's import closure through
  * `input-sites.ts`: a line that reads the environment, the network, the
@@ -52,13 +48,11 @@
  * ## "Could not determine" is never "clean"
  *
  * Every way of not knowing returns `{ undetermined: reason }`, and the caller
- * RUNS the pair. Specifically:
+ * RUNS the pair:
  *
- * - the pair has no input declaration (most pairs — the declarations start with
- *   the slowest ones);
- * - a declared input or output glob matches **no file** — a declaration over
- *   nothing would make the fingerprint constant, which is the vacuous pass this
- *   repository refuses everywhere else;
+ * - the pair has no input declaration;
+ * - a declared input or output glob matches **no file** (a declaration over
+ *   nothing would make the fingerprint constant);
  * - a command does not resolve to script files this module can read (a binary
  *   such as `tsc`, an inline shell expression);
  * - an imported module uses a NON-LITERAL dynamic import, whose target cannot
@@ -69,10 +63,9 @@
  * `pairs` is regen's: a verify/write pair (check AND writer) at a green run.
  * `checks` is a CHECK SCRIPT ALONE, recorded from a run of that script that
  * exited 0 with its inputs unmoved across the run ({@link recordCheckRun}) —
- * by `gates`, or by `regen` asking the check. Both commands read it, so the
- * `gates` run that follows a `regen` on the same tree does not ask again what
- * `regen` just asked (bean `f017`), and a gate listed twice in the workflow
- * is asked once.
+ * by `gates`, or by `regen` asking the check. Both commands read it, so a
+ * `gates` run after a `regen` on the same tree does not ask again, and a gate
+ * listed twice in the workflow is asked once.
  *
  * ## The cache is local, never committed, and off in CI
  *
@@ -80,13 +73,12 @@
  * git-ignored. A hash is recorded only for a pair that ended `current` or
  * `regenerated` in a run that reached its fixed point — a pair that was
  * skipped keeps the hash it had. `CI` set in the environment disables it, as
- * does `--no-cache`, so CI asks every pair exactly as before.
+ * does `--no-cache`.
  *
- * CI's own skip is the CI cone (`ci-cone.ts`, bean `4rbc`), built but not yet wired. The
- * rule there is the one stated here, widened by the owner on 2026-10-07: an
- * input set is **declared or derived (computed from the run itself, never
- * stored), never inferred**. The cone derives each check's read set by tracing
- * main's green run, and reuses {@link fingerprint} without the tree for
+ * CI's own skip is the CI cone (`ci-cone.ts`, not yet wired), under the same
+ * rule: an input set is **declared or derived (computed from the run itself,
+ * never stored), never inferred**. The cone derives each check's read set by
+ * tracing main's green run, and reuses {@link fingerprint} without the tree for
  * everything else.
  */
 import { createHash } from "node:crypto";

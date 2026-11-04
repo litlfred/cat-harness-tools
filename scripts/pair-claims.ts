@@ -4,22 +4,16 @@
  *
  * @module scripts/pair-claims
  *
- * Bean `ca4a` (stage A of feature `flbx`), issue #1042, requirement R3:
- * *claims naming a resolvable thing are checked mechanically; anything else is
- * not parsed, counted, never passed.* It generalises `check:agents-claims`
- * (bean `77ex`) from `AGENTS.md` to every declared prose ↔ code pair that
- * stage B discovers, and reuses that module's claim shapes rather than
- * restating them.
+ * Claims naming a resolvable thing are checked mechanically; anything else is
+ * not parsed, counted, never passed. It generalises `check:agents-claims`
+ * from `AGENTS.md` to every declared prose ↔ code pair, and reuses that
+ * module's claim shapes rather than restating them.
  *
- * ## Three outcomes per claim, and the third is most of them
+ * ## Three outcomes per claim
  *
- * `holds` · `false` · `undetermined`. Measured over the 32 declared pairs on
- * 2026-09-23 before this module existed, a naive version reported 16
- * "false" claims — and most were not: a paper-adapter skill describes
- * commands and files in a FOLIO's repository (`bun run validate-refs`,
- * `content/schema/references.ts`), which this platform cannot resolve. A
- * checker that called those false would be switched off within a week, which
- * is the failure `77ex` exists to prevent. So:
+ * `holds` · `false` · `undetermined`. Many claims name things in a FOLIO's
+ * repository (`bun run validate-refs`, `content/schema/references.ts`) that
+ * this platform cannot resolve, so they are `undetermined`, not `false`:
  *
  * - a cited path is `false` only when the DIRECTORY it names exists here — the
  *   check can then honestly say the file is not in it. A path whose directory
@@ -29,7 +23,7 @@
  *   folio's point of view;
  * - `bun run <name>` is `holds` when the root `package.json` has the script,
  *   and otherwise `undetermined` — there is no declaration saying which
- *   `package.json` a skill means, and guessing is how a false finding starts.
+ *   `package.json` a skill means.
  *
  * ## The shapes
  *

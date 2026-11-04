@@ -4,98 +4,53 @@
  *
  * @module scripts/mount-instance-docs
  *
- * ## The rule this implements, in the owner's words
+ * ## Routes
  *
- * 2026-09-20, first statement: *"rendered assets should be available at
- * toplevel like `<baseULR>/` for main jsut the docs pipleline, or
- * `<baseurl>/<page>` where is registered rendered page from a harness that was
- * instantiated and enbaled (by default enabled)."*
- *
- * And then the CORRECTION, the same session, which is the one this file
- * implements: the owner agreed the address should be `<base-url>library/<instance>`
- * for the content instance in question, and noted the rule that a harness which
- * instantiates a directory (fsh-guts, docs/, library/ and the like) must
- * create a visualiser for it.
- *
- * So a mount point is keyed on the **graph typology**: a harness that instantiates
- * a directory gets a visualiser for it, and that visualiser lives at
+ * A mount point is keyed on the **graph typology**: a harness that
+ * instantiates a directory (fsh-guts, docs/, library/ and the like) gets a
+ * visualiser for it, at
  *
  *     <base-url>/<kind>/<instance>/
  *
- * Keying on the instance alone — which an earlier version of this file did —
- * collapses every kind an instance declares onto one path, so a folio with
- * both a library and its own docs could publish only one of them.
- *
- * ## TWO handlers register, not one, and they render different things
- *
- * Owner, 2026-09-20, looking at the deployed preview (paraphrased): an
- * instance's `/docs/<instance>/` should be the cat-harness handler's default
- * for docs, and the same instance themed at `/<instance>/`.
- *
- * So each instance's content is reachable two ways, and the difference is
- * **which handler produced it**:
+ * so a folio with both a library and its own docs publishes both. Each
+ * instance's content is reachable two ways, and the difference is **which
+ * handler produced it**:
  *
  * | route | handler | what it is |
  * |---|---|---|
  * | `/<kind>/<instance>/` | the KIND's handler, cat-harness's | the default rendering any instance declaring that kind gets |
  * | `/<instance>/` | the INSTANCE itself | its own themed root — "default harness behaviour, themed" |
  *
- * The instance root is not a second copy of a page for its own sake: it is the
- * instance acting as a handler for its own name, which is what makes
- * `<base-url>/<instance>` mean something rather than 404. They are distinct
- * routes, so the walk below never has to choose between them — and if an
- * instance ever claims a path a kind handler already owns, it is refused and
- * named rather than silently overwriting.
- *
  * The root of the site stays the main docs pipeline, unchanged.
  *
- * ## Collisions, and the rule that settles them
+ * ## Collisions: outermost wins, and the walk stops
  *
- * An instance may register sub-pages of its own, so two instantiated handlers
- * CAN want the same path. Owner, 2026-09-20: *"name collsion can occur
- * potentially. need resolution rule: walk path to see which instantiated
- * handler wants to process the path then stop."*
- *
- * So resolution is a **walk from the root, outermost wins, and the walk
- * stops**. A handler mounted at `/docs/` owns everything beneath it; a second
- * handler claiming `/docs/<instance>/` is not consulted, because the walk
- * already stopped. That is the opposite of longest-prefix routing, and it is
- * the right way round here: a mount point is a claim on a SUBTREE, and letting
- * a deeper handler punch through one would mean the outer instance's own
- * index could not be trusted to describe what is under it.
+ * Two instantiated handlers CAN want the same path. Resolution walks from the
+ * root and stops at the first handler that claims it: a handler mounted at
+ * `/docs/` owns everything beneath it, and a second handler claiming
+ * `/docs/<instance>/` is not consulted. A mount point is a claim on a
+ * SUBTREE, so the outer instance's index can be trusted to describe what is
+ * under it.
  *
  * **A losing claim is REFUSED and reported, never silently dropped and never
- * overwritten.** `cpSync` would happily write one instance's page over
- * another's and exit 0, and the result is a site that serves content nobody
- * can trace to a declaration. The exit code is non-zero so CI stops.
- *
- * ## Why this exists as a step rather than as more Jekyll
- *
- * Both `docs-site.yml` and `feature-staging.yml` run Jekyll with
- * `source: ./cat-harness/docs`. That is ONE directory, hardcoded — so an
- * instance that declares a `docs` graph of its own is built by nothing and
- * reachable at no URL. The IRIS replica's `docs/` was in exactly that state the day it
- * was written: five committed, gated pages that no deployed site served.
+ * overwritten** (`cpSync` would overwrite and exit 0). The exit code is
+ * non-zero so CI stops.
  *
  * ## Declaration-driven, not a list
  *
- * The instances are read from their own `harness.json` declarations — any
- * directory whose graphs include the renderable `docs` kind. A hardcoded list
- * is the `check:declared-assets` defect, whose own doc comment describes
- * itself being "fixed" last time by writing down a list of two while the
- * repository had grown to eight.
+ * Jekyll builds one hardcoded source directory, so any other instance's
+ * `docs` graph is built by nothing unless mounted here. The instances are
+ * read from their own `harness.json` declarations — any directory whose
+ * graphs include the renderable `docs` kind.
  *
- * The instance whose docs Jekyll already built is SKIPPED, because it is the
- * root of the site and copying it under its own name would publish the whole
- * tree twice at two URLs — two IRIs for one page, which is the same
- * under-counting hazard `jsonld.ts` routes around one layer down.
+ * The instance whose docs Jekyll already built is SKIPPED: it is the root of
+ * the site, and copying it under its own name would give one page two IRIs.
  *
- * ## What it deliberately does not do
+ * ## What it does not do
  *
  * It does not run Jekyll over the mounted directories. These are finished HTML
  * — the IRIS replica's `docs/` is generated by `gen-iris-pages.ts` and gated by
- * `iris:pages:check`. Handing them to Jekyll would ask for front matter they
- * do not have and a layout they do not want.
+ * `iris:pages:check` — with no front matter or layout for Jekyll.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/mount-instance-docs.ts --site ./_site

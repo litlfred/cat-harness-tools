@@ -3,65 +3,21 @@
  * Every PUBLISHABLE package in this repository still builds and still passes
  * its own tests — in BOTH languages it ships.
  *
- * ## Why this exists
- *
- * `@litlfred/block-qa-schema` is the only package here that ships, and until
- * 2026-09-26 **no workflow and no gate built it**. It is named in no
- * `.github/workflows/*.yml`, and the root `package.json` declares no
- * `workspaces`, so its devDependencies were never installed on a runner and
- * its `build` and `test` scripts were never run.
- *
- * The cost was paid rather than predicted. PR #914 bumped its `typescript`
- * from 5.9.3 to **7.0.2** and passed **ten** CI checks, not one of which read
- * the file it changed. Merged, the bump left the package unbuildable:
- *
- *     TypeError: Cannot read properties of undefined
- *       (reading 'useCaseSensitiveFileNames')
- *
- * — `tsup --dts` delegating to `rollup-plugin-dts`, which bundles its own
- * TypeScript 5.7.3 and reaches into compiler internals TypeScript 7 changed.
- * Measured with the control: 5.9.3 builds, 6.x fails, 7.0.2 fails, and
- * TypeScript 7's own `tsc` emits the same declarations without complaint.
- * Bean `rsi6`.
- *
- * ## The package has TWO halves, and only one of them was reachable
- *
- * That npm package ships a Python half beside it — `python/block_qa_schema/`
- * and an 18-test suite at `tests/test_python.py` — which ran nowhere either.
- * Bean `1s5s`. The obvious repair was to widen the `python` job's test glob
- * (`cat-harness/scripts/tests/*.test.py`), and it does not work: that step
- * runs each file as a BARE SCRIPT (`python3 "$t"`) and installs no pytest,
- * while `test_python.py` has no `__main__` runner and uses `pytest.raises`
- * and `@pytest.mark.parametrize`. Run that way it either dies on `import
- * pytest` or — with pytest present — defines eighteen functions, executes
- * none, and **exits 0**. A widened glob would therefore have reported a pass
- * it never computed, which is the `5rfy` gate-that-never-fires shape this
- * whole line of work exists to close.
- *
- * So the question stays in one place: this check owns "the packages this
- * repository ships work", and asks it of each half in that half's own terms.
- *
- * ## What it checks, and what it refuses to call a pass
- *
  * The set is DERIVED, never listed here: every `package.json` and every
  * `pyproject.toml` git accounts for, minus the repository root, minus
  * anything `private`. One directory shipping in both ecosystems is TWO
- * entries and two verdicts, because the halves fail independently — that is
- * the whole finding above.
+ * entries and two verdicts, since the halves fail independently.
  *
  * Nothing about a runner is hardcoded. A JavaScript half declares its steps
  * as `scripts.build` / `scripts.test`; a Python half declares pytest by
  * carrying `[tool.pytest.ini_options]`, and declares its own test
  * dependencies under `[project.optional-dependencies] test`, which is what
- * gets installed. A package that declares neither is REPORTED and skipped —
- * that is a different question, not a silent pass.
+ * gets installed. A package that declares neither is REPORTED and skipped.
+ * (Python tests run under pytest, not as bare scripts, which would execute
+ * no test and exit 0.)
  *
- * **An empty set is a FINDING.** If the discovery finds nothing, this check
- * has examined nothing, and "no failures" would then be a statement about the
- * sweep rather than about the corpus — the vacuity rule `check:subgraphs` and
- * `check:content-keys` both keep. **A missing interpreter is a FINDING
- * too**, for the same reason: "python3 is not here" and "the Python half
- * passed" must never render identically.
+ * **An empty set is a FINDING**, and so is **a missing interpreter**: "no
+ * failures" over nothing examined must not read as a pass.
  *
  * Usage:
  *   bun run cat check:published-packages

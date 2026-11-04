@@ -2,9 +2,8 @@
 /**
  * Read a container's INDEX and write a `folio-extraction/v1` record.
  *
- * Metadata by default; contents only when named. Owner, 2026-09-20:
- * *"make sure you have zip ingestion skills to extract metadata of assets into
- * KG. don't extract contents unless explict ask by user."*
+ * Metadata by default; contents only when explicitly asked for (`--extract`
+ * with a `--because`).
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/extract-assets.ts <container> [--out <file>]

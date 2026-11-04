@@ -1,5 +1,5 @@
 /**
- * The viewer-navbar audit — bean `edx7`, and the owner asked for it directly.
+ * The viewer-navbar audit: which generated viewer pages carry a nav rail.
  *
  * ```sh
  * bun run cat viewer:nav:audit    # write the sidecar
@@ -7,60 +7,20 @@
  * bun run cat viewer:nav:strict   # an author's check: staleness and every finding
  * ```
  *
- * ## Why the GATE is regressions only, and this is the `library:viz` ruling
+ * The gate fails only on a **regression** (a page that was railed and is not
+ * any more, or a newly appearing layout flag), which is always the diff's
+ * author. Staleness is not gated: the audit walks the whole docs tree, so a
+ * page added anywhere makes the sidecar stale on every open branch; the gate
+ * prints it as a note. A page that never had a rail, a `missing` page, and
+ * staleness are `strict`'s, run by the author.
  *
- * The owner settled the general case on 2026-09-20: `library:viz:check` is
- * deliberately ungated **because it derives from the whole repository**, so it
- * reddens when somebody else merges and a red then means "somebody else
- * merged" rather than "the author of this diff forgot something".
+ * The committed sidecar is the record, so a diff shows whether a page lost its
+ * rail in this commit or never had one.
  *
- * This audit walks the whole docs tree and has exactly that shape — a page
- * added anywhere makes the committed sidecar stale on every open branch at
- * once. So staleness is NOT the gate. A **regression** is: a page that was
- * railed and is not any more is always the author of the diff, every time,
- * which is the test the gate comments in `code-quality-gates.yml` state.
- *
- * That is also the whole of what the owner asked the sidecar to prevent. "The
- * count cannot silently return to 0" is a statement about rails being LOST,
- * and losing one is precisely what `regressions` names and the gate refuses.
- * A page that has never had a rail is a generator nobody wired — worth
- * reporting, and `strict`'s job, run by the author who added it.
- *
- * ## Why `strict` and not `check` carries the one finding open today
- *
- * Because one page is missing today for a reason that is NOT this change's to
- * settle, and a gate that is red on the day it lands is a gate people learn to
- * re-run rather than read.
- *
- * `cat-harness/docs/cat-harness/schemas/detangle/index.html` is committed, and
- * `gen-schema-viz.ts` prunes it as an orphan — its subject stopped being an
- * instance when `detangle` became a directory of this harness (bean `byql`).
- * `schema:viz:check` was ALREADY failing on clean `main` for this, and it is
- * ungated, so nothing reported it. Removing the page is a durable deletion and
- * therefore the owner's
- * (`deletion-requires-confirmation`), so it is recorded here as a `missing`
- * with its reason rather than quietly swept or quietly tolerated.
- *
- * So the split is the one `kg:audit` already uses here: `check` fails on
- * staleness and on a **regression**, `strict` fails on any finding. That still
- * makes the count unable to return to 0 silently — a page that LOSES its rail
- * changes its verdict, which makes the sidecar stale, which fails `check`.
- * What it does not do is hold this branch hostage to somebody else's orphan.
- *
- * ## The sidecar is the record; this script is not
- *
- * A console report would make "unrailed since it was drawn" and "lost its rail
- * in the commit under review" look the same. Committed, the diff says which —
- * the same argument `kg:audit` makes for writing sidecars rather than printing.
- *
- * ## The prior verdict is a BASELINE, and it may not be here (bean `0dav`)
- *
- * The regression is computed against a prior: the committed working copy until
- * QA results leave `main` for the `qa-reports` branch (owner rulings D1/D4),
- * and `--against <ref>` after. A prior that is not there used to FAIL the gate;
- * proposal §2.3 rules it `unknown` instead — printed as such, the regression
- * half explicitly not claimed, and not this change's defect. `--strict` still
- * fails on every `missing` page, which needs no prior.
+ * The regression is computed against a prior verdict: the committed working
+ * copy, or with `--against <ref>` the `qa-reports` branch. A prior that is not
+ * there is printed `unknown` (the regression half not run), never a failure.
+ * `--strict` still fails on every `missing` page, which needs no prior.
  *
  * @module scripts/check-viewer-nav
  * @covers docs — it walks the whole docs tree, one finding per generated viewer page whose

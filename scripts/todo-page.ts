@@ -1,16 +1,15 @@
 /**
  * One todo's RENDERING — a thin page at `<site>/todos/<id>/` that loads the
- * todo's published JSON-LD. Issue #1908.
+ * todo's published JSON-LD.
  *
  * @module scripts/todo-page
  *
- * The page follows the thin-page rules (`thin-page.ts`, #1899) on the
- * site's layout (2026-10-07). What is todo-specific is only the skeleton the
- * script fills and the config it reads: the todo's id, where its JSON-LD and
- * the whole graph are, and — when the todo is attached to a block — the href
- * of that block's RENDERING, so the page can link a reader to the sentence the
- * todo is about. That href is a fact about renderings, so it lives on this
- * page and never on the todo (*"asset doesnt know about its renderings"*).
+ * The page follows the thin-page rules (`thin-page.ts`) on the site's layout.
+ * What is todo-specific is only the skeleton the script fills and the config
+ * it reads: the todo's id, where its JSON-LD and the whole graph are, and —
+ * when the todo is attached to a block — the href of that block's RENDERING,
+ * so the page can link a reader to the sentence the todo is about. That href
+ * is a fact about renderings, so it lives on this page and never on the todo.
  *
  * The script and stylesheet are static assets under `assets/todos/`, shared
  * by every todo page, so a page is a few hundred bytes of identity.

@@ -2,25 +2,17 @@
 /**
  * Validate a node in the graph — **one Tool, parameterised by graph typology**.
  *
- * Bean `folio-assistant-i31r`, route A of `folio-assistant-3lbz`. The owner,
- * 2026-09-20, on what shape this should take:
- *
- * > a Tool per Zod schema... no, but there should be common patterns (single
- * > pattern?) with some parameters more or less
- *
- * So: give it a path, and it works out what the file *is* from the
- * declaration — which declared directory contains it, and therefore which
- * graph typology — then runs that kind's validator. 199 exported schemas, one
- * lookup.
+ * Give it a path, and it works out what the file *is* from the declaration —
+ * which declared directory contains it, and therefore which graph typology —
+ * then runs that kind's validator.
  *
  * ## What it refuses to call valid
  *
  * A kind with no declared validator yields **could not determine**, and this
- * exits non-zero on it by default rather than printing a tick. That is not
- * pedantry: 14 of 16 kinds are in that state, including `qa` — the largest
- * generated graph here — so a tool that treated "nothing to run" as "fine"
- * would report success over most of the corpus. `--lenient` downgrades it to
- * a warning for a caller that knowingly wants partial coverage.
+ * exits non-zero on it by default rather than printing a tick: many kinds,
+ * including `qa`, have none, so "nothing to run" is not "fine". `--lenient`
+ * downgrades it to a warning for a caller that knowingly wants partial
+ * coverage.
  *
  * @module folio-assistant/scripts/kg-validate
  */

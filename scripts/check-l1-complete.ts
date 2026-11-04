@@ -1,36 +1,14 @@
 #!/usr/bin/env bun
 /**
- * Is a `library/<bib-slug>/` entry complete as L1 source content?
+ * Is a `library/<bib-slug>/` entry complete as L1 source content? L1 source
+ * to L1 KG is not complete while a required derived artefact is missing.
  *
- * Bean `pn6j`. **L1 source to L1 KG is not complete while a required derived
- * artefact is missing** — and without a gate, every derivation step is optional
- * in practice: the document lands in `library/`, reads as ingested, and the gap
- * is found by whoever next needs the missing artefact, long after the context
- * that would have made it cheap is gone.
+ * Each requirement is `met`, `unmet`, or `not-derivable`. A requirement whose
+ * derivation is not built yet is reported as `not-derivable`, never as a pass
+ * and never dropped silently.
  *
- * ## Three states, never two
- *
- * Each requirement is `met`, `unmet`, or **`not-derivable`** — and the third is
- * the reason this can ship now. `pn6j` asks for archive contents, technical
- * metadata, image descriptions, audio transcripts, tabular records and a
- * provenance stamp per narrative. Those are nine sibling beans in the INGEST
- * epic and **none of them is built**. A check that cannot run must not be
- * rendered as a pass, and must not be silently dropped either: it is reported
- * as its own state, naming the bean that would make it runnable.
- *
- * That is the same rule the rest of this repository keeps, and the reason bean
- * `dh4f` exists: a consumer that scans nothing and reports a clean run is worse
- * than one that says it could not look.
- *
- * ## What it does NOT do yet
- *
- * `pn6j`'s "Done when" also asks that a failure **open a bean and hold the
- * document in `uploads/`**. This reports; it does not act. Opening a bean
- * automatically would mint one per run against a store whose non-idempotent
- * `beans create` produced 14,688 duplicates once already, and moving somebody's
- * upload is a deletion-shaped act — `deletion-requires-confirmation` says an
- * agent reports what would move and waits. Both are deliberate gaps, recorded
- * on the bean rather than half-built.
+ * This reports only: it does not open a bean or move the document back to
+ * `uploads/` on failure.
  *
  * Usage:
  *   bun run cat check:l1-complete                 # every entry in library/

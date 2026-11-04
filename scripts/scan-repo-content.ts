@@ -3,63 +3,47 @@
  * Scan an existing repository for material a folio could take over.
  *
  * This runs on the `overlay` branch of the content core's `processes/conduct/getting-started.bpmn`,
- * before anything is scaffolded and long before anything is moved. It is the
- * "look first" half of a rule that only works in one order: **scan, show, ask,
- * then move.**
+ * before anything is scaffolded or moved: **scan, show, ask, then move.**
  *
- * ## Three buckets, and the third is the reason this exists
+ * ## Three buckets
  *
  * `library` is external source material — something somebody else wrote, which
  * the folio cites or ingests. `content` is material authored here, which could
  * become folio blocks. `unclassified` is everything it could not place, and it
- * is *reported*, never quietly assigned.
- *
- * A two-bucket classifier has an accuracy nobody can assess and delivers its
- * mistakes as moved files. The same third-state discipline runs through
- * `readme-sections.ts` ("could not determine" is never rendered as "empty") and
- * `decisions/pages-live-gate.dmn` ("could not check" is never rendered as "not
- * yet"). Here the cost of collapsing it would be an author's PDFs filed as
- * their drafts.
+ * is *reported*, never quietly assigned — a two-bucket classifier would
+ * deliver its mistakes as moved files.
  *
  * ## Path and extension only — deliberately
  *
- * It does not read file contents, call a model, or try to be clever. It tries
- * to be fast, explicable and reversible, so that an author can disagree with
- * any row in one word. A classifier whose reasoning cannot be stated in a
- * sentence cannot be corrected by the person it is wrong about.
+ * It does not read file contents or call a model, so an author can see why
+ * any row was placed and disagree with it in one word.
  *
- * ## Outside-content mathematical evidence & refutations (folio-assistant-qdai)
+ * ## Outside-content mathematical evidence & refutations
  *
- * In repositories with mathematical and scientific content (e.g. qou, issue #2106),
- * crucial evidence often lives OUTSIDE the primary content tree:
+ * In repositories with mathematical and scientific content, crucial evidence
+ * often lives OUTSIDE the primary content tree:
  *   - formal proofs (.lean, .v, .thy) under `docs/audits/`, `math/`, `scripts/`
  *   - computation scripts (.py, .sage, .ipynb) under `docs/audits/`, `computations/`
  *   - TeX macros and tables (`macros.tex`, `tables/*.tex`, `preamble.tex`)
  *   - audit refutations (e.g. `docs/audits/skein-mass-relation-is-false.lean`)
  *   - derivation notes under `docs/notes/`, `notes/`, `derivations/`
  *
- * A conversion that carries only the content tree drops the evidence that some claims
- * are false. The scanner surfaces these artifacts as read-only candidates, classified
- * into 5 categories (`math_proof`, `computation_script`, `macro_definition`,
- * `audit_refutation`, `derivation_note`) with source location, rationale, and link status
- * (identifying orphaned evidence unlinked to any block in the content tree).
+ * The scanner surfaces these as read-only candidates, classified into 5
+ * categories (`math_proof`, `computation_script`, `macro_definition`,
+ * `audit_refutation`, `derivation_note`) with source location, rationale, and
+ * link status (orphaned evidence is unlinked to any block in the content tree).
  *
- * ## Markers — what the harness COULD declare (bean `folio-assistant-dscv`)
+ * ## Markers — what the harness COULD declare
  *
- * The fourth section, `markers`, answers a different question from the three
- * buckets: not "where would this file go" but "what in this repository could
- * a harness be told to pay attention to". Owner, 2026-10-30T12:41Z, verbatim:
- * *"a harness can point to a repo, but doesnt want to automatically slurpo up
- * all content in a repo. harness desclares what it it pays attention to in the
- * repo."*
- *
- * So for each content marker found — `sushi-config.yaml`, a legacy
- * `dak.json`, `.bpmn` processes, a beans store, `library/`, Lean, folio
- * manifests — it reports the paths, whether `index.config.json` (or a local
- * instance's declaration) ALREADY declares it, and the snippet that would.
- * It suggests; it never declares. The pick is the person's, made on
- * `Task_ChooseHarnessed` in `getting-started.bpmn`, and a marker nobody picked
- * stays undeclared. See `lib/content-markers.ts`.
+ * The fourth section, `markers`, answers "what in this repository could a
+ * harness be told to pay attention to" — a harness that points at a repo
+ * declares what it attends to rather than taking all of it. For each content
+ * marker found — `sushi-config.yaml`, a legacy `dak.json`, `.bpmn` processes,
+ * a beans store, `library/`, Lean, folio manifests — it reports the paths,
+ * whether `index.config.json` (or a local instance's declaration) ALREADY
+ * declares it, and the snippet that would. It suggests; it never declares.
+ * The pick is the person's, made on `Task_ChooseHarnessed` in
+ * `getting-started.bpmn`. See `lib/content-markers.ts`.
  *
  * ## It never writes
  *

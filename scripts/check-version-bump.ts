@@ -1,18 +1,13 @@
 #!/usr/bin/env bun
 /**
- * check-version-bump.ts — `instance-versioning.md` §4.1's gate.
+ * check-version-bump.ts — the declared `version` must not be lower than the
+ * one computed from the exported surface.
  *
- * > `check:version-bump` compares the exported surface at `HEAD` against the
- * > last released tag for that instance and fails when the declared `version`
- * > is lower than the computed one. **It never *writes* the version** — the
- * > author may always bump further than computed (a prose rewrite released as
- * > minor is their call), but never less.
- *
- * The rules live in `schemas/kg/version-bump.ts`, including the record of §4.1's
- * falsifier being run before any of this was written. This script is the
- * plumbing: find the baseline, produce two surfaces, compare.
- *
- * ## Four states, and only one of them is a pass
+ * Compares the exported surface at `HEAD` against the last released tag for
+ * that instance. **It never *writes* the version**: the author may bump
+ * further than computed, never less. The rules live in
+ * `schemas/kg/version-bump.ts`; this script finds the baseline, produces two
+ * surfaces, and compares.
  *
  * | state | what it means |
  * |---|---|
@@ -21,37 +16,17 @@
  * | `unreleased` | the instance is publishable and has never been tagged; there is no baseline to diff against |
  * | `undetermined` | the baseline could not be exported, or a version is a pseudo-version with no triple |
  *
- * **`undetermined` is not `ok`**, and keeping them apart is the whole reason
- * this is an enum. A gate that could not build the baseline and exited 0 would
- * report a clean run over a comparison it never made — `xom7`, `dh4f`, `a6kl`,
- * and the shape this repository pays for most often.
+ * Advisory by default (exit 0); `--strict` exits 1 on `under` or
+ * `undetermined`.
  *
- * ## Why the baseline is EXPORTED rather than read from a file
+ * The baseline is EXPORTED, not read from a file (`_kg/` is a gitignored build
+ * output): the tag is checked out into a throwaway worktree and that commit's
+ * own exporter runs.
  *
- * `_kg/` is a build output: gitignored, absent in a fresh checkout, stale in a
- * dirty one, and never committed at a tag. So the baseline is produced by
- * checking the tag out into a throwaway worktree and running that commit's own
- * exporter. That is slow and it is the only honest option — a snapshot
- * committed alongside the code would be a second answer to "what did we
- * publish", free to disagree with the first.
- *
- * **Verified end-to-end, not only typechecked**: run against this
- * repository's one existing tag, `folio-assistant-v0.1.0`, the worktree
- * export produced 2035 subjects against HEAD's 2303. That is the path most
- * likely to be quietly broken — a failed export returning `undefined` scores
- * as `undetermined`, which looks like a cautious gate rather than a
- * non-functioning one.
- *
- * ## One more line, about a QA sidecar, and it never decides the exit
- *
- * The exporter also computes `kg-export.qa-results.json`; this gate compares
- * it with a baseline (bean `ymsu`, then `id4s`) — the working copy, or with
- * `--against <ref>` the `qa-reports` branch through qa-store. `current` prints
- * nothing; `stale` asks for a regeneration; `absent`, `unreadable` and
- * `unknown` print UNKNOWN, because a branch with no baseline is not a branch
- * whose baseline agrees. **Exit on every one of them: 0**, with or without
- * `--strict` — the sidecar is not this gate's subject, and a missing baseline
- * is not this change's defect (proposal §2.3).
+ * It also compares the `kg-export.qa-results.json` sidecar with a baseline
+ * (the working copy, or with `--against <ref>` the `qa-reports` branch):
+ * `stale` asks for a regeneration; `absent`, `unreadable` and `unknown` print
+ * UNKNOWN. This line never decides the exit, with or without `--strict`.
  *
  *   bun run cat check:version-bump [--strict] [--json] [--against main|<sha>|pr/<n>]
  *

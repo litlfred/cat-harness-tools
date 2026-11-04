@@ -1,19 +1,18 @@
 /**
  * The ✍ suggest editor, installed into a built site: Milkdown Crepe and KaTeX
  * bundled into ONE module and ONE stylesheet at `assets/vendor/crepe/`, where
- * the edit-links runtime looks for them (bean folio-assistant-4dx7).
+ * the edit-links runtime looks for them.
  *
  *   bun run cat-harness-tools/scripts/suggest-editor.ts --site _site
  *
  * ## Why bundled here and not loaded from a CDN
  *
- * Owner, 2026-10-14, on the live dth-hrh site: the editor failed with
- * *"Adding different instances of a keyed plugin (plugin$)"*. jsDelivr's
- * `+esm` serves each package as its own module and resolves each one's
- * dependencies on its own, so two copies of `prosemirror-state` met in one
- * editor. Its theme CSS also `@import`s bare package paths a CDN cannot
- * resolve. One bundle, built from this package's pinned dependencies, has one
- * copy of each and its CSS inlined, and it is the bytes the tests run.
+ * jsDelivr's `+esm` serves each package as its own module and resolves each
+ * one's dependencies on its own, so two copies of `prosemirror-state` meet in
+ * one editor (*"Adding different instances of a keyed plugin"*). Its theme
+ * CSS also `@import`s bare package paths a CDN cannot resolve. One bundle,
+ * built from this package's pinned dependencies, has one copy of each and its
+ * CSS inlined, and it is the bytes the tests run.
  *
  * ## Why installed at BUILD time and never committed
  *

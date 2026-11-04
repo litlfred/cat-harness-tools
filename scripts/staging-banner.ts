@@ -1,100 +1,48 @@
 /**
  * Inject the staging banner as a CONSTANT fragment, and put the per-preview
- * facts in one `staging.json` the browser reads. Bean `g196`.
+ * facts in one `staging.json` the browser reads.
  *
- * ## The problem this exists to fix
+ * A banner with the commit SHA or a build timestamp baked into every page
+ * makes every page of every rebuild a new git object on the publish branch,
+ * so the history grows on each re-push. Instead the facts are emitted once,
+ * to `<site>/staging.json`, and the injected fragment is **byte-identical on
+ * every page and across every rebuild**. The browser derives its preview root
+ * from `location.pathname`, fetches the JSON and fills the banner in.
  *
- * The banner used to be composed in `feature-staging.yml` as a bash string and
- * `sed`-ed into every page with the commit SHA and a `date -u` build timestamp
- * baked in. Measured on `origin/gh-pages`, 2026-09-19: 9 previews, **346.1 MB**,
- * of which **27.5 MB of each 37.5 MB preview is HTML** — and **zero HTML blobs
- * are shared between any two previews** (git `ls-tree` blob-hash intersection:
- * 0 of ~390 HTML objects, against 185 of ~780 overall, the shared ones being
- * images, fonts and vendor JS).
+ * ## The compare link
  *
- * The timestamp is the sharp end. Because it is `date -u +%Y-%m-%dT%H:%M:%SZ`,
- * **every page is unique even across two builds of ONE branch**, so each
- * re-push adds ~27.5 MB of permanently new objects and the history grows even
- * when the preview count does not. Run 597's log: *"Injected staging banner
- * into 530 HTML files"*.
- *
- * ## The shape
- *
- * Emit the facts once, to `<site>/staging.json`, and inject a fragment that is
- * **byte-identical on every page and across every rebuild**. The browser
- * derives its preview root from `location.pathname`, fetches the JSON and
- * fills the banner in.
- *
- * This is not a new idea here — `head_custom.html` already records the sidebar
- * QR as *"generated in the browser from `window.location.href` rather than
- * baked per page at build time"*, for the neighbouring reason.
- *
- * ## Why the compare link did not defeat it
- *
- * Exactly one fragment of the old banner was genuinely per-page: the link
- * putting this page beside its counterpart on `main`, which has three states
+ * The link putting a page beside its counterpart on `main` has three states
  * (present on main → deep link; absent → site root, and SAY the page is new;
- * publish ref unread → site root, worded neutrally). That looked like
- * build-time per-page data.
+ * publish ref unread → site root, worded neutrally). `staging.json` carries
+ * `newPages`, the pages with **no** counterpart, so membership is a
+ * client-side check and the fragment stays constant.
  *
- * It is not. The client knows its own path, and the only thing it cannot
- * compute is *which pages main has* — so `staging.json` carries `newPages`,
- * the pages with **no** counterpart, which is the short list rather than the
- * long one. Membership is then a client-side check and the fragment stays
- * constant. Had this not worked the whole approach would have collapsed to a
- * much smaller saving, so it was the first thing checked.
+ * Pages still differ **between** previews by slug (Jekyll's `relative_url`
+ * prepends `baseurl`); they no longer differ **across rebuilds of one
+ * preview**.
  *
- * ## What is deliberately NOT fixed here
- *
- * Cause 2 in `g196`: Jekyll's `relative_url` prepends `baseurl` to ~235 hrefs
- * per page. Pages therefore still differ **between** previews by slug. They no
- * longer differ **across rebuilds of one preview**, which is the unbounded
- * half.
- *
- * Cause 3 — the `fa-translation-index` island publishing `site.baseurl` to
- * JavaScript — is **done** as of 2026-10-02: the island is gone and the facts
- * are fetched once from `assets/harness/site.json`, the same move this file
- * made for the banner. Measured on a local build the day it landed: 2356 pages
- * carried it at 9482 B each, 22.34 MB on ONE distinct payload.
- *
- * ## The footer carries the same stamp, and it is filled the same way
+ * ## The footer stamp is filled the same way
  *
  * `docs/_includes/footer_custom.html` renders `short_sha`, `built_at` and
- * `run_url` from `docs/_data/build.yml` into the footer of EVERY page. A fresh
- * `date -u` there made every page unique on every run — the same defect as the
- * banner, one include away — and it SURVIVED the banner fix. Measured on two
- * deploys of one branch three minutes apart, both already shipping the
- * constant banner: **1466 insertions, 1465 deletions across 613 files, every
- * page changed by exactly one line**.
- *
- * So the staging build no longer writes those three keys; Jekyll renders the
- * footer identically every time, and {@link CLIENT}'s `stamp()` fills the real
- * values from the same `staging.json` the banner already fetches. The reader
- * loses nothing — only the moment the value is bound moves from build time to
- * load time. `docs-site.yml` still stamps the MAIN site, where there is one
- * copy and nothing to deduplicate.
- *
- * That this was missed until the deployed artefact was measured is the point
- * worth keeping: the unit test proved the FRAGMENT constant and was right,
- * and the page still was not. A test of the part is not a measurement of the
- * whole.
+ * `run_url` from `docs/_data/build.yml` into the footer of EVERY page. The
+ * staging build does not write those three keys; Jekyll renders the footer
+ * identically every time, and {@link CLIENT}'s `stamp()` fills the real
+ * values from the same `staging.json` the banner fetches. `docs-site.yml`
+ * still stamps the MAIN site, where there is one copy and nothing to
+ * deduplicate.
  *
  * ## Two rules the client script must not break
  *
- * **A failed fetch must still say PREVIEW.** The banner exists so a reviewer
- * cannot mistake staged content for the published site; if `staging.json`
- * cannot be read, the page must still announce itself. *"Could not determine"
- * is never rendered as "this is the real site"* — the same third-state rule
- * the rest of this repository runs on, and here the failure mode is a
- * reviewer approving the wrong artefact. So the static markup carries
+ * **A failed fetch must still say PREVIEW.** If `staging.json` cannot be read,
+ * the page must still announce itself, so a reviewer cannot mistake staged
+ * content for the published site: the static markup carries
  * "FEATURE BRANCH" and the fetch only ever ADDS detail.
  *
  * **Every value from the JSON goes in as `textContent`, never as markup.**
  * Git ref names may contain `<`, `>` and `"` — they are not in git's
  * forbidden set, which stops at space, `~`, `^`, `:`, `?`, `*`, `[`, `\` and
- * the control characters. A branch name is therefore attacker-influenced
- * markup if it is ever concatenated into HTML. The old bash banner
- * interpolated `$BRANCH` into a string; this one builds nodes.
+ * the control characters — so a branch name is attacker-influenced markup if
+ * it is ever concatenated into HTML.
  */
 import { isVendoredViewer } from "./pdf-viewer.ts";
 import { BUILD_TYPES, type BuildType } from "./lib/build-type.ts";

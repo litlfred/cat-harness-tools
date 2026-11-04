@@ -1,26 +1,9 @@
 /**
- * `qa-reporting` gets its first consumer.
+ * Every QA verdict is written by an actor holding the `qa-reporting`
+ * permission (declared in `skills/permissions/permissions.json`).
  *
- * The permission has been declared in `skills/permissions/permissions.json`
- * from the start — *"Emit QA reports"* — and until this gate existed **nothing
- * outside a comment and a test read it**. Five actors hold it; zero also hold
- * `content-authoring`, so the separation the owner asked for was already true
- * in the declaration and enforced at no point where a verdict is written.
- *
- * That is bean `dh4f`'s shape with the stakes raised: a declaration that reads
- * as a control, consulted by nobody. A reader who finds `qa-reporting` in the
- * permission graph reasonably concludes something checks it.
- *
- * ## What this found, and why the gate is shaped the way it is
- *
- * **0 of 5,896 reviewer entries resolve to a declared actor.** Not a single
- * one, and not because any were denied: `QaReviewer.id` is a script path or an
- * ad-hoc agent name, while an actor id is a persona. The two sides never
- * shared a vocabulary, so the permission was unevaluable rather than unmet.
- *
- * A gate that failed on "unresolved" would therefore fail on everything, and
- * one that ignored it would do nothing at all. So there are three outcomes and
- * they are counted apart:
+ * A `QaReviewer.id` is often a script path or an ad-hoc agent name rather than
+ * a declared actor, so three outcomes are counted apart:
  *
  * | outcome | meaning | gate |
  * |---|---|---|
@@ -28,54 +11,25 @@
  * | **forbidden** | `actor` resolves and does NOT hold it | **FAIL, always** |
  * | **unresolved** | no `actor`, or one naming no declared actor | baseline; fails on a NEW one |
  *
- * `forbidden` is the defect this exists to catch and is never baselined — a
- * producer writing its own verdict is the thing the whole discipline forbids.
- * `unresolved` is the backlog, and the baseline can only shrink: an entry that
- * stops matching is reported **stale** so the file cannot quietly grow.
+ * `forbidden` is never baselined. The `unresolved` baseline can only shrink:
+ * an entry that stops matching is reported **stale**.
  *
- * ## The one exception, and it is deliberate
+ * Exception: a **"could not dispatch"** record may be written by anyone,
+ * including the producer. It is identified structurally (`metrics.dispatch:
+ * "unavailable"`, per `isCouldNotDispatch`), never by reviewer name.
  *
- * A **"could not dispatch"** record may be written by anyone, including the
- * producer. That is the owner's ruling of 2026-09-21 and the reason the
- * discipline can gate at all — a producer forbidden from writing a verdict has
- * nothing to write where no dispatch exists, leaving the gate reading an
- * absence it cannot tell from negligence.
+ * The gate reads the derived results tree and the declared `attestations`
+ * tree (`test/attestations/`), and reports its population:
  *
- * Those records are identified structurally (`metrics.dispatch:
- * "unavailable"`, per `isCouldNotDispatch`), never by reviewer name, so the
- * exemption cannot be claimed by asserting it.
- *
- * ## An absent corpus is "could not determine", never a stale baseline
- *
- * Bean `c8uq` (reader audit row R28). With `test/results/` moved aside this
- * gate used to exit 1 only through its stale-baseline rule, printing *"stale
- * baseline entry, remove it"* five times — and an agent obeying that empties
- * the baseline, after which the next run passes over **0 entries**. The
- * derived corpus now lives on the `qa-reports` branch, so an unfetched
- * checkout is the normal case, not an accident.
- *
- * So the gate reports its POPULATION. It reads two places — the derived
- * results tree and the declared `attestations` tree (`test/attestations/`,
- * where agent and human judgements stay on `main`, bean `2gst`) — and:
- *
- * - a `forbidden` entry still fails (exit 1): that is determined wherever it
- *   was found;
+ * - a `forbidden` entry fails (exit 1) wherever it was found;
  * - an ABSENT results tree is exit 2, *could not determine*, and the baseline
  *   is NOT judged — no entry is called stale over a corpus nobody looked at;
  * - zero verdict-bearing entries examined is exit 2 through `vacuityRefusal`.
  *
- * ## A root that does not own the derived corpus: not applicable (78)
- *
- * Owner, 2026-11-03 (decision card, "(b) policy: 78 downstream"). Exit 2 says
- * "this root should have the corpus and could not read it". That is true of a
- * HARNESS root (`rootProfile`, `lib/root-gate-set.ts`): it carries the gates
- * workflow whose run publishes the derived corpus to `qa-reports`. It is not
- * true of a CONTENT root, a downstream that mounts the harness: the derived
- * corpus is not its own, and there is no fetch it was expected to run. So
- * there, with the derived tree absent and nothing forbidden found, the gate
- * exits 78 (`lib/not-applicable.ts`) with the reason — neither a pass nor a
- * failure. A harness root with the tree absent still exits 2, and a
- * `forbidden` entry still exits 1 in either.
+ * On a CONTENT root (`rootProfile`, `lib/root-gate-set.ts`), which does not
+ * own the derived corpus, an absent tree with nothing forbidden exits 78
+ * (`lib/not-applicable.ts`), not applicable. A harness root with the tree
+ * absent still exits 2, and a `forbidden` entry still exits 1 in either.
  *
  * @module scripts/check-qa-reviewer-permission
  * @covers policies, scenarios

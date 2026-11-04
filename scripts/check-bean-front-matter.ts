@@ -2,92 +2,52 @@
 /**
  * Every bean's front matter parses as YAML — the check `beans` cannot provide.
  *
- * Bean `t7ao`, found 2026-09-21 by breaking it.
- *
- * ## The failure, measured
- *
- * `224e0beac8` committed a bean whose line 8 was a literal `\1` — an
- * unsubstituted sed backreference where `updated_at:` belonged.
- * `bun run cat gates --all` was run on that tree: **92 gates, all green.** It was
- * pushed.
- *
- * The next `beans list` in a fresh shell:
- *
- * ```
- * Error: loading beans: loading .../folio-assistant-sqtq--*.md:
- * parsing front matter: yaml: line 8: could not find expected ':'
- * ```
- *
- * Not "that one bean is unreadable" — **no beans at all**. The CLI loads the
- * store as a unit, so `list`, `roadmap` and `prime` all fail together.
- *
- * ## Why that is worse than an ordinary broken file
- *
- * `beans prime` is the FIRST command in this repository's cold start, named in
- * the first line of `AGENTS.md`. One malformed bean means every agent starting
- * after it gets no work plan, from the one command whose whole job is to hand
- * them one. The failure is total, immediate, and attributable to a file whose
- * author has already moved on.
+ * The `beans` CLI loads the store as a unit, so one malformed bean makes
+ * `list`, `roadmap` and `prime` all fail: every agent starting after it gets
+ * no work plan from `beans prime`, the first command of the cold start.
  *
  * ## Why `check-bean-bodies` does not already catch it
  *
- * It reads titles, bodies, checklists and blockers, and it does examine front
- * matter — `isFoldedTitle` is a front-matter SHAPE defect. So the gap is not
- * that front matter went unexamined. It is that it was examined **by regex**,
- * and a regex over a broken document does not notice the document is broken.
- *
- * That is `xom7`: a check that cannot fail is indistinguishable from one that
- * passes. The store was unreadable and the report said 92/92.
+ * It examines front matter **by regex** (e.g. `isFoldedTitle`), and a regex
+ * over a broken document does not notice the document is broken.
  *
  * ## Why this parses when `bean-store-read` deliberately does not
  *
  * `bean-store-read.ts` keeps front matter VERBATIM on purpose — a YAML loader
- * resolves the very folds `isFoldedTitle` exists to see. Both are right,
- * because they ask different questions. That module asks *what does this
- * front matter say*; this one asks *is it front matter at all*. So this reads
- * the same raw block that module already hands out, and parses a COPY of it.
+ * resolves the very folds `isFoldedTitle` exists to see. That module asks
+ * *what does this front matter say*; this one asks *is it front matter at
+ * all*, so it parses a COPY of the same raw block.
  *
- * ## TWO conditions, and conflating them would be wrong
+ * ## TWO conditions
  *
  * The `yaml` package rejects a duplicate map key; the Go loader inside `beans`
- * accepts it and takes one of the values. So "this file is bad" splits into
- * two findings with different consequences, and the discriminator is whether
- * a TOLERANT parse (`uniqueKeys: false`) still refuses it:
+ * accepts it and takes one of the values. The discriminator is whether a
+ * TOLERANT parse (`uniqueKeys: false`) still refuses it:
  *
  * | condition | tolerant parse | what it costs |
  * |---|---|---|
  * | `unparseable` | refuses | the whole store, for every reader, now |
  * | `duplicate-key` | accepts | the file says two things and the winner is the reader's parser |
  *
- * Only the first is the emergency this bean was filed for. The second is a
- * real defect — `1hvo` carries two different `title:` values, so what the bean
- * is CALLED depends on who loads it — but the store is up, and gating the
- * repository on somebody else's botched conflict resolution would stop work
- * that has nothing to do with it.
+ * Only the first takes the store down; gating the repository on the second
+ * would stop unrelated work.
  *
  * ## No sidecar, and a baseline only for the second
  *
- * No sidecar: a `qa-results/v1` file records history for a backlog somebody is
- * working down, and `unparseable` must never last long enough to have any.
+ * No sidecar: `unparseable` must never last long enough to need a history,
+ * and it is NEVER baselined (that would ship a store nobody can load).
  *
- * `unparseable` is NEVER baselined, for the same reason — a baseline for it
- * would be a way to ship a store nobody can load.
+ * `duplicate-key` IS baselined at the ones the store already carries, so a
+ * NEW one fails while the existing ones are listed rather than demanded:
+ * outstanding defects are repaired by the bean's OWNER, as in
+ * `check-bean-bodies`.
  *
- * `duplicate-key` IS baselined, at the two the store already carries, so a NEW
- * one fails while the existing two are listed rather than demanded. That is
- * `check-bean-bodies`'s pattern and its stated reason: *"Outstanding defects
- * are repaired by the bean's OWNER, not by this check and not by whoever ran
- * it."* Both belong to other sessions, and one of them (`7u3g`) is `scrapped`,
- * where changing anything risks reading as resolving a sibling's bean.
+ * ## A third condition across files: `duplicate-id`
  *
- * ## A third condition that is not about any one file: `duplicate-id`
- *
- * Bean `4vg7`. Two files declared `folio-assistant-t3n8` from 2026-09-22 to
- * 2026-10-03 and every gate was green, because every check over the store —
- * this one included — judged each file ALONE, and both files were valid.
- * The id-keyed readers build `Map`s by id, so the collision was resolved by
- * overwrite rather than reported. Checked here because this is the gate that
- * already sees every file in `defs/` and `archive/` exactly once.
+ * Two files declaring the same bean id are each valid alone, and the
+ * id-keyed readers build `Map`s by id, so the collision would be resolved by
+ * overwrite rather than reported. Checked here because this gate sees every
+ * file in `defs/` and `archive/` exactly once.
  *
  * Exit: 0 every bean parses (or no store), 1 one does not, 2 could not check.
  *

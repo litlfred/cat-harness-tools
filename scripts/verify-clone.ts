@@ -7,18 +7,14 @@
  * bun run cat sub-kg:verify-clone --repo owner/name --sibling owner/platform --gate "bun test"
  * ```
  *
- * Stage 11 of `sub-kg-lifecycle` ("Verify on a fresh clone"), made a command
- * on the owner's ruling of 2026-10-06 (bean `3tza`, ruling 2), as
- * `seed:ready` was made one for the seed-readiness gateway.
+ * Stage 11 of `sub-kg-lifecycle` ("Verify on a fresh clone"), as a command.
  *
  * ## Why a fresh clone and not the rehearsal
  *
  * `seed:ready --rehearse` copies a layer out of THIS checkout, so it shares
  * the checkout's `node_modules`, its git configuration and whatever the host
- * environment quietly supplies. The first seeded fork failed with
- * `Cannot find module '../../../<harness>/…'` (#2082) after rehearsing in
- * place: nothing in a seed runs standalone until its import seam is
- * re-pointed. Only a clone in an empty directory sees that.
+ * environment quietly supplies; an import that reaches outside the seed only
+ * fails in a clone in an empty directory.
  *
  * ## What it does
  *

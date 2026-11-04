@@ -1,33 +1,26 @@
 #!/usr/bin/env bun
 /**
  * check:instance-graph — every instance's dependency graph resolves: no
- * missing dependency, no cycle. Bean `a1lq`.
+ * missing dependency, no cycle.
  *
- * The owner's ruling, 2026-09-23: at runtime a missing dependency WARNS and
- * the overlay continues without that layer, because an uncloned git-URL
- * dependency in a partial checkout looks exactly like one, and throwing there
- * stops sessions that work. That leniency is safe only if something fails on
- * it where it matters, and this is that something: in CI the checkout is
- * whole, so a dependency that is missing here is misspelled or gone.
+ * At runtime a missing dependency WARNS and the overlay continues without
+ * that layer, because an uncloned git-URL dependency in a partial checkout
+ * looks exactly like one. This is where it fails: in CI the checkout is
+ * whole, so a dependency missing here is misspelled or gone.
  *
  * A cycle already throws at runtime (`orderedDependencies`); it is reported
  * here as well, so one run names every broken instance rather than the first.
  *
- * ## Declared, and identified (issue #1548)
- *
- * Owner, 2026-09-30: *"QA gates on harness declaration of dependences. harness
- * instancess need IRI for harness."* Two more obligations, gated here:
+ * ## Declared, and identified
  *
  * - **Every instance DECLARES `needs`.** Absent is undetermined, and at
  *   runtime it stays a legal third state (`resolution-across-needs.test.ts`
  *   proves what it reports), but in this repository it is a finding. `[]`
- *   declares the floor and is fine. Until this gate, #1508 had made all
- *   instances comply by hand and nothing held them there.
+ *   declares the floor and is fine.
  * - **Every instance has an absolute harness IRI, and no two share one.** The
  *   IRI is `kg-export`'s own `exportIdentity(...).canonicalIri`, called rather
  *   than re-derived, so this gate and the published `@id` cannot disagree.
  *
-
  * @covers cat-harness
  */
 import { relative, resolve } from "node:path";

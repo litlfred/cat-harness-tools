@@ -3,35 +3,20 @@
  * check-module-scope-resolution.ts — no module scope resolves the folio
  * directory, because a throw there is an error far from its cause.
  *
- * ## What this forbids, and what it deliberately does not
+ * Forbidden: `const FOLIO_DIR = folioDir(ROOT);` at module scope. `folioDir`
+ * throws on a malformed declaration; a throw during evaluation aborts the
+ * module and leaves every later export unbound, so the error a reader sees
+ * names an unrelated binding's temporal dead zone, far from the cause.
  *
- * `const FOLIO_DIR = folioDir(ROOT);` at module scope. `folioDir` throws on a
- * malformed declaration, and a throw during evaluation ABORTS the module —
- * leaving every export below the failing line unbound. `await import()` can
- * then hand back the half-built namespace rather than re-throwing, so the
- * error a reader sees names an unrelated binding's temporal dead zone.
+ * Not flagged:
+ * - `findContentRepoRoot()` at module scope: it catches `folioDir` failures
+ *   and ends in a declared fallback.
+ * - Lazy call sites, e.g. `FOLIO_DIR: () => folioDir(x)` inside an object
+ *   (`adapters/document/paths.ts` has one deliberately).
  *
- * Bean `95s1` is what that costs: `qa-checkers-extended.ts` threw at line 49,
- * `EXTENDED_AUTOMATED_CHECKERS` at line 3235 was never bound, and the symptom
- * sat **3,186 lines** from the cause — close enough to a circular import that
- * the bean was opened as one and stayed wrong until the import graph was
- * actually measured.
- *
- * **`findContentRepoRoot()` at module scope is NOT flagged.** It no longer
- * throws: it catches `folioDir` failures while searching and ends in a
- * declared fallback (PR #695). Flagging it would be a gate against a hazard
- * that no longer exists, and this file would be the place a reader learned a
- * false thing about it.
- *
- * **Lazy call sites are not module scope**, so `FOLIO_DIR: () => folioDir(x)`
- * inside an object is fine and stays fine — `adapters/document/paths.ts` has
- * one deliberately.
- *
- * ## The fix a finding points at
- *
- * `folioDirDeferred(root, import.meta.url)` — resolves at load, exactly as
- * before, so a value captured under the loading cwd stays captured; only the
- * THROW waits for a caller, and arrives naming the module.
+ * The fix a finding points at: `folioDirDeferred(root, import.meta.url)` —
+ * resolves at load as before; only the THROW waits for a caller, and names
+ * the module.
  *
  * @module scripts/check-module-scope-resolution
  * @covers code

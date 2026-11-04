@@ -1,5 +1,6 @@
 /**
- * Report whether each workflow is actually passing on the default branch.
+ * Report whether each workflow is actually passing on the default branch, so
+ * a workflow failing run after run is surfaced.
  *
  * ```sh
  * bun run cat check:ci-health            # human-readable, exit 1 if anything is red
@@ -15,9 +16,6 @@
  * `GITHUB_TOKEN` or `GH_TOKEN` is used when present. Without one the call still
  * works for a public repo; for a private repo it fails, and this says so rather
  * than reporting green.
- *
- * Why this exists: `docs-site.yml` failed 30 consecutive runs over two months
- * and nothing surfaced it. See bean `xom7`.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";

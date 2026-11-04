@@ -1,17 +1,11 @@
 /**
  * The release security gate: run every security check this repository
- * already has, as ONE named step a release process can call (bean `ieum`,
- * issue #2389).
+ * already has, as ONE named step a release process can call.
  *
- * ## Why a gate over checks that already run in CI
- *
- * Measured 2026-10-07: the checks below run in `code-quality-gates.yml`, but
- * **no merge, publish or release process step names any of them**. A
- * `docs-site-publish` or a `merge-train` run is covered only indirectly, if
- * the CI run that preceded it happened to be the right one. The owner put it
- * this way: *"tools may be in place but not utilized fully"*. This script does
- * not add a check. It makes the existing ones callable by name at the point
- * of release, and says which state each one is in.
+ * It adds no check. The checks run in `code-quality-gates.yml`, but a merge,
+ * publish or release step is covered only if the preceding CI run was the
+ * right one; this makes them callable by name at the point of release, and
+ * says which state each one is in.
  *
  * ## Three states, never two
  *
@@ -23,24 +17,19 @@
  *
  * Action SHA pinning BLOCKS for every workflow except a staging-only one that
  * holds no write token and has no `pull_request_target` trigger, which is
- * reported as advisory (owner, 2026-10-07, twice: *"unpinned on staging"*,
- * then *"pin write-token workflows"* once the roast found a staging workflow
- * that could rewrite the live site; bean `1ygp` L4.1). `stagingExempt` in
- * `pin-actions.ts` decides that from what the workflow can do, never from its
- * name. An `advisory` check (dependency advisories, exempt staging pinning)
- * is reported in the same three states and never blocks.
+ * reported as advisory. `stagingExempt` in `pin-actions.ts` decides that from
+ * what the workflow can do, never from its name. An `advisory` check
+ * (dependency advisories, exempt staging pinning) is reported in the same
+ * three states and never blocks.
  *
  * A check runs only when its manifest command equals the one pinned in
- * {@link PINNED_CHECK_COMMANDS}; a repointed check is `fail`, not run (bean
- * `1ygp` L4.5). A pinned SHA must carry its `# <ref>` comment, and a bare one
- * is `unpinned-unlabelled` and blocks; `docker://` steps without an
- * `@sha256:` digest are advisory (L4.6).
+ * {@link PINNED_CHECK_COMMANDS}; a repointed check is `fail`, not run. A
+ * pinned SHA must carry its `# <ref>` comment, and a bare one is
+ * `unpinned-unlabelled` and blocks; `docker://` steps without an
+ * `@sha256:` digest are advisory.
  *
- * ## Every subprocess is argv, never a shell string
- *
- * The check names are constants, and they reach `Bun.spawnSync` as an
- * array, so nothing here builds a shell command from a value. That is
- * the `secure-code-authoring` voice's `scz-value-never-becomes-program-text`.
+ * Every subprocess is argv: the check names are constants and reach
+ * `Bun.spawnSync` as an array, so no shell command is built from a value.
  *
  * Usage:
  *   bun run cat security:gate            # exit 1 on a blocking fail or unknown

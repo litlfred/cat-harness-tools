@@ -4,20 +4,10 @@
  *
  * @module scripts/beans
  *
- * ## Why this module exists
+ * The one reader of the bean store; every consumer imports it rather than
+ * parsing front matter itself.
  *
- * `todos/` had a reader, a published projection and a board over it before
- * `beans/` had any of the three. Measured 2026-09-20: 239 bean files carrying
- * `status`, `type`, `parent` and `priority`, read by nothing but check
- * scripts, each of which had **its own front-matter parser**. So the larger of
- * the two stores by two orders of magnitude was the invisible one, and the
- * parsing was duplicated rather than shared.
- *
- * That is the `dh4f` shape pointed at the work plan itself: a declared
- * directory whose contents no consumer reasons about. The fix is one reader,
- * here, that every consumer imports.
- *
- * ## Beans against todos — the 2×2, and why this reader is SHAPED differently
+ * ## Beans against todos
  *
  * | | memory | workflow management |
  * |---|---|---|
@@ -25,34 +15,24 @@
  * | agent actor | `memory/` | **beans** (here) |
  *
  * `scripts/todos.ts` validates each node against `schemas/sdlc/todo.ts` and
- * **throws** on a file that declares itself a todo and fails to parse. This
- * reader deliberately does not, and the asymmetry is not laziness:
- *
- * **We own the todo format. We do not own the bean format.** Beans are
- * written by [hmans/beans](https://github.com/hmans/beans), a third-party CLI
- * that `AGENTS.md` names as the single todo mechanism for agent work. A zod
- * schema that throws on an unrecognised front-matter key would turn *"beans
- * shipped a new field"* into *"every gate in this repository is red"*, and the
- * failure would land on whoever next ran `beans create` rather than on anyone
- * who could fix it.
- *
- * So: known keys are lifted, unknown keys are ignored, and a file that is not
- * a bean is skipped rather than complained about. `beans check` owns the
- * complaint about a malformed bean; duplicating it here would put it somewhere
- * less useful.
+ * **throws** on a todo that fails to parse. This reader does not: we own the
+ * todo format, but beans are written by
+ * [hmans/beans](https://github.com/hmans/beans), a third-party CLI that
+ * `AGENTS.md` names as the single todo mechanism for agent work, and a new
+ * field there must not turn every gate red. Known keys are lifted, unknown
+ * keys are ignored, and a file that is not a bean is skipped. `beans check`
+ * owns the complaint about a malformed bean.
  *
  * ## What `blocking:` means, and which end of it carries the expiry
  *
  * `beans update <id> --blocking <other>` marks `<id>` as blocking `<other>`.
- * So the field sits on the **blocker** and names the **blocked**. Reading it
- * the other way round inverts every finding computed from it, which is why
- * {@link blockedBy} exists rather than each caller inverting the map itself.
+ * So the field sits on the **blocker** and names the **blocked**;
+ * {@link blockedBy} inverts it so no caller has to.
  *
  * The `bean-blocking` skill requires a real block to carry what it waits on,
- * since when, an **expiry** and a handoff — because a block with no expiry
- * cannot be told from abandoned work. That expiry is written in the bean's
- * BODY as prose, not in front matter, so {@link hasExpiry} matches the body
- * rather than reading a field that does not exist.
+ * since when, an **expiry** and a handoff. The expiry is written in the
+ * bean's BODY as prose, not in front matter, so {@link hasExpiry} matches the
+ * body.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";

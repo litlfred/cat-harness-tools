@@ -3,43 +3,30 @@
  *
  * @module scripts/library-refs
  *
- * ## The claim this exists to test
- *
- * Bean `jbx2`, on why `library/` is the subgraph to make visible first:
- *
- * > `library/` is L1 — every knowledge-graph reference to a source resolves
- * > THROUGH it, never to a loose path or a bare URL.
- *
- * That is a claim about the corpus, and until something walks the corpus it is
- * a sentence. Its third "done when" asks for the resolution to be
- * **demonstrated**, so this scans for the edges and the viewer shows them.
+ * `library/` is L1: every knowledge-graph reference to a source resolves
+ * THROUGH it, never to a loose path or a bare URL. This scans the corpus for
+ * those edges, and the viewer shows them.
  *
  * ## The referrer kind is READ, never listed
  *
  * A reference is a `libraryId` field, and what KIND of thing carries it is the
  * **declared graph typology of the directory the file sits in** — `catalogue` for
- * a catalogue node, `voices` for a voice. Nothing here enumerates those two.
- * A new graph typology that starts naming library slugs appears in this scan the
- * day it is declared, which is the same "derived, never listed" rule
- * `recordsWork` follows on the graph typology itself. A hardcoded pair would have
- * been wrong within the week: `voices` was not a referrer at all when this
- * corpus began.
+ * a catalogue node, `voices` for a voice. Nothing here enumerates those two, so
+ * a new graph typology that names library slugs appears in this scan the day
+ * it is declared (the same "derived, never listed" rule `recordsWork` follows).
  *
  * ## A rendering of an artefact is not the artefact
  *
  * Site output is skipped. `docs/assets/…` holds published *copies* of the
- * catalogue and of this very projection, so counting them would inflate every
- * slug's referrer list with the thing that displays it — and a slug would
- * then look referenced because it is on a page about being referenced. Same
- * error `auto-docs` made counting 1,522 skills.
+ * catalogue and of this very projection, so counting them would make a slug
+ * look referenced because it is on a page about being referenced.
  *
  * ## Zero and unknown are different answers
  *
  * A slug nothing references is a real and reportable finding: the L1 claim is
  * **not** demonstrated for it. A file that could not be parsed is not evidence
- * of anything, so it is collected separately and named. A scan that folded the
- * second into the first would let an unreadable corpus render as a corpus with
- * no references — the failure this repository keeps paying for.
+ * of anything, so it is collected separately and named, and an unreadable
+ * corpus never renders as one with no references.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";

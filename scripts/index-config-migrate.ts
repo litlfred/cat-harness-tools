@@ -20,13 +20,9 @@
  *                                                    # a remoteMounts entry that DIFFERS from the index's wins
  *                                                    # (a re-pin merged from main); without it, a difference throws
  *
- * The owner, 2026-10-07: *"go ahead and start the migration NOW to
- * index.config.json"*, and the converter is KEPT rather than run once,
- * because every separated repository (`bootstrap`, `bootstrap-tools`, and
- * each harness cut out of this monorepo) needs the same conversion, and this
- * repository's own `remoteMounts` keep gaining entries until the cutovers
- * stop. It reads only `--root`'s own files, so nothing of folio-assistant's
- * root is assumed.
+ * The converter is kept, not run once: every separated repository needs the
+ * same conversion, and `remoteMounts` keep gaining entries. It reads only
+ * `--root`'s own files.
  *
  * IDEMPOTENT: a re-run over an index that already exists merges what the
  * declaration has gained since (a cutover appending to `remoteMounts`), drops
@@ -36,18 +32,14 @@
  * Findings — a root `<name>.config.json` naming no instance the checkout
  * declares or mounts (the `<fork>.config.json` a fork inherited), or a
  * landing nobody flagged — are printed and NOT imported. They do not fail the
- * run: the index is still correct without them, and the decision about the
- * stray file is a person's.
+ * run; the stray file is a person's call.
  *
- * ## `--inline`: retiring `<name>.config.json` (bean `ymvt`)
+ * ## `--inline`: retiring `<name>.config.json`
  *
- * Owner, 2026-10-14: *"i thought ONLY index.config.json"*. The index is the
- * one config; each instance's config is inline in its entry; a
- * `<name>.config.json` is imported only as a migration step and then retired.
- * `--inline` is that step: the entry becomes the imported file overlaid by the
- * entry's own fields — EXACTLY the effective config every index-first reader
- * already computed — its `import` is dropped and the file is deleted. So the
- * effective config of every instance is unchanged by construction
+ * The index is the one config; each instance's config is inline in its entry.
+ * `--inline` overlays the imported file with the entry's own fields — EXACTLY
+ * the effective config every index-first reader already computed — drops its
+ * `import` and deletes the file, so no instance's effective config changes
  * ({@link inlineEntries}). A root config the index does not list is not
  * touched (that is `check:landing-instance`'s `unlisted` finding, a person's call).
  *

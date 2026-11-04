@@ -7,10 +7,8 @@
  * a reason — but not a step the BPMN marks `relaxable="false"`, and not one
  * that does not exist.
  *
- * This runs those checks over the whole repo, so a relaxation that has quietly
- * stopped applying — because the activity was renamed, or because a step became
- * non-relaxable — is a build failure rather than something discovered on the
- * day it was needed.
+ * Runs over the whole repo, so a relaxation that stopped applying (renamed
+ * activity, step made non-relaxable) fails the build.
  *
  * Usage:  bun run cat check:workflow-policy
  *

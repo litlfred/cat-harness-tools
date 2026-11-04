@@ -1,15 +1,12 @@
 #!/usr/bin/env bun
 /**
- * Verify what is about to be deployed — the post-processing verifier set.
- *
- * @module scripts/publish-verify
- *
- * Bean `vigi`, owner 2026-09-23: *"a set of post processing tools for
- * verification that a failure triggers an alert to the publisher manager …
- * new sub-process"*, run **before deployment**, blocking. The process is
- * `sdlc/processes/publish-verification.bpmn`; the alert is
+ * Verify what is about to be deployed — the post-processing verifier set, run
+ * **before deployment**, blocking; a failure alerts the publish manager. The
+ * process is `sdlc/processes/publish-verification.bpmn`; the alert is
  * `sdlc/processes/publish-alert.bpmn`, which every failing step after the publish
  * button shares.
+ *
+ * @module scripts/publish-verify
  *
  *   bun run cat-harness-tools/scripts/publish-verify.ts --dir ./_site [--report out.md] [--base <url>]... [--instance <dir>] [--search-index borrowed]
  *
@@ -21,32 +18,24 @@
  *
  * Each verifier is an entry in {@link VERIFIERS}: an id, what it asks, and a
  * function from the directory to findings. Adding one is adding an entry; the
- * report, the exit code and the alert need no change. The first is JSON-LD
- * expansion, because the graph was JSON-LD by convention and not by
- * construction — nothing had ever run a processor over it, and the first run
- * found two documents silently dropping a property. The second is unique ids
- * in built HTML (bean `uknu`) — a defect the source cannot show. The third is
- * the site search index (bean `fq5u`), a downstream output Jekyll writes and
- * nothing had checked — `--search-index borrowed` on a staging preview, which
- * serves the published index or a declared-empty one. The fourth and fifth are
- * the mechanical half of the `linked-data` voice (bean `4pla`):
- * `jsonld-object-links` (a value under an object property expands to a link, or
- * is a literal the author declared) and `jsonld-own-base` (no document leans on
- * a remote context's `@base`).
+ * report, the exit code and the alert need no change. They cover JSON-LD
+ * expansion under a real processor; `jsonld-object-links` (a value under an
+ * object property expands to a link, or is a literal the author declared) and
+ * `jsonld-own-base` (no document leans on a remote context's `@base`), the
+ * mechanical half of the `linked-data` voice; unique ids in built HTML; and
+ * the site search index and its scopes (`--search-index borrowed` on a
+ * staging preview, which serves the published index or a declared-empty one).
  *
  * ## What is in scope
  *
  * A document is OURS — and so verified — when its `@context` references our
  * content context or binds one of our namespaces (`own-namespaces` code list),
  * OR when its own `@id` is under the site's address (the declaration's
- * `canonicalUrl`, or each `--base`). The second test is bean `7h1c`: the SKOS
- * code-lists document binds only `skos`, `dcterms`, `owl` and `rdf`, so the
- * context test counted it "not ours" although we mint every IRI in it. A
- * document's `@id` says who published it; its context says only whose
- * vocabulary it speaks.
+ * `canonicalUrl`, or each `--base`): a document's `@id` says who published
+ * it; its context says only whose vocabulary it speaks.
  * Anything else in the tree is ingested third-party data (a WHO IG's artefact
  * index, say): counted and reported, never silently passed, and never able to
- * block our release. The same scoping the owner approved for bean `2j09`.
+ * block our release.
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";

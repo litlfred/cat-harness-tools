@@ -3,17 +3,10 @@
  * UML for every NAMED SUB-GRAPH an instance declares — PlantUML and Mermaid
  * from one model.
  *
- * Owner, 2026-09-23: *"cat-harness/uml/overview/<sub-graph path> … the
- * groupings are derived from node schema kinds and named sub-graphs … and can
- * just be used/declared colors in css in themes. justthedocs renders as
- * needed."* And: *"sections are sub-graphs in a harness … bootstrap/processes
- * is one section … bootstrap/schema, bootstrap/scenarios"*.
- *
- * So nothing here invents a grouping. The groups are read:
+ * Nothing here invents a grouping. The groups are read:
  *
  * - **Section** — one entry of an instance's declaration (`<instance>.json`
- *   `directories[]`), named `<instance>/<entry id>`. That is the unit the
- *   harness already declares, so it is the unit a diagram draws.
+ *   `directories[]`), named `<instance>/<entry id>`.
  * - **Node schema kind** — each of the entry's `graphTypologies`, resolved through
  *   {@link resolveKindValidator}: the Zod schema the registry names, turned
  *   into JSON Schema (`toJsonSchema`) and then into classes. A kind
@@ -22,7 +15,7 @@
  * - **Colour** — a CSS class per graph typology (`fa_uml_kind_<kind>`), coloured
  *   in `docs/assets/css/uml.css`. No colour is written into either diagram.
  *
- * ## Two renderings, cross-referenced
+ * ## Renderings, cross-referenced
  *
  * Per section and per instance:
  *
@@ -36,27 +29,23 @@
  *                                                page's Interactive view
  * ```
  *
- * The DOT is the third rendering (skill `kg-subgraph-layout`): the browser lays
- * it out with Graphviz in WebAssembly (`assets/js/kg-graph.js`) and the reader
- * can drag its nodes. It is written from the same {@link Section} list, so it
- * cannot say anything the `.puml` does not.
- *
- * The page renders Mermaid because just-the-docs already loads it and it
- * puts a real CSS class on a node, which PlantUML's SVG does not. The
- * `.puml` is there for the PlantUML look and for offline use, and its header
- * names the page. Both are written from the same {@link Section} list, so
- * neither can say something the other does not.
+ * All are written from the same {@link Section} list, so none can say what
+ * another does not. The page renders Mermaid because just-the-docs loads it
+ * and it puts a real CSS class on a node; the `.puml` is for the PlantUML look
+ * and offline use, and names the page. The DOT (skill `kg-subgraph-layout`) is
+ * laid out in the browser with Graphviz in WebAssembly
+ * (`assets/js/kg-graph.js`), and the reader can drag its nodes.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-uml-overview.ts           # write
  *   bun run cat-harness-tools/scripts/gen-uml-overview.ts --check   # stale or orphaned?
  *   ... --ref main|<sha>|pr/<n>   # which qa-reports entry a qa directory missing from the checkout is drawn from
  *
- * Two inputs are QA results (bean `oq1j`). The detangle numbers are read
- * from the pinned record, or computed when none is in the checkout. A `qa`
- * directory missing from the checkout is drawn as stored on the `qa-reports`
- * branch. Anything that cannot be determined stops the run with exit 2,
- * writing nothing ({@link UNDETERMINED}).
+ * Two inputs are QA results. The detangle numbers are read from the pinned
+ * record, or computed when none is in the checkout. A `qa` directory missing
+ * from the checkout is drawn as stored on the `qa-reports` branch. Anything
+ * that cannot be determined stops the run with exit 2, writing nothing
+ * ({@link UNDETERMINED}).
  *
  * @module scripts/gen-uml-overview
  * @covers uml

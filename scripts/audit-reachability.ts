@@ -2,25 +2,10 @@
 /**
  * Which DECLARED EXECUTABLE ARTEFACTS can actually be reached — measured.
  *
- * Bean `folio-assistant-dxqm`, under `folio-assistant-1xhc`. That epic's line
- * is *a gate that does not fire is indistinguishable from one that passed*.
- * This is the same sentence one level deeper:
+ * A declared executable artefact that nothing can reach is indistinguishable,
+ * from outside, from a decision nobody takes.
  *
- * > **A declared executable artefact that nothing can reach is
- * > indistinguishable, from outside, from a decision nobody takes.**
- *
- * Two instances on 2026-10-04, both past all 217 CI gates:
- *
- * 1. `scripts/merge-queue.ts` derived a PR's facts, evaluated
- *    `merge-priority.dmn` and ordered the merge queue. Its docblock said *"a
- *    library the merge steward and the tile call."* **Nothing called it** — no
- *    `package.json` script, no workflow, and its only importer was its own
- *    test. A human ordered the queue by hand instead.
- * 2. `merge-priority.dmn` used `not("green")` from the day it was drawn, which
- *    this repo's FEEL evaluator refuses. The table was unevaluable by **any**
- *    caller — and its committed `kg-qa` sidecar read `"result": "pass"`.
- *
- * ## What each check measures, and what it deliberately does NOT
+ * ## What each check measures
  *
  * | family | question | fails |
  * |---|---|---|
@@ -29,59 +14,41 @@
  * | `process-ambiguous` | do two diagrams answer to one name? | `--check` |
  * | `module-test-only` | is the only thing reaching this module the thing that proves it works? | `--strict` |
  *
- * **`decision-unevaluable` is not a second answer to `kg-audit`'s
- * `decision-outcomes-used`.** That criterion asks whether a table LOADS and
- * whether its first output column yields outcomes; this asks whether the
- * evaluator can read the cells. The two came apart on the one table that
- * mattered, which is the whole reason this file exists — and the reference
- * question (*is any gateway pointing at this decision?*) stays that
- * criterion's, recorded here as a measurement and never as a finding.
+ * `decision-unevaluable` is not `kg-audit`'s `decision-outcomes-used`: that
+ * asks whether a table LOADS and its first output column yields outcomes;
+ * this asks whether the evaluator can read the cells. Whether any gateway
+ * points at a decision stays that criterion's, recorded here only as a
+ * measurement.
  *
- * **Activity skill refs are not re-checked here.** `check:workflow-refs`
- * already fails the build on a dangling `<bootstrap.processes:skill ref>` and reports an
- * uncovered activity, and `kg-audit`'s `skill-*` criteria locate the same
- * relation per node. A third reader of one fact is a third answer free to
- * disagree with the other two.
+ * Activity skill refs are not re-checked here: `check:workflow-refs` fails on
+ * a dangling `<bootstrap.processes:skill ref>`, and `kg-audit`'s `skill-*`
+ * criteria locate the same relation per node.
  *
- * ## Evaluability is asked of the EVALUATOR, never restated here
+ * ## Evaluability is asked of the EVALUATOR
  *
  * `unreadableExpressions` lives in `src/workflow/decision-table.ts` beside the
- * grammar it is about, and this script calls it. A checker that re-derived
- * which FEEL this engine accepts would be a second spelling of one grammar,
- * free to go green on a table the engine refuses. Its docblock carries why the
- * probe is `0` and why a comma-separated test has to be split before asking.
+ * grammar, and this script calls it rather than re-deriving which FEEL the
+ * engine accepts. Its docblock says why the probe is `0` and why a
+ * comma-separated test is split before asking.
  *
  * ## Reachability for a DIAGRAM is asked of the engine's own resolver
  *
- * Same discipline: the denominator is every `.bpmn` any instance DECLARES, and
- * the numerator is `processFiles` — the list `workflow_list` prints and
- * `workflow_start` resolves against. `processFiles` keys by file STEM and keeps
- * the first claimant (`if (!seen.has(stem))`), so a dependency's diagram whose
- * stem collides with the root's is **silently dropped from the list** and
- * cannot be started by either name. Nothing measured that. It is clean today —
- * 85 declared, 85 listed — and a check over a property the repository HAS is
- * what keeps it, which is `1xhc`'s own conclusion about wiring gates.
+ * The denominator is every `.bpmn` any instance DECLARES; the numerator is
+ * `processFiles` — the list `workflow_list` prints and `workflow_start`
+ * resolves against. `processFiles` keys by file STEM and keeps the first
+ * claimant (`if (!seen.has(stem))`), so a dependency's diagram whose stem
+ * collides with the root's is silently dropped and cannot be started.
  *
- * A `calledElement` naming a process no file defines is NOT a finding. The
- * loader's own comment settles it: *"a folio may legitimately call out to a
- * process it does not host"*, and the call stays opaque by design. Counting it
- * would turn a modelling decision into a permanent red.
+ * A `calledElement` naming a process no file defines is NOT a finding: a
+ * folio may legitimately call out to a process it does not host.
  *
- * ## For a MODULE, inference fails in both directions, so declaration wins
+ * ## For a MODULE, declaration wins
  *
- * Measured over 1834 tracked `.ts`: **710** are reached by no signal any grep
- * can see. That is not a findings list, it is noise — the great majority are
- * corpora discovered by directory walk (content blocks under `docs/source/`,
- * test files `bun test` globs), and inference cannot tell those from a module
- * nobody can run. A gate keyed on 710 findings is a gate switched off within a
- * week. So the number is PRINTED and never committed, and it is the whole
- * argument for `audit-coverage`'s rule: where a grep fails in both directions
- * at once, prefer a declaration.
- *
- * What IS a finding is a relation, and it is crisp: **the only thing that
- * reaches this module is its own test.** A test proves a module works; it does
- * not make it reachable. Nine modules today, `scripts/merge-queue.ts` first
- * among them — so this slice would have caught finding 1 on the day it landed.
+ * Inference fails both ways (most unreferenced `.ts` are corpora found by
+ * directory walk), so the count of modules no grep reaches is PRINTED and
+ * never committed. The finding is a relation: **the only thing that reaches
+ * this module is its own test.** A test proves a module works; it does not
+ * make it reachable.
  *
  * A module says how it IS reached with `@entrypoint` in its own docblock:
  *
@@ -89,65 +56,37 @@
  *     @entrypoint none — written for the merge-steward tile, not built yet (bean `xxxx`)
  *     @entrypoint spawned by scripts/foo.sh
  *
- * A `script:<name>` claim is VERIFIED against `package.json`, because a
- * declaration that can be checked should be; the free-text form is recorded as
- * the author's assertion. Under-claiming is recoverable — the count says so out
- * loud. Over-claiming looks like reachability, which is the defect.
+ * A `script:<name>` claim is VERIFIED against `package.json`; the free-text
+ * form is recorded as the author's assertion.
  *
- * ## The record, and how the soft family bites without a red gate
+ * ## The record
  *
- * A printed verdict cannot tell *"nothing ever reached this"* from *"this lost
- * its caller in the commit under review"*. The sidecar holds the RELATION —
- * which decisions are evaluable, which diagrams the resolver reaches, which
- * entry points are run — and not the census, because a census moves on any
- * commit that adds a file (`audit-coverage`, bean `xutg`).
+ * The sidecar holds the RELATION — which decisions are evaluable, which
+ * diagrams the resolver reaches, which entry points are run — not the census.
+ * It is a WORKING COPY: `cat-harness/test/results/` is gitignored and the
+ * records live on the `qa-reports` branch, which `qa:publish` pushes once per
+ * CI run. {@link judgeQaResult} reads the baseline — the branch with
+ * `--against <ref>`; a baseline that cannot be asked is `unknown`: reported,
+ * never a pass, never a failure.
  *
- * It is a WORKING COPY, not a committed record: `cat-harness/test/results/` is
- * gitignored and the records live on the `qa-reports` branch (arc `3fva`, owner
- * rulings D1/D4), which `qa:publish` pushes once per CI run. So this script
- * writes the working copy and {@link judgeQaResult} reads the baseline — the
- * branch with `--against <ref>`, and a baseline that cannot be asked is
- * `unknown`: reported, never a pass, never a failure.
+ * ## What fails
  *
- * **`failOnNew` is how an orphan bites.** The first version of this gate failed
- * on its own sidecar being STALE, as a proxy: a twelfth orphan would make the
- * committed file disagree with the tree, and the author's regeneration would put
- * the new module in the diff. That proxy stopped meaning anything once the
- * records left `main`, and what replaces it asks the question directly — the
- * eleven standing orphans are inherited and do not fail, a twelfth fails on the
- * commit that introduces it.
+ * `failOn` carries the BROKEN ARTEFACTS: a decision table nothing can
+ * evaluate, a diagram the resolver cannot reach, two diagrams answering to
+ * one name, an `@entrypoint` naming no script. They fail whether or not they
+ * are new — unlike `audit:coverage`, where only a NEW finding fails.
  *
- * ## What fails, and the one divergence from `audit:coverage`
+ * `failOnNew` carries entry-point orphans: standing ones do not fail, a new
+ * one fails on the commit that introduces it. `--strict` makes
+ * `entry-point-orphan` fail outright.
  *
- * `failOn` carries the BROKEN ARTEFACTS: a decision table nothing can evaluate,
- * a diagram the resolver cannot reach, two diagrams answering to one name, an
- * `@entrypoint` naming no script. They fail whether or not a baseline calls
- * them new. In `audit:coverage` every finding is an unmet ambition and only a
- * NEW one fails; here these are defects, and a defect is not less of one for
- * having been there yesterday.
- *
- * `--strict` promotes `entry-point-orphan` to the same footing, for the day
- * eleven becomes zero. Bean `dxqm` holds that.
- *
- * **And `--check` does not write.** A checker that repairs what it reports
- * cannot be falsified — red once, green on the rerun (`generalise-the-fix`
- * Move 3).
- *
- * ## Wired, and the wiring arrived with the name
+ * `--check` does not write: a checker that repairs what it reports cannot be
+ * falsified.
  *
  * `audit:reachability:check` is a step in `code-quality-gates.yml`, so
- * `gates.ts` derives it and `bun run cat gates` runs it. The step, the
- * `package.json` alias and this paragraph landed in ONE change, separately from
- * the script, which came first with no step at all — `merge-main`'s resolution
- * push carries no `workflows` scope, so a pull request touching that file needs
- * a human push on every main-merge round (9 of 20 open PRs, owner ruling
- * 2026-10-04).
- *
- * The seam was chosen so that nothing could sit registered-and-never-run in
- * between: the gate's NAME travels with its WIRING, and `gates.ts`'s own
- * `unrunScripts` ratchet is what refuses any other split. `1xhc` measured 21 of
- * 33 `check:` scripts in no workflow, and `t373` is the one that was RED on
- * `main` while CI reported green, because nothing ran it.
+ * `gates.ts` derives it and `bun run cat gates` runs it. A gate's name and its
+ * wiring land together; `gates.ts`'s `unrunScripts` ratchet refuses a script
+ * registered but never run.
  *
  * Usage:
  *   bun run cat audit:reachability                      # report, write the working copy

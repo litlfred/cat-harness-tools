@@ -3,11 +3,7 @@
  * jobs is — read from the WORKFLOW.
  *
  * A workflow depends on the process it carries out, so the workflow holds the
- * pointer and the diagram names none of its implementations (data-modelling
- * step 8, #1168 B5). Until bean `61ca` the diagram carried
- * `<…:implements workflow="…"/>` and `<…:job name="…"/>`: nine arrow-direction
- * findings, and a process that had to be edited whenever a new workflow
- * implemented it.
+ * pointer and the diagram names none of its implementations.
  *
  * Two comment lines, because YAML has no other place a GitHub workflow will
  * accept an unknown key:
@@ -24,8 +20,7 @@
  *   spelling from there. More than one line is allowed and each is read.
  * - `# bpmn-node: <id>` INSIDE a job — indented deeper than the job's key,
  *   before the next job. A comment above a job key is prose about that job,
- *   and attributing it by proximity is the near-miss that reads right in every
- *   example; containment is the rule `declaredJobs` used for the same reason.
+ *   not attributed to it by proximity: containment is the rule.
  *
  * A comment is read line by line, not by the YAML parser (which drops it).
  * That is sound here because both lines are anchored: column 0, or inside the

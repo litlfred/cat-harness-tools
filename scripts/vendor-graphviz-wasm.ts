@@ -1,19 +1,14 @@
 #!/usr/bin/env bun
 /**
  * Vendor Graphviz, compiled to WebAssembly, into the docs site for the
- * interactive KG subgraph viewer (`docs/assets/js/kg-graph.js`).
- *
- * Owner, 2026-10-09: *"i think there is webasm graphviz?"* and *"could use the
- * wasm-graphviz to make the graph visualizers overview more dynamic. also
- * allow users to drag nodes around for better visualization."* The viewer lays
- * a DOT file out in the reader's browser, so it needs Graphviz there.
+ * interactive KG subgraph viewer (`docs/assets/js/kg-graph.js`), which lays a
+ * DOT file out in the reader's browser and lets them drag nodes.
  *
  * It is loaded from `docs/assets/js/vendor/wasm-graphviz/` and NOT from a CDN,
- * for the reasons `vendor-sqlite-wasm.ts` measured and the `kg-viewer` skill
+ * for the reasons `vendor-sqlite-wasm.ts` gives and the `kg-viewer` skill
  * states: a third host in the trust boundary of a page that shows this
  * repository's own data, and a page that cannot be tested where the CDN is
- * refused. "No CDN" means no THIRD party's; a script this site publishes
- * itself is the opposite case.
+ * refused. "No CDN" means no THIRD party's.
  *
  * One file is copied, `dist/index.js` (about 740 KB): the ESM bundle with the
  * WASM inlined, so there is no second fetch to resolve. The SOURCE is the

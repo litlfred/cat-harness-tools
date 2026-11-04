@@ -1,20 +1,18 @@
 /**
  * What each publish-time writer READ and WROTE, recorded from its own run, for
- * the rerun-and-measure deploy (bean `fwtz`, option B; owner card 2026-10-31).
+ * the rerun-and-measure deploy.
  *
  * @module cat-harness-tools/scripts/writer-cone
  * @graphNode none — a helper of `derive-at-publish.ts`; it judges no graph
  *
  * ## Why records and not declarations
  *
- * The docs-site cone dry run predicted pages before the build and fell back to
- * "full" on every deploy: about 90% of a deploy's files come out of writers,
- * and no writer says which outputs depend on which inputs. Hand-kept lists of
- * that would drift, and the owner's rule is "declared or derived, never
- * hand-narrowed" (`task-io.ts`). So, as `ci-cone.ts` does for checks (bean
- * `4rbc`), the read set is DERIVED from the run itself: each writer runs under
- * `strace`, and what it touched inside the checkout is recorded with the state
- * of each path, beside what it wrote.
+ * Most of a deploy's files come out of writers, and no writer says which
+ * outputs depend on which inputs; a hand-kept list would drift (inputs are
+ * declared or derived, never hand-narrowed: `task-io.ts`). So, as `ci-cone.ts`
+ * does for checks, the read set is DERIVED from the run itself: each writer
+ * runs under `strace`, and what it touched inside the checkout is recorded
+ * with the state of each path, beside what it wrote.
  *
  * ## The argument, the same one `ci-cone.ts` makes
  *

@@ -1,23 +1,15 @@
 #!/usr/bin/env bun
 /**
- * No library section carries a soft hyphen (U+00AD). Bean `3spu`.
+ * No library section carries a soft hyphen (U+00AD).
  *
  * @covers library
  *
- * A soft hyphen is a line-break hint the PDF text layer kept, and in section
- * text it splits one word into two fragments for every reader: a corpus grep
- * for "recommendations" missed the WHO guideline Handbook's 742 of them, and
- * the LSI index counted "recommenda" and "tions" as terms. Both PDF rungs now
- * join them at ingestion (`scripts/_pdf_text.py`); this is the gate that says
- * none came back — from a new rung, a re-ingest by an old checkout, or a hand
- * edit.
+ * A soft hyphen kept from a PDF text layer splits one word into two fragments
+ * for search and indexing. Ingestion joins them (`scripts/_pdf_text.py`); this
+ * gate says none came back.
  *
- * ## What it deliberately does not scan
- *
- * `vector-labels.json`. There a soft hyphen ends a POSITIONED label — the
- * word's other half is a separate label with its own box — so joining needs the
- * figure's geometry, not a text rule. Three such labels exist (in the DAK base layer),
- * and they are the vector arm's business, not this gate's.
+ * Not scanned: `vector-labels.json`, where a soft hyphen ends a POSITIONED
+ * label and joining needs the figure's geometry.
  *
  *   bun run cat check:soft-hyphens
  */

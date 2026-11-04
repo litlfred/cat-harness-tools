@@ -1,13 +1,12 @@
 /**
- * The review page's "What to expect in this review" pane (issue
- * cat-harness-tools#1153): what the reviewer should find on the page, read
- * from the pull request and the issue it closes.
+ * The review page's "What to expect in this review" pane: what the reviewer
+ * should find on the page, read from the pull request and the issue it
+ * closes.
  *
  * ## Any branch, not only change sets
  *
- * Not every feature branch comes from a change set, a structured review or an
- * authoring cycle (owner, 2026-10-31). So the pane reads the one thing every
- * preview has: its pull request. A change set adds detail when it is there.
+ * The pane reads the one thing every preview has: its pull request. A change
+ * set adds detail when it is there.
  *
  * - The PR body may hold a section between `<!-- review-brief -->` and
  *   `<!-- /review-brief -->`. Then the pane shows only that section. Change-set

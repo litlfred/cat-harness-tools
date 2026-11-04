@@ -4,16 +4,13 @@
  * pinned commit: fetch ONLY the substrate's declaration (at its root, or one
  * directory down — `upstreamPath`), judge it, and on
  * success record the subscription and a cached snapshot of what was judged.
+ * It writes the choice and the pin, and nothing else arrives (materialise and
+ * instantiate are the other verbs).
  *
  * @module cat-harness/scripts/kg-subscribe
  * @covers cat-harness, substrate-snapshot, subscribed-harnesses
  *
- * Issue #1719, epic bean `fnx4`, slice 4 of
- * `docs/proposals/kg-subscriptions.md`. The other two verbs, materialise and
- * instantiate, are slices 5–7; this one writes the choice and the pin, and
- * nothing else arrives.
- *
- * ## What a substrate is — the rule, stated once
+ * ## What a substrate is
  *
  * A repository is a substrate at a commit when **both** hold:
  *
@@ -32,53 +29,37 @@
  *    one of its `directories` lists one of those three kinds in `graphTypologies`
  *    — {@link HARNESS_GRAPH_TYPOLOGIES}, {@link harnessesOf}.
  *
- * ### Why that rule, and not the two nearer ones
+ * Not "has a `<name>.config.json`" (that says a harness is INSTANTIATED here,
+ * which a substrate offers to the subscriber), and not this harness's own
+ * graph typologies (the substrate meets BOOTSTRAP's requirements, whoever
+ * asks).
  *
- * - **Not "has a `<name>.config.json`".** That is what `harness-tiles.ts`
- *   reads, and it answers a different question: whether a harness is
- *   INSTANTIATED here, in the navbar. A substrate offers harnesses to be
- *   instantiated by the subscriber (slice 7), so requiring the upstream to
- *   have instantiated its own would refuse exactly the repositories a
- *   subscription exists for.
- * - **Not this harness's own graph typologies.** A kind cat-harness registers
- *   (`methodology`, `cat-harness`, …) is an Extension to a reader that knows
- *   only bootstrap, and the owner's definition says the substrate meets
- *   BOOTSTRAP's requirements. Judging it by our vocabulary would make "is a
- *   substrate" depend on which harness is asking.
+ * ### Where the declaration is looked for — `upstreamPath`
  *
- * ### Where the declaration is looked for — `upstreamPath` (bean `437w`)
- *
- * A fork that left a monorepo often keeps its instance one directory down:
- * a fork may carry `shared/<name>.json` and nothing at
- * its root, and the directory is NOT named for the instance. So the search is,
- * in order ({@link judgeTree}):
+ * A fork that left a monorepo often keeps its instance one directory down
+ * (e.g. `shared/<name>.json`, the directory not named for the instance). So
+ * the search is, in order ({@link judgeTree}):
  *
  * 1. **`--upstream-path <dir>`, or the one the subscription already records.**
  *    Only that directory is read, and it must hold exactly one declaration
  *    (the one named `--name`, when given). This is the spelling to use
  *    whenever the fallback below would have to choose.
- * 2. **The root**, by bootstrap's rule — unchanged, so every subscription
- *    recorded before this existed judges the same bytes.
+ * 2. **The root**, by bootstrap's rule.
  * 3. **Exactly one level down**: every top-level directory's `<stem>.json`
  *    whose `name` is `<stem>` — the rule `findInstance` in
- *    `scripts/remote-mount.ts` (PR #2326) applies to a remote tree, and
+ *    `scripts/remote-mount.ts` applies to a remote tree, and
  *    `findDeclarationFile` applies on disk. With `--name`, or the name a
  *    recorded snapshot carries, only a file of that name counts. ONE
  *    candidate is accepted and its directory recorded as the subscription's
  *    `upstreamPath`; TWO OR MORE are refused by name, never guessed between
  *    (`ambiguous`) — pick one with `--upstream-path` or `--name`.
  *
- * The field is named and shaped as `upstreamPath` on #2326's remote subgraph
- * source — a repository-relative directory — so one word means one thing.
- * Deeper than one level is reached only by naming it: a walk of the whole
- * tree would cost a blob per `.json` file in the repository, and would find
- * fixtures and vendored instances as readily as the one meant.
+ * `upstreamPath` has the same name and shape as on the remote subgraph source.
+ * Deeper than one level is reached only by naming it. A harness nested
+ * elsewhere in the same repository is not seen, and the zero-harness reason
+ * says so.
  *
- * A harness that is NOT the declaration found — a second instance nested
- * elsewhere in the same repository — is still not seen; that is a limit of
- * reading one declaration, and the zero-harness reason says so.
- *
- * ### A content Knowledge Graph is a SECOND kind — owner, 2026-10-06
+ * ### A content Knowledge Graph is a SECOND kind
  *
  * A declaration with Subgraphs and NO harness — a FHIR implementation guide,
  * a document corpus — is accepted, as kind **`content`**,
@@ -93,20 +74,18 @@
  * declaration with no harness and no Subgraph is still not-a-substrate, and
  * a tree with no declaration keeps every reason it had.
  *
- * ## Three answers, never two
+ * ## The verdicts
  *
  * - **substrate** — both points hold; the harness names are listed.
  * - **content** — the declaration holds and declares Subgraphs but no harness.
- *   Accepted, as the other kind; see above.
  * - **not-a-substrate(reason)** — the bytes were read and one point fails.
  * - **ambiguous(reason, candidates)** — the bytes were read and more than one
  *   directory one level down holds a declaration. `subscribe` reports it as
  *   REFUSED, with every candidate: the fix is a choice somebody makes, not a
  *   verdict on the repository.
  * - **could-not-determine(reason)** — the bytes were NOT read: the network,
- *   the forge, a SHA the remote does not serve. Collapsing this into "not a
- *   substrate" would record a guess about a repository nobody looked at, and
- *   collapsing it into "substrate" would subscribe to one. Both are `dh4f`.
+ *   the forge, a SHA the remote does not serve. Never collapsed into either
+ *   other answer.
  *
  * An unpinned ref is refused BEFORE anything is fetched, with
  * `sync-remote-skills`' {@link pinnedRef}: the same reason, the same words.
@@ -124,8 +103,8 @@
  *   copy of `<name>.json` is on the schema.
  *
  * Moving the pin of a subscription that has CHOSEN parts is refused: that is
- * `refresh-materialized` (the proposal: "Refresh is not re-subscribe"), because
- * the chosen parts' materialisation records are pinned to the old commit.
+ * `refresh-materialized`, because the chosen parts' materialisation records
+ * are pinned to the old commit.
  *
  * ## `--check` — the gate over what was written
  *

@@ -1,7 +1,7 @@
 /**
  * Screen a hand-over before a model reads it: a sub-agent's report, a
  * delegated prompt, a tool result, or a comment from a person who is not the
- * session's principal. Bean `ieum`, rules H3, H5 and H9 of
+ * session's principal. Rules H3, H5 and H9 of
  * `skills/conduct/security/zero-trust-handover.md`; the logic is
  * `cat-harness-tools/src/core/handover-screen.ts`.
  *
@@ -11,7 +11,7 @@
  *
  * The schema is `{ "fields": { "<name>": <spec> }, "strict"?: bool }`, where a
  * spec is `"control"`, `"data"`, or `{ "role": ..., "pattern"?: "<regex>",
- * "oneOf"?: [...] }` to constrain the VALUE (roast 1ygp L4.3).
+ * "oneOf"?: [...] }` to constrain the VALUE.
  *
  * Exit status is the verdict, so a caller can branch without parsing:
  *   0 clean · 1 refused · 3 quarantined · 2 could not determine (bad input).

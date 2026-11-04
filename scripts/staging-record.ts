@@ -5,38 +5,31 @@
  * @module scripts/staging-record
  * @covers none — a WRITER the deploy calls, not an audit: it records a preview, and judges nothing
  *
- * Bean `6pfo`. `feature-staging.yml` is the only thing that knows a preview's
- * pull request and issue, and it already fires at both ends of a preview's
- * life — `pull_request [opened, synchronize, reopened]` and
+ * `feature-staging.yml` is the only thing that knows a preview's pull request
+ * and issue, and it fires at both ends of a preview's life —
+ * `pull_request [opened, synchronize, reopened]` and
  * `pull_request_target [closed]`. This is what it calls at each.
  *
- * ## Why this is a script and not inline YAML
+ * ## A thin caller, not inline YAML
  *
- * Owner, 2026-09-19, on where the write and remove logic belongs: *"that's
- * part of the behaviour of that node type."* The rules live in
- * `schemas/sdlc/staging-preview.ts` — what a record carries, that retirement is a
- * state rather than a deletion, that retiring twice keeps the first
- * retirement. A workflow step that built the JSON with `jq` would be a second
- * copy of those rules, free to disagree with the first the moment either
- * changed. This file is a thin caller so that cannot happen.
+ * The rules live in `schemas/sdlc/staging-preview.ts` — what a record
+ * carries, that retirement is a state rather than a deletion, that retiring
+ * twice keeps the first retirement. A workflow step building the JSON would
+ * be a second copy of those rules.
  *
- * ## `create` is idempotent on purpose, and not by overwriting
+ * ## `create` is idempotent, and not by overwriting
  *
  * `synchronize` fires on every push to an open pull request, so `create` runs
  * many times for one preview. It REFUSES to overwrite a retired record and
- * otherwise preserves the original `builtAt`, because that field answers "when
- * did this preview first appear" — a value that walks forward on every push
- * answers nothing. The head commit IS updated, since that is the one deploy
- * fact that legitimately changes.
+ * otherwise preserves the original `builtAt` ("when did this preview first
+ * appear"). The head commit IS updated, the one deploy fact that legitimately
+ * changes.
  *
- * ## Enrichment is deliberately absent
+ * ## No enrichment
  *
  * Size, file count and liveness are the health sweep's knowledge, and
- * `health-check.yml` is `contents: read` DELIBERATELY — AGENTS.md: "It reports
- * and never acts", with bean `plj1` as the worked example of a reporting tool
- * that acted. Owner chose 2026-09-20 to drop enrichment rather than grant that
- * workflow write. So a record carries what the deploy knows and nothing it
- * would have to guess.
+ * `health-check.yml` is `contents: read`: it reports and never acts. So a
+ * record carries what the deploy knows and nothing it would have to guess.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/staging-record.ts create --out FILE --slug S --branch B \

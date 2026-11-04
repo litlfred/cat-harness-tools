@@ -1,6 +1,6 @@
 /**
  * The todos as ONE published JSON-LD graph — every todo its own IRI, and its
- * attachment, people, beans and PRs as typed edges. Issue #1908, bean `h32d`.
+ * attachment, people, beans and PRs as typed edges.
  *
  * @module scripts/todo-graph
  * @conformsTo w3c-rdf-calendar
@@ -16,17 +16,16 @@
  * | `todos/<id>/` | the todo's RENDERING, a thin page (`todo-page.ts`), not the asset |
  *
  * `skills/kg/kg-core/harness-requirements.md` requires the directory level
- * and the per-node level both, and does not let a harness waive either:
- * *"harnesses cannot override there being in the KG"*. `.json` sits beside
- * `.jsonld` because GitHub Pages serves no correct Content-Type for `.jsonld`.
- * No `.schema.json`: a todo carries no per-node schema, and the rule is that
- * whatever a node HAS is reachable, not that a missing form is invented.
+ * and the per-node level both, and does not let a harness waive either.
+ * `.json` sits beside `.jsonld` because GitHub Pages serves no correct
+ * Content-Type for `.jsonld`. No `.schema.json`: a todo carries no per-node
+ * schema, and a missing form is not invented.
  *
  * ## The IRI is the address of the published JSON-LD
  *
- * The `kg-viewer` rule from #1881: an asset's IRI dereferences to the asset.
- * So a todo is `<site>/todos/<id>.jsonld`, and the page at `<site>/todos/<id>/`
- * is a second resource that points TO it. The todo names no rendering.
+ * An asset's IRI dereferences to the asset. So a todo is
+ * `<site>/todos/<id>.jsonld`, and the page at `<site>/todos/<id>/` is a second
+ * resource that points TO it. The todo names no rendering.
  *
  * ## Vocabularies — borrowed, not minted
  *
@@ -36,15 +35,15 @@
  * schema.org and Dublin Core terms. The one term of ours is the CONTAINER's
  * class, `Subgraph` — the declared subgraph node the KG export already
  * publishes, so a todo graph names the same node rather than minting a
- * collection beside it (bean `l4ay`). Its member edge, `inSubgraph`, is its own
- * term, not `dcterms:isPartOf` (bean `3f5f`).
+ * collection beside it. Its member edge, `inSubgraph`, is its own term, not
+ * `dcterms:isPartOf`.
  *
  * | edge | term | object |
  * |---|---|---|
  * | `target` | `schema:about` | the content node the todo is attached to — its `site/…` IRI |
  * | `assignee` | `schema:agent` | the person (a `schema:Person`; a GitHub identity is its profile URL) |
  * | `bean` | `dcterms:isPartOf` | the bean whose work this todo is part of |
- * | `inSubgraph` | `ch:inSubgraph` (own term, bean `3f5f`) | the declared `todos` Subgraph node this todo is published as a member of |
+ * | `inSubgraph` | `ch:inSubgraph` (own term) | the declared `todos` Subgraph node this todo is published as a member of |
  * | `pullRequest`, `issue` | `dcterms:references` | the PR or issue it refers to |
  * | `process` | `dcterms:subject` | a BPMN process id (a literal: no process has a published IRI yet) |
  * | `source` | `dcterms:source` | the file the todo is authored in |
@@ -53,8 +52,7 @@
  *
  * The input is the same `items` array `gen-docs-pages.ts` publishes as
  * `assets/todos/index.json` — already resolved: `target` in parts, `relations`
- * with their hrefs. Re-resolving here would be a second answer free to
- * disagree with the index the board reads.
+ * with their hrefs — so it cannot disagree with the index the board reads.
  */
 import type { TodoIndexItem } from "../schemas/sdlc/todo-index.js";
 import { DOCS_SITE_BASE, siteNodeIri } from "../schemas/kg/jsonld.ts";

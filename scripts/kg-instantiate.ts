@@ -2,29 +2,23 @@
 /**
  * INSTANTIATE a harness a subscription chose: write `<harness>.config.json` at
  * the instantiation root, and the state directories the harness declares, so
- * the harness reaches the navbar.
+ * the harness reaches the navbar. The third verb after subscribe
+ * (`kg-subscribe.ts`) and materialise.
  *
  * @module cat-harness/scripts/kg-instantiate
  * @covers cat-harness, substrate-snapshot
  *
- * Issue #1719, epic bean `fnx4`, slice 7 of
- * `docs/proposals/kg-subscriptions.md` — the third verb, after subscribe
- * (slice 4, `kg-subscribe.ts`) and materialise (slices 5–6).
- *
  * ## What it reads, and why nothing is fetched
  *
  * The harness's declaration is the substrate snapshot `kg:subscribe` cached at
- * the subscription's pin. Instantiating reads that snapshot and nothing else:
- * the pin was judged once, its bytes carry a digest, and reading the network
- * again here would be a second, unpinned answer to "what does this harness
- * declare". So a missing or edited snapshot is refused rather than refetched.
+ * the subscription's pin, and nothing else: the pin was judged once and its
+ * bytes carry a digest. A missing or edited snapshot is refused rather than
+ * refetched.
  *
  * ## The refusals, each with its reason
  *
  * - **not chosen**: the harness is not in the subscription's `harnesses`.
- *   Choosing is the subscriber's act, recorded in the declaration; instantiating
- *   something unchosen would put a harness in the navbar that no declaration
- *   asked for.
+ *   Choosing is the subscriber's act, recorded in the declaration.
  * - **not declared**: the snapshot does not list it among the substrate's
  *   harnesses at the pin.
  * - **a need unmet**: every name in the harness's `needs` must be an instance
@@ -39,10 +33,8 @@
  * `could-not-determine` is its own result and is never clean: a snapshot that
  * is absent or will not parse, an unreadable declaration in the checkout while
  * a need is still unresolved, or a directory whose graph typologies this registry
- * does not know, so whether it is a STATE directory cannot be said. Creating
- * it might write a directory the harness's processes never use; skipping it
- * might leave out one they write. Either guess is `dh4f`, so the run stops and
- * names the kinds to register.
+ * does not know, so whether it is a STATE directory cannot be said. The run
+ * stops and names the kinds to register.
  *
  * ## Where the state directories go
  *
@@ -52,30 +44,17 @@
  * with a `.gitkeep` so an empty directory survives a commit
  * (`harnessHomeOf` in `kg-parts.ts`). A subscriber that declares no such
  * directory is refused, with what to declare, as `kg:subscribe` refuses one
- * that declares no snapshot directory.
- *
- * Slice 7 first wrote them under `<instantiation root>/<harness>/`. That was
- * arc gap G11, settled by the owner on 2026-10-30 (bean `tmo5`): the root is
- * not a declared directory, and a harness named after a staged instance
- * (say, a content layer staged at the root) would write into that instance's directory. The harness has no
- * local declaration (its declaration is the snapshot, on purpose: see
- * `schemas/kg/substrate-snapshot.ts`), and no scanner reads its home as an
- * instance because it carries none.
- *
- * G11 then put them under the snapshot directory, at
- * `<snapshot dir>/<subscription>/harnesses/<harness>/`. That made one
- * directory hold both upstream's read-only bytes and the subscriber's working
- * state, so it could not declare `readOnly` either way. The owner split it on
- * 2026-10-30 (bean `w1gy` finding 1, option C): the snapshots stay read-only,
- * and the state has a directory of its own.
+ * that declares no snapshot directory. Not the instantiation root (not a
+ * declared directory, and it may hold a staged instance of the same name),
+ * and not the snapshot directory (which stays read-only). The harness has no
+ * local declaration (see `schemas/kg/substrate-snapshot.ts`).
  *
  * ## Idempotent, and the config is never overwritten
  *
  * State directories are written first and the config last, so a config on disk
  * means the directories were made. A run that finds the config reports it as
  * already instantiated and leaves it byte for byte; it still creates any state
- * directory that has gone missing, which is the one thing a re-run can repair
- * without overwriting anything.
+ * directory that has gone missing.
  *
  * ## How it reaches the navbar
  *
@@ -85,9 +64,9 @@
  * harness's config as claimed rather than orphaned. Run `bun run
  * docs:harness` afterwards to regenerate `docs/_data/harness.json`.
  *
- * `check:instance-render` judges instances that have a local tree to render.
- * A subscribed harness has none until its subgraphs are materialised, so that
- * gate says nothing about it yet: a limit, reported here rather than implied.
+ * `check:instance-render` judges only instances with a local tree to render,
+ * so it says nothing about a subscribed harness until its subgraphs are
+ * materialised.
  *
  * Usage:
  *   bun run cat kg:instantiate <subscription-id> <harness> [--instance <dir>] [--dry-run]

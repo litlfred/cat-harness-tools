@@ -1,27 +1,23 @@
 #!/usr/bin/env bun
 /**
- * No built page may carry the same `id` twice — bean `uknu`.
+ * No built page may carry the same `id` twice.
  *
  * Usage:
  *   bun run cat check:duplicate-ids <site-dir>     # a built site (e.g. preview:site's output)
  *
  * ## Why it runs on a BUILT site
  *
- * The defect it exists for is invisible in source. `nav_footer_custom.html`
- * declared `id="fa-nav-open"` once, correctly, and just-the-docs renders that
- * include twice per page, so 429 of 1,283 built pages carried it twice. Every
- * `<label for>` then resolved to the first copy, which is hidden at phone
- * width. `gates` was green across it. Same shape as `gjli`: only a build
- * shows it.
+ * The defect is invisible in source: an include that declares an `id` once
+ * (e.g. `nav_footer_custom.html`) can be rendered twice per page by the
+ * theme, and every `<label for>` then resolves to the first copy.
  *
- * ## Why a tag-scoped scan and not a text search
+ * ## A tag-scoped scan, not a text search
  *
  * A text search for `id="` also matches the id inside a code sample, which
- * kramdown renders as `&lt;a id="…"&gt;` with the quotes unescaped. Measured on
- * the first run: 2 such false hits (`visual-diff`, `translation-manager`). An
- * `id=` counts here only inside a real start tag, one that opens with a
- * literal `<`, and `<script>`/`<style>` bodies are skipped. No parser
- * dependency is needed for that, and adding one would be the owner's call.
+ * kramdown renders as `&lt;a id="…"&gt;` with the quotes unescaped. An `id=`
+ * counts here only inside a real start tag, one that opens with a literal
+ * `<`, and `<script>`/`<style>` bodies are skipped. No parser dependency is
+ * needed.
  *
  * @module scripts/check-duplicate-ids
  */

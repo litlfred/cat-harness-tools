@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Merge the base branch in, resolving ONLY the conflicts a declared pattern
- * covers, and prove the result with the gate set (bean `y7b3`, issue #1707).
+ * covers, and prove the result with the gate set.
  *
  * @module scripts/merge-base
  * @graphNode none — a maintenance command over the working tree
@@ -15,17 +15,16 @@
  *
  * Every conflicted path is classified BEFORE anything is changed. If one is
  * refused — authored, or named by no pattern — the merge is ABORTED and the
- * tree is left exactly as it was, with the refused paths listed. A half-resolved
- * merge reads as progress and is not.
+ * tree is left exactly as it was, with the refused paths listed.
  *
  * ## Proved, not assumed
  *
  * After resolving, `bun run cat regen` asks every check the CI workflow runs and
  * runs each stale one's writer until the tree settles. A non-zero exit
- * (`unrepaired`, or a check with no writer) aborts the merge too: a resolution
- * the gates cannot reproduce is not a resolution. It runs as `regen --changed
- * <fork point>`, asking only the pairs either side touched; see
- * {@link regenArgs} for why that is sound, and `--full-regen` for the old way.
+ * (`unrepaired`, or a check with no writer) aborts the merge too. It runs as
+ * `regen --changed <fork point>`, asking only the pairs either side touched;
+ * see {@link regenArgs} for why that is sound, and `--full-regen` to ask
+ * every pair.
  *
  * Usage:
  *   bun run cat merge:main                 # merge origin/main, resolve, regenerate, commit

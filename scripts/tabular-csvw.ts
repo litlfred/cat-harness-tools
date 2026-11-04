@@ -2,23 +2,22 @@
 /**
  * The tabular ingest rung for delimited text and workbooks: a source read as
  * `folio-tabular-csvw/v1` by whichever layer fills the `tabular-csvw` pipeline
- * slot, written to `<library>/<slug>/tabular.csvw.json`. Bean `urat`.
+ * slot, written to `<library>/<slug>/tabular.csvw.json`.
  *
  * ```sh
  * bun run cat-harness-tools/scripts/tabular-csvw.ts -o <library> <file>
  * ```
  *
- * The owner ruled on 2026-10-20 that this step moves up into core, next to its
- * CSVW extractors. tools may not name core (`check:reference-direction`), so it
- * reaches them through the slot. When nothing fills the slot this refuses with
- * the slot's own error, which names what is missing. It never falls back to
- * `tabular-records.py`, which keeps only what core has no reader for: ODS, and
- * fixed-width text through `codata-ingest`.
+ * The CSVW extractors live in core, which tools may not name
+ * (`check:reference-direction`), so this reaches them through the slot. When
+ * nothing fills the slot this refuses with the slot's own error, which names
+ * what is missing. It never falls back to `tabular-records.py`, which keeps
+ * only what core has no reader for: ODS, and fixed-width text through
+ * `codata-ingest`.
  *
- * Under the owner's second ruling of 2026-10-20 the record carries the entry's
- * `source` (the `_tech_meta` block every rung writes) and its `narrative`,
- * empty until a person authors it (bean `ju0u`): what `check-l1-complete`,
- * `check-library-qa` and `narratives` read.
+ * The record carries the entry's `source` (the `_tech_meta` block every rung
+ * writes) and its `narrative`, empty until a person authors it: what
+ * `check-l1-complete`, `check-library-qa` and `narratives` read.
  *
  * Exit 0 written, 2 not a table this reader takes, 1 anything else.
  *

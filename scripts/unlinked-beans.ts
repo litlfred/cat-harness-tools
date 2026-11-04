@@ -6,13 +6,7 @@
  * @module scripts/unlinked-beans
  * @covers beans
  *
- * Owner, 2026-10-24 (bean `folio-assistant-w2hn`): *"should be QA report, way
- * to find beans that are not a part of a process.... a bean should be
- * assocaited to >= 1 task ideally. (some beans may be for porcesses not yet
- * in KG, so not failure, but if lots of beans like this, maybe group and see
- * if they are part of undocumented porocess)"*
- *
- * ## What "tied to a task" means here (the default the bean took)
+ * ## What "tied to a task" means here
  *
  * | basis | from | certainty |
  * |---|---|---|
@@ -20,13 +14,12 @@
  * | `named-id` | the bean's file (front matter or body) names a `bpmn:process` or activity id that a declared diagram holds | **inferred** — a mention is not a run |
  * | `none` | neither | the finding |
  *
- * The instance half is the join of bean `v49e` (`workflow-view.ts`
- * {@link beansNamedBy}), widened to the subprocesses and history notes the
- * bean names. The diagrams are found the way `gen-processes-viz` finds them:
- * every instance root's declared `processes` graphs (`workflowFiles`), `.bpmn`
- * only ({@link declaredDiagramIds}). Every id in the
- * corpus carries a `_` or `-` (measured 2026-10-24: 861 of 861), so a
- * whole-token match does not catch an English word.
+ * The instance half is the join of `workflow-view.ts` ({@link beansNamedBy}),
+ * widened to the subprocesses and history notes the bean names. The diagrams
+ * are found the way `gen-processes-viz` finds them: every instance root's
+ * declared `processes` graphs (`workflowFiles`), `.bpmn` only
+ * ({@link declaredDiagramIds}). Every id in the corpus carries a `_` or `-`,
+ * so a whole-token match does not catch an English word.
  *
  * ## The grouping is lsi-epics', not a new clusterer
  *

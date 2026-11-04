@@ -1,55 +1,20 @@
 /**
- * Every declared subgraph should be REACHABLE — by a reader and by an agent.
+ * Every declared subgraph should be REACHABLE — by a reader and by an agent:
+ * it needs a visualiser and a documentation entry, and is reported if it has
+ * no skill and no tools.
  *
- * The owner, 2026-09-20: *"everytime an instance names a directory as a
- * subgraph, it needs (QA valduation) to have visualizer, documenationentry. QA
- * if no skill, no tools."* Bean `2krx`.
+ * An AXIS, not a gate: it reports, ranks, and exits 0 on findings.
  *
- * ## Why this is an AXIS and not a gate
+ * Coverage is READ FROM THE DECLARATION (`coverage` on the directory entry),
+ * never inferred by scanning for a page that mentions the path. An absent
+ * declaration is itself the finding:
  *
- * A navbar stub built over the real declarations measured it: of 22 directories
- * this instance declares, **two** have a renderer. Turning that into a hard
- * gate on day one is 20 failures, which is a wall somebody switches off — and
- * this repository already has the rule for it: *a check that fires on every one
- * of its subjects is a check that is wrong.* So this reports, ranks, and exits
- * 0 on findings. It becomes fatal when the count is low enough to mean
- * something, which is the same path `undeclared` took in
- * `check-instance-render`.
+ * - declared-and-missing target → MAJOR (a claimed renderer is not there);
+ * - undeclared → MINOR (nobody has said yet);
+ * - unreadable declaration → `undetermined`, never a clean run.
  *
- * ## Declaration-first, never inference
- *
- * A subgraph's coverage is READ FROM ITS DECLARATION (`coverage` on the
- * directory entry), not guessed by scanning for a page that mentions the path.
- * Two reasons, and the second is the one that matters:
- *
- * 1. Fuzzy matching invents both false positives and false negatives, and an
- *    axis nobody trusts is an axis nobody runs.
- * 2. **An absent declaration is the finding.** If the instance has not said
- *    what renders `library/`, that is precisely the gap — inferring an answer
- *    would paper over the thing being measured. This is the repository's
- *    standing principle applied here: *extension is a coincidence; a
- *    declaration inside the file is the contract.*
- *
- * So a declared-and-missing target is a MAJOR finding (somebody claimed a
- * renderer that is not there) while an undeclared one is MINOR (nobody has
- * said yet). Those are different problems and the axis must not merge them.
- *
- * ## Three states, because "could not determine" is not "absent"
- *
- * An unreadable declaration is reported as `undetermined` and never as a clean
- * run. A sweep blind on one instance has not cleared the others.
- *
- * ## Bootstrap is exempt from the VISUALISER criterion, by layer
- *
- * The owner, same day: *"it is exception to harness/layer not having
- * visualtion/workflow visualizer. but it must have its json/jsonld... that is
- * its existence."*
- *
- * The exemption is **not a hole in the axis, it is a second criterion**. An
- * axis that dropped bootstrap entirely would stop checking the one thing
- * bootstrap must have. So bootstrap is not asked for a visualiser, and IS
- * asked whether its graph artefact is produced — a layer that cannot emit its
- * own graph has not shown it is a graph.
+ * Bootstrap is exempt from the VISUALISER criterion, by layer; instead it is
+ * asked whether its graph artefact (JSON/JSON-LD) is produced.
  *
  * @covers cat-harness
  */

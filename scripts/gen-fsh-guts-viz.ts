@@ -5,46 +5,28 @@
  * @module cat-harness/scripts/gen-fsh-guts-viz
  * @covers fsh-guts
  *
- * ## Why this exists, and why the page is not published
+ * ## Rendered, but not published
  *
- * The owner asked to see it (*"i eant to see beans/ todos/ fsh-guts/"*,
- * 2026-09-21). Its own declaration says the opposite, as a design decision
- * rather than an oversight: *"DELIBERATELY absent from the rendered site …
- * this one's contents could be rendered and are not, so that something can be
- * kept without being published."*
+ * The graph is deliberately absent from the published site, so the page is
+ * declared `publish: "staging-only"` and `compose-docs.ts` withholds it unless
+ * told `--staging`. A local build or a `STAGING/<slug>/` preview has the page;
+ * the published site does not.
  *
- * Both were wanted, so the owner ruled: **render it, exclude it from the
- * canonical deploy.** The page is therefore declared `publish: "staging-only"`
- * and `compose-docs.ts` withholds it unless told `--staging`. A reader here,
- * or of a `STAGING/<slug>/` preview, gets the page; a reader of the published
- * site does not meet it.
+ * It is an INDEX: each entry links to the file on GitHub rather than
+ * inlining it, so the graph stays the one copy.
  *
- * ## It indexes, it does not republish
+ * ## Three states, not two
  *
- * Each entry links to the file on GitHub rather than inlining it. That keeps
- * the page an INDEX of what is kept, which is what "see it" asked for, without
- * copying deprecated content into a second location that then has to be kept
- * in step. The graph stays the one copy; this is a way in.
- *
- * ## The third state is the point
- *
- * The declaration says *"Files declare themselves with
- * `$schema: folio-fsh-guts/v1`, per the same contract the bean and workflow
- * stores use."* Measured, that contract is honoured by most of the corpus and
- * not all of it, and the gap decomposes rather than being one number:
+ * Files declare themselves with `$schema: folio-fsh-guts/v1`:
  *
  * - a file carrying the tag is **declared**;
  * - a file whose format cannot carry YAML front matter at all — a script, a
  *   PDF, a JSON, an HTML page — is **described by sidecar** when a tagged
- *   `.md` sibling of the same basename describes it: the contract met by the
- *   only mechanism open to it;
+ *   `.md` sibling of the same basename describes it;
  * - anything else is **undeclared**, and that is a finding.
  *
- * Collapsing those into "tagged / untagged" would file a script that cannot
- * structurally comply beside a markdown file that simply omitted the line,
- * and the second is somebody's omission while the first is the format's.
- * `unknown` is never rendered as clean here for the same reason it is not
- * anywhere else in this repository.
+ * A format that cannot comply is not filed beside a file that simply omitted
+ * the tag, and `unknown` is never rendered as clean.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-fsh-guts-viz.ts

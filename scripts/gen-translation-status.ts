@@ -4,49 +4,26 @@
  * @module scripts/gen-translation-status
  * @covers translation-sources
  *
- * Bean `lnur`. Owner, 2026-09-21: *"need translation status visualtion page,
- * translations/ needs to be a declared sub-graph/dir of cat-harness and is
- * missing its visualtion, json(ld) and such"*.
- *
- * ## Half of that was already true, and the half that was not is this file
- *
- * `translations/` IS a declared sub-graph — id `translation-sources`, declared
- * 2026-09-19. What it lacked is a `coverage.visualiser` and a published
- * projection, which `kg:audit` already reported: cat-harness declares several
- * graphs with no published viewer and this was one.
- *
- * ## Why this is not a `state-visualizer` dashboard
- *
- * `state-visualizer.ts` draws a page for every declared STATE graph, asking
- * `isStateGraph(kind)`. `translation-sources` is not state — it is the INPUT
- * to injection, authored and read — so that generator correctly skips it and
- * always will. A viewer for it has to be its own, which is why this exists
- * rather than a flag on that one.
+ * It is the viewer of the `translation-sources` graph (`translations/`). That
+ * graph is authored input to injection, not state, so `state-visualizer.ts`
+ * (which draws only `isStateGraph` kinds) skips it.
  *
  * ## What it measures, and what it refuses to guess
  *
- * Two different questions, and collapsing them is the thing to avoid:
- *
  *   1. IS THERE A CATALOGUE AT ALL? `.pot` templates are what CAN be
  *      translated; `.po` catalogues are what somebody started. A locale with
- *      63 templates and 3 catalogues is 5% reachable before a single string
- *      is looked at, and a page that reported only string percentages would
- *      show that locale as nearly complete.
+ *      few catalogues is mostly unreachable however complete its strings are.
  *   2. OF THE CATALOGUES THAT EXIST, how much is translated, fuzzy, or empty.
  *
- * Reporting (2) without (1) is the failure mode this page exists to prevent.
- *
- * Every number is DERIVED from the files on each run. Nothing here is written
- * down, and there is no baseline to go stale — the defect `d2kp` records,
- * where a page carrying its own measurement lied by aging.
+ * It never reports (2) without (1). Every number is DERIVED from the files on
+ * each run; there is no baseline to go stale.
  *
  * ## Paths come from the DECLARATION
  *
  * The translations directory is resolved from the instance's own
  * `<instance>.json` (`translation-sources`), and the site directory from
- * `siteDirFor`. Neither is written here. `site-dir-single-answer.test.ts`
- * guards the second across the whole tree and has already caught one set of
- * tests in this session hardcoding it.
+ * `siteDirFor`. Neither is written here; `site-dir-single-answer.test.ts`
+ * guards the second across the whole tree.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";

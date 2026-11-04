@@ -1,21 +1,21 @@
 /**
- * The diff renderers the review page runs in the reviewer's browser. Bean
- * `d903`. Their registry, what each needs and which block kinds each is the
- * default for, is `schemas/ui/diff-renderers.ts`.
+ * The diff renderers the review page runs in the reviewer's browser. Their
+ * registry, what each needs and which block kinds each is the default for, is
+ * `schemas/ui/diff-renderers.ts`.
  *
  * Every function here is SELF-CONTAINED: it closes over nothing in this
  * module and gets what it needs as arguments. `gen-review-page` embeds each
  * one with `toString()`, so the code the e2e test drives is the code the page
- * runs. A copy inside the page's script string would be free to drift.
+ * runs.
  *
  * ## Rendered HTML is the folio's own, and it is still cleaned
  *
  * The inline renderer shows a block AS RENDERED, so it must place HTML. That
  * HTML is `changeset-text.json`'s: the folio's own prose, rendered by the
- * platform in the folio's own staging job. That is the same trust as the
- * preview page beside it. It is parsed with `DOMParser` into a detached
- * document, never assigned to `innerHTML`, and {@link cleanRendered} removes
- * what has no business in a diff:
+ * platform in the folio's own staging job, the same trust as the preview page
+ * beside it. It is parsed with `DOMParser` into a detached document, never
+ * assigned to `innerHTML`, and {@link cleanRendered} removes what has no
+ * business in a diff:
  * - scripts and anything that embeds another document;
  * - `on*` handler attributes;
  * - `javascript:` URLs.

@@ -2,12 +2,8 @@
  * Rendering machinery shared by every generator that draws a graph with
  * PlantUML: portrait and landscape views, the hash stamp, the pinned jar, one
  * JVM for all diagrams, and the page figure with its Portrait / Landscape
- * switch.
- *
- * Moved out of `gen-uml-overview.ts` when a second generator
- * (`gen-content-graph-uml.ts`, a paper's block graph) needed the same things.
- * The rules they implement are the `graph-rendering` skill's
- * (`skills/kg/graph-management/graph-rendering.md`), rules 5, 6, 8 and 9.
+ * switch. It implements rules 5, 6, 8 and 9 of the `graph-rendering` skill
+ * (`skills/kg/graph-management/graph-rendering.md`).
  *
  * @module scripts/plantuml-render
  */

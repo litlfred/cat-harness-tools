@@ -1,69 +1,34 @@
 /**
  * Put each built page's OWN locale on its `<html>` element.
  *
- * Bean `zru7`. Measured 2026-09-27 by building the site rather than by reading
- * front matter: **70 of 70** translated pages were emitted as
- * `<html lang="en-US">`, and **none** carried a `dir` attribute — including the
- * Arabic ones. The source pages declare `lang: ar`, `lang: zh` and so on
- * correctly; nothing carried the declaration into the served document.
+ * The pinned remote theme emits `<html lang="{{ site.lang | default: 'en-US' }}">`
+ * — `site.lang`, not `page.lang` — and no `dir`, so every translated page is
+ * served as English (WCAG 3.1.1, Language of Page): a screen reader
+ * mispronounces it and the browser picks the wrong fonts and hyphenation.
  *
- * That is WCAG 3.1.1 (Language of Page). A screen reader applies English
- * pronunciation to Chinese and Russian text, and `lang` is also what a browser
- * reads to choose fonts and hyphenation.
+ * ## A post-build pass, not a layout override
  *
- * ## Four locally checkable causes
+ * As with `strip-preview-seo.ts`, a pass over the emitted tree couples to
+ * nothing, where overriding the theme's layout would mean vendoring a file that
+ * goes stale whenever the theme pin moves. A runtime JavaScript patch cannot
+ * fix first paint or a reader with JavaScript off: the language has to be in
+ * the served bytes.
  *
- *   1. The pinned theme's default layout emits
- *      `<html lang="{{ site.lang | default: 'en-US' }}">` — **`site.lang`, not
- *      `page.lang`** — and no `dir` attribute anywhere in its layouts or
- *      includes. Verified by downloading the gem the `remote_theme` pin names
- *      and reading it; `page.dir` appears nowhere in it.
- *   2. This repository has no `docs/_layouts/`, so nothing overrides that.
- *   3. `docs/_config.yml` declares no `lang:`, so `site.lang` is undefined and
- *      the `en-US` default wins for every page in the site.
- *   4. `docs/assets/js/docs-ui.js` sets `lang` and `dir` on `<html>` at `init()`
- *      — but only INSIDE its RTL branch. So `ar` is repaired at runtime while
- *      `es`, `fr`, `ru` and `zh` are never repaired at all.
- *
- * So the damage was not uniform, and the split is the point: 14 Arabic pages
- * were eventually right and wrong until `init()` ran, while 56 others were
- * permanently wrong, JavaScript on or off.
- *
- * ## Why a post-build pass and not a layout override
- *
- * **This repository has already decided this class of question**, and the
- * reasoning is written on `strip-preview-seo.ts`: the tag lives in the REMOTE
- * theme's layout, *"suppressing it at the source would mean vendoring that file —
- * which is the upstream-coupling hazard each folio's Jekyll config pins the theme
- * to avoid. A pass over the emitted tree couples to nothing."*
- *
- * `docs/_config.yml` says the same thing from the other side at length: the pin
- * exists because an upstream rename *"degrades a shipped feature silently rather
- * than loudly"*, and moving it is a whole documented process with a person in it.
- * A forked `_layouts/default.html` would be a hundred lines of somebody else's
- * file going stale the next time that pin moves, for the sake of two attributes.
- *
- * Widening the runtime patch was the other candidate and is rejected on the
- * bean's own grounds: JavaScript cannot fix first paint, and cannot fix a reader
- * who has it switched off. The language has to be in the served bytes.
- *
- * ## It reads the page's own declaration, so it couples to nothing at all
+ * ## It reads the page's own declaration
  *
  * Every page already carries a `fa-translation-meta` JSON block — the pipeline
  * emits it and `docs-ui.js` reads it — whose `lang` is the page's own locale.
- * This pass reads that and rewrites the `<html>` tag. No index, no URL-to-file
- * mapping, no knowledge of the theme: a page states its language and this makes
- * the document say so.
+ * This pass reads that and rewrites the `<html>` tag (`lang`, and `dir` for
+ * right-to-left locales). No index, no URL-to-file mapping, no knowledge of
+ * the theme.
  *
- * A page with no meta block is LEFT ALONE and counted. Most of the site is not a
- * translation, and rewriting a page that has not declared a locale would be
- * inventing one.
+ * A page with no meta block is LEFT ALONE and counted: rewriting a page that
+ * has not declared a locale would be inventing one.
  *
  * Idempotent: a second run finds every tag already correct and writes nothing.
  *
- * `tools` is the graph typology this audits — the subject is the emitted site, which
- * is harness output rather than any folio's content. Declared rather than
- * inferred, per `3srh`.
+ * `tools` is the graph typology this audits — the subject is the emitted site,
+ * which is harness output rather than any folio's content.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/set-html-lang.ts --site ./_site

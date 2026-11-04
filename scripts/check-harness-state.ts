@@ -5,53 +5,34 @@
  * @module scripts/check-harness-state
  * @covers health, todos, interaction, issue-marks, merge-queue, session-survey, todo-items, todo-feedback, board-positions
  *
- * Bean `h1wq`, from `audit-coverage`'s `typed-only` finding: `health`, `todos`,
- * `interaction` and `issue-marks` each declare a validator that parses their
- * nodes, and no criterion and no gate had an opinion about what those nodes
- * SAY. The owner asked for all four (2026-09-24).
+ * Each covered graph declares a validator that parses its nodes, but no other
+ * criterion or gate judges what those nodes SAY (`audit-coverage`'s
+ * `typed-only`). This adds one criterion family per graph, including the
+ * inner directories `beans/beans.json` and `todos/todos.json` declare (see
+ * the section above `declaredDirs`).
  *
- * Five more joined on PR #2094 (owner, 2026-10-04): `merge-queue`,
- * `session-survey`, `todo-items`, `todo-feedback` and `board-positions`, the
- * inner directories `beans/beans.json` and `todos/todos.json` declare. They
- * read `typed-only` the moment nested declarations were admitted, and the
- * reasoning above carried over unchanged: each is a `state` graph, and each
- * family asks something no other gate asks. See the section above
- * `declaredDirs` for the five.
+ * ## One script, and not `kg-audit`
  *
- * ## Why one script and not four, and not `kg-audit`
+ * One gate, as in `check-asset-roles`, rather than a CI step per graph. Not
+ * `kg-audit`: its subject is *one criterion per join in the
+ * actor→role→skill→task sentence*, and these are `state` and `context`
+ * graphs, not joins in the role model.
  *
- * Four scripts would be four CI steps and four annotation rounds over 13 files
- * between them. `check-asset-roles` is the shape followed here: two findings
- * that are two halves of one rule, in one gate.
+ * ## No second answer
  *
- * **Not `kg-audit`**, and the reason is in that file's own header: its subject
- * is *one criterion per join in the actor→role→skill→task sentence*. These are
- * `state` and `context` graphs — a record of where something got to, and a
- * record a process reads — not joins in the role model. Adding subject kinds
- * for them would stretch a scope that file states deliberately, and the
- * `audit-coverage` `gates` column is exactly where a gate's coverage belongs.
+ * `health` and `todos` already have machinery (`bun run cat health`, the todo
+ * pipeline), so each family asks something no existing gate asks; no other
+ * gate declares `@covers health` or `@covers todos`.
  *
- * ## The risk the owner was told about, and how it is answered
+ * ## Determined empties are reported as such
  *
- * `health` and `todos` already have machinery — `bun run cat health` writes the one,
- * and the todo pipeline the other — so a criterion here could be a **second
- * answer** to a question something already settles, which is the drift
- * `kg-audit`'s `tool-*` criteria exist to prevent. Each family below therefore
- * asks something no existing gate asks, and that was checked by reading rather
- * than assumed: no gate declares `@covers health` or `@covers todos` at all.
- *
- * ## Three of the four are DETERMINED EMPTIES, and that is reported as such
- *
- * Measured 2026-09-24 over 13 files. Only `health-result-is-from-the-current-producer`
- * fires. A check over a two-node corpus that prints "clean" has said almost
- * nothing, so **every family prints what it examined** — §1.2a of
- * `generalise-the-fix`: a sweep that cannot tell an empty walk from a clean one
- * is not a check.
+ * Over a small corpus "clean" says little, so **every family prints what it
+ * examined**: an empty walk is not a clean one.
  *
  * Exit codes: 0 clean · 1 a finding (under `--check`) · 2 a graph could not be read,
- * or (under `--check`) an unknown flag. `--check` is the JUDGE form (bean
- * `bo44`): it computes, judges and writes nothing; the bare form writes the
- * sidecar and exits 0 on findings.
+ * or (under `--check`) an unknown flag. `--check` is the JUDGE form: it
+ * computes, judges and writes nothing; the bare form writes the sidecar and
+ * exits 0 on findings.
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";

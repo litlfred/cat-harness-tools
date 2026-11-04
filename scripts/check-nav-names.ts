@@ -7,26 +7,14 @@
  * written into viewer pages, the sidebar include, `_data/harness.json`,
  * `_data/stickies.json` and the landing template), none of which is a node in
  * a declared graph. Naming `docs` here would credit the kind with an audit of
- * its nodes that this never performs (bean `z6xd`).
+ * its nodes that this never performs.
  *
- * Owner, 2026-10-01, bean `ob3m` finding 6, choosing option 1 of 4: **"One
- * name everywhere."** Each destination gets one label, used identically on
- * every surface: the viewer rail, the Jekyll sidebar, FOLDERS, the landing's
- * "visualisations you can open", the glass tiles and More panel, and the
- * Stickies "Visualisations" row. Where the harness matters, a surface appends
- * it as a qualifier ("Skills · C@T Harness") and never uses a different base
- * name.
+ * Each destination gets one label, used identically on every surface. Where
+ * the harness matters, a surface appends it as a qualifier
+ * ("Skills · C@T Harness") and never uses a different base name.
  *
- * Measured before, on PR #1762's head, with Playwright over a built site: of
- * the 42 destinations reachable from those six surfaces, 10 carried two or
- * more names. Examples: `docs` vs "Docs — cat-harness", `methodology` vs
- * "Methodologies", `cat-harness` vs `schemas` for one schema page, and
- * "Bootstrap" vs `processes` for `/processes/`.
- *
- * ## What it reads, and why statically
- *
- * Each surface is a generated artefact committed to this repository, so the
- * names can be read without a build:
+ * Every surface is a committed generated artefact, so names are read
+ * statically:
  *
  * | surface | read from |
  * |---|---|
@@ -38,24 +26,14 @@
  * | glass tiles, More, Stickies row | `_data/harness.json` `tiles` (the client prints `title`) |
  * | sticky card links | `_data/stickies.json`, only for hrefs another surface also links |
  *
- * The landing and the client are TEMPLATES over that data. So the check also
- * reads the landing includes and fails an anchor whose text is a `.kind`
- * expression: that would be the template composing a name from the kind word
- * again, which is how `docs` and "Docs" came apart in the first place.
+ * It also fails a landing-include anchor whose text is a `.kind` expression
+ * (a name composed from the kind word).
  *
- * ## Not a second answer to the navbar gates already here
- *
- * | gate | its question |
- * |---|---|
- * | `navbar:geometry:check` | do the widths agree |
- * | `check:viewer-nav` | which pages carry a rail at all |
- * | `check:navbar-consistency:check` | are the icons registered, and does one artefact wear one glyph |
- * | this | does one destination wear one NAME |
- *
- * ## Could-not-determine is never green (bean `dh4f`)
+ * Related gates: `navbar:geometry:check` (widths), `check:viewer-nav` (which
+ * pages carry a rail), `check:navbar-consistency:check` (icons and glyphs).
  *
  * If `harness.json` will not parse, or no railed page and no include could be
- * read, this exits **2**, not 0. A check that read nothing has checked nothing.
+ * read, this exits **2**, not 0.
  *
  * ## Modes
  *

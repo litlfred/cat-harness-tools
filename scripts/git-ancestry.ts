@@ -1,15 +1,12 @@
 /**
  * Is one commit an ancestor of another — with "cannot tell" as its own answer.
  *
- * `git merge-base --is-ancestor A B` exits non-zero for TWO different facts,
- * and every caller that reads the exit code as a boolean conflates them:
+ * `git merge-base --is-ancestor A B` exits non-zero for TWO different facts:
  *
  * - **B does not descend from A.** A real answer — exit 1.
- * - **This repository cannot see enough history to say.** Not an answer.
- *
- * On a shallow clone the second wears the first's clothes, and the shape of
- * the disguise was measured rather than assumed. In a `--depth 1` clone the
- * older commit is **absent**, so git exits **128 (bad object)** — not 1:
+ * - **This repository cannot see enough history to say.** Not an answer. In a
+ *   `--depth 1` clone the older commit is **absent**, so git exits **128 (bad
+ *   object)**:
  *
  * ```
  * $ git -C shallow merge-base --is-ancestor <root> HEAD ; echo $?
@@ -18,49 +15,19 @@
  * 0
  * ```
  *
- * That matters because of HOW the callers read it. `survey.ts` and
- * `merge-leftover.ts` test a wrapper's `.ok`; `check-quiet-claim-liveness.ts`
- * wraps the call in `try`/`catch`. **Every one of those turns 128 into "not an
- * ancestor"** — the same wrong answer a false 1 would give, reached by a
- * different road. Exit 1 is still handled here as the real negative it is, but
- * the case that bites in practice is the missing object.
+ * A caller that reads the exit code as a boolean (a wrapper's `.ok`, or a
+ * `try`/`catch`) turns 128 into "not an ancestor". CI checks out with
+ * `fetch-depth`, agent containers clone `--depth 1`, and every submodule here
+ * arrives shallow, so this is the normal case.
  *
- * CI checks out with `fetch-depth`, agent containers clone `--depth 1`, and
- * every submodule here arrives shallow — so this is the normal case rather
- * than the edge one, and a caller that trusts the exit code is confidently
- * wrong exactly where it is least able to notice.
- *
- * ## Measured, 2026-10-04
- *
- * Resolving a submodule-gitlink conflict on PR #2046 by hand, `--is-ancestor`
- * answered non-zero in BOTH directions for both submodules, so the pins were
- * recorded as *diverged* in a commit message that is now on `main`. Deepening
- * the two submodules and asking again:
- *
- * | submodule | branch pin | main pin | truth |
- * |---|---|---|---|
- * | `bootstrap` | `ebfa406` (10-01) | `5761204` (10-02) | main's **fast-forwards** |
- * | `bootstrap-tools` | `3046412` (10-01) | `7ac5150` (10-04) | main's **fast-forwards** |
- *
- * Neither pair had diverged. The resolution taken happened to be right; the
- * reason recorded for it was false, which is the worse half — a wrong fact in
- * a commit message outlives the commit and gets cited.
- *
- * {@link resolveGitlink} in `merge-base.ts` already got this right for the
- * merge path, and its docblock names the trap outright: *"a conflict here
- * usually means a SHALLOW submodule, where neither pin can be shown to descend
- * from the other"*. That logic was a local closure, so nothing outside that one
- * function could reuse it, and four other call sites asked the bare question.
- * This module is that closure, lifted and named, so there is one implementation
- * of the question rather than one correct and several hopeful.
+ * This is the one implementation of the question; {@link resolveGitlink} in
+ * `merge-base.ts` uses the same logic for the merge path.
  *
  * ## What this does NOT do
  *
- * It does not decide what `unknown` means for you. A reader that must not treat
- * "cannot tell" as "no" has to branch on three cases, and the point of the
- * union return is that the compiler makes it. `audit-coverage`'s rule applies
- * here one level down: **could-not-determine is never rendered as clean**, and
- * it is never rendered as its negation either.
+ * It does not decide what `unknown` means for you: the union return makes the
+ * caller branch on three cases. **Could-not-determine is never rendered as
+ * clean**, nor as its negation.
  *
  * @module cat-harness/scripts/git-ancestry
  * @covers none — a git query helper; it judges no declared graph

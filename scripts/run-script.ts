@@ -2,15 +2,15 @@
 /**
  * `bun run cat <name> [args…]` — run a checkout script wherever it is declared.
  *
- * The scripts left the root `package.json` for the layer each one runs (bean
- * `ar1s` phase 4, `schemas/sdlc/script-table.ts`). `bun run` reads only the
- * manifest in the directory it starts in, so the root keeps this one entry,
- * `cat`, and this finds the script by asking the declared instances.
+ * Scripts are declared in the layer each one runs (`schemas/sdlc/script-table.ts`).
+ * `bun run` reads only the manifest in the directory it starts in, so the root
+ * keeps this one entry, `cat`, and this finds the script by asking the declared
+ * instances.
  *
  * A `.ts`/`.js` path in place of a name runs that file, as `bun run <file>`
  * does, so a caller whose list mixes names and files needs no second spelling.
  *
- * It runs the command exactly as `bun run` did: through `sh -c` from the
+ * It runs the command exactly as `bun run` does: through `sh -c` from the
  * CHECKOUT ROOT, with `node_modules/.bin` first on PATH, the arguments
  * appended, and `npm_lifecycle_event` set to the script's name. The exit code
  * is the command's.

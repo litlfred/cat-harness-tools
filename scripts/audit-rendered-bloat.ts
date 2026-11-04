@@ -2,9 +2,6 @@
  * Audit tool for large redundant rendered HTML content that can be dynamically
  * loaded from the Knowledge Graph.
  *
- * Implements bean folio-assistant-s32v:
- * "QA: agentic audit of large redundant rendered content that can load from the KG"
- *
  * ## Purpose
  * Analyzes built HTML pages (e.g. in `_site/` or `docs/`) to detect:
  * 1. Per-page byte sizes and HTML bloat.

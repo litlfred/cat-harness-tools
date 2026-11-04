@@ -2,52 +2,21 @@
 /**
  * Which sessions have been working this repository, and where each one got to.
  *
- * Bean `ab3n`, measured 2026-09-20: **eight sibling sessions committed in one
- * four-hour window**, and the session API returned *not found* for all eight
- * lookups by id; its listing showed only the asking session. Nothing in
- * `AGENTS.md`, `bean-coordination` or `session-intent` said how to enumerate
- * the sessions working a repository — while *"watch all open PRs for incoming
- * insights"* and *"claim before you work"* both assume an agent can see who
- * else is here.
+ * For *who is here now*, ask the session API first. This tool answers *what
+ * did each session DO in this window*: it reads commits.
  *
- * ## That observation is DATED, and this tool is not the first resort
+ * ## The trailer is the identity
  *
- * **Re-measured 2026-09-21: the listing returned seven siblings**, with their
- * statuses and — for those waiting — the question each was holding, in plain
- * text. So *"the session API cannot see a sibling"*, which this file printed in
- * its own report until then, is a present-tense claim that had stopped being
- * true, and it is exactly what bean `8nzu` is about: a dated observation
- * welded to a capability claim outlives its evidence, and every reader after
- * that takes the claim.
+ * A session is an ephemeral container whose id is not resolvable from outside
+ * itself. `Claude-Session:` on a commit is the only DURABLE session identity
+ * this repository has, and a branch tip is the only durable statement of where
+ * a session got to.
  *
- * What is durable is narrower and still worth having: **a commit trailer
- * survives the container**, and a session's own id is not resolvable from
- * outside itself. So this remains the right tool for *what did each session
- * DO in this window* — it reads commits — and the wrong first question for
- * *who is here now*. An agent that can call the session API asks that first.
- *
- * ## The trailer is the identity, and that is not a workaround
- *
- * A session is an ephemeral container. Its id is not resolvable from outside
- * itself, and nothing about it survives the container — except what it
- * committed. `Claude-Session:` on a commit is therefore the only DURABLE
- * session identity this repository has, and a branch tip is the only durable
- * statement of where a session got to.
- *
- * So a session's state here is **inferred**, and the report says so rather
- * than presenting the inference as a lookup. What can be known: which commits
- * a session authored, when it started and stopped committing, and which
- * branches carry its work. What cannot: whether it is still running. A session
- * that has stopped committing may be thinking, blocked, or gone, and this tool
- * refuses to guess between them — the same three-state discipline the rest of
- * the sweep uses, at the one place an agent most wants a yes or no.
- *
- * ## Why a tool rather than a paragraph
- *
- * `ab3n`'s Done-when says "a one-command sweep exists (a Tool node, not
- * prose)". Prose describing how to grep a trailer is a procedure every session
- * re-derives slightly differently; the counts then disagree and nobody can
- * tell which sweep was wrong.
+ * So a session's state here is **inferred**, and the report says so. What can
+ * be known: which commits a session authored, when it started and stopped
+ * committing, and which branches carry its work. What cannot: whether it is
+ * still running. A session that has stopped committing may be thinking,
+ * blocked, or gone, and this tool refuses to guess between them.
  *
  * ```sh
  * bun run cat sessions --since 4h          # this window

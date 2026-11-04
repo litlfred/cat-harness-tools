@@ -1,18 +1,13 @@
 #!/usr/bin/env bun
 /**
  * ensure-software — get the programs and modules the harness's scripts need,
- * instead of stopping at "X is not installed".
- *
- * Owner, 2026-10-09, after an ingest stopped at a missing `tesseract` and the
- * agent routed around it with a cached copy: *"update skills and tools on
- * finding software"*, *"github egress"*, *"also add apt"*. The skill is
- * `finding-software`; this is its tool.
+ * instead of stopping at "X is not installed". The tool of the
+ * `finding-software` skill.
  *
  * ## What it reads
  *
  * `scripts/software.json` — one entry per thing a script CHECKS FOR, with the
- * ways to get it. Declared rather than scattered: before this, a dozen scripts
- * each printed their own install hint, in three spellings.
+ * ways to get it.
  *
  * ## The ladder, per entry, stopping at the first that works
  *
@@ -23,8 +18,7 @@
  *    the interpreter is externally managed).
  * 4. **GitHub release** — the asset for this platform at a PINNED tag, checked
  *    against its sha256 before anything is unpacked, binary into
- *    `~/.local/bin`. No pin, no checksum, no install: an unverified download is
- *    not a way to get software, it is a way to get whatever was there.
+ *    `~/.local/bin`. No pin, no checksum, no install.
  *
  * Each rung is re-checked by presence, never by exit code alone, and every
  * attempt is reported. A rung the environment does not offer (no apt, not

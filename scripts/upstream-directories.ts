@@ -6,22 +6,18 @@
  * @module scripts/upstream-directories
  * @graphNode none — a library: it reads declarations at a pin and judges nothing
  *
- * Bean `mo75` G3. A remote mount (and anything else naming a subgraph of an
- * instance it has not got) needs the id → path map of the instance AT THE PIN.
- * The top-level `directories` of `<name>.json` are only half of it: an entry
- * declared from within (`skills/skills.json` naming `voices/`, bean `cmsl`;
- * `"subgraph": true`, bean `1g4s`) is an instance directory too, and bean
- * `2j2r` moved every on-disk reader to `instanceDirectories` so that none of
- * them would miss it. A planner reading only the top-level list refused a
- * nested id as "not declared" — the defect this module removes for readers
- * that hold a tree instead of a checkout.
+ * A remote mount (and anything else naming a subgraph of an instance it has
+ * not got) needs the id → path map of the instance AT THE PIN. The top-level
+ * `directories` of `<name>.json` are only half of it: an entry declared from
+ * within (`skills/skills.json` naming `voices/`; `"subgraph": true`) is an
+ * instance directory too, so a reader of only the top-level list would refuse
+ * a nested id as "not declared".
  *
  * It does not walk the nesting itself. It checks out the declaration files
  * only — `<name>.json` and every file a known kind names as its
  * `declarationFile` — in one sparse checkout, and hands that skeleton to
  * cat-harness's `instanceDirectories`, so the remote answer and the on-disk
- * answer come from one resolver and cannot drift (the `2j2r` lesson: one
- * fact, one reader).
+ * answer come from one resolver.
  *
  * What it cannot see, it says: a declaration this checkout's schema or kind
  * registry cannot read (a kind contributed by a layer not mounted here yet)

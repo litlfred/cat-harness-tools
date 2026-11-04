@@ -5,14 +5,12 @@
  *
  * @module scripts/prose-code-pairs
  *
- * Bean `cuxx` (stage B of feature `flbx`), issue #1042, requirements R1, R2,
- * R6 and R7. The question this answers is deliberately NOT "is the prose
- * true" — that is stage A (mechanical claims) and stage C (a reviewer). It is
- * the cheaper one underneath both: **did the code change while the prose that
- * describes it stood still?** A yes asserts nothing about truth, so it cannot
- * cry wolf, which `77ex` recorded as the way a prose checker gets switched off.
+ * The question is deliberately NOT "is the prose true" (mechanical claim
+ * checks and reviewers ask that). It is the cheaper one underneath: **did the
+ * code change while the prose that describes it stood still?** A yes asserts
+ * nothing about truth, so it cannot cry wolf.
  *
- * ## Declared pairs only (R1)
+ * ## Declared pairs only
  *
  * A pair is taken from a declaration the corpus already makes, never inferred
  * from wording:
@@ -26,18 +24,16 @@
  * in a folio, not in this platform, so it is named in {@link PAIR_KINDS_NOT_SCANNED}
  * rather than silently missing.
  *
- * ## One-sided change, keyed by content hash (R2)
+ * ## One-sided change, keyed by content hash
  *
- * Each pair's last-accepted state is kept as an ATTESTATION, carried across
- * runs the way `block-qa` carries a reviewer entry with its `field_hash`. It
- * lived in the subject's kg-qa sidecar until bean `2gst` (2026-10-01) moved it
- * to the attestation store, `test/attestations/kg-qa/` — owner ruling D2 (a):
- * a judgement stays on main while the derived sidecar moves to the
- * `qa-reports` branch. A store that cannot be read is `unknown`, never a
- * fresh baseline ({@link evaluatePairsFrom}). A store with no entry for the
- * subject (or no store at all) takes the attestations a PRIOR sidecar still
- * carries inside it, and `kg-audit` moves them into the store as it saves
- * (owner ruling 2, 2026-10-01) — {@link readAttestations}:
+ * Each pair's last-accepted state is kept as an ATTESTATION in the attestation
+ * store, `test/attestations/kg-qa/` (judgements stay on main), carried across
+ * runs the way `block-qa` carries a reviewer entry with its `field_hash`. A
+ * store that cannot be read is `unknown`, never a fresh baseline
+ * ({@link evaluatePairsFrom}). A store with no entry for the subject (or no
+ * store at all) takes the attestations a PRIOR sidecar still carries inside
+ * it, and `kg-audit` moves them into the store as it saves
+ * ({@link readAttestations}):
  *
  * - no attestation yet → a `baseline` is recorded; it claims only "unchanged
  *   since first seen", and the pair passes;
@@ -45,9 +41,7 @@
  *   the old attestation is kept, so the finding stays until somebody attests;
  * - prose changed (with or without code) → passes, and the attestation moves to
  *   the new state: whoever edited the prose wrote it against the current code.
- *
- * The last rule is the one R2 states ("one side changes and the other does
- * not"), and it is what keeps this quiet: a prose edit never raises anything.
+ *   A prose edit never raises anything.
  *
  * ## Attesting (the re-review mark)
  *
@@ -56,8 +50,7 @@
  *
  * rewrites that subject's attestations in the store to the current hashes with who and why,
  * and the next `kg:audit` passes it. `--by` is required and is `agent` or
- * `human`; a reason is required too, because a mark with no reason is a mark
- * nobody can review.
+ * `human`; a reason is required too, so the mark can be reviewed.
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";

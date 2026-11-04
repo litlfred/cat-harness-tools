@@ -2,54 +2,37 @@
 /**
  * check-code-accounting.ts — the two questions about a code file, kept APART.
  *
- * Bean `ylj7`'s last gate, and its wording is the whole specification: *"a QA
- * axis reports the two questions SEPARATELY, never as one number."*
+ * A QA axis reports these SEPARATELY, never as one number:
  *
- * | | question | kind of property | who owns it |
- * |---|---|---|---|
- * | **1** | is this file in a directory some instance DECLARES? | filesystem | `ylj7` |
- * | **2** | is it reachable from a Tool node, and so from a process step? | graph | `d308`, `ce65` |
+ * | | question | kind of property |
+ * |---|---|---|
+ * | **1** | is this file in a directory some instance DECLARES? | filesystem |
+ * | **2** | is it reachable from a Tool node, and so from a process step? | graph |
  *
- * ## Why one number would be a lie
+ * They fail independently and are fixed by different work: a file can sit in
+ * a declared directory and be reachable from nothing, or be reachable from a
+ * Tool in a directory no instance names. One percentage would be true of
+ * neither, and a rise in one could hide a fall in the other.
  *
- * They fail independently and they are fixed by different work. A file can sit
- * in a perfectly declared directory and be reachable from nothing — declared
- * and inert. Another can be reachable from a Tool while sitting in a directory
- * no instance names, so no consumer that walks declarations will ever see it.
- * A single "coverage" percentage averages those two into a number that is true
- * of neither, and — this is the part that costs — a rise in one can HIDE a
- * fall in the other. `ylj7` was written because question 2 was being asked
- * over 15 % of the code while a clean run was reported over the rest.
- *
- * ## Question 1 has two readings, and the difference is not pedantry
+ * ## Question 1 has two readings
  *
  * *In a directory declared as `code`* is narrower than *in any declared
- * directory*. `cat-harness/schemas/` holds 142 `.ts` and is declared — as
- * `schemas`, which is correct: those are schema modules, and adding `code` to
- * that entry would give one directory two kinds for no gain. So the question
- * that matters is **accounted for**, and `code` is one of several kinds that
- * account for a file.
- *
- * Both are printed. Round 1's number was the wide reading and round 2's the
- * narrow one, and comparing them across rounds as though they were one metric
- * would have read a 73 → 59 REGRESSION out of an improvement.
+ * directory*. `cat-harness/schemas/` is declared as `schemas`, which is
+ * correct for schema modules. So the question that matters is **accounted
+ * for**, and `code` is one of several kinds that account for a file. Both
+ * readings are printed, and must not be compared as one metric.
  *
  * ## Question 2 is a CLOSURE, not a count of entry points
  *
  * A Tool binds an entry point; everything that entry point imports rides
- * along. Counting the ~40 entry points and calling it coverage would report
- * about 3 % on a corpus where most modules are genuinely reachable. So the
- * closure is walked — `import`/`export … from` over relative specifiers — and
- * the entry-point count is printed BESIDE it rather than instead of it.
+ * along. So the closure is walked — `import`/`export … from` over relative
+ * specifiers — and the entry-point count is printed BESIDE it.
  *
- * The closure is a floor, not a ceiling: it follows static relative imports
- * only. A module reached by a bare specifier, a dynamic `import()` or a path
- * built at runtime is not followed and so is counted unreachable. That is the
- * safe direction — it under-claims coverage rather than over-claiming it —
- * and it is stated here rather than left for a reader to discover in a number.
+ * The closure is a floor: a module reached by a bare specifier, a dynamic
+ * `import()` or a path built at runtime is counted unreachable, which
+ * under-claims rather than over-claims.
  *
- * ADVISORY. It reports; it does not fail. Both questions have open beans, and
- * a gate that fails on a backlog is a gate somebody switches off.
+ * ADVISORY. It reports; it does not fail.
  *
  * @module scripts/check-code-accounting
  * @covers code

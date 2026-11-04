@@ -1,15 +1,13 @@
 #!/usr/bin/env bun
 /**
  * Skills reviewed against the voices that judge skills — the agentic review
- * axis of bean `rkqp`.
+ * axis.
  *
  * @module scripts/skill-voice-review
  *
- * The owner, 2026-09-21: an agentic QA review axis for skills against the
- * skill-authoring voices, and **no formal gate on rule content**. So this
- * judges nothing about whether a skill obeys a rule. An agent (or a person)
- * does that, rule by rule, with the citation open, and records the verdicts
- * here. What this module decides is the cheaper question underneath, the one
+ * There is **no formal gate on rule content**: an agent (or a person) judges a
+ * skill rule by rule, with the citation open, and records the verdicts here.
+ * This module decides the question underneath, the one
  * `prose-code-pairs.ts` asks of prose and code: **is there a review, and is it
  * still about the skill and the voice as they are now?**
  *
@@ -18,8 +16,7 @@
  * The ACTIVE voices (`readActiveVoices`, the harness config's `voice.active`)
  * that carry at least one rule scoped to the `skill` artefact kind
  * (`appliesTo: ["skill"]`, read per rule through `scopeOf`, since an inherited
- * rule keeps the scope it was declared under). Activation is the owner's
- * existing switch; this module adds no second list of which voices count.
+ * rule keeps the scope it was declared under). Activation is the only switch.
  * Three states, as `readActiveVoices` documents: nothing active is `n/a`, and
  * an unreadable config is `unknown`, never a skip.
  *
@@ -27,19 +24,16 @@
  *
  * In the attestation store (`schemas/sdlc/qa-attestations.ts`), as `voice_reviews`
  * in the skill's `test/attestations/kg-qa/…attestations.json`, beside its
- * `pair_attestations`. It sat in the kg-qa sidecar until bean `2gst`
- * (2026-10-01): a review is a judgement, and owner ruling D2 (a) keeps
- * judgements on main while derived sidecars move to the `qa-reports` branch.
- * Each review pins the skill's content hash and the hash of the voice's
- * skill-scoped rules, so either moving makes it stale.
+ * `pair_attestations` — a review is a judgement, kept on main, not a derived
+ * sidecar. Each review pins the skill's content hash and the hash of the
+ * voice's skill-scoped rules, so either moving makes it stale.
  *
  * ## What fails
  *
  * `skill-voice-review-current` is `minor` and so gated by nothing
  * (`kg:audit:check` fails on critical, `:strict` on major). It fails when an
  * active skill voice has no review, or its review is stale. A rule the
- * reviewer marked `fail` is recorded, printed and NOT a finding: that is the
- * rule-content gate the owner declined.
+ * reviewer marked `fail` is recorded, printed and NOT a finding.
  */
 
 import { createHash } from "node:crypto";

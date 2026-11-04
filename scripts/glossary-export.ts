@@ -6,114 +6,56 @@
  * @covers glossary, swimlane-glossary, scenarios — it writes the glossary graph AND
  *   the retirement ledger that `swimlane-glossary` holds
  *
- * Issue #596, bean `lqo9` slice 2. The owner named the source in their own
- * words: *"a bpmn diagram swimlane has title/description"*, and *"name,
- * documentation → glossary"*. Bean `sqtq` (PR #782) wrote the 157
- * `<bpmn:documentation>` elements that make that input exist, and
- * `check:lane-documentation` keeps it that way. This is what reads them.
+ * The input is each BPMN lane's name and `<bpmn:documentation>`
+ * (`check:lane-documentation` keeps the latter present). The output is a
+ * separate glossary document in the same instance namespace, not part of
+ * `ns-export`'s vocabulary: a persona like `Board renderer` is a
+ * `skos:Concept`, not an `rdfs:Class`. `--check` is its staleness gate.
  *
- * ## The owner's ruling, and what it settled
+ * ## A concept is a ROLE, not a lane
  *
- * 2026-09-21: **a separate glossary document, in the same instance
- * namespace.** Not folded into `ns-export`'s vocabulary document, because a
- * persona like `Board renderer` is a `skos:Concept` and *not* an
- * `rdfs:Class` — one document answering both "what can the code mint" and
- * "what does this word mean to a reader" would falsify its own docstring.
- * The stated cost was a second generator and a second staleness check. This
- * is the second generator; `--check` is the second staleness check.
- *
- * ## A concept is a ROLE, not a lane — and that is a correction
- *
- * The bean recorded a mapping of `prefLabel` ← the lane's `name`. Measuring
- * the corpus before writing showed that is wrong, and wrong in the direction
- * that matters:
- *
- * | measured 2026-09-21 | |
- * |---|---|
- * | task-containing lanes | 157 |
- * | distinct lane names | 85 |
- * | distinct roles those names resolve to | 36 |
- * | roles reached by MORE THAN ONE distinct lane name | 17 |
- *
- * `build-pipeline` is named ten different ways across the corpus — *"CI/CD
- * Pipeline"*, *"Build pipeline — validate · render · publish"*, *"Scheduled
- * log sweep"*, *"Graph audit (system)"* and six more. `reviewer` is named
- * nine. A concept per lane name would have minted 85 terms for 36 meanings
- * and copied `build-pipeline`'s definition onto ten of them — the exact
- * duplication of `roles.json` the bean set out to avoid, avoided per lane
- * OCCURRENCE (157 → 85) and not per lane NAME.
- *
- * So one concept per declared role, and the ten names become `skos:altLabel`
- * — which is what `altLabel` is for, and what makes *"Reviewer / SME"*
- * findable as the same term as *"Reviewer"* instead of a rival entry.
- *
- * **Both of the owner's halves still reach the glossary.** `name` arrives as
- * `prefLabel`/`altLabel`; `documentation` arrives as `skos:scopeNote`.
+ * One role is named many ways across the corpus (`build-pipeline` as "CI/CD
+ * Pipeline", "Build pipeline — validate · render · publish", …), so there is
+ * one concept per declared role and the lane names become `skos:altLabel`:
+ * *"Reviewer / SME"* is findable as the same term as *"Reviewer"*. A lane's
+ * `name` arrives as `prefLabel`/`altLabel`; its `documentation` as
+ * `skos:scopeNote`.
  *
  * ## `scopeNote` sits on the USAGE, and never on the concept
  *
- * Measured: of the 26 lane names appearing in more than one diagram, **26 of
- * 26 carry different `<bpmn:documentation>` per occurrence** — zero
- * counter-examples. That is the text doing its job: a scope note answers
- * *"what is this lane accountable for IN THIS PROCESS"*, which is a fact
- * about the appearance, not about the term.
- *
- * Hanging all ten of `build-pipeline`'s notes off the concept would assert
- * ten unattributed and apparently contradictory things about one word. So
- * each appearance is its own `LaneUsage` node carrying the process it is in,
- * the label the lane used there, and the note verbatim.
- *
- * **Verbatim matters and is not a style preference.** The lane documentation
- * is extracted to `.pot` as its own msgid, so a note stored exactly as the
- * diagram wrote it has a translation waiting for it in all five locales.
- * Wrapping it — `In "<process>": <note>` — would have read well in English
- * and produced a string no catalogue contains, breaking bean `jmpb` (the
- * per-locale rendering) before it is built.
+ * A scope note answers *"what is this lane accountable for IN THIS PROCESS"*,
+ * and differs per appearance. So each appearance is its own `LaneUsage` node
+ * carrying the process it is in, the label the lane used there, and the note
+ * verbatim. Verbatim, because the note is extracted to `.pot` as its own
+ * msgid; a wrapped string would match no catalogue entry.
  *
  * ## No second name for one thing
  *
  * A concept's `@id` is the IRI `kg-export` ALREADY mints for that role —
- * `makeIri(docIri, "role", id)`, imported rather than re-spelled. `kg-export`
- * has emitted registry-derived `Role` nodes since 2026-09-19. Minting a
- * parallel `cat:reviewer` here would be two names for one resource, which is
- * the drift this repository keeps paying for; and the glossary would then be
- * unjoinable with the graph that carries `performedBy` links to exactly those
- * IRIs.
- *
- * Checked rather than assumed: **0 of 47 role ids collide with any of the 111
- * vocabulary term names**, exactly and case/hyphen-insensitively.
+ * `makeIri(docIri, "role", id)`, imported rather than re-spelled — so the
+ * glossary joins the graph that carries `performedBy` links to those IRIs.
  *
  * ## `laneBinding`, so a definition-less term can be TRUE rather than missing
  *
- * Bean `ug4r` (PR #800) gives five answers where `roleForLane` gave two. The
- * one lane in the corpus whose performer varies by design —
+ * A lane whose performer varies by design —
  * `bootstrap/workflows/log-message.bpmn`'s `Actor`, whose performer is
  * whoever called the sub-process — emits a concept with a scope note and **no
- * definition**, which is true, instead of being indistinguishable from a lane
- * nobody got round to binding. Without that distinction the extractor would
- * have had to guess, and a guessed definition-less term reads as a defect.
+ * definition**, distinguishable from a lane nobody bound.
  *
  * ## Retirement needs a LEDGER, because a derived document has no memory
  *
- * The ruling: a term whose defining lane is gone becomes `deprecated`,
- * **reported and never deleted** — `deletion-requires-confirmation`, and the
- * same reason a scrapped bean is not a deleted one: retirement and accident
- * must not look alike.
- *
- * A regenerated document cannot do that. Delete a role from `roles.json` and
- * its concept simply stops appearing, which is what "never existed" also
- * looks like. So the small non-derivable fact — *this term was once minted* —
- * is committed, and the document is rebuilt from the corpus UNION the ledger.
+ * A term whose defining lane is gone becomes `deprecated`, **reported and
+ * never deleted** (`deletion-requires-confirmation`): retirement and accident
+ * must not look alike. A regenerated document would simply drop it, so the one
+ * non-derivable fact — *this term was once minted* — is committed, and the
+ * document is rebuilt from the corpus UNION the ledger.
  *
  * The ledger keys on the IRI's local part (`role/<id>`), never the absolute
  * IRI: the publication base is a deploy-time variable (`--base-url`,
- * `KG_BASE_URL`), so a committed absolute IRI would rot the day the base
- * moves and take every retirement record with it.
+ * `KG_BASE_URL`).
  *
- * **Usages are not ledgered, and that is deliberate.** A usage is an
- * occurrence, regenerated wholesale; a concept is a TERM somebody may have
- * cited. `deletion-requires-confirmation` is about the durable artefact, and
- * ledgering 157 occurrences would bury the 36 records that matter.
+ * Usages are not ledgered: a usage is an occurrence, regenerated wholesale; a
+ * concept is a term somebody may have cited.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/glossary-export.ts [--instance ROOT] [--out FILE]

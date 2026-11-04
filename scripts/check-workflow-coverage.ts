@@ -5,74 +5,26 @@
  * @module scripts/check-workflow-coverage
  * @covers processes
  *
- * Owner, 2026-09-20: *"make sure all workflows documented as bpmn"* — bean
- * `7yvd`. `AGENTS.md` says every process here is BPMN and the diagrams are
- * executable. The `.github/workflows/*.yml` are processes by any reading —
- * triggers, gateways, parallel jobs, compensation paths — and they are the
- * ones whose behaviour a person most often has to reconstruct from comments.
+ * A workflow DECLARES its diagram, `# bpmn: cat-harness/processes/x.bpmn` at
+ * the top (`workflow-bpmn.ts`); nothing is inferred from a filename or a
+ * mention. The pointer is on the workflow because it depends on the process.
  *
- * ## A workflow DECLARES its diagram; nothing is inferred from a name
- *
- * `# bpmn: cat-harness/processes/x.bpmn` at the top of the workflow
- * (`workflow-bpmn.ts`). Matching on filename would be the
- * `directory-conventions` mistake one level out: `upstream-pin-watch.bpmn`
- * and `upstream-pins.yml` do not share a basename, and five diagrams MENTION a
- * workflow file while documenting an agent process that merely touches one. A
- * mention is not coverage, and the only thing that can tell them apart is a
- * declaration inside a file.
- *
- * The declaration is on the WORKFLOW because the workflow depends on the
- * process it carries out: the dependent holds the pointer (data-modelling
- * step 8). It was `<cat-harness.processes:implements workflow>` on the diagram until bean
- * `61ca` — nine `arrow-direction` findings (#1168 B5).
- *
- * ## Coverage is not enough — a diagram that DRIFTS is worse than none
- *
- * The bean is explicit: *"a diagram that is drawn once and then drifts is
- * worse than none, because it is consulted."* Answering "is there a diagram"
- * does not answer "does it still match", and until 2026-09-20 nothing here
- * did. `feature-staging.bpmn` made that concrete — three start events for the
- * workflow's three jobs, and **nothing in either file saying which node was
- * which job**. Add a fourth job and every check stayed green.
- *
- * So a job that stands for a node DECLARES it — `# bpmn-node: Start_PR`
- * inside the job — and the two are compared in **both** directions. A job
- * with no node is a diagram that has gone stale; a node the diagram does not
- * have is one that was stale already. Neither is inferred from a label.
- *
- * Declaring is OPT-IN per workflow: a covered workflow none of whose jobs
- * names a node is reported as undeclared rather than as fully drifted,
- * because "nobody has said yet" and "said, and wrong" are different answers
- * and the first is not a finding. What is never allowed is SOME jobs naming a
- * node and the workflow being read as complete.
- *
- * ## Three states, and the third is why this exists
+ * Drift: a job that stands for a node declares it (`# bpmn-node: Start_PR`
+ * inside the job), and the two are compared in **both** directions. Declaring
+ * is OPT-IN per workflow: a covered workflow whose jobs name no node is
+ * reported as undeclared, not drifted; SOME jobs naming a node never reads as
+ * complete.
  *
  * - **covered** — the workflow names a diagram that exists.
  * - **uncovered** — it names none. A determined absence.
- * - **unknown** — the workflow could not be PARSED, so neither its triggers
- *   nor its shape can be read. A workflow naming a diagram that is not
- *   there is reported separately, as dangling. Never rendered as covered, and it is what `--strict` fails on
- *   first, because a sweep blind on one file has not cleared the others.
+ * - **unknown** — the workflow could not be PARSED. Never rendered as
+ *   covered, and it is what `--strict` fails on first.
+ * - A workflow naming a diagram that is not there is reported as dangling.
  *
- * Same rule as `ci-health.md`: could-not-determine is never rendered as clean.
- *
- * ## Why the trigger class is part of the report
- *
- * Measured 2026-09-20: of 38 workflows here, **8 auto-trigger** and 30 are
- * `workflow_dispatch`- or `workflow_call`-only. A dispatch-only workflow and a
- * scheduled one are different processes, and treating all 38 as one backlog
- * would bury the eight that actually run on their own. So coverage is reported
- * per class, and `--auto` narrows the gate to the ones that fire without
- * somebody pressing a button.
- *
- * `--strict` has NO package.json alias on purpose. A named script nothing
- * runs is the defect bean `ot9a` records — `translate-kg-viewer:check` was red
- * on `main` while CI was green, because nothing ran it — and `gates.test.ts`
- * now fails on exactly that. An alias for a flag combination that no workflow
- * uses yet is aspiration, not a check, and it is not what `SCRIPT_EXEMPTIONS`
- * is for. Whoever wires the strict gate when coverage reaches zero adds the
- * script and the workflow step in the same change.
+ * Coverage is reported per trigger class (auto-triggered vs
+ * `workflow_dispatch`/`workflow_call`-only); `--auto` narrows the gate to
+ * workflows that fire on their own. `--strict` has no `package.json` alias
+ * until a workflow runs it.
  *
  * Usage:  bun run cat check:workflow-coverage [--auto] [--strict]
  * Exit:   0 clean · 1 a workflow names a diagram that is not there, or drifted

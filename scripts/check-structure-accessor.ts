@@ -1,35 +1,25 @@
 /**
- * `structure.json` is named in code only by its accessor — bean `rkqp`, owner
- * 2026-09-30 (round 4: "literal allowlist gate").
+ * `structure.json` is named in code only by its accessor.
  *
  * @module scripts/check-structure-accessor
  * @covers library
  *
- * ## Why this exists
- *
- * `structure.json` has two variants since A+B: `pdf-structure/v1` and
+ * `structure.json` has two variants, `pdf-structure/v1` and
  * `notebook-structure/v1`, read through one accessor
- * (`schemas/content/document-structure.ts`: `readStructure`, `structureOf`). A reader
- * that builds the path itself and parses the file learns ONE variant and
- * misreads the next — a notebook's cell range taken for pages, or an
- * undeclared variant half-rendered. So the quoted token `"structure.json"` on
- * a CODE line is refused outside the accessor and a short allowlist, each
- * entry carrying its reason: {@link ALLOWED} for this layer and below, and
- * each instance's own `gateExemptions.files` for its files. Use `STRUCTURE_FILENAME` and `readStructure`.
+ * (`schemas/content/document-structure.ts`: `readStructure`, `structureOf`). A
+ * reader that builds the path itself learns one variant and misreads the
+ * other. So the quoted token `"structure.json"` on a CODE line is refused
+ * outside the accessor and a short allowlist, each entry carrying its reason:
+ * {@link ALLOWED} for this layer and below, and each instance's own
+ * `gateExemptions.files` for its files. Use `STRUCTURE_FILENAME` and
+ * `readStructure`.
  *
- * ## What it matches, and what it deliberately does not
+ * Matched: the exact quoted token — `"structure.json"` or `'structure.json'`
+ * — on a line that is not a comment. Prose (a longer message, a doc comment)
+ * is not matched. Test files are exempt.
  *
- * The exact quoted token — `"structure.json"` or `'structure.json'` — on a
- * line that is not a comment. That is how a path is built. The name inside a
- * longer message (`no structure.json under …`) or a doc comment is prose, not
- * a path, and is not matched: judging prose would make the gate a spelling
- * rule. Test files are exempt, because a fixture has to write the file.
- *
- * ## Both directions
- *
- * An unlisted file is a failure, and so is a STALE entry — an allowlisted file
- * that no longer contains the token — because an allowlist that only grows
- * stops saying anything.
+ * An unlisted file is a failure, and so is a STALE entry (an allowlisted file
+ * that no longer contains the token).
  *
  * Exit: 0 clean, 1 a finding, 2 could not list the corpus (never a pass).
  */

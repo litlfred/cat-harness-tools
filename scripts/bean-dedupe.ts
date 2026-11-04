@@ -5,21 +5,14 @@
  *
  * ## The defect
  *
- * The same bean file is kept in several stores at once. Measured 2026-10-20:
+ * The same bean file is kept in several stores at once (the
+ * `litlfred/folio-assistant` and `litlfred/cat-harness` branch stores, and
+ * the layer stores of `cat-harness-tools` and the core content layer
+ * (https://github.com/litlfred/folio-assistant-core)), and the copies have
+ * drifted in CONTENT, not only in date. "Newest wins" would lose text, so
+ * this merges, and lists what it cannot merge for the owner.
  *
- * - `litlfred/folio-assistant` and `litlfred/cat-harness` each carry the whole
- *   `cat/cat-harness/beans` branch (1707 beans), and sessions write every change
- *   to both, seconds apart. Only 50 of the 1707 copies are still identical.
- * - `cat-harness-tools` and the core content layer (https://github.com/litlfred/folio-assistant-core) took copies of their layer's
- *   `folio-assistant-*` beans when they were split off (294 and 194), and the
- *   originals stayed behind.
- *
- * The copies have drifted in CONTENT, not only in date: one copy carries a
- * closing section another lacks, while the other has the later `updated_at`.
- * So "newest wins" would lose text. This script merges instead, and lists what
- * it cannot merge for the owner.
- *
- * ## Where each bean belongs (owner, 2026-10-20)
+ * ## Where each bean belongs
  *
  * 1. `cat-tools-*` → cat-harness-tools; `folio-core-*` → the core content layer (https://github.com/litlfred/folio-assistant-core).
  * 2. A `folio-assistant-*` bean a layer took at separation → that layer. Taken
@@ -28,16 +21,13 @@
  *
  * ## How copies are merged
  *
- * The two branch stores share history: both descend from the 2026-10-08 cutover
- * commit. That commit's copy of a bean is the BASE, and the copies are merged
- * three ways against it (`git merge-file --diff3`), one after another:
- * folio-assistant, cat-harness, then the layers. A conflicting hunk is resolved
- * only when the answer is mechanical:
+ * The two branch stores share history from the 2026-10-08 cutover commit.
+ * That commit's copy of a bean is the BASE, and the copies are merged three
+ * ways against it (`git merge-file --diff3`), the bean's home copy first, so
+ * an unresolved hunk keeps the home copy's text. A conflicting hunk is
+ * resolved only when the answer is mechanical:
  *
  * - both sides changed only `updated_at` → the later one;
- *
- * The bean's home copy is folded in first, so where a hunk cannot be resolved,
- * the home copy's text is the one kept.
  * - the base had nothing there (both sides appended, typically a dated note) →
  *   keep both, ours first.
  *
@@ -46,7 +36,7 @@
  * falls back to a section merge: split at `## ` headings, carry over sections
  * only one copy has, keep the longer of two texts where one contains the other.
  *
- * ## Emitting the apply (owner, 2026-10-30)
+ * ## Emitting the apply
  *
  * `--emit <dir>` writes, per store, what applying the plan would change:
  * `<dir>/<store>/files/<path>` (each bean's merged text, in its home store)

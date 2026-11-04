@@ -3,7 +3,7 @@
  * The merge queue's ORDER — live facts in, the reprioritisation table's
  * answer out.
  *
- * Bean `hfag`. The queue STORES decisions (`schemas/sdlc/merge-queue.ts`); this
+ * The queue STORES decisions (`schemas/sdlc/merge-queue.ts`); this
  * module COMPUTES the facts a decision is made from, at the moment it is
  * made, and hands them to `sdlc/processes/decisions/merge-priority.dmn`. It
  * writes nothing: what the steward acts on is recorded as a queue entry by
@@ -11,23 +11,22 @@
  *
  * Three pieces, each the place one rule lives:
  *
- * - {@link authoredPaths} / {@link touchesShared} — technique **T3** of the
- *   requirements note on `claude/merge-pipeline-library`
- *   (`cat-harness/docs/proposals/merge-pipeline-requirements.md` §5): the
+ * - {@link authoredPaths} / {@link touchesShared} — technique **T3**, the
  *   cheap conflict test. Independence is decided on AUTHORED paths and
- *   shared declarations (R6; SQ19 §5.2, pp. 7–8), with GENERATED paths
- *   excluded (R7), because `merge-conflict-patterns` already resolves those
- *   mechanically and counting them makes every pair conflict. "Authored" is
- *   asked of that registry — a path its declared patterns would REFUSE —
- *   rather than restated here.
+ *   shared declarations, with GENERATED paths excluded, because
+ *   `merge-conflict-patterns` already resolves those mechanically and
+ *   counting them makes every pair conflict. "Authored" is asked of that
+ *   registry — a path its declared patterns would REFUSE — rather than
+ *   restated here.
  * - {@link deriveFacts} — the inputs the table reads, by the names
- *   `MemberFactsSchema` fixes, so the tools that emit them (`merge:overlap`
- *   on `claude/merge-pipeline-tools`) and this reader agree.
+ *   `MemberFactsSchema` fixes, so the tools that emit them (`merge:overlap`)
+ *   and this reader agree.
  * - {@link placeAll} / {@link orderQueue} — evaluate the table per PR, then
  *   order: owner overrides at their positions, the admitted by rank then PR
  *   number (oldest first), the handed-back last.
  *
- * SQ19 = Ananthanarayanan et al., *Keeping Master Green at Scale*, EuroSys '19.
+ * T3 follows Ananthanarayanan et al., *Keeping Master Green at Scale*,
+ * EuroSys '19.
  *
  * @module cat-harness/scripts/merge-queue
  * @covers none — a library the merge steward and the tile call; it judges no declared graph

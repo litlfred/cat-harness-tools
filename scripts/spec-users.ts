@@ -2,11 +2,9 @@
  * What in this repository uses each external specification — read from the
  * USERS, never from the specification's record.
  *
- * Until bean `u63y` each record under `external-schemas/` carried a
- * hand-written `usedBy` list: the specification naming its dependents, the
- * arrow backwards (data-modelling step 8), 36 entries that nothing kept
- * current. The owner chose (2026-09-24) that each user declares the spec
- * instead. Three direct forms, one per kind of file, and one derived:
+ * Each user declares the spec it conforms to (records under
+ * `external-schemas/` list no dependents). Three direct forms, one per kind
+ * of file, and one derived:
  *
  * | form | where | example |
  * |---|---|---|
@@ -17,8 +15,7 @@
  *
  * The last is not a second authored list: a `*.dc.json` record declares its
  * `$schema`, the registry says which module types that family, and that module
- * declares the specification. Following two pointers that already exist gives
- * the user without adding a key the file's own schema would have to allow.
+ * declares the specification.
  *
  * A declaration naming a spec id no record has is a finding — the same shape
  * as a dangling `@ref`.

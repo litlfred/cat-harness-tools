@@ -1,22 +1,14 @@
 /**
  * search-split.ts — split the site's one search index into one index per
- * SCOPE, plus a manifest naming them. Issue #1972, step A; bean `m7mn`.
+ * SCOPE, plus a manifest naming them.
  *
- * ## Why
- *
- * just-the-docs writes ONE `assets/js/search-data.json` for the whole site.
- * Measured 2026-10-03 on a local build: 12,040 entries, 13.7 MB raw, and the
- * lunr index built from it costs ~4.7 s of main-thread script and ~315 MB of
- * heap (bean `2tfy`, which moved that cost from every page load to the first
- * search). A reader searching a DAK IG's page still pays for all of it —
- * including 7.9 MB of platform pages and 2.5 MB of translations they are not
- * reading. Split by where a page lives, that IG page's own scope is
- * 1.5 MB.
+ * just-the-docs writes ONE `assets/js/search-data.json` for the whole site,
+ * so a reader searching one IG page pays to load and index every page of the
+ * site. Split by where a page lives, they load only their scope.
  *
  * ## What a scope is — derived, never listed
  *
- * From the page's site-relative URL and two DECLARED facts, never a
- * hand-kept list:
+ * From the page's site-relative URL and two DECLARED facts:
  *
  *   - an INSTANCE scope when the first path segment is a declared instance's
  *     name (`/<instance>/…`), or the second is and the first is not (`/<kind>/
@@ -25,41 +17,34 @@
  *     target locales (`translation-index.ts`);
  *   - the PLATFORM scope otherwise — except that a platform SECTION (a page's
  *     first path segment, below the root) whose entries exceed
- *     {@link SECTION_BUDGET_BYTES} becomes a `section-<name>` scope of its own
- *     (bean `mm2n`): `/reference/` alone was half the platform's 7.8 MB.
+ *     {@link SECTION_BUDGET_BYTES} becomes a `section-<name>` scope of its own.
  *
- * Every entry lands in exactly one scope, so the scopes partition the index:
- * their entry counts sum to the source's, which `publish-verify`'s
- * `search-scopes` verifier checks on every published and staged tree.
+ * Every entry lands in exactly one scope: their entry counts sum to the
+ * source's, which `publish-verify`'s `search-scopes` verifier checks on every
+ * published and staged tree.
  *
  * ## What it does not change
  *
- * `search-data.json` itself stays exactly as the theme writes it — it is the
- * published artefact staging previews borrow (bean `eof6`), and the
- * `search-index` verifier judges it as before. This writes NEXT to it:
- * `assets/js/search/manifest.json` and one `assets/js/search/<scope>.json` per
- * scope, each in the theme's own entry shape so the theme's loader reads any
- * of them unchanged.
+ * `search-data.json` itself stays exactly as the theme writes it — staging
+ * previews borrow it, and the `search-index` verifier judges it. This writes
+ * NEXT to it: `assets/js/search/manifest.json` and one
+ * `assets/js/search/<scope>.json` per scope, each in the theme's own entry
+ * shape so the theme's loader reads any of them unchanged.
  *
  * ## Stable entry ids — the cone
  *
- * The theme keys its entries by a running number (`"0"`, `"1"`, …), so one
- * page added near the top renumbers every entry after it, and every scope
- * file changes though its pages did not: one new page rewrote all of
- * `assets/js/search/*.json`. The scope files therefore key each entry by a
- * hash of its URL ({@link stableKeys}), so a page change touches only its own
- * scope's files and the manifest. The client only ever looks an entry up by
- * the ref its own index returns, so the key is opaque to it; "search
- * everywhere" loads the theme's whole index with the theme's own keys.
+ * The theme keys entries by a running number, so one added page would rewrite
+ * every scope file. The scope files key each entry by a hash of its URL
+ * ({@link stableKeys}), so a page change touches only its own scope's files
+ * and the manifest. The key is opaque to the client; "search everywhere"
+ * loads the theme's whole index with the theme's own keys.
  *
- * ## Prebuilt indexes — bean `lrzn`
+ * ## Prebuilt indexes
  *
  * A scope over {@link PREBUILT_TOKEN_BUDGET} also gets `<scope>.idx.json`:
  * the lunr index the theme would build from it, serialized, and named in the
- * manifest's `index`. The client LOADS it instead of building one. Measured
- * 2026-10-03 in Chromium on a local build, first search: `section-reference`
- * 1,747 → 342 ms of script, that IG's scope 484 → 95 ms — paid for with the
- * index's bytes, downloaded on top of the entries (0.4–2.9 MB gzipped).
+ * manifest's `index`. The client LOADS it instead of building one, trading
+ * download bytes for main-thread time on first search.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/search-split.ts --dir <built site>          # write

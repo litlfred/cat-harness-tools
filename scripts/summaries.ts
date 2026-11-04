@@ -1,10 +1,7 @@
 #!/usr/bin/env bun
 /**
- * The block-summary queue — drained slowly, a few blocks at a time.
- *
- * Owner, 2026-09-24: *"on library/ page, the extract of a node is shown, but
- * no agentic summary"*, and on scope: *"Make as QA sidecar as part of general
- * doc ingestion to slowly drain."*
+ * The block-summary queue — agentic summaries of library blocks, as QA
+ * sidecars, drained slowly, a few blocks at a time.
  *
  * Every prose block in every declared library enters this queue the moment it
  * exists: the queue is DERIVED (prose blocks minus the ones already carrying
@@ -20,21 +17,17 @@
  *
  * ## Slowly, and never a gate
  *
- * 1335 prose blocks had no summary when this landed. Writing them in one pass
- * would be a thousand unreviewed machine summaries arriving at once — the
- * reviewer's queue buried, and every one of them a `draft` nobody will look
- * at. So an agent session doing ingestion work drains K at a time, and the
- * backlog is REPORTED (here, by `check:l1-complete`, on the library page) and
- * never failed on — the same advisory standing as the narrative review queue,
- * where a draft is work waiting on a person and not a defect.
+ * An agent session doing ingestion work drains K at a time, so reviewers are
+ * not buried in unreviewed drafts. The backlog is REPORTED (here, by
+ * `check:l1-complete`, on the library page) and never failed on — a draft is
+ * work waiting on a person, not a defect.
  *
  * ## It writes drafts and nothing else
  *
  * `record` writes `state: "draft"` and refuses anything else. Confirming or
  * rejecting is a person's act and goes through `bun run cat narratives`, which
  * reads these sidecars (`NARRATIVE_BEARING` includes `summaries.json`) and
- * refuses to run outside a terminal. A tool that could both draft and confirm
- * would be one flag away from the failure the state machine exists to stop.
+ * refuses to run outside a terminal.
  *
  * @module scripts/summaries
  */

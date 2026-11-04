@@ -1,21 +1,12 @@
 /**
  * Reading the bean store as **files**, front matter and body kept apart.
  *
- * `beans list` and `beans check` both read the store, and between them they
- * still missed three beans that no tool and no person could use — bean `sfhr`,
- * measured 2026-09-20 with `beans check` reporting *"No link issues found"*:
- *
- * | bean | defect |
- * |---|---|
- * | `70c7` | `in-progress` with an **empty body** — front matter only |
- * | `52dz` | a `title: \|-` block that **swallowed the first ~10 lines of its body**, including a `## Done when` with three unchecked boxes |
- * | `nvbr` | *"blocked on bean `fsch`"* in prose; `fsch` is `scrapped` in the archive |
- *
- * None is a link defect, which is the whole of what the CLI's check covers. So
- * the readers that catch them need the **raw** front matter (a folded title is
- * invisible once a YAML loader has finished with it) and the body separately
- * from it. That is what this module hands out, and nothing more — the verdicts
- * live in the checks that import it.
+ * The `beans` CLI checks only links. The checks that catch other defects (an
+ * empty body, a block-scalar title swallowing body lines, prose blocked on a
+ * scrapped bean) need the **raw** front matter — a folded title is invisible
+ * once a YAML loader has finished with it — and the body separately. This
+ * module hands those out and nothing more; the verdicts live in the checks
+ * that import it.
  *
  * @module folio-assistant/scripts/bean-store-read
  */

@@ -1,17 +1,11 @@
 /**
  * Publish the identifier lookup into a BUILT site: the client page and every
- * declared instance's index, under `<site>/id-lookup/`. Issue #1972 step 3,
- * bean `1br0`.
+ * declared instance's index, under `<site>/id-lookup/`.
  *
- * ## Why here, and why after the build
- *
- * The owner's ruling on bean `4pm8` (2026-09-25): title search over
- * referenced nodes is an accepted gap, and IDENTIFIER lookup is carried by the
- * prefix-sharded lookup. The lookup client is JavaScript and says of itself
- * that it "never sits under the plain docs pipeline" — so it is not added to
- * the Jekyll source. It is copied into the built tree after Jekyll, the way
- * the KG viewer is emitted, and the site's search box links to it (the
- * owner's choice of 2026-10-03: a separate page and a link).
+ * The lookup client is JavaScript that never sits under the plain docs
+ * pipeline, so it is not in the Jekyll source: it is copied into the built
+ * tree after Jekyll, the way the KG viewer is emitted, and the site's search
+ * box links to it.
  *
  * Layout, which is what `search-split.ts` detects to name each index as a
  * `remote` scope in the search manifest:

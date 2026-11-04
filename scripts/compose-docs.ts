@@ -4,103 +4,42 @@
  *
  * @module scripts/compose-docs
  *
- * ## The rule this implements, in the owner's words
+ * Each harness's own `docs/` is mounted at its own path by
+ * `mount-instance-docs.ts`. This file composes the repository-root `docs/`,
+ * managed by `cat-harness`, which **overlays** the base layer rather than
+ * replacing it.
  *
- * 2026-09-21, ruling on bean `n0nf` (issue #638): *"harness can have docs/
- * which then get listed under `cat-harness/docs/<harness>`, there is also
- * docs/ dir in repo root managed by cat-harness. other harness augment or
- * overlay ontop of that (content and behviors)."*
- *
- * Three statements. The first is `mount-instance-docs.ts`, which already
- * mounts each instance's docs at its own path and is untouched here. The
- * second and third are this file: a `docs/` at the repository root, managed by
- * `cat-harness`, which **overlays** the base layer rather than replacing it.
- *
- * ## The layers come from the declarations, never from a list
- *
+ * The layers come from the declarations, never from a list:
  * `cat-harness/harness.json` declares two directories whose graphs include
- * `docs`, and the difference between them is `scope`:
+ * `docs`, told apart by `scope`:
  *
  * | entry | scope | resolves to | role |
  * |---|---|---|---|
  * | `docs` | instance (absent) | `cat-harness/docs/` | the BASE |
  * | `root-docs` | `repository` | `<repo>/docs/` | the OVERLAY |
  *
- * So "which layer is the base" is read off `scope` rather than written down
- * here. A hardcoded pair is the `check:declared-assets` defect, whose own doc
- * comment describes itself being "fixed" last time by writing down a list of
- * two while the repository had grown to eight.
+ * Base first, overlay last, so an overlay file SHADOWS the base file at the
+ * same relative path (the same direction `resolveSkillDirs` composes skills).
+ * Every shadowed path is REPORTED with both layers named; it is not an error
+ * (unlike `mount-instance-docs`, where two peers colliding is refused).
  *
- * ## Overlay order, and why later wins
+ * **An empty overlay produces a byte-identical tree**, so publishing from the
+ * composed tree is a no-op until somebody authors an override.
+ * `compose-docs.test.ts` pins it.
  *
- * Base first, overlay last, so a file in the overlay SHADOWS the base file at
- * the same relative path. That is the same direction `resolveSkillDirs`
- * already composes skills in — deepest dependency first, the instance's own
- * last — and using one direction for both is the point. An agent that learns
- * the rule once should not meet it backwards somewhere else.
+ * ## `_config.yml` is MERGED
  *
- * ## Every override is REPORTED, and that is the requirement rather than a nicety
- *
- * The ruling asks that the build be able to say which layer supplied a page.
- * An overlay that silently shadows one is the `dh4f` shape: a consumer reads
- * the composed tree, sees a single file, and cannot tell an override from the
- * only copy. So each shadowed path is printed with both layers named.
- *
- * It is NOT an error. That distinction matters and is the opposite of
- * `mount-instance-docs`, which refuses a collision: there two PEERS want one
- * path and neither has a claim, so writing either is arbitrary. Here a higher
- * layer deliberately overrides a lower one, which is the whole feature.
- *
- * ## The safety property that makes wiring this into the live publish path sound
- *
- * **An empty overlay must produce a byte-identical tree.** `docs-site.yml`
- * publishes the real site, so a change to its `source:` is a change to what
- * readers get. If composing with nothing in the overlay is provably the same
- * bytes as the base alone, then wiring it in is a no-op until somebody
- * deliberately authors an override — and the risk is bounded to that moment
- * rather than to this commit. `compose-docs.test.ts` pins it.
- *
- * ## Behaviours: `_config.yml` is MERGED, and the owner picked the rule
- *
- * The ruling says instances overlay "content and behaviors". Content is a file
- * at a path, which is the paragraphs above. A *behaviour* — a Jekyll layout, an
- * include, `_data`, client-side JS, the just-the-docs config — is not always a
- * file swap. Layouts and includes happen to compose correctly as files, so they
- * work by construction. `_config.yml` does not: it is the WHOLE of Jekyll's
- * configuration, and an overlay copy shadowing it would replace every plugin,
- * collection and theme setting at once while reading in the report as a single
- * added page.
- *
- * This refused it until 2026-09-21, which meant a downstream harness could
- * overlay pages but could not change one Jekyll setting — no theme, no nav, no
- * title. The owner settled the rule that day, choosing merge over refusal and
- * over a key allowlist:
+ * Layouts, includes and other behaviour files compose as files. `_config.yml`
+ * is all of Jekyll's configuration, so an overlay copy is merged rather than
+ * shadowing it:
  *
  * > **Overlay keys win. Objects merge recursively. Lists REPLACE rather than
  * > concatenate.**
  *
- * Lists replacing is the part worth stating, because concatenation is the more
- * common default and it is wrong here for the same reason the file overlay is
- * last-wins: an overlay that wanted three nav entries and got seven has no way
- * to remove the four it inherited. One direction, everywhere, so an agent that
- * learns the rule once does not meet it backwards.
- *
- * The allowlist that was NOT chosen is worth recording too. Merging only
- * declared keys (`title`, `nav`, colour tokens) is safer per-key and is exactly
- * the `6tkl` shape — a hardcoded list that goes stale silently, which this
- * repository has paid for three times.
- *
- * ## Why the merge is conditional, and what breaks if it is not
- *
- * **A YAML round trip is not byte-preserving.** Parsing and re-emitting strips
- * comments and may reorder keys, so merging unconditionally would change the
- * published `_config.yml` on a tree whose overlay carries none — breaking the
- * byte-identity property that licenses `docs-site.yml` pointing `source:` at
- * the composed tree at all.
- *
- * So the merge fires ONLY when an overlay actually supplies a config and a
- * lower layer already did. In every other case the file is copied, bytes
- * untouched, exactly as before. `compose-docs.test.ts` pins both halves.
+ * Lists replace so an overlay can remove inherited entries. A YAML round trip
+ * is not byte-preserving, so the merge fires ONLY when an overlay supplies a
+ * config and a lower layer already did; otherwise the file is copied
+ * untouched. `compose-docs.test.ts` pins both halves.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/compose-docs.ts --out <dir>

@@ -2,11 +2,10 @@
 /**
  * Bean notes — add one, and keep their generated index current.
  *
- * Bean `m61r`, issue #1853. A pull request that has something to add to a bean
- * it does not own writes a NOTE, in a file of its own, instead of appending to
- * the bean. The naming rule and why it is the branch are in
- * `schemas/sdlc/bean-note.ts`; the convention is in the `bean-coordination` skill,
- * §"Adding to a bean — a note, not an append".
+ * A pull request that has something to add to a bean it does not own writes
+ * a NOTE, in a file of its own, instead of appending to the bean. The naming
+ * rule is in `schemas/sdlc/bean-note.ts`; the convention is in the
+ * `bean-coordination` skill, §"Adding to a bean — a note, not an append".
  *
  * Three commands:
  *
@@ -14,24 +13,21 @@
  *   bun run cat beans:notes          # rewrite the index from the notes on disk
  *   bun run cat beans:notes:check    # fail if a note is malformed or the index is stale
  *
- * ## Why the index is a README with one generated region
+ * ## The index is a README with one generated region
  *
- * Every pull request that adds a note rewrites the index, so two of them
- * conflict on it. That conflict is the one this design accepts, because it is
- * resolvable without a person: the index is a `README.md` whose rows all sit
- * inside `<!-- bean-notes:begin -->`…`<!-- bean-notes:end -->`, which the
- * declared `readme-generated-regions` pattern in `merge-conflict-patterns.ts`
- * already resolves (take the base's side, then regenerate). The text outside
- * the region is constant, so a hunk never starts outside it. The bean itself is
- * never rewritten, so the `beans: refuse` rule is not widened by one path.
+ * The index is a `README.md` whose rows all sit inside
+ * `<!-- bean-notes:begin -->`…`<!-- bean-notes:end -->`. Two pull requests
+ * adding notes conflict only there, and the declared
+ * `readme-generated-regions` pattern in `merge-conflict-patterns.ts` resolves
+ * that (take the base's side, then regenerate). The bean itself is never
+ * rewritten, so the `beans: refuse` rule is not widened.
  *
  * ## What the check judges
  *
  * Each `.md` in the notes directory other than the index must parse as a
  * `folio-bean-note/v1` note, name a bean the store holds, and carry exactly the
- * file name its own front matter derives. The last is what keeps the rule: a
- * note named by hand is the first step back to two pull requests writing one
- * path, and it is caught here rather than at somebody else's merge.
+ * file name its own front matter derives (so no two pull requests write one
+ * path).
  *
  * Exit: 0 clean, 1 a malformed note or a stale index, 2 could not check (no
  * bean graph, or it declares no `bean-notes` directory).

@@ -2,50 +2,31 @@
 /**
  * Dump the instance's knowledge graph to one JSON file, for publication.
  *
- * `agentic-harness` has no renderer. `folio` is the only `renderable` graph
- * kind and it belongs to `folio-assist-core`, so the harness cannot put its own
- * knowledge graph on a page the way a folio puts a chapter on one. That is the
- * right boundary and this does not move it: the export is **data**, not a
- * rendered document. Something else may draw it.
+ * The export is **data**, not a rendered document: `folio` is the only
+ * `renderable` graph kind and it belongs to the content core, so the harness
+ * does not render its own graph. Something else may draw it.
+ * (`generate-registry.ts`'s `.claude/skills/registry.json` stays a runtime
+ * manifest.)
  *
- * ## Why not `generate-registry.ts`
- *
- * That script exists and writes `.claude/skills/registry.json`. Measured on
- * `main` 2026-09-18: 69 KB, uncommitted, not gitignored, and published
- * nowhere — a build artifact with no consumer. It is also **partial in a way
- * the numbers hide**: `registry.skills` was 23 because it reads only
- * `.claude/skills/local/*.json`, while the tree holds 126 skill `.md` files.
- * Package skills appear in it as bare name lists inside `registry.packages`,
- * so the thing an agent actually reads — the instruction body's front matter —
- * is absent. BPMN processes, DMN tables, the graph-typology registry and the
- * directory declaration are absent entirely.
- *
- * This exports the graph; the registry stays what it is, a runtime manifest.
- *
- * ## The publication rules are not here
- *
- * Which instance's document is published where, under which base, with which
- * schema, and what is stripped:
- * `skills/kg/kg-core/instance-publication.md` §"What each instance publishes"
- * (bean `4ak5` item 4). This module carries the mechanics those rules need.
+ * The publication rules — which instance's document is published where, under
+ * which base, with which schema, and what is stripped — are in
+ * `skills/kg/kg-core/instance-publication.md` §"What each instance
+ * publishes". This module carries the mechanics.
  *
  * ## The edges are the point
  *
- * A list of skills is not a graph. What makes this worth publishing is that
  * BPMN activities carry `<bootstrap.processes:skill ref="…"/>` and sit in a lane, so the
- * export can say **which process step is implemented by which skill, performed
- * by which role** — a relation that exists on disk today and that no tool
- * surfaces. `check:workflow-refs` already guarantees those refs resolve, so
+ * export says **which process step is implemented by which skill, performed
+ * by which role**. `check:workflow-refs` guarantees those refs resolve, so
  * this does not re-validate them.
  *
  * ## Three states
  *
  * A source that cannot be read is **reported in `problems[]` and counted**,
- * never silently dropped. An export that quietly omits half a corpus is worse
- * than no export: a consumer sees a well-formed graph and cannot tell it is
- * looking at part of one. Bean `dh4f` is the local precedent.
+ * never silently dropped, so a consumer can tell it is looking at part of a
+ * graph.
  *
- * ## Judge mode — `bun run cat kg:export:judge` (bean `bo44`)
+ * ## Judge mode — `bun run cat kg:export:judge`
  *
  * `--judge` builds the export IN MEMORY, judges it and writes nothing: no
  * `_kg/` document, no QA sidecar. 0 no fatal finding · 1 a root field or a
@@ -54,11 +35,7 @@
  * accepts `--base-url`, `--instance` and `--scope`; `--out` and `--qa-root` are a
  * writer's flags and are refused.
  *
- * Distinct from `kg:export:check` below (bean `v556`), which compares the
- * committed sidecars; both were written the same day under one name and the
- * owner ruled (2026-10-02) to keep both, the judge under its own name.
- *
- * As the `kg:export:check` gate (bean `v556`) it judges the committed
+ * As the `kg:export:check` gate it judges the committed
  * `kg-export*.qa-results.json` sidecars under the declared `test/results/`.
  *
  * @covers qa

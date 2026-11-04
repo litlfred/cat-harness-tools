@@ -5,13 +5,11 @@
  * @module cat-harness/scripts/check-foreign-paths
  * @covers code — every instance's own source, read for literals that name a directory some other instance declares
  *
- * Bean `gz47`. `check:declared-paths` reads one instance's code against that
- * instance's OWN declarations, so it cannot see the case that broke the
- * fsh-guts tests: platform code naming the root instance's `fsh-guts/`,
- * `beans/`, `uploads/`, … by literal. Those are exactly the directories moving
- * to their own branches (beans `9c7h`, `2h76`), and a spelled path keeps
- * "finding" an empty directory after the move. Batches 1–4 of gz47 fixed the
- * real reads by hand; this is the ratchet that stops new ones.
+ * `check:declared-paths` reads one instance's code against that instance's
+ * OWN declarations, so it cannot see platform code naming another instance's
+ * `fsh-guts/`, `beans/`, `uploads/`, … by literal. Such directories may move
+ * to their own branches, and a spelled path then keeps "finding" an empty
+ * directory.
  *
  * ## What counts
  *
@@ -20,24 +18,19 @@
  * literal of a path-building call, templates and sentences skipped, and the
  * `declared-path-literal: <reason>` marker honoured.
  *
- * What is new is WHICH names count. A literal is foreign when it lands in a
- * directory another instance declares — and the scanning instance does NOT
- * declare a directory of the same name itself. `docs/` is the case that rule
- * exists for: the root declares one and so does cat-harness, so
- * `join(ROOT, "docs")` in cat-harness is almost always its own, and counting
- * it would make the check cry wolf (gz47's first measurement counted 145 such
- * hits). Names only another instance declares — `beans`, `todos`, `fsh-guts`,
- * `uploads`, `issue-marks` — carry no such ambiguity.
+ * A literal is foreign when it lands in a directory another instance
+ * declares — and the scanning instance does NOT declare a directory of the
+ * same name itself. So `join(ROOT, "docs")` in cat-harness, which declares
+ * its own `docs/`, is not counted; names only another instance declares —
+ * `beans`, `todos`, `fsh-guts`, `uploads`, `issue-marks` — are.
  *
- * Three more exclusions, each measured on this corpus (gz47): a module
- * specifier (`"../cat-harness/schemas/x.js"`) is code addressed by path; a
- * literal nested in another call inside the path call (`resolve(opt("todos"))`)
- * is an option name; and a segment joined onto the INSTANCE's own root
- * (`join(INSTANCE, "docs")`) is that instance's directory.
+ * Also excluded: a module specifier (`"../cat-harness/schemas/x.js"`), which
+ * is code addressed by path; a literal nested in another call inside the
+ * path call (`resolve(opt("todos"))`), an option name; and a segment joined
+ * onto the INSTANCE's own root (`join(INSTANCE, "docs")`).
  *
  * Test files are out of the count, as in `check:declared-paths`: a test that
- * builds a fixture names declared directories by necessity (gz47 batch 1: 50
- * such lines in one test file).
+ * builds a fixture names declared directories by necessity.
  *
  * ## A ratchet, one way
  *

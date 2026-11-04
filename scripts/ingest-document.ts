@@ -2,63 +2,47 @@
 /**
  * One entry point from `uploads/` to `library/<bib-slug>/`.
  *
- * Bean `apui`. Four rungs already existed -- `pdf-structure.py` (embedded
- * outline), `pdf-pages.py` (no outline, page granularity), `pdf-ocr.py` (no
- * usable text layer) and `pdf-tables.py` -- with the choice between them
- * carried in the ingesting agent's head. This makes that choice mechanical and
- * names the rule it applied, so two ingests of the same document agree.
+ * It picks one of the rungs — `pdf-structure.py` (embedded outline),
+ * `pdf-pages.py` (no outline, page granularity), `pdf-ocr.py` (no usable text
+ * layer) and `pdf-tables.py` — by a stated rule, so two ingests of the same
+ * document agree. Every rung keeps its own flags and behaviour; this only
+ * probes the PDF, picks, and runs.
  *
- * ## It chooses; it does not re-implement
- *
- * Every rung stays where it is and keeps its own flags. This probes the PDF,
- * picks one, and runs it. A rung's own behaviour is not duplicated here,
- * because two implementations of "what is a section" is the drift this
- * repository keeps paying for.
- *
- * ## The rule, and where it came from
- *
- * Read off the four entries already in `library/`, not invented:
+ * ## The rule
  *
  *   toc_source: outline                       -> pdf-structure
  *   toc_source: none, source.text_source: embedded -> pdf-structure, which
  *       infers the contents and keeps them only if they pass its trust tests,
- *       else writes PAGE granularity (issue #2302; this said pdf-pages until
- *       2026-10-07, which left #2388's tests unreachable from here)
- *   a junk outline (8shg), text layer                  -> pdf-pages
+ *       else writes PAGE granularity
+ *   a junk outline, text layer                         -> pdf-pages
  *   toc_source: none, source.text_source: ocr      -> pdf-ocr, then pdf-pages --from-ocr
  *
- * **An inferred chapter tree is never trusted unchecked** -- `6xaz` records
- * two documents where inference was confidently wrong and the output did not
- * show it. So the absence of an outline selects `pdf-structure`, whose three
- * tests decide between the inferred contents and PAGE granularity, and says
- * which in `toc_source` / `granularity`.
+ * **An inferred chapter tree is never trusted unchecked**: `pdf-structure`'s
+ * three tests decide between the inferred contents and PAGE granularity, and
+ * say which in `toc_source` / `granularity`.
  *
  * ## Third state
  *
  * `--dry-run` reports the chosen rung and the evidence for it, writing nothing.
- * A PDF this cannot probe is reported as `undetermined` and NOT ingested: a
- * document filed under the wrong rung reads as ingested while its structure is
- * wrong, which is the failure mode `6xaz` is about.
+ * A PDF this cannot probe is reported as `undetermined` and NOT ingested.
  *
  * Usage:
  *   bun run cat ingest uploads/FILE.pdf
  *   bun run cat ingest uploads/FILE.pdf --dry-run
  *   bun run cat ingest uploads/FILE.pdf --refresh-meta   # technical facts only
- *   bun run cat ingest uploads/FILE.pdf --refresh-title  # re-resolve the title (w6fu)
+ *   bun run cat ingest uploads/FILE.pdf --refresh-title  # re-resolve the title
  *   bun run cat ingest uploads/FILE.pdf --library <instance>
  *   bun run cat ingest uploads/FILE.pdf --title "WHO Editorial Style Manual"
  *   bun run cat ingest uploads/FILE.md --text   # Markdown/MDX/XML: text has no magic bytes, so the caller says so
- *
- * `--title` passes a KNOWN title through to the PDF rungs (bean `turh`). Absent
- * it, the catalogue's Dublin Core `dc.title` is passed when the instance has a
- * catalogue node for this entry — the first authority of the 2026-10-01 title
- * ruling, so a scan no longer carries its OCR's misreading as `doc_title`.
  *   bun run cat ingest ../qou/uploads/FILE.pdf --instance ../qou   # a content folio's library
  *
- * `--library` is required only when the repository declares more than one, and
- * then it is REQUIRED rather than defaulted: since bean `frs5` there are two,
- * and a WHO publication filed into the science library reads as ingested while
- * sitting in the wrong corpus.
+ * `--title` passes a KNOWN title through to the PDF rungs. Absent it, the
+ * catalogue's Dublin Core `dc.title` is passed when the instance has a
+ * catalogue node for this entry, so a scan does not carry its OCR's misreading
+ * as `doc_title`.
+ *
+ * `--library` is REQUIRED (not defaulted) when the repository declares more
+ * than one library: a document filed into the wrong corpus reads as ingested.
  *
  * Exit: 0 ingested (or dry-run reported), 1 ingestion failed, 2 could not probe.
  *

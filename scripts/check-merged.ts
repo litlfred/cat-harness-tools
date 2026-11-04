@@ -1,40 +1,29 @@
 #!/usr/bin/env bun
 /**
  * Run the gates on the COMBINED state — this branch merged with the current
- * base — before a merge. Bean `nytj`.
+ * base — before a merge.
  *
- * ## The state that breaks is the one neither party evaluates
- *
- * A pull request's CI tests the branch merged with the base AS IT WAS WHEN THE
- * BRANCH WAS PUSHED. Anything that lands on the base afterwards is tested in
- * combination by nobody. Three times on 2026-09-23 a generated measurement
- * (`kg:detangle`, `kg:audit`) was green on the branch, green on `main`, merged
- * without a textual conflict — and was stale on the result, because each side's
- * committed measurement counted only its own edits. `git merge-tree` said
- * "clean" every time: a clean TEXT merge is not a clean STATE.
- *
- * The structural fix is the merge queue (`merge_group:` on the gating
- * workflows), which tests exactly the commit that will land. This is the half
- * an agent can run itself, before asking anyone to merge: build the merge in a
- * throwaway worktree and run the full `bun run cat gates` there.
- *
- * ## Three outcomes, never two
+ * A PR's CI tests the branch merged with the base as it was when pushed; a
+ * clean TEXT merge is not a clean STATE (e.g. a generated measurement stale
+ * after both sides changed). This builds the merge in a throwaway worktree and
+ * runs the full `bun run cat gates` there. The merge queue (`merge_group:`)
+ * is the structural fix; this is the half an agent can run itself.
  *
  * - exit 0 — the merged tree passes every gate;
  * - exit 1 — the merge conflicts (files listed), or a gate fails on the
  *   merged tree: this branch needs the base merged in and regenerated;
  * - exit 2 — COULD NOT DETERMINE (the base could not be fetched, the worktree
  *   could not be built, or the worktree's corpus is distorted — see the
- *   `node_modules` guard below, bean `qook`). Never reported as clean.
+ *   `node_modules` guard below). Never reported as clean.
  *
- * The working copy is never touched: the merge happens in a temporary worktree
- * that is removed on every path out, including failure.
+ * The working copy is never touched: the temporary worktree is removed on
+ * every path out, including failure.
  *
  * Usage:
  *   bun run cat check:merged              # base = main
  *   bun run cat check:merged -- --base <branch>
- *   bun run cat check:merged -- --against <commit>   # a FIXED base, no fetch —
- *     for replaying a past pair, which is how this script was falsified
+ *   bun run cat check:merged -- --against <commit>   # a FIXED base, no fetch,
+ *     for replaying a past pair
  *
  * @module scripts/check-merged
  */

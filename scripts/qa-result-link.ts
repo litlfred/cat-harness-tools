@@ -1,25 +1,12 @@
 /**
  * qa-result-link — THE address of a QA result file, for anything that links to
- * one. Bean `bejf`, issue #2217 (arc #1763).
+ * one, composed once from the repo-relative path, the store's own declaration
+ * and the entry the build read.
  *
- * ## Why one helper
- *
- * The site's QA panel linked every result file as
- * `https://github.com/<repo>/blob/main/` + the file's path. That was wrong
- * twice, and the two errors were independent:
- *
- * 1. **The path.** A witness projection names its sidecars relative to the
- *    INSTANCE (`test/results/…`), and the URL was rooted at the REPOSITORY, so
- *    `cat-harness/` was missing. The link was a 404 even while the file was
- *    still committed on `main`.
- * 2. **The branch.** A derived result's record is the orphan `qa-reports`
- *    branch, keyed `main/<sha>/<repo path>` ([`qa-reports`] skill). `blob/main`
- *    is the copy on its way out (bean `5hox`), and after it goes the link is
- *    dead outright.
- *
- * A URL composed at each call site gets one of those right and the other wrong.
- * This module composes it once, from the repo-relative path, the store's own
- * declaration and the entry the build read.
+ * Two things must both be right: the path is the INSTANCE-relative sidecar
+ * path rooted at the repository (so `cat-harness/` is not lost), and the
+ * branch is the store's — a derived result's record is the orphan
+ * `qa-reports` branch, keyed `main/<sha>/<repo path>` ([`qa-reports`] skill).
  *
  * ## Where a result lives is the DECLARATION's answer
  *
@@ -33,13 +20,13 @@
  * ## Which entry: the one this build's evidence came from
  *
  * A published page shows the evidence of ONE entry, and its links name that
- * entry by its key (`main/<sha>`, `pr/<n>/<sha>`), so the address is stable.
- * The newest entry, by contrast, moves on every push and soon describes a
- * different tree from the page. The key comes from the `qa-site-assets` fetch
- * state ({@link linkKeyFromFetchState}). With no key known (a local build, an
- * unavailable fetch), the link falls back to the branch tip's `index.json`,
- * which names the newest entry per ref. It is labelled `tip` so a renderer can
- * say so, never passed off as this page's own entry.
+ * entry by its key (`main/<sha>`, `pr/<n>/<sha>`), so the address is stable;
+ * the newest entry moves on every push. The key comes from the
+ * `qa-site-assets` fetch state ({@link linkKeyFromFetchState}). With no key
+ * known (a local build, an unavailable fetch), the link falls back to the
+ * branch tip's `index.json`, which names the newest entry per ref. It is
+ * labelled `tip` so a renderer can say so, never passed off as this page's
+ * own entry.
  *
  * @module scripts/qa-result-link
  * @covers qa

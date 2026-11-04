@@ -3,40 +3,28 @@
  * Every OPEN bean is placed under an epic or a milestone. This is what keeps the roadmap a plan.
  *
  * `beans roadmap` groups by `parent:` and drops everything else into a
- * "Miscellaneous" section. Measured 2026-09-19 before the restructure: one
- * epic, and **72 of 86 open beans** with no parent — a list in creation order
- * rather than a plan, which is exactly what `AGENTS.md` says the roadmap
- * exists not to be.
- *
- * The restructure fixed the instance. **This is the guard, not the fix**, and
- * it exists because nothing else notices: `beans create` does not ask for a
- * parent, a new bean is textually clean, and the roadmap grows a
- * Miscellaneous section again in silence. That is the `xom7` shape — a
- * defect indistinguishable from health from inside the repo — applied to the
- * work plan itself.
- *
- * It locks in a property the corpus HAS rather than demanding work to reach
- * one: the orphan count was zero when this was written, so adopting it costs
- * nothing today and prices the next unparented bean at the moment it lands.
+ * "Miscellaneous" section. `beans create` does not ask for a parent and a new
+ * bean is textually clean, so without this guard that section regrows in
+ * silence.
  *
  * ## What it checks
  *
  * 1. Every bean whose `status` is `todo` or `in-progress` carries a `parent`.
  * 2. Every `parent` names a bean that EXISTS. A dangling parent is worse than
  *    none: the roadmap silently omits the child rather than listing it.
- * 3. Every `parent` names a bean whose `type` is `epic` or `milestone`.
- *    Parenting a task to a task nests the roadmap somewhere nobody looks.
+ * 3. Every `parent` names a bean whose `type` may parent (`milestone`, `epic`
+ *    or `feature`), higher than the child in `milestone -> epic -> feature ->
+ *    task` (or bug). Parenting a task to a task nests the roadmap somewhere nobody
+ *    looks.
  *
- * ## What it deliberately does NOT check
+ * ## What it does NOT check
  *
- * **Closed beans.** A `completed` or `scrapped` bean predating the epic
- * structure is history, and back-filling 184 of them would be busywork that
- * changes no plan. Only open work has to be placeable.
+ * **Closed beans.** A `completed` or `scrapped` bean is history; only open
+ * work has to be placeable.
  *
  * **A ROOT's own parent.** Milestones and epics are the roadmap's roots, so
- * neither is required to carry one — `ROOT_TYPES` below. A milestone sits
- * above an epic in this store's stated hierarchy and has nothing to hang
- * from; an epic's parent is a milestone when it has one, and it need not.
+ * neither is required to carry one — `ROOT_TYPES` below. An epic's parent is
+ * a milestone when it has one.
  *
  * ## Third state
  *

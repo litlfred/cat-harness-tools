@@ -1,33 +1,11 @@
 /**
- * kg-audit-all.ts — run the knowledge-graph audit for EVERY declared instance.
+ * kg-audit-all.ts — run the knowledge-graph audit for EVERY declared instance,
+ * the one at the repository root included, so `audit:coverage` can tell
+ * "audited and clean" from "never audited".
  *
- * ## Why a loop, and why it is not a flag on `kg-audit.ts`
- *
- * `kg:audit` audits ONE instance: `kg-audit.ts` resolves `root` once at module
- * scope and derives nine `*_DIR` constants plus its subject discovery and its
- * output path from it, and its own docblock says why that is right —
- * *"nothing needs a DIFFERENT root part-way through a run"*. So a `--all` flag
- * would have to unpick that single assignment, which is the design rather than
- * a limitation. This spawns one process per instance instead, which is also
- * what makes a crash in one instance a reported failure rather than an
- * exception that ends the sweep.
- *
- * ## The gap it closes
- *
- * Measured 2026-09-27 (bean `bjzs`): of 15 nested instances, **2** had a
- * `test/results` directory and **13** had none. `audit:coverage` therefore
- * could not tell "audited and clean" from "never audited" for thirteen
- * instances — the `dh4f` defect at instance scale, and the whole subject of
- * that bean. A printed verdict cannot close it; committed sidecars can.
- *
- * ## The instance at the repository root is audited too
- *
- * It was skipped by name until bean `pgzn`: `kg-audit.ts` computed its
- * repository root as `resolve(root, "..")`, which for the instance declared AT
- * the checkout root landed outside it, so `kg:audit --instance .` threw before
- * auditing anything. The audit now asks `checkoutRootFor`, and this loop runs
- * over every declared instance with no exclusion. A crash in any one of them is
- * reported as "produced no report", never dropped.
+ * `kg-audit.ts` resolves its root once at module scope, so this spawns one
+ * process per instance rather than adding a `--all` flag. A crash in any one
+ * is reported as "produced no report", never dropped.
  *
  * @covers processes, scenarios, skills, tools, cat-harness — the same kinds
  * `kg-audit.ts` covers, because it runs exactly that audit; what differs is its

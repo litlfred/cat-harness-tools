@@ -1,37 +1,30 @@
 #!/usr/bin/env bun
 /**
- * Every special branch's README, RENDERED from what declares it — bean `esz4`.
+ * Every special branch's README, RENDERED from what declares it.
  *
- * Owner, 2026-10-03: *"make sure each of the special branches has a read me
- * file explaining what they are how they are generated when they were
- * generated, etc. like cat/cat-harness/beans branch. that should be in KG
- * too"*. Hand-written READMEs drift from the facts they restate and from each
- * other (measured: four in three different shapes, and `qa-reports` with
- * none), so this renders one from two sources that are already KG:
+ * A hand-written README drifts from the facts it restates, so this renders
+ * one from two KG sources:
  *
  * - the **declaration** — every instance directory whose `storage`/`source`
  *   names the branch, with its id, path, graph typologies and description.
- *   Per-harness by construction: the owner's ruling (`rva2`, 2026-10-03) is
- *   *"each harness declares it, (and each instance can also declare), why
- *   centralize?"*, and this reads the declarations where they are, never a
- *   table of branches;
+ *   Each harness (or instance) declares its own; this reads the declarations
+ *   where they are, never a central table of branches;
  * - the branch's own root **`manifest.json`** (`state-manifest/v1`, schema in
  *   `@litlfred/cat-harness/schemas/kg/state-manifest.ts`) — status, the seed
  *   commit, when, the writer and gate of a rendered branch.
  *
- * The facts a reader cannot recover from the files — status, provenance and
- * the write discipline — are exactly the ones a README is for: a branch
- * without them cannot be told from an abandoned one.
+ * Status, provenance and write discipline are what tell a live branch from an
+ * abandoned one.
  *
  * ## Families
  *
  * A `branchPrefix` declaration names a family, one branch per key, and the
- * members are not known until a key is published. The stated answer: **each
- * member carries its own README**, rendered from the family's declaration and
- * the member's own manifest. This command lists a family as `family` and does
- * not enumerate its members.
+ * members are not known until a key is published. **Each member carries its
+ * own README**, rendered from the family's declaration and the member's own
+ * manifest. This command lists a family as `family` and does not enumerate
+ * its members.
  *
- * ## Three states, as everywhere
+ * ## Three states
  *
  * `--check` reports a branch `current`, `stale` (README absent or different
  * from the rendering), or `unknown` (the branch or its manifest could not be

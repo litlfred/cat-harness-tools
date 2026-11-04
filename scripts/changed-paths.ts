@@ -1,5 +1,5 @@
 /**
- * Which verify/write pairs a set of CHANGED PATHS can have affected — bean `94zs`.
+ * Which verify/write pairs a set of CHANGED PATHS can have affected.
  *
  * @module scripts/changed-paths
  * @graphNode none — a selection helper for `regen-after-merge.ts`

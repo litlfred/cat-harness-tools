@@ -5,46 +5,17 @@
  * @covers docs
  * @graphNode none — a gate, not a schema
  *
- * ## Why a check rather than a fifth warning
+ * Several generators build a whole HTML page as ONE template literal; a
+ * backtick anywhere inside (often in a comment) ends the string and the rest
+ * of the page is parsed as TypeScript. The compiler reports only an
+ * unexpected token; this gate names the cause (`<file>:<line> - a backtick
+ * here closes the page template early`).
  *
- * Four generators build a whole HTML page as ONE template literal, and each
- * carries a comment saying NO BACKTICKS BELOW THIS LINE. A backtick anywhere
- * inside terminates the string, and the rest of the page becomes TypeScript.
- *
- * The comments have not worked. It has happened four times in
- * `gen-schema-viz.ts` alone — twice in prose quoting a field, once quoting an
- * intake's files[], once quoting a bean id — and every time in a COMMENT,
- * which is the one place the author is not thinking about string syntax.
- *
- * The parser already catches it, so this is not about letting a defect
- * through. It is about the MESSAGE. Measured by planting one in the real file
- * and running both:
- *
- *     compiler:  error: Expected ";" but found "whbf"
- *     this gate: gen-schema-viz.ts:833 - a backtick here closes the page
- *                template early, so everything after it is parsed as
- *                TypeScript.
- *
- * Note what is NOT wrong with the compiler's answer: the line number is
- * right. The file's own warning says the failure lands far from the mistake,
- * and on this evidence it does not. So the case for a gate is narrower than
- * the warning implies, and it is only this — the compiler names a token and
- * says nothing about backticks, template literals, or the warning three
- * hundred lines above. An author who does not already know the trap reads it
- * as a syntax error in the code they just wrote.
- *
- * ## How it decides, without parsing
- *
- * It cannot parse: the file does not parse, which is the whole situation. So
- * it reads text. The template opens at `return <backtick><!doctype html>` and
- * is meant to close immediately after the page's final `</html>`. The first
- * unescaped backtick after the opening is therefore the close — and if the
- * text just before it is not that closing tag, the literal ended early, and
- * where it ended is exactly where the stray backtick is.
- *
- * That is a check on the ONE thing that matters rather than a backtick
- * census: a backtick before the opening (a doc comment, an import) is fine
- * and must stay fine, or the gate becomes something to work around.
+ * It reads text, since the file does not parse: the template opens at
+ * `return <backtick><!doctype html>` and must close right after the final
+ * `</html>`. If the first unescaped backtick after the opening is not
+ * preceded by that tag, the literal ended early there. Backticks before the
+ * opening are fine.
  */
 import { readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";

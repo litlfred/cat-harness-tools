@@ -5,59 +5,28 @@
  * @module scripts/ensure-landing-sticky
  * @covers folio
  *
- * The owner's ask, 2026-09-20: *"the sticky note is created dynamically on
- * initailzation by cat-harness bootstrap (as last thing). it creates an empty
- * folio (if none exists) and attaches to the folio a sticky note."* And on who
- * runs it: *"cat-harness initaton craetes the folio/ (called by bootstrap)."*
+ * Creates an empty `folio/` graph directory (if none is declared) and
+ * attaches a sticky note to it. This is the `folio` graph DIRECTORY, not the
+ * separate content repository `scripts/init-folio.ts` scaffolds.
  *
- * ## Why this is not `init-folio`
+ * It belongs to cat-harness and runs after bootstrap's hand-off (`A_Install`):
+ * bootstrap may not import from the layer composed on top of it, so a bare
+ * bootstrap instance gets no folio.
  *
- * The obvious candidate, and the wrong one. Two things sound the same:
+ * ## Idempotent
  *
- * | | what it is |
- * |---|---|
- * | **`content/`** | what `scripts/init-folio.ts` scaffolds, in a SEPARATE content repository |
- * | **`folio/`** | a declared graph DIRECTORY of kind `folio` — the one renderable kind |
+ * Initiation runs again (a re-initialisation, a sibling session, a resumed
+ * container), so every step is safe to repeat:
  *
- * `init-folio` writes a content repo's `content/`, `uploads/`, `library/`, a
- * `harness.config.json` and a builder shim. Reaching for it here would scaffold
- * a folio *repository* where the ruling asks for a folio *graph*.
- *
- * ## Why it stays out of `bootstrap/`
- *
- * The owner: *"i want the grumpy cat moved out of bootstrap and into cat
- * harness."* Bootstrap's last activity `A_Install` is the **hand-off** to the
- * chosen harness, and `bootstrap/harness.json` declares an instance that may
- * not import from the layer composed on top of it. A bare bootstrap instance
- * gets no folio and no cat; this script is cat-harness's, and runs after the
- * hand-off.
- *
- * Measured 2026-09-20, so nobody hunts for a file to move: there is no grumpy
- * cat in `bootstrap/` today — `grep -rin "grumpy\|cat-mark\|landing" bootstrap/`
- * returns one false positive. The ruling is a constraint on new work, not a
- * relocation.
- *
- * ## Idempotency is the whole engineering problem
- *
- * Initiation runs again: a re-initialisation, a sibling session, a resumed
- * container. Every step here has to be safe to repeat, and two of them are not
- * naturally so:
- *
- * 1. **The sticky's `createdAt`.** Written from the clock, the file changes on
- *    every run and a `--check` gate can never say *nothing changed*. So an
- *    existing sticky's `createdAt` is **read back and reused**; the clock is
- *    consulted only when there is nothing there.
- * 2. **The declaration.** `harness.json` is committed **ASCII-escaped** —
- *    `json.dumps(…, ensure_ascii=True)` round-trips it byte-for-byte and
- *    `ensure_ascii=False` does not. `JSON.stringify` emits literal UTF-8, so
- *    re-serialising the declaration would rewrite every em dash in it: a
- *    115-line diff for a one-entry addition. Worse, the `description` carries a
- *    deliberate NO-BREAK SPACE before `c@t-harness`, and a reformat is exactly
- *    the kind of change that silently normalises one.
- *
- *    So {@link insertDirectoryEntry} is a **surgical text edit** — it splices one
- *    entry into the `directories` array and leaves every other byte alone, which
- *    `ensure-landing-sticky.test.ts` asserts directly.
+ * 1. **The sticky's `createdAt`.** An existing sticky's `createdAt` is **read
+ *    back and reused**; the clock is consulted only when there is nothing
+ *    there, so `--check` can say *nothing changed*.
+ * 2. **The declaration.** It is committed **ASCII-escaped**, and
+ *    its `description` carries a deliberate NO-BREAK SPACE before
+ *    `c@t-harness`; `JSON.stringify` would rewrite both. So
+ *    {@link insertDirectoryEntry} is a **surgical text edit** — it splices one
+ *    entry into the `directories` array and leaves every other byte alone,
+ *    which `ensure-landing-sticky.test.ts` asserts directly.
  *
  * Exit codes: 0 up to date or written · 1 stale/absent under `--check`.
  */

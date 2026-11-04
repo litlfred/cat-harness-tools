@@ -1,9 +1,8 @@
 /**
  * Which skill governs a declared directory — read from the SKILLS.
  *
- * Until #1168 B7b each directory named its governing skill
- * (`coverage.skill`): the directory pointing at what depends on it. The owner
- * chose (2026-09-24) that the skill declares instead, in its front matter:
+ * The skill declares what it governs, in its front matter; the directory does
+ * not name its skill:
  *
  * ```yaml
  * graph-typologies:          # the kinds of graph it governs, wherever they are
@@ -12,13 +11,12 @@
  *   - <instance>/<instance>-docs
  * ```
  *
- * `graph-typologies:` already existed (B3) and is the normal form: a skill that
- * governs `beans` governs every `beans` directory. `governs:` is for the case
- * the kind cannot say — a domain skill over one `docs` or `tools` directory —
- * where listing the generic kind would claim every directory of it (measured
- * 2026-09-24: 5 directories, each of kind `docs`, `tools` or `skills` alone).
- * Instance-qualified because a directory id is unique only within its
- * instance: the DAK base layer and `cat-harness` each declare one called `tools`.
+ * `graph-typologies:` is the normal form: a skill that governs `beans` governs
+ * every `beans` directory. `governs:` is for the case the kind cannot say — a
+ * domain skill over one `docs` or `tools` directory — where listing the
+ * generic kind would claim every directory of it. Instance-qualified because a
+ * directory id is unique only within its instance: the DAK base layer and
+ * `cat-harness` each declare one called `tools`.
  *
  * A kind claim reaches only the skill's own instance and the instances that
  * DEPEND on it: the FHIR IG harness's `ig-build-pipeline` governs that harness's

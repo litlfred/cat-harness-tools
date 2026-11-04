@@ -1,14 +1,12 @@
 /**
  * Bring a folio's builders shim up to the vocabularies its profile uses.
  *
- * Since the owner's ruling of 2026-10-22 the science layer's kinds
- * (`definition`, `theorem`, `lemma`, `proposition`, `corollary`, `conjecture`,
- * `proof`) are typed, and built, by its vocabulary module, not by cat-harness.
- * A paper folio scaffolded before then has a `folio/schema/builders.ts` that
- * re-exports only cat-harness's builders, so its math blocks no longer find
- * `theorem(…)` once it repins past the change. This adds the missing
- * `export * from "…/<vocabulary module>"` lines and leaves every other line
- * as the folio's author left it (the shim says "Safe to edit; not
+ * The science layer's kinds (`definition`, `theorem`, `lemma`,
+ * `proposition`, `corollary`, `conjecture`, `proof`) are typed, and built, by
+ * its vocabulary module, not by cat-harness. A `folio/schema/builders.ts` that
+ * re-exports only cat-harness's builders cannot find `theorem(…)`. This adds
+ * the missing `export * from "…/<vocabulary module>"` lines and leaves every
+ * other line as the folio's author left it (the shim says "Safe to edit; not
  * regenerated").
  *
  *   bun run cat folio:shim [--root <folio repo>]          # add what is missing

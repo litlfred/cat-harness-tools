@@ -1,27 +1,20 @@
 /**
  * Which lines of a check's source can make its answer depend on something the
  * input hash does not see — and the reviewed annotation that says why one does
- * not. Bean `f017`.
+ * not.
  *
  * @module scripts/input-sites
  * @graphNode none — a source scanner read by `input-hash.ts`
  *
- * ## Why this exists
- *
- * `input-hash.ts` skips a check whose declared inputs hash to its last pass.
- * That is sound only if the check reads NOTHING else: no environment variable,
+ * `input-hash.ts` skips a check whose declared inputs hash to its last pass,
+ * which is sound only if the check reads NOTHING else: no environment variable,
  * no network, no clock, no git history, no file outside the working tree, no
- * module it reaches by a computed path. Until this module that was a claim a
- * person made by reading one script, once (`task-io.ts`, "declare by reading")
- * — and a claim about a script's IMPORT CLOSURE, which moves under every edit
- * to a shared module without anybody re-reading the scripts that import it.
- *
- * So the claim is now checked mechanically, on every fingerprint: the closure
- * is walked, every line matching a {@link RISKS} pattern is a SITE, and a site
- * must carry a reviewed annotation (below) whose pin matches the code it
- * annotates. One unannotated or stale site anywhere in the closure makes the
- * fingerprint UNDETERMINED, and the check runs. Could-not-determine is never a
- * pass; an edit to a shared module costs skips, never correctness.
+ * module it reaches by a computed path. That claim is about a script's whole
+ * IMPORT CLOSURE, so it is checked mechanically on every fingerprint: the
+ * closure is walked, every line matching a {@link RISKS} pattern is a SITE,
+ * and a site must carry a reviewed annotation (below) whose pin matches the
+ * code it annotates. One unannotated or stale site anywhere in the closure
+ * makes the fingerprint UNDETERMINED, and the check runs.
  *
  * ## The annotation
  *
@@ -55,7 +48,7 @@
  * unannotated until a person re-reads it and re-pins. `bun run
  * input-hash:coverage --sites <file>` prints the current pins.
  *
- * ## What this cannot see, stated rather than hidden
+ * ## What this cannot see
  *
  * - packages (bare specifiers): covered by `bun.lock`'s content, not scanned;
  * - an access spelled to dodge every pattern (`globalThis["proc"+"ess"]`) —

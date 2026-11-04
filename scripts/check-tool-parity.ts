@@ -2,12 +2,8 @@
 /**
  * Measure MCP-vs-CLI tool and capability parity for Developer Mode.
  *
- * ## Why this exists — bean `folio-assistant-2ngl`
- *
- * Developer mode assumes a local workstation with CLI tools and a single model.
- * If capabilities only exist as MCP tools without CLI equivalents, then
- * developer mode is not merely a preset point in the topology product — it is
- * blocked on a tool parity gap.
+ * Developer mode assumes a local workstation with CLI tools and a single
+ * model, so a capability that exists only as an MCP tool blocks it.
  *
  * This script measures:
  * 1. How many declared Tool nodes have MCP invocations (`invoke.mcp`), CLI

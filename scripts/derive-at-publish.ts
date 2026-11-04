@@ -1,71 +1,52 @@
 #!/usr/bin/env bun
 /**
  * derive:publish — build every derived artefact that cannot be current in a
- * commit, at the moment the site is built. Bean `0b8c` (#2230).
+ * commit, at the moment the site is built.
  *
  * @module cat-harness/scripts/derive-at-publish
  * @covers none — it runs the writers `check:derived-from` names; it judges no graph
  *
- * ## Why this exists
+ * ## Branch-derived artefacts
  *
- * A derived artefact is current only relative to its inputs. When every
- * input is kept in the commit, a committed copy plus a `:check` gate keeps
- * them together. When an input is kept on a BRANCH, it moves without a
- * commit, and a committed copy is stale on main and on every open PR the
- * moment somebody writes there — measured 2026-10-05, when one `state:push`
- * to `cat/cat-harness/fsh-guts` turned `fsh-guts:viz:check` red everywhere.
+ * An artefact derived from an input kept on a BRANCH goes stale without a
+ * commit, so it is never committed: `check:derived-from` finds those by
+ * walking `derivedFrom` edges up to a branch-kept input (a visualisation
+ * counts as derived from the directory it shows) and refuses any that is
+ * tracked. The site build runs this after `state:mount` and before composing
+ * the site, and it runs each one's declared `writer`, sources before
+ * consumers.
  *
- * So such an artefact is never committed. `check:derived-from` works out
- * which artefacts those are by walking the `derivedFrom` edges up to a
- * branch-kept input — a visualisation counting as derived from the directory
- * it shows — and refuses any that is tracked. This script is the other half:
- * the site build runs it after `state:mount` and before composing the site,
- * and it runs each one's declared `writer`, sources before consumers.
+ * ## Artefacts an instance declares it builds at publish
  *
- * ## And the artefacts an instance DECLARES it builds at publish (B1)
- *
- * Owner, 2026-10-14 ("B1"; widened to state: "fix all, in proper way"). An
- * instance's `builtAtPublish` (`schemas/kg/built-at-publish.ts`) lists artefacts
- * no commit of it can hold current — computed over the checkout's other
- * instances (`checkout`), or from a branch-kept graph (`state`) — and names
- * each one's writer as a package script. After the branch-derived artefacts
- * above, this runs every such writer once — in the order {@link writersOf} works
- * out from the declarations (see "Writer order" below) — and then REFUSES an entry that
- * came out missing or empty:
- * a declared page nobody built is a broken publish, not an absent one.
- * `--cause state` runs only the state-derived ones (what an e2e job reading the
- * beans and todos projections needs after `state:mount`).
- *
- * No list of generators lives here or in a workflow. Adding the next
- * branch-kept graph (beans, todos) with a declared visualiser `writer` is the
- * whole change; this step picks it up.
+ * An instance's `builtAtPublish` (`schemas/kg/built-at-publish.ts`) lists
+ * artefacts no commit of it can hold current — computed over the checkout's
+ * other instances (`checkout`), or from a branch-kept graph (`state`) — and
+ * names each one's writer as a package script. After the branch-derived
+ * artefacts, this runs every such writer once, in the order {@link writersOf}
+ * works out (see "Writer order"), and then REFUSES an entry that came out
+ * missing or empty. `--cause state` runs only the state-derived ones (what an
+ * e2e job reading the beans and todos projections needs after `state:mount`).
+ * No list of generators lives here or in a workflow.
  *
  * ## Refusals, not silence
  *
  * A writer that exits non-zero fails the step, naming it — after every other
- * declared writer has run, so one run names every failure. A writer reads a
- * mounted graph and refuses an unmounted one (exit 2), so a build that forgot
- * `state:mount` fails here rather than publishing an empty page.
- *
- * ## Except a writer that says it does not apply to this root
+ * declared writer has run, so one run names every failure. A writer refuses an
+ * unmounted graph (exit 2), so a build that forgot `state:mount` fails here.
  *
  * A writer that exits `NOT_APPLICABLE_EXIT` (78, `lib/not-applicable.ts`) has
- * said, with a reason, that THIS root cannot build its artefact: `uml:overview`
- * reads the QA working copy, which needs the gates workflow, and a document
- * folio (smart-ra) has none (smart-ra#66, run 38714163952). It is reported
- * SKIPPED with its reason, every other writer still runs, the artefacts that
- * name it are excused from the built-or-refused check (and listed), and the
- * step does not fail on it. Only the writer can say so — no list of writers or
- * roots lives here — so a root that has the prerequisite (the folio-assistant
- * index) runs it exactly as before, and any other non-zero exit still fails.
+ * said, with a reason, that THIS root cannot build its artefact (`uml:overview`
+ * needs the gates workflow, which a document folio lacks). It is reported
+ * SKIPPED with its reason, the artefacts that name it are excused from the
+ * built-or-refused check (and listed), and the step does not fail on it. Only
+ * the writer can say so; no list of writers or roots lives here.
  *
  * ## Writer order: lowest layer first, plus the edges the declarations state
  *
- * Owner, 2026-10-15 ("A1"). The base order is the instances' dependency order
- * (lowest layer first, a function of the declared `needs` alone, never of the
- * index's listing order), each instance's entries in their declared order,
- * and a writer named by several entries runs ONCE. On top of that, two kinds
- * of edge, both read from the declarations and both hard:
+ * The base order is the instances' dependency order (lowest layer first, a
+ * function of the declared `needs` alone), each instance's entries in their
+ * declared order, and a writer named by several entries runs ONCE. On top of
+ * that, two kinds of hard edge, both read from the declarations:
  *
  * - an instance's own declared order: each of its writers runs after the one
  *   it lists before it (`processes:viz` after `render:bpmn`, `navbar:include`
@@ -73,39 +54,24 @@
  * - a READ EDGE (`reads` on an entry, `schemas/kg/built-at-publish.ts` in
  *   cat-harness): the entry's writers run after the writers of every OTHER
  *   instance's entry that fills (`directory`) a directory of one of those
- *   kinds.
- *
- * The case the second exists for (measured 2026-10-15): cat-harness's
- * `docs/_data/harness.json` (`docs:harness`) gives an IG instance a folio
- * link and a rail scope only when that IG's `docs/` exists, and that
- * directory is the IG's own publish-time artefact (its `<ig>:pages` writer).
- * Lowest-first wrote the tiles first, so one clean `derive:publish` published
- * the platform site with the IG as a landing-page section and no rail scope
- * (`foreign-site-scope.test.ts` (a), `viewer-undiscovered.test.ts`). An
- * interim fix ran every instance consumers first; the ruling replaced it with
- * the declared edge, `reads: ["docs"]` on that entry, because which way a read
- * goes is a fact the reading writer knows, and a global inversion only guesses
- * it (it also ran the shared `jsonld:contexts` before the cat-harness
- * documents it reads were written).
+ *   kinds. For example cat-harness's `docs/_data/harness.json` declares
+ *   `reads: ["docs"]`, because it links an IG only when that IG's `docs/`
+ *   exists.
  *
  * The sort is stable (a writer runs as early as its edges allow, ties broken
- * by first mention), and a cycle is REFUSED, naming the writers in it: two
- * writers that each read the other's output have no order that is right.
+ * by first mention), and a cycle is REFUSED, naming the writers in it.
  *
- * ## Reused when nothing it reads moved, and run side by side (issue #400)
+ * ## Reuse and parallelism
  *
- * The declared writers (28 of them for cat-harness's 149 entries) ran one
- * after another with nothing remembered, and `smart:pages` ran twice in a
- * layer-PR job. Now each declared writer is keyed (`derive-cache.ts`: its
- * input-hash fingerprint — the audited script closure, tool versions and its
- * declared inputs, or the whole tree when it declares none — plus its
- * predecessors' outputs), and a writer whose key has a recorded result is
- * RESTORED from `CAT_DERIVE_CACHE_DIR` (default `build/derive-cache`) and
- * reported `reused <writer> (inputs unchanged since <key>)` — never as built.
- * Writers the declared edges leave unordered run at once, at most
- * `CAT_DERIVE_JOBS` (default: the cores); with `CAT_DERIVE_JOBS=1` it is the
- * sequential order above, output unbuffered. `--no-cache` turns reuse off;
- * so does `CI`, unless `CAT_DERIVE_CACHE_DIR` opts in.
+ * Each declared writer is keyed (`derive-cache.ts`: its input-hash
+ * fingerprint plus its predecessors' outputs), and a writer whose key has a
+ * recorded result is RESTORED from `CAT_DERIVE_CACHE_DIR` (default
+ * `build/derive-cache`) and reported `reused <writer> (inputs unchanged since
+ * <key>)` — never as built. Writers the declared edges leave unordered run at
+ * once, at most `CAT_DERIVE_JOBS` (default: the cores); with
+ * `CAT_DERIVE_JOBS=1` it is the sequential order above, output unbuffered.
+ * `--no-cache` turns reuse off; so does `CI`, unless `CAT_DERIVE_CACHE_DIR`
+ * opts in.
  *
  * ```
  * bun run cat derive:publish            # run every writer

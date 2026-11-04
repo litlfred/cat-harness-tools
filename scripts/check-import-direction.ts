@@ -3,29 +3,23 @@
  * check-import-direction.ts — no module imports from an instance built on top
  * of the one it lives in.
  *
- * ## Why this exists beside three checks that look like they already do it
+ * ## Why beside three similar checks
  *
- * Bean `p11x`: `check:partition` is rooted at ONE instance, `check:instance-graph`
- * judges declarations and never imports, and `kg:detangle:direction` reaches only
- * the directories in its `SCAN` list — which omitted `cat-harness/adapters/`, so
- * the two `intake-records` imports into the content core sat under three
- * green checks until #1687 moved the file. `bf5l`'s sentence stands: *"three
- * green checks did not mean the layering held."* `check:reference-direction`
- * is the PROSE axis (a name mentioned), not this one (a module loaded).
+ * `check:partition` is rooted at ONE instance, `check:instance-graph` judges
+ * declarations and never imports, and `kg:detangle:direction` reaches only
+ * the directories in its `SCAN` list. `check:reference-direction` is the
+ * PROSE axis (a name mentioned), not this one (a module loaded).
  *
- * So this check has no scan list to fall short of. It walks every declared
- * instance in the checkout, assigns each file to the INNERMOST instance root
- * containing it, and asks the one question that decides whether an instance can
- * be lifted into its own repository: does anything it loads live in an instance
- * that is not itself or something it (transitively) `needs`? That is the same
- * direction computation `check:reference-direction` and `kg:detangle` use —
- * `allowedFromNeeds` over `ancestorsOf` — so the three axes cannot give three
- * answers about which way an arrow may point.
+ * This check has no scan list. It walks every declared instance in the
+ * checkout, assigns each file to the INNERMOST instance root containing it,
+ * and asks: does anything it loads live in an instance that is not itself or
+ * something it (transitively) `needs`? The direction computation is the one
+ * `check:reference-direction` and `kg:detangle` use — `allowedFromNeeds` over
+ * `ancestorsOf` — so the axes cannot disagree.
  *
  * **No instance is named here.** The allowed set is read from each
- * `<instance>.json`'s `needs`, so adding `bootstrap-tools` to `cat-harness`'s
- * `needs` (bean `0lj4`) made its 20 imports legal without an edit here, and the
- * next undeclared sibling edge fails without one either.
+ * `<instance>.json`'s `needs`, so a new `needs` edge legalises its imports
+ * without an edit here.
  *
  * ## What it reads, and the two things it reports rather than grades
  *
@@ -35,15 +29,10 @@
  *   Relative and absolute specifiers are resolved as paths. A bare specifier
  *   is judged when it names an instance's PACKAGE — `@litlfred/cat-harness/…`
  *   is the instance whose `package.json` `name` is `@litlfred/cat-harness` —
- *   and skipped otherwise, as a third-party module from `node_modules`. Until
- *   2026-10-14 every bare specifier was skipped, so an import written by
- *   package name crossed layers unseen; bean `7pvn` rewrites core's 260
- *   cross-layer imports that way, and they must stay graded.
+ *   and skipped otherwise, as a third-party module from `node_modules`.
  * - **Module-path literals**: a string such as `"../<layer>/adapters/paper/index.ts"`
- *   handed to a VARIABLE `import(abs)`. `src/builtin-adapters.ts` was exactly
- *   that until this change, and its own docblock said *"the one edge no
- *   static-import gate here can see"*. A literal that climbs out with `../` and
- *   names a module file (`.ts`/`.js`/…) is judged as if it were imported,
+ *   handed to a VARIABLE `import(abs)`. A literal that climbs out with `../`
+ *   and names a module file (`.ts`/`.js`/…) is judged as if it were imported,
  *   resolved against both the file's directory and its instance root.
  * - **Reported, not graded — variable specifiers**: `import(expr)` whose
  *   argument is not a literal. What it loads cannot be read from the source, so
@@ -55,10 +44,8 @@
  *
  * `--gate <name>` (repeatable) makes a wrong-direction edge FROM that instance
  * exit 1; `--all` gates every instance that holds code. Every other instance's
- * edges are printed. The repository's standing rule is that a check becomes an
- * error only once its count is zero, because a red gate turned on teaches the
- * next agent `|| true` — and on 2026-09-30, once `builtin-adapters.ts` was
- * inverted, every instance's count WAS zero, so CI runs `--all`.
+ * edges are printed. A check becomes an error only once its count is zero;
+ * CI runs `--all`.
  *
  * ```sh
  * bun run cat check:import-direction                       # report, every instance
@@ -66,8 +53,7 @@
  * bun run cat check:import-direction --all                 # …and fail on any (CI)
  * ```
  *
- * Tested with planted violations in `tests/check-import-direction.test.ts`: a
- * boundary check never seen failing checks nothing (`4j3h`, `q2wn`, `p11x`).
+ * Tested with planted violations in `tests/check-import-direction.test.ts`.
  *
  * @module scripts/check-import-direction
  * @covers code

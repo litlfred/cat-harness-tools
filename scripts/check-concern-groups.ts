@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Concern groups are declared from within, drawn from one code list, declared
- * once, and inherited as members (placement PR0c, bean `ejye`; bean `9umr`).
+ * once, and inherited as members.
  *
  * @module scripts/check-concern-groups
  * @covers cat-harness
@@ -10,18 +10,16 @@
  * library, uml, code) and every directory of it in the checkout:
  *
  * 1. **The declaration file parses and every group it names exists** — a
- *    declared-but-absent group is the `dh4f` defect, a consumer scanning
- *    nothing and reporting a clean run over it.
+ *    declared-but-absent group would be scanned as an empty, clean group.
  * 2. **Every group is a code of `code-lists/concern-group.json`.** The eight
  *    groups are one vocabulary across every instance and every kind; a code
- *    invented in one declaration is a ninth group nobody ruled on. One
- *    pre-existing exception is BASELINED, with its retirement named: the
- *    harness's skills topic `authoring`, which PR2 regroups under `content`.
- *    The baseline only shrinks — an entry that no longer occurs is a finding,
- *    so it cannot outlive its reason.
+ *    invented in one declaration is a ninth group nobody ruled on.
+ *    Pre-existing exceptions (the harness's skills topic `authoring`) are
+ *    BASELINED in `KNOWN_NON_CODES`. The baseline only shrinks — an entry
+ *    that no longer occurs is a finding.
  * 3. **A group is declared once.** A higher instance whose same-named
  *    directory REDECLARES a group the harness declared is adding a group of
- *    its own; under option A its directory is already a member.
+ *    its own; its directory is already a member.
  *
  * Prints each group with its members, so "core's `skills/library/` is a
  * member of the harness's `library` group" is a line a reviewer can read.

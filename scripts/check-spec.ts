@@ -1,8 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Spec validation checker (spec-kit Child 2 / issue #752).
- *
- * ## What this script does
+ * Spec validation checker.
  *
  * Verifies that a specification adheres to the declared template
  * (`cat-harness/sdlc/skills/spec-kit/spec-template.md`):
@@ -10,11 +8,10 @@
  *   - "User Scenarios & Testing"
  *   - "Requirements"
  *   - "Success Criteria"
- * - Does not reach adjudicated status with unresolved `[NEEDS CLARIFICATION]` markers (SC-004).
- * - Reads specs from issue comments, not from a directory (FR-013).
- * - Implements three-state reporting: exit 0 (pass), exit 1 (finding), exit 2 (could not determine).
+ * - Does not reach adjudicated status with unresolved `[NEEDS CLARIFICATION]` markers.
+ * - Reads specs from issue comments, not from a directory.
  *
- * ## Usage
+ * Exit 0 pass, 1 finding, 2 could not determine.
  *
  * ```sh
  * bun run cat-harness-tools/scripts/check-spec.ts --issue 730

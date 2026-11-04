@@ -1,13 +1,11 @@
 #!/usr/bin/env bun
 /**
  * Every generated file names a writer that exists. ADVISORY: it warns and
- * exits 0 (`--strict` exits 1). litlfred/folio-assistant#1254.
+ * exits 0 (`--strict` exits 1).
  *
  * @covers none — a marker audit over committed and built files; judges no graph
  *
- * ## The owner's ruling, 2026-10-29 (option A)
- *
- * *Derive, accept all, warn.* So:
+ * ## Derive, accept all, warn
  *
  * - **No list of generators here.** A writer is real when the checkout can
  *   find it: a script file at the path the marker names (from the file's own
@@ -23,14 +21,11 @@
  *
  * ## Unmarked files, where a writer declares what it writes
  *
- * A generated file with NO marker is found through the `writes` declaration
- * (litlfred/cat-harness#693, owner 2026-10-29, option C): each writer task
- * lists the committed files it writes (`task-io.ts`'s `OWN_WRITES`, or an
- * instance's `taskIo.<task>.writes`). Every file a glob matches must carry a
- * marker, and a glob that matches nothing is reported too: it is a
- * declaration about files that are not there. A writer that declares nothing
- * is not checked for unmarked files yet; coverage grows one declaration at a
- * time.
+ * A generated file with NO marker is found through the `writes` declaration:
+ * each writer task lists the committed files it writes (`task-io.ts`'s
+ * `OWN_WRITES`, or an instance's `taskIo.<task>.writes`). Every file a glob
+ * matches must carry a marker, and a glob that matches nothing is reported
+ * too. A writer that declares nothing is not checked for unmarked files.
  *
  *   bun run cat check:generated-writers [--strict]
  */

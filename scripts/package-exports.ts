@@ -1,36 +1,23 @@
 #!/usr/bin/env bun
 /**
  * A package's `exports` are DERIVED from the `code` subgraphs it declares and
- * ships — bean `mo75` (exports item), the prerequisite of `7pvn`.
+ * ships, so another layer can import this one by package name.
  *
  * @covers cat-harness, code — it derives a package's `exports` from the `code` directories its declaration names, and judges `package.json` against them
  * @module scripts/package-exports
  *
- * ## Why
- *
- * The content core reached into this layer through 146 relative imports
- * (`../../cat-harness-tools/src/core/rbac.js`), and could not import it by
- * package name because `package.json` `exports` listed ten hand-picked files.
- * A hand list is a second answer to "what may another layer import", and it
- * had already disagreed with the first: core imported from `src/`, `scripts/`,
- * `pipeline/`, `tools/` and `adapters/`, and the list named none of those
- * directories.
- *
- * The first answer is the declaration. Owner, 2026-10-14: *"A tool directory
- * is itself a subgraph, or should be."* A directory this instance declares
- * with graph typology `code` (top level or from within, through
- * `instanceDirectories`) is a named subgraph of code; the package exports it.
- *
  * ## The rule
  *
- * A subpath `./<dir>/*` is exported exactly when `<dir>/` is
+ * A directory this instance declares with graph typology `code` (top level or
+ * from within, through `instanceDirectories`) is a named subgraph of code. A
+ * subpath `./<dir>/*` is exported exactly when `<dir>/` is
  *
  * 1. declared with graph typology `code`, and
  * 2. SHIPPED: named in `package.json` `files`.
  *
- * The second condition is how tests stay private without a list of
- * exceptions: `test/` is declared code and is not shipped, so it is not
- * exported. Each directory gets the pair `cat-harness`'s own package uses —
+ * The second condition keeps tests private without a list of exceptions:
+ * `test/` is declared code and is not shipped, so it is not exported. Each
+ * directory gets the pair `cat-harness`'s own package uses —
  * `./<dir>/*.js` → `./<dir>/*.ts` (so a `.js` specifier finds the source) and
  * `./<dir>/*` → `./<dir>/*`.
  *

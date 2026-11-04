@@ -6,32 +6,27 @@
  * @module cat-harness-tools/scripts/gen-id-lookup
  * @covers catalogue — every referenced node of the catalogue must resolve through the committed shards
  *
- * Bean `folio-assistant-4pm8`. The shape and the budget are in
- * `../schemas/id-lookup.ts`; this file only selects the nodes and writes
- * the files.
+ * The shape and the budget are in the `id-lookup` schema module; this file
+ * only selects the nodes and writes the files.
  *
  * ## What is indexed
  *
  * Every catalogue node whose OWN `materialization.state` is `referenced`. A
- * materialised node is not here: it is held, so the site's ordinary search
- * finds it, and indexing it twice would give one node two answers. A node
- * with no upstream URL is refused rather than indexed with an empty link,
- * because a lookup that finds a node and cannot say where it is held has
- * found nothing a reader can use.
+ * materialised node is held, so the site's ordinary search finds it and it is
+ * not indexed twice. A node with no upstream URL is refused rather than
+ * indexed with an empty link.
  *
  * Which corpora are indexed is read off the checkout: every instance that
  * declares a directory with id `id-lookup` hosts one, written THERE, and its
  * catalogue is found through the same instance's declaration — never a literal
- * path or a name, so a move cannot turn this into a build over nothing. An
- * empty selection is refused for the same reason.
+ * path or a name. An empty selection is refused.
  *
  * ## `--check`
  *
  * Rebuilds in memory and compares with the committed directory byte for
  * byte, in both directions: a file that differs, a file missing, and a file
- * the build would no longer write (a stale shard) all fail. A stale shard is
- * the one that matters most, because it still answers lookups for a node the
- * catalogue no longer references.
+ * the build would no longer write (a stale shard, which still answers lookups
+ * for a node the catalogue no longer references) all fail.
  *
  * Usage:
  *   bun run cat id-lookup                    # write every hosted index (one library's `id-lookup` directory today)

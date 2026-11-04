@@ -1,24 +1,22 @@
 /**
  * The `review/` page of a folio's preview site: what changed from `main`,
- * block by block. Bean `txut`, epic `q4jm`.
+ * block by block.
  *
  * ## One static page that reads its data when it is opened
  *
  * `folio-staging.yml` builds the site FIRST and computes the ChangeSet AFTER
  * it, into `<site>/changeset.json`, and the banner step writes
- * `<site>/staging.json`. A page generated at build time would therefore never
- * see the ChangeSet. So this page carries no data. It fetches
- * `../changeset.json` and `../staging.json` in the reader's browser, which
- * also makes the same file correct on every build.
+ * `<site>/staging.json`. So this page carries no data: it fetches
+ * `../changeset.json` and `../staging.json` in the reader's browser, and the
+ * same file is correct on every build.
  *
  * ## The three states, each said in words
  *
  * - **A ChangeSet with changes.** The list, grouped by section.
  * - **A ChangeSet with none.** "No block changed," with the count of blocks
- *   compared. A determined empty.
+ *   compared.
  * - **No ChangeSet.** On `main`, or on any build that is not a preview. The
- *   page says there is nothing to compare against, instead of showing an
- *   empty list that would read as "nothing changed".
+ *   page says there is nothing to compare against.
  *
  * ## Each change is a before/after pair
  *
@@ -28,23 +26,22 @@
  * block labels that `build-document-site` writes, which the `id-unique` and
  * `id-stable` QA criteria guard.
  *
- * ## Review comments (bean `423d`)
+ * ## Review comments
  *
  * `../review-comments.json` is the `folio-review-comments` Tool's output:
  * `review-comment/1.0.0` todos, one per tagged PR comment. The page lists
- * each block's comments under it. It gives three more groups their own
- * headings, because each would otherwise vanish:
+ * each block's comments under it, and gives three more groups their own
+ * headings:
  * - comments on blocks this PR did not change;
  * - ORPHANED comments, whose block is gone;
  * - tags nobody could read.
  *
  * Every changed block also shows the `block: <label>` line to start a new
  * comment with, and links to the PR, since GitHub cannot pre-fill a comment
- * box. No file at all is SAID, never shown as an empty list: "no comment
- * data" and "nobody commented" are different facts. The skill that governs
- * all of this is `review-comments`.
+ * box. A missing file is SAID, never shown as an empty list. The governing
+ * skill is `review-comments`.
  *
- * ## Choosing how to see a change (bean `d903`)
+ * ## Choosing how to see a change
  *
  * Every changed block has a "Show this change as" selector over the renderers
  * in `schemas/ui/diff-renderers.ts`: a word diff of the source, the block inline
@@ -59,42 +56,39 @@
  * `scripts/review-renderers.ts` and `scripts/word-diff.ts`, embedded here
  * with `toString()`, so the functions the tests drive are the ones that run.
  *
- * ## Where to look first: the heat map (bean `qbfi`)
+ * ## Where to look first: the heat map
  *
  * Above the list, a section-by-metric table: changed blocks, open review
  * comments (defects apart), and stale comments (the block changed after the
  * comment was made). Review coverage and QA are columns too, and say per row
  * that they are not measured or not published YET, never 0. The numbers are
  * `scripts/review-heat.ts`, embedded with `toString()`. The tint is a
- * one-hue sequential ramp validated with the dataviz skill's validator in
- * both themes, and every cell also shows its number, so colour never carries
- * meaning alone. Each row's header moves focus to that section in the list.
+ * one-hue sequential ramp, and every cell also shows its number, so colour
+ * never carries meaning alone. Each row's header moves focus to that section.
  *
- * ## Finding your way: outline, breadcrumb, minimap (bean `eb4l`)
+ * ## Finding your way: outline, breadcrumb, minimap
  *
  * A navigation pane sits beside the list, or above it on a narrow screen:
  * - the **outline** of each document, in manifest order, from the preview's
  *   `outline.json`, with word badges per section. On a page with the harness
- *   rail it is a section OF THE RAIL (`railOutline`), not a column of the page
- *   (owner, 2026-10-07: *"i wanted the TOC in the LHS navbar, not LHS of
- *   displayed content"*); without a rail it stays in the pane;
+ *   rail it is a section OF THE RAIL (`railOutline`); without a rail it stays
+ *   in the pane;
  * - the **minimap**: one cell per block, a single tab stop, arrow keys to
  *   move, Enter to jump.
  *
  * Moving to an item announces where it is (document, chapter, section,
  * block) in the live status line. `n` and `p` jump to the next and previous
  * block with open comments, and `u` to the next changed block with no
- * reviewer verdict on its CURRENT version (bean `px0t`), each with a button
- * twin. Every changed block says in words whether it has a verdict, and
- * whose. A verdict on an older version is shown, and does not count. The
- * pieces are `scripts/review-nav.ts`, embedded with `toString()`. The owner's
- * ruling puts the outline here and nowhere else.
+ * reviewer verdict on its CURRENT version, each with a button twin. Every
+ * changed block says in words whether it has a verdict, and whose. A verdict
+ * on an older version is shown, and does not count. The pieces are
+ * `scripts/review-nav.ts`, embedded with `toString()`.
  *
- * ## Accessibility is not a finish
+ * ## Accessibility
  *
  * - Every change kind is a WORD, never a colour alone.
  * - `j` and `k` move to the next and previous change, and each has a visible
- *   button twin, so one key or one click does it.
+ *   button twin.
  * - Focus is always visible.
  * - The status line is `aria-live`.
  * - The list is built with DOM APIs, never `innerHTML`: a block label is folio

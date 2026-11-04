@@ -1,15 +1,9 @@
 /**
- * A bounded worker pool for gate and regen runs — bean `xpcu`.
+ * A bounded worker pool for gate and regen runs, so `bun run cat regen` and
+ * `bun run cat gates` use every core instead of one `bun` process at a time.
  *
  * @module scripts/task-pool
  * @graphNode none — a scheduling helper for `gates.ts` and `regen-after-merge.ts`
- *
- * ## Why it exists
- *
- * Measured on 2026-10-01 on a shared 4-CPU box: `bun run cat regen` asked ~84
- * verify/write pairs one after another (~25 min), and `bun run cat gates` ran ~200
- * gates one after another (50+ min). Most of that is waiting on one `bun`
- * process at a time while three cores idle.
  *
  * ## The one rule that makes concurrency safe here: OUTPUTS, declared
  *
@@ -18,15 +12,13 @@
  * (`task-io.ts`), never guessed:
  *
  * - a task with `outputs: undefined` (nothing declared) **conflicts with
- *   everything**, so it runs alone — exactly as it did before this module;
+ *   everything**, so it runs alone;
  * - two declared tasks conflict when one's outputs overlap the other's outputs
  *   or declared inputs ({@link pathsOverlap}).
  *
  * Conflicting tasks also keep their ORIGINAL ORDER: a task is never started
  * ahead of an earlier task it conflicts with. So an undeclared task is a
- * barrier — everything before it finishes first and nothing after it starts
- * until it is done — which is the serial behaviour, kept wherever the
- * declaration that would justify anything else is missing.
+ * barrier, and the run is serial wherever a declaration is missing.
  *
  * `regen` adds one more rule on top, {@link ReadWriteGate}: its checks are the
  * readers and its writers are serialized against everything, because a writer

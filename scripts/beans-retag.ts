@@ -3,29 +3,22 @@
  * Write `$schema: bean/1.0.0` back into every bean that lacks it, or, with
  * `--check`, fail on one that still lacks it.
  *
- * Bean `ujiv`, issue litlfred/cat-harness#88.
- *
  * ## Why the tag is restored rather than trusted
  *
  * A bean is a node kind (`bean/1.0.0`, `schemas/sdlc/bean-graph.ts#BeanKind`)
- * and says so in its own front matter, as every node-kind file does. But the
- * `beans` CLI owns that front matter. `beans update` rewrites it and drops every
- * key it does not know, `$schema` included (measured 2026-10-06 on a scratch
- * store), and `beans create` never writes one. A tag written once would be gone
- * the next time anyone claimed the bean.
- *
- * So the tag is put back after the CLI has had its turn: at session start,
- * before each commit, and by `state:push` before it splices the store onto its
- * branch. `--check` is the gate that says when none of those ran.
+ * and says so in its own front matter. But the `beans` CLI owns that front
+ * matter: `beans update` drops every key it does not know, `$schema`
+ * included, and `beans create` never writes one. So the tag is put back
+ * after the CLI has had its turn: at session start, before each commit, and
+ * by `state:push` before it splices the store onto its branch. `--check` is
+ * the gate that says when none of those ran.
  *
  * ## What it changes
  *
  * One line of front matter, inserted after the `# <id>` comment the CLI writes
- * first. Nothing else in the file moves, so a retag is a one-line diff per bean.
- *
- * A bean that already carries some OTHER `$schema` is reported and left alone.
- * Another tag is a newer major this script does not know, or a mistake, and in
- * either case overwriting it hides the finding.
+ * first, so a retag is a one-line diff per bean. A bean that already carries
+ * some OTHER `$schema` is reported and left alone (a newer major, or a
+ * mistake).
  *
  * ## Which store
  *

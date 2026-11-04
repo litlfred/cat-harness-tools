@@ -2,43 +2,21 @@
 /**
  * Beans a session judged finished but could not re-derive — the owner's batch.
  *
- * Bean `bbbl`. [`bean-coordination`](../work-plan/skills/work-plan/bean-coordination.md)
- * §"Closing a bean whose work has already landed" says a bean closes on
- * **evidence, not authorship**, and its first obligation is *re-derive, never
- * quote*. That obligation is the expensive one, and where it cannot be met the
- * rule had no exit: four beans read as finished in their own bodies and sat
- * `in-progress` — `7uff`, `t0i3`, `y8as`, `d1r6` — because every session that
- * met one discharged the collision the same way, by leaving it open.
+ * A bean closes on evidence, re-derived (`bean-coordination` §"Closing a bean
+ * whose work has already landed"). Where a session cannot re-derive it, it
+ * tags the bean `ready-to-close`; this lists every bean carrying the tag,
+ * with the evidence its session did find, for the owner to confirm.
  *
- * The third state is the `ready-to-close` **tag**. This lists every bean
- * carrying it, with the evidence its session did find, so the owner's
- * confirmation is one read rather than four.
+ * It is a tag, not a status: the status vocabulary belongs to the `beans` CLI,
+ * and `BeanStatusSchema` in `schemas/tools/tool-types.ts` mirrors exactly
+ * what `beans update --status` accepts.
  *
- * ## A tag, not a status, and the reason is mechanical
- *
- * ```
- * $ beans update <id> --status ready-to-close
- * Error: invalid status: ready-to-close (must be in-progress, todo, draft, completed, scrapped)
- * ```
- *
- * The status vocabulary belongs to the third-party CLI, and `BeanStatusSchema`
- * in `schemas/tools/tool-types.ts` is defined as *"exactly what `beans update
- * --status` accepts"*. A sixth value here would desync the schema from the
- * tool it documents on the next `beans` release.
- *
- * ## It reports and never acts
- *
- * Closing is the owner's, per
- * [`deletion-requires-confirmation`](../skills/conduct/conduct-core/deletion-requires-confirmation.md)
- * applied to the work plan — **unless** a `bean-close` waiver is in force, in
- * which case the session closing the batch names the waiver in its turn report:
- * [`confirmation-waiver`](../skills/conduct/conduct-core/confirmation-waiver.md).
- * This script does not read waivers and does not close anything; a waiver
- * changes who may act on the list, never what the list says.
+ * It reports and never acts: closing is the owner's
+ * (`deletion-requires-confirmation`) unless a `bean-close` waiver is in force
+ * (`confirmation-waiver`). This script does not read waivers.
  *
  * Exit: 0 always for the listing itself; **1** when a tagged bean carries no
- * `## Evidence` section, because an unevidenced `ready-to-close` is the parking
- * space the skill forbids.
+ * `## Evidence` section.
  *
  * @module folio-assistant/scripts/check-ready-to-close
  * @covers bean-defs, beans

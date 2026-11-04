@@ -1,49 +1,28 @@
 /**
  * ONE selector for "did this generator write this page, HERE?".
  *
- * Bean `s8nu`. Four selectors existed for one question, and `y90d` predicted
- * the fourth in advance — *"do not write a fifth"* — then wrote one, because
- * at that moment the third was not yet importable. This module is the third
- * being importable, so there is no reason left to mint another.
- *
- * ## Why a generator needs this at all
- *
  * A generator that writes and never deletes leaves a page serving a subject
  * the declaration no longer describes, at a URL nothing links to. `--check`
  * cannot see it: it inspects only the files it is about to write, so it finds
- * a page that is WRONG and never one that SHOULD NOT EXIST. Bean `ankg`,
- * found live when #604's rename left `folio-assist-sci/index.html` behind.
+ * a page that is WRONG and never one that SHOULD NOT EXIST. Use this rather
+ * than writing another selector.
  *
- * ## What is parameterised, and what deliberately is not
+ * ## What is parameterised, and what is not
  *
  * The **ownership test** is the parameter. The **unit** is not: this walks
- * directories that hold an `index.html`, full stop.
+ * directories that hold an `index.html`, full stop. Selectors over flat files
+ * (`prunableStickies` over `.json` files, the IRIS replica's
+ * `OWNED`/`OWNED_LIB`/`OWNED_DOCS` over filenames) are a different unit and
+ * stay outside it; widening the unit is a design step of its own.
  *
- * That split is the substance rather than a tidy-up. `s8nu` proposed the
- * ownership test as the axis and expected all four selectors to become call
- * sites, but two of them do not share this unit at all — `prunableStickies`
- * walks flat `.json` FILES, and the IRIS replica's `OWNED`/`OWNED_LIB`/`OWNED_DOCS`
- * match flat filenames because that site publishes no subject directories.
- * The bean names generalising the unit as *"a real design step rather than a
- * rename"* for `OWNED`, and does not notice `prunableStickies` sits on the
- * same side of that line. Widening this to cover them would be that design
- * step taken silently, so it is not taken here.
+ * ## The rules it applies
  *
- * ## Both callers gained something they did not have
+ * - A non-owned directory is **`foreign`** — a third state, listed and left
+ *   alone, never dropped silently.
+ * - An unreadable page is **not ours**, because a file we cannot read is one
+ *   we cannot prove we wrote; it is reported, never thrown on.
  *
- * The two that DO share the unit each held a rule the other lacked, which is
- * the argument for one implementation rather than two correct ones:
- *
- * - `orphanSubjectPages` reported a non-owned directory as **`foreign`** — a
- *   third state, listed and left alone. `prunableDashboards` dropped it
- *   silently, so a page it did not recognise and a directory it had examined
- *   and cleared looked identical.
- * - `prunableDashboards` treated an unreadable page as **not ours**, because
- *   a file we cannot read is one we cannot prove we wrote.
- *   `orphanSubjectPages` called `readFileSync` bare and would have THROWN on
- *   one — a generator aborting rather than reporting.
- *
- * Both behaviours are kept here. Neither was invented for this module.
+ * Its callers are `orphanSubjectPages` and `prunableDashboards`.
  *
  * @module scripts/orphan-pages
  */

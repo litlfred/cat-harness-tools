@@ -4,9 +4,9 @@
  *
  * @module cat-harness-tools/scripts/witness-conformance
  *
- * Bean `qou-qb6t` (story T1 of the qou tools migration). Every witness in the
- * folio's declared `computation-witness` directories is read and checked
- * against the two schemas in `cat-harness/schemas/computation-witness.ts`:
+ * Every witness in the folio's declared `computation-witness` directories is
+ * read and checked against the two schemas in
+ * `cat-harness/schemas/computation-witness.ts`:
  *
  * - the ENVELOPE, which every witness should meet. A failure means the file is
  *   malformed. So does a file that is not strict JSON, which Python's reader
@@ -15,9 +15,9 @@
  *   the producer, grouped by the fields it got wrong.
  *
  * **It reports and never writes.** A witness is generator output, and on a
- * mathematics folio its numbers are content the owner has ruled may not be
- * changed by a migration. The remedy for a finding is a change to the
- * producer, then a re-run, decided case by case.
+ * mathematics folio its numbers are content a migration may not change. The
+ * remedy for a finding is a change to the producer, then a re-run, decided
+ * case by case.
  *
  *   bun run cat witness:conformance                  # the folio in the cwd
  *   bun run cat witness:conformance --dir <path>     # a directory, declared or not
@@ -25,7 +25,7 @@
  *   bun run cat witness:conformance --strict         # exit 1 on a malformed file
  *
  * Without `--dir` and with no declared directory, it says so and exits 2: a
- * clean report over nothing is the `dh4f` defect, not a pass.
+ * clean report over nothing is not a pass.
  */
 import { readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";

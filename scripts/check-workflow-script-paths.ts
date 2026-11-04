@@ -2,42 +2,18 @@
 /**
  * Does a path-filtered workflow rebuild when the scripts it RUNS change?
  *
- * A `paths:` filter is a hand-maintained list, and this repository already has
- * the measurement saying that is not enough. `docs-site.yml` carried eight
- * named scripts, each added with a comment arguing — correctly — that a change
- * to that generator changes the published page while touching nothing under
- * `docs/`. The argument was right every time and the list still drifted: on
- * 2026-09-21 bean `tyyc` derived the set and found **11 of 22 uncovered**,
- * including `kg-export.ts`, which produces both graph documents the site
- * serves, and `publish-gh-pages.sh`, which performs the deploy.
+ * A `paths:` filter is a hand-maintained list; a change to a generator a
+ * workflow runs changes its output while touching nothing under the filtered
+ * directories. This checks the **directly invoked** scripts: a repo-relative
+ * `.ts` or `.sh` path appearing in a `run:` step must be covered by the
+ * filter.
  *
- * The cost was paid the same day. Bean `40fl` fixed a `kg-export` defect that
- * had kept `docs-site` red for over two hours, merged it to `main`, and **no
- * run fired** — a fix to the publisher did not rebuild what it publishes. The
- * outage and the silence after the fix were the same defect seen twice.
+ * It does NOT follow imports; a directory wildcard is the way to cover the
+ * transitive set, and is accepted.
  *
- * ## What this checks, and what it deliberately does not
- *
- * It checks the **directly invoked** scripts: a repo-relative `.ts` or `.sh`
- * path appearing in a `run:` step. That is a fact readable off the workflow.
- *
- * It does NOT follow imports. `kg-export.ts` imports a dozen modules, and
- * whether a change to one of those changes the published bytes is a question
- * about the import graph, not about this file. Claiming to check it here would
- * be a broader promise than the evidence supports — and a check that overstates
- * its own reach is the shape this repository keeps paying for. A directory
- * wildcard is the honest way to cover the transitive set, which is what
- * `docs-site.yml` now uses and what this check will accept.
- *
- * ## Third state
- *
- * A workflow with no `paths:` filter runs on every push, so it cannot be
- * under-covered and is reported as `unfiltered` rather than as a pass. A
- * workflow whose `run:` steps name no repo script is `no-scripts` — the same
- * distinction: nothing to cover is not the same fact as everything covered.
- *
- * **An empty workflow set exits 2.** A probe that found nothing must not print
- * a clean sweep — the `dh4f` shape, and the one this repository names most.
+ * A workflow with no `paths:` filter is reported as `unfiltered`, and one
+ * whose `run:` steps name no repo script as `no-scripts`, never as a pass.
+ * **An empty workflow set exits 2.**
  *
  * @covers none — .github/workflows/ is not a declared graph typology
  */

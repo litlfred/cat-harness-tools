@@ -1,13 +1,8 @@
 /**
  * Move a library's stored narratives from the single form to a one-entry
- * list that names its language — bean `cat-tools-e1lo`, step 3d.
- *
- * Owner ruling 2026-10-21 (cat-harness-tools drain session): every written
- * narrative becomes a one-entry list tagged `lang: "en"`. Measured before the
- * ruling: no library entry records a language anywhere, so the language is
- * the one the narratives were written in. All 1,090 then stored were agent
- * drafts in English (1,059 by a stopword check, 30 short captions too terse
- * for it, 1 not-authored).
+ * list that names its language (`lang: "en"` by default). No library entry
+ * records a language, so the language is the one the narratives were written
+ * in.
  *
  * What it does NOT touch, on purpose:
  * - a slot already in list form (it has its languages);

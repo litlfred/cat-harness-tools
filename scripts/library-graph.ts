@@ -6,73 +6,31 @@
  * @module scripts/library-graph
  * @graphNode none — a reader over the library graph, not a schema itself
  *
- * ## Why this exists
- *
  * `library/` is L1: every knowledge-graph reference to a source resolves
- * THROUGH it, never to a loose path or a bare URL. So it is the subgraph most
- * consumers depend on and the one nobody could look at. Bean `jbx2`.
+ * THROUGH it, never to a loose path or a bare URL.
  *
- * ## The finding that unblocks the badge — measured 2026-09-20
+ * ## Upload → entry is content-verified
  *
- * Bean `v1hw` states, as its blocker:
+ * Every `library/<slug>/manifest.jsonld` carries `meta.source_file` AND
+ * `meta.source_sha256`. The hash is recomputed here rather than trusted, so
+ * an entry matches its upload by CONTENT, not by name, and the relation
+ * survives a file moving between queues. That is what "N uningested" counts,
+ * counting documents and not plumbing (see {@link filesIn} on dotfiles).
  *
- * > **Nothing records that an upload was ingested.** … There is no marker on
- * > an upload, no back-reference on a library entry, and no manifest between
- * > them. So **"# uningested" is not a query anybody can currently run**.
+ * An entry with no `source_file` is **`unknown`**, never silently "not from
+ * an upload": the relation is only as good as the manifest.
  *
- * **That is not true of the corpus as it stands, and this module is the
- * evidence.** Every `library/<slug>/manifest.jsonld` carries
- * `meta.source_file` AND `meta.source_sha256`. Over the four entries here:
+ * ## Each declared `uploads` queue is counted on its own
  *
- * | entry | `source_file` | in an uploads queue | sha256 |
- * |---|---|---|---|
- * | `9789241548960-eng` | `9789241548960_eng.pdf` | yes | **match** |
- * | `milnorlink` | `milnorlink.pdf` | yes | **match** |
- * | `who-pub-tps-931` | `WHO_PUB_TPS_93.1.pdf` | yes | **match** |
- * | `wpr-rdo-2020-003-eng` | `WPR-RDO-2020-003-eng.pdf` | yes | **match** |
+ * Several instances may declare an `uploads/` (the repository root and
+ * `cat-harness` each do). Attribution follows declaration, so every count is
+ * per queue and the reader returns them separately; a merged count would
+ * report a set that does not exist.
  *
- * Four of four, and the hash is recomputed here rather than trusted — so the
- * relation is CONTENT-VERIFIED rather than name-matched, which is stronger
- * than any of the three shapes `v1hw` proposed inventing. The badge follows,
- * counting documents and not plumbing (see {@link filesIn} on dotfiles):
- * `uploads/` **26 uningested of 28**, `cat-harness/uploads/` **0 of 1**,
- * the IRIS replica's `uploads/` **1 of 4** — re-measured 2026-09-21, after bean `yl5w`
- * moved the three WHO sources out of the harness queue and into the folio
- * beside their own intake records.
+ * ## Read-only
  *
- * **The relation survived the move, and that is the evidence it is real.** All
- * six entries still report `upload=match` from a recomputed hash, across three
- * queues now instead of two: a name-matched relation would have broken the
- * moment the files changed directory, and this one did not notice. The one
- * uningested file under the IRIS replica's `uploads/` is the IRIS home capture, which is
- * a page grab rather than a document — uningested is the correct answer for it
- * rather than a backlog.
- *
- * So the harness layer's own queue is down to a single document and the
- * repository root's is untouched — which is a fact about this corpus that
- * nobody could state before, and the sharper reading of `v1hw`'s "those
- * numbers cannot be subtracted": they could not be subtracted, and they never
- * needed to be. The relation was on the manifest all along.
- *
- * What `v1hw` got right, and this keeps: the relation is only as good as the
- * manifest, so an entry with no `source_file` is **`unknown`** and never
- * silently "not from an upload". Three states, and the middle one is the one
- * that matters.
- *
- * ## Two instances declare `uploads`, and they are NOT merged
- *
- * The repository root declares `uploads/` and `cat-harness` declares its own.
- * They are two declarations on purpose, and attribution follows declaration —
- * so a viewer showing one queue of 28 would report a set that does not exist.
- * Every count here is per queue, and the reader returns them separately.
- *
- * ## What is NOT here, and why
- *
- * No ingestion is triggered and nothing is written. `jbx2`'s upload+process
- * affordance and the materialise-into-a-folio action are WRITES, and the
- * write path is the owner's open call on `yj32`. The owner's later
- * instruction — *"w/o edit functionality"* — is what lets the read-only half
- * ship first, and this module is that half.
+ * No ingestion is triggered and nothing is written; upload, process and
+ * materialise-into-a-folio are writes, and live elsewhere.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 

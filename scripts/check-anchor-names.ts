@@ -2,66 +2,22 @@
 /**
  * A name that claims an anchor must land on it.
  *
- * Bean `b963`, the `re-rooted-ascent` shape. The defect: `const PLATFORM = resolve(
- * import.meta.dir, "../..")` in `init-folio.test.ts` was the repository root
- * while the tests lived at `scripts/tests/`, and silently became the
- * `cat-harness/` directory when they moved. **The suite went on passing** — by
- * modelling a layout that no longer existed, and so asserting that the
- * scaffolder should keep emitting the pre-split paths.
- *
- * The shapes are NAMED rather than numbered, in `b963`'s register. The
- * ordinals collided: `b963` numbered shapes in discovery order while `7iog`
- * numbered the readers `check:command-paths` had, and both were counts in
- * prose. `7iog`'s shape is `execution-context` — a PEER rather than a later
- * instalment, because every `b963` shape is *the literal is stale* and that
- * one is *the literal is fine and the frame is wrong*.
- *
- * ## This check does NOT catch that defect, and says so
- *
- * Three designs were measured against this corpus and all three failed:
- *
- * | signal | findings | why it failed |
- * |---|---|---|
- * | refuse hand-rolled ascents | 301 | most ARE the idiom; unimplementable |
- * | lands on a non-existent directory | 8 | 7 were ordinary write targets |
- * | the ascent's depth is "wrong" | — | **no literal to check**: `"../.."` is always valid, and the right depth is a fact about where the file sits |
- *
- * What made the real case wrong was not the ascent or its depth. `PLATFORM`
- * → `cat-harness/` is defensible. It was what the fixture then DID with the
- * value: symlinked it as `folio-assistant` and expected `schemas/` directly
- * beneath. That is a semantic relation between an ascent and its downstream
- * use, and every signal that tried to infer intent produced false positives.
- *
- * ## What it does instead: remove the ambiguity the defect hid behind
- *
- * A reader of `PLATFORM` cannot tell which directory it holds — and **measured
- * on this corpus, neither can the corpus**: within `scripts/tests/` alone,
- * `init-folio.test.ts` used `PLATFORM` for the repository root while five
- * siblings used it for `cat-harness/`. One name, two anchors, one directory.
- * That is exactly the confusion the original defect lived inside.
- *
- * So the rule is definitional rather than a guess, which is why it has no
- * false positives:
+ * The rule is definitional, so it has no false positives:
  *
  * > **`REPO_ROOT`, `REPO`, `repoRoot` must land on the repository root.
  * > `INSTANCE_ROOT`, `instanceRoot` must land on a directory carrying its own
- * > `harness.json`. `PLATFORM` and `platformRoot` name neither and are
- * > refused** — rename to whichever is meant.
+ * > `harness.json`. `PLATFORM`, `platformRoot` and `platformDir` name neither
+ * > and are refused** — rename to whichever is meant.
  *
  * The repository root is found by walking up to `.git`, and an instance by its
- * `harness.json`, so neither anchor is a literal this check could get wrong in
- * the same way the code it audits did.
+ * `harness.json`, so neither anchor is a literal this check could get wrong.
  *
- * ## What it is worth
+ * It does NOT judge whether a hand-rolled ascent (`"../.."`) has the right
+ * depth or is used correctly downstream; no signal for that was free of false
+ * positives. Trustworthy names are the precondition for such a check.
  *
- * Names become trustworthy. That is worth something on its own — a reader of
- * `gen-skill-docs.ts` currently sees `REPO_ROOT` feeding `kgDirectories()`,
- * which takes an INSTANCE root, and has to read the callee to find out which
- * is true. It is also the precondition for ever building the check that would
- * catch the real defect: comparing an ascent against its downstream use is
- * hopeless while the name carries no information.
- *
- * Exit: 0 clean, 1 a mismatched or ambiguous name, 2 could not check.
+ * Exit: 0 clean, 1 a mismatched or ambiguous name (or no file read), 2 could
+ * not check.
  *
  * @module folio-assistant/scripts/check-anchor-names
  * @covers docs

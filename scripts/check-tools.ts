@@ -2,29 +2,19 @@
 /**
  * Every `satisfies` names a skill that exists, and every skill has a Tool.
  *
- * `ToolDefinitionSchema` can require `satisfies` to be non-empty; it cannot
- * know whether the names resolve, because a schema does not get to read the
- * tree. That is this.
+ * `ToolDefinitionSchema` requires `satisfies` to be non-empty; this checks the
+ * names resolve against the tree.
  *
- * ## Both directions, and they mean different things
+ * **A `satisfies` naming no skill** is a dangling edge. Hard error.
  *
- * **A `satisfies` naming no skill** is a dangling edge — the Tool claims to
- * implement something that does not exist, and an agent following the graph
- * from Tool to skill lands nowhere. Hard error.
+ * **A skill with no Tool** is reported, NOT an error: many skills are pure
+ * judgement (`interaction-modality`, `one-voice-style-guide`), while a skill
+ * that describes an action and has no Tool still has its mechanism inlined in
+ * prose.
  *
- * **A skill with no Tool** is the more interesting one and is NOT an error. The
- * skill/Tool separation says a skill states a capability generically; plenty of
- * skills are pure judgement (`interaction-modality`, `one-voice-style-guide`)
- * and have no mechanism to name. What matters is that the number is *reported*,
- * because a skill that describes an action and has no Tool is a skill whose
- * mechanism is still inlined in its prose — the migration debt
- * `skills-and-tools` names.
- *
- * Deliberately NOT here: whether `io.*.schema` IRIs dereference. They point at
- * the published type document, which does not exist until CI publishes it, so
- * checking it locally would fail on every developer machine and be switched
- * off. What IS checked is that every `$defs` name a Tool references is one the
- * shared vocabulary actually declares — the half that can be known offline.
+ * Not checked: whether `io.*.schema` IRIs dereference (the type document only
+ * exists once CI publishes it). Checked instead: every `$defs` name a Tool
+ * references is one the shared vocabulary declares.
  *
  * @module scripts/check-tools
  * @covers tools, skills

@@ -1,39 +1,21 @@
 #!/usr/bin/env bun
 /**
- * The NETWORK half of `bean-quiet-claims` — bean `thux`, which measured it by
- * hand and said it is not computable in the health check.
+ * The NETWORK half of `bean-quiet-claims`: liveness signals the health check
+ * cannot compute.
  *
- * `bun run cat health` reports quiet claims from ONE signal: hours since the bean's
- * own `updated_at`. Its threshold `basis` is explicit that the resulting count
- * is an **UPPER BOUND**, because a bean it lists may have a liveness signal the
- * sweep cannot see. `bean-coordination.md` §"A quiet claim" names the three:
+ * `bun run cat health` reports quiet claims from hours since the bean's own
+ * `updated_at`, an UPPER BOUND. A claim is live when an open PR names it, an
+ * unmerged branch touches it, or a note was added since
+ * (`bean-coordination.md` §"A quiet claim"). This script checks the first two.
  *
- *   > A claim is LIVE when something outside the bean says so — an open PR
- *   > naming it, an unmerged branch touching it, or a note since.
+ * **It never changes a bean's status**: quiet is not evidence of completion.
  *
- * The first two are here. The third is the `updated_at` the check already reads.
+ * A PR that merely MENTIONS a bean counts as a signal (naming is the test);
+ * the ref and PR number are printed so a person can look.
  *
- * **This script never changes a bean's status**, and that is a rule rather than
- * an omission. The same skill: *"quiet is never evidence of completion, so a
- * quiet claim goes back to the pool rather than being closed"*, and *"nothing
- * re-statuses one automatically"*. What a person does with the list is take an
- * item, having said in the bean that they checked.
- *
- * **A pull request that MENTIONS a bean counts as a signal, and that is a real
- * limitation rather than a bug.** `bean-coordination` states the signal as "an
- * open PR naming it", so naming is the test. Measured on the first real run of
- * this script: `q2wm` came back live on PR #1347 — which is the pull request
- * that ADDED this script, and named `q2wm` in a list of work still to come. A
- * reader who follows the signal finds a mention, not a session. Narrowing it
- * would mean ruling on what a PR has to say about a bean to be working it, and
- * that is a judgement this sweep has no business making silently; the ref and
- * PR number are printed so a person can look.
- *
- * Exit codes follow `check-head-has-run`: **0** however many findings, because
- * a quiet claim is a fact about the repository rather than a defect in it, and
- * **2** when a signal could not be established — an unreachable API or an
- * unmeasurable ref age is NOT reported as "no signal found", which would turn
- * could-not-look into the shape of nothing-was-there.
+ * Exit: **0** however many findings (a quiet claim is a fact, not a defect);
+ * **2** when a signal could not be established (an unreachable API or an
+ * unmeasurable ref age is never reported as "no signal found").
  *
  *   bun run cat-harness-tools/scripts/check-quiet-claim-liveness.ts
  *   bun run cat-harness-tools/scripts/check-quiet-claim-liveness.ts --no-fetch

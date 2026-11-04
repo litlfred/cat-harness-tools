@@ -2,10 +2,11 @@
 /**
  * @module validate-skills
  * @covers skills
- * @description Validates all skill package manifests against SkillPackageManifest schema
- * and all .claude/skills/ JSON files against their respective schemas.
+ * @description Validates all skill package manifests against SkillPackageManifest schema,
+ * and the actor, capability, requirement and skill-definition JSON files in
+ * their declared homes against their respective schemas.
  *
- * Usage: npx ts-node cat-harness/scripts/validate-skills.ts
+ * Usage: bun run cat check:skills
  */
 
 import type { z } from "zod";

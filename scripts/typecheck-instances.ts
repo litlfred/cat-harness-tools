@@ -6,13 +6,10 @@
  * ## Why a script and not a loop in the workflow
  *
  * In the index checkout the root owns no code and has no `tsconfig.json`, so
- * the typecheck runs per instance: each against its own config, which is what
- * it is checked against standing alone. That was first written as a shell
- * `for cfg in <each instance>/tsconfig.json` loop in the workflow step. `bun run cat gates`
- * keeps only a step's `bun …` lines, so it read `tsc -p "$cfg"` with the loop
- * variable discarded, could not run it, and the typecheck silently stopped
- * being a local gate (`gates-workflows.test.ts`, folio-assistant#2518). One
- * command is what both CI and the local gate set can run.
+ * the typecheck runs per instance, each against its own config. `bun run cat gates`
+ * keeps only a step's `bun …` lines and cannot run a shell loop, so one
+ * command is what both CI and the local gate set can run
+ * (`gates-workflows.test.ts`).
  *
  * ## Why the launcher is named by path
  *

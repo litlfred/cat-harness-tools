@@ -6,69 +6,43 @@
  * @module scripts/check-library-qa
  * @covers library
  *
- * Issue #1794, bean `8iqc`. Owner, 2026-10-01, looking at the IRIS replica's
- * library page: *"library entry is uninformative. no titles. and sometime
- * weird ones. review/QA checks on library assets after ingestion/KG build"*.
+ * `check:l1-complete` asks whether ingestion PRODUCED each artefact; this asks
+ * whether what is there is any GOOD (a title equal to the slug passes every
+ * completeness test).
  *
- * ## Why this is a separate check from `check:l1-complete`
+ * Every finding names the entry, its instance, and the FIELD it read.
  *
- * `check:l1-complete` asks whether ingestion PRODUCED each artefact an entry
- * owes — sections, blocks, OCR, images. It answers "is it there". This asks
- * whether what is there is any GOOD: a manifest whose `title` is the slug, or
- * the first OCR line off a scanned cover, passes every completeness test there
- * is. `who-pub-tps-931` is complete by `l1-complete` and is called *Abies*.
- *
- * ## The families, and what each reads
- *
- * Every finding names the entry, its instance, and the FIELD it read, so a
- * reader can go to the file rather than trust the summary.
- *
- * ## Titles are judged against their PROVENANCE
- *
- * The owner's ruling of 2026-10-01 fixed the order a title is taken in:
- * catalogue record (Dublin Core) → `referenced.json` → PDF Info `/Title` →
- * slug. The page-1 front-matter parse is NEVER a title. Bean `w6fu` (ruling
- * of 2026-10-02 on #1838) added an editor's `title_correction` above the
- * catalogue and a CORROBORATED extracted title (`title_verified: true`) just
- * above the slug; an unverified one is still the excluded guess.
- * `pipeline/library-title.ts` implements the order, and the generator
- * records which source won in `manifest.jsonld` `meta.title_source`. These
- * checks read that field. They also re-derive the order from the entry's
- * files, so a manifest that claims one source while a higher one exists is
- * caught rather than believed.
+ * Title authority order: editor's `title_correction` → catalogue record
+ * (Dublin Core) → `referenced.json` → PDF Info `/Title` → corroborated
+ * extracted title (`title_verified: true`) → slug. The page-1 front-matter
+ * parse is never a title. `pipeline/library-title.ts` implements the order
+ * and records the winner in `manifest.jsonld` `meta.title_source`; these
+ * checks read that field and also re-derive the order from the entry's files.
  *
  * - `title-missing` — `manifest.jsonld` `title` is absent; `meta.title_source`
  *   is `slug`, meaning no source offered a title; or the title equals the
  *   slug, `meta.doc_id` or the source's file name.
  * - `title-implausible` — a single short token; a doubled word; no recorded
  *   `meta.title_source`; a title that is not the one the authority order
- *   gives today (a stale manifest, a hand edit, or a source that outranks the
- *   one recorded); or one that DISAGREES with the highest source the entry
- *   has. Under the resolver the last two cannot happen, so a finding here is
- *   always a defect.
+ *   gives today; or one that DISAGREES with the highest source the entry has.
  * - `title-self-declared` — the title is the source's own word for itself
  *   (PDF Info `/Title`, or a text or notebook heading) and no catalogue record
- *   or `referenced.json` corroborates it. Listed, not silent: "nothing to
- *   check it against" must not read as "checked".
+ *   or `referenced.json` corroborates it.
  * - `bibliographic-missing` — no author/publisher, or no year, among the
  *   fields the ENTRY declares (`manifest.meta`, `referenced.json` `identity`,
  *   `tabular.jsonld` `source`), unless `meta.bibliographic_not_in_source`
  *   gives a reason. Each finding lists where the missing value IS readable but
- *   not carried (the DC record, PDF Info), which is what a fix would read.
+ *   not carried (the DC record, PDF Info).
  * - `block-no-content` — prose blocks the library viewer renders as
- *   *"(no content carried)"* while the entry holds words. Says whether the
- *   entry is WITHHELD, because that is the usual cause and it is by design.
+ *   *"(no content carried)"* while the entry holds words; says whether the
+ *   entry is WITHHELD (the usual, intended cause).
  * - `summary-backlog` — prose blocks with no current summary, per entry.
- *   A count, advisory: the drain is slow on purpose.
+ *   A count, advisory.
  * - `could-not-determine` — a file the judgement needs exists and cannot be
- *   read. Never a pass, and the one family `--check` FAILS on.
+ *   read. Never a pass.
  *
- * ## Advisory, deliberately
- *
- * The findings are a backlog against a corpus nobody has curated yet; a gate
- * that refused every push until 57 entries had authors would be switched off
- * within a week (`audit-coverage` §"What --check fails on"). `--check` fails on
- * a STALE sidecar and on `could-not-determine`, and on nothing else.
+ * Advisory: `--check` fails only on a STALE sidecar and on
+ * `could-not-determine`.
  *
  * Usage:
  *   bun run cat check:library-qa          # judge, and write the sidecar

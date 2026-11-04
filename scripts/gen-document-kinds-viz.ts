@@ -6,17 +6,14 @@
  * @covers document-kinds
  * @graphNode none — a generator over the document-kinds graph, not a schema itself
  *
- * Sibling of `gen-voices-viz.ts`, in its placement: one index under
+ * Placed like `gen-voices-viz.ts`: one index under
  * `<site>/<handler>/document-kinds/` and one page per SUBJECT instance under
  * it, each naming the directories it draws (`renders`) and this generator's
- * Tool (`rendered-by`). Static pages — a kind is a short structure, and there
- * is nothing to filter.
+ * Tool (`rendered-by`). Static pages — there is nothing to filter.
  *
- * Generic on purpose: core knows that document kinds exist and never which
- * (`schemas/content/document-kind.ts`). The WHO DAK and L1 kinds are the DAK base
- * layer's DATA, and this page draws them because that layer declares them — the same
- * way it would draw any other harness's. Stage D5 of the smart-* separation,
- * #1767, bean `qvxh`.
+ * Generic: core knows that document kinds exist and never which
+ * (`schemas/content/document-kind.ts`). The WHO DAK and L1 kinds are the DAK
+ * base layer's DATA, drawn because that layer declares them.
  *
  * ## What each kind's card must show
  *

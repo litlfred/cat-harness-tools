@@ -5,41 +5,25 @@
  * @module scripts/gen-default-boards
  * @covers boards
  *
- * The owner, 2026-09-21:
+ * A harness instance's default rendering is LHS + docs/ + a themed folio
+ * board, so every instantiated harness gets one; a folio does not opt in.
  *
- * > Any harness above bootsteap has a board filled with all contents.
+ * ## "Filled with all contents" is the ABSENT filter
  *
- * and, in `yj32`, what that board is FOR: *"a harness instance's default
- * rendering is LHS + docs/ + a themed folio board"*. So a board is not
- * something a folio opts into — it is part of what an instantiated harness
- * renders, and this writes the one every such harness owes.
- *
- * ## "Filled with all contents" is the ABSENT filter, and that is a convergence
- *
- * `schemas/ui/board.ts` already decided this, from a different question: a board
- * with no `filter` shows the whole folio, chosen because a stored selection
- * needs a staleness check and a query has nothing to fall behind. So the
- * default board is the MINIMAL one — id, title, nothing else — and "filled
- * with all contents" and "declares no selection" turn out to be the same
- * document. Bean `8hg7` expected to scaffold "an empty board"; the empty board
- * IS the full one.
+ * In `schemas/ui/board.ts` a board with no `filter` shows the whole folio, so
+ * the default board is the MINIMAL one — id, title, nothing else.
  *
  * ## "Above bootstrap" is read from the DECLARATION, not from a name
  *
- * `bootstrap` is exempt: its own `renderExemption` says why in its own
- * words — *"bootstrap IS the navbar footer… it produces nothing a human
- * browses"* — and a layer that renders nothing has nothing to put on a board.
- * So the test is {@link isExemptFrom}`(decl, "visualiser")`, the same rule the
- * navbar tiles sort by, rather than a check for the string `bootstrap`.
- * A checker that names one instance states a rule true only for the instance
- * somebody remembered (bean `hfkl`).
+ * The test is {@link isExemptFrom}`(decl, "visualiser")`, the rule the navbar
+ * tiles sort by: bootstrap's own `renderExemption` says it renders nothing a
+ * human browses. No instance is named here.
  *
  * ## INSTANTIATED, not merely present
  *
- * Owner, the same day: *"only the instiatiated harnesses (not all dependent
- * ones)… so repo root has `<harness>.config.json`"*. A dependency that happens
- * to sit in this checkout is not a harness this repository renders, so it is
- * not owed a board either. One signal, used by the navbar and by this.
+ * Only instantiated harnesses (the repository root has a
+ * `<harness>.config.json`) get a board; a dependency that merely sits in the
+ * checkout does not. The navbar uses the same signal.
  *
  * Usage:  bun run cat-harness-tools/scripts/gen-default-boards.ts [--check]
  *

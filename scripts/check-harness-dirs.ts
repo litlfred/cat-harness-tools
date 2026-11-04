@@ -3,30 +3,26 @@
  * The harness's two stores are declared in two files. This is what keeps them
  * from disagreeing.
  *
- * `harness.config.json`'s `harness` block is where a folio STATES where its work
- * plan and workflow state live. `.beans.yml` is what the `beans` binary
- * actually READS — it is a third-party tool and does not know
- * `harness.config.json` exists. So the same path is written twice by necessity,
- * and two configs that can drift is precisely the defect this repository has
- * paid for repeatedly.
- *
- * The duplication is not the problem; an *unchecked* duplication is. This makes
- * a disagreement a build failure on the day it is introduced rather than on the
- * day somebody's beans silently go to a second store.
+ * The bean graph declaration is where a folio STATES where its work plan
+ * (`bean-defs`) and workflow state (`workflow-state`) live. `.beans.yml` is
+ * what the `beans` binary actually READS — it is a third-party tool and does
+ * not know the bean graph exists. So the same path is written twice by
+ * necessity, and this makes a disagreement a build failure on the day it is
+ * introduced.
  *
  * ## What it checks
  *
- * 1. `harness.workPlan` equals `beans.path` in `.beans.yml`.
- * 2. `harness.workflowState` is what `workflow/store.ts` compiled in.
- * 3. Neither path is dot-prefixed at its first segment — the whole point of the
- *    move is that a person can see them.
+ * 1. The declared `bean-defs` path equals `beans.path` in `.beans.yml`.
+ * 2. The declared `workflow-state` path is what `workflow/store.ts` compiled in.
+ * 3. Neither path is dot-prefixed at its first segment, so a person can see
+ *    them.
  * 4. The declared work-plan directory exists and holds beans.
  *
  * ## Third state
  *
- * A folio with no `harness.config.json`, or with no `harness` block, is **not** a
- * failure: the schema defaults are the answer, and a folio that has not opted in
- * is reported as `not configured` rather than as wrong. Exit 2 is "could not
+ * A folio with no bean graph declaration is **not** a failure: the documented
+ * default layout is the answer, and it is reported rather than judged wrong.
+ * A declaration that will not parse is a failure. Exit 2 is "could not
  * check" and is never rendered as a pass — same rule as `check-ci-health.ts`.
  *
  * Usage:

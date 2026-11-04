@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
- * Cap the number of `STAGING/<slug>/` review previews on the publish branch,
- * rotating the oldest off.
+ * Cap the total size of the `STAGING/<slug>/` review previews on the publish
+ * branch, rotating the oldest off.
  *
  * @module scripts/staging-rotate
  * @covers none — a WRITER the deploy calls, not an audit: it removes previews over the cap, and judges nothing else
@@ -10,31 +10,18 @@
  * bun run cat-harness-tools/scripts/staging-rotate.ts --dir pages --current "$STAGING_SLUG" --summary-out rotated.txt
  * ```
  *
- * ## Why this exists — issue #1868
- *
  * GitHub Pages deploys `gh-pages` as-is, and every per-PR preview under
- * `STAGING/<slug>/` is a full copy of the site — roughly 200–500 MB each. With
- * nothing bounding how many existed at once, the branch passed GitHub's 10 GB
- * Pages artifact limit and the LIVE site stopped deploying on 2026-10-01. The
- * removal paths that existed (`cleanup` on PR close, `cleanup-dispatch` for
- * orphans — bean `w2g5`) are all per-preview and event-driven; none of them
- * bounds the TOTAL, which is the quantity the limit is about.
+ * `STAGING/<slug>/` is a full copy of the site, so the TOTAL must stay under
+ * GitHub's 10 GB Pages artifact limit. The per-preview removal paths
+ * (`cleanup` on PR close, `cleanup-dispatch` for orphans) do not bound it, so
+ * this caps the total by SIZE (`MAX_PREVIEW_BYTES`, 3 GiB; preview sizes
+ * vary too much for a count).
  *
- * **Owner ruling, 2026-10-02:** *"for going forward, we should cap the maximum
- * number of previews (<= 10) and rotate old ones off."* **Amended 2026-10-04:**
- * the cap is by SIZE, not count — *"Cap by size, not count"*, budget *"3gb"*.
- * Previews had grown from ~88 MiB (2026-09-22) to 200–780 MB each, so ten of
- * them was 3–5 GB and any one lasted an hour or two before rotating off; a
- * count bounds the total only as well as preview size is stable, and it was
- * not. The total is the quantity GitHub's limit is about, so the total is
- * what is capped. The ruling is the
- * confirmation `deletion-requires-confirmation` asks for, given once for the
- * whole class rather than per preview. What the skill still asks of every
- * removal is a RECORD, and this script leaves three: a `removed` entry in the
- * render log, the preview's `staging-preview.json` retired into
- * `STAGING/_retired/` (bean `6pfo` — retirement is a state, not a deletion),
- * and a line per preview in the commit message and the job log, with its age
- * and size.
+ * The owner's rule is the confirmation `deletion-requires-confirmation` asks
+ * for, given once for the whole class. Every removal still leaves a RECORD: a
+ * `removed` entry in the render log, the preview's `staging-preview.json`
+ * retired into `STAGING/_retired/`, and a line per preview in the commit
+ * message and the job log, with its age and size.
  *
  * ## A rotated-off preview is not lost work
  *
@@ -46,11 +33,9 @@
  * ## How "last updated" is determined, in order
  *
  * 1. **`STAGING/<slug>/.staged-at`** — an ISO timestamp this script writes into
- *    the preview being staged, every time it is staged. The authoritative
- *    answer for every preview staged after this script landed.
+ *    the preview being staged, every time it is staged. Authoritative.
  * 2. **The render log** — the latest `rendered` or `restored` entry for
- *    `STAGING/<slug>` in `_render-log/*.jsonl` (bean `5mg5`). Accurate for any
- *    preview staged since the log existed.
+ *    `STAGING/<slug>` in `_render-log/*.jsonl`.
  * 3. **`staging-preview.json`'s `builtAt`** — when the preview FIRST appeared
  *    (`staging-record.ts` deliberately does not walk it forward). A lower bound
  *    on the last update, so a preview known only this way sorts as older than
@@ -61,28 +46,24 @@
  *    other; ties then break by slug so the choice is at least deterministic.
  *
  * A preview whose age could not be determined at all sorts OLDEST and the log
- * says so. That is the one place this leans towards removal, and it is
- * deliberate: an unknown-age preview is overwhelmingly one that predates every
- * signal above, and the cap is the owner's rule — leaving it standing would let
- * the very previews that caused #1868 sit outside the bound forever.
+ * says so — the one place this leans towards removal, since an unknown-age
+ * preview predates every signal above and would otherwise sit outside the
+ * bound forever.
  *
  * ## What is never touched
  *
- * - **The preview being staged** (`--current`). It always takes one of the N
- *   slots, so the cap counts it.
+ * - **The preview being staged** (`--current`). It always stays, and the cap
+ *   counts it.
  * - **`STAGING/_retired/`** and anything that is not a preview directory: plain
  *   files, dot-entries, `_`-prefixed reserved names, and names the staging
- *   slug pipeline could not have produced. Conservative on purpose — an entry
- *   this script does not recognise is somebody else's, and a cap that deleted
- *   it would be `plj1` with a better excuse.
+ *   slug pipeline could not have produced. An entry this script does not
+ *   recognise is somebody else's.
  *
  * ## Why it runs inside the push loop
  *
  * The stage job re-reads `gh-pages` on every push attempt and re-runs this
- * against the fresh tree. A removal decided against a stale read and REPLAYED
- * by a rebase could remove a preview another run has just refreshed — or
- * conflict with it and lose this run's deploy. Re-deciding per attempt means
- * the removal pushed is always the one the current tree warrants.
+ * against the fresh tree, so the removal pushed is always the one the current
+ * tree warrants — never one decided on a stale read and replayed by a rebase.
  */
 import { spawnSync } from "node:child_process";
 import {

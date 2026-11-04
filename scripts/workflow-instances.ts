@@ -1,27 +1,16 @@
 #!/usr/bin/env bun
 /**
  * How many recorded workflow instances there are against how many merges —
- * computed, never quoted. Bean `folio-assistant-5ulq`.
+ * computed, never quoted, so whoever reads it reads today's number.
  *
- * ## Why this is a command
+ * ## Advisory
  *
- * `process-state` §"Naming it is not the same as recording it" cited bean
- * `vlhk`'s count — 54 merges in one window and an empty instance directory —
- * as prose. Two weeks later the same breach measured 755 merges against 9
- * instances (`5ulq`, 2026-10-02), and the quoted 54 had gone stale by ~14×
- * with nothing to say so. A number that matters is computed by a command, so
- * whoever reads it reads today's.
+ * This REPORTS the gap and never fails on it: a `finding` exits 0. It is not
+ * wired into CI as a gate, and must not be.
  *
- * ## Advisory, by ruling
- *
- * The owner, 2026-10-10 (`5ulq`, options gate / advisory / scrap): **make it
- * advisory**. So this REPORTS the gap and never fails on it: a `finding` exits
- * 0. It is not wired into CI as a gate, and must not be — that would be the
- * "gate it" option, which was not chosen.
- *
- * Three states all the same (`kg:audit`'s discipline): `unknown` — the store
- * cannot be reached, the clone is shallow, an instance file does not parse —
- * exits 2, because a count over data that could not be read is not a count.
+ * `unknown` — the store cannot be reached, the clone is shallow, an instance
+ * file does not parse — exits 2, because a count over data that could not be
+ * read is not a count.
  *
  * ## The denominator is an upper bound, and says so
  *

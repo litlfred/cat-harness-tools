@@ -1,21 +1,17 @@
 /**
- * Checks whose answer `regen` already has from other pairs — bean `8qyc`.
+ * Checks whose answer `regen` already has from other pairs.
  *
  * @module scripts/pair-cover
  * @graphNode none — a declaration table read by `regen-after-merge.ts`
  *
- * ## The duplication this removes
+ * ## What is covered
  *
- * Measured on `main` 2026-10-05 (`regen --dry-run --no-cache --jobs 1`, 117
- * pairs, 637 s): two of the three slowest pairs re-ran work the run was doing
- * anyway.
- *
- * - **`skill:register:check` (107 s, a barrier)** is a declaration audit (1.5 s)
- *   plus `bun run` of nine checks, {@link CHECKS} in `skill-register.ts`. Every
- *   one of the nine is ALSO a gate, so regen asks each of them as a pair of its
- *   own, spelt identically.
- * - **`kg:audit:check` (81 s)** is `kg-audit.ts --check --against main` for the
- *   `cat-harness` instance. `kg:audit:all:check` (198 s) spawns exactly that
+ * - **`skill:register:check`** is a declaration audit plus `bun run` of the
+ *   checks in {@link CHECKS} (`skill-register.ts`). Every one of them is ALSO
+ *   a gate, so regen asks each of them as a pair of its own, spelt
+ *   identically.
+ * - **`kg:audit:check`** is `kg-audit.ts --check --against main` for the
+ *   `cat-harness` instance. `kg:audit:all:check` spawns exactly that
  *   for every declared instance, `cat-harness` included, and
  *   `--instance ./cat-harness` resolves to the auditor's own root, so the run
  *   is the same program on the same root with the same flags. The coverer's
@@ -30,8 +26,7 @@
  * where the residual is what the covered check judges that no coverer does
  * (`skill:register:check`'s declarations), or nothing. Both sides are read in
  * the SAME pass, from the same tree, so the conjunction is what the covered
- * check would have answered had it been run then. Every artefact the covered
- * check verifies is still verified, by the pair that owns it.
+ * check would have answered had it been run then.
  *
  * A covered check is folded only when EVERY coverer is among the pairs being
  * asked in that pass. A run that asks a subset — `--fast`, or a `--changed` run
@@ -41,7 +36,7 @@
  *
  * ## What it does not change
  *
- * `gates` runs `skill:register:check` and `kg:audit:check` whole, as before;
+ * `gates` runs `skill:register:check` and `kg:audit:check` whole;
  * this table is read only by `regen`. The layer PR checks fold
  * `skill:register:check` the same way on their own
  * (`.github/scripts/layer-pr-checks/run-gates.py`, `fold_skill_register`).

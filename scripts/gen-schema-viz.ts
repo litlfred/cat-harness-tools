@@ -6,55 +6,35 @@
  * @graphNode none — a generator over the schema graph, not a schema itself
  * @covers none — writer — regenerates the visualisation; judges nothing
  *
- * ## The three pieces, and why the projection is separate from the page
- *
- * `schema-graph.ts` reads; this writes two artefacts and neither is the other:
+ * `schema-graph.ts` reads; this writes two artefacts:
  *
  * - **`<site>/assets/schemas/index.json`** — the projection. One indented JSON
  *   file, emitted through the same `--check` contract `gen-docs-pages.ts`
- *   uses for the todo and bean indices.
+ *   uses for the todo and bean indices. Other consumers draw from it too.
  * - **`<site>/schemas/index.html`** — the viewer. Carries no data of its own
  *   and fetches the projection **relative to its own location**, so the same
- *   bytes are correct at the canonical base and at a staging slug. That rule
- *   is `kg-viewer.ts`'s and it is the reason there is no base URL anywhere in
- *   this file.
- *
- * Keeping them apart is what lets something ELSE draw the graph. A viewer that
- * embedded its data would make every other consumer re-read the `.ts`.
+ *   bytes are correct at the canonical base and at a staging slug
+ *   (`kg-viewer.ts`'s rule; no base URL appears here).
  *
  * ## Where they go — resolved, never composed
  *
- * The owner's rule, 2026-09-20: rendered assets live at
- * `<base>/<instantiated harness>/<path to rendered content>`, relative to the
- * instance's own URL — bootstrap's `.jsonld`/`.json` being the worked example.
- * So there is **no top-level `schema/` segment** here and no instance name
- * written down. `siteDirFor` resolves this instance's rendered-content root
- * from its declaration and everything hangs off that. Bean `8325` carries the
- * general rule and the three questions still open on it; this file only has to
- * avoid pre-empting them, which it does by resolving rather than composing.
+ * Rendered assets live at `<base>/<instantiated harness>/<path to rendered
+ * content>`, relative to the instance's own URL, so no `schema/` segment or
+ * instance name is written here: `siteDirFor` resolves this instance's
+ * rendered-content root from its declaration.
  *
- * ## Why a faceted index with a ONE-TYPE diagram, and not a class diagram
+ * ## A faceted index with a ONE-TYPE diagram
  *
- * 713 declarations and 464 edges do not want to be one UML diagram. That
- * renders as a wall: it looks like a data model and answers no question about
- * one. It is the same argument `kg-viewer.ts` made for 1111 KG nodes and won,
- * and the owner's own ask — *"browsable, so i can give overview like
- * browsing"* — is a navigation requirement rather than a poster requirement.
+ * The corpus is too large for one UML diagram, so the diagram is a **view
+ * over the projection**: one selected declaration, drawn as a UML class with
+ * its fields, its generalisations above it and its references below.
+ * Everything else is the index.
  *
- * So the diagram is a **view over the projection** rather than the output
- * format: one selected declaration, drawn as a UML class with its fields, its
- * generalisations above it and its references below. Everything else is the
- * index. Adding a whole-corpus render later costs nothing, because the
- * projection already carries every edge.
+ * ## Zero dependencies
  *
- * ## Zero dependencies, and the SVG is hand-built for that reason
- *
- * No CDN, no framework, no build step — `kg-viewer.ts`'s rule, and the
- * argument is unchanged: a page that needs a network fetch to render cannot be
- * opened from a file, cannot be reviewed offline, and adds a third party to
- * the trust boundary of a page whose whole job is to display this repository's
- * own data. Mermaid would have been fewer lines and is exactly that third
- * party.
+ * No CDN, no framework, no build step (`kg-viewer.ts`'s rule): the page opens
+ * from a file and offline, with no third party in its trust boundary, so the
+ * SVG is hand-built.
  *
  * Usage:
  *   bun run schema:viz          # write

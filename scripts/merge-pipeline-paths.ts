@@ -1,8 +1,7 @@
 /**
  * Path classes for the merge pipeline: which changed paths are GENERATED,
  * which are generated REGIONS inside authored files, and which are AUTHORED,
- * plus the shared declarations two otherwise independent PRs can collide on
- * (bean `blgm`).
+ * plus the shared declarations two otherwise independent PRs can collide on.
  *
  * @module scripts/merge-pipeline-paths
  * @graphNode none — a classifier, read by `merge-train.ts`, `merge-overlap.ts` and `merge-leftover.ts`
@@ -13,17 +12,12 @@
  * resolving strategy for: `take-base` and `owned-tree` are wholly generated,
  * and `generated-regions` is authored prose with generator-owned regions.
  * Everything else, including a path no pattern names, is AUTHORED. A second
- * list here would be a second answer to "what is generated", free to drift
- * from the one `merge:main` acts on. Requirement R7 in
- * `docs/proposals/merge-pipeline-requirements.md`: a conflict test that
- * counted generated paths would predict every pair as conflicting and say
- * nothing.
+ * list here could drift from the one `merge:main` acts on.
  *
  * ## Shared declarations ARE listed here, with reasons
  *
- * Nothing else in the repository declares "a file many PRs edit and whose
- * concurrent edits interact": that is the T3 rule, and this table is its one
- * home. Each entry says why it is shared.
+ * This table is the one home of the T3 rule: a file many PRs edit and whose
+ * concurrent edits interact. Each entry says why it is shared.
  */
 import { classify, type ConflictPattern } from "./merge-conflict-patterns.ts";
 

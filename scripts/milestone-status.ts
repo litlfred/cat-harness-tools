@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
- * How far is this repository from the separation point, in two parts that must
- * not be read as one number?
+ * How far is this repository from the separation point (seeding the repos),
+ * in two parts that must not be read as one number?
  *
  * **Part 1 — the declared milestones.** Every `type: milestone` bean, rolled up
  * over the closure beneath it. This is the PLAN's progress, and it is reported
@@ -11,53 +11,19 @@
  * a state the repos can be seeded FROM. These are graded, and they set the exit
  * code.
  *
- * ## Why "MVP" is not the name
+ * A milestone share is bean-weighted and says how much of a GOAL is done; a
+ * readiness gate is a precondition (`0 authored conflicts` is not 40 % done
+ * when there are 40). Averaging them would produce a figure that is neither.
+ * The report is named after `milestone`, the `type` the bean store declares,
+ * not "MVP", which nothing here declares.
  *
- * The owner asked, 2026-10-03, what to call this: *"mvp = 'named release' /
- * milestone release? what do we call it in publication and software?"*. The
- * answer this repository can actually act on is that **"MVP" is declared
- * nowhere in it** — measured the same day, `cat-harness/methodologies/` (20
- * files) and the content core's `methodologies/` (2) contain zero hits for
- * MVP, agile, scrum, kanban or sprint, against a control of 19 files matching
- * `decision|provenance`. The declared methodology set is decision-analysis and
- * provenance; work sequencing is declared as BPMN plus CRDM.
- *
- * `milestone` IS declared — it is a `type` in the bean store, it is a root in
- * `check-bean-parents`, and three beans carry it. So the report is named after
- * the object the repository has, not after a term it would have to import. In
- * publication the neighbouring pair is *edition* / *version of record*; neither
- * is a work-plan rollup, which is why neither is used here.
- *
- * ## The two parts answer different questions, and averaging them would lie
- *
- * A milestone share is bean-weighted and says how much of a GOAL is done. A
- * readiness gate is a precondition: `0 authored conflicts` is not 40 % done
- * when there are 40 of them. Combining them into one percentage — which is
- * what a single "MVP %" invites — would produce a figure that is neither.
- *
- * ## What the milestone shares DO NOT cover, stated in the report itself
- *
- * `orphanOpen` is open beans with no milestone above them. Measured
- * 2026-10-03: **241 of 390 open beans, under 18 of 30 epics that have no
- * milestone ancestor.** So the three GOAL shares describe well under half the
- * open work, and a reader given only those three would overestimate how much
- * of the repository they account for. Whether those epics belong under a GOAL
- * or under a milestone that does not yet exist is a scope judgement for the
- * owner, so this reports it and proposes nothing.
+ * The report states what the shares do NOT cover: `orphanOpen`, the open
+ * beans with no milestone above them. Whether those belong under a milestone
+ * is the owner's scope call, so the report proposes nothing.
  *
  * @module scripts/milestone-status
  * @graphNode none — a read-only report over git, the bean store and the forge
  * @covers none — a merge-steward report: it inventories, it judges no declared graph
- *
- * ## Why a tool and not a paragraph
- *
- * The owner asked, 2026-10-03, for *"a status bar we can regularly refresh with
- * stats on how far we are from MVP = just shy of seeding repos"*. The reason
- * that cannot be a written answer is that every number in it moved within one
- * session: the authored-conflict count changed with each merge, three epics
- * were created inside a nine-hour window, and the seeding gate halved when one
- * PR landed. A paragraph would be wrong by the time it was read, and a count
- * quoted from prose is a claim rather than evidence.
  *
  * ## It COMPOSES the existing measurements — it does not take new ones
  *
@@ -71,13 +37,7 @@
  *   read by EXIT CODE, because its own contract already distinguishes
  *   could-not-ask (2) from missing-a-required-run (1);
  * - `beans:rollover --json` answers the bean-rollover gate, read from its
- *   structured summary rather than from its printed table — the first version
- *   of that gate scraped the table and matched a per-PR line instead of the
- *   summary, reporting `clear` off a plausible wrong number.
- *
- * A second reconciliation of any of these would be a second answer free to
- * disagree with the first, which `github-state-inspection` says outright and
- * this repository has paid for repeatedly.
+ *   structured summary rather than its printed table.
  *
  * ## Four states per gate, and the fourth is never a pass
  *
@@ -88,33 +48,21 @@
  * | `reported` | measured on purpose but NOT graded — a rate, not a threshold |
  * | `could-not-determine` | the question could not be answered. **Never counted clear** |
  *
- * `reported` exists because two of the most informative numbers here are rates
- * rather than thresholds. "Beans created in the window" has no target: a high
- * value means scope is still arriving, which is a fact about the plan and not a
- * defect to drive to zero. Grading it would invite someone to stop writing
- * beans, which is the opposite of what it is for. The repository already draws
- * this line — `audit:coverage` reports its counts and deliberately does not
- * grade the share (bean `3yi4`).
+ * `reported` is for rates with no target: "beans created in the window" says
+ * scope is still arriving, which is a fact about the plan, not a defect to
+ * drive to zero.
  *
  * ## Every threshold carries its BASIS, structurally
  *
- * Each gate declares `basis`: where its target comes from. The health checks
- * made this a requirement of the shape rather than a convention, so that a
- * check cannot ship a bare number. A target with no basis is somebody's
- * preference wearing a measurement's clothes.
+ * Each gate declares `basis`: where its target comes from. It is part of the
+ * shape, so no check can ship a bare number.
  *
- * ## It is NOT a committed sidecar, on purpose
+ * ## It is NOT a committed sidecar
  *
- * The usual rule here is that a printed verdict cannot tell "never measured"
- * from "measured clean", so results are committed. This one is the documented
- * exception: every value is a function of the OPEN PRs and the current head, so
- * a committed copy would change on every commit and every merge — bean `do70`,
- * a recorded value that moves on every commit, which makes every diff noisy and
- * every merge conflict. The audit-coverage argument does not apply either,
- * because there is no "never audited" state to protect: a gate that cannot be
- * answered reports `could-not-determine` in the run itself.
- *
- * So: printed for a person, `--json` for a dashboard that renders it.
+ * Every value is a function of the OPEN PRs and the current head, so a
+ * committed copy would change on every commit and conflict on every merge. A
+ * gate that cannot be answered reports `could-not-determine` in the run
+ * itself. So: printed for a person, `--json` for a dashboard that renders it.
  *
  * Usage:
  *   bun run cat milestone:status                  # the table

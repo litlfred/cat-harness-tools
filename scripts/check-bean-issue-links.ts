@@ -3,30 +3,19 @@
  * A bean and its issue reach each other — in BOTH directions, where that is
  * checkable from a checkout.
  *
- * Bean `oh78`, measured 2026-09-20: 54 proposals merged in one four-hour
- * window and **2 issues changed**, both newly opened. Issue #558 (*"Sticky pin:
- * unpinning loses the theme"*) carries no bean link although `ivfw` is its
- * subject verbatim; #464 is open on a `completed` bean.
- *
- * ## One direction is a real check; the other is honestly undetermined
- *
  * | direction | source | verdict |
  * |---|---|---|
  * | bean → issue | the bean's own body | **checked** — every reference is extracted and listed |
  * | issue → bean, for a TRACKED issue | `issue-marks/` | **checked** — a tracked issue no open bean names is a finding |
  * | issue → bean, in general | GitHub | **could not determine** — needs the API, and a checkout is not it |
  *
- * The third row is the one that must not be quietly dropped. A check that
- * reported the first two as a clean bill of health would be asserting
- * something about every issue in the repository on the evidence of two files.
- * So the third state is printed every run, named, with what would settle it —
- * the rule `could-not-determine-is-a-third-state-everywhere` already states
- * for this repository, applied to its own coverage rather than to its inputs.
+ * The third row is printed every run, named, with what would settle it, so
+ * the first two are never read as a verdict on every issue
+ * (`could-not-determine-is-a-third-state-everywhere`).
  *
- * `issue-marks/` is the right offline source for row two precisely because of
- * what it is: an id and two timestamps for an issue some session decided was
- * worth tracking. An issue in there is one the work plan has already engaged
- * with, so "no bean names it" is a defect rather than an absence.
+ * `issue-marks/` holds an id and two timestamps for each issue some session
+ * chose to track; such an issue is one the work plan has engaged with, so
+ * "no bean names it" is a defect rather than an absence.
  *
  * Exit: 0 clean or nothing to check, 1 a tracked issue no bean names, 2 unknown.
  *

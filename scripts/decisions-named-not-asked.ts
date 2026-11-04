@@ -2,62 +2,27 @@
 /**
  * A turn that NAMES open decisions without their terms — the unguarded path.
  *
- * `interaction-modality` §4.1 has been STRICT since 2026-09-20 and carries
- * three enforcement layers. On 2026-09-26 the owner had to say, for the second
- * time in the same session:
+ * `interaction-modality` §4.1 requires every handed-over decision to carry
+ * its options, pros, cons, recommendation and downstream impact, and forbids
+ * a bare list of option names. The skill, `ask-well.sh` (on `PreToolUse` of
+ * `AskUserQuestion`) and `decision-request.ts` all fire only when the agent
+ * chooses to ask; a closing paragraph that lists what is "still yours"
+ * touches no tool. This is the fourth layer, on `Stop`, where that paragraph
+ * has just been written.
  *
- * > *"You have yet again provided unanswered questions as blockers but have not
- * > provided exactly what the questions are pros cons recommendations and down
- * > steam impact"*
+ * It reminds and does not block: a misfiring blocking hook would leave the
+ * agent unable even to report that the gate is broken, and this one reads
+ * prose.
  *
- * The rule was not missing. §4.1 part 3 already required `downstream`;
- * §"More than one decision pending" already said **never a list of option
- * names**; and it already closed the obvious excuse — *"there is no 'just
- * listing what's open' exemption. A wrap-up that names a decision has handed it
- * over, whatever the framing sentence says."*
- *
- * ## Why three layers did not catch it
- *
- * Read their own stated limits, and the gap is structural rather than a lapse:
- *
- * | layer | keyed on |
- * |---|---|
- * | the skill | being read — "triggering is probabilistic" |
- * | `PreToolUse` → `ask-well.sh` | the `AskUserQuestion` **tool call** |
- * | `decision-request.ts` | decisions **rendered through it** |
- *
- * All three require the agent to CHOOSE to ask. The failure shape is the
- * opposite: a closing paragraph of an ordinary turn — "still yours: `bf5l`'s
- * layering ruling, task #26, the orphan branch, `e8m3`, `6ptx`, #951, #1340" —
- * which touches no tool and renders no schema. §4.1 predicted exactly this
- * surface (*"those are where it is most often broken, because they feel like
- * reporting rather than asking"*) and nothing guarded it.
- *
- * So this is a **fourth** layer, on `Stop`, where that paragraph has just been
- * written.
- *
- * ## It reminds and does not block, for the reason the owner already gave
- *
- * Bean `hajp` weighed blocking and the owner rejected it: a blocking hook that
- * misfires removes the escape hatch, leaving the agent unable even to report
- * that the gate is broken. That reasoning applies here with more force, because
- * this detector reads PROSE and prose is the thing a regex is worst at.
- *
- * ## The signal is narrow ON PURPOSE
- *
- * A turn legitimately names many ids while REPORTING finished work — "bean
- * `cjvs`, 190 dangling refs" is not a question. So the trigger is the
- * conjunction, not any part alone:
+ * The trigger is the conjunction, not any part alone (reporting finished
+ * work legitimately names many ids):
  *
  *   an outstanding-marker  ("still yours", "unanswered", "waiting on you", …)
  *   AND >= 2 identifiers   (4-char bean ids, `#1234`, task refs)
  *   AND no comparison      (no pro/con table, no "(Recommended)", no
  *                           "if you say nothing")
  *
- * Each alone fires constantly; together they are the forbidden shape. The
- * detector is exported so the fixtures below can be real turns from the session
- * that prompted it — a detector tested only on invented strings is a detector
- * tested on the author's idea of the defect.
+ * The detector is exported so its tests can use real turns as fixtures.
  *
  * @module scripts/decisions-named-not-asked
  */

@@ -2,88 +2,52 @@
 /**
  * Apply an agent's INSPECTION of the extracted images to their sidecars.
  *
- * Bean `d5f1`. `pdf-images.py` classifies by geometry, which gives exactly one
- * bit — is this image the whole page, or something on it. That is not enough:
- * of the 24 images it called `figure` across this corpus, 2 were real figures,
- * 12 were organisation logos, 8 were photographs (7 of them the same picture
- * at seven sizes) and 2 were unreplaced template text. No measurement of a
- * placed rectangle can tell a WHO emblem from a chart.
- *
- * So the finer roles come from LOOKING, and this writes that down as what it
- * is: an `inspection` basis naming who looked, when, and what they saw. The
- * schema refuses `logo` or `decorative` on a geometry basis precisely so the
- * two can never be confused (`schemas/content/document-image.ts`).
+ * `pdf-images.py` classifies by geometry, which only says whether an image is
+ * the whole page or something on it; no geometry tells a logo from a chart.
+ * The finer roles come from looking, recorded as an `inspection` basis naming
+ * who looked, when, and what they saw. The schema refuses `logo` or
+ * `decorative` on a geometry basis (`schemas/content/document-image.ts`).
  *
  * ## The verdicts are DATA, not code
  *
  * `library/image-verdicts.json` holds one agent's judgement, reviewable line
- * by line. This script applies it mechanically and adds nothing of its own. A
- * verdict written inline here would be a judgement disguised as a program.
+ * by line. This script applies it mechanically and adds nothing of its own.
  *
  * ## Every narrative lands as a DRAFT
  *
- * An agent may write a description; only a human may accept one. That rule is
- * in `schemas/content/narrative.ts` and it is the whole reason the state machine
- * exists — an uncited narrative is indistinguishable from a transcription of
- * the source, and the two have very different standing. This script therefore
- * cannot produce a `confirmed` narrative even if asked; `scripts/narratives.ts`
- * is where a person does that, and it refuses to run non-interactively.
+ * An agent may write a description; only a human may accept one
+ * (`schemas/content/narrative.ts`). This script cannot produce a `confirmed`
+ * narrative; `scripts/narratives.ts` is where a person does that, and it
+ * refuses to run non-interactively.
  *
- * ## Applying to a STAGED entry — bean `8suc`
+ * ## Applying to a STAGED entry
  *
- * Until 2026-09-23 this resolved every target through
- * `directoriesForGraph(root, "library")`, and so did `scripts/narratives.ts`.
- * Those are the ONLY two writers of a narrative into an `images.json`, and
- * `ingest --promote` refuses to file an entry whose `image-descriptions`
- * requirement is unmet. So a document with describable images could not be
- * promoted until it had descriptions, and could not be given descriptions
- * until it was promoted. A cycle, not a sequence.
+ * `ingest --promote` refuses an entry whose `image-descriptions` requirement
+ * is unmet, so descriptions must be writable before promotion.
+ * `--staging <entry-dir> --library <lib-dir>` writes into the staged entry;
+ * the verdicts are still read from `<lib-dir>/image-verdicts.json`, keyed by
+ * the doc id, which is the same before and after promotion.
  *
- * It went unnoticed because every entry carrying applied verdicts today was
- * in its library BEFORE that gate existed, so this always found it. The path
- * that fails is the one nothing had walked — the `1xhc` shape.
+ * **`--library` is required with `--staging`, and is not guessed**: a staging
+ * directory does not say which library the document is promoted into (the
+ * same rule `ingest` enforces for its own `--library`).
  *
- * `--staging <entry-dir> --library <lib-dir>` breaks it. The judgement keeps
- * ONE home: the verdicts are still read from `<lib-dir>/image-verdicts.json`,
- * keyed by the doc id, which is the same id before and after promotion. Only
- * the write target moves.
+ * ## Exit codes
  *
- * **`--library` is required with `--staging`, and is not guessed.** A staging
- * directory does not say which library the document is being promoted into —
- * the same rule `ingest` enforces for its own `--library`, and the one bean
- * `v1hw` measured: a queue does not determine a library.
+ * The whole-corpus mode exits 1 when it finds no verdict file anywhere. In
+ * staging mode no verdicts yet is the expected state and exits 0; the
+ * `image-descriptions` requirement is what refuses the promotion. An ORPHANED
+ * verdict (naming an image the sidecar does not have) fails in either mode.
  *
- * ## In staging mode an absent verdict is NORMAL
- *
- * The whole-corpus mode below exits 1 when it finds no verdict file anywhere,
- * because there it means a completed pass over no work. In staging mode the
- * opposite holds: the FIRST ingest necessarily runs before anybody has looked
- * at the images, so "no verdicts for this document yet" is the expected state
- * and exits 0. The `image-descriptions` requirement is what refuses the
- * promotion — this script never needs to.
- *
- * An ORPHANED verdict still fails, in either mode. A verdict naming an image
- * the sidecar does not have is a wrong verdict file, not a missing judgement.
- *
- * ## Vector figures are judged HERE too — bean `ay3x`
+ * ## Vector figures
  *
  * `pdf-vector-figures.py` renders the drawn figures `pdf-images.py` cannot
- * see, and assigns them NO role: whether a render is a figure or furniture is
- * the call `m4xy` refuses to make with a threshold. So the call is made by
- * looking, and it arrives through this file, keyed `vfig-pNNN` in the same
- * `image-verdicts.json`, as the same `inspection` basis — one judgement path
- * for both kinds of image, so they cannot come to be judged by different rules.
- *
+ * see, and assigns them no role. Their verdicts arrive through the same
+ * `image-verdicts.json`, keyed `vfig-pNNN`, as the same `inspection` basis.
  * A vector verdict may also carry `shows`: the declared figure numbers the
- * render holds. The page's caption candidates include cross-references, so
- * only the inspector can say which figure is on it, and `image-descriptions`
- * counts a figure as reached by this arm only through `shows`.
- *
- * **A render nobody has judged is REPORTED, never a failure** — in either
- * mode. The arm writes one per caption page, ~100 across the WHO corpus on its
- * first run, and failing the whole-corpus pass until all were inspected would
- * make this script unusable for the raster work it already does. The gate that
- * says what is still uncovered is `image-descriptions`, which names them.
+ * render holds; `image-descriptions` counts a figure as reached by this arm
+ * only through `shows`. A render nobody has judged is REPORTED, never a
+ * failure, in either mode; `image-descriptions` names what is uncovered.
  *
  *   bun run cat-harness-tools/scripts/apply-image-verdicts.ts            # apply
  *   bun run cat-harness-tools/scripts/apply-image-verdicts.ts --check    # report only

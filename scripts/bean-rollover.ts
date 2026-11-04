@@ -7,14 +7,7 @@
  * @graphNode none — a read-only report over git and the open PRs
  * @covers none — a merge-steward report: it inventories, it judges no declared graph
  *
- * ## The question, and why a count alone does not answer it
- *
- * Issue #1850 step 2 is *"land or park the PRs that change beans"*. Measured
- * with `merge:overlap` on 2026-10-02 that is **29 of 33 open PRs and 110
- * authored bean touches**, which reads as "clear the board" — weeks of merging
- * before the freeze in step 3 can even be scheduled.
- *
- * But "touches `beans/`" is three different situations wearing one number:
+ * "Touches `beans/`" covers three different situations:
  *
  *   - a generated region (`beans/README.md`'s file COUNT) that is regenerated
  *     and needs nothing;
@@ -24,9 +17,8 @@
  *     bean — which can be copied onto the beans branch without that PR landing
  *     at all.
  *
- * Only the last group is work, and only a group that BOTH sides edited needs a
- * person. This separates them, so the owner can schedule step 2 against a real
- * number instead of 110.
+ * Only the last group is work, and only a bean BOTH sides edited needs a
+ * person. This separates them.
  *
  * ## Five states per authored bean path, and the fifth is never clean
  *
@@ -38,30 +30,25 @@
  * | `adjudicate` | BOTH the PR and the base changed this bean since the fork with divergent edits — a person picks, because either choice drops someone's edit |
  * | `could-not-determine` | git would not answer for this path. **Never reported as portable, never counted clean** |
  *
- * The third state is the one that matters for scheduling and the one a naive
- * tool would fold into the second. Porting over a bean the base also edited
- * silently destroys the base's edit, and a bean id is referenced from commits,
- * issues and other beans, so that loss is not local.
+ * Porting over a bean the base also edited would silently destroy the base's
+ * edit, which is why `adjudicate` is never folded into `port`.
  *
- * ## What this deliberately does NOT do
+ * ## What this does NOT do
  *
- * **It never writes to `cat/cat-harness/beans`.** That branch's own manifest
- * says `status: seed`, `authoritative: false`, and *"main remains the source of
- * truth until arc fs43 migrates every reader and writer; until then this branch
- * is a verified copy, not the store."* A tool that wrote there now would
- * pre-empt steps 3 to 5 of the plan and make the seed diverge from `main` in a
- * direction nothing checks. The port is a steward action, taken after the
- * freeze, against a re-copied seed.
+ * **It never writes to `cat/cat-harness/beans`.** That branch is a seed copy
+ * (`status: seed`, `authoritative: false`) and `main` remains the source of
+ * truth; the port is a steward action, taken after the freeze, against a
+ * re-copied seed.
  *
  * It also never deletes or rewrites a bean anywhere. `deletion-requires-confirmation`.
  *
- * ## Reuse, because a second classifier is a second answer
+ * ## Shared classifier
  *
  * `pathClass` and `differsOnlyInRegions` come from `merge-pipeline-paths.ts` —
  * the same functions `merge:overlap` and `merge:train` use, so this cannot
  * disagree with them about what "authored" means. The reverse-patch test for
- * "the base already carries this change" is the technique `merge:leftover`
- * established for its own `landed` verdict.
+ * "the base already carries this change" is the one `merge:leftover` uses for
+ * its `landed` verdict.
  *
  * Usage:
  *   bun run cat beans:rollover                      # every open PR, via gh
