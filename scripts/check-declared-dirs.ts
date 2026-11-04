@@ -450,6 +450,9 @@ export function conventionalStateDirectories(): Array<{ id: string; path: string
     .map((d) => ({ id: d.id, path: d.path, kinds: d.graphTypologies ?? [] }));
 }
 
+/** The conventional directory an instance may keep as repository data, outside its KG (owner, 2026-11-03). */
+export const UPLOADS_DATA_STORE_ID = "uploads";
+
 /**
  * `undeclared-state` — a conventional state directory (`beans/`, `todos/`)
  * present at the top of an instance and named by none of its own entries.
@@ -468,6 +471,11 @@ export function auditUndeclaredState(instanceRoot: string, repoRoot: string): Di
   const covered = new Set((decl.directories ?? []).map((e) => resolve(resolveDeclaredPath(e, instanceRoot, repoRoot))));
   const out: DirFinding[] = [];
   for (const d of conventionalStateDirectories()) {
+    // An undeclared `uploads/` is the repository's own data store, not a
+    // graph: owner, 2026-11-03, *"instantiated harnesses can have an uploads/
+    // but that is data store for that repo, not part of the KG"*. Declaring it
+    // is still allowed; leaving it undeclared is not a finding.
+    if (d.id === UPLOADS_DATA_STORE_ID) continue;
     const abs = resolve(instanceRoot, d.path);
     if (!existsSync(abs) || !statSync(abs).isDirectory() || covered.has(abs)) continue;
     out.push({

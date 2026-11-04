@@ -342,6 +342,13 @@ describe("undeclared-state — a state directory on disk that nothing declares (
     expect(auditUndeclaredState(root, root)).toEqual([]);
   });
 
+  test("an undeclared uploads/ is the repository's data store, not a finding (owner, 2026-11-03)", () => {
+    const root = instance([]);
+    mkdirSync(join(root, "uploads"));
+    mkdirSync(join(root, "beans"));
+    expect(auditUndeclaredState(root, root).map((x) => x.id)).toEqual(["beans"]);
+  });
+
   test("absent is not a finding, and neither is an instance with no declaration at all", () => {
     expect(auditUndeclaredState(instance([]), REPO)).toEqual([]);
     const bare = mkdtempSync(join(tmpdir(), "declared-dirs-bare-"));
