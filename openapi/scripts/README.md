@@ -7,7 +7,7 @@ generated: "scripts/subgraph-readmes.ts of the bootstrap toolset (https://github
 
 # cat-harness-tools-openapi
 
-The OpenAPI subgraph's ingester, page generator and tests; the subgraph's content and schema stay in `cat-harness/openapi/`. Moved by bean `70lx`.
+The OpenAPI subgraph's ingester, page generator and tests. Its Zod schema is in `openapi/schemas/`; its content stays in `cat-harness/openapi/`.
 
 Part of [C@T Harness Tools](../../README.md) 0.1.0, declared as `cat-harness-tools-openapi`, holding `code`.
 

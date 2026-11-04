@@ -4,7 +4,7 @@
 
 # cat-harness-tools-schemas
 
-Tests of cat-harness's schemas that exercise tools code: the sixteen `cat-harness/schemas/*.test.ts` files that imported `scripts/`, `src/`, `pipeline/` or `test/support/`, moved first (bean `70lx`, batch B0) so that no later batch of the code move leaves a harness file importing into this layer. Since bean `8lcl` (owner, 2026-10-30, card "A. One coordinated move") the Zod sources live here too: every `cat-harness/schemas/**/*.ts`, so this directory is the schema corpus and is typed `schemas` as well as `code`. cat-harness keeps the schemas that are data: the per-skill JSON Schemas in `schemas/skills/`, `staging-comparison.schema.json` and the PlantUML model.
+The harness's Zod schema corpus and the tests that exercise it, so this directory is typed `schemas` as well as `code`. cat-harness keeps the schemas that are data: the per-skill JSON Schemas in `schemas/skills/`, `staging-comparison.schema.json` and the PlantUML model.
 
 Part of [C@T Harness Tools](../README.md) 0.1.0, declared as `cat-harness-tools-schemas`, holding `schemas`, `code`.
 

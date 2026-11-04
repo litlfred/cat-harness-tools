@@ -7,7 +7,7 @@ generated: "scripts/subgraph-readmes.ts of the bootstrap toolset (https://github
 
 # cat-harness-tools-archimate
 
-The ArchiMate subgraph's generators, checker and tests; the subgraph's content and schema stay in `cat-harness/archimate/`. Moved by bean `70lx`.
+The ArchiMate subgraph's generators, checker and tests. Its Zod schema is in `archimate/schemas/`; its content stays in `cat-harness/archimate/`.
 
 Part of [C@T Harness Tools](../../README.md) 0.1.0, declared as `cat-harness-tools-archimate`, holding `code`.
 

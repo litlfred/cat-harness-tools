@@ -7,7 +7,7 @@ generated: "scripts/subgraph-readmes.ts of the bootstrap toolset (https://github
 
 # cat-harness-tools-openapi-schemas
 
-The OpenAPI subgraph's Zod schema, moved from `cat-harness/openapi/schemas/` in bean `8lcl` (owner card "A. One coordinated move", 2026-10-30). Module paths are unchanged, so the Schema node keeps its IRI; the subgraph's content stays in `cat-harness/openapi/`.
+The OpenAPI subgraph's Zod schema. The subgraph's content stays in `cat-harness/openapi/`.
 
 Part of [C@T Harness Tools](../../README.md) 0.1.0, declared as `cat-harness-tools-openapi-schemas`, holding `schemas`, `code`.
 

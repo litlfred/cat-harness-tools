@@ -3,36 +3,12 @@
  *
  * @module cat-harness/skills/kg/graph-management/group-depth
  *
- * ## Why this is not in `kg-detangle.ts`, where the rule is used
- *
- * `kg-detangle.ts` is a straight-line script with no `import.meta.main` guard:
- * its top level walks the corpus, classifies every edge and — at line 521 —
- * `writeFileSync`s 29 sidecars. So `import { groupDepthFor } from
- * "./kg-detangle.ts"` does not import a function, it RUNS the tool.
- *
- * That is the `ymsu` defect, and it was measured rather than anticipated. The
- * test pinning this rule originally imported from `kg-detangle.ts`, and its
- * output carried the proof:
- *
- *     $ bun test cat-harness-tools/scripts/tests/kg/detangle-group-depth.test.ts
- *       wrote 29 pinned measurement(s) to cat-harness/test/results/detangle/
- *      10 pass
- *
- * A test that WRITES the sidecars is a test that makes `kg:detangle:check`
- * unfalsifiable for the rest of the gate run: the check reads what the suite
- * just wrote, so it reports "current" over any tree, including one whose
- * measurements really did move. One green line, standing for nothing.
- *
- * Guarding the script's 400-line body was the other option and is worse today:
- * it re-scopes two dozen top-level consts, and a refactor that large to protect
- * one import earns its own change. A pure module is the narrow fix — and it
- * removes the trap for the NEXT importer too, which the guard would also have
- * done but which nothing else currently needs.
- *
- * `ROOT` is recomputed here rather than imported for the same reason: importing
- * it from `kg-detangle.ts` would re-run the script. This file sits in the same
- * directory, so `../../..` resolves identically — and the test's decisive cases
- * are pinned by VALUE, so a divergence here would fail them rather than hide.
+ * Kept apart from `kg-detangle.ts`, where the rule is used, so a test can
+ * import `groupDepthFor` without loading the detangle script. A test that ran
+ * the script would write its sidecars and make `kg:detangle:check` report
+ * "current" over any tree. `ROOT` is computed here, not imported from
+ * `kg-detangle.ts`, for the same reason; the test pins its decisive cases by
+ * VALUE, so a divergence fails rather than hides.
  */
 import { join, relative, resolve } from "node:path";
 

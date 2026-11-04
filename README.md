@@ -10,7 +10,6 @@ runs them.
 
 - [Why a separate layer](#why-a-separate-layer)
 - [Where it sits](#where-it-sits)
-- [Status](#status)
 - [Working on it from a plain clone](#working-on-it-from-a-plain-clone)
 
 <!-- readme:toc:end -->
@@ -18,20 +17,13 @@ runs them.
 ## Why a separate layer
 
 The same split `bootstrap` and `bootstrap-tools` use: a contract can be read,
-audited and published without the code that runs it. The owner ruled on
-2026-09-30 that cat-harness's tools follow it (bean `w2gr`).
+audited and published without the code that runs it.
 
 ## Where it sits
 
-It needs `cat-harness` and `bootstrap-tools`, and sits BELOW the content core,
-which needs it (owner ruling C1, 2026-10-01). Nothing here may import the
-content layers above; a server part that needs one moves up into it.
-
-## Status
-
-Step 3a: the standalone MCP server (`adapters/mcp-server/`). Step 3b brings the
-HTTP server, the tool and route modules, and the document adapter's server
-wrapper.
+It needs `cat-harness` and `bootstrap-tools`, and sits below the content core,
+which needs it. Nothing here may import the content layers above; a server
+part that needs one moves up into it.
 
 ## Working on it from a plain clone
 
@@ -54,13 +46,11 @@ bun install
 bun test scripts/tests/sdlc/stage-local-publisher.test.ts
 ```
 
-Run `bun install` in **every** sibling, not only this one (owner, 2026-10-31,
-QA finding F21). This repository's install hoists the siblings' dependencies
-into its own `node_modules`, but Bun and `tsc` load a sibling's files from
-their real path, `../bootstrap-tools/…`, and look for `zod` from there. With
-no `node_modules` of its own, bootstrap-tools finds nothing and every test
-fails in the preload. A folio-assistant index and CI do not hit this, because
-they put a `node_modules` above the siblings.
+Run `bun install` in **every** sibling, not only this one. Bun and `tsc` load a
+sibling's files from its real path (`../bootstrap-tools/…`) and resolve `zod`
+from there, so a sibling with no `node_modules` of its own fails every test in
+the preload. A folio-assistant index and CI put a `node_modules` above the
+siblings and do not hit this.
 
 Each sibling then has its own copy of `zod`, so the copies must be the same
 version: two versions make `tsc` reject a schema from one layer passed to the
@@ -77,10 +67,10 @@ index's workflows, `bootstrap/`, content folios) still need that full mount.
 
 The `checkoutScripts` (every `check:` and `:check` among them) are spelled
 `bun run cat-harness-tools/scripts/…` and run from the directory that holds
-the layers, as in a composed index (owner, 2026-10-30, bean `w1gy` F11). For a
-plain directory of clones, add `bootstrap` beside the three above and write a
-minimal root into that directory — an `index.config.json` naming the four as
-local instances, and a `package.json` with the `cat` alias:
+the layers, as in a composed index. For a plain directory of clones, add
+`bootstrap` beside the three above and write a minimal root into that
+directory — an `index.config.json` naming the four as local instances, and a
+`package.json` with the `cat` alias:
 
 ```sh
 git clone https://github.com/litlfred/bootstrap
