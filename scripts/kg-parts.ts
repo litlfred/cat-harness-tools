@@ -2,9 +2,8 @@
  * The on-disk LAYOUT of a subscription's materialised parts, and a structural
  * reader of one part's record — shared by the writer (`kg:materialize`, core),
  * the subscriptions viewer, and the site build's reader of held trees
- * (`subscribed-trees.ts`, harness). Moved out of `kg-subscribe.ts` (bean
- * `g8jp`), which is classified core, so the harness can read it; that module
- * re-exports everything here, so its importers are unchanged.
+ * (`subscribed-trees.ts`, harness). `kg-subscribe.ts` re-exports everything
+ * here.
  *
  * @module cat-harness/scripts/kg-parts
  */

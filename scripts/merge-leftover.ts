@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * After a merge train landed, has this PR's INTENT landed? (bean `blgm`)
+ * After a merge train landed, has this PR's INTENT landed?
  *
  * @module scripts/merge-leftover
  * @graphNode none — a read-only report over git history

@@ -4,27 +4,24 @@
  *
  * @module cat-harness-tools/scripts/bench-id-lookup
  *
- * Bean `folio-assistant-4pm8`: the Pagefind decision may not be made until
- * this lookup has been built and MEASURED. This script is the method, so the
- * numbers recorded in the bean can be reproduced.
+ * The method behind the recorded lookup measurements, so they can be
+ * reproduced.
  *
  * ## The corpus is SYNTHETIC at scale, and says so
  *
- * This checkout holds 10 referenced IRIS nodes, not 273,559: IRIS is
- * egress-blocked here and no item list was ever captured. So the full-scale
- * run indexes the 10 real referenced nodes PLUS `--items` synthetic item
- * nodes (default 273,559, the item count IRIS's home page states):
+ * IRIS is not reachable from here, so the run indexes the real referenced
+ * IRIS nodes PLUS `--items` synthetic item nodes (default 273,559, the item
+ * count IRIS's home page states):
  *
  * - the id is `item/<uuid>`, with a version-4 UUID from a seeded generator.
  *   DSpace 7 mints random v4 UUIDs, so uniform hex is the real distribution's
  *   shape, not an approximation of it;
  * - the url is `https://iris.who.int/items/<uuid>`, DSpace 7's item route;
  * - the title is a run of consecutive words cut from the real text of the
- *   three publications the IRIS replica holds, at a length drawn uniformly from 20 to
- *   `--title-max` characters (default 180, so a mean near 100). That is deliberately longer than the three real item
- *   titles here (mean 37), because bytes grow with titles and an index
- *   measured on short ones would flatter itself. Bytes per entry are
- *   reported so another title length can be scaled linearly.
+ *   three publications the IRIS replica holds, at a length drawn uniformly
+ *   from 20 to `--title-max` characters (default 180, so a mean near 100) —
+ *   longer than the real titles, so the index is not flattered. Bytes per
+ *   entry are reported so another title length can be scaled linearly.
  *
  * Everything is seeded, so two runs build byte-identical indexes.
  *

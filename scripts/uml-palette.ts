@@ -3,11 +3,11 @@
  * are declared.
  *
  * The Mermaid pages take their colours from that stylesheet through a CSS
- * class per graph typology. PlantUML cannot: its SVG carries no class hooks, and
- * under ELK it drops a package's background colour too (measured 2026-09-23;
- * a class's colour survives). So the `.puml` files write a colour onto each
- * class, and this module is how they get the SAME colour the page would
- * show, rather than a second palette free to drift from the first.
+ * class per graph typology. PlantUML cannot: its SVG carries no class hooks,
+ * and under ELK it drops a package's background colour too (a class's colour
+ * survives). So the `.puml` files write a colour onto each class, and this
+ * module is how they get the SAME colour the page would show, rather than a
+ * second palette free to drift from the first.
  *
  * @module scripts/uml-palette
  */

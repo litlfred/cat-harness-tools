@@ -4,30 +4,19 @@
  *
  * @module scripts/page-layout
  *
- * ## Why
+ * Standalone pages come from generators in several layers. The layout rules
+ * know nothing of FHIR or of any IG, so they live HERE, the lowest layer that
+ * writes standalone pages ({@link thinPageHtml} is this layer's), and the
+ * layers above link this one file instead of keeping copies.
  *
- * Owner, 2026-10-15, on an IG repository's site: *"can we be more consistent
- * with the DAK API stlying - full width. keep it on the other pages as
- * well... also can you make it match how folio-assistnat does with the
- * scrollnig and such. please consolidate behaviours/appearance"*.
- *
- * The pages of such a site come from four generators in three layers (the
- * composed narrative pages and the thin artefact pages in the FHIR IG harness, a hub
- * page in an overlay above it, the OpenAPI pages), and each carried its own
- * copy of a bar, a width and a font: a 60rem centred column on two of them,
- * none at all on the hub. The rules that make them one layout know nothing of
- * FHIR or of any IG, so they live HERE, the lowest layer that writes
- * standalone pages ({@link thinPageHtml} is this layer's), and the layers
- * above link this one file instead of keeping copies.
- *
- * ## What it is, measured against folio-assistant's own pages
+ * ## What it is, matching folio-assistant's own pages
  *
  * - FULL WIDTH: the content fills from the rail's edge to the window's
  *   (`docs-ui.css`, "Full-width content on wide screens": `.main{max-width:none}`).
  * - ONE SCROLLER, THE WINDOW, under a STICKY BAR: folio-assistant's band is
  *   `position: sticky` at the top of the content column, the Folio tab sits
- *   on it, and text scrolls under it (`docs-ui.css` `.fa-glass-band[data-fa-band-tools]`,
- *   #1693, #2201). Here the page's own bar is that band, so the bare strip
+ *   on it, and text scrolls under it (`docs-ui.css` `.fa-glass-band[data-fa-band-tools]`).
+ *   Here the page's own bar is that band, so the bare strip
  *   docs-ui draws behind the tab on a scrolled page is not drawn. Below
  *   50rem the bar scrolls away, so a phone keeps its screen.
  * - ANCHORS BELOW THE BAR: `scroll-padding-top`, from the bar's measured
@@ -35,10 +24,9 @@
  * - The rail is unchanged: fixed at the left, its middle its own scroller
  *   (`navbar.css`, already one shared file).
  *
- * Two things a static page gets from the browser and a page drawn from JSON
- * after load does not, which the script puts back: a `#hash` scrolled to when
- * its target is drawn, and back/forward/reload returning to where the reader
- * was.
+ * For a page drawn from JSON after load, the script restores what a static
+ * page gets from the browser: a `#hash` scrolled to when its target is drawn,
+ * and back/forward/reload returning to where the reader was.
  *
  * ## The contract is markup, so nothing changes by accident
  *

@@ -6,31 +6,13 @@
  * @covers cat-harness — the instance axis: it enumerates the instances each declaration names
  *   and asks which has no avatar of its own
  *
- * ## Why this exists, and what it cost not to
+ * `harness-tiles.ts` gives an instance with no avatar of its own `GENERIC`,
+ * which is to be **reported as a finding** rather than rendered as a blank;
+ * this is that report.
  *
- * `harness-tiles.ts` carries this in its header:
- *
- * > An instance with no avatar of its own takes `GENERIC`, which is **reported
- * > as a finding** rather than rendered as a blank.
- *
- * **Nothing reported it.** `genericAvatar` is computed on every tile and read
- * by no one — measured 2026-09-22, two references in the whole corpus, both
- * the field's own declaration and its assignment. So a harness with no avatar
- * rendered a question mark and said nothing, and the defect surfaced the only
- * way left: the owner looked at the site and said *"folio assistant icon is
- * messed up still."*
- *
- * `schemas/content/avatars.ts` names the gap too — *"`harness-tiles` calls
- * `avatarFor(decl.name)` — an INSTANCE's declared name … nothing currently
- * checks"* — and points at bean `4kj4` for it. `4kj4` turned out to be about
- * the per-KIND fan, so that pointer was stale as well; this is the check both
- * comments describe.
- *
- * ## The kind axis is `check-avatar-coverage`, and they are different questions
- *
- * That one asks whether every declared graph TYPOLOGY has art. This asks whether
- * every INSTANTIATED harness does. The table serves both key spaces, which is
- * exactly why one check over it cannot answer both.
+ * `check-avatar-coverage` asks whether every declared graph TYPOLOGY has
+ * art; this asks whether every INSTANTIATED harness does. The table serves
+ * both key spaces.
  *
  * ## Instantiated, not merely declared
  *
@@ -41,13 +23,11 @@
  *
  * ## EXEMPT carries a reason, and a stale entry is itself a finding
  *
- * A content library's mark is its own. The IRIS replica and a DAK IG replicate
- * someone else's identity, and choosing a glyph for them here would be this
- * repository inventing a mark for an organisation that has one. They are
- * exempt WITH THAT REASON, printed on every clean run so the hand-maintained
- * part is visible when it passes rather than only when it fails — the shape
- * `check-invocation-parity` already uses. An exemption naming an instance
- * that no longer exists, or one that has since declared an avatar, fails.
+ * An instance that replicates someone else's identity (an organisation's
+ * own mark) may be exempted in `EXEMPT`, WITH a reason, printed on every
+ * clean run (as `check-invocation-parity` does). An exemption naming an
+ * instance that no longer exists, or one that has since declared an avatar,
+ * fails.
  *
  * Exit codes: 0 clean · 1 an instantiated harness has no avatar, or an
  * exemption is stale.

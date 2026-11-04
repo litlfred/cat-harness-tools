@@ -5,69 +5,43 @@
  * @module scripts/schema-graph
  * @graphNode none — a reader over the schema graph, not a schema itself
  *
- * ## Why this exists
- *
  * `schemas/` is a declared graph typology holding **content** (`BASE_GRAPH_TYPOLOGIES`:
- * *"a shape is the subject matter of the schema graph"*), and it is
- * `renderable: false` — so 100 modules carrying 199 exported schemas had no
- * way to be looked at. Bean `xgd8`.
+ * *"a shape is the subject matter of the schema graph"*) but is
+ * `renderable: false`; this is the reader that lets it be looked at. The
+ * projection built from it is gated — see `gen-schema-viz.ts`.
  *
- * Three generators were written for this before and none was wired:
- * `generate-schemas.ts` (18 of 199 schemas, output directory absent),
- * `generate-schema-manifest.ts` (input paths stale) and
- * `schemas/assistant-schema.puml` (266 lines of hand-authored UML referenced
- * by nothing). This module is the reader half of the fourth attempt, and the
- * thing that makes it different is that the projection built from it is gated
- * — see `gen-schema-viz.ts`.
+ * ## Why the AST, not the type checker or the published JSON Schema
  *
- * ## Why the AST and not the type checker, and not the published JSON Schema
- *
- * Both obvious alternatives **erase the edges a class diagram is made of**,
- * and it is the same erasure twice at different levels:
+ * Both alternatives **erase the edges a class diagram is made of**:
  *
  * - **The published JSON Schema.** `harness-schema-export.ts` renders with
- *   `$refStrategy: "none"`, which is right for a dereferenceable document — a
- *   consumer following an `$id` gets something self-contained. Measured
- *   2026-09-20: `folio-assistant.schema.json` is 5179 bytes and contains **one**
- *   `$ref`. `ContentDirectory` is not a named thing in it; it is an anonymous
- *   object repeated at each use site. A diagram drawn from that document is
- *   100 disconnected boxes.
+ *   `$refStrategy: "none"`, right for a dereferenceable document, so a named
+ *   schema like `ContentDirectory` is an anonymous object repeated at each use
+ *   site.
  *
  * - **The TypeScript type checker.** `z.infer<typeof FooSchema>` resolves to a
- *   deeply expanded structural type, so asking the checker what `Foo.bar` is
- *   returns the whole of `Bar` inlined rather than a reference to it. Same
- *   erasure, one level up, and slower.
+ *   deeply expanded structural type, so `Foo.bar` comes back as the whole of
+ *   `Bar` inlined rather than a reference to it.
  *
- * So the **syntactic** form is not a compromise here, it is the only one of
- * the three that still holds `bar: BarSchema` as a reference to a named thing.
- * That is the edge. Everything else is a property of a box.
- *
- * `typescript` is already a direct dependency, so this adds nothing to the
- * dependency surface — which is what lets the viewer built over it keep
- * `kg-viewer.ts`'s rule of no CDN and no third party on a page rendering this
- * repository's own data.
+ * Only the syntactic form still holds `bar: BarSchema` as a reference to a
+ * named thing. That is the edge; everything else is a property of a box.
+ * `typescript` is already a direct dependency, so the viewer built over this
+ * keeps `kg-viewer.ts`'s rule of no CDN and no third party.
  *
  * ## Resolution is syntactic, and says so
  *
  * A referenced name is resolved in this order: an export of the same module,
- * then through that module's import map to the exporting module. There is no
- * type checker behind it, so a name that is neither is recorded in
- * {@link SchemaDecl.unresolved} rather than dropped. An unresolved reference
- * is a real finding — it usually means the target is a type from outside the
- * schema graph — and a reader that silently omitted it would render a box with
- * fewer edges than the source has, which is indistinguishable from a type that
- * genuinely references nothing.
+ * then through that module's import map to the exporting module. A name that
+ * is neither is recorded in {@link SchemaDecl.unresolved} rather than dropped
+ * — usually a type from outside the schema graph.
  *
  * ## Three states, and `undetermined` is never a pass
  *
  * A Zod expression this walker does not recognise yields
  * `kind: "undetermined"` **with the head of the expression recorded in
- * `note`** — never an empty object that renders as a type with no fields. The
- * repository's rule throughout (`check-ci-health`, `check-instance-render`,
- * `beans.ts`) is that "could not determine" and "there is nothing" are
- * different answers, and rendering them alike reports a clean run over
- * something never looked at. `z.lazy`, a 16-member union and the registry
- * pattern in `cat-harness.ts` are the real cases, so this is not hypothetical.
+ * `note`** — never an empty object that renders as a type with no fields.
+ * `z.lazy`, a 16-member union and the registry pattern in `cat-harness.ts` are
+ * the real cases.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, posix, relative } from "node:path";

@@ -8,27 +8,20 @@
  * A todo records that a **person** has something outstanding. It is **not** a
  * second work plan: `beans/` is the agent work plan and `AGENTS.md` forbids
  * standing another up beside it. The two sit in different quadrants of one 2×2
- * — memory against workflow management, human against agent — and conflating
- * them is the drift this repo keeps paying for:
+ * — memory against workflow management, human against agent:
  *
  * | | memory | workflow management |
  * |---|---|---|
  * | human actor | **todos** (here) | *— nothing —* |
  * | agent actor | `memory/` | `beans/` |
  *
- * The empty quadrant is empty deliberately and still is.
+ * The empty quadrant is empty deliberately.
  *
- * ## Why this reader exists at all
+ * The schemas (`schemas/sdlc/todo.ts`, `schemas/sdlc/todo-graph.ts`), the
+ * declared `todos/` directory and this reader go together: a declared
+ * directory nothing reads would report a clean run over nothing.
  *
- * `schemas/sdlc/todo.ts`, `schemas/sdlc/todo-graph.ts` and the `todos` / `todo-items`
- * graph typologies were all in place before any todo existed on disk, and
- * `harness.json` did not declare `todos/`. A schema ahead of its graph is
- * harmless; a **declared directory nothing reads** is not — that is the bean
- * `dh4f` defect, where a consumer scans nothing and reports a clean run over
- * it. So the declaration, the directory, the files and the reader land
- * together or not at all.
- *
- * ## Front matter is flattened, and the flattening is the interesting part
+ * ## Front matter is flattened
  *
  * A `NoteTags` has six axes and YAML front matter is a flat map, so the
  * reader lifts `roles`, `processes`, `identities`, `references` and

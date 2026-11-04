@@ -7,78 +7,32 @@
  * @graphNode none — a generator over the uploads half of the library graph
  * @covers none — writer — regenerates the visualisation; judges nothing
  *
- * Third sibling of `gen-schema-viz.ts` and `gen-library-viz.ts`, and the same
- * shape MINUS ONE PIECE: those two publish a projection and a viewer over it;
- * this publishes only the viewer, because the dataset it renders already
- * exists and must stay single. See "ONE DATASET, TWO VIEWERS" below.
- * Zero-dependency, under `<site>/<handler>/<graph>/`, fetching the projection
- * relative to its own location.
+ * Third sibling of `gen-schema-viz.ts` and `gen-library-viz.ts`, MINUS the
+ * projection: zero-dependency, under `<site>/<handler>/<graph>/`, fetching the
+ * projection relative to its own location.
  *
- * ## Why this is a SEPARATE harness and not a tab on the library viewer
+ * ## A separate viewer, not a tab on the library viewer
  *
- * `uploads` and `library` declared the SAME `coverage.visualiser`, so both
- * navbar tiles opened the library viewer and the uploads tile rendered the
- * library's entry count — 0 on this instance, while fifteen sources sat in the
- * queue beside it. Bean `v18c` tabled three ways out and the owner rejected
- * all three, because each assumed one page that two tiles reach:
+ * A queue has none of what the library viewer reads (bib-slugs, `sections/`,
+ * `structure.json`, the OCR three-state), and its job is the opposite: uploads
+ * is the incoming queue and is **not greppable by the corpus checklist**
+ * (`docs/source/guides-document-ingestion/uploads-and-library-are-two-stages-of-one-pipeline.md`),
+ * so a paper still in `uploads/` makes a clean corpus grep read as "nobody
+ * has done this". The headline here is therefore the UNINGESTED count.
  *
- * > uploads/ are not ingested, they are ingested into libray/. separate
- * > visualizations … actually funcionally different/behavior diffent so need
- * > distinct harness
+ * ## ONE DATASET, TWO VIEWERS
  *
- * The falsification is in `gen-library-viz.ts` itself: it reads bib-slugs,
- * `sections/`, `structure.json` and the OCR three-state. A queue has none of
- * those, so "same harness, different theme" would mean teaching a corpus
- * browser to render a queue.
- *
- * And the repository already argued the split, in
- * `docs/source/guides-document-ingestion/uploads-and-library-are-two-stages-of-one-pipeline.md`:
- * uploads is the incoming queue and is **not greppable by the corpus
- * checklist**, library is L1 source content and is. That page also states what
- * this viewer is FOR, better than this comment would:
- *
- * > an un-ingested source is worse than an absent one, because it produces
- * > false confidence rather than a gap
- *
- * The corpus grep searches `library/` only, so a paper still sitting in
- * `uploads/` makes a clean grep read as *"nobody has done this"*. **The
- * library viewer cannot surface that by construction** — the thing this one
- * must show is exactly what is NOT in the library. That is the behavioural
- * difference, and it is why the headline here is the UNINGESTED count rather
- * than a total.
- *
- * ## ONE DATASET, TWO VIEWERS — and the first draft of this file got it wrong
- *
- * `state-visualizer.ts` records the ruling, from bean `flh4` / issue #618:
- * the queue block is published inside `assets/library/index.json`,
- *
- * > one dataset with `library/`, since two projections over it would be two
- * > answers to "how many are queued"
- *
- * This file's first draft emitted its own `assets/uploads/index.json`. Derived
- * from the same reader, so it could not have DISAGREED on the day it was
- * written — and that is the whole trap: a second file over one reading cannot
- * be wrong until the day one of them is regenerated and the other is not, at
- * which point two pages state different counts and neither says which is
- * stale.
- *
- * So this emits NO projection. It publishes a viewer that fetches the library
- * projection and renders its queue half. `library:viz` owns the dataset;
- * this owns a rendering of it — which is the same split `gen-library-viz`
- * already uses for its own Listing and Desktop views, applied across two
- * harnesses instead of two tabs.
- *
- * A distinct harness was never a claim about the DATA. It is a claim about
- * behaviour, and the behaviour is what this file holds.
+ * The queue block is published inside `assets/library/index.json`
+ * (`state-visualizer.ts`): two projections would be two answers to "how many
+ * are queued". So this emits NO projection; `library:viz` owns the dataset and
+ * this renders its queue half.
  *
  * ## Three states, not a tick and a cross
  *
  * `waiting` and `ingested` are the two the reader can determine. The third is
  * `sidecar-free`: an intake DIRECTORY declares which files are the capture, so
  * a loose file and a declared intake are different units and are labelled as
- * such rather than both being counted as "a document". Counting the four files
- * of one IRIS intake as four queued documents is the exact error
- * `UploadItem.kind` exists to stop.
+ * such (`UploadItem.kind`), never each counted as "a document".
  *
  * Usage:
  *   bun run cat uploads:viz          # write

@@ -4,47 +4,33 @@
  *
  * `skills/ui/ui-core/serving-renderings.md` settles the contract — four
  * endpoints under the instance's stub, the media type each declares, and the
- * three enforcement states per host — and closes by saying, verbatim:
- *
- * > **How to run a server.** No tool is specified here — the media types and
- * > the per-host enforcement story are the durable part, and a server that
- * > reads them is an implementation of this, not a prerequisite for it.
- *
- * This is that implementation. It is the publication host for every topology
- * in `docs/proposals/deployment-topologies.md` whose `publication host` axis
- * is not `github-pages` — local git only, private repo, developer and
- * self-sovereign — where Pages is absent rather than merely limited.
- * Bean `folio-assistant-0hi8`, issue #363.
+ * three enforcement states per host — and names no server; this is one. It
+ * is the publication host for every topology in
+ * `docs/proposals/deployment-topologies.md` whose `publication host` axis is
+ * not `github-pages` — local git only, private repo, developer and
+ * self-sovereign.
  *
  * ## What this adds over `python3 -m http.server`
  *
- * Less than you would guess, and the measurement matters more than the
- * intuition. Measured 2026-09-19: Python's `mimetypes` and `Bun.file().type`
- * BOTH resolve `.jsonld` to `application/ld+json` already. A plain static
- * server is not broken here and this file must not be sold as fixing it.
- *
- * The gap is one row. **`.schema.json` infers as `application/json`** from
- * every OS table, because `.json` is the suffix that matches and nothing
- * knows the compound extension means a schema. `RENDERING_MEDIA_TYPES` is
- * ordered longest-first so the compound wins, and this server reads that
- * table rather than the filesystem's.
+ * One row. Plain static servers already resolve `.jsonld` to
+ * `application/ld+json`, but **`.schema.json` infers as `application/json`**
+ * from every OS table. `RENDERING_MEDIA_TYPES` is ordered longest-first so
+ * the compound extension wins, and this server reads that table rather than
+ * the filesystem's.
  *
  * ## Two behaviours that are contract, not convenience
  *
- * - **`<stub>/` resolves to its directory index.** The bare stub has to be
- *   openable, which on GitHub Pages is what forces the viewer to be a
- *   directory in the first place. A local server that 404s there would make
- *   the two hosts disagree about a URL the documentation prints.
+ * - **`<stub>/` resolves to its directory index**, as on GitHub Pages, so
+ *   both hosts agree about a URL the documentation prints.
  * - **An unknown path falls back to Bun's own inference**, never to
  *   `application/octet-stream`. The table's `undefined` means "the
- *   declaration says nothing about this file", not "this file has no type" —
- *   the third state, kept as one.
+ *   declaration says nothing about this file", not "this file has no type".
  *
  * ```sh
  * bun run cat-harness-tools/scripts/serve-rendering.ts --dir <site> --port 4007
  * ```
  *
- * ## Several sites at once (local server Phase 1, 2026-10-31)
+ * ## Several sites at once
  *
  * `--mount /<repo>=<dir>` (repeatable) serves each built site under its own
  * prefix on one origin, as GitHub Pages does, so root-relative links and IRI
@@ -52,10 +38,9 @@
  * written against web-standard `Request`/`Response` only so a Node launcher
  * can reuse it; this file is the Bun launcher.
  *
- * Default port **4007** (owner, 2026-10-31: a prime near 4000, which is
- * `jekyll serve`'s default and so clashed with it). Default host 127.0.0.1;
- * with the CLI, `localhost` and `[::1]` requests are redirected there so
- * browser state is never split across two origins.
+ * Default port **4007** (not 4000, which `jekyll serve` uses). Default host
+ * 127.0.0.1; with the CLI, `localhost` and `[::1]` requests are redirected
+ * there so browser state is never split across two origins.
  *
  * ```sh
  * bun run cat-harness-tools/scripts/serve-rendering.ts --mount /folio-assistant=../gh-pages/folio-assistant --mount /dth-pc=../dth-pc-pages

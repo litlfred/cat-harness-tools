@@ -7,14 +7,9 @@
  *   bun run cat-harness-tools/scripts/seed-folio-from-library.ts \
  *     --entry library/<doc-id> --slug <folio-doc> [--title T] [--author A]... [--force]
  *
- * ## Why this exists (owner, 2026-10-14)
- *
- * litlfred/dth-hrh was seeded from a library entry by a script written for
- * that one folio, which wrote blocks and no `.jsonld`, and nothing noticed:
- * its site published no graph. Every folio seeded from a source needs the
- * same generic part, so it lives here, and it ends where every block-writing
- * step must end: with the block's KG node, written by `gen-block-jsonld`'s
- * own `blockToJsonLd`.
+ * Every block it writes ends with its KG node `.jsonld`, written by
+ * `gen-block-jsonld`'s own `blockToJsonLd`, so the folio's site publishes a
+ * graph.
  *
  * ## What it decides, and what it does not
  *
@@ -23,9 +18,9 @@
  *   top heading level becomes the chapters, deeper levels nest as sections.
  *   No division is inferred.
  * - **Every block is `prose`.** As `l1-blocks.ts` says of ingested text, a
- *   section IS prose until somebody reads it; a classifier that guessed a
- *   persona or a requirement from a heading would be `6xaz` one layer up.
- *   A folio's own enrichment (structured assets, figures) is its own step.
+ *   section IS prose until somebody reads it; no persona or requirement is
+ *   guessed from a heading. A folio's own enrichment (structured assets,
+ *   figures) is its own step.
  * - **Provenance on every block**: `meta.source` names the library, the
  *   section and its locator, with `method: "library-seed"`. The library's
  *   files are read, never written.

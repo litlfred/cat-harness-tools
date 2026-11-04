@@ -25,13 +25,9 @@
  * cancelled, and a commit can be green while a workflow has been red for a
  * month on a path it never touched.
  *
- * ## Why it exists
- *
- * Measured 2026-09-30: an agent watching `main` after a merge folded
- * `cancelled` into failure and reported **main red** on a commit whose every
- * hard gate had passed. The cancelled run was a deploy job superseded by the
- * next push. See {@link ../src/workflow/check-verdict} for the full account and
- * the precedence rules, which are pure and tested there rather than here.
+ * A `cancelled` run (e.g. a deploy superseded by the next push) is
+ * undetermined, never a failure. See {@link ../src/workflow/check-verdict}
+ * for the precedence rules, which are pure and tested there.
  *
  * `GITHUB_TOKEN` or `GH_TOKEN` is used when present. Without one the call
  * still works for a public repository; for a private one it fails, and this

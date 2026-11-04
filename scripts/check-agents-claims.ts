@@ -6,44 +6,25 @@
  * @covers code — its subject is the CODE a prose claim asserts about — the symbols and paths it
  *   names. The `AGENTS.md` it reads is this instance's declared `agent-instructions` asset
  *
- * Bean `77ex`. Two checks already cover `AGENTS.md` and neither covers this:
- * `check:agents-xref` verifies citations INTO it, `check:agent-entry-links`
- * verifies links OUT of it. Neither reads what the prose ASSERTS.
+ * `check:agents-xref` verifies citations INTO `AGENTS.md`,
+ * `check:agent-entry-links` verifies links OUT of it; this reads what the
+ * prose ASSERTS.
  *
- * ## Two claim shapes, and the second is the one that cost something
+ * ## Two claim shapes
  *
  * **LOCATION** — `` `symbol` in `module.ts` ``. Catches a symbol renamed or
  * removed while the prose kept its old name.
  *
  * **ABSENCE** — `` `symbol` `` … "has no caller", "nothing calls it", "is not
- * reachable". This is the expensive one, and `AGENTS.md` says why in its own
- * voice: *"a stale gap notice is worse than none, because an agent that
- * believes it either avoids the feature or rebuilds it."*
+ * reachable". A stale gap notice is worse than none: an agent that believes
+ * it either avoids the feature or rebuilds it.
  *
- * ## The bean's own design would not have caught its own example
+ * A claim about a config file's CONTENTS is caught by neither, and the report
+ * says so.
  *
- * `77ex` proposed the LOCATION check and asked, as its third done-when, to
- * falsify it against the two real claims from git history. Doing that first
- * is what found the problem. At `08f43c55b2` the file said:
+ * ## It does not grep English
  *
- * > `resolveSkillDirs` in `schemas/folio-config.ts` computes the
- * > cross-instance skill overlay and has **no caller**
- *
- * `schemas/folio-config.ts` existed at that commit and did declare
- * `resolveSkillDirs` — verified with `git show`. The LOCATION claim was
- * **true**. What was false was "no caller", which a location check never
- * looks at. So the ABSENCE check is not an extension here; it is the half
- * that catches the motivating case.
- *
- * The bean's second example — *"declares `schemas/` and `skills/` only"* — is
- * a claim about a config file's CONTENTS and is caught by neither. That is
- * stated in the report rather than quietly dropped.
- *
- * ## Why it does not grep English
- *
- * The bean is explicit that a checker over prose will cry wolf and be
- * switched off, and this repository has already paid for one such proxy. So
- * every claim must carry a BACKTICKED symbol and a recognised shape; anything
+ * Every claim must carry a BACKTICKED symbol and a recognised shape; anything
  * else is counted as **not parsed** and reported as its own state. A sentence
  * the checker did not understand is not a sentence it verified.
  *

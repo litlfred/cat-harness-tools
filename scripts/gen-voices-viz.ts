@@ -6,39 +6,22 @@
  * @covers voices
  * @graphNode none — a generator over the voices graph, not a schema itself
  *
- * Sibling of `gen-library-viz.ts` and `gen-schema-viz.ts`, deliberately the
- * same three pieces: a reader (`voices-graph.ts`), a projection under
- * `<site>/assets/<graph>/`, and a zero-dependency viewer under
- * `<site>/<handler>/<graph>/` that fetches the projection relative to its own
- * location. The published segment is the DECLARED directory's own name, read
- * rather than written down.
+ * The same three pieces as `gen-library-viz.ts` and `gen-schema-viz.ts`: a
+ * reader (`voices-graph.ts`), a projection under `<site>/assets/<graph>/`, and
+ * a zero-dependency viewer under `<site>/<handler>/<graph>/` that fetches the
+ * projection relative to its own location. The published segment is the
+ * DECLARED directory's own name.
  *
  * ## The page's one job: show the citations
  *
- * `check-voices.ts` exists because PR #210 shipped ten plausible rules per
- * voice with `source: null`, one of which asserted the opposite of what the
- * source says. Every rule now carries the page and the quote it was read
- * from — machine-checked, and until this page, **unreadable by a person
- * without opening JSON**. So the rule row leads with the quote, and the
- * citation is the column that cannot be sorted away.
- *
- * Bean `bu2q`, on the owner's ask: *"shoulld show list of voices defined"*.
- *
- * ## The visualiser rule does NOT demand this page, and that is worth saying
- *
- * `owesVisualiser` returns false for a `content` kind and `voices` is
- * `content`, so `check:subgraph-coverage` never asked for it — exactly as it
- * never asked for the library viewer (bean `jbx2`). The obligation this page
- * meets is the one in `2krx`'s own words — *"a directory nobody can see is one
- * nobody checks"* — not a failing row. Recording that here so a later reader
- * does not go looking for the finding that motivated it.
+ * Every rule carries the page and the quote it was read from, machine-checked
+ * by `check-voices.ts`. The rule row leads with the quote, and the citation is
+ * the column that cannot be sorted away.
  *
  * ## A declared-but-absent directory gets a ROW, not silence
  *
- * `agent-skills` declares a `voices` graph and ships none. The directories
- * panel lists it as declared-but-absent rather than omitting it, because a
- * consumer that scans nothing and reports a clean run is the `dh4f` defect
- * this repository keeps paying for.
+ * `agent-skills` declares a `voices` graph and ships none; the directories
+ * panel lists it as declared-but-absent rather than omitting it.
  *
  * Usage:
  *   bun run cat voices:viz          # write

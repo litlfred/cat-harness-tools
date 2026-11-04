@@ -1,193 +1,58 @@
 #!/usr/bin/env bun
 /**
  * Regenerate everything adding a skill stales, and REFUSE a skill that arrived
- * without its declarations — one command, beans `v625` and `nfv3`.
+ * without its declarations — one command, because a documented list is not
+ * reachable at the moment of authoring.
  *
- * ## Why this exists rather than a documented list
+ * It also gates in CI (the obligation is refused, not merely documented),
+ * reports **dangling** manifest entries, and strips **retired** front-matter
+ * keys.
  *
- * `v625` cost twice in one hour on 2026-09-26. Six skills reached `main` with
- * no package-manifest entry and no reference page; the fix merged; forty
- * minutes later a seventh landed with the same gap, from a different session.
+ * ## The chain
  *
- * The second one rules out documentation as the remedy. The commit that fixed
- * the first six wrote the chain out in full, and it was written **before** the
- * next author needed it. Prose in a merged commit is not reachable from the
- * moment of authoring — so the remedy has to be a command, not a paragraph.
+ * The writer and check pairs are `STEPS` in this file, ending with
+ * `subgraph:jsonld`: a skill's body is published as a content-addressed
+ * PAYLOAD (`docs/payload/sha256/<hex>`) that its subgraph index points at, so
+ * editing a body moves the hash; it is LAST because it reads the graph the
+ * steps above write into. Checks downstream of a step (`slice:sqlite:check`,
+ * `check:ci-invocations`) are not steps of their own.
  *
- * ## Two commands became one, and the owner chose which name
+ * A step is an ARGUMENT LIST of package script names — the scripts CI runs —
+ * so a step can carry a flag and every name can be asserted against
+ * `package.json` ({@link missingScripts}).
  *
- * `nfv3` built a second command — `skills:register` → `register-skills.ts` —
- * one letter away from this one, found in a `package.json` conflict rather than
- * by looking. It contributed three things this lacked: a **CI gate**, so the
- * obligation is refused rather than merely documented; a **dangling**-entry
- * report; and a **retired-key strip**. Those are below. Its fourth behaviour,
- * writing the manifest entry for you, was deliberately dropped — see
- * §"What it does not do".
+ * No entry joins the chain without an isolated red-then-green run of its
+ * check against a known tree. `bun run cat gates` cannot derive the chain:
+ * `bun test` runs some writers, so a stale artefact is repaired before its
+ * check reads it, and checks run in sequence perturb each other. Even an
+ * isolated run is not proof, so {@link main} verifies at runtime instead of
+ * trusting the list.
  *
- * The owner settled the name on 2026-09-26: this one, because it was already on
- * `main`, so every other session already calls it. Consolidating was put to a
- * person rather than decided by whoever pushed next, since retiring a command is
- * removing a durable artefact (`deletion-requires-confirmation`).
+ * ## Order
  *
- * ## The list was DERIVED BY EXPERIMENT, and my remembered one was wrong
- *
- * This matters more than the list. Three times before measuring, this chain
- * was written down from memory of incidents, and each time it was wrong:
- *
- * - it named `gen-docs-pages`, `docs:harness`, `translation:index` and
- *   `state:visualizer`, **none of which adding a skill stales**. They had gone
- *   red in the same sessions for unrelated reasons and were attributed here.
- * - it omitted `glossary:page`, `auto:docs`, `kg:audit` and `kg:detangle`,
- *   **all four of which it does stale**. Two were already red on a red `main`,
- *   so they were filtered out as "not mine"; two were masked (below).
- *
- * The method that worked: add a throwaway skill to a green tree, run each
- * check **individually**, and subtract a baseline measured the same way.
- *
- * `nfv3` then made the same error a **fourth** time from the other direction,
- * inferring nine steps — `glossary:export`, `uml:overview`, `prov:qaqc` and
- * `tools:viz` on top of the five — from what went red in a branch that had also
- * added three Tool nodes and merged 20 translated pages.
- *
- * **And one of those four was right.** `uml:overview` IS staled by adding a
- * skill, measured the same day and added below as step 6. So the fourth wrong
- * answer was wrong by including three, and the five it was corrected to were
- * wrong by excluding one — the correction dropped a correct entry on the
- * authority of a sweep that had been perturbed. Neither list was arrived at
- * badly and neither was right.
- *
- * That is the reason the limit above is stated as a limit rather than a
- * procedure: no entry joins this chain without an isolated red-then-green run,
- * and an isolated run is still not proof, so {@link main} verifies at runtime
- * instead of trusting the list.
- *
- * ## `bun run cat gates` CANNOT derive this, and that is the subtle part
- *
- * The first experiment ran `gates` and reported four stale artefacts.
- * `kg:audit:check` and `kg:detangle:check` were green in it — and red when run
- * on their own against the identical tree. `bun test` runs those writers, so
- * by the time the checks execute the artefacts have been repaired. That is
- * bean `ymsu`'s blind spot: a gate that writes what a later gate reads.
- *
- * Running the checks in sequence perturbs too — a later loop found
- * `kg:audit:check` green again, because something earlier in it wrote.
- * **Only an isolated run of one check against a known tree measures anything**,
- * which is why the table below cites per-check runs and not a `gates` summary.
- *
- * ## The chain, each step measured alone, red before and green after
- *
- * | writer | the check it clears |
- * |---|---|
- * | `skill:commands` | `skill:commands:check` — added 2026-09-30 (`j6t3`): red with 37 missing and one undeclared, green after |
- * | `skills:docs` | `skills:docs:check` |
- * | `glossary:page` | `check:glossary` |
- * | `auto:docs` | `auto:docs:check` |
- * | `kg:audit` | `kg:audit:check` |
- * | `kg:detangle` | `kg:detangle:check` |
- * | `uml:overview` | `uml:overview:check` |
- * | `subgraph:jsonld` | `subgraph:jsonld:check` — added 2026-10-05 (`8qyc`), below |
- *
- * **`subgraph:jsonld` is measured, not recalled.** #2139 went red in CI after
- * editing three skills, on `subgraph:jsonld:check`: a skill's body is published
- * as a content-addressed PAYLOAD (`docs/payload/sha256/<hex>`) that its
- * subgraph index points at, so editing the body moves the hash. Measured
- * 2026-10-05 on `main` at `da10ede3d3`, where `merge-conflict-patterns.md` had
- * been edited without it: `subgraph:jsonld:check` exit 1 alone (2 stale
- * payloads, 4 subgraph files); `bun run cat subgraph:jsonld` (28 s under load 15);
- * then exit 0. `slice:sqlite:check` was red on the same tree for the same
- * missing payload and went green from that one write, with no slice writer
- * run, so it is downstream of this step rather than a step. Of the chain's
- * other checks, `auto:docs:check`, `readme:subgraphs:check`, `docs:pages:check`
- * and `check:undeclared-files:check` were green before and after, so the new
- * payload files stale nothing else. It is LAST because it reads the graph
- * the steps above write into.
- *
- * `check:ci-invocations` also goes green, and is not a step of its own: it
- * re-runs the CI invocations, one of which is step 1, so it is downstream of it.
- *
- * Step 1 was measured as a direct `gen-skill-docs.ts` invocation and is now the
- * `skills:docs` npm script; step 6 likewise names `uml:overview` rather than
- * `gen-uml-overview.ts`. Same programs. Routing them through scripts is what
- * `check:ci-invocations` asks of every CI step, and a chain that names scripts
- * uniformly can be asserted against `package.json` — {@link missingScripts}.
- *
- * **A step is an ARGUMENT LIST rather than a bare name, and that is `v625`'s
- * shape kept over this file's own.** `v625` reached `main` with
- * `readonly string[]`, because it needed `gen-skill-docs.ts --check` and there
- * was then no `skills:docs:check` script to name. Both halves were right about
- * something: a list can carry a flag, and a NAME can be asserted against
- * `package.json`. The merge keeps the list shape and populates it with script
- * names — this branch supplies the two aliases `main` lacked — so nothing has
- * to choose between expressiveness and assertability.
- *
- * It also removes a defect a merge would otherwise have shipped silently:
- * `v625`'s step arrived in the array shape while this file's field was typed
- * `string`, and `git` merged the two without complaint.
- *
- * **`gen-uml-overview` was added as a sixth step on the day this shipped**, and
- * how it was missed is the same lesson one turn later. The per-check sweep that
- * derived the first five ran the checks IN SEQUENCE, and sequence perturbs —
- * something earlier in that loop wrote, so `uml:overview:check` read as green.
- * It surfaced an hour later when an ordinary skill EDIT moved the kg-qa and
- * detangle sidecars and the UML overview, which renders that tree, went stale
- * behind them.
- *
- * So the derivation method has a stated limit: isolating one check against a
- * known tree is necessary and was not sufficient, because a check can be
- * perturbed by a NEIGHBOUR in the same sweep. The runtime verification below is
- * what catches that — it reports the checks' verdicts, so an under-declared
- * list fails loudly rather than passing quietly.
- *
- * ## Order: five were independent, and the SIXTH is not — measured 2026-09-27
- *
- * This section said the chain was order-independent, on a real measurement:
- * running all **five** in reverse and re-checking left them green. That
- * measurement predates `uml:overview`, and the six-step chain does NOT have the
- * property:
- *
- *     declare a `qa` directory for a nested instance
- *       -> kg:audit writes its sidecars
- *       -> uml:overview renders the QA tree, adding pages
- *       -> auto:docs:check goes STALE, and auto:docs ran two steps earlier
- *
- * Measured by running the command: pass 1 left `auto:docs:check` red, pass 2
- * exited 0. **One pass is not a fixed point**, and the order below is now
- * dependency-bearing whether or not it was designed to be.
- *
- * The order is deliberately NOT changed to fix it. Putting `auto:docs` last would
- * close this pair and might open another, and the verification loop already
- * reports the truth: every check runs after the writes and the command exits
- * non-zero while any is red, so a stale artefact is named rather than shipped.
- * What was wrong was this paragraph asserting a property the chain had since
- * lost — a measurement whose conclusion outlived the thing it measured.
+ * One pass is not a fixed point: e.g. `kg:audit` writes sidecars,
+ * `uml:overview` renders them into pages, and `auto:docs:check` goes stale
+ * though `auto:docs` ran earlier. Every check runs after the writes and the
+ * command exits non-zero while any is red, so a stale artefact is named rather
+ * than shipped.
  *
  * ## Why it shells out instead of importing
  *
- * Every step runs as the package script CI runs. Importing the generators would
- * be faster and would be wrong twice over: the versions would be free to drift
- * from what the gate set actually executes, and
- * `declared-directory-resolves.test.ts` guards a real defect where IMPORTING a
- * generator wrote files. A registration command that writes by import is the
- * unguarded entry point that test exists to catch.
+ * Every step runs as the package script CI runs, so the versions cannot drift
+ * from what the gate set executes, and no generator writes files on import
+ * (guarded by `declared-directory-resolves.test.ts`).
  *
  * ## Third state
  *
  * Exit 2 — never 0, never 1 — when the question could not be answered: no
- * package manifests found, or a chain step that is not a registered script. A
- * sweep that examined nothing has cleared nothing, and this repository has paid
- * for the opposite reading (bean `dh4f`).
+ * package manifests found, or a chain step that is not a registered script.
  *
  * ## What it does not do
  *
  * It does not add the package-manifest entry. That is the author's assertion
- * that the file is a skill of that package, not a derivable fact, and a
- * command that guessed it would register files someone was still drafting.
+ * that the file is a skill of that package, not a derivable fact.
  * `skill package manifests cover the package` fails loudly when it is missing,
- * and this script says so rather than papering over it.
- *
- * `nfv3`'s command did write it. That behaviour was dropped rather than merged,
- * on this file's own argument — which is the one place the consolidation took
- * the OLDER design over the newer one, deliberately.
+ * and this script says so.
  *
  * It also does not prune a manifest entry whose file is gone. See
  * {@link dangling}.
@@ -195,25 +60,13 @@
  * @module cat-harness/scripts/skill-register
  * @covers skills — the kind this gate JUDGES. It reads a skill's declarations:
  *   its manifest entry, its front matter, and whether the manifest points at
- *   anything absent. Those live in the directories that declare `skills`. The
- *   derived `folio` reference pages and `qa` sidecars are produced by the chain
- *   and judged by their own gates (`skills:docs:check`, `kg:audit:check`), so
- *   claiming them here would report coverage this gate does not provide. `kg`
- *   was written in `nfv3`'s version first and is not a kind at all — it names a
- *   graph LAYER, which `audit-coverage`'s own test caught
- *
- *   The subject set is resolved from the instance's declarations via
+ *   anything absent. The derived `folio` reference pages and `qa` sidecars are
+ *   judged by their own gates (`skills:docs:check`, `kg:audit:check`). The
+ *   subject set is resolved from the instance's declarations via
  *   `kgDirectories`, never from a list written here
- * @covers cat-harness — `v625`'s declaration, RETAINED across the merge rather
- *   than reversed, and flagged rather than quietly kept. Both names are real
- *   graph typologies (42 are registered in `BASE_GRAPH_TYPOLOGIES`; `audit-coverage`
- *   validates a `@covers` name against nothing, so being accepted is not
- *   evidence of being apt), and both are declared by many other gates, so
- *   `audit:coverage:require-all` is unaffected whichever stands. The reason to
- *   query it: in `cat-harness.json` the `cat-harness` kind is declared on the
- *   `schemas/` directories, and this gate does not read a schema. Reversing a
- *   sibling's deliberate line inside a merge resolution is the wrong place to
- *   settle it, so it stays and the question is on the PR.
+ * @covers cat-harness — retained, though in `cat-harness.json` the
+ *   `cat-harness` kind is declared on the `schemas/` directories and this gate
+ *   does not read a schema; an open question
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";

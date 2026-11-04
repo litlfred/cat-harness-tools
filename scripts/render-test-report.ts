@@ -1,7 +1,6 @@
 /**
  * Render a `test-report/v1` as a page a person reads, with a badge that links
- * to the run it came from — bean `folio-assistant-ff09`, Done-when 2: *"the
- * report renders, and its badge links to the run."*
+ * to the run it came from.
  *
  * Written beside the report, in the same `tests/<plan>/<sut>/<run>/`
  * directory of the `qa` working copy, so `qa:publish` records the page, the
@@ -13,7 +12,7 @@
  * The badge reads `testReportVerdict` — the schema's own three states — and
  * nothing else: `ok`, `finding` or `unknown`. A `running` report is `unknown`,
  * never a pass. It never shows a total across plans, because a report has no
- * field for one (the owner's `py74` ruling).
+ * field for one.
  *
  * Measurements a run records in its `outcome` (precision, recall …) are shown
  * as RECORDED numbers. Whether any threshold applies is the plan's exit DMN's

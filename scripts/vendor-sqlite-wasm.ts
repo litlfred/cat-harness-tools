@@ -1,18 +1,17 @@
 #!/usr/bin/env bun
 /**
- * Vendor the official SQLite WASM build into the docs site. Bean `q8ar`.
+ * Vendor the official SQLite WASM build into the docs site.
  *
  * The client (`docs/assets/js/slice-sqlite.js`) loads SQLite from
- * `docs/assets/js/vendor/sqlite-wasm/` and NOT from a CDN, for two measured
- * reasons:
+ * `docs/assets/js/vendor/sqlite-wasm/` and NOT from a CDN:
  *
- * - `cdn.jsdelivr.net` is refused by this container's egress proxy (403 on
- *   CONNECT, 2026-10-03), so a CDN-loaded page could not be tested here;
+ * - a CDN may be refused by an agent container's egress proxy, so a
+ *   CDN-loaded page could not be tested there;
  * - a reader's search would then depend on a third host, where the rest of the
  *   page depends only on Pages.
  *
- * The repository already vendors JS (`vendor/qrcode.js`), so this follows that
- * precedent. Only two files are copied:
+ * It follows the existing vendored JS (`vendor/qrcode.js`). Only two files are
+ * copied:
  *
  * - `index.mjs`, the ESM bundle;
  * - `sqlite3.wasm`, which the bundle finds through `import.meta.url`.

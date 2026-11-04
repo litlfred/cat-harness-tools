@@ -2,27 +2,17 @@
 /**
  * Scaffold a new folio in an empty (or existing) repository.
  *
- * ## The problem this solves
- *
  * folio-assistant is the platform; a folio is the content repo that uses it.
- * Standing one up by hand means knowing six conventions that were only ever
- * written down implicitly: where the document manifest lives and that it must
- * be named after its own directory, that block manifests import builders
- * through a `folio/schema/` shim, that `harness.config.json` selects the
- * adapter, that `AGENTS.md` is the agent-generic entry point with `CLAUDE.md`
- * and `GEMINI.md` as stubs, that `beans/` is the work plan, and that the
- * folio-assistant checkout has to be reachable from the shim's relative path.
+ * This writes, together, the conventions a folio needs (any one missing gives
+ * a repo that looks right and renders nothing): the document manifest, named
+ * after its own directory; block manifests importing builders through a
+ * `folio/schema/` shim; `harness.config.json` selecting the adapter;
+ * `AGENTS.md` as the agent-generic entry point with `CLAUDE.md` and
+ * `GEMINI.md` as stubs; `beans/` as the work plan; and a shim path that
+ * reaches the folio-assistant checkout.
  *
- * Getting any one of them wrong produces a repo that looks right and renders
- * nothing. This writes all of them together, so the first thing an author does
- * in a fresh folio is add a chapter rather than debug a layout.
- *
- * ## What it does NOT do
- *
- * It writes no subject matter. The starter block says what a block is; it does
- * not say anything about the folio's topic, because that is the author's to
- * write and a scaffolder that guesses at it produces content nobody asked for
- * that then has to be deleted.
+ * It writes no subject matter: the starter block says what a block is, not
+ * what the folio is about.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/init-folio.ts --dir . --type document --slug my-guidance \

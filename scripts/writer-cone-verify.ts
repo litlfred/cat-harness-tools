@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 /**
- * The writers' half of the rerun-and-measure dry run (bean `fwtz`, option B):
- * after a FULL `derive:publish`, which writers could the previous deploy's
- * records have skipped, and would skipping them have been right?
+ * The writers' half of the rerun-and-measure dry run: after a FULL
+ * `derive:publish`, which writers could the previous deploy's records have
+ * skipped, and would skipping them have been right?
  *
  * @module cat-harness-tools/scripts/writer-cone-verify
  * @covers none — a measurement logged beside the deploy; it gates nothing and

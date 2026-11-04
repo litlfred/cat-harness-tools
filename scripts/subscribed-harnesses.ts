@@ -1,7 +1,7 @@
 /**
  * The harnesses a KG SUBSCRIPTION chose, read from the substrate snapshots
  * `kg:subscribe` cached: whether each is instantiated at the root, and the
- * navbar tile of one that is. Issue #1719, epic bean `fnx4`, slice 7.
+ * navbar tile of one that is.
  *
  * @module cat-harness/scripts/subscribed-harnesses
  *
@@ -18,7 +18,7 @@
  * Every reader here is offline: what a tile shows is what was recorded at the
  * last subscribe. A snapshot that is absent, unreadable or not the pin's is
  * returned as such, and the tile draws it as a finding rather than as an
- * empty tile (`dh4f`).
+ * empty tile.
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";

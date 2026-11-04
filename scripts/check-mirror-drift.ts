@@ -3,29 +3,12 @@
  * Mirror-drift audit — a content-block `.lean` sibling that restates a library
  * declaration must not disagree with it.
  *
- * ## The defect this catches
- *
- * Content-block `.lean` siblings compile standalone and cannot import one
- * another, so a sibling that needs a library type **restates it**: same
- * `structure`/`class`, same name, same namespace, fields copied across. That
- * is deliberate and mostly harmless.
- *
- * It stops being harmless when the two copies drift, because a co-located
- * `<block>.lean` wins **candidate 1** of `lean.ref` resolution
- * (`resolveCanonicalLean` / `walkBlocks` in `pipeline/qa-utils.ts`),
- * unconditionally and before any Lake-tree candidate. Every checker aimed at
- * that block then audits the sibling's copy and never sees the declaration
- * `lake build` actually compiles. A file can be green, compile clean, satisfy
- * every gate — and be the wrong definition.
- *
- * Measured on `litlfred/qou@main` 2026-08-23 (bean `qou-u87j`): 147 same-FQN
- * pairs, 94 faithful, **46 drifted across 39 files, and all 46 mask a block's
- * `lean.ref`** — plus **7 `regime` pairs** that the field comparison alone
- * calls faithful, and **10** of the 46 that cross the wall as well.
- * Worked example — `QOU.CRManifoldData`: the library copy carries
- * `n_pos : 0 < n` and the siblings do not; the siblings carry `contact_nondeg`
- * and `reeb_preserves_contact` and the library does not. Each side has an
- * anti-vacuity condition the other lacks.
+ * Content-block `.lean` siblings compile standalone, so a sibling that needs a
+ * library type restates it (same `structure`/`class`, name and namespace).
+ * When the copies drift, the sibling still wins **candidate 1** of `lean.ref`
+ * resolution (`resolveCanonicalLean` / `walkBlocks` in `pipeline/qa-utils.ts`),
+ * so every checker on that block audits the sibling's copy, not the one
+ * `lake build` compiles.
  *
  * ## What counts as drift
  *
@@ -35,33 +18,21 @@
  * part of *that* comparison — a rename or a re-ordering is drift, a whitespace
  * change is not.
  *
- * Two findings are reported separately rather than as drift, because they are
- * different problems:
+ * Reported separately, not as drift:
  *
- *   - `regime` — the pair agrees on every field name and parent and still sits
- *     on **opposite sides of the §7c substrate→archimedean wall**, judged by
- *     the corpus's own `ARCHIMEDEAN_TYPE_RE` applied to the field *types*. The
- *     name comparison scores these as faithful mirrors; on qou that hid **7**
- *     of them. Kept out of the drift count on purpose: the fix is a wall split,
- *     not a field resync, and a §7c figure should not move when someone drains
- *     the drift backlog. Drifted pairs that *also* cross the wall are counted
- *     under `driftedRegime` and flagged in place.
+ *   - `regime` — the pair agrees on every field name and parent but sits on
+ *     **opposite sides of the §7c substrate→archimedean wall**, judged by
+ *     `ARCHIMEDEAN_TYPE_RE` on the field *types*. The wall gates only catch a
+ *     file that mixes regimes, not a declaration wholly on the wrong side.
+ *     Drifted pairs that also cross the wall are counted under
+ *     `driftedRegime` and flagged in place.
  *   - `duplicate-in-library` — one fully-qualified name declared more than once
  *     inside the Lake tree. Nothing to mirror against; fix that first.
  *
- * The `regime` check exists because the wall gates cannot see this. Bean
- * `qou-6ome`: `check-wall-side` and `check-base-ring` fire on a file that
- * *mixes* regimes, so a declaration **wholly** on the wrong side passes both.
- * Passing the wall gate means "not mixed", not "on the right side of the wall".
- * Comparing a declaration against its own mirror is the cheapest way to see it.
- *
  * ## Gating
  *
- * Reports everything and exits 0 by default: a new gate that fails CI on a
- * pre-existing backlog just trains people to pass `--warn-only`. Freeze the
- * current count with `--baseline <N>` and the gate fires only on growth, which
- * is what keeps the faithful mirrors from becoming the next batch of drifted
- * ones.
+ * Reports everything and exits 0 by default. `--baseline <N>` freezes the
+ * current count so the gate fires only on growth.
  *
  * Exit codes:
  *   0  — under all gates, or `--warn-only`.
@@ -77,7 +48,7 @@
  *   bun run cat-harness-tools/scripts/check-mirror-drift.ts --max 0          # fail on any drift
  *   bun run cat-harness-tools/scripts/check-mirror-drift.ts --package qou    # one package only
  *
- * ## Parser limits — read these before quoting a number
+ * ## Parser limits
  *
  * Regex, not Lean. It reads a `structure`/`class` head, then indented
  * `field :` lines until the first dedent, tracking `namespace`/`section` as a
@@ -85,26 +56,14 @@
  *
  *   - A field whose type spans lines before its `:` is missed.
  *   - A `where`-clause default on its own line is not counted as a field.
- *   - A head binder written `[inst : Foo]` on its own line is indistinguishable
- *     from an instance-implicit field at the textual level, so it is counted as
- *     a field. Both sides are parsed identically, so a drift verdict stays
+ *   - A head binder written `[inst : Foo]` on its own line is counted as a
+ *     field. Both sides are parsed identically, so a drift verdict stays
  *     sound; a field *list* printed in a finding may include one binder.
- *   - Name + namespace collision is treated as "same declaration". Two
- *     genuinely unrelated declarations sharing a fully-qualified name would be
- *     reported as drift — which is a defect deserving the same attention.
+ *   - Name + namespace collision is treated as "same declaration".
  *
- * The faithful-mirror count is the control: a parser mis-reading fields at
- * random could not produce a high exact-match rate. `--json` reports
- * `identical` alongside `drifted` so the ratio stays visible, and the summary
- * prints it. If that ratio collapses, suspect the parser before the corpus.
- *
- * `scripts/tests/check-mirror-drift.test.ts` pins the mistakes earlier versions
- * of this parser made — named and anonymous sections corrupting the namespace
- * stack, docstring prose read as fields, `extends` unparsed or dropped when
- * wrapped, a lowercase-only field pattern dropping `M : Type*`, and splitting
- * an `extends` clause on commas *before* stripping `.{u, v}` (which tears
- * `B.{u, v} R` into two entries and reports every explicitly-universed mirror
- * as drift). Every one of them moved a count.
+ * `--json` reports `identical` alongside `drifted`; if that ratio collapses,
+ * suspect the parser before the corpus. Parser regressions are pinned in
+ * `scripts/tests/check-mirror-drift.test.ts`.
  */
 
 import { folioDir } from "../schemas/kg/cat-harness.js";

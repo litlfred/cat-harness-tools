@@ -6,44 +6,25 @@
  * @covers docs
  * @graphNode none — a generator over the tiles model, not a schema itself
  *
- * ## Why this page exists, and what it replaced
- *
  * `/<handler>/` is where this instance publishes every graph it renders, as
- * `<base>/<handler>/<kind>/[<subject>/]`. Four generators write into it and
- * **none of them owned its root**, so the root held one AUTHORED page: prose
- * about the platform, sitting in a namespace that otherwise means "renderings
- * by this handler".
- *
- * Two path rules meet there. `<base>/<handler>/<kind>/` is the machinery
- * rendering something; `<base>/<instance>/` is an instance presenting itself,
- * which is how the IRIS replica mocks the IRIS website. This instance is both, so the
- * rules collided at exactly one path, and the owner settled it on 2026-09-21:
- * **the handler wins**. The authored page moved to `docs/platform.md` and
- * this generated index took the route. Bean `8h42`.
- *
- * ## It is not cosmetic — a navbar tile points here
+ * `<base>/<handler>/<kind>/[<subject>/]`. Where that meets the instance's own
+ * `<base>/<instance>/` route, **the handler wins**: the root is this
+ * generated index.
  *
  * `siteLinks` publishes the `kg` tile as `{ path: "/<stub>/", target:
- * "<stub>/index.html" }`, so the authored page was also the KG viewer's
- * landing. Moving it without writing this would have left that tile dead for
- * every reader, and **nothing local would have said so**: `verifySiteLinks`
- * reports `unknown` rather than `dead` when the site is not built, which is
- * correct (this repository is cloned far more often than it is built) and
- * means the breakage surfaces only in production.
+ * "<stub>/index.html" }`, so this page is the KG viewer's landing.
+ * `verifySiteLinks` reports `unknown`, not `dead`, when the site is not built,
+ * so a missing page here shows only in production.
  *
  * ## Derived from the tiles model, not from the filesystem
  *
- * `harnessTiles` already computes, per instance, which declared kinds have a
- * published path — it is what the navbar and the board read. Rendering the
- * same model here means the page and the navbar **cannot disagree**, and the
- * generator is order-independent: it does not need the other four to have run
- * first, because a `coverage.visualiser` declaration is what makes a kind
- * appear, not a file landing on disk.
+ * It renders `harnessTiles` (which declared kinds have a published path, per
+ * instance), the model the navbar and the board read, so the page and the
+ * navbar cannot disagree, and it need not run after the other generators: a
+ * `coverage.visualiser` declaration makes a kind appear, not a file on disk.
  *
  * A kind whose declaration names no published path is shown as **declared,
- * not published** rather than omitted. That is the `dh4f` distinction: a
- * reader who cannot tell "nothing renders this" from "this does not exist"
- * learns nothing from the gap.
+ * not published** rather than omitted.
  *
  * Usage:
  *   bun run cat handler:index          # write

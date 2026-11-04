@@ -6,53 +6,34 @@
  * @covers none — it RENDERS every declared state graph rather than judging one; a stale
  *   dashboard is a currency finding about the render, not a verdict on the graph
  *
- * Owner, 2026-09-20, settling the route after two earlier attempts:
- *
- * > i think policy in `<base-url>/<cat-harness-path-to-kind>/dashboard`
- *
- * and, settling it:
- *
- * > beans/ todos/ fsh-guts/ etc are all directories installed by a harness
- * > kind. a requirement of them is to provide visualisers accessible at
- * > `<base-url>/beans` `<base-url>/todos/` etc.
- *
- * ## The route, and it is a POLICY rather than this generator's choice
+ * ## The route is a POLICY rather than this generator's choice
  *
  * ```
  * <base>/<graph>/          the visualiser for one declared state graph
  * <base>/assets/<graph>/index.json   its data, published by gen-docs-pages.ts
  * ```
  *
- * **At the directory's own URL, with no `/dashboard` beneath it.** That is the
- * obligation `harness-requirements` states — *"a requirement of them is to
- * provide visualisers accessible at `<base-url>/beans`"*. An earlier draft put
- * the page one segment deeper, which left `<base>/beans` a 404: the obligation
- * names that URL, so a page beside it does not meet it.
+ * **At the directory's own URL, with no `/dashboard` beneath it**: a
+ * directory a harness kind installs (`beans/`, `todos/`, `fsh-guts/`) must
+ * provide its visualiser at `<base-url>/beans` etc. (`harness-requirements`).
+ * Three rules on the published URL space bind here:
  *
- * Bean `o7eq` carries the owner's three rulings on the published URL space,
- * and all three bind here:
- *
- * 1. **The segment is the instance's `name`, never its `stub`.** Two earlier
- *    drafts of this file published under `artefactStub(decl)` —
- *    `folio-assistant` — which is the name of the published GRAPH DOCUMENT,
- *    not of the instance. #477 recorded that split deliberately.
+ * 1. **The segment is the instance's `name`, never its `stub`.** The stub
+ *    (`artefactStub(decl)`, e.g. `folio-assistant`) names the published GRAPH
+ *    DOCUMENT, not the instance.
  * 2. **The declared graph IS a path segment**, not elided, because an instance
  *    may declare more than one renderable graph and they would otherwise
  *    collide on one URL.
  * 3. **The root instance elides its own name**, because its `docs/` is
- *    installed by cat-harness rather than its own (bean `n0nf`). This
- *    instance's site dir IS the published root, so `<site>/<graph>/` already
- *    is `<base>/<graph>/` — ruling 2 with ruling 3 applied.
+ *    installed by cat-harness rather than its own. This instance's site dir
+ *    IS the published root, so `<site>/<graph>/` already is `<base>/<graph>/`.
  *
- * ## The segment is the declared entry's `id` — and that is a SECOND rule
+ * ## The segment is the declared entry's `id`
  *
- * This generator takes the declared entry's `id`. `gen-schema-viz.ts` and
- * `gen-library-viz.ts` take `viewerPlacement(site, dirPath, kind)`, which is
- * the handled directory's **repo-relative path**. Two rules, deliberately,
- * and this comment said otherwise until 2026-09-20.
- *
- * **Where they agree and where they do not.** Measured on this instance's
- * declaration, over the seven declared state graphs:
+ * `gen-schema-viz.ts` and `gen-library-viz.ts` instead take
+ * `viewerPlacement(site, dirPath, kind)`, the handled directory's
+ * **repo-relative path**. The two rules agree for a graph declared at the
+ * repository root and diverge for nested ones:
  *
  * | id | declared path | here, `<base>/<id>/` | `viewerPlacement` |
  * |---|---|---|---|
@@ -60,50 +41,22 @@
  * | `qa` | `test/results/` | `<base>/qa/` | `<base>/test/results/` |
  * | `health` | `test/health/results/` | `<base>/health/` | `<base>/test/health/results/` |
  *
- * Five of seven agree, because a graph declared at the repository root has a
- * path equal to its id. The two that diverge are the nested ones, and they are
- * the reason this generator does not share the sibling's resolver: a public
- * dashboard addressed `<base>/test/results/` names a TEST directory, and `id`
- * is what `harness.json` declares and what an override matches on, so an
- * id-derived URL survives a directory moving.
- *
- * **What this comment claimed before, and why it was wrong.** It said
- * `gen-schema-viz.ts` takes `basename(declaredDirectory)`, and that both
- * generators therefore "agree by construction". The basename reading was true
- * when written and stopped being true at #598, which replaced it with
- * `viewerPlacement` — `gen-schema-viz.ts` now contains no `basename(…)` call
- * at all. The collision that argument rested on (`test/results/` and
- * `test/health/results/` both basenaming to `results`) cannot occur under the
- * rule that replaced it, since those are distinct paths.
- *
- * So the *conclusion* stands on its own reasons above, and the *premise* was
- * stale. Both are stated here rather than one, because a reader who checks the
- * premise and finds it false has no way to tell which half to keep.
- * All 32 declared ids are unique.
- *
- * Read from the declaration either way — never written down here. That is what
- * `check:declared-paths` exists to catch, and it caught the literal in an
- * earlier draft of this file.
+ * A public dashboard should not be addressed by a TEST directory, and `id` is
+ * what `harness.json` declares and what an override matches on, so an
+ * id-derived URL survives a directory moving. The id is read from the
+ * declaration, never written here (`check:declared-paths` catches a literal).
  *
  * ## Committed, not written into `_site`
  *
- * The first two drafts generated into `_site` at build time and argued that a
- * `--check` was therefore impossible. Both the argument and the premise were
- * wrong: the house pattern for a visualiser here is a COMMITTED page under the
- * instance's site dir, gated on exact content — the pattern
- * `schema:viz:check` and `library:viz:check` established. Note those two are
- * no longer IN the gate set (#598 removed them: their projections derive from
- * the whole repository, so a red meant a sibling merged). `state:visualizer:check`
- * is, so of the three it is now the only one a gate run actually executes. A reviewer can then see the
- * page in the diff, and the gate fires when somebody changes the generator and
- * does not regenerate.
+ * The page is COMMITTED under the instance's site dir and gated on exact
+ * content (`state:visualizer:check`), so a reviewer sees it in the diff and
+ * the gate fires when somebody changes the generator and does not regenerate.
  *
- * ## It reuses the projection; it does not publish a second one
+ * ## It reuses the projection
  *
  * `gen-docs-pages.ts` already writes `<site>/assets/beans/index.json` and
- * `<site>/assets/todos/index.json`. This reads those. Writing its own copy
- * would be two answers to "what does the work plan hold", free to disagree
- * while both look right.
+ * `<site>/assets/todos/index.json`; this reads those rather than publishing a
+ * second answer to "what does the work plan hold".
  *
  * ## No CDN, no framework, no build step
  *
@@ -114,9 +67,9 @@
  * the two surfaces cannot drift.
  *
  * It does NOT open from `file://` — the code is inlined but the data is
- * fetched, and Chromium blocks that as cross-origin. Measured, not assumed.
- * Over any HTTP root, including a staging preview under `STAGING/<slug>/`, it
- * works with no configuration, because every path is relative to the page.
+ * fetched, and Chromium blocks that as cross-origin. Over any HTTP root,
+ * including a staging preview under `STAGING/<slug>/`, it works with no
+ * configuration, because every path is relative to the page.
  *
  * Usage:
  *   bun run cat state:visualizer

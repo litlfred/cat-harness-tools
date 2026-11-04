@@ -6,25 +6,18 @@
  * @module cat-harness/scripts/sync-remote-skills
  * @covers skills — the synced packages a remote-package wrapper declares, at their pin
  *
- * Issue #556, bean `wlqd`. Owner, 2026-09-24:
- *
- * 1. **"Implement via #556"** — the wrappers under `skills/remote-packages/`
- *    said `shallow-clone`, `weekly`, `autoUpdate: true`, and nothing
- *    performed any of it. This is the thing that performs it.
- * 2. **"Commit, pinned, read-only"** — the synced bytes are COMMITTED, at the
- *    commit the wrapper pins, with sha256 fixity per file. That is the
- *    repository's materialized-content rule, so `check:materialized-fixity`
- *    fails an edit in place with no new code: a synced skill is somebody
- *    else's bytes, and a change to them is a re-sync, never a hand edit.
+ * It performs what the wrappers under `skills/remote-packages/` declare. The
+ * synced bytes are COMMITTED, at the commit the wrapper pins, read-only, with
+ * sha256 fixity per file, so `check:materialized-fixity` fails an edit in
+ * place: a synced skill is somebody else's bytes, and a change to them is a
+ * re-sync, never a hand edit.
  *
  * ## Why a pinned commit and never a branch
  *
- * `ref: "main"` with `autoUpdate: true` would ingest whatever upstream pushes,
- * unreviewed, as instructions an agent then follows. A skill body IS a prompt;
- * an unpinned one is an unreviewed prompt from a stranger. So a wrapper that
- * declares a `sync` must pin a full 40-character commit, and an update is a
- * deliberate change to that pin, reviewed as a diff of the materialized
- * files. {@link pinnedRef} refuses anything else.
+ * A skill body IS a prompt; an unpinned one is an unreviewed prompt from a
+ * stranger. So a wrapper that declares a `sync` must pin a full 40-character
+ * commit, and an update is a deliberate change to that pin, reviewed as a
+ * diff of the materialized files. {@link pinnedRef} refuses anything else.
  *
  * ## Layout — one package per skill
  *
@@ -32,10 +25,10 @@
  * `references/`, `scripts/` and `assets/` beside it, and SKILL.md links to
  * them relatively. This instance serves FLAT packages, `<package>/<skill>.md`.
  * Flattening several upstream skills into one package would collide their
- * `references/` directories and break their links, so each skill becomes its
- * own package: `skills/<skill>/<skill>.md` is the upstream SKILL.md renamed,
- * and everything else keeps its upstream relative path. Discovery needs no
- * change, and every relative link still resolves.
+ * `references/` directories, so each skill becomes its own package:
+ * `skills/<skill>/<skill>.md` is the upstream SKILL.md renamed, and everything
+ * else keeps its upstream relative path, so every relative link still
+ * resolves.
  *
  * ## What is written, per skill
  *

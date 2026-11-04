@@ -2,42 +2,25 @@
 /**
  * Can this instance render its own JSON-LD, and does it publish what it owns?
  *
- * Bean `z4mq` item 3: *"Rendering JSON-LD is a conformance requirement of
- * every instance, not a convenience of this one. Needs a check that an
- * arbitrary cat-harness instance — including one whose declaration names
- * directories this repo does not have — can render its JSON-LD, and a 'could
- * not determine' third state that is never reported as a pass."*
+ * Rendering JSON-LD is a conformance requirement of every instance, including
+ * one whose declaration names directories this repository does not have.
  *
  * ## Why "did it throw" is not the check
  *
- * That was the obvious implementation and it is worthless here, because **an
- * export of nothing succeeds**. Both defects this check was written against
- * rendered cleanly:
- *
- * - `collectSkills` resolved `bootstrap/skills/` against the wrong root, found
- *   nothing, and `continue`d under the comment "a package this instance does
- *   not carry". CatBootstrap's skills left the published graph in silence;
- *   `confirm-harness` became a dangling `hasSkill` and `kg-navigation` only
- *   looked present because a second copy exists elsewhere (bean `v3se`).
- * - `bootstrap/bootstrap.jsonld` publishes **16** graph-typology nodes while
- *   `bootstrap/harness.json` declares **one**.
- *
- * Neither threw. So the question is not whether a render returned, it is
- * whether what came back is the instance's OWN — which is a comparison
- * between what it DECLARES and what it PUBLISHES, and cannot be made by
- * watching for an exception.
+ * **An export of nothing succeeds**: a reader resolving a directory against
+ * the wrong root finds nothing and renders cleanly, and an export can publish
+ * kinds the instance never declared. So this compares what the instance
+ * DECLARES with what it PUBLISHES.
  *
  * ## Declared means transitively declared
  *
- * `harness.json` names a directory and the graph typologies in it; a graph file
- * inside that directory may name more. `beans/beans.json` declares
- * `bean-defs` and `workflow-state`, `todos/todos.json` declares `todo-items`
- * and `todo-feedback`. Those are the instance's, declared one level down, and
- * a check reading only the root declaration reports four false findings here.
- * Measured before this was written: comparing against `harness.json` alone
- * gives cat-harness 5 undeclared kinds, and 4 of the 5 are that mistake.
+ * The instance declaration names a directory and the graph typologies in it;
+ * a graph file inside that directory may name more. `beans/beans.json`
+ * declares `bean-defs` and `workflow-state`, `todos/todos.json` declares
+ * `todo-items` and `todo-feedback`. Those are the instance's, declared one
+ * level down.
  *
- * ## Three states, and the middle one is the point
+ * ## Three states
  *
  * - **rendered** — it declared, it published, and everything it published is
  *   its own.
@@ -49,16 +32,12 @@
  *
  * ## An instance that declares no directories renders nothing, and passes
  *
- * Owner, 2026-10-15 ("C1"): an instance may declare `directories: []` — an
- * index that mounts none of a repository's directories declares only what it
- * has there, which is nothing (B1). Its
- * render is then empty BY DECLARATION, which is a different fact from the
- * `dh4f` defect this check exists for (a declared directory resolving to
- * nothing). So such an instance is **rendered**, flagged `noDirectories`, and
- * reported as "declares no directories" in the summary, never silently. The
- * exemption is exactly the explicit empty list: an instance that declares a
- * directory and renders nothing still fails, and so does one whose
- * declaration leaves `directories` out, which has not said it holds nothing.
+ * An instance may declare `directories: []` (e.g. an index that mounts none
+ * of a repository's directories). Its render is then empty BY DECLARATION,
+ * so it is **rendered**, flagged `noDirectories`, and reported as "declares
+ * no directories" in the summary. The exemption is exactly the explicit
+ * empty list: an instance that declares a directory and renders nothing
+ * still fails, and so does one whose declaration leaves `directories` out.
  *
  * Usage:
  *   bun run cat check:instance-render

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Propose an epic for every open bean, open PR and unmerged branch — the
- * qou project-management hierarchy (`todo-manager`, `session-intent`: every
+ * project-management hierarchy (`todo-manager`, `session-intent`: every
  * piece of work is a child of a parent bean) applied to the work plan as it
  * stands, with Latent Semantic Indexing as the fallback evidence.
  *
@@ -25,9 +25,8 @@
  *    FOLDED IN (method step 6) from its title, branch name and commit
  *    messages.
  *
- * The report carries the margin between the best and second-best epic,
- * because a best guess that barely beats the runner-up is not a proposal, it
- * is a coin toss — and says so.
+ * The report carries the margin between the best and second-best epic, so a
+ * near tie reads as one.
  *
  *   bun run cat lsi:epics [--out <file.md>]
  *   bun run cat lsi:near "<planned bean title>" [--body "<text>"] [--graphs blocks,lean-decl] [--root lean-decl=<dir>]

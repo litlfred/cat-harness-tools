@@ -2,21 +2,17 @@
 /**
  * The knowledge-graph viewer's chrome, extracted and checked.
  *
- * Bean `xcyh`. `scripts/kg-viewer-strings.ts` is the table; this is the
- * orchestration around it, and it is deliberately the same shape as
- * `scripts/translate-bpmn.ts`: extract from the SOURCE, write
- * `translations/<locale>/<stem>.pot`, and let the artefact's own generator do
- * the injecting. Two spellings of one concept is the drift this repository
- * keeps paying for, so this borrows `formatPot` and `parsePo` rather than
- * growing a second gettext implementation.
+ * `scripts/kg-viewer-strings.ts` is the table; this is the orchestration
+ * around it, the same shape as `scripts/translate-bpmn.ts`: extract from the
+ * SOURCE, write `translations/<locale>/<stem>.pot`, and let the artefact's
+ * own generator do the injecting. It reuses `formatPot` and `parsePo` rather
+ * than a second gettext implementation.
  *
- * ## There is no `--inject`, and that is the difference from BPMN
+ * ## There is no `--inject`
  *
- * A diagram is injected by writing a translated copy of the `.bpmn`. The
- * viewer has no copy to write: `bun run cat kg:viewer` reads every locale's `.po`
- * and embeds the catalogues in the one page it emits, so **generating the page
- * IS the injection**. A separate `--inject` would produce a second artefact
- * nothing serves.
+ * `bun run cat kg:viewer` reads every locale's `.po` and embeds the
+ * catalogues in the one page it emits, so **generating the page IS the
+ * injection**.
  *
  * Usage:
  *   bun run cat translate-kg-viewer --extract [--locale fr]
@@ -26,14 +22,11 @@
  *
  * It fails on **drift**: a `.pot` that no longer matches the table, a
  * translation that dropped a `{placeholder}` the runtime will substitute into,
- * or an entry for a string the viewer no longer says. Each of those is a
- * defect in a file somebody already wrote.
+ * or an entry for a string the viewer no longer says.
  *
  * It reports, without failing, on **coverage**: a string with no translation
  * yet. The page falls back to English per string, so a partial catalogue is
- * the ordinary state of a translation in progress rather than a broken build —
- * the same reasoning that keeps `skill-in-role-or-process` off the gate in
- * `kg-audit`.
+ * the ordinary state of a translation in progress.
  *
  * @module scripts/translate-kg-viewer
  * @covers translation-sources

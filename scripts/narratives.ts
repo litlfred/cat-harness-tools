@@ -1,18 +1,10 @@
 /**
- * The narrative review queue — bean `ju0u`.
+ * The narrative review queue: how a person confirms or rejects an
+ * agent-drafted narrative.
  *
- * Agent-drafted, human-confirmed means nothing without a way for the human to
- * confirm. This is that way, and it is built around one constraint: the owner
- * has very limited hand function, so **every action is selection by number**.
- *
- * That is not a convenience. An unusable review step makes `confirmed` mean
- * "nobody got round to objecting", which is worse than not having the state:
- * it launders an unreviewed machine summary into an accepted one. If confirming
- * costs a sentence of typing, the design the owner chose is worse in practice
- * than plain agent attribution.
- *
- * So: rejection reasons are numbered too. Free text stays available through
- * `--why-text`, and is never required.
+ * **Every action is selection by number**, for users with very limited hand
+ * function: rejection reasons are numbered too. Free text stays available
+ * through `--why-text`, and is never required.
  *
  * ```sh
  * bun run cat narratives                 # numbered list of everything awaiting a person
@@ -24,9 +16,8 @@
  * ## It never writes a draft
  *
  * This tool moves a narrative between states and records WHO did it. Writing
- * the words is an arm's job (`d5f1`, `1r0p`, `p67i`), and a tool that could
- * both draft and confirm would be one `--yes` away from the failure the whole
- * state machine exists to prevent.
+ * the words is an arm's job; a tool that could both draft and confirm would
+ * defeat the state machine.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";

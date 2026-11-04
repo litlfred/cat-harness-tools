@@ -2,46 +2,29 @@
 /**
  * The archive is a DECLARED view, and everything in it is terminal.
  *
- * Bean `e8m3`, and the owner's ruling of 2026-09-26: archiving is a **view**,
- * not a terminal state. An archived bean keeps its status and is still part of
- * the store. Two things follow, and neither held when this was written.
+ * Archiving is a **view**, not a terminal state: an archived bean keeps its
+ * status and is still part of the store. Two rules follow.
  *
- * ## 1. The directory was not declared, and no existing check could see that
+ * ## 1. The archive directory is declared
  *
- * `beans/beans.json` declared `defs` and `workflows` and nothing else, while
- * `beans/defs/archive/` held **631 bean-defs** — the larger half of the store.
- * That is the `dh4f` family INVERTED: not a declared directory that is absent,
- * but a present one nothing declares. `check:declared-dirs` and
- * `check:harness-dirs` both compare declarations against disk, so a directory
- * missing from the declaration is invisible to them by construction. The gap is
- * structural rather than an oversight, which is why it needs its own check
- * rather than a wider glob somewhere else.
+ * `beans/defs/archive/` must be declared in `beans/beans.json`.
+ * `check:declared-dirs` and `check:harness-dirs` compare declarations
+ * against disk, so a present directory missing from the declaration is
+ * invisible to them by construction.
  *
- * ## 2. An archived bean that is still open is work nobody can see
+ * ## 2. Every archived bean is terminal
  *
- * This is the invariant the ruling implies, and the defect `e8m3` was filed
- * over. Measured 2026-09-25: in one five-day window 131 beans left the top
- * level, and **35 of them were `todo` or `in-progress`** — gone from the active
- * store without a terminal status and, because archiving is a file move rather
- * than a status change, without a recorded reason. Every count this repository
- * quotes reads the active store only, so none of them could fall when that
- * happened. A number that drops when work FINISHES but not when it is set aside
- * is not measuring what its name says.
+ * Archiving is a file move, not a status change, and the counts this
+ * repository quotes read the active store only. An archived bean still
+ * `todo` or `in-progress` is work nobody can see, set aside without a
+ * recorded reason.
  *
- * Those 35 were triaged before this check existed — measured 2026-09-26, all
- * 631 archived beans are terminal. So this ships GREEN, and that is the point:
- * it is the guard that makes the recurrence impossible to have silently, not a
- * report of a present mess. A check written only when it can fail is a check
- * that exists because somebody was already in trouble.
- *
- * ## What it deliberately does NOT do
+ * ## What it does NOT do
  *
  * It does not hold archived beans to `check:bean-parents`, `bean-rollup` or
- * `bean-blocks`. Those are about work in front of somebody; 631 historical
- * beans were never held to today's conventions, and turning them all into
- * findings would be a red nobody can act on — which is how a gate gets
- * switched off. Terminality is the one property the VIEW ruling actually
- * requires.
+ * `bean-blocks`: those are about work in front of somebody, and historical
+ * beans were never held to today's conventions. Terminality is the one
+ * property the view requires.
  *
  * Exit: 0 declared and all terminal, 1 undeclared or a non-terminal bean,
  * 2 COULD NOT DETERMINE (declared and absent).

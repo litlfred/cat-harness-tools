@@ -1,51 +1,35 @@
 #!/usr/bin/env bun
 /**
- * One knowledge-graph export per declared instance — bean `4ak5` item 1.
+ * One knowledge-graph export per declared instance, so each harness can be
+ * fetched on its own.
  *
  * @module scripts/instance-exports
  * @covers cat-harness
  *
- * Owner, 2026-10-02: *"please make sure harnesses generate json(ld)+schema for
- * their semi-static KGs … i dont see folio-assistnat.jsonld in gh-pagaes …
- * these should be split out into their component sub-grpah/harnesses."*
- *
- * Measured on `main` 2026-10-04: fourteen directories declare an instance and
- * the site published three graphs — the host's, bootstrap's and the checkout
- * root's. The other eleven (the DAK base layer, the IRIS replica, the content
- * core, …) had a declaration and no document, so nothing could fetch one harness on
- * its own. Each of them already exported cleanly with `kg-export --instance`
- * in one to three seconds; nothing ran the command.
- *
  * ## The set is DERIVED from the declarations, never listed
  *
- * A list of instances in a workflow is a second answer to "what is declared
- * here", and it went stale the way such lists do: every instance added since
- * `l4ay` was missing from it. So the workflows run THIS script, which asks
- * {@link instanceRootsIn}, and a new declaration is published with no edit.
+ * The workflows run THIS script, which asks {@link instanceRootsIn}, so a new
+ * declaration is published with no workflow edit.
  *
  * ## Published elsewhere — the only list, and each entry is CHECKED
  *
- * Two instances keep the publisher they already have, for reasons that are
- * not this bean's to overturn. {@link PUBLISHED_ELSEWHERE} names each one with
- * the command that publishes it, and `check:published-instance-exports` fails
- * when a workflow that runs this script does not also run that command — so an
- * exemption cannot outlive its publisher and leave the instance with nothing.
+ * {@link PUBLISHED_ELSEWHERE} names the instances that keep their own
+ * publisher, each with the command that publishes it, and
+ * `check:published-instance-exports` fails when a workflow that runs this
+ * script does not also run that command.
  *
  * Each document lands at `<out-dir>/<name>/<stub>.jsonld`, which is the
- * `docPath` `exportIdentity` gives a foreign instance (bean `dyd3`), with the
- * `.json` alias beside it because Pages serves `.jsonld` as octet-stream. The
- * `<name>/` segment is cat-harness's one URL-space resolver
- * (`schemas/kg/url-space.ts`, bean `nbal`), through {@link instanceSitePath}: the
- * segment is the instance's NAME, never its stub (owner, 2026-09-20, recorded
- * on bean `cat-tools-sthf`). An instance declaring `"enabled": false` is not
- * planned, so it is not published.
+ * `docPath` `exportIdentity` gives a foreign instance, with the `.json` alias
+ * beside it because Pages serves `.jsonld` as octet-stream. The `<name>/`
+ * segment is cat-harness's one URL-space resolver (`schemas/kg/url-space.ts`),
+ * through {@link instanceSitePath}: the segment is the instance's NAME, never
+ * its stub. An instance declaring `"enabled": false` is not published.
  *
  * Beside it, `<out-dir>/<name>/schema/`: the instance's own skill I/O
  * contracts, its public Zod schemas under `zod/<module>/<Export>.schema.json`
- * (owner ruling 2026-10-05, option C: every exported Zod `*Schema` const), and
- * a `<stub>.schema.json` index (bean `4ak5` item 1, the "and a schema" half).
- * A Zod module that fails to import or render fails the run, as a failed
- * export does. Policy: `instance-publication` §"The schema".
+ * (every exported Zod `*Schema` const), and a `<stub>.schema.json` index. A
+ * Zod module that fails to import or render fails the run, as a failed export
+ * does. Policy: `instance-publication` §"The schema".
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/instance-exports.ts --out-dir ./_site [--base-url URL]

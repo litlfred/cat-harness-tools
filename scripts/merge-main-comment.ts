@@ -1,48 +1,31 @@
 #!/usr/bin/env bun
 /**
  * The merge-main bot's REPORTING: what its PR comment says, whether it says
- * anything at all (bean `qnob`, issue #1854), and whether a failure notifies
- * anybody (bean `03nl`).
+ * anything at all, and whether a failure notifies anybody.
  *
  * @module scripts/merge-main-comment
  * @graphNode none — a formatter called by `.github/workflows/merge-main.yml`
  * @covers none — it composes a comment and judges no declared graph
  *
- * ## Why it is a function and not shell
- *
- * The composition lived inline in the workflow's comment step, where no test
- * could reach its branches. Its last branch caught everything the others did
- * not, including a run that never finished: measured 2026-10-02 on #1777
- * (run 36986362911), a newer push to `main` cancelled the job mid-merge
- * (`concurrency: cancel-in-progress`), the `always()` comment step ran anyway
- * with an empty `STATUS`, and the PR's comment was rewritten to
- * "**Error** (exit ) — merge-base failed …". A superseded run is not an
- * error, and it knows nothing newer than the comment already there.
+ * A function rather than inline workflow shell, so a test can reach every
+ * branch.
  *
  * ## What it decides
  *
- * - `leave`: the job was cancelled, or the merge step reported no status.
- *   The existing comment stays as it is; the run that superseded this one
- *   writes its own.
+ * - `leave`: the job was cancelled (e.g. superseded by a newer push to
+ *   `main`), or the merge step reported no status. The existing comment stays
+ *   as it is; the run that superseded this one writes its own.
  * - `write`: the comment body. The refusal REASON is in that body; it is not
- *   also encoded as a label. Owner, 2026-10-03: stop using
- *   `needs-merge-human` — a label that says "a person is needed" outlives
- *   the condition that set it, and a stale one is indistinguishable from a
- *   live one without re-measuring why the bot could not push.
- *
- * Every `write` text is the text the workflow wrote before, unchanged.
+ *   also encoded as a label (no `needs-merge-human`), because a label
+ *   outlives the condition that set it.
  *
  * ## What it decides, second: whether the run NOTIFIES
  *
- * `merge-main.yml` fires on every push to `main` — many an hour — and runs one
- * matrix member per opted-in PR. One member's failure made the whole run
- * `failure`, and GitHub emails a failed run: measured on run 37179860536, where
- * exactly one of the members failed (#1801) on a condition already fixed on
- * another branch, and the owner was emailed about it on every push. *A run that
- * is red because one of fifteen PRs needs a person tells the owner nothing
- * actionable, dozens of times a day.*
+ * `merge-main.yml` fires on every push to `main` and runs one matrix member
+ * per opted-in PR, and GitHub emails a failed run. A run that is red because
+ * one PR needs a person tells the owner nothing actionable on every push.
  *
- * So the member no longer decides the run's colour (`continue-on-error` on the
+ * So the member does not decide the run's colour (`continue-on-error` on the
  * job) and {@link aggregateVerdicts} does, once per run, on three conditions:
  * a NEW or CHANGED failure, a member that could not say what happened, and a
  * SYSTEMIC one (every selected PR failed) that is not made up entirely of
@@ -50,15 +33,12 @@
  * per-member half, and {@link signatureOf} is what makes "the same failure
  * again" answerable at all.
  *
- * **Quiet is not silent.** `1xhc`'s standing rule is that a gate which does not
- * fire cannot be told from one that passed, and the same holds one layer out: a
- * failure that does not notify must still be findable. Every quiet failure
- * keeps its PR comment (edited in place, carrying the signature), its line in
- * the job summary, a warning annotation, and its own red member job. What it
- * loses is the second, third and fortieth email about one condition.
+ * **Quiet is not silent.** Every quiet failure keeps its PR comment (edited in
+ * place, carrying the signature), its line in the job summary, a warning
+ * annotation, and its own red member job. It loses only the repeat emails.
  *
  * Governed by {@link sdlc/skills/sdlc-core/ci-health.md} §"The second instance:
- * merge-main's in-place comment" (bean `obhe`).
+ * merge-main's in-place comment".
  *
  * Usage (from the workflow; inputs in the environment, as the step sets them):
  *   bun run cat-harness-tools/scripts/merge-main-comment.ts --log <merge.log> [--plan-out <plan.json>]

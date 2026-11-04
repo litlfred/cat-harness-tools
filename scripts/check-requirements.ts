@@ -4,13 +4,9 @@
  *
  * @covers proposals, requirements
  *
- * Owner, 2026-09-23 (issue #1164): when a harness feature ships, its proposal
- * is moved from `docs/proposals/` to `docs/requirements/` and filed against
- * the bootstrap `Requirement` schema — and, asked what happens on the move,
- * *"make sure no name collision, need to organize things when filing"*.
- *
- * Three things are checked, each because it cannot be seen by reading one
- * file:
+ * When a harness feature ships, its proposal moves from `docs/proposals/` to
+ * `docs/requirements/` and is filed against the bootstrap `Requirement`
+ * schema. Checked:
  *
  * 1. **Every requirement page's front matter parses as a `Requirement`.** The
  *    page's own Jekyll keys (`layout`, `nav_order`, `summary`, …) ride beside
@@ -19,40 +15,29 @@
  *    superseded requirement that names no successor).
  * 2. **The id is the file name.** `req:<slug>` in `<slug>.md` — so a test
  *    run's `req:<slug>#<key>` resolves by path, with no index to keep.
- * 3. **No slug is in both sub-graphs.** A proposal filed onto an existing
- *    requirement would overwrite it; a requirement whose proposal was copied
- *    rather than moved leaves two documents free to disagree. Either way it
- *    is refused here, before the move, not discovered after.
+ * 3. **No slug is in both sub-graphs**, so a filed proposal cannot overwrite
+ *    an existing requirement or leave a copy behind.
  *
- * And one thing is WARNED, never failed (issue #2405, owner decision 3 of
- * 2026-10-07): **a statement with no `successCriteria`**. The field is
- * optional in the base while the existing statements are migrated — the
- * filed pages here AND the `req:*` JSON files in the knowledge graph's
- * `requirements/` — so a statement without one is a debt to name, not a
- * defect to refuse. Once the migration bean closes the field becomes
- * required and this warning becomes the schema's refusal.
+ * WARNED, never failed: **a statement with no `successCriteria`** (optional
+ * while existing statements, including the `req:*` JSON files, are migrated).
  *
- * And, since the RequirementSet amendment of #2405 (FR-010 to FR-012), every
- * **requirement set** found in the two sub-graphs — a `*.requirement-set.json`
- * file, or a page whose front matter carries `requirementSet:` — is judged:
+ * Every **requirement set** in the two sub-graphs (a `*.requirement-set.json`
+ * file, or a page whose front matter carries `requirementSet:`) is judged:
  *
  * - its shape against the bootstrap `RequirementSetSchema`;
  * - its STAGE against its sign-offs, read from the set itself AND from the
  *   `requirement-signoff` family of the `attestations` graph, as one union
  *   (`requirementSetProblems`): `approved`/`accepted` with no human sign-off,
  *   `planned` with no beans and `cancelled` with no reason are refused;
- * - the one link between a set's stage and its members' statuses (owner,
- *   2026-10-07: they stay independent otherwise): a set is `accepted` only
- *   when every member it APPROVED is `in-force`.
+ * - a set is `accepted` only when every member it APPROVED is `in-force`
+ *   (otherwise set stage and member status are independent).
  *
  * `--signoff-facts <reqset:slug>` prints the two facts the requirement-signoff
- * DMN reads (`signoffRecorded`, `signoffOutcome`), computed from the record,
- * so a sign-off step cannot be completed on a decision nobody wrote down.
+ * DMN reads (`signoffRecorded`, `signoffOutcome`), computed from the record.
  *
- * The directories are READ FROM THE DECLARATION — whatever the instance
- * declares with the `requirements` and `proposals` graph typologies, at its root or
- * from within `docs/` — never hardcoded. A declared kind with no directory on disk is a failure: a clean
- * run over nothing is the defect this repository keeps re-finding.
+ * The directories are READ FROM THE DECLARATION (the `requirements` and
+ * `proposals` graph typologies, at the root or within `docs/`), never
+ * hardcoded. A declared kind with no directory on disk is a failure.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative } from "node:path";

@@ -1,8 +1,6 @@
 #!/usr/bin/env bun
 /**
- * A checklist projection of every BPMN diagram — bean `folio-assistant-cy4p`,
- * owner ruling 2026-10-10 ("both": the engine as a Tool node, and a generated
- * checklist per diagram).
+ * A checklist projection of every BPMN diagram.
  *
  * **A rendering, never an authority.** The checklist is the diagram walked as
  * a state machine, emitted FROM the `.bpmn`; it says so in its own first
@@ -10,9 +8,9 @@
  * `render:bpmn:check` holds the SVGs to. The engine (`workflow_start` /
  * `workflow_next` / `workflow_complete`) stays the authority on which edge was
  * taken: every step names the call that records it, so a wrong turn is
- * visible and refusable rather than a memory of a list.
+ * visible and refusable.
  *
- * How it follows the edges (the bean's design):
+ * How it follows the edges:
  *   1. each task is a step that ENDS with `next:` naming the node(s) it flows
  *      to by id — order is never inferred from position;
  *   2. a decision (exclusive gateway with more than one way out) is a
@@ -20,31 +18,24 @@
  *      table computes it, the table by id and the `facts` call; a parallel
  *      fork is "do all of …", a join is "wait for all of …";
  *   3. start and end events are the entry and exit lines.
- * An agent with no MCP can walk 1–3 by hand; 4 (the calls) makes it auditable.
+ * An agent with no MCP can walk 1–3 by hand; the engine calls each step names
+ * make it auditable.
  *
- * ## Committed, in the instance that owns the diagram (owner, 2026-10-14)
+ * ## Committed, beside the diagram, in the instance that owns it
  *
- * The owner chose to COMMIT the checklists, so `bpmn:checklist:check` compares
- * committed bytes. Committed where, is the question that decides whether the
- * comparison can stay green, and the answer is the instance that owns the
- * diagram, BESIDE it: `<dir>/<stem>.bpmn` → `<dir>/<stem>.checklist.md`.
+ * Checklists are committed, so `bpmn:checklist:check` compares committed
+ * bytes: `<dir>/<stem>.bpmn` → `<dir>/<stem>.checklist.md`.
  *
- * - Not one directory for every instance's diagrams. That was the default
- *   (`cat-harness/docs/assets/workflows/checklists`), and nothing had ever
- *   been written there. Committed, it would hold the content core's, the
- *   DAK base layer's and sci's diagrams inside cat-harness: 33 new wrong-direction
- *   references in 27 files (measured with `check:reference-direction`), and a
- *   red check in cat-harness whenever a layer above it edits a diagram. That
- *   is the B1 defect, a commit that cannot hold an artefact current.
- * - Beside the diagram, not in the owner's site directory. A diagram's
- *   directory is mounted wherever the diagram is, by construction. A site
- *   directory is not always: the DAK base layer's `docs/` is built from the mount and
- *   never committed.
+ * - Not one shared directory: that would put every layer's diagrams inside
+ *   cat-harness, referencing upward, and turn its check red whenever a layer
+ *   above edits a diagram.
+ * - Not the owner's site directory: a diagram's directory is mounted wherever
+ *   the diagram is, while a site directory may be built and never committed
+ *   (the DAK base layer's `docs/`).
  * - **Except below the harness.** bootstrap and bootstrap-tools must not refer
  *   to a harness, and a checklist names `workflow_complete` and this
  *   generator. So the harness holds theirs, in its own site's
- *   `assets/workflows/checklists/`. Naming a layer it `needs` is the right
- *   direction.
+ *   `assets/workflows/checklists/`.
  *
  * The source line a checklist cites is `<instance>/<path within it>`, so it is
  * the same text in an index checkout and in the owner's own repository.

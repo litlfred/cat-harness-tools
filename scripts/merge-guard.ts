@@ -1,30 +1,14 @@
 #!/usr/bin/env bun
 /**
- * The single way a steward lands a pull request.
+ * The single way a steward lands a pull request: an ENFORCED merge guard
+ * that asks whether the PR is finished before it reaches its base.
  *
  * @module cat-harness/scripts/merge-guard
  * @covers none — a merge precondition over GitHub's live facts about one PR; it judges no declared graph
  *
- * Bean `uoob` (merge gate (f), epic `nok9`). Owner ruling 2026-10-03, option 1: build an ENFORCED merge
- * guard. Until this existed, the Merge Manager steward landed PRs with
- *
- * ```
- * gh api -X PUT repos/litlfred/folio-assistant/pulls/<n>/merge -f sha=<head>
- * ```
- *
- * under the owner's token, and nothing between "the steward decided" and "the
- * PR is on its base" asked whether the PR was finished. Three were not:
- *
- * | PR | what was wrong when it merged |
- * |---|---|
- * | #1937 | its base was `claude/quirky-davinci-ixuymr`, the head of #1764, which had ALREADY merged, so it landed on a dead branch; its head was newer than its `ready:` comment, and the commits in between were a hand merge and two claim commits, not bot merges; `needs-merge-human` was still on it; its own `pull_request` runs had failed and only a `workflow_dispatch` run was green |
- * | #1960 | no `ready-to-merge` label, no `ready:` comment, and its body still read `- [ ] CI green` |
- * | #1957 | the steward itself called `ready_for_review` and added `ready-to-merge`, 75 s before merging; there was no `ready:` comment at all |
- *
- * No workflow merges into a base (`merge-main.yml` merges `main` INTO PRs only),
- * the repository's rulesets are empty, and its branch protection could not be
- * read. So the only thing that could have stopped any of the three was the
- * steward's memory, and it did not.
+ * No workflow merges into a base (`merge-main.yml` merges `main` INTO PRs
+ * only), so this guard is what stands between "the steward decided" and "the
+ * PR is on its base".
  *
  * ## Usage
  *
@@ -36,8 +20,8 @@
  * `--session` is the MERGING session (an id `session_…` or its URL). It is
  * required with `--merge`, because check 2 asks whether that session is the
  * one that marked the PR ready. `--no-merge-manager` lifts that separation
- * when no Merge Manager is active and the PR's own session merges (owner
- * ruling 2026-10-06); everything else is still checked. `--status` also posts the verdict as the
+ * when no Merge Manager is active and the PR's own session merges; everything
+ * else is still checked. `--status` also posts the verdict as the
  * `merge-guard` commit status on the head, which is what the workflow does.
  *
  * ## The eight checks
@@ -45,40 +29,36 @@
  * Every refusal names its check, by number and by id:
  *
  * 1. `base` — the base is `main`, the PR is open, and the base is not the head
- *    branch of a merged PR (#1937).
+ *    branch of a merged PR.
  * 2. `ready-for-review` — not a draft; and the latest `ready_for_review` event
- *    is attributable to the PR's OWN session, never the merging one (#1957) —
- *    unless `--no-merge-manager`: with no Merge Manager active, the own
- *    session IS the merging one (owner ruling 2026-10-06).
+ *    is attributable to the PR's OWN session, never the merging one — unless
+ *    `--no-merge-manager`, when the own session IS the merging one.
  * 3. `ready-marker` — a `ready: <sha>` comment whose session footer is the
  *    PR's own session, and `<sha>` is the head or every commit after it is a
- *    merge-main bot merge (#1937, #1960, #1957).
- * 4. `labels` — `ready-to-merge` present, `needs-merge-human` absent (#1937, #1960).
+ *    merge-main bot merge.
+ * 4. `labels` — `ready-to-merge` present, `needs-merge-human` absent.
  * 5. `ci` — every `pull_request` run on the head is `success` or `skipped`,
- *    and every workflow owed for that event ran (#1937). One substitution: on
+ *    and every workflow owed for that event ran. One substitution: on
  *    a head that is a merge-main bot merge, a `pull_request` run GitHub held
- *    for approval (`NOT_EXECUTED`, bean `0qjq`) is judged by the latest
+ *    for approval (`NOT_EXECUTED`) is judged by the latest
  *    `workflow_dispatch` run of the same workflow on the head — green counts,
  *    running is not-ready, red is a defect. Held with no dispatch: refused
  *    not-ready if `merge-main.yml` dispatches that workflow (it is still
  *    owed), reported "not judged" if it does not (preview-only), `unknown` if
  *    that file's dispatch line cannot be parsed. One exemption from WAITING,
  *    never from judging: a workflow in {@link NOT_WAITED_FOR_WORKFLOW_FILES}
- *    (Feature Staging, owner ruling 2026-10-05, bean `gnnj`) that is still in
- *    flight or has not started is not a refusal; once finished, red refuses.
- * 6. `checklist` — no unticked `- [ ]` item in the body (#1960).
+ *    (Feature Staging) that is still in flight or has not started is not a
+ *    refusal; once finished, red refuses.
+ * 6. `checklist` — no unticked `- [ ]` item in the body.
  * 7. `open-question` — no comment newer than the ready marker asks the owner
  *    or the Merge Manager an open question. A heuristic; its limits are on
  *    {@link openQuestions}.
- * 8. `mergeable` — GitHub says the head still merges cleanly into its base
- *    (bean `vihx`). Check 5's runs tested the head merged with main AS MAIN
- *    WAS when the head was pushed; once main moves, a stale green head with a
- *    valid marker passed checks 1-7 while it conflicted (#1898, and two HTTP
- *    405 "merge conflicts" refusals on 2026-10-05). `mergeable: false` (or
- *    `mergeable_state: dirty`) refuses not-ready; `null` — GitHub has not
- *    computed it yet — is `unknown`, after {@link fetchSnapshot} re-asks a few
- *    times. `unstable` and `blocked` pass here: they are about checks, which
- *    check 5 judges.
+ * 8. `mergeable` — GitHub says the head still merges cleanly into its base:
+ *    check 5's runs tested the head merged with main as main was when the
+ *    head was pushed. `mergeable: false` (or `mergeable_state: dirty`) refuses
+ *    not-ready; `null` — GitHub has not computed it yet — is `unknown`, after
+ *    {@link fetchSnapshot} re-asks a few times. `unstable` and `blocked` pass
+ *    here: they are about checks, which check 5 judges.
  *
  * ## Exit codes
  *
@@ -97,25 +77,23 @@
  * | refused, any refusal a `defect` | `failure` | a base that is not `main` or is dead, `needs-merge-human`, red CI, a marker or ready-flip by another session |
  * | unknown | `error` | a fact could not be read |
  *
- * `pending` exists so that every unfinished PR is not painted red, which
- * would teach readers to ignore red ({@link RefusalKind}). A required check
- * blocks the merge in every state but `success`, and the exit code is 1 for
- * both kinds of refusal.
+ * `pending` exists so that every unfinished PR is not painted red
+ * ({@link RefusalKind}). A required check blocks the merge in every state but
+ * `success`, and the exit code is 1 for both kinds of refusal.
  *
  * **Unknown is never a pass.** A check that could not ask returns `unknown`,
  * and an unknown anywhere makes the whole verdict `unknown` even when another
- * check refused. A guard blind on one check has not cleared the others.
+ * check refused.
  *
- * ## Why attribution goes through comments, not the event's actor
+ * ## Attribution goes through comments, not the event's actor
  *
- * Every session here acts with the owner's token, so every timeline event's
- * actor is `litlfred`: the actor login cannot tell the owning session from
- * the steward. The session IS recorded in the footer of what a session posts
- * (`https://claude.ai/code/session_…`). So a `ready_for_review` event is
- * attributed to the session of the nearest session-bearing comment within
- * {@link READY_WINDOW_MS}, and the rule the owning session follows is: **mark
- * the PR ready and post its `ready: <sha>` marker together.** `--actor` is
- * still compared, for the day a steward acts under its own login.
+ * Every session acts with the owner's token, so every timeline event's actor
+ * is the same login. The session IS recorded in the footer of what a session
+ * posts (`https://claude.ai/code/session_…`), so a `ready_for_review` event
+ * is attributed to the session of the nearest session-bearing comment within
+ * {@link READY_WINDOW_MS}. The owning session must therefore **mark the PR
+ * ready and post its `ready: <sha>` marker together.** `--actor` is still
+ * compared, for the day a steward acts under its own login.
  *
  * ## What this does not stop
  *

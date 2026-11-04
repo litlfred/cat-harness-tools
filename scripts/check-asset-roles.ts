@@ -3,29 +3,24 @@
  * check-asset-roles.ts — every required asset role has decided its layer, and
  * no instance restates on an asset what the ROLE already answers.
  *
- * Two findings, and they are two halves of one rule: `ASSET_ROLES` is the
- * single place a role says what it is for, which layer it belongs to and how
- * it reaches its reader. This gate keeps that place SINGLE.
+ * Two halves of one rule: `ASSET_ROLES` is the single place a role says what
+ * it is for, which layer it belongs to and how it reaches its reader. This
+ * gate keeps that place SINGLE.
  *
- * ## Why the stray-key half is not caught by the schema
+ * ## Stray keys
  *
- * `KgAssetSchema` is a non-strict `z.object`, so an unknown key is dropped
- * without a word. That is deliberate — it is how a downstream instance carries
- * a key this layer has not learned about yet — and it has a recorded cost: a
- * `purpose` was written into `cat-harness/harness.json`, silently stripped,
- * and the declaration read as if it carried one while no consumer ever saw it.
- * Worse than absent, because absent is visible.
+ * `KgAssetSchema` is a non-strict `z.object` (so a downstream instance can
+ * carry a key this layer does not know), which drops an unknown key without
+ * a word. A key restated on an asset would vanish silently, so the RAW
+ * declaration is what gets asked.
  *
- * So the raw declaration is what gets asked. After parsing, the evidence is
- * gone.
+ * ## Layers
  *
- * ## Why the layer half is a gate rather than a required field
- *
- * It is not — `AssetRoleDef.layer` IS required, and `tsc` refuses a role that
- * does not say. What this half catches is the other direction: a role in
+ * `AssetRoleDef.layer` is required, and `tsc` refuses a role that does not
+ * say. This half catches the other direction: a role in
  * `REQUIRED_ASSET_ROLES` that `ASSET_ROLES` does not govern at all. The two
- * lists are separate on purpose (one says what every instance must declare,
- * the other says what a role means), and nothing but this makes them agree.
+ * lists are separate (what every instance must declare; what a role means),
+ * and only this gate makes them agree.
  *
  * @module scripts/check-asset-roles
  * @covers cat-harness — `ASSET_ROLES` against what each instance's declaration restates on an

@@ -1,48 +1,32 @@
 /**
  * Refuse a `.bpmn` or `.dmn` whose comments are not well-formed XML.
  *
- * ## The defect this exists for
- *
  * XML 1.0 §2.5 defines a comment as
  *
  *     '<!--' ((Char - '-') | ('-' (Char - '-')))* '-->'
  *
- * — so the body may not contain `--`, and may not end with `-`. Six diagrams
- * and one decision table here violated that for months, all by writing a
- * double hyphen where an em dash was meant (`render:bpmn` -- never hand-edit`)
- * or by quoting a CLI flag (`pages-bootstrap.ts --json`).
- *
- * **Nothing caught it, and every gate was green over them.** `bpmn-moddle` and
- * `dmn-moddle` parse them happily, so `kg:audit` reported `unknown 0` and
- * `render:bpmn` drew them. The audit was telling the truth about what THIS
- * instance can load, and was silent about what anyone else can — while each of
- * those files' own header invites the reader to "open it in bpmn.io, Camunda
- * Modeler, or any other BPMN 2.0 tool". A conformant parser cannot open them.
- * Python's expat rejects all seven. Bean `folio-assistant-qjog`.
+ * — so the body may not contain `--`, and may not end with `-` (a double
+ * hyphen typed for an em dash, or a quoted CLI flag, breaks it).
+ * `bpmn-moddle` and `dmn-moddle` parse such files happily, so `kg:audit` and
+ * `render:bpmn` stay green, but a conformant parser (bpmn.io, Camunda Modeler,
+ * Python's expat) cannot open them.
  *
  * ## Why this is hand-written rather than delegated to a parser
  *
- * Measured 2026-09-18, and this is the reason the check looks naive: the two
- * XML parsers already in this repo's dependencies BOTH accept the invalid
- * comment. `fast-xml-parser`'s `XMLValidator.validate()` returns `true` for
- * `<root><!-- a -- b --></root>`, and the moddles are what shipped the bug.
- * Delegating to either would have produced a check that passes over exactly
- * the corpus that motivated it.
+ * The two XML parsers already in this repo's dependencies BOTH accept the
+ * invalid comment: `fast-xml-parser`'s `XMLValidator.validate()` returns
+ * `true` for `<root><!-- a -- b --></root>`, and the moddles are the other.
  *
- * So the rule is implemented directly, and the scope is stated honestly:
- * **this checks the comment production and nothing else.** It is not a
- * well-formedness check. A diagram can pass here and still be invalid XML for
- * some other reason — the moddles catch most of that by failing to load, and
- * `kg:audit` records such a file as `unknown` rather than as a pass.
+ * So the rule is implemented directly, and **this checks the comment
+ * production and nothing else.** It is not a well-formedness check: the
+ * moddles catch most other invalid XML by failing to load, and `kg:audit`
+ * records such a file as `unknown` rather than as a pass.
  *
  * ## Scanning, not regexing
  *
- * `/<!--.*?-->/` finds the comment but mis-reports the trailing-hyphen case:
- * in `<!-- a --->` the lazy match ends at the FIRST `-->`, which starts one
- * character into the `---` run, so the body it yields is ` a -` — right by
- * accident here, and wrong as soon as the input is less convenient. The scan
- * below takes the same first-`-->` boundary a parser does, deliberately, and
- * then tests the body against the production.
+ * `/<!--.*?-->/` mis-reports the trailing-hyphen case (`<!-- a --->`). The
+ * scan below takes the same first-`-->` boundary a parser does, deliberately,
+ * and then tests the body against the production.
  *
  * Usage:  bun run cat-harness-tools/scripts/xml-comment-check.ts
  * Exits 1 and names every offending file, line and text.

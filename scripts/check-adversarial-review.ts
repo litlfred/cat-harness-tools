@@ -2,9 +2,6 @@
 /**
  * Adversarial Review Merge Gate Checker
  *
- * Implements child (a) of merge gate epic (bean `folio-assistant-w8jq`, proposal
- * `cat-harness/docs/proposals/merge-gate-2026-10-02.md` §5.1–5.3, amended 2026-10-03).
- *
  * ## What this gate checks
  *
  * 1. Provenance: Detects whether >= 1 agent touched the PR (branch, trailers, bot).
@@ -16,11 +13,11 @@
  *    and reviewer session and model must be recorded.
  * 5. Findings: Evaluated using RED FLAG taxonomy (`schemas/sdlc/red-flag.ts`).
  *
- * ## Warn-only ruling (2026-10-03 owner ruling)
+ * ## Warn-only by default
  *
- * Under the owner ruling, this gate WARNS and reports; it does not block the merge.
- * Follows the `dependency-advisories` pattern: exits 0 across all states while keeping
- * distinct states (`clean`, `would-have-blocked`, `unknown`, `stale`, `skipped`) in output.
+ * The gate WARNS and reports; it does not block the merge. Like
+ * `dependency-advisories`, it exits 0 across all states while keeping them
+ * distinct (`clean`, `would-have-blocked`, `unknown`, `stale`, `skipped`).
  * Under `--strict` or `--mode hard`, blocking findings and unknown/stale states exit 1.
  *
  * @covers merge-reviews, qa, attestations — the merge-review verdict it looks for: the `merge-reviews` state graph first, then the declared `qa` tree and `attestations` store

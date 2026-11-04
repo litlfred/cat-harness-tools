@@ -1,37 +1,22 @@
 #!/usr/bin/env bun
 /**
  * Every page an instance publishes as a standalone replica carries the folio
- * mount. Bean `jpjt`, F8/F9 on issue #796.
+ * mount.
  *
- * ## What it is for
- *
- * The owner's requirement is **consistency**, not quality:
- *
- * (paraphrased) the content instances are libraries a user browses, and the
- * "folio" the cat-harness gives them is consistent across them.
- *
- * `board-windows` states the test that follows from it — *"the test is not
- * 'is this folio good' but 'is this the same folio'"*. A reader moving
- * between libraries must find the same surface, so **a page missing the mount
- * is a reader who silently loses their folio when they click a link.** That is
- * exactly the failure nothing reports: the page renders, the library works,
- * and the only symptom is an absence.
+ * The requirement is **consistency**, not quality: the content instances are
+ * libraries a user browses, and the folio the cat-harness gives them is the
+ * same across them (`board-windows`: *"the test is not 'is this folio good'
+ * but 'is this the same folio'"*). A page missing the mount silently loses
+ * the reader's folio when they click a link, and nothing else reports it.
  *
  * `folio-mount.ts` makes the mount one line for a generator to emit. This is
  * what makes emitting it not optional.
  *
- * ## WHY THE SCOPE IS DECLARED AND NOT INFERRED
+ * ## The scope is DECLARED, not inferred
  *
- * The obvious gate — *every standalone HTML document in the repository* —
- * was measured before being rejected: **67 HTML files, 60 of them standalone,
- * spread over `cat-harness/docs` (38), the IRIS replica (11+1), `cat-harness/ui`
- * (4), `_kg` fixtures (5), `cat-harness/viewer` (1)**. Most have no business
- * carrying a folio: a fixture, the viewer shell, and the generated
- * visualisation pages whose folio is a separate piece of work. A gate whose
- * subject is wrong fails honest pages and gets exemptions bolted on until it
- * asserts nothing.
- *
- * So an instance **opts in**, in its own `<instance>.json`:
+ * Most standalone HTML in the repository (fixtures, the viewer shell,
+ * generated visualisation pages) has no business carrying a folio. So an
+ * instance **opts in**, in its own `<instance>.json`:
  *
  * ```json
  * "folioMount": {
@@ -40,48 +25,36 @@
  * }
  * ```
  *
- * An instance with no `folioMount` block is **not configured**, which is a
- * third state and not a pass — it is reported by name on every run, so an
- * instance that grows replica pages and never opts in is visible rather than
- * silently clean. This is `check-harness-dirs`'s shape and `check-ci-health`'s
- * rule: *could not determine is never rendered as clean.*
+ * An instance with no `folioMount` block is **not configured**, a third state
+ * reported by name on every run, never a pass (`check-harness-dirs`'s shape,
+ * `check-ci-health`'s rule).
  *
- * The roots are relative to the instance, and the instance owns them, because
- * a route is a fact about that instance. A list of library directories in a
- * platform gate would be the platform knowing about one library — the
- * boundary this repository exists to keep.
+ * The roots are relative to the instance, which owns them; a platform gate
+ * listing library directories would know about one library.
  *
- * ## EXEMPTIONS CARRY REASONS, AND A STALE ONE FAILS
+ * ## Exemptions carry reasons, and a stale one fails
  *
- * The IRIS replica's `uploads/` holds one captured IRIS page — the ingested source the
- * replica is generated *from*. Injecting into it would corrupt the capture,
- * which is the artefact ingestion exists to preserve. So it is exempt **with
- * that reason printed on every clean run**, the shape `check-invocation-parity`
- * and `check-avatar-instances` use.
- *
- * An exemption naming a path that holds no standalone pages is itself a
- * finding: an exemption outliving its subject is how a gate quietly stops
- * asserting the thing it was written for.
+ * E.g. the IRIS replica's `uploads/` holds a captured IRIS page, the source
+ * the replica is generated *from*; injecting into it would corrupt the
+ * capture. Its reason is printed on every clean run, as in
+ * `check-invocation-parity` and `check-avatar-instances`. An exemption naming
+ * a path that holds no standalone pages is itself a finding.
  *
  * ## What counts as a page
  *
  * A file ending `.html` that contains a doctype, or that opens with Jekyll
  * front matter naming a layout. A fragment included into another document is
- * not a page and cannot carry a mount, so counting it would make the gate fail
- * on files that are correct.
+ * not a page and cannot carry a mount.
  *
  * ## A page on the theme's layout is mounted BY the layout
  *
  * The site's layout loads `docs-ui.js` and `docs-ui.css` on every page
- * (`_includes/head_custom.html`), which is everything the fragment loads. So a
- * themed page carries the folio without the fragment, and the fragment there
- * would load both a second time. The library viewer's pages moved onto the
- * layout on 2026-10-07 (`gen-library-viz.ts`), and they are counted here as
- * mounted BY THE LAYOUT — reported apart, so a reader can see which pages
- * carry the mount themselves. Counting them as no pages at all would have
- * turned this gate into a clean run over an empty root. A themed page that
- * names no layout (`layout: none` or `null`) gets no head at all, and is
- * missing the mount like any other.
+ * (`_includes/head_custom.html`), which is everything the fragment loads. So
+ * a themed page (e.g. the library viewer's, from `gen-library-viz.ts`)
+ * carries the folio without the fragment, and is counted as mounted BY THE
+ * LAYOUT, reported apart. A themed page that names no layout
+ * (`layout: none` or `null`) gets no head at all, and is missing the mount
+ * like any other.
  *
  * Usage:
  *   bun run cat check:folio-mount

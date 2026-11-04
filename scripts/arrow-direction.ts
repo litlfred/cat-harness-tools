@@ -3,13 +3,11 @@
  *
  * The rule is data-modelling step 8: when two nodes are related, the one that
  * depends on the other holds the pointer, and the general node names none of
- * its dependents. #1168 flipped the arrows that broke it — lanes, voices,
- * stories, scripts, `satisfiedBy`, a graph typology's skill, a test's subject.
- * This is what stops the next one being written (B5).
+ * its dependents.
  *
- * Which nodes are general is a MODELLING DECISION, so it is declared, never
- * inferred: a schema declaration whose doc comment carries `@general`
- * (`schema-graph.ts` reads it). Two sources are checked:
+ * Which nodes are general is declared, never inferred: a schema declaration
+ * whose doc comment carries `@general` (`schema-graph.ts` reads it). Two
+ * sources are checked:
  *
  * - **Schemas.** A `@general` declaration may `@ref` only another `@general`
  *   one. A field pointing from a general node at anything else is the
@@ -19,9 +17,8 @@
  *   must point at a general one. {@link PROCESS_POINTERS} lists the elements
  *   that do; any other element carrying a pointer attribute is a finding.
  *
- * What it cannot see is stated rather than implied: a bare string field with
- * no `@ref` holds no arrow this reader can follow (B8 types those), and a
- * general node's PROSE naming its dependents is not parsed here.
+ * Not seen: a bare string field with no `@ref` (no arrow to follow), and a
+ * general node's prose naming its dependents.
  *
  * @module scripts/arrow-direction
  */

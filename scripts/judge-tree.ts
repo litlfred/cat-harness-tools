@@ -1,7 +1,6 @@
 /**
- * Judge a tree once, on whatever runner is at hand, and say so by digest
- * (cat-harness-tools#399; owner, 2026-10-16: "github should be one Tool of
- * several").
+ * Judge a tree once, on whatever runner is at hand, and say so by digest;
+ * GitHub is one runner of several.
  *
  * ```sh
  * # the digest of the tree: the index lock's fixity digests, the caller's entry

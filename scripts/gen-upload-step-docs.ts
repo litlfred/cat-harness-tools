@@ -1,48 +1,27 @@
 #!/usr/bin/env bun
 /**
  * gen-upload-step-docs.ts — the reference page for document ingestion's FIRST
- * step, generated from the Tool nodes that implement it.
- *
- * Owner, 2026-09-29: *"generate documentation from Tool documentation of the
- * upload Task/Skill as first step of document ingestion process."*
- *
- * ## Why the page could not be generated before the other three layers existed
- *
- * The chain it asks for is `process step → skill → Tool → page`, and its first
- * link was missing. `document-ingestion.bpmn` began at an EVENT — *"a file
- * lands in `uploads/`"* — so the process started after arrival; the ingest
- * Tools both type their first input as *"the upload to ingest, under the
- * declared `uploads` graph"*, a file already present; and `document-intake`
- * triggers on a drop that has happened. Nothing modelled the act of putting a
- * file there, so there was no Tool documentation for a page to be generated
- * FROM. `Task_Place`, the `upload-routes` skill and the `upload-url` Tool are
- * the three links this generator needed.
+ * step, generated from the Tool nodes that implement it: process step →
+ * skill → Tool → page.
  *
  * ## Nothing about WHICH step is written here
  *
  * The process file is named and everything else is DERIVED from it: the start
  * event, the activity its only outgoing flow reaches, that activity's
  * `<bootstrap.processes:skill ref>`, and every Tool whose `satisfies` names
- * that skill. So inserting another step ahead of `Task_Place`, renaming it, or
- * pointing it at a different skill moves the page rather than staling a
- * literal — and a step that stops naming a skill fails the run instead of
- * producing a page about nothing.
+ * that skill. Inserting, renaming or re-pointing a step moves the page rather
+ * than staling a literal.
  *
- * It IMPORTS both graphs rather than parsing them, for the reason
- * `gen-tools-viz` gives: the Tools are authored as TypeScript calling
- * `defineTool` precisely so a malformed one fails at `tsc`, and the diagram
- * has an interpreter. A generator with its own weaker readers would be free to
- * disagree with the ones the server uses.
+ * It IMPORTS both graphs rather than parsing them (as `gen-tools-viz` does),
+ * so it reads them exactly as the server does.
  *
  * ## What it refuses rather than papers over
  *
  * - the named process file missing, or its start event flowing nowhere;
- * - a first activity naming no skill, or naming more than one (the page would
- *   have to pick, and picking is a judgement a generator may not make);
- * - **no Tool satisfying that skill.** An empty page reads as "this step has no
- *   mechanism", which is a finding, not a document — and it is the state the
- *   whole chain was in until today, so emitting it silently would be the one
- *   failure this generator exists to have made impossible.
+ * - a first activity naming no skill, or naming more than one (picking is a
+ *   judgement a generator may not make);
+ * - **no Tool satisfying that skill**: an empty page would read as "this
+ *   step has no mechanism", which is a finding, not a document.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-upload-step-docs.ts

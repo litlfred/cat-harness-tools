@@ -1,32 +1,16 @@
 #!/usr/bin/env bun
 /**
  * The arm between a staged entry and a promotable one: `manifest.jsonld` and
- * one `blocks/*.jsonld` per section.
- *
- * ## Why this did not exist, and what that cost
- *
- * `ingest-document.ts` stages a document and then prints *"run the remaining
- * arms"*. Measured 2026-09-20 while ingesting the agent-skill corpus: of the
- * five requirements a staged entry still fails, `images` names its arm
- * (`pdf-images.py`) and **`blocks`, `manifest` and `narrative-provenance`
- * named nothing at all** — there was no script to run. `mayPromote` requires
- * every requirement met, so `bun run cat ingest` could stage a document and
- * nothing could ever promote one.
- *
- * That is not a missing feature, it is a pipeline that cannot terminate, and
- * it was invisible because both ends looked healthy: staging exits 0 and says
- * `✓ staged`, and `check:l1-complete` passes over `library/` because the four
- * entries already THERE were built before the pipeline was assembled. The
- * eight PDFs sitting unprocessed in `uploads/` are what it actually looked
- * like from outside.
+ * one `blocks/*.jsonld` per section — the `blocks` and `manifest`
+ * requirements `mayPromote` checks after `bun run cat ingest`
+ * (`ingest-document.ts`) stages a document.
  *
  * ## It DERIVES; it does not decide
  *
  * Every field here is computed from `structure.json` and the files beside it.
  * Nothing is inferred, and in particular **no block kind is guessed**: every
  * block is `prose`, because a page of an ingested source IS prose until
- * somebody reads it, and a classifier that guessed `theorem` from a heading
- * would be `6xaz` one layer up. Deliberate, not a stub.
+ * somebody reads it. Deliberate, not a stub.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/l1-blocks.ts -o <staged-entry-dir>

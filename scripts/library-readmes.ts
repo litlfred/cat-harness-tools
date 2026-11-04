@@ -5,23 +5,20 @@
  * @module scripts/library-readmes
  * @covers cat-harness
  *
- * Bean `qgjh`, owner 2026-09-30: a library reference links to the viewer, to
- * a page for the item, and to its source — and the page "should be like
- * bootstrap readmes". So this writes `<library>/<slug>/README.md` exactly the
- * way `bootstrap-tools/scripts/subgraph-readmes.ts` writes a directory's:
+ * Writes `<library>/<slug>/README.md` the way
+ * `bootstrap-tools/scripts/subgraph-readmes.ts` writes a directory's:
  *
  * - only between the `kg:subgraph` markers, through the SAME `splice`, so a
  *   README somebody wrote without them is left alone and reported;
  * - every value read from the item (`manifest.jsonld`) or counted on disk,
  *   never composed; the layout is a Liquid template beside this script.
  *
- * Once an item has a README, the library's own subgraph README links its row
- * to it (`subdirs.readme` in `subgraph.liquid`), so the parent table stops
- * saying only "185 files".
+ * The library's own subgraph README links each item's row to its README
+ * (`subdirs.readme` in `subgraph.liquid`).
  *
  * Libraries are found through the declaration (`directoriesForGraph(root,
  * "library")`), every declared one, as the library viewer finds them — never
- * by path (bean `a02m`).
+ * by path.
  *
  * Usage: `bun run cat library:readmes` · `bun run cat library:readmes:check`
  */

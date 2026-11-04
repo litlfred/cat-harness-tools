@@ -1,15 +1,13 @@
 #!/usr/bin/env bun
 /**
- * Print where an instance's published files go, for a workflow to capture
- * (bean `cat-tools-sthf`, the index half).
+ * Print where an instance's published files go, for a workflow to capture.
  *
  * @module scripts/print-published-path
  *
- * The URL-space ruling (owner, 2026-09-20, recorded on `sthf`) puts an
- * instance presented as itself at `<base>/<instance>/`, the segment being its
- * NAME, and cat-harness's `publishedPath` is the one resolver that composes it.
- * A workflow cannot call a TypeScript function, and an inline `bun -e` is the
- * place a missing import hides (see `print-stub.ts`), so this is a script.
+ * An instance presented as itself publishes at `<base>/<instance>/`, the
+ * segment being its NAME, and cat-harness's `publishedPath` is the one
+ * resolver that composes it; a workflow cannot call it directly, so this is a
+ * script.
  *
  *   DIR=$(bun run cat-harness-tools/scripts/print-published-path.ts ./bootstrap)
  *   FILE=$(bun run cat-harness-tools/scripts/print-published-path.ts ./bootstrap <path-in-instance>)

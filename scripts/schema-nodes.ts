@@ -1,40 +1,28 @@
 /**
  * Which `schemas/*.ts` modules are knowledge-graph nodes, read from the files.
  *
- * ## The defect this exists for
+ * `harness.json` declares `schemas/` with `graphTypologies: ["schemas", "kg"]`,
+ * so the exported graph must hold nodes of the `schemas` kind; this module
+ * finds them.
  *
- * `harness.json` declares `schemas/` with `graphTypologies: ["schemas", "kg"]`.
- * Measured on `814b693e`: the exported graph contained **zero** nodes of the
- * `schemas` kind — 11 node types, none of them a schema. A declaration a
- * consumer reads and finds nothing behind is the `dh4f` shape this repository
- * keeps naming, and it had reached the instance's own declaration.
+ * ## The declaration principle
  *
- * ## The declaration principle, applied to the odd one out
- *
- * A directory says what to EXPECT; the files declare what they ARE. Three of
- * the four graph typologies already hold that up — skills by YAML front matter,
- * beans by front matter, workflow instances by `"$schema"`. `schemas/*.ts`
- * declared nothing: `@module` names the file's own path, which a scanner
- * already knows, so it says WHERE and not WHAT. Bean `xxxb`.
- *
- * `@graphNode` is that missing declaration. It is a JSDoc tag rather than an
- * exported constant because it must cost nothing at runtime and be greppable
- * from outside the toolchain — a consumer reading the repository, not
- * importing it, has to be able to answer the question.
+ * A directory says what to EXPECT; the files declare what they ARE: skills by
+ * YAML front matter, beans by front matter, workflow instances by
+ * `"$schema"`. For `schemas/*.ts`, `@module` only says WHERE, so `@graphNode`
+ * says WHAT. It is a JSDoc tag rather than an exported constant so it costs
+ * nothing at runtime and a consumer reading the repository, not importing it,
+ * can answer the question.
  *
  * ## Every file declares, including the ones that are not nodes
  *
- * `@graphNode none — <reason>` is a real value, and the reason is required.
- * Three modules carry it: `index.ts` (a re-export barrel), `builders.ts`
- * (constructor functions over other modules' schemas) and `namespaces.ts` (one
- * IRI constant).
+ * `@graphNode none — <reason>` is a real value, and the reason is required —
+ * for example `builders.ts` (constructor functions over other modules'
+ * schemas).
  *
- * **An untagged file is `undeclared`, never a pass.** That is the whole point:
- * the alternative considered in `xxxb` was excluding `*.test.ts` by pattern,
- * which solves nothing — it restates a layout coincidence, the very thing
- * #263 named ("distinguishable by extension … a coincidence of the current
- * layout, not a contract"). A test file is excluded here because it declares
- * nothing AND is a test, and the gate says so in those terms.
+ * **An untagged file is `undeclared`, never a pass.** Test files are not
+ * excluded by pattern: a test file is excluded because it declares nothing
+ * AND is a test, and the gate says so in those terms.
  *
  * @module scripts/schema-nodes
  * @graphNode none — tooling that reads the declarations, not a schema itself

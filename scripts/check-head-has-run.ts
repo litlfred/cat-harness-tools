@@ -4,43 +4,19 @@
  *
  * @module scripts/check-head-has-run
  *
- * Bean `3pqn`. **A pull request carrying ZERO checks renders identically to
- * one whose checks have not started yet** — both are an absence of status. An
- * agent or a person who merges on "nothing red" merges unverified, and the
- * repository has no way to tell them apart from a checkout.
+ * **A pull request carrying ZERO checks renders identically to one whose
+ * checks have not started yet** — both are an absence of status. An agent or
+ * a person who merges on "nothing red" merges unverified.
  *
- * That is the `xom7` shape one layer up: a workflow failing invisibly, where
- * the remedy was to make the state legible rather than to trust somebody would
- * notice.
- *
- * ## Measured, twice, in two different shapes
- *
- * The bean recorded two cases on 2026-09-19 (`#340` head `e0e3b4b8`, `#349`
- * head `059cf9e1`): force-push, then open the PR seconds later, and no
- * `pull_request` run ever fired. Waiting ~45s made it go away, so it read as a
- * race between the ref update and `pull_request.opened`.
- *
- * **That framing is too narrow, and this repository produced the
- * counter-example on 2026-09-20.** On `#518`, already open, with no
- * force-push and no PR being opened:
- *
- * | commit | pushed | `pull_request` run |
- * |---|---|---|
- * | `f93582e52b` | 13:16:18 | yes |
- * | `cbfd048a1d` | 13:23:46 — **448s later** | **none, ever** |
- * | `f9cb1ee08f` | 13:24:12 — 26s after that | **none, ever** |
- *
- * Re-queried hours afterwards across all forty `pull_request` runs on the
- * branch: neither appeared. So a `synchronize` can be dropped too, seven and a
- * half minutes after the previous push — no race to lose — and **the later of
- * two rapid pushes is not a safe assumption either**, because it was dropped
- * as well. The checks had to be produced by hand with `workflow_dispatch`.
+ * GitHub can drop the event: a `pull_request` run may never fire for a PR
+ * opened right after a force-push, nor for a `synchronize` on an open PR,
+ * even minutes after the previous push. Neither the first nor the later of
+ * two rapid pushes is safe to assume.
  *
  * ## What this can and cannot do
  *
  * It cannot make GitHub deliver an event. It can say **"this commit has no
- * run"**, which is the fact nobody could see. Three states, and the third is
- * why the script exists at all:
+ * run"**:
  *
  * | state | means | exit |
  * |---|---|---|
@@ -50,113 +26,55 @@
  * | could not ask | no remote, no network, rate limited, HTTP error | 2 |
  *
  * **Could-not-ask is never reported as "has a run"**, and never as "no run"
- * either: telling somebody their commit is unverified when you simply could
- * not look would train them to ignore it, which costs more than the gap.
+ * either.
  *
- * ## "Has a run" was the wrong question — bean `9x9r`
+ * ## The owed runs are derived
  *
- * Until 2026-09-24 the first row read *"at least one workflow run names this
- * exact `head_sha`"*, and the script decided on `runs.length > 0`. Any run.
- * Any workflow, any event. The header was honest about what it measured; the
- * QUESTION was wrong, because the operator running this is asking whether
- * **their PR's gates** fired.
+ * "Any run" is the wrong question: a run of a different workflow, or a
+ * `workflow_dispatch` run (which checks out `refs/heads/<branch>`, not the
+ * merge ref), says nothing about the PR's gates. The owed workflows are
+ * derived from `.github/workflows/` by {@link scanTriggers}, so a gate
+ * workflow that is renamed or deleted is caught too; why a path-filtered
+ * workflow is `conditional` rather than required is in
+ * `src/core/workflow-events.ts`.
  *
- * Two live cases, both measured that day:
+ * ## "No run" is not one situation
  *
- * | head | its runs | old verdict |
- * |---|---|---|
- * | PR #1309 | `JSON-LD drift` twice — one `push`, one `pull_request` | ✓ |
- * | PR #1222 `28f929a` | `Code-quality gates` via **`workflow_dispatch`** only | ✓ |
- *
- * The second is the worse one and it indicts the fix as much as the defect: a
- * dispatch resolves `refs/heads/<branch>` rather than the merge ref, so that
- * green was about a different tree (`yv4z`, `sddf`) — and this script endorsed
- * it. `3pqn` reported as clean, by the file written to detect `3pqn`.
- *
- * The owner ruled the stronger of two fixes on 2026-09-24: **derive the owed
- * workflows from `.github/workflows/`** rather than match per-event, so a gate
- * workflow that is renamed or deleted is caught too. The required set is read
- * by {@link scanTriggers}; the reasoning, and why a path-filtered workflow is
- * `conditional` rather than required, is in `src/core/workflow-events.ts`.
- *
- * ## "No run" is not one situation — bean `sddf`
- *
- * Exit 1 is the same either way, because the operator's immediate position is
- * the same: **nothing verified this head**. But WHY differs, and one of the
- * reasons used to get advice that made things worse. So the no-run branch now
- * asks {@link mergeStateForHead} and says which of these it is:
+ * Exit 1 is the same either way, but the no-run branch asks
+ * {@link mergeStateForHead} and says which of these it is:
  *
  * | why | what it means | what to do |
  * |---|---|---|
  * | **conflicted** | the forge publishes no `refs/pull/N/merge`, and a `pull_request` run checks that ref out | merge the base in. **Never dispatch** |
- * | mergeable | a run is owed and its absence is unexplained — this is `3pqn` | dispatching is safe here |
+ * | mergeable | a run is owed and its absence is unexplained | dispatching is safe here |
  * | not a PR head | no open PR has this sha, so nothing was owed | open the PR, or ask about the right head |
  * | unknown | the probe itself failed | check by hand; assume nothing |
  *
- * **The conflicted row is why this was a defect and not a wording nit.** The
- * old message said *"this is bean `3pqn`: the event was dropped"* and told the
- * reader to dispatch. A dispatch resolves `refs/heads/<branch>`, not the merge
- * ref — so on a conflicted PR it is a green signal for a tree that will never
- * exist, which is worse than the absence it replaces. `yv4z` established that
- * and `prepare-merge` §Guardrails gained a step 0 for it; this script, the one
- * an operator actually runs at that moment, did not get the memo.
+ * On a conflicted PR a dispatch is a green signal for a tree that will never
+ * exist (see `prepare-merge` §Guardrails step 0).
  *
- * It also stated a cause as fact two sentences before admitting the evidence
- * could not distinguish it — the `xom7` shape, inside the file written to
- * prevent it, and the second time this file has done that (see the hazard
- * section below).
+ * A run for a DIFFERENT commit is not a run for this one; that distinction
+ * is the whole check.
  *
- * A run for a DIFFERENT commit is not a run for this one, and that distinction
- * is the whole check: in both of the bean's cases the branch *did* have a
- * recent run — for the commit the previous PR had merged.
- *
- * ## A push does not buy you a run, and `mergeable_state` does not buy you an answer
- *
- * Two things measured 2026-09-25 (bean `fx5r`), both of which change what an
- * operator standing at a runless head should DO.
+ * ## Operator rules
  *
  * **Pushing to a PR's head branch does not re-run its `pull_request`
- * workflows.** A merge commit was pushed to an open PR's branch and only the
- * `push`-triggered workflow fired:
+ * workflows**; only `push`-triggered ones fire, leaving the wrong subset of
+ * checks. `workflow_dispatch` against the branch is the remedy, and only
+ * while the PR is mergeable.
  *
- * ```
- * 17:04  success  JSON-LD generated-file drift   57fd738d8  (event=push)
- * 04:54  success  Code-quality gates             5a02ac4b5  (event=pull_request)
- * ```
+ * **`mergeable_state` is not the way to check by hand**: it, `head.sha` and
+ * `updated_at` can serve a stale view long after a merge. {@link mergeStateForHead}
+ * asks `git ls-remote origin refs/pull/N/merge` instead. When a forge API and
+ * git disagree about git, git is the subject and the API is a cache.
  *
- * The head then carried ONE green check and not the one that mattered — this
- * script's own subject, `3pqn`, arrived at from the other side: not zero
- * checks, but the wrong subset, which reads as green at a glance. So
- * "push something to trigger CI" is not a remedy; `workflow_dispatch` against
- * the branch is, and the table above is right that it is safe only while the
- * PR is mergeable.
+ * ## Unknown commits
  *
- * **`mergeable_state` is not the way to check by hand.** It, `head.sha` and
- * `updated_at` all kept serving a PR's pre-merge view 45 minutes after that PR
- * merged; only `merged` went stale-safe. Worse, `update-branch` answered
- * *"merge conflict between base and head"* for a CLOSED PR, while
- * `git merge-tree` and a real `git merge --no-commit` both reported zero
- * unmerged paths — a wrong cause stated with the authority of a measurement.
- *
- * This module already had the right instinct: {@link mergeStateForHead} asks
- * `git ls-remote origin refs/pull/N/merge` rather than the field. The advice it
- * PRINTED in the `unknown` case did not, and pointed at `mergeable_state`
- * twice. That is fixed; the rule is the one `h2s9` arrived at independently —
- * **when a forge API and git disagree about git, git is the subject and the
- * API is a cache.**
- *
- * ## The hazard this script could itself have become
- *
- * A commit id GitHub has never heard of returns an empty run list, which is
- * indistinguishable from a real commit whose event was dropped. The first
- * draft reported `deadbeef…` as "has NO workflow run of any kind" — a
- * confident wrong answer, which is the exact failure this file exists to
- * prevent, reproduced inside it.
- *
- * So the id is resolved against the local repository FIRST: unknown here is
- * `cannot-ask`, not a finding. And a commit that exists locally but sits on no
- * remote ref genuinely has no run and always will, so it is reported with THAT
- * as the reason rather than implying GitHub lost something.
+ * A commit id GitHub has never heard of returns an empty run list, which
+ * looks like a dropped event. So the id is resolved against the local
+ * repository FIRST: unknown here is `cannot-ask`, not a finding. A commit
+ * that exists locally but sits on no remote ref is reported with THAT as the
+ * reason.
  *
  * Usage:  bun run cat check:head-has-run [<sha>]
  */

@@ -2,61 +2,23 @@
 /**
  * Do the declared directories' subgraphs have any edge between them?
  *
- * Bean `x4v4`. The owner, 2026-09-20: *"`cat-harness/methodologies/` is a
- * subgraph. should be disconnected. convention folder corresponds to subgraph
- * (but may be in process of being disentangled). use schema
- * declaration/definition."*
+ * A **subgraph** is a set of nodes with the graph's edges between them; every
+ * set of files induces one. A **directory** is where a named subgraph is
+ * written down so tooling can find it (`subgraphTree` and `owningDirectory`
+ * in `schemas/kg/cat-harness.ts` are pure path containment, derived from the
+ * declared paths).
  *
- * ## Vocabulary, because the headline here said it backwards until 2026-09-27
- *
- * It read *"a folder corresponds to a subgraph"*, which inverts the two. The
- * owner's own sentence carries the correction and this file dropped the load-
- * bearing word: **convention** folder corresponds to subgraph.
- *
- * - A **subgraph** is the mathematical object — a set of nodes together with
- *   the edges of the graph between them. Every set of files induces one.
- *   Nothing has to be cohesive, large, or disconnected to *be* a subgraph, and
- *   an edgeless set of nodes is a perfectly good one.
- * - A **directory** is a CONVENIENCE: where a subgraph somebody chose to name
- *   gets written down so tooling can find it. Bookkeeping, not the object.
- *   `subgraphTree` and `owningDirectory` in `schemas/kg/cat-harness.ts` are pure
- *   path containment for exactly this reason.
- *
- * The inversion is not pedantry, because it is what makes the property this
- * script measures sayable at all. "A folder is a subgraph" is unfalsifiable —
- * any set of files induces a subgraph, so there is nothing to check. What is
- * checkable is a relation BETWEEN the declared subgraphs:
+ * The intent measured here:
  *
  * > **The partition by declared directory should have no edge crossing it** —
  * > equivalently, it should COARSEN the graph's partition into connected
  * > components. Each declared subgraph is then a union of components, and
  * > "should be disconnected" means mutually disconnected.
  *
- * That is one comparison of two partitions, and it is what `byPair` below
- * computes. Note "disconnected" is a claim about PAIRS: a single subgraph is
- * not disconnected from anything, and a connected component is by definition
- * connected, so the verdict has to name the pairwise property or it says
- * something false. It did — *"every declared directory is a disconnected
- * component"* — and that is corrected below too.
+ * `byPair` below computes the crossing edges per pair of subgraphs.
  *
- * The declaration half lives in `schemas/kg/cat-harness.ts` — `subgraphTree` and
- * `owningDirectory`, both DERIVED from the paths already declared rather than
- * restated, with the reasoning on those functions. This is the other half:
- * measuring how far the corpus is from the intent.
- *
- * ## Why this REPORTS and does not gate
- *
- * Because the intent is not met and the owner said so in the same sentence.
- * Measured 2026-09-20, CRDM's skills reference seven skills in `folio-core`.
- * A gate failing on seven edges nobody has decided about is the *"a check that
- * cries wolf is a check somebody switches off"* failure `known-skills.ts`
- * names — and this session already arrived there once by another route,
- * counting test literals in `check-declared-paths` (bean `dhol`). Twice in one
- * day is a pattern, not bad luck.
- *
- * `--check` exits non-zero ONLY on the third state: a subgraph whose edges
- * could not be read at all. Could-not-determine is never rendered as clean,
- * which is the rule `ci-health` and `health` both keep.
+ * It REPORTS the entanglement and does not gate on it. `--check` exits
+ * non-zero ONLY when a subgraph's edges could not be read at all.
  *
  * Usage:
  *   bun run cat subgraphs            # the tree and the entanglement report

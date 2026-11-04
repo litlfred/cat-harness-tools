@@ -6,38 +6,32 @@
  * @graphNode none — the write half of the state mount
  * @covers none — it writes a state graph's edits to its branch and judges nothing
  *
- * Bean `2h76`, the `bun run cat state:push` line. The proposal: *"`bun run
- * state:push` commits and pushes the worktree through the library."*
- *
- * Rebuilt by bean `nij4` on one implementation: every graph is spliced by
- * branch-store's {@link pushMount}, once per graph, to the branch that
- * graph's mount was read from. The `state/` worktree push is gone with the
- * worktree (`state-mount.ts`).
+ * `bun run cat state:push` splices every graph with branch-store's
+ * {@link pushMount}, once per graph, to the branch that graph's mount was
+ * read from (`state-mount.ts`).
  *
  * ## Why not `git push`
  *
- * Because that is the lost update. A push of the tree the editor started from
- * reverts a sibling's write to a DIFFERENT file landed meanwhile, and
- * overwrites a sibling's write to the SAME file outright. What goes to the
- * remote instead is a SPLICE: only the paths that actually changed, grafted
- * onto whatever the tip is now, every other file carried across by id.
+ * A push of the tree the editor started from reverts a sibling's write to a
+ * DIFFERENT file landed meanwhile, and overwrites a sibling's write to the
+ * SAME file. What goes to the remote instead is a SPLICE: only the paths that
+ * actually changed, grafted onto whatever the tip is now, every other file
+ * carried across by id.
  *
  * ## The `expect` is the whole safety story
  *
- * The mount marker records the blob each file had at the mounted tip, which IS
- * what the editor read. That is exactly `Change.expect`. A sibling who edited
- * the same file since gets this write stopped as `conflict` with the paths
- * named, and NOTHING is pushed for that graph — rather than one of the two
- * edits quietly disappearing. A file the editor created carries
+ * The mount marker records the blob each file had at the mounted tip — what
+ * the editor read, i.e. `Change.expect`. A sibling who edited the same file
+ * since gets this write stopped as `conflict` with the paths named, and
+ * NOTHING is pushed for that graph. A file the editor created carries
  * `expect: null`, so two sessions creating the same bean are told instead of
  * both believing they did.
  *
  * ## Which graphs: the declarations AND the mounts
  *
  * Every declared tip-keyed graph, plus every graph mounted in this worktree
- * whose declaration has since gone. A mount's marker records its branch, so
- * it needs no declaration to push — and edits in a mount nobody declares any
- * more must not be stranded where no command reaches them.
+ * whose declaration has since gone: a mount's marker records its branch, so
+ * its edits are never stranded.
  *
  * ## It never discards edits
  *
@@ -47,12 +41,10 @@
  * ## It retags the beans first
  *
  * Before the splice, every bean in the mounted store gets back its
- * `$schema: bean/1.0.0` (`beans-retag.ts`, bean `ujiv`). The `beans` CLI drops
- * that key whenever it rewrites a bean, so without this step every claimed or
- * updated bean would reach the branch untagged. The retag only edits files in
- * the mount; the splice then carries them like any other edit. It is skipped on
- * `--dry-run`, which must not write, and a retag that cannot run is reported
- * and does not stop the push.
+ * `$schema: bean/1.0.0` (`beans-retag.ts`), which the `beans` CLI drops
+ * whenever it rewrites a bean. The retag only edits files in the mount. It is
+ * skipped on `--dry-run`, which must not write, and a retag that cannot run is
+ * reported and does not stop the push.
  */
 
 import { isAbsolute, relative, resolve } from "node:path";

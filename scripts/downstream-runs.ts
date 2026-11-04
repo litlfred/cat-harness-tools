@@ -1,13 +1,13 @@
 /**
  * The downstream-tool criterion family — one evaluator for every Tool that
- * declares `downstream`, generalising what `lsi-index-fresh` did for LSI alone.
+ * declares `downstream`.
  *
  * @module scripts/downstream-runs
  *
- * Bean `fq5u`. The owner's design: every downstream tool is a Tool node
- * declaring its output and inputs (`schemas/tools/tool.ts#ToolDownstreamSchema`);
- * each run writes a `folio-tool-run/v1` record (`schemas/tools/tool-run.ts`); QA
- * reads **fresh** only for a successful run over the current inputs, **stale**
+ * Every downstream tool is a Tool node declaring its output and inputs
+ * (`schemas/tools/tool.ts#ToolDownstreamSchema`); each run writes a
+ * `folio-tool-run/v1` record (`schemas/tools/tool-run.ts`). QA reads
+ * **fresh** only for a successful run over the current inputs, **stale**
  * when an input moved since, and **not-run / failed** — never green — when
  * there is no successful record.
  *
@@ -26,8 +26,7 @@
  * and reads each one's state with the tool's OWN fingerprint (see
  * `schemas/tools/tool-run.ts` for why not a generic file hash). A `checkout`-judged
  * declaration with no member cannot be judged, which is `unknown`, not a pass.
- * Adding a member is one entry here plus the Tool's declaration; the criteria
- * need no change.
+ * Adding a member is one entry here plus the Tool's declaration.
  */
 import type { ToolDefinition } from "../schemas/tools/tool.ts";
 import { listToolRuns, TOOL_RUNS_DIR, type DownstreamState } from "../schemas/tools/tool-run.ts";

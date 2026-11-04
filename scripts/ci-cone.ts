@@ -1,103 +1,69 @@
 #!/usr/bin/env bun
 /**
  * The CI cone. A pull request's CI skips a check whose inputs are unchanged
- * since main's last green run (bean `4rbc`, issue #2456, building on `f017`).
+ * since main's last green run.
  *
  * @module scripts/ci-cone
  * @graphNode none — a CI helper behind `gate-shell.sh`, not a gate itself
  *
- * ## The rule: declared or derived, never inferred
- *
- * Owner, 2026-10-07: *"derived is BEST"*, then *"DERIVED = no drift, no extra
- * data fields"*. `f017` skips a check only on DECLARED inputs, and every
- * skippable declaration is `{tracked}`, the whole tree. So any PR moves every
- * fingerprint, and a PR skips nothing. Measured on `1d28c5c4562`: a one-line
- * bean edit moved the fingerprint of checks that never read beans.
- *
- * This module adds the second source, the DERIVED read set. It is computed from
- * the run itself and is never stored as authored or committed data:
+ * A check's inputs are declared or DERIVED, never inferred. Declared inputs
+ * of `{tracked}` (the whole tree) move on every PR, so this adds the derived
+ * read set, computed from the run itself and never stored as authored data:
  *
  * 1. **Record (a push to main).** Every candidate check runs under
  *    `strace -f`. The files, directories and absent paths that run touched
  *    inside the checkout are its read set. They are recorded with the state of
- *    each one and the check's `f017` fingerprint (script closure, audited
+ *    each one and the check's input fingerprint (script closure, audited
  *    environment, tool versions and `--against` baseline, but not the tree),
  *    in `build/ci-cone/records.json`. The workflow caches that file under
- *    main's sha. It holds only what that run measured.
+ *    main's sha.
  * 2. **Decide (a pull request).** The PR restores the record of its nearest
- *    main ancestor. It re-computes the fingerprint on its own tree, and the
- *    state of every recorded path. It skips only on an exact match, and says
+ *    main ancestor, re-computes the fingerprint and the state of every
+ *    recorded path, and skips only on an exact match, saying
  *    `SKIPPED — inputs unchanged since <sha>`, never "passed".
  *
- * ## Not wired into the workflow yet (measured 2026-10-07)
+ * ## Wiring
  *
- * The 36 of 53 `gates-kg` / `gates-docs` candidates it can record are the
- * cheap ones, about 30 runner-seconds of skips against about 22 s of
- * deciding. The expensive checks are not recordable yet: `kg:audit*` read the
- * `qa-reports` store, and `skill:register:check` has an unannotated site.
- * Tracing them would add minutes to every main run. To wire it in, add to
- * each gate job a restore step for `build/ci-cone` (key
- * `ci-cone-v1-<job>-<base sha>`, restore-keys `ci-cone-v1-<job>-`), a step
- * running `bun cat-harness/scripts/ci-cone.ts prepare`, and a save step on a
- * green push to main. `gate-shell.sh` already does the rest. Bean `4rbc`.
- *
- * ## Wired into the layer PR checks (cat-harness-tools#398)
- *
- * `layer-pr-checks.yml` uses it without `gate-shell.sh`: its gates are run by
- * `.github/scripts/layer-pr-checks/run-gates.py`, which asks
- * {@link decideAll} once per shard (`decide-all`), records a cone skip as
- * SKIPPED with its sha (never an exit code, so never a pass), and on a push
- * to the caller's main runs each candidate that did not skip through `run`,
- * one at a time. The records it keeps are this file's, unchanged in shape.
+ * `gate-shell.sh` uses it once a gate job restores `build/ci-cone` (key
+ * `ci-cone-v1-<job>-<base sha>`, restore-keys `ci-cone-v1-<job>-`), runs
+ * `prepare`, and saves on a green push to main. `layer-pr-checks.yml` uses it
+ * without `gate-shell.sh`: `.github/scripts/layer-pr-checks/run-gates.py`
+ * asks {@link decideAll} once per shard (`decide-all`), records a cone skip
+ * as SKIPPED with its sha (never an exit code), and on a push to the caller's
+ * main runs each candidate that did not skip through `run`.
  *
  * ## Why an exact match is enough
  *
- * The verdict and its read set come from the same run, so there is no
- * declaration that could drift from the code. Take a run on main that read the
- * set R and passed. A PR run with the same code (the fingerprint hashes the
- * script's import closure) and the same content at every path in R starts in
- * the same state. The input-site audit (`input-sites.ts`) makes every other
- * input hashed or refused: the environment, the clock, the network and git
- * history. So the PR run would take the same path, read the same R and give
- * the same answer. A data-dependent read is covered, because the files that
- * decided which path the run took are in R and their content must match.
+ * The verdict and its read set R come from the same run. A PR run with the
+ * same code (the fingerprint hashes the import closure) and the same content
+ * at every path in R starts in the same state; the input-site audit
+ * (`input-sites.ts`) hashes or refuses every other input (environment, clock,
+ * network, git history). So it reads the same R and gives the same answer.
  *
- * **The caveat.** A trace covers only the path that run took. The argument
- * above is what makes that enough, and it holds only for a check whose reads
- * the trace can enumerate. Anything else is recorded as undetermined, never
- * as clean, so it always runs:
+ * A trace covers only the path that run took, so a run whose reads cannot be
+ * enumerated is recorded as undetermined and always runs:
  * - a write inside the checkout;
  * - a relative path whose directory the trace does not name;
  * - a syscall this parser does not classify;
  * - more than {@link MAX_PATHS} paths;
- * - a `tree` site (git's view of the tree, refused by `f017` for any input set
+ * - a `tree` site (git's view of the tree, refused for any input set
  *   narrower than `{tracked}`);
  * - a `traced` input site the run reached.
  *
- * ## What is left out of a read set, each for a reason
+ * ## Left out of a read set
  *
  * - **Paths outside the checkout** (system libraries, `/tmp`, the bun install
- *   cache). These are the environment. `f017` hashes the bun and git versions
- *   and the audited variables, and accepts the same exposure.
- * - **The top-level `node_modules/`.** `bun.lock` pins it, every fingerprint
- *   hashes `bun.lock`, and CI installs with `--frozen-lockfile`. A NESTED
- *   `node_modules` is not pinned that way (bean `xd1g`), so it is read like
- *   any other directory.
- * - **`.git/` read by a `git` process.** What git answers is an input site,
- *   audited and hashed by `f017` (`head`, `refs`) or refused (`tree`). The
- *   script's own reads of `.git` are kept.
- * - **This module's own directory and the input-hash cache.** They are
- *   written by the recording machinery, never read by a check.
+ *   cache): the environment, covered by the hashed versions and variables.
+ * - **The top-level `node_modules/`**: pinned by `bun.lock`, which every
+ *   fingerprint hashes, and CI installs with `--frozen-lockfile`. A NESTED
+ *   `node_modules` is read like any other directory.
+ * - **`.git/` read by a `git` process**: an audited input site (`head`,
+ *   `refs`) or refused (`tree`). The script's own reads of `.git` are kept.
+ * - **This module's own directory and the input-hash cache.**
  *
- * ## A directory that was opened is not a directory that was listed
- *
- * `getdents64` is traced too (tracer 3, tools#1265). A directory the run only
- * opened, stat'ed or resolved names inside, and never listed, has the state
- * {@link OPENED_DIR}: all the run learnt is that the path is a directory, and
- * every name it looked up inside is a path of its own in the read set. Only a
- * directory whose entries the run read keeps its sorted entry listing. Before
- * this, bun opening the checkout root to find `package.json` made a new
- * top-level entry rerun every writer.
+ * A directory the run only opened, stat'ed or resolved names inside, and never
+ * listed (`getdents64`), has the state {@link OPENED_DIR}; only a directory
+ * whose entries the run read keeps its sorted entry listing.
  */
 import { createHash } from "node:crypto";
 import { appendFileSync, existsSync, lstatSync, statSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from "node:fs";

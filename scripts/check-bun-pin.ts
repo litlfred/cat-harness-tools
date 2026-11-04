@@ -1,47 +1,25 @@
 /**
  * Every workflow installs the SAME Bun, and `.bun-version` says which.
  *
- * Bean `3ozg`. `upstream-pins.json`'s own note is the reason this gate has to
- * exist rather than being a convention:
+ * `.bun-version` is the one answer to "what are we running"; the
+ * `setup-bun` sites in the workflows are copies, and this gate forbids them
+ * from disagreeing. Without it, `pinnedIn: ../.bun-version` would point at a
+ * file no build consults.
  *
- *   > NOTE WHAT IS NOT HERE: the pinned version. It lives in the file the build
- *   > reads … a registry with its own copy would be a second answer to "what are
- *   > we running", free to disagree with the build.
+ * ## Why explicit literals, not `setup-bun` reading `.bun-version`
  *
- * The workflows are what CI actually reads, and there are **22** `setup-bun`
- * sites across 12 files. So `.bun-version` is one answer and those 22 are
- * copies — and copies are only not a second answer while something forbids them
- * from disagreeing. That is this file. Without it, `pinnedIn: ../.bun-version`
- * would point at a file no build consults, and the registry would be watching a
- * number with no consequence.
- *
- * ## Why not let `setup-bun` read `.bun-version` and delete the 22 literals
- *
- * Because it cannot be verified from here. The action may well read
- * `.bun-version` — four of the 22 sites already omit `bun-version` and take its
- * default — but egress to the action's documentation is blocked in this
- * container, and an unverifiable assumption would make the pin SILENTLY do
- * nothing: every site would fall back to whatever the default is, the sidecars
- * would keep churning, and the gate would still be green because the literals
- * it compares would all be absent. Explicit literals are checkable from the
- * repository alone, which is the property that matters for a gate.
+ * Whether the action reads `.bun-version` cannot be verified from the
+ * repository, and if it did not, every site would fall back to a default
+ * while this gate stayed green over absent literals. Explicit literals are
+ * checkable from the repository alone.
  *
  * ## What the pin is for
  *
  * `engine_version` in a QA script sidecar is `bun-${Bun.version}`, and
- * `saveQaScriptSidecar` treats it as a SUBSTANTIVE field — correctly, since a
- * verdict produced by a different engine is a different verdict. With nothing
- * pinning the runtime, that field recorded whoever ran last: 86 committed
- * sidecars held two values (72 at `bun-1.3.14`, 14 at `bun-1.3.11`) and CI's
- * `bun-version: latest` would have rewritten all of them to `bun-1.4.2` on its
- * next sweep. `bun run cat gates`' tree-mutation detector therefore ended "NOT
- * clean" on every branch, pristine `main` included — and a signal that is always
- * red is one nobody reads, which is the `ymsu` failure class the detector exists
- * to catch.
- *
- * `tools` is the graph typology: the subject is `.github/workflows/`, this harness's
- * own CI definition, and no folio content is read. Declared rather than
- * inferred, per `3srh`.
+ * `saveQaScriptSidecar` treats it as a SUBSTANTIVE field, since a verdict
+ * produced by a different engine is a different verdict. With an unpinned
+ * runtime that field records whoever ran last, so sidecars churn and
+ * `bun run cat gates`' tree-mutation detector is never clean.
  *
  * Usage:
  *   bun run cat check:bun-pin

@@ -2,11 +2,9 @@
  * Print waits for render: the headless PDF path's wait on `data-fa-render`,
  * and its refusal over a page that is still `pending` or has `failed`.
  *
- * Split out of the DAK PDF builder when that builder moved up to the DAK
- * layer (wrong-direction move M12): the wait is generic — any page this
- * platform renders can carry `data-fa-render` — and its end-to-end spec
- * (`test/render-wait.e2e.ts`) belongs with it here, where every PDF writer
- * above this layer can import it.
+ * The wait is generic — any page this platform renders can carry
+ * `data-fa-render` — so every PDF writer above this layer imports it from
+ * here; its end-to-end spec is `test/render-wait.e2e.ts`.
  *
  * @module scripts/render-wait
  */

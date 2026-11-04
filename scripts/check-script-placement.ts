@@ -2,13 +2,11 @@
 /**
  * Does every script live in the manifest of the layer it runs?
  *
- * Bean `ar1s` phase 4 split the root `package.json`'s 509 scripts by layer
- * (`cat-harness/schemas/sdlc/script-table.ts`). A script whose command names one
- * layer's paths belongs to that layer; one naming several belongs to the one
- * that needs all the others (its declared `needs`, transitively); one naming
- * none, or naming layers no single one needs, belongs to the root, the
- * aggregate. Without this check the next added script lands in the root out of
- * habit, and the table drifts back to the one file a split cannot divide.
+ * Scripts are split by layer (`cat-harness/schemas/sdlc/script-table.ts`). A
+ * script whose command names one layer's paths belongs to that layer; one
+ * naming several belongs to the one that needs all the others (its declared
+ * `needs`, transitively); one naming none, or naming layers no single one
+ * needs, belongs to the root, the aggregate.
  *
  * The layers and their order are READ from each instance's declaration, never
  * listed here. A submodule (another repository's checkout) is not a layer of

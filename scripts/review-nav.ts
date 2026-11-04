@@ -1,21 +1,16 @@
 /**
- * The review page's navigation: an outline, a breadcrumb, and a minimap. Bean
- * `eb4l`, epic `q4jm`.
+ * The review page's navigation: an outline, a breadcrumb, and a minimap.
  *
- * ## The owner's rulings this follows
+ * - **Outline on the review page only.** It lists a DOCUMENT folio's chapters
+ *   and sections in manifest order, from `outline.json`, which the folio's
+ *   own site build writes. Normal pages have no table of contents.
+ * - **One key or one click; never a drag or a hover**, for users with very
+ *   limited hand function.
  *
- * - **Outline on the review page only** (2026-09-22). It lists a DOCUMENT
- *   folio's chapters and sections in manifest order, from `outline.json`,
- *   which the folio's own site build writes. The "no toc" ruling for normal
- *   pages stands.
- * - **One key or one click; never a drag or a hover.** The owner works with
- *   very limited hand function.
+ * ## The minimap is ONE tab stop
  *
- * ## Why the minimap is ONE tab stop
- *
- * A 300-page document has thousands of blocks. As plain buttons, each cell
- * would be a tab stop, and a keyboard or switch user could not get past it.
- * So the minimap is a roving-tabindex list:
+ * A long document has thousands of blocks, and a tab stop per cell would trap
+ * a keyboard or switch user. So the minimap is a roving-tabindex list:
  * - one cell is reachable with Tab;
  * - Up/Down (and Left/Right) move between cells in reading order, and Home
  *   and End go to either end;

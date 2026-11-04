@@ -2,81 +2,45 @@
 /**
  * Claim a bean by pushing its `in-progress` status to the DEFAULT BRANCH.
  *
- * ## The defect this exists for — bean `35nj`
+ * A claim committed on a feature branch is invisible to sibling sessions,
+ * which read `origin/main`. This pushes the claim ALONE, built in a detached
+ * `git worktree` on `origin/<default>` (removed afterwards, whatever happens),
+ * so the caller's working tree is never disturbed.
  *
- * A claim is a commit to `beans/defs/<id>.md` on your **feature branch**. A
- * sibling session reads `origin/main`, where the bean still says `todo`. So a
- * claim becomes visible to anybody else only once your PR exists — and
- * `AGENTS.md`'s "open the PR at the first commit" rule is the only reason it is
- * visible then rather than at the end.
+ * Protection cannot be detected in advance, so the push is ATTEMPTED and its
+ * rejection handled:
  *
- * Measured 2026-09-19: two sessions set `plj1` `in-progress` **61 seconds
- * apart** — 09:28:18Z and 09:29:19Z — and opened two PRs for it at ~09:36 and
- * 09:37. Same diagnosis, same design choice, two implementations; one was
- * withdrawn. Both sessions followed "claim before you work" exactly as written
- * and it prevented nothing, because neither claim existed anywhere either
- * session could read.
- *
- * The owner chose this mechanism over a PR-list check, from options carrying
- * their costs: it is the only one that actually closes the window, and the cost
- * is that a session writes to the default branch for claims, which this
- * repository otherwise routes through pull requests.
- *
- * ## Why a separate commit, and why a temp worktree
- *
- * The claim must land ALONE. A claim bundled with work cannot be pushed until
- * the work is ready, which is the whole defect. And it must not disturb the
- * caller's working tree: a session mid-edit cannot afford a checkout, so this
- * builds the commit in a detached `git worktree` on `origin/<default>` and
- * removes it afterwards, whatever happens.
- *
- * ## "Could not push" is a THIRD STATE and is never silent
- *
- * The default branch may be protected — and this environment cannot find out:
- * `GET /branches/main/protection` answers **403 "Resource not accessible by
- * integration"**, and `git push --dry-run` does not run the receive hooks that
- * enforce protection, so neither tells you in advance. So the push is ATTEMPTED
- * and its rejection is handled:
- *
- * - **`pushed`** — the claim is on the default branch and every session sees it.
+ * - **`pushed`** — the claim is on the default branch and every session sees
+ *   it. Exit 0.
  * - **`already-claimed`** — somebody else holds it. Nothing is written; the
- *   holder is named. This is a success for the caller's purposes: the question
- *   "may I take this" was answered.
- * - **`fell-back`** — the push was rejected (protection, permissions). The claim
- *   is NOT on the default branch; the caller is told to claim on its branch and
- *   open a PR early, and told exactly why. Exit 3, so a script can branch on it.
- * - **`unknown`** — the default branch could not even be read. Exit 2. Never
- *   rendered as "the bean is free", because that reading is what produces the
- *   duplicate this module exists to prevent.
+ *   holder is named. Exit 0: the question "may I take this" was answered.
+ * - **`held-unknown`** — the branch was read, but who holds the bean could
+ *   not be determined. Exit 4.
+ * - **`fell-back`** — the push was rejected (protection, permissions). The
+ *   claim is NOT on the default branch; the caller is told to claim on its
+ *   branch and open a PR early. Exit 3.
+ * - **`unknown`** — the default branch could not be read. Exit 2. Never
+ *   rendered as "the bean is free".
  *
- * A non-fast-forward is NOT a failure: another claim landed while this one was
- * being built, which is the expected race. It re-reads the branch and retries,
- * because the second attempt may discover the bean is now claimed by that other
- * session — which is the correct answer, not a conflict to force past.
+ * Other exits: 5 when run from a checkout other than the one doing the work
+ * (override with `--any-branch`), 64 on a usage error.
  *
- * ## The claim then joins YOUR branch's history (bean `24fa`, owner option 1)
+ * A non-fast-forward is the expected race, not a failure: it re-reads the
+ * branch and retries, and may then find the bean claimed.
  *
- * A claim that lives only on the default branch conflicts with the branch that
- * made it: the branch edits the same bean next (works it, completes it), and
- * both sides diverge from a merge base that predates the claim — `updated_at`
- * always, the end of the body usually. Copying the claim's TEXT onto the branch
- * (`mirrorClaimNote`) was not enough: measured on #2344, the copy was byte-
- * identical and the bean still conflicted on both. And a conflicted PR gets no
- * CI at all, so it can never turn green (#2376: seven PRs at once).
- *
- * So after a successful push the claim COMMIT is brought into the caller's
- * branch ({@link joinClaim}): a fast-forward when the branch has no commits of
- * its own yet (the usual case — claim before work), otherwise a merge commit.
- * The claim is then part of the branch's merge base and later edits merge
- * cleanly. When it cannot be done safely — a detached checkout, local edits in
- * the way, or a merge that would conflict — nothing is left half-done: the merge
- * is aborted, the old text mirror is applied instead, and the outcome says so.
+ * After a successful push the claim COMMIT joins the caller's branch
+ * ({@link joinClaim}): a fast-forward when the branch has no commits of its
+ * own yet, otherwise a merge commit, so later edits to the bean merge cleanly.
+ * When that cannot be done safely (a detached checkout, local edits in the
+ * way, or a conflicting merge) the merge is aborted, the claim's text is
+ * mirrored instead (`mirrorClaimNote`), and the outcome says so.
  *
  * Usage:
  * ```sh
  * bun run cat-harness-tools/scripts/claim-bean.ts <bean-id>            # claim on the default branch
  * bun run cat-harness-tools/scripts/claim-bean.ts <bean-id> --dry-run  # say what would happen
  * ```
+ * `--repo <folio>` names the store (default: the current directory's checkout).
  *
  * @module scripts/claim-bean
  */

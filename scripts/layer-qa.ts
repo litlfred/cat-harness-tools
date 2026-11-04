@@ -1,19 +1,12 @@
 /**
  * A MOUNTED layer's QA results, read from that layer's OWN store at the
- * commit the index pins (bean `folio-assistant-7mwa`; owner, 2026-11-03,
- * "2. Each layer publishes").
- *
- * ## Why this exists
+ * commit the index pins.
  *
  * Every layer declares its `qa` directory with
  * `storage: { branch: "cat/cat-harness/qa-reports", keyedBy: "commit" }`: the
  * results are computed, never committed, and kept on that branch of the
- * layer's own repository, keyed by the layer's commit. A layer's QA is that
- * repository's to write (bean `nn8e`, `kg-audit-all.ts`). The index used to
- * find a layer's sidecars only because the layer still committed them; once
- * the content layers stopped (`7mwa`), the index's
- * own store held cat-harness's sidecars alone and every reader of a nested
- * instance's QA read nothing (folio-assistant re-pin train 20261103-0041).
+ * layer's own repository, keyed by the layer's commit; a layer's QA is that
+ * repository's to write.
  *
  * The layer publishes with the reusable workflow
  * `.github/workflows/layer-qa-publish.yml`; this module is the reading half.

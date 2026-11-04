@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
 /**
- * Build a KG slice as ONE SQLite file a browser opens without parsing it.
- * Bean `q8ar` (late materialization). Owner ruling 2026-10-03: use the official
- * SQLite WASM build with an OPFS VFS.
+ * Build a KG slice as ONE SQLite file a browser opens without parsing it,
+ * using the official SQLite WASM build with an OPFS VFS.
  *
  * The contract is `skills/kg/kg-core/kg-export.md` §"Per-slice SQLite — a
  * named subgraph as one file a browser mounts". The browser half is
@@ -18,7 +17,7 @@
  * payloads live, how the search page shows a result, and a `load` that turns
  * the source into rows. The engine — build, `VACUUM INTO`, digest, manifest,
  * `--check` — knows nothing about any slice. Adding a slice is adding a
- * definition, never copying this file.
+ * definition.
  *
  * | slice | source | heavy field → payload |
  * |---|---|---|
@@ -30,7 +29,7 @@
  * ## What it writes
  *
  * - `<out>/<slice>.<sha256>.sqlite3`: the skeleton — rows, edges, a
- *   contentless FTS5 — at a CONTENT-ADDRESSED name (bean `wixl`, below).
+ *   contentless FTS5 — at a CONTENT-ADDRESSED name.
  * - `<out>/<slice>.sqlite3.json`: the manifest (`folio-slice-sqlite/v1`), at a
  *   FIXED name. Its `file` names the database; it carries the file's `sha256`
  *   and `bytes`, which the client verifies the download against and keys its
@@ -40,62 +39,35 @@
  * - `<out>/index.json`: the list of slices in `<out>`, for the search page.
  * - With `--payload-out <dir>`: every deploy-written payload of the slices
  *   built, at `<dir>/<hex>` plus its `<hex>.json` sidecar, written by
- *   `gen-subgraph-jsonld`'s own `renderPayloadFiles` — not a second writer.
+ *   `gen-subgraph-jsonld`'s own `renderPayloadFiles`.
  *
- * ## The database is content-addressed; the manifest is not (bean `wixl`)
+ * ## The database is content-addressed; the manifest is not
  *
- * Until 2026-10-03 the database sat at `<slice>.sqlite3`, one path across
- * builds. Behind a CDN with any TTL a client could get a FRESH manifest and a
- * STALE database, fail the sha256 check, and fall back: correct, but a search
- * that does not open. Naming the file by its sha256 removes the pair that can
- * disagree. A fresh manifest names a file no cache has seen; a stale manifest
- * names an older file whose bytes still hash to what that manifest promises.
- * Either way the client gets a self-consistent pair, or a 404 it reports.
+ * Behind a CDN, a fixed database name lets a client get a fresh manifest and
+ * a stale database. Named by its sha256, a manifest always names bytes that
+ * hash to what it promises, or a 404 the client reports.
  *
- * **The scheme is `assets/slices/<slice>.<full sha256 hex>.sqlite3`, not
- * `payload/sha256/<hex>`.** Weighed against `kg-export` §"Payloads":
+ * The scheme is `assets/slices/<slice>.<full sha256 hex>.sqlite3`, not
+ * `payload/sha256/<hex>`: a slice database is derived, SQLite-version
+ * dependent and linked from no node, so the payload orphan audit
+ * (`auditPayloadTree`) would reject it. `file` stays a SIBLING name resolved
+ * against the manifest's URL, and the FULL hex lets a reader check the name
+ * against `sha256`. Like a payload it is **immutable, not kept forever**.
  *
- * - A payload is the MUSCLE: a node's heavy body, "the source file verbatim",
- *   linked from a node's `payload` and admitted by an orphan audit only while
- *   something links to it. A slice database is the SKELETON in a second
- *   encoding — derived, SQLite-version dependent, and linked from no node. In
- *   `payload/sha256/` it would be an orphan by that contract's own rule (the
- *   deploy audit, `auditPayloadTree`, admits referenced payloads only), and it
- *   would need a `<hex>.json` sidecar to carry a media type its extension
- *   already says.
- * - Beside its manifest, `file` stays a SIBLING name the client resolves
- *   against the manifest's URL, so the client's resolution did not change and
- *   the directory still says which slice a file is.
- * - The FULL hex, not a prefix, for the payload contract's own reason: the
- *   name's hash segment IS `sha256` by construction, so a reader (and the
- *   client) can check one against the other. A prefix would be a weaker claim
- *   to save ~50 bytes.
- *
- * What the scheme borrows from the payload contract is the property that
- * matters: **immutable, not kept forever.** The bytes at a name never change;
- * a name stops resolving once a build no longer writes it.
- *
- * **The manifest stays at the fixed `<slice>.sqlite3.json`**, because it is the
- * one file that says which build is current, and the page has to find it by
- * slice name. It must be served with a SHORT TTL. The client fetches it with
- * `no-store`, which bypasses the BROWSER cache only; a CDN in front of the
- * site keeps it for the host's TTL (GitHub Pages sends `max-age=600`, and a
- * repository cannot change it). That is now an availability bound, not a
- * correctness one: a manifest up to one TTL old names a file that is either
- * still cached beside it, or gone and reported as a 404.
+ * **The manifest stays at the fixed `<slice>.sqlite3.json`**, so the page
+ * finds it by slice name. It must be served with a SHORT TTL. The client
+ * fetches it with `no-store`, which bypasses the BROWSER cache only; a CDN
+ * keeps it for the host's TTL, which bounds availability, not correctness.
  *
  * **Rotation.** A build writes ONLY the current file, and removes any other
  * `<slice>.<hex>.sqlite3` (and the legacy `<slice>.sqlite3`) of the SAME slice
  * from `--out` — {@link rotateSliceFiles}. `--out` is a build directory this
- * tool owns (`_site/assets/slices/` at deploy; a gitignored one locally), so
- * this is a build output replacing itself, not a durable artefact removed.
+ * tool owns (`_site/assets/slices/` at deploy; a gitignored one locally).
  *
  * ## Bodies are payloads, not columns
  *
- * Measured 2026-10-03 over 717 beans, one 4096-byte page per `VACUUM INTO`:
- * bodies stored with an external-content FTS5 gave 7,847,936 bytes; no bodies
- * with a contentless full-detail FTS5 gave 2,637,824. So every slice's FTS5 is
- * CONTENTLESS (`content=''`): it indexes the text without storing it, and keeps
+ * Every slice's FTS5 is CONTENTLESS (`content=''`), which keeps the file a
+ * fraction of the size: it indexes the text without storing it, and keeps
  * full detail, because positions are what make a phrase query work. A row
  * carries `payload_sha256`; the client fetches `<site>/payload/sha256/<hex>`
  * when a result is opened.
@@ -111,11 +83,9 @@
  *
  * ## Neither the binaries nor their deploy payloads are committed
  *
- * Every session writes `beans/`, and the other three sources are regenerated
- * by their own generators on most merges, so a committed binary would be stale
- * against a merge ref and would grow the clone on every edit. The deploy
- * (`docs-site.yml`, `feature-staging.yml`) builds every slice from the tree it
- * publishes, straight into `_site/`.
+ * Their sources change on most merges, so a committed binary would go stale.
+ * The deploy (`docs-site.yml`, `feature-staging.yml`) builds every slice from
+ * the tree it publishes, straight into `_site/`.
  *
  * What `--check` gates, per slice:
  *

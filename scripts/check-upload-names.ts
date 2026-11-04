@@ -5,54 +5,19 @@
  * @module scripts/check-upload-names
  * @covers uploads, library
  *
- * ## Why — a name broke `main`
+ * A raw name such as `PIIS2589750021000388 (2).pdf` breaks a Markdown link
+ * (the target ends at the first `)`). `linkTarget` in
+ * `bootstrap-tools/scripts/subgraph-readmes.ts` percent-encodes generated
+ * links; this check makes the NAME safe, so it also holds for a shell, an
+ * `href`, a CI log line and any other generator.
  *
- * `uploads/PIIS2589750021000388 (2).pdf` is a browser's duplicate-download
- * suffix, ingested verbatim. The generated README row for it reads
- *
- *     | [`PIIS2589750021000388 (2).pdf`](PIIS2589750021000388 (2).pdf) | a file | |
- *
- * and a Markdown link target ENDS AT THE FIRST `)`, so the link resolves to
- * `PIIS2589750021000388 (2` — a path that does not exist. `readme:links` fails,
- * which is a `Repository gates` step, and so does *"over the real tree, every
- * link in every generated README resolves"*. **Main was red on this**, from an
- * upload rather than from any code.
- *
- * ## Why the name AS WELL AS the link — both layers exist, on purpose
- *
- * The escaping half landed on `main` the same day from a sibling session
- * (#1639): `linkTarget` in `bootstrap-tools/scripts/subgraph-readmes.ts`
- * percent-encodes every segment of a destination, and `decodeLinkTarget` in
- * `check-subgraphs.ts` decodes before asking the filesystem. **That is what
- * keeps `main` green, and this check does not replace it.**
- *
- * The two reach different things. The encoder is total over what that ONE
- * generator writes. This is total over the NAME, so it also holds for a shell,
- * an `href`, a CI log line, and the next generator nobody has written yet — the
- * places the encoder is not. Measured after both landed: `uploads/README.md`
- * contains zero percent-escapes, because the encoder is a no-op once the names
- * are safe.
- *
- * So the reason is reach, not effort. The owner ruled it 2026-09-30: *"rename
- * files to normalize to stubs and downstream us is OK"*.
- *
- * ## The extension chain is preserved, and that is the whole risk
- *
- * `slugify` from `init-folio.ts` maps every non-alphanumeric run to `-`, so
- * applied to a whole filename it destroys the extension:
- * `…(2).pdf` → `…-2-pdf`. This slugs the STEM only.
- *
- * And `.extraction.json` is a SIDECAR suffix, not an extension: `X.pdf` pairs
- * with `X.pdf.extraction.json`. Renaming the source without its sidecar
- * orphans an extraction; renaming the sidecar by a different rule than its
- * source does the same. So the sidecar suffix is stripped first, the remaining
- * name normalised by the one rule, and the suffix put back — which makes the
- * pair move together by construction rather than by care. Measured before this
- * shipped: 10 pairs, 0 orphans.
+ * The stem only is slugged (`slugify` from `init-folio.ts` applied to a whole
+ * filename would destroy the extension). `.extraction.json` is a SIDECAR
+ * suffix: it is stripped first, the name normalised, and the suffix put back,
+ * so `X.pdf` and `X.pdf.extraction.json` move together.
  *
  * `--fix` moves with `git mv`, so history follows the file. It **refuses**
- * rather than renaming when two files would normalise to one name: picking a
- * winner there silently destroys an upload.
+ * rather than renaming when two files would normalise to one name.
  *
  * Exit codes: 0 report only, or `--check` with every name normalised · 1
  * `--check` with a finding, or `--fix` refusing a collision · 2 could not

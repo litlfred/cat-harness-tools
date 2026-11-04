@@ -5,30 +5,23 @@
  * @module scripts/post-merge-regen
  * @graphNode none — SDLC maintenance and repair automation
  *
- * ## The failure this exists for (bean `folio-assistant-ey1c`)
- *
  * `.github/workflows/merge-main.yml` runs `bun run cat merge:main` on an opted-in
- * PR branch when `main` moves, resolving declared conflicts and regenerating. But
- * after a PR merges into `main`, nothing regenerates `main`.
- *
- * Any merge changing an enumerated or counted directory can leave `main` red
- * (e.g. `readme:subgraphs:check` step 65 counting files in `uploads/`).
- *
- * The accidental-repair pattern: PR branches that happen to carry regenerated
- * files incidentally repair `main`, creating untrustworthy gate histories
- * (observed 3 times in 2 hours on 2026-10-03).
+ * PR branch when `main` moves, but nothing regenerates `main` after a PR
+ * merges into it, so a merge that changes an enumerated or counted directory
+ * can leave `main` red (e.g. `readme:subgraphs:check` counting files in
+ * `uploads/`). This detects that and opens a repair.
  *
  * ## Principles
  *
  * 1. Detected and ACTED on: main going stale on a derived artefact is detected
  *    and an automated repair action is generated.
- * 2. Reviewable PR, never direct push to main: the repair is a PR rather than a
- *    push to main, so it is reviewable and cannot bypass CI gates.
+ * 2. Reviewable PR, never direct push to main, so the repair cannot bypass CI
+ *    gates.
  * 3. NEGATIVE CONTROL: a merge that changes nothing counted triggers 0 repairs
- *    and opens NO repair PR, preventing churn.
+ *    and opens NO repair PR.
  * 4. Honest reporting: if a check has no writer or its writer fails, it is
  *    reported as unrepaired/defect (exit 1), not claimed as a repair.
- * 5. A `builtAtPublish` output is never stale (bean `folio-assistant-p7mb`):
+ * 5. A `builtAtPublish` output is never stale:
  *    a check whose writer moved only paths an instance declares it builds at
  *    publish is reported in `builtAtPublishChecks`, not as stale or repaired.
  *    Those paths are gitignored, so no repair of them could ever land.

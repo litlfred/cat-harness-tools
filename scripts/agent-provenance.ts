@@ -2,8 +2,8 @@
 /**
  * Agent Provenance Detection
  *
- * Implements provenance detection for merge gate review requirement
- * (bean `folio-assistant-w8jq`, proposal `merge-gate-2026-10-02.md` §5.2).
+ * Detects whether a PR is agent-authored, which makes the merge gate require
+ * an adversarial review.
  *
  * Signals inspected:
  * 1. `Co-Authored-By: Claude...` or other agent trailers, or `Claude-Session:` / `Agent-Session:` trailers on any commit in base..head.

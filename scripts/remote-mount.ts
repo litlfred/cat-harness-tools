@@ -10,7 +10,7 @@
  * mount that claimed their coverage would let them be removed unnoticed (the
  * reasoning `state-mount.ts` records for the branch mounts).
  *
- * Bean `0mpw`. Schema and the owner's rulings: `schemas/kg/remote-mount.ts`.
+ * Schema: `schemas/kg/remote-mount.ts`.
  *
  *   bun run cat mount:remote              # plan, fetch, mount, write the lock, re-render the agent surface if it changed
  *   bun run cat mount:remote --plan       # resolve the closure and print it; write nothing
@@ -20,9 +20,9 @@
  *   echo "<where they said yes>" | bun run cat mount:remote --seed <name>=<owner/repo>@<sha> --consent-by <who> [--whole]
  *                                          # create or re-pin a remote instance in index.config.json, WITH its consent
  *   bun run cat mount:remote --choose <harness>[:<instance>] [--directories a,b] [--tools x,y]
- *                                          # write a review's choice into overrides.<instance>, so a fresh clone replays it (bean mo75)
+ *                                          # write a review's choice into overrides.<instance>, so a fresh clone replays it
  *   bun run cat mount:repin:standing [--dry-run]
- *                                          # re-pin every instance a STANDING consent covers (repin-standing.ts, #401)
+ *                                          # re-pin every instance a STANDING consent covers (repin-standing.ts)
  *
  * `state:mount` runs the mount after the branch mounts, so the session-start
  * hook needs no second entry point.
@@ -33,13 +33,11 @@
  * harness's declaration is read FROM THAT TREE; each name in its `needs` is
  * looked for in the same tree (an instance whose `<name>.json` agrees with its
  * own `name`), and failing that as a GITLINK at that tree — a submodule entry
- * is itself a pin, so `cat-harness`'s `needs: ["bootstrap"]` at a pinned
- * folio-assistant commit names `litlfred/bootstrap` at the gitlink's SHA, with
- * no submodule in the downstream. A need found in neither is `missing`, never
- * dropped. A need the downstream already holds as a local instance is
- * `local` — supplied, not mounted over.
+ * is itself a pin. A need found in neither is `missing`, never dropped. A
+ * need the downstream already holds as a local instance is `local` —
+ * supplied, not mounted over.
  *
- * ## Three states, never two (bean `1xhc`)
+ * ## Three states, never two
  *
  * Every instance comes back `mounted`, `missing` or `could-not-determine`. A
  * fetch that failed is the third, not an empty layer; a lock that cannot be
@@ -49,19 +47,13 @@
  *
  * ## A changed lock re-renders the agent surface
  *
- * A mount is not done when the bytes are on disk. A newly pinned layer can
- * bring new skills, renamed skills and new agent-memory entries, and what an
- * agent actually reads is the GENERATED surface: `.claude/commands/` (from
- * the skills, `skill:commands`) and `.claude/agent-memory/` plus the
- * `.agents/` copies (from the memory nodes, `agent-memory`). Left to a
- * separate, remembered step, a re-pin commit ships the new layer with the old
- * surface; that is how folio-assistant#2526 went red on three agent-memory
- * tests. So when this run CHANGES the lock, it runs both generators from the
- * checkout root before exiting, and a generator that fails fails the run.
- * `--no-agent-surface` skips it; `--check`, `--plan` and `--staging` never
- * run it. Owner, 2026-10-10: *"that should be a part of process/skills/tools
- * when a new/updated subgraph is mounted... it may have new agentic skills to
- * re-render and add. same for memory."*
+ * A newly pinned layer can bring new or renamed skills and agent-memory
+ * entries, and an agent reads the GENERATED surface: `.claude/commands/`
+ * (`skill:commands`) and `.claude/agent-memory/` plus the `.agents/` copies
+ * (`agent-memory`). So when this run CHANGES the lock, it runs both
+ * generators from the checkout root before exiting, and a generator that
+ * fails fails the run. `--no-agent-surface` skips it; `--check`, `--plan` and
+ * `--staging` never run it.
  *
  * ## A mount is runnable, and an install does not make it modified
  *
@@ -70,17 +62,17 @@
  * keeps devDependencies, `--no-install` skips it). `node_modules/` is outside
  * every mount digest and the lockfile is put back byte-for-byte, so `--check`
  * still passes over an installed mount and a re-mount does not refuse it.
- * Why that route and not a root-level workspace: `installDependencies` in
- * `mount-from-lock.ts` (task #10, gap b).
+ * Why not a root-level workspace: `installDependencies` in
+ * `mount-from-lock.ts`.
  *
  * ## Seeding writes consent
  *
  * `--seed <name>=<owner/repo>@<sha> --consent-by <who> --evidence "<…>"`
  * creates or re-pins a remote instance in `index.config.json` and writes its
- * `trust.consent` bound to that pin in the same write (task #10, gap c), so a
- * pin and its consent cannot be committed apart.
+ * `trust.consent` bound to that pin in the same write, so a pin and its
+ * consent cannot be committed apart.
  *
- * ## Hydrated: metadata, no files (bean `mo75` G2)
+ * ## Hydrated: metadata, no files
  *
  * `hydrated: true` on a mount entry (every instance it reaches) or on
  * `overrides.<instance>` (that one; `false` opts back out) lays each chosen
@@ -88,9 +80,9 @@
  * the pin from where the instance publishes it,
  * `<docs>/subgraph/<HARNESS>/<path>/` (`publishedSubgraphDir`), and checked
  * against `SubgraphHydratedSchema` and the IRI it must declare before it
- * lands: the same contract `kg:materialize`'s metadata mode holds a subscription's
- * metadata to (bean `c1m4`). Each such directory's per-directory answer is a
- * `kind: "hydrated"` `SubgraphSource` naming this Tool (bean `l4ay`, `j9cs`).
+ * lands, as `kg:materialize`'s metadata mode does. Each such directory's
+ * per-directory answer is a `kind: "hydrated"` `SubgraphSource` naming this
+ * Tool.
  *
  * Which directories: `directories` as for a file mount when it is given, and
  * then a named subgraph the pin does not publish is `missing`. Absent, every
@@ -99,23 +91,18 @@
  * never an empty "mounted". No `<name>.json` is laid down and the lock marks
  * the instance `hydrated` (`schemas/kg/remote-mount.ts` says why).
  *
- * Absent, it is NOT `mountDefaults.directories`, on purpose. That list is the
- * harness's answer to "which FILES does a downstream want unless it says
- * otherwise"; a hydrated mount asks the question before that one — what is
- * there to choose from — and is the "hydrated metadata first" half of bean
- * `mo75` ("…then a chosen set"). Narrowing the metadata to the file default
- * would hide exactly the subgraphs a reader is deciding whether to add, and
- * costs nothing to show: each is one file of descriptions, not code.
+ * Absent, it is NOT `mountDefaults.directories`: that list answers which
+ * FILES a downstream wants, while a hydrated mount shows everything there is
+ * to choose from, at the cost of one file of descriptions per subgraph.
  *
- * ## Named ids: declared, or declared FROM WITHIN (bean `mo75` G3)
+ * ## Named ids: declared, or declared FROM WITHIN
  *
  * An id in `overrides.<instance>.directories` or `mountDefaults.directories`
  * is looked up in the instance's `<name>.json` first, and — only when it is
  * not there — among the directories it declares from within one of its own
- * (`skills/skills.json` naming `voices/`, beans `cmsl`, `1g4s`), resolved at
- * the pin by `upstream-directories.ts` through cat-harness's
- * `instanceDirectories`: the resolver bean `2j2r` moved every on-disk reader
- * to, so a remote plan and a local one agree on what an id names. A nested id
+ * (`skills/skills.json` naming `voices/`), resolved at the pin by
+ * `upstream-directories.ts` through cat-harness's `instanceDirectories`, so a
+ * remote plan and a local one agree on what an id names. A nested id
  * mounts its own path (`skills/voices/` alone, or its published hydrated
  * file); naming it beside its parent mounts nothing twice that the digest
  * would count differently, since every digest is taken after every copy. The
@@ -123,7 +110,7 @@
  * holds what is declared within it — its files, or, hydrated, its nested
  * subgraphs inline (`hasSubgraph`).
  *
- * ## Concern names (bean `mo75`)
+ * ## Concern names
  *
  * An id that is neither, but is a concern group's code (`sdlc`, `kg`, `ui`
  * …, from `code-lists/concern-group.json`), names that concern across kinds:
@@ -134,7 +121,7 @@
  * member is locked under the id `<directory id>/<code>`. A code no kind of
  * the instance declares is refused like any other unknown id.
  *
- * ## Tools: chosen by id, mounted runnable (bean `mo75` G3)
+ * ## Tools: chosen by id, mounted runnable
  *
  * `overrides.<instance>.tools` names Tools that instance declares. Each is
  * brought RUNNABLE — its definition, its implementation and their import
@@ -142,11 +129,11 @@
  * `tools` named anywhere in an entry, that entry's instances mount those
  * directories (plus any their override names) instead of their default list.
  * A `whole` instance stays whole. An instance of ANOTHER entry the closure
- * reaches shrinks too, to the directories the closures need from it (owner,
- * 2026-10-29, option B: "every touched entry"), unless its own entry mounts
- * it whole or names its `directories`: then that list stands, and must
- * already bring what the closure needs. The owner's rulings and why each is so are
- * in `tool-closure.ts`, which computes it; this file only plans with it:
+ * reaches shrinks too, to the directories the closures need from it, unless
+ * its own entry mounts it whole or names its `directories`: then that list
+ * stands, and must already bring what the closure needs. The rules and why
+ * each is so are in `tool-closure.ts`, which computes it; this file only
+ * plans with it:
  *
  * - each chosen Tool's `invoke` is read from the declaring instance's
  *   published `tools` metadata (`index.hydrated.jsonld`) at the pin — the
@@ -157,13 +144,12 @@
  *   an import that names nothing, a closure file in no declared directory)
  *   makes the declaring instance `missing` (`could-not-determine` when a
  *   fetch failed) and every instance of its entry unmounted with it: a
- *   half-brought Tool is the state the rulings exist to prevent.
+ *   half-brought Tool is never mounted.
  *
  * ## It never discards work
  *
  * A mounted directory whose bytes no longer hash to the lock is left exactly
- * as it is and reported, never re-fetched over: somebody edited it, and those
- * edits are theirs to move upstream or drop. `--fresh` is the one explicit
+ * as it is and reported, never re-fetched over. `--fresh` is the one explicit
  * exception, for a build that writes into its own mounts and wants them laid
  * down again: it replaces an edited mount as if it were current, still only
  * what the lock says this mount put there, never tracked bytes or a

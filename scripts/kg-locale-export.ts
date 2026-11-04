@@ -5,99 +5,54 @@
  * @module scripts/kg-locale-export
  * @covers cat-harness
  *
- * Owner, 2026-09-21: *"we should also build the json/jsonld for the rendered
- * result of the translations. no reason that is english only"*. Bean `jmpb`.
+ * Translations reach the data, not only the rendered diagrams: one document
+ * per locale.
  *
- * `kg-export.ts` contained ONE occurrence of the string `locale`. A `.po` was
- * injected into a diagram and an SVG rendered per locale, but the graph a
- * machine consumes was produced once, in the language the assets were authored
- * in — so every translated string this repository holds was invisible to
- * anything reading the data rather than the picture.
+ * ## One document per locale, and the arrow runs ONE WAY
  *
- * ## Two rulings, and the second is the one that would have been got wrong
- *
- * **One document per locale.** Not language maps, not `@language` in the
- * published `@context`. Per-locale files are simple to serve and cacheable;
- * language maps are native JSON-LD but would need a binding added to the
- * context, and this repository has already paid for a prefix bound in the
- * context and emitted by nothing (`fd6i`, where `skos:` sat declared and
- * unused while prose claimed the graph spoke eight vocabularies).
- *
- * **THE CORE GRAPH MUST NOT REFERENCE ITS TRANSLATIONS.** The obvious
- * implementation hangs a `hasTranslation` / `availableLocales` / `seeAlso` off
- * each node. Refused: the core would then carry an edge per locale per node,
- * growing with the translation effort, and bootstrap's graph would gain
- * references to artefacts it does not own and cannot validate.
- *
- * So the arrow runs ONE WAY — a per-locale document references the core, never
- * the reverse, and the core is complete with no translation existing. Same
- * relation `board-diagram-interchange` states for a board and its folio. What
- * discovers the translations instead is the filesystem, exactly as the
- * language bar already does. **`localeDocumentsUnreferenced` is what makes
- * that checked rather than intended.**
+ * Per-locale files rather than language maps in the published `@context`:
+ * simple to serve, cacheable, and no new context binding. **THE CORE GRAPH
+ * MUST NOT REFERENCE ITS TRANSLATIONS**: no `hasTranslation` /
+ * `availableLocales` / `seeAlso` per node, which would grow with the
+ * translation effort and give bootstrap's graph references it cannot validate.
+ * A per-locale document references the core, never the reverse, and the core
+ * is complete with no translation existing (the relation
+ * `board-diagram-interchange` states for a board and its folio). The
+ * filesystem discovers the translations, as the language bar does;
+ * **`localeDocumentsUnreferenced`** checks it.
  *
  * ## A catalogue is scoped to the ASSET it was extracted from
  *
- * The first version read every `.po` under a locale and translated any string
- * the merged map carried. Run against the real corpus it reported *"1
- * applicable msgid, 40 substitutions"* in three locales — and the msgid was
- * **`"yes"` → `"oui"`, from `index.po`, a docs page.** The 40 hits were
- * `name` on BPMN sequence flows: a gateway's `yes`/`no` branch labels.
+ * A `.po` is read only when its stem is the stem of an asset this graph
+ * PROJECTS (a `.bpmn` this instance owns), so a docs page's translation (e.g.
+ * `"yes"` in a table) is never applied to a diagram's gateway label. That is
+ * provenance, not a path, so it survives a layout move.
  *
- * `oui` is the right French for that label, which is exactly why the defect is
- * worth naming: the result LOOKED right. What was wrong is the provenance —
- * a translation authored for a table cell in `docs/index.md` was applied to
- * the knowledge graph, and the report then said diagram translation was under
- * way in three locales while **no diagram catalogue exists in any of them**.
- *
- * So a `.po` is read only when its stem is the stem of an asset this graph
- * PROJECTS — today, a `.bpmn` this instance owns. That is provenance, not a
- * path: hardcoding `workflows/` would break the day the layout moves, and
- * `check:declared-paths` would be right to flag it.
- *
- * Residual and accepted: a msgid from diagram A applies to an identical string
- * on a node from diagram B. That is not a new assumption — `kg-export`
- * already DEDUPES lane-derived `Role` nodes by lane name across every diagram,
- * so one English phrase meaning one thing corpus-wide is the existing model.
+ * A msgid from diagram A applies to an identical string on a node from
+ * diagram B — the model `kg-export` already uses when it dedupes lane-derived
+ * `Role` nodes by name.
  *
  * Identity-bearing keys are excluded on top of that ({@link IDENTITY_KEYS}),
  * because a `@id`, a `notation` or a `sourceKind` colliding with a msgid would
- * be rewritten into something no link resolves to. A blocklist of what must
- * never move, not an allowlist of what may: an allowlist is a second answer to
- * "what did the extractor extract", stale the first time a node kind gains a
- * field.
+ * be rewritten into something no link resolves to. It is a blocklist of what
+ * must never move, so a new node field needs no list update.
  *
  * ## Fall-through, and why the language tag is per VALUE
  *
- * `parsePo` takes only non-empty `msgstr` and skips fuzzy entries, *"to avoid
- * injecting uncertain translations"* — so an untranslated string is absent
- * from the map and the source survives. That is already the behaviour
- * everywhere translation happens here, and a second answer in the data would
- * mean a string that falls through in a rendered diagram and vanishes in the
- * graph describing the same diagram.
+ * `parsePo` takes only non-empty `msgstr` and skips fuzzy entries, so an
+ * untranslated string is absent from the map and the source survives, as
+ * everywhere else translation happens here. A blanket `"@language": "fr"` on
+ * the document would assert French over every fall-through, so a translated
+ * value carries `{"@value", "@language"}` and a fall-through stays a plain
+ * string under the document's declared source language: fall-through is
+ * visible IN THE DATA.
  *
- * Which is exactly why a blanket `"@language": "fr"` on the document is
- * **wrong**: it would assert French over every string that fell through. A
- * translated value carries `{"@value", "@language"}`; a fall-through stays a
- * plain string under the document's declared source language. Fall-through is
- * then visible IN THE DATA rather than inferable from a coverage number.
- *
- * ## Measured before building, and it changes what gets emitted
- *
- * 2026-09-22: **58 of the 62 `.pot` templates are BPMN diagrams, and none of
- * them has a `.po` in any of the five locales.** The `.po` files that exist
- * are docs pages, and `glossary.po` is not a translation at all — its own
- * header says so; it is terminology input for `translation-block-qa`.
- *
- * So the graph's translatable surface has ZERO translations today, and
- * `cat-harness.jsonld` is 2.0 MB. Emitting five byte-identical copies would
- * publish 10 MB to say nothing — `6tkl`, an artefact whose correctness cannot
- * be told from doing nothing.
+ * ## Which locales are emitted
  *
  * **A locale is emitted when it has at least one translation that applies to
- * this graph, and every locale is REPORTED either way** — so the zero is loud
- * rather than a missing file, which is the third-state rule. `--all-locales`
- * forces emission for the reading where a consumer would rather have a 0 %
+ * this graph, and every locale is REPORTED either way**, so a zero is loud
+ * rather than a missing file, and no byte-identical copies are published.
+ * `--all-locales` forces emission for a consumer that would rather have a 0 %
  * document than a 404.
  *
  * Usage:

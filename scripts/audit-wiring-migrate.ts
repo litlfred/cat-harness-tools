@@ -3,38 +3,34 @@
  * Migration: stamp ``auditOnly`` on every Python witness JSON whose
  * filename appears in any ``docs/audits/*.md`` report.
  *
- * The triage policy (see commit message for the original plan) introduces
- * a three-bucket model for ``folio-assistant/computations/*.witness.json``:
+ * Witnesses in ``folio-assistant/computations/*.witness.json`` fall into
+ * three buckets:
  *
  *   1. **wired**       — referenced by ``computation.witness`` in some
  *                        content block.
  *   2. **audit-only**  — declares ``"auditOnly": "docs/audits/<file>.md"``.
  *   3. **orphan**      — neither of the above; actionable.
  *
- * This script performs the one-pass migration described in step 3 of the
- * plan:
+ * This one-pass migration:
  *
  *   - Reads every ``docs/audits/*.md`` and grep-matches witness filenames
  *     (``<name>.witness.json``).
- *   - For each matched witness, opens the JSON and (if it does not
- *     already have an ``auditOnly`` field) inserts
+ *   - For each matched witness without an ``auditOnly`` field, inserts
  *     ``"auditOnly": "docs/audits/<file>.md"`` immediately after
- *     ``contentBlock`` (or at the end if neither exists).
+ *     ``contentBlock``, else before ``parameters`` / ``data`` /
+ *     ``caveats``, else at the end.
  *
- * The script is **idempotent**: re-running it on a stamped witness is a
- * no-op.  If a witness is referenced from more than one audit report,
- * the first match (lexicographic order of report filenames) wins, on
- * the principle that earlier audits are usually the canonical ones; the
- * stamp records the first audit that took ownership of the witness.
+ * It is **idempotent**: re-running it on a stamped witness is a no-op. A
+ * witness referenced from more than one audit report gets the first match
+ * (lexicographic order of report filenames).
  *
  * Usage
  * -----
  *   bun run cat-harness-tools/scripts/audit-wiring-migrate.ts          # apply (writes in place)
  *   bun run cat-harness-tools/scripts/audit-wiring-migrate.ts --dry    # preview only
  *
- * Pre-conditions: clean working tree (recommended).  The script does
- * not stage or commit; the operator commits the stamped witnesses in
- * one atomic batch.
+ * Pre-conditions: clean working tree (recommended). The script does not
+ * stage or commit.
  *
  * @module scripts/audit-wiring-migrate
  */

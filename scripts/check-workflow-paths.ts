@@ -3,175 +3,62 @@
  * TWO criteria over the same parse of `.github/workflows/`:
  *
  * 1. **Every script path a workflow invokes must RESOLVE** — from the
- *    directory the step actually runs in. Bean `52dz`, and the whole of the
- *    history below.
- * 2. **Every `working-directory` must EXIST.** Bean `ai9u`, and the section
- *    §"The second criterion" near the end of this comment.
+ *    directory the step actually runs in.
+ * 2. **Every `working-directory` must EXIST.**
  *
- * They are one module because the second is a by-product of the first's
- * parse — the cwd model criterion 1 needs is criterion 2's whole subject —
- * and separating them would mean two readers of the same YAML, free to
- * disagree about what a job's checkout layout is.
+ * One module, because the cwd model criterion 1 needs is criterion 2's whole
+ * subject.
  *
  * ## Criterion 1 — a path that does not resolve
  *
- * Bean `folio-assistant-52dz`. The #223 split moved the platform's scripts
- * under `cat-harness/`, and the workflows that name them without that prefix
- * kept naming them without it. Nothing caught this, for a reason worth
- * stating plainly: **a path that does not resolve is not a type error, not a
- * lint error, and not a test failure.** It is discovered when the step runs,
- * and a step that never runs never discovers it.
+ * A path that does not resolve is not a type, lint or test error; it is found
+ * only when the step runs, and a dispatch-only or rarely scheduled workflow
+ * may never run.
  *
- * Two classes were found the day this was written, and only the second is
- * the one people expect:
+ * The cwd is COMPUTED: the job's `defaults.run.working-directory`, then the
+ * step's own `working-directory`, then any `cd` earlier in the same `run:`
+ * block. So a bare `pipeline/build.ts` after `cd content` is judged from
+ * there.
  *
- * 1. **`workflow_dispatch`-only workflows nobody dispatches.** Eight of them,
- *    two with zero runs in their entire history. Broken since the split and
- *    structurally incapable of saying so — `check:ci-health` reads *runs*,
- *    and a workflow with no runs has nothing to be red.
- * 2. **SCHEDULED workflows that fire weekly and crash on line one.**
- *    `ci-health.yml` and `upstream-pins.yml`. These DID fail, visibly, every
- *    week — in a tab nobody opens. `ci-health.yml` is the workflow whose
- *    whole purpose is catching workflows that fail where nobody looks
- *    (`xom7`), so it had been failing at its own job, at its own job.
+ * Where the tree is matters too: `actions/checkout` with a `path:` puts it
+ * below the workspace root, which then holds nothing, so a path resolves only
+ * under a checkout that is there. A checkout at another `ref:` (e.g.
+ * `gh-pages`) is not the HEAD tree, so a path under it is
+ * {@link Verdict.Undetermined}.
  *
- * ## Why this reads the working directory rather than just the path
+ * Not visible here: `bun run cat check:l1-complete` is an npm script NAME, so
+ * {@link invokedPath} declines it (naming the script is the recommended fix).
+ * That moves the risk into the script's own root resolution, guarded only by
+ * each script refusing its own empty corpus.
  *
- * An unprefixed path is not automatically wrong. A step that sets
- * `working-directory: cat-harness`, or opens its `run:` block with
- * `cd content`, is correct with a bare `pipeline/build.ts`. Checking the
- * spelling alone would report those as broken and train a reader to skim
- * past this check's output — which is worse than not having it, because a
- * check nobody reads still costs a CI minute and still looks like coverage.
+ * When a `cd` names something not resolvable statically (a shell variable, a
+ * glob, a command substitution), the invocation is
+ * {@link Verdict.Undetermined} and the run FAILS.
  *
- * So the cwd is COMPUTED: the job's `defaults.run.working-directory`, then
- * the step's own `working-directory`, then any `cd` earlier in the same
- * `run:` block. That is a real parse of the common cases, not a guess.
+ * Paths that name a *folio's* tree, absent from this repository, are declared
+ * in {@link FOLIO_PATHS} with a reason each; an entry matching nothing is
+ * itself a failure.
  *
- * ## The fourth input, and why three were not enough (bean `7iog`)
+ * ## Criterion 2 — `working-directory` must exist
  *
- * A cwd is only half an answer. The other half is **where the tree is** —
- * `actions/checkout` with a `path:` puts it somewhere other than the
- * workspace root, and then the root holds NOTHING.
+ * A step whose `working-directory` is missing fails every time, whatever it
+ * runs (including steps that invoke no script path). Differences from
+ * criterion 1, each with its reason at the code: `cd` targets are excluded
+ * (a `cd` may target what the block just created); a checkout at another
+ * `ref:` **resolves** at its root here; and a workflow-level default is ONE
+ * finding however many jobs inherit it, folded only when the verdict is
+ * identical.
  *
- * The first version collected those prefixes and used them only to *strip*,
- * which made the check strictly more permissive: a path under a checkout
- * resolved, and a path that was not under one resolved too, because it fell
- * through to the repository. So `feature-staging.yml`'s `cleanup` job — which
- * checks out to `source/` — ran `bun run cat-harness-tools/scripts/backoff-sleep.ts`
- * from the workspace root and passed, while at run time that directory is
- * empty. `run:` blocks are `bash -e`, so the step aborted, and **the retry
- * loops those calls exist to provide never ran**: the first lost push race
- * ended the job. Three of the four were wrong this way and this check said
- * `✓ every workflow script path resolves` over all three.
- *
- * A checkout at another `ref:` is a third state again. `pages` holds
- * `gh-pages`: the directory is there and its contents are real, they are
- * simply not the tree a working copy of HEAD can read. Stripping that prefix
- * measured paths against the wrong commit, which is how the third broken call
- * kept passing after the other two were caught. It is now
- * {@link Verdict.Undetermined} — not a pass, per the rule below.
- *
- * ## What this check structurally CANNOT see, and where that exposure went
- *
- * `bun run cat check:l1-complete` is an npm script NAME, so {@link invokedPath}
- * declines it — deliberately, since naming the script instead of the path is
- * the fix this check recommends. Bean `a6kl` lives exactly there: the
- * workflow line was correct, and `check:l1-complete` resolved its own corpus
- * from `process.cwd()` (the repository root, which carries no declaration),
- * found nothing, and reported `nothing to check` over 1,402 files.
- *
- * So the recommended fix MOVES the risk rather than removing it: out of the
- * workflow, into the script's own root resolution. This module used to claim
- * that class had its own reader — `check:anchor-names` — and that "between
- * them the path is accounted for at both ends". **The second half was wrong,
- * and the sweep closing `a6kl` measured it.** Reintroducing the defect (the
- * four call sites in `check-l1-complete.ts` reverted to `resolve(".")`) leaves
- * `check:anchor-names` at exit 0, along with `check:command-paths`,
- * `check:partition`, `check:harness-dirs`, `check:declared-assets` and this
- * check. `check:anchor-names` audits anchor NAMES — `REPO_ROOT`,
- * `INSTANCE_ROOT`, `PLATFORM` — and those call sites pass an inline expression
- * under no named anchor, so it is structurally blind to them.
- *
- * What DOES catch it is the gate's own refusal: `checkAll` throws rather than
- * returning `[]`, so the reintroduced defect exits 2 saying *"This is NOT a
- * pass. Treat it as unknown."* That is the half of `a6kl`'s fix doing the
- * work — not the root resolution, which is why the distinction is recorded
- * here rather than left as two interchangeable bullet points.
- *
- * So: this check owns the workflow end. The script end is guarded by each
- * script refusing its own empty corpus, one script at a time, with no
- * cross-gate reader over that convention. Naming the gap is not closing it,
- * and a reader that pinned every corpus-walking gate non-empty is queued
- * rather than built.
- *
- * ## "Could not determine" is never green
- *
- * When a `cd` names something this module cannot resolve statically — a
- * shell variable, a glob, a command substitution — the invocation is
- * reported as {@link Verdict.Undetermined} and the run FAILS. This is the
- * house rule (`ci-health`, `health`, `kg:audit` all carry it) and it exists
- * because an unknown rendered as a pass is indistinguishable from a real
- * pass, while an unknown rendered as a failure merely costs somebody a
- * minute's reading.
- *
- * ## The folio allowlist
- *
- * Some paths are correct and still absent: they name a *folio's* tree, which
- * the platform repository does not carry. Those are declared in
- * {@link FOLIO_PATHS} with a reason each, the same shape as `STEP_EXEMPTIONS`
- * in `gates.ts` and for the same reason — a machine can then read what prose
- * asserted, and an exemption cannot outlive the step it exempts (an entry
- * matching nothing is itself a failure).
- *
- * ## The second criterion — `working-directory` must exist (bean `ai9u`)
- *
- * Criterion 1 reads `working-directory` to compute the frame a path resolves
- * against. It was INPUT there, and trusted: nothing asked whether the
- * directory was there. **Eight declarations across four workflows named
- * absent directories while this module printed `✓ every workflow script path
- * resolves`** — a gate that fires, passes, and is blind to the case, which is
- * `1xhc` one level up from the gate that never fires at all.
- *
- * Two causes compounded. The value was never a subject; and a step running
- * `npx typedoc` rather than a script path contributes NO invocation, so it
- * was never examined however broken it was. A step whose `working-directory`
- * is missing fails **every time, whatever it runs** — a stronger and cheaper
- * property than any path resolution here, and the one not checked.
- *
- * Three things about it that are NOT simply criterion 1 applied to the cwd,
- * each carrying its reason at the code: `cd` targets are excluded (GitHub
- * evaluates `working-directory` *before* the script runs, so it must
- * pre-exist, while a `cd` may target what the same block just created); a
- * checkout at another `ref:` **resolves** at its root here where the same
- * prefix is {@link Verdict.Undetermined} for a path, because the only
- * question for a cwd is whether the directory exists and `actions/checkout`
- * makes it; and a workflow-level default is ONE finding however many jobs
- * inherit it, folded only when the verdict is identical.
- *
- * Its allowlist is {@link FOLIO_WORKDIRS} — absent on purpose, always will
- * be. Separately, {@link workDirBaseline} is a RATCHET for the ones somebody
- * still owes an answer for; keeping the two apart is what stops an open
- * defect becoming accepted architecture.
+ * Its allowlist is {@link FOLIO_WORKDIRS} (absent on purpose). Separately,
+ * {@link workDirBaseline} is a RATCHET for ones still owed an answer.
  *
  * Usage:
  *   bun run cat check:workflow-paths          # report and exit non-zero on a finding
  *   bun run cat check:workflow-paths --list   # print every invocation, verdict and cwd
  *
- * ## Its sibling, `scripts/tests/workflow-paths-resolve.test.ts`
- *
- * Not a duplicate, and the two must not be consolidated. That test covers
- * **4 allowlisted workflows** but **every path-shaped token on a line** (a
- * `cp` argument, a `paths:` filter entry, a typedoc entry list, a `bun -e`
- * string). This covers **all workflows** but only **script invocations**,
- * with a cwd model.
- *
- * Measured 2026-09-20 by breaking each in turn and running both: a `cp`
- * argument naming a missing directory in `docs-site.yml` is caught by the
- * test and missed here; `bun run scripts/does-not-exist.ts` in `publish.yml`
- * is caught here and missed by the test. Neither subsumes the other, and
- * deleting either loses a class of defect nothing else in this repository
- * would see.
+ * A sibling test covers every path-shaped token on the lines of a few
+ * allowlisted workflows; this covers only script invocations, in all
+ * workflows, with a cwd model. Neither subsumes the other.
  *
  * @module scripts/check-workflow-paths
  * @covers none — .github/workflows/ is not a declared graph typology

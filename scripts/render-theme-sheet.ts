@@ -1,59 +1,38 @@
 /**
  * THE THEMING SUBGRAPH'S VISUALISER — every theme, drawn.
  *
- * ## Why this exists rather than an exemption
- *
- * Bean `2krx`: every time an instance names a directory as a subgraph, that
- * subgraph owes a **visualiser** and a **documentation entry**. `1hvo` adds
- * `cat-harness/skills/ui/theming/`, so it arrives owing both, and *shipping it without
- * them manufactures the finding rather than clearing it*. This is the
- * visualiser; `docs/architecture/theming.md` is the entry.
- *
- * bootstrap's `renderExemption` was the alternative and is the wrong shape
- * here. That exemption is a FLOOR THAT RISES — the bottom layer produces
- * nothing a human browses, so it trades a visualiser for its own graph.
- * Theming is the opposite case: it produces nothing BUT things a human looks
- * at, and a theme nobody rendered is a palette nobody checked.
+ * A subgraph owes a **visualiser** and a **documentation entry**;
+ * `cat-harness/skills/ui/theming/` gets its visualiser here and its entry in
+ * `docs/architecture/theming.md`. Theming takes no `renderExemption`: it
+ * produces nothing BUT things a human looks at.
  *
  * ## It PRINTS and never gates
  *
- * The schema proves a scrim parses and a crop box is square and in bounds.
- * **It cannot see what a picture shows.** Two of the first seven avatar boxes
- * framed scenery, and the operations box was square, in bounds, and clipped
- * the crown off a hard hat — caught by the owner looking at a render, not by
- * any assertion. So this answers a question no gate can carry, and making it
- * fail would only teach somebody to switch it off.
- *
- * Numbers that CAN be gated are gated elsewhere and not restated here: the
- * contrast ratios are computed in `schemas/themes.test.ts`, which is why this
- * page shows them beside a PASS/FAIL against the AAA floor rather than
- * claiming them.
+ * The schema proves a scrim parses and a crop box is square and in bounds,
+ * but **it cannot see what a picture shows**, so this answers a question no
+ * gate can carry. The contrast ratios are computed in
+ * `schemas/themes.test.ts`; this page shows them beside a PASS/FAIL against
+ * the AAA floor rather than claiming them.
  *
  * ## Two outputs, one set of rows
  *
  * `theme:sheet` writes a STANDALONE file with every image inlined as a data
  * URI, so it can be opened from anywhere, attached, or looked at offline.
  *
- * `theme:page` writes the same rows into the SITE, at `docs/themes/index.md`
- * — owner, 2026-09-24: *"have the themes harness make themes/ page to
- * browse"*. There the images are LINKED rather than inlined: the art is
- * already published under `assets/img/`, and inlining two dozen crops into one
- * committed page would put megabytes of base64 in the diff every time a
- * palette moved. Both go through {@link sheetBody}, so the page a reader
- * browses and the sheet a reviewer opens cannot show different themes.
+ * `theme:page` writes the same rows into the SITE, at `docs/themes/index.md`,
+ * with the images LINKED (the art is already published under `assets/img/`)
+ * so the committed page carries no base64. Both go through {@link sheetBody},
+ * so the page and the sheet cannot show different themes.
  *
- * The page is generated and committed like every other browse page here, so
- * `theme:page:check` gates it: a stale theme page is a page reporting themes
- * that no longer exist. It is still a page for LOOKING — the check asserts the
- * page matches the registry, never that a picture is right.
+ * The page is generated and committed, so `theme:page:check` gates that it
+ * matches the registry — never that a picture is right.
  *
  * Usage:  bun run cat theme:sheet [--out <file>]
  *         bun run cat theme:page [--check]
  *
  * @covers none — it reads `THEMES` (the platform's own, declared in code)
  * plus an instance's declared art via `readDeclaration` and `THEME_LAYOUTS`.
- * Neither is the `themes` graph, and this resolves no directory of that kind.
- * It declared `@covers themes` until 2026-09-30 (bean `z6xd`);
+ * Neither is the `themes` graph, and this resolves no directory of that kind;
  * `check:instance-themes` is the gate that covers the graph.
  * @module scripts/render-theme-sheet
  */

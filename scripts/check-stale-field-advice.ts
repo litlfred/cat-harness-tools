@@ -2,73 +2,25 @@
 /**
  * A forge field that goes stale is never named in advice **unqualified**.
  *
- * Bean `fx5r`'s last open item, and it is the only one of its five that a test
- * could not close. The other four were fixes to particular strings; this one
- * asks for the general rule, in the bean's own words:
+ * GitHub keeps serving a merged PR's pre-merge `mergeable`, `mergeable_state`,
+ * `head.sha` and `updated_at` long after the merge; only `merged` is
+ * stale-safe. Advice that tells a reader to read such a field must say
+ * something about its reliability.
  *
- * > *no advice string names `mergeable_state` approvingly, anywhere*
- *
- * ## What the instance cost, twice
- *
- * `fx5r` measured it: **45 minutes after a PR merged**, `GET /pulls/N` still
- * served that PR's pre-merge `mergeable`, `mergeable_state`, `head.sha` and
- * `updated_at`. Only `merged` went stale-safe. An agent reading the field got
- * a wrong answer carrying the authority of a measurement.
- *
- * PR #1362 fixed the two advice strings in `check-head-has-run.ts`. Four days
- * later `fx5r` recorded that **`.github/workflows/pr-checks-present.yml`
- * carried a third copy**, untouched, because nothing linked them — and it was
- * still being posted to live PRs hours after the fix merged. The drift was
- * PARTIAL, which is the part worth keeping:
- *
- * | | the merge-ref probe (code) | the UNKNOWN advice (prose) |
- * |---|---|---|
- * | `check-head-has-run.ts` | correct | fixed by #1362 |
- * | `pr-checks-present.yml` | correct, line 163 | pre-`fx5r`, line 192 |
- *
- * The code was right in **both** places and the prose in only one. A reader
- * checking whether the fix had landed by grepping for `ls-remote` would have
- * found it twice and concluded the job was done. Two copies fixed by hand
- * leaves the fourth free to appear tomorrow, which is what this gate is for.
- *
- * ## "Approvingly" is not what is measured — QUALIFIED is
- *
- * Reading intent out of prose is what a regex is worst at, and a gate that
- * tried would be wrong in both directions. So the rule is structural and
- * inverts the burden: a mention passes when its neighbourhood **says something
- * about the field's reliability**, and fails when it is bare.
- *
- * That is deliberately wider than "approving". It admits the two shapes that
- * are both legitimate and that a caution-only rule would have to choose
- * between:
+ * The rule is structural, not a judgement of intent: a mention passes when its
+ * neighbourhood **says something about the field's reliability**, and fails
+ * when it is bare. Both legitimate shapes pass:
  *
  * - a **caution** — *"`unknown` means GitHub has not finished computing it,
  *   not that the PR is fine"*;
- * - a **measured licence** — *"when it is `dirty`, merge the base in"*, which
- *   `yv4z` established and which is sound because `dirty` is the one value
- *   whose falsity costs nothing.
+ * - a **measured licence** — *"when it is `dirty`, merge the base in"*
+ *   (sound because a false `dirty` costs nothing).
  *
- * What it refuses is the third shape, the one that actually shipped:
- * `mergeable_state` in a list of fields to read, with nothing said. A reader
- * cannot tell from that whether the author knew.
- *
- * ## Default-deny, because an allowlist of SITES rots on every edit
- *
- * A qualifier must be present at the mention. There is no per-line exemption
- * table: a line number is invalidated by the next paragraph inserted above it,
- * and an exemption keyed on a line number that has moved is an exemption
- * protecting the wrong text. Whole PATHS can be declined — see
- * {@link skipPath} — and each declension carries its reason and is COUNTED in
- * the summary, per `check-command-paths`: what a check declines to judge has
- * to stay visible, or its coverage is a guess.
- *
- * ## Why `beans/` is out of scope and that is not a hole
- *
- * A bean is a `state` graph — the record of a measurement, in the past tense,
- * frequently quoting the very string the fix removed. `fx5r` itself names the
- * field eight times, and every one is evidence. Requiring a qualifier there
- * would either rewrite history or teach authors to sprinkle the marker, and a
- * marker sprinkled to satisfy a gate stops meaning anything.
+ * Default-deny: a qualifier must be present at the mention; there is no
+ * per-line exemption table. Whole PATHS can be declined (see
+ * {@link skipPath}); each carries its reason and is COUNTED in the summary.
+ * `beans/` is out of scope: a bean is a past-tense record that may quote the
+ * very string a fix removed.
  *
  * Exit: 0 every mention qualified, 1 one is bare, 2 could not check.
  *

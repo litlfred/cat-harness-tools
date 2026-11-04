@@ -6,32 +6,27 @@
  * @covers none — it JOINS committed workflow instances with the store's beans
  *   and the diagrams they run; the state visualiser renders the two pages
  *
- * Owner, 2026-11-02 (cat-harness-tools#1413, bean `folio-assistant-pbv1`):
- * *"visualizer that shows all the beans by process ... visualize the BPMN with
- * marks to show beans are at which process. ability to filter, query, search
- * for last updated to find stalled ... similar but for single bean."*
- *
  * ## Two pages, one projection
  *
  * `workflow-view.ts` draws one page per INSTANCE. This adds the two views it
  * lacks: `beans-processed/` (every process with an instance, each diagram
  * marked with how many beans wait at each step) and `bean-processed/?bean=<id>`
  * (one bean through every instance that names it). Both read one projection,
- * {@link processedBeansRows}, embedded in the page, so the filters run in the
- * browser and the URL query keeps them (`?q=&process=&stale=30`).
+ * {@link processedBeansRows}, embedded in the page, so the filters (search,
+ * process, last-updated to find stalled beans) run in the browser and the URL
+ * query keeps them (`?q=&process=&stale=30`).
  *
- * ## Nothing new about "stuck"
+ * ## Stuck states
  *
- * The stuck kinds are `stuckStatesOf`'s. This adds two the per-instance page
- * shows in prose and the table needs as words: `bean-missing` (the instance
- * names a bean the store does not hold) and `node-missing` (a token sits on a
- * step the current diagram no longer has, so no marker can be drawn for it).
+ * The stuck kinds are `stuckStatesOf`'s, plus two the table needs as words:
+ * `bean-missing` (the instance names a bean the store does not hold) and
+ * `node-missing` (a token sits on a step the current diagram no longer has,
+ * so no marker can be drawn for it).
  *
  * ## Lazy drawings
  *
  * The diagrams are the SVGs `render:bpmn` already publishes. A page fetches
- * each one only when its card scrolls near the viewport, so a store with many
- * processes costs one request per diagram the reader actually looks at.
+ * each one only when its card scrolls near the viewport.
  */
 import type { BeanNode } from "./beans.ts";
 import type { InstanceState } from "../src/workflow/instance.js";

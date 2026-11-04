@@ -5,10 +5,6 @@
  * @module scripts/tool-closure
  * @graphNode none — a library under `remote-mount.ts`: it resolves and judges nothing on its own
  *
- * Bean `mo75` G3 (cat-harness-tools#744). The owner's rulings, 2026-10-24
- * (decision card, all four as recommended), three of which this module
- * carries out:
- *
  * 1. **A mounted Tool brings BOTH halves** — its definition
  *    (`<tools dir>/<id>/<id>.ts` in the instance that declares it, the folder
  *    convention of cat-harness `schemas/tools/tool-folders.ts`) AND its
@@ -27,15 +23,13 @@
  *
  * ## Where a Tool's `invoke` is read from: its published metadata
  *
- * The definition is code, and the plan runs before the trust gate, so the
- * definition is never EXECUTED to learn what it invokes: that would run a
- * pin's code before anyone consented to it. Static parsing is no answer
- * either — 20 of 180 definitions build their `shell` through a helper
- * (measured 2026-10-24). The Tool's node in its instance's published
- * `tools/` `index.hydrated.jsonld` carries `invoke` as data (`@json`, bean
- * `mo75` G1), at the same pin, from the same tree or package a hydrated
- * mount reads: "load the tools metadata, choose, materialise" uses one file
- * for the first and last steps. The caller hands this module those nodes.
+ * The plan runs before the trust gate, so a definition is never EXECUTED to
+ * learn what it invokes (that would run a pin's code before anyone consented),
+ * and static parsing fails where a definition builds its `shell` through a
+ * helper. The Tool's node in its instance's published `tools/`
+ * `index.hydrated.jsonld` carries `invoke` as data (`@json`), at the same pin,
+ * from the same tree or package a hydrated mount reads. The caller hands this
+ * module those nodes.
  *
  * ## How the implementation is found
  *

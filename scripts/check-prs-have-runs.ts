@@ -4,50 +4,20 @@
  *
  * @module scripts/check-prs-have-runs
  *
- * Bean `3pqn`. `check:head-has-run` answers this for one commit, and the
- * remaining gap was stated when it shipped: **a pull request with zero checks
- * is invisible precisely because nobody is looking**, so a check that runs
- * only when somebody remembers to look is the weakest possible placement.
- * This is the unattended half.
+ * The unattended sweep across all open PRs; `check:head-has-run` answers the
+ * same for one commit.
  *
- * ## It is not hypothetical
+ * A head is only judged once it is **older than `--min-age-minutes` (default
+ * 15)**; a younger one is reported as **too new to judge**, not as clean. The
+ * age is the HEAD COMMIT's committer date, a proxy for push time (GitHub
+ * exposes no per-ref push time), so a commit authored long ago and pushed
+ * just now can be flagged early.
  *
- * Measured 2026-09-20 over the six open pull requests on this repository:
- * **two had no run of any kind on their head** — `#525`, updated three
- * minutes earlier, and `#477`, updated one minute earlier. A third of the
- * open set, sitting with nothing to merge on.
- *
- * ## The age gate is the whole difference between useful and ignored
- *
- * A head pushed thirty seconds ago legitimately has no run yet, and a sweep
- * that reports those is a sweep nobody reads — which is the failure this bean
- * is about, reproduced by its own fix. So a head is only a finding once it is
- * **older than `--min-age-minutes` (default 15)**, and a younger one is
- * reported as **too new to judge** rather than as clean. That is the third
- * state, not a rounding-down.
- *
- * **The age is the HEAD COMMIT's committer date, which is a proxy for push
- * time**, and the limitation is stated rather than hidden: a commit authored
- * long ago and pushed just now reads as old and can be flagged early. GitHub
- * exposes no per-ref push time on the pull request, and in practice a commit
- * and its push are seconds apart here. A false finding of this shape says
- * "no run", which a reader disproves in one click — the opposite error,
- * staying silent, is the one that costs.
- *
- * ## A run that EXISTS is not a gate that RAN
- *
- * Bean `1acg`, 2026-10-03. This sweep asked "is there a run", and a
- * `pull_request` run that completes `action_required` is one: created, never
- * started, no job run, no gate evaluated. Measured on #1819 and #1808 — three
- * such runs each, and the sweep marked both `✓ has-run`.
- *
- * So `blocked` is a fourth state and a FINDING. It is kept apart from `no-run`
- * because the two call for opposite actions: an absent run may be a dropped
- * event worth dispatching, while this one is explained — a `github-actions[bot]`
- * actor on a non-fork head — and dispatching it is what masked it. The fix is
- * issue #1829 D1.
- *
- * ## Four states, and `unknown` outranks a finding
+ * A run that exists is not a gate that ran: a `pull_request` run completing
+ * `action_required` (created, never started) is `blocked`, a FINDING kept
+ * apart from `no-run`. An absent run may be a dropped event worth
+ * dispatching; a blocked one (a `github-actions[bot]` actor on a non-fork
+ * head) is explained, and dispatching it masks it.
  *
  * | verdict | means | exit |
  * |---|---|---|
@@ -55,9 +25,8 @@
  * | `findings` | an eligible head has no run (`no-run`) or none that ran (`blocked`) | 1 |
  * | `unknown` | the list or a run query could not be read | 2 |
  *
- * A sweep blind on one pull request has not cleared the others, so a single
- * unreadable answer makes the whole run `unknown` — never a partial clean.
- * Same rule as `ci-health` and the repository health sweep.
+ * A single unreadable answer makes the whole run `unknown` — never a partial
+ * clean.
  *
  * Usage:  bun run cat check:prs-have-runs [--min-age-minutes N] [--out <file>]
  */

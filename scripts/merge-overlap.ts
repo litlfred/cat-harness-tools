@@ -1,19 +1,18 @@
 #!/usr/bin/env bun
 /**
  * Which open PRs would conflict with each other — the conflict-prediction
- * input for composing merge trains (bean `blgm`; requirements T3 and R7 in
- * `docs/proposals/merge-pipeline-requirements.md`).
+ * input for composing merge trains.
  *
  * @module scripts/merge-overlap
  * @graphNode none — a read-only report over git and the open PRs
  * @covers none — a merge-steward report: it predicts, it judges no declared graph
  *
- * ## The rule, at this repository's granularity (SQ19 §5.2)
+ * ## The rule
  *
  * Two PRs are **independent** when their AUTHORED paths do not overlap and
  * neither touches a shared declaration (`merge-pipeline-paths.ts`). Generated
  * paths are excluded, because every pair "conflicts" on them and `merge:train`
- * resolves them by regenerating (R7). A README whose generated regions alone
+ * resolves them by regenerating. A README whose generated regions alone
  * changed is a generated region, not authored text, and is reported apart.
  *
  * ## Where the PRs come from

@@ -2,15 +2,13 @@
 /**
  * section-story-audit.ts — Audit section + chapter narrative compliance.
  *
- * Implements the §Story coherence (STRICT) policy that landed in PR #738
- * (.claude/skills/local/detangler-integration-watcher.md §Slot D, lines
- * 122-198). Walks every chapter / section in the given paper and reports
- * findings against the policy's finding kinds:
+ * Implements the §Story coherence (STRICT) policy. Walks every chapter /
+ * section in the given paper and reports these finding kinds:
  *
  *   missing-section-story        major — section has no opening prose block
  *   section-lead-too-short        minor — section's prose lead has fewer
- *                                          paragraphs than the §738 length-
- *                                          scale table requires (1 / 2 / 3 /
+ *                                          paragraphs than the length-scale
+ *                                          table requires (1 / 2 / 3 /
  *                                          4 paras for ≤5 / 6-12 / 13-20 /
  *                                          >20 non-prose blocks).
  *   section-lead-block-title-list minor — section's lead reads as a
@@ -24,32 +22,18 @@
  *   missing-chapter-manifest      major — chapter directory present in the
  *                                          paper manifest but the chapter
  *                                          .ts file is missing or
- *                                          unreadable.  This checks only
- *                                          file existence — a syntactically
- *                                          broken manifest that still parses
- *                                          to *something* under the regex
- *                                          scan will not trip this finding;
- *                                          the upstream content-validation
- *                                          pipeline catches genuine TS /
- *                                          Zod parse errors.  Distinct from
- *                                          missing-chapter-intro: this is a
- *                                          structural / build problem, not
- *                                          a narrative problem.
+ *                                          unreadable. File existence only;
+ *                                          TS / Zod parse errors are caught
+ *                                          by content validation.
  *   abrupt-chapter-ending         minor — chapter's last block is not
  *                                          a closing prose block.
  *
- * Note: §738 also lists `section-narrative-drift` (block ordering breaks
- * the story arc), but the auditor here does NOT yet implement it — drift
- * detection requires walking the block graph and comparing to the lead's
- * implied ordering, which is a follow-up. The header was previously
- * misleading; this revision removes the unimplemented kind from the
- * documented set so the script's contract matches its behaviour.
+ * The policy's `section-narrative-drift` kind (block ordering breaks the
+ * story arc) is not implemented.
  *
- * The audit is read-only and deterministic. Drafts for missing leads /
- * intros are NOT produced — that requires editorial judgement per the
- * §738 policy ("auto-fix a missing chapter intro without surfacing the
- * draft is forbidden"). The intended workflow is: run the audit, surface
- * the findings to the author, the author picks which to fix.
+ * The audit is read-only and deterministic. It does NOT draft missing leads
+ * or intros — that needs editorial judgement; the author picks which findings
+ * to fix.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/section-story-audit.ts                        # default paper

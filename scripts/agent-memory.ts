@@ -4,53 +4,25 @@
  * @module scripts/agent-memory
  * @covers memory
  *
- * ## What this is for
- *
- * `memory: project` is a Claude Code **harness** feature: it injects the first
+ * `memory: project` is a Claude Code harness feature: it injects the first
  * 200 lines of `.claude/agent-memory/<agent>/MEMORY.md` into a subagent's
- * system prompt. The harness decides where it looks, so that path is not ours
- * to move. What IS ours is where the entries are authored, and authoring them
- * as knowledge-graph nodes is what lets one fact reach two agents.
+ * system prompt. That path is fixed by the harness; the entries are authored
+ * as knowledge-graph nodes in `memory/`, so one fact can reach two agents —
+ * the same relation `docs/reference/skill-instructions/` has to `memory/`.
  *
- * The relation is the one `docs/reference/skill-instructions/` already has to
- * `memory/`: entries are authored there, scoped, and
- * **assembled** into the injected file.
- *
- * ## The generated REGION, not the generated file
+ * ## Only the generated region is written
  *
  * This writes only between `<!-- folio:memory:begin -->` and
- * `<!-- folio:memory:end -->`, exactly as `pipeline/readme-sections.ts`
- * writes only inside its markers. Nothing outside a marked region is ever
- * touched.
- *
- * That is not symmetry for its own sake. Every one of the three memory files
- * ends with a `## Session log` the agent writes as it works, and
- * `content-pipeline-navigator` also carries `## Corrected invocations`.
- * Regenerating the whole file would delete them — an agent's own running notes,
- * destroyed by the tool that exists to preserve its memory. The predecessor of
- * `readme-sections.ts` ended in `cp "$OUT" README.md` and lost an author's
- * README for the same reason.
+ * `<!-- folio:memory:end -->`, as `pipeline/readme-sections.ts` writes only
+ * inside its markers. Each memory file also holds sections the agent writes
+ * itself (`## Session log`, and in `content-pipeline-navigator`
+ * `## Corrected invocations`), which a whole-file rewrite would destroy.
  *
  * ## Telling a memory node from a skill
  *
- * Memory nodes lived in `skills/memory/` until 2026-09-20 — INSIDE the
- * declared `cat-harness` directory, whose path is `skills/`, and
- * `skillFiles()` in `kg-audit.ts` walks that tree recursively. So a memory
- * entry would have been audited as a skill, the same defect that made five
- * split-skill siblings appear as skills until `part-of:` was read.
- *
- * The fix was, and remains, the repo's rule: **declaration over location**. A
- * file carrying `$schema: folio-memory/v1` is a memory node whatever directory
- * it is in. #263: telling parts of a graph apart by where they sit is "a
- * coincidence of the current layout, not a contract".
- *
- * **They now have a directory of their own** — `memory/`, declared, holding the
- * `memory` graph, which is `context` by the axis bean `mhh9` settled. The
- * file-level predicate is what still does the work and is why the move was
- * safe rather than urgent: nothing depended on the directory to tell them
- * apart. What the move fixes is the OTHER direction — the containing kind was
- * `content` while its contents were `context`, and a nested declaration is the
- * defect #263 names. Bean `07xs`.
+ * Declaration over location: a file carrying `$schema: folio-memory/v1` is a
+ * memory node whatever directory it is in. The declared `memory/` directory
+ * holds the `memory` graph, on the `context` axis.
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";

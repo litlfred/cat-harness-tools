@@ -1,36 +1,27 @@
 /**
  * The knowledge-graph viewer's own words — the table the page is built from.
  *
- * Bean `xcyh`: "the KG viewer must be translated". The obvious route is to run
- * the extractor over the page the generator emits, and it is the wrong one.
- * `scripts/kg-viewer.ts` WRITES that page, so every regeneration would rewrite
- * every `msgid` reference in the `.pot`, churning entries that did not change
- * and invalidating a sign-off that was still valid. **A generated artefact is
- * not a translation source. Its generator is.**
- *
- * So the strings live here, in the source, as a declared table — and the
- * extractor reads THIS. `scripts/translate-kg-viewer.ts --extract` turns it
- * into `translations/<locale>/kg-viewer.pot` through the same `formatPot` the
+ * The strings live here, in the source, as a declared table, because a
+ * generated artefact is not a translation source; its generator is.
+ * `scripts/kg-viewer.ts` writes the page, and extracting from its output
+ * would churn every `msgid` reference on each regeneration.
+ * `scripts/translate-kg-viewer.ts --extract` turns this table into
+ * `translations/<locale>/kg-viewer.pot` through the same `formatPot` the
  * markdown and BPMN extractors use, and the generator reads each locale's
- * `.po` back through the same `parsePo`. One pipeline, one file format, one
- * place a string is written down.
+ * `.po` back through the same `parsePo`.
  *
  * ## The msgid is the English text, not a key
  *
- * That is the gettext convention this repository already follows everywhere
- * else: `extractMarkdown` emits the prose itself as the `msgid`, and a `.po`
- * for a page is readable without the page beside it. A key (`viewer.empty.3`)
- * would make the catalogue opaque to the translator and would let the English
- * drift from the `msgid` silently — the English IS the `msgid`, so it cannot.
+ * The gettext convention used everywhere else (`extractMarkdown` emits the
+ * prose itself as the `msgid`), so a `.po` is readable on its own and the
+ * English cannot drift from its `msgid`.
  *
- * ## What is here and what is deliberately not
+ * ## What is here and what is not
  *
  * **Here: the chrome** — every word the viewer itself says. **Not here: the
  * graph.** Node titles, descriptions and property names come from the corpus
- * this instance publishes; they arrive in the JSON-LD document in whatever
- * language the corpus is written in, and no catalogue can reach them. The page
- * SAYS so, in the reader's language, rather than presenting a translated frame
- * around English content as though the whole thing had been translated.
+ * in whatever language it is written in, and no catalogue can reach them. The
+ * page SAYS so, in the reader's language.
  *
  * @module scripts/kg-viewer-strings
  */

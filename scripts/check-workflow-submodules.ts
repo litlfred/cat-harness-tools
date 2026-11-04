@@ -5,66 +5,25 @@
  * @module folio-assistant/scripts/check-workflow-submodules
  * @covers none — an audit of this repository's workflow YAML; it judges, and writes nothing
  *
- * ## The defect this exists for
- *
  * `cat-harness/schemas/kg/graph-typology-registry.ts` imports
  * `../../bootstrap-tools/schemas/graph`, and `bootstrap-tools` is a git
  * SUBMODULE. So any `bun run` of a platform script that reaches the schema
  * layer dies on `Cannot find module` unless its checkout carried
- * `submodules: true`. A schema import is the least visible dependency a script
- * can acquire — nothing in the script's own text mentions a submodule — and an
- * import added to `schemas/` can break a workflow that nobody edited.
+ * `submodules: true` — and nothing in the script's own text says so. Under
+ * `bash -e` such a failure can abort a step halfway (e.g. a cleanup that
+ * deletes locally but never pushes), so findings are `critical`.
  *
- * ## Why it is a gate and not a fixed list
+ * Jobs are DISCOVERED from the YAML, never listed. It reads
+ * `uses: actions/checkout` steps and `run:` bodies per job, and does not pair
+ * a script to its checkout. The rule is conservative: **if a job runs any
+ * platform script, every non-publish checkout in that job must carry
+ * `submodules`.** It can over-report; the remedy is one harmless line.
  *
- * Measured 2026-10-02. `feature-staging.yml`'s `cleanup` job had failed on
- * exactly this for **six consecutive runs** across two days, and `STAGING/`
- * held **80** previews totalling ~19.5 GB, **47** of them for pull requests
- * already closed. The automatic cleanup had stopped working and the only
- * symptom was a red job nobody was reading.
+ * Blind spot, printed every run: a composite action or reusable workflow that
+ * runs platform code on the caller's behalf.
  *
- * The failure mode is worse than a missing cleanup, and it is the reason this
- * is `critical` rather than advisory. In that job the order is: retire the
- * record, `rm -rf` the preview, write the render log, commit, push. The record
- * writer fails first but is guarded with `|| echo ::error`, so the `rm -rf`
- * proceeds; the `render-log.ts` call then dies and — under `bash -e` — aborts
- * the step. **The commit and push never happen.** The preview is deleted in the
- * runner's working copy and left untouched on the publish branch: a cleanup
- * that reports failure having changed nothing, while looking from the outside
- * like a cleanup that ran.
- *
- * A hardcoded list of the two offending steps would be the
- * `check-declared-assets` defect again — that module's own comment records a
- * hardcoded list going stale twice, and being "fixed" once by correcting the
- * list. So the pairs are DISCOVERED from the YAML and a new job is covered the
- * day it is written.
- *
- * ## What it can and cannot see
- *
- * It reads `uses: actions/checkout` steps and `run:` bodies per job. It does
- * NOT try to pair a script to the checkout it came from, and that is the
- * design rather than a shortcut: the paths are written `source/x.ts`,
- * `../source/x.ts` and `"$PLATFORM_DIR/x.ts"` in three jobs of the same
- * repository, and a textual pairing left 18 of them undetermined — including
- * both halves of the `cleanup-dispatch` job that has the very defect. A rule
- * whose answer is mostly "cannot tell" does not protect anything.
- *
- * So the rule is the conservative one: **if a job runs any platform script,
- * every non-publish checkout in that job must carry `submodules`.** It can
- * over-report — a job with two checkouts where only one supplies the script —
- * and that is the right direction to be wrong in, because the remedy is one
- * harmless line and the alternative is a silent broken cleanup.
- *
- * One blind spot remains and is printed every run rather than implied: a
- * composite action or reusable workflow that runs platform code on the
- * caller's behalf is invisible here, because this file reads only `run:`
- * bodies. That is the
- * `could-not-determine-is-a-third-state-everywhere` rule applied to this
- * check's own coverage rather than to its subject.
- *
- * A checkout of a PUBLISH branch is exempt: `gh-pages` and the
- * `publish_branch` input carry built output, never the platform's source, so
- * submodules would cost a large fetch for nothing.
+ * A checkout of a PUBLISH branch (`gh-pages`, the `publish_branch` input) is
+ * exempt: it carries built output, never source.
  *
  * Exit: 0 clean, 1 a job runs platform code from a submodule-less checkout.
  */

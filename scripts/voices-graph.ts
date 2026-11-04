@@ -6,34 +6,21 @@
  * @module scripts/voices-graph
  * @graphNode none — a reader over the voices graph, not a schema itself
  *
- * ## Why this exists
+ * A voice is **auditable rather than asserted**: every rule carries the page
+ * and the quote it was read from (`check-voices.ts`). This reader makes those
+ * citations readable without opening JSON.
  *
- * The subsystem's whole claim is that a voice is **auditable rather than
- * asserted**. `check-voices.ts` exists because PR #210 shipped three WHO
- * profiles carrying ten plausible rules each with `source: null` — and one of
- * those plausible rules asserted the OPPOSITE of what the WHO Editorial Style
- * Manual says on p14. Every rule now carries the page and the quote it was
- * read from.
+ * ## A declared directory with no voices is reported
  *
- * **And nobody could read a single one of them without opening JSON.** A
- * citation that is only machine-checked is a citation the reader takes on
- * trust, which is the state the citations were added to end. Bean `bu2q`.
- *
- * ## Three declarations, and one of them is empty
- *
- * Measured 2026-09-21: `who-style-guide`, the formal-math layer and
- * `agent-skills` declare a `voices` graph. `agent-skills/voices/` **is not
- * there** (bean `26tu`), so this reader reports it as a declared directory
- * with no voices rather than omitting it. Those are different facts: the
- * first is a gap somebody should close, the second is an instance that never
- * claimed to have any.
+ * A `voices` directory that is declared but absent is reported as a declared
+ * directory with no voices rather than omitted: that is a gap somebody should
+ * close, unlike an instance that never claimed any.
  *
  * ## A voice that will not load THROWS
  *
  * `loadVoices` throws on a malformed voice and this reader does not catch it.
  * A malformed voice must not present as an instance with fewer voices: the
- * second is a legitimate state and the first is a defect, and collapsing them
- * is the false-clean this repository keeps paying for. Same rule as
+ * second is a legitimate state and the first is a defect. Same rule as
  * `shippedVoices` in `pipeline/voice-criteria.ts`, which is the other
  * cross-instance reader over this graph.
  */

@@ -1,36 +1,23 @@
 /**
  * `<base>/fsh-guts.jsonld` — the trashcan, reachable by name.
  *
- * Owner, 2026-09-19: *"jsonld accessible via `<base-url>/fsh-guts.jsonld`."*
- *
- * ## A SEPARATE document, and that is the whole point
+ * ## A SEPARATE document
  *
  * The main export strips `fsh-guts` from every graph it publishes — the
  * kind, the directory, the skill and every edge naming them. This document
- * is how the content stays reachable anyway: **by name, deliberately, and
- * never by following an edge.** A reader who wants it asks for it; a crawler
- * walking the knowledge graph never arrives.
+ * keeps the content reachable **by name, never by following an edge**: a
+ * reader who wants it asks for it; a crawler never arrives.
  *
- * Folding these nodes into the main graph would have been the obvious
- * implementation and would have undone the strip in one step.
+ * ## Logs are excluded by DECLARATION
  *
- * ## Logs are excluded by DECLARATION, not by luck
+ * Logs are not published. `fsh-guts/logs/` lives inside the tree this walks,
+ * and being git-ignored is not enough (an export from a working tree has
+ * them), so a file is included only if it DECLARES `folio-fsh-guts/v1`.
  *
- * `fsh-guts/logs/` lives inside the tree this walks, and the owner was
- * explicit that logs are not published. They are git-ignored, so a CI
- * checkout happens to have none — which is a property of the build, not of
- * this exporter, and would stop being true the moment somebody exported from
- * a working tree. A file is included only if it DECLARES
- * `folio-fsh-guts/v1`, so a log entry is excluded because of what it says it
- * is.
+ * ## Skipped files are reported
  *
- * ## Skipped files are reported, never silently dropped
- *
- * A file that declares nothing is data (somebody dropped a note in); a file
- * that declares this schema and fails it is a defect. Both are listed in
- * `skipped` with a reason, because an exporter whose output is a short list
- * gives no way to tell "the trashcan has three things in it" from "eleven
- * things failed to parse".
+ * A file that declares nothing is data; a file that declares this schema and
+ * fails it is a defect. Both are listed in `skipped` with a reason.
  *
  * Usage:  bun run cat-harness-tools/scripts/fsh-guts-export.ts [--out FILE] [--base-url URL]
  *

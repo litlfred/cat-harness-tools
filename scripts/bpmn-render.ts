@@ -2,19 +2,15 @@
 /**
  * BPMN → SVG, using bpmn-js inside the Chromium already installed here.
  *
- * §12.18 shipped a DAK PDF whose largest gap was that business processes were
- * *listed rather than drawn*. This draws them. It also fills a gap on the WHO
- * side: `smart-dak-immz`'s `input/images/` is empty, so the IG has no process
- * diagrams either, and the same SVGs serve both.
+ * Draws business processes for DAK content; `smart-dak-immz`'s
+ * `input/images/` has no process diagrams, and the same SVGs serve the IG.
  *
- * ## Why this works at all
+ * ## Layout comes from the file
  *
  * bpmn-js does **not** lay out a diagram — it renders the layout the file
- * already carries as BPMN Diagram Interchange. Measured across all 8 WHO
- * processes, every one has DI (20–264 `BPMNShape` elements each), so there is
- * a layout to render. A BPMN file without DI would produce an empty canvas
- * rather than an error, which is why {@link renderBpmn} reports a diagram it
- * could not find rather than writing a blank SVG.
+ * already carries as BPMN Diagram Interchange. A file without DI would draw
+ * an empty canvas rather than error, so {@link renderBpmn} reports a diagram
+ * it could not find rather than writing a blank SVG.
  *
  * ## Multiple diagrams per file
  *
@@ -26,13 +22,12 @@
  *
  * ## Not to be confused with `render-bpmn.ts`
  *
- * The names are unhelpfully close, so: `render-bpmn.ts` is the **docs
- * pipeline** — fixed input (`processes/`), fixed output
- * (`docs/assets/img/workflows/`), and a `--check` staleness gate CI runs. This
- * file is the **library** — arbitrary inputs, exported functions, sub-process
- * plane handling — and is what WHO DAK content goes through. Both take
- * {@link chromiumExecutable} from bootstrap-tools' renderer, which owns the
- * drawing (bean `xsqm`), rather than keeping a second copy of the probe.
+ * `render-bpmn.ts` is the **docs pipeline** — fixed input (`processes/`),
+ * fixed output (`docs/assets/img/workflows/`), and a `--check` staleness gate
+ * CI runs. This file is the **library** — arbitrary inputs, exported
+ * functions, sub-process plane handling — and is what WHO DAK content goes
+ * through. Both take {@link chromiumExecutable} from bootstrap-tools'
+ * renderer, which owns the drawing.
  *
  * They are not merged because their contracts differ: applying
  * {@link keepPrimaryPlane} to the docs sources could change committed SVGs and

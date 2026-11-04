@@ -1,7 +1,7 @@
 /**
  * Git plumbing shared by the merge-pipeline commands: run git without
  * throwing, and turn a member spec (a PR number, `N:sha`, a branch or a SHA)
- * into a commit (bean `blgm`).
+ * into a commit.
  *
  * @module scripts/merge-pipeline-git
  * @graphNode none — helpers, read by `merge-train.ts`, `merge-overlap.ts` and `merge-leftover.ts`

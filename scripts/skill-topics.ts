@@ -4,33 +4,27 @@
  * @module scripts/skill-topics
  * @covers cat-harness
  *
- * Owner, 2026-09-29: *"declared sub-graphs of cat-harness based on semantic
- * concern … dont need a separate facet. built into location."* Ruled
- * 2026-09-30 (bean `9umr`, option A): a topic directory HOLDS packages —
- * `skills/<topic>/<package>/`, e.g. `skills/kg/graph-management/` — and
- * `skills/skills.json` is the labelling node that says which subdirectories
- * are topics. It is the node #980 asked for: nesting is described FROM
+ * A topic directory HOLDS packages — `skills/<topic>/<package>/`, e.g.
+ * `skills/kg/graph-management/` — and `skills/skills.json` is the labelling
+ * node that says which subdirectories are topics: nesting is described FROM
  * WITHIN, by a file in the directory whose children it names, never by the
  * root declaration reaching down a path it cannot verify.
  *
- * ## Why one walk, and why it returns directories rather than packages
+ * ## One walk, returning directories rather than packages
  *
- * Six places walked a skills directory one level deep and read each child as
- * a package. Each one taught to descend on its own is six chances to disagree
- * about which directories are topics, which is the `dh4f` shape: a consumer
- * that scans the wrong set reports a clean run over it.
- *
- * They do NOT agree on what makes a package — one asks for a skill `.md`,
- * another for `package-manifest.json` — and that difference is theirs. So this
- * returns the CANDIDATE directories and each caller keeps its own test.
+ * Every caller that walks a skills directory uses this, so none can disagree
+ * about which directories are topics. Callers do NOT agree on what makes a
+ * package — one asks for a skill `.md`, another for `package-manifest.json` —
+ * so this returns the CANDIDATE directories and each caller keeps its own
+ * test.
  *
  * ## Declaration over location
  *
  * Only a subdirectory `skills.json` names is descended into. A directory that
- * merely looks like a topic (holds subdirectories, no skills) is not one, and
- * is not guessed at. A present but malformed `skills.json` throws, and a topic
- * it names that does not exist throws too: declare only what exists (bean
- * `dh4f`), and a declared-but-absent directory is the defect, not a no-op.
+ * merely looks like a topic (holds subdirectories, no skills) is not one. A
+ * present but malformed `skills.json` throws, and so does a topic it names
+ * that does not exist: a declared-but-absent directory is the defect, not a
+ * no-op.
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";

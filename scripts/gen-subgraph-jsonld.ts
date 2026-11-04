@@ -4,24 +4,17 @@
  * `index.hydrated.jsonld` — by framing kg-export's one in-memory graph.
  *
  * The contract is `skills/kg/kg-core/kg-export.md` §"Named subgraphs — one
- * IRI, two files, framed from one graph" (bean `c1m4`), and the schema both
- * files validate against is `schemas/kg/subgraph-manifest.ts`.
+ * IRI, two files, framed from one graph", and the schema both files validate
+ * against is `schemas/kg/subgraph-manifest.ts`.
  *
  * ## What is a subgraph here
  *
  * Every directory under each of this instance's declared knowledge-graph
- * directories (`kgDirectories(…, "instance")`: today `skills/`, `scenarios/`
- * and `processes/`) and under each framed instance's declared `tools` graph
- * ({@link subgraphDirectories}), nested ones included — so `skills/` and
- * `skills/sdlc/` are both subgraphs, and the second is a child of the first.
- * Above them is the ROOT, the harness instance itself, whose IRI is
- * `<BASE_URL>/subgraph/<HARNESS>/`.
- *
- * `tools/` is here for bean `mo75` G1 (owner, 2026-10-09, Option C of
- * `docs/proposals/semantic-subgraphs-2026-10-09.md`: *"load the tools/skills
- * metadata, review the skills description and then materialize a set of
- * Tools"*). Until then every Tool node fell to the root, which has no
- * hydrated file, so there was no Tools metadata to load in one fetch.
+ * directories (`kgDirectories(…, "instance")`) and under each framed
+ * instance's declared `tools` graph ({@link subgraphDirectories}), nested ones
+ * included — so `skills/` and `skills/sdlc/` are both subgraphs, and the second
+ * is a child of the first. Above them is the ROOT, the harness instance
+ * itself, whose IRI is `<BASE_URL>/subgraph/<HARNESS>/`.
  *
  * ## Membership is containment, and every node lands exactly once
  *
@@ -33,8 +26,8 @@
  *   `stampSubgraph` uses for `inSubgraph`, to a fixed point.
  * - A node of an instance stacked on this one lands in that instance's own
  *   tree, `<BASE_URL>/subgraph/<ITS NAME>/…`, by the same containment rule
- *   over its declared directories (bean `ax6r`) — a path outside them falls
- *   to that instance's root.
+ *   over its declared directories — a path outside them falls to that
+ *   instance's root.
  * - A Tool node has no source path: it is placed by the folder convention
  *   (`schemas/tools/tool-folders.ts`, `<tools dir>/<id>/<id>.ts`) in its OWN
  *   instance's `tools` subgraph — `tools/<id>/` when that folder is on disk,
@@ -42,30 +35,26 @@
  * - Everything else — schemas, roles, graph typologies — is a direct member
  *   of its own harness's ROOT.
  *
- * ## Each instance is framed from its OWN export (bean `4ak5` item 2)
+ * ## Each instance is framed from its OWN export
  *
- * Since the split, `cat-harness.jsonld` holds cat-harness's directories only,
- * so a stacked instance's nodes are read from that instance's export, under
- * the `@id`s its published document gives them — never under
- * `cat-harness.jsonld#…` fragments, which are tombstones now and are not
- * framed. Which instances are framed is {@link framedInstances}: the corpus
- * this instance's checkout scope reaches, as before. A node's paths are
- * relative to the instance that exported it, so the plan is told which one
- * (`rootOf`).
+ * A stacked instance's nodes are read from that instance's export, under the
+ * `@id`s its published document gives them. Which instances are framed is
+ * {@link framedInstances}: the corpus this instance's checkout scope reaches.
+ * A node's paths are relative to the instance that exported it, so the plan is
+ * told which one (`rootOf`).
  *
  * Above every root is the REPOSITORY's index, `<BASE_URL>/subgraph/`, whose
  * `hasSubgraph` are the roots framed here. `bootstrap` and `bootstrap-tools`
- * are not among them: they sit below this instance and publish through their
- * own graph (`pve3`). Their own repository indexes are linked from it with
- * `rdfs:seeAlso` (bean `t8c4`) — a link a reader may follow, never membership.
+ * sit below this instance and publish through their own graph; their
+ * repository indexes are linked with `rdfs:seeAlso` — a link a reader may
+ * follow, never membership.
  *
- * Transitive membership is not a second property. It is `hasMember` followed
- * through `hasSubgraph`, which is exactly what the hydrated file nests.
+ * Transitive membership is `hasMember` followed through `hasSubgraph`, which
+ * is exactly what the hydrated file nests.
  *
  * A node this cannot place — a path inside a kg directory that is not on disk,
  * or a `partOf` naming a node the graph does not hold — goes in `problems`,
- * and the run exits 1 having written nothing: a partial set must not pass for
- * a whole one.
+ * and the run exits 1 having written nothing.
  *
  * ## One graph, two frames
  *
@@ -74,19 +63,18 @@
  * pointer projection — `@id`, `@type` and label, under `@explicit`; the
  * hydrated frame embeds every member whole and every child subgraph whole
  * (`@embed: @always`), while every edge between KG nodes stays an IRI. The
- * root gets the index only: a deep hydrated file there is the whole graph in
- * one document, the monolith `f233` forbids.
+ * root gets the index only, so no one document holds the whole graph.
  *
  * `@context` is the URL of `ns/subgraph/v1.jsonld`, which this script also
  * writes — kg-export's context without its keyword aliases (so the files say
  * `@id`, not `id`) plus the two subgraph terms. It is never inlined.
  *
- * ## Heavy bodies stay pointers — and the pointer now resolves (bean `f233`)
+ * ## Heavy bodies stay pointers
  *
- * The KG already carries a skill's body as `instructionsPath`, a diagram as
+ * The KG carries a skill's body as `instructionsPath`, a diagram as
  * `sourcePath`, a schema as `module` — never the text. This script refuses a
- * literal over {@link HEAVY_LITERAL_BYTES} rather than trimming it, because a
- * body that has crept into the graph is a kg-export defect to fix there.
+ * literal over {@link HEAVY_LITERAL_BYTES} rather than trimming it (fix it in
+ * kg-export).
  *
  * For the fields `HEAVY_POINTERS` names (`schemas/kg/subgraph-manifest.ts`), the
  * TARGET is published as a PAYLOAD: one immutable file per distinct body at
@@ -100,15 +88,11 @@
  * Output is deterministic — no timestamps, no commit, keys and members
  * sorted — so `--check` can compare bytes.
  *
- * Every file it writes says so itself, in a top-level `_generated` key
- * ({@link SUBGRAPH_GENERATED}): the convention `sync-docs-harness.ts` and
- * `glossary-page.ts` use (bean `ws99`), which `check:reference-direction`
- * reads as "a generator wrote this". A subgraph file names every instance
- * whose nodes it frames, so without the key each one read as authored
- * prose in the instance that commits it naming the layers above it. The
- * subgraph context declares `_generated` as a `@json` term
- * ({@link subgraphContext}), so the files stay valid JSON-LD: an unmapped key
- * is an `invalid property` to a processor, not something it silently drops.
+ * Every file it writes carries a top-level `_generated` key
+ * ({@link SUBGRAPH_GENERATED}), which `check:reference-direction` reads as "a
+ * generator wrote this" (a subgraph file names the layers whose nodes it
+ * frames). The subgraph context declares `_generated` as a `@json` term
+ * ({@link subgraphContext}), so the files stay valid JSON-LD.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-subgraph-jsonld.ts            # write

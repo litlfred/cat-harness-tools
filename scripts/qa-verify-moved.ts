@@ -1,11 +1,9 @@
 #!/usr/bin/env bun
 /**
  * qa-verify-moved — is every QA file that is leaving `main` already on the
- * `qa-reports` branch, byte for byte? Bean `5hox`, arc `3fva`, proposal
- * `docs/proposals/qa-reports-branch-and-test-process-2026-10-01.md` §4 item
- * 3.7 and owner ruling D4: the moved files are removed from `main` "as soon as
- * every reader is migrated and the branch holds a hash-verified copy". This is
- * the hash verification.
+ * `qa-reports` branch, byte for byte? Moved files are removed from `main`
+ * only once the branch holds a hash-verified copy; this is the hash
+ * verification.
  *
  * ## What "moved" means — derived, never listed
  *
@@ -14,8 +12,8 @@
  * for its roots, so the set verified is the set published by construction.
  * Nothing else is in it:
  *
- * - `test/attestations/` is the `attestations` kind and stays on `main`
- *   (ruling D2 (a)); it is not a `qa` directory, so it is never inventoried.
+ * - `test/attestations/` is the `attestations` kind and stays on `main`; it
+ *   is not a `qa` directory, so it is never inventoried.
  * - `test/health/results/` is the `health` kind. `qa:publish` does not carry
  *   it, so it cannot be verified against an entry and is not in the set.
  *
@@ -27,10 +25,6 @@
  * | 1 | differs | at least one path differs, or is missing from the entry |
  * | 2 | unknown | the entry could not be read (miss, corrupt, remote failure), or there was nothing to compare. **Never a pass.** |
  * | 3 | usage | malformed invocation |
- *
- * A `miss` of the entry is UNKNOWN here, not "nothing differs": an entry that
- * is not there has verified nothing, and reading its absence as agreement is
- * the `dh4f` defect pointed at the one decision it would make irreversible.
  *
  * Paths the ENTRY holds and the checkout does not are reported as `extra` and
  * do not fail: removal needs the branch to hold everything `main` holds, not

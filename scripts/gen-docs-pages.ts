@@ -1,29 +1,18 @@
 /**
  * Emit `docs/<slug>.md` from a `docs/source/<slug>/<slug>.ts` webpage manifest.
  *
- * This is the missing code path. Every existing renderer targets LaTeX
- * (`render-latex.ts`), one assembled Markdown file (`render-markdown.ts`), or
- * the viewer — nothing has ever emitted into the Jekyll site from content. The
- * shape here is deliberately copied from `gen-skill-docs.ts`, which has been
- * emitting 107 pages into `docs/reference/skill-instructions/` for months:
- * derive the front matter, wrap the body, write, and gate on `--check` so the
- * generated copy cannot drift from its source.
+ * Same shape as `gen-skill-docs.ts`: derive the front matter, wrap the body,
+ * write, and gate on `--check` so the generated copy cannot drift from its
+ * source. Over a hand-written page it gives:
  *
- * WHAT THIS BUYS OVER A HAND-WRITTEN PAGE, concretely:
- *
- *   1. Anchors stop depending on heading text. `heading_anchors: true` derives
- *      `#extract-structure` from the words in the heading, so a retitle
- *      silently breaks every inbound link — including the subprocess links
- *      `render-bpmn.ts` derives from a node's `asset.source`
- *      (`process-presentations.ts`). Each node's `id` is pinned with
- *      kramdown's `{: #id }` instead.
- *   2. Every node gets an edit link to ITS OWN source. Jekyll knows only
- *      `page.path`, so a per-node link is impossible from the theme: the
- *      node -> file mapping exists only here, in the thing that assembles the
- *      page. That is the whole argument for generating the page at all.
+ *   1. Anchors that do not depend on heading text. Each node's `id` is pinned
+ *      with kramdown's `{: #id }`, so a retitle does not break inbound links
+ *      (including the subprocess links `render-bpmn.ts` derives from a node's
+ *      `asset.source`, `process-presentations.ts`).
+ *   2. An edit link per node to ITS OWN source; Jekyll knows only
+ *      `page.path`, so only the page assembler can do this.
  *   3. An asset's edit link points at the `.bpmn`, never at the generated
- *      `.svg`. `render-bpmn.ts` is explicit that the SVGs are never
- *      hand-edited; a link inviting someone to do so would be worse than none.
+ *      `.svg`, which `render-bpmn.ts` says is never hand-edited.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-docs-pages.ts            # write

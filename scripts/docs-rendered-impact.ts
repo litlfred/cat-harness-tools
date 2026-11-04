@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 /**
  * The DOCS SITE's answer to the rendered-impact contract
- * (`cat-harness/schemas/ui/rendered-impact.ts`, bean `bnjs`, issue #971): from
- * the files a change touched, the pages of the just-the-docs site it alters.
+ * (`cat-harness/schemas/ui/rendered-impact.ts`): from the files a change
+ * touched, the pages of the just-the-docs site it alters.
  *
  * ## How the site is made, and so how a file reaches a page
  *
@@ -24,24 +24,21 @@
  * ## An include the theme may call is reached by every page
  *
  * just-the-docs includes `head_custom.html`, `title.html` and others from its
- * own layouts, so no file in OUR tree names them, and "nothing includes it"
- * would read as "no page changes" — the most expensive wrong answer here. So
- * an include is site-wide when its name is one the theme defines (read from
- * the installed theme gem), when the theme cannot be read (then EVERY include
- * is), or when nothing in the tree includes it.
+ * own layouts, so no file in OUR tree names them. An include is therefore
+ * site-wide when its name is one the theme defines (read from the installed
+ * theme gem), when the theme cannot be read (then EVERY include is), or when
+ * nothing in the tree includes it.
  *
  * ## Outside the composed tree: the staging cone is the authority
  *
- * A script, a skill, a schema reaches the site only through a writer: one
- * whose output is committed (and so appears in the change itself, mapped
- * above), or one the build runs (`derive:publish`, the KG viewer, the
- * instance mounts), whose output nobody can map file by file before the
- * build. The cone (bean `4j86`) already answers "which declared directories
- * can this file reach", with "any doubt carries". So a file the cone carries
- * somewhere is `undetermined` (`scope: unknown`) with the directories named,
- * never a guess at pages; a file it reaches nowhere renders no page. The
- * staging build's measurement against main's site (`measure-rendered-impact`)
- * is what then says which pages actually moved.
+ * A script, a skill, a schema reaches the site only through a writer, whose
+ * output is either committed (and mapped above) or built (`derive:publish`,
+ * the KG viewer, the instance mounts) and so cannot be mapped file by file
+ * before the build. A file the cone carries somewhere is `undetermined`
+ * (`scope: unknown`) with the directories named, never a guess at pages; a
+ * file it reaches nowhere renders no page. The staging build's measurement
+ * against main's site (`measure-rendered-impact`) then says which pages
+ * actually moved.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/docs-rendered-impact.ts (--changed a,b | --changed-from <file> | --base <ref> [--head <ref>])

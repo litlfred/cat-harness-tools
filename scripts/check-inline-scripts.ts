@@ -5,23 +5,13 @@
  * @module scripts/check-inline-scripts
  * @covers none — it reads a built site's HTML, not a graph
  *
- * ## The defect it exists for (owner's report, 2026-10-15)
- *
- * `/en/cat-harness/schemas/bootstrap/` never loaded its schemas:
- * `Uncaught SyntaxError: Invalid or unexpected token`. `gen-schema-viz.ts`
- * wrote `var h = '<h2>' + esc(d.name) + '</h2>…'` into an inline `<script>`,
- * and the theme's markup passes rewrote that text as if it were markup:
- * the heading-anchor pass broke the `'…'` literal across lines, and the
- * table-wrapper pass dropped `class="table-wrapper"` into a `"…"` literal.
- * The generator's output was correct, every gate was green, and the site
- * published the broken page. The same was true of `folio/`, `uploads/`,
- * `voices/` and every `schemas/` page.
- *
- * The chrome now keeps those passes out of `<script>` and `<style>`
- * (cat-harness `site-chrome/_includes/vendor/anchor_headings.html` and
- * `_layouts/table_wrappers.html`). This is the other half: a check on what
- * SHIPS, so the class — any build step that rewrites a script's text — cannot
- * come back silently, whichever step does it next.
+ * The theme's markup passes (heading anchors, table wrappers) can rewrite an
+ * inline `<script>`'s text as if it were markup, breaking a string literal
+ * while every generator's output is correct and every source gate green. The
+ * chrome keeps those passes out of `<script>` and `<style>` (cat-harness
+ * `site-chrome/_includes/vendor/anchor_headings.html` and
+ * `_layouts/table_wrappers.html`); this checks what SHIPS, so any build step
+ * that rewrites a script's text is caught.
  *
  * ## What it asks, per inline CLASSIC script
  *

@@ -5,77 +5,34 @@
  * @module scripts/check-lane-documentation
  * @covers processes, scenarios
  *
- * ## Why this exists, and why it is a glossary problem
+ * A BPMN lane's `name` and `<bpmn:documentation>` together are what the
+ * glossary reads as a term's label and definition. The subject is every lane
+ * that contains a task (a lane nothing happens in is a drawing decision).
+ * An activity in no lane cannot be answered and is reported in its own
+ * family, never as a pass.
  *
- * The owner asked (issue #596) for a glossary built from terms extracted out of
- * KG assets, naming *"a bpmn diagram swimlane has title/description"* as a
- * source. Measured 2026-09-21 across the whole corpus: **61 diagrams, 164
- * lanes, ZERO carrying `<bpmn:documentation>`.** A lane has a `name` and
- * nothing else.
+ * Axes, each its own family:
  *
- * Extracting on that basis would have produced 164 glossary entries with a
- * label and no definition — an index wearing a glossary's name. So the
- * documentation is a DEFECT TO FIX rather than a gap to report and live with,
- * and this check is what makes the fix measurable. `name` + `documentation`
- * together are what the glossary reads.
+ * | axis | who can fix it |
+ * |---|---|
+ * | `name` — the term's LABEL | an author |
+ * | `documentation` — its DEFINITION | an author |
+ * | extracted for translation (names reach every `.pot`) | the platform |
  *
- * ## The subject is the TASK's lane, not every lane
- *
- * A lane nothing happens in is a drawing decision. A lane that CONTAINS A TASK
- * is a swimlane in the sense `AGENTS.md` means — *"a persona an actor takes on
- * because of the lane it is acting in"* — so a reader meeting that task has to
- * know what the lane is, and the diagram is the only place that can say.
- *
- * Measured on the same corpus: 433 activities, 432 of them inside a lane.
- * Scoping to task-containing lanes takes the subject from 164 to **157** and
- * makes every finding one a reader would actually hit.
- *
- * ## The one task in no lane is UNDETERMINED, never a pass
- *
- * Exactly one activity sits outside any lane. It has no containing lane, so
- * the question this check asks cannot be answered about it — and "cannot be
- * answered" is not "fine". It is reported in its own family and counted, the
- * house rule every other check here follows (`ci-health`, `health`,
- * `kg:audit`): an unknown rendered as a pass is indistinguishable from a real
- * pass, while an unknown rendered as a finding costs somebody a minute.
- *
- ## THREE AXES, because a glossary term needs all three
- *
- * The owner, 2026-09-21: *"does a swimlane have name, have documentation? and
- * translations of course"*. Each is a separate family, because each fails
- * differently and only one of them is currently broken:
- *
- * | axis | measured 2026-09-21 | who can fix it |
- * |---|---|---|
- * | `name` — the term's LABEL | 162 of 162 have one | — |
- * | `documentation` — its DEFINITION | **0 of 157** | an author |
- * | extracted for translation | 137 of 137 names reach every `.pot` | — |
- *
- * **The translation axis asks about EXTRACTION, not about a translation
- * existing.** This repository ships catalogues whose `msgstr` is deliberately
- * empty, awaiting a person — a machine translation nobody here reads is an
- * artefact whose correctness cannot be checked here. Extraction is the
- * platform's job and can be gated; translating is a person's and can only be
- * reported. Demanding a non-empty `msgstr` would be a gate on somebody else's
- * unfinished work.
- *
- * It is measured anyway, and it is the axis that proves the other two matter:
- * `extractBpmn` already handles `<documentation>`, so every definition written
- * to fix the family above reaches all five locales' catalogues on the next
- * extract with nothing further to wire. The pipeline is not the gap. The
- * source text is.
+ * The translation axis checks EXTRACTION, not that a translation exists:
+ * catalogues ship with empty `msgstr` awaiting a person. `extractBpmn`
+ * already handles `<documentation>`, so a definition written here reaches
+ * every locale's catalogue on the next extract.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/check-lane-documentation.ts
  *   bun run cat-harness-tools/scripts/check-lane-documentation.ts --json
  *   bun run cat check:lane-documentation:check   # JUDGE: compute and judge, write nothing (the gate)
  *
- * Exit (writer): 0 clean, 1 any finding — or zero diagrams, which it has
- * always reported as 1. Judge mode (`--check`, bean `bo44`): 0 clean · 1 any
- * of the four families · 2 zero diagrams (could not determine — a corpus of
- * nothing is not a finding about lanes either), an unknown flag, or a run
- * that threw. An activity in no lane stays a FINDING in both modes: it is
- * undetermined about ONE activity, and the gate has always failed on it.
+ * Exit (writer): 0 clean, 1 any finding or zero diagrams. Judge mode
+ * (`--check`): 0 clean · 1 any of the four families · 2 zero diagrams, an
+ * unknown flag, or a run that threw. An activity in no lane is a FINDING in
+ * both modes.
  */
 import { readFileSync } from "node:fs";
 import { relative, resolve } from "node:path";

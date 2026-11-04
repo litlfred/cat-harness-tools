@@ -6,14 +6,6 @@
  * pointing at the general node (data-modelling step 8), so the index is built
  * from it and nothing is authored on the process.
  *
- * Until bean `xl55` the process pointed the other way — a hand-written
- * `<…:link href="page.html#section"/>` on a call activity — and of the ten
- * such links, five were broken somewhere: two named an anchor no page had,
- * one sat on a gateway the renderer never reads, and every one of them
- * resolved against the wrong directory on the generated `/processes/` pages.
- * Nothing checked them, because nothing could: the process cannot tell
- * whether a page still says what it once said about it.
- *
  * Two readers use this index: `render-bpmn.ts` (where a subprocess box
  * links) and `gen-processes-viz.ts` (the "Presented on" line of a process
  * page).

@@ -4,16 +4,9 @@
  *
  * The CLI face of {@link materialiseDeclaredDirectories}. Run by
  * `scripts/session-start-coord-sweep.sh` and by `init-folio`, so that a
- * declared directory exists in every checkout rather than only in the one
- * where somebody happened to create it by hand.
- *
- * Why this is a real step and not housekeeping: `AGENTS.md` records the bean
- * `dh4f` defect — "a declared-but-absent directory is where a consumer scans
- * nothing and reports a clean run over it". Absent and empty look identical to
- * a consumer, so the declaration alone converts a gap into a false pass. The
- * document-ingestion pipeline is the sharp case: the corpus checklist greps
- * `library/` and not `uploads/`, so a missing `library/` reads as "nobody has
- * ingested anything" rather than as a missing directory.
+ * declared directory exists in every checkout. A declared-but-absent
+ * directory is where a consumer scans nothing and reports a clean run (e.g. a
+ * missing `library/` reads as "nobody has ingested anything").
  *
  *     bun run cat harness:dirs            # create what is missing
  *     bun run cat harness:dirs --check    # report only; exit 1 if anything is missing

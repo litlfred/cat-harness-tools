@@ -3,13 +3,10 @@
  * Write a minimal aggregate root beside a sibling layout of fresh clones, so
  * the checkout scripts can run there without the full folio-assistant index.
  *
- * ## Why
- *
  * `run-script.ts` runs every checkout script from `dirname(HARNESS_ROOT)`, and
  * the scripts are spelled `bun run cat-harness-tools/scripts/…`: they assume a
- * composed checkout as cwd. The owner kept that (bean `w1gy`, F11, option A,
- * 2026-10-30) and chose this follow-up (C): in a bare sibling layout the parent
- * directory gets the two files a composed checkout's root has and the scripts
+ * composed checkout as cwd. In a bare sibling layout this gives the parent
+ * directory the two files a composed checkout's root has and the scripts
  * read — `index.config.json`, naming each sibling as a LOCAL instance, and a
  * `package.json` carrying the `cat` alias (`bun run cat <name>`).
  *

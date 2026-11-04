@@ -11,16 +11,12 @@
  * bun run cat-harness-tools/scripts/stage-workflow-local.ts --repo . [--branch B] [--base main] [--pr N] [--plan] [--no-push]
  * ```
  *
- * ## Why (owner, 2026-11-01, Q-ABP-1 A; folio-assistant#2881)
- *
  * `stage-local.ts` builds a folio from the inputs of `folio-staging.yml`, and
- * an IG or a `site.build` repository from its recipe. folio-assistant's own
- * preview is neither: it is the ~70 steps of the `stage` job of
- * `feature-staging.yml`, written inline. The owner chose to REPLAY those steps
- * rather than write the build down a second time: *"A. Replay workflow steps
- * locally"*. The workflow stays the one definition of the build, so an agent
- * build and CI's full recheck (Q-SPD-9b A) run the same steps on the same
- * tree, and a difference between them is a real difference.
+ * an IG or a `site.build` repository from its recipe. A preview whose build is
+ * written inline in a workflow job (folio-assistant's `stage` job of
+ * `feature-staging.yml`) is replayed instead, so the workflow stays the one
+ * definition of the build: an agent build and CI's full recheck run the same
+ * steps on the same tree, and a difference between them is a real difference.
  *
  * ## What is replayed, and what is not
  *

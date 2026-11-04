@@ -6,49 +6,21 @@
  * @module scripts/check-instance-themes
  * @covers themes
  *
- * ## Why this exists — bean `z6xd`
- *
- * `themes` read `state: "covered"` with three gates behind it, and **none of
- * the three resolved a themes directory.** `check-theme-art` reads
- * `readDeclaration` + `THEME_LAYOUTS`; `gen-themes-css` and
- * `render-theme-sheet` read `THEMES`. Those are the platform's own theme
- * constants and an instance's declared theme ART — and the IRIS replica's
- * declaration is explicit that they are a different thing from its graph:
- *
- * > These are NOT the platform's twelve themes: those are cat-harness's own
- * > furniture, and a palette read off a WHO style guide is subject matter.
- *
- * So the kind was reported audited over ground nothing reached. I wrote one of
- * those three `@covers` lines myself, from the script's TITLE rather than its
- * scan set — the exact mistake the `@covers` work existed to prevent — and two
- * sibling sessions copied it. The three declarations are now `@covers none`
- * with their real subjects, and this is the gate that covers the graph.
- *
- * ## It asks the runtime's own question, and does not re-derive it
- *
- * `instanceThemes` in `schemas/ui/theme-by-ref.ts` is what every generator
- * resolves a theme reference through. This calls it. A gate that re-derived
- * "which themes does this instance own" would be a second answer, free to
- * disagree with the one the pages are actually rendered from — which is the
- * defect this bean is about, one layer along.
- *
- * ## What it grades, and what it refuses to
+ * Resolves themes through `instanceThemes` in `schemas/ui/theme-by-ref.ts`,
+ * the function every generator uses, rather than re-deriving them, so the gate
+ * cannot disagree with what pages are rendered from. The platform's own theme
+ * constants (`THEMES`, `THEME_LAYOUTS`) are a different thing and are not
+ * read here.
  *
  * **Graded:** a declared themes directory whose module will not load, and a
- * theme that does not satisfy `ResolvedThemeSchema`. Both are broken
- * declarations with one repair.
+ * theme that does not satisfy `ResolvedThemeSchema`.
  *
- * **Reported, never graded:** which KINDS an instance's themes carry. The
- * board styles a card only from `sticky` themes, and whether an instance
- * authors one is an authoring decision, not a defect: #1584 reserved it for
- * the owner, who answered it for the IRIS replica on 2026-09-30 ("author iris-sticky",
- * bean `v8n5`) and for no other instance. So the kinds are printed with their
- * denominator and no verdict is attached. A check that failed on a missing
- * `sticky` would be answering a question its author was told not to.
+ * **Reported, never graded:** which kinds an instance's themes carry (e.g.
+ * `sticky`, which the board styles cards from). Authoring one is the
+ * instance's choice, not a defect.
  *
- * **Could-not-determine is never green** (bean `dh4f`): an instance whose
- * declaration will not load, or a themes module that throws, exits 2 rather
- * than being counted clean or skipped silently.
+ * **Could-not-determine is never green:** an instance whose declaration will
+ * not load, or a themes module that throws, exits 2.
  *
  * Exit codes: 0 report only, or `--check` with no blocking finding · 1
  * `--check` with one · 2 could not determine.

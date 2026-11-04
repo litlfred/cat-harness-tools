@@ -5,9 +5,8 @@
  * @module scripts/notebook-structure
  * @covers none — a WRITER an ingest step calls, not an audit.
  *
- * Bean `rkqp`, owner 2026-09-30: notebook ingestion is "A+B", a variant of the
- * shared document-structure base (`schemas/content/document-structure.ts`) rather than
- * a notebook rendered to PDF. What this rung decides, and why:
+ * A notebook is a variant of the shared document-structure base
+ * (`schemas/content/document-structure.ts`), not a notebook rendered to PDF:
  *
  * - **A section is a heading and the cells under it**, up to the next cell
  *   that opens with a heading. A notebook's markdown headings are its author's
@@ -15,9 +14,8 @@
  *   a `preamble` section when they hold anything.
  * - **Code cells are kept as code**, fenced with the notebook's declared
  *   language, and counted per section. They are never executed.
- * - **Outputs are not kept.** They are what a run produced, not what the
- *   author wrote, and they can be large or binary. `structure_note` says so,
- *   so the omission is recorded rather than silent.
+ * - **Outputs are not kept** (they are run products, possibly large or
+ *   binary); `structure_note` records the omission.
  * - **A notebook with no heading is one section**, and `structure_note` says
  *   that no structure was found; the schema refuses the pair otherwise.
  *

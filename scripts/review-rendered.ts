@@ -1,15 +1,13 @@
 /**
- * The review page's RENDERED list (bean `bnjs`, issue #971): which pages of the
- * built site a Change Set alters, read in the reader's browser from the
- * preview's own `rendered-impact.json`.
+ * The review page's RENDERED list: which pages of the built site a Change Set
+ * alters, read in the reader's browser from the preview's own
+ * `rendered-impact.json`.
  *
- * Owner, 2026-10-06: *"do the staging build step with dynamic loading on
- * review page"*. So the page is static and carries no list: it fetches the
- * file the staging build published (one `rendered-impact/v1` per renderer)
- * when it is opened, as it fetches `changeset.json`. A preview whose build
- * published no such file says so in words; an empty list is never shown in
- * its place, because "no page changed" and "nobody computed which" are
- * different facts.
+ * The page is static and carries no list: when opened it fetches the file the
+ * staging build published (one `rendered-impact/v1` per renderer), as it
+ * fetches `changeset.json`. A preview whose build published no such file says
+ * so in words; an empty list is never shown in its place, because "no page
+ * changed" and "nobody computed which" are different facts.
  *
  * Both functions are embedded in the page by `toString()`, like the heat map
  * and the outline, so they must stay self-contained: no imports, no closures

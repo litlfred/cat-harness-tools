@@ -5,10 +5,10 @@
  * @module cat-harness-tools/scripts/check-declaration-resolution
  * @covers cat-harness — every instance declaration in the checkout
  *
- * ## Why one more check, and why it is mostly not new code
+ * ## Mostly composition
  *
- * A declaration names four kinds of thing, and four existing gates each
- * resolve one of them:
+ * Four existing gates each resolve one field; this gate CALLS them rather
+ * than restating them, and resolves the rest itself:
  *
  * | field | resolved by | what it answers |
  * |---|---|---|
@@ -18,27 +18,23 @@
  * | `needs` | `check:instance-graph` → `resolveInstanceGraph` | every dependency resolves, no cycle |
  * | `enableSubgraphs` | here → `enableSubgraphsProblems` | each id names an opt-in sub-graph of this instance or its `needs` closure |
  *
- * This gate CALLS those four rather than restating them, and adds only the
- * one reference none of them resolves: `visualisers[].coversKinds`, a graph
- * typology. `checkVisualiserRoutes` filters to PUBLISHED kinds before judging,
- * so an unregistered kind was dropped unjudged. (`covers`, a directory id, is
- * refused by the declaration schema itself — measured 2026-10-12 — so it is
- * not re-checked here; a declaration that does not parse is a finding.)
+ * It also resolves `visualisers[].coversKinds`, a graph typology, which
+ * `checkVisualiserRoutes` drops unjudged (it filters to PUBLISHED kinds).
+ * `covers`, a directory id, is refused by the declaration schema itself; a
+ * declaration that does not parse is a finding.
  *
- * Its value is the composition: one run, one verdict, per instance and per
- * field, over the checkout as it is actually laid out — the question
- * `separation:cutover:check` asks of a repository that has just left the
- * monorepo.
+ * The result is one run, one verdict, per instance and per field, over the
+ * checkout as it is actually laid out.
  *
- * ## Lesson 6, and why the checkout is `cwd`
+ * ## The checkout is `cwd`
  *
- * kg-separation lesson 6: no fixed-depth repository root. Every gate composed
- * here reads the checkout from its argument, and the graph-typology registry
- * reads kinds from the checkout under inspection (`cwd`) before the one the
- * harness module sits in (`defaultTypologyRoots`, cat-harness). So `--root`
- * re-runs this script with `cwd` set to that root rather than passing a path
- * the registry would not see: a declaration whose kinds come from a mounted
- * layer is then judged against that layer, standalone or mounted alike.
+ * There is no fixed-depth repository root. Every gate composed here reads the
+ * checkout from its argument, and the graph-typology registry reads kinds
+ * from the checkout under inspection (`cwd`) before the one the harness
+ * module sits in (`defaultTypologyRoots`, cat-harness). So `--root` re-runs
+ * this script with `cwd` set to that root: a declaration whose kinds come
+ * from a mounted layer is judged against that layer, standalone or mounted
+ * alike.
  *
  * ## Three states, never two
  *

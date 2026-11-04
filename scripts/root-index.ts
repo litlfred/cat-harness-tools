@@ -1,19 +1,14 @@
 #!/usr/bin/env bun
 /**
  * The root meta-skeleton: `<site>/index.jsonld` (and its `.json` alias) names
- * every declared instance at depth 1 — bean `4ak5` item 3.
+ * every declared instance at depth 1. Built at publish time only; there is no
+ * committed copy, since a committed one would conflict whenever two PRs change
+ * the set of harnesses.
  *
  * @module scripts/root-index
  * @covers cat-harness
  *
- * Owner, 2026-10-02: *"maybe we also need index.json index.jdonld at root of
- * repo as meta-sleton naming all the KG harnesses (and maybe materialziing
- * them at depth 1 so a single retriveal gets the subgraph/harness metadata, no
- * heavy assetds)"*. Owner, 2026-10-04: built **at publish time only**, with no
- * committed copy — a committed generated file conflicts whenever two PRs change
- * the set of harnesses, which is the churn this session's merges measured.
- *
- * ## What an entry carries, and where each fact comes from
+ * ## What an entry carries
  *
  * One `Harness` per declared instance ({@link instanceRootsIn}),
  * read from its declaration and from the files the deploy already wrote:
@@ -24,18 +19,15 @@
  * - `dependsOn` — the declaration's `needs`, as the dependencies' `@id`s;
  * - `directory` — each declared directory's id, path and graph typologies;
  * - `subgraph` — its named-subgraph root, when the repository's subgraph
- *   index frames it (bean `c1m4`), or the `seeAlso` site that publishes it
- *   (bean `t8c4`);
+ *   index frames it, or the `seeAlso` site that publishes it;
  * - `nodes`, `bytes`, `sha256` — counted from the export document on disk.
  *
- * Nothing heavy: no node of any graph is inlined. One fetch is the whole map.
+ * No node of any graph is inlined. One fetch is the whole map.
  *
  * ## Could-not-determine is a failure, never a shorter index
  *
  * An instance whose export document is not where its identity says is a
- * PROBLEM and the run exits 1 having written nothing — item 5's "the root
- * index names an instance with no export". A partial map that read as whole
- * is the defect this index exists to end.
+ * PROBLEM and the run exits 1 having written nothing.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/root-index.ts --site ./_site [--base-url URL]

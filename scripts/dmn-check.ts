@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * dmn-check: run the DMN table checks (src/workflow/dmn-qa.ts) over an
- * instance's decision tables, wherever they sit (bean `lo3p`).
+ * instance's decision tables, wherever they sit.
  *
  * Usage, from an instance root that mounts cat-harness-tools:
  *
@@ -12,16 +12,13 @@
  * root, whichever exist. A table beside a folio block is compared with that
  * block's Markdown (same file stem, `.md`). The same decision id in more than
  * one file is a `dmn-one-copy` warning: the copy beside the folio block is the
- * one to keep (owner, Q-S4-4 A).
+ * one to keep.
  *
  * Exit code 1 when any error is found (with --strict, any warning too).
  *
- * The script is `dmn:report`, not `dmn:check`, on purpose. CI gates every
- * `check:*` and `*:check` script of an instance's whole dependency harness,
- * so a `dmn:check` here would run in every repository that mounts this layer
- * and turn red on tables nobody has fixed yet. A DTH that wants the gate
- * declares its own `check:dmn` once its tables pass (owner, Q-S4-5 A: warn
- * first, fix the tables in PRs).
+ * The script is `dmn:report`, not `dmn:check`: CI gates every `check:*` and
+ * `*:check` script of every repository that mounts this layer. A DTH that
+ * wants the gate declares its own `check:dmn` once its tables pass.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";

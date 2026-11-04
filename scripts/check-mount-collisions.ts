@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Mount path and route collision gate (bean folio-assistant-t4xb).
+ * Mount path and route collision gate.
  *
  * Checks that:
  * 1. Remote mount paths do not collide with:

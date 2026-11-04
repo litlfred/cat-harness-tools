@@ -1,13 +1,10 @@
 /**
  * Concern groups in EVERY grouping kind — skills, processes, schemas,
  * library, uml and the test directories — declared once from within and
- * inherited as members (placement PR0c, bean `ejye`; the eight groups of bean
- * `9umr`; option A of bean `1g4s`).
+ * inherited as members.
  *
  * @module scripts/concern-groups
  * @covers cat-harness
- *
- * ## The rule, in three sentences
  *
  * A grouping kind's directory names its groups in its own declaration file —
  * `skills/skills.json` (`topics`), `processes/processes.json`,
@@ -16,24 +13,14 @@
  * `code-lists/concern-group.json`. A group is declared ONCE, by the lowest
  * instance whose same-named directory declares it, and every higher
  * instance's same-named `<dir>/<group>/` is a MEMBER of it, so a higher
- * instance adds no group of its own. Nesting is declared FROM WITHIN (the
- * #980 rule `directory-conventions` carries): never by `<instance>.json`
- * reaching down a path it cannot verify.
+ * instance adds no group of its own. Nesting is declared FROM WITHIN, never
+ * by `<instance>.json` reaching down a path.
  *
- * ## Why one walker for every kind
+ * A member sits at the SAME path relative to its own instance as the
+ * declaring directory (core's `skills/library/` is a member of the harness's
+ * `skills/library/` group), which is why a group's directory is its code.
  *
- * `scripts/skill-topics.ts` already had this walk for skills, and the
- * placement proposal splits five more kinds the same way. Five private copies
- * of "which subdirectories are groups" would be five answers free to disagree
- * — the `dh4f` shape, where a consumer scanning the wrong set reports a clean
- * run over it. `packageDirsIn` now delegates here.
- *
- * ## "Same-named" is the member test
- *
- * A member is found at the SAME path relative to its own instance as the
- * declaring directory: core's `skills/library/` is a member of the harness's
- * `skills/library/` group. That is option A's rule one level down, and the
- * reason a group's directory is its code.
+ * This is the one walker for every kind; `packageDirsIn` delegates here.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";

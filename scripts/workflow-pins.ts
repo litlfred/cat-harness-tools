@@ -6,10 +6,9 @@
  * @module scripts/workflow-pins
  * @covers cat-harness — the instance axis: every `uses: litlfred/<layer>/…` line in .github is pinned to the commit index.lock.json mounts for that layer
  *
- * Owner, 2026-11-01 (security audit finding S1, card Q-SEC-4 "B. Pin all
- * 59"): a `uses: litlfred/cat-harness-tools/.github/workflows/x.yml@main`
- * line runs whatever that branch holds when the run starts, so one bad push
- * to a lower layer's main runs in every repository that calls it, with that
+ * A `uses: litlfred/cat-harness-tools/.github/workflows/x.yml@main` line runs
+ * whatever that branch holds when the run starts, so one bad push to a lower
+ * layer's main would run in every repository that calls it, with that
  * repository's tokens. The lock already names the commit of each layer this
  * repository has accepted; the call follows it:
  *
@@ -25,11 +24,11 @@
  *
  * `mount:remote` runs `--write` after it writes the lock, so a re-pin moves
  * the calls with the mounts. In CI (`CI=true`) it does not: the re-pin train's
- * App has no `workflows` permission (owner, 2026-11-01, Q-PIN-6 "C"), so a
- * train cannot push workflow-file edits. A call pinned to an OLDER commit than
- * the lock therefore only trails it: the check warns and passes, and the next
- * agent-session run of `workflow-pins` catches it up. A branch or tag still
- * fails. `WORKFLOW_PINS_STRICT=1` makes a trailing pin fail too.
+ * App has no `workflows` permission, so a train cannot push workflow-file
+ * edits. A call pinned to an OLDER commit than the lock therefore only trails
+ * it: the check warns and passes, and the next agent-session run of
+ * `workflow-pins` catches it up. A branch or tag still fails.
+ * `WORKFLOW_PINS_STRICT=1` makes a trailing pin fail too.
  *
  *   bun run cat workflow-pins          # check (the gate is check:workflow-pins)
  *   bun run cat workflow-pins --write  # rewrite the lines

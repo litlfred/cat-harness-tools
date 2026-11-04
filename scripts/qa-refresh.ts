@@ -1,42 +1,27 @@
 #!/usr/bin/env bun
 /**
  * qa-refresh — produce the QA working copy that `qa-publish` stores, and say
- * whether it is complete. Bean `3hk4`, a blocker of `5hox` (arc `3fva`).
- *
- * ## The gap it closes
+ * whether it is complete.
  *
  * `qa:publish` stores whatever the checkout holds under the declared `qa`
- * directories. While `test/results/` is committed, that is the commit's own
- * copy. Once `5hox` removes it, a fresh CI checkout holds ONE file there (the
- * bootstrap kg-export sidecar the publish job writes itself), so every
- * `main/<sha>` entry would shrink to one file and every `--against main`
- * baseline would shrink with it. Measured on a scratch branch with the removal
- * cherry-picked: 0 of the inventory's 1,186 paths on disk after checkout.
+ * directories. Where `test/results/` is not committed, a fresh CI checkout
+ * holds almost nothing there, so the writers must run before publishing.
  *
- * ## Why the publish job runs the writers, and the gates job does not hand over
+ * ## The publish job runs the writers
  *
- * The job's comment named two fixes: (a) the gates job uploads its working
- * copy as an artifact, (b) the publish job runs the QA writers. (a) carries
- * nothing. Every gate over the `qa` graph is in JUDGE mode (beans `bo44`,
- * `id4s`, `0dav`, `oqe3`): it computes, judges and **writes nothing**, and
- * `gates.ts`' tree guard reports a read-only gate that writes. So after the
- * gates run, their checkout's `test/results/` is exactly the fresh checkout's,
- * and an artifact of it is the one-file entry this bean exists to prevent.
- * Making the gates write again would undo judge mode, and would put the
- * writers on the critical path of every PR and of every local `bun run cat gates`.
- *
- * So (b): the writers run here, in `qa-publish`, which is not a gate and runs
- * after the gates whatever they concluded. It is the same commit and the same
- * producers, so what it stores is what the gates judged, recomputed.
+ * Every gate over the `qa` graph is in JUDGE mode: it computes, judges and
+ * **writes nothing** (`gates.ts`' tree guard reports a read-only gate that
+ * writes), so the gates job has no working copy to hand over. Making gates
+ * write would put the writers on the critical path of every PR and of every
+ * local `bun run cat gates`. So the writers run here, in `qa-publish`, which
+ * is not a gate and runs after the gates whatever they concluded — the same
+ * commit and the same producers, so what it stores is what the gates judged,
+ * recomputed.
  *
  * ## The writers are DECLARED, and the declaration is checked on every run
  *
- * {@link QA_WRITERS} says which command writes which part of the tree. It was
- * measured, not inferred: on the scratch branch each writer was run into the
- * empty tree and the result compared path-for-path with the files-present
- * inventory (`qa:verify-moved --inventory`). A list is how a producer goes
- * missing, so the list is checked where it matters — after every computed
- * run, over the real tree:
+ * {@link QA_WRITERS} says which command writes which part of the tree. After
+ * every computed run, over the real tree:
  *
  * - a file **no** writer claims is `unclaimed`: something wrote where the
  *   declaration does not look, and the record's provenance is unknown;
@@ -48,37 +33,23 @@
  * --completeness` refuses an incomplete report. A partial entry is never
  * stored as if it were whole.
  *
- * ## Two modes, decided by the checkout
+ * ## Modes, decided per writer
  *
- * - **tracked** — every writer's declared paths are still tracked (before
- *   `5hox`). Nothing is run: the commit's own copy IS the record, and
- *   `5hox`'s precondition is that `main/<sha>` is byte-identical to it
- *   (`qa:verify-moved`). Running the writers would make it differ.
- * - **computed** — nothing is tracked there (after `5hox`). Every writer runs,
- *   in order, into the working copy.
- * - **mixed** — some writers' paths are tracked and some are not. Each writer
- *   is decided ON ITS OWN DECLARED PATHS: unbacked, it runs; backed, the
- *   commit's copy is its record and it does not.
+ * Each writer is decided ON ITS OWN DECLARED PATHS, so one family can be
+ * untracked while others stay tracked:
  *
- * ## Why the mode is per WRITER and not per checkout (bean `tqjj`)
+ * - **tracked** — every writer's declared paths are still tracked. Nothing is
+ *   run: the commit's own copy IS the record, and `main/<sha>` must be
+ *   byte-identical to it (`qa:verify-moved`).
+ * - **computed** — nothing is tracked there. Every writer runs, in order,
+ *   into the working copy.
+ * - **mixed** — some writers' paths are tracked and some are not. Unbacked, a
+ *   writer runs; backed, the commit's copy is its record and it does not.
  *
- * It was per checkout until 2026-10-04, as one boolean over every tracked file
- * under the qa roots. That made `5hox` **atomic**: untracking one family while
- * its 1,020 siblings stayed tracked left the mode at `tracked`, so the family's
- * writer did not run, so nothing produced it, so `qa-reports` stopped carrying
- * it — and the readers that fetch it by ref went UNKNOWN with no step having
- * failed. Measured on the LSI family, the first subset whose readers were
- * migrated (`oq1j`). A removal that can only be done 1,186 files at once is a
- * removal that does not get done; `QA_WRITERS` already declares each writer's
- * paths, so the decision each writer needs was already in hand.
- *
- * The asymmetry between the two halves of `mixed` is deliberate. `empty` and
- * `failed` are judged over EVERY writer, because a backed writer's family
- * holding no file means the commit's copy is missing it. `unclaimed` is judged
- * only over the files NOT tracked: a tracked file's provenance is the commit
- * that carries it, so asking which writer claims it is asking the wrong
- * question, and answering it would fail `qa-publish` over files this change
- * does not touch.
+ * In `mixed`, `empty` and `failed` are judged over EVERY writer (a backed
+ * writer's family holding no file means the commit's copy is missing it), but
+ * `unclaimed` only over files NOT tracked: a tracked file's provenance is the
+ * commit that carries it.
  *
  * Usage:
  *   bun run cat qa:refresh [--report FILE] [--json]   # run (computed) or account (tracked); write the report

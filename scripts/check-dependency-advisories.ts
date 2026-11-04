@@ -1,35 +1,19 @@
 /**
- * Is anything we depend on KNOWN-VULNERABLE? Nobody was asking.
+ * Is anything we depend on KNOWN-VULNERABLE?
  *
- * `j41m` measured the dependency tree and found the pins in good order: a
- * committed `bun.lock`, 19 direct dependencies resolving to ~373 packages,
- * every one of them reproducible. What it also found is that **reproducible
- * is not safe**. A lockfile answers *"will this resolve the same way
- * tomorrow?"* — yes. It does not answer *"is anything in here known-
- * vulnerable?"*, and before this gate no step in this repository asked.
+ * A committed `bun.lock` makes the tree reproducible; it does not say whether
+ * anything in it is known-vulnerable. Currency is not validity: this step
+ * asks the second question.
  *
- * That is `jfr6`'s split — **currency is not validity** — arriving one layer
- * down, in the dependency tree rather than in the generated artefacts. The 42
- * generator checks ask whether the committed bytes match what the generator
- * would write; none asks whether the artefact works. The lockfile asks whether
- * the tree is the tree we recorded; none asked whether the tree is sound.
+ * ## WARN-ONLY
  *
- * ## WARN-ONLY, and that is a decision rather than timidity
+ * A hard gate would let a **transitive** advisory you cannot patch turn
+ * every PR red until somebody adds a suppression, and suppressions rot. So
+ * this reports on every PR and blocks nothing. Dependabot
+ * (`.github/dependabot.yml`) is the other half: it turns the same advisories
+ * into reviewable PRs.
  *
- * The owner chose advisory over blocking, and the reason is worth keeping: a
- * hard gate on advisories hands a **transitive** advisory you cannot patch the
- * power to red every PR until somebody adds a suppression — and the
- * suppression is what rots. An advisory step reports on every PR and blocks
- * nothing. Dependabot (`.github/dependabot.yml`) is the other half: it turns
- * the same advisories into reviewable PRs rather than into a gate.
- *
- * ## The failure mode this gate was written against
- *
- * This workflow's own header records it, about the ruff step: it *"warned
- * about the missing paths and exited 0, so the step reported a clean baseline
- * it had never computed."* A warn-only step that exits 0 come what may is one
- * registry outage away from being that. So this gate separates the two things
- * an exit code cannot:
+ * ## Three states, which an exit code alone cannot carry
  *
  * | state | meaning | printed as |
  * |---|---|---|
@@ -37,11 +21,9 @@
  * | `advisories` | the audit ran and found something | `::warning::` per advisory |
  * | `undetermined` | the audit did not produce an answer | `::warning::` + **never** `✓` |
  *
- * **`undetermined` is never rendered as clean.** That is the same three-state
- * rule `check:ci-health` and `bun run cat health` are built on, and it is the
- * whole reason this is a script rather than four lines of YAML: bash reaches
- * for `|| true`, and `|| true` is precisely how "could not determine" becomes
- * "fine".
+ * **`undetermined` is never rendered as clean** — the rule `check:ci-health`
+ * and `bun run cat health` follow, and the reason this is a script rather
+ * than YAML with `|| true`.
  *
  * ## What this gate does NOT claim
  *

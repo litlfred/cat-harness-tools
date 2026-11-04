@@ -6,38 +6,31 @@
  * @covers cat-harness — it reads the instance declaration's graph typologies and asks each for art; the
  *   avatars themselves are code in `schemas/content/avatars.ts`, as `gen-avatars-css` records
  *
- * Owner, 2026-09-19: *"QA sidescares if avatar thems not fully done."*
- *
  * ## Why this is a QA result and not an assertion
  *
  * The kind vocabulary is OPEN — `BASE_GRAPH_TYPOLOGIES` is an open registry and
  * an `fsh-guts` node's `kind` is deliberately a free string. So a missing
  * avatar is not a build error: it is a fact about how far the art has got,
  * and it must read as MISSING rather than as a blank the viewer silently
- * tolerates. That is the third-state rule applied to pictures.
+ * tolerates.
  *
- * A written result rather than a printed one, for the reason
- * `check-workflow-refs` paid for: a console report's previous answer is
- * gone, which makes "this kind has never had art" and "this kind lost its
- * art in the commit under review" indistinguishable.
+ * The result is written, not only printed, so "never had art" and "lost its
+ * art in the commit under review" can be told apart.
  *
- * ## What it checks, and what it deliberately does NOT
+ * ## The trash state is not checked per kind
  *
  * The trash state is DERIVED from the base glyph (see `schemas/content/avatars.ts`),
- * so trash coverage cannot be missing and checking it would be a criterion
- * that can never fail — which reads as coverage while measuring nothing.
- * This asserts the derivation is in place ONCE, and spends its per-kind
- * attention on the cell that can actually be empty.
+ * so it cannot be missing per kind. This asserts the derivation is in place
+ * ONCE.
  *
  * Usage:
  *   bun run cat check:avatar-coverage          # report, write the sidecar, exit 0
  *   bun run cat check:avatar-coverage:check    # JUDGE: compute and judge, write nothing (the gate)
  *
- * Exit codes: the writer exits 0. Judge mode (`--check`, bean `bo44`): 0 clean
+ * Exit codes: the writer exits 0. Judge mode (`--check`): 0 clean
  * · 1 a declared kind has no avatar, or the trash state is not derived · 2 no
  * kind required at all (could not determine), an unknown flag, or a run that
- * threw. Before `bo44`, `--check` ALSO wrote the sidecar, and no package
- * script or CI step ran it at all.
+ * threw.
  */
 import { join } from "node:path";
 

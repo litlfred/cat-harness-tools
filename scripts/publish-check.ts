@@ -6,24 +6,19 @@
  * @module scripts/publish-check
  * @covers none — it runs one declared writer and judges what it wrote; it reads no graph of its own
  *
- * ## Why the old `:check` cannot stay (owner, 2026-10-14, "B1")
- *
- * `auto:docs:check` and its siblings compared a generator's output with the
- * bytes the instance had COMMITTED. For an artefact an instance declares in
- * `builtAtPublish` (`@litlfred/cat-harness/schemas/kg/built-at-publish.ts`) there
- * are no committed bytes: it is computed over the checkout's other instances,
- * or from a branch-kept graph, so no commit could hold it current, and every
- * re-pin of the index turned the comparison red. Removing the comparison
- * without a replacement would leave a broken generator unseen until a publish.
+ * An artefact an instance declares in `builtAtPublish`
+ * (`@litlfred/cat-harness/schemas/kg/built-at-publish.ts`) has no committed
+ * bytes: it is computed over the checkout's other instances, or from a
+ * branch-kept graph, so comparing with a commit would go red on every re-pin.
  *
  * ## What it asks instead, in order
  *
  * 1. **The writer runs and exits 0** — a generator that throws is caught on the
  *    PR, not at publish.
- * 2. **The generator's own `--check` then passes against what it just wrote.**
- *    Nothing is compared with a commit any more; what that still catches is a
- *    generator that does not reach a fixed point (two runs disagree), an orphan
- *    it refuses, and every structural refusal the `--check` path already makes.
+ * 2. **The generator's own `--check` then passes against what it just wrote**,
+ *    which still catches a generator that does not reach a fixed point (two
+ *    runs disagree), an orphan it refuses, and every structural refusal the
+ *    `--check` path already makes.
  * 3. **Every declared artefact of this writer was built**: present, and a
  *    directory not empty.
  * 4. **No COMMITTED file moved.** A generator that writes both kinds — the
@@ -31,7 +26,7 @@
  *    renders on github.com) and other instances' (built at publish) — is still
  *    held to the committed half: any file that changed, appeared or vanished,
  *    is not under a declared path and is not ignored by ITS INSTANCE's own
- *    `.gitignore`, is stale, exactly what the old `--check` reported (see
+ *    `.gitignore`, is stale (see
  *    {@link ignoredBy} for why the enclosing checkout's rules are not asked).
  *    A file in a mount but outside every path the lock mounts is not
  *    committed here either ({@link outsideMounts}).
@@ -39,18 +34,16 @@
  * ```
  * bun run cat publish:check <writer-script>     # e.g. auto:docs
  * ```
- * With no declaration naming the writer it is exactly the old gate: the
- * writer's own `--check`, against committed bytes.
+ * With no declaration naming the writer it is the plain gate: the writer's
+ * own `--check`, against committed bytes.
  *
- * ## It writes into a scratch copy, never into the checkout (owner, 2026-10-30)
+ * ## It writes into a scratch copy, never into the checkout
  *
  * The writer runs in a copy of the checkout made for the run and deleted after
- * it ({@link scratchCopy}), and every question above is asked of the copy. The
- * mounted layers are never written. Before this, `render:bpmn:check` wrote 109
- * files into the cat-harness and bootstrap mounts on every run, so afterwards
- * `mount:remote:check` reported them "modified". On an air-gapped machine that
- * cannot re-clone a layer (bean `61tg`), that broke the mount until it was
- * re-laid by hand. The owner's ruling: a check never writes into a mount.
+ * it ({@link scratchCopy}), and every question above is asked of the copy. A
+ * check never writes into a mount: written files would show as "modified" to
+ * `mount:remote:check`, and a machine that cannot re-clone a layer could not
+ * repair it.
  *
  * Exit: 0 pass · 1 fail · 2 could not run (unknown script).
  */

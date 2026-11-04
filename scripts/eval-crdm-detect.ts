@@ -2,41 +2,25 @@
 /**
  * Measure the `crdm-detect` phrase signals against real issues.
  *
- * The CRDM page claimed the detection skill existed; nobody had ever checked
- * whether it FIRES correctly, so the honest claim was "the guidance exists",
- * not "detection works". This turns that into a number.
- *
  * ## What this measures, and what it does not
  *
  * `sdlc/skills/crdm/crdm-detect.md` is prose for a model to read. It lists
  * five categories of phrasing plus an explicit "what is NOT a feature request"
- * list. This script implements the PHRASE SIGNALS mechanically. That makes it
- * a LOWER BOUND on an agent that also applies judgement — an agent can catch a
- * feature request phrased in words the list never anticipated, and can decline
- * one whose phrasing matches but whose substance does not.
+ * list. This script implements the PHRASE SIGNALS mechanically, so it is a
+ * LOWER BOUND on an agent that also applies judgement: low recall here means
+ * the phrase list is thin; low precision is more damning, since a phrase that
+ * fires on a bug report pushes a model the wrong way too.
  *
- * So: a low recall here means the phrase list is thin, not necessarily that
- * the skill fails. A low precision here is more damning, because a phrase that
- * fires on a bug report will push a model toward the wrong branch too.
- *
- * ## The ground truth: two annotators, and the owner's adjudication
+ * ## The ground truth
  *
  * `scripts/eval/crdm-detect-corpus.json` carries all 27 issues in this
  * repository — the whole population, not a sample — each labelled with a
- * one-line reason. The first labels were written by the same agent that wrote
- * this script, without blinding. On 2026-09-24 (bean `vjbl`) a fresh agent
- * labelled a blinded copy (`eval-crdm-detect-blind.ts`) and agreed on 23/27,
- * Cohen's kappa 0.62. The owner adjudicated the four disagreements, so the
- * labels are now owner-adjudicated where the two raters differed. The second
- * rater's labels are kept in `crdm-detect-second-annotator.json`.
+ * one-line reason, owner-adjudicated where two annotators differed (the
+ * second, blinded, via `eval-crdm-detect-blind.ts`; its labels are in
+ * `crdm-detect-second-annotator.json`).
  *
- * ## The signals are not in this file
- *
- * They are in `src/crdm/detect-signals.ts`, with the check that they still say
- * what the skill says. They lived here as literals under the comment *"the
- * skill's explicit exclusions"* until bean `xfoh`, by which point the
- * transcription had lost a bullet and nothing noticed — the runner's own output
- * reported a false alarm it could not explain.
+ * The signals are in `src/crdm/detect-signals.ts`, with the check that they
+ * still say what the skill says.
  *
  * Usage: bun run cat eval:crdm-detect [--verbose]
  */

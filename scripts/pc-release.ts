@@ -19,25 +19,23 @@
  *
  * ## Why a path of its own
  *
- * A public comment cites a page and a line of ONE draft. A staging preview
- * cannot be that draft: `STAGING/<slug>/` is replaced on every push to its
- * branch and deleted when the PR closes. So a release is copied to `PC/`,
- * which no publish path writes or deletes: the main publish
+ * A public comment cites a page and a line of ONE draft, and
+ * `STAGING/<slug>/` is replaced on every push and deleted when the PR closes.
+ * `PC/` is written or deleted by no publish path: the main publish
  * (`publish-main-site.ts`, `build-instance-site.ts`) keeps it, and the
  * full-replace deploys carry it (`restore-staging.ts`). This script refuses to
- * write a version that already exists, so a release is never overwritten.
+ * write a version that already exists.
  *
  * ## What is frozen
  *
  * Every file of the release is listed in `PC/<version>/release.json` with its
  * sha256, so `verify` can show that the draft the public read is the draft
  * that is still served. The line-numbered PDF and its line map
- * (`pc-line-numbered-pdf.ts`) go in the same directory, so the comment sheet,
- * the form and the triage all cite the same pages and lines.
+ * (`pc-line-numbered-pdf.ts`) go in the same directory.
  *
  * Links inside the copied site that named the preview's path are rewritten to
- * the release's path, because the preview will be deleted. The staging banner
- * is replaced by the release banner.
+ * the release's path, and the staging banner is replaced by the release
+ * banner.
  *
  * `close` writes only `status`, `closed` and `log` into `release.json` (the
  * archive step of the review): the release's pages stay as they were.

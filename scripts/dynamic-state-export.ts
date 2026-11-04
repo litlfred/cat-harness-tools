@@ -1,12 +1,8 @@
 #!/usr/bin/env bun
 /**
  * Render stage 3 (`kg-dynamic`): publish the running workflows' state as
- * JSON-LD at `<site>/<harness>/state.jsonld` (bean 6h47 / cat-tools-1as6).
- *
- * Owner, 2026-09-20: *"dynamic content then gets json/jsonld export available
- * under cat-harness/state.jsonld or so (whatever matches the dynamic state
- * visualisers)"*. Settled 2026-10-29 (Lane B card Q1, option A): the workflow
- * pages are that visualiser, and they read this file when they load.
+ * JSON-LD at `<site>/<harness>/state.jsonld`. The workflow pages read this
+ * file when they load.
  *
  * It is a different document from the stage-1 graph export: a different
  * name, `type: cat-harness:DynamicState` and `$schema:

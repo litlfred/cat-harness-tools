@@ -1,12 +1,11 @@
 /**
  * Put the instance's own title, description and mark where Jekyll can read them.
  *
- * just-the-docs draws `site.title` at the top of the left sidebar, and this
- * repo had `title: folio-assistant` written into `docs/_config.yml` by hand —
- * a second answer to "what is this instance called", free to disagree with the
- * declaration at the root and, on 2026-09-18, doing exactly that. The
- * declaration is the source; this copies the reader-facing part of it into
- * `docs/_data/harness.json`, which `docs/_includes/title.html` renders.
+ * just-the-docs draws `site.title` at the top of the left sidebar. The root
+ * declaration is the one source for what the instance is called; this copies
+ * the reader-facing part of it into `docs/_data/harness.json`, which
+ * `docs/_includes/title.html` renders, rather than a second hand-written
+ * title in `docs/_config.yml`.
  *
  * Usage:  bun run cat-harness-tools/scripts/sync-docs-harness.ts [--check]
  *
@@ -15,16 +14,15 @@
  * ## Why a copy at all
  *
  * Jekyll reads data only from `_data/`, and `harness.json` belongs at the
- * repository root where every other consumer looks for it. Symlinking it in
- * would work on a developer's machine and not in the Pages build. So: one
- * generated file, gated, rather than a second authored one.
+ * repository root where every other consumer looks for it. A symlink would
+ * not survive the Pages build. So: one generated file, gated.
  *
  * ## Site-relative, not repo-relative
  *
  * `images[].src` is repo-relative (`docs/assets/…`) because that is what a
  * reader of the declaration can open. The site serves `docs/` AS its root, so
  * the same file is at `/assets/…` once published. The conversion happens here,
- * once, rather than in the Liquid template where it would be invisible.
+ * once, rather than in the Liquid template.
  *
  * @covers docs
  */

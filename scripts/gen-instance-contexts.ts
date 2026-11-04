@@ -4,36 +4,30 @@
  * documents actually use — and, with `--check`, gate that every prefix a
  * document speaks resolves.
  *
- * Bean `folio-assistant-63q4`, owner 2026-10-14: no "forward-declared"
- * prefix anywhere. An instance declares the external namespaces it speaks
- * (`jsonldPrefixes`, cat-harness `schemas/kg/jsonld-prefixes.ts`); its published
- * context binds exactly the prefixes its `.jsonld` documents use, resolved
- * through its own table flattened with those of every instance it `needs`
- * (dependency order, `@protected`). A node then references ONE context URL
- * plus its own inline `@base`.
+ * No prefix is forward-declared. An instance declares the external namespaces
+ * it speaks (`jsonldPrefixes`, cat-harness `schemas/kg/jsonld-prefixes.ts`);
+ * its published context binds exactly the prefixes its `.jsonld` documents
+ * use, resolved through its own table flattened with those of every instance
+ * it `needs` (dependency order, `@protected`). A node then references ONE
+ * context URL plus its own inline `@base`.
  *
  * ## Where it is written: `<instance>/ns/context/v1.jsonld`
  *
- * Beside the two contexts that already exist, in the same `ns/<what>/v<major>.jsonld`
- * shape: `ns/content/v1.jsonld` (the shared content context this replaces) and
+ * In the same `ns/<what>/v<major>.jsonld` shape as `ns/content/v1.jsonld` and
  * `ns/subgraph/v1.jsonld`. INSTANCE-relative, so it is served at
- * `<iriBase>ns/context/v1.jsonld` — one URL per instance, under the instance's
- * own base, which is what lets a layer's context be published by that layer
- * rather than by the harness. The `v1` is load-bearing: the terms are
- * `@protected`, so a change that rebinds one is a NEW context (`v2`) published
- * beside the old one, never an edit under a URL consumers have cached.
+ * `<iriBase>ns/context/v1.jsonld`, under the instance's own base, and a
+ * layer's context is published by that layer. The terms are `@protected`, so
+ * a change that rebinds one is a NEW context (`v2`) published beside the old
+ * one, never an edit under a cached URL.
  *
  * ## Except where the instance's `ns` is a DOCUMENT: `<instance>/ns.context.v1.jsonld`
  *
- * Owner, 2026-10-15 ("D1"). An instance that holds its vocabulary as
- * `ns.jsonld` at its root (bootstrap) has it staged at the extensionless `ns`
- * and `v<major>/ns`: `ns` is a FILE there, so `ns/context/v1.jsonld` cannot
- * sit under it, and a static host cannot serve both. Staging both was the
- * `ENOTDIR` `check:bootstrap-standalone` met after `derive:publish`, and the
- * collision bootstrap's `gh-pages` would meet. Such an instance's context goes
- * BESIDE the vocabulary, at {@link NS_DOCUMENT_CONTEXT_PATH}, same `v1`
- * rule. Decided by what the instance holds ({@link contextPathFor}), never by
- * its name, so the next layer whose namespace is a document gets the same.
+ * An instance that holds its vocabulary as `ns.jsonld` at its root
+ * (bootstrap) has it staged at the extensionless `ns` and `v<major>/ns`, a
+ * FILE, so `ns/context/v1.jsonld` cannot sit under it. Such an instance's
+ * context goes BESIDE the vocabulary, at {@link NS_DOCUMENT_CONTEXT_PATH},
+ * same `v1` rule. Decided by what the instance holds ({@link contextPathFor}),
+ * never by its name.
  *
  * ## What it reads, and what it refuses to read
  *
@@ -46,10 +40,7 @@
  *   plus remote mounts — `contentDocuments` in `lib/jsonld-corpus.ts`), each
  *   assigned to its innermost instance.
  *   EXCLUDED: a context document under `ns/` (a file whose only key is
- *   `@context`). The emission check counts those, so the published content
- *   context's own CURIE-valued term definitions were counted as documents
- *   speaking `dcterms` and `cito`; a context binding a prefix is not a document
- *   using it.
+ *   `@context`): a context binding a prefix is not a document using it.
  *
  * ## Terms, not only prefixes
  *
@@ -59,10 +50,9 @@
  * DEFINES every content- and subgraph-context term the instance's documents
  * use, copied verbatim, `@protected` with the rest, and with the prefixes those
  * definitions are written in bound alongside. A term's context must belong to
- * an instance in the flattened `needs` (both belong to `cat-harness`); only
- * the instance's own documents' terms are carried, never a later instance's.
- * The point is that the generated context can REPLACE `ns/content/v1.jsonld`
- * in a document with no triple lost — the acceptance measurement for this.
+ * an instance in the flattened `needs`; only the instance's own documents'
+ * terms are carried. The generated context can therefore REPLACE
+ * `ns/content/v1.jsonld` in a document with no triple lost.
  *
  * ## What `--check` fails on
  *
@@ -74,13 +64,8 @@
  * shares a name with), a term whose context or prefixes do not resolve here,
  * and a malformed `jsonldPrefixes` table. Each names the file and
  * the prefix. A prefix met only as a literal string (`leanRef: "qou:QOU.x"`) is
- * REPORTED, never failed on — see `pipeline/jsonld-contexts.ts`.
- *
- * The emitters write per-instance context URLs (cat-harness
- * `atInstanceContext`), so `check:context-emission` and its `FORWARD_DECLARED`
- * are retired: a context generated from use binds nothing unused, and the
- * `--check` above fails on anything used and unbound. Its key and path halves
- * live on in `check-content-keys.ts`.
+ * REPORTED, never failed on — see `pipeline/jsonld-contexts.ts`. Key and path
+ * checks live in `check-content-keys.ts`.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-instance-contexts.ts

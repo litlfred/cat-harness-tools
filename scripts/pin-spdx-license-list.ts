@@ -1,11 +1,8 @@
 #!/usr/bin/env bun
 /**
- * Snapshot the SPDX License List's identifiers at the pinned version.
- *
- * Bean `sd5v`. The owner, 2026-10-03, after the SPDX 3 applicability analysis
- * found nothing that consumes an SPDX document: *"go ahead with licence-id
- * validation, that's it for now"*. So the platform adopts the License List as
- * a VALUE VOCABULARY — the ids a `licence.json` may name — and nothing else.
+ * Snapshot the SPDX License List's identifiers at the pinned version. The
+ * platform uses the License List only as a VALUE VOCABULARY — the ids a
+ * `licence.json` may name.
  *
  * The pin is `cat-harness/external-schemas/spdx-license-list.json`; the
  * snapshot is `spdx-license-list.terminology.json` beside it, in the existing
@@ -16,24 +13,19 @@
  *
  * `--from <dir>` is a checkout or download of github.com/spdx/license-list-data
  * at tag `v<version>`, holding `json/licenses.json` and `json/exceptions.json`.
- * A gate that needed the network would fail for the wrong reason, and the
- * snapshot is committed so the check runs offline.
+ * The snapshot is committed so the check runs offline.
  *
  * ## The version is the pin's, never this script's
  *
  * Refused unless BOTH files declare `licenseListVersion` equal to the pin's
- * `version` — the one way this snapshot could assert something false is by
- * labelling one edition's ids with another's number, so that is refused when
- * writing rather than reported afterwards.
+ * `version`, so one edition's ids are never labelled with another's number.
  *
  * ## What is kept, and what is not
  *
  * The id, the name, and `isDeprecated…Id`. Not the licence texts, URLs or OSI
  * and FSF flags: validation needs only whether an id exists and whether it is
- * deprecated, and the list's own data repository states no licence for itself
- * (it defers to its upstream repositories), so the snapshot holds the
- * identifiers — facts a reader needs in order to use the list at all — and no
- * more than that.
+ * deprecated, and the list's own data repository states no licence for
+ * itself, so the snapshot holds the identifiers and no more.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/pin-spdx-license-list.ts --from <license-list-data checkout>

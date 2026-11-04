@@ -2,35 +2,21 @@
 /**
  * Work the bean store when the `beans` CLI is not available.
  *
- * ## Why read-only was not enough
- *
- * The session-start sweep has always had a fallback: when `beans` is missing it
- * parses `beans/*.md` by hand and prints titles and statuses. That lets an agent
- * *see* the plan and do nothing else — it cannot claim an item, cannot open one,
- * cannot record what it found. So a session in a container where the CLI would
- * not install did its work **unclaimed**, which is the exact failure the work
- * plan exists to prevent, and which happened here on 2026-09-18 across two
- * merged PRs.
- *
- * A fallback that only reads is not a fallback for an agent. It is a consolation
- * prize. This one writes.
+ * Unlike a read-only fallback, this one writes, so an agent without the CLI
+ * can still claim, create and note beans instead of working unclaimed.
  *
  * ## It is the same store, not a shadow copy
  *
  * Every operation reads and writes `beans/<id>--<slug>.md` in the layout the CLI
  * uses, with the id prefix and length taken from `.beans.yml`. Anything written
  * here is read by the CLI once it is available again, and vice versa — there is
- * no import step and no second store to reconcile. `scripts/tests/beans-fallback.test.ts`
- * asserts that the CLI can read what this writes, so the two cannot drift
- * silently.
+ * no import step and no second store to reconcile.
  *
- * ## The idempotency rule is enforced here, not merely documented
+ * ## Idempotent create
  *
- * `beans create` mints a fresh id on every call and dedupes on nothing; an
- * unguarded loop over that produced **14,688** duplicate beans in the `qou`
- * folio in one afternoon. So `create` here refuses an exact title that already
- * exists and tells you which bean to claim instead. `--force` exists for the
- * case where a genuine duplicate title is intended, and it has to be typed.
+ * `beans create` mints a fresh id on every call and dedupes on nothing, so
+ * `create` here refuses an exact title that already exists and names the bean
+ * to claim instead. `--force` allows an intended duplicate title.
  *
  * Usage:
  *   bun run cat beans:fallback list [--status todo]

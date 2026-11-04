@@ -2,8 +2,6 @@
 /**
  * Carry the open PRs' `STAGING/` previews across a full-replace `gh-pages` deploy.
  *
- * ## The defect this exists for — bean `plj1`
- *
  * `peaceiris/actions-gh-pages@v4` with `keep_files: false` and no
  * `destination_dir` does exactly this at push time (its own
  * `src/git-utils.ts`, `setRepo`):
@@ -14,45 +12,22 @@
  * cp -R publish_dir/* workDir/
  * ```
  *
- * `docs-site.yml` is the ONLY `gh-pages` publisher in this repository without
- * `keep_files: true` — measured against all six, 2026-09-19 — and it is the one
- * that fires on every push to `main` touching `docs/`, `processes/`,
- * `schemas/` or four scripts. So the most frequently run publisher was the only
- * one that wiped, and what it wiped was every open PR's review preview.
- *
- * Measured on the real `gh-pages` history, 2026-09-19 — every `docs(gh-pages)`
- * commit in the window deleted every preview its own parent carried:
- *
- * | deploy | previews on parent | previews after |
- * |---|---|---|
- * | `a9c58f8ec` | 1 | 0 |
- * | `498edc4d1` | 3 | 0 |
- * | `d98ad6c82` | 1 | 0 |
- *
- * It is silent: the staging push succeeds, the bot comments the URL on the PR,
- * the check run is green, and an unrelated merge to `main` removes the artefact
- * minutes later. A reviewer following the link gets a 404 with nothing anywhere
- * saying why — and `AGENTS.md`'s merge discipline turns on staging being the
- * place a human assesses a rendered artefact.
+ * so a full-replace publisher (`docs-site.yml`) would silently delete every
+ * open PR's review preview.
  *
  * ## Why not `keep_files: true`
  *
- * Because `keep_files` is not path-scoped and the action offers nothing that
- * is — its `action.yml` has `keep_files`, `force_orphan` and `exclude_assets`,
- * and `exclude_assets` filters the SOURCE directory, not the branch. So
- * `keep_files: true` would also stop the main site's own deleted pages from
- * ever disappearing: rename a doc and both the old and the new URL serve
- * forever, and nothing would ever report it.
- *
- * Restoring `STAGING/` into the publish directory keeps both halves: the main
- * site is still a full replace, so a removed page goes; the previews are part
- * of what is published, so they stay.
+ * `keep_files` is not path-scoped (and `exclude_assets` filters the SOURCE
+ * directory, not the branch), so it would also keep the main site's deleted
+ * pages forever. Restoring `STAGING/` into the publish directory keeps both
+ * halves: the main site is still a full replace, so a removed page goes; the
+ * previews are part of what is published, so they stay.
  *
  * ## "Could not determine" is a third state, and it is the important one
  *
  * An unreadable `gh-pages` must NEVER render as "there are no previews to
- * keep" — that reading deploys the wipe this module exists to stop. Four
- * outcomes, and only the first three are allowed to continue:
+ * keep" — that reading deploys the wipe. Four outcomes, and only the first
+ * three are allowed to continue:
  *
  * - **`restored`** — the branch was read and carries previews; they are now in
  *   the publish directory.
@@ -61,22 +36,17 @@
  *   `git ls-remote --exit-code` says so with exit 2, which is distinct from a
  *   failure.
  * - **`unknown`** — the branch could not be read. Exit **2**, which fails the
- *   deploy step on purpose, the same way `translation:index` fails it rather
- *   than publish a navbar whose translation set could not be determined.
+ *   deploy step on purpose.
  *
- * ## `--verify`, because a green run proves nothing here
+ * ## `--verify`
  *
- * The action re-clones `gh-pages` itself at push time, so there is a window of
- * a few seconds between this restore and that clone in which a
- * `feature-staging` deploy can land a preview that the push then removes. That
- * window is seconds against the whole of every deploy before this change, but
- * it is not zero, and a loss inside it would be exactly as silent as the defect.
- *
- * So the restore records what it restored (`--state`), and `--verify` re-reads
- * the branch afterwards and exits non-zero naming any preview that did not
- * survive. A new preview pushed in the window is ADDED, never missing, so the
- * comparison has no false positives. `unknown` there is exit 2 again — a
- * verifier that has gone blind must not read as a pass.
+ * The action re-clones `gh-pages` itself at push time, so a `feature-staging`
+ * deploy landing in the seconds between this restore and that clone could
+ * still be removed. So the restore records what it restored (`--state`), and
+ * `--verify` re-reads the branch afterwards and exits non-zero naming any
+ * preview that did not survive. A new preview pushed in the window is ADDED,
+ * never missing, so the comparison has no false positives. `unknown` there is
+ * exit 2 again.
  *
  * Usage:
  * ```sh

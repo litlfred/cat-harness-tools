@@ -1,8 +1,7 @@
 #!/usr/bin/env bun
 /**
  * qa-store — the ONE read/write API for QA results kept on the orphan
- * `qa-reports` branch. Bean `16ei`, arc `3fva`, proposal
- * `docs/proposals/qa-reports-branch-and-test-process-2026-10-01.md` §2.
+ * `qa-reports` branch.
  *
  * ## The layout it reads and writes
  *
@@ -12,7 +11,7 @@
  * ├── main/<commit-sha>/               one tree per main commit that published
  * │   ├── manifest.json                qa-reports-manifest/v1
  * │   └── <instance>/test/results/**   byte-identical to the checkout's layout
- * └── pr/<number>/<head-sha>/…         same shape (owner ruling D3)
+ * └── pr/<number>/<head-sha>/…         same shape
  * ```
  *
  * ## Four states, and a miss is never empty-clean
@@ -28,20 +27,18 @@
  * | corrupt | 3 | present but unusable: no/foreign manifest, payload tree mismatch, unparseable JSON |
  * | unknown | 4 | could not determine: the remote or git failed. **Never a pass.** |
  *
- * A reader that renders `miss` as "no findings" is the `dh4f` defect; the
- * readers-audit (`qa-readers-audit-2026-10-01.md`, C4–C11) is a catalogue of
- * exactly that, so the type does not let a miss carry a file list at all.
+ * The type does not let a miss carry a file list at all, so no reader can
+ * render `miss` as "no findings".
  *
- * ## The design inputs the spike (`3ds9`) measured, each kept here
+ * ## How it talks to git
  *
  * 1. **Read in one batch.** A snapshot fetches the tip with
  *    `--depth=1 --filter=blob:none` (trees only), then fetches every missing
- *    blob of the entry in ONE `fetch --stdin` round trip. `git show` per file
- *    over a blob:none clone is one round trip per file (0.56 s each).
+ *    blob of the entry in ONE `fetch --stdin` round trip, not one per file.
  * 2. **Push with `-c pack.useSparse=false`**, so blobs already on the remote
- *    under another `main/<sha>/` are not resent (368 KiB → 666 bytes).
- * 3. **Hash through a private `GIT_INDEX_FILE`** (`git add` + `write-tree`):
- *    0.09 s against 12.1 s for per-file `hash-object`, same tree id.
+ *    under another `main/<sha>/` are not resent.
+ * 3. **Hash through a private `GIT_INDEX_FILE`** (`git add` + `write-tree`),
+ *    far faster than per-file `hash-object`, same tree id.
  * 4. **Tolerate `push negotiation failed; proceeding anyway`** on stderr: the
  *    push's exit code is the verdict, never its stderr.
  * 5. **Never `-f`.** Fetch the tip, splice this entry in, `commit-tree -p tip`,
@@ -61,9 +58,9 @@
  *   bun run cat qa:fetch [--ref main|<sha>|main/<sha>|pr/<n>|pr/<n>/<sha>] [--into DIR] [--prefix P]
  *   bun run cat qa:publish --ref main/<sha>|pr/<n>/<sha> [--root DIR ...] [--gates-result R]
  *   bun run cat qa:publish --add --ref main/<sha>|pr/<n>/<sha> --root DIR ...   # into the EXISTING entry;
- *                                                       # only creates paths, or replaces earlier adds (bean 1dre)
+ *                                                       # only creates paths, or replaces earlier adds
  *   bun run cat qa:publish --github --completeness FILE [--gates-result R]   # CI: derive the key, skip forks,
- *                                                       # refuse an incomplete qa:refresh report (bean 3hk4)
+ *                                                       # refuse an incomplete qa:refresh report
  *   bun run cat qa:prune [--apply] [--pr-states FILE]       # dry run unless --apply
  *   bun run cat-harness-tools/scripts/qa-store.ts read --ref R <path>
  *   bun run cat-harness-tools/scripts/qa-store.ts where

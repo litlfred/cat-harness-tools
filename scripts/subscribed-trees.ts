@@ -2,26 +2,21 @@
  * The directories a SUBSCRIBED harness declares, resolved to the tree this
  * checkout holds for each — the seam through which a site build (or anything
  * else that walks declared directories) reads an instance that is not in the
- * tree. Bean `g8jp`, GAP 1 of a staged instance's cutover.
+ * tree.
  *
  * @module cat-harness/scripts/subscribed-trees
  *
  * ## Why it exists
  *
- * Every consumer that publishes an instance's pages — `mount-instance-docs.ts`,
- * `compose-docs.ts` — walked the repository's TOP-LEVEL directories for
- * declarations. That answers "which instances are staged here", and nothing
- * else: the day a staged instance leaves for its own repository and is read
- * back by subscription, the walk finds no `<instance>/`, and `/<instance>/` stops being
- * published with exit 0. A declared instance publishing nothing, silently, is
- * the `dh4f` defect.
- *
- * So the question is asked of the DECLARATION instead: each subscription names
- * a substrate at a pin and the subgraphs it CHOSE; the substrate's own root
- * declaration (cached by `kg:subscribe`) says what each subgraph is; and
- * `kg:materialize` says whether its bytes are held. A directory read through
- * here is an ordinary declared entry whose files live under the part's
- * `tree/` instead of under `<instance>/<path>`.
+ * Walking the repository's TOP-LEVEL directories for declarations (as
+ * `mount-instance-docs.ts` and `compose-docs.ts` publish) finds only staged
+ * instances: one read back by subscription has no `<instance>/`, and would
+ * silently stop being published. So the question is asked of the DECLARATION:
+ * each subscription names a substrate at a pin and the subgraphs it CHOSE;
+ * the substrate's own root declaration (cached by `kg:subscribe`) says what
+ * each subgraph is; and `kg:materialize` says whether its bytes are held. A
+ * directory read through here is an ordinary declared entry whose files live
+ * under the part's `tree/` instead of under `<instance>/<path>`.
  *
  * ## Three states, never two
  *
@@ -40,8 +35,8 @@
  *
  * One function, so the site build and the navbar (`harness-tiles.ts`) cannot
  * disagree about which subscribed directories are held. A remote mount of a
- * declared directory pinned to a SHA (bean `0mpw`) lands at the same kind of
- * place — a tree for a declared entry — and reads through this seam.
+ * declared directory pinned to a SHA lands at the same kind of place — a tree
+ * for a declared entry — and reads through this seam.
  */
 import { existsSync, mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";

@@ -6,12 +6,8 @@
  * @module scripts/site-workflow
  * @covers none — a dispatcher to a repository's own publish path, not an audit
  *
- * Owner, 2026-10-30 (option A, "Make them generic"): the two Tools named
- * folio-assistant's own workflow files, `docs-site.yml` and
- * `feature-staging.yml`, so `check:tools` failed in every IG repository, which
- * has its own `site-publish.yml` instead. The Tool now names the script key
- * (`bun run cat site:workflow publish|stage`), and the repository says what
- * runs, in its own `index.config.json`:
+ * The Tools name the script key (`bun run cat site:workflow publish|stage`),
+ * and the repository says what runs, in its own `index.config.json`:
  *
  * 1. `site.agentRun: true` — the agent path, `stage-local.ts`. `publish`
  *    builds the main site (`--main`), `stage` a preview of the branch. The

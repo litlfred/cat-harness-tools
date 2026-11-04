@@ -8,15 +8,8 @@
  * bun run cat check:upstream-pins --out <file> # write the markdown AND keep the exit code
  * ```
  *
- * `git ls-remote --tags` per row. Nothing is cloned and no token is needed, so
- * this runs identically on a laptop and in CI — unlike an API-backed check,
- * which would be rate-limited at session start and would fail differently in
- * the two places.
- *
- * `--markdown` always exits 0 and `--out` keeps the code, for the same reason
- * `check-ci-health.ts` splits them: a notifier that both prints the report and
- * signals failure through its exit status cannot be used by a caller that
- * treats non-zero as "could not produce a report".
+ * Runs `git ls-remote --tags` per row: nothing is cloned and no token is
+ * needed, so it behaves the same on a laptop and in CI.
  *
  * @module scripts/check-upstream-pins
  */

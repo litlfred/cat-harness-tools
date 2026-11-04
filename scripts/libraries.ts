@@ -6,8 +6,7 @@
  * @module scripts/libraries
  * @covers software-library — it derives every node of each declared `libraries/` directory, vendored bundles included, and fails on a stale node, an import no node names, a shim no node names, and a vendored bundle whose bytes or manifest it cannot vouch for
  *
- * Option D of bean `jbvi` (owner, 2026-10-24 08:25Z, "D. Shared core"). The
- * kind is cat-harness's (`schemas/library/software-library.ts`, a node kind on the
+ * The kind is cat-harness's (`schemas/library/software-library.ts`, a node kind on the
  * `outside-software` core it shares with `tool-release`); this is its writer
  * and its gate.
  *
@@ -34,6 +33,11 @@
  * of the lockfile) are not outside software, so they get no node and their
  * imports are not findings.
  *
+ * The lockfile carries no licence, so it is read from the installed package.
+ * In an index checkout that install is the index's, so its version can differ
+ * from the one the layer locks; the node keeps the LOCKED version and the
+ * difference is printed, never refused.
+ *
  * ## What `--check` refuses
  *
  * 1. **A stale node** — one whose file differs from what `libraries:derive`
@@ -49,18 +53,18 @@
  *    installed, or one that states no licence. Each is a finding, never a
  *    quietly skipped node.
  * 6. A vendored bundle with no manifest, a manifest that does not parse or
- *    disagrees with its directory, a kept file whose bytes are not the ones
- *    its manifest records, or no licence to read (§"A vendored bundle").
+ *    disagrees with its directory, a kept file whose bytes are not the sha256
+ *    its manifest records (the node's digest vouches for the tarball, so the
+ *    bytes must be the tarball's), or no licence to read.
  *
- * ## A vendored bundle is a node too, and its bytes are not read for imports
+ * ## A vendored bundle is a node too
  *
- * Owner, 2026-10-26 (bean `jbvi`, Q3 "A. Record as vendored"). A layer may
- * keep a library's prebuilt bytes rather than install them: one directory per
- * bundle, `vendor/<name>/<version>/`, anywhere in the layer, holding the
- * bytes, the package's own licence file and a `vendored.json` manifest
- * ({@link VendoredManifestSchema}: the npm `package`, `version`, `tarball`,
- * `integrity`, and a sha256 per kept file). Each bundle gets ONE node,
- * `software-library/1.1.0` with `vendored: { path }` and no `range` or `dev`:
+ * A layer may keep a library's prebuilt bytes rather than install them: one
+ * directory per bundle, `vendor/<name>/<version>/`, anywhere in the layer,
+ * holding the bytes, the package's own licence file and a `vendored.json`
+ * manifest ({@link VendoredManifestSchema}: the npm `package`, `version`,
+ * `tarball`, `integrity`, and a sha256 per kept file). Each bundle gets ONE
+ * node, `software-library/1.1.0` with `vendored: { path }` and no `range` or `dev`:
  *
  * | field | from |
  * |---|---|
@@ -68,23 +72,9 @@
  * | `digest`, `source` | the manifest's `integrity` (re-spelled in hex) and `tarball` |
  * | `licence`, `licenceSource` | the bundle's own `package.json` when it kept one; else its licence file — a text recognised as a listed licence ({@link recogniseLicenceText}) is that id, and any other is `LicenseRef-<name>`, SPDX's own name for a licence the list does not carry, whose text is that file |
  *
- * The imports INSIDE a bundle are not this layer's imports — they are what
- * the bundle was built from — so its files are not read for imports, and a
- * polyfill a bundle names is not a finding against the layer's `package.json`.
- * What `--check` refuses instead: a bundle with no manifest, a manifest that
- * does not parse or disagrees with its directory, and a kept file whose bytes
- * are not the sha256 its manifest records (the node's digest vouches for the
- * tarball, so the bytes must be the tarball's). `usedBy` is empty: what loads
- * a bundle is a page or a path string, never an import.
- *
- * ## The licence is read from what is installed
- *
- * The lockfile carries no licence, so it comes from the installed package.
- * In an index checkout the install is the index's, not the layer's, so the
- * installed version can differ from the one the layer locks. The node keeps
- * the LOCKED version, and the difference is printed — a licence rarely moves
- * between versions, and refusing would make the gate depend on which
- * checkout ran it.
+ * A bundle's files are not read for imports (they are what the bundle was
+ * built from, not this layer's imports), and `usedBy` is empty: what loads a
+ * bundle is a page or a path string, never an import.
  */
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";

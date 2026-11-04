@@ -1,8 +1,7 @@
 /**
  * Each path's git blob id at a ref, in one `git ls-tree`: what a rendered
- * file's pin is made of (`pinImpact`, bean `bnjs`). Shared by every
- * renderer's CLI, so the three cannot disagree on what "the version of an
- * input" means.
+ * file's pin is made of (`pinImpact`). Shared by every renderer's CLI, so
+ * they cannot disagree on what "the version of an input" means.
  *
  * @module cat-harness/scripts/git-blobs
  */

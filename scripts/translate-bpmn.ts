@@ -2,68 +2,37 @@
 /**
  * BPMN diagram translation — extract strings, and inject them back per locale.
  *
- * Bean `8xx6`. `pipeline/bpmn-translate.ts` is the round-trip; this is
- * the orchestration around it.
+ * `pipeline/bpmn-translate.ts` is the round-trip; this is the orchestration
+ * around it.
  *
- * ## What exists, and what this does not pretend to
+ *   - EXTRACT writes the `.pot` a translator needs before there can be a `.po`.
+ *   - INJECT SKIPS a locale that has no `.po` rather than failing: "not
+ *     translated yet" is the ordinary state of a diagram, not an error.
+ *   - PAGE WIRING is not attempted here. No translated page references a
+ *     workflow SVG, so a locale render would produce a file nothing links to
+ *     (the mirror of the dangling references gated by `check:workflow-refs`).
  *
- * Measured 2026-09-18 before building: `translations/<locale>/` holds `.po`
- * files for `index` and `agent-onboarding` and NOTHING for any diagram, and
- * `docs/fr/` contains a single page that embeds no diagram at all. So:
+ * ## `--check`
  *
- *   - EXTRACT has a real consumer today — a translator needs a `.pot` before
- *     there can be a `.po`, and none exists for any of the 19 diagrams.
- *   - INJECT has no input yet. It is built, and it SKIPS a locale that has no
- *     `.po` rather than failing: "not translated yet" is the ordinary state of
- *     nearly every diagram, not an error.
- *   - PAGE WIRING is genuinely blocked and is not attempted here. No
- *     translated page references a workflow SVG, so a locale render would
- *     produce a file nothing links to — present but unreferenced, which is the
- *     mirror of the dangling references gated by `check:workflow-refs`.
+ * Like `render:bpmn:check` for `render-bpmn`: a diagram added without
+ * re-extracting would otherwise be invisible to translators, since a `.pot`
+ * is their INPUT.
  *
- * ## `--check` — the gate its sibling already had
- *
- * `render-bpmn` has `render:bpmn:check`, which fails when an SVG is stale, and
- * `AGENTS.md` records at length why: a generated artefact with no staleness
- * check drifts silently and the published site serves the old one. This script
- * had **no counterpart**, so adding a diagram and not re-extracting cost
- * nothing at the time and was discovered only when somebody ran extract by
- * hand. Measured that way on 2026-09-19 (bean `0hd6`): **twelve of thirty-two
- * diagrams had no `.pot` at all**, the whole CRDM cluster among them. A `.pot`
- * is a translator's INPUT, so those diagrams were not merely untranslated —
- * they were invisible to whoever does the translating, because nothing in the
- * translations tree said they existed.
- *
- * **One wrinkle, and without it the check is useless:** the ONLY difference
- * between two runs over an unchanged diagram is the `POT-Creation-Date`
- * header — measured, 32 files regenerated, every one differing in that line
- * and nothing else. A naive byte comparison therefore fails always. The
- * comparison excludes that header, exactly as a lockfile check ignores its own
- * timestamp.
+ * The comparison excludes the `POT-Creation-Date` header, the only line that
+ * differs between two runs over an unchanged diagram.
  *
  * **Three states, not two.** A `.pot` that is absent is STALE; one that
  * differs is STALE; one that cannot be READ is reported as such and fails,
- * never as a pass. "Could not determine" is never rendered green — and a run
- * in which NO locale gates, so that no template was examined at all, exits 2
- * rather than 0 (exit codes: 0 fresh, 1 stale/missing/orphaned, 2 nothing
- * examined or nothing to do).
+ * never as a pass. A run in which NO locale gates, so that no template was
+ * examined at all, exits 2 rather than 0 (exit codes: 0 fresh, 1
+ * stale/missing/orphaned, 2 nothing examined or nothing to do).
  *
  * ## What it gates on, and what it only reports
  *
- * A locale that has NEVER carried a workflow template is not out of date —
- * it has not opted in. Measured 2026-09-19: `fr` holds 20 of them, and `ar`,
- * `es`, `ru` and `zh` hold **none**, carrying only `kg-viewer.pot` and a
- * handful of `.po`. Gating on all five would demand 128 templates for
- * locales that have no workflow coverage anywhere else — inventing a diff
- * nobody asked for, and misreporting how far those locales have actually
- * got.
- *
- * So a locale with a `processes/` tree GATES, and one without is reported as
- * NOT A TARGET with its count. That is the same shape as `kg-audit`'s
- * coverage criteria: legitimate instances exist, so it must not gate — and it
- * must not be silent either, because a locale scanned and found empty,
- * reported as clean, is the `dh4f` defect (a consumer scans nothing and
- * reports a clean run over it).
+ * A locale that has NEVER carried a workflow template has not opted in. So a
+ * locale with a `processes/` tree GATES, and one without is reported as NOT A
+ * TARGET with its count — not gated, and not silent either, since a locale
+ * scanned and found empty must not read as clean.
  *
  * Usage:
  *   bun run cat translate-bpmn --extract [--locale fr]

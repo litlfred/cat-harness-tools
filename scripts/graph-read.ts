@@ -5,28 +5,15 @@
  * @module scripts/graph-read
  * @covers cat-harness
  *
- * ## What this is for — bean `9ofm`, row D
- *
- * Every reader of `beans/`, `todos/`, `issue-marks/` and the health results
- * joins its path onto the repository root. That is correct today and wrong
- * after the cutover, and the migration the bean asks for is one row per
- * reader. The thing each row needs is the same, so it is written once here:
- * **given a declared directory id, which directory do I actually read.**
- *
- * With this in place the cutover is a no-op for correctness. Before it, a
- * tip-keyed declaration whose files are still tracked resolves to the
- * checkout — which is where they are. After it, the same call resolves to the
- * mount. No reader changes between those two states, which is the whole point:
- * a migration that needed every reader edited again at cutover time would be
- * two migrations.
+ * Readers of `beans/`, `todos/`, `issue-marks/` and the health results ask
+ * here: **given a declared directory id, which directory do I actually
+ * read.** The same call answers before and after a cutover to a branch, so no
+ * reader changes at cutover.
  *
  * ## It REFUSES rather than returning a plausible empty directory
  *
- * The states come from {@link tipPresence} and {@link routePresence} (row B), and
- * each maps onto exactly one read decision. The first row read *"not tip-keyed |
- * the checkout | nothing moved"* until `route` existed, and that was the whole
- * bug: a route-keyed entry is not tip-keyed, so it took the "nothing moved" arm
- * while its files had moved to a branch.
+ * The states come from {@link tipPresence} and {@link routePresence}, and each
+ * maps onto exactly one read decision:
  *
  * | state | read from | why |
  * |---|---|---|
@@ -37,28 +24,23 @@
  * | `mounted` | the marker's `into` | the cutover happened and the mount is the store |
  * | `unmounted` | **refused** | cut over, nothing mounted: the only honest answer is not a path |
  *
- * That last row is the reason this module exists rather than a one-line
- * `join`. A reader handed `repoRoot/beans` after the cutover gets an absent or
- * empty directory and reports a clean run over nothing — `dh4f`, and for the
- * work plan specifically it is an empty `beans list`, which reads as "there is
- * no work". So {@link graphReadPath} returns a REFUSAL a caller must handle,
- * and {@link mustReadGraph} throws with the remedy for the many callers whose
- * honest behaviour is to stop.
+ * A reader handed `repoRoot/beans` after the cutover would get an empty
+ * directory and an empty `beans list` reading as "there is no work". So
+ * {@link graphReadPath} returns a REFUSAL a caller must handle, and
+ * {@link mustReadGraph} throws with the remedy for callers that should stop.
  *
  * ## Resolution, and what it does not do
  *
- * The declaration is resolved through `resolveSubgraphSource` (#1987), so both
- * the `source: { kind: "branch" }` spelling and the legacy `storage` reach the
- * same answer, and a future source kind lands in the default arm rather than
- * being guessed at. Presence is read from `git ls-files` and the mount marker,
- * never from the branch, so this is **offline**: it cannot block a reader on a
- * fetch, and it cannot be made to answer differently by one.
+ * The declaration is resolved through `resolveSubgraphSource`, so both the
+ * `source: { kind: "branch" }` spelling and the legacy `storage` reach the
+ * same answer, and a future source kind lands in the default arm. Presence is
+ * read from `git ls-files` and the mount marker, never from the branch, so
+ * this is **offline**.
  *
  * It resolves the directory and nothing inside it. `beans/beans.json`'s nested
  * declaration still says where `defs` is *within* the graph, and
- * `resolveBeanDefs` still answers that — a nested declaration is invisible to
- * the mount (measured: `beans/` is not an instance root), which is precisely
- * why the two questions stay separate.
+ * `resolveBeanDefs` answers that (a nested declaration is invisible to the
+ * mount).
  */
 import { existsSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";

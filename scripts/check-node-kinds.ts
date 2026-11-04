@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
- * The node-kind index, written or checked — issue #2195, PR 1; per-layer
- * baselines since the owner's ruling of 2026-10-15.
+ * The node-kind index, written or checked, with a per-layer baseline of
+ * unkinded families.
  *
  * @module scripts/check-node-kinds
  * @covers cat-harness, typologies — it resolves every declared family's validator, records which are node kinds, and holds each instance's unkinded families to that instance's own baseline
@@ -10,37 +10,19 @@
  *   bun run cat node-kinds:check                 fail on a NEW unkinded family, a stale or foreign baseline entry, or an id collision
  *   bun run cat node-kinds --accept-unkinded     write, admitting new unkinded families to their owners' baselines
  *
- * ## The index is derived; the baselines are not
+ * `kinds` is recomputed from the typologies every run (`nodeKindIndex`). The
+ * baseline lists families that predate node kinds: a family unkinded now and
+ * not in its owner's baseline is refused by BOTH modes; `--accept-unkinded`
+ * is the deliberate override. A family that becomes a node kind leaves the
+ * baseline at the next write, and `--check` fails until it is written.
  *
- * `kinds` is recomputed from the typologies every run (`nodeKindIndex`), so the
- * table is only ever a regenerate. The baseline is different: it is the list
- * of families that predate node kinds, and the owner asked for a *"QA check on
- * new kinds"*. So a family that is unkinded NOW but is not in its owner's
- * baseline is refused by BOTH modes — the writer will not quietly add it,
- * which would make regenerating the fix for the very finding the gate exists
- * to raise. `--accept-unkinded` is the deliberate override, and a reviewer sees
- * it as a growing list in the diff.
- *
- * A baseline only shrinks on its own: a family that becomes a node kind leaves
- * at the next write, and `--check` fails until it is written, so the
- * improvement is recorded rather than lost.
- *
- * ## One baseline per layer; the table at publish (owner, 2026-10-15)
- *
- * The baseline was the `unkinded` half of the committed table, one cat-harness
- * file naming every layer's families, which went stale at every re-pin. Now a
- * family belongs to the instance that declares its typology (`typologyOwner`),
- * each instance keeps its own in a declared asset of role `unkinded-baseline`
- * (none declared: an empty baseline), and the gate judges each against its own
- * (`ratchet`), so a layer's PR adding a family is judged by that layer's
- * commit. The table `docs/_data/node-kinds.json` is still written, for the
- * node-kind pages, but cat-harness declares it `builtAtPublish`: under
- * `--check` there are no committed bytes to compare, so it is not compared
- * (the `tools:viz` / `folio:viz` rule).
- *
- * A cat-harness that does not yet declare the table built at publish is read
- * the old way — the committed table IS the baseline, and `--check` compares
- * its bytes — so these tools can land before the declaration flips.
+ * A family belongs to the instance that declares its typology
+ * (`typologyOwner`). Each instance keeps its baseline in a declared asset of
+ * role `unkinded-baseline` (none declared: empty) and is judged against it
+ * (`ratchet`). The table `docs/_data/node-kinds.json` is still written for
+ * the node-kind pages but is `builtAtPublish`, so `--check` does not compare
+ * it. If cat-harness does not declare it built at publish, the committed
+ * table is the baseline and `--check` compares its bytes.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";

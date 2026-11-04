@@ -5,57 +5,21 @@
  * @module scripts/check-undeclared-files
  * @covers cat-harness
  *
- * `check-declared-assets.ts` walks **declared → disk**: it reports a declared
- * asset that is missing, a dead link, or one it could not check. Nothing walked
- * the other way, and the gap is not symmetric with it — it is the `dh4f` shape
- * INVERTED:
- *
- * | | |
- * |---|---|
- * | `dh4f` | declared but absent, so a consumer scans nothing and **reports a clean run** |
- * | this | present but undeclared, so **no consumer ever sees it at all** |
- *
- * ## The measured cost
- *
- * Commit `0301fbd2` added three 1.6–1.8 MB PNGs at the repository root, with
- * spaces and commas in their filenames, and **no gate noticed**. They sat
- * outside every instance, undeclared and invisible; they were found only
- * because somebody went looking by hand. An automated pass then misread them as
- * a regeneration of the existing landing art and recommended overwriting three
- * declared `.webp` files — opening the image showed a completely different
- * costume. Both halves of that near-miss trace to one absence: **a file nothing
- * declares is a file nothing reasons about.**
- *
- * ## Why the repository root is swept EXPLICITLY
- *
- * This paragraph read that `check-declared-assets.ts` carries
- * `DECLARED_INSTANCES = ["cat-harness", "bootstrap"]` and that "since the
- * instance moved under `cat-harness/` the repository root is deliberately
- * **not an instance**". **Both halves are now false**, and they became false
- * a day apart: the root gained a `harness.json` of its own
- * (`folio-assistant-checkout`), and the literal was replaced by
- * `declaredInstances()`, which discovers instead of listing (bean `6tkl`).
- *
- * The CONCLUSION survives its premises, which is why the section stays. The
- * root is named here as its own subject rather than reached by accident: a
- * sweep that covered it only as a side effect of some other rule would stop
- * covering it the first time that rule changed — and that rule has now changed
- * twice while this sweep kept working.
- *
- * ## What counts as accounted for
+ * `check-declared-assets.ts` walks **declared → disk**; this walks disk →
+ * declared, because a present-but-undeclared file is one no consumer ever
+ * sees. The repository root is swept explicitly, as its own subject.
  *
  * A root entry is accounted for when it is one of:
  *
- * 1. **an instance** — a directory holding its own `harness.json`;
+ * 1. **an instance** — a directory holding its own declaration;
  * 2. **a declared directory** of any instance, resolved at repository scope
  *    (`beans/`, `todos/` and friends live at the root by declaration);
- * 3. **repository infrastructure** — {@link ROOT_INFRASTRUCTURE}, which is a
- *    list with a reason per entry rather than a pile of extensions;
+ * 3. **repository infrastructure** — {@link ROOT_INFRASTRUCTURE}, a list with
+ *    a reason per entry;
  * 4. **git's own business** — dotfiles, `node_modules/`, ignored paths.
  *
  * Anything else is reported. The report is a **finding, not an action**:
- * `deletion-requires-confirmation` governs what happens next, and four of this
- * sweep's five current findings are somebody's uploaded documents.
+ * `deletion-requires-confirmation` governs what happens next.
  *
  * Exit codes: 0 report only, or `--check` with nothing unaccounted · 1 `--check`
  * with findings.

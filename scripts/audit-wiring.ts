@@ -40,9 +40,8 @@
  * Scope
  * -----
  *   Scans `folio-assistant/computations/` recursively for
- *   `*.witness.json` (post the subdirectory refactor — witnesses
- *   live next to their producer scripts inside cluster subdirs).
- *   Lean witnesses
+ *   `*.witness.json` (witnesses live next to their producer scripts in
+ *   cluster subdirs). Lean witnesses
  *   (``content/**\/*.lean.*.witness``) have a different lifecycle and are
  *   covered by ``scripts/lean-witness.ts`` / ``scripts/witness-audit.ts``.
  *

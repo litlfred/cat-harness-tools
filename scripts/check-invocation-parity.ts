@@ -3,42 +3,18 @@
  * check-invocation-parity.ts — a preview must run the generators the deploy
  * runs, with the same instance arguments.
  *
- * ## The defect, and why the two obvious checks could not find it
+ * A preview that skips an export the deploy runs (e.g. `kg-export.ts
+ * --instance ./bootstrap`) publishes links to documents its build never
+ * wrote. This checks SYMMETRY, not resolution: does the preview invoke what
+ * the deploy invokes?
  *
- * `3jhq`: `docs-site.yml` ran `kg-export.ts --instance ./bootstrap` and
- * `feature-staging.yml` did not, so a cat-harness graph staged at `$BASE`
- * carried `$BASE/bootstrap.jsonld#skill/…` pointing at a document that
- * build never wrote. Two dangling links on every preview. `blv9`, found by
- * hand for the third time.
+ * Deploy and preview are derived, never named: the deploy is the workflow
+ * whose graph export passes no `--base-url` (it publishes at the declared
+ * `canonicalUrl`); a preview passes one. A new site workflow is classified as
+ * soon as it exists.
  *
- * Two designs were tried and withdrawn (bean `qgpo`):
- *
- * - **Parsing destinations was VACUOUS.** `--out-dir ./_site` read as "writes
- *   everything beneath" yields the empty prefix, so every target matched. It
- *   stayed GREEN when the staging export was removed — the exact defect.
- * - **Executing the workflow lines was UNSAFE.** `lean_ci.yml`'s
- *   `cp -r "$dir"/* _lean_docs/` with `$dir` unset is `cp -r /*`, and it
- *   copied 7.8 GB of the root filesystem into the checkout.
- *
- * This asks a smaller question that needs neither: **does the preview invoke
- * what the deploy invokes?** It verifies SYMMETRY rather than resolution, and
- * says so — see §"What this does not check".
- *
- * ## Deploy and preview are DERIVED, never named here
- *
- * The deploy is the workflow whose graph export passes no `--base-url`: it
- * publishes at the declared `canonicalUrl`. A preview passes one, because a
- * staged copy must name itself rather than claim to be the live document.
- * That is the same fact `check:published-instance-exports` already reports as
- * a stood-in base, and it means neither workflow is written down here — a
- * third site workflow is classified the moment it exists.
- *
- * ## What this does NOT check, stated because a proxy invites the mistake
- *
- * That the documents resolve. Both workflows dropping a generator together
- * passes. The invariant `qgpo` states — every link target is published —
- * needs the generators to declare their outputs, which is bean `dyd3`'s
- * neighbour and a separate build. This is the cheap guard, not the answer.
+ * Not checked: that the documents resolve. Both workflows dropping a
+ * generator together passes.
  *
  * @module scripts/check-invocation-parity
  * @covers none — .github/workflows/ is not a declared graph typology

@@ -2,27 +2,12 @@
 /**
  * Which audits reach which KIND of node — measured, with denominators.
  *
- * Bean `folio-assistant-xutg`. On 2026-09-23 an agent reported that beans were
- * "effectively unaudited". Its evidence was a count of `kg-qa` sidecars over
- * them: zero. Its conclusion was wrong — five gates audit beans
- * (`check:bean-bodies`, `check:bean-front-matter`, `check:bean-issue-links`,
- * `check:bean-parents`, `check:bean-rollup`), plus `check:subgraphs` over the
- * links in their bodies.
- *
- * The defect was not the count. It is that **nothing answered "what audits this
- * kind of node"**, so the question got answered from whichever signal happened
- * to be in reach — the one family of sidecar that agent had just been reading. A
- * sidecar count is a fine measurement of sidecars and says nothing about gates.
- *
- * ## What this is NOT a second answer to
- *
- * `check:kind-validators` (bean `i31r`) asks whether every graph typology has a
- * **validator that loads** — can a node of this kind be *typed*. This asks who
- * **judges** it. The two come apart: a kind can be perfectly typed and audited
- * by nothing, which is exactly the state that got misread, and a validator
- * sweep would have reported it covered. Where they agree in shape they agree on
- * purpose too, and this deliberately copies two things from it — the open
- * registry as the denominator, and a gap REPORTED rather than failed.
+ * Answers "what audits this kind of node", so that question is not answered
+ * from whatever signal is at hand (a sidecar count says nothing about gates).
+ * `check:kind-validators` asks whether a kind can be *typed*; this asks who
+ * *judges* it. A kind can be typed and audited by nothing. Like that gate, it
+ * uses the open registry as the denominator and REPORTS a gap rather than
+ * failing.
  *
  * ## Coverage is DECLARED, not inferred
  *
@@ -32,107 +17,47 @@
  *     @covers none — a language-level check, not a graph audit
  *     @covers computed — it sweeps whichever kinds declare `nodeSchemas`
  *
- * The alternative was to infer it: grep each gate's source for a kind's name or
- * its declared directory. That is a heuristic, and a heuristic printed in a
- * coverage column is the `dh4f` defect — could-not-determine rendered as clean.
- * A gate that reads `beans/defs/` incidentally would score as auditing beans; a
- * gate that resolves its directory through `directoriesForGraph` names no path
- * at all and would score as auditing nothing. Both answers would be wrong and
- * neither would look it.
+ * Grepping a gate's source for kind names or directories would be wrong both
+ * ways (a gate using `directoriesForGraph` names no path at all). An
+ * undeclared gate is `undeclared` — counted, printed, never zero;
+ * `--require-all` makes that a failure.
  *
- * So an undeclared gate is `undeclared` — counted, printed, never zero.
- * `--require-all` turns that into a failure, for the day the gap is meant to be
- * closed.
+ * - **`@covers none`** — the gate has decided it audits no declared graph
+ *   (`check:workflows` reads `.github/workflows/`), distinct from not saying.
+ * - **`@covers computed`** — the covered set is derived at run time
+ *   (`check:kind-validators` walks whichever kinds declare `nodeSchemas`). It
+ *   counts as neither coverage nor a gap; that gate reports its own kinds.
  *
- * Two further states exist because a static list cannot express what two real
- * gates do, and forcing them into it would have made the declaration a lie:
+ * ## Three states per kind, kept distinguishable
  *
- * - **`@covers none`** — a gate that has DECIDED it audits no declared graph.
- *   `check:workflows` reads `.github/workflows/`, which is not a graph typology.
- *   That is a different fact from a gate that has not said, and collapsing them
- *   would mean the one honest answer available to such a gate is silence.
- * - **`@covers computed`** — a gate whose covered set is DERIVED at run time.
- *   `check:kind-validators` walks whichever kinds declare `nodeSchemas`, so its
- *   coverage moves when the registry does. Writing today's answer as a literal
- *   would be a snapshot that goes stale silently, which is the failure
- *   `BASE_GRAPH_TYPOLOGIES`'s own doc refuses for counts in prose. It counts as
- *   neither coverage nor a gap: the kinds it reaches are reported by that gate,
- *   not by this one.
- *
- * ## Three states per kind, and they must stay distinguishable
- *
- * The whole report is worthless if these collapse:
- *
- * 1. **no directory** — no instance declares a directory of this kind. A nested
- *    kind reached through its parent (`bean-defs` inside `beans/`), or a kind
- *    this instance simply does not have. NOT a gap.
+ * 1. **no directory** — no instance declares a directory of this kind (a
+ *    nested kind such as `bean-defs` inside `beans/`, or one this instance
+ *    does not have). NOT a gap.
  * 2. **a directory with no files** — a determined empty.
  * 3. **files, and no criterion and no gate reaching them** — the finding.
  *
- * A single "0" in one column cannot tell them apart, which is why every row
- * prints all four counts and the states are named rather than inferred from
- * zeroes.
+ * Every row prints all four counts and names its state. A declared directory
+ * absent from the checkout is `unknown`.
  *
- * ## The committed record holds COVERAGE; the census is printed
+ * ## The record holds COVERAGE; the census is printed
  *
- * `files` and `sidecars` are printed and NOT written to the sidecar. They are a
- * census, and a census moves on any commit that adds a file to any graph — the
- * `docs` count changes when somebody writes a page. A gate keyed on that would
- * have been stale on nearly every pull request, and a gate that is stale by
- * default is a gate people learn to regenerate without reading. It went further
- * than churn: regenerating the L1 verdicts under `library/` made this report
- * stale, so a QA writer in one graph turned another graph's coverage gate red.
+ * `files` and `sidecars` are printed, not written to the sidecar: they move
+ * on any commit that adds a file. The sidecar records the coverage relation —
+ * declared directories, criteria reaching the kind, gates declaring it, and
+ * the resulting state — plus `hasFiles`, the one census fact the states need.
+ * `files` counts files (excluding QA sidecars and dot-prefixed paths), not
+ * nodes; only a kind's own validator knows which files are nodes.
  *
- * What the sidecar records instead is the COVERAGE RELATION — which directories
- * are declared, which criteria reach the kind, which gates declare it, and the
- * resulting state. Those move when coverage moves, which is exactly when a
- * reviewer needs to see a diff. `hasFiles` carries the only thing the census
- * decides, since the states turn on whether a directory holds anything at all
- * rather than on how much.
+ * ## What `--check` fails on
  *
- * And that is this bean's own lesson applied to its own design: a sidecar count
- * is not a coverage measurement. Committing it here would have made the report
- * depend on the signal it exists to replace.
+ * `--check` fails on a finding that is **NEW** against a baseline (a kind
+ * that lost its audit, a gate that stopped declaring). Standing findings are
+ * reported and do not fail; `--strict` fails on them too. The baseline is the
+ * working copy, or `--against <ref>` (a `qa-reports` ref); a baseline that is
+ * not there is UNKNOWN — reported, never a pass, never a failure.
  *
- * ## Why `files` and not `nodes`
- *
- * Only a kind's own validator knows which of its files are nodes, and this
- * script is not going to mint a per-kind extension table to guess — that would
- * be a second source of truth about node shape, drifting from the one in
- * `nodeSchemas`. So the column counts FILES, excluding QA sidecars and
- * dot-prefixed paths, and is labelled as files. It is enough for the
- * distinction the report needs, which is whether the directory has content at
- * all.
- *
- * ## What `--check` fails on, and why it is NOT the findings
- *
- * `--check` fails on a finding that is **NEW** against a baseline — a kind that
- * lost its audit, a gate that stopped declaring, in the commit under review.
- * The standing findings are reported and do not fail, which is
- * `check:kind-validators`'s state 2 for the same reason: a gate that refused
- * every push until somebody wrote criteria for `interaction/` would be switched
- * off within a week. `--strict` is the flag for the day that gap is meant to
- * be closed.
- *
- * It used to fail on a **stale sidecar** instead, and that stopped being a
- * question the day QA results leave `main` for the `qa-reports` branch (owner
- * rulings D1/D4, bean `0dav`): nothing committed is left to be stale, and a
- * gate that failed on its own record being absent would be red for nobody's
- * defect. The baseline is the committed working copy until then, and
- * `--against <ref>` (a `qa-reports` ref) after; a baseline that is not there
- * is UNKNOWN — reported, never a pass, never a failure (proposal §2.3).
- *
- * The same move fixed **C8**: a declared directory not in the checkout used to
- * census as zero, so `qa` read `empty` the moment `test/results/` was absent.
- * It is the `unknown` state now.
- *
- * **And `--check` does NOT write.** The first version did, and the
- * falsification pass is what caught it: the gate repaired the staleness it was
- * reporting, so it could not fail twice, and in CI it would have left the
- * runner's tree modified with nothing committed — red once, green on the rerun,
- * the stale file still stale in the repository. A checker that mutates its own
- * subject cannot be falsified, which is the one property `generalise-the-fix`
- * Move 3 asks a guard to have.
+ * `--check` does NOT write: a checker that repairs what it reports cannot
+ * fail twice.
  *
  * Usage:
  *   bun run cat audit:coverage                 # print the report, write the sidecar

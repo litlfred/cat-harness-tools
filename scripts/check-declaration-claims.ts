@@ -2,9 +2,8 @@
 /**
  * Every prose claim about which file declares a graph agrees with the files.
  *
- * Bean `hrv2`. The rule, what it refuses to be keyed on, and why
- * `check:declaration-filename` could not have caught the defect that opened
- * it, are all in `src/docs/declaration-claims.ts`.
+ * The rule, and what it refuses to be keyed on, are in
+ * `src/docs/declaration-claims.ts`.
  *
  * Usage: bun run cat check:declaration-claims [--json]
  *

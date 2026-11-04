@@ -1,20 +1,18 @@
 #!/usr/bin/env bun
 /**
  * Rewrite node files' `$schema` tags — the migration a renamed or MAJOR-bumped
- * node kind ships with (issue #2195).
+ * node kind ships with.
  *
  * @module scripts/retag-schemas
  * @graphNode none — a migration over node files, not a schema
  *
- * The owner, 2026-10-05: node kinds are short names with *"SEMVER"* versions,
- * one live version per kind, so a major bump rewrites every file in the same
- * change. This is that rewrite, and the first one it does is the rename to
- * short names ({@link RENAMES_2026_10_05}).
+ * Each node kind has one live version, so a major bump rewrites every file in
+ * the same change. The renames applied start with the move to short names
+ * ({@link RENAMES_2026_10_05}).
  *
  * It changes ONLY the value of a `$schema` key: a JSON file's top-level
  * `"$schema"`, or a Markdown file's `$schema:` front-matter line. A tag quoted
- * in prose is left alone — prose that names an old tag is history, and
- * rewriting it would make the record say something that was never true.
+ * in prose is left alone, since prose that names an old tag is a record.
  *
  *   bun run cat-harness-tools/scripts/retag-schemas.ts <dir>...            rewrite
  *   bun run cat-harness-tools/scripts/retag-schemas.ts --check <dir>...    fail if any file still carries an old tag

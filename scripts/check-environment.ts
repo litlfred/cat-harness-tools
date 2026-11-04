@@ -7,25 +7,18 @@
  * tool that resolves a module, walks a directory or counts a corpus reads the
  * filesystem, and the filesystem holds things the repository does not.
  *
- * ## Three measured instances of one shape
+ * ## What it detects
  *
- * | bean | the residue | what it distorted |
- * |---|---|---|
- * | `xd1g` | `block-qa-schema/node_modules` + `dist` | `kg-detangle` counted **1214** phantom KG nodes |
- * | `qook` | a SYMLINKED root `node_modules` | `gitCorpus` handed every consumer one phantom path |
- * | `3vc1` | a nested REAL `node_modules` | root `tsc` resolves a different SDK and reports **12** errors in **6** files |
+ * Residue the repository does not contain that distorts a reading:
  *
- * Each is *"a tool answered a question about the repository and the answer came
- * from something the repository does not contain"*.
+ * - a `node_modules` or `dist` inside a package (e.g.
+ *   `block-qa-schema/node_modules`), counted as phantom KG nodes;
+ * - a SYMLINKED root `node_modules`, which hands `gitCorpus` phantom paths;
+ * - a nested REAL `node_modules`, so root `tsc` resolves a different SDK.
  *
- * `3vc1` is the one that makes this worth a guard rather than a note, because it
- * is a **TRAP and not a mistake**: a stale nested lockfile can only be fixed by
- * `bun install` **in that directory**, there is no other way to regenerate a
- * lockfile, and that install is what creates the distortion. Doing the correct
- * thing is what breaks the reading, and nothing warns you. Measured 2026-09-26:
- * it cost a full `bun run cat gates` cycle, and the false red arrived alongside two
- * unrelated test failures, so the reading was wrong in three places at once and
- * none of them named a `node_modules`.
+ * The last is a TRAP: a stale nested lockfile can only be fixed by
+ * `bun install` **in that directory**, and that install is what creates the
+ * distortion.
  *
  * ## Exit codes — this is a THIRD STATE, never a finding
  *
@@ -33,19 +26,17 @@
  *     2  distorted: a reading taken now cannot be trusted
  *
  * **There is deliberately no exit 1.** A distortion is not a defect in this
- * repository's source, and `nytj` is the rule it follows: a gate that cannot run
- * must not read as green — and equally must not read as a finding. `gates.ts`
- * consults this BEFORE running anything and refuses the whole run, because 168
- * gate results computed against a lying filesystem are worse than no results:
- * they look like evidence.
+ * repository's source: a gate that cannot run must not read as green, nor as
+ * a finding. `gates.ts` consults this BEFORE running anything and refuses the
+ * whole run, since results computed against a lying filesystem look like
+ * evidence.
  *
- * ## Why this is a precondition and not one of the gates
+ * ## A precondition, not one of the gates
  *
  * CI installs only from the repository root, so this condition cannot arise
- * there — a workflow step would be a gate that can never fire, which reads as
- * protection and is not (the `build-glossary` dead-guard defect `gates.ts` names
- * elsewhere). It is exempt in `SCRIPT_EXEMPTIONS` with that reason rather than
- * wired into a workflow to satisfy `check:unrun-scripts`.
+ * there and a workflow step could never fire. It is exempt in
+ * `SCRIPT_EXEMPTIONS` with that reason rather than wired into a workflow to
+ * satisfy `check:unrun-scripts`.
  *
  * ```sh
  * bun run cat check:environment          # 0 clean, 2 distorted

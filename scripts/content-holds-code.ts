@@ -3,49 +3,28 @@
  *
  * @module scripts/content-holds-code
  *
- * ## The rule, and where it comes from
+ * `kg-separation`: a knowledge graph separates into a CONTENT repository
+ * (files to read, no code; a reader needs nothing installed) and a TOOLS
+ * repository (`<name>-tools`, the code that writes and checks it). Code
+ * tolerated in a content instance is still reported as a failing finding.
  *
- * `kg-separation`: a knowledge graph separates into a CONTENT repository (files
- * to read, no code — bootstrap FR-7, "a reader needs nothing installed") and a
- * TOOLS repository (`<name>-tools`, the code that writes and checks it). The
- * rule is only as good as something that notices it being broken, and until
- * 2026-09-30 nothing did for an instance that has no tools repository yet.
+ * Which instances are content is read from declarations, never guessed:
  *
- * Owner, 2026-09-30, on the IRIS replica (paraphrased): generic DSpace scripts
- * belong in the platform; tools specific to that repository are tolerated in
- * its own content instance for now, but must fail as a QA finding.
- * So the generic code moved to core (bean `eayu`) and what is left is
- * tolerated — which is exactly why it must FAIL rather than be silent: a
- * tolerated violation nothing reports is indistinguishable from none.
- *
- * ## Which instances are content — declared, never guessed
- *
- * Two signals, both read from declarations:
- *
- *   1. `separation: "content"` on the instance itself (the IRIS replica);
+ *   1. `separation: "content"` on the instance itself;
  *   2. a declared TOOLS instance names it in `supports` (bootstrap, supported
- *      by bootstrap-tools) — the pair exists, so this is its content half.
+ *      by bootstrap-tools).
  *
- * NOT "the declared `repository` differs from `livesAt.repository`". Every
- * staged instance here satisfies that, platform ones included (cat-harness,
- * core), and whether each becomes a content/tools pair is a decision not yet
- * made for most. Firing on all of them would turn a finding about one
- * tolerated case into a wall nobody reads.
+ * A `repository` differing from `livesAt.repository` is NOT a signal (every
+ * staged instance has that).
  *
- * ## What counts as code
+ * Code is a file git accounts for under the instance root whose extension is
+ * a programming language's ({@link CODE_EXTENSIONS}), EXCEPT under a
+ * directory the instance declares as graph typology `folio`, whose block
+ * manifests are authored content written as TypeScript data.
  *
- * A file git accounts for under the instance root whose extension is a
- * programming language's — see {@link CODE_EXTENSIONS}. EXCEPT files under a
- * directory the instance declares as graph typology `folio`: a folio's block
- * manifests are authored CONTENT that happens to be written as TypeScript
- * data (they import `../schema/builders`), and reporting them would make every
- * folio fail a rule about tooling.
- *
- * ## Three states
- *
- * `n/a` — not declared content. `pass`/`fail` — content, and git listed the
- * files. `unknown` — git could not list them, or a declaration could not be
- * read: never a pass, because "could not look" is not "looked and found none".
+ * States: `n/a` — not declared content. `pass`/`fail` — content, and git
+ * listed the files. `unknown` — git could not list them, or a declaration
+ * could not be read; never a pass.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";

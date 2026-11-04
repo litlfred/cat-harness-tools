@@ -3,54 +3,14 @@
  * check-published-instance-exports.ts — every foreign-instance export the
  * deploy actually runs must succeed, and must mint absolute `@id`s.
  *
- * ## Why this gate exists at all
+ * The set is DERIVED from EVERY workflow file, never listed here: add a
+ * `kg-export --instance` line to any workflow and it is covered with no edit
+ * to this file. Only `kg-export`'s invocations are matched (see `INVOCATION`
+ * below); another instance-scoped publisher is covered by its own gate (e.g.
+ * `glossary:check:bootstrap`).
  *
- * `docs-site.yml` failed on `main` for over two hours on 2026-09-21 and the
- * fast gate set was green through every one of those runs; several merges
- * landed against that green. The break was a single command —
- * `kg-export.ts --instance ./bootstrap` — that no gate ran, because the
- * gate set ran `kg-export` only for THIS instance. The export defect itself
- * is fixed (bean `40fl`); this gate is the part that was missing, and it is
- * the reason the outage was findable only from the forge.
- *
- * That is `xom7`'s finding one workflow over: a red workflow looks exactly
- * like a green one from a checkout. A gate is the only thing that makes the
- * deploy's own commands visible from inside a clone.
- *
- * ## The set is DERIVED, and from EVERY workflow — never listed here
- *
- * An array of instance paths is a second answer to "what does this repository
- * publish", free to disagree with the first the moment somebody edits the
- * YAML — and the disagreement would present as this gate passing while a
- * deploy breaks, which is that failure with an extra step. So the invocations
- * are read out of the workflow files themselves: add a `kg-export --instance`
- * line to any of them and it is covered here with no edit to this file.
- *
- * **`kg-export`'s, not every `--instance`** — see `INVOCATION` below for why
- * the anchor is deliberate. This sentence said "an `--instance` line to any of
- * them" until 2026-09-21, which was true while `kg-export` was the only script
- * taking the flag and stopped being true the moment `glossary-export.ts` took
- * it too. A second instance-scoped publisher is covered by its OWN gate
- * (`glossary:check:bootstrap`, which runs the same build), not by this one.
- *
- * **Every workflow, not a named pair.** The first version of this gate read
- * `docs-site.yml` alone, and `3jhq` measured what that missed:
- * `feature-staging.yml` published no site-root export at all, so a staged
- * cat-harness graph carried `$BASE/bootstrap.jsonld#skill/discussion`
- * pointing at a document that build never wrote — two dangling links on every
- * preview, invisible to a gate looking one file over. Naming the second file
- * would have fixed today and left the third to be discovered the same way.
- *
- * Same reasoning as `viewerSources()` replacing `VIEWER_SOURCES`, and as
- * `gates.ts` deriving its list from `code-quality-gates.yml`.
- *
- * ## An empty set is exit 2, not a pass
- *
- * If the regex stops matching — the command is renamed, the flag changes
- * spelling — this gate would examine nothing and report clean, which is the
- * failure it exists to prevent wearing a green tick. Nothing found is
- * "could not determine", and the third-state rule says that is never
- * rendered as clean.
+ * An empty set (the regex stopped matching) is exit 2, could not determine,
+ * never a pass.
  *
  * @module scripts/check-published-instance-exports
  * @covers cat-harness

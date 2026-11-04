@@ -1,6 +1,6 @@
 /**
  * Which checks `regen` and `gates` may skip on an unchanged tree, and what
- * stops the rest — bean `f017`.
+ * stops the rest.
  *
  * @module scripts/input-hash-coverage
  * @graphNode none — a report over `task-io.ts` and `input-sites.ts`; it writes nothing

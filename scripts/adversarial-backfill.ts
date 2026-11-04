@@ -2,12 +2,8 @@
 /**
  * Per-content-block adversarial QA backfill runner and risk-ranking.
  *
- * Implements child (d) of the merge gate epic (bean `folio-assistant-lvlv`, proposal
- * `cat-harness/docs/proposals/merge-gate-2026-10-02.md` §7).
+ * ## Backfill order (risk-ranked, not file order)
  *
- * ## Backfill Order (Risk-Ranked, not file order)
- *
- * Evaluates candidate nodes for adversarial review prioritized by:
  * 1. Gate adjacency: nodes on the critical merge/gating path rank first
  *    (`gates.ts`, `merge-base.ts`, `regen-after-merge.ts`, `merge-conflict-patterns.ts`, `kg-qa.ts`).
  * 2. Fan-in: how many files across the repository reference or import the node.
@@ -16,19 +12,15 @@
  *
  * ## Sidecars, never beans
  *
- * Findings stay in `kg-qa/v1` sidecars under `test/results/kg-qa/`.
- * **No bean per finding** (beans are not sidecars).
+ * Findings stay in `kg-qa/v1` sidecars under `test/results/kg-qa/`; no bean
+ * per finding. Because the derived tree is not committed and a review is a
+ * judgement no generator reproduces, each review is also appended, before
+ * the sidecar, to the subject's committed attestation file
+ * (`test/attestations/adversarial-review/…`). A node counts as reviewed when
+ * either holds one.
  *
- * A review is a judgement no generator reproduces (owner, 2026-10-14), and
- * the derived tree is not committed (cat-harness#857). So each review is ALSO
- * appended to the subject's committed attestation file
- * (`test/attestations/adversarial-review/…`, ruling D2 (a)), written
- * before the sidecar, and a node counts as reviewed when either holds one.
- *
- * ## Cost measurement
- *
- * Wall-clock execution time and token usage are measured per node and reported,
- * providing the empirical basis for full swarm backfill planning.
+ * Wall-clock time is measured and token usage estimated per node, and both
+ * are reported.
  *
  * @module scripts/adversarial-backfill
  * @graphNode tool — adversarial review backfill runner

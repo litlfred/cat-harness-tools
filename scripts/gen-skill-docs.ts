@@ -4,20 +4,17 @@
  * markdowns the LLM loads) as browsable HTML pages on the docs site, with an
  * index.
  *
- * Sources (the actual skill bodies — single source of truth):
- *   skills/authoring/content-lifecycle/*.md   → "Lifecycle skills"
- *   src/skills/*.md                  → "Agent skills"
+ * Sources: every declared skills directory in the corpus, one group each.
  *
  * Output (consumed by Jekyll → HTML on GitHub Pages):
  *   docs/reference/skill-instructions/<name>.md   (+ index.md)
  *
  * Each generated page gets just-the-docs front matter (any front matter already
- * present in the source body is stripped first), so they render with navigation
- * and link back to the source + the skill's typed schema. Regenerate with:
+ * present in the source body is stripped first) and links back to the source
+ * and the skill's typed schema. Never hand-edit the output; `--check` reports
+ * drift. Regenerate with:
  *
  *     bun run cat-harness-tools/scripts/gen-skill-docs.ts
- *
- * Dependency-free (bun + fs only). Never hand-edit the output.
  *
  * @module scripts/gen-skill-docs
  * @covers skills, docs

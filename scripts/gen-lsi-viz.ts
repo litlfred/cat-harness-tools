@@ -5,14 +5,11 @@
  *
  * @covers qa
  *
- The page names the `qa` directory it renders and its Tool (`lsi-viewer`) in
- * front matter; since #1168 B7a-2b that is how a directory's viewer is found,
- * so the navbar row, the harness tile (titled by the directory's `tile:`) and
- * the published-graphs row appear with no further wiring (skill
- * `harness-tiles`). The indexes are sidecars under `test/results/lsi/`,
- * inside that directory, which is why the page renders it rather than a
- * directory of its own: a second declaration nested in a declared one is the
- * graph-inside-a-graph shape the directory conventions refuse.
+ * The page names the `qa` directory it renders and its Tool (`lsi-viewer`) in
+ * front matter, so the navbar row, the harness tile and the published-graphs
+ * row appear with no further wiring (skill `harness-tiles`). The indexes are
+ * sidecars under `test/results/lsi/`, inside that directory, so the page
+ * renders it rather than declaring a nested graph.
  *
  * ## What it renders, and what it refuses to
  *
@@ -24,8 +21,8 @@
  * term frequency), the effect `correspondence-analysis` exists to remove.
  *
  * The need-an-index table shows each graph's VERDICT without its unit and word
- * counts, for the reason `GraphVerdict.stableDetail` gives: the page then
- * changes only when a verdict does, not on every edit to a prose graph.
+ * counts (`GraphVerdict.stableDetail`), so the page changes only when a
+ * verdict does.
  *
  *   bun run cat lsi:viz            # write cat-harness/docs/lsi/index.md
  *   bun run cat lsi:viz:check      # exit 1 if the committed page is stale
@@ -37,13 +34,7 @@
  *
  * ## Two pages from one generator: the committed one, and `--detail`
  *
- * Bean `tqjj`. Until 2026-10-04 this wrote ONE page and committed all of it,
- * and that cost 319 of the last 400 commits on `main`. `skill-register.ts`
- * recorded the same finding from the other side: adding one skill left the
- * page stale and reddened `main` through this gate.
- *
- * The split is by **what a value is a function of**, and the test is whether a
- * corpus edit moves it:
+ * The split is by **what a value is a function of**:
  *
  * | part | a function of | committed |
  * |---|---|---|
@@ -52,36 +43,19 @@
  * | each index's freshness verdict | the STORE | no |
  * | units, terms, retained, σ, pole terms, cosines | an index's CONTENT | no |
  *
- * The committed page reads **no index at all**, and the line between rows 2
- * and 3 is where the first draft of this got it wrong. Computing the verdict
- * from the tree instead (`graphVerdict` with an absent source takes its
- * compute-and-judge branch) does make the answer machine-independent — and
- * turns the page's only finding into a lie: `cat-harness/docs` went from
- * "needs an LSI index and has none" to **pass**, because an index recomputed
- * in the run is fresh by construction. The tile went 4 → 0. A value that is
- * stable because it can no longer say anything is not a measurement.
- *
- * Whether a graph NEEDS one is a different question and genuinely tree-
- * determined: `needOf` counts the graph's units and words against the
- * thresholds, reads nothing else, and a graph crossing one is a change worth
- * seeing in a diff. Whether the index it needs is FRESH is irreducibly about
- * the store, so it is drawn with the detail. Keeping it committed was the trap
- * on the way out: with no sidecar in the checkout the same commit would say
- * "fresh" on a container holding a working copy and "stale" in CI reading
- * `qa-reports` at `main`, which `qa-store` resolves to the LATEST published
- * entry — a value depending on when the gate ran rather than on the tree,
- * which is bean `in5a`'s loop arriving over the network.
+ * The committed page reads **no index at all**. `needOf` counts a graph's
+ * units and words against the thresholds and reads nothing else. Freshness is
+ * about the store: recomputing an index in the run would make it fresh by
+ * construction, and reading `qa-reports` (which `qa-store` resolves to the
+ * LATEST entry) would depend on when the gate ran.
  *
  * `--detail` adds the per-index sections and is run by the docs-site build,
- * after that workflow's `qa:fetch` pins the entry to the build's own sha. So
- * the published page carries everything a reader wants and `main` carries
- * nothing that a one-sentence skill edit moves. The same shape as
- * `state:visualizer` one step above it in that workflow.
+ * after that workflow's `qa:fetch` pins the entry to the build's own sha, the
+ * same shape as `state:visualizer`.
  *
- * `--check` keeps its ordinary meaning — is the committed page current — and
- * is therefore still a gate that fails (bean `xom7`). `--detail --check`
- * additionally reports whether the detail could be drawn at all; anything but
- * a hit is exit 2, never a pass.
+ * `--check` asks whether the committed page is current and fails when it is
+ * not. `--detail --check` additionally reports whether the detail could be
+ * drawn at all; anything but a hit is exit 2, never a pass.
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";

@@ -5,11 +5,6 @@
  * @module scripts/check-model-languages
  * @covers models
  *
- * Bean `46uh`. The owner: *"should clarify each new model added to bootstrap
- * which of the preferred languages ... especially if human validated"*.
- *
- * ## What it refuses, and what it only reports
- *
  * | state | verdict |
  * |---|---|
  * | the registry is missing or unparseable | **exit 2** — could not determine |
@@ -18,18 +13,10 @@
  * | a model with `validation: "self-reported"` | reported |
  * | the registry is EMPTY | reported, loudly |
  *
- * **An empty registry is reported rather than refused**, and that is the one
- * judgement in this file. Refusing it would make the gate red on a repository
- * that has simply not had a person look at a model yet, and a gate somebody
- * switches off protects nothing. Reporting it keeps the zero visible, which
- * is the whole reason `model-registry/1.0.0` ships empty: an agent is not
- * a valid source for the evidence the schema asks for.
- *
- * **Unparseable is exit 2 rather than "no models".** Reporting a malformed
- * registry as empty would make "nobody has declared a model" and "this file
- * is broken" the same answer, and an agent would fall through to the
- * instance's `defaultLocale` believing a determination had been made — which
- * is exactly the default-masquerading-as-a-decision this bean exists to end.
+ * An empty registry is reported, not refused: `model-registry/1.0.0` ships
+ * empty because an agent is not a valid source for the evidence. Unparseable
+ * is exit 2, never "no models", so a broken file is not mistaken for a
+ * decision and an agent does not fall back to `defaultLocale`.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/check-model-languages.ts [--instance ROOT]

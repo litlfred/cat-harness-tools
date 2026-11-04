@@ -1,26 +1,16 @@
 #!/usr/bin/env bun
 /**
  * Produce the QA working copy, and record WHICH TREE it was produced from —
- * so a reader can tell a current copy from a stale one (bean `7how`).
+ * so a reader can tell a current copy from a stale one.
  *
  * @module scripts/qa-working-copy
  * @graphNode none — a maintenance command over the working tree
  * @covers none — a build step: it writes the ignored QA tree and judges nothing
  *
- * ## The failure this exists for
- *
- * Since `5hox` the QA results tree (`*‍/test/results/`) is computed, not
- * committed. Generators read it from disk — `uml:overview`, `readme:subgraphs`
- * — and so does every gate that judges it. Measured 2026-10-06 on #2267: a
- * container held only the `kg-qa` part of the tree, `bun run cat regen` rewrote
- * the QA overview from that partial copy, every local check passed, and CI,
- * which builds the copy first, went red on `uml:overview:check` (10 files).
- *
- * The copy had no way to say what it was a copy OF. `gates` produced it only
- * when ABSENT, so a stale one was judged as if current; `regen` never produced
- * it at all, so the PR recipe grew two manual steps and a second full regen
- * around it (`regen → qa:working-copy → kg:detangle → regen`), at ~20 minutes
- * a round on every merge of `main`.
+ * The QA results tree (`*‍/test/results/`) is computed, not committed.
+ * Generators read it from disk — `uml:overview`, `readme:subgraphs`, as
+ * `bun run cat regen` runs them — and so does every gate that judges it, so a
+ * partial or stale copy silently yields wrong output.
  *
  * ## The stamp
  *
@@ -37,7 +27,7 @@
  * `current` lets a caller skip the build: absent stamp, unreadable tree, a
  * submodule with its own changes — every way of not knowing — rebuilds. The
  * stamp is never committed (`build/` is ignored) and `--if-stale` is off under
- * `CI`, as the input-hash cache is, so CI builds the copy exactly as before.
+ * `CI`, as the input-hash cache is, so CI always builds the copy.
  *
  * What it does NOT see: a moved `qa-reports` baseline, the environment, the
  * clock. Those are the same exclusions as `{tracked}` in `input-hash.ts`, and

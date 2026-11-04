@@ -5,31 +5,18 @@
  * @graphNode none — a pure function over the bean store
  * @covers none — it measures the work plan; the verdicts on it live in `check-bean-*`
  *
- * ## Why this is a module and not three implementations
- *
- * Three consumers need the same number: the terminal report
+ * One definition for three consumers: the terminal report
  * (`milestone-status.ts`), the committed projection the board fetches
  * (`gen-docs-pages.ts` writes `milestones` into `assets/beans/index.json`),
- * and the board itself, which therefore RENDERS the projection rather than
- * recomputing it. The alternative — the page deriving its own rollup from the
- * `items` it already loads — is a second answer to one question, free to
- * disagree with the first, which is what `kg:audit` and
- * `github-state-inspection` both say outright and what this repository has
- * paid for repeatedly.
- *
- * So: one definition here, one writer, and the page gets a number it does not
- * compute.
+ * and the board itself, which RENDERS the projection rather than recomputing
+ * it.
  *
  * ## The closure is TRANSITIVE, not two levels
  *
- * It is tempting to read the hierarchy as milestone → epic → task and count
- * the grandchildren. `check-bean-parents` rule 3 admits a parent whose `type`
- * is `epic` **or** `milestone`, and says nothing against an epic parented to
- * another epic — so the depth is whatever the store happens to hold, and a
- * fixed two-level walk would silently drop every bean below an epic nested
- * under an epic. Descent is transitive, with a visited guard: nothing in
- * `check-bean-parents` forbids a cycle among epics, and a cycle met by a naive
- * walk is a hang rather than a finding.
+ * `check-bean-parents` rule 3 admits a parent whose `type` is `epic` **or**
+ * `milestone`, and an epic may be parented to another epic, so the depth is
+ * whatever the store holds. Descent is transitive, with a visited guard,
+ * because nothing forbids a cycle among epics.
  *
  * ## `unclassified` is a THIRD bucket, never folded into either
  *
@@ -41,37 +28,19 @@
  *
  * ## The percentage is REPORTED, not graded — and it is bean-weighted
  *
- * `share` is `closed / classified`, which weights every bean equally: a
- * milestone whose remaining work is one large bean reads worse than one with
- * ten trivial ones. That is a real limit of counting beans, so the counts are
- * the answer and the share is a convenience derived from them. Nothing here
- * sets an exit code on it. The repository already draws this line —
- * `audit:coverage` reports its counts and deliberately does not grade the
- * share (bean `3yi4`).
+ * `share` is `closed / classified`, which weights every bean equally, so the
+ * counts are the answer and the share is a convenience derived from them.
+ * Nothing here sets an exit code on it.
  *
- * `orphanOpen` exists for the same honesty: open beans under no milestone at
- * all. If that number is large the per-milestone shares do not describe the
- * repository, and a reader cannot tell without being told.
+ * `orphanOpen` counts open beans under no milestone at all; if it is large,
+ * the per-milestone shares do not describe the repository.
  *
- * ## `coveredOpen` is SUMMED, never subtracted — and a duplicate id is why
+ * ## `coveredOpen` is SUMMED, never subtracted
  *
- * The obvious way to say how much the shares cover is `openTotal -
- * orphanOpen`. That is a different number from the sum of the bars, and the
- * first run of this module found out how: **two bean FILES share the id
- * `folio-assistant-t3n8`** (measured 2026-10-03 — 675 files, 674 distinct
- * ids), so a count over files and a count over ids differ by one, and the two
- * figures disagreed on a board that showed both.
- *
- * Both halves of that are fixed here rather than papered over. The counts are
- * taken over DISTINCT ids, because a bean is its id — it is what a commit, an
- * issue and another bean's `parent` reference. And `duplicateIds` is reported,
- * because the alternative is a module that silently absorbs a store defect no
- * gate currently catches: `check:bean-front-matter`, `check:bean-parents` and
- * `check:bean-bodies` are all green on it.
- *
- * Which of the two files keeps the id is a judgement about somebody's work and
- * belongs to its owner — and no bean is ever deleted here, so this reports and
- * changes nothing.
+ * `coveredOpen` is the sum of the bars, not `openTotal - orphanOpen`: counts
+ * are taken over DISTINCT ids (a bean is its id), and two bean files can
+ * share an id. `duplicateIds` reports such ids; which file keeps the id is
+ * its owner's call, and nothing here changes or deletes a bean.
  */
 import { z } from "zod";
 

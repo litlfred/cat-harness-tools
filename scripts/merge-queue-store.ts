@@ -9,59 +9,43 @@
  *   (`audit:coverage`'s own thesis): claiming coverage here would let the gate
  *   that judges the kind be removed without the census noticing.
  *
- * ## Why the queue is to come off `main`, and why that needed a module
+ * ## Why the queue lives on a branch
  *
- * `beans/queue/` held **no entry at all** for the two days after it was
- * declared, and the reason was structural rather than neglect. `main` is
- * reached only through a pull request, and the merge steward does no
- * development work: the owner has ruled that it must not open PRs of its own,
- * because that has it setting its own priority in the queue it manages,
- * spending the CI the queue is starved of, and judging its own head. So the one
- * actor whose decisions this graph records was the one actor that could not
- * write to it.
+ * The merge steward must not open PRs of its own (it would set its own
+ * priority, spend the queue's CI and judge its own head), so it cannot write
+ * to `main`. When the `queue` entry in `beans/beans.json` declares
+ * `source: { kind: "branch", keyedBy: "tip" }` (branch
+ * `cat/cat-harness/merge-queue`), a write here is a splice onto that tip — no
+ * pull request, no commit on `main`, and a sibling steward's write to the
+ * same entry is a CONFLICT rather than an overwrite.
  *
- * The graph is to be cut over to `cat/cat-harness/merge-queue` by giving the
- * `queue` entry in `beans/beans.json` a `source: { kind: "branch", keyedBy:
- * "tip" }`, after which a write here is a splice onto that tip — no pull
- * request, no commit on `main`, and a sibling steward's write to the same entry
- * is a CONFLICT rather than an overwrite. Bean `najo`, under the merge-pipeline
- * epic `hfag`; the mechanism is arc `fs43`'s.
- *
- * **Not cut over yet** (owner, 2026-10-05: *"Land code now, switch later"*).
- * Until bean `ugxd` lands, the declaration has no `source`, so READS come from
- * the checkout's `beans/queue/` and {@link recordDecision} REFUSES — a write
- * there would be a commit on this branch, which is the pull request this
- * module exists to avoid. Stewards keep committing entries to `main` until
- * then.
+ * While the declaration has no `source`, READS come from the checkout's
+ * `beans/queue/` and {@link recordDecision} REFUSES — a write there would be
+ * a commit on this branch — so stewards commit entries to `main`.
  *
  * ## Four read states, and a miss is never empty-clean
  *
- * The shape is {@link BeanStore}'s, deliberately: the same four answers, for
- * the same measured reasons, so a reader of one can read the other.
+ * The shape is {@link BeanStore}'s, so a reader of one can read the other.
  *
  * | state | means | the remedy it prints |
  * |---|---|---|
  * | `absent` | no declaration names a `merge-queue` directory | none — legitimate |
- * | `declared-but-absent` | a declaration names one in the checkout and it is not there | create it, or fix the declaration (`dh4f`) |
- * | `unreachable` | it is on the branch and nothing is mounted here | `bun run cat state:mount` (`9ofm` row D) |
+ * | `declared-but-absent` | a declaration names one in the checkout and it is not there | create it, or fix the declaration |
+ * | `unreachable` | it is on the branch and nothing is mounted here | `bun run cat state:mount` |
  * | `read` | the entries, with what was skipped and how many files were seen | — |
  *
- * **`unreachable` is not a spelling of `declared-but-absent`**, and the whole
- * module exists for that sentence. The task this was built for named the
- * failure: a checkout that cannot reach the graph reporting *"no decisions
- * recorded, all clear"* and exiting 0. `dh4f` is 30 pipeline scripts doing
- * exactly that, and the remedy the two states print is different — one says
- * *create the directory*, which would be acting on a declaration that is
- * CORRECT. So {@link readQueueEntries} **throws** rather than returning an
- * empty list, following `readBeanFiles`: a crash beats a clean run over
- * nothing.
+ * **`unreachable` is not a spelling of `declared-but-absent`**: their
+ * remedies differ, and "create the directory" would act on a declaration that
+ * is CORRECT. A checkout that cannot reach the graph must never report "no
+ * decisions recorded" and exit 0, so {@link readQueueEntries} **throws**
+ * rather than returning an empty list, following `readBeanFiles`.
  *
  * ## It never spells the directory's path
  *
  * The id is resolved from the declared GRAPH TYPOLOGY and the path from
  * `graphReadPath`, so this module knows neither `beans/queue` nor the branch
- * name (bean `gz47`, `check:declared-paths`). Relocating the graph — or
- * mounting it with `--into` — moves this reader with it.
+ * name (`check:declared-paths`). Relocating the graph — or mounting it with
+ * `--into` — moves this reader with it.
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";

@@ -6,20 +6,14 @@
  * @module scripts/site-parity
  * @covers none — a publish guard: it compares two built sites and judges no graph
  *
- * Owner, 2026-10-14 ("1 but I want things fixed first"): the one agent publish
- * path must publish an IG repository's main site with everything the older
- * `folio-site.yml` gave it, and until it does no IG main site is published
- * with it. So before a root publish the candidate is measured against the
- * root it would replace, on the PAGES, never on the exit codes of the steps
- * that made them:
+ * Before a root publish the candidate is measured against the root it would
+ * replace, on the PAGES, never on the exit codes of the steps that made them:
  *
  * - the theme's side bar (`#site-nav`) and a search box (`#search-input`),
  *   which a page Jekyll laid out with just-the-docs carries, and which an IG
  *   site's own search box carries too (the FHIR IG harness's `ig-search.ts`);
  * - the language picker's block (`#fa-translation-meta`), from which docs-ui
- *   draws the language picker at the top of the page (owner, 2026-10-15:
- *   *"what happened to search/language select at top of display window?"* —
- *   the IG route's pages had dropped it, and this guard did not look);
+ *   draws the language picker at the top of the page;
  * - the harness icon row (`#fa-navbar-row`) and the rail (`nav.fa-nav`, or the
  *   theme's `#site-nav`, which is where the rail sits on a laid-out page);
  * - every top-level directory (`openapi/`, `fhir-artifact-index/`, `ast-data/`,
@@ -35,19 +29,14 @@
  *
  * ## Directories and features dropped by a ruling
  *
- * A directory the current root serves, or a page feature its pages wear, that
- * the owner ruled is NOT to be published any more is not a shortfall, but only
- * when the caller names it in a {@link DroppedByRuling} with the ruling's own
- * words. An entry names EITHER top-level directory names (a `*` glob) OR one
- * page feature, by its key in {@link PAGE_FEATURES}; it excuses exactly that,
- * so a directory entry cannot excuse a feature, a feature entry cannot excuse
- * another feature, and neither excuses a missing `index.html` or the stamp.
- * What it excuses is said, never silent ({@link droppedByRuling}).
- *
- * The case that needed features: owner, 2026-10-15, layout "C" for an IG
- * repository's site — the folio rail stands in for the theme's side menu, so
- * `#site-nav` is dropped by ruling, while the search box and the rail stay
- * required.
+ * A directory or page feature the owner ruled is no longer published is not
+ * a shortfall, but only when the caller names it in a {@link DroppedByRuling}
+ * with the ruling's own words. An entry names EITHER top-level directory
+ * names (a `*` glob) OR one page feature, by its key in {@link PAGE_FEATURES},
+ * and excuses exactly that — never a missing `index.html` or the stamp. What
+ * it excuses is said, never silent ({@link droppedByRuling}). Example: an IG
+ * site whose folio rail stands in for the theme's side menu drops
+ * `#site-nav`, while the search box and the rail stay required.
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";

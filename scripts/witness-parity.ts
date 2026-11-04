@@ -2,12 +2,10 @@
 /**
  * Does a computation still reproduce its committed witness?
  *
- * @module cat-harness-tools/scripts/witness-parity
- *
- * Story T4 of the qou tools migration (bean `qou-a3l1` depends on it), and the
- * owner's ruling of 2026-10-04: *"all witnesses tools will need to go into the
- * KG"*. Before a producer is declared as a Tool whose output is a witness node,
+ * Before a producer is declared as a Tool whose output is a witness node,
  * this is how anyone checks that running the Tool actually yields that node.
+ *
+ * @module cat-harness-tools/scripts/witness-parity
  *
  * Given a witness, it:
  *
@@ -15,20 +13,16 @@
  *    `python3 <scriptFile>`) and the package versions it recorded
  *    (`environment`);
  * 2. compares those versions with what is installed, and stops at **unknown**
- *    when they differ. A witness computed under other versions is not a
- *    reproduction test, and running it anyway would report version drift as a
+ *    when they differ: running it anyway would report version drift as a
  *    defect in the producer;
  *    `reproduce` is parsed into an argv and run without a shell, with a
  *    minimal environment ({@link producerEnv}); see {@link parseReproduce};
  * 3. checks the COMMITTED tree out into a scratch `git worktree`, sparse to the
- *    directories the run needs, and runs the producer there. Whatever the
- *    producer writes lands in the scratch tree, so the folio's own checkout is
- *    untouched by construction rather than by cleaning up afterwards;
+ *    directories the run needs, and runs the producer there, so the folio's
+ *    own checkout is untouched by construction;
  * 4. stops at **unknown** if the re-run's OWN `environment` differs from the
- *    committed one. A build fingerprint or an interpreter patch level is
- *    recorded by the producer, not discoverable beforehand, and calibration
- *    found a run under the same package versions but another native build
- *    whose values moved at the 60th digit;
+ *    committed one (a build fingerprint or an interpreter patch level is
+ *    recorded by the producer, not discoverable beforehand);
  * 5. compares the rewritten witness with the committed one, both with
  *    {@link WITNESS_EPHEMERAL_FIELDS} masked at every depth.
  *

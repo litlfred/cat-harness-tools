@@ -2,32 +2,19 @@
 /**
  * Create a document in the reader's folio, of any DOCUMENT KIND the loaded
  * knowledge graphs describe, or LINK an external document by URL into the
- * library as a `referenced` node. Bean `95sk`, R28.
+ * library as a `referenced` node.
  *
  * @module scripts/folio-create
  * @covers folio
  * @graphNode none — a writer into the folio and library graphs, not a schema itself
  *
- * ## The rule it implements
- *
- * The owner, 2026-10-24, settling R28 ("new documents a reader creates or
- * links to go in `folio/`"):
- *
- * > a document someone creates goes into folio. can be of mutliple kinds -
- * > any that hey have KG to decribe/loaded in dep chain … /mounted
- *
- * So the kinds are not a list here. They are whatever `document-kinds`
+ * The kinds are not a list here. They are whatever `document-kinds`
  * directories the instances in this checkout, its mounted layers
  * (`index.lock.json`), and its dependency chain (`needs` and
  * `dependencies.folioAssistant`) declare, read by
- * `gen-document-kinds-viz.ts`'s `readDocumentKinds`, which is the same reader
- * the document-kinds viewer draws from. A layer that adds a kind makes it
- * creatable with no change here.
- *
- * A document the reader LINKS to by URL is the other half of R28: it goes into
- * `library/<slug>/` as a `referenced` node (`referenced.json` validated against
- * `ReferencedSourceSchema` + `manifest.jsonld` built by `buildEntryNodes`),
- * holding the upstream URL and copying no text.
+ * `gen-document-kinds-viz.ts`'s `readDocumentKinds` (the reader the
+ * document-kinds viewer uses). A layer that adds a kind makes it creatable
+ * with no change here.
  *
  * ## What it writes
  *
@@ -37,15 +24,14 @@
  *   its front matter as `<instance>:<id>`, and one heading per section of the
  *   kind, its parent kind's (`extends`) first, each marked required or
  *   optional, with the section's description as a comment. It writes no
- *   subject matter, for the reason `init-folio.ts` gives: content nobody asked
- *   for has to be deleted.
- * - `--link`: `<library>/<slug>/referenced.json` and
- *   `<library>/<slug>/manifest.jsonld`, where `<library>` is the target
- *   repository's declared `library` directory (`libraryRoot`), falling back to
- *   the conventional `library/` when the repository declares none.
+ *   subject matter (see `init-folio.ts`).
+ * - `--link`: `<library>/<slug>/referenced.json` (validated against
+ *   `ReferencedSourceSchema`) and `<library>/<slug>/manifest.jsonld` (built by
+ *   `buildEntryNodes`), holding the upstream URL and copying no text.
+ *   `<library>` is the target repository's declared `library` directory
+ *   (`libraryRoot`), falling back to the conventional `library/`.
  *
- * Both paths refuse to overwrite: an existing `<slug>/` is somebody's document
- * or library entry.
+ * Both refuse to overwrite an existing `<slug>/`.
  *
  * Usage:
  *   bun run cat folio:create --list [--root <repo>]

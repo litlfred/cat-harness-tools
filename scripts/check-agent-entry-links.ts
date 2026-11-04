@@ -5,13 +5,8 @@
  * @module scripts/check-agent-entry-links
  * @covers docs, skills
  *
- * Bean `v8gh`. `AGENTS.md` is the file every agent opens before anything
- * else, and nothing checked the links OUT of it. Measured 2026-09-19: it
- * carried **seven dead links**, five broken by one directory move — including
- * `docs/guides/agent-onboarding.md`, which its own banner calls the place to
- * start. A cold agent following the banner hit a 404.
- *
- * The two neighbouring checks each miss it by design:
+ * `AGENTS.md` is the file every agent opens before anything else. The two
+ * neighbouring checks each miss its outbound links by design:
  *
  * | check | covers |
  * |---|---|
@@ -19,26 +14,16 @@
  * | `check:agents-xref` | section citations **into** `AGENTS.md` |
  * | *this* | links **out of** every agent entry file |
  *
- * ## It reuses the generic auditor rather than growing a second one
- *
- * `src/core/markdown-links.ts` already does relative-path-against-working-tree,
- * ref-aware and Pages-aware checking, and already reports a third state for
- * what it could not check. The bean guessed it would generalise and said to
- * confirm rather than assume — confirmed: it ran clean over `AGENTS.md`
- * unmodified.
- *
- * That auditor was inside `pipeline/readme-links.ts` when this check
- * was written, which made this file import core from harness and forced it to
- * be CLASSIFIED core — honest about shipping, dishonest about subject, since
- * `AGENTS.md` is harness through and through. Bean `cp3l` lifted the generic
- * half out, so this now sits where its subject says it belongs.
+ * It reuses the generic auditor, `src/core/markdown-links.ts`:
+ * relative-path-against-working-tree, ref-aware and Pages-aware checking,
+ * with a third state for what it could not check.
  *
  * ## Discovery, not a list
  *
- * A hardcoded list of entry files would go stale exactly the way the links
- * did — `bootstrap/AGENTS.md` exists today and was not obvious. So the files
- * are FOUND: the three agent-generic names, at the repository root and at any
- * instance root, skipping vendored and published trees.
+ * The entry files are FOUND, not listed (a list would go stale like the
+ * links): the three agent-generic names, at the repository root and at any
+ * instance root (e.g. `bootstrap/AGENTS.md`), skipping vendored and published
+ * trees.
  */
 import { existsSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";

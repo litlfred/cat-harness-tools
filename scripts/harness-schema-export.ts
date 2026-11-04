@@ -2,33 +2,21 @@
 /**
  * Publish the declaration's JSON Schema at a dereferenceable `$id`.
  *
- * The other half of a self-describing graph. `<stub>.jsonld` says what this
- * instance contains; this says what a declaration *is*, and lives at the URL
- * its own `$id` names — so a consumer holding an `harness.json` it does
- * not understand has somewhere to go.
+ * `<stub>.jsonld` says what this instance contains; this says what a
+ * declaration *is*, and lives at the URL its own `$id` names — so a consumer
+ * holding a declaration it does not understand has somewhere to go.
  *
- * ## The trick, from the WHO DAK base IG
+ * As in the WHO DAK base IG (`generate_logical_model_schemas.py`), `$id` is
+ * the URL the file is served from, so the schema is its own documentation
+ * endpoint. Ours derive from Zod (`directory-conventions` §"What lives in the
+ * `schemas` graph": the `.ts` is authoritative), so this is a rendering of
+ * `CatHarnessDeclarationSchema` beside the JSON-LD, not a second authority.
  *
- * `generate_logical_model_schemas.py` mints `$id` as
- * `{schema_base_url}/StructureDefinition-{model}.schema.json` — the URL the
- * file is actually served from — and `generate_dak_api_hub.py` then renders
- * each schema as browsable HTML at that address. The schema is not merely
- * *described* somewhere; it **is** its own documentation endpoint.
+ * ## `$id` is absolute or absent
  *
- * Copied here with one deliberate difference. That IG derives its schemas
- * from FHIR StructureDefinitions; ours derive from Zod, because
- * `directory-conventions` §"What lives in the `schemas` graph" settled that
- * the `.ts` is authoritative and every other form is generated. So this is a
- * third rendering of `CatHarnessDeclarationSchema`, beside the JSON-LD — not
- * a second authority.
- *
- * ## Why `$id` must be absolute or absent
- *
- * A relative `$id` is legal and useless: `$ref` resolution against it depends
- * on where the fetcher happened to get the file, so two consumers can resolve
- * the same schema differently. When no `canonicalUrl` is declared this writes
- * **no** `$id` rather than a plausible-looking relative one — the same rule
- * `kg-export` follows for `@id`, and for the same reason.
+ * A relative `$id` makes `$ref` resolution depend on where the fetcher got the
+ * file. When no `canonicalUrl` is declared this writes **no** `$id` — the same
+ * rule `kg-export` follows for `@id`.
  *
  * @module scripts/harness-schema-export
  * @covers schemas, cat-harness

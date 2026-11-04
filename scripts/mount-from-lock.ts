@@ -3,26 +3,16 @@
  * Lay down every remote mount a committed lock records — from the LOCK alone,
  * with nothing but Node's own modules.
  *
- * ## Why a second mounter
- *
- * `remote-mount.ts` (bean `0mpw`) PLANS a mount: it reads the harness's
- * declaration at the pin, follows `needs` across the closure, checks trust and
- * writes the lock. To do that it reads declarations through
- * `schemas/kg/cat-harness.ts`, whose import closure reaches six modules under
- * `bootstrap-tools/schemas/` (measured 2026-10-07: `declared-order`, `graph`,
- * `requirement`, `model-registry`, `release-iri`, `declaration`). That is fine
- * while `bootstrap-tools` arrives as a git submodule. It is a bootstrapping
- * loop the moment `bootstrap-tools` itself arrives by remote mount: the tool
- * that would fetch it cannot be loaded until it is there (bean `nn8e`, #2462,
- * blocker B2).
- *
- * This script breaks the loop by doing the one part that needs no
- * declaration: REPLAYING a lock. Every decision — which instances, which
- * repository, which commit, which directories, where — was made when the lock
- * was written and is committed; what is left is fetch, copy and verify. So it
- * imports only `node:*`, runs on a fresh clone with no submodule, and is what
- * CI and the session-start hook run first. `mount:remote` stays the only
- * writer of a lock.
+ * `remote-mount.ts` PLANS a mount: it reads the harness's declaration at the
+ * pin (through `schemas/kg/cat-harness.ts`, whose imports reach into
+ * `bootstrap-tools/schemas/`), follows `needs` across the closure, checks
+ * trust and writes the lock. It cannot load until `bootstrap-tools` is
+ * mounted, so this script does the one part that needs no declaration:
+ * REPLAYING a lock. Every decision — which instances, which repository, which
+ * commit, which directories, where — is in the committed lock; what is left
+ * is fetch, copy and verify. So it imports only `node:*`, runs on a fresh
+ * clone, and is what CI and the session-start hook run first.
+ * `mount:remote` stays the only writer of a lock.
  *
  * ## What it guarantees
  *

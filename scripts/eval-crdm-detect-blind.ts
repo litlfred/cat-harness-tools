@@ -1,12 +1,11 @@
 #!/usr/bin/env bun
 /**
- * A BLIND second annotation of the crdm-detect corpus — bean `vjbl`.
+ * A BLIND second annotation of the crdm-detect corpus.
  *
- * The corpus's labels are one agent's, unblinded, and an annotator who
- * prepared normally cannot be the second one: the labels sit beside the text
- * in `scripts/eval/crdm-detect-corpus.json`, the sibling bean carries the
- * diagnosis, and the skill itself names two items and their labels. Owner,
- * 2026-09-24: a **fresh blind agent**, given only a blinded packet.
+ * The corpus's labels sit beside the text in
+ * `scripts/eval/crdm-detect-corpus.json`, and the skill itself names two items
+ * and their labels, so the second annotator is a fresh agent given only a
+ * blinded packet.
  *
  * Two commands:
  *

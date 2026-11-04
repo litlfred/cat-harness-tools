@@ -7,34 +7,30 @@
  *   bun run cat beans:landed --all    # every finding
  *   bun run cat beans:landed --days 60
  *
- * Bean `4d22`. The PR merges, the agent then commits the bean's completion to
- * the branch, then re-branches from the new `main`, and that completion commit
- * is orphaned: the bean still reads open on `main`. The rule that prevents it
- * is in `work-plan/skills/work-plan/bean-coordination.md` §"Complete it in the PR's own
- * last commit". This is the report for what slips through.
+ * When an agent commits a bean's completion after its PR merged and then
+ * re-branches from the new `main`, the completion commit is orphaned and the
+ * bean still reads open. The rule that prevents it is in
+ * `work-plan/skills/work-plan/bean-coordination.md` §"Complete it in the PR's own
+ * last commit". This reports what slips through.
  *
- * ## The signal, and why it is ranked rather than listed
+ * ## The signal, ranked rather than listed
  *
  * A merged PR's title names its bean by convention (`gpdo: …`), and GitHub
  * puts the title in the merge commit: as the subject when the merge is titled,
  * as the first body line when it is the default "Merge pull request #N from
- * …". So an OPEN bean named there may be finished and unrecorded.
+ * …". So an OPEN bean named there may be finished and unrecorded. Epics are
+ * excluded: many PRs name them and they stay open by design. The rest rank:
  *
- * May, not is. Measured 2026-09-23 over 30 days: 39 of 251 open beans were
- * named. 8 were epics, which are named by many PRs and stay open by design, so
- * they are excluded. Of the 31 left:
+ * - `done-ticked`: every `## Done when` box ticked, status still open — the
+ *   orphan shape itself, listed first.
+ * - `partly-ticked`: some boxes open; often a PR that legitimately did part
+ *   of the work.
+ * - `no-checklist`: nothing to read either way.
  *
- * - `done-ticked` (1): every `## Done when` box ticked, status still open.
- *   That is the orphan shape itself, and it is listed first.
- * - `partly-ticked` (23): some boxes open. Often a PR that did part of the
- *   work, which is legitimate.
- * - `no-checklist` (7): nothing to read either way.
+ * ## Could not determine
  *
- * ## Three states for the whole run
- *
- * A shallow clone has no merge history, and "no findings" would then be a
- * lie. With no merge commits visible in the window, the run says it could not
- * determine anything rather than reporting clean.
+ * With no merge commits visible in the window (e.g. a shallow clone), the run
+ * says it could not determine anything rather than reporting clean.
  *
  * It closes nothing. `bean-coordination.md` §"Closing a bean whose work has
  * already landed": a bean closes on evidence you re-derive, never on a report.

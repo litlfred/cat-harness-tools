@@ -5,144 +5,91 @@
  * @module scripts/regen-after-merge
  * @graphNode none — a maintenance command over the gate set
  *
- * ## The failure this exists for
+ * Two branches can change one committed generated file in non-overlapping
+ * places; git merges them with **no conflict** into a state no generator
+ * would produce. The only reliable check is to RE-RUN THE GENERATOR, never to
+ * read the diff.
  *
- * Bean `lxpq`, measured on `main` at `3341108a`, 2026-09-22. Two branches
- * changed one committed generated file in NON-OVERLAPPING places:
+ * ## It asks the gates rather than regenerating everything
  *
- *   main (`tis1`)  added `tile.voices.count` — a projection declares its count
- *   #827 (`26tu`)  added a sixth voice, `agent-skill-authoring`
+ * The gate set is loaded from the CI workflow, through `loadGates` (the
+ * workflow is the authority, not `package.json`), so a `:check` CI does not
+ * run is not this command's business. Each check is asked FIRST, so the
+ * output is exactly the set of artefacts the merge left wrong, and correct
+ * artefacts are not rewritten.
  *
- * One touched the header, the other the array. Git merged them with **no
- * conflict** and produced a projection declaring `count: 5` while listing 6
- * voices — an artefact **neither side would ever emit**.
- *
- * **A conflict is a question; a clean merge is an assertion that the result is
- * correct.** That is why this is not bean `520m` and why the retired
- * `qa:resolve-conflicts` (bean `7mwa`) could not help: it only ever inspected UNMERGED
- * paths, and here there were none.
- *
- * The general shape, which is not specific to voices:
- *
- * > A committed generated artefact can merge into a state no generator would
- * > produce, whenever two branches touch different parts of it. The only
- * > reliable check is to RE-RUN THE GENERATOR, never to read the diff — the
- * > merged file looks plausible from either side, which is exactly what let
- * > this one through.
- *
- * ## Why it asks the gates rather than regenerating everything
- *
- * "Regenerate everything declared" was the obvious repair and is the wrong
- * one twice over.
- *
- * **It would need a list, and the list is the defect.** `gates.ts` already
- * settled where the authority lives — *"the workflow is the authority, and
- * `package.json` is not"* — having measured that of the repository's `:check`
- * scripts, **21 appeared in no workflow at all**. A second list here, derived
- * from `package.json`, would run generators CI does not gate and would be a
- * guess that reads as coverage. So the gate set is loaded from the workflow,
- * through `loadGates`, and a `:check` CI does not run is not this command's
- * business.
- *
- * **And a blanket regeneration cannot tell repair from damage.** Running every
- * writer rewrites artefacts that were already correct, so the diff afterwards
- * says nothing about what the merge broke. Asking each check FIRST means the
- * output is exactly the set of artefacts the merge left wrong, which is the
- * question a person actually has after a merge.
- *
- * ## The three states, and the fourth that matters most
+ * ## The outcomes
  *
  * | state | what happened |
  * |---|---|
  * | `current` | the check passed; nothing was run |
+ * | `judged` | a judge-mode check passed; nothing was run |
  * | `regenerated` | the check failed, its writer ran, the check now passes |
  * | **`unrepaired`** | the check failed, its writer ran, **and it still fails** |
  * | `no-writer` | the check failed and has no writer counterpart |
  * | `writer-failed` | the check failed, its writer EXITED NON-ZERO, and the check still fails |
  * | `no-browser` | as `unrepaired`/`writer-failed`, for a browser-job check on a machine with no Chromium |
  *
- * **`unrepaired` is the one this command exists to surface honestly.** A check
- * can fail for reasons that are not staleness — a real defect — and a tool
- * that ran a generator and then reported success would be claiming a repair it
- * did not make. Both it and `no-writer` exit non-zero and name the check.
+ * **`unrepaired` is a real defect, not staleness**, and is never reported as
+ * a repair. **`writer-failed` is a verdict about the TOOL, not the tree**: it
+ * points the reader at the writer's `package.json` command rather than at the
+ * artefact. **`no-browser`** is could-not-determine, never green, and never
+ * a claim that the tree is wrong.
  *
- * **`writer-failed` is a verdict about the TOOL, not the tree** — bean `i1q7`.
- * `translate-bpmn:bootstrap` printed "Nothing to do" and exited 2, and regen
- * reported `translate-bpmn:bootstrap:check` as "a real defect, not staleness"
- * while `--extract` fixed it in a second. A writer that refuses to run is not a
- * repair that failed; it is a writer that is not a writer, and saying so points
- * the reader at `package.json` rather than at the artefact.
+ * ## The whole gate set by default
  *
- * ## The whole gate set by default — bean `i1q7`, item 3
+ * Regen asks only verify/write PAIRS and never runs `playwright test`, so
+ * the default is the whole set; `--fast` restricts it to the fast set
+ * (`bun run cat gates`' inner-loop boundary, the jobs that install no
+ * browser).
  *
- * This command asked only the FAST set (the jobs that install no browser),
- * borrowing `bun run cat gates`' inner-loop boundary. That boundary is about the
- * cost of `playwright test`, which regen never runs: it asks only verify/write
- * PAIRS, and outside the fast set there were exactly two — `render:bpmn:check`
- * (3.7 s) and `bat:sync:check` (0.1 s, and it needs no browser at all; it sits
- * in the e2e job by placement). `render:bpmn:check` was stale after every
- * merge that brought a process change, measured four times on 2026-10-01, and
- * every time the line saying so was the "NOT covered" footnote. So the default
- * is the whole set now, and `--fast` keeps the old scope for a machine that
- * wants it. A browser-job check that cannot be repaired on a machine with no
- * Chromium is reported `no-browser` — could-not-determine, never green, and
- * never a claim that the tree is wrong.
- *
- * ## Speed — bean `xpcu`
- *
- * Asked serially this took ~25 minutes on a shared 4-CPU box. Two things now
- * cut that, and neither changes a verdict:
+ * ## Speed, without changing a verdict
  *
  * - **Input-hash skipping** (`input-hash.ts`). A pair whose declared inputs,
  *   outputs and script sources hash to what was recorded at its last green run
  *   is not asked again — it cannot answer differently. A pair with no
  *   declaration, or whose inputs cannot be determined, is ALWAYS asked. The
  *   cache is local (`build/regen-cache/`, ignored by version control) and is
- *   off under `CI`, so CI asks every pair exactly as before. Each check that
- *   RAN and passed in a settled run is also recorded on its own, which is
- *   what lets the `gates` run that follows skip it — and a check `gates` saw
- *   pass on these inputs is skipped here too (bean `f017`, `pairSkip`).
+ *   off under `CI`, so CI asks every pair. Each check that RAN and passed in a
+ *   settled run is also recorded on its own, so the `gates` run that follows
+ *   can skip it — and a check `gates` saw pass on these inputs is skipped here
+ *   too (`pairSkip`).
  * - **A worker pool** (`task-pool.ts`). A pair whose CHECK declares
  *   `outputs: []` (it only reads) is asked beside other such pairs. Every
  *   WRITER runs alone — no check reading and no other writer writing — and
  *   writers run in pair order. A pair whose check has no declaration is a
- *   barrier: it runs alone and in order, exactly as before. Per-pair lines
- *   (`--explain`) print in the original order.
+ *   barrier: it runs alone and in order. Per-pair lines (`--explain`) print in
+ *   the original order.
  *
- * Why concurrency cannot change a verdict: a pass that ran a writer is always
- * followed by another, and the run is reported settled only after a pass in
- * which NO writer ran, or whose writers repaired nothing and left the tree
- * measurably unchanged — so the final verdicts were all read from a tree no
- * writer changed (bean `14ve`'s fixpoint does the work).
+ * A pass that ran a writer is always followed by another, and the run is
+ * settled only after a pass in which NO writer ran, or whose writers repaired
+ * nothing and left the tree measurably unchanged — so the final verdicts were
+ * all read from a tree no writer changed.
  *
- * ## Asking only what a change can have affected — bean `94zs`
+ * ## Asking only what a change can have affected
  *
- * Two more cuts, both selecting by the same FOOTPRINT (`changed-paths.ts`):
- * a pair's declared input/output globs, its scripts' import closure, its
+ * Both cuts select by the same FOOTPRINT (`changed-paths.ts`): a pair's
+ * declared input/output globs, its scripts' import closure, its
  * `package.json` commands and `bun.lock` — what the input hash covers.
  *
  * - **`--changed <base>`** asks, in the first pass, only the pairs whose
  *   footprint meets a path changed since `<base>` (`git diff <base>...HEAD`
- *   plus the working tree and untracked files). A pair outside it reads what
- *   it read at `<base>`, so its answer there is its answer here — an
+ *   plus the working tree and untracked files). A pair outside it is an
  *   ASSUMPTION about `<base>`, reported as `not asked` and never recorded in
- *   the hash cache as a green run. `merge:main` passes the merge's fork point,
- *   for the reason on `regenArgs` in `merge-base.ts`. Unlike the cache it
- *   needs no earlier run on this machine, and it works under CI.
+ *   the hash cache as a green run. `merge:main` passes the merge's fork point
+ *   (see `regenArgs` in `merge-base.ts`). Unlike the cache it needs no earlier
+ *   run on this machine, and it works under CI.
  * - **The narrowed fixpoint.** Each pass after the first asks only the pairs
  *   whose footprint meets a path the previous pass ACTUALLY changed —
  *   measured by snapshotting `git` status before and after the pass, never
- *   taken from a writer's declaration. A pair not re-asked keeps the answer it
- *   gave from a tree identical on its footprint, so "settled" still means a
- *   pass that ran no writer.
+ *   taken from a writer's declaration.
  *
  * Neither ever skips a pair with no input declaration, a `{tracked}` pair
  * when anything changed, or a pair whose footprint or change set cannot be
- * determined. **The limit, measured 2026-10-05:** the wall time is set by the
- * `{tracked}` pairs (`kg:audit:all:check`, `skill:register:check`,
- * `kg:audit:check`), which read the whole tree and so run after any merge and
- * after any writer. Narrow declarations in `task-io.ts` are what let these
- * two cuts skip anything; each must be read first.
+ * determined. The `{tracked}` pairs (`kg:audit:all:check`,
+ * `skill:register:check`, `kg:audit:check`) read the whole tree and so run
+ * after any merge; narrow declarations in `task-io.ts` are what let these
+ * cuts skip anything.
  *
  * Usage:
  *   bun run cat regen                # ask every gate; repair what is stale
@@ -158,8 +105,8 @@
  * `--all` is accepted and is the default.
  *
  * Exit (one decision, in {@link exitCodeFor}):
- *   0  every pair is current or was regenerated, and the run SETTLED
- *   1  at least one check is `unrepaired` or `no-writer` — not staleness
+ *   0  every pair is current, judged or regenerated, and the run SETTLED
+ *   1  at least one check is `unrepaired`, `no-writer`, `writer-failed` or `no-browser` — not staleness
  *   2  the run did not reach a fixed point: COULD NOT DETERMINE, never clean
  */
 import { spawnSync } from "node:child_process";

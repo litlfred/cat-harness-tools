@@ -5,10 +5,10 @@
  *
  * A rewritten PNG that a catalogue records as held (a node's
  * `materialization.localPath`) has its recorded `bytes` and sha256 `fixity`
- * brought up to date in the same run: otherwise the optimisation silently
- * turns every such record into a fixity failure. The catalogue is read as raw
- * JSON — this layer may not import the content core that defines its schema —
- * and only fields that described the OLD bytes are changed.
+ * updated in the same run, so it does not become a fixity failure. The
+ * catalogue is read as raw JSON (this layer may not import the content core
+ * that defines its schema), and only fields that described the old bytes
+ * change.
  *
  * @module scripts/optimize-library-pngs
  */

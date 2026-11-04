@@ -1,47 +1,38 @@
 #!/usr/bin/env bun
 /**
- * Repo partition — Phase 0.2 of the separation-of-concerns migration (#223).
- *
- * Replaces the filename heuristic in `docs/architecture/current-state.md` with
- * a real import-graph partition. Answers two questions:
+ * Repo partition — an import-graph partition of this instance's modules into
+ * the five proposed repositories. Answers two questions:
  *
  *   1. Which modules would land in each of the five proposed repositories?
  *   2. Which import edges cross a proposed boundary IN THE WRONG DIRECTION?
  *
- * Question 2 is the point. That cross-edge list is Phase I's worklist: every
- * entry is a module that must move, a dependency that must invert, or a
- * documented exception.
+ * Every entry in the answer to question 2 is a module that must move, a
+ * dependency that must invert, or a documented exception.
  *
  * ## BOTH QUESTIONS ARE ASKED WITHIN ONE INSTANCE
  *
  * `ROOT` is this instance, and `SCAN_ROOTS` are relative to it, so question 2
  * is "which edges cross a proposed boundary **among this instance's own
  * modules**". It is silent about imports between instances that already exist
- * side by side in the checkout. Bean `p11x`; the report says so in its own
- * output, because a bare "0 wrong-direction edges" was cited as the wide claim
- * on #1465 and had to be corrected by comment.
+ * side by side in the checkout, and the report says so in its own output.
  *
- * The cross-instance axis belongs to `kg:detangle:direction`, where a node's
- * layer is the instance it lives in — the owner's Option 2 ruling of
- * 2026-09-30. It is blocking in CI. The two are not each other's second
- * opinion: this one partitions a future layout by path rule, that one checks
- * a present layout against declared `needs`, and Phase I.1 needs both.
+ * The cross-instance axis belongs to `kg:detangle:direction` (blocking in
+ * CI), where a node's layer is the instance it lives in: this one partitions
+ * a future layout by path rule, that one checks a present layout against
+ * declared `needs`.
  *
  * ## Three states, not two
  *
  * A module this tool cannot classify is reported as `unassigned`, never
- * silently bucketed into core. Same discipline as `readme-sections.ts`: "could
- * not determine" is a distinct answer from "determined to be core", and
- * collapsing the two is how a wrong partition looks like a clean one.
+ * silently bucketed into core: "could not determine" is a distinct answer
+ * from "determined to be core".
  *
  * Every assignment carries its provenance:
  *
  *   - `rule`    — an explicit path rule. Trustworthy.
- *   - `triage`  — a per-file judgement someone made by hand, by the bean
- *                 `dh4f` question: does this read or write PLATFORM, or
- *                 CONTENT? Recorded separately from `rule` so a decision
- *                 stays visible as a decision, and can be revisited without
- *                 first working out which entries were judgements.
+ *   - `triage`  — a per-file judgement someone made by hand: does this read
+ *                 or write PLATFORM, or CONTENT? Recorded separately from
+ *                 `rule` so a decision stays visible as a decision.
  *   - `keyword` — a domain keyword in the path. Probable, worth a human look.
  *   - `default` — fell through to core because nothing else claimed it.
  *                 This is the weakest signal in the report and is counted

@@ -5,48 +5,26 @@
  * @module scripts/check-bean-parent-prose
  * @covers bean-defs
  *
- * ## Why — bean `tlj9`
+ * Every consumer that walks `parent` — a goal's open count, `beans roadmap`,
+ * a review's queue — omits a bean whose prose names a parent its front
+ * matter lacks, and that bean's whole subtree. `check:bean-parents` validates
+ * the DECLARED graph; this asks whether the declaration agrees with the
+ * bean's own prose.
  *
- * `4ccr`'s body said *"It belongs to the rendered-surface stream,
- * `folio-assistant-10uc`"* while its front matter carried **no `parent`**. Every
- * consumer that walks `parent` — a goal's open count, `beans roadmap`, a review's
- * queue — therefore omitted `4ccr` and its whole subtree from GOAL 2: **24 open
- * items**, including `ob3m`, the navbar findings that prompted the session which
- * found this. It surfaced only because somebody read the body.
+ * ## The phrase set is narrow ON PURPOSE
  *
- * `check:bean-parents` already validates the DECLARED graph — that a parent
- * exists, that its type may parent, that an epic hangs from a milestone. This
- * asks a different question it cannot: **does the declaration agree with the
- * bean's own prose?**
+ * Beans cross-reference each other constantly, so any nearby id is not a
+ * parent claim. Only phrases that ASSERT PLACEMENT count — "belongs to",
+ * "parent is", "should hang from", "parented to", "sits under" — each
+ * requiring the id within about sixty characters. The scope is stated rather
+ * than widened: other phrasings are not judged.
  *
- * ## The phrase set is narrow ON PURPOSE, and the measurement says why
+ * Blockquote lines and fenced code are skipped, so a quoted sentence is not
+ * read as a claim.
  *
- * Beans cross-reference each other constantly: **113 of 496 bodies name at
- * least one bean id, 337 mentions in total** (measured 2026-09-30). A detector
- * that treated any nearby id as a parent claim would fire on a fifth of the
- * store, and a check that cries wolf over 483 items is worse than the silence
- * it replaces.
+ * ## Could-not-determine is never green
  *
- * So the phrases below are the ones that ASSERT PLACEMENT — "belongs to",
- * "parent is", "should hang from", "parented to", "sits under" — each requiring
- * the id within about sixty characters. Over the whole store that set yields
- * **2 candidate sites**, not 337. That ratio is the reason to trust it, and the
- * reason `tlj9` scoped it to one phrasing family rather than to prose in
- * general: a detector recognising one form and calling the corpus clean is the
- * `vq8g` defect, and the honest answer to that is a stated scope, not a wider
- * net.
- *
- * ## Quotations are skipped, because one of the two hits was a quotation
- *
- * `tlj9`'s own body QUOTES `4ccr`'s sentence as evidence, inside a blockquote.
- * Reading that as a claim would make the bean that reports the defect a
- * reporter of itself. Blockquote lines and fenced code are skipped, which takes
- * the candidate set from 2 to 1 — and the one that remains is real.
- *
- * ## Could-not-determine is never green (bean `dh4f`)
- *
- * No bean store, or a body that cannot be read, exits 2. A store this cannot
- * open is not a store with no drift.
+ * No bean store, or a body that cannot be read, exits 2.
  *
  * Exit codes: 0 report only, or `--check` with no finding · 1 `--check` with
  * one · 2 could not determine.

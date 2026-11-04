@@ -4,34 +4,23 @@
  *
  * Usage: `bun run cat skill:commands` (write) · `bun run cat skill:commands:check`
  *
- * Bean `j6t3`, option A, on the owner's choice of 2026-09-30 ("F + A"). The
- * MCP prompts (`src/tools/skill-prompts.ts`) reach every MCP host but are
+ * The MCP prompts (`src/tools/skill-prompts.ts`) reach every MCP host but are
  * namespaced — `/mcp__folio-assistant__coordinate`. This writes the short form,
  * `/coordinate`, as `.claude/commands/<name>.md`, for Claude Code. Both read the
  * same list, {@link userInvocableSkills}, so neither can offer a skill the
  * other does not.
  *
- * ## A command is a POINTER, never a copy
+ * A generated command is a POINTER: it says which skill to run and where its
+ * body is, and never inlines the body.
  *
- * A generated command says which skill to run and where its body is. It does
- * not inline the body: a copy is a second place the instructions live, free to
- * disagree with the first, which is the drift this generator exists to end.
- *
- * ## Both directions, and four findings that are not "clean"
- *
- * Measured 2026-09-22 and again 2026-09-30: the drift ran BOTH ways — skills
- * declaring `user_invocable` with no command, and `/prepare-merge`, a command
- * whose skill declared nothing. A generator that only writes from the
- * declarations would fix the first and never notice the second. So:
+ * ## Findings, in both directions
  *
  * - **missing** — a `user_invocable` skill with no command. Written.
  * - **stale** — a generated command whose text no longer matches. Rewritten.
  * - **orphaned** — a GENERATED command whose skill no longer declares itself
- *   invocable. Removed: it is this generator's own output, and a command that
- *   points at nothing is worse than none.
+ *   invocable. Removed.
  * - **undeclared** — a HAND-WRITTEN command with no `user_invocable` skill of
- *   its name. Reported and never touched: a person wrote it, and whether the
- *   skill should declare itself or the command should go is theirs to decide.
+ *   its name. Reported and never touched; its author decides.
  *
  * A hand-written command (no `generated:` key) for a declared skill is left
  * alone — `watch`, `goal-review` and `staging-review` carry argument handling

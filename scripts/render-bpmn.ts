@@ -1,22 +1,19 @@
 /**
  * Render BPMN 2.0 sources to standalone SVG.
  *
- * The `.bpmn` files under `processes/` are the source of truth — they are
- * plain BPMN 2.0 with diagram interchange, so they open in bpmn.io, Camunda
- * Modeler, or any other BPMN tool. This script rasterises them to SVG for the
- * docs site and for GitHub's Markdown renderer, which cannot draw BPMN itself.
+ * The `.bpmn` files under `processes/` are the source of truth — plain BPMN
+ * 2.0 with diagram interchange, so any BPMN tool opens them. This script
+ * renders them to SVG for the docs site and for GitHub's Markdown renderer.
  *
  * Usage:  bun run cat-harness-tools/scripts/render-bpmn.ts [--check]
  *
- * `--check` renders to memory and fails if a committed SVG is stale, so CI can
- * catch a `.bpmn` edit that never had its SVG regenerated.
+ * `--check` renders to memory and fails if a committed SVG is stale.
  *
  * Never hand-edit `docs/assets/img/workflows/*.svg` — regenerate instead.
  *
- * The drawing itself — bpmn-js in headless Chromium, made byte-stable and
- * responsive — is bootstrap-tools'
- * `scripts/render-bpmn.ts` (one copy of the writers, in the tools
- * repository: bean `xsqm`). This is the SITE half: every instance's
+ * The drawing itself (bpmn-js in headless Chromium, byte-stable and
+ * responsive) is bootstrap-tools'
+ * `scripts/render-bpmn.ts`. This is the SITE half: every instance's
  * diagrams, into this site's `workflows/`, with each step's title linking to
  * its page and each call activity's [+] to the process it calls
  * (`src/workflow/diagram-links.ts`).

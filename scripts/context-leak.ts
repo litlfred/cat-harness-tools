@@ -1,11 +1,7 @@
 /**
  * **The context-leak check**: does what a bean-blind agent is given say
- * anything about beans, the work plan or the harness's process engine?
- * (cat-harness#991 proposal §4.9 and §4.13, step 22.)
- *
- * Owner, 2026-11-03: *"the knowledge graphs for the smart guidelines should
- * not have any reference to beans in it. Otherwise it pollutes the testing run
- * because the agent will then learn about beans and processes."*
+ * anything about beans, the work plan or the harness's process engine? A
+ * guideline's graph must not teach the agent under test about them.
  *
  * It scans what an agent would read — the files of a built context, the live
  * tool list, the fixed prompt — for the vocabulary below. It does **not**
@@ -13,7 +9,7 @@
  * processes as content (L2), so those words are the subject, not a leak.
  *
  * "Could not determine" is never clean: an unreadable input, or nothing to
- * read at all, is its own answer (bean `dh4f`).
+ * read at all, is its own answer.
  *
  * @module scripts/context-leak
  */

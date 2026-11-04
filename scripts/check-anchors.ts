@@ -6,14 +6,8 @@
  * @module scripts/check-anchors
  * @covers none — it reads a built site's HTML, not a graph
  *
- * ## Why (owner, 2026-11-02)
- *
- * *"should have (named/semantic/slug) # links for items in the page like
- * #dth-hrh/ch05-user-personas-and-use-cases. this should be consistent on
- * all pages"*, *"not just review page, but all viewers should try to have
- * this. part of accessabilty/QA reivew"*. A reader who cannot link to a
- * section cannot point a colleague at it, and a viewer with no way back to
- * its document strands whoever followed a link into it.
+ * Every section on every page should have a named (slug) `#` link a reader
+ * can share, and a viewer should lead back to its document.
  *
  * ## What it asks, per HTML page
  *
@@ -26,9 +20,8 @@
  * 3. **A review page leads back to its document.** A change-review page
  *    (`id="changes"`) has the "Back to the document" line (`id="source-docs"`).
  *
- * It REPORTS; it does not stop a publish. Many viewers predate it, and the
- * owner asked that they *try* to have this. The build prints the count and
- * the first pages, the way it prints the content's own unresolved links.
+ * It REPORTS; it does not stop a publish. The build prints the count and the
+ * first pages, the way it prints the content's own unresolved links.
  *
  * ```
  * bun run cat-harness-tools/scripts/check-anchors.ts --site _site

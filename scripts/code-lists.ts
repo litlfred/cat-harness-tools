@@ -6,27 +6,25 @@
  * @module scripts/code-lists
  * @covers code-list
  *
- * Owner, 2026-09-23: *"list of codes and corresponding narrative desc and
- * source should be part of a node/asset"*, published through the existing
- * SKOS tooling. The shape is `schemas/library/code-list.ts`; this is its gate.
+ * A code list holds codes with a narrative definition and a source; the shape
+ * is `schemas/library/code-list.ts`, and this is its gate.
  *
  *   bun run cat-harness-tools/scripts/code-lists.ts --check
  *
  * Exit 0 clean · 1 a finding · 2 nothing to check (no code list anywhere is
- * `could not determine`, never a pass).
+ * `could not determine`, never a pass). `--instance <root>` picks the
+ * instance (default: this one).
  *
- * ## What `--check` refuses
+ * ## What it refuses
  *
  * 1. A file declaring `folio-code-list/v1` that does not parse — a malformed
  *    list fails where it lives, not when a diagram first reads it.
  * 2. An adjudication in this instance's diagrams that declares `codes` and
- *    names no `list`: its answers are strings nobody defined or sourced. The
- *    engine ACCEPTS that (a downstream folio may not have written its lists
- *    yet); this repository has, so here it is a finding.
+ *    names no `list`. The engine accepts that (a downstream folio may not
+ *    have written its lists yet); here it is a finding.
  *
  * Whether the codes MATCH the list is the engine's job, at load time
- * (`checkCodeLists` in `src/workflow/process-model.ts`) — checked once, where
- * every consumer gets it, rather than restated here.
+ * (`checkCodeLists` in `src/workflow/process-model.ts`).
  *
  * @conformsTo w3c-owl2
  * @conformsTo w3c-rdf

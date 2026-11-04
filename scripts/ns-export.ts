@@ -2,32 +2,20 @@
  * The folio namespace, as a document that dereferences.
  *
  * `FOLIO_NS` is `https://litlfred.github.io/folio-assistant/ns/` and every
- * class and property the graph projects hangs off it. **Nothing served that
- * stem.** `scripts/tests/kg-export.test.ts` exempted it from the dead-link
- * walk BY NAME — "an IRI stem, not a file — nothing serves it and nothing
- * should try to" — which was right while a term only had to be an IDENTIFIER
- * and stopped being right when the terms had to be DEFINED.
- *
- * ## This is documentation, and can be used as a conformance test
- *
- * The owner's correction, 2026-09-19, and the order matters. The primary job
- * is the graph documenting itself: a consumer holding only the JSON-LD can
- * resolve any term it meets. That the same document also lets CI assert every
- * minted term is defined is a second use of one artefact, not its purpose.
+ * class and property the graph projects hangs off it. This serves that stem,
+ * so a consumer holding only the JSON-LD can resolve any term it meets; CI
+ * also uses it to assert every minted term is defined.
  *
  * ## One node per term
  *
- * Not one node whose `description` carries the vocabulary. A term is a thing
- * the graph has an opinion about, so it gets an `@id`, a type, a label and a
- * definition — which is what makes `folio:Actor` resolvable rather than merely
- * mentioned.
+ * Each term gets an `@id`, a type, a label and a definition — which is what
+ * makes `folio:Actor` resolvable rather than merely mentioned.
  *
- * ## Where each definition comes from, and why not from here
+ * ## Where each definition comes from
  *
  * Graph typologies are read from `BASE_GRAPH_TYPOLOGIES`, which already carries a
- * `summary` for each. Restating them in `schemas/content/vocabulary.ts` would be a
- * second answer to one question, free to disagree — the drift this repository
- * keeps paying for. Everything else is glossed in `vocabulary.ts`. A term
+ * `summary` for each; they are not restated in `schemas/content/vocabulary.ts`.
+ * Everything else is glossed in `vocabulary.ts`. A term
  * defined in both is an error, not a preference.
  *
  * Usage:  bun run cat-harness-tools/scripts/ns-export.ts [--out FILE] [--check]

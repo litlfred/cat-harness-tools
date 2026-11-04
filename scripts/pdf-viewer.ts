@@ -1,47 +1,38 @@
 /**
  * The inline PDF viewer: Mozilla's pdf.js generic viewer, pinned, installed
- * into a built site, and a fragment that embeds it on a page. Bean
- * `folio-assistant-5ea6`.
- *
- * Owner, 2026-10-04: *"is there a lightweight inline viewer that could be
- * used for viewing PDF on CDN … basic functionality (search, scroll, jump to
- * page, print, d/l)"* — then option 2 of four, *"copied PDF.js"*, and *"add as
- * skill and tool"*. The skill is `ui-core/pdf-inline-viewer`; the Tool node is
- * `pdf_viewer_embed`.
+ * into a built site, and a fragment that embeds it on a page — search,
+ * scroll, jump to page, print and download. The skill is
+ * `ui-core/pdf-inline-viewer`; the Tool node is `pdf_viewer_embed`.
  *
  * ## Why the generic viewer and not the browser's own
  *
- * An `<iframe src="x.pdf">` is zero code and gives all five features on
- * desktop Chromium and Firefox. On iOS Safari it shows page one as an image
- * and on Android Chrome it downloads the file, so "inline" holds on the
- * devices where it was least needed. The generic viewer is the same five
- * features on every engine, from one set of bytes.
+ * An `<iframe src="x.pdf">` works on desktop Chromium and Firefox, but iOS
+ * Safari shows page one as an image and Android Chrome downloads the file.
+ * The generic viewer gives the same features on every engine, from one set of
+ * bytes.
  *
- * ## Why it is installed at BUILD time and never committed
+ * ## Installed at BUILD time, never committed
  *
- * The pruned viewer is ~12 MB (407 files at v6.5.438, measured). Committed, it is clone weight every checkout
- * pays forever and a vendored tree nobody reviews. Installed by
- * {@link install} into `_site/` from a release whose SHA-256 is written
- * below, it costs the site and nothing else, and the pin is one line that
- * `upstream-pins.json` reads (`pdfjs` entry) rather than a copy of it.
+ * {@link install} puts the pruned viewer (~12 MB) into `_site/` from a
+ * release whose SHA-256 is written below, so it costs the site and not every
+ * clone; the pin is one line that `upstream-pins.json` reads (`pdfjs` entry).
  *
  * ## The cross-origin open, and why it carries an allowlist
  *
  * The PDFs these pages show are served from a CDN, not from Pages. The
- * generic viewer refuses a cross-origin `?file=` with *"file origin does not
- * match viewer's"* — measured in `web/viewer.mjs` at v6.4.299 and v6.5.438,
- * `validateFileURL`. That refusal exists so a hosted viewer cannot be pointed
- * at an arbitrary document and lend it the host's address. So the shim
+ * generic viewer refuses a cross-origin `?file=` (`validateFileURL` in
+ * `web/viewer.mjs`), so a hosted viewer cannot be pointed at an arbitrary
+ * document and lend it the host's address. So the shim
  * {@link openShim} opens `?src=` ONLY when it starts with a prefix the BUILD
  * named (`--allow`), plus the viewer's own origin. Every other value is
  * refused on screen, never opened. The prefixes are a caller's fact — the
  * workflow passes its own repository owner — so no folio's host is written
  * into the platform.
  *
- * ## Why the site root is derived in the browser
+ * ## The site root is derived in the browser
  *
- * The same reason as `folio-mount.ts`, which this reuses rather than restates:
- * one generated page is served at several depths (`/<instance>/`,
+ * As in `folio-mount.ts`, which this reuses: one generated page is served at
+ * several depths (`/<instance>/`,
  * `/folio-assistant/<instance>/`, `/STAGING/<branch>/<instance>/`), so a relative
  * or absolute viewer URL is right on at most one of them. The caller passes
  * the route pattern; `siteRootOf` and the inlined client apply the same one.

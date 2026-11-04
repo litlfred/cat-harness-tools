@@ -15,106 +15,79 @@
  *   --also <root>.config.json                  # SEPARATION: a whole instance, into the host's fsh-guts
  * ```
  *
- * ## Why this exists — `state:drift`'s remedy had no implementation
- *
- * `state-drift.ts` (bean `9ofm` row C) ends every drifted run with *"Refresh
- * the seed before any cutover"*, and nothing in the repository refreshed one.
- * Both refreshes so far were hand-run git plumbing recorded in a bean body
- * (bean `2h76`, 2026-10-02 and 2026-10-03), and the second was needed because
- * the first had gone **173 commits and 14 files** stale with nothing saying so.
- * A remedy a gate names but no command performs is a remedy that gets
- * improvised differently every time, and a hand-spliced tree is unverifiable
- * after the fact: the cutover replaces the whole subtree in one commit, so
- * there is no diff left to read.
- *
- * What a cutover from a stale seed does is worse than failing. It **resurrects**
- * whatever the seed still holds and **loses** whatever landed on the source ref
- * since — silently, because the branch is perfectly well-formed either way.
+ * This is the remedy `state-drift.ts` names ("Refresh the seed before any
+ * cutover"). A cutover from a stale seed **resurrects** whatever the seed
+ * still holds and **loses** whatever landed on the source ref since —
+ * silently, because the branch is well-formed either way.
  *
  * ## Keyed by the SPECIAL-BRANCH row, not by the declared directory
  *
- * `branch-store mount --id` and `push --id` are keyed by DIRECTORY id (the
- * owner's 2026-10-03 ruling: one generic pair for beans, todos and fsh-guts
- * alike), and this is deliberately keyed by the observed row id (the retired `special-branches.json` used the same ids)
- * instead — the same key `state:drift` uses. The reason is the state this
- * command exists for: before a cutover the directory's declaration still says
+ * `branch-store mount --id` and `push --id` are keyed by DIRECTORY id; this is
+ * keyed by the observed row id, the same key `state:drift` uses. Before a
+ * cutover the directory's declaration still says
  * `source: { kind: "directory" }`, so `resolveTipLocation` refuses it, and a
  * refresh keyed off the declaration would be unavailable in exactly the
- * pre-cutover window it is for. The ids coincide for every state branch today
- * (`beans`, `todos`, `fsh-guts`), so this is a different KEY rather than a
- * different name.
+ * window it is for. The ids coincide for every state branch today (`beans`,
+ * `todos`, `fsh-guts`).
  *
  * Which paths to copy is read from the branch's own `manifest.json`
  * (`graphs[].path`, or the older `subgraph`), and the source ref from its
- * `source.ref`. Both are read rather than assumed: a seed that records another
- * ref is refreshed from the ref it claims, and a seed that records none is a
- * refusal rather than a guess at `main`.
+ * `source.ref`. A seed that records another ref is refreshed from the ref it
+ * claims, and a seed that records none is a refusal rather than a guess at
+ * `main`.
  *
  * ## It refuses the two states where a refresh would destroy work
  *
  * - `authoritative: true` — the branch IS the store. Copying `main` over it
- *   would overwrite every edit made since the cutover with a stale copy of a
- *   directory `main` no longer even tracks.
- * - `status: "retired"` — a superseded seed (`cat/cat-harness/state`, owner
- *   ruling D4 (b)). Refreshing it would make a branch nothing should read look
- *   current, which is how a cutover tool picks the wrong one.
+ *   would overwrite every edit made since the cutover.
+ * - `status: "retired"` — a superseded seed (`cat/cat-harness/state`).
+ *   Refreshing it would make a branch nothing should read look current.
  *
- * Both are `refused` (exit 5), never a silent no-op, because "nothing to do"
- * and "I declined to do this" are different answers to a caller.
+ * Both are `refused` (exit 5), never a silent no-op.
  *
  * ## `--authoritative` is the cutover's branch half, and it is one-way
  *
  * The cutover is one commit on `main` (the declaration, the `git rm`, the
  * `.gitignore`) and one push to the branch (the current content, plus
  * `authoritative: true`). This performs the second half. Afterwards this
- * command refuses the branch, by the rule above — which is what makes the flag
- * one-way rather than a mode.
+ * command refuses the branch, by the rule above, so the flag is one-way.
  *
  * ## Why it does not go through {@link BranchStore.write}
  *
- * `write()` is blob-keyed: it takes a list of file contents, and it REFUSES
- * `manifest.json` because that file describes the branch rather than the
- * subgraph. A refresh is the one write that must replace a whole SUBTREE (1442
- * files for `beans`) and rewrite the manifest. So it splices trees with the
- * same plumbing and the same discipline — `commit-tree -p tip`, push without
- * `-f`, the server's ref lock as the concurrency primitive — rather than
- * widening `write()` into two shapes.
+ * `write()` is blob-keyed and REFUSES `manifest.json`. A refresh must replace
+ * a whole SUBTREE and rewrite the manifest, so it splices trees with the same
+ * plumbing and discipline — `commit-tree -p tip`, push without `-f`, the
+ * server's ref lock as the concurrency primitive.
  *
- * ## `--cutover` is the MAIN half, and it never pushes (bean `hp54`)
+ * ## `--cutover` is the MAIN half, and it never pushes
  *
- * After `--authoritative`, the cutover still needed a hand-run `git rm -r`,
- * a `.gitignore` line and a commit — measured 2026-10-06 cutting a folio's
- * `beans/` and `todos/` over. {@link cutoverMain} is that half. It REFUSES
- * unless:
+ * {@link cutoverMain} removes the directory from `main`. It REFUSES unless:
  *
  * - the branch's manifest says `authoritative: true` (the branch is the store);
  * - the directory is declared on that branch (`source` / `storage`, read
- *   through `tipLocations`) — flipping the declaration and removing the files
- *   are one change (bean `9ofm`), so the declaration comes first;
+ *   through `tipLocations`) — the declaration comes first;
  * - the checkout has no uncommitted change under the path;
  * - `HEAD:<path>` and the branch's `<path>` are the SAME tree id — byte-
  *   identical, every file, mode and name, so nothing is removed from `main`
- *   that the branch does not hold.
- *
+ *   that the branch does not hold;
  * - the directory's OWN instance declares a `fsh-guts` graph kept at a branch
  *   tip, and the snapshot DEPOSIT into it succeeds and re-reads verified
- *   (§"The deposit", below). No trashcan, or a deposit that did not land, is
- *   a refusal with main untouched.
+ *   (§"The deposit", below). No
+ *   trashcan, or a deposit that did not land, is a refusal with main
+ *   untouched.
  *
  * It is a DRY RUN unless `--commit` is passed: it reports the files and bytes
  * it would remove and the deposit it would make. With `--commit` it first
  * deposits, then stages `git rm -r <path>` and a
- * `/<path>/**` ignore line (the `/fsh-guts/**` precedent: a mount must never be
- * committed) as ONE commit naming the branch and the tree id. It never pushes —
- * the caller reviews and pushes. `deletion-requires-confirmation`: the dry run
- * is the report, `--commit` is the person saying go.
+ * `/<path>/**` ignore line (a mount must never be committed) as ONE commit
+ * naming the branch and the tree id. It never pushes — the caller reviews and
+ * pushes. `deletion-requires-confirmation`: the dry run is the report,
+ * `--commit` is the person saying go.
  *
- * ## Which repository — the cwd's, not the platform's (bean `hp54`)
+ * ## Which repository — the cwd's
  *
- * Every default here resolves through `defaultRepoRoot()`: the git toplevel of
- * the directory the command is run from. It used to be the platform checkout
- * unconditionally, so a folio linking the platform as a submodule refreshed
- * the PLATFORM's branch. `--repo-root <dir>` overrides it.
+ * Every default resolves through `defaultRepoRoot()`: the git toplevel of the
+ * directory the command is run from. `--repo-root <dir>` overrides it.
  *
  * Exit codes: 0 refreshed or already current (or cut over / would cut over)
  * · 1 pushed and still not verified · 4 could not determine · 5 refused.

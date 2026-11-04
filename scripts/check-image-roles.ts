@@ -1,64 +1,38 @@
 /**
  * Every declared image `role` is read by something that can actually reach it.
  *
- * Bean `5yrl`, split out of `blv9` on 2026-09-22 because it is a different
- * question over a different corpus: *declared but unread* — the `dh4f` shape —
- * rather than *a path that will not resolve*.
+ * ## Two halves
  *
- * ## Why half of this check is the half that matters
+ * Every role is NAMED by a consumer, **and** every lookup used to consume one
+ * can MATCH what is declared. The second half matters: e.g.
+ * `imagesForRole()` filters on `i.role === role && i.layout !== undefined`,
+ * so a role declared on an image with no `layout` (a mark) returns an EMPTY
+ * MAP even though a caller exists.
  *
- * `blv9` recorded the finding that makes the obvious version wrong, and it is
- * worth restating rather than pointing at, because a reader who sees only
- * "check every role has a consumer" will build the obvious version:
+ * The theme tests scan **consumer → declaration** (`resolveThemeBackdrop`
+ * resolves all three layouts), so a declaration NO consumer names is outside
+ * their domain. This file scans **declaration → consumer**.
  *
- * > `cat-harness.json` declared `role: "browser-icon"` on `mark-small` and
- * > nothing consumed it — the site emitted no favicon at all. But the reason
- * > was **not an absent caller**. `imagesForRole()` filters on
- * > `i.role === role && i.layout !== undefined`, and a mark carries no
- * > `layout`, so the lookup returned an EMPTY MAP and said nothing about why.
- * > A caller existed; it could not reach what was declared.
+ * ## The states
  *
- * So the check has two halves, and the second is the one that catches the real
- * instance: every role is NAMED by a consumer, **and** every lookup used to
- * consume one can MATCH what is declared.
- *
- * ## Why the existing test cannot do this
- *
- * `schemas/themes.test.ts` already walks every theme with a backdrop and
- * asserts `resolveThemeBackdrop` resolves all three layouts. That is a good
- * check and it scans **consumer → declaration**, so a declaration NO consumer
- * names is outside its domain by construction. It reports clean over exactly
- * the case this file exists for — which is the `dh4f` shape one level up, and
- * is how `landing-architecture` sat declared and unnamed.
- *
- * This file scans the other direction: **declaration → consumer**.
- *
- * ## The states, and why there are five rather than two
- *
- * A role is not simply consumed or orphaned. Measured on this repository:
+ * A role is not simply consumed or orphaned:
  *
  * - `landing` and the five `landing-*` theme roles are consumed **indirectly**,
  *   through `themes.ts` declaring `imageRole: "<role>"` and `resolveThemeBackdrop`
- *   reading `theme.backdrop.imageRole`. A check looking for the role inside a
- *   lookup CALL would report six false positives.
+ *   reading `theme.backdrop.imageRole`.
  * - `mark` is read by **id**, not by role: `sync-docs-harness.ts` does
- *   `decl.images?.find((i) => i.id === decl.icon)`. The role is genuinely
- *   unread and the image is genuinely reached, so failing it would be wrong
- *   and passing it silently would be a lie.
+ *   `decl.images?.find((i) => i.id === decl.icon)`. The role is unread and the
+ *   image is reached.
  *
  * Hence `by-id` and `declined` are reported and never counted clean, the same
- * third-state discipline `check:partition` and `check:docs-templates` use: an
- * unexaminable case and an examined-clean one must not look alike.
+ * third-state discipline `check:partition` and `check:docs-templates` use.
  *
  * ## Scope
  *
  * INSTANCE DECLARATIONS ONLY. `library/<slug>/images.json` files carry their
- * own roles — `page-scan` (140), `logo` (12), `decorative` (10), `figure` (2) —
- * and they are a different graph with different consumers. Folding them in
- * would make one gate answer two questions, which is the mistake this bean was
- * split out of `blv9` to avoid. They are REPORTED as out of scope rather than
- * silently skipped, because a corpus a gate declined to examine and one it
- * found clean must not read the same.
+ * own roles (`page-scan`, `logo`, `decorative`, `figure`), a different graph
+ * with different consumers. They are REPORTED as out of scope rather than
+ * silently skipped.
  *
  * @module scripts/check-image-roles
  * @covers cat-harness — the `role` keys it grades are on the instance DECLARATIONS, and the

@@ -1,26 +1,12 @@
 /**
  * A contact sheet of every declared `avatarRegion`, so a person can LOOK.
  *
- * ## Why a renderer and not a checker
- *
  * `schemas/avatar-region.test.ts` already refuses a box that is out of bounds,
- * not square in pixels, or unverifiable. **None of that can tell whether the
- * box is on the cat.** Two of the first seven boxes were square, in bounds and
- * wrong — they framed scenery — and only a render caught it, which is why bean
- * `603s` says the declaration *"should be rendered in review, not eyeballed in
- * a diff"*.
- *
- * So this is deliberately a tool that PRINTS and never gates. It answers a
- * question no assertion can carry, and it exists as a script rather than as a
- * one-off because the question returns every time a theme gains art.
- *
- * ## Self-contained on purpose
+ * not square in pixels, or unverifiable, but none of that tells whether the
+ * box is on the cat. So this tool PRINTS and never gates.
  *
  * The art is inlined as `data:` URIs, so the output is one file that opens
- * anywhere — a review comment, a chat panel, a browser with no server. A page
- * referencing `../docs/assets/...` renders as seven broken images the moment
- * it leaves the repository, which for a reviewing tool is worse than nothing:
- * it looks like the crops are broken rather than like the page is.
+ * anywhere — a review comment, a chat panel, a browser with no server.
  *
  * Usage:  bun run cat avatar:crops [--out <file>]
  *

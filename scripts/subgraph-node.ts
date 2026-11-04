@@ -1,23 +1,12 @@
 /**
  * ONE container node for the published contents of a declared subgraph —
- * the declared Subgraph node itself, never a parallel collection.
+ * the declared Subgraph node itself, never a parallel collection (two nodes
+ * describing one subgraph, with members pointing at neither).
  *
  * @module scripts/subgraph-node
  *
- * The owner, 2026-10-03: *"todos = subgraph node + todo content nodes"*
- * (option 1), *"and make pattern for declared repo branches (and declared dir
- * subgraphs)"* — and, later the same day, that a directory subgraph and a
- * branch subgraph are one pattern with two content sources
- * (`schemas/kg/subgraph-source.ts`). Bean `l4ay`.
- *
- * ## The defect it removes
- *
- * `todo-graph.ts` (#1941) published `todos.jsonld` with its OWN container — a
- * `TodoGraph` → `schema:Collection` at `<site>/todos.jsonld` with `hasPart` to
- * each todo — while the instance's KG already declared the same thing as a
- * Subgraph node (`<instance>.jsonld#directory/todos`). Two nodes described one
- * subgraph, nothing said they were the same, and the members pointed at
- * neither (`hasPart` ran one way only).
+ * A directory subgraph and a branch subgraph are one pattern with two content
+ * sources (`schemas/kg/subgraph-source.ts`).
  *
  * ## The pattern
  *
@@ -27,8 +16,7 @@
  *    function `kg-export` mints the node with) as the container `@id`, typed
  *    `Subgraph`, with `hasPart` to every member ({@link subgraphContainer});
  * 2. gives every member `inSubgraph` → that IRI ({@link memberOf}) —
- *    `inSubgraph` is the term `kg-export` already uses for exactly this edge,
- *    and it expands to `dcterms:isPartOf`;
+ *    `inSubgraph` is the term `kg-export` already uses for exactly this edge;
  * 3. carries the subgraph's RESOLVED content source (`contentSource`), so a
  *    branch-sourced subgraph names its branch — from the one resolver, so it
  *    cannot disagree with the KG export or with a mount;

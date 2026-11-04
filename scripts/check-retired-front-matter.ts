@@ -1,31 +1,13 @@
 /**
  * A front-matter key that was RETIRED must not come back.
  *
- * ## Why this check and not a schema
+ * The retired keys parsed and validated fine but were read by nothing, so a
+ * schema cannot catch them, and copying an adjacent skill's front matter
+ * brings them back. The error names the key's retirement **record**, which
+ * explains what was tried and what remains open.
  *
- * The keys below were not wrong in shape — they parsed fine, validated fine,
- * and were consumed by nothing. That is the defect class this repository
- * keeps paying for: **declared but read by nothing**. A schema cannot catch
- * it, because a schema's job is to say what a valid value looks like and
- * every one of these carried valid values. `roles:` carried 325 of them.
- *
- * Nor can the removal defend itself. 140 files lost `roles:` on 2026-09-20,
- * and the corpus that taught every agent here to write it is the corpus in
- * front of them: copy an adjacent skill's front matter and the field is back.
- * That is how it reached 140 files in the first place — six arrived in the
- * qou migration and the rest is copy-paste, never a decision.
- *
- * ## What the registry buys over a grep
- *
- * The error names the **record**, not the rule. Somebody re-adding `roles:`
- * is usually right that a skill should say who performs it; they are wrong
- * about the field. Pointing them at `fsh-guts/retired/…` hands them the
- * census, the archaeology and the two questions the removal deliberately did
- * not answer, which is the difference between "don't" and "here is what was
- * tried".
- *
- * Adding the next retirement is one entry, and the entry is refused without
- * a record to point at — see {@link RETIRED}.
+ * Adding a retirement is one entry, refused without a record to point at —
+ * see {@link RETIRED}.
  *
  * @module scripts/check-retired-front-matter
  * @covers computed — its scan set is `kgRoots(instance)` — whichever kg graphs each instance

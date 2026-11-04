@@ -5,84 +5,44 @@
  * @module scripts/check-declared-dirs
  * @covers cat-harness
  *
- * ## The gap, and why no existing check could have found it
+ * `resolveDirectories` is **existence-filtered**: a declared directory not on
+ * disk is dropped before any consumer sees it, so every consumer would report
+ * a clean run over nothing. This reports it. (`check:declared-assets`
+ * verifies declared FILES, `check:declared-paths` refuses a literal naming a
+ * declared directory, and `check:declaration-claims` compares prose against
+ * the files; none of them sees this.)
  *
- * `resolveDirectories` is **existence-filtered**. A declared directory that is
- * not on disk is dropped before any consumer sees it — which is right for a
- * consumer (scanning a path that is not there is not useful) and is precisely
- * why nothing ever reported one. A declaration asserts *this directory is
- * ours*; when that is false, every consumer reports a clean run over nothing.
- * The `dh4f` shape, inside the resolver they all depend on. Bean `8mbk`.
+ * It covers the `directories` of each `<instance>.json` AND entries declared
+ * FROM WITHIN (`docs/docs.json`, `beans/beans.json`, `voices/voices.json`).
+ * The summary counts the two separately and never adds them.
  *
- * The neighbouring checks each answer a different question and none answers
- * this one: `check:declared-assets` verifies declared FILES and their links,
- * `check:declared-paths` refuses a literal naming a declared directory, and
- * `check:declaration-claims` compares prose against the files. A directory
- * declared into thin air passes all three.
- *
- * ## It covers entries declared FROM WITHIN too — and did not until 2026-10-03
- *
- * The sweep below read each instance's `<instance>.json` `directories` and
- * nothing else, so every entry a declaration declares from within — the
- * `docs/docs.json`, `beans/beans.json`, `voices/voices.json` shape sanctioned
- * by #980 — was neither checked nor counted. **32 directories**, measured.
- *
- * Found by mutation rather than by reading: pointing a real nested entry at a
- * path that does not exist produced
- *
- *     111 declared director(ies) across 15 instance(s); 0 finding(s)   exit=0
- *
- * byte-identical to the sound path. So this module's own opening paragraph —
- * a declaration into thin air makes every consumer "report a clean run over
- * nothing" — was true OF THIS MODULE for a whole class of declaration. The
- * `dh4f` shape inside the checker written to stop it. Bean `xsrv`.
- *
- * The summary counts the two separately and never adds them: how many
- * directories an instance declares and how many more are declared inside one
- * are different questions, and one total would hide the second behind the
- * first, which is how these went unnoticed.
- *
- * ## Two directions, and the second is the one that rots quietly
+ * ## Two directions
  *
  * - **absent, unexplained** — declared and not on disk, with no `absent`
  *   reason. A finding.
  * - **explained, but present** — declares `absent` and the directory exists.
  *   Also a finding: an exemption that outlived its cause reads as a live
- *   decision and is not one. Nothing goes wrong when this rots, which is
- *   exactly why it needs a checker rather than a reader.
- *
- * Checking only the first direction would let the escape hatch become
- * permanent the moment somebody created the directory, and the declaration
- * would go on claiming a deliberate absence forever.
+ *   decision and is not one.
  *
  * ## Where a path resolves against
  *
  * `scope: "repository"` resolves against the REPOSITORY root; anything else
  * against the declaring INSTANCE's root — the rule `KgAssetSchema.src`
- * already states for assets. Getting this backwards is not a subtle bug: a
- * first measurement for `8mbk` joined other instances' repo-scoped paths onto
- * the instance root and reported **ten** phantom absences out of 35. Every one
- * was the checker's error.
+ * already states for assets.
  *
  * ## Instances are DISCOVERED, not listed
  *
- * Via {@link instanceRootsIn}, the same way `check:declared-assets` does, and
- * for the reason recorded there: that gate twice reported a clean run over
- * instances a hardcoded list had never heard of.
+ * Via {@link instanceRootsIn}, the same way `check:declared-assets` does.
  *
- * ## A third finding: a MIRROR of another instance's directory
+ * ## A MIRROR of another instance's directory
  *
  * - **mirror** — a `scope: "repository"` entry whose path lies inside ANOTHER
- *   instance's root. Until bean `cmsl` step 3 (issue #1694, PR #1747)
- *   `cat-harness.json` declared twenty of these — the IRIS replica's
- *   `library/`, the content core's `skills/`, … — so the platform named the instances
- *   stacked on it, under ids that had already drifted from the owners' own.
- *   Each instance declares its own directories; the checkout aggregates them
- *   (the root instance `needs` every staged instance, and `check:instance-graph`
- *   refuses one it does not reach). A mirror is refused so the twenty cannot
- *   quietly come back one at a time.
+ *   instance's root. Each instance declares its own directories; the checkout
+ *   aggregates them (the root instance `needs` every staged instance, and
+ *   `check:instance-graph` refuses one it does not reach). So a lower layer
+ *   never names the instances stacked on it.
  *
- * ## Two more, for a directory kept at a branch TIP
+ * ## A directory kept at a branch TIP
  *
  * - **not-cut-over** — it declares the branch and the checkout still tracks
  *   files at the path. Two copies, and nothing says which is authoritative.
@@ -90,23 +50,17 @@
  *   the path sees an EMPTY graph rather than an unreachable one.
  *
  * A **route**-keyed directory gets the FIRST of those two and not the second:
- * two copies is still two copies, but there is no route-keyed mount for
- * `unmounted` to be about. {@link routePresence} carries why, and which gate asks
- * the question this one declines.
+ * there is no route-keyed mount for `unmounted` to be about. {@link routePresence}
+ * carries why, and which gate asks the question this one declines.
  *
- * A **commit**-keyed directory is still skipped entirely, because for that keying
- * the checkout copy really is an artefact of whether `qa:fetch` ran. The
- * distinction, and the measurements behind it, are in {@link tipPresence}.
+ * A **commit**-keyed directory is skipped entirely: the checkout copy is an
+ * artefact of whether `qa:fetch` ran. See {@link tipPresence}.
  *
- * ## And the REVERSE direction, for state: `undeclared-state` (bean `hp54`)
+ * ## The REVERSE direction, for state: `undeclared-state`
  *
- * Everything above compares declarations to disk, so a directory on disk that
- * NO declaration names is invisible to it. For most directories that is
- * right — an instance may hold files nobody needs to know the kind of. For a
- * STATE graph it is not: measured 2026-10-06, a folio scaffolded by
- * `folio_init` carried `beans/` and `todos/` on `main` from its first commit,
- * declared nowhere, so no reader could ask where its work plan lives and no
- * check could see that it had been put on `main` rather than on a branch.
+ * A directory on disk that NO declaration names is invisible to the checks
+ * above, which is fine except for a STATE graph: an undeclared `beans/` or
+ * `todos/` on `main` leaves no reader able to ask where the work plan lives.
  * {@link auditUndeclaredState} reports a top-level directory at a
  * conventional state path (every `DEFAULT_DIRECTORIES` entry whose kinds all
  * `holds: "state"`) that the instance does not declare. It REPORTS: the

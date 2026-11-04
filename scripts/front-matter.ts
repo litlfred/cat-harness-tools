@@ -3,25 +3,13 @@
  *
  * @module scripts/front-matter
  *
- * A skill states what it is in two places and only two: a `description:` in its
- * front matter, or — for the minority that carry no front matter at all — its
- * first `#` heading. Every consumer that wants to say what a node IS, rather
- * than merely that it exists, needs the same answer, so it is written here once
- * instead of in each of them.
+ * A skill states what it is in a `description:` in its front matter, or — when
+ * it has no front matter — its first `#` heading. Every consumer that says
+ * what a node IS reads it here.
  *
- * It lived privately inside `scripts/kg-export.ts` until 2026-09-19. That was
- * fine while the exporter was the only caller and stopped being fine the moment
- * `skill_list` needed the same field: this repository has paid for a duplicated
- * parser three times that are written down (three `todo-manager.md`, four
- * doc-id spellings, two `-o` meanings), and the cost is never the second copy —
- * it is the day the two disagree and nothing says which is right.
- *
- * **Deliberately not a YAML library.** Front matter here is a handful of scalar
- * keys and one folded block; `js-yaml` would be a dependency on the MCP
- * server's load path for a regex's worth of work. What it therefore does NOT
- * support is stated rather than assumed: no nested maps, no anchors, no `|`
- * literal blocks, no multi-document streams. A file needing those is a file
- * this reader should not be asked about.
+ * **Not a YAML library**, to keep `js-yaml` off the MCP server's load path.
+ * It does NOT support nested maps, anchors, `|` literal blocks or
+ * multi-document streams.
  */
 
 /** The scalar keys a knowledge-graph node is read for. */

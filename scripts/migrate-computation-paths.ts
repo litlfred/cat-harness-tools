@@ -1,31 +1,27 @@
 #!/usr/bin/env bun
 /**
  * Codemod that rewrites references to compute scripts after a
- * subdirectory move. Drives the content/.ts + content/.md +
- * content/.qa.json + scripts/*.{sh,ts} + workflow.yml rewrites
- * that each phase of the subdirectory refactor requires (see
- * docs/proposals/computations-subdirectory-refactor.md).
+ * subdirectory move: the content/.ts + content/.md + content/.qa.json +
+ * scripts/*.{sh,ts} + workflow.yml rewrites a move requires.
  *
  * INPUT: a move table — an array of [oldPath, newPath] pairs,
  * relative to repo root. Each pair covers BOTH the .py producer
- * AND any sibling artifacts that share the same root name (per
- * owner-decision 5: witnesses co-move with producers):
+ * AND any sibling artifacts that share the same root name
+ * (witnesses co-move with producers):
  *
  *   foo.py            → cluster/foo.py
  *   foo.witness.json  → cluster/foo.witness.json   (if present)
  *   foo.derivation.json → cluster/foo.derivation.json (if present)
  *
- * The codemod is invoked PER PHASE with the move table for that
- * phase only — it doesn't try to discover what moved by walking
- * git. That keeps each phase auditable.
+ * It is run once per move table and never discovers moves by walking git,
+ * so each run is auditable.
  *
  * USAGE
  *
  *   bun scripts/migrate-computation-paths.ts <move-table.json> [--write]
  *
- * Without `--write`, runs in dry-run mode: prints every rewrite
- * it would make, doesn't touch any files. Run with `--write` once
- * the dry-run output looks right.
+ * Without `--write`, a dry run: prints every rewrite it would make and
+ * touches no file.
  *
  * SCAN SCOPE — every file kind that may cite a compute path:
  *
@@ -43,15 +39,13 @@
  *   - Whole-path substring match: every occurrence of `oldPath` in
  *     the file content is replaced with `newPath`. The move-table
  *     entries are normalized to leading-slash-free relative paths.
- *   - Idempotent: re-running on already-migrated files is a no-op
- *     (the oldPath substring is gone).
- *   - Preserves indentation, quoting, surrounding punctuation —
- *     it's a pure string-substring replace, not a parse-rewrite.
+ *   - Idempotent: re-running on already-migrated files is a no-op.
+ *   - A pure substring replace, so indentation, quoting and punctuation
+ *     are preserved.
  *
  * SAFETY
  *
- *   - Refuses to run unless on a non-main branch (so dry-run on
- *     main is impossible).
+ *   - Refuses to run on `main` (or `master`), dry run included.
  *   - Prints per-file diff stats so you can spot suspicious mass
  *     replacements.
  *   - `--write` always writes UTF-8, preserves line endings, and

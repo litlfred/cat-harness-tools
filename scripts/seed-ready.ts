@@ -10,19 +10,14 @@
  * This evaluates `GW_SeedReady` — "Ready to seed?" — in `kg-separation.bpmn`,
  * the gateway between `Create the repositories` and `10 · Seed`. The decision
  * itself is `seed-readiness-gate.dmn`, found by NAME through `workflowFile`
- * rather than by a composed path, so the next regroup of `processes/` does not
- * break it. This script gathers the facts and hands them to the table, so
- * **every threshold lives in the table and none lives here**. Change the
- * table, not this file.
+ * rather than by a composed path. This script gathers the facts and hands them
+ * to the table: **every threshold lives in the table and none lives here**.
  *
  * ## Why a seed waits for the source to settle
  *
- * A seed is a snapshot: one commit, no history (bean `iai8`). Every open PR
- * whose diff touches the layer at that moment is orphaned into the monorepo —
- * its change is in neither the seed nor, after cutover, anywhere that reads
- * it. The steward was applying four criteria by hand before each seeding
- * review (2026-10-02); this is those criteria, generalised per layer and read
- * off the declarations rather than off a list of directory names:
+ * A seed is a snapshot: one commit, no history. Every open PR whose diff
+ * touches the layer at that moment is orphaned. The criteria, read off the
+ * declarations per layer:
  *
  * | fact               | what is counted                                              |
  * |--------------------|--------------------------------------------------------------|
@@ -35,12 +30,11 @@
  * | `undetermined`     | criteria this run could not decide                           |
  *
  * The first four ask whether the SOURCE is still moving; the last two re-ask,
- * at seed time, whether the layer can stand alone — `8 · Rehearse` asked it
- * once, and main has moved since.
+ * at seed time, whether the layer can stand alone (`8 · Rehearse` asked it
+ * once, and main has moved since).
  *
- * ## The rehearsal runs only on request — the owner's ruling
+ * ## The rehearsal runs only on request
  *
- * Owner, 2026-10-02: "Optional, run only on request with --rehearse."
  * `--rehearse` copies the layer and everything it needs into a scratch
  * workspace of sibling directories and runs `bun test` there; for cat-harness
  * that is ~150 MB and ~8,000 tests. Without it the standalone criterion is
@@ -54,25 +48,22 @@
  * repository. Its directory is `livesAt.path`; its position is the longest
  * `needs` chain beneath it, so `bootstrap → bootstrap-tools → cat-harness →
  * cat-harness-tools → <content core> → {the layers above it}`
- * falls out of the declarations rather than being restated. "The next layer"
- * is every instance one level up that needs L, directly or transitively. The
- * repository whose PRs are read is `livesAt.repository` — where the layer's
- * in-flight work actually is.
+ * falls out of the declarations. "The next layer" is every instance one level
+ * up that needs L, directly or transitively. PRs are read from
+ * `livesAt.repository`.
  *
  * ## Could-not-determine is never green
  *
- * GitHub's files endpoint stops at 3,000 files, so a PR larger than that has a
- * path set this script cannot see whole. A criterion that depends on the
- * unseen part is `could-not-determine`, and the gate answers `unknown` rather
- * than `settled`. A missing `heavy-mover` label is the same: it means the
- * marker does not exist, not that nothing carries it. An unknown can only
- * withhold `settled`; it never hides a certain `not yet`, which is why the
- * table tests the findings first.
+ * GitHub's files endpoint stops at 3,000 files, so a criterion that depends on
+ * the unseen part of a larger PR is `could-not-determine`, and the gate
+ * answers `unknown` rather than `settled`. A missing `heavy-mover` label is the
+ * same. An unknown can only withhold `settled`; it never hides a certain
+ * `not yet`, which is why the table tests the findings first.
  *
  * ## It reports and never acts
  *
  * Nothing here seeds, pushes, labels or comments. Seeding is `10 · Seed`, after
- * the owner's authorisation (`9 · Authorise`, bean `smbc`).
+ * the owner's authorisation (`9 · Authorise`).
  *
  * @module cat-harness/scripts/seed-ready
  */

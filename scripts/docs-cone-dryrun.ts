@@ -1,42 +1,35 @@
 #!/usr/bin/env bun
 /**
- * The docs site's DEPENDENCY-CONE DEPLOY, as a dry run (bean `fwtz`, option C;
- * owner, 2026-10-23). It decides nothing and skips nothing: beside the full
- * build it says whether a cone-only deploy WOULD have been chosen, and then
- * checks that choice against what the full build actually changed.
- *
- * A full `docs-site` run takes over 20 minutes; a cone-only refresh about 2.
- * Before anything is skipped the cone has to be shown never to under-carry,
- * because an under-carried page is a STALE PAGE SERVED AS FRESH — the one
- * failure a partial deploy must never have. So this logs, per deploy:
+ * The docs site's DEPENDENCY-CONE DEPLOY, as a dry run. It decides nothing
+ * and skips nothing: beside the full build it says whether a cone-only deploy
+ * WOULD have been chosen, and checks that choice against what the full build
+ * actually changed — a cone that under-carries serves a stale page as fresh.
+ * Per deploy it logs:
  *
  * 1. **eligible** — whether the cone, computed before the build, is fully
  *    determined: a readable deployed stamp to diff from, every re-pinned mount
  *    expanded, every moved branch mount diffed, and NO `undetermined` input in
- *    the docs renderer's prediction (`docs-rendered-impact.ts`, which carries
- *    any doubt). Not eligible means the real switch would fall back to the
- *    full build, and the reasons are listed.
+ *    the docs renderer's prediction (`docs-rendered-impact.ts`). Not eligible
+ *    means the real switch would fall back to the full build; the reasons are
+ *    listed.
  * 2. **measured** — what the full build changed against the site it replaces
  *    (the `gh-pages` root, other previews left out), with the per-deploy
  *    stamps blanked (`DEPLOY_STAMPS`).
  * 3. **verdict** — `cone-safe` (eligible, and every measured file was
  *    predicted), `cone-unsafe` (eligible, and the build changed a file the
- *    cone did not name: the switch would have served it stale), or `full`
- *    (not eligible: the fallback, correct by construction).
+ *    cone did not name), or `full` (not eligible: the fallback).
  *
- * `cone-unsafe` is the number that must stay at zero before the switch is
- * turned on; `full` with a small measured set is where the cone is too
- * cautious and is worth sharpening.
+ * `cone-unsafe` must stay at zero before the switch is turned on; `full` with
+ * a small measured set is where the cone is too cautious.
  *
  * ## The base is the DEPLOYED site, not the previous push
  *
  * The cone is computed from the commit the live site was built from (its
- * `build.json`), never from `github.event.before`: a cancelled or failed run
- * leaves the live site older than the previous push, and a cone from the push
- * would skip the changes that never deployed. For the same reason the stamp
- * records the tip of each branch-mounted subgraph (`state:mount`'s markers),
- * so a bean edit is an input like a code change. A stamp that records no tip
- * makes the run ineligible, never "nothing moved".
+ * `build.json`), never from `github.event.before`, since a failed run leaves
+ * the live site older than the previous push. The stamp also records the tip
+ * of each branch-mounted subgraph (`state:mount`'s markers), so a bean edit is
+ * an input like a code change. A stamp that records no tip makes the run
+ * ineligible, never "nothing moved".
  *
  * Usage (both from the index root, after the build, before the publish):
  *   bun run cat-harness-tools/scripts/docs-cone-dryrun.ts inputs --stamp pages/build.json \

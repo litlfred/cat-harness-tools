@@ -2,49 +2,17 @@
 /**
  * Can this repository actually be checked out?
  *
- * Every other gate here asks whether the CONTENT is right. This one asks
- * whether the tree can be created at all on the filesystems people clone it
- * onto — a property of the filenames, which nothing checked until 2026-09-21,
- * when a user's clone produced:
- *
- * ```
- * Receiving objects: 100% (647920/647920), 869.73 MiB | 9.21 MiB/s, done.
- * error: invalid path 'cat-harness/test/results/kg-qa/skills/requirements/req:agent-workflow.kg-qa.json'
- * fatal: unable to checkout working tree
- * ```
- *
- * ## Why the generator fix is not this check
- *
- * `kgQaSidecarPath` now encodes the stem it composes, so those seven sidecars
- * cannot come back. That fixes one writer. It does not fix a hand-authored
- * file, a second composer nobody has found yet, or a path arriving with a
- * vendored dependency — and the seven got in precisely because no gate stood
- * between a legal-on-Linux name and the commit.
- *
- * So the subject is **every tracked path**, read from `git ls-files`, not the
- * working tree: an untracked scratch file breaks nobody's clone, and grading it
- * would make the gate fail for reasons the committer cannot fix.
- *
- * ## Why a failure here is worse than it looks
- *
- * Git aborts the whole checkout on the FIRST invalid path. One bad filename
- * does not cost one file — it costs the working tree, for every developer on
- * that platform, with the fetch having already succeeded. The author sees
- * nothing wrong and CI runs on Linux, so the only signal is somebody else's
- * failed clone.
- *
- * ## Third state
- *
- * Exit 2 is "could not check" — no `git`, or not a repository — and is never
- * rendered as a pass, the same rule as `check-harness-dirs.ts` and
- * `check-ci-health.ts`. A gate that cannot see the file list has not cleared
- * it.
+ * Checks that every tracked path (from `git ls-files`, not the working tree)
+ * is creatable on the filesystems people clone onto. Git aborts the whole
+ * checkout on the FIRST invalid path, and CI runs on Linux, so the only
+ * other signal is somebody else's failed clone.
  *
  * Usage:
  *   bun run cat check:portable-paths
  *   bun run cat check:portable-paths -- --json
  *
- * Exit: 0 every tracked path is creatable, 1 at least one is not, 2 could not check.
+ * Exit: 0 every tracked path is creatable, 1 at least one is not, 2 could not
+ * check (no `git`, or not a repository; never a pass).
  *
  * @module scripts/check-portable-paths
  * @covers code

@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * The KG subscriptions page: the known substrates, and what each instance has
- * subscribed to and chosen to hold. Issue #1719, epic bean `fnx4`; the design is
+ * subscribed to and chosen to hold. The design is
  * `docs/proposals/kg-subscriptions.md` §"Known substrates" and §"The visualizer".
  *
  * ```sh
@@ -14,13 +14,11 @@
  * Four sources, merged by `name`, the later overriding the earlier:
  *
  * 1. every instance in the checkout that declares a planned `repository` other
- *    than the one it lives in today (#1652), which is `planned`;
+ *    than the one it lives in today, which is `planned`;
  * 2. every `associatedHarnesses` entry, which is `exists` (it has a site);
  * 3. every `subscriptions` entry, which is `exists` (it is pinned to a commit
- *    of a repository that was read). A subscription may not also be an
- *    associated harness (issue #1719), so without this row the first real
- *    subscription (`litlfred/ihris`, bean `tmo5`) would fall out of the
- *    registry the moment it stopped being associated;
+ *    of a repository that was read) — needed because a subscription may not
+ *    also be an associated harness;
  * 4. every `knownSubstrates` hand row, for what no declaration can say.
  *
  * So a staged instance appears the moment it declares its planned home, and
@@ -30,12 +28,11 @@
  *
  * A subscription's STATE is read from the checkout only: a chosen part with no
  * materialisation record is drawn as not yet held, never as held, and never as
- * missing. A part WITH a record (slices 5 and 6, `kg:materialize`) is drawn
- * from that record: ⬇ held, and its bytes still hash to it; ⚠ held at another
- * pin, or bytes that no longer match; ✗ a gate refused; ? a gate unanswered or
- * a record unreadable — could-not-determine is drawn, never hidden. What
- * upstream looks like right now is `refresh-materialized`'s question, not this
- * page's.
+ * missing. A part WITH a record (`kg:materialize`) is drawn from that record:
+ * ⬇ held, and its bytes still hash to it; ⚠ held at another pin, or bytes
+ * that no longer match; ✗ a gate refused; ? a gate unanswered or a record
+ * unreadable — could-not-determine is drawn, never hidden. What upstream looks
+ * like right now is `refresh-materialized`'s question, not this page's.
  *
  * @module cat-harness/scripts/subscriptions-viz
  * @covers cat-harness, docs — the subscriptions and known substrates every declaration states

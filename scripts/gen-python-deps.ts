@@ -3,22 +3,13 @@
  * Write `requirements.txt` and `requirements-extended.txt` from the declaration,
  * into this layer's declared `python/` directory — the location
  * `requirementsPath` in `cat-harness/schemas/sdlc/python-deps.ts` names, and nowhere
- * else (bean `ar1s`, phase 3).
+ * else.
  *
- * It moved here from `cat-harness/scripts/` with the files it writes: a
- * generator in the harness writing into the tool layer above it would be a
- * wrong-direction reference by construction, whatever it was spelled as.
- *
- * Bean `68dt`. `schemas/sdlc/python-deps.ts` is definitional; these are downstream,
- * the same carrier split the schema modules use (`harness-schema-export.ts`
- * does it for JSON Schema). pip cannot read TypeScript, and the declaration
- * carries two things a flat list cannot — the import name a distribution
- * provides, and why a package has no import at all — so the file is generated
- * rather than authored.
- *
- * `--check` fails when either file is stale, which is what stops the generated
- * artefact and its source drifting apart. Without it the pair is two
- * declarations of one fact, which is the defect the split exists to avoid.
+ * `schemas/sdlc/python-deps.ts` is definitional; these are downstream. pip
+ * cannot read TypeScript, and the declaration carries what a flat list cannot
+ * — the import name a distribution provides, and why a package has no import
+ * at all — so the files are generated, never authored. `--check` fails when
+ * either file is stale.
  *
  *   bun run cat deps:python          # write both files
  *   bun run cat deps:python:check    # fail if either is stale

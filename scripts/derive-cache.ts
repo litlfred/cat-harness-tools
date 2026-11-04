@@ -1,41 +1,32 @@
 /**
  * The per-writer output cache and the bounded parallel scheduler of
- * `derive:publish` (bean `0b8c`; issue #400).
+ * `derive:publish`.
  *
  * @module scripts/derive-cache
  * @graphNode none — a helper of `derive-at-publish.ts`; it judges no graph
  *
- * ## What it answers
+ * When nothing a publish-time writer reads has changed since it last ran
+ * green here, `derive:publish` RESTORES the bytes it wrote then and reports
+ * `reused <writer> (inputs unchanged since <key>)` — never as built.
  *
- * *"Has anything this publish-time writer reads changed since it last ran
- * green here?"* If not, running it again writes the bytes it wrote then, so
- * `derive:publish` RESTORES those bytes from the cache and says so — `reused
- * <writer> (inputs unchanged since <key>)` — and never reports a reused result
- * as built.
- *
- * ## The key, and what it does not narrow
+ * ## The key
  *
  * A writer's key is a hash over:
  *
- * - its input-hash fingerprint (`input-hash.ts`, bean `f017`): its script
- *   closure, AUDITED for every environment, network, clock and git read
- *   (`input-sites.ts`), the `bun` and `git` versions, `bun.lock`, and its
- *   declared inputs. A writer declares inputs the way a check does, in
- *   `task-io.ts` or its instance's `taskIo`; one that declares none is keyed on
- *   `{tracked}` — the WHOLE working tree. That is deliberate, not a shortcut:
- *   the owner's rule is "declared or derived, never hand-narrowed globs"
- *   (`ci-cone.ts`, `task-io.ts` "The rule for adding one"), so with no
- *   declaration the only sound key is the whole tree. It costs hits, never
- *   correctness: any edit anywhere re-runs every such writer.
+ * - its input-hash fingerprint (`input-hash.ts`): its script closure, AUDITED
+ *   for every environment, network, clock and git read (`input-sites.ts`), the
+ *   `bun` and `git` versions, `bun.lock`, and its declared inputs. A writer
+ *   declares inputs the way a check does, in `task-io.ts` or its instance's
+ *   `taskIo`; one that declares none is keyed on `{tracked}` — the WHOLE
+ *   working tree, since inputs are declared or derived, never hand-narrowed
+ *   globs (`ci-cone.ts`). It costs hits, never correctness.
  * - the content of the DECLARED outputs of every writer ordered before it
- *   ({@link predecessorsOf}), as they stand when it starts — what a `reads`
- *   edge or an instance's listed order says it may read.
+ *   ({@link predecessorsOf}), as they stand when it starts.
  *
  * The tree digest leaves out every declared `builtAtPublish` path (what each
  * run rewrites), and `build/`, where this cache lives (`BUILD_OUTPUT_DIRS`).
  * A fingerprint that cannot be determined — an unannotated network read, a
- * dirty submodule — makes the writer RUN, as everywhere else in this layer:
- * could-not-determine is never clean.
+ * dirty submodule — makes the writer RUN: could-not-determine is never clean.
  *
  * ## Recorded only over a tree that held still
  *
@@ -47,19 +38,17 @@
  *
  * ## Order and parallelism
  *
- * The declared edges (`writerEdges` in `derive-at-publish.ts`, owner ruling
- * "A1" of 2026-10-15) are the whole order: "a writer runs as early as its
- * edges allow". {@link schedule} starts a writer once every writer with an
- * edge into it has finished, at most `CAT_DERIVE_JOBS` at once (default: the
- * machine's cores), ties broken by the sequential order. With one job it runs
- * exactly the sequential order.
+ * The declared edges (`writerEdges` in `derive-at-publish.ts`) are the whole
+ * order. {@link schedule} starts a writer once every writer with an edge into
+ * it has finished, at most `CAT_DERIVE_JOBS` at once (default: the machine's
+ * cores), ties broken by the sequential order. With one job it runs exactly
+ * the sequential order.
  *
  * ## Where, and when it is off
  *
  * `CAT_DERIVE_CACHE_DIR`, default `build/derive-cache` (git-ignored). Off
- * under `--no-cache`, and under `CI` unless `CAT_DERIVE_CACHE_DIR` is set —
- * the input-hash rule ("CI asks every pair exactly as before") holds until a
- * workflow opts in by naming a cache directory it restores.
+ * under `--no-cache`, and under `CI` unless `CAT_DERIVE_CACHE_DIR` is set (a
+ * workflow opts in by naming a cache directory it restores).
  */
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";

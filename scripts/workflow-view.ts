@@ -1,15 +1,10 @@
 /**
  * Where a running workflow instance IS, what it names, and whether it is
- * stuck — the join bean `folio-assistant-v49e` asks for, computed from
- * committed state only.
+ * stuck — computed from committed state only.
  *
  * @module scripts/workflow-view
  * @covers none — it JOINS committed workflow instances with the diagrams they
  *   run and the beans and todos those name; the state visualiser renders it
- *
- * Owner, 2026-09-20: *"cat-harness folio should have function to show
- * workflow mgmt... where todso/beans are in bpmn/dmn. should have specialized
- * browser visualzier to see where process is breaking down."*
  *
  * ## A join, not a second store
  *
@@ -22,9 +17,8 @@
  *
  * ## Stuck states are STATES
  *
- * Bean `v49e`: *"the interesting states are the ones that look like
- * nothing"*. Each is its own {@link StuckKind}, with a sentence saying what
- * was measured, rather than a red tint over a tidy diagram:
+ * Each is its own {@link StuckKind}, with a sentence saying what was
+ * measured, rather than a red tint over a tidy diagram:
  *
  * | kind | from |
  * |---|---|
@@ -37,26 +31,23 @@
  * | `no-status` | the file records no `status` at all |
  * | `refused-gate` | the engine refused a step after the instance last moved (`refusals`) |
  *
- * **A refused gate is recorded since 2026-10-29.** `workflow_complete`
- * refuses by throwing a `WorkflowError`; it now also appends the refusal to
- * the instance's `refusals` and saves it, so "this gate keeps refusing" is on
- * disk. A file written before then carries no `refusals`, and
- * {@link GATE_REFUSALS} says so on every page rather than reading the absence
- * as "never refused". The hand-over screen's refusals are not recorded: they
- * refuse the caller's ARGUMENTS before the instance is read, which is not a
- * gate of the process.
+ * `workflow_complete` refuses by throwing a `WorkflowError` and also appends
+ * the refusal to the instance's `refusals`. An older file carries no
+ * `refusals`, and {@link GATE_REFUSALS} says so on every page rather than
+ * reading the absence as "never refused". The hand-over screen's refusals are
+ * not recorded: they refuse the caller's ARGUMENTS before the instance is
+ * read, which is not a gate of the process.
  *
  * ## The working context, by the step's role
  *
- * Bean `v49e`, item 3: *"for a task: the working context/memory its
- * dependency tree implies"*. The engine already computes the context of an
- * enabled step (`enabled()`'s `TaskContext`: the role, the role stack down the
- * call path, the skills closed over `inherits`, the conventions in force and
- * the beans the token carries), so {@link workingContextOf} reads it rather
- * than computing a second one. Memory is joined by ROLE, the axis
- * `memoryForRoles` defines: the step's role and the roles it `inherits`, plus
- * every untagged entry. The outer roles of the call path are NOT overlaid,
- * because `schemas/memory.ts` leaves the call-path overlay open on purpose.
+ * The engine already computes the context of an enabled step (`enabled()`'s
+ * `TaskContext`: the role, the role stack down the call path, the skills
+ * closed over `inherits`, the conventions in force and the beans the token
+ * carries), so {@link workingContextOf} reads it rather than computing a
+ * second one. Memory is joined by ROLE, the axis `memoryForRoles` defines:
+ * the step's role and the roles it `inherits`, plus every untagged entry. The
+ * outer roles of the call path are NOT overlaid, because `schemas/memory.ts`
+ * leaves the call-path overlay open on purpose.
  *
  * ## The log
  *
@@ -68,9 +59,7 @@
  *
  * The age-based states need a "now", and it is passed in, never read here.
  * The pages are built at publish (`builtAtPublish`), so their reference time
- * is the publish and each page states it; a committed, content-gated file
- * would have needed the client to compute age instead (the rule `beans.ts`
- * states on `beanFindings`).
+ * is the publish and each page states it.
  */
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";

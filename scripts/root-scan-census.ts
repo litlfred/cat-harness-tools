@@ -3,61 +3,26 @@
  * root-scan-census.ts — how many scanners walk the filesystem, and how many
  * ask GIT what the corpus is.
  *
- * ## Why this exists, and the objection it was built over
- *
- * `xd1g` Done-when 3 asks for a check that catches *number twelve* — the next
- * scanner written with a bare walk. I built that check first and it failed its
- * own falsifier, so it is not one. The measurement, which is the useful part
- * and the reason this file reports two numbers instead of one:
- *
- * | filter | scanners found | of `xd1g`'s twelve |
- * |---|---|---|
- * | binds a root constant **and** enumerates anything | **62** | all |
- * | enumeration **seeded at** a root constant | **4** | 1 |
- *
- * 62 is mostly correct code — a `readdirSync` over one declared directory
- * cannot read gitignored content unless gitignored content is there. 4 misses
- * eleven of the twelve, because they seed a recursion helper or take the root
- * as a PARAMETER. There is no setting in between: the two shapes are not
- * syntactically distinguishable.
- *
- * **I argued against shipping it anyway**, because a check that cannot fail is
- * the `1xhc` pattern this repository has a PR arguing against, and a number
- * nobody can act on is a number people learn to skim. The owner chose to ship
- * it regardless, 2026-09-27, so that the count is visible and cannot drift
- * unnoticed. That is their call and it is recorded here rather than argued
- * again — but the objection is why this file is built the way it is.
+ * It reports two numbers, because the two shapes are not syntactically
+ * distinguishable: scanners that bind a root constant and enumerate anything
+ * (mostly correct code — a `readdirSync` over one declared directory reads no
+ * gitignored content unless it is there), and enumerations seeded at a root
+ * constant (precise, but misses scans that seed a recursion helper or take the
+ * root as a PARAMETER).
  *
  * ## Advisory on the FINDINGS, hard on the STALENESS
  *
- * The compromise that gives it teeth where teeth are honest. The counts are
- * reported and never fail: the backlog is a shape, not a defect, and gating on
- * it would be the wall somebody switches off (`2krx`'s reasoning, and it is
- * right).
- *
- * But `--check` fails when a scan that is SEEDED AT A ROOT and NOT GIT-AWARE is
- * new against a baseline. That is a real failure about a real thing: the
- * number changed and nobody looked. It is `audit-coverage`'s arrangement
- * exactly, and it is what "cannot drift" requires — a printed verdict is gone
- * the moment the log scrolls, and cannot tell "never measured" from "measured
- * clean".
- *
- * It used to fail on the committed sidecar being STALE, and that stopped being
- * a question when QA results left `main` for the `qa-reports` branch (owner
- * rulings D1/D4, bean `0dav`): nothing committed is left to be stale. The
- * baseline is the committed working copy until then and `--against <ref>`
- * after; a baseline that is not there is UNKNOWN, reported and not gated
- * (proposal §2.3). Only the drift that was ever a finding — a new exposed
- * scan — fails; a new git-aware scanner, which also staled the old sidecar,
- * does not.
+ * The counts are reported and never fail: the backlog is a shape, not a
+ * defect. `--check` fails only when a scan that is SEEDED AT A ROOT and NOT
+ * GIT-AWARE is new against a baseline (the same arrangement as
+ * `audit-coverage`). A new git-aware scanner does not fail. The baseline is the
+ * committed working copy, or `--against <ref>`; a baseline that is not there
+ * is UNKNOWN, reported and not gated.
  *
  * ## A FLOOR, stated in the output, never a count
  *
  * The filters are syntactic, so a scanner spelled differently is missed. The
- * sidecar says so in its own summary rather than leaving a reader to infer
- * that a census is exhaustive. `xd1g` made the same caveat about its own
- * eleven and it was right to: that list was one short (`kg-audit`), found by a
- * sibling session weeks later.
+ * sidecar says so in its own summary.
  *
  * Usage:
  *   bun run cat root-scan-census            # report, write the sidecar

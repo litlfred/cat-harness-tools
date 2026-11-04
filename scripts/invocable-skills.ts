@@ -5,12 +5,9 @@
  * @module scripts/invocable-skills
  * @covers cat-harness
  *
- * MOVED HERE from `src/tools/skill-prompts.ts` (bean `w2gr`, 2026-09-30). The
- * owner ruled that tools depend on the harness and never the reverse, and
- * `scripts/gen-skill-commands.ts` — harness — was importing this list from a
- * Tool. The derivation is harness logic (it reads skill front matter); only
- * registering the prompts on an MCP server is the Tool's, and that stays in
- * `skill-prompts.ts`, which now imports from here.
+ * The derivation reads skill front matter, so it is harness logic, imported by
+ * `scripts/gen-skill-commands.ts` and by `skill-prompts.ts` (which only
+ * registers the prompts on an MCP server).
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";

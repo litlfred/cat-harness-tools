@@ -2,55 +2,23 @@
 /**
  * Run the gates CI runs — DERIVED from the workflow, never listed here.
  *
- * Bean `folio-assistant-n60j`. The SDLC audit
- * (`cat-harness/docs/proposals/sdlc-process-audit.md` §3) found the VERIFICATION
- * phase unowned for the platform: the commands a contributor runs before
- * pushing lived in `package.json` and in CI YAML and nowhere an agent was
- * told to read. An agent found them by grepping.
- *
- * ## Why the workflow is the authority, and `package.json` is not
- *
- * The failure being prevented is specifically **locally green, red in CI**.
- * So the question an agent needs answered is not "what checks exist" — it is
- * *"what will CI run against my change"*. Only the workflow knows that.
- *
- * `package.json` over-answers it. Measured 2026-09-19: of 33 `check:` /
- * `:check` scripts, 21 appeared in no workflow at all — running them all
- * would fail on things CI does not gate, and the workflow's own comments
- * list six it deliberately excludes, each with a reason (`check:ci-health`
- * is a report, not a gate; `check:corpus-gate` needs a folio; and so on).
- *
- * A hand-maintained list under-answers it, and this script exists because
- * that was demonstrated rather than feared: the agent writing it had run
- * **17** gates by hand that day, repeatedly, and reported them as the sweep.
- * The workflow runs about thirty. The list was a guess that read as coverage
- * — exactly the drift bean `n60j` predicted a restated list would suffer.
+ * The question a contributor needs answered before pushing is *"what will CI
+ * run against my change"*, and only the workflow knows that. `package.json`
+ * over-answers it (many `check:` scripts are gated by no workflow, some
+ * deliberately excluded, e.g. `check:ci-health` is a report); a
+ * hand-maintained list drifts.
  *
  * ## Fast vs full is DERIVED too
  *
- * From job membership, not from a judgement encoded here: a job that installs
- * a browser ({@link installsBrowser}) is in `--all` only, and every other job
- * is in the fast set. The `e2e` job installs Chromium, which is why
- * `render:bpmn:check` lives there — bpmn-js renders through a browser, and
- * it passed "locally" once only because a browser had been staged earlier in
- * that session. Default is the fast set; `--all` adds the rest.
- *
- * The rule is the predicate, never a job's name, and it moves jobs when the
- * workflow does. B1 (owner, 2026-10-14) needs Chromium to draw the
- * publish-time BPMN pages `bun test` reads. Installed in `typescript-test`, it
- * moved `bun test` out of the fast set; so the owner moved the page build out
- * instead ("Move the page build out"): the `publish-pages` job installs
- * Chromium and runs `derive:publish`, the test shards restore its artifact
- * and install no browser, and `bun test` stays in the inner loop.
+ * From job membership: a job that installs a browser ({@link installsBrowser})
+ * is in `--all` only, and every other job is in the fast set. The `e2e` job
+ * installs Chromium, which is why `render:bpmn:check` lives there. The rule is
+ * the predicate, never a job's name, so it moves jobs when the workflow does.
  *
  * ## The vacuity guard
  *
- * If the extraction finds no commands it **fails**. A runner that silently
- * executes an empty list exits 0 and reads as a clean sweep — the defect
- * this repository has now paid for in `lean-bare-import` (a grep over zero
- * files reporting OK), in `ruff` (a scan of missing paths reporting a clean
- * baseline it never computed), and in `readme:sync:check` (passing over a
- * README with no markers). A filter over nothing passes.
+ * If the extraction finds no commands it **fails**: a runner over an empty
+ * list would exit 0 and read as a clean sweep.
  *
  * Usage:
  *   bun run cat gates              # the fast set — every job that installs no browser
@@ -60,9 +28,9 @@
  *   bun run cat gates --no-cache   # ask every gate; neither read nor update the input-hash cache
  *
  * Gates whose script declares `outputs: []` in `task-io.ts` run in a worker
- * pool, output printed in workflow order; every other gate runs alone, as it
- * always did (bean `xpcu`). A gate whose declared inputs are unchanged since it
- * last passed is SKIPPED and reported as such (bean `f017`, {@link GateSkipper}).
+ * pool, output printed in workflow order; every other gate runs alone. A gate
+ * whose declared inputs are unchanged since it last passed is SKIPPED and
+ * reported as such ({@link GateSkipper}).
  *
  * @module scripts/gates
  */

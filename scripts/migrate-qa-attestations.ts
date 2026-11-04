@@ -2,15 +2,12 @@
 /**
  * IDEMPOTENT: move every QA judgement still inside a derived file into the
  * attestation store (`schemas/sdlc/qa-attestations.ts`) — the ONE migration path
- * for all three families.
+ * for all three families (kg-qa, block-qa, translation-qa).
  *
- * Beans `2gst` (kg-qa) and `8wj1` (block-qa, translation-qa), arc `3fva`.
- * Owner rulings: D2 (a), judgements stay on main; the 26 `baseline` pair
- * attestations count as judgements; and ruling 2 (2026-10-01): a WRITER moves
- * a judgement it finds in a prior derived file with no store entry as it
- * saves, so this command is no longer the only way in. It remains the way to
- * do a whole instance at once, and `--check` is the gate that says nothing is
- * still waiting.
+ * Judgements stay on main, and `baseline` pair attestations count as
+ * judgements. A WRITER also moves a judgement it finds in a prior derived file
+ * with no store entry as it saves; this command does a whole instance at
+ * once, and `--check` is the gate that says nothing is still waiting.
  *
  * ## kg-qa — move, then strip
  *

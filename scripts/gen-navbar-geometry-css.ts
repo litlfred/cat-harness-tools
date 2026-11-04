@@ -7,28 +7,12 @@
  *   `check:partition` and the TypeScript gates already grade
  *
  * Same contract as `gen-avatars-css.ts`: the module is the source and the
- * stylesheet is a rendering of it, so a width has one home. `--check` fails
- * when the committed file is stale.
+ * stylesheet is a rendering of it, so a width has one home (`navbar.ts` and
+ * `docs-ui.css` cannot disagree). `--check` fails when the committed file is
+ * stale.
  *
- * ## What this closes
- *
- * `sjic`. `navbar.ts` interpolates its numbers into the stylesheet it emits
- * for a mounted page; `docs-ui.css` is hand-authored and stated its own. They
- * disagreed — 40px against 56px at rest, 232px against 248px open — and each
- * side had a test asserting its own copy, so both were green while the two
- * navbars the owner called "the same navbar" were different widths.
- *
- * **A generated custom property is what makes that unrepeatable.** The check
- * gate is the load-bearing half: without it the file is a snapshot that goes
- * stale silently, which is the same defect with an extra step.
- *
- * ## Why custom properties rather than rewriting `docs-ui.css`
- *
- * `docs-ui.css` already reads `var(--fa-nav-collapsed)` and
- * `var(--fa-nav-open)` in nine places. Generating the two DEFINITIONS and
- * leaving every use in the authored stylesheet keeps the hand-written CSS
- * hand-written — the alternative is a generated 5,000-line file nobody may
- * edit, to own two numbers.
+ * It generates only the two custom-property DEFINITIONS; `docs-ui.css` reads
+ * `var(--fa-nav-collapsed)` and `var(--fa-nav-open)` and stays hand-written.
  *
  * Exit codes: 0 written or up to date · 1 stale under `--check`.
  */

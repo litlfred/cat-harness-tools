@@ -1,46 +1,28 @@
 /**
- * Currency is not validity — and 42 checks answer only the first question.
+ * Currency is not validity — and generated-artefact checks answer only the
+ * first question.
  *
- * Bean `jfr6`. Every generated artefact in this repository has a `--check`
- * mode, and every one of them asks: *would the generator write something
- * different from what is committed?* That is **currency**. It is not the
- * question a consumer asks, which is: *does this artefact work?*
- *
- * ## The two are measurably different, and it has already cost six pages
- *
- * `library:viz:check` was **green** while the page it generated could not
- * run. The committed bytes were exactly what the generator would write; the
- * generator was writing JavaScript that did not parse. Every link resolved,
- * the file existed, the size was plausible, the site build was green — and
- * five of twelve navbar tiles sat on *"loading…"* forever (PR #805).
- *
- * `generated-viewer-scripts.test.ts` closed that for inline scripts. **It is
- * one instance of the gap, not the gap.** A JSON that parses is not a JSON
- * that validates; a `.jsonld` that validates is not one whose `@context`
- * resolves; a `.bpmn` that is well-formed is not one the engine loads.
+ * Every generated artefact here has a `--check` mode that asks: *would the
+ * generator write something different from what is committed?* That is
+ * **currency**. A consumer asks: *does this artefact work?* A JSON that
+ * parses is not a JSON that validates; a `.jsonld` that validates is not one
+ * whose `@context` resolves; a `.bpmn` that is well-formed is not one the
+ * engine loads.
  *
  * ## What this derives, and what it refuses to claim
  *
- * The inventory is **derived from `package.json`**, never listed here —
- * `tyyc`'s lesson: a hand-maintained list is edited by whoever remembers, and
- * the symptom of forgetting is invisible. A check counts as generated-artefact
- * currency when its script is invoked with `--check`.
- *
- * Each is then classified by reading its source, and the classification is
- * deliberately weak in the middle:
+ * The inventory is **derived from `package.json`**, never listed here (a
+ * hand-kept list goes stale invisibly). A check counts as generated-artefact
+ * currency when its script is invoked with `--check`. Each is then
+ * classified by reading its source:
  *
  * | class | what it means |
  * |---|---|
  * | **no-parsing** | the script contains no parse or validate call at all, so it CANNOT be checking its artefact's validity |
  * | **undetermined** | it parses something — which does NOT establish that it validates its OUTPUT. It may be parsing its input |
  *
- * That middle class is not "validated", and the distinction is the whole
- * point. A heuristic that cannot tell input-parsing from output-validation
- * must not report the difference as if it could — that is the over-claim this
- * bean exists to find, and writing it here would be committing it.
- *
- * Measured 2026-09-22: **42** generated-artefact checks, **18** with no
- * parsing at all.
+ * `undetermined` is never reported as "validated": the heuristic cannot tell
+ * input-parsing from output-validation.
  *
  * ## The declaration
  *

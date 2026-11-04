@@ -6,72 +6,31 @@
  * @covers folio
  * @graphNode none — a generator over the folio graph, not a schema itself
  *
- * Owner, 2026-09-22: *"folio must be in cat-harness and visualizer owned by
- * it. transations too... there should be visualizer."*
- *
- * Measured against that ruling before writing anything. The three graphs it
- * names:
- *
- * | graph | in cat-harness | visualiser |
- * |---|---|---|
- * | `library/` | yes | `docs/cat-harness/library/…` — present |
- * | `translations/` | yes | `docs/translation-status/…` — present |
- * | **`folio/`** | yes | **none** |
- *
- * So the ruling was already satisfied twice and once not, and this is the
- * once. Bean `7ofc`.
- *
- * ## `folio` IS RENDERED ALREADY, and that is not the same thing
- *
- * `folio` is the only `renderable` graph typology — a folio graph comes out the
- * other end as a website — and `gen-landing-data.ts` already turns these
- * nodes into the landing board a reader sees. So there is a rendering of the
- * folio's CONTENT.
- *
- * What there is no view of is the GRAPH: which nodes exist, what each one
- * anchors to, which theme it claims, where it was declared, and whether the
- * links it carries resolve. That is the difference between reading a folio
- * and inspecting one, and it is the same difference `gen-library-viz` draws
- * between reading an ingested document and seeing the corpus.
- *
- * ## The obligation is `2krx`'s, not a failing row
- *
- * `check:subgraph-coverage` never asked for this page. `owesVisualiser`
- * exempts the kind, exactly as it exempted `library` (bean `jbx2`) and
- * `voices` (bean `bu2q`) — this generator's two siblings, which say the same
- * thing in their own headers. The obligation met here is `2krx`'s: *"a
- * directory nobody can see is one nobody checks."* Recording that so a later
- * reader does not go hunting for the finding that motivated it, and finds
- * instead the owner's ruling, which is what did.
+ * `folio` is the only `renderable` graph typology, and `gen-landing-data.ts`
+ * renders its CONTENT as the landing board. This shows the GRAPH: which nodes
+ * exist, what each anchors to, which theme it claims, where it was declared,
+ * and whether its links resolve.
  *
  * ## Three pieces, the same three as its siblings
  *
  * A reader over the declared directories, a projection under
  * `<site>/assets/folio/`, and a zero-dependency viewer under
  * `<site>/<handler>/folio/` that fetches the projection relative to its own
- * location. The reader's folio comes with the site's layout, which the
- * viewer is on since 2026-10-07: a library surface that did not carry it
- * would be the one page in the set that forgot it.
+ * location. The viewer carries the reader's folio with the site's layout.
  *
  * NO BACKTICKS BELOW THE TEMPLATE LITERAL — not in strings, not in comments.
  * The whole page is one template literal and a backtick anywhere inside it
- * terminates the string, failing at a line number far from the mistake. Bean
- * `bmr0` gated this after four warnings did not work, and it caught the
- * author of this file on 2026-09-22 in `gen-library-viz.ts`.
+ * terminates the string, failing at a line number far from the mistake.
  *
- * ## One page per instance — bean `folio-assistant-1nu0`
+ * ## One page per instance
  *
- * Owner, 2026-10-15: *"per-instance pages"*. The visualiser covered
- * cat-harness's own `folio` directory by id, so the two content instances
- * holding one (a `folios/` and a `folio/`) read *"no viewer yet"* in the
- * navbar although each declares a folio graph. It now covers the KIND with
- * `subgraphs: "instance"`: the full view stays cat-harness's own graph at
- * `<locale>/<harness>/folio/`, and every OTHER instance in the checkout
- * holding a folio directory gets `<locale>/<harness>/folio/<instance>/`,
- * over a projection of that instance's directories alone at
- * `assets/folio/<instance>/index.json`. Those pages describe instances above
- * this layer, so they are built at publish (`builtAtPublish`) and never
- * committed here.
+ * It covers the KIND with `subgraphs: "instance"`: the full view stays
+ * cat-harness's own graph at `<locale>/<harness>/folio/`, and every OTHER
+ * instance in the checkout holding a folio directory gets
+ * `<locale>/<harness>/folio/<instance>/`, over a projection of that
+ * instance's directories alone at `assets/folio/<instance>/index.json`. Those
+ * pages describe instances above this layer, so they are built at publish
+ * (`builtAtPublish`) and never committed here.
  *
  * Usage:
  *   bun run cat folio:viz

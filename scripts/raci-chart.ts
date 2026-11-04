@@ -1,64 +1,43 @@
 #!/usr/bin/env bun
 /**
  * RACI across the process corpus — the chart, and the rule that makes it
- * worth reading.
+ * worth reading. RACI is used to work with stakeholders and sketch a
+ * project's breakdown across processes.
  *
- * Bean `folio-assistant-7o7i`. Owner, 2026-09-20: *"adopt RACI chart as
- * part of generic project management … use it as a way to work w/
- * stakeholders and determine involvement in project being initiated"*,
- * *"to help sketch project breakdown"*, and *"skills to make raci charts
- * across processes"*.
- *
- * ## What this adds, and what it deliberately does not
+ * ## What this adds, and what it does not
  *
  * A BPMN lane already says who performs an activity. **That is R**, and it
- * is not re-declared: one fact in two places with nothing asserting they
- * agree is the shape `85e8` removed `fallbackRole` for. So `responsible`
- * is read from `roleRef` and is not a value `folio:raci` accepts.
+ * is not re-declared: `responsible` is read from `roleRef` and is not a value
+ * `folio:raci` accepts.
  *
  * What BPMN cannot say is *Accountable* (one per activity, the neck on the
  * block), *Consulted* (two-way, before the work) and *Informed* (one-way,
  * after it). Those three are the overlay — three edge kinds over roles and
- * activities that already exist, rather than a new party registry, which
- * would be a second answer to "who is the reviewer" free to disagree with
- * `roles.json`.
+ * activities that already exist (`roles.json`), not a new party registry.
  *
  * ## Exactly one Accountable, enforced
  *
- * Owner's choice, and the defensible one: it is the rule most often broken
- * in practice, and a chart that permits two A's lies about who carries the
- * decision. Zero is also a violation once an activity declares **any**
- * RACI — a half-annotated activity is worse than an unannotated one,
- * because the chart looks complete.
+ * A chart that permits two A's lies about who carries the decision. Zero is
+ * also a violation once an activity declares **any** RACI, because a
+ * half-annotated activity makes the chart look complete.
  *
  * An activity with no RACI at all is `n/a`, not a failure. Annotation is
  * incremental by design; the gate is on what a diagram CLAIMS, never on
  * how much it has claimed so far.
  *
- * ## The rule is ALSO a kg-audit criterion, and that is not two implementations
+ * ## One implementation, two consumers
  *
- * Bean `3kbd`. Until 2026-09-20 a breach was only ever PRINTED, and
- * `kg-audit`'s own rationale says why that is not enough: a printed verdict
- * is gone when the job ends, which makes *"unsound since the diagram was
- * drawn"* and *"broken in the commit under review"* indistinguishable. The
- * three rules below are now committed sidecar criteria too —
+ * The three rules are also committed `kg-audit` sidecar criteria —
  * `raci-role-resolves`, `raci-single-accountable` and
- * `raci-accountable-not-consulted`.
+ * `raci-accountable-not-consulted` — so a breach outlives the job that found
+ * it. **`raciBreaches` stays the only implementation.** It tags each breach
+ * with its kind and `kg-audit` partitions on the tag; nothing re-derives the
+ * rule.
  *
- * **`raciBreaches` stays the only implementation.** It tags each breach with
- * its kind and `kg-audit` partitions on the tag; nothing re-derives the rule.
- * A second copy would be a second answer to "is this chart sound", free to
- * disagree with the first — the drift `85e8` and the retired `roles:` field
- * both cost.
- *
- * **Why `check:raci` survives anyway.** Severity is a repo-wide policy:
- * `kg:audit --check` fails on `critical`, and only `raci-role-resolves` is
- * critical (it is a DANGLING REF — `role-ref-resolves` on another edge). The
- * other two are `major`, which by that policy does not gate. But the owner
- * asked for exactly one Accountable *enforced*, so dropping this gate would
- * silently downgrade the one rule that was explicitly requested. It is kept
- * as a DELIBERATE, documented exception to the severity policy rather than
- * as a duplicate of it — one rule, two consumers, different gating.
+ * `check:raci` also stays, as a deliberate exception to the severity policy:
+ * `kg:audit --check` fails only on `critical`, and only `raci-role-resolves`
+ * is critical (a DANGLING REF); the other two are `major`, so without
+ * `check:raci` exactly one Accountable would not be enforced.
  *
  * Usage:
  *   bun run cat raci                     # the chart, every process

@@ -4,33 +4,26 @@
  * harness declaration (`<instance>/<instance>.json`) that lacks it, or, with
  * `--check`, fail on one that still lacks it.
  *
- * Bean `ujiv`, issue litlfred/cat-harness#88.
- *
  * A declaration is a node kind (`cat-harness-declaration/1.0.0`,
  * `schemas/kg/cat-harness.ts#CatHarnessDeclarationKind`), found by its name rather
- * than by a typology directory. New ones are tagged when `init-folio` writes
- * them, and `CatHarnessDeclarationSchema` keeps the key through a parse, so
- * unlike a bean a declaration does not lose its tag in normal use. This script
- * is for the ones written before the kind existed, and its `--check` is the
- * gate that keeps them tagged.
+ * than by a typology directory. `init-folio` tags new ones and
+ * `CatHarnessDeclarationSchema` keeps the key through a parse; this script
+ * tags older ones, and its `--check` keeps them tagged.
  *
- * The tag goes in as a TEXT edit, one line after the opening brace, so the rest
- * of the file keeps its formatting and the diff is one line. A declaration that
- * carries some other `$schema` is reported and left alone.
+ * The tag goes in as a TEXT edit, one line after the opening brace, so the diff
+ * is one line. A declaration that carries some other `$schema` is reported and
+ * left alone.
  *
  * Which declarations: every instance `instanceRootsIn` finds under this
- * checkout's repository root, or only the one named by `--instance <dir>`. In
- * an index checkout that includes the mounted instances of other repositories;
- * their tags land through PRs to those repositories, so `--check` there names
- * each one rather than passing.
+ * checkout's repository root (in an index checkout, including mounted
+ * instances of other repositories, which `--check` names rather than
+ * passes), or only the one named by `--instance <dir>`.
  *
  * Not tagged: the instances the harness is composed ON TOP of — every instance
  * that does not reach cat-harness through `needs` (bootstrap, bootstrap-tools;
- * `scripts/lib/needs-reach.ts`, the rule `libraries.ts` uses). Their own rule
- * is that nothing in them refers to a harness, and a `cat-harness-…` tag would
- * be the first such reference. They are read with the same schema, which keeps
- * `$schema` optional; this script reports them as below the harness and leaves
- * them alone (bean `ujiv`, decided 2026-10-10).
+ * `scripts/lib/needs-reach.ts`, the rule `libraries.ts` uses). Nothing in them
+ * may refer to a harness; they are reported as below the harness and left
+ * alone.
  *
  * Exit codes follow the bean gates: 0 every declaration tagged, 1 a defect
  * (untagged under `--check`, or a foreign tag), 2 could not check.

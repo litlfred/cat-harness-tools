@@ -8,8 +8,6 @@
  * 4. Third-state rule: if a directory is undeclared or absent from disk, return undetermined/unknown rather than false pass or false clean.
  * 5. Vacuity guard: an audit over zero blocks returns unknown, never a pass.
  *
- * Bean `folio-assistant-smhv`.
- *
  * @module scripts/block-reference-resolver
  * @covers folio
  */

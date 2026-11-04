@@ -6,26 +6,17 @@
  *
  * - `storage.keyedBy: "tip"` — ONE live copy whose tip IS the current state.
  *   Beans, todos, fsh-guts. A write carries `expect`, so two sessions editing
- *   one file is a `conflict` the caller settles. Bean `2h76`, arc `fs43`
- *   (issue #1850), proposal `docs/proposals/state-branch-2026-10-02.md`
- *   §3.2 / §3.4.
+ *   one file is a `conflict` the caller settles.
  * - `storage.keyedBy: "route"` — one entry per published SITE ROUTE, each
  *   replaced wholesale by the single generator that owns it. Regenerable
  *   rendered pages. A write may NOT carry `expect` and is refused if it does:
- *   nobody authored either side, so the newer generation wins and a
- *   `conflict` would block a push over content no one disagrees about. Bean
- *   `1j3q`, owner 2026-10-03.
+ *   nobody authored either side, so the newer generation wins.
  *
  * The keying is PASSED to {@link BranchStore.open}, not read off the branch,
- * and a manifest that disagrees is `corrupt`. A store that adopted whatever
- * keying the branch claimed would read a route-keyed branch as state the
- * moment somebody pushed the wrong manifest — the caller states what it came
+ * and a manifest that disagrees is `corrupt`: the caller states what it came
  * for.
  *
- * The owner, 2026-10-02: *"go with cat/cat-harness/todos and
- * cat/cat-harness/beans as their own named sub-graph branches"* — and *"(not
- * all named subgraphs get own branch, especially not semi-static KG
- * content)"*. So the store is one ref per STATE subgraph; skills, schemas and
+ * Only STATE subgraphs get a branch of their own; skills, schemas and
  * processes stay on `main`.
  *
  * ## The layout it reads and writes
@@ -51,7 +42,7 @@
  * | corrupt | present but unusable: no/foreign manifest, a tree where a file was asked for, unparseable JSON |
  * | unknown | could not determine: the remote or git failed. **Never a pass.** |
  *
- * ## The write path — modelled on `qa-store.ts`, not shared with it
+ * ## The write path
  *
  * Fetch the tip, SPLICE the changed paths into its tree (every other file is
  * carried across by id), `commit-tree -p tip`, push WITHOUT `-f`. On
@@ -59,15 +50,14 @@
  * on the new tip — {@link WRITE_ATTEMPTS} attempts. The server's ref lock is
  * the concurrency primitive, so a sibling's write to another file survives.
  *
- * Two writers editing the SAME file is the case a splice alone cannot settle:
- * the second would silently replace the first. A change may therefore carry
- * `expect` — the blob id its author read (or `null`, "must not exist") — and
- * when the tip disagrees the write stops as `conflict` and pushes nothing. The
- * caller re-reads and decides; the store never merges content.
+ * Two writers editing the SAME file is the case a splice alone cannot settle.
+ * A change may therefore carry `expect` — the blob id its author read (or
+ * `null`, "must not exist") — and when the tip disagrees the write stops as
+ * `conflict` and pushes nothing. The caller re-reads and decides; the store
+ * never merges content.
  *
- * `qa-store.ts` (arc 3fva) has the same loop for commit-keyed entries. It is
- * deliberately not refactored onto this module here; whether it adopts this
- * one is 3fva's call.
+ * `qa-store.ts` has the same loop for commit-keyed entries; it is modelled
+ * on, not shared with, this module.
  *
  * ## Where its git objects live
  *
@@ -78,14 +68,7 @@
  * `http.*.extraheader` (CI's token) is carried in the ENVIRONMENT
  * (`GIT_CONFIG_COUNT`), never in argv.
  *
- * ## Not wired to anything yet
- *
- * No reader or writer of `beans/` or `todos/` uses this module, and no
- * declaration sets `keyedBy: "tip"` or `"route"`: `main` stays authoritative
- * until the steward-run flip on #1850. {@link resolveTipLocation} is what the
- * flip will read. No generator writes a route-keyed branch either — the first
- * family (`docs/uml/`) is a follow-on bean to `1j3q`, deliberately separate so
- * the mechanism lands before 49 gated checks move.
+ * {@link resolveTipLocation} maps a declared directory to its branch and path.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/branch-store.ts read --branch B <path>

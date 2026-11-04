@@ -4,85 +4,26 @@
  *
  * @covers cat-harness
  *
- * ## What this is for, and what it deliberately is NOT
+ * No kind-level `storage` default is provided: `BranchSourceSchema` requires a
+ * `branch`, which a kind cannot supply, so each tip-keyed directory declares
+ * its own `source`. (A kind's `newInstanceSource` is a scaffold default read
+ * once by `folio_init`; the resolver never reads it.)
  *
- * Arc `fs43`'s plan of record carried a row reading *"`holds: state` ⇒ default
- * `storage.keyedBy: tip`, plus a check that a declared `state` dir on `main`
- * is a finding"*, marked done. It was not done — `grep -c "keyedBy\|storage"
- * cat-harness/schemas/kg/graph-typology-registry.ts` was 0 — and the two halves are
- * not equally worth doing.
- *
- * **The default half is near-worthless and is not built here.** A kind-level
- * default cannot supply the one field that matters: `BranchSourceSchema`
- * REQUIRES `branch`, and a kind has no branch name to give. So the default
- * could supply `keyedBy` and nothing else, every tip-keyed directory would
- * still need its own `source` with its own branch, and the only thing gained
- * would be action at a distance — a directory's storage decided partly in its
- * declaration and partly in a registry entry somebody else edits. Two places
- * answering one question is the defect `resolveSubgraphSource` throws on when
- * `source` and `storage` disagree; a default would reintroduce it by design.
- *
- * (What DID land, bean `hp54`, is a SCAFFOLD default instead:
- * `newInstanceSource` on a kind is read once by `folio_init`, which writes a
- * complete `source` — branch `cat/<instance>/<id>` — into the new instance's
- * own declaration. The resolver never reads it, so the objection above stands.)
- *
- * **The check half is worth building, and this is it.** After a cutover, a
- * `holds: state` directory declared on `main` is silently fine — nothing
- * fails, and the next one gets declared the old way. That is what the row was
- * for.
- *
- * ## Why a ratchet and not a rule
- *
- * The rule is FALSE TODAY, 19 times over. Measured on `main`, 2026-10-04:
- * 28 declared directories across 10 instances carry a `holds: "state"` kind and
- * 9 of them are off the checkout. The others are legitimately
- * mid-arc — `beans` and `todos` are `p3ny`'s and its sibling's to move,
- * `queue` is `najo`'s, `uploads` is named in the same plan — and some may
- * never move: `swimlane-glossary` at `glossary/` is regenerated from `main`'s
- * own content by a declared writer, so a branch would buy it nothing.
- *
- * A gate that fails 19 times on the commit it lands in is a gate somebody
- * switches off. So this follows the repository's existing idiom for recorded
- * debt — `declared-path-baseline.json`, `check:fhir-harness-exclusions` — and
- * keeps a baseline that may only SHRINK:
+ * Ratchet: a baseline that may only SHRINK.
  *
  * - a state directory on `main` that the baseline does not name is a NEW
  *   finding, and fails;
  * - a baseline entry that is no longer on `main` has been cut over, and fails
- *   too, with the instruction to delete the line. A baseline entry that has
- *   stopped describing anything is how a ratchet quietly becomes a blanket
- *   exemption (`translation-drift.ts` records the same lesson: its first
- *   version exempted a whole page, and drift under the exemption went
- *   unseen).
+ *   too, with the instruction to delete the line.
  *
- * So the gate answers the question the row wanted — *has anybody declared a
- * NEW state directory on main?* — from the day it lands, without asserting
- * something untrue about the 19.
+ * `--update` writes the baseline and refuses to grow it without
+ * `--allow-growth`. The gate is listed in `regen-after-merge.ts`'s `NO_WRITER`
+ * table so that `regen` can never raise the ratchet as a "repair".
  *
- * ## `regen` must NOT be allowed to repair this
- *
- * `--update` exists and writes the baseline, so the name-based pairing would
- * make this a verify/write pair — and then a `regen` over a tree with a new
- * state directory on `main` would RAISE the ratchet and report it as a repair.
- * That is the `check:viewer-nav` case exactly, and it is recorded the same
- * way: in `regen-after-merge.ts`'s `NO_WRITER` table, so the gate shows as a
- * deliberate non-pair rather than being quietly absent from the pair set.
- *
- * `--update`'s own refusal to grow without `--allow-growth` is the SECOND line
- * of defence, not the first. A guard that depends on the caller passing no
- * flag is one `--allow-growth` in a script away from being gone, which is why
- * the pairing is refused as well.
- *
- * ## It asks the DECLARATION, never the disk
- *
- * `contentIsOffCheckout` is the single predicate, shared with
- * `materialiseDirectories`, `check:declared-dirs` and `audit:coverage`. This
- * gate does no IO beyond reading declarations: whether a directory's content
- * belongs on `main` is a property of what was declared, and a checkout where
- * somebody has not run `state:mount` must not read as a finding (bean `dh4f`
- * — a clean run over nothing). That also makes it safe in the merge bot,
- * which runs gates before the mount step on some paths.
+ * It asks the DECLARATION, never the disk: `contentIsOffCheckout` is the
+ * single predicate, shared with `materialiseDirectories`,
+ * `check:declared-dirs` and `audit:coverage`. A checkout where `state:mount`
+ * has not run is not a finding, so the gate is safe before the mount step.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";

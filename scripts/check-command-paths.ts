@@ -2,22 +2,9 @@
 /**
  * A path inside a **fenced command** still resolves.
  *
- * Bean `b963`. `AGENTS.md` line 3 is the cold-start line every agent runs
- * before anything else, and after the split it read:
- *
- * ```sh
- * scripts/install-beans.sh && export PATH="$HOME/.local/bin:$PATH"
- * ```
- *
- * There is no root `scripts/` — the script moved under `cat-harness/scripts/`.
- * So a fresh container following the first instruction it reads got
- * *"No such file or directory"* and no work-plan CLI. Nine occurrences across
- * `AGENTS.md`, `README.md` and the onboarding guide, and **four more** in
- * `session-start-coord-sweep.sh`, which prints the same line for an agent to
- * copy. Bean `z9eb` is the same defect inside a skill: `session-intent`
- * step 1 was *"Open `STATUS.md`"*, and `ls STATUS.md` fails here.
- *
- * ## Why the two neighbouring checks both miss it by design
+ * A command an agent copies, such as the cold-start line in `AGENTS.md`,
+ * fails outright when a path in it has moved. Neighbouring checks each read
+ * something else:
  *
  * | check | reads |
  * |---|---|
@@ -26,24 +13,16 @@
  * | `check:declared-paths` | path literals in **code** |
  * | *this* | paths inside fenced **commands**, and in the prose of a skill |
  *
- * A path in a command is not a link, not a claim about a symbol, and not a
- * literal in a `.ts` file. It sits in exactly the gap between them, which is
- * how one rotted in the file a newcomer reads first and stayed there. AGENTS.md
- * records the same defect for two generator commands "until 2026-09-20" — it
- * was fixed in one file and not in the other two, because nothing swept.
- *
- * ## What counts as a path, and why the rule is conservative
+ * ## What counts as a path
  *
  * A token is a candidate when it **contains a `/` and looks like a file or
  * directory**, or ends in a known script extension. It is checked only when it
  * is **repository-relative and static**: a token carrying `$`, `<`, `*`, `~`
- * or a URL scheme is a template or an example, and a check that guessed at
- * those would cry wolf until somebody deleted it.
+ * or a URL scheme is a template or an example, and is not judged.
  *
- * The conservatism is deliberate and is the whole design. A check over prose
- * has to be RIGHT rather than thorough, because its findings are read by a
- * person deciding whether to keep it. Everything it declines to judge is
- * COUNTED in the summary rather than disappearing, so the coverage is visible.
+ * The rule is conservative on purpose: a check over prose must be right
+ * rather than thorough. Everything it declines to judge is COUNTED in the
+ * summary, so the coverage is visible.
  *
  * Exit: 0 every checked path resolves, 1 one does not, 2 could not check.
  *

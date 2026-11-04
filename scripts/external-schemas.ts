@@ -3,15 +3,9 @@
  * Reconcile the specifications this repository depends on against what it
  * actually uses — and MATERIALIZE the operative vocabulary into the graph.
  *
- * Owner, 2026-09-20: *"if you import scheam (e.g DC, ingest it through the
- * proper pipline …)"*, *"(dont need to materalize, but should reference
- * specific version being used)"*, *"some schema that is operational should be
- * in KG"*, *"(materizlied through the tooling)"*.
- *
- * So: the SPECIFICATION is referenced, by edition. The TERMS WE BRANCH ON are
+ * The SPECIFICATION is referenced, by edition. The TERMS WE BRANCH ON are
  * derived from the corpus by this tool and written into the record — never
- * hand-listed, because a hand-listed vocabulary is a transcription and drifts
- * from what the code does the first time somebody adds an element.
+ * hand-listed, so they cannot drift from what the code does.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/external-schemas.ts            # report

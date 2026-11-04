@@ -10,31 +10,22 @@
  *   <script type="application/ld+json">{… "@type":"WebPage","url":"…"}</script>
  *
  * **A preview must not make them.** `canonical` tells a crawler which URL is
- * authoritative for this content, and a branch build naming itself authoritative
- * invites the preview into a search index in place of the published page — then
- * outlives nothing, because the directory is pruned. `og:url` is the same claim
- * to a link unfurler, and the JSON-LD block is the same claim to a structured-data
- * consumer. Three audiences, one wrong assertion.
+ * authoritative, so a branch build claiming it invites the preview into a
+ * search index in place of the published page; `og:url` and the JSON-LD
+ * block make the same claim to link unfurlers and structured-data consumers.
  *
- * This is a CORRECTNESS fix and not, on its own, a size fix. It removes 3 of the
- * ~238 slug-bearing references on a page, so git still cannot deduplicate the
- * page against another preview's copy of it — see bean `xxku` for the other three
- * sources, of which the build timestamp in the staging banner is the one that
- * makes every page unique even across two builds of ONE branch.
+ * This is a correctness fix, not a size fix: pages still carry other
+ * slug-bearing references.
  *
  * Why a post-build pass rather than Jekyll config: `jekyll-seo-tag` ships in the
  * `github-pages` gem set that `actions/jekyll-build-pages` runs, it has no global
  * off switch, and the `{% seo %}` call lives in the REMOTE theme's `head.html`.
  * Suppressing it at the source would mean vendoring that file — which is the
  * upstream-coupling hazard each folio's Jekyll config pins the theme to avoid.
- * (Naming that file's path here is not possible: a glob segment inside it spells
- * the block-comment CLOSING delimiter, which has no escape — the same asymmetry
- * `head_custom.html` records after it cost two red deploys. Describe, never
- * spell.) A pass
- * over the emitted tree couples to nothing.
+ * (That file's path is not named here: a glob segment in it would close this
+ * comment.) A pass over the emitted tree couples to nothing.
  *
- * It is deliberately NOT idempotency-sensitive: running it twice is a no-op,
- * because the second run finds nothing to remove.
+ * Running it twice is a no-op: the second run finds nothing to remove.
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join } from "path";

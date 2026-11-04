@@ -1,37 +1,19 @@
 /**
- * One answer to *"is this position inside an HTML comment?"*, because two
- * answers is how `ur84` comes back.
+ * One answer to *"is this position inside an HTML comment?"*
  *
- * ## What `ur84` was
- *
- * `staging-banner` found its insertion point with `html.search(/<body/i)` and
- * put the banner **inside a comment on 323 of 670 staged pages** — 48 % of a
- * preview, measured on the deployed tree, 2026-09-21. The prose comment in
- * `docs/_includes/head_custom.html` that explains why a `<meta>` is used
- * rather than a `<div>` contains the words `<body>` as an EXAMPLE, and
- * `head_custom.html` is in the `<head>` of every just-the-docs page. The
- * non-global `replace` spent its one substitution on the sentence; the real
- * tag, hundreds of lines later, got nothing.
- *
- * **A comment about the banner broke the banner**, and nothing said so: the
- * page still contained `data-fa-staging-banner`, so every check that asked
- * *"did the string land"* answered yes.
- *
- * ## Why this is its own module
- *
- * `folio-mount` has to ask the same question — a marker inside a comment is
- * not a mount — and a second copy of the scan is a second thing to get right.
- * `bodyInsertionPoint` and `hasMount` now differ only in what they look for,
- * which is the only thing they should differ in.
+ * A `<body>` written as an example inside a template comment once caught a
+ * `search(/<body/i)`, and the banner landed inside the comment while every
+ * "did the string land" check still passed. `staging-banner`'s
+ * `bodyInsertionPoint` and `folio-mount`'s `hasMount` (a marker inside a
+ * comment is not a mount) share this scan and differ only in what they look
+ * for.
  *
  * ## What it does NOT do
  *
  * It does not parse HTML. A `<!--` inside a `<script>` string literal or an
- * attribute value would be counted as a comment here and is not one. That is
- * accepted rather than overlooked: the failure it guards against is prose in
- * a template, and the direction of the error is the safe one — a marker
- * wrongly judged commented-out fails a gate loudly, where a marker wrongly
- * judged live is exactly the silent `ur84` shape.
+ * attribute value would be counted as a comment here and is not one. The
+ * error is in the safe direction: a marker wrongly judged commented-out fails
+ * a gate loudly; a marker wrongly judged live would pass silently.
  *
  * @module scripts/html-comments
  */

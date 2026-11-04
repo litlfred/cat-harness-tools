@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Install the harness's skills into an agent host, each under its harness's
- * prefix (bean `folio-assistant-x4mt`, issue litlfred/folio-assistant#247).
+ * prefix.
  *
  * @module cat-harness-tools/scripts/install-skills
  *
@@ -9,9 +9,8 @@
  * bun run cat-harness-tools/scripts/install-skills.ts [--root <dir>] [--host claude|antigravity|gemini|cursor|copilot] [--into <dir>] [--check]
  * ```
  *
- * ## The owner's ruling, 2026-10-10
+ * ## Prefixes
  *
- * "A, but harnesses have own prefix (e.g. cat, fa)". So:
  * - **At install, not at rest.** Nothing in any repository is renamed: skill
  *   files, manifests, BPMN `folio:skill` refs and cross-references keep the
  *   bare name. Only the installed copy carries the prefix.
@@ -25,17 +24,14 @@
  *
  * The union across the dependency tree: every skill directory
  * `resolveSkillDirs(root)` returns (dependencies first, the root last, so the
- * root wins a name collision; the loser is reported, not dropped silently).
- * Within them, every `.md` that `isSkillMd` accepts and that has a
- * `description` in its front matter: a host decides when to load a skill from
- * its description, so a skill without one cannot be triggered, and inventing
- * one would put words in the author's mouth. Those are listed as skipped.
+ * root wins a name collision; the loser is reported). Within them, every `.md`
+ * that `isSkillMd` accepts and that has a `description` in its front matter (a
+ * host triggers a skill by its description); the rest are listed as skipped.
  *
  * Each skill becomes `<host dir>/<prefix>-<name>/SKILL.md`: the source front
  * matter with `name` replaced by the prefixed name, a provenance line, and the
  * body unchanged. Every host here reads that layout natively, as an Agent
- * Skill with a required `name` and `description` (bean `cat-tools-0nxe`,
- * vendor docs read 2026-10-20):
+ * Skill with a required `name` and `description`:
  *
  * | host | directory | source |
  * |---|---|---|
@@ -48,27 +44,20 @@
  * `.agents/skills/` is also read by Gemini CLI (an alias that takes precedence
  * over `.gemini/skills/`), Cursor and Copilot, so `--host antigravity` alone
  * reaches all four of those; the per-host directories are for a checkout that
- * wants one host's tree only. Copilot reads skills in the cloud agent, code
- * review, the CLI, the app and VS Code agent mode.
+ * wants one host's tree only.
  *
  * Cursor requires `name` to be lowercase letters, digits and hyphens, and to
- * match the folder. That holds for every installed name (prefix, hyphen,
- * name), and a name that breaks it is skipped with the reason rather than
- * written where a host would refuse it.
+ * match the folder; a name that breaks it is skipped with the reason.
  *
- * ## Process checklists, installed as skills (bean `folio-assistant-cy4p`)
+ * ## Process checklists, installed as skills
  *
- * Owner, 2026-10-16 (thread "BPMN engine status", option 1): the BPMN engine's
- * "downcompilation per coding agent" is the committed checklist of each
- * diagram (`bpmn-checklist.ts`) installed as one skill per host, not a
- * compiler per agent. Every host here takes Markdown, and the checklist already
- * is Markdown. So each `<stem>.checklist.md` found beside a diagram, or in an
- * instance's `assets/workflows/checklists/`, becomes `<prefix>-process-<stem>`:
- * a generated front matter (the description names the process and how to walk
- * it) over the checklist body, unchanged. It takes the prefix of the instance
- * that holds the checklist. The checklist is read as committed, never
- * regenerated here: `bpmn:checklist:check` keeps it current, so the installed
- * copy is a rendering of a rendering and still never an authority. An agent
+ * Each diagram's committed checklist (`bpmn-checklist.ts`) is installed as one
+ * skill per host. Each `<stem>.checklist.md` found beside a diagram, or in an
+ * instance's `assets/workflows/checklists/`, becomes
+ * `<prefix>-process-<stem>`: a generated front matter (the description names
+ * the process and how to walk it) over the checklist body, unchanged, with the
+ * prefix of the instance that holds it. It is read as committed
+ * (`bpmn:checklist:check` keeps it current), never regenerated here. An agent
  * with the MCP server uses `bpmn-engine`, which refuses a wrong turn; one
  * without walks the checklist.
  *
@@ -76,9 +65,8 @@
  *
  * Every installed `SKILL.md` carries {@link INSTALLED_MARKER}. A re-run
  * removes installed directories whose skill is gone, and touches nothing
- * without the marker: a host's own skills, and skills a person put there,
- * are not this script's to delete. `--check` writes nothing and exits 1 when
- * the host directory differs from what an install would write.
+ * without the marker. `--check` writes nothing and exits 1 when the host
+ * directory differs from what an install would write.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";

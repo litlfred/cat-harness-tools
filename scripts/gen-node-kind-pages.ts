@@ -1,18 +1,12 @@
 #!/usr/bin/env bun
 /**
- * A page for every node kind, every harness that holds one, and every node —
- * issue #2195, PR 2.
+ * A page for every node kind, every harness that holds one, and every node.
  *
  * @module scripts/gen-node-kind-pages
  * @covers typologies — it renders every node kind the typologies name, and the nodes their directories hold
  * @graphNode none — a generator over the node-kind index, not a schema itself
  *
- * The owner, 2026-10-05: *"generic requirement for a new node kind, should be
- * visualizer available at <base-url>/<declaring-harness>/<kind> that is a
- * dashboard like view of all nodes of that kind, …/<harness> for the nodes in
- * a named harness, …/<harness>/<path/to/node> for a node of that kind"*, and
- * then *"we need to keep track of locales, so lets do it upfront
- * /<locale>/<declaring>/<kind>/…"*. So, under the site being built:
+ * Under the site being built:
  *
  * | page | shows |
  * |---|---|
@@ -22,19 +16,16 @@
  *
  * ## Generic, from the kind's schema
  *
- * Settled the same day: *"Generic + override"*. Every kind gets these pages,
- * built from its Zod schema — top-level scalar fields become columns, enum
- * fields become status tiles — and a kind may later declare its own renderer
- * (the change-set dashboard is the first, PR 3). The chrome is always the
- * platform's, whatever renders the content: on the platform's docs site a page
- * is THEMED (2026-10-07) and gets the theme's top band and sidebar; on a
- * folio's already-built `_site` it is standalone and gets the harness rail
- * (`makeEmit`).
+ * Every kind gets these pages, built from its Zod schema — top-level scalar
+ * fields become columns, enum fields become status tiles — and a kind may
+ * declare its own renderer (e.g. the change-set dashboard). The chrome is
+ * always the platform's: on the platform's docs site a page is THEMED and gets
+ * the theme's top band and sidebar; on a folio's already-built `_site` it is
+ * standalone and gets the harness rail (`makeEmit`).
  *
- * Only `en` is written today: the chrome strings are English, and a locale
- * segment with nothing translated behind it would claim a translation that
- * does not exist. The segment is in the URL from the start so adding a locale
- * moves no page.
+ * Only `en` is written: the chrome strings are English, and a locale segment
+ * with nothing translated behind it would claim a translation. The segment is
+ * in the URL so adding a locale moves no page.
  *
  * ## Built at publish, where cat-harness declares it
  *

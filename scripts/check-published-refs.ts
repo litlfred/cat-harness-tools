@@ -2,64 +2,25 @@
 /**
  * check-published-refs.ts — a SHA may stage; only a version may publish.
  *
- * The owner, 2026-09-20, settling how instance dependencies are pinned:
- *
- * > sha is for staging, regernecing in published SEMVER
- *
- * and, immediately before it, the constraint that makes it binding:
- *
- * > downstream we need to align to fhir, sushi. hard constraint.
- *
- * **A SHA is an excellent pin and a useless published reference.** It names a
- * commit in a repository the downstream consumer may not have and may not be
- * able to fetch — and in FHIR's vocabulary cannot state at all: `dependsOn`
- * carries `packageId` and `version`, and there is no field a SHA belongs in. A
- * published artefact carrying one is not a stricter pin, it is an unresolvable
- * one.
- *
- * Scheme: `cat-harness/docs/proposals/instance-versioning.md`. This is its §3.3 gate,
- * built first on purpose — it was the one that could be written against the
- * data as it stood, before `id`, `version` or `publishable` existed anywhere.
- * They exist now (§3.1/§3.2), and carrier 3 below is §3.4's dependency set,
- * which this gate was carrying as a declared gap until then.
- *
- * ## A REFERENCE is not PROVENANCE, and the difference is the whole gate
- *
- * Both look identical — a hex string in a published document. They are
- * opposite things:
+ * A published reference must be a version, never a commit SHA: a downstream
+ * consumer may not be able to fetch the commit, and FHIR's `dependsOn`
+ * (`packageId` + `version`) has no field a SHA belongs in. Scheme:
+ * `cat-harness/docs/proposals/instance-versioning.md`.
  *
  * | | what it is | example | in scope? |
  * |---|---|---|---|
  * | **reference** | a consumer must RESOLVE it to obtain another artefact | a dependency's `ref`, an asset's `source` | **yes** |
  * | **provenance** | a record of where THIS artefact came from | `staging.sha`, `sourceCommitSha` | no |
  *
- * A build stamp saying "produced from commit `abc123`" is not asking anybody
- * to fetch `abc123`; it is stating a fact about the document in hand. Failing
- * it would be a bug, and it is the failure a shape-based check
- * (`/[0-9a-f]{40}/` over the published JSON) walks straight into — the
- * exported graph carries exactly one 40-hex string today and it is the stamp.
+ * Classification is by KEY, declared in {@link PROVENANCE_KEYS}, never by the
+ * look of the value (a 40-hex regex would fail the build stamp). A new
+ * provenance key is a deliberate addition to that list.
  *
- * So **classification is by KEY, declared in {@link PROVENANCE_KEYS}, never by
- * the look of the value.** A new provenance key is a deliberate addition to
- * that list with a reason, which is the property a regex cannot have.
+ * Per-PR previews are STAGING: a SHA there is correct, and this gate does not
+ * look at `/STAGING/`.
  *
- * ## Previews are STAGING
- *
- * Settled by the owner in the same exchange. This repository builds an
- * externally reachable preview per open PR, which would otherwise sit
- * ambiguously between the tiers — it is reachable like a publication and
- * provisional like a checkout. It is staging, so a SHA in one is correct and
- * this gate does not look at `/STAGING/`.
- *
- * ## Zero references is REPORTED, never rendered as a pass
- *
- * The reference carriers are enumerated and each prints its count even when
- * that count is nought. A gate that silently covers nothing and exits 0 is
- * this repository's most expensive recurring defect (`xom7`, `dh4f`,
- * `a6kl` — an L1 gate that was a no-op in CI). Each carrier's note says WHY
- * it is empty when it is, and no count is quoted here: a number in prose is a
- * claim that the next commit is free to falsify, and this header has already
- * outlived one.
+ * Every reference carrier prints its count, even nought, with a note on why
+ * it is empty; zero references is reported, never rendered as a pass.
  *
  * @module scripts/check-published-refs
  * @covers cat-harness

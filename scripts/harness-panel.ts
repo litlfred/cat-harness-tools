@@ -1,16 +1,11 @@
 /**
- * The data the Harnesses config panel draws (issue #1146).
+ * The data the Harnesses config panel draws: a glass panel grouped as
+ * **Instantiated here**, **In this checkout** and **Associated ↗ remote**, a
+ * property table per harness, the skills that edit each property, and ✎ to
+ * the declaration (wireframes in `docs/wireframes/harness-config/`).
  *
- * Owner, 2026-09-23: *"should add to cat-harness harness visualize a config
- * panel/popup which shows properties of cat-harness and other instances. add
- * in to render appropraite edit skills as well."* The design is the owner's
- * pick from the WireGen review in `docs/wireframes/harness-config/`: a glass
- * panel grouped as **Instantiated here**, **In this checkout** and
- * **Associated ↗ remote**, a property table per harness, the skills that edit
- * each property, and ✎ to the declaration.
- *
- * It rides `docs/_data/harness.json` as `config`, for the reason that file
- * gives: one generated file, one staleness gate (`docs:harness:check`).
+ * It rides `docs/_data/harness.json` as `config`: one generated file, one
+ * staleness gate (`docs:harness:check`).
  *
  * ## Associated is never local
  *
@@ -21,14 +16,11 @@
  *
  * ## Subscribed, and not instantiated here
  *
- * A harness a KG subscription reaches (issue #1719) is listed under
- * **Subscribed ↗ remote** until it is instantiated, which is when it becomes a
- * tile of its own (`kg:instantiate`, `subscribed-harnesses.ts`). Without this
- * group, turning an association into a subscription (bean `tmo5`: iHRIS, whose
- * harness is deliberately not instantiated) would make it vanish from the
- * panel. One row per harness the cached snapshot declares at the pin, read
- * offline; a snapshot that cannot be read is still a row, plus a finding,
- * never silence.
+ * A harness a KG subscription reaches is listed under **Subscribed ↗ remote**
+ * until it is instantiated, which is when it becomes a tile of its own
+ * (`kg:instantiate`, `subscribed-harnesses.ts`). One row per harness the
+ * cached snapshot declares at the pin, read offline; a snapshot that cannot be
+ * read is still a row, plus a finding, never silence.
  *
  * @module scripts/harness-panel
  */

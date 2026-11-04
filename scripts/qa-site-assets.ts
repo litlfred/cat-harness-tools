@@ -1,21 +1,8 @@
 #!/usr/bin/env bun
 /**
  * qa-site-assets — the QA evidence a site build publishes, fetched from the
- * `qa-reports` branch and checked after it is copied. Bean `tfqf`, reader audit
- * family F6 (`docs/proposals/qa-readers-audit-2026-10-01.md`, defects C9, C10).
- *
- * ## Why
- *
- * `docs-site.yml` and `feature-staging.yml` published `/assets/qa/` with two
- * shell lines: `cp -rT …/test/results/witnesses` and a `find … -name
- * '*.qa-results.json' -exec cp`. Both copy WHATEVER IS THERE. With the derived
- * corpus absent — every checkout, once it lives on `qa-reports` — the build
- * wrote two witnesses and one export result, the other 19 results vanished
- * from `/assets/qa/`, and the step printed a smaller count and stayed green
- * (C10). Nothing in the build knew what it should have published.
- *
- * So the build now says where its evidence came from BEFORE it generates
- * anything, and what it should hold:
+ * `qa-reports` branch and checked after it is copied, so the build knows what
+ * it should have published and never passes a smaller set off as the whole.
  *
  * 1. **`fetch`**, before the docs generator. Reads the entry for this build's
  *    ref (`main/<sha>`, `pr/<n>/<sha>`) — and optional fallbacks — from
@@ -24,8 +11,8 @@
  *      materialised into the checkout's `test/results/` paths even when the
  *      checkout still holds a committed corpus, because `main/<sha>` is
  *      evidence about the exact tree being built;
- *    - otherwise, the checkout already holds the corpus (still committed today):
- *      source `checkout`, and the expected counts are the checkout's;
+ *    - otherwise, the checkout already holds the corpus: source `checkout`,
+ *      and the expected counts are the checkout's;
  *    - it does not, and the fetch hit: the entry is MATERIALISED into the
  *      checkout's `test/results/` paths (`fetched`, or `fetched-fallback` when
  *      only a fallback ref hit — another commit's evidence, labelled as such);
@@ -37,15 +24,12 @@
  *    writes `_site/assets/qa/availability.json` saying which source the
  *    evidence came from — so the published site carries the answer too.
  *
- * ## Why the checkout wins on PR previews while the corpus is committed
+ * ## Why the checkout wins on PR previews
  *
  * A PR's entry is published from the pull request's MERGE checkout, while a
- * staging preview builds the head. Overwriting the head's committed results
- * with the merge commit's would publish evidence about a tree the preview does
- * not show. On a `main` build, by contrast, an exact `main/<sha>` hit is
- * evidence about the very tree being built, so it wins over the checkout. Once
- * `storage` is declared and the corpus leaves the checkout (bean `5hox`) the
- * fetched entry is the only source and this question goes away.
+ * staging preview builds the head, so the head's committed results describe
+ * the tree the preview shows. On a `main` build an exact `main/<sha>` hit is
+ * evidence about the very tree being built, so it wins over the checkout.
  *
  * ## A miss is never clean
  *

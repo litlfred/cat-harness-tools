@@ -10,121 +10,70 @@
  *   pages built as strings; its WIRING by `check:invocation-parity` and
  *   `gates.test.ts`'s step classification.
  *
- * ## The measurement, and why it is a post-build pass
+ * ## A post-build pass, run LAST
  *
- * Measured over the published main site at `origin/gh-pages` 752e3a7 —
- * 4,672 HTML files, 609.1 MiB — **58.1 MiB of it is HTML comments: 9.54 %**.
- * Not a reader's bytes and not a maintainer's either: the prose lives in
- * `_includes/head_custom.html`, where its readers are, and is then serialised
- * into every page of the tree. The nav tree and the harness bar are bigger
- * blocks, but they are MARKUP and removing them is a design change. This is
- * the part that is simply a copy.
+ * HTML comments (mostly prose from `_includes/head_custom.html`, serialised
+ * into every page) are a large share of the published bytes. The site is
+ * built with `actions/jekyll-build-pages@v1`, whose plugin allow-list has no
+ * minifier, so this post-processes the emitted tree like
+ * `strip-preview-seo.ts`, `set-html-lang.ts`, `rail-standalone-pages.ts` and
+ * `staging-banner.ts` do: no gem, no theme fork, no `_config.yml`.
  *
- * A Jekyll minifier PLUGIN is not available and that is settled: both site
- * workflows build with `actions/jekyll-build-pages@v1`, i.e. the
- * `github-pages` gem set and its plugin allow-list, and `docs/Gemfile` says in
- * its own header that CI does not read it. Reaching for `jekyll-minifier`
- * would mean a plain `bundle exec jekyll build`, which also un-pins
- * `remote_theme: just-the-docs/just-the-docs@v0.12.0` — and `_config.yml`
- * lines 10–45 say why that pin exists and that moving it is the
- * `upstream-version-adoption` process rather than an edit.
- *
- * **But the plugin was never the only route.** Both workflows already
- * post-process the emitted tree — `strip-preview-seo.ts`, `set-html-lang.ts`,
- * `rail-standalone-pages.ts`, `staging-banner.ts` — so a pass over `_site`
- * couples to nothing: no gem, no theme fork, no `_config.yml`. A decision memo
- * closed minification on the plugin fact alone and proposed hand-converting 30
- * comments in one include to `{% comment %}` instead. That recovers 38.47 MiB
- * of the 58.1; this recovers the rest at no further cost, and keeps recovering
- * it when the next generator adds a banner.
- *
- * ## It runs LAST, and that ordering is the correctness argument
- *
- * Eight steps read or rewrite the built HTML before a deploy —
+ * Every step that reads or rewrites the built HTML before a deploy —
  * `check:duplicate-ids`, `check:escaped-markup`, `check:maintained-artefacts`,
  * `site-links.ts`, `publish-verify.ts`, `set-html-lang.ts`,
- * `rail-standalone-pages.ts`, `staging-banner.ts` — and two of them
- * (`staging-banner`, `folio-mount`) decide whether a marker is live by asking
- * whether it sits inside a COMMENT (`html-comments.ts`, bean `ur84`). Every one
- * of them is upstream of this pass, so none of them sees minified input and the
- * judgements they publish are made over the same bytes they were written for.
- * **Moving this step earlier would silently change what those checks judge.**
- *
- * It is also why this is not folded into `strip-preview-seo.ts`: that one runs
- * mid-pipeline, by design, because the claims it removes must be gone before
- * the banner goes in.
+ * `rail-standalone-pages.ts`, `staging-banner.ts` — runs before this pass, and
+ * two of them (`staging-banner`, `folio-mount`) decide whether a marker is
+ * live by asking whether it sits inside a COMMENT (`html-comments.ts`). So
+ * none of them sees minified input. **Moving this step earlier would silently
+ * change what those checks judge.**
  *
  * ## What is NOT touched, and the rule rather than the list
  *
  * Whitespace is semantic inside `<pre>`, `<code>`, `<textarea>`, `<script>`,
  * `<style>` and `<title>`, so their content is copied through byte for byte —
  * including any `<!--` inside a script string, which a regex over the whole
- * document would read as a comment and this does not. This corpus is full of
- * code samples; a naive `>\s+<` over a whole page corrupts them.
+ * document would read as a comment and this does not.
  *
  * An UNCLOSED one of those falls through to being treated as an ordinary tag,
- * so a malformed page loses no content — but its interior whitespace is then
- * collapsed like any other. That is the one case where this pass could change
- * a rendering, and it is accepted rather than overlooked: an unclosed
- * `<script>` or `<pre>` cannot survive Jekyll's own markdown conversion, and
- * the alternative (treating the rest of the document as verbatim) would turn
- * one bad tag into a silently unminified page. Measured: 0 occurrences in
- * 4,711 published pages, since the equivalence check over them found no
- * verbatim region changed.
+ * so a malformed page loses no content, but its interior whitespace is then
+ * collapsed — the one case where this pass could change a rendering, accepted
+ * because an unclosed `<script>` or `<pre>` cannot survive Jekyll's markdown
+ * conversion.
  *
- * Outside those, the rule comes from CSS rather than from a list of tags: in
- * normal flow **any run of whitespace renders as exactly one space**. So
- * collapsing a whitespace-only run between two tags to one space is always
- * safe, and dropping it entirely is safe only where that one space could not
- * be rendered at all — next to a block-level boundary, or anywhere inside an
- * `<svg>` away from its text elements. Inline neighbours (`</a>` … `<a>`,
- * `</code>` … `<code>`) get the single space, because `a b` and `ab` are
- * different words. That distinction is the whole reason this is a tokenizer
- * and not a regex: `>\s+<` → `><` would delete the space in
- * `<a>one</a> <a>two</a>`.
+ * Outside those, the rule comes from CSS: in normal flow **any run of
+ * whitespace renders as exactly one space**. So a whitespace-only run between
+ * two tags collapses to one space, and is dropped entirely only where that
+ * space could not be rendered — next to a block-level boundary, or anywhere
+ * inside an `<svg>` away from its text elements. Inline neighbours (`</a>` …
+ * `<a>`, `</code>` … `<code>`) keep the single space, because `a b` and `ab`
+ * are different words: `>\s+<` → `><` would delete the space in
+ * `<a>one</a> <a>two</a>`, which is why this is a tokenizer and not a regex.
  *
  * ## The three classes of comment that stay
  *
- * Enumerated from the published tree rather than guessed — 84 distinct
- * comments over 4,672 pages, read before any were deleted:
- *
  * 1. **Conditional comments** (`<!--[if …]>`, `<![endif]-->`). Markup to a
  *    browser that honours them, not prose.
- * 2. **Licence and attribution notices.** The published tree carries
- *    `<!-- Feather. MIT License: … -->` and `<!-- Bootstrap Icons. MIT
- *    License: … -->` on 2,377 pages each. MIT requires the notice to travel
- *    with the copy. A minifier that removes it makes the publish
- *    non-compliant, which is not a byte question.
+ * 2. **Licence and attribution notices**, e.g. `<!-- Feather. MIT License: … -->`
+ *    and `<!-- Bootstrap Icons. MIT License: … -->`: MIT requires the notice
+ *    to travel with the copy.
  * 3. **Region markers** — `<!-- x:begin -->` / `<!-- x:end -->`, the idiom
  *    `readme-sections.ts`, `agent-memory.ts` and `merge-conflict-patterns.ts`
- *    all read. Every reader found today reads them from a SOURCE file, so
- *    stripping them from `_site` breaks nothing measurable; they are kept
- *    because a marker exists to be found by a tool, and a tool that one day
- *    reads the published copy would fail silently rather than loudly. The
- *    class costs 0.13 MiB of the 58.1 (`fa-first-paint`, `kg:subgraph`,
- *    `kg:toc`, `kg:roles`, `kg:processes`, `kg:files`).
+ *    read (`fa-first-paint`, `kg:subgraph`, `kg:toc`, `kg:roles`,
+ *    `kg:processes`, `kg:files`). A marker exists to be found by a tool, so
+ *    it is kept even in the published copy.
  *
- * `fa-first-paint:begin`/`end` is the one to be careful with and it is in
- * class 3: `first-paint-scheme.e2e.ts` slices the dark-first snippet out from
- * between those markers — but it reads them from `_includes/head_custom.html`,
- * which Jekyll never copies into `_site`. The spec is upstream of this pass in
- * every sense.
+ * ## Idempotent
  *
- * ## Idempotent, and that is asserted rather than hoped for
- *
- * A second run finds no comment to drop and no whitespace-only run left to
- * collapse that would change, so it writes nothing — `minify-site.test.ts`
- * asserts `minifyHtml(minifyHtml(x)) === minifyHtml(x)` over every fixture.
- * It matters because `restore-staging.ts` lays previously-published previews
- * back into `_site`, and a pass that drifted on re-entry would rewrite other
- * branches' previews on every main-site deploy.
+ * A second run writes nothing — `minify-site.test.ts` asserts
+ * `minifyHtml(minifyHtml(x)) === minifyHtml(x)` over every fixture — because
+ * `restore-staging.ts` lays previously-published previews back into `_site`,
+ * and a pass that drifted on re-entry would rewrite them on every deploy.
  *
  * ## Three states, never two
  *
  * Exit 0 the tree was walked and the result reported · 2 the site directory
- * could not be read. A pass that could not read the tree has not established
- * that the tree holds nothing to minify, and reporting "0 bytes saved" would
- * be indistinguishable from a tree already minified. Same rule as
+ * could not be read, never reported as "0 bytes saved". Same rule as
  * `strip-preview-seo.ts`.
  *
  *   bun run cat-harness-tools/scripts/minify-site.ts --site ./_site [--check]

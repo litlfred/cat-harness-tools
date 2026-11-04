@@ -1,56 +1,43 @@
 #!/usr/bin/env bun
 /**
  * check:derived-from — the edges between derived subgraphs resolve, form no
- * cycle, and respect the interim rendering order. Bean `nama`, step 2.
+ * cycle, and respect the interim rendering order.
  *
  * `derivedFrom` (schemas/kg/cat-harness.ts) names the declared directory ids a
  * derived graph is computed FROM. An edge nothing checks is prose, so this
- * gate gives it three refusals and one ratchet, per the owner's rulings of
- * 2026-10-04 (design note docs/proposals/derived-graph-dependencies-2026-10-04.md):
+ * gate checks:
  *
  * - **Resolution.** An id resolves to the NEAREST instance that declares it:
  *   the edge's own instance first, then the instances it `needs`, closest
- *   first. Ids are not unique across instances (`library` is declared six
- *   times), so the instance picked is part of the answer and is printed.
+ *   first. Ids are not unique across instances, so the instance picked is
+ *   part of the answer and is printed.
  * - **An id declared nowhere** is refused.
  * - **An id declared only by an instance the edge's instance does not need**
- *   is a LAYERING GAP: the chrome case, where an IG's pages are styled by
- *   the DAK base layer's chrome across no `needs` path. The owner ruled it a RATCHET
- *   (option 1 of 3). It is held in `derived-from.baseline.ts` with a reason; a
- *   new gap fails, and a cleared one leaves the baseline stale until shrunk.
+ *   is a LAYERING GAP (e.g. an IG's pages styled by the DAK base layer's
+ *   chrome across no `needs` path). It is a RATCHET, held in
+ *   `derived-from.baseline.ts` with a reason; a new gap fails, and a cleared
+ *   one leaves the baseline stale until shrunk.
  * - **A cycle** is refused.
- * - **The interim order** (the owner's rule: declaration order is rendering
- *   order until a topological order is computed). A directory whose source is
- *   declared AFTER it in the same instance is refused, because it would render
- *   from a stale source.
- *
+ * - **The interim order**: declaration order is rendering order until a
+ *   topological order is computed, so a directory whose source is declared
+ *   AFTER it in the same instance is refused.
  * - **A dangling `writer`** is refused: the staging cone reads a directory's
- *   generator from it (bean `4j86`), and a path that does not exist would
- *   silently shrink the cone rather than fail.
- *
- * - **The storage clock** (bean `0b8c`, #2230). A derived artefact can be
- *   current in a commit only if every input it is computed from — directly,
- *   or through the `derivedFrom` edges upstream — is itself kept in the
- *   commit. An input kept on a BRANCH (a `source` or `storage` that is not
- *   the checkout) moves without a commit, so a committed artefact derived
- *   from it is stale the moment somebody writes there, on main and on every
- *   open PR at once. That was measured: the fsh-guts viewer, committed on
- *   main while `fsh-guts/` lives on `cat/cat-harness/fsh-guts`, went red
- *   everywhere on one `state:push` (2026-10-05). So:
+ *   generator from it, and a missing path would silently shrink the cone.
+ * - **The storage clock.** A derived artefact can be current in a commit only
+ *   if every input it is computed from — directly, or through `derivedFrom`
+ *   upstream — is kept in the commit. An input kept on a BRANCH (a `source`
+ *   or `storage` that is not the checkout) moves without a commit. So:
  *   - a TRACKED artefact with a branch-kept input is refused
  *     (`committed-from-branch`): it must be built at publish instead;
  *   - a publish-time visualisation that names no `writer` is refused
  *     (`publish-without-writer`): `derive:publish` would have nothing to run.
- *   A visualisation is derived from the directory it visualises — the edge
- *   is implicit, because a viewer of X is computed from X by definition.
+ *   A visualisation is implicitly derived from the directory it visualises.
  *   "Kept on a branch" is read from the COMMITTED declaration; a per-checkout
- *   source override is a local choice and does not change what every
- *   checkout shares.
+ *   source override does not change it.
  *
  * And one ADVISORY count: directories in the `derived` layer that name no
- * `derivedFrom`. Absent means "not declared", and a `library/` is derived from
- * an external publication, not from a graph. Making silence fail needs a field
- * for "why not", which is the owner's call, so it is reported, not graded.
+ * `derivedFrom`. Absent means "not declared" (a `library/` is derived from
+ * an external publication, not a graph), so it is reported, not graded.
  *
  * @module cat-harness/scripts/check-derived-from
  * @covers none — it judges directory declarations, which no graph typology holds

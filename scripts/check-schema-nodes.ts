@@ -2,26 +2,14 @@
 /**
  * Every module in the declared `schemas/` directory declares what it is.
  *
- * `harness.json` declares `schemas/` as holding a `schemas` graph, and
- * until 2026-09-19 the export produced no nodes of that kind at all — a
- * declaration with nothing behind it, which is the `dh4f` shape reaching the
- * instance's own root declaration. Bean `xxxb`.
- *
- * The membership test is now the file's own `@graphNode` tag, and this gate is
- * what stops it rotting: a module added to `schemas/` without one is silently
- * ABSENT from the published graph, and absence is the one failure a consumer
- * cannot distinguish from "this instance has none".
- *
- * ## Three states, and the third is not a pass
+ * Membership in the `schemas` graph is the file's own `@graphNode` tag; a
+ * module without one is silently ABSENT from the published graph.
  *
  * - declared `schema` → a node;
- * - declared `none — <reason>` → deliberately not a node, and the reason is
- *   required so that silencing costs more than declaring;
- * - **undeclared** → reported, non-zero. A `*.test.ts` is undeclared too, and
- *   is listed separately rather than pattern-excluded: excluding by extension
- *   restates a layout coincidence, which is the "distinguishable by extension
- *   … a coincidence of the current layout, not a contract" defect #263 named.
- *   It is not an error, because a test declaring nothing is the expected shape.
+ * - declared `none — <reason>` → deliberately not a node; the reason is
+ *   required;
+ * - **undeclared** → reported, non-zero. A `*.test.ts` that declares nothing
+ *   is listed separately (not excluded by extension) and is not an error.
  *
  * Usage:  bun run cat check:schema-nodes
  *

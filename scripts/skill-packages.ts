@@ -5,11 +5,9 @@
  * @module scripts/skill-packages
  * @covers cat-harness
  *
- * MOVED HERE from `src/tools/skill-fetch.ts` (bean `9umr`, 2026-09-30). The
- * owner ruled that tools depend on the harness and never the reverse (bean
- * `w2gr`), and two harness callers needed this table: `scripts/kg-audit.ts`
- * and the workflow engine's `loadRelaxations`. Both were reaching into a Tool
- * for it. The tool now imports it from here, like everyone else.
+ * Shared by `scripts/kg-audit.ts`, the workflow engine's `loadRelaxations` and
+ * `src/tools/skill-fetch.ts`, which import it from here rather than from a
+ * Tool.
  */
 import { readdirSync } from "node:fs";
 import { basename, join, resolve } from "node:path";

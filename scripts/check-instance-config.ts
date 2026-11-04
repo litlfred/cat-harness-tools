@@ -2,18 +2,9 @@
  * Every instance's config is named after the instance, and no retired name
  * survives.
  *
- * ## Why this gate exists at all
- *
- * The config filename has changed twice. `folio.config.json` became
- * `harness.config.json` on 2026-09-18 (bean `6nfy`), as a HARD BREAK on the
- * owner's instruction — the old name "no longer read at all". Nothing
- * announced it, and two days later `9ici` found the cost: one reader had kept
- * the old name in a fallback loop, so an instance on the old spelling got a
- * DETERMINED answer for its voices while fifteen other settings vanished in
- * silence. The break was right; being quiet about it was not.
- *
- * `<instance>.config.json` (2026-09-20) is the third name, and the first to
- * ship with something that fails when a checkout is on the wrong one.
+ * The config is `<instance>.config.json`. A retired name is not read at all,
+ * so a checkout still on one silently loses its settings unless something
+ * says so; this does.
  *
  * ## What it checks, and the third state
  *
@@ -29,8 +20,7 @@
  *
  * COULD-NOT-DETERMINE is its own exit. An unreadable declaration means the
  * instance's name is unknown, so its filename is unknowable — reported, never
- * folded into "no finding". A sweep that could not look has not cleared
- * anything (bean `xom7`).
+ * folded into "no finding".
  *
  * @module scripts/check-instance-config
  * @covers cat-harness

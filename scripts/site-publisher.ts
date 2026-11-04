@@ -6,19 +6,17 @@
  * @module scripts/site-publisher
  * @covers none — the slot and the workflow reading that chooses a publisher; it builds and judges nothing
  *
- * ## Why a slot (owner, 2026-10-14, Q4 of the folio-assistant#2529 reference-direction review)
+ * ## Why a slot
  *
- * The FHIR-IG publish path (`stage-local-ig.ts`) lived in this layer and was
- * named by the reusable workflows of an IG layer above it. The owner ruled
- * that it moves to the layer that owns IG builds, and that `stage-local.ts`
- * reaches it through a declared slot, so this layer names no higher one. The
- * slot is the existing pipeline-plugin mechanism (bean `squu`, bean `riit`
- * step 3b): a layer declares a `folio-pipeline-plugin/v1` node whose `slot`
- * starts with {@link SITE_PUBLISHER_SLOT_PREFIX}, naming a table that holds a
- * {@link SitePublisherDeclaration}, and `loadContributionsSync` finds it
- * through the repository's declared dependencies. One contributor per slot,
- * as for every pipeline slot: which code publishes an IG must not depend on
- * the order the dependencies are listed in.
+ * The FHIR-IG publish path lives in the layer that owns IG builds, and this
+ * layer names no higher one, so `stage-local.ts` reaches it through the
+ * pipeline-plugin mechanism: a layer declares a `folio-pipeline-plugin/v1`
+ * node whose `slot` starts with {@link SITE_PUBLISHER_SLOT_PREFIX}, naming a
+ * table that holds a {@link SitePublisherDeclaration}, and
+ * `loadContributionsSync` finds it through the repository's declared
+ * dependencies. One contributor per slot, as for every pipeline slot: which
+ * code publishes an IG must not depend on the order the dependencies are
+ * listed in.
  *
  * The FOLIO publisher is this layer's own (`folio-staging.yml` is the
  * platform's reusable workflow), so it is built in, not a slot.

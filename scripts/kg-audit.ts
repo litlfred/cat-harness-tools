@@ -5,9 +5,8 @@
  *
  * The model it checks is one sentence: **an actor performs a task in a process
  * as a role, using that role's skills.** Every join in that sentence is a place
- * two independently-edited files can stop agreeing, and until now only one of
- * them was checked at all (`check-workflow-refs.ts`, on skill refs). This walks
- * the rest:
+ * two independently-edited files can stop agreeing; `check-workflow-refs.ts`
+ * checks skill refs, and this walks the rest:
  *
  *   activity ──names──▶ skill          skill-ref-resolves
  *   activity ──sits in─▶ lane          activity-in-lane
@@ -17,15 +16,12 @@
  *   actor    ──takes on▶ role          role-has-actor
  *   gateway  ──computes▶ decision      decision-ref-resolves · decision-outcomes-used
  *
- * ## Why sidecars rather than a console report
+ * ## Sidecars rather than a console report
  *
- * `check-workflow-refs.ts` prints and exits, so its previous answer is gone.
- * That makes "this lane has been unbound since the day it was drawn" and "this
- * lane broke in the commit under review" indistinguishable, and a reviewer
- * cannot separate a new defect from inherited debt. The sidecars are committed,
- * so the diff says exactly which findings a change introduced. Same argument,
- * and same file shape, as the block sweep's `*.qa.json` and the script sweep's
- * `*.script-qa.json`; schema in `schemas/sdlc/kg-qa.ts`.
+ * The sidecars are committed, so the diff says exactly which findings a change
+ * introduced, separating a new defect from inherited debt. Same file shape as
+ * the block sweep's `*.qa.json` and the script sweep's `*.script-qa.json`;
+ * schema in `schemas/sdlc/kg-qa.ts`.
  *
  * ## Gate
  *
@@ -36,7 +32,7 @@
  *   bun run cat kg:audit --instance ./bootstrap
  *                               audit ANOTHER declared instance from its own
  *                               root, writing its sidecars under its own
- *                               results directory (bean `bjzs`)
+ *                               results directory
  *
  * A diagram that will not load records `unknown` against every criterion,
  * including the critical ones, so it fails `--check`. `unknown` is never
@@ -45,9 +41,9 @@
  * @module scripts/kg-audit
  * @covers processes, scenarios, skills, tools, cat-harness, attestations, test-plan — the graph typologies
  *   `KG_SUBJECT_GRAPH_TYPOLOGIES` maps its seven subject kinds onto, plus the
- *   attestation store it reads and `--check`s (bean `2gst`), plus the declared
- *   `test-plan` directories `testPlanCriteria` reads and judges (beans `3o5b`,
- *   `ff09`) — which audit:coverage otherwise reports as typed-only
+ *   attestation store it reads and `--check`s, plus the declared `test-plan`
+ *   directories `testPlanCriteria` reads and judges — which audit:coverage
+ *   otherwise reports as typed-only
  */
 
 import { createHash } from "node:crypto";

@@ -2,21 +2,10 @@
  * Audit actor facts (capabilities and permissions) for consuming processes,
  * gateways, tasks, or rules in the knowledge graph.
  *
- * Bean `folio-assistant-bkje`, proposal
- * `cat-harness/docs/proposals/actor-facts-and-their-processes.md` §4 item 1.
- *
- * ## The rule
- *
- * Every declared actor fact (capabilities and permissions declared on an actor)
- * must have at least one consuming process, gateway, task, or rule in the KG.
- * A declared capability or permission that is read nowhere is reported as a
- * finding.
- *
- * ## Report before gating
- *
- * Established as report-only (`minor` severity, non-blocking), measuring the
- * baseline debt before gating, with a vacuity guard so that an empty actor set
- * returns undetermined (`unknown`) rather than passing.
+ * Every capability or permission declared on an actor must be read by at
+ * least one process, gateway, task, or rule; one read nowhere is a finding.
+ * Findings are report-only (`minor`, non-blocking). An empty actor set
+ * returns `unknown` rather than passing.
  *
  * @module scripts/actor-facts
  */

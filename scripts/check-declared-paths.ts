@@ -2,154 +2,63 @@
 /**
  * A path a declaration could have answered is not written down in code.
  *
- * ## The defect
+ * The instance's declaration says where its graphs live; a literal such as
+ * `processes` hardcoded at a call site turns a topical split into a many-file
+ * edit, and a list of such sites always misses some. So this is a gate.
  *
- * `harness.json` says where this instance's graphs live. Nine production
- * sites nevertheless hardcoded `processes`, so a topical split — the
- * whole point of the declaration — would have been a nine-file edit.
- * `workflowDirs()` fixed those nine, and then a sweep found **four more** the
- * working list had missed (`check-workflow-policy`, `check-workflow-refs`,
- * `gen-docs-pages`, a `kg-audit` leftover). That is the argument for a gate
- * rather than for a longer list: the sites nobody remembered are exactly the
- * ones a list omits.
+ * ## The rule
  *
- * ## The rule, and where it comes from
- *
- * The owner's concession on 2026-09-19 — *"if need to hardcode json/jsonld
- * assets, thats ok. not preferrred"* — settles it. Hardcoding is permitted and
- * discouraged, which means it must be **declared and checked**, not forbidden
- * and not free. So a literal naming a declared directory is allowed when:
+ * Hardcoding is permitted but discouraged, so it must be **declared and
+ * checked**. A literal naming a declared directory is allowed when:
  *
  *  - **it names a FILE that exists, and the witness list records it.**
  *    Authored prose naming one specific artefact —
  *    `source: "processes/crdm-requirements.bpmn"` in a docs page — is not
- *    discovery and no declaration would answer it. Eighteen of these are
- *    correct and must stay. They are **checked to resolve**, which closes the
- *    `blv9` defect class (a link-shaped value that does not dereference) over
- *    the same corpus for free.
+ *    discovery and no declaration would answer it. Witnesses are **checked to
+ *    resolve**.
  *
- *    **An existing file is not a stable one** (bean `gz47`, owner ruling
- *    2026-10-04). Under the content-source ruling of 2026-10-03 a declared
- *    subgraph's source may move — directory, branch, graph store — so a file
- *    that exists today names nothing after the move, as `fsh-guts/` did.
- *    The owner chose a one-way baseline over fixing every site now or
- *    exempting them for good: the witnesses recorded on 2026-10-04 stay, a
- *    NEW literal naming an existing file fails, and `--update` may drop a
- *    witness but never adds one. Four had crept in unseen since the list was
- *    first written.
- *    A MOVE is not a new literal: a witness whose literal left its file and
- *    is now named in another is carried by `--update` one for one
- *    (`relocatedWitnesses`; cat-harness #286 moved eight).
+ *    The witness list is a one-way baseline, since a declared subgraph's
+ *    source may move: a NEW literal naming an existing file fails, and
+ *    `--update` may drop a witness but never adds one. A MOVE is not a new
+ *    literal: a witness whose literal left its file and is now named in
+ *    another is carried by `--update` one for one (`relocatedWitnesses`).
  *  - **it carries `declared-path-literal: <reason>`** in a comment on its own
- *    line or the line above. The base cases are here: the module that supplies
- *    the defaults, the scaffolder that CREATES the layout, the partition plan
- *    that describes a layout this repo does not have yet. Same shape as
- *    `<cat-harness.processes:no-skill reason="…"/>`: exempt, but the reason is required, so
- *    silencing the check costs more than satisfying it, and the marked sites
- *    are COUNTED in the summary rather than disappearing.
+ *    line or the line above — e.g. the module that supplies the defaults, the
+ *    scaffolder that CREATES the layout. Same shape as
+ *    `<cat-harness.processes:no-skill reason="…"/>`: exempt, but the reason is
+ *    required, and the marked sites are COUNTED in the summary.
  *
  * Everything else — a literal naming a declared DIRECTORY, or naming nothing
  * that resolves — is refused, with the helper that answers it named.
  *
  * ## What it does not look at
  *
- * Comments, because a path in prose is documentation and this repo's own
- * doc blocks are full of them; and placeholders (`${…}`, `<locale>`), because
- * a template is not a path a declaration could have answered without also
- * answering the placeholder.
+ * Comments (a path in prose is documentation), and placeholders (`${…}`,
+ * `<locale>`), since a template is not a path a declaration could answer.
  *
- * ## Tests ARE scanned, and were not until 2026-09-20
+ * ## Tests
  *
- * `*.test.ts` was skipped from this module's first commit. Read the history
- * and there is no reason recorded anywhere: not a comment on the clause, not
- * a line in a 71-line commit message that argues every other scoping decision
- * with measurements, not a mention in the section above that exists to list
- * exclusions. **It was written, never argued** — so it cost three breakages
- * (bean `dhol`) before anyone asked.
+ * Tests ARE scanned, but are outside the count ratchet: a test that builds a
+ * fixture tree names declared directories by necessity. They are governed by
+ * the **witness list** (`witnessesOf`, `resolves` in the baseline): the gate
+ * fires when a recorded witness stops resolving, which is relocation and
+ * nothing else.
  *
- * The worst was not a test failing. `scripts/tests/log-writer.test.ts`
- * composed a path to a diagram that had moved, went ENOENT, and reported
- * *"the process does not declare folio:log"* — **a false finding about the
- * corpus**, from a test that was itself broken. A gate that reads the
- * declaration is the thing that catches that, and it was looking away.
+ * ## A ratchet, not a wall
  *
- * ### Why the obvious fix was wrong, and what replaced it
- *
- * Scanning tests adds **407** literals to 18. So the bean proposed narrowing
- * the exemption to FIXTURES — a literal inside a `mkdtemp` tree names nothing
- * in this repository and must not be resolved against the declaration.
- *
- * Measured 2026-09-20, that is under-resolved. The 443 test literals are four
- * populations, not two: fixture trees; **test VECTORS** (`check(["folio/paper/
- * ch/x.qa.json"])` — path-shaped data passed to the function under test, and
- * `"@id": "library/who-anc-2016/nodes/rec-007"`, which is an identifier and
- * not a path at all); layout ASSERTIONS pinning that the declaration yields
- * `src/skills`; and real corpus references. A line-local fixture heuristic
- * scored 161 of 407 and misfiled the rest.
- *
- * **No heuristic was needed, and neither did the count work.** The first
- * attempt put all 407 into the per-file baseline and relied on the ratchet:
- * a corpus literal that stops resolving raises its file above baseline. That
- * catches relocation, and it was still wrong, for a reason that showed up
- * within the hour — a sibling's `schemas/folio-dir.test.ts`, merged from main,
- * tripped the gate with **two literals that were both entirely correct**. A
- * test that builds a fixture tree names declared directories by necessity, so
- * counting tests fires on every new test. That is the *"a check that cries
- * wolf is a check somebody switches off"* failure this file names twice, and
- * arriving at it by a different route does not make it a different failure.
- *
- * So tests leave the count ratchet entirely — for a test, naming nothing is
- * the normal case and counting it is noise — and what governs them instead is
- * the **witness list** (`witnessesOf`, `resolves` in the baseline): the
- * literals that resolve TODAY, committed. The gate fires when a recorded
- * witness stops resolving, which is relocation and nothing else.
- *
- * That also closes the case a fixture heuristic provably cannot catch: a
- * literal that LOOKS like a fixture path today because the file it named was
- * moved yesterday. **96 literals are witnessed, 23 of them in tests** — among
- * them the CRDM diagrams in `bpmn-translate.test.ts` and
- * `editing-hci-validation.bpmn` in `corpus-gate.test.ts`.
- *
- * Falsified in both directions rather than assumed: renamed
- * `crdm-deliver.bpmn` and the gate named the lost witness and exited 1;
- * restored it and the gate went quiet; added a new test building a fixture
- * tree under `mkdtemp` and the gate stayed silent, which the count could not
- * do.
- *
- * **The source baseline did not move** — still 18 across 11 files. Scanning
- * tests cost no recorded debt at all; it bought 23 witnesses.
- *
- * ## Why it ships as a ratchet and not as a wall
- *
- * First run, 2026-09-19: **152** unaccounted literals across 40 files. That
- * is the finding — the debt is an order of magnitude past the nine sites the
- * `workflowDirs()` rewire knew about — and it is also why a blocking gate
- * cannot land today. Some of those sites need real design (`LOCAL_PACKAGES`
- * in `skill-fetch.ts` is a package→directory map, not a lookup), and a gate
- * that fails 152 times on the day it arrives is a gate somebody switches off.
- * `check-corpus-gate.ts` has `--warn` for the same reason.
- *
- * So the baseline is COMMITTED, **per file rather than per line** — a count
- * churns under an unrelated edit far less than a line number does — and a
- * file may only ever lose literals. A new hardcode in a file that had none
- * fails immediately, which is the case this gate exists for; the 152 are
- * recorded debt that is visible in one number and can only go down.
- * `--update` rewrites it, and raising a count is printed loudly and shows up
- * as a diff somebody reviews, the same contract a lockfile has.
+ * Existing hardcoded literals in source are recorded debt. The baseline is
+ * COMMITTED, **per file rather than per line** (a count churns less than a
+ * line number), and a file may only ever lose literals. A new hardcode in a
+ * file that had none fails immediately. `--update` rewrites it; raising a
+ * count is printed loudly and shows up as a diff somebody reviews.
  *
  * ## A witness inside an ABSENT results tree is unknown, not lost
  *
- * Bean `c8uq` (reader audit row R32). Six witnessed literals name files under
- * `test/results/` or `test/health/results/` — derived QA output, which leaves
- * `main` for the `qa-reports` branch and is present only once `qa:fetch` has
- * materialised it. With those trees moved aside the gate said *"6 witnessed
- * literal(s) no longer resolve … point it at where the artefact went"*, and
- * the artefact went nowhere. So a witness whose literal falls under a declared
- * `qa` or `health` directory that is ABSENT from the checkout is reported as
- * `?` *could not determine*, is neither lost nor counted as new debt, and the
- * run exits 2 when nothing determined failed. `--update` refuses in that state:
- * dropping six witnesses because the corpus was not fetched is the vacuous
- * rebaseline this gate exists to stop.
+ * A witness under a declared `qa` or `health` directory (e.g.
+ * `test/results/`, `test/health/results/`) that is ABSENT from the checkout
+ * (present only once `qa:fetch` has run) is reported as `?` *could not
+ * determine*, neither lost nor new debt, and the run exits 2 when nothing
+ * determined failed. `--update` refuses in that state.
  *
  * Usage:  bun run cat check:declared-paths  [--update]
  * Exit:   0 at or under baseline · 1 above it, or a marked literal naming nothing

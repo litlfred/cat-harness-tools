@@ -1,6 +1,5 @@
 /**
- * The dependency cone for the QA working copy (owner card Q-CONE-2 B,
- * 2026-11-01; issue cat-harness-tools#1271): main records what each
+ * The dependency cone for the QA working copy: main records what each
  * `qa:refresh` step READ, and a preview reruns only the steps whose reads
  * changed, putting back main's outputs for the rest.
  *
@@ -25,7 +24,7 @@
  *   again untraced, and that answer stands.
  * - **Skip** (`CAT_WRITER_SKIP=1`, a preview): a step whose record matches is
  *   not run, and its recorded outputs are put back. Any doubt runs it.
- * - Otherwise nothing changes: every step runs as before.
+ * - Otherwise nothing changes: every step runs.
  *
  * Steps run in their declared order, and each is decided just before it would
  * run, so a step that reads an earlier step's output compares what that step

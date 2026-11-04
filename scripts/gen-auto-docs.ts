@@ -5,76 +5,33 @@
  * @module scripts/gen-auto-docs
  * @covers docs, auto-docs
  *
- * Owner, 2026-09-20, bean `06e3`:
- *
- * > in cat-harness needs to be harness/handler at
- * > `cat-harness/auto-docs/<auto-doc-type>/<path>` defined. which will
- * > auto-generate extracatable documentation at `<path>` sub-graph.
- * > extracablle = bpmn, tasks, glossary, etc.
- *
- * ## Why this is a NEW generator rather than a kind of an existing one
- *
- * A note on `06e3` guessed the opposite — that auto-docs would be a `kind`
- * handled by `state-visualizer.ts`, which had just landed. Reading the three
- * existing generators says no, and the reason is structural rather than a
- * matter of taste: **every one of them is one-axis.** `gen-schema-viz`,
- * `gen-library-viz` and `state-visualizer` each map ONE graph typology to ONE
- * viewer at a fixed route, with optional subject pages beneath it. auto-docs
- * is **two-axis** — an auto-doc TYPE crossed with a SUB-GRAPH — and there is
- * nowhere in a one-axis generator to put the second axis without it becoming
- * this file anyway.
- *
- * What IS reused, and it is the part worth reusing: the routing.
- * `viewerPlacement(site, "<handler>/auto-docs/<type>", …)` is the owner's
- * `<base>/<handler>/<kind>/<subject>` rule with the type as a segment, and
- * `orphanSubjectPages()` prunes the result. No new URL rule, no fourth pruner.
+ * A separate generator because auto-docs is two-axis (a TYPE crossed with a
+ * SUB-GRAPH), unlike the one-axis `gen-schema-viz`, `gen-library-viz` and
+ * `state-visualizer`. It reuses their routing:
+ * `viewerPlacement(site, "<handler>/auto-docs/<type>", …)` (the
+ * `<base>/<handler>/<kind>/<subject>` rule with the type as a segment), and
+ * `orphanSubjectPages()` prunes the result.
  *
  * ## The sub-graph segment is the declared directory's `id`, not its path
  *
- * The owner wrote `<path>`. This publishes under the declared entry's **id**
- * instead — put to them as an open question on #607 with both costs stated,
- * and **ruled for the `id` on 2026-09-21**. The reasons it was argued on, all
- * of which survive as the reasons it stays:
+ * - `id` is what the declaration declares and what an override matches on, so
+ *   the URL survives the directory moving (as in `state-visualizer.ts`).
+ * - It stays one segment, which `orphanSubjectPages` relies on (it scans one
+ *   level).
+ * - Each page STATES its declared path, so the mapping is on the artefact.
  *
- * - **Precedent.** `state-visualizer.ts` settled the same question the same
- *   way, and gave the reason: `id` is what `harness.json` declares and what an
- *   override matches on, so an id-derived URL survives the directory moving.
- *   A path-derived one does not.
- * - **It stays one segment.** A path has slashes, so page directories would
- *   nest — and `orphanSubjectPages` scans one level, which is what makes
- *   pruning's ownership test exact. A nested tree would need a fourth pruner,
- *   which bean `ankg` explicitly asks nobody to write.
- * - **Nothing is lost.** Each page STATES its declared path, so the mapping
- *   from id to path is on the artefact rather than only in the URL.
+ * The URL does not mirror the tree; the declaration maps id to path.
  *
- * The cost, said out loud because a settled question still has one: the URL
- * does not mirror the tree, so `skills/` publishing under `cat-harness` is
- * legible only from the declaration. That is the trade taken.
+ * ## What this emits is an INDEX, not the documentation
  *
- * ## What this emits is an INDEX, and an index is not the documentation
- *
- * Owner, same bean:
- *
- * > then when authong `<harness>/docs` the author should make use of auto-doc
- * > referneces and provide a summary / overvuew of each of the business
- * > processes defined. as part of skills and judgement
- *
- * and, on how:
- *
- * > ..reuse assets in explain.
- *
- * So this file deliberately stops at the index. The per-process summary — what
- * each one is FOR, when you would be in it, what it is not — is a HUMAN or
- * AGENT obligation carried by the `auto-docs` skill, and it reuses these
- * assets rather than paraphrasing them into a second copy. A generated index
- * with no authored prose around it reads as complete while explaining nothing,
- * which is the `xom7` shape moved into documentation.
+ * The per-process summary — what each one is FOR, when you would be in it,
+ * what it is not — is authored by a human or agent under the `auto-docs`
+ * skill, reusing these assets rather than paraphrasing them.
  *
  * ## Empty is not rendered
  *
- * A sub-graph contributing no items of a type gets NO page. A declared-but-
- * empty directory with a page claiming to index it is the `dh4f` defect as a
- * nav entry — a link that resolves to nothing while reading as a section.
+ * A sub-graph contributing no items of a type gets NO page, so no nav entry
+ * resolves to nothing.
  *
  * Usage:
  *   bun run cat auto:docs          # write

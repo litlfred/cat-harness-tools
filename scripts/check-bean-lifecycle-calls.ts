@@ -3,16 +3,9 @@
  * A process that claims, resolves or archives a bean does it by calling `Process_BeanOpen`
  * and `Process_BeanClose`, always both. No other diagram carries those ops.
  *
- * Bean `folio-assistant-m8gz`, owner ruling of 2026-10-24 (option A). Measured
- * on main that day: 19 `claim` ops in 18 diagrams, 13 `resolve` in 11 and 3
- * `archive` in 3, each copied into the diagram by hand. Seven processes opened
- * a bean they never closed, eight closed one without archiving it, and
- * `Process_BeanLifecycle`, the diagram that drew the whole cycle, was called by
- * nothing. Copies drift, and nothing said when one had.
- *
- * So the ops now live in two called processes in `cat-harness`
- * (`sdlc/processes/bean-open.bpmn`, `bean-close.bpmn`), and this check holds
- * the corpus to them. It fails on three things:
+ * The ops live in two called processes in `cat-harness`
+ * (`sdlc/processes/bean-open.bpmn`, `bean-close.bpmn`), so no copy can
+ * drift. This check fails on three things:
  *
  * 1. **`claim`, `resolve` or `archive` outside OPEN and CLOSE**, on an activity
  *    or on a global task an activity calls. `note` stays where the work happens.
@@ -20,24 +13,22 @@
  *    `<cat-harness.processes:bean ref="…"/>` (or `id`, `bean`) on one of its
  *    activities. "Entry" means no diagram in the corpus calls it: a process
  *    that is only ever called runs on its caller's bean (`enterSubprocesses`
- *    hands `state.bean` down), and opening the bean again there would be the
- *    caller's job done twice.
- * 3. **A process that calls one of the two and not the other.** An OPEN with no
- *    CLOSE is the "opened and never closed" seven; the reverse closes a bean the
- *    process never checked was its own.
+ *    hands `state.bean` down).
+ * 3. **A process that calls one of the two and not the other.** An OPEN with
+ *    no CLOSE leaves a bean open; the reverse closes a bean the process never
+ *    checked was its own.
  *
  * **Note-takers are reported, not failed.** An entry process whose only marks
  * are `op="note"` or a bare `<cat-harness.processes:bean/>` writes on whatever
  * bean its instance was started with — `merge-train` notes on each PR's, the
- * FHIR build logs its findings on the build's — and never decided that bean's
- * fate. Making it open and close one would have it claim and complete work it
- * only annotates. Rules 1 and 3 already hold the line that matters: no process
- * can claim without calling OPEN, and none can call OPEN without CLOSE. The
- * list is printed so the judgement stays visible.
+ * FHIR build logs its findings on the build's — and never decides that
+ * bean's fate. Rules 1 and 3 already ensure no process can claim without
+ * OPEN, nor OPEN without CLOSE. The list is printed so the judgement stays
+ * visible.
  *
  * Reads every diagram in the checkout scope, so a higher layer's diagrams are
  * judged whenever they are mounted. An empty corpus is refused rather than
- * reported clean (bean `dh4f`).
+ * reported clean.
  *
  * Usage:  bun run cat check:bean-calls
  * Exit:   0 clean · 1 a finding, or no diagram read

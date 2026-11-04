@@ -3,10 +3,7 @@
  * Resolve each lean.ref against the declarations and modules of Lake targets
  * that CI builds, classifying references into built / sibling_only / dangling.
  *
- * Recorded from the qou orphaned-content census (2026-10-04, session
- * 01NdDGeP1SyShmoUssLuRZ91, issue #2106).
- *
- * Three-state / four-state outcome:
+ * Outcomes:
  *   - "built": lands in a Lake build target (compiled library / lean_lib / lean_exe)
  *   - "sibling_only": absent from any Lake target, but resolves in an uncompiled chapter-dir .lean sibling
  *   - "dangling": resolves neither in Lake targets nor in chapter-dir siblings

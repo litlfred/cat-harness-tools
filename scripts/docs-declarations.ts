@@ -1,10 +1,6 @@
 /**
  * Which documentation page documents a declared directory — read from the
- * PAGES.
- *
- * Until #1168 B7c each directory named its documentation page
- * (`coverage.docs`): the directory pointing at what depends on it. The owner
- * chose (2026-09-24, "pages declare") that the page says what it documents:
+ * PAGES. The page says what it documents:
  *
  * | page | where it says so |
  * |---|---|

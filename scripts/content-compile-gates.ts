@@ -2,10 +2,7 @@
 /**
  * Content-type compile gates for the merge pipeline.
  *
- * Bean `folio-assistant-xqdi` (Child b of merge-gate epic `folio-assistant-nok9`).
- * Design: `cat-harness/docs/proposals/merge-gate-2026-10-02.md` §5.1, §5.4.
- *
- * ## The Gates
+ * Design: `cat-harness/docs/proposals/merge-gate-2026-10-02.md`.
  *
  * | # | gate | when | blocks? |
  * |---|---|---|---|
@@ -16,15 +13,13 @@
  * | A2 | Full IG Publisher run; qa.html error and warning counts recorded | FHIR IG | advisory |
  * | A3 | Strict KG audit: kg:audit:strict checks major findings | KG paths | advisory |
  *
- * ## Principles Enforced
- *
  * 1. **Path-scoped**: Gates run only when files in their declared path cone are touched.
  * 2. **Data-declared**: Path -> gate mapping is declared as data (`CONTENT_COMPILE_GATES`),
  *    read directly by `gates.ts` and the merge pipeline.
  * 3. **The third state (`unknown`)**: If a toolchain is absent (e.g. `lake`/`lean` or `sushi`
  *    not installed), or the cache is cold and timed out:
  *    - On a **blocking** gate (G5, G6, G7), `unknown` **must block** and is **never reported as green**.
- *    - On an **advisory** gate (A1, A2), `unknown` reports a warning and does not block merge.
+ *    - On an **advisory** gate (A1, A2, A3), `unknown` reports a warning and does not block merge.
  * 4. **Merge-train composition**: Compile gates evaluate over the union of changed paths
  *    across all PRs in the train, running on the combined train result.
  *

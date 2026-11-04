@@ -7,14 +7,9 @@
  * @module scripts/route-authority
  * @graphNode none — a resolver, read by a generator's `--check`
  *
- * ## The question this exists to stop being hardcoded
- *
  * A generator's `--check` reads its own output off disk and compares. That is
- * right while `main` holds the output and wrong the moment a declaration says
- * the output lives on a branch — and `xsrv` Done-when 3 states the hard part:
- * *"a branch it cannot fetch reports unknown, never a pass."*
- *
- * So authority is RESOLVED, with three answers:
+ * wrong once a declaration says the output lives on a branch, so authority is
+ * RESOLVED:
  *
  * | declaration | branch manifest | authority |
  * |---|---|---|
@@ -22,29 +17,21 @@
  * | `storage` | `authoritative: false` | `both` |
  * | `storage` | `authoritative: true` | `branch` |
  *
- * **`both` is the state that earns this module.** Between seeding a branch and
- * removing the files from `main` the same bytes exist in two places on purpose,
- * and nothing today compares them: `9ofm` added `not-cut-over` for a TIP-keyed
- * directory, and `offCheckoutFindings` skips `route`. During that window a
- * drift between the two copies is invisible, and it is exactly the window a
- * cutover spends its whole life in. So `both` compares both and reports a
- * disagreement.
+ * `both` covers the cutover window, when the same bytes exist on the branch
+ * and on `main`: it compares both copies and reports a disagreement, which
+ * nothing else does (`offCheckoutFindings` skips `route`).
  *
- * ## Why `unknown` is not `stale`, and never `current`
+ * ## `unknown` is not `stale`, and never `current`
  *
- * A branch that cannot be fetched is a question nobody answered. Calling it
- * stale sends the next hour to the generator; calling it current is the
- * vacuous pass this repository has paid for repeatedly (`1xhc`, `xom7`). The
- * caller is expected to exit non-zero on `unknown` AND to say it could not
- * determine — which is a different sentence from "stale".
+ * A branch that cannot be fetched reports `unknown`. The caller is expected to
+ * exit non-zero on `unknown` AND to say it could not determine — a different
+ * sentence from "stale".
  *
  * ## Nothing is flipped by adopting this
  *
  * No declaration in this repository sets `storage`, so every caller resolves
- * `checkout` and the comparison is the one it already did. That is asserted
- * rather than asserted-in-prose: `route-authority.test.ts` pins that the
- * `checkout` verdict over a given file map equals the direct on-disk
- * comparison, file for file.
+ * `checkout`. `route-authority.test.ts` pins that the `checkout` verdict over
+ * a given file map equals the direct on-disk comparison, file for file.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

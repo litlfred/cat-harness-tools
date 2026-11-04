@@ -17,40 +17,34 @@
  *   bun run cat lsi audit  [--strict]      # which graphs need an index; is each fresh?
  *   bun run cat lsi links  --instance <name> --graph <id> [--per N] [--top N]   # cross-document proposals
  *
- * ## What is committed, and why not the vectors
+ * ## What the sidecar holds, and why not the vectors
  *
  * The sidecar under `cat-harness/test/results/lsi/<instance>/<graph>.lsi.json`
  * carries the input fingerprint, the parameters, the retained variance, the
  * top-loading terms at each pole of the first dimensions, each unit's nearest
  * neighbours, and two kinds of finding. It does NOT carry `U` or `V`: a
- * rebuild is about a second at this corpus size, and a multi-megabyte float
- * dump is not something a reviewer can judge. What a reviewer CAN judge — do
- * the dimensions make sense, are the neighbours plausible — is what is kept.
+ * rebuild is cheap, and a float dump is not something a reviewer can judge.
  *
- * ## The need-an-index rule, and its basis
+ * ## The need-an-index rule
  *
  * A graph NEEDS an index when it holds at least `NEED_UNITS` text units and
- * `NEED_WORDS` words. **Basis: a house threshold, not from the method.** The
- * 1990 paper gives no corpus-size rule. The two numbers encode the case the
- * method exists for — more prose than one reader holds in a sitting, so a
- * change of vocabulary between two units goes unnoticed — and they are here,
- * named, so a reviewer can move them. Below either threshold the result is
- * `n/a`, not `pass`: a small graph was not judged to be fine, it was not
- * judged.
+ * `NEED_WORDS` words — a house threshold, not from the method, named here so a
+ * reviewer can move it. Below either threshold the result is `n/a`, not
+ * `pass`: a small graph was not judged.
  *
  * ## With no index directory in the checkout
  *
  * The sidecars and their run records are derived QA bound for the
- * `qa-reports` branch (arc `3fva`, owner rulings D1/D4, bean `oq1j`). When
+ * `qa-reports` branch. When
  * `test/results/lsi/` is absent, {@link graphVerdict} REBUILDS the index in
- * memory and judges that run, writing nothing (proposal §2.3: compute and
- * judge): fresh by construction, or failed. It never reads the absence as
- * "has none", and never as a pass it did not compute. A reader that wants the
+ * memory and judges that run, writing nothing: fresh by construction, or
+ * failed. It never reads the absence as "has none", and never as a pass it
+ * did not compute. A reader that wants the
  * STORED indexes (the viewer page) fetches them by ref and passes them in as
  * an {@link IndexSource}.
  *
- * It REPORTS by default (exit 0 with findings), like `check:methodology-
- * evidence`; `--strict` fails on a needed-but-missing or stale index.
+ * It REPORTS by default (exit 0 with findings); `--strict` fails on a
+ * needed-but-missing or stale index.
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";

@@ -1,39 +1,32 @@
 #!/usr/bin/env bun
 /**
  * block-screenshots — a picture of each changed VISUAL block on main and on
- * the branch, and how much of it changed. Bean `0rxe`, epic `q4jm`.
+ * the branch, and how much of it changed.
  *
- * ## Why
- *
- * For a figure, a diagram or a table, the markup diff says little: a colour
- * change, a reordered axis or a re-rendered SVG is unreadable as text. The
- * reviewer needs to SEE before and after. The owner asked for this as a Skill
- * and Tool incorporated into the processes, so the staging job and the review
- * process call it (the `visual-diff` skill says how), and nobody copies the
- * steps.
+ * For a figure, a diagram or a table, the markup diff says little; the
+ * reviewer needs to SEE before and after. The staging job and the review
+ * process call this (the `visual-diff` skill says how).
  *
  * ## No new dependency
  *
- * Playwright is already the platform's browser driver. So the screenshots
- * are taken with it, and the comparison runs in Chromium's own canvas:
- * {@link comparePixels} is self-contained and is sent into the page with
- * `toString()`, so the function the unit tests call is the one that runs.
- * Nothing is added to THIRD-PARTY-NOTICES.
+ * Screenshots are taken with Playwright, and the comparison runs in
+ * Chromium's own canvas: {@link comparePixels} is self-contained and is sent
+ * into the page with `toString()`, so the function the unit tests call is the
+ * one that runs. Nothing is added to THIRD-PARTY-NOTICES.
  *
  * ## What a block's picture IS
  *
  * The site build writes an empty `<a id="<label>">` before each labelled
- * block. There is no element wrapping the block. So a block's region is from
- * its anchor down to the NEXT anchor, as wide as the anchor's container.
+ * block, with no wrapping element. So a block's region is from its anchor
+ * down to the NEXT anchor, as wide as the anchor's container.
  * {@link blockRegion} computes it in the page.
  *
- * ## What the number means, and what it must not be read as
+ * ## What the number means
  *
  * `changed` is the share of pixels, in the larger of the two pictures, that
- * differ by more than a small per-channel tolerance. The tolerance absorbs
- * anti-aliasing. A size change counts the uncovered area as changed. The
- * number says HOW MUCH moved, not whether the change is right; a one-pixel
- * line through the middle of a chart can be the whole point.
+ * differ by more than a small per-channel tolerance (which absorbs
+ * anti-aliasing). A size change counts the uncovered area as changed. The
+ * number says HOW MUCH moved, not whether the change is right.
  *
  * ## Output
  *

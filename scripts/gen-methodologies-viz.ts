@@ -6,33 +6,11 @@
  * @module cat-harness/scripts/gen-methodologies-viz
  * @covers methodology
  *
- * ## The gap this closes
- *
- * `methodology` was one of seven graph typologies this instance declares with no
- * published viewer — the build says so itself, in `_data/harness.json`:
- * *"cat-harness: declares 7 graph(s) with no published viewer — code,
- * external-schema, interaction, memory, methodology, scenarios, waiver."* So
- * the navbar listed it disabled, and nine typed nodes carrying an `origin`, an
- * `applies-when` and an evidence base reached no reader at all.
- *
- * That is the worst kind for it to happen to. `methodology-adoption` makes a
- * methodology's whole justification its being somebody else's named external
- * work, and `applies-when` is what a selection question matches against. A
- * corpus of adoptions nobody can browse is a corpus an agent picks from by
- * resemblance, which is the failure the skill exists to prevent.
- *
- * ## It does not walk the graph, and that is the point
- *
- * Both the node list and the evidence join come from
+ * It does not walk the graph: the node list and the evidence join come from
  * `check-methodology-evidence.ts` — `methodologyNodes` for the fields a reader
- * needs, `checkMethodologyEvidence` for which citations resolve. Nothing here
- * opens a `methodologies/` directory or parses front matter.
- *
- * Bean `zw4a` states the rule for the adjacent case: *"a second traversal is a
- * second answer … free to disagree with the first."* A generator with its own
- * reader would be free to render a node the gate never checked, or to miss one
- * the gate fails on — and a page saying "9 methodologies" beside a sidecar
- * saying 10 is worse than either alone, because it makes the reader arbitrate.
+ * needs, `checkMethodologyEvidence` for which citations resolve — so the page
+ * cannot disagree with the gate. Nothing here opens a `methodologies/`
+ * directory or parses front matter.
  *
  * ## Three evidence states, kept visibly apart
  *
@@ -42,14 +20,8 @@
  * | **cited only** | an `origin`, no `evidence:` field | an open question, reported and not gated |
  * | **dangling** | `evidence:` names a bib-slug no library holds | a citation that CLAIMS to resolve — worse than none |
  *
- * `dh4f` is why these are three and not two: a node whose source nobody has
- * ingested and a node whose citation is broken both render as "no source you
- * can open", and collapsing them would put the more reassuring answer on the
- * record for the broken one.
- *
- * And a fourth state above all of them: if no directory declares a
- * `methodology` graph, this REFUSES rather than writing an empty page. An
- * empty sweep and a clean sweep must not share a spelling.
+ * If no directory declares a `methodology` graph, this REFUSES rather than
+ * writing an empty page.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-methodologies-viz.ts

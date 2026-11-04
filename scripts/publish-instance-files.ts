@@ -7,24 +7,17 @@
  *
  * For an instance that renders nothing of its own: bootstrap. Its
  * `renderExemption.reachableAt` names one of its own files (`README.md`), and
- * the navbar tab links to where this script puts it. Until 2026-09-23 that
- * field named a page in the platform's docs instead, which made the floor of
- * the stack point at a layer above it (owner, bean iwtn: *"bootstrap is
- * bootstrap"*).
+ * the navbar tab links to where this script puts it.
  *
  * The files are published AS THEY SIT, so every relative link in them still
  * resolves: a README that links `schemas/graph.schema.json#/$defs/Role` finds
  * that file beside it. The only change made is in the rendered `.html`, where
  * a link to a `.md` file is pointed at its `.html` rendering.
  *
- * ## What is bootstrap-tools', and what stays here
- *
- * Owner, 2026-09-30 (bean `xsqm`): the publisher moved to bootstrap-tools
- * "without remark", and bootstrap's own site lets GitHub Pages render `.md`.
- * The COPY is `bootstrap-tools/scripts/publish-files.ts`. What stays here is
- * the `.md` → `.html` rendering, because cat-harness's site is assembled after
- * its Jekyll build and Pages renders nothing written into it then — the navbar
- * tab points at `README.html`. Rendering a hosted copy is the host's job.
+ * The plain COPY is `bootstrap-tools/scripts/publish-files.ts`. What stays
+ * here is the `.md` → `.html` rendering, because cat-harness's site is
+ * assembled after its Jekyll build and Pages renders nothing written into it
+ * then — the navbar tab points at `README.html`.
  *
  * Usage: bun run cat-harness-tools/scripts/publish-instance-files.ts --instance ./bootstrap --out ./_site/bootstrap
  */

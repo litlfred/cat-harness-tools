@@ -1,21 +1,11 @@
 #!/usr/bin/env bun
 /**
  * check-qa-corpus — validate a QA results tree as a whole: every declared `qa`
- * directory and every HOSTED kg-qa home in it. Bean `cxcn`, reader audit
- * family F7 (`docs/proposals/qa-readers-audit-2026-10-01.md` §5.5, R65/R66).
+ * directory and every HOSTED kg-qa home in it.
  *
- * ## Why a gate, and not a test
- *
- * These assertions lived in `schemas/kg-qa.test.ts` ("every committed kg-qa
- * validates", "no critical criterion is failing on main", the hosted
- * bootstrap manifest exists). A test that reads the COMMITTED corpus has two
- * failure modes once that corpus leaves `main` for the `qa-reports` branch
- * (owner rulings D1/D4, bean `5hox`): it fails for a reason that is not a
- * defect (the files are not in the checkout), or it iterates over zero files
- * and goes vacuously green. The audit measured both: 15 tests failing only
- * when the corpus was absent, and "no critical criterion" passing over
- * nothing. So the tests now assert on fixtures and fresh runs, and the corpus
- * itself is judged here, over the tree `qa:fetch` materialises.
+ * The committed corpus lives on the `qa-reports` branch, not in a checkout, so
+ * it is judged here over the tree `qa:fetch` materialises rather than by
+ * tests (which would fail on absent files or pass over zero).
  *
  * ## What it walks
  *
@@ -25,9 +15,7 @@
  * - every directory any instance DECLARES as a `qa` graph, mapped into the tree;
  * - every instance's kg-qa home as `kgQaHomeFor` resolves it — `own`,
  *   `hosted` (`cat-harness/test/results/bootstrap/`, `bootstrap-tools/`,
- *   `cat-harness-tools/`) or `convention`. The old test walked only
- *   cat-harness's own `kg-qa/`, which is why three conflict-marked sidecars in
- *   the hosted homes went unseen (bean `de9k`, C1).
+ *   `cat-harness-tools/`) or `convention`.
  *
  * ## What it judges
  *
@@ -38,15 +26,12 @@
  *    without findings, and has no CRITICAL criterion other than pass or n/a.
  * 3. Every home holding kg-qa sidecars holds a `kg-qa.manifest.json` that
  *    validates against `KgQaManifestSchema`.
- * 4. The witnesses the docs site publishes at `/assets/qa/` (moved here from
- *    `qa-results.test.ts`, reader audit R64): every generated page's verdict
- *    index exists in the tree and holds a row for every badge on the page,
- *    every URL a badge fetches is present, and no published path is
- *    `_`-prefixed (Pages strips those without `.nojekyll`). The PAGES are this
- *    checkout's, so judge the entry of the commit you have checked out —
+ * 4. The witnesses the docs site publishes at `/assets/qa/`: every generated
+ *    page's verdict index exists in the tree and holds a row for every badge
+ *    on the page, every URL a badge fetches is present, and no published path
+ *    is `_`-prefixed (Pages strips those without `.nojekyll`). The PAGES are
+ *    this checkout's, so judge the entry of the commit you have checked out —
  *    `--github` does, and `--dir` over a `qa:fetch` of your own HEAD does.
- *
- * ## Four states, and a miss is never clean
  *
  * | exit | state | meaning |
  * |---|---|---|
@@ -57,8 +42,7 @@
  *
  * `--github` (CI, the `qa-publish` job) derives the same key `qa:publish
  * --github` writes. When publishing is skipped (a fork PR, a non-main push) it
- * says so with a `::notice` and exits 0 — the same stated skip the publish
- * makes, because there is no entry for this run to judge.
+ * says so with a `::notice` and exits 0.
  *
  * Usage:
  *   bun run cat check:qa-corpus --dir <tree>      # a tree already fetched (qa:fetch --into <tree>)

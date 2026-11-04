@@ -5,16 +5,7 @@
  * @module cat-harness-tools/scripts/separation-cutover-check
  * @covers cat-harness — one separated checkout: its declarations, its wiring, its mounts and its site
  *
- * ## The question, and why it needs a gate
- *
- * kg-separation stage 13 (cutover) is "the one commit worth reverting", and
- * lessons 15–18 are each a cutover that was called done and was not: a content
- * instance still declared `livesAt` the parent and could not publish itself (15); every
- * workflow bootstrapped through a path the cutover had just removed (16); a
- * downstream's CI went red on a cutover green in the parent (17); a separated
- * checkout's tests still read the composed tree (18). Each was found by hand,
- * after the fact. This is the after-the-fact made mechanical: run it in the
- * separated repository, and it answers for that repository alone.
+ * Run it in the separated repository; it answers for that repository alone.
  *
  * ## The conditions — six, each decided by a gate that already exists
  *
@@ -27,16 +18,15 @@
  * | `reference-direction` | nothing names a layer that depends on it | `check:reference-direction` |
  * | `site` | the site builds from the mounts alone, every link resolving | `build-instance-site --no-mount` (only with `--site`) |
  *
- * Only `monorepo-paths` is new code; it is the one condition no gate asked.
- * The rest are CALLED, so a rule lives in one place.
+ * Only `monorepo-paths` is decided here; the rest are CALLED, so a rule lives
+ * in one place.
  *
  * ## Three states, and `site`
  *
  * Exit 0 every condition passed · 1 at least one failed · 2 at least one could
- * not be determined (and none failed). A site build is minutes, not seconds,
- * so it runs only with `--site`; WITHOUT it the `site` condition is
- * `not-run`, and a run with a condition not run is not "complete" — exit 2.
- * A gate that skipped part of its question has not answered it.
+ * not be determined (and none failed). A site build takes minutes, so it runs
+ * only with `--site`; WITHOUT it the `site` condition is `not-run`, and a run
+ * with a condition not run is not "complete" — exit 2.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/separation-cutover-check.ts [--root <checkout>] [--site]

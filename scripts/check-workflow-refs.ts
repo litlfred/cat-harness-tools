@@ -3,28 +3,11 @@
  * Every `<bootstrap.processes:skill ref="…"/>` in a BPMN names a skill that exists, and
  * every activity says which skill implements it.
  *
- * AGENTS.md: "Each activity carries a `<bootstrap.processes:skill ref="…"/>` extension
- * naming the skill that implements it". Nothing checked either half, and both
- * had drifted by the time this was written (2026-09-18):
- *
- *   - `corpus-search` and `paper-relevance-triage` were referenced by
- *     diagrams and resolved to no skill at all, so `workflow_next` would hand
- *     an agent the name of something it cannot open.
- *   - `crdm-requirements.bpmn` carried ONE ref across 35 nodes, and three
- *     diagrams carried none, so the process ran but could only return a step
- *     name.
- *
- * Both are the kind of finding that recurs every time somebody adds a
- * diagram, which is the argument for a check rather than another round of
- * hand-fixing.
- *
- * TWO TIERS, deliberately:
- *   - A DANGLING REF IS AN ERROR. It is unambiguous and it breaks a consumer.
- *   - MISSING COVERAGE IS A REPORT. Some activities genuinely have no skill —
- *     a human signing something off is not implemented by a markdown file —
- *     so failing on coverage would force a fake ref onto a real step, which
- *     is worse than the gap. `--strict` turns it into an error for a caller
- *     that wants the stronger gate.
+ * Two tiers:
+ *   - A DANGLING REF IS AN ERROR: it breaks a consumer (`workflow_next` would
+ *     hand an agent a skill it cannot open).
+ *   - MISSING COVERAGE IS A REPORT: some activities (e.g. a human sign-off)
+ *     genuinely have no skill. `--strict` makes it an error.
  *
  * Usage:  bun run cat check:workflow-refs  [--strict]
  * Exit:   0 clean · 1 dangling ref (or, with --strict, any uncovered activity)

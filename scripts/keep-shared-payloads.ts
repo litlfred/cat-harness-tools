@@ -13,15 +13,12 @@
  *
  * ## Why
  *
- * Since `staging-share.ts` a preview stores only what differs from the live
- * site and borrows the rest. A main deploy is a FULL REPLACE
+ * A preview (`staging-share.ts`) stores only what differs from the live site
+ * and borrows the rest. A main deploy is a FULL REPLACE
  * (`publish-gh-pages.sh`), and payloads under `payload/sha256/` are named by
- * their hash, so a blob the new build no longer writes is simply gone. A
- * preview staged before that deploy, which borrowed the blob, then gets a 404
- * for it. Keeping a copy in every preview would break the owner's ruling
- * (2026-10-31, "link to main asset so no file content duplication"), so main
- * keeps the dropped blob instead, for as long as an older sharing preview
- * stands (bean fwtz, Q-S2-2).
+ * their hash, so a blob the new build no longer writes would be gone and a
+ * preview that borrowed it would 404. Previews never copy main's files, so
+ * main keeps the dropped blob for as long as an older sharing preview stands.
  *
  * ## The rule
  *

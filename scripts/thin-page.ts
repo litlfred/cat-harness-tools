@@ -4,12 +4,7 @@
  *
  * @module scripts/thin-page
  *
- * ## Where the rule comes from
- *
- * #1881 / #1899 (library), owner, 2026-10-02: *"each link/page needs to be
- * materialized on the CDN (gh-pagees), just load the content from the KG
- * json(ld) assets already published"* — and *"each asset should have one IRI,
- * but the view page is a rendering of that asset, a different page"*. So:
+ * ## The rules
  *
  * - every asset has ONE IRI, the address of its published JSON-LD;
  * - its rendering is a SEPARATE resource at a path of its own (`<…>/<id>/`),
@@ -21,26 +16,19 @@
  * - the asset carries no link to its renderings. The page points at the
  *   asset, never the other way round.
  *
- * ## Why a module of its own
+ * ## Who uses it
  *
- * The library's per-entry pages (#1899) were the first instance of this, and
- * the todo pages (#1908) the second, so the generic part lives HERE rather
- * than in either generator. Both families left {@link thinPageHtml} on
- * 2026-10-07 for the theme's layout (`gen-library-viz.ts` `libraryPageHtml`,
- * `todo-page.ts` `todoPageHtml`), so it has no generator calling it today;
- * they keep the same rules — one IRI, content loaded at runtime, the asset
- * named as `alternate` — and still name themselves through
- * {@link thinPageConfigOf}.
+ * The library and todo page families render through the theme's layout
+ * (`gen-library-viz.ts` `libraryPageHtml`, `todo-page.ts` `todoPageHtml`), so
+ * no generator calls {@link thinPageHtml} today; they keep the same rules and
+ * still name themselves through {@link thinPageConfigOf}.
  *
  * ## The rail is LINKED, and that is a declaration
  *
- * {@link NAVBAR_LINKED} is written by default. These pages declined the rail
- * (`folio-navbar: none`) until 2026-10-05, because inlined it was ~8 KB of
- * markup and style on a 1.4-3 KB page — "until the rail is itself a shared
- * asset". It now is: `assets/css/navbar.css` and the row's own files are
- * LINKED, so the page carries only the rail's markup (owner: *"1. Shared rail
- * style first"*, bean `lnoy`). The build's rail passes honour the meta;
- * `check-viewer-nav.ts` reads it as `linked`, railed at build.
+ * {@link NAVBAR_LINKED} is written by default: `assets/css/navbar.css` and the
+ * row's own files are LINKED, so the page carries only the rail's markup. The
+ * build's rail passes honour the meta; `check-viewer-nav.ts` reads it as
+ * `linked`, railed at build.
  */
 import { NAVBAR_LINKED } from "./lib/harness-rail.ts";
 import { pageLayoutTags } from "./page-layout.ts";

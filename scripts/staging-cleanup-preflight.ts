@@ -6,47 +6,20 @@
  * bun run cat-harness-tools/scripts/staging-cleanup-preflight.ts --slug claude-health-checks
  * ```
  *
- * ## Why this exists at all
+ * A preview is removed by `feature-staging.yml`'s `cleanup` job, on a closed
+ * pull request or a `workflow_dispatch`. A dispatch input is a deletion
+ * trigger, and this is the guard about the artefact rather than the caller.
  *
- * Bean `w2g5`, second half. `feature-staging.yml`'s `cleanup` job is the only
- * mechanism that removes a preview, and it is gated
- * `if: github.event.action == 'closed'` on a `pull_request_target` event — so
- * being *findable* as an orphan requires the pull request to be closed
- * already, which means the event has fired, the job has run and the label was
- * absent. Labelling afterwards fires nothing. **The documented remedy was
- * unreachable for every orphan the sweep could ever report.** The fix is a
- * `workflow_dispatch` path, and a dispatch input is a deletion trigger, so it
- * needs guarding at least as carefully as the label it replaces.
+ * ## Liveness is judged again, at removal time
  *
- * This is one of those guards, and it is the one that is about the artefact
- * rather than about the caller.
- *
- * ## A dispatch that removes a preview still in use is the same defect, one level out
- *
- * The health sweep runs daily and writes a report; a person reads it, decides,
- * and dispatches. Between the sweep and the dispatch the branch can come back
- * to life — that is exactly the behaviour bean `w2g5` documents, a session
- * reusing one branch across five successive pull requests. A removal that
- * trusted a day-old verdict would reintroduce the bug on a longer timescale
- * and with a worse outcome, because the sweep only *proposes* while this
- * *acts*.
- *
- * ## Branch reuse across PRs (bean oz5w)
- *
- * The preview slug is derived from the branch name, while cleanup is triggered
- * when a PR closes. When a session reuses a branch across successive pull
- * requests (e.g. PR N merges while PR N+1 is already open on the same branch),
- * PR N's merge triggers cleanup. Without a liveness preflight, that cleanup
- * deletes the preview PR N+1 just published (bean `folio-assistant-oz5w`).
- *
- * So liveness is evaluated again, here, at removal time, through the SAME
- * {@link previewLiveness} the sweep uses. Not a second implementation: two
- * implementations of one judgement are two answers free to diverge, and the
- * one that diverges here deletes somebody's work.
- *
- * Invoking preview liveness checks (`previewLiveness`, `probeOpenPrHeads`)
- * before any slug removal explicitly verifies that another open PR or branch
- * is not reusing or claiming the slug.
+ * The preview slug comes from the branch name, and a session can reuse one
+ * branch across successive pull requests: PR N's close would delete the
+ * preview PR N+1 just published, and a dispatch acting on a day-old sweep
+ * verdict would do the same. So before any removal, liveness is evaluated
+ * again through the SAME {@link previewLiveness} the health sweep uses (and
+ * `probeOpenPrHeads`), verifying no other open PR or branch claims the slug.
+ * Not a second implementation: two implementations of one judgement are free
+ * to diverge.
  *
  * ## Three states, and the third one refuses
  *
@@ -55,11 +28,9 @@
  * - **exit 1** — at least one signal says the preview is in use. Refuse.
  * - **exit 2** — a signal could not be evaluated. **Refuse.**
  *
- * The third is the interesting one, and it points the opposite way from the
- * health check that shares its logic. There, "could not determine" means *do
- * not accuse*; here it means *do not delete*. Both err away from removal,
- * which is the only direction that is recoverable:
- * `skills/conduct/conduct-core/deletion-requires-confirmation.md`.
+ * In the health check "could not determine" means *do not accuse*; here it
+ * means *do not delete*. Both err away from removal, the only recoverable
+ * direction: `skills/conduct/conduct-core/deletion-requires-confirmation.md`.
  *
  * @module scripts/staging-cleanup-preflight
  */

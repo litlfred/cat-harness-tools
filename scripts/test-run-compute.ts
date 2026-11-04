@@ -2,13 +2,10 @@
  * Compute the recorded test runs of a results directory the checkout does not
  * hold, without writing the tree.
  *
- * Since cat-harness#857 a harness's `test/results/` is not committed: it is
- * derived, and stored on a `qa-reports` branch. A repository that MOUNTS the
- * harness (dth-hrh, smart-ra, …) cannot read that store — it lives on another
- * repository — so `kg:audit:check` found no runs and reported the three
- * test-run criteria `unknown`, which gates at their severity
- * (cat-harness-tools#1191). Unknown was honest, but the runs are cheap to
- * compute and each one's writer is declared here. A writer in
+ * A harness's `test/results/` is not committed: it is derived, and stored on
+ * a `qa-reports` branch another repository cannot read. So a repository that
+ * MOUNTS the harness (dth-hrh, smart-ra, …) computes the runs instead of
+ * reporting the test-run criteria `unknown`. A writer in
  * {@link TEST_RUN_WRITERS} writes its runs to {@link TEST_RUN_OUT_ENV} when
  * that is set, and nothing else, so the gate can run it into a temporary
  * directory and judge what it produced: determined, and still writing nothing.

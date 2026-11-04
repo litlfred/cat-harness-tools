@@ -1,43 +1,21 @@
 #!/usr/bin/env bun
 /**
- * check-publishable.ts — the census `instance-versioning.md` §3.1 asks for,
- * plus the two rules a per-instance schema structurally cannot see.
+ * check-publishable.ts — a census of which instances are publishable, plus
+ * the two cross-instance rules a per-instance schema cannot see.
  *
- * ## Why a census is the primary output
- *
- * §3.1's whole argument is that **absence is a third state**:
- *
- * > An instance that has not declared `publishable` is *undecided*, never
- * > *false*, and a gate reports it — the same rule `publication.host` already
- * > follows.
- *
- * A boolean defaulting to `false` would read correctly for nearly every
- * instance here, and that is exactly the trap: it makes *"we decided this is
- * internal"* and *"nobody looked"* the same value. §6 Q1 leaves WHICH
- * instances are publishable open — *"the rest are unclear and should be
- * declared rather than inferred"* — so this script does not guess. It prints
- * the three buckets and names every instance in the undecided one, which is
- * the owner's worklist.
- *
- * Consequently **an all-undecided repository is the expected state today and
- * is not a pass**. The report says so in that many words, for the same reason
- * `check:published-refs` shouts `NOTHING WAS EXAMINED`: a gate that covers
- * nothing and exits 0 is this repository's most expensive recurring defect
- * (`xom7`, `dh4f`, `a6kl`).
- *
- * ## What this checks that the schema cannot
+ * Absence is a third state: an instance that has not declared `publishable`
+ * is *undecided*, never *false*. The report prints three buckets and names
+ * every undecided instance; an all-undecided repository is reported as such,
+ * not as a pass.
  *
  * `CatHarnessDeclarationSchema` already refuses an `id`/`version`/`canonicalUrl`
- * that does not match the instance's `publishable` state, and refuses a range
- * version. Those are per-declaration facts and belong there. Two rules are
- * CROSS-INSTANCE, so no single parse can hold them:
+ * that does not match the instance's `publishable` state, and a range version.
+ * This adds the CROSS-INSTANCE rules:
  *
- * 1. **Two instances must not share an `id`.** An id is the identity a
- *    consumer resolves; two of them is two packages answering to one name.
- * 2. **An unreadable declaration is a finding, not a skip.** An instance whose
- *    `<name>.json` does not parse has an unknown publishability, and unknown
- *    is not undecided — undecided is a fact about the repository, unknown is
- *    a fact about this run. Three states again, one level up.
+ * 1. **Two instances must not share an `id`.**
+ * 2. **An unreadable declaration is a finding, not a skip.** Its
+ *    publishability is unknown (a fact about this run), which is not
+ *    undecided (a fact about the repository).
  *
  * @module scripts/check-publishable
  * @covers cat-harness

@@ -5,63 +5,40 @@
  * languages can I read this page in"*. This gate holds the corpus to that
  * sentence: every locale a page claims must have a RENDERED page behind it.
  *
- * ## Why a gate when the generator already gets it right
+ * `gen-docs-pages.ts` computes the field from the translation index and
+ * `docs:pages:check` holds generated pages to it; this gate covers the
+ * hand-authored pages, translations and sources alike, that stamp their own
+ * list.
  *
- * Because most of the corpus is not generated. 94 pages declare the field and
- * only 24 are source pages; the other 70 are hand-authored translations that
- * stamp their own list. `gen-docs-pages.ts` now computes the field from the
- * translation index and `docs:pages:check` holds it to a fixpoint, so a
- * GENERATED page cannot drift. Nothing was watching the other 70, and nothing
- * was watching a hand-authored source page either.
+ * ## Over-claiming only
  *
- * That is the half of `9x01` a generator fix cannot reach. The bean's own case
- * — `crdm-methodology` claiming `fr` on the strength of a 25-line catalogue
- * with one filled `msgstr` and no French page anywhere — happened to be
- * generated. The next one need not be.
- *
- * ## Over-claiming only, deliberately
- *
- * A page claiming a locale it has no rendering for is a promise to a reader
- * that cannot be kept: the language bar offers a link and the coverage badge
- * counts a language. A page claiming FEWER locales than it has renderings for
- * is a different defect — it hides work that exists rather than inventing work
- * that does not — and it is the generator's to get right, which it now does.
- * Folding both into one gate would make a single red mean two unrelated things.
+ * A page claiming a locale it has no rendering for makes the language bar
+ * offer a link and the coverage badge count a language that are not there.
+ * Claiming FEWER locales than exist is a different defect, the generator's
+ * to get right, and is not judged here.
  *
  * ## A translated page is resolved through its SOURCE
  *
- * `docs/fr/architecture.md` is not a source page: the index keys translations
- * under the page they translate, so looking it up by its own key would find no
- * entry and report every locale it claims as unbacked. All 70 translated pages
- * would fail, which is how this check looked the first time it ran. The index
- * is inverted here — translated page key → source key — rather than
- * re-resolving `translation_source` by hand, because the index has already done
- * that resolution and doing it twice is two answers free to disagree.
+ * The index keys translations under the page they translate, so
+ * `docs/fr/architecture.md` is not a key of its own. The index is inverted
+ * here — translated page key → source key — rather than re-resolving
+ * `translation_source` by hand, so there is one answer.
  *
  * ## Three states
  *
- * The index carries findings, and an index that could not be read is not an
- * index with no translations. On a non-`note` finding this exits 2 without
- * judging the corpus, because a clean verdict computed from an unreadable index
- * is the `dh4f` defect — a consumer scanning nothing and reporting a clean run
- * over it. Finding no page that declares the field at all is the same failure
- * wearing different clothes, and also exits 2: a sweep over an empty set
- * asserts nothing, and this file's assertions would all hold vacuously (`6tkl`).
+ * An index that could not be read is not an index with no translations: on
+ * a non-`note` index finding this exits 2 without judging the corpus.
+ * Finding no page that declares the field at all also exits 2, since a sweep
+ * over an empty set asserts nothing.
  *
- * Only tracked files are examined. A gate over what the repository PUBLISHES
- * should judge what the repository holds, and an untracked scratch page under
- * `docs/` is not that.
+ * Only tracked files are examined; an untracked scratch page under `docs/`
+ * is not what the repository publishes.
  *
  * `docs` is the graph typology this audits — `cat-harness.json` declares `docs/`
  * with `graphs: ["docs"]`, and the locale subtrees walked here are part of it.
- * Declared rather than inferred, per `3srh`: a gate that does not say what it
- * audits turns every "unaudited" count into an upper bound rather than a
- * verdict.
  *
  * Usage:
  *   bun run cat check:available-locales
- *
- * Bean `9x01`.
  *
  * @covers docs
  * @graphNode tool

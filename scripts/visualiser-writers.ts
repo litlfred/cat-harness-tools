@@ -6,15 +6,9 @@
  * @module scripts/visualiser-writers
  * @covers none — a build step: it runs the declared writers and judges no graph
  *
- * ## The failure this exists for (owner, 2026-10-15)
- *
- * *"a harness should combine its library/ (or whatever) sites of it and all
- * its dependencies and use the url path pattern"*. A repository's own site
- * (`build-instance-site.ts`) composed `compose-docs --shell`, which carries no
- * visualiser pages, and never ran the writers: smart-ra's site lacked 31 of
- * the 32 pages its declarations promise (`site-coverage.ts`). The platform's
- * own site ran them as a hand-kept list of workflow steps (folio-assistant's
- * `docs-site.yml`), which no other build could read.
+ * A repository's own site (`build-instance-site.ts`) must carry the
+ * visualiser pages of it and all its dependencies (checked by
+ * `site-coverage.ts`); this is how every site build runs their writers.
  *
  * ## Where the list is: the declarations already carry it
  *
@@ -23,14 +17,13 @@
  *   Tool node ─io.inputs `site`, arg.flag→ how to point it at a site
  *   Tool node ─io.inputs `instance`, arg.flag→ the harness it is run for
  *
- * So this module adds no table: a new visualiser whose Tool declares a `site`
- * input is run by every site build the day it is declared, and one whose Tool
- * declares none is REPORTED as not runnable into a site, with the reason —
- * never skipped in silence. The inputs are explicit per Tool, as the Tool
- * contract requires (`ToolArgSchema`: "never a template and never a
- * convention"); the one thing written here is which input NAMES this runner
- * fills: `site` (and `out`, archimate-pages' name for the same thing) with the
- * site, and `instance` with the declaring harness's root.
+ * So a new visualiser whose Tool declares a `site` input is run by every site
+ * build the day it is declared, and one whose Tool declares none is REPORTED
+ * as not runnable into a site, with the reason — never skipped in silence.
+ * The inputs are explicit per Tool (`ToolArgSchema`); the one thing written
+ * here is which input NAMES this runner fills: `site` (and `out`,
+ * archimate-pages' name for the same thing) with the site, and `instance`
+ * with the declaring harness's root.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/visualiser-writers.ts [--root <checkout>] [--list] [--json]

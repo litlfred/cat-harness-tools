@@ -6,16 +6,9 @@
  * @module scripts/site-coverage
  * @graphNode none — a guard over a built site, run by `build-instance-site.ts`
  *
- * ## The failure this exists for (owner, 2026-10-15)
- *
- * smart-ra's own site was published without `en/cat-harness/library/`
- * although smart-ra has a library: `build-instance-site.ts` never ran the
- * library viewer, and nothing compared the built site with what the
- * declarations say it should hold. The parity guard (`site-parity.ts`) only
- * measures a build against the root it replaces, so a page that was never
- * published is never missed. The owner: *"a harness should combine its
- * library/ (or whatever) sites of it and all its dependencies and use the url
- * path pattern"*, and *"please fix processes so this doesnt fail again"*.
+ * It compares the built site with what the declarations say it should hold.
+ * The parity guard (`site-parity.ts`) only measures a build against the root
+ * it replaces, so it cannot miss a page that was never published; this can.
  *
  * ## What is expected
  *

@@ -1,76 +1,30 @@
 /**
- * An ingested upload does not stay in the queue. Bean `q7ey`.
+ * An ingested upload does not stay in the queue.
  *
  * @module cat-harness/scripts/check-uploads-retired
  *
- * Both graphs, because the finding is a RELATION between them — a queue file
- * whose bytes some library entry derived from — and a declaration naming one
- * would credit half the audit to nothing.
+ * Both graphs, because the finding is a RELATION between them.
  *
  * @covers uploads
  * @covers library
  *
- * ## The rule, in the owner's words
- *
- * 2026-09-29, answering *"why are ingested things still sitting in uploads and
- * not moived to library of appropraite harness?"*:
- *
- * > no, uploads is archival copy.
- *
- * then, refining where the archival copy belongs:
- *
- * > archival (once ingested into KG and put into a proper `library/` under a
- * > harness repo) then it should be moved to fsh-guts.
- *
- * So there are three stages and `uploads/` is the only temporary one: **queued**
- * in a declared `uploads/`, **derived** into `library/<slug>/`, **archived** in
- * `fsh-guts/uploads/` with a same-basename sidecar. The reasoning is in
- * `skills/library/library-core/library-ingestion.md` and, in full, its detail
- * `library-ingestion/uploads-retirement.md` (split out in placement PR6).
- *
- * ## Why a check and not a sweep
- *
- * The rule was written on 2026-09-30 and swept by hand the same day. Within
- * that one commit the sweep produced **three** wrong answers, each invisible
- * from its own output:
- *
- *   - it reported **nine** sources to retire, having resolved
- *     `cat-harness/library/` alone. The answer was 28 across five harnesses.
- *   - it reported **five sources RESTORED** from `4b10661cdde` "after an
- *     earlier session deleted them". None had been deleted. All five were at
- *     `cat-harness/uploads/` continuously, and are there at HEAD; the sweep
- *     `git show`-ed a second copy of each into the archive. It believed them
- *     deleted because it looked for them in `uploads/`, where they were
- *     genuinely absent — they had been RENAMED into `cat-harness/uploads/`.
- *   - three more it processed from the right directory and copied rather than
- *     moved, leaving the original in place.
- *
- * Eight files in two places, and a recovery claim with nothing recovered.
- * Correcting the count did not correct the method that produced it, which is
- * the whole argument for this file: **a rule nothing checks is a rule that
- * holds until the next session, and this one did not survive its own commit.**
- *
- * `milnorlink.pdf` is the fourth case and the cleanest statement of it: it was
- * ingested to the formal-math layer's `library/`, so a sweep matching against
- * `cat-harness/library/` saw no match and read it as still queued. The finding
- * is not "somebody was careless"; it is that a one-directory answer looks
- * exactly like a whole one.
- *
- * ## What it compares, and what it deliberately does not
+ * Three stages, and `uploads/` is the only temporary one: **queued** in a
+ * declared `uploads/`, **derived** into `library/<slug>/` (in any harness),
+ * **archived** in `fsh-guts/uploads/` with a same-basename sidecar. The
+ * reasoning is in `skills/library/library-core/library-ingestion.md` and its
+ * detail `library-ingestion/uploads-retirement.md`.
  *
  * A queue file is RETIRED when its sha256 equals the `source_sha256` recorded
- * by some library entry's manifest. Hashes rather than filenames, because a
- * rename is the normal case — `2509.06388v1.pdf` is archived as
- * `wang-rangaiah-2026-mcdm-aggregation.pdf`, and a name comparison would have
- * called that unarchived and produced a ninth duplicate.
+ * by some library entry's manifest, across every harness's `library/`. Hashes,
+ * not filenames, because an archived source is normally renamed.
  *
- * It does not judge whether a queued file OUGHT to be ingested. A PDF nobody
- * has read is a legitimate queue item and reports as `queued`. The finding is
- * only ever the pair: derived AND still in the queue.
+ * It does not judge whether a queued file OUGHT to be ingested; an unread PDF
+ * reports as `queued`. The finding is only ever the pair: derived AND still
+ * in the queue.
  *
- * It reports rather than deletes. `deletion-requires-confirmation`: the remedy
- * names a `git mv`, or a `git rm` when the identical bytes are already in the
- * archive, and a person runs it.
+ * It reports rather than deletes (`deletion-requires-confirmation`): the
+ * remedy names a `git mv`, or a `git rm` when the identical bytes are already
+ * in the archive, and a person runs it.
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { libraryEntryDirs } from "./lib/library-entry-graphs.ts";

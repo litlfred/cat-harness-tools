@@ -2,36 +2,26 @@
 /**
  * Three store defects `beans check` cannot see, because none of them is a link.
  *
- * Bean `sfhr`, measured 2026-09-20 with `beans check` reporting *"No link
- * issues found"* over the same store:
+ * 1. **An empty body** on an open bean — front matter only, so a sibling
+ *    reading the store cannot tell what the claimed item is.
+ * 2. **A folded title** — a `title: |-` that continues into the body and
+ *    swallows its first lines (e.g. a `## Done when` checklist).
+ * 3. **A dead prose blocker** — *"blocked on bean `x`"* where `x` is
+ *    `scrapped`, so the block can never lift.
  *
- * 1. **`70c7`** — `in-progress` with an **empty body**. Front matter only. A
- *    claimed item that says nothing about what it is, which is the one thing a
- *    sibling reading the store needs.
- * 2. **`52dz`** — `title: |-` continued into the body and swallowed the first
- *    ~10 lines, including a `## Done when` with three unchecked boxes. It read
- *    as a bean with no acceptance criteria; it had three.
- * 3. **`nvbr`** — *"blocked on bean `fsch`"* in prose. `fsch` is `scrapped`.
- *    The block can never lift, and nothing said so.
- *
- * ## Why prose, when front-matter links are already checked
- *
- * Because that is where blockers are actually written. `beans` has no blocker
- * field, so [`bean-blocking.md`](../work-plan/skills/work-plan/bean-blocking.md) puts
- * them in the body — and the CLI's link check covers front matter. The one
- * place the convention puts the fact is the one place nothing read.
+ * Blockers are checked in prose because `beans` has no blocker field, so
+ * [`bean-blocking.md`](../work-plan/skills/work-plan/bean-blocking.md) puts
+ * them in the body, which the CLI's link check does not read.
  *
  * ## What it does NOT do
  *
- * **It does not repair anything.** `sfhr`'s own Done-when says the three beans
- * above are repaired *by their owners* and that the bean does not edit them.
- * Same rule as `bun run cat health`: four of its five checks are about artefacts
- * accumulating and every finding names something a person does.
+ * **It does not repair anything.** Beans are repaired by their owners, the
+ * same rule as `bun run cat health`: every finding names something a person
+ * does.
  *
- * **It ignores closed beans**, like `check:bean-parents` and for the same
- * reason: a finished bean is history, and back-filling it changes no plan.
- * A `## Done when` is not required either — plenty of good beans are a
- * paragraph — the requirement is that the body EXISTS.
+ * **It ignores closed beans**, like `check:bean-parents`: a finished bean is
+ * history. A `## Done when` is not required either; the requirement is that
+ * the body EXISTS.
  *
  * Exit: 0 clean (or no store), 1 a real defect, 2 could not check.
  *

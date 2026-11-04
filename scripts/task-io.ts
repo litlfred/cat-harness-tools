@@ -1,35 +1,34 @@
 /**
- * What a check script reads and writes (bean `xpcu`). This layer's rows are
- * declared here; an instance above it declares its own under `taskIo` in its
- * `<instance>.json`, and {@link collectTaskIo} reads both (bean `0r7u`).
+ * What a check script reads and writes. This layer's rows are declared here;
+ * an instance above it declares its own under `taskIo` in its
+ * `<instance>.json`, and {@link collectTaskIo} reads both.
  *
  * @module scripts/task-io
  * @graphNode none — a declaration table read by `regen-after-merge.ts` and `gates.ts`
  *
  * ## What a declaration buys
  *
- * - `outputs: []` — the script WRITES NOTHING. That is what lets `gates` run
- *   it in the worker pool beside other read-only gates, and lets `regen` ask
- *   it beside other read-only checks. A script with no `outputs` here runs
- *   alone, in order, exactly as it always did. (Only the empty list is used: a
- *   check that writes is treated as undeclared, and the test says so.)
- * - `inputs` — what can change the script's answer. This is what lets `regen`
- *   SKIP a verify/write pair whose inputs hash to the value recorded at its last
+ * - `outputs: []` — the script WRITES NOTHING, so `gates` runs it in the
+ *   worker pool beside other read-only gates, and `regen` asks it beside other
+ *   read-only checks. A script with no `outputs` here runs alone, in order.
+ *   (Only the empty list is used: a check that writes is treated as
+ *   undeclared, and the test says so.)
+ * - `inputs` — what can change the script's answer, so `regen` can SKIP a
+ *   verify/write pair whose inputs hash to the value recorded at its last
  *   green run, and `gates` skip the script itself when its inputs hash to its
- *   last pass (`input-hash.ts`, bean `f017`). `{tracked}` means the whole working tree as
+ *   last pass (`input-hash.ts`). `{tracked}` means the whole working tree as
  *   version control sees it; a narrower glob list hashes only what it names,
  *   plus the script's own source and every module it imports.
  *
  * ## The rule for adding one
  *
- * **`inputs: [TRACKED]` is a claim the fingerprint CHECKS, every time** (bean
- * `f017`, 2026-10-06). `input-sites.ts` walks the script's import closure, and
- * every line that can read something the tree does not hold — the environment,
- * the network, the clock, git history, a spawned process, a computed module —
- * must carry a pinned, reviewed `// input-site:` annotation saying what it
- * reads; otherwise the fingerprint is undetermined and the script RUNS. So a
- * `{tracked}` declaration can cost skips, never correctness, and the old rule
- * ("declare only what you have read") is enforced rather than remembered.
+ * **`inputs: [TRACKED]` is a claim the fingerprint CHECKS, every time.**
+ * `input-sites.ts` walks the script's import closure, and every line that can
+ * read something the tree does not hold — the environment, the network, the
+ * clock, git history, a spawned process, a computed module — must carry a
+ * pinned, reviewed `// input-site:` annotation saying what it reads;
+ * otherwise the fingerprint is undetermined and the script RUNS. So a
+ * `{tracked}` declaration can cost skips, never correctness.
  * `bun run cat input-hash:coverage` says which declared scripts can skip and what
  * blocks the rest; `--sites <file>` prints the pins.
  *
@@ -37,38 +36,32 @@
  *   about FILES the audit cannot check, and a `tree` site refuses it;
  * - an `outputs: []` claim is re-checked on every `gates` run by the tree
  *   guard: a parallel batch that changes the tree is reported, naming the batch.
- * - **never add a narrower list to get a CI skip.** The rule is "declared or
- *   derived (computed from the run itself, never stored), never inferred"
- *   (owner, 2026-10-07: *"derived is BEST"*, then *"DERIVED = no drift, no
- *   extra data fields"*). The narrow set is DERIVED instead: `ci-cone.ts`
- *   traces a `{tracked}` check's green run and records what it read
- *   (bean `4rbc`). A row here only makes a check a candidate.
+ * - **never add a narrower list to get a CI skip.** Inputs are declared or
+ *   derived (computed from the run itself, never stored), never inferred: the
+ *   narrow set is DERIVED by `ci-cone.ts`, which traces a `{tracked}` check's
+ *   green run and records what it read. A row here only makes a check a
+ *   candidate.
  *
- * ## How these entries were chosen — measured, 2026-10-01
+ * ## How entries are chosen
  *
- * - `inputs`: the slowest pairs of a timed `bun run cat regen` (4 shared CPUs, load
- *   average 6–11 from other sessions; 1634 s, 2 passes). Each one's `--check`
- *   path was READ for writes, and its import closure scanned for environment,
- *   network and clock reads. Left out on purpose despite their cost:
- *   `uml:overview:check` (network and environment, via the PlantUML renderer),
- *   `kg:locale:check` and `translated-links:check` (environment),
- *   `library:viz:check`, `schema:viz:check` and `auto:docs:check` (network).
- * - `outputs: []` without `inputs`: every gate script that, run under
- *   `strace` on a clean tree, opened NOTHING for writing, created, renamed,
- *   removed or truncated nothing, inside or outside the repository (Bun's own
- *   cache aside). 185 of 193 gate scripts, measured 2026-10-01 — not inferred
- *   from a name.
+ * - `inputs`: a script's `--check` path is READ for writes, and its import
+ *   closure scanned for environment, network and clock reads. Scripts that
+ *   read the network or environment (e.g. `uml:overview:check`,
+ *   `kg:locale:check`, `translated-links:check`, `library:viz:check`,
+ *   `schema:viz:check`, `auto:docs:check`) are left out.
+ * - `outputs: []` without `inputs`: a gate script that, run under `strace` on
+ *   a clean tree, opened NOTHING for writing, created, renamed, removed or
+ *   truncated nothing, inside or outside the repository (Bun's own cache
+ *   aside) — measured, not inferred from a name.
  *
  * ## What the measurement cannot see, and why that is tolerable
  *
  * `strace` sees the code path a CLEAN tree takes. A check that writes only
- * when its answer changes is invisible to it: `skill:register:check` measured
- * read-only and writes its report whenever the verdict moves, so it is
- * declared by reading instead (skippable, not read-only). Another such check
- * left in the list fails in one direction only: in `gates`, its write is caught
- * by the tree guard and the run reports NOT clean, naming the parallel batch;
- * in `regen`, the settling pass re-asks every pair. A wrong `outputs: []` can
- * produce a false red, not a false green.
+ * when its answer changes is invisible to it (`skill:register:check` is
+ * therefore declared by reading: skippable, not read-only). A wrong
+ * `outputs: []` can produce a false red, not a false green: in `gates`, its
+ * write is caught by the tree guard and the run reports NOT clean, naming the
+ * parallel batch; in `regen`, the settling pass re-asks every pair.
  */
 import { dirname } from "node:path";
 import { checkoutRootFor, readDeclaration } from "../schemas/kg/cat-harness.ts";

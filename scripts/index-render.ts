@@ -6,49 +6,29 @@
  * @module scripts/index-render
  * @covers cat-harness — the instance axis: the four entry files at the root of an index checkout are the current output of this renderer over `index.config.json` and the declarations of the instances it names
  *
- * ## The decision
- *
- * Owner, 2026-10-08: *"folio-asst should not need folio-assistant declared at
- * all"* — the root of an index checkout declares no instance. Until then the
- * root declaration carried the root `AGENTS.md` (role `agent-instructions`,
- * `source: bootstrap/AGENTS.md`) and `README.md` (role `instance-readme`) as
- * its own assets, so with it gone nothing declared them and three checks
- * (`declared-assets`, `check-published-refs`, `asset-roles`) failed over
- * files no instance owned. Owner, 2026-10-09: *"these should be rendrederd
- * files"*, option (a): this script writes all four from
+ * The root of an index checkout declares no instance, so these files are
+ * written from:
  *
  * - `index.config.json` — which instances, in which order, and the
  *   checkout's own `title` and `description`;
  * - each instance's DECLARED `agent-instructions` and `instance-readme`
  *   assets — linked, and the README's lead paragraph quoted;
  * - bootstrap's `AGENTS.md`, quoted as the cold start for a checkout that
- *   is not yet set up — the provenance the deleted declaration's `source`
- *   carried, now carried by the render itself;
+ *   is not yet set up;
  * - the README section generators (`pipeline/readme-sections.ts`):
  *   `cat-harness:cold-start`, `cat-harness:instances` and `readme:toc`.
  *
- * The hand-written prose the two files carried before went where its
- * pointers already led — each rule to the skill it cited, the rest to this
- * instance's own `AGENTS.md` and `README.md` — and the originals are kept
- * verbatim on the `fsh-guts` state branch (`separated/root-AGENTS.md`,
- * `separated/root-README.md`).
- *
- * ## Why rendered and not declared again
- *
- * A file that says what every instance in a checkout is cannot belong to any
- * ONE of them: whichever instance declared it would be speaking for the
- * others, and its README is the one file no check reads. Everything here is
- * read from a declaration, so adding an instance to the index adds it here
- * on the next render, and `--check` fails the commit that forgot.
+ * A file that says what every instance is cannot belong to any one of them.
+ * Adding an instance to the index adds it here on the next render, and
+ * `--check` fails the commit that forgot.
  *
  * ## Could-not-determine is a failure, never a shorter file
  *
  * An instance the index names that is not on disk, or whose declaration
- * will not parse, makes the run exit 2 having written NOTHING. A partial
- * index that read as whole is the defect this exists to end — the same rule
- * `root-index.ts` holds for the published meta-skeleton. A declared asset
- * that is missing is different: it is a known gap, rendered as an em dash
- * and counted, never a guessed path.
+ * will not parse, makes the run exit 2 having written NOTHING (the rule
+ * `root-index.ts` holds for the published meta-skeleton). A declared asset
+ * that is missing is a known gap, rendered as an em dash and counted, never a
+ * guessed path.
  *
  * Usage:
  *   bun run cat index:render            # write the four files

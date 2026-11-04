@@ -5,31 +5,17 @@
  * @module cat-harness-tools/scripts/check-standalone
  * @covers code — the layer's own tests, run where only its declared closure sits beside it
  *
- * Stage 2 of the split (bean `ho66`). `probeStandalone` (seed-ready.ts) does
- * the work: the tracked files of the layer and everything it `needs`, laid
- * out as sibling git repositories with no aggregate at the root, and `bun
- * test` run in the layer. This file only JUDGES what it measured. It is not
- * a third rehearsal; bootstrap-tools' `rehearse-standalone.ts` has a check
- * list hard-wired to bootstrap, and this one asks the generic probe.
+ * `probeStandalone` (seed-ready.ts) does the work: the tracked files of the
+ * layer and everything it `needs`, laid out as sibling git repositories with
+ * no aggregate at the root, and `bun test` run in the layer. This file only
+ * JUDGES what it measured.
  *
- * ## Why a baseline, and not "green"
- *
- * Measured 2026-10-03 on cat-harness: 463 tests fail standalone, most of them
- * correct tests in the wrong layer (bean `ho66`'s note). Relocating them waits
- * on the code split, so the gate cannot demand zero today. What it can demand
- * is that the number never GROWS: a failure not already in the baseline is a
- * new read of something only the monorepo has, and that is red.
- *
- * A baseline entry that now passes is REPORTED, not red. It was red at first,
- * and #1977's CI showed why that is the wrong trade: one listed test
- * (`kg-audit-root-instance … emits a report`) fails in a loaded local run and
- * passes on the runner, so a symmetric ratchet turns CI red at random over a
- * test that is not getting worse. The direction the gate exists for — a NEW
- * standalone failure — stays red. `bun run cat standalone:baseline` writes
- * `standalone-baseline.json`; a PR that fixes a test commits the shorter list,
- * and the report names the command whenever one could be shorter.
- *
- * ## The three states
+ * The gate demands that standalone failures never GROW: a failure not in the
+ * baseline is red. A baseline entry that now passes is REPORTED, not red
+ * (some tests are flaky between local and CI runs). `bun run cat
+ * standalone:baseline` writes `standalone-baseline.json`; a PR that fixes a
+ * test commits the shorter list, and the report names the command whenever
+ * one could be shorter.
  *
  * - **held** (0): nothing fails that the baseline does not list. Listed tests
  *   that now pass are printed, with the command that lowers the list.
@@ -39,12 +25,10 @@
  *
  * ## In parts (`--part i/n`)
  *
- * cat-harness-tools' whole layer takes about 500 s standalone, the slowest
- * single gate of a PR run (a downstream layer's run 41287467368). `--part i/n`
- * runs slice i of n of the layer's test files (`bun test --shard=i/n`), so CI
- * runs the n parts as n gates on n machines (`run-gates.py` `SPLIT_GATES`).
- * Together the parts run every test file once, and each part is judged on
- * what it ran:
+ * `--part i/n` runs slice i of n of the layer's test files
+ * (`bun test --shard=i/n`), so CI runs the n parts as n gates on n machines
+ * (`run-gates.py` `SPLIT_GATES`). Together the parts run every test file
+ * once, and each part is judged on what it ran:
  *
  * - a named failure the baseline does not list is red, exactly as in a whole
  *   run (a test runs in exactly one part, so no new failure is missed);

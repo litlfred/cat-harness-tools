@@ -5,30 +5,19 @@
  * @module scripts/check-declared-assets
  * @covers cat-harness
  *
- * ## Why this is not "a link checker for AGENTS.md"
+ * This checks **whatever an instance declares** as an asset (such as its
+ * `AGENTS.md`), not one special-cased file: a file nobody declares is a file
+ * no checker looks at. A newly declared markdown asset is covered with no
+ * change here. (`readme:audit` verifies `README.md` alone, and
+ * `check:agents-xref` citations INTO `AGENTS.md`.)
  *
- * Because that would special-case the file this design stops special-casing.
- * Bean `v8gh` measured seven dead links in the root `AGENTS.md`, five broken
- * by a single directory move — including the one its own banner calls the
- * place to start, so a cold agent following the banner hit a 404. The gap was
- * never "nobody wrote an AGENTS.md checker"; it was that the file was
- * **undeclared**, so no checker had any reason to look at it. `readme:audit`
- * verifies `README.md` alone and `check:agents-xref` verifies citations INTO
- * `AGENTS.md` rather than links out of it.
- *
- * So this checks **whatever an instance declares**. Declare a third markdown
- * asset tomorrow and it is covered with no change here.
- *
- * ## Three states, and the middle one is the point
+ * ## Three states
  *
  * - **missing** — declared and not on disk. A finding: somebody asserted this
- *   file is ours. Unlike a conventional directory, which may simply be a
- *   convention this instance did not take up.
+ *   file is ours (unlike a conventional directory an instance may not use).
  * - **dead link** — a relative target that does not resolve.
  * - **not checked** — a non-markdown asset, or a link this cannot resolve
- *   offline (`http(s)`, `mailto`). Reported as such and never counted clean,
- *   because "could not determine" rendered as a pass is how a sweep blind on
- *   one check clears the others.
+ *   offline (`http(s)`, `mailto`). Reported as such and never counted clean.
  *
  * Exit codes: 0 clean · 1 any missing asset or dead link.
  */

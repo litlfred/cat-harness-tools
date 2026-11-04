@@ -2,22 +2,11 @@
 /**
  * Every graph typology that declares a validator — does it actually load?
  *
- * Bean `folio-assistant-i31r`. Two failure modes, and only one of them fails
- * the build:
- *
  * 1. **A declared validator that does not resolve** — a wrong path, a missing
  *    export, or a module that exports an interface rather than a Zod schema.
- *    That is a defect and it fails. It is also not hypothetical: the three
- *    `schema` paths on these kinds silently became instance-relative when
- *    `#437` moved the instance under `cat-harness/`, and nothing noticed,
- *    because nothing read them.
- * 2. **A kind with no validator at all** — reported, never failed. 13 of 16
- *    base kinds are in that state today and one is `qa`, the largest
- *    generated graph here. Failing on it would make the check unrunnable;
- *    hiding it would report a clean sweep over most of the corpus.
- *
- * `--require-all` turns state 2 into a failure, for the day the gap is meant
- * to be closed.
+ *    Fails.
+ * 2. **A kind with no validator at all** — reported, never failed.
+ *    `--require-all` turns this into a failure.
  *
  * @module folio-assistant/scripts/check-kind-validators
  * @covers validators, block-kinds, content-adapters, qa-checkers, pipeline-plugins, computed — every

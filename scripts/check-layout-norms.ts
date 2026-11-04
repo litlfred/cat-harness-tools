@@ -2,84 +2,26 @@
 /**
  * No declared directory sits inside another declared directory.
  *
- * ## The norm, in one sentence
- *
  * An instance's assets live at `<stub>/<asset>` — `cat-harness/skills/`,
- * `<content>/library/`, `<ig>/methodologies/`. The owner, 2026-09-22:
- * *"dont bury sub-graph assets. same for `<stub>/skills`, etc."*
+ * `<content>/library/`, `<ig>/methodologies/`. A root declaration reaching
+ * down a multi-level path is not allowed. Nesting declared from within (a
+ * sub-graph node in the first subdirectory labelling the ones inside it) is
+ * allowed but not yet recognised here; when that node kind exists, this check
+ * must stop reporting the nestings it describes.
  *
- * ## What it measures, against the owner's NEWER ruling
+ * A pair is also not a finding when one of the child's typologies declares
+ * `within` equal to one of the parent directory's typologies (e.g.
+ * `library/<entry>/l1-extraction/` with a typology `within: "library"`). The
+ * rule reads the typology registry, never a kind name, the same reading
+ * `lib/library-entry-graphs.ts` makes to publish that directory.
  *
- * #980, 2026-09-22, ruled after this check was written: nesting IS allowed,
- * *"if there is a (Sub?)KGraph node within the first subdir that labels all the
- * other ones that exist within it"*, and a root declaration reaching down a
- * multi-level path is NOT allowed.
+ * The test is containment, not depth: `<content>/library/` is two segments
+ * deep and fine. The containment relation comes from `subgraphTree`; this
+ * check computes no geometry of its own.
  *
- * This check measures the second half. Every pair it finds is two entries in a
- * ROOT declaration, one containing the other — precisely the forbidden shape —
- * so the two rulings agree on every case in the corpus today.
- *
- * **It does not yet know about the from-within node, and must learn it.** That
- * node's kind and name are explicitly left open to the owner, so nothing can
- * declare nesting from within today and no legitimate structure is being
- * flagged. The day it lands, a nesting it describes is sanctioned and this
- * check must stop reporting it, or it becomes an obstacle to the mechanism the
- * owner chose. Written down here rather than left to be rediscovered as a
- * false finding.
- *
- * ## A sub-graph KIND that lives inside its parent's (bean `8pzh`)
- *
- * The from-within rule above sanctions a nesting by WHO declared it. A second
- * shape is sanctioned by WHAT the inner directory is: a graph typology whose
- * registry definition says `within: "<kind>"` is, by definition, a sub-graph
- * held inside a directory of that kind. Owner, 2026-10-12, bean `8pzh` item 1:
- * L1 extraction output lives beside its library entry and is published with
- * it, so an instance declares `library/<entry>/l1-extraction/` with a typology
- * that is `within: "library"`, nested inside its `library/` entry.
- *
- * So a pair is not a finding when one of the child's typologies declares
- * `within` equal to one of the parent directory's typologies. The rule reads
- * the registry, never a kind name — the kinds are a content layer's, loaded
- * from its `typologies/` graph — and it is the same reading
- * `lib/library-entry-graphs.ts` makes to PUBLISH that directory, so the
- * check and the publisher cannot disagree about which nesting is intended.
- * A child whose typology names some other parent kind is still reported.
- *
- * ## Why the check is "nested inside another DECLARED directory"
- *
- * Depth is the wrong test and would produce false findings immediately.
- * `<content>/library/` is two segments from the repository root and is exactly
- * right; `test/results/` is two segments from its instance root and is also
- * fine, because `test/` is not a graph. What is actually wrong is a declared
- * directory **contained by another declared directory** — then a consumer
- * scanning the outer one has to decide whether the inner one's nodes are also
- * its own, which is bean `x4v4`'s question, and every count computed from that
- * sweep depends on the answer.
- *
- * That relation is already derived, by `subgraphTree`, from the declared paths
- * and nothing else. So this check computes no geometry of its own: it asks the
- * schema the question the schema already answers, and reports the pairs.
- *
- * ## Enforcement is a RATCHET, not a gate on the whole corpus
- *
- * Four instances nest `skills/voices` inside `skills/` today — `agent-skills`,
- * the content core, a paper folio and the IRIS replica (which took them over
- * from a style-guide instance, bean `qsx4`). (Three,
- * said this line when it was written from a hand audit; the check found the
- * fourth. The baseline is the list, not this sentence.) Failing on those
- * would make this the "check that cries wolf is a check somebody switches off"
- * failure `known-skills.ts` names, on its first run, over other people's
- * instances.
- *
- * So known pairs sit in a committed baseline and **anything not in it fails**.
- * `cat-harness` reached zero on 2026-09-22 and the baseline holds none of its
- * pairs, so any new nesting there is refused immediately. That is the same
- * shape `check-declared-paths` uses, chosen for the same reason: a corpus with
- * outstanding work still gets a gate against making it worse.
- *
- * Removing a pair is progress and is NOT a failure — it prints as fixed, and
- * `--update` rewrites the baseline so the diff somebody reviews is the
- * shrinking list.
+ * Enforcement is a RATCHET: known pairs sit in a committed baseline and
+ * anything not in it fails. Removing a pair prints as fixed, not a failure;
+ * `--update` rewrites the baseline.
  *
  * Usage:
  *   bun run cat check:layout-norms
@@ -88,7 +30,7 @@
  *   bun run cat check:layout-norms:check          # JUDGE: compute and judge, write nothing (the gate)
  *
  * Exit: 0 clean (or only known pairs), 1 a pair not in the baseline,
- *       2 could not determine. Judge mode (`--check`, bean `bo44`) keeps the
+ *       2 could not determine. Judge mode (`--check`) keeps the
  *       same table and adds 2 for an unknown flag or a run that threw.
  *
  * @module scripts/check-layout-norms

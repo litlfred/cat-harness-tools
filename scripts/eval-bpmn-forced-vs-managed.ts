@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Two-arm experiment runner for bean `folio-assistant-502c`:
+ * Two-arm experiment runner:
  *   "EXPERIMENT: forced along a BPMN vs managing it — do outcomes change, at what compute?"
  *
  * Runs both arms on the same BPMN diagram (`test-plan-execution.bpmn` and its
@@ -27,12 +27,11 @@
  * after a refusal the forced arm's runner submits the enabled node itself.
  * Token counts are `ceil(bytes / 4)` of the payloads the runner builds, and
  * wall time is the runner's own. The output exercises the harness and the
- * engine's refusals; it is not evidence about how a model behaves, and a run
- * that is meant to be must replace the script with model calls.
+ * engine's refusals; it is not evidence about how a model behaves.
  *
- * Per `deployment-topologies.md` §2 and `benchmarking-mode` (bean `wp49`),
- * benchmark outputs default to `build/benchmarks/bpmn-forced-vs-managed/` and
- * are guarded by `assertBenchmarkOutputPath` so they never land in declared
+ * Per `deployment-topologies.md` §2 and `benchmarking-mode`, benchmark outputs
+ * default to `build/benchmarks/bpmn-forced-vs-managed/` and are guarded by
+ * `assertBenchmarkOutputPath` so they never land in declared
  * knowledge-graph directories.
  */
 

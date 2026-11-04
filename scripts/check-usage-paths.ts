@@ -2,124 +2,30 @@
 /**
  * A script's usage string must name the script.
  *
- * Sibling of `check-workflow-paths.ts` (bean `52dz`), one layer out. That
- * module asks whether a path a WORKFLOW invokes resolves from the directory
- * the step runs in. This asks the narrower question that needs no cwd model
- * and no judgement at all:
+ * Asks one question, with no cwd model and no judgement:
  *
  * > When a file's own header says `bun run <path>` and `<path>` is this file
  * > under a shorter root, is `<path>` where this file actually is?
  *
- * ## "Under a shorter root" is a SUFFIX test, and the first draft got it wrong
+ * "Under a shorter root" is a **path-segment suffix** test, not a basename
+ * test: `pipeline/build.ts` is a suffix of
+ * `cat-harness/content/pipeline/build.ts` and so names it, while
+ * `src/index.ts` is not a suffix of `cat-harness/tools/index.ts` and names
+ * a different file. Basename collisions are excluded structurally.
  *
- * The obvious rule — same basename — is wrong, and reading one line it flagged
- * is what caught it. `cat-harness/tools/index.ts` documents `--check-deps`
- * against `cat-harness/src/index.ts`, spelled there without the instance
- * prefix: a DIFFERENT file that merely shares the basename `index.ts`. Under
- * the basename rule `--fix` would have rewritten that reference to point at
- * `cat-harness/tools/index.ts` — a wrong fix that LOOKS right, which is the
- * exact failure `check-workflow-paths.ts`'s exemption table warns about for the
- * `build.ts` under `pipeline/`.
+ * Only SELF-references are judged: the reader is looking at the file, so the
+ * only true path is the file's own. General paths in prose are
+ * `check:command-paths`' (which counts unresolvable ones as folio-relative
+ * rather than judging them).
  *
- * (Both of those wrong spellings are named here WITHOUT their bare prefix on
- * purpose. This module is a printed-command source, so `check:command-paths`
- * holds it to the entry-corpus rule — every repository-relative path in it must
- * resolve, with no folio-relative escape. Quoting the defect verbatim made this
- * file's own documentation break a sibling gate, which is a neat demonstration
- * of why that gate declines to guess and this one only judges self-references.)
+ * Where a `package.json` script exists for the file, the script name is
+ * reported as advice but never applied (it may bake in flags). `--fix` only
+ * ever writes the file's own repo-relative path.
  *
- * So the spelling must be a **path-segment suffix** of the referring file's own
- * repo-relative path: `pipeline/build.ts` is a suffix of
- * `cat-harness/content/pipeline/build.ts` and so names it under its pre-split
- * root, while `src/index.ts` is not a suffix of `cat-harness/tools/index.ts`
- * and names something else. That is decidable from the two strings, and it
- * excludes the collision STRUCTURALLY rather than by exemption — an exemption
- * would have had to be written once per collision, and the next one would
- * arrive unexempted.
- *
- * ## Why the self-reference and not every path — the gap, located exactly
- *
- * Three checks already read paths, and this is a FOURTH question rather than a
- * fourth answer. `check-command-paths.ts`'s own header tables the first three:
- *
- * | check | judges |
- * |---|---|
- * | `check:agent-entry-links` | markdown LINKS out of the entry files |
- * | `check:agents-claims` | LOCATION claims — `symbol` in `module.ts` |
- * | `check:declared-paths` | quoted path LITERALS in code |
- * | `check:command-paths` | paths inside fenced COMMANDS and skill prose |
- *
- * `check:command-paths` is the near neighbour and it **passes** over every
- * occurrence this module reports. That is not an oversight — it is
- * `aboutThisTree()`, which judges a path only when its first segment is a
- * directory that EXISTS at the repository root, or it is a root-level `.md`.
- * `FOLIO_OWNED` (`folio`, `content`, `uploads`, `library`, `lean`, `.lake`, plus
- * `docs` for skills) is excluded outright. Everything else is COUNTED as
- * folio-relative rather than judged, and its header defends that as the design:
- * *"a check over prose has to be RIGHT rather than thorough, because its
- * findings are read by a person deciding whether to keep it."*
- *
- * Measured on a clean worktree, 2026-09-25: **364 checked, 306 folio-relative**,
- * exit 0. And that 306 holds two different things — genuinely folio-relative
- * paths (`content/…`, `folio/…`) AND stale spellings whose head exists nowhere.
- * `pipeline/apply-glossary-curation.ts` is in it because no root `pipeline/`
- * exists, not because anybody judged it folio-side.
- *
- * ## A self-reference needs no audience guess, which is the whole point
- *
- * A path in prose has an AUDIENCE and prose cannot declare one, which is why
- * the conservatism above is right. Running `pipeline/build.ts` after
- * `cd content` is a folio reader's command, written against a root the
- * convention has since retired in favour of `folio/` (owner, 2026-09-20) — so
- * prefixing `cat-harness/` would cement a retired convention AND resolve to a
- * different file that shares the basename. `check-workflow-paths.ts`'s own
- * exemption table records paying for exactly that:
- *
- * > *"I prefixed this line under `52dz` because THIS check demanded it, which
- * > made the file internally inconsistent in the one workflow folios consume.
- * > The check was right that the path does not resolve here and wrong about
- * > the remedy."*
- *
- * A **self-reference** has no such problem. The reader is looking at the file,
- * so the only path true for them is the file's own — whatever its head. That
- * makes this check total and decidable precisely where the general one must
- * decline, and it is the subset a sweep can touch without deciding anything.
- *
- * ## What it found the day it was written
- *
- * **294 self-references, of which 287 in 105 files misname themselves** — only
- * **7** were already correct. Every one is a casualty of the #223 split moving
- * the platform under `cat-harness/` while the usage strings kept the pre-split
- * spelling. `AGENTS.md` records two of them being fixed by hand the same day
- * (*"the two commands in the file a newcomer reads first both exited 1"*);
- * these are the rest.
- *
- * The basename draft reported 107 files over 289 occurrences. The suffix rule
- * above removed 2 files and 2 occurrences, and those two were the dangerous
- * ones — a collision `--fix` would have mis-rewritten, not a near miss.
- *
- * Of the 105, **19 already have a `package.json` script**. For those the
- * better spelling is the script NAME, which is the fix
- * `check-workflow-paths.ts` recommends — *"it puts the path in `package.json`
- * once instead of in every caller"*. This check reports that as advice and
- * does not apply it: a named script may bake in flags the usage line varies,
- * so substituting one is a judgement about equivalence, not a rename.
- * `--fix` only ever writes the file's own repo-relative path, which is
- * provable from the filesystem.
- *
- * ## Tests are excluded, deliberately
- *
- * A test may name a path that does not exist ON PURPOSE:
- * `scripts/tests/workflow-paths-resolve.test.ts` invokes
- * `scripts/does-not-exist.ts` as a fixture, and reporting it would train a
- * reader to skim this check's output — which is worse than not having it.
- *
- * ## "Could not determine" is never green
+ * Tests are excluded: a test may name a non-existent path as a fixture.
  *
  * A file this module cannot read is {@link Verdict.Undetermined} and the run
- * FAILS. House rule (`ci-health`, `health`, `kg:audit`, `gates`): an unknown
- * rendered as a pass is indistinguishable from a real pass, while an unknown
- * rendered as a failure costs somebody a minute's reading.
+ * FAILS.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/check-usage-paths.ts          # report, exit 1 on a finding

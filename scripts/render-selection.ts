@@ -3,56 +3,37 @@
  *
  * @module scripts/render-selection
  *
- * Owner, 2026-09-20, bean `9c34`:
+ * A staging render seeds from main's render as a cache when that is not
+ * stale, diffs, and re-renders only what changed **and what DEPENDS on it** —
+ * a dependency graph, because a page that was not re-rendered looks exactly
+ * like one that was.
  *
- * > new skill for staging rendernig.... dont rerender the whole thing... if
- * > main render is not stale, copy that to staging render pipleine as cahche.
- * > trigger rerender only on assets that have changed and downstream depndent
- * > index.
- *
- * Three steps, and the bean is explicit that the third is the whole thing:
- * seeding is a cache, diffing is a diff, and **re-rendering what DEPENDS on
- * what changed is a dependency graph.** Getting that wrong fails in the
- * direction nobody notices — *a page that was not re-rendered looks exactly
- * like a page that was*, which is `xom7` moved into the render.
- *
- * ## The two edges, and why one mechanism expresses both
- *
- * The bean asks for both to be expressible:
+ * ## The two edges, one mechanism
  *
  * | edge | example | one change means |
  * |---|---|---|
  * | **projection** | `ingestion-notes.html` ← `iris-dspace.md` | one source file → one page |
  * | **index** | `community-list.html` ← every catalogue node | one MEMBER → the whole index |
  *
- * They differ in what a reader should expect, and **not** in what the runner
- * must do: in both cases, if any declared input changed, the step re-runs and
- * its own `--check` decides which outputs actually differ. So `inputs` is one
+ * In both cases, if any declared input changed, the step re-runs and its own
+ * `--check` decides which outputs actually differ. So `inputs` is one
  * mechanism, and the distinction lives in the declaration a human reads.
  *
- * **The downstream half needs no new mechanism at all.** `needs` already says
- * which steps run after which, so a step whose dependency re-ran must re-run
- * too. That is the cascade, and it is the same edge the pipeline already
- * declares for ordering.
+ * The downstream half is `needs`: a step whose dependency re-ran re-runs too.
  *
  * ## Staleness is DETECTED, never assumed
  *
- * A seed is trustworthy for a step only if the inputs that produced it are the
- * inputs present now. So a render writes a MANIFEST — per step, a hash over
- * the content of its declared inputs — and a later build compares. Three
- * outcomes, and the third is the one that matters:
+ * A render writes a MANIFEST — per step, a hash over the content of its
+ * declared inputs — and a later build compares:
  *
  * - hashes match → the seeded output stands, the step is skipped;
  * - hashes differ → the step runs, and so does everything that needs it;
  * - **the manifest is missing, unreadable, or does not mention the step →
- *   the step RUNS.** Never "assume fresh". A partial render presented as
- *   complete is the failure this module exists to prevent, and it is exactly
- *   the third state this repository keeps everywhere else: *could not
- *   determine is never rendered as clean*.
+ *   the step RUNS.** Never "assume fresh": could not determine is never
+ *   rendered as clean.
  *
- * A step that declares NO inputs also always runs, for the same reason: it has
- * not said what it reads, so nothing can be concluded about whether its output
- * is current.
+ * A step that declares NO inputs also always runs: it has not said what it
+ * reads, so nothing can be concluded about whether its output is current.
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";

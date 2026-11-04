@@ -5,12 +5,9 @@
  * @module scripts/remote-tree
  * @graphNode none — a library: it fetches and reads, and judges nothing
  *
- * Bean `0mpw`. `gitPartFetcher` lived in the content layer's KG materialiser
- * (`kg-materialize.ts`) until the remote mount needed it, and cat-harness may not
- * import core (`check:reference-direction` — a wrong-direction edge). So it
- * moved DOWN, unchanged in behaviour, and core re-exports it; the remote mount
- * reads through the same {@link RemoteTree} rather than a second copy of
- * "shallow, blobless, one commit, sparse checkout".
+ * The remote mount and the content layer's KG materialiser (which re-exports
+ * `gitPartFetcher`) both read through {@link RemoteTree}: shallow, blobless,
+ * one commit, sparse checkout.
  *
  * A {@link RemoteTree} fetches once per (repository, commit) and answers every
  * question about that tree from it: listing a directory and reading a small

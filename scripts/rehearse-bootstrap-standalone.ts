@@ -1,33 +1,21 @@
 #!/usr/bin/env bun
 /**
  * Run bootstrap-tools' standalone rehearsal when bootstrap arrives by remote
- * mount from lock (bean `nn8e`, #2462).
+ * mount from lock.
  *
- * ## Why this wrapper exists
- *
- * `rehearse-standalone.ts` (Phase 4 of bean `xsqm`) tests that bootstrap-tools
- * passes its checks when isolated beside bootstrap in an empty scratch directory.
- * To know which files a standalone clone would hold, it queries `gitFiles()`.
- *
- * When bootstrap and bootstrap-tools were submodules, each directory was its own
- * git worktree. Under bean `nn8e`, they arrive by remote mount from the lock and
- * are ignored by the enclosing repository's `.gitignore` and `.git/info/exclude`.
- * In that state, `git ls-files` inside them asks the enclosing repository, which
- * ignores them, returning zero files.
+ * `rehearse-standalone.ts` tests that bootstrap-tools passes its checks when
+ * isolated beside bootstrap in an empty scratch directory, and asks
+ * `gitFiles()` which files a standalone clone would hold. Remote-mounted
+ * bootstrap and bootstrap-tools are ignored by the enclosing repository's
+ * `.gitignore` and `.git/info/exclude`, so `git ls-files` inside them returns
+ * zero files.
  *
  * ## It works on COPIES, never on the mounts
  *
- * The gates run concurrently over one tree, and no gate may change it. This
- * wrapper used to `git init` inside the shared `bootstrap/` and
- * `bootstrap-tools/` mounts for its whole run. Meanwhile
- * `check:cat-harness-standalone` read the same tree: `instanceRootsIn`
- * (cat-harness `schemas/kg/instance-roots.ts`) drops a subdirectory with its own
- * `.git` as a foreign checkout, and `closureOf` (`seed-ready.ts`) skips a
- * missing need without a word. So cat-harness was laid out without bootstrap,
- * and its five `render-exemption.test.ts` tests failed in every index that runs
- * both gates in one shard (a content layer's harness checks, 2026-10-20). It
- * reproduced exactly: no failures as laid out, the five after `git init` in the
- * two mounts.
+ * The gates run concurrently over one tree, and no gate may change it: a
+ * `.git` inside a mount makes `instanceRootsIn` (cat-harness
+ * `schemas/kg/instance-roots.ts`) drop it as a foreign checkout, and
+ * `closureOf` (`seed-ready.ts`) then skips the missing need silently.
  *
  * So bootstrap and bootstrap-tools are copied (without `.git` and
  * `node_modules`) into a fresh temporary directory, the COPIES are given git

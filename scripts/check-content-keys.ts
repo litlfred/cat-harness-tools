@@ -8,25 +8,16 @@
  * @covers schemas — the thing graded is `CONTENT_CONTEXT` in `schemas/kg/jsonld.ts`: a key a document
  *   writes that it does not declare, and a path under a term it coerces to `@id`
  *
- * ## Why these two outlived the check they lived in (bean `folio-assistant-63q4`)
+ * Prefix binding is covered elsewhere: each instance's generated context
+ * (`<iriBase>ns/context/v1.jsonld`, `gen-instance-contexts`) binds only what
+ * is used, and `jsonld:contexts --check` fails on a prefix used in an IRI
+ * position that nothing binds.
  *
- * `check-context-emission` asked four questions. Two belonged to the SHARED
- * content context and went with it, once every emitter names its own
- * instance's context (`<iriBase>ns/context/v1.jsonld`), generated from what
- * that instance's documents use:
- *
- * - "is every bound prefix emitted?" (and `FORWARD_DECLARED`, the reasons a
- *   bound prefix was not) — a generated context binds ONLY what is used, so a
- *   bound-but-unused prefix cannot exist (`gen-instance-contexts`);
- * - "is every spoken prefix bound?" — `jsonld:contexts --check` fails on a
- *   prefix used in an IRI position that nothing binds.
- *
- * These two ask about TERMS, which a generated context cannot answer: it
- * defines the terms a document uses that the content context declares, and a
- * key the content context does not declare is simply absent from both — and
- * dropped by a processor without a word. So they stay, over every document
- * that names the content context OR an instance's own context, whose terms
- * are the content context's.
+ * These two ask about TERMS, which a generated context cannot answer: a key
+ * the content context does not declare is absent from both, and dropped by a
+ * processor without a word. So they run over every document that names the
+ * content context OR an instance's own context, whose terms are the content
+ * context's.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/check-content-keys.ts [--json]

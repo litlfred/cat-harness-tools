@@ -5,22 +5,20 @@
  * @module scripts/text-structure
  * @covers none — a WRITER an ingest step calls, not an audit.
  *
- * Bean `y4uj`, issue #1614 item 4. The sources the KG/folio-asst deck relies on
- * for testing and tooling — the Gherkin reference, the MCP specification, the
- * `hmans/beans` README, FHIR R5's TestPlan resource — are published as Markdown
- * or XML in git repositories, not as PDFs. The other rungs read pages, cells or
- * slides; none can locate a section in a text file, and printing one to PDF
- * first would make the recorded sha256 identify a rendering nobody published.
+ * Many sources (specifications, READMEs) are published as Markdown or XML in
+ * git repositories, not as PDFs. The other rungs read pages, cells or slides;
+ * printing a text file to PDF first would make the recorded sha256 identify a
+ * rendering nobody published.
  *
- * What this rung decides, and why:
+ * What this rung decides:
  *
  * - **A Markdown file is divided by its own ATX headings**, outside fenced
  *   code (a `# comment` inside a ```gherkin block is not a heading). Lines
  *   before the first heading form a section titled by the file's front-matter
  *   `title:` when it has one — an `.mdx` page's title IS its front matter —
  *   and by its path otherwise.
- * - **Any other text file is ONE section, kept verbatim** in a fenced block.
- *   A division nobody wrote would be the inferred-chapter failure (`6xaz`).
+ * - **Any other text file is ONE section, kept verbatim** in a fenced block;
+ *   no division is inferred.
  * - **Nothing is rendered.** Shortcodes, JSX components and HTML stay as the
  *   author wrote them, and `structure_note` says so.
  * - **Images are recorded, never sectioned.** The caller names them with

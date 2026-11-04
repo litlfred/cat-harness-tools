@@ -1,19 +1,12 @@
 /**
  * Which Chromium should Playwright launch here?
  *
- * The answer is not always "the one Playwright asks for". A prebuilt image
- * pins a browser build under `PLAYWRIGHT_BROWSERS_PATH` and sets
- * `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD`, so the build on disk is whatever the
- * image was baked with — while the installed `@playwright/test` asks for the
- * revision ITS version pins. When those diverge every browser-backed test
- * dies at launch with "Executable doesn't exist … run npx playwright install",
- * which is advice you cannot take in an image that forbids the download.
- *
- * Measured in this container on 2026-09-19: `@playwright/test` resolved to
- * 1.61.1, which wants `chromium_headless_shell-1228`; the image ships 1194.
- * Playwright 1.56.0 is the release whose pinned revision IS 1194, so the
- * declared floor `^1.60.0` could not be satisfied by any version matching the
- * image — the drift was in the range, not only in the caret.
+ * Not always the one Playwright asks for. A prebuilt image pins a browser
+ * build under `PLAYWRIGHT_BROWSERS_PATH` and sets
+ * `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD`, while the installed `@playwright/test`
+ * asks for the revision its own version pins. When those diverge, every
+ * browser-backed test dies at launch with "Executable doesn't exist … run npx
+ * playwright install", advice an image that forbids the download cannot take.
  *
  * @module scripts/playwright-chromium
  * @graphNode schema

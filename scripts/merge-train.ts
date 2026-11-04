@@ -1,14 +1,11 @@
 #!/usr/bin/env bun
 /**
  * Build a merge TRAIN: a branch from a base SHA with each member merged in,
- * regenerated once, checked, and brought up to `origin/main` (bean `blgm`).
+ * regenerated once, checked, and brought up to `origin/main`.
  *
  * @module scripts/merge-train
  * @graphNode none — a maintenance command over a working tree
  * @covers none — a merge step: it builds a branch and judges no declared graph
- *
- * The executable form of the merge steward's hand recipe of 2026-10-02
- * (scratch `train.sh` / `train2.sh`), approved by the owner the same day.
  *
  * ## The steps
  *
@@ -18,9 +15,9 @@
  *    merge and restores the tree, and this records why and on which paths.
  *    Nothing is resolved by hand. A member already contained is recorded so.
  * 3. One `bun run cat regen` over the whole train, then the checks regen does not
- *    repair today: `check:l1-complete --write`; every task an instance
+ *    repair: `check:l1-complete --write`; every task an instance
  *    declares `afterMerge` under `taskIo`, its declared writer run when the
- *    check is red (bean `0r7u`); and `kg:audit:all:check` (its writer runs
+ *    check is red; and `kg:audit:all:check` (its writer runs
  *    once when it is stale). What they wrote is committed as one commit.
  * 4. Merge `origin/main` with `merge-base.ts` (full form): conflicts that are
  *    only declared generated paths take main's side and regenerate once more;
