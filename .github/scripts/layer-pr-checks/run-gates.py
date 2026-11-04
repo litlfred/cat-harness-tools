@@ -779,6 +779,43 @@ def cone_plan(root, gates, runner, caller, env):
     return mode, note, cands, unchanged, traced
 
 
+# A finding a gate prints: a `✗` line, or an item listed under a `✗ N finding(s):`
+# header. A bare count (`✗ 6 finding(s):`, `✗ 1 kind JSON Schema finding(s) —`)
+# is left out, so a PR that fixes one finding does not read as adding one, and
+# every number is read as `#`, so a count inside a finding that only went down
+# (`3 contract(s)` to `2`) is not new either. Repeats are counted, so two
+# findings that differ only in a number still count as two.
+FINDING = re.compile(r"^\s*✗\s*(?P<msg>.+)$")
+COUNT = re.compile(r"^\d+\b")
+NUMBER = re.compile(r"\d+")
+ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def findings(text):
+    """Every finding `text` prints, in order (repeats kept): the `diagnostics` compare-gates.py judges.
+
+    Without them a gate already red on main judged nothing: a PR that made one
+    more file stale passed, because the gate was "failing on main too". That is
+    how folio-assistant main stayed red on `libraries:check`,
+    `bpmn:checklist:check`, `render:bpmn:check` and `kind:json-schemas:check`
+    while each layer's own PRs added to them (2026-11-04). With them, a gate red
+    on both sides still fails the PR that adds a finding main does not have.
+    """
+    out, listing = [], False
+    for raw in text.splitlines():
+        line = ANSI.sub("", raw).rstrip()
+        m = FINDING.match(line)
+        if m:
+            listing = bool(COUNT.match(m["msg"])) and m["msg"].endswith(":")
+            if not COUNT.match(m["msg"]):
+                out.append(NUMBER.sub("#", m["msg"]))
+        elif listing and line.startswith((" ", "\t")) and line.strip():
+            out.append(NUMBER.sub("#", line.strip()))
+        else:
+            listing = False
+    return out
+
+
 def run(root, name, command):
     start = time.monotonic()
     try:
@@ -1010,7 +1047,8 @@ def main():
         print(f"::group::{name}: exit {code} in {seconds} s — {command}", flush=True)
         print(text[-4000:], flush=True)
         print("::endgroup::", flush=True)
-        results[name] = {"command": command, "exit": code, "tail": text[-1500:], "seconds": seconds}
+        results[name] = {"command": command, "exit": code, "tail": text[-1500:], "seconds": seconds,
+                         "diagnostics": findings(text)}
     ran = list(results)
     for name, entry in unchanged.items():
         print(f"{name}: SKIPPED — {entry['skipped']} — {entry['command']}", flush=True)
