@@ -5417,7 +5417,7 @@ export function resolveDirectories(
   // OPT-IN SUB-GRAPHS (cat-harness#991 step 23.1): the ROOT decides, from its
   // own list — a dependency's `enableSubgraphs` is that layer's, for itself.
   const enabled: EnabledSubgraphs =
-    opts.enabledSubgraphs ?? enabledSubgraphsFrom(rootLink ? readDeclaration(rootLink.root, registry)?.enableSubgraphs : undefined);
+    opts.enabledSubgraphs ?? enabledSubgraphsFrom(rootLink ? (readDeclaration(rootLink.root, registry)?.enableSubgraphs ?? declaredEnableSubgraphs(rootLink.root)) : undefined);
   /** The entry's nearest opt-in sub-graph, given its parent's; `null` when that one is switched off. */
   const optInOf = (e: ResolvedDirectory, parent?: string): string | undefined | null => {
     const own = ownOptInId(e);
@@ -6237,7 +6237,7 @@ export function ownDirectories(
   opts: ResolveOptions = {},
 ): ResolvedDirectory[] {
   const decl = readDeclaration(link.root, registry);
-  const enabled: EnabledSubgraphs = opts.enabledSubgraphs ?? enabledSubgraphsFrom(decl?.enableSubgraphs);
+  const enabled: EnabledSubgraphs = opts.enabledSubgraphs ?? enabledSubgraphsFrom(decl?.enableSubgraphs ?? declaredEnableSubgraphs(link.root));
 
   // The conventional set FIRST, existence-filtered, and then declared entries
   // override it by id — which is `resolveDirectories`' order, and now this
@@ -7604,7 +7604,7 @@ import "./folio-graph-typology.js";
 import { ThemeRefSchema, type ThemeRef } from "../ui/theme";
 import { CONFIG_SUFFIX, DECLARATION_SUFFIX, findDeclarationFile, instanceRootsIn, isForeignCheckout, lockFilesIn } from "./instance-roots";
 import { projectedRead } from "../sdlc/read-projections";
-import { enabledSubgraphsFrom, isSubgraphEnabled, ownOptInId, switchedOff, type EnabledSubgraphs } from "./opt-in-subgraphs";
+import { declaredEnableSubgraphs, enabledSubgraphsFrom, isSubgraphEnabled, ownOptInId, switchedOff, type EnabledSubgraphs } from "./opt-in-subgraphs";
 // Instance DISCOVERY lives in a leaf module (bean dmx1), so the graph-typology
 // registry can find each harness's declared `kinds/` without importing this
 // file, which imports the registry. Re-exported here so no caller moves.
