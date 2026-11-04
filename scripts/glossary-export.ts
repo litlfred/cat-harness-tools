@@ -753,7 +753,12 @@ export function buildGlossary(opts: {
   for (const k of nodeKindMap === undefined ? [] : (opts.nodeKinds ?? [])) {
     const localPart = `node-kind/${k.id}`;
     const iri = nodeKindIri(k.id);
-    const label = k.term?.trim() || humanise(k.id);
+    // A node kind with no term is read off its id, which can be the very
+    // label a graph kind of the same word already carries ("Basic cdn site").
+    // SKOS allows one prefLabel per scheme, so the node kind says what it is.
+    const plain = k.term?.trim() || humanise(k.id);
+    const taken = [...live.values()].some((l) => l.toLowerCase() === plain.toLowerCase());
+    const label = taken ? `${plain} (node kind)` : plain;
     iriOfKey.set(localPart, iri);
     live.set(localPart, label);
     nodes.push({
@@ -763,7 +768,9 @@ export function buildGlossary(opts: {
         label,
         id: localPart,
         definition: k.summary?.trim() || undefined,
-        altLabels: [...new Set([humanise(k.id), ...(k.tag !== undefined ? [k.tag] : [])])].filter((a) => a !== label).sort(),
+        altLabels: [...new Set([humanise(k.id), ...(k.tag !== undefined ? [k.tag] : [])])]
+          .filter((a) => a !== label && !(taken && a === plain))
+          .sort(),
         broader: k.parents.map(nodeKindIri),
         scheme: schemeIri,
       }),
@@ -868,8 +875,15 @@ export function buildGlossary(opts: {
     node["hiddenLabel"] = [...hidden].sort();
   }
 
-  const ledger: Ledger = { $schema: LEDGER_SCHEMA, instance: id.stub, concepts };
-  const ledgerStale = JSON.stringify(prior.concepts) !== JSON.stringify(concepts) || prior.instance !== id.stub;
+  // Keys in one order whichever families this run built, so a run that kept a
+  // family's keys untouched (`familyOff`) does not read as a changed ledger.
+  const sortedConcepts = Object.fromEntries(Object.entries(concepts).sort(([a], [b]) => a.localeCompare(b)));
+  const ledger: Ledger = { $schema: LEDGER_SCHEMA, instance: id.stub, concepts: sortedConcepts };
+  // Order-insensitive: a committed ledger written before the keys were sorted
+  // (retired terms last) holds the same facts and is not stale for that.
+  const canonical = (c: Record<string, LedgerEntry>) =>
+    JSON.stringify(Object.entries(c).sort(([a], [b]) => a.localeCompare(b)));
+  const ledgerStale = canonical(prior.concepts) !== canonical(sortedConcepts) || prior.instance !== id.stub;
 
   // Declared but undrawn. A role no longer lists lanes (data-modelling step 8,
   // #1168), so a "role names a lane no diagram contains" (`fd6i`) cannot occur
