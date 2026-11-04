@@ -23,6 +23,7 @@
     "src/tools/folio-init.ts",
     "src/tools/graph.ts",
     "src/tools/lsi-query.ts",
+    "src/tools/memory.ts",
     "src/tools/nquads-query.ts",
     "src/tools/readme-audit.ts",
     "src/tools/readme-sync.ts",
