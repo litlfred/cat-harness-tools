@@ -14,7 +14,6 @@
     "folio-assistant-core::beans/defs",
     "folio-assistant-core::beans/notes",
     "folio-assistant-core::beans/workflows",
-    "folio-assistant-sci::attestations",
-    "who-iris::who-iris-uploads"
+    "folio-assistant-sci::attestations"
   ]
 }

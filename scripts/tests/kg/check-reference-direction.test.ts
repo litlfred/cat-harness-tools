@@ -45,6 +45,7 @@ import {
   rekeyToolSplits,
   type MoveEvidence,
   EXEMPTIONS_DECLARED,
+  INSTANCE_UPLOADS_DATA,
   directionCensus,
   directionSidecarState,
   directionStates,
@@ -1389,5 +1390,20 @@ describe("bean tdir — a baseline pair on tools/index.ts is compared at the Too
     expect(rekeyToolSplits(base, mk([{ file: "x/tools/a/a.ts", target: "who-iris" }])).rekeyed).toBe(0);
     expect(rekeyToolSplits(base, mk([{ file: "x/tools/a/a.ts", target: "smart-base" }, { file: "x/tools/b/b.ts", target: "smart-base" }])).rekeyed).toBe(0);
     expect(rekeyToolSplits(base, mk([{ file: "x/tools/a/b.ts", target: "smart-base" }])).rekeyed).toBe(0);
+  });
+});
+
+describe("an instance's uploads/ is its data store, not a reference (owner, 2026-11-03)", () => {
+  // who-iris#176 stopped declaring uploads/ as a graph; its intakes record
+  // provenance ("cited in DAK Component 1 … smart-base/scripts/…", "moved here
+  // from … smart-immunizations"), which names instances above it.
+  test("an intake under <instance>/uploads/ naming a higher instance is exempt, with the ruling as its reason", () => {
+    const v = classifyReference(occ("low", "high", "basis: cited by high/scripts/x.ts", "low/uploads/item/intake.json"), RULE, never, [INSTANCE_UPLOADS_DATA]);
+    expect(v.verdict).toBe("exempt");
+    expect(v.basis).toContain("data store");
+  });
+
+  test("the same text outside uploads/ is still wrong-direction", () => {
+    expect(classifyReference(occ("low", "high", "basis: cited by high/scripts/x.ts", "low/library/item/manifest.jsonld"), RULE, never, [INSTANCE_UPLOADS_DATA]).verdict).toBe("wrong-direction");
   });
 });
