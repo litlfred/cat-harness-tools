@@ -218,6 +218,17 @@ export const IndexConfigSchema = z
       .refine((xs) => !xs.some((x) => x.name === HUB_LANDING), { message: `instances: \`${HUB_LANDING}\` is the landing keyword, not an instance name` }),
     site: IndexSiteSchema.optional(),
     /**
+     * The opt-in named sub-graphs switched on for THIS checkout, each
+     * `<instance>.<directory id>` (cat-harness#991 step 23.4). An index root
+     * declares no instance, so this is where it says what a layer's
+     * declaration says in its own `enableSubgraphs`
+     * (`schemas/kg/opt-in-subgraphs.ts`). Not inherited by any layer.
+     */
+    enableSubgraphs: z
+      .array(z.string().regex(/^[a-z0-9][a-z0-9-]*\.[^\s]+$/, "`<instance>.<directory id>`, e.g. `cat-harness.sdlc`"))
+      .refine((xs) => new Set(xs).size === xs.length, { message: "enableSubgraphs: an id is listed twice" })
+      .optional(),
+    /**
      * The steps of THIS checkout's own workflows that CI runs and the local
      * gate set does not, each with its reason ({@link GateExemptionsSchema}).
      * The index owns `.github/workflows/`, so it declares their exemptions,

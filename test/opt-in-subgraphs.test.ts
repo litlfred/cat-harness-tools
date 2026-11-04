@@ -25,6 +25,7 @@ import {
   SUBGRAPHS_ENV,
   switchedOff,
 } from "../schemas/kg/opt-in-subgraphs.ts";
+import { IndexConfigSchema } from "../schemas/kg/index-config.ts";
 import { servedToolGroups } from "../src/tool-groups.ts";
 import { checkDeclarationResolution } from "../scripts/check-declaration-resolution.ts";
 import { defaultMountDirectoryIds } from "../scripts/remote-mount.ts";
@@ -210,6 +211,45 @@ describe("an enable id that names nothing opt-in is refused", () => {
     ];
     expect(enableSubgraphsProblems("b", ["a.x-inner"], closure)).toEqual([]);
     expect(enableSubgraphsProblems("b", ["c.x"], closure)[0]?.detail).toContain("needs");
+  });
+});
+
+describe("an index root enables it in index.config.json (step 23.4)", () => {
+  /** The checkout's parent as an index: no declaration of its own, an index.config.json naming `a` and `b`. */
+  function indexCheckout(enable: string[]): string {
+    const { parent } = checkout();
+    write(parent, {
+      "index.config.json": {
+        $schema: "folio-index-config/v1",
+        instances: [{ name: "a", source: { local: { at: "a" } } }, { name: "b", source: { local: { at: "b" } } }],
+        enableSubgraphs: enable,
+      },
+    });
+    return parent;
+  }
+
+  test("the index's list is the root's list", () => {
+    expect([...enabledSubgraphs(indexCheckout(["a.x"]))]).toEqual(["a.x"]);
+    expect([...enabledSubgraphs(indexCheckout([]))]).toEqual([]);
+  });
+
+  test("the served Tool groups follow it", () => {
+    expect(servedModules(indexCheckout(["a.x"]))).toEqual(["src/at.ts", "src/xt.ts"]);
+    expect(servedModules(indexCheckout([]))).toEqual(["src/at.ts"]);
+  });
+
+  test("the schema takes it, and refuses an id listed twice or not qualified", () => {
+    const base = { $schema: "folio-index-config/v1", instances: [{ name: "a", source: { local: { at: "a" } } }] };
+    expect(IndexConfigSchema.safeParse({ ...base, enableSubgraphs: ["a.x"] }).success).toBe(true);
+    expect(IndexConfigSchema.safeParse({ ...base, enableSubgraphs: ["a.x", "a.x"] }).success).toBe(false);
+    expect(IndexConfigSchema.safeParse({ ...base, enableSubgraphs: ["x"] }).success).toBe(false);
+  });
+
+  test("check:declaration-resolution refuses an index id that names nothing opt-in", () => {
+    const r = checkDeclarationResolution(indexCheckout(["a.x", "a.api", "a.nope"]));
+    const mine = r.findings.filter((f) => f.field === "enableSubgraphs");
+    expect(mine.map((f) => f.subject).sort()).toEqual(["a.api", "a.nope"]);
+    expect(mine.every((f) => f.instance === "(index)")).toBe(true);
   });
 });
 

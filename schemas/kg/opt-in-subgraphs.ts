@@ -35,10 +35,10 @@
  * `check:declaration-resolution` ({@link enableSubgraphsProblems}), never
  * ignored: a typo would otherwise read as "the switch does not work".
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { findDeclarationFile } from "./instance-roots";
+import { findDeclarationFile, INDEX_CONFIG_FILENAME } from "./instance-roots";
 
 /** The development override: a comma list of `+<instance>.<id>` / `-<instance>.<id>`. */
 export const SUBGRAPHS_ENV = "CAT_SUBGRAPHS";
@@ -104,9 +104,14 @@ export function enabledSubgraphsFrom(
  * answer. No declaration, or no field, is the empty list; an unreadable file
  * is the same, since the parse that fails is reported by the reader that
  * parses it.
+ *
+ * **An index root** declares no instance of its own, so its list is in its
+ * `index.config.json` (`folio-index-config/v1`). That is where folio-assistant,
+ * the checkout the owner named, switches `sdlc` and `work-plan` on
+ * (cat-harness#991 step 23.4).
  */
 export function declaredEnableSubgraphs(root: string): string[] {
-  const file = findDeclarationFile(root);
+  const file = findDeclarationFile(root) ?? (existsSync(join(root, INDEX_CONFIG_FILENAME)) ? INDEX_CONFIG_FILENAME : undefined);
   if (file === undefined) return [];
   try {
     const raw = JSON.parse(readFileSync(join(root, file), "utf-8")) as { enableSubgraphs?: unknown };
