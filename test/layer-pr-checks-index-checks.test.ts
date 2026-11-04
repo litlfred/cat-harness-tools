@@ -34,6 +34,11 @@ const diag = (text: string, root = "/r/fa") =>
   py("gate_diagnostics.py", `m.diagnostics(${JSON.stringify(text)}, ${JSON.stringify(root)})`) as string[];
 
 describe("gate_diagnostics.py: the harness's own finding shapes", () => {
+  test("run-gates.py's findings() is this parser (one parser, #1457)", () => {
+    const text = "✗ 2 finding(s):\n    a.json: stale\n✗ p.ts: 3 contract(s)";
+    expect(py("run-gates.py", `m.findings(${JSON.stringify(text)})`)).toEqual(diag(text));
+  });
+
   test("core#630: a qa-results baseline's new findings, by family", () => {
     const out = [
       "  baseline (qa-reports:main/50961d8): 2 NEW finding(s), 7 inherited, 0 resolved — over wrong-direction",
@@ -48,7 +53,7 @@ describe("gate_diagnostics.py: the harness's own finding shapes", () => {
     ]);
   });
 
-  test("a ✗ finding is kept; a counted ✗ heading keys the items under it without its count", () => {
+  test("a ✗ finding is kept; the items under a counted ✗ heading are kept, the count is not", () => {
     const out = [
       "✗ who-iris/processes/a.checklist.md is stale or missing — run `bun run cat bpmn:checklist`",
       "✗ 2 finding(s):",
@@ -58,9 +63,9 @@ describe("gate_diagnostics.py: the harness's own finding shapes", () => {
       "✗ 1 kind JSON Schema finding(s) — run `bun run cat kind:json-schemas`.",
     ].join("\n");
     expect(diag(out)).toEqual([
-      "✗ who-iris/processes/a.checklist.md is stale or missing — run `bun run cat bpmn:checklist`",
-      "finding(s): core/libraries/zod.library.json: stale",
-      "finding(s): x.json: stale",
+      "who-iris/processes/a.checklist.md is stale or missing — run `bun run cat bpmn:checklist`",
+      "core/libraries/zod.library.json: stale",
+      "x.json: stale",
     ]);
   });
 
@@ -68,6 +73,7 @@ describe("gate_diagnostics.py: the harness's own finding shapes", () => {
     const a = diag("✗ 6 finding(s):\n    a: stale\n\n✗ b took 1.5 s in /tmp/abc123/x");
     const b = diag("✗ 5 finding(s):\n    a: stale\n\n✗ b took 12 s in /tmp/zz9/x");
     expect(a).toEqual(b);
+    expect(a).toEqual(["a: stale", "b took # s in /tmp/<tmp>/x"]);
   });
 });
 

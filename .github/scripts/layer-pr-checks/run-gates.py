@@ -802,6 +802,21 @@ def cone_plan(root, gates, runner, caller, env):
     return mode, note, cands, unchanged, traced
 
 
+def findings(text, root=None):
+    """Every finding `text` prints, in order (repeats kept): the `diagnostics`
+    compare-gates.py judges. One parser, `gate_diagnostics.py`, shared with
+    run-root-gates.py; this name is kept for its callers (#1457).
+
+    Without them a gate already red on main judged nothing: a PR that made one
+    more file stale passed, because the gate was "failing on main too". That is
+    how folio-assistant main stayed red on `libraries:check`,
+    `bpmn:checklist:check`, `render:bpmn:check` and `kind:json-schemas:check`
+    while each layer's own PRs added to them (2026-11-04), and how
+    folio-assistant-core#630 added a wrong-direction reference unjudged.
+    """
+    return diagnostics(text, root)
+
+
 def run(root, name, command):
     start = time.monotonic()
     try:
@@ -1035,8 +1050,8 @@ def main():
         print(f"::group::{name}: exit {code} in {seconds} s — {command}", flush=True)
         print(text[-4000:], flush=True)
         print("::endgroup::", flush=True)
-        # The errors it printed, so a gate red on main too still fails the PR
-        # that adds one (compare-gates.py; folio-assistant-core#630).
+        # The findings it printed, so a gate red on main too still fails the
+        # PR that adds one (compare-gates.py; folio-assistant-core#630, #1457).
         results[name] = {"command": command, "exit": code, "tail": text[-1500:], "seconds": seconds,
                          "diagnostics": diagnostics(text, root)}
     ran = list(results)

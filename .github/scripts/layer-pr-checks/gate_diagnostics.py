@@ -8,17 +8,22 @@ gate red on both sides is "failing on main too" whatever the PR added
 (folio-assistant-core#630 added a wrong-direction reference to
 `check:reference-direction:check`, red on main, and passed).
 
-Each key is `<file or heading>: <code, rule or finding>`, with line numbers,
-columns and counts left out, so an error that only moved, or a count that
-went down, is not new. Five shapes are read:
+Each key leaves out line numbers, columns and counts, so an error that only
+moved, or a count that went down, is not new. Five shapes are read:
 
 - `tsc`: `file(line,col): error TSnnnn: message`, and the file-less `error TSnnnn: message`;
 - ESLint's stylish report: a file line, then `  line:col  error  message  rule`;
 - the harness's qa-results baseline (`scripts/qa-results.ts`), printed by every
   `--against <ref>` gate: `new in <family>:` then `  + {json}` per new finding;
-- a harness `✗ <finding>` line, unless it opens with a count (`✗ 6 finding(s):`);
-- the indented items under such a counted `✗ N ...:` heading, keyed by the
-  heading with its count dropped (`libraries:check`).
+- a harness `✗ <finding>` line, unless it opens with a count (`✗ 6 finding(s):`,
+  `✗ 1 kind JSON Schema finding(s) —`), keyed by its text;
+- the indented items under a counted `✗ N ...:` heading, keyed by the item
+  (`libraries:check`).
+
+In the last two every number (`3`, `1.5`, `1.4.4`) reads as `#` (cat-harness-tools#1457), so a count
+inside a finding that only went down (`3 contract(s)` to `2`) is not new.
+Repeats are kept, so two findings that differ only in a number count as two.
+`run-gates.py`'s `findings()` is this function.
 
 A gate that printed none of them is judged by its exit code alone, as before.
 """
@@ -35,14 +40,18 @@ ESLINT_ERROR = re.compile(r"^\s+(?P<line>\d+):(?P<col>\d+)\s+error\s+(?P<msg>.+?
 # qa-results.ts: `    new in <family>:` then `      + {json}`.
 QA_FAMILY = re.compile(r"^\s+new in (?P<family>.+):$")
 QA_ADDED = re.compile(r"^\s+\+ (?P<entry>\{.*)$")
-# A harness finding: `✗ <text>`. One that opens with a count is a heading.
-CROSS = re.compile(r"^\s*✗ (?P<text>.+?)\s*$")
-COUNTED = re.compile(r"^\d+\s")
+# A harness finding: `✗ <text>`. One that opens with a count is a count, and
+# a heading when it ends in `:`.
+CROSS = re.compile(r"^\s*✗\s*(?P<text>.+?)\s*$")
+COUNTED = re.compile(r"^\d+\b")
+NUMBER = re.compile(r"\d+(?:\.\d+)*")  # 3, 1.5 and 1.4.4 alike
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def rel(path, root):
     """`path` relative to `root` when it lies under it, so both sides' keys agree."""
+    if root is None:
+        return path
     root = os.path.abspath(root)
     if os.path.isabs(path) and (path == root or path.startswith(root + os.sep)):
         return os.path.relpath(path, root)
@@ -50,27 +59,34 @@ def rel(path, root):
 
 
 # What differs between two runs of the same finding: a temporary directory's
-# random name, and a duration.
+# random name (a duration's number reads as `#` like any other).
 TMP = re.compile(r"(/tmp|/var/folders)/[^/\s'\"]+")
-DURATION = re.compile(r"\b\d+(?:\.\d+)?\s?(?:ms|s|min)\b")
 
 
 def unroot(text, root):
-    """`text` with the absolute root, temporary directories and durations made
+    """`text` with the absolute root (when given) and temporary directories made
     run-independent, so two checkouts' keys agree."""
-    root = os.path.abspath(root)
-    text = text.replace(root + os.sep, "").replace(root, ".")
-    return DURATION.sub("<t>", TMP.sub(r"\1/<tmp>", text))
+    if root is not None:
+        root = os.path.abspath(root)
+        text = text.replace(root + os.sep, "").replace(root, ".")
+    return TMP.sub(r"\1/<tmp>", text)
 
 
-def diagnostics(text, root):
+def finding_key(text, root):
+    """A `✗` finding's key: run-independent, every number read as `#`."""
+    return NUMBER.sub("#", unroot(text, root))
+
+
+def diagnostics(text, root=None):
     """Every error `text` reports, as line-free keys, in the order printed (repeats kept)."""
     out = []
-    eslint_file = family = heading = None
+    eslint_file = family = None
+    listing = False
     for raw in text.splitlines():
         line = ANSI.sub("", raw).rstrip()
         if not line.strip():
-            eslint_file = family = heading = None
+            eslint_file = family = None
+            listing = False
             continue
         m = TSC.match(line)
         if m:
@@ -98,16 +114,14 @@ def diagnostics(text, root):
             continue
         m = CROSS.match(line)
         if m:
-            t = unroot(m["text"], root)
-            if COUNTED.match(t):
-                # `✗ 6 finding(s):` heads a list; its count is left out of the key.
-                heading = COUNTED.sub("", t, count=1) if t.endswith(":") else None
-            else:
-                out.append(f"✗ {t}")
-                heading = None
+            # `✗ 6 finding(s):` heads a list; a bare count is no finding.
+            counted = bool(COUNTED.match(m["text"]))
+            listing = counted and m["text"].endswith(":")
+            if not counted:
+                out.append(finding_key(m["text"], root))
             continue
-        if heading and line[:1].isspace():
-            out.append(f"{heading} {unroot(line.strip(), root)}")
+        if listing and line[:1] in (" ", "\t"):
+            out.append(finding_key(line.strip(), root))
             continue
-        heading = None
+        listing = False
     return out
