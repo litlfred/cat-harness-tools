@@ -2,14 +2,14 @@
 # cat-tools-d5j0
 $schema: bean/1.0.0
 title: 'subgraph:jsonld drops the `bootstrap` prefix from cat-harness''s ns/subgraph/v1.jsonld when the checkout holding cat-harness does not hold bootstrap, so the committed file reads as stale'
-status: todo
+status: completed
 type: bug
 priority: normal
 tags:
     - ci
     - jsonld
 created_at: 2026-11-03T07:15:45Z
-updated_at: 2026-11-03T07:15:45Z
+updated_at: 2026-11-04T06:54:25Z
 parent: folio-assistant-1xhc
 ---
 
@@ -37,3 +37,10 @@ Measured on 2026-11-03 in session https://claude.ai/code/session_01EucfRoX2s5Q9r
 - A test builds the context for a fixture instance whose needed instance is absent from the checkout and asserts the needed prefix is still bound. It also asserts the result equals the context built with the needed instance present.
 - In the sibling layout above, `bun run cat-harness-tools/scripts/publish-check.ts subgraph:jsonld` no longer reports `bootstrap` as a change to cat-harness's `ns/subgraph/v1.jsonld`.
 - Other byte differences in that file are still reported, so the check stays strict. Today's real case is the `deprecated`/`isReplacedBy` drop, which is fixed by regenerating the file in cat-harness, not here.
+
+*2026-11-04T06:54:25Z* — Fixed (session https://claude.ai/code/session_01EucfRoX2s5Q9rHUMB8HHbH). `prefixesInScope` keeps a needed instance the checkout does not hold when its name is an own prefix (`ownPrefixTable()`), with its stub taken as its name. Its own `needs` are not followed, because there is no declaration to read. A name that is no own prefix still binds nothing, and the generator's existing warning ("named in … `needs`, matches no instance in this checkout") still reports it.
+
+- [x] Same context whatever else the checkout holds: `scripts/tests/subgraph-prefix-scope.test.ts` compares fixture checkouts with and without bootstrap. It fails 3 of 5 without the fix.
+- [x] An unknown `needs` name stays out of scope and is still warned about.
+- [x] Sibling layout, cat-harness main 5e07b09: the writer leaves `ns/subgraph/v1.jsonld` byte-identical. `publish-check.ts` itself cannot run there, because it calls `bun run cat` and needs a composed index's root `package.json`, so this was measured with the writer and not the gate.
+- [x] Other byte differences still fail: nothing in `--check` or `publish-check` was relaxed.
