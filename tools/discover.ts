@@ -1,43 +1,31 @@
 /**
  * Every declared `tools` graph's Tool nodes, found by asking the declarations.
  *
- * @module cat-harness/tools/discover
+ * @module cat-harness-tools/tools/discover
  *
- * ## Why this exists — bean `p0za`
+ * Every directory an instance declares with graph typology `tools` is loaded,
+ * and its `tools()` export merged. A static barrel could not do this: the
+ * harness may not import an instance that depends on it (`check:partition`).
  *
- * Eight of the nine modules that read a tool list imported
- * `cat-harness/tools/index.ts`, which holds only this instance's own Tools.
- * The DAK base layer's and the FHIR IG harness's `tools/` declared Tool nodes that no
- * check, export or audit ever saw — declared, and unreachable. A barrel that
- * imported them would not fix it: the harness may not import an instance that
- * depends on it (`check:partition`), and a core Tool is exactly that.
+ * ## No import edge
  *
- * The owner ruled **auto-discovery** (2026-09-22): every directory an instance
- * declares with graph typology `tools` is loaded, and its `tools()` export merged.
+ * The module specifier is a variable read from a declaration, as in
+ * `qa-checker-discovery.ts`. `repo-partition` counts a literal `import("./x")`
+ * as an edge and a variable one as none: the edge exists exactly when the
+ * target is hardcoded.
  *
- * ## Why this adds no import edge
+ * ## Broken Tools fail the gate, not the call
  *
- * The module specifier is a variable read from a declaration, the same pattern
- * `qa-checker-discovery.ts` uses for QA checkers. `repo-partition` counts a
- * literal `import("./x")` as an edge and a variable one as none, and that is
- * the right distinction: the edge exists exactly when the target is hardcoded.
- *
- * ## What auto-discovery gives up, and what takes its place
- *
- * The barrel's header recorded why a runtime scan was rejected before: a
- * malformed Tool would fail when something called it rather than at `tsc`.
- * That is still true of discovery. What replaces it is `check:tools`, which is
- * in the gate set and runs THIS discovery: a declared `tools` module that does
- * not load, exports no `tools()`, or yields a Tool that fails its schema is a
- * reported {@link ToolDiscovery.failures | failure}, and the gate fails on it.
- * A broken Tool is caught on push, in the same PR, not on call in production.
+ * `check:tools`, in the gate set, runs this discovery: a declared `tools`
+ * module that does not load, exports no `tools()`, or yields a Tool that fails
+ * its schema is a reported {@link ToolDiscovery.failures | failure}, and the
+ * gate fails on it.
  *
  * ## Failures are never "no tools"
  *
  * A declared graph whose module is missing or throws is a failure with a
- * reason. Folding it into an empty list would make "this instance's Tools
- * could not be loaded" read as "this instance has no Tools", which is the
- * clean-run-over-nothing defect (`dh4f`) at the scale of a whole graph.
+ * reason, never an empty list, so "could not be loaded" never reads as "has
+ * no Tools".
  */
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";

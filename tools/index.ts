@@ -5,30 +5,14 @@
  * @module cat-harness-tools/tools
  * @graphNode tool
  *
- * Reached through tool auto-discovery ({@link ./discover.ts}, bean `p0za`),
- * never by an import, like every other instance's `tools` graph.
- *
- * ## Why a Tool node lives here and not in `cat-harness/tools/`
+ * Reached through tool auto-discovery ({@link ./discover.ts}), never by an
+ * import, like every other instance's `tools` graph.
  *
  * A Tool whose `invoke.inProcess.module` is code in THIS layer is declared
- * here, beside that code (owner, 2026-10-14: "Move the node to tools"). Its
- * module path is then instance-relative to this layer, so it names no
- * directory above or beside the instance that declares it. Declared in
- * cat-harness, the same node had to spell `../cat-harness-tools/src/…`, which
- * `check:import-direction` reads, correctly, as cat-harness reaching a layer
- * its `needs` does not name.
- *
- * Tools invoked by shell (`bun run cat-harness-tools/scripts/…`) stay declared
- * in cat-harness: a command line is not a module path, and the `w2gr` split
- * (definitions there, implementations here) still holds for them.
- *
- * ## `bpmn-engine` — bean `folio-assistant-cy4p`
- *
- * Owner ruling 2026-10-10 ("both"): the engine other instances discover and
- * depend on, not an implementation detail of one MCP server. Its checklist
- * projection, `bpmn-checklist`, is invoked by shell and stays in cat-harness.
- *
- * ## One Tool per folder — bean `tdir`
+ * here, beside that code, so its module path is instance-relative and names
+ * no directory outside this instance (`check:import-direction` would refuse
+ * one that did). Tools invoked by shell (`bun run cat-harness-tools/scripts/…`)
+ * stay declared in cat-harness: a command line is not a module path.
  *
  * Each Tool is declared in `<id>/<id>.ts` beside this file, with its scripts
  * and tests when they are its alone; this file only loads the folders
