@@ -17,7 +17,9 @@ import { dirname, join } from "node:path";
 
 import { CatHarnessDeclarationSchema, ownDirectories, readDeclaration, resolveDirectories } from "../schemas/kg/cat-harness.ts";
 import { clearCheckoutCache, declarationChain, resolveSkillDirs } from "../schemas/kg/harness-config.ts";
+import { IndexConfigSchema } from "../schemas/kg/index-config.ts";
 import {
+  declaredEnableSubgraphs,
   enabledSubgraphs,
   enabledSubgraphsFrom,
   enableSubgraphsProblems,
@@ -236,4 +238,33 @@ test("the fixture's declarations parse", () => {
   expect(readDeclaration(a)?.directories.find((d) => d.id === "x")?.optIn).toBe(true);
   expect(readDeclaration(b)?.enableSubgraphs).toEqual(["a.x"]);
   expect(JSON.parse(readFileSync(join(b, "b.json"), "utf-8")).needs).toEqual(["a"]);
+});
+
+describe("an index switches sub-graphs on in `index.config.json`", () => {
+  // folio-assistant is an index and declares no instance of its own, so the
+  // owner's "folio-assistant switches them on" has to be said in its
+  // `index.config.json` (cat-harness#991 step 23).
+  const dirs: string[] = [];
+  afterAll(() => {
+    for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  });
+  const root = (files: Record<string, unknown>): string => {
+    const d = mkdtempSync(join(tmpdir(), "opt-in-index-"));
+    dirs.push(d);
+    for (const [name, body] of Object.entries(files)) writeFileSync(join(d, name), JSON.stringify(body));
+    return d;
+  };
+
+  test("a root with no declaration reads the index's list", () => {
+    const d = root({ "index.config.json": { $schema: "folio-index-config/v1", instances: [], enableSubgraphs: ["a.x"] } });
+    expect(declaredEnableSubgraphs(d)).toEqual(["a.x"]);
+  });
+  test("an index that lists nothing switches nothing on", () => {
+    const d = root({ "index.config.json": { $schema: "folio-index-config/v1", instances: [] } });
+    expect(declaredEnableSubgraphs(d)).toEqual([]);
+  });
+  test("the index schema accepts the field and refuses an unqualified id", () => {
+    expect(IndexConfigSchema.safeParse({ $schema: "folio-index-config/v1", instances: [], enableSubgraphs: ["a.x"] }).success).toBe(true);
+    expect(IndexConfigSchema.safeParse({ $schema: "folio-index-config/v1", instances: [], enableSubgraphs: ["x"] }).success).toBe(false);
+  });
 });

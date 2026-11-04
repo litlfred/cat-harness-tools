@@ -35,10 +35,13 @@
  * `check:declaration-resolution` ({@link enableSubgraphsProblems}), never
  * ignored: a typo would otherwise read as "the switch does not work".
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { findDeclarationFile } from "./instance-roots";
+
+/** The checkout's own file, which carries the list when the root is an index. */
+const INDEX_CONFIG_FILE = "index.config.json";
 
 /** The development override: a comma list of `+<instance>.<id>` / `-<instance>.<id>`. */
 export const SUBGRAPHS_ENV = "CAT_SUBGRAPHS";
@@ -106,7 +109,10 @@ export function enabledSubgraphsFrom(
  * parses it.
  */
 export function declaredEnableSubgraphs(root: string): string[] {
-  const file = findDeclarationFile(root);
+  // An index declares no instance of its own, so its list is in
+  // `index.config.json` — the checkout's file, read when the root has no
+  // declaration (a root never carries both lists).
+  const file = findDeclarationFile(root) ?? (existsSync(join(root, INDEX_CONFIG_FILE)) ? INDEX_CONFIG_FILE : undefined);
   if (file === undefined) return [];
   try {
     const raw = JSON.parse(readFileSync(join(root, file), "utf-8")) as { enableSubgraphs?: unknown };

@@ -251,6 +251,18 @@ export const IndexConfigSchema = z
       .min(1)
       .refine((xs) => new Set(xs).size === xs.length, { message: "mountApprovers: a name appears twice" })
       .optional(),
+    /**
+     * The opt-in named sub-graphs this CHECKOUT switches on, qualified
+     * `<instance>.<directory id>` (`opt-in-subgraphs.ts`). The same field an
+     * instance declaration carries, here for the checkout that declares no
+     * instance of its own: the owner's ruling of 2026-11-03 is that the
+     * sub-graphs are off in every layer and *folio-assistant switches them
+     * on*, and folio-assistant is an index (cat-harness#991 step 23).
+     */
+    enableSubgraphs: z
+      .array(z.string().regex(/^[a-z0-9][a-z0-9-]*\.[^\s]+$/, "`<instance>.<directory id>`, e.g. `cat-harness.sdlc`"))
+      .refine((xs) => new Set(xs).size === xs.length, { message: "enableSubgraphs: an id appears twice" })
+      .optional(),
   })
   .strict()
   .superRefine((c, ctx) => {
