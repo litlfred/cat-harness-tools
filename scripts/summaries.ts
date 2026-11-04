@@ -51,7 +51,7 @@ import {
 } from "../schemas/content/block-summary.ts";
 import { NarrativeSchema, narrativesOfSlot, type Narrative } from "../schemas/content/narrative.ts";
 import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
-import { declarationPathIn, repoRootFor, resolveDirectories } from "../schemas/kg/cat-harness.ts";
+import { declarationPathIn, readDeclaration, repoRootFor, resolveDirectories } from "../schemas/kg/cat-harness.ts";
 import { specimenSections } from "../schemas/content/section-verdicts.ts";
 import { corpusDirectoriesForGraph, declarationChain } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -174,14 +174,19 @@ export function heldLibraries(root = ROOT): string[] {
     const abs = resolve(lib);
     for (let owner = dirname(abs); owner !== dirname(owner); owner = dirname(owner)) {
       if (declarationPathIn(owner) === undefined) continue;
-      // The RESOLVED entries, not the declaration's own list: a library declared
-      // from within a sub-graph (cat-harness's corpus, `library/graph.json`) is
-      // absent from `directories`, and reading only that list dropped its
-      // `heldEntries` — the drain then offered blocks the owner holds back. Every
-      // sub-graph is switched on here: a hold must not depend on the switch.
-      const entry = resolveDirectories(declarationChain(owner), undefined, { enabledSubgraphs: "all" }).find(
-        (d) => (d.graphTypologies ?? []).includes("library") && resolve(d.absPath) === abs,
-      );
+      // The declaration's own list first, then the RESOLVED entries: a library
+      // declared from within a sub-graph (cat-harness's corpus,
+      // `library/graph.json`) is absent from `directories`, and reading only that
+      // list dropped its `heldEntries` — the drain then offered blocks the owner
+      // holds back. The resolver is the slow path, so it runs only when the list
+      // has no entry. Every sub-graph is switched on there: a hold must not
+      // depend on the switch.
+      const isLib = (d: { graphTypologies?: readonly string[] }) => (d.graphTypologies ?? []).includes("library");
+      const entry =
+        readDeclaration(owner)?.directories.find((d) => isLib(d) && resolve(owner, d.path) === abs) ??
+        resolveDirectories(declarationChain(owner), undefined, { enabledSubgraphs: "all" }).find(
+          (d) => isLib(d) && resolve(d.absPath) === abs,
+        );
       if (entry?.summaries === "held") held.push(abs);
       // Per-entry holds (bean `j7ql`): the same answer for one document as
       // `held` gives for the whole directory.
