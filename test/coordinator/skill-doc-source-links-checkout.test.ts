@@ -49,7 +49,8 @@ describe.skipIf(NOT_BUILT)("generated skill pages link a source that exists", ()
       const body = readFileSync(join(OUT_DIR, page), "utf8");
       for (const m of body.matchAll(LINK)) {
         checked++;
-        const path = decodeURIComponent(m[1]);
+        // The file is what must exist; a `#fragment` names a place in it, not a path.
+        const path = decodeURIComponent(m[1].split("#")[0]!);
         if (path.split("/").includes("..") || !existsSync(join(REPO_ROOT, path))) dead.push(`${page} -> ${path}`);
       }
     }
