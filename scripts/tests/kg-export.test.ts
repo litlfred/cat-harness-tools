@@ -777,12 +777,18 @@ describe("every self-URL the export publishes resolves to something published", 
       out.add(`tool-types/${n}.schema.json`);
       out.add(`${hostDir}tool-types/${n}.schema.json`);
     }
-    const toolDir = join(HARNESS_ROOT, "tools");
+    // The Tool folders: `tools/`, and the `work-plan` sub-graph's since
+    // cat-harness#1014 moved eleven of them there (cat-harness#991 step 23.2).
+    // The document beside each is `tools/<id>.jsonld` whichever folder holds it.
+    // declared-path-literal: the two Tool folders the harness has, one per layout (transitional, cat-harness#991 step 23).
+    const toolDirs = [join(HARNESS_ROOT, "tools"), join(HARNESS_ROOT, "work-plan", "tools")].filter((d) => existsSync(d));
     // Beside the document, so under `<name>/` since #603 decision 1b.
     const docDir = docPath.includes("/") ? docPath.slice(0, docPath.lastIndexOf("/") + 1) : "";
-    for (const f of readdirSync(toolDir, { withFileTypes: true })) {
-      if (!f.isDirectory()) continue;
-      out.add(`${docDir}tools/${f.name}.jsonld`);
+    for (const toolDir of toolDirs) {
+      for (const f of readdirSync(toolDir, { withFileTypes: true })) {
+        if (!f.isDirectory()) continue;
+        out.add(`${docDir}tools/${f.name}.jsonld`);
+      }
     }
     const svgDir = join(HARNESS_ROOT, siteDirFor(join(HARNESS_ROOT)), "assets", "img", "workflows");
     for (const f of readdirSync(svgDir)) if (f.endsWith(".svg")) out.add(`assets/img/workflows/${f}`);
