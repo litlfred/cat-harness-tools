@@ -184,6 +184,10 @@ describe("real repository measurement", () => {
     // one of the 16 known: a NEW unconsumed fact fails here in either setting.
     // `git-push` left the list when cat-harness's own copy-into-folio.bpmn
     // began probing it as a write capability.
+    // `jekyll` left the must-be-unconsumed list below when cat-harness#1015's
+    // sdlc/processes/docs-site-publish.bpmn began naming `bundle exec jekyll
+    // build`. It stays in KNOWN: a checkout pinning cat-harness before #1015
+    // still reports it, and either answer is right for its pin.
     const KNOWN = new Set([
       // capabilities
       "fhir-validator", "ig-publisher", "jekyll", "lean-toolchain", "sushi-compiler",
@@ -196,7 +200,7 @@ describe("real repository measurement", () => {
     const findingsWhere = res.findings.map((f) => f.where);
     expect(findingsWhere.filter((w) => !KNOWN.has(w))).toEqual([]);
     // Unconsumed in either setting: no process mounted anywhere consumes these yet.
-    for (const w of ["jekyll",
+    for (const w of [
       "release-authorization", "content-authoring", "qa-reporting", "clinical-validation",
       "perform-task", "approval-authority", "project-governance", "first-pass-review", "sme-coordination"]) {
       expect(findingsWhere).toContain(w);
