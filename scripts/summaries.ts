@@ -51,9 +51,9 @@ import {
 } from "../schemas/content/block-summary.ts";
 import { NarrativeSchema, narrativesOfSlot, type Narrative } from "../schemas/content/narrative.ts";
 import { DEFAULT_NARRATIVE_LANG } from "./lib/narrative-display.ts";
-import { declarationPathIn, readDeclaration, repoRootFor } from "../schemas/kg/cat-harness.ts";
+import { declarationPathIn, repoRootFor, resolveDirectories } from "../schemas/kg/cat-harness.ts";
 import { specimenSections } from "../schemas/content/section-verdicts.ts";
-import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
+import { corpusDirectoriesForGraph, declarationChain } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { libraryEntryDir, libraryEntryDirs, libraryOfEntry } from "./lib/library-entry-graphs.ts";
 
@@ -174,8 +174,13 @@ export function heldLibraries(root = ROOT): string[] {
     const abs = resolve(lib);
     for (let owner = dirname(abs); owner !== dirname(owner); owner = dirname(owner)) {
       if (declarationPathIn(owner) === undefined) continue;
-      const entry = readDeclaration(owner)?.directories.find(
-        (d) => (d.graphTypologies ?? []).includes("library") && resolve(owner, d.path) === abs,
+      // The RESOLVED entries, not the declaration's own list: a library declared
+      // from within a sub-graph (cat-harness's corpus, `library/graph.json`) is
+      // absent from `directories`, and reading only that list dropped its
+      // `heldEntries` — the drain then offered blocks the owner holds back. Every
+      // sub-graph is switched on here: a hold must not depend on the switch.
+      const entry = resolveDirectories(declarationChain(owner), undefined, { enabledSubgraphs: "all" }).find(
+        (d) => (d.graphTypologies ?? []).includes("library") && resolve(d.absPath) === abs,
       );
       if (entry?.summaries === "held") held.push(abs);
       // Per-entry holds (bean `j7ql`): the same answer for one document as
