@@ -6,7 +6,7 @@
  * Reads all Zod schemas from schemas/constraints.ts and writes
  * corresponding JSON Schema files to schemas/generated/.
  *
- * Usage: npx ts-node cat-harness-tools/scripts/generate-schemas.ts
+ * Usage: bun run cat-harness-tools/scripts/generate-schemas.ts
  */
 
 import { namedJsonSchema } from "../schemas/kg/to-json-schema.ts";

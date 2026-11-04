@@ -16,7 +16,8 @@ Merged as #1463 (root docs and directory descriptions), #1464 (`schemas/`
 headers) and #1465 (`scripts/` headers): 311,939 words to 192,708 over 768
 documents. QA report: https://claude.ai/artifact/6xMoPLRk412iT2hXKkqYfK
 
-Left open: five headers spell a checkout script without `cat`
-(`bun run schema:viz`, `bun run detect:live-corpus`, …) and so do the scripts'
-own messages; `generate-schemas.ts` and `generate-registry.ts` still give
-`npx ts-node` as their runner.
+Follow-up: `generate-schemas.ts` and `generate-registry.ts` now give `bun run`
+as their runner (the registry test runs it that way), and the
+`instantiate-harness.ts` header, skipped because main changed it mid-review, is
+cleaned. Commands written as `bun run <name>` without `cat` are the checkout
+root's convention (every generator's `command:` field uses it), so they stay.
