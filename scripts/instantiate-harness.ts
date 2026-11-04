@@ -22,7 +22,7 @@
  * §4 rule "if `main` has no harness yet, land a setup-only PR first". The PR
  * this opens IS that setup-only PR, and its preview is what a reviewer looks
  * at before merging it. Until now every harnessed IG was set up by hand by
- * copying a sibling's files (smart-ips-pilgrimage#6 copied smart-trust-phw's).
+ * copying a sibling's files (smart-ips-pilgrimage#6 copied a sibling IG's).
  *
  * ## It runs before anything is mounted, so it imports only `node:*`
  *

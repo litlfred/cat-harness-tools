@@ -725,7 +725,7 @@ function lead(store: string, now: Date, up: string): string {
  * only over instances), so the link is left out rather than left dead. A
  * store with beans and no instance is a content layer mounted in an IG's site
  * (found 2026-11-03 rendering a newly harnessed IG: `../workflows/` from
- * `folio-assistant-core/beans-processed/` was the one dead chrome link).
+ * a content layer's `beans-processed/` page was the one dead chrome link).
  */
 function nav(store: string, up: string, instances = true): string {
   return `<p class="sv-sub"><a href="${up}">${esc(store)}'s work plan</a> · <a href="${up}beans-processed/">beans by process</a>${instances ? ` · <a href="${up}workflows/">every instance</a>` : ""}</p>`;
