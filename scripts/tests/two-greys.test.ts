@@ -203,17 +203,40 @@ describe.skipIf(NOT_BUILT || NO_IRIS)("who-iris — the instance that carries bo
     expect(vis("catalogue")?.readOnly).toBe(true);
   });
 
-  it("and its uploads drop zone is explicitly NOT", () => {
-    // The case that added a fourth verdict to `check:read-only-graphs`. The
-    // bytes there are materialized and the directory is a write target —
-    // `adapters/document/paths.ts` creates it on a first ingest precisely so
-    // somebody can write to it. Two different questions.
-    expect(vis("uploads")?.readOnly).toBe(false);
+  // Owner, 2026-11-03: *"instantiated harnesses can have an uploads/ but that
+  // is data store for that repo, not part of the KG"*. who-iris#176 drops the
+  // `uploads` declaration, so which answer holds is read from who-iris's own
+  // declaration, never assumed: the checkout this runs in may hold either.
+  const irisDeclaresUploads = (() => {
+    try {
+      const decl = JSON.parse(readFileSync(join(REPO, "who-iris", "who-iris.json"), "utf-8")) as {
+        directories?: Array<{ graphTypologies?: string[] }>;
+      };
+      return (decl.directories ?? []).some((d) => (d.graphTypologies ?? []).includes("uploads"));
+    } catch {
+      return false;
+    }
+  })();
+
+  it("and its uploads/ is writable while declared, and not a graph once it is repository data", () => {
+    // While declared: the case that added a fourth verdict to
+    // `check:read-only-graphs`. The bytes there are materialized and the
+    // directory is a write target. Two different questions.
+    if (irisDeclaresUploads) expect(vis("uploads")?.readOnly).toBe(false);
+    // Undeclared: the repository's data store, so no graph row at all.
+    else expect(vis("uploads")).toBeUndefined();
   });
 
-  it("so one instance proves the field is not a per-instance constant", () => {
-    // If readOnly were resolved per INSTANCE rather than per kind, these two
-    // could not disagree, and the drop-zone exception would be unrepresentable.
-    expect(vis("catalogue")?.readOnly).not.toBe(vis("uploads")?.readOnly);
+  it("so readOnly is per kind, not a per-instance constant", () => {
+    // If readOnly were resolved per INSTANCE rather than per kind, no instance
+    // could hold a frozen kind and an explicitly writable one. who-iris did,
+    // through its uploads drop zone; once that is repository data, any
+    // instance that does carries the proof.
+    const mixed = harnesses.filter((h) => {
+      const ro = (h.visualisations ?? []).map((v) => v.readOnly);
+      return ro.includes(true) && ro.includes(false);
+    });
+    expect(mixed.length, "no instance holds both a frozen and an explicitly writable kind").toBeGreaterThan(0);
+    if (irisDeclaresUploads) expect(vis("catalogue")?.readOnly).not.toBe(vis("uploads")?.readOnly);
   });
 });
