@@ -359,10 +359,11 @@ if (import.meta.main) {
     process.exit(1);
   }
   const files = gutsFiles(dir);
-  if (files.length === 0) {
-    console.error(`::error::gen-fsh-guts-viz: ${relative(REPO, dir)} is empty — nothing to render`);
-    process.exit(1);
-  }
+  // A directory that EXISTS and holds nothing is a store nobody has relocated
+  // anything into yet (a downstream's freshly seeded `cat/<instance>/fsh-guts`),
+  // not the `dh4f` shape above: the page says "0 file(s)", which is true, rather
+  // than failing the site build that owes it.
+  if (files.length === 0) console.log(`gen-fsh-guts-viz: ${relative(REPO, dir)} holds no kept file yet; writing the empty index`);
   const blobBase = `https://github.com/litlfred/folio-assistant/blob/main/${relative(REPO, dir)}`;
   const rendered = page(files, blobBase);
   const PAGE = pageRelPath(REPO);

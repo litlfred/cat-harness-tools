@@ -132,3 +132,12 @@ describe("page lede and links (folio-assistant-oi3h)", () => {
   });
 });
 
+
+describe("an existing, empty store", () => {
+  // A downstream's freshly seeded cat/<instance>/fsh-guts holds nothing yet. Its
+  // index says so; refusing it failed every site build that owes the page.
+  test("renders an index that says 0 file(s), not an error", () => {
+    const rendered = page([], "https://github.com/x/y/blob/main/fsh-guts");
+    expect(rendered).toContain("**0 file(s)** across 0 group(s)");
+  });
+});
