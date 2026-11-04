@@ -539,6 +539,7 @@
     "library:keywords:check": "bun run cat-harness-tools/scripts/library-keywords.ts --check",
     "library:readmes": "bun run cat-harness-tools/scripts/library-readmes.ts",
     "library:readmes:check": "bun run cat-harness-tools/scripts/library-readmes.ts --check",
+    "check:retired-prose-words": "bun run cat-harness-tools/scripts/retired-prose-words.ts",
     "readme:subgraphs": "bun run cat-harness-tools/scripts/subgraph-readmes.ts",
     "readme:subgraphs:check": "bun run cat-harness-tools/scripts/subgraph-readmes.ts --check --against main",
     "post-merge:regen": "bun run cat-harness-tools/scripts/post-merge-regen.ts",
