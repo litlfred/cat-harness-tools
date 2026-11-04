@@ -54,6 +54,8 @@
 # (`.github/scripts/merge-junit.py`); the index's own gates run in part 1.
 #
 # The same two runs also run the INDEX's own gates over the composed root
+# (`root-gates.json`, and `index-gates.json`: the index's gates that read every
+# layer, which this workflow ran nowhere before #1445 and #1417 broke them)
 # (owner, 2026-10-23, item 2: a layer PR merges only on a green index run with
 # it pinned). The index lints every mounted instance with this layer's eslint
 # config and typechecks every instance; #385 passed every check here and
@@ -268,7 +270,7 @@ jobs:
           else
             base="$(git ls-remote origin refs/heads/main | cut -f1)"
           fi
-          judge="$(cat .github/scripts/layer-pr-checks/run-root-gates.py .github/scripts/layer-pr-checks/root-gates.json scripts/check-standalone.ts | sha256sum | cut -c1-16)"
+          judge="$(cat .github/scripts/layer-pr-checks/run-root-gates.py .github/scripts/layer-pr-checks/root-gates.json .github/scripts/layer-pr-checks/index-gates.json .github/scripts/layer-pr-checks/gate_diagnostics.py scripts/check-standalone.ts | sha256sum | cut -c1-16)"
           {
             echo "base=$base"
             echo "any=pr-tests-main-v1-$judge-"
@@ -394,12 +396,28 @@ jobs:
           print(f"{sys.argv[2]}: mounted")
           PY
           done
+      - name: Install Chromium, for render:bpmn:check (shard 1)
+        # The index's own Playwright, so the browser build is the one it
+        # expects (as layer-pr-checks.yml installs it).
+        if: matrix.shard == 1
+        working-directory: fa
+        run: |
+          if [ -x node_modules/.bin/playwright ]; then
+            node_modules/.bin/playwright install --with-deps chromium
+          else
+            echo "no playwright in the index: no browser installed"
+          fi
       - name: The index's own gates over the composed root (shard 1)
         # Before the tests, which write into the tree. Judged by the
         # index-gates job, not by this exit code. One shard runs them.
+        # `index-gates.json` adds the index's gates that read every layer
+        # (check:reference-direction:check, check:prov-qaqc, the generated-
+        # file checks), one at a time after the pooled ones: none of them ran
+        # on this layer's PRs, and #1445 and #1417 each broke the index with
+        # one of them at re-pin.
         if: matrix.shard == 1
         working-directory: fa
-        run: python3 ../judge/run-root-gates.py . ../judge/root-gates.json "$RUNNER_TEMP/root-gates.json" || true
+        run: python3 ../judge/run-root-gates.py . ../judge/root-gates.json "$RUNNER_TEMP/root-gates.json" ../judge/index-gates.json || true
       - name: bun test, part ${{ matrix.shard }} of 4
         working-directory: fa
         # The result is judged by the tests job, not by this exit code. The

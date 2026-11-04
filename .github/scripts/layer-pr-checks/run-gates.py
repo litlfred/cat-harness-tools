@@ -105,6 +105,11 @@ import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+# Beside this file, found by its path: the tests and `python3 -I` put no
+# script directory on sys.path.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from gate_diagnostics import diagnostics  # noqa: E402
+
 # Scoped to the instance where the check takes a scope (kg-audit, kg-export,
 # import-direction). check-tools and declaration-resolution read the whole
 # checkout; the base/head comparison is what attributes a change in them to
@@ -136,6 +141,24 @@ CHECKOUT_SCRIPTS = {
     "index-config:inline:check": "cat-harness-tools",
     "skill:commands:check": "cat-harness-tools",
 }
+# The index's own gates that read every mounted layer (`index-gates.json`, the
+# one list, shared with pr-tests.yml): run for every caller too, so a layer
+# below the declaring instance (cat-harness, bootstrap, bootstrap-tools) is
+# judged on them with its head swapped in. A caller above it already derives
+# them under the same names, so for it nothing changes but their diagnostics.
+INDEX_GATES_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index-gates.json")
+
+
+def index_scripts(path=INDEX_GATES_JSON):
+    """script -> declaring instance, from `index-gates.json`; {} when it is absent or unreadable."""
+    try:
+        gates = json.load(open(path))["gates"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+    return {script: name.split(":", 1)[0] for name, script in gates.items()
+            if isinstance(script, str) and ":" in name}
+
+
 TIMEOUT_S = 1200
 # Gates that judge the REMOTE's live state, not the checkout: which workflows
 # are red on the default branch, whether a commit has a run, which advisories
@@ -819,8 +842,10 @@ def derive(root, given, tmp, env=None):
     gates.update({f"graph:{k}": v for k, v in CHECKOUT_GATES.items()})
     seen_scripts = set()
     runner = script_runner(root)
-    for script, owner in CHECKOUT_SCRIPTS.items():
+    for script, owner in {**CHECKOUT_SCRIPTS, **index_scripts()}.items():
         command = f"{runner} {script}"
+        if command in seen_scripts:
+            continue
         seen_scripts.add(command)
         gates[f"{owner}:{script}"] = command
     skipped = {}
@@ -1010,7 +1035,10 @@ def main():
         print(f"::group::{name}: exit {code} in {seconds} s — {command}", flush=True)
         print(text[-4000:], flush=True)
         print("::endgroup::", flush=True)
-        results[name] = {"command": command, "exit": code, "tail": text[-1500:], "seconds": seconds}
+        # The errors it printed, so a gate red on main too still fails the PR
+        # that adds one (compare-gates.py; folio-assistant-core#630).
+        results[name] = {"command": command, "exit": code, "tail": text[-1500:], "seconds": seconds,
+                         "diagnostics": diagnostics(text, root)}
     ran = list(results)
     for name, entry in unchanged.items():
         print(f"{name}: SKIPPED — {entry['skipped']} — {entry['command']}", flush=True)
