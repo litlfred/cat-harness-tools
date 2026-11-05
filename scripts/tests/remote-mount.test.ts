@@ -388,6 +388,27 @@ describe("mount:remote over fixture repositories", () => {
     expect(remoteFanOut(root, { check: true }).state).toBe("mounted");
   });
 
+  test("14b. a fan-out over mounts the lock already verifies fetches nothing (bean folio-assistant-x35i); a removed one is fetched again", () => {
+    const root = downstream({});
+    expect(remoteFanOut(root, { urlFor }).state).toBe("mounted");
+    let asked = 0;
+    const counting = (r: string): string => {
+      asked++;
+      return urlFor(r);
+    };
+    const again = remoteFanOut(root, { urlFor: counting });
+    expect(again.state).toBe("mounted");
+    expect(asked).toBe(0);
+    expect(again.text).toContain("nothing fetched");
+    // A locked directory gone from disk is stale: the full mount runs and lays it again.
+    const dir = readLock(root).instances[0]!.directories[0]!.path;
+    rmSync(join(root, dir), { recursive: true, force: true });
+    const healed = remoteFanOut(root, { urlFor: counting });
+    expect(asked).toBeGreaterThan(0);
+    expect(healed.state).toBe("mounted");
+    expect(existsSync(join(root, dir))).toBe(true);
+  });
+
   test("15. a declaration whose directory is NOT its name is found, and lands at livesAt.path", () => {
     // The smart-* forks: `smart-base/smart-trust.json` declares `smart-trust`.
     const odd = bareRepo(base, "odd", {
