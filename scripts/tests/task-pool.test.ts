@@ -112,6 +112,20 @@ describe("input-hash skipping", () => {
     expect(sourceClosure(root, e!)).toEqual({ files: ["scripts/x.ts", "scripts/y.ts"] });
   });
 
+  test("an import written inside a template literal is text, not an edge", () => {
+    writeFileSync(
+      join(root, "scripts", "y.ts"),
+      'export const y = 2;\nexport const shim = (d: string) => `export * from "../../${d}/schemas/builders";\n`;\n',
+    );
+    expect(sourceClosure(root, ["scripts/x.ts"])).toEqual({ files: ["scripts/x.ts", "scripts/y.ts"] });
+  });
+
+  test("an unresolvable literal import still makes the closure undetermined", () => {
+    writeFileSync(join(root, "scripts", "y.ts"), 'import { z } from "./nowhere.ts";\nexport const y = z;\n');
+    const c = sourceClosure(root, ["scripts/x.ts"]);
+    expect("undetermined" in c && c.undetermined).toContain("imports unresolvable ./nowhere.ts");
+  });
+
   describe("COULD NOT DETERMINE is never clean — the pair runs", () => {
     const cacheWith = (h: string): HashCache => ({ version: 1, pairs: { k: h } });
 
