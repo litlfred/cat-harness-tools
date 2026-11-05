@@ -420,10 +420,24 @@ export function processDrawing(corpus: JourneyCorpus, instance: string, process:
   return { svg: readFileSync(svgPath, "utf8"), file: relative(info.root, svgPath).split("\\").join("/") };
 }
 
+const XML_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+
+/**
+ * An XML attribute value with its entities resolved, in ONE pass: each
+ * `&…;` is replaced once, so `&amp;lt;` is `&lt;`, never `<`.
+ */
+export function unescapeXml(text: string): string {
+  return text.replace(/&(?:#x([0-9a-f]+)|#(\d+)|(amp|lt|gt|quot|apos));/gi, (whole, hex: string | undefined, dec: string | undefined, name: string | undefined) => {
+    if (hex !== undefined) return String.fromCodePoint(parseInt(hex, 16));
+    if (dec !== undefined) return String.fromCodePoint(Number(dec));
+    return XML_ENTITIES[name!.toLowerCase()] ?? whole;
+  });
+}
+
 /** The name of the process a BPMN file a step names holds (its first `process` with a `name`); undefined when there is none. */
 export function processName(corpus: JourneyCorpus, instance: string, process: string): string | undefined {
   const file = instanceFile(corpus, instance, process);
   if (file === undefined) return undefined;
   const m = /<(?:[A-Za-z_][\w.-]*:)?process\b[^>]*\sname="([^"]+)"/.exec(readFileSync(file, "utf8"));
-  return m ? m[1]!.replace(/&#x([0-9a-f]+);/gi, (_x, h: string) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (_x, d: string) => String.fromCodePoint(Number(d))).replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">") : undefined;
+  return m ? unescapeXml(m[1]!) : undefined;
 }

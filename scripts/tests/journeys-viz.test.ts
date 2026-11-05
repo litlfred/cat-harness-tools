@@ -12,7 +12,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { readJourneyCorpus } from "../journeys/read.ts";
+import { readJourneyCorpus, unescapeXml } from "../journeys/read.ts";
 import { bpmnFigure, orderByFollows, renderJourneyPages, stepAnchor, type PageFile } from "../journeys/render.ts";
 import { journeyFiles, journeysRoute } from "../gen-journeys-viz.ts";
 import {
@@ -573,6 +573,11 @@ describe("presentation helpers", () => {
     );
     // An escaped quote stays inside its string.
     expect(highlightJson(JSON.stringify({ q: 'say "hi"' }))).toContain('<span class="jp-j-str">&quot;say \\&quot;hi\\&quot;&quot;</span>');
+  });
+  test("unescapeXml resolves each entity once: an escaped ampersand is not unescaped again", () => {
+    expect(unescapeXml("&amp;lt;")).toBe("&lt;");
+    expect(unescapeXml("newborn&#x27;s &#39;dose&#39; &lt;b&gt; &quot;x&quot; &apos;y&apos; &amp;")).toBe(`newborn's 'dose' <b> "x" 'y' &`);
+    expect(unescapeXml("&unknown; & alone")).toBe("&unknown; & alone");
   });
   test("the views' pure helpers: feeling points, block usage, step refs, screens", () => {
     const p = presentationOf(corpus, corpus.workshops[0]!);

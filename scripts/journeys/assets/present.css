@@ -523,7 +523,7 @@ a.jp-block:hover { background: var(--s50); box-shadow: var(--shadow-sm); }
 .jp-phead-top { display: flex; align-items: center; gap: 16px; }
 .jp-phead h2 { font-size: 22px; font-weight: 700; color: var(--ink); }
 .jp-phead h2 small { font-size: 12px; font-weight: 600; color: color-mix(in srgb, var(--c) 70%, black); }
-.jp-goal { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--s800); }
+.jp-goal { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; color: var(--s800); }
 .jp-goal .jp-i { color: var(--s500); }
 .jp-pboxes { display: grid; grid-template-columns: 1fr; gap: 12px; }
 @media (min-width: 768px) { .jp-pboxes { grid-template-columns: 1fr 1fr; } }
