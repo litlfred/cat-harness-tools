@@ -980,6 +980,8 @@ export function publishLayers(root: string, opts: { url?: string; main?: boolean
   const notCurrent = instances.map((i) => checkInstance(root, i)).filter((o) => o.state !== "current");
   if (notCurrent.length) return { ok: false, detail: `refused — not every mount hashes to the lock (run \`bun run cat mount:lock\` first): ${notCurrent.map((o) => `${o.instance}: ${o.detail}`).join("; ")}` };
   const key = layersKey(instances);
+  const url = opts.url ?? layersUrl(root);
+  if (opts.push !== false && !url) return { ok: false, key, detail: "no index remote to push to (pass --url or set CAT_LAYERS_URL)" };
   const entries = overlayEntries(root, instances);
   const scratch = mkdtempSync(join(tmpdir(), "layers-publish-"));
   try {
@@ -1018,11 +1020,9 @@ export function publishLayers(root: string, opts: { url?: string; main?: boolean
     const sha = commit.stdout.trim();
     const refs = [layersRef(key), ...(opts.main ? [LAYERS_MAIN_REF] : [])];
     if (opts.push === false) return { ok: true, key, commit: sha, refs: [], detail: `built ${sha.slice(0, 12)} for ${key.slice(0, 12)} (${entries.length} files); not pushed` };
-    const url = opts.url ?? layersUrl(root);
-    if (!url) return { ok: false, key, commit: sha, detail: "no index remote to push to (pass --url or set CAT_LAYERS_URL)" };
-    const push = gitEnv(root, ["push", "-q", "--force", url, ...refs.map((r) => `${sha}:${r}`)], env);
+    const push = gitEnv(root, ["push", "-q", "--force", url!, ...refs.map((r) => `${sha}:${r}`)], env);
     if (push.status !== 0) return { ok: false, key, commit: sha, detail: `git push failed: ${push.stderr.trim().split("\n").pop()}` };
-    const pruned = opts.prune !== undefined ? pruneLayers(url, opts.prune, [key, ...(opts.keep ?? [])]) : [];
+    const pruned = opts.prune !== undefined ? pruneLayers(url!, opts.prune, [key, ...(opts.keep ?? [])]) : [];
     return { ok: true, key, commit: sha, refs, pruned, detail: `pushed ${sha.slice(0, 12)} (${entries.length} files) to ${refs.join(", ")}${pruned.length ? `; pruned ${pruned.length}` : ""}` };
   } finally {
     rmSync(scratch, { recursive: true, force: true });
