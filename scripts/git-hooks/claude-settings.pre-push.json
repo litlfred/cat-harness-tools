@@ -1,0 +1,17 @@
+{
+  "_comment": "Merge into a composed checkout's .claude/settings.json (folio-assistant, or any index that mounts cat-harness-tools at cat-harness-tools/). It runs the fast gates before an agent's `git push` and blocks the push on a red one; see scripts/pre-push-gates.ts and bean cat-tools-pp9g. For cat-harness-tools checked out on its own, the path is scripts/pre-push-gates.ts.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run \"$CLAUDE_PROJECT_DIR/cat-harness-tools/scripts/pre-push-gates.ts\" --claude-hook",
+            "timeout": 1800
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -39,6 +39,12 @@ export const GatesReportSchema = z
     /** How many gates the set holds, and how many declared writers ran after them. */
     gates: z.number().int().nonnegative(),
     writers: z.number().int().nonnegative(),
+    /**
+     * Every gate command in the set, in workflow order — what the run was asked
+     * to judge, so a record of it (`scripts/gate-record.ts`) names what it
+     * covers rather than only how many. Absent from reports written before it.
+     */
+    commands: z.array(z.string()).optional(),
     failed: z.array(GateRefSchema.extend({ why: z.array(z.string()) })),
     /** Not asked: inputs unchanged since each last passed. Never counted as a pass. */
     skipped: z.array(z.object({ command: z.string(), why: z.string() })),

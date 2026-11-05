@@ -2265,6 +2265,7 @@ if (import.meta.main) {
     process.exit(2);
   }
   report.gates = gates.length;
+  report.commands = gates.map((g) => g.command);
 
   // ── Is the ENVIRONMENT fit to be read from? (bean `3vc1`) ──────────────
   //
