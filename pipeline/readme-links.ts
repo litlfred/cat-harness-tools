@@ -41,6 +41,7 @@ import { loadReadmeConfig } from "./readme-toc";
 import { findContentRepoRoot } from "./repo-root";
 import { auditMarkdownFile } from "../src/core/markdown-links";
 import { INSTANCE_README_ROLE, declaredAssetPath } from "../schemas/kg/cat-harness.ts";
+import { movesResolver } from "../scripts/check-agent-entry-links.ts";
 
 // Re-exported for callers that audit a README and nothing else, so a folio
 // tool does not have to know where the generic auditor lives. New harness
@@ -76,6 +77,8 @@ export function runReadmeAudit(opts: {
     pagesBaseUrl: cfg.pagesBaseUrl,
     publishRef: cfg.publishRef,
     fetch: opts.fetch,
+    // A link into a path an instance moved resolves there in the move's window.
+    resolveMoved: movesResolver(root),
   });
 }
 

@@ -31,13 +31,13 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { findDeclarationFile, repoRootFor, KG_CONTENT_GRAPH_TYPOLOGIES } from "../schemas/kg/cat-harness.js";
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
 import { gateOwnsFile } from "./lib/gate-own.ts";
 
-import { findEntryFiles } from "./check-agent-entry-links.ts";
+import { findEntryFiles, movesResolver } from "./check-agent-entry-links.ts";
 import { isSyncedSkillDir } from "./sync-remote-skills.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -129,6 +129,24 @@ export interface CommandPathReport {
    */
   held: { file: string; line: number; token: string; command: string }[];
   dead: { file: string; line: number; token: string; command: string }[];
+  /**
+   * Paths that resolve only through a move some instance declares, in its
+   * window (sdlc skill `two-phase-move`): checked and passing, each still to
+   * switch to the new path. Past `until` the same path is `dead`.
+   */
+  moved: { file: string; line: number; token: string; command: string; move: string }[];
+}
+
+const RESOLVERS = new Map<string, ReturnType<typeof movesResolver>>();
+
+/** Does {@link tok} resolve through a declared move? If so it is recorded on {@link report} as moved. */
+function throughMove(repo: string, tok: string, report: CommandPathReport, at: Omit<CommandPathReport["moved"][number], "token" | "move">): boolean {
+  let resolveMoved = RESOLVERS.get(repo);
+  if (resolveMoved === undefined) RESOLVERS.set(repo, (resolveMoved = movesResolver(repo)));
+  const through = resolveMoved(resolve(repo, tok));
+  if (through === undefined) return false;
+  report.moved.push({ ...at, token: tok, move: through.move });
+  return true;
 }
 
 /**
@@ -269,9 +287,8 @@ export function checkFile(repo: string, rel: string, report: CommandPathReport, 
           continue;
         }
         report.checked++;
-        if (!existsSync(join(repo, tok))) {
-          report.dead.push({ file: rel, line: block.line + 1 + i, token: tok, command: raw.trim() });
-        }
+        const at = { file: rel, line: block.line + 1 + i, command: raw.trim() };
+        if (!existsSync(join(repo, tok)) && !throughMove(repo, tok, report, at)) report.dead.push({ ...at, token: tok });
       }
     }
   }
@@ -284,7 +301,7 @@ export function checkFile(repo: string, rel: string, report: CommandPathReport, 
  * against the whole checkout.
  */
 export function checkCommandPaths(repo: string = repoRootFor(INSTANCE_ROOT), owns: (rel: string) => boolean = () => true): CommandPathReport {
-  const report: CommandPathReport = { filesRead: 0, checked: 0, declined: 0, folioRelative: 0, exempt: 0, held: [], dead: [] };
+  const report: CommandPathReport = { filesRead: 0, checked: 0, declined: 0, folioRelative: 0, exempt: 0, held: [], dead: [], moved: [] };
   for (const { file, corpus: c } of corpus(repo)) if (owns(file)) checkFile(repo, file, report, c);
   checkHooks(repo, report, owns);
   checkPrintedCommands(repo, report, owns);
@@ -394,7 +411,7 @@ export function checkPrintedCommands(repo: string, report: CommandPathReport, ow
           report.declined++;
           continue;
         }
-        if (existsSync(join(repo, tok))) {
+        if (existsSync(join(repo, tok)) || throughMove(repo, tok, report, { file, line: i + 1, command: cmd.trim() })) {
           report.checked++;
           continue;
         }
@@ -609,7 +626,7 @@ function checkHostCommandFile(repo: string, file: string, report: CommandPathRep
         continue;
       }
       report.checked++;
-      if (!existsSync(join(repo, tok))) {
+      if (!existsSync(join(repo, tok)) && !throughMove(repo, tok, report, { file, line: 0, command: cmd })) {
         report.dead.push({ file, line: 0, token: tok, command: cmd });
       }
     }
@@ -691,6 +708,10 @@ function formatReport(r: CommandPathReport): string {
       out.push(`      ${String(n).padStart(4)}  ${seg}/…`);
     }
     out.push("      `--held` lists them. The basis is a LAYOUT, not a declaration — see FOLIO_OWNED.");
+  }
+  if (r.moved.length) {
+    out.push(`  · ${r.moved.length} path(s) resolve only through a declared move — passing until its \`until\`, still to switch:`);
+    for (const m of r.moved) out.push(`      ${m.file}:${m.line}  \`${m.token}\`  (${m.move})`);
   }
   if (r.dead.length === 0) {
     // The claim names its FRAME, because bean `7iog` is what a claim
