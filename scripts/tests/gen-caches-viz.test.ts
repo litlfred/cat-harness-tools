@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { hashFilesOf, impliedKey, loadCaches, render, storedFromReport, VIEW_FILE } from "../gen-caches-viz.ts";
+import { hashFilesOf, impliedKey, loadCaches, cell, render, storedFromReport, VIEW_FILE } from "../gen-caches-viz.ts";
 
 const sha = (s: string) => createHash("sha256").update(s).digest();
 
@@ -90,4 +90,10 @@ describe("storedFromReport — the daily report's raw facts, matched by location
   test("an already-resolved map passes through", () => {
     expect(storedFromReport({ x: { key: "k" } }, [])).toEqual({ x: { key: "k" } });
   });
+});
+
+test("a table cell escapes backslashes before pipes, so a trailing backslash cannot un-escape a pipe", () => {
+  expect(cell("a\\|b")).toBe("a\\\\\\|b");
+  expect(cell("x|y")).toBe("x\\|y");
+  expect(cell("1\r\n2")).toBe("1 2");
 });
