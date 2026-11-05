@@ -106,8 +106,8 @@ describe("a scoped check whose caller commits none of its subjects passes, never
   // Exit 2 or 78 against a base that passed is a NEW failure in compare-gates.py.
   const env = { ...process.env, [GATE_OWN_ENV]: "no-such-instance" };
   for (const [script, what] of [
-    ["check-methodology-evidence.ts", "methodology/"],
-    ["check-tabular-stubs.ts", "library/"],
+    ["check-methodology-evidence.ts", "methodology directory"],
+    ["check-tabular-stubs.ts", "library directory"],
     ["check-translation-officiality.ts", "translations directory"],
     ["check-schema-nodes.ts", "schemas/*.ts"],
     ["check-concern-groups.ts", "grouping directory"],

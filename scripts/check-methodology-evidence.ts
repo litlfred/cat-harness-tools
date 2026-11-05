@@ -367,7 +367,7 @@ if (import.meta.main) {
   // repository's, so a scoped run neither writes nor compares it.
   const { dirs: subjects, scoped } = gateDirectoriesForGraph(INSTANCE_ROOT, "methodology");
   if (scoped && subjects.length === 0) {
-    console.log(nothingOwnLine(GATE, "methodology/", scoped));
+    console.log(nothingOwnLine(GATE, "methodology directory", scoped));
     process.exit(0);
   }
   if (judging()) {
