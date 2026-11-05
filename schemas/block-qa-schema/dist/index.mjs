@@ -59,12 +59,8 @@ var QaCriterionEntry = z.object({
   reviewer: QaReviewer,
   // ISO-8601 UTC datetime; legacy agent entries may carry a bare ISO date.
   reviewed_at: z.string(),
-  // Tree of repo HEAD at audit time (`HEAD^{tree}`). What producers write
-  // since bean 69lr: a PR run's HEAD commit can vanish, its tree cannot.
-  reviewed_tree: z.string().optional(),
-  // Repo HEAD at audit time. No longer written (superseded by
-  // `reviewed_tree`), kept readable for existing sidecars; legacy agent
-  // entries (pre-2026-06) omit it, so it is optional here.
+  // Repo HEAD at audit time. Recommended; legacy agent entries
+  // (pre-2026-06) omit it, so it is optional here.
   reviewed_sha: z.string().optional(),
   notes: z.string().optional()
 }).passthrough().refine((val) => !(val.ruling === "surviving" && val.result !== "fail"), { message: "result must agree with ruling on finding entries.", path: ["result"] }).refine((val) => !(val.ruling === "partial" && val.result !== "warn"), { message: "result must agree with ruling on finding entries.", path: ["result"] }).refine((val) => !(val.ruling === "rebutted" && val.result !== "pass"), { message: "result must agree with ruling on finding entries.", path: ["result"] }).refine((val) => !(val.verdict === "open-objection" && val.result !== "fail"), { message: "result must agree with verdict on the rollup entry.", path: ["result"] }).refine((val) => !(val.verdict === "survivable-objection" && val.result !== "warn"), { message: "result must agree with verdict on the rollup entry.", path: ["result"] }).refine((val) => !((val.verdict === "clean" || val.verdict === "clean-rebutted") && val.result !== "pass"), { message: "result must agree with verdict on the rollup entry.", path: ["result"] }).refine((val) => !(val.scope === "structural" && (!val.rebuttal || !val.referee_argument)), { message: "structural scope requires a non-empty rebuttal naming the invariant.", path: ["rebuttal"] });

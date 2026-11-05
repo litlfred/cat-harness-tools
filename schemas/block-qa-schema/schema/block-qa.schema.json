@@ -164,13 +164,9 @@
           "type": "string",
           "description": "When the audit ran. ISO-8601 UTC datetime; legacy agent entries may carry a bare ISO date."
         },
-        "reviewed_tree": {
-          "type": "string",
-          "description": "Tree of repo HEAD at audit time (HEAD^{tree}, full git id). What producers write: a pull-request run's HEAD is a synthetic merge commit that can vanish, while its tree survives onto main unchanged."
-        },
         "reviewed_sha": {
           "type": "string",
-          "description": "Repo HEAD at audit time (full git SHA). Superseded by reviewed_tree and no longer written; kept readable for existing sidecars. Legacy agent entries (pre-2026-06) may omit it."
+          "description": "Repo HEAD at audit time (full git SHA). Recommended; legacy agent entries (pre-2026-06) may omit it."
         },
         "notes": { "type": "string", "description": "Free-form notes." },
         "scope": { "$ref": "#/$defs/daScope" },

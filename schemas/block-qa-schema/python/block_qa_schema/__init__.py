@@ -121,10 +121,8 @@ class QaCriterionEntry(BaseModel):
     """The outcome of one reviewer evaluating one criterion on one block.
 
     A verdict whose ``field_hash`` no longer matches the present source
-    files is stale and must be re-run. ``reviewed_tree`` (the tree of HEAD) is
-    what producers write; ``reviewed_sha`` is the older commit-id field, kept
-    readable. Both are optional — legacy agent entries (pre-2026-06) carry
-    neither.
+    files is stale and must be re-run. ``reviewed_sha`` is recommended but
+    optional — legacy agent entries (pre-2026-06) omit it.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -149,7 +147,6 @@ class QaCriterionEntry(BaseModel):
     reviewer: QaReviewer
     # ISO-8601 UTC datetime; legacy agent entries may carry a bare ISO date.
     reviewed_at: str
-    reviewed_tree: Optional[str] = None
     reviewed_sha: Optional[str] = None
 
     @model_validator(mode="after")
