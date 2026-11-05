@@ -45,10 +45,28 @@
  *    commit's time for every path, so it cannot order previews against each
  *    other; ties then break by slug so the choice is at least deterministic.
  *
+ * In a SPARSE checkout (only `STAGING/<slug>`, `STAGING/_retired` and
+ * `_render-log` on disk) the other previews are read from git instead: the
+ * same four signals, in the same order, from the same files, read as blobs.
+ * Nothing here reads a file's mtime.
+ *
  * A preview whose age could not be determined at all sorts OLDEST and the log
  * says so — the one place this leans towards removal, since an unknown-age
  * preview predates every signal above and would otherwise sit outside the
  * bound forever.
+ *
+ * ## How a preview's size is known without its files
+ *
+ * The size is the bytes of the preview's files as checked out. Outside a
+ * sparse checkout's cone that costs every blob of the preview (a blob's size
+ * is in its header, and a blobless clone fetches the blob to read it), so
+ * every staging also writes {@link STAGED_SIZE_FILE}: the bytes of every other
+ * file in the preview and a digest of their blob ids and paths. Read from git,
+ * it is trusted only when the digest matches the preview's tree, which a
+ * blobless clone has; the size is then its bytes plus the record's own. Any
+ * other writer that changed the preview since makes the digest disagree, and
+ * the size is read from the blobs, fetched in one request — slower, never
+ * different.
  *
  * ## What is never touched
  *
@@ -76,7 +94,10 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
+
+import { blobId, blobSizes, forEachBlob, isRegular, objectFormat, prefetchBlobs, removeFromIndex, sparseEntries, type GitEntry } from "./lib/git-blobs.ts";
 
 import { RENDER_LOG_DIR, readRenderLog } from "../schemas/ui/render-log.ts";
 import { readStagingPreview, retireStagingPreview, serializeStagingPreview } from "../schemas/sdlc/staging-preview.ts";
@@ -101,6 +122,9 @@ export const MAX_PREVIEW_BYTES = 3 * 1024 ** 3;
 
 /** The per-preview stamp, inside the preview directory. */
 export const STAGED_AT_FILE = ".staged-at";
+
+/** The size record, inside the preview directory — see "How a preview's size is known". */
+export const STAGED_SIZE_FILE = ".staged-size.json";
 
 /** The record `staging-record.ts` writes beside each preview. */
 const RECORD_FILE = "staging-preview.json";
@@ -212,20 +236,124 @@ function sizeOf(path: string): number {
   return total;
 }
 
-/** Every preview under `<dir>/STAGING`, with its age and where the age came from. */
+/** The digest a size record carries: the preview's regular files (but the record) by blob id and path. */
+export function sizeDigest(files: readonly { path: string; oid: string }[]): string {
+  const lines = files
+    .filter((f) => f.path !== STAGED_SIZE_FILE)
+    .map((f) => `${f.oid} ${f.path}\n`)
+    .sort();
+  return `sha256:${createHash("sha256").update(lines.join("")).digest("hex")}`;
+}
+
+interface SizeRecord {
+  version: 1;
+  /** Bytes of every regular file in the preview but this record. */
+  bytes: number;
+  digest: string;
+}
+
+function regularFiles(abs: string, rel = "", out: { path: string; abs: string }[] = []): { path: string; abs: string }[] {
+  for (const k of readdirSync(abs)) {
+    const p = join(abs, k);
+    const r = rel === "" ? k : `${rel}/${k}`;
+    const st = lstatSync(p);
+    if (st.isDirectory()) regularFiles(p, r, out);
+    else if (st.isFile()) out.push({ path: r, abs: p });
+  }
+  return out;
+}
+
+/** Write the size record of a preview on disk. Last, after every other file of it is written. */
+export function writeSizeRecord(dir: string, previewAbs: string): void {
+  const format = objectFormat(dir);
+  const files = regularFiles(previewAbs)
+    .filter((f) => f.path !== STAGED_SIZE_FILE)
+    .map((f) => {
+      const bytes = readFileSync(f.abs);
+      return { path: f.path, oid: blobId(bytes, format), size: bytes.length };
+    });
+  const rec: SizeRecord = { version: 1, bytes: files.reduce((n, f) => n + f.size, 0), digest: sizeDigest(files) };
+  writeFileSync(join(previewAbs, STAGED_SIZE_FILE), `${JSON.stringify(rec)}\n`);
+}
+
+/** The size of a preview known only from git: its record when the digest agrees, else its blobs. */
+function sizeFromGit(dir: string, entries: readonly GitEntry[], prefix: string, record: Buffer | undefined): number {
+  const files = entries.filter((e) => isRegular(e.mode)).map((e) => ({ path: e.path.slice(prefix.length), oid: e.oid }));
+  if (record !== undefined) {
+    try {
+      const r = JSON.parse(record.toString("utf-8")) as SizeRecord;
+      if (r.version === 1 && Number.isInteger(r.bytes) && r.bytes >= 0 && r.digest === sizeDigest(files)) return r.bytes + record.length;
+    } catch {
+      // not a record: read the blobs
+    }
+  }
+  const sizes = blobSizes(dir, [...new Set(files.map((f) => f.oid))]);
+  return files.reduce((n, f) => n + (sizes.get(f.oid) ?? 0), 0);
+}
+
+/** The small blobs a preview's age and size are read from, for every preview known only from git. */
+function readSmallBlobs(dir: string, fromGit: ReadonlyMap<string, GitEntry[]>): Map<string, Buffer> {
+  const wanted = new Map<string, string>();
+  for (const [name, entries] of fromGit) {
+    for (const f of [STAGED_AT_FILE, RECORD_FILE, STAGED_SIZE_FILE]) {
+      const e = entries.find((x) => x.path === `${STAGING_PREFIX}/${name}/${f}`);
+      if (e !== undefined && isRegular(e.mode)) wanted.set(e.path, e.oid);
+    }
+  }
+  const byOid = new Map<string, Buffer>();
+  const oids = [...new Set(wanted.values())];
+  prefetchBlobs(dir, oids);
+  forEachBlob(dir, oids, (oid, bytes) => byOid.set(oid, Buffer.from(bytes)));
+  return new Map([...wanted].map(([path, oid]) => [path, byOid.get(oid)!]));
+}
+
+function timeOf(raw: string | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  const t = Date.parse(raw.trim());
+  return Number.isNaN(t) ? undefined : t;
+}
+
+/** The previews a sparse checkout holds only in git, with their index entries, by slug. */
+function previewsInGit(dir: string, outside: Map<string, GitEntry> | undefined): Map<string, GitEntry[]> {
+  const out = new Map<string, GitEntry[]>();
+  if (outside === undefined) return out;
+  const prefix = `${STAGING_PREFIX}/`;
+  for (const e of outside.values()) {
+    if (!e.path.startsWith(prefix)) continue;
+    const rest = e.path.slice(prefix.length);
+    const slash = rest.indexOf("/");
+    if (slash <= 0) continue;
+    const name = rest.slice(0, slash);
+    if (existsSync(join(dir, STAGING_PREFIX, name))) continue;
+    out.set(name, [...(out.get(name) ?? []), e]);
+  }
+  return out;
+}
+
+/**
+ * Every preview under `<dir>/STAGING`, with its age and where the age came
+ * from. In a sparse checkout, also every preview the index holds outside the
+ * cone, read from git.
+ */
 export function readPreviews(dir: string, git: GitTime = gitLastCommit): Preview[] {
   const staging = join(dir, STAGING_PREFIX);
-  if (!existsSync(staging)) return [];
+  const inGit = previewsInGit(dir, sparseEntries(dir));
+  if (!existsSync(staging) && inGit.size === 0) return [];
   const logTimes = renderLogTimes(dir);
+  const small = readSmallBlobs(dir, inGit);
+  const onDisk = existsSync(staging) ? readdirSync(staging) : [];
   const out: Preview[] = [];
-  for (const name of readdirSync(staging).sort()) {
+  for (const name of [...new Set([...onDisk, ...inGit.keys()])].sort()) {
     if (!isPreviewName(name)) continue;
     const abs = join(staging, name);
-    if (!lstatSync(abs).isDirectory()) continue;
+    const entries = inGit.get(name);
+    if (entries === undefined && !lstatSync(abs).isDirectory()) continue;
+    const blob = (f: string) => small.get(`${STAGING_PREFIX}/${name}/${f}`);
 
     let updatedMs: number | undefined;
     let source: AgeSource = "unknown";
-    const stamp = readTime(join(abs, STAGED_AT_FILE), (t) => t);
+    const stamp =
+      entries === undefined ? readTime(join(abs, STAGED_AT_FILE), (t) => t) : timeOf(blob(STAGED_AT_FILE)?.toString("utf8"));
     if (stamp !== undefined) {
       updatedMs = stamp;
       source = "stamp";
@@ -233,7 +361,17 @@ export function readPreviews(dir: string, git: GitTime = gitLastCommit): Preview
       updatedMs = logTimes.get(name);
       source = "render-log";
     } else {
-      const built = readTime(join(abs, RECORD_FILE), (t) => readStagingPreview(t).node?.staging.builtAt);
+      const pick = (t: string) => readStagingPreview(t).node?.staging.builtAt;
+      let built: number | undefined;
+      if (entries === undefined) built = readTime(join(abs, RECORD_FILE), pick);
+      else {
+        try {
+          const rec = blob(RECORD_FILE);
+          built = rec === undefined ? undefined : timeOf(pick(rec.toString("utf8")));
+        } catch {
+          built = undefined;
+        }
+      }
       if (built !== undefined) {
         updatedMs = built;
         source = "record";
@@ -245,7 +383,9 @@ export function readPreviews(dir: string, git: GitTime = gitLastCommit): Preview
         }
       }
     }
-    out.push({ slug: name, updatedMs, source, bytes: sizeOf(abs) });
+    const bytes =
+      entries === undefined ? sizeOf(abs) : sizeFromGit(dir, entries, `${STAGING_PREFIX}/${name}/`, blob(STAGED_SIZE_FILE));
+    out.push({ slug: name, updatedMs, source, bytes });
   }
   return out;
 }
@@ -294,8 +434,13 @@ export function rotate(o: RotateOptions): { plan: RotationPlan; lines: string[] 
 
   const curDir = join(o.dir, STAGING_PREFIX, o.current);
   if (existsSync(curDir)) writeFileSync(join(curDir, STAGED_AT_FILE), `${o.now}\n`);
+  const outside = sparseEntries(o.dir);
+  const inGit = previewsInGit(o.dir, outside);
 
   const plan = planRotation(readPreviews(o.dir, o.git ?? gitLastCommit), o.current, budget);
+  // After the plan, so this run decides on the bytes it always did; the next
+  // run, and any read from git, counts the record too.
+  if (existsSync(curDir)) writeSizeRecord(o.dir, curDir);
   const reason =
     `rotated off: the previews on gh-pages came to more than ${human(budget)} ` +
     `(owner ruling 2026-10-02, issue #1868, amended 2026-10-04 to a size budget); ` +
@@ -311,12 +456,21 @@ export function rotate(o: RotateOptions): { plan: RotationPlan; lines: string[] 
     // goes to `_retired/`, never with the directory. Retiring twice keeps the
     // first retirement.
     const rec = join(abs, RECORD_FILE);
-    if (existsSync(rec)) {
+    const entries = inGit.get(p.slug);
+    // Outside a sparse checkout's cone, the record is its blob.
+    const recBlob = entries?.find((e) => e.path === `${STAGING_PREFIX}/${p.slug}/${RECORD_FILE}` && isRegular(e.mode));
+    if (existsSync(rec) || recBlob !== undefined) {
       const retiredDir = join(o.dir, STAGING_PREFIX, RETIRED_DIR);
       const out = join(retiredDir, `${p.slug}.json`);
       mkdirSync(retiredDir, { recursive: true });
       try {
-        if (!existsSync(out)) copyFileSync(rec, out);
+        // A retired record outside the cone is materialised first, so retiring twice still keeps the first.
+        const already = outside?.get(`${STAGING_PREFIX}/${RETIRED_DIR}/${p.slug}.json`);
+        if (!existsSync(out) && already !== undefined) writeBlob(o.dir, already.oid, out);
+        if (!existsSync(out)) {
+          if (existsSync(rec)) copyFileSync(rec, out);
+          else writeBlob(o.dir, recBlob!.oid, out);
+        }
         const node = loadExisting(out);
         if (node !== undefined) writeFileSync(out, serializeStagingPreview(retireStagingPreview(node, reason, o.now)));
       } catch (e) {
@@ -345,8 +499,15 @@ export function rotate(o: RotateOptions): { plan: RotationPlan; lines: string[] 
     );
 
     rmSync(abs, { recursive: true, force: true });
+    // Not on disk to delete: take it out of the index, so the commit removes it.
+    if (entries !== undefined) removeFromIndex(o.dir, [`${STAGING_PREFIX}/${p.slug}`]);
   }
   return { plan, lines };
+}
+
+function writeBlob(dir: string, oid: string, out: string): void {
+  prefetchBlobs(dir, [oid]);
+  forEachBlob(dir, [oid], (_o, bytes) => writeFileSync(out, bytes));
 }
 
 function flag(argv: string[], name: string): string | undefined {
