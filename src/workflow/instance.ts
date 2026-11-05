@@ -141,6 +141,13 @@ export interface InstanceState {
   subject: string;
   /** Bean this instance is tracked under, when there is one. */
   bean?: string;
+  /**
+   * The work plan this instance runs under: an epic or milestone work item
+   * whose `process:` tag names this process (`schemas/sdlc/work-plan.ts`,
+   * work item folio-assistant-exrp). Optional, because not every process
+   * needs a plan. The plan does not list its instances; this field is the link.
+   */
+  plan?: string;
   /** Bean ids carried by this instance / traveling with its tokens. */
   carriedBeans?: string[];
   /** Node ids currently holding a token. */
@@ -553,6 +560,7 @@ export function startInstance(
     id: string;
     subject: string;
     bean?: string;
+    plan?: string;
     carriedBeans?: string[];
     startNode?: string;
     model?: ModelConfig;
@@ -579,6 +587,7 @@ export function startInstance(
     source: model.source,
     subject: opts.subject,
     bean: opts.bean,
+    ...(opts.plan !== undefined ? { plan: opts.plan } : {}),
     carriedBeans: initialCarriedBeans,
     tokens: [],
     arrivals: {},
