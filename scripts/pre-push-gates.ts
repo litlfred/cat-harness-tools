@@ -409,7 +409,11 @@ function runTests(root: string, files: readonly string[], junit: string, logPath
   rmSync(junit, { force: true });
   return new Promise((done) => {
     const log = createWriteStream(logPath, { flags: "a" });
-    const child = spawn("bun", ["test", "--reporter=junit", `--reporter-outfile=${junit}`, ...files.map((f) => `./${f}`)], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("bun", ["test", "--reporter=junit", `--reporter-outfile=${junit}`, ...files.map((f) => `./${f}`)], {
+      cwd: root,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: testEnv(process.env),
+    });
     const tee = (b: Buffer) => {
       log.write(b);
       stream?.write(b);
@@ -437,6 +441,21 @@ function runTests(root: string, files: readonly string[], junit: string, logPath
  * is never touched, and the caller verified the tree was clean first, so the
  * restore is exact; it says so loudly if it is not.
  */
+/**
+ * The environment the affected tests run under: this one, minus
+ * `BUN_OPTIONS`. bun reads extra CLI flags from it, and a CI test shard sets
+ * it to `--shard=N/M --reporter=junit --reporter-outfile=<its report>`
+ * (folio-assistant#2954, 2026-11-05). Inherited, the selection was sharded
+ * away to nothing (could-not-determine where a refusal was due), and its
+ * JUnit report overwrote the shard's own. The selection names its files and
+ * its report itself.
+ */
+export function testEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out = { ...env };
+  delete out.BUN_OPTIONS;
+  return out;
+}
+
 export function swapToBase(root: string, base: string, paths: readonly string[]): () => void {
   const atBase = (p: string) => git(root, ["cat-file", "-e", `${base}:${p}`]) !== undefined;
   const atHead = (p: string) => git(root, ["cat-file", "-e", `HEAD:${p}`]) !== undefined;
