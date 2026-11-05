@@ -781,6 +781,13 @@ describe("a changed lock re-renders the agent surface", () => {
 });
 
 describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () => {
+  // Each test here builds bare repositories and replays mounts through `git`
+  // subprocesses (local file:// fixtures: no network). Measured 2026-11-05:
+  // ~3 s each on an idle machine, 10-15 s on a loaded 4-CPU container, and
+  // bun's 5000 ms default failed H1-H6 at random on CI shards
+  // (folio-assistant#2949, #2950; cat-harness-tools#1487). 30 s is twice the
+  // worst measured cost.
+  const HYDRATED_TIMEOUT_MS = 30_000;
   // o/hy holds two instances. `hh` publishes ONE hydrated file, for `tools`
   // (and a child's, which must not travel); its `skills` and `docs` publish
   // none, and its code must not arrive. `hb` publishes a file under the
@@ -873,7 +880,7 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
     const c = checkRemote({ instanceRoot: root });
     expect(c.state).toBe("missing");
     expect(c.outcomes.find((x) => x.instance === "hh")!.detail).toContain("hh/tools/ modified");
-  });
+  }, HYDRATED_TIMEOUT_MS);
 
   test("H2. an override chooses the subgraphs; a named one the pin does not publish is missing, the rest mounted", () => {
     const root = hdown("hh", hy, "o/hy", { overrides: { hh: { hydrated: true, directories: ["tools", "skills"] } } });
@@ -887,7 +894,7 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
     mountRemote({ instanceRoot: files, urlFor: hUrl });
     expect(existsSync(join(files, "hh/tools/a/a.ts"))).toBe(true);
     expect(existsSync(join(files, "hh/hh.json"))).toBe(true);
-  });
+  }, HYDRATED_TIMEOUT_MS);
 
   test("H3. a pin that publishes no hydrated file is missing, and says the files are built at publish — never an empty 'mounted'", () => {
     const root = hdown("np", np, "o/np", { hydrated: true });
@@ -897,7 +904,7 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
     expect(o.detail).toContain("builtAtPublish");
     expect(existsSync(join(root, "np"))).toBe(false);
     expect(checkRemote({ instanceRoot: root }).state).toBe("missing");
-  });
+  }, HYDRATED_TIMEOUT_MS);
 
   test("H4. a hydrated file declaring another subgraph's IRI is refused, not held as the one asked for", () => {
     const root = hdown("hb", hy, "o/hy", { hydrated: true });
@@ -905,14 +912,14 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
     expect(o.state).toBe("missing");
     expect(o.detail).toContain("it was fetched for");
     expect(existsSync(join(root, "hb/tools"))).toBe(false);
-  });
+  }, HYDRATED_TIMEOUT_MS);
 
   test("H5. `whole` and `hydrated` together are refused at plan time", () => {
     const root = hdown("hh", hy, "o/hy", { overrides: { hh: { hydrated: true, whole: true } } });
     const o = planRemote({ instanceRoot: root, urlFor: hUrl }).outcomes.find((x) => x.instance === "hh")!;
     expect(o.state).toBe("could-not-determine");
     expect(o.detail).toContain("keep one");
-  });
+  }, HYDRATED_TIMEOUT_MS);
 
   test("H6. the lock replays on a fresh clone: the one file again, still no declaration, then current", () => {
     const src = hdown("hh", hy, "o/hy", { hydrated: true });
@@ -938,7 +945,7 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
       if (prev === undefined) delete process.env.CAT_MOUNT_URL_PREFIX;
       else process.env.CAT_MOUNT_URL_PREFIX = prev;
     }
-  });
+  }, HYDRATED_TIMEOUT_MS);
   // ── G2b: the index files come from the pin's subgraph index PACKAGE ──────
 
   /** Publish `harness`'s package for `repo@sha`, holding `files` under docs/subgraph/<harness>/. */
@@ -970,7 +977,7 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
     expect(dir).toMatchObject({ id: "tools", path: "np/tools", upstreamPath: "docs/subgraph/np/tools", files: 1, package: { url: pkg.tarballUrl, member: "docs/subgraph/np/tools/index.hydrated.jsonld" } });
     expect(dir.package!.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
-  });
+  }, HYDRATED_TIMEOUT_MS);
 
   test("H8. a package file declaring another subgraph's IRI is refused like a tree file; no package at all keeps G2's answer, naming where it looked", () => {
     const bad = publish("np", "o/np", np.sha, { "tools/index.hydrated.jsonld": hydratedFile("np", "tools", "elsewhere") });
@@ -985,7 +992,7 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
     expect(p.state).toBe("missing");
     expect(p.detail).toContain("builtAtPublish");
     expect(p.detail).toContain("subgraph index package: absent");
-  });
+  }, HYDRATED_TIMEOUT_MS);
 
   test("H9. a package that fails its checks is never an empty layer", () => {
     const out = publish("np", "o/np", np.sha, { "tools/index.hydrated.jsonld": hydratedFile("np", "tools") });
@@ -996,7 +1003,7 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
     expect(o.state).toBe("missing");
     expect(o.detail).toContain("subgraph index package: refused");
     expect(existsSync(join(root, "np"))).toBe(false);
-  });
+  }, HYDRATED_TIMEOUT_MS);
 
   test("H10. the lock replays a package-sourced directory on a fresh clone: same bytes, refused if they change", () => {
     const out = publish("np", "o/np", np.sha, { "tools/index.hydrated.jsonld": hydratedFile("np", "tools") });
@@ -1033,7 +1040,7 @@ describe("hydrated mounts: metadata at the pin, no files (bean `mo75` G2)", () =
       if (prev === undefined) delete process.env.CAT_MOUNT_URL_PREFIX;
       else process.env.CAT_MOUNT_URL_PREFIX = prev;
     }
-  });
+  }, HYDRATED_TIMEOUT_MS);
 });
 
 describe("named ids declared FROM WITHIN (bean `mo75` G3)", () => {
