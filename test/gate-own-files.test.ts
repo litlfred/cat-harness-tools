@@ -27,6 +27,7 @@ import {
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { auditSchemaNodes } from "../scripts/schema-nodes.ts";
+import { scopeReport, type ReferenceReport } from "../scripts/check-reference-direction.ts";
 
 const RUN_GATES = resolve(import.meta.dir, "..", ".github", "scripts", "layer-pr-checks", "run-gates.py");
 // Where this layer can sit: this file's own layer root (the standalone
@@ -152,5 +153,28 @@ describe("check:command-paths judges only the caller's own files", () => {
     });
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("commits none of the files it reads");
+  });
+});
+
+describe("check:reference-direction judges only the caller's own files and instances", () => {
+  const occ = (file: string) => ({ occurrence: { file }, verdict: { verdict: "wrong-direction" } }) as unknown as ReferenceReport["classified"][number];
+  const report = {
+    instances: 3,
+    classified: [occ("folio-assistant-core/skills/x.md"), occ("smart-base/input/y.md")],
+    skippedMachineWritten: 0,
+    skippedGeneratorWritten: 0,
+    undeclared: ["folio-assistant-core", "smart-base"],
+  } as ReferenceReport;
+
+  test("a lower layer's file naming an instance above it is not charged to the caller (smart-base#298)", () => {
+    const e = { [GATE_OWN_PATHS_ENV]: "smart-base", [GATE_FOREIGN_PATHS_ENV]: "folio-assistant-core" };
+    const r = scopeReport(report, (f) => gateOwnsFile(f, e) !== false, new Set(["smart-base"]));
+    expect(r.classified.map((c) => c.occurrence.file)).toEqual(["smart-base/input/y.md"]);
+    expect(r.undeclared).toEqual(["smart-base"]);
+    expect(r.instances).toBe(3);
+  });
+
+  test("unscoped, nothing is dropped", () => {
+    expect(scopeReport(report, () => true, undefined)).toEqual(report);
   });
 });
