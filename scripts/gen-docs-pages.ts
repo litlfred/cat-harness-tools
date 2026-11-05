@@ -25,6 +25,8 @@ import { markdownEditLink, repoOf } from "../src/core/edit-links.js";
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync, unlinkSync } from "node:fs";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { GLOBAL_TASK_ELEMENT } from "../src/workflow/process-model.js";
+import { listInstances } from "../src/workflow/store.js";
+import { workPlanFindings, workPlanOf } from "../schemas/sdlc/work-plan.js";
 import { join, dirname, relative, resolve, posix, sep } from "node:path";
 import { instanceRepositories, type InstanceRepository } from "../schemas/kg/instance-repositories.ts";
 import type { WebPage, WebPageNode } from "../schemas/ui/webpage.ts";
@@ -1929,6 +1931,29 @@ function processHierarchy(): Record<string, string[]> {
     const { edges, dangling } = blockEdges(beans);
     const blockers = blockedBy(beans);
     const blocks = blocksOf(beans);
+    // WORK PLANS (work item folio-assistant-exrp, owner 2026-11-05: "Epic is
+    // the plan"). An epic or milestone that names the process it runs, read
+    // from its `process:` / `proposal:` tags, and the instances that name it
+    // as their plan. Joined HERE, so the board renders a plan's process and
+    // its runs without reading the instance store itself. An instance store
+    // that cannot be read gives no runs, and the plan says so (`runs: null`)
+    // rather than showing none.
+    let instancesRead: ReturnType<typeof listInstances> | null;
+    try {
+      instancesRead = listInstances(repoRootFor(INSTANCE_ROOT));
+    } catch {
+      instancesRead = null;
+    }
+    const runsOf = (id: string) =>
+      instancesRead === null
+        ? null
+        : instancesRead
+            .filter((i) => i.plan === id)
+            .map((i) => ({ id: i.id, processId: i.processId, status: i.status, at: i.tokens, updatedAt: i.updatedAt }));
+    const planField = (id: string, tags: readonly string[] | undefined) => {
+      const plan = workPlanOf(tags);
+      return plan === undefined ? {} : { plan: { ...plan, runs: runsOf(id) } };
+    };
     const items = beans.map((b) => ({
       id: b.id,
       title: b.title,
@@ -1936,6 +1961,10 @@ function processHierarchy(): Record<string, string[]> {
       type: b.type,
       priority: b.priority,
       parent: b.parent,
+      // Present only on a work plan: what it runs, where it came from, and
+      // the instances running under it. Absent is "not a plan", never "a
+      // plan with nothing known".
+      ...planField(b.id, b.tags),
       // Both directions, resolved once. A client given only `blocking` would
       // have to invert the whole set to answer "what is holding THIS bean up",
       // which is the question a board is actually asked. Both from the edge
@@ -1981,6 +2010,9 @@ function processHierarchy(): Record<string, string[]> {
         // `blocking-unknown` finding: reported, never dropped.
         edges,
         findings: beanFindings(beans),
+        // A work plan filed under the wrong type, or a proposal with no
+        // process: reported, never fatal (`schemas/sdlc/work-plan.ts`).
+        planFindings: workPlanFindings(beans),
         // The milestone rollup, COMPUTED HERE so the board renders a number
         // it does not derive. The board already loads every bean's `parent`,
         // `type` and `status`, so it could compute the closure client-side —
