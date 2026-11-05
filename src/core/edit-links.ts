@@ -1166,7 +1166,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   };
   const bookmarkIcon = (box, label) => {
     if (!label || box.querySelector(":scope > .ba-bookmark")) return;
-    const base = (location.pathname || "/") + (location.search || "");
+    const base = location.pathname || "/"; // a page is addressed by its path, never a query string (#1881)
     const href = base + "#" + encodeURIComponent(label).replace(/%3A/g, ":").replace(/%2F/g, "/");
     const title = titleOf(box) || label;
     if (!box.hasAttribute("data-fa-pin")) {
