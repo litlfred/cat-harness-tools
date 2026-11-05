@@ -43,6 +43,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { codeListDirs, loadCodeLists } from "../schemas/library/code-list.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { builtAtPublishOf, withoutBuiltAtPublish } from "./mount-from-lock.ts";
 
 /** The code list an instance declares its retired words in. */
 export const RETIRED_WORDS_LIST = "retired-prose-words";
@@ -164,7 +165,11 @@ export async function retiredWordsOf(instanceRoot: string): Promise<Map<string, 
  * A directory walk rather than `git ls-files`: a layer mounted into a composed
  * checkout carries no `.git` of its own (that is how CI runs it), and a git
  * listing there answers "no files", which this would report as clean.
- * Dot-directories are not walked.
+ * Dot-directories are not walked, and nothing the instance declares
+ * `builtAtPublish` is listed: those pages are written by a publish build, are
+ * never committed, and so are their generator's prose. They are on disk only
+ * where a build has run (CI's QA working copy), which made the scan's answer
+ * depend on where it ran (folio-assistant#2954).
  */
 export function ownProseFiles(instanceRoot: string): string[] {
   const out: string[] = [];
@@ -184,7 +189,7 @@ export function ownProseFiles(instanceRoot: string): string[] {
     }
   };
   walk(instanceRoot, "");
-  return out.sort();
+  return withoutBuiltAtPublish(out, builtAtPublishOf(instanceRoot)).sort();
 }
 
 /** Every retired word in an instance's own prose, by file. */
