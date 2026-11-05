@@ -252,6 +252,7 @@ STANDALONE_GATE = re.compile(r"^check:(.+)-standalone$")
 # entry was confirmed by reading the script and running it with no argument;
 # the workflow that does supply the input runs it there.
 NEEDS_INPUT_SCRIPTS = {
+    "check:context-leak": "needs --dir <built context>, --tools <tools/list JSON> or --prompt <file>; bare, nothing to scan and exit 2",
     "check:duplicate-ids": "needs a built site directory; bare, it prints its usage and exits 2",
     "check:escaped-markup": "needs a built site directory (or --source <dir>); bare, it prints its usage and exits 2",
     "check:qa-corpus": "needs one of --dir <tree>, --ref <ref> or --github; bare, it prints its usage and exits 2",
