@@ -17,6 +17,7 @@
   "usedBy": [
     "pipeline/markdown-ast.ts",
     "schemas/ui/render-output.ts",
+    "scripts/journeys/render.ts",
     "scripts/publish-instance-files.ts"
   ]
 }

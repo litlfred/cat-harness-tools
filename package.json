@@ -515,6 +515,7 @@
     "pairs:claims": "bun run cat-harness-tools/scripts/pair-claims.ts",
     "preview:site": "cat-harness-tools/scripts/preview-site.sh",
     "processes:viz": "bun run cat-harness-tools/scripts/gen-processes-viz.ts",
+    "journeys:viz": "bun run cat-harness-tools/scripts/gen-journeys-viz.ts",
     "processes:viz:check": "bun run cat-harness-tools/scripts/publish-check.ts processes:viz",
     "prov:qaqc": "bun run cat-harness-tools/scripts/prov-qaqc.ts",
     "subscriptions:viz": "bun run cat-harness-tools/scripts/subscriptions-viz.ts",

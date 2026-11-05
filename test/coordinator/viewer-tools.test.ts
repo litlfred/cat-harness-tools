@@ -65,6 +65,11 @@ describe("viewer Tools declare what they render", () => {
     // DAK's business processes. processes-viewer renders it (cat-harness
     // 4fb8e9c); no instance this index mounts declares it yet.
     "business-processes": "a DAK outside this index",
+    // Owner, 2026-11-05, option A: journeys-viewer draws the journeys and
+    // workshops of litlfred/smart-trust-demo and litlfred/smart-ips-pilgrimage,
+    // neither of which this index mounts.
+    "user-scenario": "litlfred/smart-trust-demo",
+    workshop: "litlfred/smart-trust-demo",
   };
 
   it("every rendered kind is declared by some directory", () => {
