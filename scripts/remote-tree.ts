@@ -22,6 +22,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
 import { LICENCE_NAMES, git, shallowFetch, upstreamLicence } from "./sync-remote-skills.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 /** How `owner/repo` becomes a fetch URL. Injectable, so tests serve a local bare repository. */
 export type UrlFor = (repository: string) => string;
@@ -108,6 +109,8 @@ export class RemoteTree {
     if (!this.fileSet) {
       // A large tree's listing (cat-harness: ~40k entries) overflows
       // spawnSync's default 1 MiB buffer, which fails with no exit status.
+      // input-site: traced #4bc0be6e — lists the remote commit RemoteTree.open fetched; a run that reaches it records no hash
+      inputSiteReached("remote-tree: files");
       const r = spawnSync("git", ["ls-tree", "-r", "FETCH_HEAD"], { cwd: this.dir, encoding: "utf8", maxBuffer: 512 * 1024 * 1024 });
       if (r.status !== 0) throw new Error(`git ls-tree -r FETCH_HEAD failed: ${(r.stderr ?? "").trim() || r.error?.message || `exit ${r.status}`}`);
       this.fileSet = new Set(
@@ -185,6 +188,8 @@ export const gitPartFetcher: PartFetcher = (repository, ref, path) => {
     const entry = tree.entry(path);
     if (!entry) return undefined;
     const collectionFiles = tree.countFiles();
+    // input-site: traced #50739a0b — the scratch directory a fetched part is copied into
+    inputSiteReached("remote-tree: part");
     const out = mkdtempSync(join(tmpdir(), "kg-materialize-part-"));
     if (entry.kind === "commit") return { kind: "submodule", root: out, part: out, collectionFiles };
     const kind = entry.kind === "tree" ? "tree" : "blob";

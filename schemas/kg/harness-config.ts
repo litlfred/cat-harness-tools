@@ -391,7 +391,6 @@ import {
   type ContentTypeRegistry,
 } from "../content/content-type";
 import { INDEX_CONFIG_FILENAME, LEGACY_HARNESS_CONFIG, rootConfigStems } from "./instance-roots";
-import { inputSiteReached } from "../sdlc/input-trace";
 import { enabledSubgraphs as enabledSubgraphs_, type EnabledSubgraphs } from "./opt-in-subgraphs";
 import {
   HUB_LANDING,
@@ -2209,13 +2208,9 @@ function tableEntry(dep: ResolvedDependency, nodeFile: string, ref: string, key:
   const { path, exportName } = splitOwnCodeRef(ref);
   const abs = resolve(dep.rootPath, path);
   if (!existsSync(abs)) throw new Error(`${nodeFile}: ${ref} — ${abs} does not exist`);
-  // A loaded plugin table brings its whole implementation (IG staging, site
-  // building) into the answer, so a run that loads one records no hash. As an
-  // `imports` verdict its closure, some 300 sites, entered the static audit of
-  // every check that imports this module, loading a plugin or not.
-  // input-site: traced #51a7193e — own-code refs of declared qa-checkers / pipeline-plugins nodes; a run that loads one records no hash
-  inputSiteReached("harness-config: plugin table");
-  const table = (require(abs) as Record<string, unknown>)[exportName]; // eslint-disable-line @typescript-eslint/no-require-imports
+  // input-site: declared plugin-tables #f17e81a6 — own-code refs of declared qa-checkers / pipeline-plugins nodes, resolved from them at fingerprint time (`scripts/declared-imports.ts`); input-sites.test.ts holds the two to each other
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const table = (require(abs) as Record<string, unknown>)[exportName];
   if (typeof table !== "object" || table === null) throw new Error(`${nodeFile}: ${ref} exports no table named ${exportName}`);
   const entry = (table as Record<string, unknown>)[key];
   if (want === "function" ? typeof entry !== "function" : typeof entry !== "object" || entry === null) {

@@ -44,8 +44,10 @@ export function referenceDirs(repoRoot: string): string[] {
   } catch {
     folio = undefined;
   }
+  // declared-path-literal: the convention fallback when no `references` directory is declared, at the call site so the choice is visible.
   const conventional = folio ? join(folio, "references") : undefined;
   if (conventional && existsSync(conventional)) return [conventional];
+  // declared-path-literal: the same convention fallback, at the repository root.
   const rootConventional = join(repoRoot, "references");
   return existsSync(rootConventional) ? [rootConventional] : [];
 }

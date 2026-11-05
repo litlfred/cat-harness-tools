@@ -8,9 +8,7 @@
   "carriedBeans": [
     "folio-assistant-ff09"
   ],
-  "tokens": [
-    "Call_Sign"
-  ],
+  "tokens": [],
   "arrivals": {},
   "history": [
     {
@@ -68,7 +66,7 @@
       "note": "CERTIFIED: crdm-detect-signals v1 against crdm-detect-evaluation v1, run r-3554a15543fc-54762ece6646 — plan executed in full, P=R=F1=0.9545 recorded, no threshold (owner, option 4). Decided by the owner (litlfred) in session_01JkK6uP3iU2etyMbrw7v3cu at about 2026-10-11T06:55Z (the owner's own pick, \"Certified\") and relayed to lane B (session_01QmRtjQNyHiH2RuimTfuJDu). The relay named run r-3554a15543fc-00051fde91fd; this run supersedes it with the same data hash, outcome and case verdicts — only the runner changed, to render the report."
     }
   ],
-  "status": "running",
+  "status": "completed",
   "startedAt": "2026-10-11T06:52:54.461Z",
   "updatedAt": "2026-10-11T07:02:09.501Z",
   "children": {
@@ -81,9 +79,7 @@
       "carriedBeans": [
         "folio-assistant-ff09"
       ],
-      "tokens": [
-        "Task_StoreSigned"
-      ],
+      "tokens": [],
       "arrivals": {},
       "history": [
         {
@@ -123,7 +119,7 @@
           "note": "signed over the human route by the owner"
         }
       ],
-      "status": "running",
+      "status": "completed",
       "startedAt": "2026-10-11T07:02:09.500Z",
       "updatedAt": "2026-10-11T07:02:09.501Z"
     }
