@@ -23,7 +23,7 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { ownName } from "./workflow-pins.ts";
+import { checkoutName } from "./workflow-pins.ts";
 
 const TOOLS_ROOT = resolve(import.meta.dir, "..");
 const ROOT = join(import.meta.dir, "..", "..");
@@ -107,7 +107,7 @@ export function baselineKey(f: PinFinding): string {
 }
 
 export interface PinBaseline {
-  /** The root the entries were recorded in (`ownName`); absent, they apply in every root. */
+  /** The root the entries were recorded in (`checkoutName`); absent, they apply in every root. */
   root?: string;
   known: string[];
 }
@@ -135,7 +135,7 @@ if (import.meta.main) {
   const degrading = findings.filter((f) => f.kind === "degrading");
   const unpinned = findings.filter((f) => f.kind === "unpinned");
 
-  const here = ownName(ROOT);
+  const here = checkoutName(ROOT);
   if (process.argv.includes("--write-baseline")) {
     const known = [...new Set(unpinned.map(baselineKey))].sort();
     writeFileSync(

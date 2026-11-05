@@ -38,7 +38,7 @@ import { join, resolve } from "node:path";
 
 import { captureTools } from "./capture-mcp-tools.ts";
 import { knownSkills } from "./known-skills.ts";
-import { ownName } from "./workflow-pins.ts";
+import { checkoutName } from "./workflow-pins.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 export const BASELINE_FILE = join(import.meta.dir, "split-baseline.json");
@@ -52,7 +52,7 @@ export interface ToolContract {
 export interface SplitBaseline {
   /** The commit the baseline describes. */
   sha: string;
-  /** The repository `sha` is in (`ownName`); absent, the baseline judges every root. */
+  /** The repository `sha` is in (`checkoutName`); absent, the baseline judges every root. */
   root?: string;
   mcpTools: ToolContract[];
   knownSkills: string[];
@@ -113,7 +113,7 @@ export function splitFindings(lines: string[]): { failing: string[]; notes: stri
 
 async function main(): Promise<number> {
   const check = process.argv.includes("--check");
-  const here = ownName(REPO_ROOT);
+  const here = checkoutName(REPO_ROOT);
   if (check && existsSync(BASELINE_FILE)) {
     const base = JSON.parse(readFileSync(BASELINE_FILE, "utf-8")) as SplitBaseline;
     if (!judges(base, here)) {
