@@ -499,6 +499,7 @@
     "library:viz": "bun run cat-harness-tools/scripts/gen-library-viz.ts",
     "library:viz:check": "bun run cat-harness-tools/scripts/gen-library-viz.ts --check",
     "caches:viz": "bun run cat-harness-tools/scripts/gen-caches-viz.ts",
+    "cache:plan": "bun run cat-harness-tools/scripts/cache-plan.ts",
     "caches:viz:check": "bun run cat-harness-tools/scripts/gen-caches-viz.ts --check",
     "methodologies:viz": "bun run cat-harness-tools/scripts/gen-methodologies-viz.ts",
     "methodologies:viz:check": "bun run cat-harness-tools/scripts/gen-methodologies-viz.ts --check",
