@@ -717,6 +717,9 @@ export function fingerprint(
   if (audit.needsTree && !wholeTree && opts.treeReplayed !== true) {
     return { undetermined: "a source reads the working tree through git (`tree` site), which only a {tracked} declaration covers" };
   }
+  if (audit.spawnsChildren && opts.treeReplayed !== true) {
+    return { undetermined: "a test runs a `bun` child (`spawned` site), whose reads only a traced run shows" };
+  }
   for (const name of audit.envUnset) {
     // input-site: traced #87c9a17e — the fingerprint machinery
     inputSiteReached("input-hash: fingerprint reads env-unset names");

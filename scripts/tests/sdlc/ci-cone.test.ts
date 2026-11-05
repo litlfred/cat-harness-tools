@@ -128,6 +128,38 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
     expect("undetermined" in r && r.undetermined).toContain("git fetch");
   });
 
+  test("git in a directory the run created is its own scratch repository: kept as an ordinary process", () => {
+    const r = read(
+      [
+        `10 mkdir("/tmp/probe-ab12", 0700) = 0`,
+        `20 getcwd("/tmp/probe-ab12", 4096) = 16`,
+        `20 execve("/usr/bin/git", ["git", "commit", "-qm", "x"], 0x1 /* 3 vars */) = 0`,
+        `20 openat(AT_FDCWD</tmp/probe-ab12>, ".git/index", O_RDONLY|O_CLOEXEC) = 3</tmp/probe-ab12/.git/index>`,
+        // Its reads of the checkout's .git are kept: no replay answers them.
+        `20 openat(AT_FDCWD</tmp/probe-ab12>, "/work/repo/.git/HEAD", O_RDONLY|O_CLOEXEC) = 4</work/repo/.git/HEAD>`,
+      ].join("\n"),
+    );
+    expect(r).toEqual({ paths: [".git/HEAD"], git: [], children: ["/usr/bin/git"] });
+  });
+
+  test("the programs a child exec'd are named; the command's own exec is not", () => {
+    const r = read(
+      [
+        `10 execve("/usr/bin/bun", ["bun", "test"], 0x1 /* 3 vars */) = 0`,
+        `20 execve("/usr/bin/bun", ["bun", "x.ts"], 0x1 /* 3 vars */) = 0`,
+        `21 execve("/usr/bin/nope", ["nope"], 0x1 /* 3 vars */) = -1 ENOENT (No such file or directory)`,
+      ].join("\n"),
+    );
+    expect(r).toEqual({ paths: [], git: [], children: ["/usr/bin/bun"] });
+  });
+
+  test("git outside the checkout in a directory the run did not create is still undetermined", () => {
+    for (const mk of [`10 mkdir("/tmp/other", 0700) = 0`, `10 mkdir("/tmp/probe-ab12", 0700) = -1 EEXIST (File exists)`]) {
+      const r = read([mk, `20 getcwd("/tmp/probe-ab12", 4096) = 16`, `20 execve("/usr/bin/git", ["git", "status"], 0x1 /* 3 vars */) = 0`].join("\n"));
+      expect("undetermined" in r && r.undetermined).toContain("ran outside the checkout");
+    }
+  });
+
   test("the top-level node_modules is left out (bun.lock pins it); a nested one is kept (bean xd1g)", () => {
     expect(excluded("node_modules/zod/index.js", false)).toBe(true);
     expect(excluded("pkg/node_modules/x/index.js", false)).toBe(false);
@@ -444,5 +476,63 @@ describe.skipIf(!HAS_STRACE)("test files as gates: a test's result is reused onl
   test("the fingerprint audits the bunfig preloads as entries", () => {
     expect(preloadScripts(root)).toEqual({ "test-preload:t/preload.ts": "bun ./t/preload.ts" });
     expect(scripts()[T]).toBe("bun test ./t/a.test.ts");
+  });
+});
+
+describe.skipIf(!HAS_STRACE)("a test's bun children: their environment is derived from the trace", () => {
+  let root: string;
+  const write = (rel: string, text: string) => writeFileSync(join(root, rel), text);
+  const T = "test:t/spawn.test.ts";
+  const scripts = () => testGates(root, ["t/spawn.test.ts"]);
+  const record = () => recordRun({ root, scripts: scripts(), script: T, io: undefined, baseline: undefined, sha: "mainsha", stdio: "ignore" });
+  const decide = () => decideRun({ root, scripts: scripts(), script: T, io: undefined, baseline: undefined });
+  const VAR = "CONE_CHILD_FIXTURE";
+  /** The child, its env read annotated and pinned the way a reviewer would. */
+  const child = (extra = "") => {
+    const lines = [`// input-site: env ${VAR} #PIN — the fixture's variable`, `const v = process.env.${VAR};`, "console.log(v ?? '');", extra];
+    write("t/child.ts", lines.join("\n").replace("#PIN", `#${statementPin(lines, 1)}`) + "\n");
+  };
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), "ci-cone-child-"));
+    mkdirSync(join(root, "t"));
+    write("package.json", JSON.stringify({ name: "fixture" }));
+    write(
+      "t/spawn.test.ts",
+      [
+        'import { expect, test } from "bun:test";',
+        'test("runs its child", () => {',
+        '  const r = Bun.spawnSync(["bun", "t/child.ts"], { stdout: "pipe" });',
+        "  expect(r.exitCode).toBe(0);",
+        "});",
+      ].join("\n") + "\n",
+    );
+    child();
+    process.env[VAR] = "one";
+  });
+  afterEach(() => {
+    delete process.env[VAR];
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("the child's variable is recorded; changing it, or the child, makes the test RUN", () => {
+    const r = record();
+    expect(r.note).toStartWith("recorded");
+    expect(loadRecords(root)!.checks[T]!.env).toEqual({ [VAR]: "one" });
+    expect(decide().skip).toBe(true);
+    process.env[VAR] = "two";
+    expect(decide()).toMatchObject({ skip: false, why: expect.stringContaining(VAR) });
+    process.env[VAR] = "one";
+    expect(decide().skip).toBe(true);
+    child("// edited");
+    expect(decide().skip).toBe(false);
+  });
+
+  test("a child module with a site nobody reviewed records nothing", () => {
+    write("t/child.ts", "console.log(process.env.HOME);\n");
+    const r = record();
+    expect(r.code).toBe(0);
+    expect(r.note).toContain("a bun child's modules");
+    expect(decide().skip).toBe(false);
   });
 });
