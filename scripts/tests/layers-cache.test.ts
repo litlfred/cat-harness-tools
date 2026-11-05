@@ -18,7 +18,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, w
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { digestOf, LAYERS_MAIN_REF, layersKey, layersRef, publishLayers, pruneLayers, run, type LockInstance } from "../mount-from-lock.ts";
+import { digestOf, LAYERS_MAIN_REF, layersKey, layersRef, layersSummaryLine, publishLayers, pruneLayers, run, type LockInstance } from "../mount-from-lock.ts";
 
 const ENV = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
 function git(cwd: string, ...args: string[]): string {
@@ -129,6 +129,7 @@ describe("layers cache: publish and the fast path", () => {
     expect(states(r)).toEqual({ alpha: "mounted", beta: "mounted" });
     expect(r.layers[0]?.ref).toBeUndefined();
     expect(r.layers[0]?.miss).toContain("refs/cat/layers/");
+    expect(layersSummaryLine(r.layers[0]!)).toStartWith("**cached-step `layers`: miss** (exact) — ");
   });
 
   test("hit: after publish, a fresh clone mounts every layer from the ref with the layer repositories unreachable", () => {
@@ -145,6 +146,9 @@ describe("layers cache: publish and the fast path", () => {
     expect(states(r)).toEqual({ alpha: "mounted", beta: "mounted" });
     expect(r.layers[0]?.ref).toBe(layersRef(p.key!));
     expect(r.outcomes.every((o) => o.detail.includes("layers cache"))).toBe(true);
+    expect(layersSummaryLine(r.layers[0]!)).toBe(`**cached-step \`layers\`: hit** (exact) — 2 layer(s) from ${layersRef(p.key!)}, 0 fetched. Key \`${p.key}\`.`);
+    // Already current: nothing needed, so no line.
+    expect(layersSummaryLine(replay(clone).layers[0]!)).toBeUndefined();
     expect(states(run(clone, true))).toEqual({ alpha: "current", beta: "current" });
   });
 
@@ -187,6 +191,7 @@ describe("layers cache: publish and the fast path", () => {
     expect(states(r)).toEqual({ alpha: "mounted", beta: "mounted" });
     expect(r.layers[0]?.ref).toBe(LAYERS_MAIN_REF);
     expect(r.layers[0]?.fellBack).toEqual(["beta"]);
+    expect(layersSummaryLine(r.layers[0]!)).toContain("**cached-step `layers`: warm** (exact) — 1 layer(s) from refs/cat/layers/main, 1 fetched (beta did not verify)");
     expect(readFileSync(join(clone, "beta/scripts/run.ts"), "utf-8")).toBe("export const b = 3;\n");
   });
 

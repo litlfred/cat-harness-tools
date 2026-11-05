@@ -1065,9 +1065,33 @@ export function exitCode(outcomes: Outcome[]): 0 | 1 | 2 {
 }
 
 export interface LayersReport {
+  /** The lock's key. */
+  key: string;
   ref?: string;
   miss?: string;
   fellBack: string[];
+  /** Instances laid down from the cache. */
+  served: string[];
+  /** Instances fetched from their own repository. */
+  fetched: string[];
+}
+
+/**
+ * The cache's one hit/miss/why line, in `cached-step`'s format (cache-first CI,
+ * rule 4), or `undefined` when no instance needed laying down (the cache was
+ * never consulted). `hit`: every needed layer came from the lock's own ref;
+ * `warm`: some did (from `main`, or with a layer that did not verify); `miss`:
+ * none did.
+ */
+export function layersSummaryLine(r: LayersReport): string | undefined {
+  if (r.served.length + r.fetched.length === 0) return undefined;
+  const exact = r.ref === layersRef(r.key);
+  const verdict = r.served.length === 0 ? "miss" : exact && r.fetched.length === 0 ? "hit" : "warm";
+  const why =
+    r.served.length === 0
+      ? `${r.miss ?? "no layer verified from the cache"}; ${r.fetched.length} fetched per repository`
+      : `${r.served.length} layer(s) from ${r.ref}, ${r.fetched.length} fetched${r.fellBack.length ? ` (${r.fellBack.join(", ")} did not verify)` : ""}`;
+  return `**cached-step \`layers\`: ${verdict}** (exact) — ${why}. Key \`${r.key}\`.`;
 }
 
 export function run(
@@ -1094,7 +1118,12 @@ export function run(
     } finally {
       layers?.dispose();
     }
-    if (layers) layersReport.push({ ref: layers.ref, miss: layers.miss, fellBack: layers.fellBack });
+    if (layers) {
+      const fresh = outcomes.filter((o) => o.state === "mounted" && l.instances!.some((i) => i.instance === o.instance));
+      const served = fresh.filter((o) => o.detail.includes("(layers cache")).map((o) => o.instance);
+      const fetched = fresh.filter((o) => !o.detail.includes("(layers cache") && !o.detail.includes("(local mount cache")).map((o) => o.instance);
+      layersReport.push({ key: layersKey(l.instances!), ref: layers.ref, miss: layers.miss, fellBack: layers.fellBack, served, fetched });
+    }
   }
   // AFTER every instance is down, so a manifest's `workspaces` reaching a
   // sibling mount finds it. A failed install is reported against the instance
@@ -1137,6 +1166,15 @@ if (import.meta.main) {
   }
   for (const o of outcomes) console.log(`  ${o.state.padEnd(20)} ${o.instance.padEnd(22)} ${o.detail}`);
   for (const l of layers) {
+    const line = layersSummaryLine(l);
+    const summary = process.env.GITHUB_STEP_SUMMARY;
+    if (line && summary) {
+      try {
+        appendFileSync(summary, `${line}\n`);
+      } catch {
+        // The summary is a report: failing to write it changes no mount.
+      }
+    }
     if (l.ref) console.log(`  layers cache: ${l.ref}${l.fellBack.length ? ` — did not verify for ${l.fellBack.join(", ")}, fetched from their own repositories` : ""}`);
     else if (l.miss) console.log(`  layers cache: miss — ${l.miss}; fetched per repository`);
   }
