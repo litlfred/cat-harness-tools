@@ -25,6 +25,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
 
 import { declaredAssets, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { movesResolver } from "./check-agent-entry-links.ts";
 
 /**
  * Instances whose declarations this repository owns — **discovered, not
@@ -57,7 +58,8 @@ export function declaredInstances(repoRoot: string): string[] {
 export interface AssetFinding {
   instance: string;
   asset: string;
-  kind: "missing" | "dead-link";
+  /** `moved`: resolves only through a declared move in its window — still to switch, not a failure. */
+  kind: "missing" | "dead-link" | "moved";
   detail: string;
 }
 
@@ -73,7 +75,10 @@ export function isCheckable(target: string): boolean {
   return !/^[a-z][a-z0-9+.-]*:/i.test(target);
 }
 
-export function auditInstance(root: string): { findings: AssetFinding[]; notChecked: number } {
+export function auditInstance(
+  root: string,
+  resolveMoved: ReturnType<typeof movesResolver> = movesResolver(root),
+): { findings: AssetFinding[]; notChecked: number } {
   const findings: AssetFinding[] = [];
   let notChecked = 0;
 
@@ -94,9 +99,11 @@ export function auditInstance(root: string): { findings: AssetFinding[]; notChec
       }
       const path = target.split("#")[0]!;
       if (!path) continue;
-      if (!existsSync(resolve(dirname(a.absPath), path))) {
-        findings.push({ instance: root, asset: a.id, kind: "dead-link", detail: target });
-      }
+      const abs = resolve(dirname(a.absPath), path);
+      if (existsSync(abs)) continue;
+      const through = resolveMoved(abs);
+      if (through !== undefined) findings.push({ instance: root, asset: a.id, kind: "moved", detail: `${target} (${through.move})` });
+      else findings.push({ instance: root, asset: a.id, kind: "dead-link", detail: target });
     }
   }
   return { findings, notChecked };
@@ -116,6 +123,10 @@ if (import.meta.main) {
     notChecked += r.notChecked;
   }
 
+  // A link through a declared move is shown, not failed (sdlc skill `two-phase-move`).
+  const moved = findings.filter((f) => f.kind === "moved");
+  findings = findings.filter((f) => f.kind !== "moved");
+  for (const f of moved) console.log(`  · ${f.instance}/${f.asset}: moved — ${f.detail}, still to switch`);
   for (const f of findings) {
     console.error(`  ✗ ${f.instance}/${f.asset}: ${f.kind} — ${f.detail}`);
   }
