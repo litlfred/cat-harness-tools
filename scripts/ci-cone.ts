@@ -79,6 +79,7 @@ import { dirname, join, normalize, resolve } from "node:path";
 import {
   againstRefsOf,
   checkFingerprint,
+  entryFiles,
   FileDigests,
   fingerprint,
   qaBaselineIdentity,
@@ -94,6 +95,7 @@ import { collectTaskIo } from "./task-io.ts";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { findReusable, putResult, STORE_DIR } from "./result-store.ts";
 import { testFilesUnder, testPreloads } from "./affected-tests.ts";
+import { auditClosure } from "./input-sites.ts";
 
 /** Bump when the parser or the read-set rules change. A record from another version is ignored, so every check runs. */
 export const TRACER_VERSION = 3;
@@ -146,6 +148,8 @@ export type ReadSet =
       rewritten?: string[];
       /** How many times each path asked for in `countOpens` was opened for reading. */
       opened?: Record<string, number>;
+      /** The programs a CHILD of the traced command exec'd (absolute paths, sorted); left out when none. */
+      children?: string[];
     }
   | { undetermined: string };
 
@@ -459,6 +463,9 @@ export function parseTrace(
   const wrote = new Set<string>();
   const first = new Map<string, "read" | "absent" | "write">();
   const opened = new Map<string, number>();
+  /** The first process in the trace is the command itself; every other execve is a child's. */
+  const top = parsed[0]?.pid;
+  const children = new Set<string>();
   for (const c of parsed) {
     const me = cell(c.pid);
     for (const a of c.args) {
@@ -514,6 +521,7 @@ export function parseTrace(
         if (base === undefined) return { undetermined: `${c.name}("${p}") from pid ${c.pid}: relative to a directory the trace does not name` };
         abs = normalize(join(base, p)).replace(/(.)\/+$/, "$1");
       }
+      if (c.name === "execve" && c.pid !== top && /^0\b/.test(c.ret)) children.add(abs);
       if ((c.name === "mkdir" || c.name === "mkdirat") && /^0\b/.test(c.ret) && repoRelative(roots, abs) === undefined) scratch.add(abs);
       if (c.name === "execve" && /(^|\/)git$/.test(abs) && /^0\b/.test(c.ret)) {
         const argv = arrayArg(c.args[1] ?? "");
@@ -582,7 +590,7 @@ export function parseTrace(
   }
   if (writes.length > 0) return { undetermined: `the check writes inside the checkout (${writes.slice(0, 3).join(", ")})` };
   if (paths.size > MAX_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_PATHS}` };
-  return { paths: [...paths].sort(), git: [...git.values()], ...listedOf(listed, paths) };
+  return { paths: [...paths].sort(), git: [...git.values()], ...listedOf(listed, paths), ...(children.size ? { children: [...children].sort() } : {}) };
 }
 
 /** `{ listed }` for the read paths that were listed, left out when there are none. */
@@ -756,6 +764,12 @@ export interface ConeCheck {
   reads: Record<string, string>;
   /** Every git command it ran ({@link gitKey}), and what that command answered after the run. */
   git: Record<string, string>;
+  /**
+   * A test gate whose run started a `bun` child: every variable the modules it
+   * read can read ({@link childEnvOf}), and its value then (`null`: unset).
+   * Derived from the run, never declared; absent when it started none.
+   */
+  env?: Record<string, string | null>;
 }
 
 export interface ConeRecords {
@@ -893,6 +907,12 @@ export function matchCheck(rec: ConeCheck, fp: Fingerprint, root: string, digest
     }
     if (gitState(root, call) !== state) return { skip: false, why: `git ${call.args.join(" ")} answers differently` };
   }
+  if (rec.env !== undefined) {
+    // input-site: traced #c6583b74 — compares a test's children's recorded environment, on the decide path
+    inputSiteReached("ci-cone: child env now");
+    const env = process.env;
+    for (const [n, v] of Object.entries(rec.env)) if ((env[n] ?? null) !== v) return { skip: false, why: `$${n}, which a bun child's module reads, changed` };
+  }
   return { skip: true, sha: rec.sha, why: `inputs unchanged since ${rec.sha} (${Object.keys(rec.reads).length} paths)` };
 }
 
@@ -910,6 +930,10 @@ export function coneRecordOf(args: {
   reached: string | undefined;
   root: string;
   digests: FileDigests;
+  /** The package scripts, for a `scripts` site a child's module carries. */
+  scripts?: Readonly<Record<string, string>>;
+  /** A test gate: its `bun` children's environment is derived ({@link childEnvOf}). */
+  testGate?: boolean;
 }): ConeCheck | { none: string } {
   if (!args.passed) return { none: "the check did not pass" };
   if ("undetermined" in args.before) return { none: args.before.undetermined };
@@ -921,7 +945,52 @@ export function coneRecordOf(args: {
   for (const p of args.reads.paths) reads[p] = readState(args.root, p, args.digests, listed);
   const git: Record<string, string> = {};
   for (const c of args.reads.git) git[gitKey(c)] = gitState(args.root, c);
-  return { sha: args.sha, base: args.before.hash, reads, git };
+  const env = args.testGate === true ? childEnvOf(args.root, args.reads, args.digests, args.scripts ?? {}) : {};
+  if ("none" in env) return { none: String(env.none) };
+  return { sha: args.sha, base: args.before.hash, reads, git, ...(Object.keys(env).length ? { env } : {}) };
+}
+
+/** A program that runs this tree's TypeScript: what a test's `spawned` site starts. */
+const JS_RUNTIME_RE = /(?:^|\/)(?:bun|bunx|node)$/;
+
+/**
+ * What a test's `bun` children read from the environment, derived from its
+ * trace (owner, 2026-11-05: "Read them from the trace"). A child's modules are
+ * in the read set, so a change to one reruns the test; its environment is
+ * not, so every source module the run read is audited as an entry (its
+ * `import.meta.main` block included, since a child runs it as one), and the
+ * variables they can read are recorded with their values. A module read only
+ * as text is audited too: that can only make the test run more often. Any
+ * site the audit cannot answer records nothing. A run that started no bun
+ * child records no variables.
+ */
+export function childEnvOf(
+  root: string,
+  reads: Extract<ReadSet, { paths: string[] }>,
+  digests: FileDigests,
+  scripts: Readonly<Record<string, string>>,
+): Record<string, string | null> | { none: string } {
+  if (!(reads.children ?? []).some((p) => JS_RUNTIME_RE.test(p))) return {};
+  const modules = reads.paths.filter((p) => /\.(m?[jt]sx?)$/.test(p) && existsSync(join(root, p)) && statSync(join(root, p)).isFile());
+  const audit = auditClosure(
+    root,
+    modules,
+    digests.sites,
+    undefined,
+    (name) => entryFiles(root, scripts, name),
+    (source) => digests.declared.resolve(source),
+  );
+  if ("undetermined" in audit) return { none: `a bun child's modules: ${audit.undetermined}` };
+  const out: Record<string, string | null> = {};
+  // input-site: traced #c6583b74 — records a test's children's environment, on the record path only
+  inputSiteReached("ci-cone: child env");
+  const env = process.env;
+  for (const n of audit.envUnset) {
+    if ((env[n] ?? "") !== "") return { none: `$${n} is set, and a bun child's module names it as outside the tree` };
+    out[n] = null;
+  }
+  for (const n of audit.env) out[n] = env[n] ?? null;
+  return out;
 }
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
@@ -1044,6 +1113,8 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
       reached: trace.reached(againstRefsOf(o.scripts, o.script)),
       root: o.root,
       digests,
+      scripts: o.scripts,
+      testGate: isTestGate(o.script),
     });
     const records = loadRecords(o.root) ?? { version: TRACER_VERSION, recipe: RECIPE_VERSION, sha: o.sha, checks: {} };
     if ("none" in rec) {

@@ -595,9 +595,23 @@ describe("the test git-spawn rule", () => {
   });
   test("outside a test file, beside another spawn, or with any other risk, it still needs one", () => {
     expect(verdictsOf("x/a.ts", 'Bun.spawnSync(["git", "init"]);')).toEqual([undefined]);
-    expect(verdictsOf("x/a.test.ts", 'spawnSync("git", ["init"]); spawnSync("bun", ["x.ts"]);')).toEqual([undefined]);
+    expect(verdictsOf("x/a.test.ts", 'spawnSync("git", ["init"]); spawnSync("sh", ["x"]);')).toEqual([undefined]);
     expect(verdictsOf("x/a.test.ts", "spawnSync(cmd, []);")).toEqual([undefined]);
     expect(verdictsOf("x/a.test.ts", 'spawnSync("gitx", []);')).toEqual([undefined]);
     expect(verdictsOf("x/a.test.ts", 'spawnSync("git", [], { env: process.env });')).toEqual([undefined]);
+  });
+});
+
+describe("the test bun-spawn rule", () => {
+  const verdictsOf = (file: string, line: string) => scanSource(file, `${line}\n`).map((s) => s.verdicts);
+  test("a spawn of bun itself in a test file is `spawned`; beside git, also `tree`", () => {
+    expect(verdictsOf("x/a.test.ts", 'const r = Bun.spawnSync(["bun", "scripts/x.ts"], { cwd });')).toEqual([[{ kind: "spawned" }]]);
+    expect(verdictsOf("x/a.test.ts", 'spawnSync(process.execPath, ["x.ts"]);')).toEqual([[{ kind: "spawned" }]]);
+    expect(verdictsOf("x/a.test.ts", 'spawnSync("bun", ["x.ts"]); spawnSync("git", ["init"]);')).toEqual([[{ kind: "spawned" }, { kind: "tree" }]]);
+  });
+  test("outside a test file, or beside another program, it still needs one", () => {
+    expect(verdictsOf("x/a.ts", 'Bun.spawnSync(["bun", "x.ts"]);')).toEqual([undefined]);
+    expect(verdictsOf("x/a.test.ts", 'spawnSync("bun", ["x.ts"]); spawnSync("python3", []);')).toEqual([undefined]);
+    expect(verdictsOf("x/a.test.ts", 'spawnSync("bunx", ["x"]);')).toEqual([undefined]);
   });
 });
