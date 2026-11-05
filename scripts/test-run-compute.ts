@@ -20,6 +20,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { TOOLS_ROOT } from "./lib/roots.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 /** Directory a {@link TEST_RUN_WRITERS} writer puts its test runs in instead of `test/results/`. */
 export const TEST_RUN_OUT_ENV = "QA_TEST_RUN_OUT_DIR";
@@ -67,16 +68,18 @@ export function computeTestRuns(
 ): ComputedTestRuns | { reason: string } {
   const chosen = testRunWritersFor(resultsDir, workspaceRoot, writers);
   if (chosen.length === 0) return { reason: "no declared writer computes its test runs" };
+  // input-site: traced #4904ad92 — where the writers write their computed runs, which reach the answer; a run that reaches it records no hash
+  inputSiteReached("test-run-compute: dir");
   const dir = mkdtempSync(join(tmpdir(), "test-runs-computed-"));
   const done = (): void => rmSync(dir, { recursive: true, force: true });
   for (const w of chosen) {
+    // input-site: traced #db56d334 — the writer's environment, all of this process's
+    inputSiteReached("test-run-compute: writer env");
+    const env = { ...process.env, [TEST_RUN_OUT_ENV]: dir };
     // `bun run cat …`, without needing the workspace's package.json to name `cat`.
-    const r = spawnSync("bun", [join(TOOLS_ROOT, "scripts", "run-script.ts"), ...w.run], {
-      cwd: workspaceRoot,
-      encoding: "utf-8",
-      env: { ...process.env, [TEST_RUN_OUT_ENV]: dir },
-      maxBuffer: 1 << 26,
-    });
+    // input-site: traced #69125803 — runs a declared test-run writer, whose output reaches the answer
+    inputSiteReached("test-run-compute: writer");
+    const r = spawnSync("bun", [join(TOOLS_ROOT, "scripts", "run-script.ts"), ...w.run], { cwd: workspaceRoot, encoding: "utf-8", env, maxBuffer: 1 << 26 });
     if (r.status !== 0) {
       done();
       const why = (r.stderr || r.stdout || "").trim().split("\n").pop() ?? "";
