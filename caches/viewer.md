@@ -6,6 +6,8 @@ Every cache this layer declares (`cache/1.0.0`, `caches/`), and the key today's 
 
 | cache | kind | trust | location | key recipe | implied key | stored key | staleness | size · last access · hit rate |
 |---|---|---|---|---|---|---|---|---|
+| [bundle-publish-pages](#bundle-publish-pages) | artifact-reuse | a-provenance | `artifact publish-pages + record bundle-publish-pages-<digest>` | script: `sha256(recipe 3, bundle name, HEAD^{tree}, ImageOS + RUNNER_ARCH, exact bun/git/node/python3/java versions, every state ref tip + qa-reports head, extras)` | undetermined — computed only by .github/scripts/bundle-cache.sh digest | from the daily report (not read) | undetermined — the implied key: computed only by .github/scripts/bundle-cache.sh digest | from the daily report (not read) |
+| [bundle-qa-working-copy](#bundle-qa-working-copy) | artifact-reuse | a-provenance | `artifact qa-working-copy + record bundle-qa-working-copy-<digest>` | script: `sha256(recipe 3, bundle name, HEAD^{tree}, ImageOS + RUNNER_ARCH, exact bun/git/node/python3/java versions, every state ref tip + qa-reports head, extras)` | undetermined — computed only by .github/scripts/bundle-cache.sh digest | from the daily report (not read) | undetermined — the implied key: computed only by .github/scripts/bundle-cache.sh digest | from the daily report (not read) |
 | [cat-gates-notes](#cat-gates-notes) | git-ref | b | `refs/notes/cat-gates` | cache:key: `refs/notes/cat-gates` | undetermined — one key per gate (`cache:key <gate>`), not one for the cache | from the daily report (not read) | undetermined — whether its producer reads a state branch is not measured yet | from the daily report (not read) |
 | [ci-image](#ci-image) | ghcr-image | a | `ghcr.io/<owner>/<repo>-ci of the INDEX repository (folio-assistant: ghcr.io/litlfred/folio-assistant-ci), tag = key` | script: `sha256(index.lock.json, bun.lock, package.json, every file under .github/ci-image and .github/actions/ci-setup sorted by path, bun --version, $ImageOS uname -m)` | undetermined — computed only by .github/ci-image/key.sh | from the daily report (not read) | undetermined — the implied key: computed only by .github/ci-image/key.sh | from the daily report (not read) |
 | [layers-ref](#layers-ref) | git-ref | a | `refs/cat/layers/<key> (and the moving refs/cat/layers/main), in the INDEX repository` | script: `sha256(JSON.stringify(index.lock.json .instances))` | undetermined — computed only by scripts/mount-from-lock.ts#layersKey | from the daily report (not read) | undetermined — the implied key: computed only by scripts/mount-from-lock.ts#layersKey | from the daily report (not read) |
@@ -19,6 +21,32 @@ Every cache this layer declares (`cache/1.0.0`, `caches/`), and the key today's 
 | [lpc-writer-cone](#lpc-writer-cone) | actions-cache | c | `writer-cone-v1-` | script: `writer-cone-v1-${{ github.repository }}-${{ github.sha }} (save) / -${{ github.event.pull_request.base.sha }} (restore)` | undetermined — computed only by writer-cone.ts | from the daily report (not read) | undetermined — whether its producer reads a state branch is not measured yet | from the daily report (not read) |
 | [lpc-writer-stamp](#lpc-writer-stamp) | actions-cache | c | `writer-record-stamp-v1-` | per-run: `writer-record-stamp-v1-${repo}-<epoch/(3600*writer-record-hours) or GITHUB_SHA>` | undetermined — run-scoped: no key is implied between runs | from the daily report (not read) | undetermined — whether its producer reads a state branch is not measured yet | from the daily report (not read) |
 | [pr-tests-main-answer](#pr-tests-main-answer) | actions-cache | c | `pr-tests-main-v1-` | hand-listed: `pr-tests-main-v1-$judge-$base-$MAINS_KEY-$INDEX ($judge = sha256 of 5 named files)` | undetermined — hand-listed inputs: no derived key to compare (a finding) | from the daily report (not read) | undetermined — whether its producer reads a state branch is not measured yet | from the daily report (not read) |
+
+### bundle-publish-pages
+
+**Generated set: the publish-time pages** — cat-harness-tools, trust class a-provenance, owner CI speed 10 (session_01VQDpPd7y4nwxjHFm66CMKF); ported onto cached-step by CI speed 14 after #2965.
+
+- **Holds:** the pages derive:publish writes, with their manifest; built over the QA working copy
+- **Derived inputs:** the tree of the commit (the writers declare {tracked}), the exact tool versions the writers call, and the tips of the state branches they read
+- **Producer:** code-quality-gates.yml job publish-pages (bun run cat derive:publish)
+- **Consumers:** the gate jobs that read the publish-time pages; docs-site
+- **Save policy:** each run that built the bundle uploads it plus a `bundle-<name>-<digest>` record artifact last; artifacts are run-scoped, so the trust is in the reader's source rule
+- **Verify:** bundle-cache.sh fetch: (1) source run's head is this head, a parent of this commit, or a commit with this tree; (2) the tar matches manifest.txt; (3) the bundle names no foreign run id, commit or <n>/merge (until 69lr/#1509 removes the stamps)
+- **Uses:** `.github/scripts/bundle-cache.sh digest|fetch|record`, `.github/workflows/code-quality-gates.yml publish-pages job`
+- **Notes:** folio-assistant #2965/#2966. Not byte-reproducible yet: same commit eaa6558, runs 42025861803 and 42030336059, QA manifests 17f6fa0a… vs 7ba8341b… (determinism audit's first row).
+
+### bundle-qa-working-copy
+
+**Generated set: the QA working copy** — cat-harness-tools, trust class a-provenance, owner CI speed 10 (session_01VQDpPd7y4nwxjHFm66CMKF); ported onto cached-step by CI speed 14 after #2965.
+
+- **Holds:** qa-working-copy.tar and manifest.txt: the test/results the QA writers produce over the tree
+- **Derived inputs:** the tree of the commit (the writers declare {tracked}), the exact tool versions the writers call, and the tips of the state branches they read
+- **Producer:** code-quality-gates.yml job qa-working-copy (bun run cat qa:working-copy)
+- **Consumers:** the gate jobs that read test/results; Feature Staging's stage (qa-copy-reuse.sh, to move onto cached-step)
+- **Save policy:** each run that built the bundle uploads it plus a `bundle-<name>-<digest>` record artifact last; artifacts are run-scoped, so the trust is in the reader's source rule
+- **Verify:** bundle-cache.sh fetch: (1) source run's head is this head, a parent of this commit, or a commit with this tree; (2) the tar matches manifest.txt; (3) the bundle names no foreign run id, commit or <n>/merge (until 69lr/#1509 removes the stamps)
+- **Uses:** `.github/scripts/bundle-cache.sh digest|fetch|record`, `.github/workflows/code-quality-gates.yml qa-working-copy job`
+- **Notes:** folio-assistant #2965/#2966. Not byte-reproducible yet: same commit eaa6558, runs 42025861803 and 42030336059, QA manifests 17f6fa0a… vs 7ba8341b… (determinism audit's first row).
 
 ### cat-gates-notes
 
