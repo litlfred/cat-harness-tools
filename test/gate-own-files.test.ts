@@ -16,7 +16,14 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { GATE_OWN_ENV, gateDirectoriesForGraph, gateOwnInstances } from "../scripts/lib/gate-own.ts";
+import {
+  GATE_FOREIGN_PATHS_ENV,
+  GATE_OWN_ENV,
+  GATE_OWN_PATHS_ENV,
+  gateDirectoriesForGraph,
+  gateOwnInstances,
+  gateOwnsFile,
+} from "../scripts/lib/gate-own.ts";
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { auditSchemaNodes } from "../scripts/schema-nodes.ts";
@@ -46,6 +53,10 @@ describe("run-gates.py hands every gate the caller's own instances", () => {
     const src = readFileSync(RUN_GATES, "utf-8");
     expect(src).toContain(`GATE_OWN_ENV = "${GATE_OWN_ENV}"`);
     expect(src).toMatch(/os\.environ\.setdefault\(GATE_OWN_ENV, ","\.join\(own\)\)/);
+    expect(src).toContain(`GATE_OWN_PATHS_ENV = "${GATE_OWN_PATHS_ENV}"`);
+    expect(src).toContain(`GATE_FOREIGN_PATHS_ENV = "${GATE_FOREIGN_PATHS_ENV}"`);
+    expect(src).toMatch(/os\.environ\.setdefault\(GATE_OWN_PATHS_ENV,/);
+    expect(src).toMatch(/os\.environ\.setdefault\(GATE_FOREIGN_PATHS_ENV,/);
   });
 });
 
@@ -98,6 +109,8 @@ describe("a scoped check whose caller commits none of its subjects passes, never
     ["check-tabular-stubs.ts", "library directory"],
     ["check-translation-officiality.ts", "translations directory"],
     ["check-schema-nodes.ts", "schemas/*.ts"],
+    ["check-concern-groups.ts", "grouping directory"],
+    ["check-subgraphs.ts", "markdown in a declared directory"],
   ] as const) {
     test(script, () => {
       const r = spawnSync("bun", [resolve(import.meta.dir, "..", "scripts", script)], { encoding: "utf-8", env });
@@ -105,4 +118,39 @@ describe("a scoped check whose caller commits none of its subjects passes, never
       expect(r.stdout).toContain(`commits no ${what}`);
     });
   }
+});
+
+describe("gateOwnsFile: a file is the caller's when its deepest instance directory is", () => {
+  const env = (own: string, foreign: string) => ({ [GATE_OWN_PATHS_ENV]: own, [GATE_FOREIGN_PATHS_ENV]: foreign });
+
+  test("unset is undefined: judge everything", () => {
+    expect(gateOwnsFile("cat-harness/AGENTS.md", {})).toBeUndefined();
+  });
+
+  test("a layer root: its own directory is its own, a mounted layer's and the index's root files are not", () => {
+    const e = env("smart-base", "cat-harness,cat-harness-tools");
+    expect(gateOwnsFile("smart-base/AGENTS.md", e)).toBe(true);
+    expect(gateOwnsFile("./smart-base/scripts/x.ts", e)).toBe(true);
+    expect(gateOwnsFile("cat-harness/docs/guides/agent-onboarding.md", e)).toBe(false);
+    expect(gateOwnsFile("README.md", e)).toBe(false);
+    // A prefix of a name is not containment.
+    expect(gateOwnsFile("smart-base-extra/AGENTS.md", e)).toBe(false);
+  });
+
+  test("an instance at the root owns the root's files but not a mounted layer under it", () => {
+    const e = env(".", "cat-harness");
+    expect(gateOwnsFile("README.md", e)).toBe(true);
+    expect(gateOwnsFile("cat-harness/AGENTS.md", e)).toBe(false);
+  });
+});
+
+describe("check:command-paths judges only the caller's own files", () => {
+  test("a caller that commits none of them passes, never exit 1 for reading nothing", () => {
+    const r = spawnSync("bun", [resolve(import.meta.dir, "..", "scripts", "check-command-paths.ts")], {
+      encoding: "utf-8",
+      env: { ...process.env, [GATE_OWN_ENV]: "no-such-instance", [GATE_OWN_PATHS_ENV]: "no-such-instance", [GATE_FOREIGN_PATHS_ENV]: "" },
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("commits none of the files it reads");
+  });
 });
