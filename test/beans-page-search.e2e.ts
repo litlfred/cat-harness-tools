@@ -123,7 +123,7 @@ test.describe("/beans/ — themed, beans only, and searchable (#2418)", () => {
 
   test("no match says so rather than showing an empty list", async ({ page: p }) => {
     await open(p, "zzzz-no-bean-has-this-zzzz");
-    await expect(p.locator(".fa-workplan-results .fa-workplan-chart-title")).toContainText("No bean matches");
+    await expect(p.locator(".fa-workplan-results .fa-workplan-chart-title")).toContainText(/No (bean|work item) matches/);
     await expect(p.locator(".fa-workplan-results .fa-workplan-bean-row")).toHaveCount(0);
   });
 

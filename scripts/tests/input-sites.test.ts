@@ -17,10 +17,13 @@ import { join, relative, resolve } from "node:path";
 import { instanceDirectoriesForGraph } from "../../schemas/kg/cat-harness.ts";
 import { declaredDirectories } from "../../schemas/kg/declared-nodes.ts";
 import { orderedDependencies } from "../../schemas/kg/harness-config.ts";
+import { defaultGraphTypologies } from "../../schemas/kg/graph-typology-registry.ts";
+import { moduleRootOf, parseValidatorRef } from "../../schemas/kg/kind-validator.ts";
 import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "../../schemas/ui/theme-by-ref.ts";
 
 import { blankSource, auditClosure, mainBlockLines, outsideTemplates, parseVerdicts, scanSource, SiteMemo, statementPin } from "../input-sites.ts";
+import { pluginTableModules, validatorModules } from "../declared-imports.ts";
 import { checkFingerprint, entryFiles, FileDigests, TRACKED, type Fingerprint } from "../input-hash.ts";
 import { inputSiteReached, openTrace, qaRefLine, quietly, TRACE_ENV } from "../../schemas/sdlc/input-trace.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "../lib/roots.ts";
@@ -361,31 +364,62 @@ describe("annotations hold to the data that chooses their targets", () => {
     }
   });
 
-  test("every qa-checker and pipeline-plugin ref lies under harness-config's `imports` globs", () => {
-    const globs = ["*/pipeline/plugin-slots.ts", "*/pipeline/qa-checkers-*.ts"];
+  const declaredBy = (file: string, source: string) =>
+    scanSource(file, readFileSync(join(repo, file), "utf-8")).some(
+      (s) => Array.isArray(s.verdicts) && s.verdicts.some((v) => v.kind === "declared" && v.sources.includes(source)),
+    );
+
+  test("every qa-checker and pipeline-plugin ref is a module harness-config's `declared plugin-tables` names", () => {
+    const named = new Set(pluginTableModules(repo));
     const all = roots();
     // A ref is relative to the instance that owns the node: the deepest root holding it.
     const ownerOf = (dir: string) => all.filter((r) => dir.startsWith(`${r}/`)).sort((a, b) => b.length - a.length)[0]!;
-    {
-      for (const graph of ["qa-checkers", "pipeline-plugins"]) {
-        for (const dir of declaredDirectories(repo, graph)) {
-          if (!existsSync(dir)) continue;
-          const root = ownerOf(resolve(dir));
-          for (const f of readdirSync(dir).filter((n) => n.endsWith(".json"))) {
-            const raw = JSON.parse(readFileSync(join(dir, f), "utf-8")) as { check?: string; implementation?: string };
-            const ref = raw.check ?? raw.implementation;
-            if (typeof ref !== "string" || !ref.includes("#")) continue;
-            const target = relTo(resolve(root, ref.split("#")[0]!));
-            expect(globs.some((g) => globMatch(g, target)), `${dir}/${f}: ${target} is outside ${globs.join(", ")}`).toBe(true);
-          }
+    for (const graph of ["qa-checkers", "pipeline-plugins"]) {
+      for (const dir of declaredDirectories(repo, graph)) {
+        if (!existsSync(dir)) continue;
+        const root = ownerOf(resolve(dir));
+        for (const f of readdirSync(dir).filter((n) => n.endsWith(".json"))) {
+          const raw = JSON.parse(readFileSync(join(dir, f), "utf-8")) as { check?: string; implementation?: string };
+          const ref = raw.check ?? raw.implementation;
+          if (typeof ref !== "string" || !ref.includes("#")) continue;
+          const target = resolve(root, ref.split("#")[0]!);
+          if (!existsSync(target)) continue; // harness-config throws naming the node: it loads nothing
+          expect(named.has(relTo(target)), `${dir}/${f}: ${relTo(target)} is not named by plugin-tables`).toBe(true);
         }
       }
     }
     // The module moved into this layer with schemas/kg/ (8lcl); named from TOOLS_ROOT, not spelled.
     // declared-path-literal: the module whose `input-site` annotation is the subject of this assertion, the same file this test imports; no declaration answers where a module of this layer sits.
-    for (const g of globs) expect(annotated(relTo(join(TOOLS_ROOT, "schemas/kg/harness-config.ts")), g), g).toBe(true);
+    expect(declaredBy(relTo(join(TOOLS_ROOT, "schemas/kg/harness-config.ts")), "plugin-tables")).toBe(true);
   });
 
+  test("every declared validator module, from any root a caller passes, is one `declared validator-refs` names", () => {
+    const named = new Set(validatorModules(repo));
+    const registry = defaultGraphTypologies;
+    registry.ensureCheckout(repo);
+    // The loaders resolve an unqualified ref against the instance root their CALLER passes.
+    const callerRoots = [repo, ...roots()];
+    let seen = 0;
+    for (const kind of registry.names()) {
+      const def = registry.get(kind);
+      const refs = [def?.validator, ...Object.values(def?.nodeSchemas ?? {}).map((r) => (r as { validator?: string }).validator)];
+      for (const raw of refs) {
+        if (typeof raw !== "string") continue;
+        const ref = parseValidatorRef(raw);
+        for (const r of callerRoots) {
+          const base = moduleRootOf(ref, r);
+          if (base === undefined) continue; // unresolvable: loads nothing
+          const target = resolve(base, ref.module);
+          if (!existsSync(target)) continue; // the loader reports it unresolvable: loads nothing
+          seen++;
+          expect(named.has(relTo(target)), `${kind}: ${raw} -> ${relTo(target)} is not named by validator-refs`).toBe(true);
+        }
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
+    // declared-path-literal: the two modules that load the declared validator refs, whose `input-site` annotations are the subject of this assertion; no declaration answers where a module of this layer sits.
+    for (const file of ["kind-validator.ts", "node-kind-index.ts"]) expect(declaredBy(relTo(join(TOOLS_ROOT, "schemas/kg", file)), "validator-refs"), file).toBe(true);
+  });
 
   test("every instance themes module lies under theme-by-ref's `imports` glob", () => {
     for (const root of roots()) {
@@ -448,6 +482,68 @@ describe("the audit walks only what can run", () => {
     }
   });
 
+  test("a `declared` load reaches exactly what its source names, kept apart as computed and still audited", () => {
+    const root = mkdtempSync(join(tmpdir(), "vgfp-declared-"));
+    try {
+      const load = "const m = await import(p);";
+      writeFileSync(join(root, "a.ts"), `import "./shared.ts";\nexport async function f(p: string) {\n  // input-site: declared kinds #${pinOf(load)} — the modules the kinds name\n  ${load}\n  return m;\n}\n`);
+      writeFileSync(join(root, "shared.ts"), "export const s = 1;\n");
+      writeFileSync(join(root, "v1.ts"), 'import "./dep.ts";\nimport "./shared.ts";\n');
+      writeFileSync(join(root, "dep.ts"), "export const d = 1;\n");
+      writeFileSync(join(root, "v2.ts"), "export const v = 2;\n");
+      const named: Record<string, string[]> = { kinds: ["v1.ts"] };
+      const audit = auditClosure(root, ["a.ts"], new SiteMemo(), undefined, undefined, (src) => named[src]);
+      if (!("files" in audit)) throw new Error(audit.undetermined);
+      // v2.ts lies beside v1.ts, and no declaration names it.
+      expect(audit.files).toEqual(["a.ts", "dep.ts", "shared.ts", "v1.ts"]);
+      // shared.ts is imported statically too, so it is not only computed.
+      expect(audit.computed).toEqual(["dep.ts", "v1.ts"]);
+      // A computed target is audited like any other source.
+      writeFileSync(join(root, "dep.ts"), "export const d = Date.now(); // a site now\n");
+      isUndetermined(auditClosure(root, ["a.ts"], new SiteMemo(), undefined, undefined, (src) => named[src]) as Fingerprint, "dep.ts:1 (clock)");
+      // A source that does not resolve is undetermined.
+      isUndetermined(auditClosure(root, ["a.ts"], new SiteMemo()) as Fingerprint, "declaration source kinds");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a module reached statically after a computed load is not computed", () => {
+    const root = mkdtempSync(join(tmpdir(), "vgfp-upgrade-"));
+    try {
+      const load = "const m = await import(p);";
+      // The computed load is walked before the static import of v.ts, so v.ts is first seen as computed.
+      writeFileSync(join(root, "a.ts"), `import "./z.ts";\nexport async function f(p: string) {\n  // input-site: imports v.ts #${pinOf(load)} — v\n  ${load}\n  return m;\n}\n`);
+      writeFileSync(join(root, "z.ts"), 'import "./v.ts";\n');
+      writeFileSync(join(root, "v.ts"), 'import "./w.ts";\n');
+      writeFileSync(join(root, "w.ts"), "export const w = 1;\n");
+      const audit = auditClosure(root, ["a.ts"], new SiteMemo());
+      if (!("files" in audit)) throw new Error(audit.undetermined);
+      expect(audit.files).toEqual(["a.ts", "v.ts", "w.ts", "z.ts"]);
+      expect(audit.computed).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a traced fingerprint does not hash a computed target; an untraced one does", () => {
+    const root = mkdtempSync(join(tmpdir(), "vgfp-traced-"));
+    try {
+      const load = "const m = await import(p);";
+      writeFileSync(join(root, "c.ts"), `export async function f(p: string) {\n  // input-site: imports v.ts #${pinOf(load)} — v\n  ${load}\n  return m;\n}\n`);
+      writeFileSync(join(root, "v.ts"), "export const v = 1;\n");
+      const scripts = { "c:check": "bun run c.ts" };
+      const io = { inputs: [], outputs: [] };
+      const fp = (treeReplayed: boolean) => checkFingerprint(root, scripts, "c:check", io, new FileDigests(root), undefined, { treeReplayed });
+      const [traced, plain] = [hashOf(fp(true)), hashOf(fp(false))];
+      writeFileSync(join(root, "v.ts"), "export const v = 2;\n");
+      expect(hashOf(fp(true))).toBe(traced);
+      expect(hashOf(fp(false))).not.toBe(plain);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("every runtime module under schemas/ is input-site annotated after 8lcl (cat-harness-tools#634)", () => {
     // declared-path-literal: the directory of schema modules whose input-site annotations this test audits.
     const schemasRoot = join(TOOLS_ROOT, "schemas");
@@ -470,5 +566,22 @@ describe("the audit walks only what can run", () => {
       }
     }
     expect(unannotated).toEqual([]);
+  });
+});
+
+describe("the test scratch-dir rule (owner, 2026-11-05)", () => {
+  const sites = (file: string, line: string) => scanSource(file, `import { tmpdir, homedir } from "node:os";\nimport { mkdtempSync } from "node:fs";\nimport { join } from "node:path";\n${line}\n`);
+  test("tmpdir() in a test file needs no annotation: it is inert", () => {
+    const s = sites("x/a.test.ts", 'const root = mkdtempSync(join(tmpdir(), "a-"));');
+    expect(s).toHaveLength(1);
+    expect(s[0]!.verdicts).toEqual([{ kind: "inert" }]);
+  });
+  test("the same line outside a test file still needs one", () => {
+    expect(sites("x/a.ts", 'const root = mkdtempSync(join(tmpdir(), "a-"));')[0]!.verdicts).toBeUndefined();
+  });
+  test("homedir(), or tmpdir() beside another risk, still needs one in a test", () => {
+    expect(sites("x/a.test.ts", "const h = homedir();")[0]!.verdicts).toBeUndefined();
+    expect(sites("x/a.test.ts", "const p = join(tmpdir(), homedir());")[0]!.verdicts).toBeUndefined();
+    expect(sites("x/a.test.ts", "const p = join(tmpdir(), process.env.HOME!);")[0]!.verdicts).toBeUndefined();
   });
 });

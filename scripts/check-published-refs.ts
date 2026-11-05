@@ -16,8 +16,8 @@
  * look of the value (a 40-hex regex would fail the build stamp). A new
  * provenance key is a deliberate addition to that list.
  *
- * Per-PR previews are STAGING: a SHA there is correct, and this gate does not
- * look at `/STAGING/`.
+ * Per-PR previews are branches/: a SHA there is correct, and this gate does not
+ * look at `/branches/`.
  *
  * Every reference carrier prints its count, even nought, with a note on why
  * it is empty; zero references is reported, never rendered as a pass.

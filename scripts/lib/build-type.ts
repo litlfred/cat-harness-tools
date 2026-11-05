@@ -11,7 +11,7 @@
  *
  * | build type | used for | what it builds |
  * |---|---|---|
- * | `preview` | a pull request's `STAGING/<slug>/` preview | only what the change can reach (the cone); every whole-corpus index (`builtAtPublish` entries marked `index: true`, and the search index) is main's copy, put back rather than rebuilt |
+ * | `preview` | a pull request's `branches/<slug>/` preview | only what the change can reach (the cone); every whole-corpus index (`builtAtPublish` entries marked `index: true`, and the search index) is main's copy, put back rather than rebuilt |
  * | `full` | the main site deploy, a public comment release, a release | everything, every index rebuilt from this tree |
  *
  * A preview exists so a reviewer can see a change. An index (search, LSI,

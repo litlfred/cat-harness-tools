@@ -26,7 +26,7 @@
  *
  * An entry is never rewritten, and a removal is a NEW entry, so `removed`
  * does not delete the `rendered` entry that precedes it; "what happened to
- * `STAGING/x`" is answered by reading forward.
+ * `branches/x`" is answered by reading forward.
  *
  * ## What is NOT here
  *
@@ -45,10 +45,10 @@ export const RENDER_LOG_SCHEMA_ID = "folio-render-log/v1";
 /**
  * Where the log lives on the publish branch.
  *
- * At the root rather than under `STAGING/`, and that is load-bearing: the
- * cleanup runs `rm -rf "STAGING/$SLUG"`, and a branch named to collide with a
- * directory under `STAGING/` slugifies to exactly that name — verified, git
- * permits such a ref. A store outside `STAGING/` is unreachable by that
+ * At the root rather than under `branches/`, and that is load-bearing: the
+ * cleanup runs `rm -rf "branches/$SLUG"`, and a branch named to collide with a
+ * directory under `branches/` slugifies to exactly that name — verified, git
+ * permits such a ref. A store outside `branches/` is unreachable by that
  * command whatever the slug says, which is a structural guarantee rather than
  * a guard somebody has to remember to write.
  */
@@ -119,7 +119,7 @@ export type RenderTextFormat = (typeof RENDER_TEXT_FORMATS)[number] | (string & 
 export const RenderSubjectSchema = z.object({
   kind: z.string().min(1),
   /**
-   * The path on the publish branch — `STAGING/<slug>`, or `/` for the site.
+   * The path on the publish branch — `branches/<slug>`, or `/` for the site.
    *
    * A single safe path, checked by {@link isSafeRenderPath}. The log is
    * written by the same jobs that run `rm -rf` on paths built from a branch

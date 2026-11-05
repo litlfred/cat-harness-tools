@@ -124,8 +124,10 @@ export interface UntaintedPayload {
   reasoning?: string;
   /** Anything the checker flagged as ambiguous. */
   uncertainties?: string[];
-  /** Defaults to now / current HEAD; pass them when re-recording an older review. */
+  /** Defaults to now / current HEAD's tree; pass them when re-recording an older review. */
   reviewed_at?: string;
+  reviewed_tree?: string;
+  /** Legacy re-record address; see {@link reviewAddress}. */
   reviewed_sha?: string;
 }
 
@@ -144,7 +146,29 @@ export interface CouldNotDispatchPayload {
   /** Who recorded the absence. May be the producer; that is the point. */
   recorded_by: UntaintedParty;
   reviewed_at?: string;
+  reviewed_tree?: string;
+  /** Legacy re-record address; see {@link reviewAddress}. */
   reviewed_sha?: string;
+}
+
+/**
+ * Where a review is addressed: `reviewed_tree`, the tree of HEAD (bean 69lr;
+ * owner card Q4, 2026-11-05: a PR run's HEAD commit can vanish, its tree
+ * cannot).
+ *
+ * A caller re-recording an older review may still name it by commit
+ * (`reviewed_sha`). That is written through verbatim and NO tree is stamped:
+ * the current tree would place the review against a tree it never saw — the
+ * lie a re-stamped commit once told — and the commit's own tree is not known
+ * here without a git read this module does not make. An explicit
+ * `reviewed_tree` wins over both.
+ */
+export function reviewAddress(
+  p: { reviewed_tree?: string; reviewed_sha?: string },
+  headTree: string | undefined,
+): Pick<QaCriterionEntry, "reviewed_tree" | "reviewed_sha"> {
+  if (p.reviewed_tree === undefined && p.reviewed_sha !== undefined) return { reviewed_sha: p.reviewed_sha };
+  return { reviewed_tree: p.reviewed_tree ?? headTree };
 }
 
 /**
@@ -191,10 +215,10 @@ function provenanceMetrics(
 export function untaintedEntries(
   payload: UntaintedPayload,
   fieldHash: QaFieldHash,
-  headSha?: string,
+  headTree?: string,
 ): QaCriterionEntry[] {
   const at = payload.reviewed_at ?? new Date().toISOString();
-  const sha = payload.reviewed_sha ?? headSha;
+  const address = reviewAddress(payload, headTree);
   const findings = payload.findings?.filter((f) => f.trim() && f.trim().toLowerCase() !== "none");
 
   const verdict: QaCriterionEntry = {
@@ -209,7 +233,7 @@ export function untaintedEntries(
       ...partyFields(payload.adjudicator),
     },
     reviewed_at: at,
-    reviewed_sha: sha,
+    ...address,
     metrics: provenanceMetrics(payload.adjudicator, { role: "adjudicator" }),
     notes: payload.reasoning,
   };
@@ -226,7 +250,7 @@ export function untaintedEntries(
       ...partyFields(payload.checker),
     },
     reviewed_at: at,
-    reviewed_sha: sha,
+    ...address,
     metrics: provenanceMetrics(payload.checker, { role: "checker" }),
     notes:
       `Checker output: ${payload.intermediate}` +
@@ -248,7 +272,7 @@ export function untaintedEntries(
 export function couldNotDispatchEntry(
   payload: CouldNotDispatchPayload,
   fieldHash: QaFieldHash,
-  headSha?: string,
+  headTree?: string,
 ): QaCriterionEntry {
   if (payload.reason.trim() === "") {
     throw new Error(
@@ -261,7 +285,7 @@ export function couldNotDispatchEntry(
     result: "n/a",
     reviewer: { kind: "agent", id: payload.recorded_by.id, ...partyFields(payload.recorded_by) },
     reviewed_at: payload.reviewed_at ?? new Date().toISOString(),
-    reviewed_sha: payload.reviewed_sha ?? headSha,
+    ...reviewAddress(payload, headTree),
     metrics: provenanceMetrics(payload.recorded_by, { dispatch: "unavailable" }),
     notes: `Could not dispatch: ${payload.reason.trim()}`,
   };

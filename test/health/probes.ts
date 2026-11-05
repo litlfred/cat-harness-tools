@@ -57,6 +57,7 @@ import {
   type BranchEvidence,
   type BranchEvidenceSet,
 } from "./checks.ts";
+import { PREVIEW_PREFIX } from "../../schemas/sdlc/preview-prefix.ts";
 import type {
   PagesServingEvidence,
   RemoteMountEvidence,
@@ -75,7 +76,7 @@ import type {
 } from "./checks.ts";
 
 /** Where the review previews live on the publish branch. Same constant as `restore-staging.ts`. */
-export const STAGING_PREFIX = "STAGING";
+export const STAGING_PREFIX = PREVIEW_PREFIX;
 
 interface Ran {
   code: number;
@@ -175,7 +176,7 @@ export function probeStaging(o: StagingProbeOptions): Probe<StagingEvidence> {
   }
 
   const command = `git ls-tree -r -l ${rev}:${o.prefix}/<slug>`;
-  // Is there a STAGING directory at all? An absent one is a determined empty:
+  // Is there a branches/ directory at all? An absent one is a determined empty:
   // the branch was read and carries no previews.
   const has = git(o.repoRoot, ["ls-tree", "--name-only", rev, o.prefix]);
   if (has.code !== 0) {

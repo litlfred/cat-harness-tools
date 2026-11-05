@@ -946,7 +946,7 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
   },
   {
     // Added by folio-assistant#2843 in `feature-staging.yml`: rewrites the
-    // `gh-pages` checkout in place (`pages/STAGING/<slug>/` -> `_staging-blob/`
+    // `gh-pages` checkout in place (`pages/branches/<slug>/` -> `_staging-blob/`
     // + `_staging-manifest/<slug>.json`) and writes `pages/404.html` and
     // `pages/_worker.js` right before the staging commit/push. Its four modes
     // (`apply`, `GC`, `write-404`, `verify`) — content-addressed deduplication,

@@ -283,6 +283,8 @@ describe("what gets written", () => {
       "folio/cold-chain-guidance/introduction/overview.ts",
       "folio/cold-chain-guidance/introduction/overview.md",
       "uploads/README.md",
+      // declared-path-literal: a file the scaffold writes in the NEW folio, not a harness file; it only
+      // resolved against cat-harness while the harness kept a README at library/.
       "library/README.md",
       "AGENTS.md",
       "CLAUDE.md",

@@ -174,6 +174,9 @@ describe("the preview root is derived from the path, not baked in", () => {
     ["/folio-assistant/STAGING/my-branch/index.html", "/folio-assistant/STAGING/my-branch/"],
     ["/folio-assistant/STAGING/my-branch/a/b/c.html", "/folio-assistant/STAGING/my-branch/"],
     ["/STAGING/x/", "/STAGING/x/"],
+    // `branches/` since 2026-11-05; `STAGING/` above is still read.
+    ["/folio-assistant/branches/my-branch/a/b/c.html", "/folio-assistant/branches/my-branch/"],
+    ["/branches/x/", "/branches/x/"],
   ])("%s -> %s", (pathname, expected) => {
     expect(previewRootOf(pathname)).toBe(expected);
   });
@@ -194,7 +197,7 @@ describe("the preview root is derived from the path, not baked in", () => {
     const shipped = FRAGMENT.match(/location\.pathname\.match\((\/.*\/)\)/);
     expect(shipped).not.toBe(null);
     const client = new RegExp(shipped![1]!.slice(1, -1));
-    for (const p of ["/a/STAGING/b/c.html", "/STAGING/x/", "/nope/index.html"]) {
+    for (const p of ["/a/STAGING/b/c.html", "/STAGING/x/", "/a/branches/b/c.html", "/branches/x/", "/nope/index.html"]) {
       expect(client.exec(p)?.[1] ?? null).toBe(previewRootOf(p));
     }
   });

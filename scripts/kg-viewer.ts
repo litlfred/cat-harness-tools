@@ -10,7 +10,7 @@
  * runtime.
  *
  * It fetches the graph **relative to its own location**, so the same bytes work
- * at `<canonical>/<stub>/` and at `STAGING/<slug>/<stub>/` with no
+ * at `<canonical>/<stub>/` and at `branches/<slug>/<stub>/` with no
  * configuration.
  *
  * **The graph is found from the SITE ROOT, never as a neighbour.** The page
@@ -401,7 +401,7 @@ export function viewerHtml(
   <!-- The way back (bean yhcq, finding 8). The page is reached from the docs
        navbar and carries none of its chrome, so returning depended on the
        browser's Back button. The site root, reached relatively: the same
-       reasoning as DOC, so it is right under STAGING/<slug>/ too. -->
+       reasoning as DOC, so it is right under branches/<slug>/ too. -->
   <a class="crumb" id="home" href="${up}">&larr; <bdi id="home-t">Docs site</bdi></a>
   <h1 id="title">${stub} — knowledge graph</h1>
   <div class="meta" id="meta">loading <code>${doc}</code>…</div>
@@ -444,7 +444,7 @@ export function viewerHtml(
 "use strict";
 // The document is a SIBLING of this page — never an absolute URL and never a
 // composed one. The same bytes therefore work at the canonical base and under
-// STAGING/<slug>/ with no configuration.
+// branches/<slug>/ with no configuration.
 const DOC = ${JSON.stringify(doc)};
 const STUB = ${JSON.stringify(stub)};
 const SUBJECT_KINDS = ${JSON.stringify(SUBJECT_KINDS)};
@@ -856,7 +856,7 @@ function renderMeta() {
   //
   // DOC, not a composed absolute URL. The page already fetched its sibling by
   // that relative path, so the link is correct wherever the page is served
-  // from -- canonical or STAGING/<slug>/ -- for the same reason the fetch is.
+  // from -- canonical or branches/<slug>/ -- for the same reason the fetch is.
   // Composing <base>/kg/<stub>.jsonld from the declaration would have been a
   // second answer to a question the page has already answered, and the one
   // that goes wrong on a preview.

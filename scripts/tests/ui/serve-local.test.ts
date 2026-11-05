@@ -1,6 +1,6 @@
 /**
  * serve-local (#1179): fetch a repo's gh-pages into a sparse cache, leaving
- * STAGING out unless a preview is named, and update it on the next run.
+ * branches/ out unless a preview is named, and update it on the next run.
  *
  * The "remote" is a local git repository, so the test needs no network.
  *
@@ -83,7 +83,7 @@ describe("inputs", () => {
   });
 
   test("STAGING is excluded and named previews added back", () => {
-    expect(sparsePatterns(["claude-x"])).toEqual(["/*", "!/STAGING/", "/STAGING/claude-x/"]);
+    expect(sparsePatterns(["claude-x"])).toEqual(["/*", "!/branches/", "!/STAGING/", "/branches/claude-x/", "/STAGING/claude-x/"]);
     expect(() => sparsePatterns(["../x"])).toThrow();
   });
 
