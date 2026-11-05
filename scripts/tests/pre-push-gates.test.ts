@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { failedTests, gatesEnabled, judge, parsePushCommand, parsePushStdin } from "../pre-push-gates.ts";
+import { failedTests, gatesEnabled, judge, parsePushCommand, parsePushStdin, testEnv } from "../pre-push-gates.ts";
 import { readDurations } from "../gate-durations.ts";
 import { buildRecord, covers, newFailures, readRecord, readResults, stateDir, toolVersions, treeOf, type GatesReportLike } from "../gate-record.ts";
 
@@ -370,4 +370,10 @@ describe("off by default: the gates run only when the checkout opts in", () => {
     expect(r.status).toBe(0);
     expect(r.stderr).toContain("off by default");
   });
+});
+
+test("the affected tests never inherit BUN_OPTIONS (a CI shard's --shard and --reporter-outfile)", () => {
+  const env = testEnv({ BUN_OPTIONS: "--shard=1/4 --reporter=junit --reporter-outfile=/x.xml", PATH: "/bin" });
+  expect(env.BUN_OPTIONS).toBeUndefined();
+  expect(env.PATH).toBe("/bin");
 });
