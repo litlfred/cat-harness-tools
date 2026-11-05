@@ -22,7 +22,8 @@
  *   that only meet at a shared box are not a crossing.
  * - **through a box**: a line passing through the inside of an element or
  *   note box that is not one of its ends and does not hold one of its ends.
- *   Groups are bands a line may cross; they are not counted.
+ *   Groups, and Grouping elements (drawn as bands too), are bands a line may
+ *   cross; they are not counted.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -41,7 +42,7 @@ export interface Tangle {
 }
 
 /** Every tangle in a view, as drawn. `routed` defaults to the view's own routing; a caller that already has it passes it in. */
-export function tanglesOf(view: ArchimateView, routed: RoutedConnection[] = routeConnections(view)): Tangle[] {
+export function tanglesOf(view: ArchimateView, routed: RoutedConnection[] = routeConnections(view), model?: ArchimateModel): Tangle[] {
   const nodes = new Map(view.nodes.map((n) => [n.id, n]));
   const ancestors = (id: string): Set<string> => {
     const out = new Set<string>([id]);
@@ -62,7 +63,9 @@ export function tanglesOf(view: ArchimateView, routed: RoutedConnection[] = rout
       }
     }
   }
-  const boxes = view.nodes.filter((n) => n.kind === "element" || n.kind === "note" || n.kind === "view-ref");
+  // A Grouping element is drawn as a band, as a diagram group is: a line may cross it.
+  const groupings = new Set((model?.elements ?? []).filter((e) => e.type === "Grouping").map((e) => e.id));
+  const boxes = view.nodes.filter((n) => (n.kind === "element" && !groupings.has(n.ref ?? "")) || n.kind === "note" || n.kind === "view-ref");
   for (const r of routed) {
     const own = new Set([...ancestors(r.connection.source), ...ancestors(r.connection.target)]);
     for (const n of boxes) {
@@ -115,7 +118,7 @@ if (import.meta.main) {
   const names = new Map<string, string>();
   for (const e of model.elements) names.set(e.id, e.name);
   const rows = (views as ArchimateView[]).map((v) => {
-    const t = tanglesOf(v);
+    const t = tanglesOf(v, undefined, model);
     return { id: v.id, name: v.name, crossings: t.filter((x) => x.kind === "crossing").length, throughBox: t.filter((x) => x.kind === "through-box").length, tangles: t };
   });
   if (process.argv.includes("--json")) {

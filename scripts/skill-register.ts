@@ -310,7 +310,7 @@ export interface Findings {
  * Why there is nothing for this command to judge in `instance`, or `undefined`
  * when there is.
  *
- * An instance that declares no knowledge-graph directory holds no skill, so no
+ * An instance that declares no `skills` directory holds no skill, so no
  * skill of it can be unregistered and nothing the chain regenerates is staled
  * by one. Since bean `j3ls` the instance judged is the one MOUNTING the harness
  * (a content instance's own index, such as a FHIR IG's), and most of those
@@ -318,12 +318,19 @@ export interface Findings {
  * which is a question with no answer rather than one nobody could reach.
  *
  * Deliberately narrow, so `dh4f` stays shut: it is the DECLARATION that is
- * asked, not the disk. An instance that declares a knowledge-graph directory
- * and has no package manifests in it is still the third state.
+ * asked, not the disk. An instance that declares a `skills` directory and has
+ * no package manifests in it is still the third state. Any OTHER
+ * knowledge-graph directory (`scenarios`, which an IG declares for the actors
+ * its journeys name) holds no skill package, so it does not make the instance
+ * applicable.
  */
 export function notApplicable(instance: string = INSTANCE_ROOT): string | undefined {
-  if (declaredKgDirectories(instance, corpusScopeFor(instance)).length > 0) return undefined;
-  return `${instance} declares no knowledge-graph directory, so it holds no skill to register`;
+  // A `skills` directory, not any knowledge-graph one: an IG that declares
+  // only `scenarios` (the actors its journeys name) holds no skill package,
+  // and judging it ended in "no package manifests found".
+  const dirs = declaredKgDirectories(instance, corpusScopeFor(instance));
+  if (dirs.some((d) => (d.graphTypologies ?? []).includes("skills"))) return undefined;
+  return `${instance} declares no \`skills\` directory, so it holds no skill to register`;
 }
 
 export function audit(instance: string = INSTANCE_ROOT): Findings {
