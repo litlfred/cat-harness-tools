@@ -172,7 +172,11 @@ export type BeanFrontMatter = z.infer<typeof BeanFrontMatterSchema>;
  * for two things made `schemas/sdlc/bean-graph.ts#BeanNodeKind` resolve to the type
  * in the schema index and to this value in `validators/bean-node.json`.
  */
-export const BeanKind = nodeKind("bean/1.0.0", [MemoryRecordCoreKind], beanOwnFields());
+export const BeanKind = nodeKind("bean/1.0.0", [MemoryRecordCoreKind], beanOwnFields(), {
+  term: "Work item",
+  summary:
+    "One piece of work an agent or a person takes up: a memory record with a status, a type, a priority, a parent and what it blocks, kept in the work plan. Its file is the one the `beans` CLI reads, which is why the kind is named `bean`.",
+});
 
 /**
  * The bean's own fields: the front matter minus the memory record's shared

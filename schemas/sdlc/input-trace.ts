@@ -87,7 +87,12 @@ export function openTrace(root: string): {
       if (!existsSync(path)) return undefined;
       const lines = readFileSync(path, "utf-8").split("\n").filter(Boolean);
       rmSync(path, { force: true });
-      projected.push(...lines.filter((l) => l.startsWith(PROJECTED_LINE)));
+      // A loop, not `push(...lines)`: a spread passes every line as an
+      // argument, and a whole-suite gate's trace (`bun test`, measured
+      // 2026-11-05 in a composed folio-assistant checkout) is long enough to
+      // overflow the call stack, which crashed `gates` after every verdict
+      // and left its input-hash cache unsaved.
+      for (const l of lines) if (l.startsWith(PROJECTED_LINE)) projected.push(l);
       const allowed = new Set([...hashedRefs.map(qaRefLine), ...seen]);
       return lines.find((l) => !allowed.has(l) && !l.startsWith(PROJECTED_LINE));
     },

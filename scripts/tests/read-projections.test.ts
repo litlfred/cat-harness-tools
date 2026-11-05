@@ -13,7 +13,7 @@ import { parseTrace, STRACE_ARGS } from "../ci-cone.ts";
 import { FileDigests } from "../input-hash.ts";
 import { decideWriter, emptyRecords, projectedReadsOf, projectionFor, writerRecordOf } from "../writer-cone.ts";
 import { openTrace } from "../../schemas/sdlc/input-trace.ts";
-import { PROJECTIONS, projectedRead, projectedReads, projectedState } from "../../schemas/sdlc/read-projections.ts";
+import { PROJECTED_LINE, PROJECTIONS, TRACE_ENV, projectedRead, projectedReads, projectedState } from "../../schemas/sdlc/read-projections.ts";
 import { reportLocationRead } from "../mount-from-lock.ts";
 
 const HAS_STRACE = Bun.which("strace") !== null && Bun.spawnSync(["strace", "-f", "-qq", "-o", "/dev/null", "true"], { stdout: "ignore", stderr: "ignore" }).exitCode === 0;
@@ -157,4 +157,19 @@ describe("mount-from-lock's restated report", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+});
+
+test("a trace too long to spread into push() is read without overflowing the stack", () => {
+  // `gates` crashed after a whole-suite `bun test` run (2026-11-05,
+  // RangeError at input-trace.ts): `projected.push(...lines)` passes every
+  // line as an argument. 1 000 000 projected lines is past that limit.
+  const root = mkdtempSync(join(tmpdir(), "trace-long-"));
+  try {
+    const trace = openTrace(root);
+    writeFileSync(trace.env[TRACE_ENV]!, `${PROJECTED_LINE}kg /x.json\n`.repeat(1_000_000));
+    expect(trace.reached()).toBeUndefined();
+    expect(trace.projected().length).toBe(1_000_000);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

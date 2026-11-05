@@ -46,6 +46,7 @@ import {
   type MoveEvidence,
   EXEMPTIONS_DECLARED,
   INSTANCE_UPLOADS_DATA,
+  PROVENANCE_LOG,
   directionCensus,
   directionSidecarState,
   directionStates,
@@ -1405,5 +1406,19 @@ describe("an instance's uploads/ is its data store, not a reference (owner, 2026
 
   test("the same text outside uploads/ is still wrong-direction", () => {
     expect(classifyReference(occ("low", "high", "basis: cited by high/scripts/x.ts", "low/library/item/manifest.jsonld"), RULE, never, [INSTANCE_UPLOADS_DATA]).verdict).toBe("wrong-direction");
+  });
+});
+
+describe("a provenance log quotes where a rule came from, not a reference (owner, 2026-11-05)", () => {
+  // The Docs QA pass gave skills `<skill>.prov.jsonld` logs whose verbatim
+  // quotes name the layers the owner was talking about (cat-harness#1037).
+  test("a <document>.prov.jsonld naming a higher instance is exempt, with the ruling as its reason", () => {
+    const v = classifyReference(occ("low", "high", "\"quote\": \"move it into high\"", "low/skills/kg/x.prov.jsonld"), RULE, never, [PROVENANCE_LOG]);
+    expect(v.verdict).toBe("exempt");
+    expect(v.basis).toContain("PROVENANCE LOG");
+  });
+
+  test("the same text in the document itself is still wrong-direction", () => {
+    expect(classifyReference(occ("low", "high", "\"quote\": \"move it into high\"", "low/skills/kg/x.jsonld"), RULE, never, [PROVENANCE_LOG]).verdict).toBe("wrong-direction");
   });
 });

@@ -19,6 +19,7 @@
  * written by one") is a different thing and stays separate.
  *
  * @module schemas/kg/memory-record
+ * @graphNode schema
  */
 import { z } from "zod";
 import { nodeKind } from "./node-kind.ts";
@@ -56,6 +57,10 @@ export const MemoryRecordCoreKind = nodeKind("memory-record-core", [], {
   tags: z.array(z.string()).optional(),
   created_at: z.string().optional(),
   updated_at: z.string().optional(),
+}, {
+  term: "Memory record",
+  summary:
+    "What every kept memory shares: an id, a title, tags and when it was made and changed. A work item is one, with more structure; a memory record on its own adds a scope and dated entries.",
 });
 
 /** A memory record on its own, as a store that is not the work plan keeps it. */

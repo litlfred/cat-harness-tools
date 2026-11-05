@@ -20,7 +20,12 @@ describe("declaredEditLocation (bean 5o5c)", () => {
     // A real narrative, found rather than named: a literal path would be a
     // second record of the corpus for `declared-paths` to police.
     const sourceDir = join(HARNESS_ROOT, "docs", "source");
-    const page = readdirSync(sourceDir).find((d) => readdirSync(join(sourceDir, d)).some((f) => f.endsWith(".md")));
+    // Directories only: `docs/source/README.md` sits beside the page
+    // directories, and reading it as one threw ENOTDIR wherever it was listed first.
+    const page = readdirSync(sourceDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+      .find((d) => readdirSync(join(sourceDir, d)).some((f) => f.endsWith(".md")));
     expect(page).toBeDefined();
     const block = readdirSync(join(sourceDir, page!)).find((f) => f.endsWith(".md"))!;
     const target = `docs/source/${page}/${block}`;

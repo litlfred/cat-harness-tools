@@ -820,7 +820,7 @@ export function beansBoardPage(
   src: string,
 ): string {
   return page({
-    title: "Beans",
+    title: "Work plan",
     body: `<h1 id="beans">${esc(g.id)}</h1>
 <p class="sv-sub">${esc(g.path)} · ${esc(g.kinds.join(", "))}</p>
 <div class="fa-workplan" data-fa-workplan data-fa-workplan-only="beans">
@@ -2473,7 +2473,7 @@ export function beansSubjectPage(
   read: BeanStoreRead = readSubjectBeans(s.instanceRoot),
   view?: Omit<WorkflowViewContext, "beans">,
 ): string {
-  const title = vis.title ?? "Beans";
+  const title = vis.title ?? "Work plan";
   const others = subjects
     .map((o) =>
       o.name === s.name

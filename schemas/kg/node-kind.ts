@@ -46,6 +46,15 @@ export interface NodeKind<S extends z.ZodRawShape = z.ZodRawShape> {
   version?: string;
   /** `<id>/<version>`: what a writer stamps in `$schema`. Absent when unversioned. */
   tag?: string;
+  /**
+   * What ONE node of this kind is called, in the words a reader meets: "Work
+   * item" for `bean`. The glossary's label for the kind; absent, the glossary
+   * reads the id (`memory-record-core` → "Memory record core"). Work item
+   * folio-assistant-dkqd: the id stays, the word a reader sees need not be it.
+   */
+  term?: string;
+  /** One sentence saying what a node of this kind is: the glossary's definition. */
+  summary?: string;
   parents: readonly NodeKind[];
   /** The fields this layer itself declares. */
   own: z.ZodRawShape;
@@ -129,6 +138,10 @@ export function nodeKind<const I extends string, const P extends readonly NodeKi
      * a defect, and stripping would pass it silently.
      */
     strict?: boolean;
+    /** {@link NodeKind.term}. */
+    term?: string;
+    /** {@link NodeKind.summary}. */
+    summary?: string;
   } = {},
 ): NodeKind<Composed<P, OwnOf<I, O>>> {
   const parsed = parseSchemaTag(versionedId);
@@ -202,6 +215,8 @@ export function nodeKind<const I extends string, const P extends readonly NodeKi
   return {
     id,
     ...(version ? { version, tag: `${id}/${version}` } : {}),
+    ...(opts.term !== undefined ? { term: opts.term } : {}),
+    ...(opts.summary !== undefined ? { summary: opts.summary } : {}),
     parents,
     own,
     overrides: [...declaredOverrides],

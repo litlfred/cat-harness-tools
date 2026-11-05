@@ -26,8 +26,13 @@ export const LEGACY_LEDGER_SCHEMA = "folio-glossary-ledger/v1";
  * `process/<bpmn:process id>/lane/<bpmn:lane id>` — the Lane node's own
  * identity in kg-export — never its display name, so renaming a lane does
  * not mint a new term: the old name becomes a `formerLabels` entry.
+ *
+ * Since work item folio-assistant-dkqd (2026-11-04) the glossary also defines
+ * the words for what a harness keeps: a graph kind is `kind/<kind word>`, a
+ * node kind `node-kind/<kind id>`, and the harness itself `harness/<name>`.
  */
-export const LEDGER_KEY = /^(?:role\/[a-z0-9][a-z0-9-]*|process\/[A-Za-z_][\w.-]*\/lane\/[A-Za-z_][\w.-]*)$/;
+export const LEDGER_KEY =
+  /^(?:role\/[a-z0-9][a-z0-9-]*|process\/[A-Za-z_][\w.-]*\/lane\/[A-Za-z_][\w.-]*|(?:kind|node-kind|harness)\/[a-z][a-z0-9-]*)$/;
 
 export const LedgerEntrySchema = z.object({
   prefLabel: z.string().describe("The current label — what the term is shown as, and what a retired term keeps."),
@@ -45,6 +50,6 @@ export const LedgerSchema = z.object({
   $schema: z.literal(LEDGER_SCHEMA),
   instance: z.string().min(1).describe("Which Knowledge Graph's glossary this is: its name, never a path."),
   concepts: z
-    .record(z.string().regex(LEDGER_KEY, "a ledger key is role/<id> or process/<process id>/lane/<lane id>"), LedgerEntrySchema)
+    .record(z.string().regex(LEDGER_KEY, "a ledger key is role/<id>, process/<process id>/lane/<lane id>, kind/<kind>, node-kind/<kind> or harness/<name>"), LedgerEntrySchema)
     .describe("Keyed by the term IRI's local part, never the absolute IRI, so the file survives a change of address."),
 });

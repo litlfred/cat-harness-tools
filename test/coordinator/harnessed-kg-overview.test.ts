@@ -115,7 +115,9 @@ describe("living deck: every claim about the KG still holds", () => {
   test("slide 10 — the taxonomy still uses smart-kg as its example, and says it is its own repository", () => {
     const t = read(join(SITE, "concepts/architecture/repo-taxonomy.md"));
     expect(t).toContain("`smart-kg` and `smart-kg-tools` is the worked example");
-    expect(t).toContain("`smart-kg` is its own repository");
+    // Either wording: the docs-QA pass wrote "is its own repository", and
+    // cat-harness d9a8bb40 kept "is already its own repository".
+    expect(t).toMatch(/`smart-kg` is (already )?its own repository/);
     // Its stub left this checkout for that reason (bean `wg7r`).
     expect(existsSync(join(REPO, "smart-kg"))).toBe(false);
   });
