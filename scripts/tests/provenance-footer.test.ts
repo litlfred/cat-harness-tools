@@ -58,6 +58,7 @@ describe("provenance footer", () => {
 
   test("a passage cut from an HTML comment loses the markers and the indent", () => {
     expect(passageText("<!--\n  one\n    two\n-->")).toBe("one\n  two");
+    expect(passageText("<!-- one --!>")).toBe("one");
   });
 
   test("emphasis becomes tags outside code spans only", () => {

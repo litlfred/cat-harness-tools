@@ -96,7 +96,7 @@ export function provenanceOf(sources: readonly string[]): ProvenanceEntry[] {
 export function passageText(value: string): string {
   const lines = value
     .replace(/^\s*<!--/, "")
-    .replace(/-->\s*$/, "")
+    .replace(/--!?>\s*$/, "")
     .split("\n");
   const indents = lines.filter((l) => l.trim() !== "").map((l) => l.match(/^ */)![0].length);
   const cut = indents.length ? Math.min(...indents) : 0;
