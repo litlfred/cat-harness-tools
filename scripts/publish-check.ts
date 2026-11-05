@@ -62,6 +62,7 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
 /** Never content: install artefacts, git, and the scratch a build writes. */
+// input-site: inert #062e600e — the directories a snapshot never reads; their contents never reach the answer
 const SKIP_DIRS = new Set(["node_modules", ".git", "_site", "build"]);
 
 /** sha256 of every file under each root, keyed repo-relative. */

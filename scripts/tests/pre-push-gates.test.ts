@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { failedTests, judge, parsePushCommand, parsePushStdin } from "../pre-push-gates.ts";
+import { failedTests, gatesEnabled, judge, parsePushCommand, parsePushStdin } from "../pre-push-gates.ts";
 import { buildRecord, covers, newFailures, readRecord, readResults, stateDir, toolVersions, treeOf, type GatesReportLike } from "../gate-record.ts";
 
 const PASS: GatesReportLike = {
@@ -282,4 +282,53 @@ const a = process.argv; writeFileSync(a[a.indexOf("--report") + 1]!, JSON.string
     expect(v.kind).toBe("allow");
     expect(v.kind === "allow" && v.why).toContain("0 affected test file(s)");
   }, 60_000);
+});
+
+describe("off by default: the gates run only when the checkout opts in", () => {
+  const HOOK = join(import.meta.dir, "..", "pre-push-gates.ts");
+  let root: string;
+  const sh = (...args: string[]) => spawnSync("git", args, { cwd: root, encoding: "utf-8" });
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), "pre-push-off-"));
+    sh("init", "-q");
+    sh("config", "user.email", "t@example.invalid");
+    sh("config", "user.name", "t");
+    // A `cat` runner that would FAIL every gate, so a run of it would refuse the push.
+    writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: { cat: "exit 1" } }));
+    sh("add", "-A");
+    sh("commit", "-qm", "c");
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  test("gatesEnabled reads the env first, then git config", () => {
+    expect(gatesEnabled(root, {})).toBe(false);
+    expect(gatesEnabled(root, { CAT_PREPUSH_GATES: "1" })).toBe(true);
+    sh("config", "cat.gates.prePush", "true");
+    expect(gatesEnabled(root, {})).toBe(true);
+    expect(gatesEnabled(root, { CAT_PREPUSH_GATES: "0" })).toBe(false);
+  });
+
+  test("the git hook, off, lets the push go at once, says so and logs it", () => {
+    const head = sh("rev-parse", "HEAD").stdout.trim();
+    const r = spawnSync("bun", ["run", HOOK, "--git-hook", "origin"], {
+      cwd: root,
+      input: `refs/heads/main ${head} refs/heads/main ${"0".repeat(40)}\n`,
+      encoding: "utf-8",
+      env: { ...process.env, CAT_PREPUSH_GATES: "" },
+    });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain("gates not run (off by default");
+    expect(readFileSync(join(stateDir(root), "push.log"), "utf-8")).toContain('"event":"off"');
+  });
+
+  test("the Claude hook, off, never blocks, even a --no-verify push", () => {
+    const r = spawnSync("bun", ["run", HOOK, "--claude-hook"], {
+      cwd: root,
+      input: JSON.stringify({ tool_name: "Bash", tool_input: { command: "git push --no-verify origin main" }, cwd: root }),
+      encoding: "utf-8",
+      env: { ...process.env, CAT_PREPUSH_GATES: "" },
+    });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain("off by default");
+  });
 });
