@@ -43,6 +43,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { codeListDirs, loadCodeLists } from "../schemas/library/code-list.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { ignoredBy } from "./publish-check.ts";
 
 /** The code list an instance declares its retired words in. */
 export const RETIRED_WORDS_LIST = "retired-prose-words";
@@ -184,7 +185,14 @@ export function ownProseFiles(instanceRoot: string): string[] {
     }
   };
   walk(instanceRoot, "");
-  return out.sort();
+  // A file the instance's own `.gitignore` excludes is generated, not authored:
+  // a built-at-publish page such as `docs/cat-harness/kind-table.md`, which
+  // exists only where a writer ran (CI's QA working copy) and carries no
+  // "do not edit" header. Its generator is where a word is fixed. Asked of
+  // the `.gitignore` files themselves, not of git, so a mount without `.git`
+  // answers the same (folio-assistant#2954, CI shard 4, 2026-11-05).
+  const ignored = ignoredBy(out, [instanceRoot], instanceRoot);
+  return out.filter((f) => !ignored.has(f)).sort();
 }
 
 /** Every retired word in an instance's own prose, by file. */

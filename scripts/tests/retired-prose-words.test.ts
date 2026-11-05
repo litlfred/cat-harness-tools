@@ -79,6 +79,20 @@ describe("whose prose it is", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  test("a file the instance's .gitignore excludes is generated output, not its prose", () => {
+    const root = mkdtempSync(join(tmpdir(), "retired-words-"));
+    try {
+      mkdirSync(join(root, "docs", "built"), { recursive: true });
+      writeFileSync(join(root, ".gitignore"), "/docs/built/\n/docs/table.md\n");
+      writeFileSync(join(root, "docs", "authored.md"), "Authored prose.\n");
+      writeFileSync(join(root, "docs", "table.md"), "A generated table.\n");
+      writeFileSync(join(root, "docs", "built", "index.md"), "A generated page.\n");
+      expect(ownProseFiles(root)).toEqual(["docs/authored.md"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("this harness's own prose", () => {
