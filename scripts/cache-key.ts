@@ -29,10 +29,12 @@
  *
  * ## `cache:publish <step>` — a committer's entry, which CI only verifies
  *
- * For an EXACTLY verifiable step (trust `exact`): the output can be checked
- * against its inputs without re-running the producer — the mounts against
- * the lock's tree digests, a deterministic producer's bundle against its
- * manifest. The committer builds it locally and runs this, which commits the
+ * For a class-(a) step only: its `verify` checks the output against a
+ * reference derived from the TREE (the mounts against the lock's tree
+ * digests), so a bad entry is only a miss. A bundle checked against the
+ * manifest it carries is not one: a manifest proves it intact, not built from
+ * these inputs, so such bundles need a source rule and are never published
+ * by a committer. CI never consumes a published entry on main. The committer builds it locally and runs this, which commits the
  * output as a tree (`ws/<path>` for a path in the checkout, `home/<path>` for
  * one under `$HOME`) and pushes it to `refs/cache/cs1-<step>-<key>`. CI's
  * `cached-step` (with `committer-refs: true`) fetches it and accepts it only
