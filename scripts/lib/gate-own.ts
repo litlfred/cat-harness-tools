@@ -20,6 +20,7 @@
  * local run, the index's own gates workflow), the check judges the whole
  * checkout, as before.
  */
+import { checkoutDirectories, corpusDirectoriesForGraph } from "../../schemas/kg/harness-config.js";
 
 /** Comma-separated names of the instances whose files this run judges. */
 export const GATE_OWN_ENV = "CAT_GATE_OWN_INSTANCES";
@@ -30,4 +31,38 @@ export function gateOwnInstances(env: Readonly<Record<string, string | undefined
   const raw = env[GATE_OWN_ENV];
   const names = (raw ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   return names.length > 0 ? new Set(names) : undefined;
+}
+
+/** The corpus directories holding `kind` that `own`'s instances commit (an inherited member counts as its member's). */
+export function ownDirectoriesForGraph(root: string, kind: string, own: ReadonlySet<string>): string[] {
+  return checkoutDirectories(root, { stackedOn: root })
+    .filter((d) => d.graphTypologies.includes(kind as never) && own.has(d.member ?? d.declaredBy))
+    .map((d) => d.absPath);
+}
+
+/**
+ * The directories holding `kind` whose files a gate JUDGES: the corpus
+ * (`corpusDirectoriesForGraph`), or, when this run names its own instances,
+ * only the ones they commit. `scoped` says which, so a check can tell "this
+ * caller commits none" (nothing of its own to judge, a pass) from "the corpus
+ * has none" (its own refusal, unchanged).
+ *
+ * For the SUBJECTS of a check only. A reference resolved against the corpus
+ * (a citation into a lower layer's library, a link into its skills) keeps the
+ * whole corpus: a caller may rely on what it mounts.
+ */
+export function gateDirectoriesForGraph(
+  root: string,
+  kind: string,
+  // input-site: env CAT_GATE_OWN_INSTANCES #949cc29c — passed to gateOwnInstances; the value is the whole of what it contributes
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): { dirs: string[]; scoped: ReadonlySet<string> | undefined } {
+  const own = gateOwnInstances(env);
+  if (!own) return { dirs: corpusDirectoriesForGraph(root, kind), scoped: undefined };
+  return { dirs: ownDirectoriesForGraph(root, kind, own), scoped: own };
+}
+
+/** The line a scoped check prints when its caller commits nothing it judges. */
+export function nothingOwnLine(check: string, what: string, own: ReadonlySet<string>): string {
+  return `✓ ${check}: ${[...own].join(", ")} commits no ${what}; the mounted layers' are judged by their own CI.`;
 }

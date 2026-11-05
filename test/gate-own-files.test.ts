@@ -12,10 +12,12 @@
  * @module test/gate-own-files.test
  */
 import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { GATE_OWN_ENV, gateOwnInstances } from "../scripts/lib/gate-own.ts";
+import { GATE_OWN_ENV, gateDirectoriesForGraph, gateOwnInstances } from "../scripts/lib/gate-own.ts";
+import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { auditSchemaNodes } from "../scripts/schema-nodes.ts";
 
@@ -72,4 +74,35 @@ describe("auditSchemaNodes with own instances", () => {
     expect(a.directories.length > 0).toBe(wholeHasTools);
     expect(modules(a).length > 0).toBe(wholeHasTools);
   });
+});
+
+describe("gateDirectoriesForGraph: the subjects a scoped check judges", () => {
+  test("unset is the whole corpus, unscoped", () => {
+    const g = gateDirectoriesForGraph(HARNESS_ROOT, "methodology", {});
+    expect(g.scoped).toBeUndefined();
+    expect(g.dirs).toEqual(corpusDirectoriesForGraph(HARNESS_ROOT, "methodology"));
+  });
+
+  test("scoped to an instance that commits none is empty, and says it was scoped", () => {
+    const g = gateDirectoriesForGraph(HARNESS_ROOT, "methodology", { [GATE_OWN_ENV]: "no-such-instance" });
+    expect([...g.scoped!]).toEqual(["no-such-instance"]);
+    expect(g.dirs).toEqual([]);
+  });
+});
+
+describe("a scoped check whose caller commits none of its subjects passes, never exits 2 or 78", () => {
+  // Exit 2 or 78 against a base that passed is a NEW failure in compare-gates.py.
+  const env = { ...process.env, [GATE_OWN_ENV]: "no-such-instance" };
+  for (const [script, what] of [
+    ["check-methodology-evidence.ts", "methodology directory"],
+    ["check-tabular-stubs.ts", "library directory"],
+    ["check-translation-officiality.ts", "translations directory"],
+    ["check-schema-nodes.ts", "schemas/*.ts"],
+  ] as const) {
+    test(script, () => {
+      const r = spawnSync("bun", [resolve(import.meta.dir, "..", "scripts", script)], { encoding: "utf-8", env });
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain(`commits no ${what}`);
+    });
+  }
 });

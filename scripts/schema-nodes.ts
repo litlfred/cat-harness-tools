@@ -29,7 +29,8 @@
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
-import { checkoutDirectories, corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
+import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
+import { ownDirectoriesForGraph } from "./lib/gate-own.ts";
 import { directoriesForGraph } from "../schemas/kg/cat-harness.js";
 import type { CorpusScope } from "./known-skills.js";
 import { withConcernGroupDirs } from "./concern-groups.ts";
@@ -79,9 +80,7 @@ function schemasRoots(root: string, scope: CorpusScope = "checkout", own?: Reado
   let declared: string[];
   if (scope === "instance") declared = directoriesForGraph(root, "schemas");
   else if (own) {
-    declared = checkoutDirectories(root, { stackedOn: root })
-      .filter((d) => d.graphTypologies.includes("schemas" as never) && own.has(d.member ?? d.declaredBy))
-      .map((d) => d.absPath);
+    declared = ownDirectoriesForGraph(root, "schemas", own);
     if (declared.length === 0) return [];
   } else declared = corpusDirectoriesForGraph(root, "schemas");
   // Each directory's concern groups too (`schemas/<group>/`, declared from
