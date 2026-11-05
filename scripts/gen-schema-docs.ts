@@ -345,7 +345,7 @@ function main(): void {
     const page = renderSkillPage(skill, input, output);
     emit(join(OUT_DIR, `${skill}.md`), page);
     const title = (input?.title || output?.title || skill).replace(/ (Input|Output)$/i, "");
-    const desc = (input?.description || output?.description || "").replace(/\|/g, "\\|");
+    const desc = (input?.description || output?.description || "").replace(/[\\|]/g, "\\$&");
     indexRows.push(`| [${title}](${skill}.html) | \`${skill}\` | ${desc} |`);
     console.log(`  ✓ ${skill}.md`);
   }

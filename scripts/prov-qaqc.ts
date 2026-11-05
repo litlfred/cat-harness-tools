@@ -434,7 +434,7 @@ export function totals(r: Report): { checked: number; activities: number; byKind
   return { checked, activities, byKind };
 }
 
-const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\|/g, "\\|");
+const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/[\\|]/g, "\\$&");
 
 export function renderPage(r: Report): string {
   const t = totals(r);

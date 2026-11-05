@@ -166,7 +166,7 @@ function collapse(uses: readonly SpecUse[]): SpecUse[] {
 }
 
 function cell(v: string): string {
-  return v.replace(/\|/g, "\\|").replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
+  return v.replace(/[\\|]/g, "\\$&").replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
 }
 
 /**
@@ -352,7 +352,7 @@ export function page(
     if (s.note) {
       const paras = s.note
         .split(/\n\s*\n/)
-        .map((p) => p.replace(/\|/g, "\\|").trim())
+        .map((p) => p.replace(/[\\|]/g, "\\$&").trim())
         .filter(Boolean);
       if (paras.length > 0) {
         b.push(`**Note.** ${paras[0]}`, "");

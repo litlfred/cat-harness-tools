@@ -762,7 +762,7 @@ export function skillToProcesses(rows: readonly ProcessRow[]): Map<string, strin
   return new Map([...m].sort((a, b) => a[0].localeCompare(b[0], "en")));
 }
 
-const esc = (s: string): string => s.replace(/\|/g, "\\|");
+const esc = (s: string): string => s.replace(/[\\|]/g, "\\$&");
 
 /**
  * `skillPages` is the set of skills with a generated instruction page, as for

@@ -111,7 +111,7 @@ function sidecars(dir = RESULTS, out: string[] = []): string[] {
 }
 
 const code = (s: string): string => "`" + s + "`";
-const esc = (s: string): string => s.replace(/\|/g, "\\|").replace(/</g, "&lt;");
+const esc = (s: string): string => s.replace(/[\\|]/g, "\\$&").replace(/</g, "&lt;");
 
 /**
  * The indexes the page draws, and where they came from.

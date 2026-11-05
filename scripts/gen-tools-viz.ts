@@ -458,7 +458,7 @@ function badge(kind: string): string {
 
 /** Escape a cell so a pipe in a description cannot break the table. */
 function cell(v: string): string {
-  return v.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+  return v.replace(/[\\|]/g, "\\$&").replace(/\r?\n/g, " ");
 }
 
 /**

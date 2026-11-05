@@ -296,7 +296,7 @@ if (import.meta.main) {
     if (rs.length) lines.push("| item | proposal | cos | margin | note |", "|---|---|---|---|---|", ...rs.map(fmt));
   };
   const fmtRow = (r: (typeof rows)[number], note: string) =>
-    `| ${r.kind === "bean" ? `\`${r.key}\`` : `branch \`${r.key}\``} ${r.title.replace(/\|/g, "\\|").slice(0, 90)} | \`${short(r.best.epic)}\` ${title(r.best.epic)} | ${r.best.cosine.toFixed(2)} | ${r.margin.toFixed(2)} | ${note} |`;
+    `| ${r.kind === "bean" ? `\`${r.key}\`` : `branch \`${r.key}\``} ${r.title.replace(/[\\|]/g, "\\$&").slice(0, 90)} | \`${short(r.best.epic)}\` ${title(r.best.epic)} | ${r.best.cosine.toFixed(2)} | ${r.margin.toFixed(2)} | ${note} |`;
 
   const beanRows = rows.filter((r) => r.kind === "bean");
   const branchRows = rows.filter((r) => r.kind === "branch");
