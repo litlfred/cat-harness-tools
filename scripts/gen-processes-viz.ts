@@ -437,7 +437,14 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
     // discount it, and this repository has paid for that once already
     // (`viewer-undiscovered.test.ts`, the same week).
     const svgRel = join(baseDocsDir(repo), "assets/img/workflows", `${basename(abs, ".bpmn")}.svg`);
-    const svg = existsSync(svgRel) ? relative(repo, svgRel) : undefined;
+    // The site copy is built at publish (cat-harness#1047), so it is absent
+    // wherever render:bpmn has not run. The drawing committed beside the
+    // .bpmn (bean akiq) has the same layout, so it answers "is there a
+    // drawing" and gives the markers their geometry; the page still links
+    // the site copy, which carries the step links.
+    const beside = abs.replace(/\.bpmn$/, ".svg");
+    const drawn = existsSync(svgRel) ? svgRel : existsSync(beside) ? beside : undefined;
+    const svg = drawn !== undefined ? relative(repo, svgRel) : undefined;
     // The DECLARATION, asked of the file: is there an enforcement VALUE? A
     // presence check, not a second reading of what the policy means — and a
     // presence check on the value, not on the element. See the module doc.
@@ -451,7 +458,7 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
       const m = await loadProcessModel(abs, [], new Map(), { view: true });
       const nodes = [...m.nodes.values()];
       const acts = nodes.filter(isActivity);
-      const markers = svg ? await taskMarkers(xml, readFileSync(svgRel, "utf-8"), acts) : [];
+      const markers = drawn !== undefined ? await taskMarkers(xml, readFileSync(drawn, "utf-8"), acts) : [];
       rows.push({
         file,
         group,
