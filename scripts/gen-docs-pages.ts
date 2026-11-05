@@ -32,6 +32,7 @@ import { instanceRepositories, type InstanceRepository } from "../schemas/kg/ins
 import type { WebPage, WebPageNode } from "../schemas/ui/webpage.ts";
 import { resolveTarget } from "../schemas/sdlc/todo-index.js";
 import { groupTodosByPage, renderTodoListing, todoListingFileFor } from "./todo-listing.js";
+import { provenanceLogFor, writeProvenanceListing } from "./provenance-footer.ts";
 import { SEMANTIC_ZOOM_FILE, readSemanticZoom } from "../schemas/kg/semantic-zoom.js";
 import {
   buildTranslationIndex,
@@ -1277,6 +1278,13 @@ const labelFile = new Map<string, string>();
 const pageRoute = new Map<string, string>();
 const publishedAt = (slug: string): string => pageRoute.get(slug) ?? publishedPagePath(OUT_DIR, slug);
 
+/**
+ * Each page's source documents, keyed as the footer looks them up, for the
+ * provenance footer (`provenance-footer.ts`). A generated page's blocks are
+ * its sources, in node order. Authored pages are added after the loop.
+ */
+const provenancePages = new Map<string, string[]>();
+
 for (const src of allDocsSources()) {
 CUR = src;
 if (!src.base) console.log(`  docs source: ${src.instance} — ${relative(repoRootFor(INSTANCE_ROOT), src.srcDir)}`);
@@ -1368,6 +1376,10 @@ for (const slug of slugs) {
   qaUnswept = [];
   const body = renderPage(page);
   emit(outPath, body);
+  provenancePages.set(
+    pageKey,
+    page.nodes.map((n) => join(src.srcDir, slug, `${n.id}.md`)),
+  );
   // The page's verdict index: what every badge on it needs to paint itself,
   // in ONE request. Written even when empty, because a page with badges and a
   // missing index is indistinguishable in the browser from a network failure,
@@ -1795,6 +1807,47 @@ function processHierarchy(): Record<string, string[]> {
     console.log(
       `  ${check ? "·" : "✓"} _includes/generated/todo-listing/ ` +
         `(${pages.size} page(s) with notes, ${unplaced.length} unplaced)`,
+    );
+  }
+
+  // THE PROVENANCE FOOTER (owner, 2026-11-05, "2B"). The generated pages
+  // were collected in the loop above. An AUTHORED page is any `.md` under the
+  // site directory with a `.prov.jsonld` beside it, outside `docs/source/`
+  // (those are blocks of generated pages) and outside `assets/` (PROV traces
+  // of another shape). Both go into one slice of site data.
+  {
+    const srcRel = relative(OUT_DIR, SRC_DIR).split(sep).join("/");
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const abs = join(dir, e.name);
+        const rel = relative(OUT_DIR, abs).split(sep).join("/");
+        if (e.isDirectory()) {
+          if (e.name.startsWith("_") || e.name.startsWith(".") || rel === "assets" || rel === srcRel) continue;
+          walk(abs);
+        } else if (e.name.endsWith(".md") && existsSync(provenanceLogFor(abs))) {
+          const key = rel.replace(/\.md$/, "");
+          if (!provenancePages.has(key)) provenancePages.set(key, [abs]);
+        }
+      }
+    };
+    walk(OUT_DIR);
+    const result = writeProvenanceListing({
+      siteDir: OUT_DIR,
+      producer: "docs-pages",
+      pages: provenancePages,
+      check,
+      emit: (path, content) => emit(path, content, "data"),
+      banner: GENERATED_INCLUDE_BANNER,
+    });
+    for (const f of result.stale) {
+      if (check) {
+        console.error(`  ✗ _includes/generated/provenance/docs-pages/${f} is stale: that page has no provenance log any more`);
+        stale++;
+      }
+    }
+    console.log(
+      `  ${check ? "·" : "✓"} _includes/generated/provenance/docs-pages/ ` +
+        `(${result.pages} page(s), ${result.entries} provenance entries)`,
     );
   }
 
