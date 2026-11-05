@@ -178,3 +178,16 @@ describe("check:reference-direction judges only the caller's own files and insta
     expect(scopeReport(report, () => true, undefined)).toEqual(report);
   });
 });
+
+describe("a generator check judges only the output the caller commits", () => {
+  // A layer that commits none of a generator's output is not judged on it,
+  // stale or not (owner ruling 2026-11-05, generator checks included).
+  const env = { ...process.env, [GATE_OWN_ENV]: "no-such-instance", [GATE_OWN_PATHS_ENV]: "no-such-instance", [GATE_FOREIGN_PATHS_ENV]: "" };
+  for (const script of ["bpmn-checklist.ts", "branch-readme.ts"]) {
+    test(`${script} --check passes for a caller that commits none of its output`, () => {
+      const r = spawnSync("bun", [resolve(import.meta.dir, "..", "scripts", script), "--check"], { encoding: "utf-8", env });
+      expect(r.status).toBe(0);
+      expect(r.stdout + r.stderr).not.toContain("✗");
+    });
+  }
+});
