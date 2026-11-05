@@ -180,6 +180,64 @@ export const WorkshopPresentationSchema = z
     about: z.object({ title: Text, text: Text.optional() }).strict().optional(),
     /** Links out (the IG, its source, its journeys), drawn in the `about` band; one with `frame` is also on the app bar, under that label. */
     links: z.array(z.object({ label: Text, href: Text, frame: Text.optional() }).strict()).optional(),
+    /** The presenter's note on each of the other views; a view without one shows none. */
+    notes: z
+      .object({ map: Text.optional(), personas: Text.optional(), how: Text.optional(), discuss: Text.optional(), sheets: Text.optional(), demo: Text.optional() })
+      .strict()
+      .optional(),
+    /**
+     * The ArchiMate views How it works shows first (the systems, the journeys
+     * as use cases), before the views each taught journey names: a model id of
+     * the instance's `cat-archimate.config.json` and a view id in it.
+     */
+    views: z.array(z.object({ model: Text, view: Text, label: Text.optional() }).strict()).optional(),
+    /** The line the Discussion view opens with ("The technology works. What do countries need to agree on to make it real?"). */
+    closingQuestion: Text.optional(),
+    /**
+     * Where the FHIR implementation guide the walkthrough demonstrates is
+     * published, so a step's examples, profiles and processes link to their
+     * pages. `href` is the IG's base: a URL, or a path from the site's root
+     * (`""` when the IG is the site). `example` and `profile` are page
+     * patterns under it, with `{type}` and `{id}` filled in (the IG
+     * Publisher's own: `{type}-{id}.html`, `StructureDefinition-{id}.html`);
+     * `processes` is the page listing the business processes, each under a
+     * heading named for its BPMN process.
+     */
+    ig: z
+      .object({ href: z.string(), example: Text.optional(), profile: Text.optional(), processes: Text.optional() })
+      .strict()
+      .optional(),
+    /**
+     * The instance's own device demo: an app that shows each moment's screen.
+     * The viewer does not draw the screens; its Device Demo view frames the
+     * app's own page for each (`href` + `#/demo/<id>` unless `route` says
+     * otherwise) and links each screen and the steps it shows both ways.
+     * `href` is a URL, or a path from the site's root (`vaxlink/`).
+     */
+    deviceDemo: z
+      .object({
+        href: Text,
+        /** The app's address for one screen, `{id}` filled in; `#/demo/{id}` when absent. */
+        route: Text.optional(),
+        label: Text.optional(),
+        screens: z
+          .array(
+            z
+              .object({
+                id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9.-]*$/),
+                title: Text,
+                device: z.enum(["phone", "tablet"]).optional(),
+                /** The step ids it shows (`J3a`), in the workshop's steps. */
+                steps: z.array(Text).min(1),
+                /** What to try on it in the room ("Flip the tamper toggle"). */
+                try: Text.optional(),
+              })
+              .strict(),
+          )
+          .min(1),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type WorkshopPresentation = z.infer<typeof WorkshopPresentationSchema>;

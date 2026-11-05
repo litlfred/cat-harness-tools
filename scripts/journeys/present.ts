@@ -34,11 +34,12 @@
  * Pure, like `render.ts`: a corpus in, files out.
  */
 import { escHtml } from "../thin-page.ts";
+import { renderViewPages, VIEW_SEGMENTS } from "./present-views.ts";
 import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
 import type { ScenarioStep } from "../../schemas/process/user-scenario.ts";
-import type { WorkshopStep } from "../../schemas/process/workshop.ts";
-import { blockFor, journeyById, lookup, processDrawing, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
+import type { WorkshopPresentation, WorkshopStep } from "../../schemas/process/workshop.ts";
+import { blockFor, journeyById, lookup, processDrawing, processName, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
 import {
   allSteps,
   bpmnFigure,
@@ -55,7 +56,7 @@ import {
 
 export const PRESENT_ASSETS = ["present.css", "present.js"] as const;
 /** The workshop segments these pages take: a module may not be called either. */
-export const PRESENT_SEGMENTS = ["overview", "walkthrough"] as const;
+export const PRESENT_SEGMENTS = ["overview", "walkthrough", ...VIEW_SEGMENTS] as const;
 
 const e = escHtml;
 
@@ -190,7 +191,7 @@ export function countryTones(countries: readonly (string | undefined)[]): Map<st
 }
 
 /** The colour of each building-block layer, in the catalogue's order: as VaxLink's apps, data, trust. */
-const LAYER_TONES = ["teal", "sky", "indigo", "violet", "rose", "amber"] as const;
+export const LAYER_TONES = ["teal", "sky", "indigo", "violet", "rose", "amber"] as const;
 
 /**
  * Text with each person's avatar beside their name, as VaxLink's
@@ -211,8 +212,9 @@ export function personaText(text: string, people: readonly PersonaView[]): strin
   return out + e(text.slice(last));
 }
 
-function avatar(p: PersonaView, size: "sm" | "md" = "md"): string {
-  return `<span class="jp-av jp-av-${size}" style="--c:${e(p.color)}" title="${e(p.name)}" aria-hidden="true">${e(p.initials)}</span>`;
+export function avatar(p: PersonaView, size: "sm" | "md" | "lg" = "md"): string {
+  const inner = p.icon && GLYPH[p.icon] ? glyph(p.icon) : e(p.initials);
+  return `<span class="jp-av jp-av-${size}" style="--c:${e(p.color)}" title="${e(p.name)}" aria-hidden="true">${inner}</span>`;
 }
 
 // Small line icons (24×24, stroked), drawn for these pages.
@@ -255,23 +257,67 @@ const ICON: Record<string, string> = {
   smile: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/>',
   laugh: '<circle cx="12" cy="12" r="10"/><path d="M8 13h8a4 4 0 0 1-8 0zM9 9h.01M15 9h.01"/>',
 };
-const icon = (name: keyof typeof ICON, cls = ""): string =>
+export type IconName = keyof typeof ICON;
+export const icon = (name: IconName, cls = ""): string =>
   `<svg class="jp-i${cls ? ` ${cls}` : ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[name]}</svg>`;
 
-const EMOTION: Record<number, [string, keyof typeof ICON, string]> = {
+/**
+ * The glyphs a journey's `scene` and a persona's `icon` name
+ * (`JOURNEY_GLYPHS` of the user-scenario kind), drawn as the icons are.
+ */
+export const GLYPH: Record<string, string> = {
+  baby: '<circle cx="12" cy="8" r="4.5"/><path d="M10.2 7.5h.01M13.8 7.5h.01M10.5 9.8a2 2 0 0 0 3 0M6 21v-1.5a6 6 0 0 1 12 0V21"/>',
+  person: ICON.user!,
+  family: ICON.users!,
+  clinician: '<circle cx="12" cy="6" r="3.5"/><path d="M5 21v-3a7 7 0 0 1 14 0v3M9 14.5v3a3 3 0 0 0 6 0"/>',
+  "health-worker": '<circle cx="12" cy="7" r="4"/><path d="M4 21a8 8 0 0 1 16 0M12 15v4M10 17h4"/>',
+  hospital: '<path d="M3 21h18M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16M12 7v6M9 10h6M10 21v-4h4v4"/>',
+  clinic: '<path d="M3 21h18M4 21V10l8-6 8 6v11M12 10v6M9 13h6"/>',
+  home: '<path d="M3 11l9-8 9 8M5 9v12h14V9M10 21v-6h4v6"/>',
+  phone: ICON.phone!,
+  tablet: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M11 18h2"/>',
+  qr: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/>',
+  paper: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5"/>',
+  "wifi-off": ICON.wifioff!,
+  wifi: ICON.wifi!,
+  "shield-check": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
+  "calendar-check": '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/>',
+  stethoscope: '<path d="M5 3v6a4 4 0 0 0 8 0V3M9 13v2a5 5 0 0 0 10 0v-2"/><circle cx="19" cy="11" r="2"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+  transfer: '<path d="M8 3L4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/>',
+  globe: ICON.globe!,
+  key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="M11.5 11.5L21 2M17 6l3 3M15 8l2 2"/>',
+  lock: '<rect x="4" y="11" width="16" height="11" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/>',
+  tent: '<path d="M3 21L12 4l9 17zM12 4v17M9 21l3-6 3 6"/>',
+  bus: '<rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 11h16M8 21v-3M16 21v-3M7 15h.01M17 15h.01"/>',
+  plane: '<path d="M2 16l20-8-6 13-3-6z"/><path d="M13 15l-5 5"/>',
+};
+export const glyph = (name: string, cls = ""): string =>
+  `<svg class="jp-i${cls ? ` ${cls}` : ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GLYPH[name] ?? ""}</svg>`;
+
+/** A journey's small picture: its `scene` glyphs with arrows between (VaxLink `MomentIllustration`); empty when it has none. */
+export function sceneStrip(scene: readonly { icon: string; label: string }[] | undefined, tone = "sky", size: "sm" | "md" = "md"): string {
+  if (!scene?.length) return "";
+  return `<figure class="jp-scene jp-scene-${size} jp-scene-${tone}" aria-label="${e(scene.map((x) => x.label).join(", then "))}">${scene
+    .map((x, i) => `${i ? icon("arrow", "jp-scene-arrow") : ""}<span title="${e(x.label)}"><span class="jp-scene-i">${glyph(x.icon)}</span></span>`)
+    .join("")}</figure>`;
+}
+
+export const EMOTION: Record<number, [string, keyof typeof ICON, string]> = {
   [-2]: ["Distressed", "frown", "rose"],
   [-1]: ["Worried", "frown", "amber"],
   [0]: ["Neutral", "meh", "slate"],
   [1]: ["Reassured", "smile", "emerald"],
   [2]: ["Delighted", "laugh", "emerald2"],
 };
-function emotionBadge(v: number | undefined): string {
+export function emotionBadge(v: number | undefined): string {
   if (v === undefined) return "";
   const [label, ic, tone] = EMOTION[v] ?? EMOTION[0]!;
   return `<span class="jp-emo jp-emo-${tone}" title="${label}">${icon(ic)}<span>${label}</span></span>`;
 }
 
-const ext = (href: string, label: string, cls = ""): string =>
+export const ext = (href: string, label: string, cls = ""): string =>
   `<a class="jp-ext${cls ? ` ${cls}` : ""}" href="${e(href)}" target="_blank" rel="noopener noreferrer">${e(label)}${icon("ext")}</a>`;
 
 /** The width a drawing has at 100%: its root `<svg>`'s viewBox width, else its `width` in pixels. */
@@ -283,11 +329,85 @@ export function viewBoxWidth(svg: string): number | undefined {
   return Number.isFinite(w) && w > 0 ? Math.round(w) : undefined;
 }
 
+// ── links out: the site, the IG, the device demo ──────────────────────────
+
+/** From a page to the site's root: the viewer's route root, then up out of the route (`en/<harness>/<id>`). */
+export const siteRootFrom = (root: string, links: SiteLinks): string => root + "../".repeat(links.route.split("/").length);
+
+/** An href a workshop names: a URL as it is, an absolute path as it is, else a path from the site's root. */
+export function fromSite(href: string, siteRoot: string): string {
+  return /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("/") || href.startsWith("#") ? href : `${siteRoot}${href}`;
+}
+
+/** `{type}` and `{id}` filled into a page pattern. */
+export const fillPattern = (pattern: string, v: { type?: string; id: string }): string => pattern.split("{type}").join(v.type ?? "").split("{id}").join(v.id);
+
+/**
+ * A heading's anchor as kramdown (Jekyll's Markdown, the IG Publisher's
+ * pages) writes it: lower case, every character but a letter, a digit, a
+ * space, `-` or `_` dropped, then each space a `-`. "J1 — Born abroad
+ * (Thailand, birth day)" is `j1--born-abroad-thailand-birth-day`.
+ */
+export function kramdownSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N} _-]/gu, "")
+    .replace(/ /g, "-");
+}
+
+/** An example's page: the artifact index's own, else the IG's pattern. */
+export function examplePage(corpus: JourneyCorpus, pr: WorkshopPresentation, key: string, siteRoot: string): string | undefined {
+  const x = corpus.examples.get(key);
+  if (x?.url) return x.url;
+  const [type, id] = key.split("/");
+  if (!pr.ig || !type || !id) return undefined;
+  return fromSite(`${pr.ig.href}${fillPattern(pr.ig.example ?? "{type}-{id}.html", { type, id })}`, siteRoot);
+}
+
+/** A profile's page, by StructureDefinition id (or a canonical's last segment), in the IG. */
+export function profilePage(pr: WorkshopPresentation, profile: string, siteRoot: string): string | undefined {
+  if (!pr.ig) return undefined;
+  const id = profile.replace(/.*\//, "");
+  return fromSite(`${pr.ig.href}${fillPattern(pr.ig.profile ?? "StructureDefinition-{id}.html", { id })}`, siteRoot);
+}
+
+/** The device-demo screens that show a step. */
+export function screensFor(pr: WorkshopPresentation, stepId: string): NonNullable<WorkshopPresentation["deviceDemo"]>["screens"] {
+  return (pr.deviceDemo?.screens ?? []).filter((x) => x.steps.includes(stepId));
+}
+
+/** A screen's address in the instance's app. */
+export function screenHref(pr: WorkshopPresentation, id: string, siteRoot: string): string | undefined {
+  const d = pr.deviceDemo;
+  if (!d) return undefined;
+  return fromSite(`${d.href}${fillPattern(d.route ?? "#/demo/{id}", { id })}`, siteRoot);
+}
+
+/**
+ * JSON as HTML with each token in a span (`jp-j-key`, `-str`, `-num`,
+ * `-lit`, `-pun`), escaped: the payload drawer's syntax colouring, done once
+ * at build so the page needs no highlighter.
+ */
+export function highlightJson(json: string): string {
+  const re = /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|\b(true|false|null)\b|([{}[\],])/g;
+  let out = "";
+  let last = 0;
+  for (const m of json.matchAll(re)) {
+    out += e(json.slice(last, m.index));
+    if (m[1] !== undefined) out += m[2] !== undefined ? `<span class="jp-j-key">${e(m[1])}</span>${e(m[2])}` : `<span class="jp-j-str">${e(m[1])}</span>`;
+    else if (m[3] !== undefined) out += `<span class="jp-j-num">${m[3]}</span>`;
+    else if (m[4] !== undefined) out += `<span class="jp-j-lit">${m[4]}</span>`;
+    else out += `<span class="jp-j-pun">${e(m[5]!)}</span>`;
+    last = m.index! + m[0].length;
+  }
+  return out + e(json.slice(last));
+}
+
 // ── the frame ─────────────────────────────────────────────────────────────
 
-type View = "overview" | "walkthrough" | "map" | "personas" | "how" | "discuss" | "sheets";
+export type View = "overview" | "walkthrough" | "map" | "personas" | "how" | "discuss" | "sheets" | "demo";
 
-interface FrameOpts {
+export interface FrameOpts {
   p: Presentation;
   /** From the page to the viewer's route root. */
   root: string;
@@ -301,6 +421,12 @@ interface FrameOpts {
   prev?: string;
   next?: string;
   body: string;
+  /** More for the `<head>` (a view's own stylesheet). */
+  head?: string;
+  /** More classes for the `<body>`. */
+  bodyClass?: string;
+  /** What sits under the page, fixed at the foot (the payload drawer). */
+  foot?: string;
 }
 
 /** The step range and the scope: "J1 → J4.1 (Thailand ⇄ Lao PDR)". */
@@ -311,7 +437,7 @@ export function rangeLabel(steps: readonly { step: { id: string } }[], scope?: s
   return `${first === last ? first : `${first} → ${last}`}${scope ? ` (${scope})` : ""}`;
 }
 
-function frame(o: FrameOpts): string {
+export function frame(o: FrameOpts): string {
   const ws = o.p.w.workshop;
   const pr = ws.presentation ?? {};
   const name = pr.name ?? ws.title;
@@ -319,12 +445,13 @@ function frame(o: FrameOpts): string {
   const tabs: { id: View; label: string; hint: string; ic: keyof typeof ICON; href?: string }[] = [
     { id: "overview", label: "Overview", hint: "The story & the cast", ic: "compass", href: `${o.toWorkshop}overview/` },
     { id: "walkthrough", label: "Walkthrough", hint: "Present one moment at a time", ic: "present", href: o.p.steps[0] ? `${o.toWorkshop}walkthrough/${o.p.steps[0].key}/` : undefined },
-    { id: "map", label: "Journey map", hint: "Everyone, every step", ic: "map", href: firstJourney ? `${o.root}${firstJourney.instance}/${firstJourney.scenario.id}/` : undefined },
-    { id: "personas", label: "Persona lens", hint: "One person end-to-end", ic: "user" },
-    { id: "how", label: "How it works", hint: "Standards & tools behind each moment", ic: "cpu" },
-    { id: "discuss", label: "Discussion", hint: "Policy questions to close", ic: "message", href: ws.discussion?.length ? `${o.toWorkshop}#discussion` : undefined },
+    { id: "map", label: "Journey map", hint: "Everyone, every step", ic: "map", href: o.p.steps.length ? `${o.toWorkshop}map/` : undefined },
+    { id: "personas", label: "Persona lens", hint: "One person end-to-end", ic: "user", href: o.p.cast.length ? `${o.toWorkshop}personas/` : undefined },
+    { id: "how", label: "How it works", hint: "Standards & tools behind each moment", ic: "cpu", href: `${o.toWorkshop}how/` },
+    { id: "discuss", label: "Discussion", hint: "Policy questions to close", ic: "message", href: `${o.toWorkshop}discuss/` },
     { id: "sheets", label: "Table sheets", hint: "Print the A3 canvas", ic: "printer", href: ws.sheets?.length ? `${o.toWorkshop}sheets/` : undefined },
   ];
+  void firstJourney;
   const nav = tabs
     .map((t) => {
       const cur = t.id === o.view;
@@ -348,9 +475,10 @@ ${NAVBAR_OPT_OUT}
 <link rel="stylesheet" href="${o.root}assets/present.css">
 <script>try{if(localStorage.getItem("jp:presenter")==="off")document.documentElement.setAttribute("data-presenter","off")}catch(_){}</script>
 <script src="${o.root}assets/present.js" defer></script>
+${o.head ?? ""}
 ${o.prev ? `<link rel="prev" href="${e(o.prev)}">` : ""}${o.next ? `<link rel="next" href="${e(o.next)}">` : ""}
 </head>
-<body class="jp jp-${o.view}">
+<body class="jp jp-${o.view}${o.bodyClass ? ` ${o.bodyClass}` : ""}">
 <header class="jp-head">
 <div class="jp-top">
 <div class="jp-top-l">${pr.occasion ? `<span class="jp-occasion">${icon("globe")}<span>${e(pr.occasion)}</span></span><span class="jp-bar">|</span>` : ""}<span>${e(pr.subject ?? ws.title)}</span>${range ? `<span class="jp-range">${e(range)}</span>` : ""}</div>
@@ -358,15 +486,20 @@ ${o.prev ? `<link rel="prev" href="${e(o.prev)}">` : ""}${o.next ? `<link rel="n
 </div>
 <div class="jp-app">
 <div class="jp-brand"><span class="jp-logo" aria-hidden="true">${e(name.trim().charAt(0).toUpperCase())}</span><div><div class="jp-brand-name"><span class="jp-name">${e(name)}</span>${pr.badge ? `<span class="jp-badge">${e(pr.badge)}</span>` : ""}</div>${pr.tagline ? `<p class="jp-tagline">${e(pr.tagline)}</p>` : ""}</div></div>
-<div class="jp-mode"><a class="is-on" href="${e(`${o.toWorkshop}overview/`)}">${icon("route", "jp-rose")}<span>Journeys</span></a><span class="jp-mode-off" aria-disabled="true" title="Not drawn yet">${icon("phone", "jp-sky")}<span>Device Demo</span></span></div>
+<div class="jp-mode"><a${o.view === "demo" ? "" : ' class="is-on"'} href="${e(`${o.toWorkshop}overview/`)}">${icon("route", "jp-rose")}<span>Journeys</span></a>${
+    pr.deviceDemo
+      ? `<a${o.view === "demo" ? ' class="is-on" aria-current="page"' : ""} href="${e(`${o.toWorkshop}demo/`)}">${icon("phone", "jp-sky")}<span>${e(pr.deviceDemo.label ?? "Device Demo")}</span></a>`
+      : `<span class="jp-mode-off" aria-disabled="true" title="This workshop names no device demo">${icon("phone", "jp-sky")}<span>Device Demo</span></span>`
+  }</div>
 <div class="jp-links">${links}</div>
 </div>
 </header>
 ${o.note ? `<div class="jp-note jp-presenter-only"><div><span class="jp-note-tag">PRESENTER NOTE</span><span>${e(o.note)}</span></div><button type="button" data-jp-dismiss>Dismiss</button></div>` : ""}
 <main class="jp-main"><div class="jp-wrap">
-<nav class="jp-tabs" aria-label="Views">${nav}</nav>
+${o.view === "demo" ? "" : `<nav class="jp-tabs" aria-label="Views">${nav}</nav>`}
 ${o.body.trim()}
 </div></main>
+${o.foot ?? ""}
 <footer class="jp-foot">Drawn by the journeys viewer from the <code>workshop</code> and <code>user-scenario</code> nodes of ${e(o.p.w.instance)}. Every person is fictional.</footer>
 </body>
 </html>
@@ -376,9 +509,9 @@ ${o.body.trim()}
 
 // ── the record's trust ladder ─────────────────────────────────────────────
 
-type Ladder = { code: string; label: string; definition?: string }[];
+export type Ladder = { code: string; label: string; definition?: string }[];
 
-function ladderOf(corpus: JourneyCorpus, j: Journey): Ladder | undefined {
+export function ladderOf(corpus: JourneyCorpus, j: Journey): Ladder | undefined {
   return j.scenario.trustLadder ? lookup(corpus.ladders, j.instance, j.scenario.trustLadder) : undefined;
 }
 
@@ -391,17 +524,22 @@ const TRUST = ["#cbd5e1", "#94a3b8", "#64748b", "#475569", "#334155", "#0f172a"]
 /** The neutral ramp of a rung, light to dark as trust grows (VaxLink `trustColor`). */
 export const trustColor = (rung: number, of: number): string => TRUST[Math.round((rung / Math.max(1, of - 1)) * (TRUST.length - 1))] ?? TRUST[TRUST.length - 1]!;
 
-function meter(ladder: Ladder, level: number): string {
+export function meter(ladder: Ladder, level: number): string {
   return `<div class="jp-meter"><div class="jp-meter-bars">${ladder.map((r, i) => `<i style="${i <= level ? `background:${trustColor(i, ladder.length)}` : ""}" title="${e(`${r.label}: ${r.definition ?? ""}`)}"></i>`).join("")}</div><div class="jp-meter-labels">${ladder.map((r, i) => `<span${i === level ? ' class="is-on"' : ""}>${e(r.label)}</span>`).join("")}</div></div>`;
 }
 
 // ── the overview ──────────────────────────────────────────────────────────
 
-function pictureOf(corpus: JourneyCorpus, s: PresentedStep, root: string): string {
+export function pictureOf(corpus: JourneyCorpus, s: PresentedStep, root: string): string {
   const at = illustrationPath(corpus, s.journey, s.step);
   if (at === undefined) return "";
   const alt = s.step.illustration?.alt ?? "";
   return `<img class="jp-pic" src="${e(`${root}${s.journey.instance}/${s.journey.scenario.id}/${at.to}`)}" alt="${e(alt)}" title="${e(alt)}" loading="lazy">`;
+}
+
+/** A chapter's small picture: its own journey's `scene`, else the first of its steps' journeys that has one. */
+export function chapterScene(c: Chapter): { icon: string; label: string }[] | undefined {
+  return c.journey.scenario.scene ?? c.steps.find((s) => s.journey.scenario.scene)?.journey.scenario.scene;
 }
 
 function overviewPage(corpus: JourneyCorpus, p: Presentation): string {
@@ -416,13 +554,14 @@ function overviewPage(corpus: JourneyCorpus, p: Presentation): string {
     .map((c, i) => {
       const j = c.journey.scenario;
       const pic = c.steps.map((s) => pictureOf(corpus, s, root)).find(Boolean) ?? "";
+      const scene = sceneStrip(chapterScene(c), tones.get(j.country ?? "") ?? "sky", "sm");
       const people = p.cast.filter((x) => c.steps.some((s) => s.step.experiences.some((y) => y.actor === x.id)));
       return `<a class="jp-card jp-moment" href="${e(walk(c.steps[0]))}">${i < p.chapters.length - 1 ? `<span class="jp-moment-arrow">${icon("arrow")}</span>` : ""}
 <span class="jp-moment-top"><span class="jp-num">${i + 1}</span>${chip(j.country)}</span>
 <span class="jp-moment-title">${e(c.title)}</span>
 <span class="jp-moment-meta">${[j.when, j.where].filter(Boolean).map((x) => e(x!)).join(" · ")}</span>
 <span class="jp-moment-sum">${e(j.description.replace(/\.md$/, ""))}</span>
-${pic}
+${pic}${scene}
 <span class="jp-stack">${people.map((x) => avatar(x, "sm")).join("")}</span>
 </a>`;
     })
@@ -455,7 +594,7 @@ ${pic}
 <span class="jp-kicker">${icon("route")} The story in one sentence</span>
 <h2>${e(pr.story ?? ws.description)}</h2>
 ${pr.lede ? `<p>${e(pr.lede)}</p>` : ""}
-<div class="jp-ctas">${first ? `<a class="jp-cta" href="${e(walk(first))}">${icon("play")} Start the walkthrough</a>` : ""}${p.chapters[0] ? `<a class="jp-cta jp-cta-2" href="${e(`${root}${p.chapters[0].journey.instance}/${p.chapters[0].journey.scenario.id}/`)}">See the whole journey map ${icon("arrow")}</a>` : ""}</div>
+<div class="jp-ctas">${first ? `<a class="jp-cta" href="${e(walk(first))}">${icon("play")} Start the walkthrough</a>` : ""}${p.steps.length ? `<a class="jp-cta jp-cta-2" href="../map/">See the whole journey map ${icon("arrow")}</a>` : ""}</div>
 </div>
 </section>
 <section class="jp-moments-sec">
@@ -545,6 +684,33 @@ ${caps ? `<div class="jp-gap"><h4 class="jp-h">${icon("clipboard", "jp-indigo")}
 </section>`;
 }
 
+/**
+ * The IG's own pages for a step's process: its section of the business
+ * processes page (anchored by the BPMN process's name, as kramdown writes a
+ * heading), and the journey's `references` with `rel: "scenario"`.
+ */
+export function processLinks(corpus: JourneyCorpus, pr: WorkshopPresentation, j: Journey, process: string, siteRoot: string): string {
+  const out: string[] = [];
+  const name = processName(corpus, j.instance, process);
+  if (pr.ig?.processes) out.push(ext(`${fromSite(`${pr.ig.href}${pr.ig.processes}`, siteRoot)}${name ? `#${kramdownSlug(name)}` : ""}`, "Process in the IG"));
+  for (const r of j.scenario.references ?? []) if (r.rel === "scenario") out.push(ext(fromSite(r.href, siteRoot), r.label));
+  return out.join("");
+}
+
+/** The FHIR payload drawer of a step: every example it names whose JSON this build has, highlighted, with a copy button. */
+export function payloadDrawer(corpus: JourneyCorpus, st: ScenarioStep): string {
+  const keys = [...new Set([...(st.examples ?? []), ...(st.fhirChanges ?? []).flatMap((c) => c.examples ?? [])])].filter((k) => corpus.examples.get(k)?.json);
+  if (keys.length === 0) return "";
+  const tabs = keys.map((k, i) => `<button type="button" role="tab" data-jp-tab="${e(k)}" aria-selected="${i === 0}"${i === 0 ? ' class="is-on"' : ""}>${e(k)}</button>`).join("");
+  const panes = keys
+    .map((k, i) => `<div class="jp-pane" role="tabpanel" data-jp-pane="${e(k)}"${i === 0 ? "" : " hidden"}><pre class="jp-json"><code>${highlightJson(corpus.examples.get(k)!.json!)}</code></pre></div>`)
+    .join("");
+  return `<aside class="jp-drawer" data-jp-drawer aria-label="FHIR payload inspector">
+<button type="button" class="jp-drawer-bar" data-jp-drawer-toggle aria-expanded="false">${icon("code", "jp-sky3")}<b>FHIR payload inspector</b><span class="jp-drawer-n">${keys.length} resource${keys.length === 1 ? "" : "s"} at this moment</span><span class="jp-drawer-hint">Click to inspect the raw FHIR JSON</span></button>
+<div class="jp-drawer-body" hidden><div class="jp-drawer-tabs" role="tablist">${tabs}<button type="button" class="jp-copy" data-jp-copy>Copy</button></div>${panes}</div>
+</aside>`;
+}
+
 function hood(corpus: JourneyCorpus, p: Presentation, s: PresentedStep, links: SiteLinks, root: string): string {
   const st = s.step;
   const lead = p.cast.find((x) => x.id === st.lead);
@@ -579,17 +745,37 @@ function hood(corpus: JourneyCorpus, p: Presentation, s: PresentedStep, links: S
 <div class="jp-flow">${who(h.from) ? `<span class="jp-end">${e(who(h.from)!)}</span>` : ""}<div class="jp-flow-mid"><span>${e(h.carrier ?? h.summary)}</span><i></i></div>${who(h.to) ? `<span class="jp-end">${e(who(h.to)!)}</span>` : ""}</div>
 ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
     : "";
+  const pr = p.w.workshop.presentation ?? {};
+  const siteRoot = siteRootFrom(root, links);
+  const changes = st.fhirChanges ?? [];
   const examples = st.examples ?? [];
+  const inspect = (k: string | undefined) => (k && corpus.examples.get(k)?.json ? `<button type="button" class="jp-inspect" data-jp-inspect="${e(k)}">Inspect JSON</button>` : "");
+  const exLink = (k: string, label: string) => {
+    const href = examplePage(corpus, pr, k, siteRoot);
+    return href ? ext(href, label) : `<span class="jp-small">${e(label)}</span>`;
+  };
+  const profileChip = (profile: string | undefined, of?: string) => {
+    if (!profile) return "";
+    const href = profilePage(pr, profile, siteRoot);
+    const label = of ? `${of} profile` : "Profile";
+    return href ? `<a class="jp-prof" href="${e(href)}" target="_blank" rel="noopener noreferrer" title="${e(profile)}">${e(label)}</a>` : `<span class="jp-prof" title="${e(profile)}">${e(label)}</span>`;
+  };
+  const rows = changes.length
+    ? changes.map((c) => {
+        const first = c.examples?.[0];
+        const head = first && examplePage(corpus, pr, first, siteRoot) ? `<a class="jp-mono" href="${e(examplePage(corpus, pr, first, siteRoot)!)}" target="_blank" rel="noopener noreferrer">${e(c.resource)}</a>` : `<span class="jp-mono">${e(c.resource)}</span>`;
+        const json = (c.examples ?? []).find((k) => corpus.examples.get(k)?.json);
+        const more = [...(c.examples ?? []).map((k) => exLink(k, k.split("/")[1] ?? k)), c.spec ? ext(c.spec, "base standard", "jp-ext-soft") : ""].filter(Boolean).join("");
+        return `<li>${icon("file", "jp-sky")}<div><div class="jp-fhir-row">${head}${profileChip(c.profile, c.profileOf)}<span class="jp-fhir-change">${e(c.change)}</span>${inspect(json)}</div>${c.why ? `<p class="jp-fhir-why">${e(c.why)}</p>` : ""}${more ? `<div class="jp-fhir-links">${more}</div>` : ""}</div></li>`;
+      })
+    : examples.map((k) => {
+        const x = corpus.examples.get(k);
+        const [type] = k.split("/");
+        const href = examplePage(corpus, pr, k, siteRoot);
+        return `<li>${icon("file", "jp-sky")}<div><div class="jp-fhir-row">${href ? `<a href="${e(href)}" class="jp-mono" target="_blank" rel="noopener noreferrer">${e(type!)}</a>` : `<span class="jp-mono">${e(type!)}</span>`}${profileChip(x?.profiles?.[0])}<span class="jp-fhir-id">${e(x?.title ?? k)}</span>${inspect(k)}</div></div></li>`;
+      });
   const fhir = `<div class="jp-box"><div class="jp-box-h"><span class="jp-label">FHIR resources created or changed</span></div>${
-    examples.length
-      ? `<ul class="jp-fhir">${examples
-          .map((k) => {
-            const x = corpus.examples.get(k);
-            const [type] = k.split("/");
-            return `<li>${icon("file", "jp-sky")}${x?.url ? `<a href="${e(x.url)}" class="jp-mono">${e(type!)}</a>` : `<span class="jp-mono">${e(type!)}</span>`}<span class="jp-fhir-id">${e(x?.title ?? k)}</span></li>`;
-          })
-          .join("")}</ul>`
-      : `<p class="jp-small">None: this moment reads data but writes nothing.</p>`
+    rows.length ? `<ul class="jp-fhir">${rows.join("")}</ul>` : `<p class="jp-small">None: this moment reads data but writes nothing.</p>`
   }</div>`;
   const toSite = root + "../".repeat(links.route.split("/").length);
   const procPage = links.processesPage?.(s.journey.instance)?.replace(/^(\.\.\/)+/, "");
@@ -598,7 +784,7 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
       const d = processDrawing(corpus, s.journey.instance, r.process);
       const src = sourceHref(corpus, s.journey.instance, r.process);
       const head = `<div class="jp-proc-h">${icon("workflow")}<span class="jp-label">Business process (BPMN)</span><span class="jp-small">${e(s.journey.scenario.title)}</span></div>
-<div class="jp-proc-links">${procPage ? `<a href="${e(toSite + procPage)}">Process viewer (tasks and skills)</a>` : ""}<a href="${e(`${root}${s.journey.instance}/${s.journey.scenario.id}/`)}">User scenario</a>${src ? ext(src, "BPMN source") : ""}</div>`;
+<div class="jp-proc-links">${processLinks(corpus, pr, s.journey, r.process, siteRoot)}${procPage ? `<a href="${e(toSite + procPage)}">Process viewer (tasks and skills)</a>` : ""}<a href="${e(`${root}${s.journey.instance}/${s.journey.scenario.id}/`)}">User scenario</a>${src ? ext(src, "BPMN source") : ""}</div>`;
       const zoom = `<div class="jp-zoom" role="group" aria-label="Zoom"><button type="button" data-jp-zoom="fit">Fit</button><button type="button" data-jp-zoom="1" class="is-on">100%</button><button type="button" data-jp-zoom="1.5">150%</button><button type="button" data-jp-zoom="2">200%</button><button type="button" data-jp-zoom="full">Full screen</button></div>`;
       const caption = `<code>${e(r.process)}</code>${r.tasks?.length ? ` · ${r.tasks.length} flow node${r.tasks.length === 1 ? "" : "s"} highlighted` : " · the whole process"}`;
       const vw = d ? viewBoxWidth(d.svg) : undefined;
@@ -614,7 +800,7 @@ ${st.technicalSummary ? `<div class="jp-sowhat">${icon("bulb", "jp-amber jp-i-lg
 <div class="jp-layer jp-layer-rose"><div class="jp-layer-h"><b>${icon("users")} Experience</b><span>What people see and do</span></div><div class="jp-layer-cells jp-exp">${lead && leadDoing ? personaText(`${lead.name}: ${leadDoing}`, p.cast) : ""}</div></div>
 ${layerRows}${unplacedHtml}
 </div>
-${handoff || examples.length ? `<div class="jp-two">${handoff}${fhir}</div>` : ""}
+${handoff || rows.length ? `<div class="jp-two">${handoff}${fhir}</div>` : ""}
 ${procs}
 </div>
 </section>`;
@@ -632,7 +818,7 @@ function stepPage(corpus: JourneyCorpus, p: Presentation, s: PresentedStep, link
   const prevS = p.steps[s.index - 1];
   const nextS = p.steps[s.index + 1];
   const prev = prevS ? `../${prevS.key}/` : undefined;
-  const next = nextS ? `../${nextS.key}/` : ws.discussion?.length ? `${toWorkshop}#discussion` : `${toWorkshop}overview/`;
+  const next = nextS ? `../${nextS.key}/` : `${toWorkshop}discuss/`;
   const people = [...st.experiences].sort((a, b) => (a.actor === st.lead ? -1 : b.actor === st.lead ? 1 : 0));
   const personCards = people
     .map((x) => {
@@ -661,15 +847,22 @@ ${st.handoff ? `<div class="jp-handoff">${icon("arrow")}<span><b>Hand-off:</b> $
   const policy = st.policy ? `<section class="jp-card jp-pad jp-tone-indigo"><h3 class="jp-h jp-indigo">${icon("landmark")} Policy takeaway</h3><p>${e(st.policy)}</p></section>` : "";
   const cue = s.ws?.facilitatorCue ? `<section class="jp-cue jp-presenter-only"><div class="jp-cue-h">${icon("mic")} Facilitator cue</div><p>${e(s.ws.facilitatorCue)}</p></section>` : "";
   const pic = pictureOf(corpus, s, root);
+  const siteRoot = siteRootFrom(root, links);
+  const lead = p.cast.find((x) => x.id === st.lead);
+  const screens = screensFor(pr, st.id)
+    .map((sc) => `<a class="jp-see" href="${e(`${toWorkshop}demo/${sc.id}/`)}">${glyph(sc.device === "tablet" ? "tablet" : "phone")}<span>See what ${e(lead?.name ?? "they")} ${lead?.name ? "sees" : "see"} <small>(screen ${e(sc.id)})</small></span>${icon("right")}</a>`)
+    .join("");
+  void siteRoot;
   const meta = [st.when ? `<span>🕒 ${e(st.when)}</span>` : "", st.where ? `<span>📍 ${e(st.where)}</span>` : "", st.touchpoint ? `<span>${icon("phone")} ${e(st.touchpoint)}</span>` : ""].join("");
   const body = `${progress(p, s, prev, next)}
 <div class="jp-walk">
 <div class="jp-walk-l">
 <section class="jp-card jp-story">
 <div class="jp-story-top"><span class="jp-chapter">Chapter ${s.chapter + 1} · ${e(chapter.title)}</span>${country ? `<span class="jp-chip jp-chip-${tones.get(country)}">${e(country)}</span>` : ""}<span class="jp-pos">${e(st.id)} · ${s.index + 1}/${p.steps.length}</span></div>
-<div class="jp-story-head"><h2><a href="./" title="Link to this moment">${e(st.title)}</a></h2>${pic ? `<div class="jp-story-pic">${pic}</div>` : ""}</div>
+<div class="jp-story-head"><h2><a href="./" title="Link to this moment">${e(st.title)}</a></h2>${pic || chapterScene(chapter) ? `<div class="jp-story-pic">${pic}${sceneStrip(chapterScene(chapter), tones.get(country ?? "") ?? "sky", "sm")}</div>` : ""}</div>
 ${st.headline ? `<p class="jp-headline">${personaText(st.headline, p.cast)}</p>` : ""}
 ${meta ? `<div class="jp-meta">${meta}</div>` : ""}
+${screens ? `<div class="jp-sees">${screens}</div>` : ""}
 </section>
 <section><h3 class="jp-h jp-h-pad">Who’s in this moment</h3><div class="jp-whos">${personCards}</div></section>
 ${st.painPoint || st.enabler ? `<section class="jp-pe">${st.painPoint ? `<div class="jp-pain"><div class="jp-h">${icon("alert")} Without this</div><p>${personaText(st.painPoint, p.cast)}</p></div>` : ""}${st.enabler ? `<div class="jp-enable"><div class="jp-h">${icon("sparkles")} What makes it work</div><p>${personaText(st.enabler, p.cast)}</p></div>` : ""}</section>` : ""}
@@ -690,6 +883,7 @@ ${hood(corpus, p, s, links, root)}`;
     ...(prev ? { prev } : { prev: "../../overview/" }),
     next,
     body,
+    foot: payloadDrawer(corpus, st),
   });
 }
 
@@ -704,6 +898,7 @@ export function renderPresentationPages(corpus: JourneyCorpus, links: SiteLinks)
     const base = `${w.instance}/workshops/${w.workshop.id}`;
     out.push({ path: `${base}/overview/index.html`, content: overviewPage(corpus, p) });
     for (const s of p.steps) out.push({ path: `${base}/walkthrough/${s.key}/index.html`, content: stepPage(corpus, p, s, links) });
+    for (const f of renderViewPages(corpus, p, links)) out.push({ ...f, path: `${base}/${f.path}` });
   }
   return out;
 }

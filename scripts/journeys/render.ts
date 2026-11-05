@@ -27,6 +27,7 @@
  * | `<instance>/workshops/<workshop id>/overview/`, `…/walkthrough/<step>/` | the workshop told in a room, with no site chrome (`present.ts`) |
  * | `assets/journeys.css`, `assets/journeys.js` | the style and the script |
  * | `assets/present.css`, `assets/present.js` | the presentation pages' style and script |
+ * | `assets/fonts/` | Plus Jakarta Sans (WOFF2, five weights) and its OFL, from the vendored bundle |
  */
 import { readFileSync } from "node:fs";
 import { extname, join, posix } from "node:path";
@@ -51,11 +52,14 @@ import {
   type JourneyCorpus,
   type WorkshopEntry,
 } from "./read.ts";
-import { PRESENT_ASSETS, PRESENT_SEGMENTS, renderPresentationPages } from "./present.ts";
+import { PRESENT_ASSETS, PRESENT_SEGMENTS, presentationOf, renderPresentationPages } from "./present.ts";
 
 export const TOOL_ID = "journeys-viewer";
 const ASSET_DIR = join(import.meta.dir, "assets");
 export const ASSETS = ["journeys.css", "journeys.js", ...PRESENT_ASSETS] as const;
+/** The presentation pages' typeface: a vendored bundle, copied as bytes to `assets/fonts/` with its licence. */
+export const FONT_BUNDLE = "vendor/plus-jakarta-sans/2.7.1";
+export const FONT_FILES = ["PlusJakartaSans-Regular.woff2", "PlusJakartaSans-Medium.woff2", "PlusJakartaSans-SemiBold.woff2", "PlusJakartaSans-Bold.woff2", "PlusJakartaSans-ExtraBold.woff2", "OFL.txt"] as const;
 
 export interface PageFile {
   path: string;
@@ -106,6 +110,10 @@ export interface PersonaView {
   initials: string;
   color: string;
   goal?: string;
+  needs?: string[];
+  frustrations?: string[];
+  /** A glyph drawn in the avatar instead of the initials (`meta.persona.icon`). */
+  icon?: string;
 }
 
 export function personaOf(corpus: JourneyCorpus, instance: string, id: string, i: number): PersonaView {
@@ -127,6 +135,9 @@ export function personaOf(corpus: JourneyCorpus, instance: string, id: string, i
     ...(p?.role ? { role: p.role } : {}),
     ...(p?.country ? { country: p.country } : {}),
     ...(p?.goal ? { goal: p.goal } : {}),
+    ...(p?.needs?.length ? { needs: p.needs } : {}),
+    ...(p?.frustrations?.length ? { frustrations: p.frustrations } : {}),
+    ...(p?.icon ? { icon: p.icon } : {}),
     initials: initials || id.slice(0, 2).toUpperCase(),
     color: p?.color ?? PALETTE[i % PALETTE.length]!,
   };
@@ -827,11 +838,11 @@ function lines(n: number): string {
   return `<span class="jv-lines">${"<i></i>".repeat(n)}</span>`;
 }
 
-function sheetsPage(corpus: JourneyCorpus, w: WorkshopEntry): string {
-  const up = "../../../../";
+/** The printable sheets of a workshop, one `<article class="jv-sheet">` each: on the sheets page, framed or not. */
+export function sheetsHtml(corpus: JourneyCorpus, w: WorkshopEntry): string {
   const ws = w.workshop;
   const scales = ws.assessment?.scales ?? [];
-  const sheets = (ws.sheets ?? [])
+  return (ws.sheets ?? [])
     .map((sh) => {
       const mods = sh.modules.map((id) => ws.modules.find((m) => m.id === id)).filter((m): m is NonNullable<typeof m> => m !== undefined);
       const qBlocks = mods
@@ -856,6 +867,12 @@ ${strip}
 </article>`;
     })
     .join("\n");
+}
+
+function sheetsPage(corpus: JourneyCorpus, w: WorkshopEntry): string {
+  const up = "../../../../";
+  const ws = w.workshop;
+  const sheets = sheetsHtml(corpus, w);
   const body = `<header class="jv-hero jv-noprint"><p class="jv-kicker"><a href="../">${e(ws.title)}</a></p><h1>Printable sheets</h1><p>One sheet per page, ${[...new Set((ws.sheets ?? []).map((s) => s.size))].join(" and ")} landscape. Print from the browser at 100% with background graphics on.</p><p><button type="button" class="jv-btn" data-jv-print>Print the sheets</button></p></header>
 ${sheets || `<p class="jv-muted">This workshop has no sheets.</p>`}`;
   return page({
@@ -893,9 +910,11 @@ export function renderJourneyPages(corpus: JourneyCorpus, links: SiteLinks, decl
       if (seg === "sheets" || (PRESENT_SEGMENTS as readonly string[]).includes(seg)) throw new Error(`${w.file}: a module may not be called "${seg}", the viewer's own segment`);
       out.push({ path: `${base}/${moduleSegment(m.id)}/index.html`, content: modulePage(corpus, w, m.id) });
     }
-    out.push({ path: `${base}/sheets/index.html`, content: sheetsPage(corpus, w) });
+    // A workshop with steps to present has its sheets in the presentation frame (`present.ts`).
+    if (presentationOf(corpus, w).steps.length === 0) out.push({ path: `${base}/sheets/index.html`, content: sheetsPage(corpus, w) });
   }
   out.push(...renderPresentationPages(corpus, links));
   for (const a of ASSETS) out.push({ path: posix.join("assets", a), content: readFileSync(join(ASSET_DIR, a), "utf8") });
+  for (const f of FONT_FILES) out.push({ path: posix.join("assets", "fonts", f), content: new Uint8Array(readFileSync(join(ASSET_DIR, FONT_BUNDLE, f))) });
   return out;
 }

@@ -24,7 +24,7 @@
  * |---|---|
  * | `personas`, `lead`, `experiences[].actor` | `actors/<id>.json` in a `scenarios` directory |
  * | `stories` | `stories.json` in a `scenarios` directory |
- * | `uses[].block` | a `building-blocks/0.1.0` file in a directory declaring the `building-blocks` kind, wherever it is (typically `archimate/building-blocks/`, beside the ArchiMate model) |
+ * | `uses[].block` | a `building-blocks/0.1.0` file (its blocks, layers and big ideas) in a directory declaring the `building-blocks` kind, wherever it is (typically `archimate/building-blocks/`, beside the ArchiMate model) |
  * | `trustLadder` | a `folio-code-list/v1` file in a `code-list` directory |
  * | `realisedBy[].process` | the BPMN file, relative to the instance root, and its drawing `<stem>.svg` beside it; `tasks` are flow-node ids in that file |
  * | `illustration.src` | the image, relative to the instance root |
@@ -115,8 +115,18 @@ export interface FhirExample {
   key: string;
   title?: string;
   code?: string;
+  /** Its published page (`published.html`, else `.json`). */
   url?: string;
+  /** Its published JSON (`published.json`). */
+  jsonUrl?: string;
+  /** The canonical URLs of the profiles it claims. */
+  profiles?: string[];
+  /** The resource as JSON text, read from the index's local copy (`materialization.localPath`) when the checkout has it. */
+  json?: string;
 }
+
+/** The largest example JSON a page carries inline for the payload drawer. */
+export const EXAMPLE_JSON_MAX_BYTES = 256 * 1024;
 
 export interface Problem {
   instance: string;
@@ -134,7 +144,7 @@ export interface JourneyCorpus {
   actors: Map<string, Map<string, Actor>>;
   stories: Map<string, Map<string, Story>>;
   /** Per instance: the catalogues' layers and blocks. */
-  blocks: Map<string, { layers: BuildingBlocks["layers"]; blocks: Map<string, BuildingBlock> }>;
+  blocks: Map<string, { layers: BuildingBlocks["layers"]; blocks: Map<string, BuildingBlock>; ideas: NonNullable<BuildingBlocks["ideas"]> }>;
   /** Per instance: its code lists (trust ladders), by id. */
   ladders: Map<string, Map<string, { code: string; label: string; definition?: string }[]>>;
   /** Per instance: each code list's title and description, by id. */
@@ -186,6 +196,17 @@ function jsonFilesUnder(dir: string, depth = 4): string[] {
 }
 
 const upper = (id: string): string => id.replace(/^req:/, "").toUpperCase();
+
+/** An example's JSON from the index's local copy: only inside the instance, only JSON, only up to {@link EXAMPLE_JSON_MAX_BYTES}. */
+function exampleJson(root: string, local: string): string | undefined {
+  const p = resolve(root, local);
+  if (relative(root, p).startsWith("..") || !existsSync(p) || !statSync(p).isFile() || statSync(p).size > EXAMPLE_JSON_MAX_BYTES) return undefined;
+  try {
+    return JSON.stringify(JSON.parse(readFileSync(p, "utf8")), null, 2);
+  } catch {
+    return undefined;
+  }
+}
 
 /** Read the checkout `start` is in. */
 export function readJourneyCorpus(start: string): JourneyCorpus {
@@ -248,9 +269,10 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
           } else if (kinds.includes(BUILDING_BLOCKS_KIND) && tag === BUILDING_BLOCKS_V01) {
             seenFiles.add(p);
             const c = BuildingBlocksSchema.parse(raw);
-            const into: { layers: BuildingBlocks["layers"]; blocks: Map<string, BuildingBlock> } = corpus.blocks.get(instance) ?? { layers: [], blocks: new Map() };
+            const into: { layers: BuildingBlocks["layers"]; blocks: Map<string, BuildingBlock>; ideas: NonNullable<BuildingBlocks["ideas"]> } = corpus.blocks.get(instance) ?? { layers: [], blocks: new Map(), ideas: [] };
             for (const l of c.layers) if (!into.layers.some((x) => x.id === l.id)) into.layers.push(l);
             for (const b of c.blocks) into.blocks.set(b.id, b);
+            for (const i of c.ideas ?? []) if (!into.ideas.some((x) => x.id === i.id)) into.ideas.push(i);
             corpus.blocks.set(instance, into);
           } else if (tag === "folio-code-list/v1" && typeof raw.id === "string" && Array.isArray(raw.codes)) {
             seenFiles.add(p);
@@ -295,10 +317,23 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
     }
     if (kinds.includes("fhir-artifact-index")) {
       const idx = readJson(join(d.absPath, "index.json")) as { artifacts?: unknown[]; entries?: unknown[] } | undefined;
-      for (const a of (idx?.artifacts ?? idx?.entries ?? []) as { key?: string; title?: string; code?: { text?: string }; published?: Record<string, { url?: string }> }[]) {
+      type Entry = { key?: string; title?: string; code?: { text?: string }; published?: Record<string, { url?: string }>; profiles?: unknown; materialization?: { localPath?: unknown } };
+      for (const a of (idx?.artifacts ?? idx?.entries ?? []) as Entry[]) {
         if (typeof a.key !== "string") continue;
         const url = a.published?.html?.url ?? a.published?.json?.url;
-        corpus.examples.set(a.key, { key: a.key, ...(a.title ? { title: a.title } : {}), ...(a.code?.text ? { code: a.code.text } : {}), ...(url ? { url } : {}) });
+        const jsonUrl = a.published?.json?.url;
+        const profiles = Array.isArray(a.profiles) ? a.profiles.filter((x): x is string => typeof x === "string") : [];
+        const local = typeof a.materialization?.localPath === "string" ? a.materialization.localPath : undefined;
+        const json = local ? exampleJson(info.root, local) : undefined;
+        corpus.examples.set(a.key, {
+          key: a.key,
+          ...(a.title ? { title: a.title } : {}),
+          ...(a.code?.text ? { code: a.code.text } : {}),
+          ...(url ? { url } : {}),
+          ...(jsonUrl ? { jsonUrl } : {}),
+          ...(profiles.length ? { profiles } : {}),
+          ...(json ? { json } : {}),
+        });
       }
     }
     // Requirements: `req:` nodes kept in a `requirements/` folder of any declared directory.
@@ -383,4 +418,12 @@ export function processDrawing(corpus: JourneyCorpus, instance: string, process:
   const svgPath = join(dirname(bpmn), `${basename(bpmn).replace(/\.bpmn$/, "")}.svg`);
   if (!existsSync(svgPath)) return undefined;
   return { svg: readFileSync(svgPath, "utf8"), file: relative(info.root, svgPath).split("\\").join("/") };
+}
+
+/** The name of the process a BPMN file a step names holds (its first `process` with a `name`); undefined when there is none. */
+export function processName(corpus: JourneyCorpus, instance: string, process: string): string | undefined {
+  const file = instanceFile(corpus, instance, process);
+  if (file === undefined) return undefined;
+  const m = /<(?:[A-Za-z_][\w.-]*:)?process\b[^>]*\sname="([^"]+)"/.exec(readFileSync(file, "utf8"));
+  return m ? m[1]!.replace(/&#x([0-9a-f]+);/gi, (_x, h: string) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (_x, d: string) => String.fromCodePoint(Number(d))).replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">") : undefined;
 }
