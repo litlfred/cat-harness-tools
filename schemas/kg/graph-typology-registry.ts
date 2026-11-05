@@ -1808,7 +1808,8 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     newInstanceSource: { kind: "branch", keyedBy: "tip" },
     description:
       "the work plan as a whole (`beans/`); its inner nodes are declared by `beans/beans.json`",
-    title: "Beans",
+    // "Work plan", not "Beans" (work item folio-assistant-dkqd); see `bean-defs`.
+    title: "Work plan",
     perInstance: true,
     renderable: false,
     // The work plan. Its own declaration already splits WHAT IS BEING WORKED
@@ -1856,7 +1857,12 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   "bean-defs": {
     description:
       "work items — one Markdown file each, in the layout the `beans` CLI reads, `$schema: bean/1.0.0` in its front matter. Authored by people and agents.",
-    title: "Bean definitions",
+    // "Work items", not "Bean definitions" (work item folio-assistant-dkqd):
+    // the kind word, the CLI and its files keep their names; the words a
+    // reader sees do not. The old title stays findable as the glossary's
+    // hidden label, from the ledger's `formerLabels`. One node is a "Work
+    // item": that is the node kind `bean`'s term, not this kind's.
+    title: "Work items",
     renderable: false,
     // What is being worked on. A bean names a change to something; it is not
     // the something.
