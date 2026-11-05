@@ -16,16 +16,26 @@
  *   are cloned fresh and never run `install.sh`, so this is the hook they get.
  *   The recipe is in bean `cat-tools-pp9g`.
  *
- * ## Which gates
+ * ## Which gates, and which tests (owner, 2026-11-05: "Affected tests only")
  *
- * The fast set, derived from the workflow by `scripts/gates.ts` — never listed
- * here. "Only the gates the change affects" is what the input-hash cache
- * (bean `f017`) already does there: a gate whose fingerprint matches a pass is
- * SKIPPED. Measured on `4rbc`, almost every gate declares `{tracked}`, so a
- * change re-asks almost all of them; the narrow, strace-derived read sets that
- * make the CI cone skip are recorded on main's CI runs and not on disk here.
- * A record for the tree (`scripts/gate-record.ts`) skips the whole run when
- * the same tree is pushed again, which is the case the two hooks create.
+ * The fast set, derived from the workflow by `scripts/gates.ts`, never listed
+ * here, MINUS the whole-suite `bun test` (`gates --except "bun test"`). It
+ * took 31 of the 55 minutes of a fast-set run on a 4-CPU agent container,
+ * and CI runs it, sharded. In its place run the test files whose relative
+ * import closure holds a file the push changed (`scripts/affected-tests.ts`).
+ * A change to what every test runs under (lockfile, manifest, bunfig,
+ * tsconfig, a test preload), or a push with no base to diff against, selects
+ * them all, and those are left to CI. The record names `bun test` as held
+ * out, so it never claims the suite.
+ *
+ * Gates whose inputs are unchanged since they last passed are SKIPPED by the
+ * input-hash cache (bean `f017`). A record for the tree skips the whole run
+ * when the same tree is pushed again, which is the case the two hooks create.
+ *
+ * An affected test that fails is this push's only when it passes with the
+ * pushed files put back as at the base, in this same environment: the
+ * failing files are re-run with the changed paths swapped to the base in the
+ * working tree (never the index), then put back to HEAD.
  *
  * ## Verdicts
  *
@@ -67,10 +77,11 @@
  * @module scripts/pre-push-gates
  * @graphNode none — a git and Claude Code hook, not a gate itself
  */
-import { createWriteStream, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, createWriteStream, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 
+import { affectedTests } from "./affected-tests.ts";
 import {
   attachNote,
   buildRecord,
@@ -235,7 +246,6 @@ export async function judge(
   const logPath = join(dir, "last-run.log");
   const startedAt = new Date().toISOString();
   const code = await runGates(root, reportPath, logPath, stream);
-  const finishedAt = new Date().toISOString();
 
   let report: GatesReportLike | undefined;
   try {
@@ -243,49 +253,191 @@ export async function judge(
   } catch {
     report = undefined;
   }
-  if (code === 0 && report !== undefined) {
-    const { commit, tree } = uncovered[0]!;
-    const rec = buildRecord(report, {
-      tree,
-      commit,
-      tools: now,
-      runBy: process.env.CLAUDECODE ? "agent" : "human",
-      startedAt,
-      finishedAt,
-    });
-    if (rec === undefined) return { kind: "undetermined", why: `the gates exited 0 but the report (${reportPath}) names no gate set to record` };
-    writeRecord(root, rec);
-    if (git(root, ["config", "--bool", "cat.gates.noteRecords"]) !== "false") attachNote(root, rec);
-    return { kind: "allow", why: `${rec.gates.length - rec.skipped.length} gate(s) passed, ${rec.skipped.length} skipped on unchanged inputs` };
-  }
+  const { commit, tree } = uncovered[0]!;
   const outcomes = report !== undefined ? outcomesOf(report) : undefined;
-  if (outcomes !== undefined) {
-    writeResults(root, { $schema: LOCAL_GATE_RESULTS_SCHEMA, tree: uncovered[0]!.tree, tools: now, at: finishedAt, outcomes });
-  }
-  if (code === 1 && report !== undefined) {
-    if (report.outcome === "not-clean") {
-      return { kind: "undetermined", why: `every gate passed but one changed the tree (${report.mutatedBy?.join(", ") ?? "see the log"}), so nothing was decided here (output: ${logPath})` };
-    }
+  if (outcomes !== undefined) writeResults(root, { $schema: LOCAL_GATE_RESULTS_SCHEMA, tree, tools: now, at: new Date().toISOString(), outcomes });
+
+  // ── The gates' verdict: refusing reds, or why nothing was decided ──────
+  const refuse: string[] = [];
+  const unsure: string[] = [];
+  if (code === 1 && report !== undefined && report.outcome === "not-clean") {
+    unsure.push(`every gate passed but one changed the tree (${report.mutatedBy?.join(", ") ?? "see the log"})`);
+  } else if (code === 1 && report !== undefined) {
     const failedNow = report.failed.map((f) => f.command);
-    const baseTree = baseTreeFor(root, uncovered[0]!.commit, bases);
+    const baseTree = baseTreeFor(root, commit, bases);
     const fresh = newFailures(failedNow, baseTree === undefined ? undefined : readResults(root, baseTree), now);
-    if (fresh.length === 0) {
-      return {
-        kind: "undetermined",
-        why:
-          `${failedNow.length} gate(s) red here, and none is known green on the base ${baseTree?.slice(0, 12) ?? "(none found)"} in this ` +
-          `environment, so these reds may be the environment's rather than this push's (${failedNow.join(", ")}; output: ${logPath})`,
-      };
+    if (fresh.length > 0) {
+      refuse.push(`${fresh.length} gate(s) were green on the base in this environment and are red on the tree being pushed:`);
+      for (const f of report.failed.filter((x) => fresh.includes(x.command))) {
+        refuse.push(`  · ${f.command}   (${f.job} / ${f.step})`);
+        for (const w of f.why.slice(0, 5)) refuse.push(`      ${w}`);
+      }
     }
-    const lines = [`${fresh.length} gate(s) were green on the base in this environment and are red on the tree being pushed, so the push was refused.`];
-    for (const f of report.failed.filter((x) => fresh.includes(x.command))) {
-      lines.push(`  · ${f.command}   (${f.job} / ${f.step})`);
-      for (const w of f.why.slice(0, 5)) lines.push(`      ${w}`);
+    const old = failedNow.filter((c) => !fresh.includes(c));
+    if (old.length > 0) {
+      unsure.push(`${old.length} gate(s) red here and not known green on the base ${baseTree?.slice(0, 12) ?? "(none found)"} in this environment (${old.join(", ")})`);
     }
-    lines.push(`  Full output: ${logPath}`);
-    return { kind: "refuse", why: lines };
+  } else if (code !== 0) {
+    unsure.push(`\`bun run cat gates\` exited ${code}, which is could-not-determine, not a pass`);
   }
-  return { kind: "undetermined", why: `\`bun run cat gates\` exited ${code}, which is could-not-determine, not a pass (output: ${logPath})` };
+
+  // ── The affected tests, in place of the held-out whole suite ───────────
+  const tests = await judgeAffectedTests(root, commit, bases, dir, logPath, stream);
+  if (tests.kind === "fresh") refuse.push(...tests.lines);
+  else if (tests.kind === "unsure") unsure.push(tests.why);
+  const finishedAt = new Date().toISOString();
+
+  if (refuse.length > 0) return { kind: "refuse", why: [...refuse, `  Full output: ${logPath}`] };
+  if (unsure.length > 0 || (tests.kind !== "pass" && tests.kind !== "all")) return { kind: "undetermined", why: `${unsure.join("; ")} (output: ${logPath})` };
+  const rec = report !== undefined ? buildRecord(report, { tree, commit, tools: now, runBy: process.env.CLAUDECODE ? "agent" : "human", startedAt, finishedAt }) : undefined;
+  if (rec === undefined) return { kind: "undetermined", why: `the gates exited 0 but the report (${reportPath}) names no gate set to record` };
+  rec.affectedTests = tests.kind === "all" ? { all: tests.why } : { files: tests.files, passed: true };
+  writeRecord(root, rec);
+  if (git(root, ["config", "--bool", "cat.gates.noteRecords"]) !== "false") attachNote(root, rec);
+  const testNote = tests.kind === "all" ? `; tests left to CI (${tests.why})` : `; ${tests.files} affected test file(s) passed`;
+  return { kind: "allow", why: `${rec.gates.length - rec.skipped.length} gate(s) passed, ${rec.skipped.length} skipped on unchanged inputs${testNote}` };
+}
+
+/** The whole-suite gate the hook holds out of `gates` and replaces with the affected tests. */
+export const WHOLE_SUITE = "bun test";
+
+type TestVerdict =
+  | { kind: "pass"; files: number }
+  | { kind: "all"; why: string }
+  | { kind: "fresh"; lines: string[] }
+  | { kind: "unsure"; why: string };
+
+/** Each failing test in a bun JUnit report, as `file > group > name`. */
+export function failedTests(junit: string): Set<string> {
+  const out = new Set<string>();
+  const unxml = (v: string) => v.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#10;/g, "\n").replace(/&amp;/g, "&");
+  for (const m of junit.matchAll(/<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g)) {
+    const body = m[2] ?? "";
+    if (!/<(failure|error)\b/.test(body)) continue;
+    const attr = (k: string) => unxml(new RegExp(`\\b${k}="([^"]*)"`).exec(m[1]!)?.[1] ?? "");
+    out.add([attr("file"), attr("classname"), attr("name")].filter(Boolean).join(" > "));
+  }
+  return out;
+}
+
+/**
+ * The commit to compare the affected tests against: what the remote holds now
+ * (the previous push), else the merge base with `origin`'s default branch.
+ */
+export function baseCommitFor(root: string, commit: string, bases: readonly (string | undefined)[]): string | undefined {
+  const candidates = [
+    ...bases.filter((b): b is string => b !== undefined && !ZERO.test(b)),
+    git(root, ["rev-parse", "--verify", "--quiet", "@{upstream}"]),
+    git(root, ["merge-base", commit, "refs/remotes/origin/HEAD"]),
+    git(root, ["merge-base", commit, "refs/remotes/origin/main"]),
+  ];
+  for (const c of candidates) {
+    if (c === undefined || c === commit) continue;
+    if (git(root, ["cat-file", "-e", `${c}^{commit}`]) !== undefined) return c;
+  }
+  return undefined;
+}
+
+/**
+ * Run the tests the push's changed files can affect (`affected-tests.ts`).
+ * A failure is this push's only when the same test passes with the pushed
+ * files put back as they are at the base, in this same environment: CI's
+ * "no new failures" rule, asked of the failing files only. The working tree
+ * is restored to HEAD afterwards, whatever happens.
+ */
+async function judgeAffectedTests(
+  root: string,
+  commit: string,
+  bases: readonly (string | undefined)[],
+  dir: string,
+  logPath: string,
+  stream?: NodeJS.WritableStream,
+): Promise<TestVerdict> {
+  const base = baseCommitFor(root, commit, bases);
+  // No base to diff against: nothing can be selected, so the tests are CI's, as with a runtime change.
+  if (base === undefined) return { kind: "all", why: "no base commit on disk to diff the push against" };
+  const changed = (git(root, ["diff", "--name-only", "--no-renames", base, commit]) ?? "").split("\n").filter(Boolean);
+  const sel = affectedTests(root, changed);
+  if (sel.kind === "all") return { kind: "all", why: sel.why };
+  if (sel.files.length === 0) return { kind: "pass", files: 0 };
+  appendFileSync(logPath, `\n── ${sel.files.length} affected test file(s) ──\n${sel.files.map((f) => `  ${f}   (${sel.why[f]})`).join("\n")}\n`);
+  stream?.write(`pre-push: ${sel.files.length} affected test file(s), in place of the whole suite (CI runs it)\n`);
+  const head = await runTests(root, sel.files, join(dir, "affected-junit.xml"), logPath, stream);
+  if (head.code === 0) return { kind: "pass", files: sel.files.length };
+  if (head.failed === undefined || head.failed.size === 0) {
+    return { kind: "unsure", why: `the affected tests exited ${head.code} and no failing test could be read from their report` };
+  }
+  // Ask the failing files again at the base: only a test that passes there is this push's.
+  const failingFiles = [...new Set([...head.failed].map((t) => t.split(" > ")[0]!))].filter((f) => sel.files.includes(f));
+  const atBase = failingFiles.filter((f) => git(root, ["cat-file", "-e", `${base}:${f}`]) !== undefined);
+  let baseFailed = new Set<string>();
+  if (atBase.length > 0) {
+    const restore = swapToBase(root, base, changed);
+    try {
+      const b = await runTests(root, atBase, join(dir, "affected-junit-base.xml"), logPath, undefined);
+      if (b.failed === undefined && b.code !== 0) return { kind: "unsure", why: `the failing tests could not be re-run at the base ${base.slice(0, 12)}` };
+      baseFailed = b.failed ?? new Set();
+    } finally {
+      restore();
+    }
+  }
+  // A test the base does not have (a new file, or a new case) fails only here, so it is this push's.
+  const fresh = [...head.failed].filter((t) => !baseFailed.has(t));
+  if (fresh.length === 0) {
+    return { kind: "unsure", why: `${head.failed.size} affected test(s) red here and red at the base ${base.slice(0, 12)} too, so not this push's` };
+  }
+  return {
+    kind: "fresh",
+    lines: [`${fresh.length} affected test(s) pass at the base ${base.slice(0, 12)} in this environment and fail on the tree being pushed:`, ...fresh.slice(0, 20).map((t) => `  · ${t}`)],
+  };
+}
+
+function runTests(root: string, files: readonly string[], junit: string, logPath: string, stream?: NodeJS.WritableStream): Promise<{ code: number; failed?: Set<string> }> {
+  rmSync(junit, { force: true });
+  return new Promise((done) => {
+    const log = createWriteStream(logPath, { flags: "a" });
+    const child = spawn("bun", ["test", "--reporter=junit", `--reporter-outfile=${junit}`, ...files.map((f) => `./${f}`)], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    const tee = (b: Buffer) => {
+      log.write(b);
+      stream?.write(b);
+    };
+    child.stdout.on("data", tee);
+    child.stderr.on("data", tee);
+    child.on("error", () => log.end(() => done({ code: 2 })));
+    child.on("close", (c) =>
+      log.end(() => {
+        let failed: Set<string> | undefined;
+        try {
+          failed = failedTests(readFileSync(junit, "utf-8"));
+        } catch {
+          failed = undefined;
+        }
+        done({ code: c ?? 2, failed });
+      }),
+    );
+  });
+}
+
+/**
+ * Put `paths` in the working tree as they are at `base` (a path the base does
+ * not have is removed), and return what puts them back as at HEAD. The index
+ * is never touched, and the caller verified the tree was clean first, so the
+ * restore is exact; it says so loudly if it is not.
+ */
+export function swapToBase(root: string, base: string, paths: readonly string[]): () => void {
+  const atBase = (p: string) => git(root, ["cat-file", "-e", `${base}:${p}`]) !== undefined;
+  const atHead = (p: string) => git(root, ["cat-file", "-e", `HEAD:${p}`]) !== undefined;
+  const present = paths.filter(atBase);
+  for (const p of paths.filter((x) => !atBase(x))) rmSync(join(root, p), { force: true });
+  for (let i = 0; i < present.length; i += 200) git(root, ["restore", `--source=${base}`, "--worktree", "--", ...present.slice(i, i + 200)]);
+  return () => {
+    const back = paths.filter(atHead);
+    for (const p of paths.filter((x) => !atHead(x))) rmSync(join(root, p), { force: true });
+    for (let i = 0; i < back.length; i += 200) git(root, ["restore", "--source=HEAD", "--worktree", "--", ...back.slice(i, i + 200)]);
+    if (git(root, ["diff", "--quiet", "HEAD", "--"]) === undefined) {
+      process.stderr.write(`pre-push: ⚠ the working tree did not return to HEAD after the base re-run; \`git restore --source=HEAD --worktree -- .\` puts it back\n`);
+    }
+  };
 }
 
 /**
@@ -311,7 +463,7 @@ export function baseTreeFor(root: string, commit: string, bases: readonly (strin
 function runGates(root: string, reportPath: string, logPath: string, stream?: NodeJS.WritableStream): Promise<number> {
   return new Promise((done) => {
     const log = createWriteStream(logPath);
-    const child = spawn("bun", ["run", "cat", "gates", "--report", reportPath], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("bun", ["run", "cat", "gates", "--report", reportPath, "--except", WHOLE_SUITE], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
     const tee = (b: Buffer) => {
       log.write(b);
       stream?.write(b);

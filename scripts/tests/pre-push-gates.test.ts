@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { judge, parsePushCommand, parsePushStdin } from "../pre-push-gates.ts";
+import { failedTests, judge, parsePushCommand, parsePushStdin } from "../pre-push-gates.ts";
 import { buildRecord, covers, newFailures, readRecord, readResults, stateDir, toolVersions, treeOf, type GatesReportLike } from "../gate-record.ts";
 
 const PASS: GatesReportLike = {
@@ -214,4 +214,70 @@ process.exit(failed.length ? 1 : 0);\n`,
     expect((await judge(root, [sh("rev-parse", "HEAD").stdout.trim()])).kind).toBe("undetermined");
     expect(existsSync(stateDir(root))).toBe(false);
   });
+});
+
+test("failedTests reads bun's JUnit report, failures only, entities decoded", () => {
+  const xml = `<testsuites><testsuite name="a.test.ts" file="a.test.ts"><testsuite name="grp" file="a.test.ts">
+      <testcase name="ok" classname="grp" file="a.test.ts" line="2" />
+      <testcase name="bad &amp; &lt;x&gt;" classname="grp" file="a.test.ts" line="2"><failure type="AssertionError">x</failure></testcase>
+    </testsuite></testsuite></testsuites>`;
+  expect([...failedTests(xml)]).toEqual(["a.test.ts > grp > bad & <x>"]);
+});
+
+describe("the affected tests, run for real in a throwaway repository", () => {
+  let root: string;
+  const sh = (...args: string[]) => spawnSync("git", args, { cwd: root, encoding: "utf-8" });
+  const head = () => sh("rev-parse", "HEAD").stdout.trim();
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), "pre-push-tests-"));
+    sh("init", "-q");
+    sh("config", "user.email", "t@example.invalid");
+    sh("config", "user.name", "t");
+    // A `cat` runner whose gates all pass, so the verdict is the tests'.
+    writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: { cat: "bun run fake-cat.ts" } }));
+    writeFileSync(
+      join(root, "fake-cat.ts"),
+      `import { writeFileSync } from "node:fs";
+const a = process.argv; writeFileSync(a[a.indexOf("--report") + 1]!, JSON.stringify(${JSON.stringify({ ...PASS, skipped: [] })}));\n`,
+    );
+    writeFileSync(join(root, ".gitignore"), "fake-cat.ts\n");
+    writeFileSync(join(root, "lib.ts"), "export const one = () => 1;\n");
+    writeFileSync(join(root, "other.ts"), "export const two = 2;\n");
+    writeFileSync(join(root, "lib.test.ts"), 'import { test, expect } from "bun:test";\nimport { one } from "./lib.ts";\ntest("one is 1", () => expect(one()).toBe(1));\n');
+    writeFileSync(
+      join(root, "env.test.ts"),
+      'import { test, expect } from "bun:test";\nimport { one } from "./lib.ts";\ntest("needs the publish pages", () => { one(); expect(require("node:fs").existsSync("_site/index.html")).toBe(true); });\n',
+    );
+    sh("add", "-A");
+    sh("commit", "-qm", "base");
+    sh("update-ref", "refs/remotes/origin/main", head());
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  test("a test green at the base and red now refuses; one red at the base too does not; the tree is put back", async () => {
+    writeFileSync(join(root, "lib.ts"), "export const one = () => 2;\n");
+    sh("commit", "-qam", "break one");
+    const v = await judge(root, [head()]);
+    expect(v.kind).toBe("refuse");
+    const why = v.kind === "refuse" ? v.why.join("\n") : "";
+    expect(why).toContain("lib.test.ts > one is 1");
+    expect(why).not.toContain("needs the publish pages");
+    expect(sh("diff", "--quiet", "HEAD", "--").status).toBe(0);
+  }, 60_000);
+
+  test("a change whose only red is the environment's is undetermined, never refused", async () => {
+    writeFileSync(join(root, "lib.ts"), "export const one = () => 1; // reworded\n");
+    sh("commit", "-qam", "harmless");
+    const v = await judge(root, [head()]);
+    expect(v.kind).toBe("undetermined");
+    expect(v.kind === "undetermined" && v.why).toContain("red at the base");
+  }, 60_000);
+
+  test("a change no test imports runs no test, and the push is allowed and recorded", async () => {
+    writeFileSync(join(root, "other.ts"), "export const two = 3;\n");
+    sh("commit", "-qam", "unrelated");
+    const v = await judge(root, [head()]);
+    expect(v.kind).toBe("allow");
+    expect(v.kind === "allow" && v.why).toContain("0 affected test file(s)");
+  }, 60_000);
 });

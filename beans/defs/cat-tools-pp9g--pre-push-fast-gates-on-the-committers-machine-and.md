@@ -63,6 +63,19 @@ Running the producers CI runs first (`derive:publish`) is the other fix; it is
 left for when its cost in a container is measured, since the baseline rule
 already keeps an environment red from refusing.
 
+**Affected tests only (owner, 2026-11-05).** Measured in a freshly mounted
+folio-assistant checkout on 4 CPUs: the whole fast set took 55 min, 31 of
+them in the whole-suite `bun test` (19 412 pass, 80 fail, mostly failing on
+main too). The owner chose: before a push, the fast gates *minus* that suite
+(`gates --except "bun test"`, named `heldOut` in the report and the record),
+plus only the test files whose relative-import closure holds a changed file
+(`scripts/affected-tests.ts`). A runtime change (lockfile, manifest, bunfig,
+tsconfig, a test preload), or no base to diff against, selects all of them,
+and those are left to CI. A failing affected test refuses only if it passes
+with the changed paths swapped back to the base in the working tree (index
+untouched, restored to HEAD after). The closure does not see fixture reads,
+walks or spawns (bean `4rbc`), so CI's whole suite still catches those.
+
 **Bypass**: `CAT_GATES_BYPASS='<reason>' git push ...`, appended with the refs
 and time to `<git dir>/cat-gates/push.log`. `git push --no-verify` skips git's
 hook and git gives the hook no way to log that; the Claude hook (below)

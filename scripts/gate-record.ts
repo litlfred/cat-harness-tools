@@ -47,6 +47,7 @@ export interface GatesReportLike {
   set: "fast" | "whole";
   gates: number;
   commands?: string[];
+  heldOut?: string[];
   failed: { command: string; job: string; step: string; why: string[] }[];
   skipped: { command: string; why: string }[];
   mutatedBy?: string[];
@@ -69,6 +70,14 @@ export interface LocalGateRecord {
   outcome: "pass";
   /** Every gate in the set, in workflow order. */
   gates: string[];
+  /** Gates of the set this run did not run (`gates --except`): the record does not cover them, CI runs them. */
+  heldOut: string[];
+  /**
+   * The affected-test selection that ran in place of a held-out whole suite
+   * (`scripts/affected-tests.ts`): what it ran, and that it passed. Never the
+   * suite's verdict.
+   */
+  affectedTests?: { files: number; passed: boolean } | { all: string };
   /** Gates not asked because the input-hash cache (bean `f017`) holds a pass on identical inputs. */
   skipped: { command: string; why: string }[];
   tools: ToolVersions;
@@ -124,6 +133,7 @@ export function buildRecord(
     set: report.set,
     outcome: "pass",
     gates: [...report.commands],
+    heldOut: [...(report.heldOut ?? [])],
     skipped: report.skipped.map((s) => ({ command: s.command, why: s.why })),
     tools: ctx.tools,
     runBy: ctx.runBy,

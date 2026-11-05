@@ -45,6 +45,11 @@ export const GatesReportSchema = z
      * covers rather than only how many. Absent from reports written before it.
      */
     commands: z.array(z.string()).optional(),
+    /**
+     * Gates of the set this run was told not to run (`--except`), so a record
+     * of it never claims them. CI runs them. Absent when none was held out.
+     */
+    heldOut: z.array(z.string()).optional(),
     failed: z.array(GateRefSchema.extend({ why: z.array(z.string()) })),
     /** Not asked: inputs unchanged since each last passed. Never counted as a pass. */
     skipped: z.array(z.object({ command: z.string(), why: z.string() })),

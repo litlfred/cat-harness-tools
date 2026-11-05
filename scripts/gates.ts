@@ -26,6 +26,7 @@
  *   bun run cat gates --list       # print them and exit, running nothing
  *   bun run cat gates --jobs 3     # pool size for read-only gates (default: CPUs - 1)
  *   bun run cat gates --no-cache   # ask every gate; neither read nor update the input-hash cache
+ *   bun run cat gates --except "bun test"   # hold one gate out (repeatable); named in the report as `heldOut`
  *
  * Gates whose script declares `outputs: []` in `task-io.ts` run in a worker
  * pool, output printed in workflow order; every other gate runs alone. A gate
@@ -2152,6 +2153,18 @@ export function reportPathFrom(argv: readonly string[]): string | undefined {
   return p;
 }
 
+/** Every `--except <command>` value, in order. A flag with no value is refused. */
+export function exceptFrom(argv: readonly string[]): string[] {
+  const out: string[] = [];
+  argv.forEach((a, i) => {
+    if (a !== "--except") return;
+    const v = argv[i + 1];
+    if (v === undefined || v.startsWith("--")) throw new Error("--except needs a gate command");
+    out.push(v);
+  });
+  return out;
+}
+
 /** An empty report for a run of the fast or whole set, filled in as the run goes. */
 export function startGatesReport(all: boolean): GatesReport {
   return {
@@ -2263,6 +2276,20 @@ if (import.meta.main) {
     for (const line of undeterminedReport(e, ROOT)) console.error(line);
     report.undetermined.push(...undeterminedReport(e, ROOT));
     process.exit(2);
+  }
+  // `--except <command>` (repeatable): hold a gate out of this run by its
+  // exact command, as the pre-push hook does with the whole-suite `bun test`
+  // (owner, 2026-11-05). It is named in the report and the text, never
+  // dropped silently. One that names no gate of this set holds nothing out
+  // and is said so: a content root's set has no `bun test`, and the hook
+  // passes the same flag everywhere.
+  const asked = exceptFrom(process.argv);
+  const except = asked.filter((c) => gates.some((g) => g.command === c));
+  for (const c of asked.filter((x) => !except.includes(x))) console.log(`--except \`${c}\`: no gate of this set has that command, so nothing was held out for it`);
+  if (except.length > 0) {
+    gates = gates.filter((g) => !except.includes(g.command));
+    report.heldOut = [...except];
+    console.log(`HELD OUT (--except), CI runs them: ${except.map((c) => `\`${c}\``).join(", ")}\n`);
   }
   report.gates = gates.length;
   report.commands = gates.map((g) => g.command);

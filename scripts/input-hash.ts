@@ -266,22 +266,32 @@ export function sourceClosure(root: string, entries: readonly string[]): { files
     const file = stack.pop()!;
     if (seen.has(file)) continue;
     seen.add(file);
-    if (!/\.(m?[jt]sx?)$/.test(file)) continue;
-    const text = stripComments(readFileSync(file, "utf-8"));
-    if (DYNAMIC_NONLITERAL_RE.test(text)) {
-      return { undetermined: `${relative(root, file)} has a non-literal dynamic import` };
-    }
-    for (const m of text.matchAll(IMPORT_RE)) {
-      const spec = m[1] ?? m[2] ?? m[3];
-      if (spec === undefined || !spec.startsWith(".")) continue;
-      const target = resolveModule(file, spec);
-      // An import that does not resolve is a module Bun would fail to load;
-      // the script will fail when run, so running it is the right answer.
-      if (target === undefined) return { undetermined: `${relative(root, file)} imports unresolvable ${spec}` };
-      stack.push(target);
-    }
+    const d = directRelativeImports(file);
+    if ("undetermined" in d) return { undetermined: `${relative(root, file)} ${d.undetermined}` };
+    stack.push(...d.targets);
   }
   return { files: [...seen].map((f) => relative(root, f)).sort() };
+}
+
+/**
+ * The files one source file imports by a RELATIVE specifier, absolute; a
+ * non-source file imports nothing. Undetermined for a non-literal dynamic
+ * import, or an import that does not resolve: Bun would fail to load the
+ * module, so whoever asks should run it rather than skip it.
+ */
+export function directRelativeImports(file: string): { targets: string[] } | { undetermined: string } {
+  if (!/\.(m?[jt]sx?)$/.test(file)) return { targets: [] };
+  const text = stripComments(readFileSync(file, "utf-8"));
+  if (DYNAMIC_NONLITERAL_RE.test(text)) return { undetermined: "has a non-literal dynamic import" };
+  const targets: string[] = [];
+  for (const m of text.matchAll(IMPORT_RE)) {
+    const spec = m[1] ?? m[2] ?? m[3];
+    if (spec === undefined || !spec.startsWith(".")) continue;
+    const target = resolveModule(file, spec);
+    if (target === undefined) return { undetermined: `imports unresolvable ${spec}` };
+    targets.push(target);
+  }
+  return { targets };
 }
 
 /** Expand declared globs to repo-relative files, sorted. A glob matching nothing is reported. */
