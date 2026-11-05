@@ -606,8 +606,19 @@ export const INSTANCE_UPLOADS_DATA: ReferenceExemption = {
     "an instance's UPLOADS data store. Owner, 2026-11-03: *\"instantiated harnesses can have an uploads/ but that is data store for that repo, not part of the KG\"*. An intake records where a capture came from and who cited it (a DAK's reference list, the repository it moved from), which names other instances as provenance, not as a dependency; while `uploads/` was declared it was a state graph this axis never read, and an undeclared one is the same data",
 };
 
+/**
+ * A document's provenance log, `<document>.prov.jsonld`, quotes verbatim
+ * where a rule came from (owner, 2026-11-05, decision card "A. Exempt logs").
+ */
+export const PROVENANCE_LOG: ReferenceExemption = {
+  file: /\.prov\.jsonld$/,
+  reason:
+    "a PROVENANCE LOG: `<document>.prov.jsonld` quotes verbatim where a rule came from (the owner, an issue, a PR, an earlier state), so it names the instances those words named. It is a record of origin, not a reference the document depends on. Owner, 2026-11-05, decision card: *\"A. Exempt logs\"*, keeping the quotes verbatim. The rule is in `skills/conduct/conduct-core/symbiotic-interaction.md`",
+};
+
 const EXEMPTIONS: readonly ReferenceExemption[] = [
   INSTANCE_UPLOADS_DATA,
+  PROVENANCE_LOG,
   {
     pattern: /https?:\/\/\S+/,
     reason:
