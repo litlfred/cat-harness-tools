@@ -12,7 +12,7 @@
  * @module test/gate-own-files.test
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import { GATE_OWN_ENV, gateOwnInstances } from "../scripts/lib/gate-own.ts";
@@ -20,9 +20,13 @@ import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { auditSchemaNodes } from "../scripts/schema-nodes.ts";
 
 const RUN_GATES = resolve(import.meta.dir, "..", ".github", "scripts", "layer-pr-checks", "run-gates.py");
-// The tools layer as the checkout composes it: the harness's sibling, which is
-// what the declarations resolve (in CI, this layer's own mount).
-const TOOLS = resolve(HARNESS_ROOT, "..", "cat-harness-tools");
+// Where this layer can sit: this file's own layer root (the standalone
+// rehearsal, where the layer IS the checkout root, and a mounted index), or
+// the harness's sibling as a composing checkout resolves it. Real paths, so a
+// symlinked mount compares as itself.
+const real = (p: string) => (existsSync(p) ? realpathSync(p) : p);
+const TOOLS_ROOTS = [...new Set([resolve(import.meta.dir, ".."), resolve(HARNESS_ROOT, "..", "cat-harness-tools")].map(real))];
+const underTools = (d: string) => TOOLS_ROOTS.some((t) => !relative(t, real(d)).startsWith(".."));
 
 describe("gateOwnInstances", () => {
   test("unset or blank is undefined: the whole checkout is judged, as before", () => {
@@ -57,7 +61,7 @@ describe("auditSchemaNodes with own instances", () => {
   test("this layer's own run reads only this layer's directories, a subset of the whole", () => {
     const a = auditSchemaNodes(HARNESS_ROOT, "checkout", new Set(["cat-harness-tools"]));
     expect(a.directories.length).toBeGreaterThan(0);
-    for (const d of a.directories) expect(relative(TOOLS, d).startsWith("..")).toBe(false);
+    for (const d of a.directories) expect(underTools(d)).toBe(true);
     const whole = new Set(modules(all));
     for (const m of modules(a)) expect(whole.has(m)).toBe(true);
     expect(modules(a).length).toBeGreaterThan(0);
