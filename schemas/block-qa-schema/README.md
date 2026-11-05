@@ -79,7 +79,8 @@ Per criterion entry:
 | `metrics` | map | no | descriptive checker measures (e.g. detangler `tanglement_score`, `cone_size`, `pagerank`, `graph_energy`) |
 | `reviewer` | object | yes | `kind` (`script`/`agent`/`human`) + `id`, with script-hash or agent model/session/skill provenance |
 | `reviewed_at` | string | yes | ISO-8601 UTC datetime (legacy agent entries: bare date) |
-| `reviewed_sha` | string | no | repo HEAD at audit time — recommended; legacy agent entries omit it |
+| `reviewed_tree` | string | no | tree of repo HEAD at audit time (`HEAD^{tree}`) — what producers write: a pull-request run's HEAD commit can vanish, its tree cannot |
+| `reviewed_sha` | string | no | repo HEAD at audit time — superseded by `reviewed_tree` and no longer written; kept readable, and legacy agent entries omit it |
 | `notes` | string | no | free-form |
 
 Both schemas set `additionalProperties: true` — the format is intentionally extensible.

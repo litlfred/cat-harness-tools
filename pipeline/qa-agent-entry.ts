@@ -24,11 +24,10 @@
  * @module pipeline/qa-agent-entry
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { blockQaPath, existingBlockQaPath, findContentRepoRoot } from "./qa-paths";
 import { blockAttestationKey, composeCriteria, finalizeCriteria, refusalLine, resolvePrior } from "../schemas/sdlc/qa-attestations.ts";
-import { hashBlockFiles, loadPriorBlockReport, priorRefusalLine, resolveCanonicalLean } from "./qa-utils";
+import { gitHeadTree, hashBlockFiles, loadPriorBlockReport, priorRefusalLine, resolveCanonicalLean } from "./qa-utils";
 import { priorFromOrExit } from "../scripts/qa-results.ts";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
 
@@ -102,12 +101,10 @@ const repoRoot = findContentRepoRoot(resolve(blockRoot), PLATFORM_ROOT);
 const qaReadPath = existingBlockQaPath(repoRoot, blockRoot);
 const qaPath = blockQaPath(repoRoot, blockRoot);
 
-let reviewedSha = "unknown";
-try {
-  reviewedSha = execFileSync("git", ["rev-parse", "HEAD"]).toString().trim();
-} catch {
-  /* ignore */
-}
+// The tree, not the commit: a PR run's HEAD is a synthetic merge commit that
+// can vanish, while its tree survives onto main (bean 69lr; owner card Q4,
+// 2026-11-05). Read from the cwd, as the commit id was before it.
+const reviewedTree = gitHeadTree();
 
 interface QaEntry {
   field_hash: { md?: string; ts?: string; lean?: string; lean_statement?: string };
@@ -117,7 +114,7 @@ interface QaEntry {
   notes?: string;
   reviewer: { kind: string; id: string; version?: string };
   reviewed_at: string;
-  reviewed_sha: string;
+  reviewed_tree: string;
 }
 interface QaSidecarDoc {
   $schema?: string;
@@ -181,7 +178,7 @@ const entry: QaEntry = {
   result,
   reviewer: { kind: "agent", id: reviewerId, version: "v1" },
   reviewed_at: new Date().toISOString(),
-  reviewed_sha: reviewedSha,
+  reviewed_tree: reviewedTree,
 };
 if (severity) entry.severity = severity;
 if (evidence) entry.evidence = evidence;

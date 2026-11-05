@@ -156,6 +156,7 @@ export declare const QaCriterionEntry: z.ZodObject<{
         agent_skill: z.ZodOptional<z.ZodString>;
     }, z.core.$loose>;
     reviewed_at: z.ZodString;
+    reviewed_tree: z.ZodOptional<z.ZodString>;
     reviewed_sha: z.ZodOptional<z.ZodString>;
     notes: z.ZodOptional<z.ZodString>;
 }, z.core.$loose>;
@@ -246,6 +247,7 @@ export declare const BlockQaReport: z.ZodObject<{
             agent_skill: z.ZodOptional<z.ZodString>;
         }, z.core.$loose>;
         reviewed_at: z.ZodString;
+        reviewed_tree: z.ZodOptional<z.ZodString>;
         reviewed_sha: z.ZodOptional<z.ZodString>;
         notes: z.ZodOptional<z.ZodString>;
     }, z.core.$loose>>>;
