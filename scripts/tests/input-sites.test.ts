@@ -389,7 +389,7 @@ describe("annotations hold to the data that chooses their targets", () => {
   });
 
 
-  test("every declared validator module lies under kind-validator's `imports` globs", () => {
+  test("every declared validator module lies under kind-validator's and node-kind-index's `imports` globs", () => {
     const globs = [
       "*/schemas/**/*.ts",
       "schemas/**/*.ts",
@@ -420,8 +420,8 @@ describe("annotations hold to the data that chooses their targets", () => {
       }
     }
     expect(seen).toBeGreaterThan(0);
-    // declared-path-literal: the module whose `input-site` annotation is the subject of this assertion, the same file this test imports; no declaration answers where a module of this layer sits.
-    for (const g of globs) expect(annotated(relTo(join(TOOLS_ROOT, "schemas/kg/kind-validator.ts")), g), g).toBe(true);
+    // declared-path-literal: the two modules that load the declared validator refs, whose `input-site` annotations are the subject of this assertion; no declaration answers where a module of this layer sits.
+    for (const file of ["kind-validator.ts", "node-kind-index.ts"]) for (const g of globs) expect(annotated(relTo(join(TOOLS_ROOT, "schemas/kg", file)), g), `${file}: ${g}`).toBe(true);
   });
 
   test("every instance themes module lies under theme-by-ref's `imports` glob", () => {
