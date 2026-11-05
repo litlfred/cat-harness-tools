@@ -161,6 +161,12 @@ body.jv {
 .jv-prose p { margin: 8px 0; }
 .jv-pre { margin: 12px 0; padding: 8px 12px; border: 1px dashed var(--jv-line); border-radius: 8px; }
 .jv-pre summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+.jv-illus { margin: 12px 0; }
+.jv-illus img { display: block; width: 100%; height: auto; border-radius: 8px; }
+.jv-illus-title { margin: 0 0 6px; font-weight: 600; }
+.jv-illus figcaption { margin-top: 4px; font-size: 0.85rem; color: var(--jv-muted); }
+.jv-brief { margin: 12px 0; padding: 8px 12px; border: 1px dashed var(--jv-line); border-radius: 8px; }
+.jv-brief summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; }
 .jv-whatif, .jv-gaps, .jv-stories, .jv-reqs, .jv-examples { padding-left: 18px; margin: 0; font-size: 0.92rem; }
 .jv-whatif li, .jv-gaps li, .jv-stories li, .jv-reqs li, .jv-examples li { margin: 4px 0; }
 .jv-gaps li::marker { content: "⚑  "; color: var(--jv-warn); }

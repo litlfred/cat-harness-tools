@@ -24,14 +24,17 @@
  * |---|---|
  * | `personas`, `lead`, `experiences[].actor` | `actors/<id>.json` in a `scenarios` directory |
  * | `stories` | `stories.json` in a `scenarios` directory |
- * | `uses[].block` | a `building-blocks/0.1.0` file in a `user-scenario` directory |
+ * | `uses[].block` | a `building-blocks/0.1.0` file in a directory declaring the `building-blocks` kind, wherever it is (typically `archimate/building-blocks/`, beside the ArchiMate model) |
  * | `trustLadder` | a `folio-code-list/v1` file in a `code-list` directory |
- * | `realisedBy[].process` | the BPMN file, relative to the instance root, and its drawing `<stem>.svg` beside it |
+ * | `realisedBy[].process` | the BPMN file, relative to the instance root, and its drawing `<stem>.svg` beside it; `tasks` are flow-node ids in that file |
+ * | `illustration.src` | the image, relative to the instance root |
  * | `requirements` | a `req:` node (`<dir>/requirements/<id>.json`) in any declared directory |
  * | `examples` | the `index.json` of a `fhir-artifact-index` directory |
  *
  * An edge that resolves to nothing is kept and drawn as unresolved, never
- * dropped: a missing story is a finding a reader should see.
+ * dropped: a missing story is a finding a reader should see. The same
+ * resolution is the gate `check:journey-refs` (`journeys/check.ts`), so the
+ * viewer and the check cannot disagree about what resolves.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
@@ -56,6 +59,8 @@ export const SCENARIO_KIND = "user-scenario";
 export const WORKSHOP_KIND = "workshop";
 /** Where a trust ladder is kept: a code list, read from any `code-list` directory. */
 export const CODE_LIST_KIND = "code-list";
+/** Where a building-block catalogue is kept: any directory declaring this kind. */
+export const BUILDING_BLOCKS_KIND = "building-blocks";
 
 /** An instance of the checkout, as the viewer needs it. */
 export interface InstanceInfo {
@@ -138,6 +143,8 @@ export interface JourneyCorpus {
   examples: Map<string, FhirExample>;
   /** Files of the two kinds that would not parse: drawn as findings, never silently skipped. */
   problems: Problem[];
+  /** Why the checkout's declared directories could not be read: set, the corpus is NOT complete. */
+  undetermined?: string;
 }
 
 function readJson(p: string): unknown {
@@ -199,8 +206,9 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
   let dirs: ReturnType<typeof checkoutDirectories> = [];
   try {
     dirs = checkoutDirectories(start);
-  } catch {
+  } catch (e) {
     dirs = [];
+    corpus.undetermined = e instanceof Error ? e.message : String(e);
   }
   const seenFiles = new Set<string>();
   for (const d of dirs) {
@@ -209,7 +217,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
     if (info === undefined || !existsSync(d.absPath) || !statSync(d.absPath).isDirectory()) continue;
     const kinds = d.graphTypologies as readonly string[];
     const rel = (p: string) => relative(info.root, p).split("\\").join("/");
-    if (kinds.includes(SCENARIO_KIND) || kinds.includes(WORKSHOP_KIND) || kinds.includes(CODE_LIST_KIND)) {
+    if (kinds.includes(SCENARIO_KIND) || kinds.includes(WORKSHOP_KIND) || kinds.includes(CODE_LIST_KIND) || kinds.includes(BUILDING_BLOCKS_KIND)) {
       for (const p of jsonFilesUnder(d.absPath, 2)) {
         if (seenFiles.has(p)) continue;
         const raw = readJson(p) as { $schema?: unknown; id?: unknown; codes?: unknown } | undefined;
@@ -219,7 +227,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
           if (kinds.includes(SCENARIO_KIND) && isUserScenario(raw)) {
             seenFiles.add(p);
             corpus.journeys.push({ instance, file: rel(p), scenario: parseUserScenario(raw, rel(p)) });
-          } else if (kinds.includes(SCENARIO_KIND) && tag === BUILDING_BLOCKS_V01) {
+          } else if (kinds.includes(BUILDING_BLOCKS_KIND) && tag === BUILDING_BLOCKS_V01) {
             seenFiles.add(p);
             const c = BuildingBlocksSchema.parse(raw);
             const into: { layers: BuildingBlocks["layers"]; blocks: Map<string, BuildingBlock> } = corpus.blocks.get(instance) ?? { layers: [], blocks: new Map() };
@@ -324,6 +332,25 @@ export function journeyById(corpus: JourneyCorpus, instance: string, id: string)
 /** A requirement by the id a step names (`STT-VER-008`, `req:stt-ver-008`). */
 export function requirementFor(corpus: JourneyCorpus, id: string): Requirement | undefined {
   return corpus.requirements.get(upper(id));
+}
+
+/** A path a journey names, relative to its instance's root: absolute when the file exists. */
+export function instanceFile(corpus: JourneyCorpus, instance: string, path: string): string | undefined {
+  const info = corpus.instances.get(instance);
+  if (info === undefined) return undefined;
+  const p = resolve(info.root, path);
+  // Never outside the instance: `../` in a journey is not a reference into another repository.
+  if (relative(info.root, p).startsWith("..")) return undefined;
+  return existsSync(p) && statSync(p).isFile() ? p : undefined;
+}
+
+/** The ids of every element of a BPMN file a step names; undefined when the file does not exist. */
+export function processElementIds(corpus: JourneyCorpus, instance: string, process: string): Set<string> | undefined {
+  const file = instanceFile(corpus, instance, process);
+  if (file === undefined) return undefined;
+  const ids = new Set<string>();
+  for (const m of readFileSync(file, "utf8").matchAll(/<(?:[A-Za-z_][\w.-]*:)?[A-Za-z_][\w.-]*\b[^>]*?\sid="([^"]+)"/g)) ids.add(m[1]!);
+  return ids;
 }
 
 /** The drawing of a BPMN file a step names: `<stem>.svg` beside it, as `render:bpmn` writes it. */

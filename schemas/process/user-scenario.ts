@@ -42,8 +42,10 @@
  * (`docs/proposals/user-scenario/`, frozen 2026-11-05); every 0.1.0 file is
  * read unchanged. `user-scenario/0.2.0` adds what the harness needed to make
  * the viewer generic: `partOf`, `views` (ArchiMate views of the journey),
- * `references` and, on a step, `gaps` (what the specification does not yet
- * cover) and `references`. Nothing of 0.1.0 changes meaning.
+ * `references`, `illustrationStyle` and, on a step, `gaps` (what the
+ * specification does not yet cover), `references` and `illustration`.
+ * Nothing of 0.1.0 changes meaning, and the kind accepts a 0.1.0 file as it
+ * is.
  *
  * ## What is NOT here, on purpose
  *
@@ -181,11 +183,51 @@ const StepV01 = {
   examples: z.array(z.string().regex(/^[A-Z][A-Za-z]+\/[A-Za-z0-9.-]+$/)).optional(),
 };
 
+/**
+ * A step's picture: the image when there is one, and the brief for drawing it
+ * when there is not. `src` is relative to the instance root, as
+ * `realisedBy[].process` is, and `check:journey-refs` fails when it names no
+ * file. `prompt` is the step's own image-generation prompt; the scenario's
+ * {@link IllustrationStyleSchema} is the style and cast every step shares.
+ *
+ * **A picture carries no text** (owner, 2026-11-05). The step's title and any
+ * caption are translatable page text, rendered by the viewer from the step's
+ * `title` and this `alt`, never baked into the image; a prompt asks for no
+ * readable text, signs or logos.
+ */
+export const IllustrationSchema = z
+  .object({
+    /** The image, instance-relative (`docs/images/p3-mina.png`), with no text in it. Absent: not drawn yet. */
+    src: Text.optional().describe("The image, relative to the instance root. It carries NO text: the step title and any caption are translatable page text, rendered from the step's `title` and `alt`."),
+    /** What the picture shows, for a reader who cannot see it; translatable page text, the caption the picture itself never carries. */
+    alt: Text.describe("What the picture shows: translatable page text, rendered beside the image as its caption, never baked into it."),
+    /** The scene, as a prompt for an image generator: what to draw when `src` is absent. It asks for no readable text. */
+    prompt: Text.optional().describe("The scene, as a prompt for an image generator, for when no picture exists yet. It asks for no readable text, signs or logos."),
+  })
+  .strict()
+  .describe("A step's picture, or the brief for drawing it. A picture carries no text; the title and caption are page text.");
+export type Illustration = z.infer<typeof IllustrationSchema>;
+
+/** The style and cast a scenario's illustrations share, so each step's prompt says only its scene. */
+export const IllustrationStyleSchema = z
+  .object({
+    /** The style prefix every step's prompt is read with. */
+    prompt: Text,
+    /** How each person is drawn, kept the same across steps. Every person is fictional. */
+    cast: z.array(z.object({ actor: Id, description: Text }).strict()).optional(),
+    /** What to keep in mind: cultural notes, what never to draw. */
+    notes: z.array(Text).optional(),
+  })
+  .strict();
+export type IllustrationStyle = z.infer<typeof IllustrationStyleSchema>;
+
 const StepV02 = {
   ...StepV01,
   /** What the specification does not yet cover for this step: each a finding, not a failure. */
   gaps: z.array(Text).optional(),
   references: z.array(ReferenceSchema).optional(),
+  /** The step's picture, or the brief for drawing it. */
+  illustration: IllustrationSchema.optional(),
 };
 
 /** An ArchiMate view of a journey: a model id of the instance's `cat-archimate.config.json` and a view id in it. */
@@ -223,7 +265,7 @@ function uniqueSteps(s: { steps: readonly { id: string; experiences: readonly { 
 
 /**
  * `user-scenario/0.2.0`, as a node kind: 0.1.0 plus grouping, views,
- * references and per-step gaps. A minor bump only adds, so the kind accepts a
+ * references, illustrations and per-step gaps. A minor bump only adds, so the kind accepts a
  * `user-scenario/0.1.0` file as it is (`acceptsSchemaTag`).
  */
 export const UserScenarioKind = nodeKind(
@@ -236,6 +278,8 @@ export const UserScenarioKind = nodeKind(
     /** ArchiMate views of the journey. */
     views: z.array(ViewRefSchema).optional(),
     references: z.array(ReferenceSchema).optional(),
+    /** The style and cast the steps' illustrations share. */
+    illustrationStyle: IllustrationStyleSchema.optional(),
     /** The steps in order. May be empty for a journey that only groups its sub-journeys. */
     steps: z.array(z.object(StepV02).strict()),
   },
@@ -282,7 +326,21 @@ export const BuildingBlockSchema = z
   .strict();
 export type BuildingBlock = z.infer<typeof BuildingBlockSchema>;
 
-/** `building-blocks/0.1.0`: the catalogue a step's `uses` edges point into. */
+/**
+ * `building-blocks/0.1.0`: the catalogue a step's `uses` edges point into.
+ *
+ * Its own kind, `building-blocks`, not a family of `user-scenario`: the
+ * catalogue describes the architecture, and an instance keeps it beside its
+ * ArchiMate model, where the overlay that draws those blocks reads it. So a
+ * reader finds a catalogue in ANY directory that declares the kind, never by
+ * folder name. The usual place is a directory declared inside the
+ * `archimate` one (`archimate/building-blocks/`, `graphTypologies:
+ * ["building-blocks"]`). Not the `archimate` directory itself with both kinds:
+ * each kind of a directory claims every typed node in it, so
+ * `check:kind-validators` would find the catalogue unmapped under `archimate`
+ * and the ArchiMate config unmapped under `building-blocks`; a nested
+ * declaration gives each node one kind.
+ */
 export const BuildingBlocksKind = nodeKind(
   BUILDING_BLOCKS_V01,
   [],
@@ -311,6 +369,10 @@ export type BuildingBlocks = z.infer<typeof BuildingBlocksSchema>;
  * (`scenarios/actors/<id>.json`, `meta.persona`) so who a person is is said
  * once. Read, not owned, by this kind: an actor is bootstrap's `scenarios`
  * kind and its `meta` is open. Every persona is fictional.
+ *
+ * `initials` and `color` are optional presentation fields (owner,
+ * 2026-11-05): kept on the actor when a demonstrator wants a fixed avatar,
+ * derived by the viewer when absent. Nothing else in the harness reads them.
  */
 export const JourneyPersonaSchema = z
   .object({

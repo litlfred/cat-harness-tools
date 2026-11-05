@@ -44,12 +44,21 @@ put("lower/lower.json", {
     { id: "processes", path: "processes/", graphTypologies: ["processes"] },
     { id: "skills", path: "skills/", graphTypologies: ["skills"] },
     { id: "code-lists", path: "code-lists/", graphTypologies: ["code-list"] },
+    // The catalogue beside the ArchiMate model, in a directory declared inside it.
+    { id: "archimate", path: "archimate/", graphTypologies: ["archimate"] },
+    { id: "building-blocks", path: "archimate/building-blocks/", graphTypologies: ["building-blocks"] },
   ],
 });
 put("lower/scenarios/actors/ana.json", { id: "ana", title: "Ana (pilgrim)", kind: "person", meta: { persona: { name: "Ana", role: "Pilgrim", color: "#123456" } } });
 put("lower/scenarios/actors/ben.json", { id: "ben", title: "Ben (nurse)", kind: "person" });
 put("lower/scenarios/stories.json", { name: "lower", stories: [{ id: "pilgrim-1", role: { role: "pilgrim" }, want: "Show my summary abroad", soThat: "I am treated safely" }] });
-put("lower/scenarios/user-scenarios/blocks.json", {
+// A catalogue in a journeys directory is NOT read: the kind is declared, not the folder.
+put("lower/scenarios/user-scenarios/stray-blocks.json", {
+  $schema: "building-blocks/0.1.0",
+  layers: [{ id: "apps", label: "Tools & apps" }],
+  blocks: [{ id: "stray", name: "Stray", kind: "tool", layer: "apps", jurisdiction: "International", what: "Not declared." }],
+});
+put("lower/archimate/building-blocks/blocks.json", {
   $schema: "building-blocks/0.1.0",
   layers: [{ id: "apps", label: "Tools & apps" }],
   blocks: [{ id: "wallet", name: "Health wallet", kind: "tool", layer: "apps", jurisdiction: "International", what: "Holds the summary." }],
@@ -89,6 +98,7 @@ put("lower/scenarios/user-scenarios/p2.json", {
         { block: "nowhere", role: "unknown block" },
       ],
       gaps: ["No transaction for this yet."],
+      illustration: { src: "docs/images/p2.png", alt: "Ben reads the summary on a tablet." },
     }),
   ],
 });
@@ -101,6 +111,7 @@ put("lower/scenarios/user-scenarios/p1.json", {
   steps: [step("P1", "ana")],
 });
 put("lower/processes/care.bpmn", "<definitions/>");
+put("lower/docs/images/p2.png", "\x89PNG fixture");
 put(
   "lower/processes/care.svg",
   '<?xml version="1.0"?><!DOCTYPE svg><!-- generated --><svg xmlns="http://www.w3.org/2000/svg"><g class="djs-element djs-shape" data-element-id="Task_Read"><g class="djs-visual"><rect/></g></g><g class="djs-element djs-shape" data-element-id="Task_Other"><g class="djs-visual"><rect/></g></g></svg>',
@@ -120,7 +131,29 @@ put("top/top.json", {
 });
 put("top/journeys/group.json", { $schema: "user-scenario/0.2.0", id: "t-group", title: "T — The whole trip", description: "Groups the trip.", personas: ["ana"], steps: [] });
 put("top/journeys/t2.json", { $schema: "user-scenario/0.2.0", id: "t2-home", title: "T2 — Home", description: "Back home.", personas: ["ana"], partOf: "t-group", follows: "t1-away", steps: [step("T2", "ana")] });
-put("top/journeys/t1.json", { $schema: "user-scenario/0.2.0", id: "t1-away", title: "T1 — Away", description: "Away.", personas: ["ana"], partOf: "t-group", steps: [step("T1", "ana")] });
+// The pilgrimage's P3 brief, with a fictional cast (image prompts, owner via the parallel session, 2026-11-05).
+put("top/journeys/t1.json", {
+  $schema: "user-scenario/0.2.0",
+  id: "t1-away",
+  title: "T1 — Away",
+  description: "Away.",
+  personas: ["ana"],
+  partOf: "t-group",
+  illustrationStyle: {
+    prompt: "Warm, flat digital illustration with soft shading and clean outlines. Wide banner, 11:4. No readable text, no logos. All people are fictional.",
+    cast: [{ actor: "ana", description: "Pilgrim, 61, slim, short grey hair, white ihram." }],
+    notes: ["Keep medical signs text-free."],
+  },
+  steps: [
+    step("T1", "ana", {
+      title: "Taken ill in Mina",
+      illustration: {
+        alt: "Ana, dizzy in the midday heat, is helped toward a health facility.",
+        prompt: "The white tent city of Mina at midday; Ana, in white ihram, looks dizzy and is helped toward a plain white health facility with no text on its sign.",
+      },
+    }),
+  ],
+});
 put("top/journeys/broken.json", { $schema: "user-scenario/0.2.0", id: "broken", title: "Broken", description: "d", personas: ["ana"], steps: [step("B1", "zed")] });
 put("top/workshops/policy.json", {
   $schema: "workshop/0.1.0",
@@ -156,7 +189,7 @@ const files = renderJourneyPages(corpus, { route: "en/top/journeys", title: "Top
 const at = (path: string): string => {
   const f = files.find((x: PageFile) => x.path === path);
   if (!f) throw new Error(`no page ${path}; have ${files.map((x) => x.path).join(", ")}`);
-  return f.content;
+  return String(f.content);
 };
 
 describe("the reader finds every journey the checkout's declarations hold", () => {
@@ -176,6 +209,8 @@ describe("the reader finds every journey the checkout's declarations hold", () =
     expect(corpus.actors.get("lower")?.get("ana")?.persona?.name).toBe("Ana");
     expect(corpus.stories.get("lower")?.has("pilgrim-1")).toBe(true);
     expect(corpus.blocks.get("lower")?.blocks.has("wallet")).toBe(true);
+    // Only a directory declaring `building-blocks` is read for a catalogue.
+    expect(corpus.blocks.get("lower")?.blocks.has("stray")).toBe(false);
     expect(corpus.ladders.get("lower")?.get("trust")?.map((c) => c.code)).toEqual(["paper", "shared"]);
     expect(corpus.requirements.get("LOW-REQ-001")?.title).toBe("Read the summary");
   });
@@ -207,7 +242,7 @@ describe("the index: all journeys, by instance, by partOf, along follows", () =>
     expect(at("top/index.html")).toContain("journeys/broken.json");
   });
   test("every page says which Tool drew it", () => {
-    for (const f of files.filter((x) => x.path.endsWith(".html"))) expect(renderedByOf(f.content)).toBe("journeys-viewer");
+    for (const f of files.filter((x) => x.path.endsWith(".html"))) expect(renderedByOf(String(f.content))).toBe("journeys-viewer");
   });
 });
 
@@ -245,6 +280,27 @@ describe("a journey page", () => {
   test("follows and partOf are links", () => {
     expect(p2).toContain('href="../../lower/p1-checked/" rel="prev"');
     expect(at("top/t1-away/index.html")).toContain('href="../../top/t-group/" rel="up"');
+  });
+});
+
+describe("illustrations: the picture carries no text, the page does", () => {
+  test("a resolved src is copied beside the page, with the step title above and the alt below as page text", () => {
+    const p2 = at("lower/p2-treated/index.html");
+    const fig = p2.slice(p2.indexOf('<figure class="jv-illus">'));
+    expect(fig).toContain(`<img src="img/${stepAnchor("P2")}.png" alt="Ben reads the summary on a tablet."`);
+    expect(fig.indexOf("Step P2")).toBeLessThan(fig.indexOf("<img"));
+    expect(fig.indexOf("<figcaption>")).toBeGreaterThan(fig.indexOf("<img"));
+    const img = files.find((f) => f.path === `lower/p2-treated/img/${stepAnchor("P2")}.png`);
+    expect(img && String(img.content)).toContain("PNG fixture");
+  });
+  test("without a picture, the journey page carries the brief: style, cast and the step's prompt", () => {
+    const t1 = at("top/t1-away/index.html");
+    expect(t1).toContain('<details class="jv-brief"><summary>Illustration brief');
+    expect(t1).toContain("The white tent city of Mina at midday");
+    expect(t1).toContain("Warm, flat digital illustration");
+    expect(t1).toContain("Pilgrim, 61, slim");
+    expect(t1).toContain("Keep medical signs text-free.");
+    expect(t1).not.toContain('class="jv-illus"');
   });
 });
 

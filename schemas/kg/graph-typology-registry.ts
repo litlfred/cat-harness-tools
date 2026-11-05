@@ -917,25 +917,50 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   "user-scenario": {
     anyLayer: true,
     description:
-      "user scenarios told as journey maps (`scenarios/user-scenarios/`, by convention): one `user-scenario/0.2.0` file per journey (the smart-trust-demo draft `user-scenario/0.1.0` is read unchanged), keeping the DAK `UserScenario` fields (`id`, `title`, `description`, `personas`) and adding the ordered steps: per actor what they do and feel (emotion -2..2), the pain point and enabler, the policy point, how far the record can be trusted (a code of the scenario's `trustLadder` code list), the hand-off, what-ifs and gaps, and edges to user stories, BPMN tasks (`realisedBy`), `req:` requirements, FHIR examples and the building blocks it `uses`, each in its role. `follows` chains journeys into one story; `partOf` groups sub-journeys. Also holds the `building-blocks/0.1.0` catalogue those `uses` edges point into; a trust ladder is a code list, kept in a `code-list` directory. Drawn by the journeys viewer. Shapes in `schemas/process/user-scenario.ts`.",
+      "user scenarios told as journey maps (`scenarios/user-scenarios/`, by convention): one `user-scenario/0.2.0` file per journey (the smart-trust-demo draft `user-scenario/0.1.0` is read unchanged), keeping the DAK `UserScenario` fields (`id`, `title`, `description`, `personas`) and adding the ordered steps: per actor what they do and feel (emotion -2..2), the pain point and enabler, the policy point, how far the record can be trusted (a code of the scenario's `trustLadder` code list), the hand-off, what-ifs and gaps, and edges to user stories, BPMN tasks (`realisedBy`), `req:` requirements, FHIR examples and the building blocks it `uses`, each in its role. `follows` chains journeys into one story; `partOf` groups sub-journeys. A step may carry an `illustration` (an image, or the prompt to draw it), with the style and cast the scenario's `illustrationStyle` shares. The catalogue those `uses` edges point into is the `building-blocks` kind; a trust ladder is a code list, kept in a `code-list` directory. Every reference a step names must resolve (`check:journey-refs`). Drawn by the journeys viewer. Shapes in `schemas/process/user-scenario.ts`.",
     title: "User scenarios",
     renderable: false,
     holds: "content",
     // declared-path-literal: this table IS the declaration, as on `tool-release`.
     schema: "schemas/process/user-scenario.ts",
     // Every family listed: declaring `nodeSchemas` claims the map is complete.
-    // The validators are `validators/user-scenario*.json` and
-    // `validators/building-blocks.json`, each naming a node kind. A trust
-    // ladder is a code list, so it lives in a `code-list` directory.
+    // The validators are `validators/user-scenario*.json`, each naming a node
+    // kind. A trust ladder is a code list, so it lives in a `code-list`
+    // directory; a building-block catalogue is the `building-blocks` kind.
     nodeSchemas: {
       "user-scenario/0.1.0": {},
       "user-scenario/0.2.0": {},
-      "building-blocks/0.1.0": {},
     },
     summary:
       "User scenarios as journey maps -- one file per journey: ordered steps, per actor what " +
       "they do and feel, pain points, enablers, the record's trust state, and edges to user " +
       "stories, BPMN tasks, requirements, FHIR examples and the building blocks each step uses.",
+  },
+  // The building blocks a journey step `uses`. Owner, 2026-11-05: the
+  // catalogue lives in an instance's `archimate/` directory, read by its
+  // ArchiMate overlay. A family of `user-scenario` could only be read from a
+  // journeys directory, so it is a kind of its own, and a directory DECLARES
+  // it: `archimate/building-blocks/`, declared inside the `archimate`
+  // directory. Not `["archimate", "building-blocks"]` on `archimate/` itself:
+  // every kind of a directory claims every typed node in it, so
+  // `check:kind-validators` would call each kind's node unmapped under the
+  // other. Readers ask for the kind, never the folder. `content`, as
+  // `user-scenario`.
+  "building-blocks": {
+    anyLayer: true,
+    description:
+      "building-block catalogues: one `building-blocks/0.1.0` file per catalogue, its layers (each with the question it answers) and its blocks (a tool, a deployed system, a standard or a trust network, with its jurisdiction, owner, what it is and why it matters, the ArchiMate element keys that deploy it, and links). The target of a `user-scenario` step's `uses` edges, resolved by block id. Usually kept beside the instance's ArchiMate model, in a directory declared inside its `archimate` one (`archimate/building-blocks/`). Shape in `schemas/process/user-scenario.ts`.",
+    title: "Building blocks",
+    renderable: false,
+    holds: "content",
+    // declared-path-literal: this table IS the declaration, as on `tool-release`.
+    schema: "schemas/process/user-scenario.ts",
+    nodeSchemas: {
+      "building-blocks/0.1.0": {},
+    },
+    summary:
+      "Building-block catalogues -- layers and blocks (tools, systems, standards, trust networks) " +
+      "with their jurisdiction and what each is, the targets of a journey step's `uses` edges.",
   },
   // A workshop teaches from journeys and points at their step ids, so a
   // journey does not change when a workshop does (bean smart-trust-demo-kg01,

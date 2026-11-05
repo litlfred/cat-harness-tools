@@ -20,6 +20,14 @@ describe("user-scenario: the draft family is read unchanged, 0.2.0 adds to it", 
     const child = { ...v01, $schema: "user-scenario/0.2.0", partOf: "j", views: [{ model: "0.1.0", view: "id-1" }], steps: [{ ...step, gaps: ["not yet"] }] };
     expect(parseUserScenario(child).steps[0]).toMatchObject({ gaps: ["not yet"] });
   });
+  test("0.2.0 carries an illustration (alt required) and the scenario's shared style; 0.1.0 does not", () => {
+    const il = { src: "docs/images/p3.png", alt: "Helped toward the clinic.", prompt: "A tent city at midday; no readable text." };
+    const v02 = { ...v01, $schema: "user-scenario/0.2.0", illustrationStyle: { prompt: "Flat, no text.", cast: [{ actor: "mother", description: "d" }], notes: ["n"] }, steps: [{ ...step, illustration: il }] };
+    expect(parseUserScenario(v02).steps[0]).toMatchObject({ illustration: il });
+    expect(() => parseUserScenario({ ...v02, steps: [{ ...step, illustration: { src: "x.png" } }] })).toThrow(/alt/);
+    expect(() => parseUserScenario({ ...v02, steps: [{ ...step, illustration: { ...il, caption: "baked" } }] })).toThrow();
+    expect(UserScenarioV01Schema.safeParse({ ...v01, steps: [{ ...step, illustration: il }] }).success).toBe(false);
+  });
   test("a step id twice, an actor not among the personas, and an unknown key are refused", () => {
     expect(() => parseUserScenario({ ...v01, steps: [step, step] })).toThrow(/appears twice/);
     expect(() => parseUserScenario({ ...v01, steps: [{ ...step, lead: "stranger" }] })).toThrow(/not among the scenario's personas/);

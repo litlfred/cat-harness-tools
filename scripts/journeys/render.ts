@@ -27,7 +27,7 @@
  * | `assets/journeys.css`, `assets/journeys.js` | the style and the script |
  */
 import { readFileSync } from "node:fs";
-import { join, posix } from "node:path";
+import { extname, join, posix } from "node:path";
 import { remark } from "remark";
 import remarkGfm from "remark-gfm";
 import remarkHtml from "remark-html";
@@ -39,6 +39,7 @@ import type { ScenarioStep, UserScenario } from "../../schemas/process/user-scen
 import type { Workshop, WorkshopStep } from "../../schemas/process/workshop.ts";
 import {
   blockFor,
+  instanceFile,
   journeyById,
   lookup,
   processDrawing,
@@ -55,7 +56,8 @@ export const ASSETS = ["journeys.css", "journeys.js"] as const;
 
 export interface PageFile {
   path: string;
-  content: string;
+  /** A page or an asset as text; an illustration copied from its instance as bytes. */
+  content: string | Uint8Array;
 }
 
 /** Where things are in the site, for links that leave the viewer. */
@@ -507,6 +509,35 @@ ${resources.length ? `<h4>Job aids and resources</h4><ul class="jv-res">${resour
 </aside>`;
 }
 
+/** Where a step's illustration is copied, relative to its journey's page; undefined when `src` names no file. */
+export function illustrationPath(corpus: JourneyCorpus, j: Journey, s: ScenarioStep): { from: string; to: string } | undefined {
+  const src = s.illustration?.src;
+  const from = src === undefined ? undefined : instanceFile(corpus, j.instance, src);
+  return from === undefined ? undefined : { from, to: `img/${stepAnchor(s.id)}${extname(from).toLowerCase()}` };
+}
+
+/**
+ * A step's picture, or the brief for drawing one. The picture carries no
+ * text (owner, 2026-11-05): the step's title is drawn above it and the `alt`
+ * below it as page text, so both are translated with the page.
+ */
+function illustrationHtml(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, personas: PersonaView[]): string {
+  const il = s.illustration;
+  if (il === undefined) return "";
+  const at = illustrationPath(corpus, j, s);
+  if (at !== undefined) {
+    return `<figure class="jv-illus"><p class="jv-illus-title"><span class="jv-code">${e(s.id)}</span> ${e(s.title)}</p><img src="${e(at.to)}" alt="${e(il.alt)}" loading="lazy"><figcaption>${e(il.alt)}</figcaption></figure>`;
+  }
+  const style = j.scenario.illustrationStyle;
+  const who = (id: string) => personas.find((p) => p.id === id)?.name ?? lookup(corpus.actors, j.instance, id)?.title ?? id;
+  return `<details class="jv-brief"><summary>Illustration brief${il.src ? ` <span class="jv-badge jv-warn">no file at ${e(il.src)}</span>` : ""}</summary>
+<p class="jv-muted">No picture yet: the brief for drawing one. The picture carries no text; the title and caption are the page's.</p>
+<dl class="jv-dl"><dt>Title (page text)</dt><dd>${e(s.title)}</dd><dt>Caption (page text)</dt><dd>${e(il.alt)}</dd>${il.prompt ? `<dt>Scene</dt><dd>${e(il.prompt)}</dd>` : ""}${style ? `<dt>Style</dt><dd>${e(style.prompt)}</dd>` : ""}</dl>
+${style?.cast?.length ? `<h5>Cast</h5><ul>${style.cast.map((c) => `<li><b>${e(who(c.actor))}</b>: ${e(c.description)}</li>`).join("")}</ul>` : ""}
+${style?.notes?.length ? `<h5>Notes</h5><ul>${style.notes.map((n) => `<li>${e(n)}</li>`).join("")}</ul>` : ""}
+</details>`;
+}
+
 function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: number, personas: PersonaView[], links: SiteLinks, up: string): string {
   const steps = j.scenario.steps;
   const lead = personas.find((p) => p.id === s.lead);
@@ -592,6 +623,7 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
 <div><h3>${e(s.title)}</h3>${s.headline ? `<p class="jv-headline">${e(s.headline)}</p>` : ""}
 <p class="jv-muted">${[s.when, s.where, s.touchpoint].filter(Boolean).map((x) => e(x!)).join(" · ")}${lead ? ` · told through ${avatar(lead, "s")} ${e(lead.name)}` : ""}</p></div>
 </header>
+${illustrationHtml(corpus, j, s, personas)}
 <div class="jv-step-body">
 <div class="jv-col">${story}</div>
 <div class="jv-col jv-hood"><h4 class="jv-hood-h">Under the hood</h4>${hood}</div>
@@ -841,6 +873,10 @@ export function renderJourneyPages(corpus: JourneyCorpus, links: SiteLinks, decl
   for (const j of corpus.journeys) {
     if (j.scenario.id === "workshops") throw new Error(`${j.instance}/${j.file}: a journey may not be called "workshops", the viewer's own segment`);
     out.push({ path: `${j.instance}/${j.scenario.id}/index.html`, content: journeyPage(corpus, j, links) });
+    for (const s of j.scenario.steps) {
+      const il = illustrationPath(corpus, j, s);
+      if (il !== undefined) out.push({ path: `${j.instance}/${j.scenario.id}/${il.to}`, content: readFileSync(il.from) });
+    }
   }
   for (const w of corpus.workshops) {
     const base = `${w.instance}/workshops/${w.workshop.id}`;
