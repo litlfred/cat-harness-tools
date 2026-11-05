@@ -44,6 +44,7 @@ import {
   parseMemoryFile,
   readMemoryNodes,
   rebaseAgentsMdLinks,
+  rebaseAgentFileLinks,
   rebaseRuleLinks,
   renderAgentsMdSection,
   renderAntigravityRule,
@@ -610,5 +611,20 @@ describe("Repo-wide AGENTS.md section and per-target budgets (bean 31ni)", () =>
     expect(rebaseAgentsMdLinks("See [`x`](../skills/ui/ui-core/render-logging.md).", ROOT)).toBe(
       "See [`x`](skills/ui/ui-core/render-logging.md).",
     );
+    // The per-agent files sit three levels below the root.
+    expect(rebaseAgentFileLinks("See [`x`](../skills/ui/ui-core/render-logging.md).", ROOT)).toBe(
+      "See [`x`](../../../skills/ui/ui-core/render-logging.md).",
+    );
+  });
+
+  test("rebaseAgentFileLinks points an index root's per-agent files into cat-harness", () => {
+    const dir = mkdtempSync(join(tmpdir(), "agent-file-links-"));
+    try {
+      expect(rebaseAgentFileLinks("See [`x`](../skills/a/b.md) and [`y`](https://e.org/skills/).", dir)).toBe(
+        "See [`x`](../../../cat-harness/skills/a/b.md) and [`y`](https://e.org/skills/).",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
