@@ -174,14 +174,61 @@ export function render(loaded: Loaded, root: string, stored: Readonly<Record<str
   return lines.join("\n");
 }
 
+/** One entry of the daily cache report (folio-assistant `cache-report.sh --json`, schema `cache-report/1`). */
+export interface ReportEntry {
+  key: string;
+  ref: string;
+  sizeBytes: number;
+  lastAccessedAt: string;
+  createdAt?: string;
+}
+export interface CacheReport {
+  schema: "cache-report/1";
+  entries: ReportEntry[];
+  hitRate?: Record<string, number>;
+}
+
+/**
+ * The stored facts of each cache, from a raw daily report. The report names no
+ * node: an Actions-cache node owns the entries whose key starts with its
+ * `location`, and its stored key is the newest one saved on `main` (what every
+ * branch reads), else the newest at all. A node of another kind (a ref, an
+ * image) gets nothing from this report, so its cells stay undetermined. The
+ * hit rate is the one `cached-step` reported under the node's id, if any.
+ * An already-resolved map (`Record<id, StoredFacts>`) passes through.
+ */
+export function storedFromReport(report: unknown, caches: readonly Cache[]): Record<string, StoredFacts> {
+  const r = report as Partial<CacheReport> | undefined;
+  if (r?.schema !== "cache-report/1" || !Array.isArray(r.entries)) return (report ?? {}) as Record<string, StoredFacts>;
+  const out: Record<string, StoredFacts> = {};
+  const newest = (a: ReportEntry, b: ReportEntry) => ((b.createdAt ?? b.lastAccessedAt) > (a.createdAt ?? a.lastAccessedAt) ? b : a);
+  for (const c of caches) {
+    const facts: StoredFacts = {};
+    if (c.kind === "actions-cache" && c.location.length > 0) {
+      const mine = r.entries.filter((e) => e.key.startsWith(c.location));
+      const onMain = mine.filter((e) => e.ref === "refs/heads/main");
+      const pick = (onMain.length > 0 ? onMain : mine).reduce<ReportEntry | undefined>((a, b) => (a === undefined ? b : newest(a, b)), undefined);
+      if (pick !== undefined) {
+        facts.key = pick.key;
+        facts.sizeBytes = mine.reduce((n, e) => n + e.sizeBytes, 0);
+        facts.lastAccessedAt = pick.lastAccessedAt;
+      }
+    }
+    const rate = r.hitRate?.[c.id];
+    if (typeof rate === "number") facts.hitRate = rate;
+    if (Object.keys(facts).length > 0) out[c.id] = facts;
+  }
+  return out;
+}
+
 function main(argv: string[]): number {
   const at = (f: string) => (argv.indexOf(f) >= 0 ? argv[argv.indexOf(f) + 1] : undefined);
   const storedFile = at("--stored");
   const out = at("--out") ?? VIEW_FILE;
   // The checkout root, for `hashFiles` recipes: the composed checkout when this layer is mounted in one.
   const root = existsSync(join(LAYER_ROOT, "..", "index.lock.json")) ? resolve(LAYER_ROOT, "..") : LAYER_ROOT;
-  const stored = storedFile ? (JSON.parse(readFileSync(storedFile, "utf8")) as Record<string, StoredFacts>) : undefined;
   const loaded = loadCaches();
+  const stored = storedFile ? storedFromReport(JSON.parse(readFileSync(storedFile, "utf8")), loaded.caches) : undefined;
   // The COMMITTED page (no --out) is rendered with the layer as root and no
   // report, so it does not depend on where the layer is mounted or on a
   // report, and `--check` can hold it current. A live page, with a report and

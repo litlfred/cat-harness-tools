@@ -9,7 +9,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { hashFilesOf, impliedKey, loadCaches, render, VIEW_FILE } from "../gen-caches-viz.ts";
+import { hashFilesOf, impliedKey, loadCaches, render, storedFromReport, VIEW_FILE } from "../gen-caches-viz.ts";
 
 const sha = (s: string) => createHash("sha256").update(s).digest();
 
@@ -64,4 +64,30 @@ describe("render", () => {
 test("the committed viewer.md is current", () => {
   const LAYER = join(import.meta.dir, "..", "..");
   expect(readFileSync(VIEW_FILE, "utf8")).toBe(render(loadCaches(), LAYER, undefined) + "\n");
+});
+
+describe("storedFromReport — the daily report's raw facts, matched by location", () => {
+  const node = (id: string, location: string, kind = "actions-cache") => ({ id, location, kind }) as unknown as Parameters<typeof storedFromReport>[1][number];
+  const report = {
+    schema: "cache-report/1",
+    entries: [
+      { key: "derive-cache-v1-a", ref: "refs/pull/3/merge", sizeBytes: 10, lastAccessedAt: "2026-11-05T10:00:00Z", createdAt: "2026-11-05T10:00:00Z" },
+      { key: "derive-cache-v1-b", ref: "refs/heads/main", sizeBytes: 20, lastAccessedAt: "2026-11-04T10:00:00Z", createdAt: "2026-11-04T10:00:00Z" },
+      { key: "other-x", ref: "refs/heads/main", sizeBytes: 5, lastAccessedAt: "t", createdAt: "t" },
+    ],
+    hitRate: { "lpc-derive-cache": 0.5 },
+  };
+  test("the stored key is main's newest entry under the location, size is every entry's", () => {
+    const s = storedFromReport(report, [node("lpc-derive-cache", "derive-cache-v1-")]);
+    expect(s["lpc-derive-cache"]).toEqual({ key: "derive-cache-v1-b", sizeBytes: 30, lastAccessedAt: "2026-11-04T10:00:00Z", hitRate: 0.5 });
+  });
+  test("a node of another kind gets nothing from the Actions-cache report", () => {
+    expect(storedFromReport(report, [node("layers", "derive-cache-v1-", "git-ref")])).toEqual({});
+  });
+  test("a node with no entry stays absent (its cells stay undetermined)", () => {
+    expect(storedFromReport(report, [node("none", "nothing-")])).toEqual({});
+  });
+  test("an already-resolved map passes through", () => {
+    expect(storedFromReport({ x: { key: "k" } }, [])).toEqual({ x: { key: "k" } });
+  });
 });
