@@ -100,10 +100,14 @@ export function passageText(value: string): string {
     .split("\n");
   const indents = lines.filter((l) => l.trim() !== "").map((l) => l.match(/^ */)![0].length);
   const cut = indents.length ? Math.min(...indents) : 0;
+  // A passage cut from a `.bpmn` is XML text, so its `<` arrive as `&lt;`;
+  // Markdown shows those entities as characters too. Decoded here, escaped
+  // once on output, so a reader never sees `&lt;`.
   return lines
     .map((l) => l.slice(cut))
     .join("\n")
-    .trim();
+    .trim()
+    .replace(/&(lt|gt|quot|apos|amp);/g, (_, e: string) => ({ lt: "<", gt: ">", quot: '"', apos: "'", amp: "&" })[e]!);
 }
 
 /**
