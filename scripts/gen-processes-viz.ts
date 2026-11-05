@@ -440,11 +440,11 @@ export async function processRows(repo = REPO): Promise<ProcessRow[]> {
     // The site copy is built at publish (cat-harness#1047), so it is absent
     // wherever render:bpmn has not run. The drawing committed beside the
     // .bpmn (bean akiq) has the same layout, so it answers "is there a
-    // drawing" and gives the markers their geometry; the page still links
-    // the site copy, which carries the step links.
+    // drawing" and gives the markers their geometry; `svg` names the file
+    // that is on disk, and the page still links the site copy by stem.
     const beside = abs.replace(/\.bpmn$/, ".svg");
     const drawn = existsSync(svgRel) ? svgRel : existsSync(beside) ? beside : undefined;
-    const svg = drawn !== undefined ? relative(repo, svgRel) : undefined;
+    const svg = drawn !== undefined ? relative(repo, drawn) : undefined;
     // The DECLARATION, asked of the file: is there an enforcement VALUE? A
     // presence check, not a second reading of what the policy means — and a
     // presence check on the value, not on the element. See the module doc.
