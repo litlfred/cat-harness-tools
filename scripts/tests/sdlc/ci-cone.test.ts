@@ -128,6 +128,27 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
     expect("undetermined" in r && r.undetermined).toContain("git fetch");
   });
 
+  test("git in a directory the run created is its own scratch repository: kept as an ordinary process", () => {
+    const r = read(
+      [
+        `10 mkdir("/tmp/probe-ab12", 0700) = 0`,
+        `20 getcwd("/tmp/probe-ab12", 4096) = 16`,
+        `20 execve("/usr/bin/git", ["git", "commit", "-qm", "x"], 0x1 /* 3 vars */) = 0`,
+        `20 openat(AT_FDCWD</tmp/probe-ab12>, ".git/index", O_RDONLY|O_CLOEXEC) = 3</tmp/probe-ab12/.git/index>`,
+        // Its reads of the checkout's .git are kept: no replay answers them.
+        `20 openat(AT_FDCWD</tmp/probe-ab12>, "/work/repo/.git/HEAD", O_RDONLY|O_CLOEXEC) = 4</work/repo/.git/HEAD>`,
+      ].join("\n"),
+    );
+    expect(r).toEqual({ paths: [".git/HEAD"], git: [] });
+  });
+
+  test("git outside the checkout in a directory the run did not create is still undetermined", () => {
+    for (const mk of [`10 mkdir("/tmp/other", 0700) = 0`, `10 mkdir("/tmp/probe-ab12", 0700) = -1 EEXIST (File exists)`]) {
+      const r = read([mk, `20 getcwd("/tmp/probe-ab12", 4096) = 16`, `20 execve("/usr/bin/git", ["git", "status"], 0x1 /* 3 vars */) = 0`].join("\n"));
+      expect("undetermined" in r && r.undetermined).toContain("ran outside the checkout");
+    }
+  });
+
   test("the top-level node_modules is left out (bun.lock pins it); a nested one is kept (bean xd1g)", () => {
     expect(excluded("node_modules/zod/index.js", false)).toBe(true);
     expect(excluded("pkg/node_modules/x/index.js", false)).toBe(false);

@@ -433,6 +433,15 @@ export function parseTrace(
   const cwd = new Map<number, { dir: string | undefined }>();
   /** The pids that exec'd `git`, whose reads of `.git` are git's answer, not the script's. */
   const gitPids = new Set<number>();
+  /**
+   * The directories outside the checkout this run created (a successful
+   * `mkdir`, as `mkdtempSync` makes one). A git command run in one is the
+   * run's own scratch repository: what it answers is what the run wrote
+   * there, so it is neither replayed nor refused, and its reads inside the
+   * checkout, `.git` included, are kept like any other process's.
+   */
+  const scratch = new Set<string>();
+  const inScratch = (dir: string) => [...scratch].some((s) => dir === s || dir.startsWith(`${s}/`));
   const cell = (pid: number) => {
     let c = cwd.get(pid);
     if (c === undefined) {
@@ -505,11 +514,14 @@ export function parseTrace(
         if (base === undefined) return { undetermined: `${c.name}("${p}") from pid ${c.pid}: relative to a directory the trace does not name` };
         abs = normalize(join(base, p)).replace(/(.)\/+$/, "$1");
       }
+      if ((c.name === "mkdir" || c.name === "mkdirat") && /^0\b/.test(c.ret) && repoRelative(roots, abs) === undefined) scratch.add(abs);
       if (c.name === "execve" && /(^|\/)git$/.test(abs) && /^0\b/.test(c.ret)) {
-        gitPids.add(c.pid);
         const argv = arrayArg(c.args[1] ?? "");
         if (argv === undefined) return { undetermined: `a git command line strace did not print whole (${(c.args[1] ?? "").slice(0, 80)})` };
         const where = me.dir === undefined ? undefined : repoRelative(roots, me.dir);
+        // The run's own scratch repository: an ordinary process, its reads kept.
+        if (where === undefined && me.dir !== undefined && inScratch(me.dir)) continue;
+        gitPids.add(c.pid);
         if (where === undefined) return { undetermined: `git ${argv.slice(1).join(" ")} ran outside the checkout, or where the trace does not say` };
         const call = gitReplayable(where, argv.slice(1), (abs) => repoRelative(roots, abs));
         if ("undetermined" in call) return call;

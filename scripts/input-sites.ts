@@ -125,6 +125,27 @@ export function isTestScratchDir(file: string, risks: readonly string[], code: s
   return /\btmpdir\s*\(/.test(code) && !RISKS.host!.test(code.replace(/\btmpdir\s*\(/g, ""));
 }
 
+/** A spawn of a literal `git`: the call, then `"git"` as the command or as argv[0]. */
+const GIT_SPAWN_RE = /(?:\bBun\.spawn(?:Sync)?|\bspawnSync|(?<!\w)spawn|\bexecFileSync|(?<!\w)execFile)\s*\(\s*\[?\s*["']git["']/g;
+
+/**
+ * The second site that needs no annotation in a TEST file: a line whose only
+ * risk is `spawn` and whose every spawn runs a literal `git`. It is `tree`:
+ * a test is only ever fingerprinted as a cone gate (`ci-cone.ts`, `test:`),
+ * which replays every git command the run executed in the checkout, and
+ * keeps the reads of one it ran in a scratch directory it created (its own
+ * repository, `parseTrace`); any other git command leaves the run
+ * unrecorded. A fingerprint that does not replay the tree needs `{tracked}`
+ * for a `tree` site, which no test gate declares, so it stays undetermined.
+ */
+export function isTestGitSpawn(file: string, risks: readonly string[], raw: string): boolean {
+  if (!TEST_FILE_RE.test(file)) return false;
+  if (risks.length !== 1 || risks[0] !== "spawn") return false;
+  // `raw` is the line as written: the blanked code has no string text to name `git`.
+  const rest = raw.replace(GIT_SPAWN_RE, "");
+  return rest !== raw && !RISKS.spawn!.test(rest);
+}
+
 /** A line of a source file that matched a risk. */
 export interface Site {
   file: string;
@@ -459,6 +480,7 @@ export function scanSource(file: string, text: string): Site[] {
       else verdicts = parsed;
     }
     if (verdicts === undefined && malformed === undefined && isTestScratchDir(file, [...risks], c)) verdicts = [{ kind: "inert" }];
+    if (verdicts === undefined && malformed === undefined && isTestGitSpawn(file, [...risks], raw)) verdicts = [{ kind: "tree" }];
     sites.push({ file, line: i + 1, risks: [...risks], pin, verdicts, ...(malformed ? { malformed } : {}), ...(main.has(i) ? { inMain: true } : {}) });
   }
   return sites;
