@@ -117,3 +117,93 @@ export function workPlanFindings(
   }
   return out;
 }
+
+/**
+ * APPROVING A PROPOSAL SEEDS ITS PLAN (work item folio-assistant-exrp, plan
+ * step 4; owner 2026-11-05: *"Docs/proposals/ once approved become
+ * workplans"*, and chose "Proposal seeds plan" on the card).
+ *
+ * A proposal records its approval in its own front matter, beside the
+ * `title`/`summary` it already carries:
+ *
+ * | key | means |
+ * |---|---|
+ * | `status: approved` | the owner approved it; any other value (or none) is not approved |
+ * | `approvedOn: <YYYY-MM-DD>` | the day it was approved |
+ * | `plan: <work item id>` | the epic or milestone that carries it out |
+ *
+ * The plan points back with its `proposal:` tag. Both ends are written by one
+ * command, `proposal:approve`, so neither is kept by hand; the findings below
+ * say when the two ends disagree.
+ */
+export const PROPOSAL_APPROVED = "approved";
+
+/** What a proposal's front matter says about its approval. */
+export interface ProposalApproval {
+  /** The proposal's path, as the plan's `proposal:` tag spells it. */
+  readonly path: string;
+  readonly status?: string;
+  readonly plan?: string;
+}
+
+/**
+ * Where a proposal and its plan disagree. Reported, never fatal, like
+ * {@link workPlanFindings}: an approved proposal with no plan, a plan id that
+ * is no work item, a plan that is not a work plan, and a plan whose
+ * `proposal:` tag names another file.
+ */
+export function proposalPlanFindings(
+  proposals: readonly ProposalApproval[],
+  items: ReadonlyArray<{ id: string; tags?: readonly string[] }>,
+): WorkPlanFinding[] {
+  const byId = new Map(items.map((b) => [b.id, b]));
+  const out: WorkPlanFinding[] = [];
+  for (const p of proposals) {
+    if (p.status !== PROPOSAL_APPROVED) continue;
+    if (p.plan === undefined || p.plan.trim() === "") {
+      out.push({ id: p.path, problem: "is approved but names no plan (`plan: <work item id>`): run `proposal:approve` to seed one" });
+      continue;
+    }
+    const item = byId.get(p.plan);
+    if (item === undefined) {
+      out.push({ id: p.path, problem: `names plan ${p.plan}, which is not a work item in this store` });
+      continue;
+    }
+    const plan = workPlanOf(item.tags);
+    if (plan === undefined) {
+      out.push({ id: p.path, problem: `names plan ${p.plan}, which names no process: it is not a work plan yet` });
+    } else if (plan.proposal !== p.path) {
+      out.push({ id: p.path, problem: `names plan ${p.plan}, whose proposal tag is ${plan.proposal === undefined ? "missing" : `\`${plan.proposal}\``}` });
+    }
+  }
+  return out;
+}
+
+/**
+ * Add tags to a work item's file text, keeping its other bytes: the
+ * `beans` CLI's block sequence (`tags:` then `    - x` lines) is extended, or
+ * created after the `type:` line. A tag already present is not added twice.
+ * Pure, so the command and its test share it.
+ */
+export function addTagsInText(raw: string, tags: readonly string[]): string {
+  const m = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(raw);
+  if (!m) throw new Error("not a work item file: no front matter");
+  let front = m[1]!;
+  const seq = /^tags:[ \t]*\n((?:[ \t]+-[ \t]*\S.*(?:\n|$))+)/m.exec(front);
+  const have = seq
+    ? seq[1]!.split("\n").map((l) => l.replace(/^[ \t]*-[ \t]*/, "").trim().replace(/^['"]|['"]$/g, "")).filter(Boolean)
+    : [];
+  const add = tags.filter((t, i) => !have.includes(t) && tags.indexOf(t) === i);
+  if (add.length === 0) return raw;
+  const lines = add.map((t) => `    - ${t}`).join("\n");
+  if (seq) {
+    const end = seq.index + seq[0].length;
+    const block = seq[0].endsWith("\n") ? `${seq[0]}${lines}\n` : `${seq[0]}\n${lines}`;
+    front = front.slice(0, seq.index) + block + front.slice(end);
+  } else if (/^type:.*$/m.test(front)) {
+    front = front.replace(/^(type:.*)$/m, `$1\ntags:\n${lines}`);
+  } else {
+    front = `${front}\ntags:\n${lines}`;
+  }
+  return `---\n${front.replace(/\n+$/, "")}\n---\n${m[2]}`;
+}
