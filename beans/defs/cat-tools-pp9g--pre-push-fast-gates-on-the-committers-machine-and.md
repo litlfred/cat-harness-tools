@@ -28,8 +28,10 @@ it.
 `scripts/git-hooks/pre-push`, installed by `scripts/git-hooks/install.sh`,
 runs `scripts/pre-push-gates.ts --git-hook <remote>`:
 
-- only the checked-out commit is judged, and tracked files must not differ
-  from HEAD (else refused: the gates judge files). A pushed commit that is not
+- only the checked-out commit is judged, and only when no tracked file
+  differs from HEAD; a dirty tree is "not judged" (allowed, logged), never a
+  refusal, since `state:mount` itself rewrites folio-assistant's `.gitignore`
+  whenever main's ignore block lags a mounted graph. A pushed commit that is not
   HEAD is allowed unjudged, because the branch store pushes
   `<commit>:refs/heads/cat/...` from the same repository on every
   `beans:claim` / `state:push`, and refusing those would break claiming;

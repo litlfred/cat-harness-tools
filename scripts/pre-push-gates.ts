@@ -60,11 +60,12 @@
  * branch has a base to compare against; `--baseline` records them for HEAD
  * without pushing, e.g. on `main` right after a container's cold start.
  *
- * Refused before any gate runs: tracked files differ from HEAD, because the
- * gates would judge a tree that is not being pushed. A pushed commit that is
- * not HEAD is not judged at all (allowed, CI judges it): the branch store
- * pushes `<commit>:refs/heads/cat/...` from this same repository on every
- * `beans:claim` and `state:push`.
+ * Not judged at all (allowed, said, logged): tracked files that differ from
+ * HEAD, because the gates would judge a tree that is not being pushed and the
+ * tooling itself dirties it (`state:mount` and folio-assistant's
+ * `.gitignore`); and a pushed commit that is not HEAD, which CI judges: the
+ * branch store pushes `<commit>:refs/heads/cat/...` from this same
+ * repository on every `beans:claim` and `state:push`.
  *
  * ## The bypass is explicit and logged
  *
@@ -230,13 +231,16 @@ export async function judge(
     return { kind: "allow", why: `not judged here: ${elsewhere.map((u) => u.commit.slice(0, 12)).join(", ")} is not the checked-out commit, so CI judges it` };
   }
   uncovered.splice(0, uncovered.length, ...uncovered.filter((u) => u.tree === headTree));
-  if (git(root, ["diff", "--quiet", "HEAD", "--"]) === undefined) {
+  // Tracked files differing from HEAD: the gates would judge a tree that is
+  // not being pushed, so nothing is decided here; never a refusal, because
+  // the tooling itself dirties the tree (measured 2026-11-05: `state:mount`
+  // rewrites folio-assistant's `.gitignore` block whenever main's lags a
+  // mounted graph, which would have refused every agent push there).
+  const dirty = (git(root, ["diff", "--name-only", "HEAD", "--"]) ?? "").split("\n").filter(Boolean);
+  if (dirty.length > 0) {
     return {
-      kind: "refuse",
-      why: [
-        "Tracked files differ from HEAD, so the gates would judge a tree you are not pushing.",
-        "  Commit or stash them (`git stash`), then push again.",
-      ],
+      kind: "undetermined",
+      why: `tracked files differ from HEAD (${dirty.slice(0, 3).join(", ")}${dirty.length > 3 ? `, +${dirty.length - 3}` : ""}), so the gates would judge a tree that is not being pushed; commit or stash them to have the push judged`,
     };
   }
 

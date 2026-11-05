@@ -192,10 +192,12 @@ process.exit(failed.length ? 1 : 0);\n`,
     expect((await judge(root, [sh("rev-parse", "HEAD").stdout.trim()])).kind).toBe("undetermined");
   });
 
-  test("a dirty tracked file is refused before any gate runs", async () => {
+  test("a dirty tracked file is not judged (never refused), and no gate runs", async () => {
     stub(0, PASS);
     writeFileSync(join(root, ".gitignore"), "changed\n");
-    expect((await judge(root, [sh("rev-parse", "HEAD").stdout.trim()])).kind).toBe("refuse");
+    const v = await judge(root, [sh("rev-parse", "HEAD").stdout.trim()]);
+    expect(v.kind).toBe("undetermined");
+    expect(v.kind === "undetermined" && v.why).toContain(".gitignore");
     expect(runs()).toBe(0);
   });
 
