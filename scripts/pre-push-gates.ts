@@ -16,6 +16,15 @@
  *   are cloned fresh and never run `install.sh`, so this is the hook they get.
  *   The recipe is in bean `cat-tools-pp9g`.
  *
+ * ## Off by default (2026-11-05)
+ *
+ * Measured on a 4-CPU agent container, the gates below took 70 minutes for a
+ * typical push, so neither hook runs them unless the checkout opts in
+ * ({@link gatesEnabled}: `CAT_PREPUSH_GATES=1`, or `git config
+ * cat.gates.prePush true`). Off, a push goes at once, with one line saying so
+ * and an `off` entry in the push log. The owner's ruling on a time-bounded
+ * subset will change what runs, not this switch.
+ *
  * ## Which gates, and which tests (owner, 2026-11-05: "Affected tests only")
  *
  * The fast set, derived from the workflow by `scripts/gates.ts`, never listed
@@ -486,9 +495,30 @@ function say(lines: readonly string[]): void {
   for (const l of lines) process.stderr.write(`${l}\n`);
 }
 
+/**
+ * Whether the gates run before a push at all. OFF unless asked for: measured
+ * 2026-11-05 on a 4-CPU agent container, the fast set minus the whole suite
+ * took 70 minutes per push (`skill:register:check` 18 min and
+ * `uml:overview:check` 11 min alone), far past what a push can wait on. Until
+ * the owner rules on a time-bounded subset, a checkout opts in with
+ * `CAT_PREPUSH_GATES=1` or `git config cat.gates.prePush true`.
+ */
+export function gatesEnabled(root: string, env: Readonly<Record<string, string | undefined>> = process.env): boolean {
+  const v = env.CAT_PREPUSH_GATES;
+  if (v !== undefined && v !== "") return v === "1" || v.toLowerCase() === "true";
+  return git(root, ["config", "--bool", "cat.gates.prePush"]) === "true";
+}
+
+const OFF_NOTE = "pre-push: gates not run (off by default: the fast set takes ~70 min on an agent container); opt in with CAT_PREPUSH_GATES=1 or `git config cat.gates.prePush true`";
+
 async function gitHook(root: string, remote: string): Promise<number> {
   const refs = parsePushStdin(await Bun.stdin.text()).filter((r) => !ZERO.test(r.localSha));
   if (refs.length === 0) return 0;
+  if (!gatesEnabled(root)) {
+    logPush(root, { event: "off", via: "git-hook", remote, refs });
+    say([OFF_NOTE]);
+    return 0;
+  }
   const bypass = process.env.CAT_GATES_BYPASS;
   if (bypass !== undefined && bypass !== "") {
     const p = logPush(root, { event: "bypass", via: "git-hook", reason: bypass, remote, refs });
@@ -520,6 +550,11 @@ async function claudeHook(): Promise<number> {
   if (push === undefined || push.dryRun) return 0;
   const root = git(input.cwd ?? process.cwd(), ["rev-parse", "--show-toplevel"]);
   if (root === undefined) return 0;
+  if (!gatesEnabled(root)) {
+    logPush(root, { event: "off", via: "claude-hook", command: input.tool_input.command });
+    say([OFF_NOTE]);
+    return 0;
+  }
   const bypass = push.bypass ?? process.env.CAT_GATES_BYPASS;
   if (bypass !== undefined && bypass !== "") {
     const p = logPush(root, { event: "bypass", via: "claude-hook", reason: bypass, command: input.tool_input.command });

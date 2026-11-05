@@ -23,6 +23,15 @@ the code do this work?"*. Agent containers run the same pinned Bun as CI, so
 the fast set can run there, before the push, instead of only on a runner after
 it.
 
+## Off by default (2026-11-05, after the measurement)
+
+A typical push in a composed agent container (4 CPUs, cold cache) took
+**70 min** even with the whole suite held out (`skill:register:check` 18 min,
+`uml:overview:check` 11 min). So both hooks are now **off unless the checkout
+opts in** (`CAT_PREPUSH_GATES=1`, or `git config cat.gates.prePush true`); off,
+a push goes at once, says so, and logs an `off` entry. What a time-bounded
+subset should hold is the owner's open decision.
+
 ## 1. git's pre-push hook (built)
 
 `scripts/git-hooks/pre-push`, installed by `scripts/git-hooks/install.sh`,
