@@ -71,8 +71,8 @@ import {
   SoftwareSourceSchema,
   SoftwareVersionSchema,
   outsideSoftwareLicenceProblem,
-} from "../library/outside-software";
-import type { SpdxLicenseList } from "../library/spdx-license-expression";
+} from "../library/outside-software.js";
+import type { SpdxLicenseList } from "../library/spdx-license-expression.js";
 
 /** The tag a tool-release document carries, so it is identified by declaration. */
 export const TOOL_RELEASE_SCHEMA_TAG = "folio-tool-release/v1";
