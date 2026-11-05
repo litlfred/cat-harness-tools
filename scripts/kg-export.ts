@@ -1664,7 +1664,10 @@ async function collectProcesses(
   const depictionOf = (abs: string): string | undefined => {
     if (svgDir === undefined) return undefined;
     const name = `${basename(abs, ".bpmn")}.svg`;
-    return existsSync(join(svgDir, name)) ? `${base!.replace(/\/+$/, "")}/assets/img/workflows/${name}` : undefined;
+    // The site copy is built at publish (cat-harness#1047); the drawing
+    // committed beside the .bpmn (bean akiq) says the same diagram is drawn.
+    const drawn = existsSync(join(svgDir, name)) || existsSync(abs.replace(/\.bpmn$/, ".svg"));
+    return drawn ? `${base!.replace(/\/+$/, "")}/assets/img/workflows/${name}` : undefined;
   };
   // Zero diagrams is a determined empty ONLY if we looked. Say which.
   //
