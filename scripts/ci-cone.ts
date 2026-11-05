@@ -1212,14 +1212,25 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
       : scriptCmd !== undefined
         ? ["sh", "-c", scriptCmd]
         : [...RUNNER, o.script];
+  // A test file's own run never takes `BUN_OPTIONS`: CI's test shards set it
+  // to `--shard=N/M --reporter=junit ...`, and inherited by `bun test ./<one
+  // file>` it shards that one file away to nothing, so the run reads nothing
+  // and a red file "passes" and is recorded (folio-assistant#2954, 2026-11-05;
+  // `testEnv` in pre-push-gates.ts drops it for the same reason).
+  const runEnv = (base: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
+    if (!isTestGate(o.script) || base.BUN_OPTIONS === undefined) return base;
+    const out = { ...base };
+    delete out.BUN_OPTIONS;
+    return out;
+  };
   const cmdEnv = (base: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
     o.runner === undefined && scriptCmd !== undefined
       ? {
-          ...base,
+          ...runEnv(base),
           PATH: `${join(o.root, "node_modules", ".bin")}${base.PATH ? `:${base.PATH}` : ""}`,
           npm_lifecycle_event: o.script,
         }
-      : base;
+      : runEnv(base);
   const plain = (why: string) => {
     // input-site: traced #3f7614a5 — runs the check itself, untraced, on the record path
     inputSiteReached("ci-cone: run plain");
