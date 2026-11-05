@@ -76,7 +76,10 @@ export const PROV_JSONLD_CONTEXT_URL = PROV_CONTEXT;
 export const PROV_JSONLD_CONTEXT_HELD = {
   // declared-path-literal: a PINNED copy, addressed with its sha256; the pin is to the bytes at
   // exactly this path, so resolving the directory through a declaration would unpin it.
-  path: "cat-harness/library/kg/w3c-2024-prov-jsonld/context.jsonld",
+  path: "cat-harness/library/corpus/kg/w3c-2024-prov-jsonld/context.jsonld",
+  // declared-path-literal: the same pinned bytes where a harness from before the library sub-graph
+  // (owner, 2026-11-04) keeps them. Transitional: remove once the move is on every pin.
+  legacyPath: "cat-harness/library/kg/w3c-2024-prov-jsonld/context.jsonld",
   sha256: "811d5e94d8cb568d7dc4461ef6a247644dd0e775cdc88b65c42238d8e832be1e",
 } as const;
 
@@ -418,7 +421,10 @@ export function provJsonldDocument(
 
 /** The held context, read and checked against its pin; throws on drift. */
 export function heldProvJsonldContext(repo: string): unknown {
-  const file = join(repo, PROV_JSONLD_CONTEXT_HELD.path);
+  const at = existsSync(join(repo, PROV_JSONLD_CONTEXT_HELD.path))
+    ? PROV_JSONLD_CONTEXT_HELD.path
+    : PROV_JSONLD_CONTEXT_HELD.legacyPath;
+  const file = join(repo, at);
   const bytes = readFileSync(file);
   const sha = new Bun.CryptoHasher("sha256").update(bytes).digest("hex");
   if (sha !== PROV_JSONLD_CONTEXT_HELD.sha256) {

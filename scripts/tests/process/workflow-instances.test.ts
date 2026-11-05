@@ -9,16 +9,19 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { resolveBeanGraphNode } from "../../beans.ts";
-import { report, workflowInstances } from "../../workflow-instances.ts";
+import { resolveBeanDefs, resolveBeanGraphNode } from "../../beans.ts";
+import { report, sweepWorkflowInstances, workflowInstances } from "../../workflow-instances.ts";
 
 const roots: string[] = [];
 afterEach(() => {
   for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true });
 });
 
-/** A checkout with the default bean graph and the given instance files. */
-function fixture(instances: Record<string, unknown>): { root: string; dir: string } {
+/** A checkout with the default bean graph and the given instance files (plus optional bean files). */
+function fixture(
+  instances: Record<string, unknown>,
+  beans?: Record<string, { status: string; title?: string; tags?: string[] }>,
+): { root: string; dir: string; defsDir?: string } {
   const root = mkdtempSync(join(tmpdir(), "wf-instances-"));
   roots.push(root);
   const dir = resolveBeanGraphNode(root, "workflow-state").dir!;
@@ -26,7 +29,17 @@ function fixture(instances: Record<string, unknown>): { root: string; dir: strin
   for (const [name, body] of Object.entries(instances)) {
     writeFileSync(join(dir, name), typeof body === "string" ? body : JSON.stringify(body));
   }
-  return { root, dir };
+  let defsDir: string | undefined;
+  if (beans) {
+    defsDir = resolveBeanDefs(root).dir!;
+    mkdirSync(defsDir, { recursive: true });
+    for (const [id, b] of Object.entries(beans)) {
+      const tagsYaml = b.tags?.length ? `tags:\n${b.tags.map((t) => `  - ${t}`).join("\n")}\n` : "";
+      const md = `---\n# ${id}\ntitle: ${b.title ?? id}\nstatus: ${b.status}\n${tagsYaml}---\n`;
+      writeFileSync(join(defsDir, `${id}.md`), md);
+    }
+  }
+  return { root, dir, defsDir };
 }
 
 const git = (merges: string, shallow = "false") => (args: string[]) =>
@@ -74,5 +87,102 @@ describe("workflowInstances", () => {
     writeFileSync(join(root, ".github", "workflows", "w.yml"), "run: bun run cat workflow:instances\n");
     writeFileSync(join(root, ".github", "workflows", "other.yml"), "run: echo hi\n");
     expect(workflowInstances({ root, git: git("0") })).toMatchObject({ state: "ok", gatesReading: ["w.yml"] });
+  });
+
+  test("reports running instances on closed or missing work items and in-progress process work items without a running instance (#988)", () => {
+    const { root } = fixture(
+      {
+        "closed-bean.json": {
+          id: "crdm--done",
+          status: "running",
+          bean: "folio-assistant-done",
+          tokens: ["Task_1"],
+          startedAt: "2026-10-10T00:00:00Z",
+        },
+        "missing-bean.json": {
+          id: "crdm--gone",
+          status: "running",
+          bean: "folio-assistant-gone",
+          tokens: ["Task_1"],
+          startedAt: "2026-10-10T00:00:00Z",
+        },
+        "tracked.json": {
+          id: "ccr--tracked",
+          status: "running",
+          bean: "folio-assistant-tracked",
+          tokens: ["Task_1"],
+          startedAt: "2026-10-10T00:00:00Z",
+        },
+      },
+      {
+        "folio-assistant-done": { status: "completed", tags: ["process:Process_CRDM"] },
+        "folio-assistant-tracked": { status: "in-progress", tags: ["process:Process_CodeChangeReview"] },
+        "folio-assistant-untracked": { status: "in-progress", tags: ["process:Process_CodeChangeReview"] },
+      },
+    );
+    const c = workflowInstances({ root, git: git("0") });
+    expect(c).toMatchObject({
+      state: "finding",
+      staleInstances: [
+        { file: "closed-bean.json", instance: "crdm--done", bean: "folio-assistant-done", reason: "bean-closed", beanStatus: "completed" },
+        { file: "missing-bean.json", instance: "crdm--gone", bean: "folio-assistant-gone", reason: "bean-missing" },
+      ],
+      untrackedProcessBeans: [{ bean: "folio-assistant-untracked", processes: ["Process_CodeChangeReview"] }],
+    });
+    const text = report(c);
+    expect(text).toContain("running instances on closed/missing work items: 2");
+    expect(text).toContain("in-progress process work items without a running instance: 1");
+    expect(text).toContain("folio-assistant-untracked (Process_CodeChangeReview)");
+  });
+
+  test("sweepWorkflowInstances closes running instances (and children) whose work item is completed, scrapped, or missing (#988)", () => {
+    const { root } = fixture(
+      {
+        "closed.json": {
+          id: "crdm--done",
+          status: "running",
+          bean: "folio-assistant-done",
+          tokens: ["Call_Sub"],
+          startedAt: "2026-10-10T00:00:00Z",
+          history: [{ at: "2026-10-10T01:00:00Z", node: "Call_Sub" }],
+          children: {
+            Call_Sub: {
+              id: "crdm--done/Call_Sub",
+              status: "running",
+              tokens: ["Task_Inner"],
+              history: [{ at: "2026-10-10T01:00:00Z", node: "Task_Inner" }],
+            },
+          },
+        },
+        "missing.json": {
+          id: "crdm--gone",
+          bean: "folio-assistant-gone",
+          tokens: ["End_Merged"],
+          history: [{ at: "2026-10-11T00:00:00Z", node: "End_Merged" }],
+        },
+        "active.json": {
+          id: "ccr--open",
+          status: "running",
+          bean: "folio-assistant-open",
+          tokens: ["Task_Work"],
+          startedAt: "2026-10-12T00:00:00Z",
+        },
+      },
+      {
+        "folio-assistant-done": { status: "completed" },
+        "folio-assistant-open": { status: "in-progress", tags: ["process:Process_CodeChangeReview"] },
+      },
+    );
+
+    const s = sweepWorkflowInstances({ root });
+    expect(s).toEqual({ state: "ok", dir: "beans/workflows", closed: ["closed.json", "missing.json"] });
+
+    // Re-running the check after sweeping finds 0 stale instances and 0 untracked process work items.
+    const after = workflowInstances({ root, git: git("0") });
+    expect(after).toMatchObject({
+      state: "ok",
+      staleInstances: [],
+      untrackedProcessBeans: [],
+    });
   });
 });

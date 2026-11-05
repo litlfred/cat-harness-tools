@@ -214,3 +214,44 @@ ${spec}
     expect(auditWorkflow("w.yml", sparse("          sparse-checkout: |\n            .github/scripts\n            cat-harness")).findings).toHaveLength(1);
   });
 });
+
+describe("a local composite action that mounts the lock (ci-setup, bean ay33)", () => {
+  const job = (path: string | undefined) => `name: gates
+on: [pull_request]
+jobs:
+  gates-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7${path === undefined ? "" : `\n        with:\n          path: ${path}`}
+      - name: Set up from the prepared CI image
+        uses: ./.github/actions/ci-setup
+        with:
+          registry-token: \${{ github.token }}
+      - run: bun run cat-harness-tools/scripts/check-something.ts
+`;
+  const IMAGE = "runs:\n  using: composite\n  steps:\n    - shell: bash\n      run: |\n        bash .github/ci-image/fetch.sh x && bun run cat mount:lock:check\n";
+  const REPLAY = "runs:\n  using: composite\n  steps:\n    - shell: bash\n      run: bash .github/mount-from-lock.sh --root .\n";
+  const NOTHING = "runs:\n  using: composite\n  steps:\n    - shell: bash\n      run: bun install --frozen-lockfile\n";
+  const reader = (text: string | undefined) => (dir: string) => (dir === ".github/actions/ci-setup" ? text : undefined);
+
+  test("an action that runs `mount:lock:check` clears the root checkout", () => {
+    expect(auditWorkflow("g.yml", job(undefined), reader(IMAGE)).findings).toHaveLength(0);
+  });
+
+  test("an action that replays the lock with `--root .` clears it", () => {
+    expect(auditWorkflow("g.yml", job(undefined), reader(REPLAY)).findings).toHaveLength(0);
+  });
+
+  test("an action that neither replays nor checks the lock does not", () => {
+    expect(auditWorkflow("g.yml", job(undefined), reader(NOTHING)).findings).toHaveLength(1);
+  });
+
+  test("an action that cannot be read does not — the job's own text is all there is", () => {
+    expect(auditWorkflow("g.yml", job(undefined), reader(undefined)).findings).toHaveLength(1);
+    expect(auditWorkflow("g.yml", job(undefined)).findings).toHaveLength(1);
+  });
+
+  test("it serves only a checkout at the workspace root: one at `source` is still a finding", () => {
+    expect(auditWorkflow("g.yml", job("source"), reader(IMAGE)).findings).toHaveLength(1);
+  });
+});
