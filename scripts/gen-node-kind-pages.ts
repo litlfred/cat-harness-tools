@@ -55,6 +55,7 @@ import type { VisualiserNavEntry } from "./lib/navbar.ts";
 import { themedPage } from "./lib/themed-page.ts";
 import { makeEmit, subjectSection, type ViewerNav } from "./viewer-page.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { PROVENANCE_INLINE_STYLE, provenanceSectionFor } from "./provenance-footer.ts";
 
 /**
  * The locales a page is written for: cat-harness's `PUBLISHED_LOCALES`, the
@@ -360,7 +361,14 @@ ${table}`,
 }
 
 /** One node's page: every field, then the source. */
-export function nodeHtml(k: NodeKindEntry, n: KindNode, locale: string, extra: readonly PageSection[] = [], shape: PageShape = "themed"): string {
+export function nodeHtml(
+  k: NodeKindEntry,
+  n: KindNode,
+  locale: string,
+  extra: readonly PageSection[] = [],
+  shape: PageShape = "themed",
+  provenance = "",
+): string {
   const base = kindDir(locale, k);
   const here = `${base}/${n.harness}/${n.path}`;
   const name = n.node.title ?? n.node.summary ?? n.node.id ?? n.path;
@@ -376,7 +384,7 @@ ${sectionsHtml(extra)}
 <h2 id="fields">Fields</h2>
 <dl>
 ${fields}
-</dl>`,
+</dl>${provenance === "" ? "" : `\n${shape === "standalone" ? `<style>${PROVENANCE_INLINE_STYLE}</style>\n` : ""}${provenance}`}`,
     "",
     shape,
   );
@@ -556,7 +564,11 @@ export async function buildNodeKindPages(o: BuildOptions): Promise<{ pages: stri
         if (n.kind !== k.id) continue; // written under its own kind
         const here = `${base}/${n.harness}/${n.path}`;
         const extra = own.node?.(n, ctxFor(here)) ?? [];
-        write(here, nodeHtml(k, n, locale, extra, shape), nodeSection(k, n, extra));
+        // The node's provenance log, beside its file (owner, 2026-11-05, "2B").
+        // A themed page is read by Jekyll, so its fragment keeps the raw tags.
+        const source = [o.siteRepo, platformRepo].map((r) => join(r, n.file)).find((f) => existsSync(f));
+        const provenance = source === undefined ? "" : provenanceSectionFor(source, { liquid: shape === "themed" });
+        write(here, nodeHtml(k, n, locale, extra, shape, provenance), nodeSection(k, n, extra));
       }
     }
   }

@@ -1807,9 +1807,11 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     // (owner, 2026-10-06, bean `hp54`). folio_init only — see the field.
     newInstanceSource: { kind: "branch", keyedBy: "tip" },
     description:
-      "the work plan as a whole (`beans/`); its inner nodes are declared by `beans/beans.json`",
-    // "Work plan", not "Beans" (work item folio-assistant-dkqd); see `bean-defs`.
-    title: "Work plan",
+      "the work plans and the work items they hold (`beans/`); its inner nodes are declared by `beans/beans.json`",
+    // "Plans and work", not "Beans" (work item folio-assistant-dkqd) and no
+    // longer "Work plan": a work plan is now one epic or milestone (work item
+    // folio-assistant-exrp), so the store holds plans AND work. See `bean-defs`.
+    title: "Plans and work",
     perInstance: true,
     renderable: false,
     // The work plan. Its own declaration already splits WHAT IS BEING WORKED

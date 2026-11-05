@@ -87,6 +87,7 @@ export const PAGE_CONFIG_ID = "archimate-page";
 export const TOOL_ID = "archimate-pages";
 const LOADER = "assets/archimate.js";
 const STYLE = "assets/archimate.css";
+// declared-path-literal: this module's own templates under cat-harness-tools/archimate/, not an instance's archimate/ directory.
 const TEMPLATES = join(TOOLS_ROOT, "archimate", "scripts", "templates");
 
 export const CONTEXT = {

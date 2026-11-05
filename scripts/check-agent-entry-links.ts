@@ -24,6 +24,13 @@
  * links): the three agent-generic names, at the repository root and at any
  * instance root (e.g. `bootstrap/AGENTS.md`), skipping vendored and published
  * trees.
+ *
+ * ## A moved path
+ *
+ * A link into a path some instance has moved resolves at the new place while
+ * that instance's `moves` entry is in its window (sdlc skill
+ * `two-phase-move`), and is reported as moved, not dead; past `until` it is
+ * dead again.
  */
 import { existsSync, readdirSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
@@ -31,7 +38,32 @@ import { join, relative, resolve } from "node:path";
 import { auditMarkdownFile } from "../src/core/markdown-links.js";
 import { publishTargets } from "../src/core/git-refs.js";
 import { repoRootFor } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor } from "../schemas/kg/harness-config.js";
+import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
+import { declaredMoves, resolveThroughMove } from "./check-subgraphs.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+
+/**
+ * The `resolveMoved` a link auditor takes: through the moves declared by the
+ * instances at and under {@link start} (an instance root or a checkout root)
+ * and every instance of its checkout, when it has one.
+ */
+export function movesResolver(
+  start: string,
+  today?: string,
+): (abs: string) => { resolved: string; move: string } | undefined {
+  const roots = [start, ...instanceRootsIn(start)];
+  try {
+    roots.push(...instanceRootsIn(checkoutRootFor(start)));
+  } catch {
+    // Not in a checkout: the instance's own moves are still honoured.
+  }
+  const moves = declaredMoves(roots, today);
+  return (abs) => {
+    const through = resolveThroughMove(abs, moves);
+    return through && { resolved: through.resolved, move: through.move.id };
+  };
+}
 
 /**
  * The agent-generic entry files.
@@ -87,13 +119,14 @@ if (import.meta.main) {
   // `github.io` link in `AGENTS.md` would come back UNCHECKED — which is the
   // clean-looking blindness bean `v8gh` existed to remove, not a pass.
   const targets = publishTargets(repo);
+  const resolveMoved = movesResolver(repo);
 
   console.log(`Agent entry links — ${files.length} file(s)\n`);
   let dead = 0;
   let unreadable = 0;
   for (const f of files) {
     const rel = relative(repo, f);
-    const r = auditMarkdownFile({ root: repo, file: f, ...targets });
+    const r = auditMarkdownFile({ root: repo, file: f, ...targets, resolveMoved });
     // exit 2 from the auditor is "could not read it", which is neither a pass
     // nor a dead link and must not be folded into either.
     if (r.exitCode === 2) {

@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { decideRun, excluded, gitReplayable, loadRecords, parseTrace, pathState, recordRun, splitArgs, unquote } from "../../ci-cone.ts";
+import { decideRun, excluded, gitReplayable, loadRecords, parseTrace, pathState, preloadScripts, recordRun, splitArgs, testGates, unquote } from "../../ci-cone.ts";
 import { BUILD_OUTPUT_DIRS, FileDigests, TRACKED, type BaselineResolver, type PairIO } from "../../input-hash.ts";
 import { NOT_INSTANCE_DIRS } from "../../../schemas/kg/instance-roots.ts";
 import { statementPin } from "../../input-sites.ts";
@@ -271,6 +271,21 @@ describe.skipIf(!HAS_STRACE)("the falsifiers, under a real strace (skipped where
     expect(decide("g:check").skip).toBe(false);
   });
 
+  test("the result store: a result main's latest record no longer holds is REUSED; an unseen state still runs", () => {
+    expect(record().note).toContain("result store");
+    write("data/c.json", "c2\n");
+    expect(record().note).toContain("result store");
+    // records.json now holds the c2 run; the c run lives only in the store.
+    write("data/c.json", "c\n");
+    const back = decide();
+    expect(back.skip).toBe(true);
+    expect(back.why).toContain("reused");
+    write("data/c.json", "c3\n");
+    const unseen = decide();
+    expect(unseen.skip).toBe(false);
+    expect(unseen.why).toContain("result store: none of 2 stored result(s) matches");
+  });
+
   test("a green run is recorded with what it read, and an untouched tree SKIPS", () => {
     const r = record();
     expect(r.code).toBe(0);
@@ -357,6 +372,9 @@ describe.skipIf(!HAS_STRACE)("the falsifiers, under a real strace (skipped where
     const path = join(root, "build", "ci-cone", "records.json");
     const rec = JSON.parse(readFileSync(path, "utf-8"));
     writeFileSync(path, JSON.stringify({ ...rec, version: -1 }));
+    // The same green run is also in the result store, under THIS tracer's
+    // recipe, and would rightly be reused. Without it, records.json alone decides.
+    rmSync(join(root, "build", "result-store"), { recursive: true, force: true });
     expect(decide().skip).toBe(false);
   });
 });
@@ -366,4 +384,65 @@ test("strace availability is reported, not hidden", () => {
   // happened here, so a green run without strace is not read as one with it.
   console.log(`ci-cone.test: strace ${HAS_STRACE ? "available, falsifiers ran" : "NOT available, falsifiers skipped"}`);
   expect(typeof HAS_STRACE).toBe("boolean");
+});
+
+describe.skipIf(!HAS_STRACE)("test files as gates: a test's result is reused only when what it READ is unchanged", () => {
+  let root: string;
+  const write = (rel: string, text: string) => writeFileSync(join(root, rel), text);
+  const T = "test:t/a.test.ts";
+  const scripts = () => testGates(root, ["t/a.test.ts", "t/red.test.ts"]);
+  const record = (name = T) => recordRun({ root, scripts: scripts(), script: name, io: undefined, baseline: undefined, sha: "mainsha", stdio: "ignore" });
+  const decide = (name = T) => decideRun({ root, scripts: scripts(), script: name, io: undefined, baseline: undefined });
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), "ci-cone-tests-"));
+    for (const d of ["t", "fixtures", "elsewhere"]) mkdirSync(join(root, d));
+    write("package.json", JSON.stringify({ name: "fixture" }));
+    write("bunfig.toml", '[test]\npreload = ["./t/preload.ts"]\n');
+    write("t/preload.ts", "export {};\n");
+    // A fixture read the import closure cannot see: only the trace names it.
+    write(
+      "t/a.test.ts",
+      ['import { expect, test } from "bun:test";', 'import { readFileSync } from "node:fs";', 'test("reads its fixture", () => expect(readFileSync("fixtures/f.json", "utf-8")).toContain("ok"));'].join("\n") + "\n",
+    );
+    write("t/red.test.ts", 'import { expect, test } from "bun:test";\ntest("red", () => expect(1).toBe(2));\n');
+    write("fixtures/f.json", '{"ok":1}\n');
+    write("elsewhere/x.json", "{}\n");
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  test("a green test file is recorded and SKIPS on an untouched tree, or when only an unrelated file changed", () => {
+    const r = record();
+    expect(r.code).toBe(0);
+    expect(r.note).toStartWith("recorded");
+    expect(Object.keys(loadRecords(root)!.checks[T]!.reads)).toContain("fixtures/f.json");
+    expect(decide().skip).toBe(true);
+    write("elsewhere/x.json", '{"changed":1}\n');
+    expect(decide().skip).toBe(true);
+  });
+
+  test("its fixture, its preload or the test itself changed: it RUNS", () => {
+    record();
+    write("fixtures/f.json", '{"ok":2}\n');
+    expect(decide().skip).toBe(false);
+    write("fixtures/f.json", '{"ok":1}\n');
+    expect(decide().skip).toBe(true);
+    write("t/preload.ts", "export const p = 1;\n");
+    expect(decide().skip).toBe(false);
+    write("t/preload.ts", "export {};\n");
+    write("t/a.test.ts", readFileSync(join(root, "t/a.test.ts"), "utf-8") + "// edited\n");
+    expect(decide().skip).toBe(false);
+  });
+
+  test("a red test file is never recorded", () => {
+    const r = record("test:t/red.test.ts");
+    expect(r.code).not.toBe(0);
+    expect(r.note).toContain("not recorded");
+    expect(decide("test:t/red.test.ts").skip).toBe(false);
+  });
+
+  test("the fingerprint audits the bunfig preloads as entries", () => {
+    expect(preloadScripts(root)).toEqual({ "test-preload:t/preload.ts": "bun ./t/preload.ts" });
+    expect(scripts()[T]).toBe("bun test ./t/a.test.ts");
+  });
 });

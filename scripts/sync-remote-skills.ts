@@ -62,6 +62,7 @@ import { findInstanceRoot } from "../schemas/kg/cat-harness.ts";
 import { kgRoots } from "./known-skills.js";
 import { packageDirsIn } from "./skill-topics.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 const INSTANCE = join(HARNESS_ROOT);
 
@@ -193,6 +194,8 @@ export function upstreamLicence(clone: string, skillDir: string): { path: string
 
 /** Run git; its stdout, or a throw carrying its stderr. Shared with `kg-subscribe`. */
 export function git(args: string[], cwd?: string): string {
+  // input-site: traced #aeee0c38 — any git command, a fetch from the network among them (shallowFetch by a branch or a sha); a run that reaches it records no hash
+  inputSiteReached("sync-remote-skills: git");
   const r = spawnSync("git", args, { cwd, encoding: "utf8" });
   if (r.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${(r.stderr ?? "").trim() || `exit ${r.status}`}`);
   return r.stdout;
@@ -205,6 +208,8 @@ export function git(args: string[], cwd?: string): string {
  * read — `kg-subscribe` reads one file of a whole repository this way.
  */
 export function shallowFetch(repo: string, ref: string, opts: { blobless?: boolean; prefix?: string } = {}): string {
+  // input-site: traced #c912fbc5 — the scratch repository a remote fetch lands in
+  inputSiteReached("sync-remote-skills: shallowFetch");
   const dir = mkdtempSync(join(tmpdir(), opts.prefix ?? "remote-skill-"));
   try {
     git(["init", "-q", dir]);
@@ -293,6 +298,7 @@ export function checkNotice(noticeText: string, wrappers: Wrapper[]): string[] {
 
 function sync(skillsDir: string, instanceRoot: string): number {
   let failures = 0;
+  // input-site: inert #a3e3d49c — the sync time stamped into each provenance record (buildRecord); it never reaches the exit code
   const at = new Date().toISOString();
   for (const w of wrappersIn(skillsDir)) {
     if (!w.sync) continue;

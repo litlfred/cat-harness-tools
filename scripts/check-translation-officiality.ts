@@ -24,7 +24,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
+import { gateDirectoriesForGraph, nothingOwnLine } from "./lib/gate-own.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { noteAbsent, splitDeclared } from "./lib/declared-presence.ts";
 import { poHeader } from "./kg-viewer-strings.ts";
@@ -90,7 +90,13 @@ export function readLocale(dir: string): LocaleState {
 }
 
 function run(): number {
-  const { present, absent } = splitDeclared(corpusDirectoriesForGraph(HARNESS_ROOT, "translation-sources"));
+  // In a layer's PR checks, only the caller's own translations (owner ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`).
+  const { dirs, scoped } = gateDirectoriesForGraph(HARNESS_ROOT, "translation-sources");
+  if (scoped && dirs.length === 0) {
+    console.log(nothingOwnLine("check:translation-officiality", "translations directory", scoped));
+    return 0;
+  }
+  const { present, absent } = splitDeclared(dirs);
   noteAbsent(absent, "a translations directory");
   if (present.length === 0) {
     console.error("Could not resolve any `translation-sources` directory. This is NOT a pass.");

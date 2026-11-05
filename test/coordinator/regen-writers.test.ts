@@ -38,7 +38,6 @@ import { dirname, join } from "node:path";
 
 import { regenPass, writerFor, type Runner } from "../../scripts/regen-after-merge.ts";
 import { chromiumExecutable } from "../../scripts/bpmn-render.ts";
-import { builtAtPublishOf } from "../../scripts/mount-from-lock.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.ts";
 import { scriptsOf } from "../../schemas/sdlc/script-table.ts";
 import { noRootManifest } from "../support/checkout.ts";
@@ -59,18 +58,15 @@ function firstIn(dir: string, suffix: string): string {
   return join(dir, f);
 }
 
-/**
- * The first COMMITTED file in an instance directory with this suffix. A path
- * the instance declares `builtAtPublish` has no committed bytes to be stale
- * against: staling it is not a defect any check should report (B1).
- */
-function firstCommittedIn(instance: string, dir: string, suffix: string): string {
-  const declared = builtAtPublishOf(join(REPO, instance));
-  const f = readdirSync(join(REPO, instance, dir))
-    .filter((n) => n.endsWith(suffix) && !declared.includes(`${dir}/${n}`))
-    .sort()[0];
-  if (f === undefined) throw new Error(`no committed *${suffix} under ${instance}/${dir} — the fixture this case stales is gone`);
-  return join(instance, dir, f);
+/** An own drawing committed beside its `.bpmn` (bean akiq): the first `<name>.svg` under `<instance>/<dir>` whose `<name>.bpmn` sits next to it. */
+function firstBesideSource(instance: string, dir: string): string {
+  const root = join(REPO, instance, dir);
+  const hits = (readdirSync(root, { recursive: true }) as string[])
+    .filter((p) => p.endsWith(".bpmn") && existsSync(join(root, p.replace(/\.bpmn$/, ".svg"))))
+    .map((p) => p.replace(/\.bpmn$/, ".svg"))
+    .sort();
+  if (hits[0] === undefined) throw new Error(`no drawing beside a .bpmn under ${instance}/${dir} — the fixture this case stales is gone`);
+  return join(instance, dir, hits[0]);
 }
 
 /** Is this check routed through `publish-check.ts`, which runs its writer before it checks (B1)? */
@@ -129,8 +125,12 @@ const CASES: Case[] = [
   },
   {
     check: "render:bpmn:check",
-    // An own drawing: its .bpmn is cat-harness's, so the .svg stays committed.
-    artefact: () => firstCommittedIn("cat-harness", "docs/assets/img/workflows", ".svg"),
+    // A drawing committed beside its .bpmn: cat-harness's workflows/ folder is
+    // built at publish since cat-harness#1047, so nothing there is committed
+    // (bean nikw). bootstrap's beside-source drawings are drawn by render:bpmn
+    // with or without cat-harness-tools#1504 (bean akiq), so the case holds
+    // either side of it.
+    artefact: () => firstBesideSource("bootstrap", "processes"),
     stale: (t) => t.replace("</svg>", "<!-- stale (i1q7 fixture) --></svg>"),
     needsBrowser: true,
   },

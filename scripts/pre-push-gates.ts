@@ -22,8 +22,15 @@
  * typical push, so neither hook runs them unless the checkout opts in
  * ({@link gatesEnabled}: `CAT_PREPUSH_GATES=1`, or `git config
  * cat.gates.prePush true`). Off, a push goes at once, with one line saying so
- * and an `off` entry in the push log. The owner's ruling on a time-bounded
- * subset will change what runs, not this switch.
+ * and an `off` entry in the push log.
+ *
+ * ## The time budget (owner, 2026-11-05: "gates under about 60 s")
+ *
+ * On, the run holds out every read-only gate measured over 60 s on this
+ * machine (`scripts/gate-durations.ts`): named in the report and the record
+ * as `heldOut`, like the whole suite, and run by CI. Seven gates were 2324 of
+ * the pool's 3241 CPU-seconds. `git config cat.gates.budgetSeconds <s>`
+ * changes the budget, and `0` runs every gate.
  *
  * ## Which gates, and which tests (owner, 2026-11-05: "Affected tests only")
  *
@@ -92,10 +99,12 @@ import { join } from "node:path";
 import { spawn } from "node:child_process";
 
 import { affectedTests } from "./affected-tests.ts";
+import { budgetSeconds, durationsFromLog, mergeDurations, overBudget, readDurations, readSeed, writeDurations } from "./gate-durations.ts";
 import {
   attachNote,
   buildRecord,
   covers,
+  f017Keys,
   git,
   logPush,
   newFailures,
@@ -107,7 +116,10 @@ import {
   treeOf,
   writeRecord,
   writeResults,
+  verdictsFor,
+  writeVerdictRefs,
   LOCAL_GATE_RESULTS_SCHEMA,
+  LOCAL_VERDICT_REF_PREFIX,
   RECORD_NOTES_REF,
   type GatesReportLike,
 } from "./gate-record.ts";
@@ -257,8 +269,29 @@ export async function judge(
   mkdirSync(dir, { recursive: true });
   const reportPath = join(dir, "last-report.json");
   const logPath = join(dir, "last-run.log");
+  // ── The time budget (owner, 2026-11-05): read-only gates measured over it are held out ──
+  let budget: number | undefined;
+  try {
+    budget = budgetSeconds(root);
+  } catch (e) {
+    return { kind: "undetermined", why: (e as Error).message };
+  }
+  const slow = overBudget(readDurations(root)?.seconds ?? {}, readSeed(), budget);
+  if (slow.length > 0) {
+    const shown = slow.map((g) => `${g.command.replace(/^bun run cat /, "")} ${Math.round(g.seconds)}s${g.source === "seed" ? "*" : ""}`);
+    stream?.write(
+      `pre-push: ${slow.length} gate(s) over the ${budget}s budget held out, CI runs them: ${shown.join(", ")}` +
+        `${slow.some((g) => g.source === "seed") ? " (* not yet timed here; the committed estimate)" : ""}. ` +
+        "Every gate: `git config cat.gates.budgetSeconds 0`.\n",
+    );
+  }
   const startedAt = new Date().toISOString();
-  const code = await runGates(root, reportPath, logPath, stream);
+  const code = await runGates(root, reportPath, logPath, stream, slow.map((g) => g.command));
+  try {
+    writeDurations(root, mergeDurations(readDurations(root), durationsFromLog(readFileSync(logPath, "utf-8")), now, new Date().toISOString()));
+  } catch {
+    // a missing log teaches nothing; the next run measures again
+  }
 
   let report: GatesReportLike | undefined;
   try {
@@ -307,8 +340,11 @@ export async function judge(
   rec.affectedTests = tests.kind === "all" ? { all: tests.why } : { files: tests.files, passed: true };
   writeRecord(root, rec);
   if (git(root, ["config", "--bool", "cat.gates.noteRecords"]) !== "false") attachNote(root, rec);
+  // One Class B entry per keyed gate, beside the tree record (CI speed 14, "Cache-First CI").
+  writeVerdictRefs(root, verdictsFor(rec, f017Keys(root)));
   const testNote = tests.kind === "all" ? `; tests left to CI (${tests.why})` : `; ${tests.files} affected test file(s) passed`;
-  return { kind: "allow", why: `${rec.gates.length - rec.skipped.length} gate(s) passed, ${rec.skipped.length} skipped on unchanged inputs${testNote}` };
+  const heldNote = slow.length > 0 ? `; ${slow.length} over the ${budget}s budget left to CI` : "";
+  return { kind: "allow", why: `${rec.gates.length - rec.skipped.length} gate(s) passed, ${rec.skipped.length} skipped on unchanged inputs${heldNote}${testNote}` };
 }
 
 /** The whole-suite gate the hook holds out of `gates` and replaces with the affected tests. */
@@ -409,7 +445,11 @@ function runTests(root: string, files: readonly string[], junit: string, logPath
   rmSync(junit, { force: true });
   return new Promise((done) => {
     const log = createWriteStream(logPath, { flags: "a" });
-    const child = spawn("bun", ["test", "--reporter=junit", `--reporter-outfile=${junit}`, ...files.map((f) => `./${f}`)], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("bun", ["test", "--reporter=junit", `--reporter-outfile=${junit}`, ...files.map((f) => `./${f}`)], {
+      cwd: root,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: testEnv(process.env),
+    });
     const tee = (b: Buffer) => {
       log.write(b);
       stream?.write(b);
@@ -437,6 +477,21 @@ function runTests(root: string, files: readonly string[], junit: string, logPath
  * is never touched, and the caller verified the tree was clean first, so the
  * restore is exact; it says so loudly if it is not.
  */
+/**
+ * The environment the affected tests run under: this one, minus
+ * `BUN_OPTIONS`. bun reads extra CLI flags from it, and a CI test shard sets
+ * it to `--shard=N/M --reporter=junit --reporter-outfile=<its report>`
+ * (folio-assistant#2954, 2026-11-05). Inherited, the selection was sharded
+ * away to nothing (could-not-determine where a refusal was due), and its
+ * JUnit report overwrote the shard's own. The selection names its files and
+ * its report itself.
+ */
+export function testEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out = { ...env };
+  delete out.BUN_OPTIONS;
+  return out;
+}
+
 export function swapToBase(root: string, base: string, paths: readonly string[]): () => void {
   const atBase = (p: string) => git(root, ["cat-file", "-e", `${base}:${p}`]) !== undefined;
   const atHead = (p: string) => git(root, ["cat-file", "-e", `HEAD:${p}`]) !== undefined;
@@ -473,10 +528,11 @@ export function baseTreeFor(root: string, commit: string, bases: readonly (strin
   return undefined;
 }
 
-function runGates(root: string, reportPath: string, logPath: string, stream?: NodeJS.WritableStream): Promise<number> {
+function runGates(root: string, reportPath: string, logPath: string, stream?: NodeJS.WritableStream, holdOut: readonly string[] = []): Promise<number> {
   return new Promise((done) => {
     const log = createWriteStream(logPath);
-    const child = spawn("bun", ["run", "cat", "gates", "--report", reportPath, "--except", WHOLE_SUITE], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    const except = [WHOLE_SUITE, ...holdOut].flatMap((c) => ["--except", c]);
+    const child = spawn("bun", ["run", "cat", "gates", "--report", reportPath, ...except], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
     const tee = (b: Buffer) => {
       log.write(b);
       stream?.write(b);
@@ -499,9 +555,10 @@ function say(lines: readonly string[]): void {
  * Whether the gates run before a push at all. OFF unless asked for: measured
  * 2026-11-05 on a 4-CPU agent container, the fast set minus the whole suite
  * took 70 minutes per push (`skill:register:check` 18 min and
- * `uml:overview:check` 11 min alone), far past what a push can wait on. Until
- * the owner rules on a time-bounded subset, a checkout opts in with
- * `CAT_PREPUSH_GATES=1` or `git config cat.gates.prePush true`.
+ * `uml:overview:check` 11 min alone), far past what a push can wait on. The
+ * time budget cuts that, but a cold run is still minutes, not seconds, so a
+ * checkout opts in with `CAT_PREPUSH_GATES=1` or
+ * `git config cat.gates.prePush true`.
  */
 export function gatesEnabled(root: string, env: Readonly<Record<string, string | undefined>> = process.env): boolean {
   const v = env.CAT_PREPUSH_GATES;
@@ -525,15 +582,15 @@ async function gitHook(root: string, remote: string): Promise<number> {
     say([`pre-push: gates BYPASSED — "${bypass}" (logged to ${p})`]);
     return 0;
   }
-  // A push of the records' own notes ref carries no tree to judge.
-  const judged = refs.filter((r) => r.localRef !== RECORD_NOTES_REF);
+  // A push of the records' own refs (the notes, the Class B entries) carries no tree to judge.
+  const judged = refs.filter((r) => r.localRef !== RECORD_NOTES_REF && !r.localRef.startsWith(LOCAL_VERDICT_REF_PREFIX));
   if (judged.length === 0) return 0;
   say([`pre-push: running the fast gates on ${judged.map((r) => r.localRef).join(", ")} (bypass: CAT_GATES_BYPASS='<reason>')`]);
   const v = await judge(root, judged.map((r) => r.localSha), process.stderr, judged.map((r) => r.remoteSha));
   return finish(root, v, { via: "git-hook", remote, refs: judged }, 1, () => {
     if (git(root, ["config", "--bool", "cat.gates.pushRecords"]) === "true") {
-      // `--no-verify`: this push carries only notes, and re-entering this hook would judge nothing.
-      git(root, ["push", "--no-verify", "--quiet", remote, `${RECORD_NOTES_REF}:${RECORD_NOTES_REF}`]);
+      // `--no-verify`: this push carries only records, and re-entering this hook would judge nothing.
+      git(root, ["push", "--no-verify", "--quiet", remote, `${RECORD_NOTES_REF}:${RECORD_NOTES_REF}`, `${LOCAL_VERDICT_REF_PREFIX}*:${LOCAL_VERDICT_REF_PREFIX}*`]);
     }
   });
 }

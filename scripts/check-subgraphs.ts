@@ -38,12 +38,15 @@ import {
   isPublishedGraphTypology,
   isRenderable,
   owningDirectory,
+  readDeclaration,
   resolveDirectories,
   subgraphTree,
 } from "../schemas/kg/cat-harness.js";
-import { checkoutDirectories } from "../schemas/kg/harness-config.js";
+import { checkoutDirectories, checkoutRootFor } from "../schemas/kg/harness-config.js";
+import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
 import type { GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.js";
 import { corpusScopeFor } from "./known-skills.js";
+import { gateOwnInstances, nothingOwnLine } from "./lib/gate-own.ts";
 import { mayLeaveMain } from "./qa-results.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -81,6 +84,15 @@ export interface SubgraphReport {
    * prevent.
    */
   dangling: Array<{ from: string; fromDir: string; target: string }>;
+  /**
+   * Links that name a path an instance has MOVED, resolved at its new place
+   * through that instance's declared `moves` (sdlc skill `two-phase-move`).
+   * Not dangling while the move's window is open; each is a link its layer
+   * still has to switch to the new path. `to` is the file it resolved to.
+   */
+  moved: Array<{ from: string; fromDir: string; target: string; to: string; move: string }>;
+  /** Every move the instances of this checkout declare, with how many links still use the old path. */
+  moves: Array<ResolvedMove & { inbound: number }>;
   /**
    * Links into a declared directory that is ABSENT from this checkout and may
    * be (`mayLeaveMain`: every kind it holds is one the qa-reports arc moves
@@ -402,7 +414,81 @@ export function resolveAcrossArchive(
   return undefined;
 }
 
-export function scanSubgraphs(root: string = ROOT): SubgraphReport {
+/** One entry of an instance's `moves`, with its paths made absolute. */
+export interface ResolvedMove {
+  /** `<instance>:<from>`, how the report names it. */
+  id: string;
+  absFrom: string;
+  absTo: string;
+  until: string;
+  /** `until` is before today: the move is no longer honoured. */
+  expired: boolean;
+}
+
+/**
+ * The moves the instances under {@link roots} declare (`moves` on each
+ * declaration). An unreadable declaration contributes none; reporting it is
+ * `check:harness-dirs`'s job.
+ */
+export function declaredMoves(roots: readonly string[], today: string = new Date().toISOString().slice(0, 10)): ResolvedMove[] {
+  const out: ResolvedMove[] = [];
+  for (const root of new Set(roots.map((r) => resolve(r)))) {
+    let decl;
+    try {
+      decl = readDeclaration(root);
+    } catch {
+      continue;
+    }
+    for (const m of decl?.moves ?? []) {
+      out.push({
+        id: `${decl!.name}:${m.from}`,
+        absFrom: resolve(root, m.from),
+        absTo: resolve(root, m.to),
+        until: m.until,
+        expired: m.until < today,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Where {@link wanted} resolves through a move whose window is still open, or
+ * `undefined`. The old path is answered for, not kept on disk: a copy left in
+ * both places mints one IRI twice (`kg-separation`, "A file left in BOTH layers").
+ */
+export function resolveThroughMove(
+  wanted: string,
+  moves: readonly ResolvedMove[],
+): { resolved: string; move: ResolvedMove } | undefined {
+  for (const move of moves) {
+    if (move.expired) continue;
+    if (wanted !== move.absFrom && !wanted.startsWith(move.absFrom + "/")) continue;
+    const resolved = resolveInTree(join(move.absTo, relative(move.absFrom, wanted)));
+    if (resolved !== undefined) return { resolved, move };
+  }
+  return undefined;
+}
+
+/**
+ * What a link sweep needs to know about the corpus, computed once: the
+ * declared directories, how each is labelled, which absent ones may be, and
+ * the bean store's archive views. {@link scanSubgraphs} sweeps every file with
+ * it; {@link danglingLinksIn} judges ONE file's text with the same rule, which
+ * is how `state:push` judges the files it is about to splice (bean `asq1`).
+ */
+export interface LinkContext {
+  root: string;
+  own: ReturnType<typeof resolveDirectories>;
+  dirs: ReturnType<typeof resolveDirectories>;
+  label: (d: ReturnType<typeof resolveDirectories>[number]) => string;
+  absentOffMain: string[];
+  archiveViews: Array<{ store: string; view: string }>;
+  /** The `moves` the checkout's instances declare (sdlc skill `two-phase-move`). */
+  moves?: ResolvedMove[];
+}
+
+export function linkContext(root: string = ROOT): LinkContext {
   // The CORPUS on the platform's own run (placement PR0, bean `ejye`): what
   // the platform's `scope: "repository"` mirrors used to bring into this sweep
   // is asked of the checkout now. Ids repeat across instances there (several
@@ -411,34 +497,111 @@ export function scanSubgraphs(root: string = ROOT): SubgraphReport {
   // instance's own declaration, the question it always answered.
   const own = resolveDirectories([{ name: "(local)", root, own: true }]);
   const dirs = corpusScopeFor(root) === "checkout" ? checkoutDirectories(root, { stackedOn: root }) : own;
-  const tree = subgraphTree(own);
   // `own` on a checkout entry means "its own instance's", not this one's, so
   // the test is membership of THIS instance's resolution.
   const ownPaths = new Set(own.map((o) => o.absPath));
   const label = (d: (typeof dirs)[number]): string =>
     ownPaths.has(d.absPath) || d.member === undefined ? d.id : `${d.member}/${d.id}`;
-  const edges: CrossEdge[] = [];
-  const dangling: SubgraphReport["dangling"] = [];
-  const unverifiable: SubgraphReport["unverifiable"] = [];
   // Declared directories that are absent and allowed to be: a link into one
   // cannot be judged from this checkout.
   const absentOffMain = dirs
     .filter((d) => mayLeaveMain(d as { graphTypologies?: string[]; storage?: unknown }))
     .map((d) => resolve(d.absPath ?? join(root, d.path)))
     .filter((a) => !existsSync(a));
+  const moves = declaredMoves([root, ...instanceRootsIn(checkoutRootFor(root))]);
+  return { root, own, dirs, label, absentOffMain, archiveViews: beanArchiveViews(dirs, root), moves };
+}
+
+/** Retired content is not held to link resolution — see `exempt`. */
+function isExemptDirectory(dir: { graphTypologies: readonly string[] }): boolean {
+  return dir.graphTypologies.length > 0 && dir.graphTypologies.every((g) => !isPublishedGraphTypology(g));
+}
+
+/**
+ * Where one link of `file` (owned by `owner`) goes: the file it resolves to,
+ * or the bucket an unresolved link is reported in.
+ */
+function judgeLink(
+  ctx: LinkContext,
+  file: string,
+  owner: { graphTypologies: readonly string[] },
+  target: string,
+): { resolved: string; move?: ResolvedMove } | { bucket: "unverifiable" | "siteResolved" | "derivedLinks" | "dangling" } {
+  // `resolveInTree` carries the `.html` → `.md` rule and its reasoning.
+  // A link destination is a URL: `%20`, `%28`, `%40` name the file's own
+  // characters (`linkTarget` in subgraph-readmes writes them), so decode
+  // before asking the filesystem. Malformed escapes stay as written.
+  const decoded = decodeLinkTarget(target);
+  const wanted = resolve(dirname(file), decoded);
+  const resolved = resolveAcrossArchive(file, decoded, wanted, ctx.archiveViews);
+  if (resolved !== undefined) return { resolved };
+  // Through a declared move whose window is open: resolved, and reported as moved.
+  const through = resolveThroughMove(wanted, ctx.moves ?? []);
+  if (through !== undefined) return { resolved: through.resolved, move: through.move };
+  if (ctx.absentOffMain.some((a) => wanted === a || wanted.startsWith(a + "/"))) return { bucket: "unverifiable" };
+  // A renderable graph addresses the PUBLISHED tree, not this one.
+  // A typology `within` a renderable one is published BY it — the
+  // docs graph's named groups (bean `xka5`), `proposals` and
+  // `requirements` are not sites of their own, but their pages are docs
+  // pages on the docs site, so their links address the same tree.
+  // A kind whose markdown a published page SHOWS (an IG annex) is the same case.
+  const renderable = addressesPublishedTree(owner.graphTypologies);
+  // A DERIVED graph's links came from the SOURCE document rather than
+  // from an author here — see `derivedLinks`. Tested after
+  // `renderable` only because no kind is currently both; if one ever
+  // is, addressing the published tree is the more specific claim and
+  // should win.
+  const derived = owner.graphTypologies.some((g) => isDerivedGraph(g));
+  return { bucket: renderable ? "siteResolved" : derived ? "derivedLinks" : "dangling" };
+}
+
+/**
+ * The targets in `text` that {@link scanSubgraphs} would report as
+ * `dangling` if `text` were the content of `file` (an absolute path): none
+ * when its owner is exempt, and `undefined` when no declared directory owns
+ * it, which the sweep never reaches and so cannot judge.
+ *
+ * The text is passed rather than read so a caller can judge two versions of
+ * one file — what is on disk and what the branch tip holds — under the same
+ * rule, and report only what the edit introduced (`state:push`, bean `asq1`).
+ */
+export function danglingLinksIn(ctx: LinkContext, file: string, text: string): string[] | undefined {
+  const owner = owningDirectory(ctx.dirs, file);
+  if (owner === undefined) return undefined;
+  if (isExemptDirectory(owner)) return [];
+  return linkTargets(text).filter((t) => {
+    const j = judgeLink(ctx, file, owner, t);
+    return "bucket" in j && j.bucket === "dangling";
+  });
+}
+
+/**
+ * `scope`, when given, sweeps only the directories those instances commit
+ * (owner ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`). Every
+ * directory stays a link TARGET, so an edge into a mounted layer is still
+ * resolved and reported.
+ */
+export function scanSubgraphs(root: string = ROOT, scope?: ReadonlySet<string>): SubgraphReport {
+  const ctx = linkContext(root);
+  const { own, dirs, label } = ctx;
+  const tree = subgraphTree(own);
+  const edges: CrossEdge[] = [];
+  const dangling: SubgraphReport["dangling"] = [];
+  const moved: SubgraphReport["moved"] = [];
+  const unverifiable: SubgraphReport["unverifiable"] = [];
   const derivedLinks: SubgraphReport["derivedLinks"] = [];
   const unreadable: string[] = [];
   const notExamined: string[] = [];
   const exempt: string[] = [];
   const siteResolved: SubgraphReport["siteResolved"] = [];
+  const buckets = { dangling, unverifiable, derivedLinks, siteResolved };
   let scanned = 0;
-  const archiveViews = beanArchiveViews(dirs, root);
 
   for (const dir of dirs) {
+    if (scope !== undefined && dirs !== own && !scope.has((dir as { member?: string }).member ?? (dir as { declaredBy?: string }).declaredBy ?? "")) continue;
     const abs = dir.absPath ?? join(root, dir.path);
     if (!existsSync(abs) || !statSync(abs).isDirectory()) continue;
-    // Retired content is not held to link resolution — see `exempt`.
-    if (dir.graphTypologies.length > 0 && dir.graphTypologies.every((g) => !isPublishedGraphTypology(g))) {
+    if (isExemptDirectory(dir)) {
       exempt.push(`${label(dir)} (${dir.path})`);
       continue;
     }
@@ -472,38 +635,14 @@ export function scanSubgraphs(root: string = ROOT): SubgraphReport {
         continue;
       }
       for (const target of linkTargets(text)) {
-        // `resolveInTree` carries the `.html` → `.md` rule and its reasoning.
-        // A link destination is a URL: `%20`, `%28`, `%40` name the file's own
-        // characters (`linkTarget` in subgraph-readmes writes them), so decode
-        // before asking the filesystem. Malformed escapes stay as written.
-        const decoded = decodeLinkTarget(target);
-        const wanted = resolve(dirname(file), decoded);
-        const resolved = resolveAcrossArchive(file, decoded, wanted, archiveViews);
-        if (resolved === undefined && absentOffMain.some((a) => wanted === a || wanted.startsWith(a + "/"))) {
-          unverifiable.push({ from: relative(root, file), fromDir: label(owner), target });
+        const j = judgeLink(ctx, file, owner, target);
+        if ("bucket" in j) {
+          buckets[j.bucket].push({ from: relative(root, file), fromDir: label(owner), target });
           continue;
         }
-        if (resolved === undefined) {
-          // A renderable graph addresses the PUBLISHED tree, not this one.
-          // A typology `within` a renderable one is published BY it — the
-          // docs graph's named groups (bean `xka5`), `proposals` and
-          // `requirements` are not sites of their own, but their pages are docs
-          // pages on the docs site, so their links address the same tree.
-          // A kind whose markdown a published page SHOWS (an IG annex) is the same case.
-          const renderable = addressesPublishedTree(owner.graphTypologies);
-          // A DERIVED graph's links came from the SOURCE document rather than
-          // from an author here — see `derivedLinks`. Tested after
-          // `renderable` only because no kind is currently both; if one ever
-          // is, addressing the published tree is the more specific claim and
-          // should win.
-          const derived = owner.graphTypologies.some((g) => isDerivedGraph(g));
-          const bucket = renderable ? siteResolved : derived ? derivedLinks : dangling;
-          bucket.push({
-            from: relative(root, file),
-            fromDir: label(owner),
-            target,
-          });
-          continue;
+        const resolved = j.resolved;
+        if (j.move !== undefined) {
+          moved.push({ from: relative(root, file), fromDir: label(owner), target, to: relative(root, resolved), move: j.move.id });
         }
         const to = owningDirectory(dirs, resolved);
         if (to === undefined || to.absPath === owner.absPath) continue;
@@ -524,13 +663,16 @@ export function scanSubgraphs(root: string = ROOT): SubgraphReport {
       notExamined.push(`${label(dir)} (${dir.path})`);
     }
   }
-  return { tree, edges, dangling, unverifiable, derivedLinks, exempt, siteResolved, unreadable, notExamined, scanned };
+  const moves = (ctx.moves ?? []).map((m) => ({ ...m, inbound: moved.filter((l) => l.move === m.id).length }));
+  return { tree, edges, dangling, moved, moves, unverifiable, derivedLinks, exempt, siteResolved, unreadable, notExamined, scanned };
 }
 
 if (import.meta.main) {
   const check = process.argv.includes("--check");
-  const { tree, edges, dangling, unverifiable, derivedLinks, exempt, siteResolved, unreadable, notExamined, scanned } =
-    scanSubgraphs(ROOT);
+  // In a layer's PR checks, only the caller's own directories are swept (owner ruling 2026-11-05).
+  const scope = gateOwnInstances();
+  const { tree, edges, dangling, moves, unverifiable, derivedLinks, exempt, siteResolved, unreadable, notExamined, scanned } =
+    scanSubgraphs(ROOT, scope);
 
   console.log(`Subgraphs  (${scanned} markdown node(s) attributed to a declared directory)\n`);
 
@@ -543,6 +685,10 @@ if (import.meta.main) {
 
   // Vacuity before the verdict. With nothing attributed, "no cross edges"
   // is a statement about the sweep and not about the corpus.
+  if (scanned === 0 && scope) {
+    console.log(nothingOwnLine("check:subgraphs", "markdown in a declared directory", scope));
+    process.exit(0);
+  }
   if (scanned === 0) {
     console.error("\n✗ ATTRIBUTED NO FILES. This is not a pass: nothing was examined.");
     process.exit(1);
@@ -588,6 +734,14 @@ if (import.meta.main) {
     for (const [dir, list] of [...byDir].sort((a, b) => b[1].length - a[1].length)) {
       console.log(`  ${String(list.length).padStart(3)}  ${dir}`);
       for (const d of list) console.log(`         ${d.from}  →  ${d.target}`);
+    }
+  }
+
+  if (moves.length > 0) {
+    console.log(`\nMOVES — ${moves.length} declared; a link to the old path resolves at the new one until \`until\` (skill \`two-phase-move\`):`);
+    for (const m of moves) {
+      const state = m.expired ? "EXPIRED, not honoured" : m.inbound === 0 ? "nothing links to the old path: remove the entry" : `${m.inbound} link(s) still to switch`;
+      console.log(`  ${m.id}  until ${m.until}  — ${state}`);
     }
   }
 
@@ -660,6 +814,15 @@ if (import.meta.main) {
         "fall out. Retired content under `fsh-guts/` is deliberately not held to\n" +
         "link resolution; the others are a gap, not a decision.",
     );
+  }
+
+  const expired = moves.filter((m) => m.expired);
+  if (check && expired.length > 0) {
+    console.error(
+      `\n✗ ${expired.length} declared move(s) are past \`until\`: ${expired.map((m) => m.id).join(", ")}.\n` +
+        "Remove the entry from the declaration; any link above still using the old path is now broken.",
+    );
+    process.exit(1);
   }
 
   // GATED, as of 2026-09-20 — and only now, because only now is the number

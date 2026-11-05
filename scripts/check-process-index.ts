@@ -49,6 +49,7 @@ import { docsSourceDirFor, instanceRootsIn, readDeclaration, repoRootFor, siteDi
 import { framedInstances as framedRoots, subgraphOutDir } from "./gen-subgraph-jsonld.ts";
 import { readKnowledgeGraphDeclaration } from "@litlfred/bootstrap-tools/schemas/declaration.ts";
 import { buildSubgraphs, publicationBase } from "@litlfred/bootstrap-tools/scripts/subgraph-jsonld.ts";
+import { gateOwnsFile } from "./lib/gate-own.ts";
 
 const ROOT = HARNESS_ROOT;
 const REPO = repoRootFor(ROOT);
@@ -219,8 +220,20 @@ export function unframedProcesses(seeAlso: readonly string[], framed: ReadonlySe
 }
 
 if (import.meta.main) {
-  const { processes, problems, repoIri, seeAlso } = publishedProcesses();
-  const declared = declaredDiagrams();
+  // In a layer's PR checks, only the caller's own diagrams and page (owner
+  // ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`): a lower layer's
+  // diagram is judged by that layer's own CI.
+  const scoped = gateOwnsFile(".") !== undefined;
+  const mine = (repoPath: string) => gateOwnsFile(repoPath) !== false;
+  const whole = publishedProcesses();
+  const { repoIri, seeAlso } = whole;
+  const problems = whole.problems;
+  const processes = whole.processes.filter((p) => mine(diagramPath(p)));
+  const declared = new Map([...declaredDiagrams()].filter(([path]) => mine(path)));
+  if (scoped && processes.length === 0 && declared.size === 0) {
+    console.log("✓ check:process-index: the caller commits no process diagram; the mounted layers' are judged by their own CI.");
+    process.exit(0);
+  }
   const framed = framedInstances();
   const unframed = unframedProcesses(seeAlso, framed);
   problems.push(...unframed.problems);
@@ -238,20 +251,21 @@ if (import.meta.main) {
     }
   }
   for (const [path, p] of unframed.byPath) {
+    if (!mine(path)) continue;
     if (!declared.has(path)) problems.push(`a Process node for an undeclared diagram: ${path} (${p.id})`);
     if (!p.summary) problems.push(`a Process node carries no documentation: ${path} — give the diagram a <bpmn:documentation> of its own`);
   }
   const outside: string[] = [];
   for (const [path, inst] of declared) {
-    if (byPath.has(path) || unframed.byPath.has(path)) continue;
+    if (byPath.has(path) || unframed.byPath.has(path) || !mine(path)) continue;
     if (framed.has(inst)) problems.push(`declared but not a Process node in any published processes subgraph: ${path}`);
     else outside.push(`${path}  (${readDeclaration(inst)?.name ?? relative(REPO, inst)})`);
   }
   if (processes.length === 0) problems.push("the published subgraphs hold no process — a sweep over nothing has cleared nothing");
 
   const page = existsSync(PAGE) ? readFileSync(PAGE, "utf-8") : "";
-  if (!/data-fa-process-index\b/.test(page)) problems.push(`${PAGE} no longer carries the [data-fa-process-index] container`);
-  if (!/<noscript>/.test(page)) problems.push(`${PAGE} has no <noscript> fallback for the process table`);
+  if (mine(repoRel(PAGE)) && !/data-fa-process-index\b/.test(page)) problems.push(`${PAGE} no longer carries the [data-fa-process-index] container`);
+  if (mine(repoRel(PAGE)) && !/<noscript>/.test(page)) problems.push(`${PAGE} has no <noscript> fallback for the process table`);
 
   if (outside.length) {
     console.log(`Not covered — declared by an instance outside this graph whose own subgraphs the repository index does not link (pve3, t8c4):`);

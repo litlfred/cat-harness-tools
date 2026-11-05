@@ -156,6 +156,13 @@ export interface MountOptions {
   id?: string;
   /** Passed to `BranchStore.open` — tests point it at a scratch store. */
   store?: BranchStoreOptions;
+  /**
+   * The state of the layer mounts against `index.lock.json`, when the caller
+   * already has it (the CLI's remote fan-out ran first). Absent, it is ASKED
+   * ({@link staleLayerMounts}, check mode, no network). Either way the
+   * `.gitignore` block is rewritten only over current layer mounts.
+   */
+  layerMounts?: Parameters<typeof remoteExitCode>[0];
 }
 
 function git(cwd: string, args: string[]): { status: number; stdout: string; stderr: string } {
@@ -207,14 +214,21 @@ export function mountState(opts: MountOptions = {}): MountResult {
   // and only for the full declared set (`opts.id` narrows the mount, not the
   // block), so a partial run never drops a line another graph needs.
   //
-  // `--id` skips the CLI's remote fan-out, so the layer mounts the declarations
-  // are read from may be OLDER than the lock (bean folio-assistant-792f: a
-  // stale cat-harness mount predating `merge-reviews/` rewrote the block
-  // without it, twice). The block is then rewritten only when the layer
-  // mounts are verified current; otherwise it is left alone, and said so.
+  // The declarations the block is written from are read from the layer
+  // mounts, and those may be OLDER than the lock: `--id` skips the CLI's
+  // remote fan-out (bean folio-assistant-792f: a stale cat-harness mount
+  // predating `merge-reviews/` rewrote the block without it, twice), and a
+  // fan-out that ran can still leave them stale — it leaves a mount that no
+  // longer hashes to the lock untouched, and cannot run at all when the index
+  // is unreadable to the tools on disk (bean folio-assistant-x38u: every fresh
+  // session dropped `/who-iris/test/attestations/**`, declared by the pinned
+  // who-iris but not by the older copy on disk). So on EVERY run the block is
+  // rewritten only when the layer mounts are verified current; otherwise it is
+  // left alone, and said so.
   if (result.graphs.some(isPresent)) {
     try {
-      const stale = opts.id === undefined ? undefined : staleLayerMounts(root);
+      const known = opts.layerMounts;
+      const stale = known === undefined ? staleLayerMounts(root) : staleLayerMounts(root, () => known);
       if (stale !== undefined) result.reason += `; .gitignore left unchanged: ${stale}`;
       else syncStateIgnores(root, opts.id === undefined ? locations : tipLocations(root));
     } catch (e) {
@@ -536,7 +550,7 @@ if (import.meta.main) {
   // then its graphs are mounted into it. The other order mounted the graphs
   // and then re-laid the instance over them.
   const remote = at === -1 ? remoteFanOut(repoRootOf()) : undefined;
-  const r = mountState({ id: at === -1 ? undefined : argv[at + 1] });
+  const r = mountState({ id: at === -1 ? undefined : argv[at + 1], layerMounts: remote?.state });
   if (argv.includes("--json")) console.log(JSON.stringify(remote ? { ...r, remote: { state: remote.state } } : r, null, 2));
   else console.log(report(r) + delegatedReport(delegatedStores()) + (remote ? `\n\n${remote.text}` : ""));
   if (remote && remoteExitCode(remote.state) !== 0) process.exit(remoteExitCode(remote.state));

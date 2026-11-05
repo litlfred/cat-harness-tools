@@ -189,8 +189,11 @@ export const QA_WRITERS: readonly QaWriter[] = [
   // `*/test/results`, not `${R}`: since cat-harness#12 each verdict is written
   // under the instance that owns the library entry (the IRIS replica, the DAK
   // base layer, the FHIR IG harness …), and claiming only cat-harness's tree left 24 of them
-  // `unclaimed` in the composed checkout (2026-10-09).
-  { id: "check:l1-complete", run: ["check:l1-complete", "--write"], writes: [`*/test/results/library-qa/**`], because: "per-library-entry L1 completeness, under the instance owning each entry; `--write` is its writer form" },
+  // `unclaimed` in the composed checkout (2026-10-09). And the ROOT instance's
+  // own entries land at `test/results/library-qa/`, which `*/` never matches:
+  // in smart-ra (library/ at the repo root) the writer read as producing
+  // nothing and uml:overview failed (smart-ra#228, 2026-11-05).
+  { id: "check:l1-complete", run: ["check:l1-complete", "--write"], writes: [`*/test/results/library-qa/**`, `test/results/library-qa/**`], because: "per-library-entry L1 completeness, under the instance owning each entry; `--write` is its writer form" },
   {
     id: "p2:refusals",
     run: ["p2:refusals"],
