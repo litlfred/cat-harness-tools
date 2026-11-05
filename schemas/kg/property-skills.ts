@@ -115,6 +115,9 @@ export const PROPERTY_SKILLS = {
     skills: [],
     gap: "no skill edits `enableSubgraphs` yet: the rule (qualified `<instance>.<id>`, an opt-in entry of this instance or its `needs` closure, not inherited; `CAT_SUBGRAPHS` overrides) is documented only in the schema (cat-harness.ts, opt-in-subgraphs.ts)",
   },
+  // folio-assistant-tsh9: paths a layer moved and still answers for while the
+  // layers that link to them switch, in any order.
+  moves: { skills: ["two-phase-move"] },
   // Bean `0r7u`: what an instance's own check scripts read and write, so
   // `gates` may pool them and `regen` may skip them. prepare-merge says what
   // a wrong declaration costs.
