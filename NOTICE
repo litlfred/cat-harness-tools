@@ -30,3 +30,12 @@ Third-party components redistributed in this repository under their own terms:
     Upstream: https://github.com/K-Dense-AI/claude-scientific-skills
     at commit 49c6e97775eaa18ba791bebe23162a70ae601c18.
     Full licence text: the LICENSE file in each package directory.
+
+  * Plus Jakarta Sans by Tokotype — SIL Open Font License 1.1 (OFL-1.1).
+    The typeface of the journeys viewer's presentation pages; five upright
+    weights, 400 to 800, as WOFF2.
+    scripts/journeys/assets/vendor/plus-jakarta-sans/2.7.1/
+    Upstream: https://github.com/tokotype/PlusJakartaSans at tag 2.7.1
+    (commit 489ca9f6588fcf460c8c2fe1ec70c3d610363c98); vendored.json there
+    records how each file was taken and its sha256.
+    Full licence text: OFL.txt in that directory.

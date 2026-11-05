@@ -12,10 +12,28 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { readJourneyCorpus } from "../journeys/read.ts";
+import { readJourneyCorpus, unescapeXml } from "../journeys/read.ts";
 import { bpmnFigure, orderByFollows, renderJourneyPages, stepAnchor, type PageFile } from "../journeys/render.ts";
 import { journeyFiles, journeysRoute } from "../gen-journeys-viz.ts";
-import { chapterRoots, countryTones, countWord, personaText, presentationOf, rangeLabel, rungOf, shortTitle, viewBoxWidth } from "../journeys/present.ts";
+import {
+  chapterRoots,
+  countryTones,
+  countWord,
+  fillPattern,
+  fromSite,
+  highlightJson,
+  kramdownSlug,
+  personaText,
+  presentationOf,
+  rangeLabel,
+  rungOf,
+  screenHref,
+  screensFor,
+  shortTitle,
+  siteRootFrom,
+  viewBoxWidth,
+} from "../journeys/present.ts";
+import { blockUsage, feelingPoints, stepByRef } from "../journeys/present-views.ts";
 import { NAVBAR_LINKED } from "../lib/harness-rail.ts";
 import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { clearDeclaredVisualisers, renderedByOf } from "../viewer-declarations.ts";
@@ -50,9 +68,11 @@ put("lower/lower.json", {
     // The catalogue beside the ArchiMate model, in a directory declared inside it.
     { id: "archimate", path: "archimate/", graphTypologies: ["archimate"] },
     { id: "building-blocks", path: "archimate/building-blocks/", graphTypologies: ["building-blocks"] },
+    { id: "fhir-artifact-index", path: "fhir-artifact-index/", graphTypologies: ["fhir-artifact-index"] },
   ],
 });
-put("lower/scenarios/actors/ana.json", { id: "ana", title: "Ana (pilgrim)", kind: "person", meta: { persona: { name: "Ana", role: "Pilgrim", color: "#123456" } } });
+put("lower/scenarios/actors/ana.json", { id: "ana", title: "Ana (pilgrim)", kind: "person", meta: { persona: { name: "Ana", role: "Pilgrim", color: "#123456", needs: ["Her summary abroad"], frustrations: ["Paper gets lost"] } } });
+put("lower/scenarios/actors/cleo.json", { id: "cleo", title: "Cleo (baby)", kind: "person", meta: { persona: { name: "Cleo", role: "Baby", icon: "baby" } } });
 put("lower/scenarios/actors/ben.json", { id: "ben", title: "Ben (nurse)", kind: "person" });
 put("lower/scenarios/stories.json", { name: "lower", stories: [{ id: "pilgrim-1", role: { role: "pilgrim" }, want: "Show my summary abroad", soThat: "I am treated safely" }] });
 // A catalogue in a journeys directory is NOT read: the kind is declared, not the folder.
@@ -64,8 +84,12 @@ put("lower/scenarios/user-scenarios/stray-blocks.json", {
 put("lower/archimate/building-blocks/blocks.json", {
   $schema: "building-blocks/0.1.0",
   layers: [{ id: "apps", label: "Tools & apps" }],
-  blocks: [{ id: "wallet", name: "Health wallet", kind: "tool", layer: "apps", jurisdiction: "International", what: "Holds the summary." }],
+  blocks: [{ id: "wallet", name: "Health wallet", kind: "tool", layer: "apps", jurisdiction: "International", what: "Holds the summary.", soWhat: "She carries it.", links: [{ label: "Spec", url: "https://example.org/wallet" }] }],
+  ideas: [{ id: "carry", title: "Carry it yourself", text: "The record travels with the person.", blocks: ["wallet"] }],
 });
+// An artifact index with a local copy of one example, as fhir-harness builds it at publish.
+put("lower/fhir-artifact-index/index.json", { artifacts: [{ key: "Bundle/ana-ips", title: "Ana's IPS", profiles: ["http://example.org/StructureDefinition/ips-bundle"], materialization: { localPath: "output-ast/Bundle-ana-ips.json" } }] });
+put("lower/output-ast/Bundle-ana-ips.json", { resourceType: "Bundle", id: "ana-ips", type: "document", total: 1, entry: null });
 put("lower/code-lists/trust.json", {
   $schema: "folio-code-list/v1",
   id: "trust",
@@ -82,14 +106,17 @@ put("lower/scenarios/user-scenarios/p2.json", {
   id: "p2-treated",
   title: "P2 — Treated",
   description: "Ana is treated.",
-  personas: ["ana", "ben"],
+  personas: ["ana", "ben", "cleo"],
   follows: "p1-checked",
   trustLadder: "trust",
+  scene: [{ icon: "hospital", label: "A clinic" }, { icon: "qr", label: "A QR" }],
+  references: [{ label: "User scenario in the IG", href: "journeys.html#p2", rel: "scenario" }],
   steps: [
     step("P2", "ben", {
       experiences: [
         { actor: "ben", doing: "reads the summary", emotion: 2 },
         { actor: "ana", doing: "waits", feeling: "“worried”", emotion: -1 },
+        { actor: "cleo", doing: "sleeps" },
       ],
       record: { state: "shared", description: "read abroad", heldWhere: "home" },
       stories: ["pilgrim-1", "ghost-story"],
@@ -101,6 +128,8 @@ put("lower/scenarios/user-scenarios/p2.json", {
         { block: "nowhere", role: "unknown block" },
       ],
       gaps: ["No transaction for this yet."],
+      handoff: { summary: "The summary goes home", from: "Clinic EMR", to: "ana", offline: false },
+      fhirChanges: [{ resource: "Bundle", change: "Read, not stored", why: "It is hers.", profile: "ips-bundle", profileOf: "Intl", examples: ["Bundle/ana-ips"] }],
       illustration: { src: "docs/images/p2.png", alt: "Ben reads the summary on a tablet." },
     }),
   ],
@@ -113,7 +142,7 @@ put("lower/scenarios/user-scenarios/p1.json", {
   personas: ["ana"],
   steps: [step("P1", "ana")],
 });
-put("lower/processes/care.bpmn", "<definitions/>");
+put("lower/processes/care.bpmn", '<definitions><bpmn:process id="P" name="Read the patient&#x27;s summary"/></definitions>');
 put("lower/docs/images/p2.png", "\x89PNG fixture");
 put(
   "lower/processes/care.svg",
@@ -184,6 +213,10 @@ put("top/workshops/policy.json", {
   sheets: [{ id: "s1", label: "Sheet 1", title: "Our journey", modules: ["M1"], assessmentStrip: true }],
   resources: [{ id: "card", title: "Facilitator card", kind: "job-aid", body: "1. Ask.", steps: ["p2-treated#P2"], modules: ["M1"] }],
   presentation: {
+    ig: { href: "", processes: "business-processes.html" },
+    closingQuestion: "What must countries agree on?",
+    notes: { map: "Read across, then down." },
+    deviceDemo: { href: "app/", screens: [{ id: "S2", title: "The nurse's tablet", device: "tablet", steps: ["P2"], try: "Flip the toggle" }] },
     name: "PilgrimLink",
     badge: "Interactive Spec",
     occasion: "Fixture vignette",
@@ -399,6 +432,101 @@ describe("the presentation pages: a workshop told in a room, with no site chrome
   });
 });
 
+describe("the presentation views: map, persona lens, how it works, discussion, sheets, device demo", () => {
+  const base = "top/workshops/policy";
+  const map = at(`${base}/map/index.html`);
+  const how = at(`${base}/how/index.html`);
+  const wallet = at(`${base}/how/wallet/index.html`);
+  const discuss = at(`${base}/discuss/index.html`);
+  const p2 = at(`${base}/walkthrough/P2/index.html`);
+  test("every view has a page, in the frame, and the tabs link them", () => {
+    for (const path of ["map", "personas", "personas/ana", "personas/cleo", "how", "how/wallet", "discuss", "sheets", "demo", "demo/S2"]) {
+      const page = at(`${base}/${path}/index.html`);
+      expect(page).toContain(NAVBAR_OPT_OUT);
+      expect(page).toContain('<span class="jp-name">PilgrimLink</span>');
+    }
+    expect(p2).toContain('href="../../map/"');
+    expect(p2).toContain('href="../../personas/"');
+    expect(p2).toContain('href="../../how/"');
+    expect(p2).toContain('href="../../discuss/"');
+    expect(p2).not.toContain("jp-tab-off");
+    expect(files.some((f) => f.path === `${base}/map/bpmn/processes-care.svg`)).toBe(true);
+  });
+  test("the map: a lane per person to focus on, the two toggles, a column per step, the technical layer, the per-view note", () => {
+    expect(map).toContain('data-jp-focus="ana"');
+    expect(map).toContain('data-jp-show="pain"');
+    expect(map).toContain('data-jp-show="tech"');
+    expect(map).toContain('data-row="lane" data-actor="cleo"');
+    expect(map).toContain('href="../how/wallet/"');
+    expect(map).toContain("<b>Clinic EMR → Ana</b>");
+    expect(map).toContain('data-jp-panel="1" hidden');
+    expect(map).toContain("Open screen S2");
+    expect(map).toContain("Read across, then down.");
+  });
+  test("the persona lens: needs, frustrations, the curve's points linking to steps, the touchpoints; a glyph for an icon", () => {
+    const ana = at(`${base}/personas/ana/index.html`);
+    expect(ana).toContain("Her summary abroad");
+    expect(ana).toContain("Paper gets lost");
+    expect(ana).toContain('<a href="../../walkthrough/P2/"><title>P2 Step P2: Worried</title>');
+    expect(ana).toContain("Ana’s touchpoints (2)");
+    expect(at(`${base}/personas/index.html`)).toContain('href="ana/"');
+    expect(at(`${base}/personas/cleo/index.html`)).not.toMatch(/jp-av-lg"[^>]*>CL</);
+  });
+  test("how it works: the big ideas, the grid, a block's detail with the moments that use it", () => {
+    expect(how).toContain("Carry it yourself");
+    expect(how).toContain('<a class="jp-bchip jp-layer-teal" href="wallet/">Health wallet</a>');
+    expect(how).toContain("Select a building block");
+    expect(wallet).toContain("So what for the journey");
+    expect(wallet).toContain('href="https://example.org/wallet"');
+    expect(wallet).toContain("<small>shows the QR</small>");
+    expect(wallet).toContain("Read the patient&#39;s summary");
+  });
+  test("the discussion: the closing question, the moments to revisit, the tables with what forces each row, the gap list", () => {
+    expect(discuss).toContain("What must countries agree on?");
+    expect(discuss).toContain('data-jp-gap="policy:viewer:status"');
+    expect(discuss).toContain("Forced by:");
+    expect(discuss).toContain('href="../walkthrough/P2/"');
+  });
+  test("a step: its screen, its FHIR change with Inspect JSON, the payload drawer, the IG's process and scenario pages", () => {
+    expect(p2).toContain('href="../../demo/S2/"');
+    expect(p2).toContain("<small>(screen S2)</small>");
+    expect(p2).toContain('data-jp-inspect="Bundle/ana-ips"');
+    expect(p2).toContain('<span class="jp-j-key">&quot;resourceType&quot;</span>');
+    expect(p2).toContain("Read, not stored");
+    expect(p2).toContain("Intl profile");
+    expect(p2).toContain('href="../../../../../../../../business-processes.html#read-the-patients-summary"');
+    expect(p2).toContain('href="../../../../../../../../journeys.html#p2"');
+    expect(p2).toContain('class="jp-scene');
+  });
+  test("the device demo frames the app's screen and links back to its moments", () => {
+    const s2 = at(`${base}/demo/S2/index.html`);
+    expect(s2).toContain('<iframe class="jp-device jp-device-tablet" src="../../../../../../../../app/#/demo/S2"');
+    expect(s2).toContain('href="../../walkthrough/P2/"');
+    expect(s2).toContain("Screen S2 — Flip the toggle");
+  });
+  test("the font is vendored and copied as bytes, with its licence", () => {
+    const woff = files.find((f) => f.path === "assets/fonts/PlusJakartaSans-Bold.woff2");
+    expect(woff?.content).toBeInstanceOf(Uint8Array);
+    expect(files.some((f) => f.path === "assets/fonts/OFL.txt")).toBe(true);
+    expect(at("assets/present.css")).toContain('src: url("fonts/PlusJakartaSans-Bold.woff2") format("woff2")');
+  });
+});
+
+describe("a workshop with none of the optional data still presents", () => {
+  test("no device demo, no IG, no catalogue, no index: the views draw what there is", () => {
+    const bare = renderJourneyPages(
+      { ...corpus, blocks: new Map(), examples: new Map(), workshops: corpus.workshops.map((w) => ({ ...w, workshop: { ...w.workshop, presentation: undefined } })) } as never,
+      { route: "en/top/journeys", title: "Top" },
+      "top",
+    );
+    const page = (p: string) => String(bare.find((f) => f.path === `top/workshops/policy/${p}`)!.content);
+    expect(page("walkthrough/P2/index.html")).not.toContain("jp-drawer");
+    expect(page("walkthrough/P2/index.html")).toContain('aria-disabled="true" title="This workshop names no device demo"');
+    expect(page("how/index.html")).toContain("No building-block catalogue is declared");
+    expect(bare.some((f) => f.path.includes("/demo/"))).toBe(false);
+  });
+});
+
 describe("presentation helpers", () => {
   test("shortTitle drops a step code and its dash, and nothing else", () => {
     expect(shortTitle("J1 — Born abroad")).toBe("Born abroad");
@@ -419,7 +547,7 @@ describe("presentation helpers", () => {
     const p = presentationOf(corpus, corpus.workshops[0]!);
     expect(p.chapters.map((c) => c.title)).toEqual(["Checked", "Treated"]);
     expect(p.steps.map((s) => `${s.key}@${s.chapter}`)).toEqual(["P1@0", "P2@1"]);
-    expect(p.cast.map((c) => c.id)).toEqual(["ana", "ben"]);
+    expect(p.cast.map((c) => c.id)).toEqual(["ana", "ben", "cleo"]);
     expect(p.steps[1]!.ws?.askTheRoom).toBe("Should the family be told?");
   });
   test("personaText puts the avatar beside whole-word names, longest first, and escapes the rest", () => {
@@ -431,6 +559,36 @@ describe("presentation helpers", () => {
     expect(out).toContain('<span class="jp-named">Dr. Anan<span class="jp-av jp-av-sm" style="--c:#111111"');
     expect(out).not.toContain(">Anan<span");
     expect(out).toContain("Ananda &lt;b&gt;");
+  });
+  test("links out: kramdown anchors, page patterns, the site's root, JSON colouring", () => {
+    expect(kramdownSlug("J1 — Born abroad (Thailand, birth day)")).toBe("j1--born-abroad-thailand-birth-day");
+    expect(kramdownSlug("J1 Issue the newborn's birth-dose DVCs in Country A")).toBe("j1-issue-the-newborns-birth-dose-dvcs-in-country-a");
+    expect(fillPattern("artifact/{type}-{id}.html", { type: "Immunization", id: "X" })).toBe("artifact/Immunization-X.html");
+    expect(fromSite("vaxlink/", "../../")).toBe("../../vaxlink/");
+    expect(fromSite("https://x.org/", "../../")).toBe("https://x.org/");
+    expect(fromSite("/abs/", "../../")).toBe("/abs/");
+    expect(siteRootFrom("../../", { route: "en/h/journeys", title: "" })).toBe("../../../../../");
+    expect(highlightJson('{"a": "b<", "n": -1.5e3, "t": true, "z": null}')).toBe(
+      '<span class="jp-j-pun">{</span><span class="jp-j-key">&quot;a&quot;</span>: <span class="jp-j-str">&quot;b&lt;&quot;</span><span class="jp-j-pun">,</span> <span class="jp-j-key">&quot;n&quot;</span>: <span class="jp-j-num">-1.5e3</span><span class="jp-j-pun">,</span> <span class="jp-j-key">&quot;t&quot;</span>: <span class="jp-j-lit">true</span><span class="jp-j-pun">,</span> <span class="jp-j-key">&quot;z&quot;</span>: <span class="jp-j-lit">null</span><span class="jp-j-pun">}</span>',
+    );
+    // An escaped quote stays inside its string.
+    expect(highlightJson(JSON.stringify({ q: 'say "hi"' }))).toContain('<span class="jp-j-str">&quot;say \\&quot;hi\\&quot;&quot;</span>');
+  });
+  test("unescapeXml resolves each entity once: an escaped ampersand is not unescaped again", () => {
+    expect(unescapeXml("&amp;lt;")).toBe("&lt;");
+    expect(unescapeXml("newborn&#x27;s &#39;dose&#39; &lt;b&gt; &quot;x&quot; &apos;y&apos; &amp;")).toBe(`newborn's 'dose' <b> "x" 'y' &`);
+    expect(unescapeXml("&unknown; & alone")).toBe("&unknown; & alone");
+  });
+  test("the views' pure helpers: feeling points, block usage, step refs, screens", () => {
+    const p = presentationOf(corpus, corpus.workshops[0]!);
+    expect(feelingPoints(p, "ana")).toEqual([{ index: 0, emotion: 1 }, { index: 1, emotion: -1 }]);
+    expect(feelingPoints(p, "cleo")).toEqual([]);
+    expect(blockUsage(p, "wallet").map((u) => `${u.s.step.id}:${u.role}`)).toEqual(["P2:shows the QR"]);
+    expect(stepByRef(corpus, p, "p2-treated#P2")?.key).toBe("P2");
+    expect(stepByRef(corpus, p, "P1")?.key).toBe("P1");
+    expect(stepByRef(corpus, p, "t1-away#T1")).toBeUndefined();
+    expect(screensFor(p.w.workshop.presentation!, "P2").map((x) => x.id)).toEqual(["S2"]);
+    expect(screenHref(p.w.workshop.presentation!, "S2", "../")).toBe("../app/#/demo/S2");
   });
   test("small ones", () => {
     expect(countWord(4)).toBe("Four");

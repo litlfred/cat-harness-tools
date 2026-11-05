@@ -352,6 +352,17 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     expect(licenseRefFor("@lhncbc/ucum-lhc")).toBe("LicenseRef-lhncbc-ucum-lhc");
   });
 
+  test("a font's OFL.txt is OFL-1.1 when it is the licence whole, under its copyright line and the standard notice", () => {
+    const ofl = readFileSync(join(import.meta.dir, "..", "journeys", "assets", "vendor", "plus-jakarta-sans", "2.7.1", "OFL.txt"), "utf-8");
+    expect(recogniseLicenceText(ofl)).toBe("OFL-1.1");
+    // The licence alone, with no notice above it, is the licence too.
+    expect(recogniseLicenceText(ofl.slice(ofl.indexOf("SIL OPEN FONT LICENSE")))).toBe("OFL-1.1");
+    // One more term, or anything but the notice above it, is not.
+    expect(recogniseLicenceText(`${ofl}\nAnd one more term.`)).toBeUndefined();
+    expect(recogniseLicenceText(`Use only on Tuesdays.\n${ofl}`)).toBeUndefined();
+    expect(recogniseLicenceText(ofl.replace("may be sold by itself", "may be sold"))).toBeUndefined();
+  });
+
   test("a written layer with bundles is clean, and its licences parse on the pinned list", () => {
     const d = deriveLayer(root);
     writeLayer(layer, d);

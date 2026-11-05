@@ -43,7 +43,9 @@
  * read unchanged. `user-scenario/0.2.0` adds what the harness needed to make
  * the viewer generic: `partOf`, `views` (ArchiMate views of the journey),
  * `references`, `illustrationStyle` and, on a step, `gaps` (what the
- * specification does not yet cover), `references` and `illustration`.
+ * specification does not yet cover), `references`, `illustration` and
+ * `fhirChanges` (the FHIR resources it creates or changes, told for a room),
+ * and on a journey its `scene` (a few glyphs that picture it).
  * Nothing of 0.1.0 changes meaning, and the kind accepts a 0.1.0 file as it
  * is.
  *
@@ -63,6 +65,19 @@ import { nodeKind } from "../kg/node-kind.ts";
 export const USER_SCENARIO_V01 = "user-scenario/0.1.0";
 export const USER_SCENARIO_V02 = "user-scenario/0.2.0";
 export const BUILDING_BLOCKS_V01 = "building-blocks/0.1.0";
+
+/**
+ * The small line glyphs the journeys viewer draws: a journey's `scene`, a
+ * persona's `icon`. A closed list, so a name the viewer cannot draw is refused
+ * here rather than drawn as nothing.
+ */
+export const JOURNEY_GLYPHS = [
+  "baby", "person", "family", "clinician", "health-worker", "hospital", "clinic", "home", "phone", "tablet",
+  "qr", "paper", "wifi-off", "wifi", "shield-check", "calendar-check", "stethoscope", "link", "transfer",
+  "globe", "key", "lock", "database", "tent", "bus", "plane",
+] as const;
+export const JourneyGlyphSchema = z.enum(JOURNEY_GLYPHS);
+export type JourneyGlyph = z.infer<typeof JourneyGlyphSchema>;
 
 /** A lower-case kebab id: a scenario, an actor, a story, a block. */
 const Id = z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "an id is lower-case kebab");
@@ -113,8 +128,10 @@ const RecordSchema = z
 const HandoffSchema = z
   .object({
     summary: Text,
-    from: Id.optional(),
-    to: Id.optional(),
+    /** Who or what it leaves: an actor id (drawn with the persona's name), or a place or system in words ("Thai hospital"). */
+    from: Text.optional(),
+    /** Who or what it reaches, as `from`. */
+    to: Text.optional(),
     offline: z.boolean().optional(),
     /** How it travels: a camera scan, a sync through a gateway, a QR on a phone. */
     carrier: Text.optional(),
@@ -221,8 +238,41 @@ export const IllustrationStyleSchema = z
   .strict();
 export type IllustrationStyle = z.infer<typeof IllustrationStyleSchema>;
 
+/** An example key, `Type/id`, as `examples` and an artifact index spell it. */
+const ExampleKey = z.string().regex(/^[A-Z][A-Za-z]+\/[A-Za-z0-9.-]+$/);
+
+/**
+ * One FHIR resource a step creates or changes, told for a room: what changes,
+ * why it is there at this moment, the profile it conforms to, and the
+ * examples that show it. `examples` are `Type/id` keys, resolved like the
+ * step's own `examples` (an instance's `fhir-artifact-index`); `profile` is a
+ * StructureDefinition id; `spec` the base standard's page.
+ */
+export const FhirChangeSchema = z
+  .object({
+    /** As the room says it: "Immunization ×2", "Group (household)". */
+    resource: Text,
+    /** What happens to it: "Created as primarySource = false". */
+    change: Text,
+    why: Text.optional(),
+    /** The StructureDefinition id the record conforms to. */
+    profile: Text.optional(),
+    /** Whose profile it is, as a chip beside it ("Lao PDR"). */
+    profileOf: Text.optional(),
+    examples: z.array(ExampleKey).optional(),
+    /** The base standard's page. */
+    spec: z.string().url().optional(),
+  })
+  .strict();
+export type FhirChange = z.infer<typeof FhirChangeSchema>;
+
+/** One part of a journey's small picture: a glyph and what it stands for. */
+export const SceneSchema = z.object({ icon: JourneyGlyphSchema, label: Text }).strict();
+
 const StepV02 = {
   ...StepV01,
+  /** The FHIR resources the step creates or changes, told for a room; its `examples` stay the plain list. */
+  fhirChanges: z.array(FhirChangeSchema).optional(),
   /** What the specification does not yet cover for this step: each a finding, not a failure. */
   gaps: z.array(Text).optional(),
   references: z.array(ReferenceSchema).optional(),
@@ -280,6 +330,8 @@ export const UserScenarioKind = nodeKind(
     references: z.array(ReferenceSchema).optional(),
     /** The style and cast the steps' illustrations share. */
     illustrationStyle: IllustrationStyleSchema.optional(),
+    /** The journey's small picture, a few glyphs in order (VaxLink's moment icons): drawn on its chapter card and map column. */
+    scene: z.array(SceneSchema).min(1).max(5).optional(),
     /** The steps in order. May be empty for a journey that only groups its sub-journeys. */
     steps: z.array(z.object(StepV02).strict()),
   },
@@ -347,6 +399,12 @@ export const BuildingBlocksKind = nodeKind(
   {
     layers: z.array(z.object({ id: Id, label: Text, question: Text.optional() }).strict()).min(1),
     blocks: z.array(BuildingBlockSchema).min(1),
+    /**
+     * The big ideas the blocks add up to, in plain words ("Trust without
+     * phoning home"): each names the blocks that carry it. The journeys
+     * viewer's How it works leads with them.
+     */
+    ideas: z.array(z.object({ id: Id, title: Text, text: Text, blocks: z.array(Id).min(1) }).strict()).optional(),
   },
   {
     strict: true,
@@ -357,6 +415,9 @@ export const BuildingBlocksKind = nodeKind(
         if (seen.has(b.id)) ctx.addIssue({ code: "custom", message: `block id "${b.id}" appears twice` });
         seen.add(b.id);
         if (!layers.has(b.layer)) ctx.addIssue({ code: "custom", message: `block ${b.id} is in layer "${b.layer}", which the catalogue does not list` });
+      }
+      for (const idea of c.ideas ?? []) {
+        for (const id of idea.blocks) if (!seen.has(id)) ctx.addIssue({ code: "custom", message: `idea ${idea.id} names block "${id}", which the catalogue does not list` });
       }
     },
   },
@@ -370,7 +431,7 @@ export type BuildingBlocks = z.infer<typeof BuildingBlocksSchema>;
  * once. Read, not owned, by this kind: an actor is bootstrap's `scenarios`
  * kind and its `meta` is open. Every persona is fictional.
  *
- * `initials` and `color` are optional presentation fields (owner,
+ * `initials`, `color` and `icon` are optional presentation fields (owner,
  * 2026-11-05): kept on the actor when a demonstrator wants a fixed avatar,
  * derived by the viewer when absent. Nothing else in the harness reads them.
  */
@@ -386,6 +447,8 @@ export const JourneyPersonaSchema = z
     initials: z.string().min(1).max(3).optional(),
     /** A CSS colour for the persona's lane and curve; assigned in order when absent. */
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    /** A glyph drawn in the avatar instead of the initials (a baby, who has none). */
+    icon: JourneyGlyphSchema.optional(),
   })
   .passthrough();
 export type JourneyPersona = z.infer<typeof JourneyPersonaSchema>;

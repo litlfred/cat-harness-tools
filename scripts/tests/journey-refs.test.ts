@@ -154,12 +154,16 @@ describe("the negative fixture: one broken reference of each sort", () => {
     s.examples.push("Bundle/missing");
     s.record.state = "unknown-state";
     s.handoff.to = "stranger";
+    // An end in words is a place or a system, not an actor reference.
+    s.handoff.from = "Thai hospital";
+    s.fhirChanges = [{ resource: "Bundle", change: "c", examples: ["Bundle/also-missing"] }];
     s.illustration.src = "docs/images/missing.png";
   });
   edit(files, "demo/workshops/w.json", (w) => {
     w.scenarios.push("no-journey");
     w.steps.push({ scenario: "p4-scanned", step: "P9" }, { scenario: "nope", step: "P1" });
     w.discussion[0].steps.push("p3-ill#P0", "not-a-ref");
+    w.presentation = { recordOf: "nobody", deviceDemo: { href: "app/", screens: [{ id: "S9", title: "t", steps: ["P99"] }] } };
   });
   // A catalogue left in a journeys directory is not a catalogue: the block it holds does not resolve.
   files["demo/journeys/blocks.json"] = {
@@ -195,6 +199,12 @@ describe("the negative fixture: one broken reference of each sort", () => {
     has(/steps\[2\]: scenario "nope"/);
     has(/discussion q1: step "P0" is no step of journey p3-ill/);
     has(/discussion q1: step ref "not-a-ref" is not <scenario>#<step>/);
+    has(/presentation: recordOf "nobody" is no actor/);
+    has(/presentation\.deviceDemo S9: step "P99" is no step of a journey the workshop teaches/);
+  });
+  test("a FHIR change's examples resolve as the step's do; a hand-off end in words is not an actor", () => {
+    has(/step P4: FHIR example "Bundle\/also-missing"/);
+    expect(messages.some((m) => m.includes("Thai hospital"))).toBe(false);
   });
   test("a file that does not parse is a finding, not a skip", () => {
     has(/journeys\/broken\.json · \(root\): does not parse/);
