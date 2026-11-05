@@ -5,7 +5,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOOK_DIR="$(git rev-parse --show-toplevel)/.git/hooks"
 
-for hook in "$SCRIPT_DIR"/post-checkout "$SCRIPT_DIR"/pre-commit; do
+for hook in "$SCRIPT_DIR"/post-checkout "$SCRIPT_DIR"/pre-commit "$SCRIPT_DIR"/pre-push; do
     name="$(basename "$hook")"
     [ -f "$hook" ] || continue
     cp "$hook" "$HOOK_DIR/$name"
