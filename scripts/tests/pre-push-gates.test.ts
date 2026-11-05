@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { failedTests, gatesEnabled, judge, parsePushCommand, parsePushStdin, testEnv } from "../pre-push-gates.ts";
+import { readDurations } from "../gate-durations.ts";
 import { buildRecord, covers, newFailures, readRecord, readResults, stateDir, toolVersions, treeOf, type GatesReportLike } from "../gate-record.ts";
 
 const PASS: GatesReportLike = {
@@ -102,7 +103,7 @@ process.exit(${code});\n`,
     sh("config", "user.email", "t@example.invalid");
     sh("config", "user.name", "t");
     writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: { cat: "bun run fake-cat.ts" } }));
-    writeFileSync(join(root, ".gitignore"), "fake-cat.ts\nreport.fixture.json\nruns.txt\n");
+    writeFileSync(join(root, ".gitignore"), "fake-cat.ts\nreport.fixture.json\nruns.txt\nargv.txt\n");
     sh("add", "-A");
     sh("commit", "-qm", "init");
   });
@@ -120,6 +121,44 @@ process.exit(${code});\n`,
     sh("commit", "-q", "--amend", "-m", "reworded");
     expect((await judge(root, [sh("rev-parse", "HEAD").stdout.trim()])).kind).toBe("allow");
     expect(runs()).toBe(1);
+  });
+
+  test("the time budget: a read-only gate timed over it here is held out of the next run, and the seed covers what is not timed yet", async () => {
+    stub(0, PASS);
+    // The stub also prints two pool lines, and keeps the argv it was given.
+    writeFileSync(
+      join(root, "fake-cat.ts"),
+      readFileSync(join(root, "fake-cat.ts"), "utf-8").replace(
+        "process.exit(",
+        `appendFileSync(${JSON.stringify(join(root, "argv.txt"))}, JSON.stringify(a.slice(2)) + "\\n");
+console.log("▸ bun run cat check:a   (75.0s, parallel)");
+console.log("▸ bun run cat check:b   (3.0s, parallel)");
+process.exit(`,
+      ),
+    );
+    const argvs = () => readFileSync(join(root, "argv.txt"), "utf-8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
+    const excepts = (a: string[]) => a.flatMap((x, i) => (a[i - 1] === "--except" ? [x] : []));
+    const first = await judge(root, [sh("rev-parse", "HEAD").stdout.trim()]);
+    expect(first.kind).toBe("allow");
+    // Nothing timed here yet: the committed seed's gates are held out, with the whole suite.
+    expect(excepts(argvs()[0]!)).toContain("bun test");
+    expect(excepts(argvs()[0]!)).toContain("bun run cat skill:register:check");
+    expect(excepts(argvs()[0]!)).not.toContain("bun run cat check:a");
+    expect(readDurations(root)!.seconds).toEqual({ "bun run cat check:a": 75, "bun run cat check:b": 3 });
+    // A new tree: check:a, timed at 75 s here, is now held out; check:b is not.
+    writeFileSync(join(root, "x.txt"), "x");
+    sh("add", "x.txt");
+    sh("commit", "-qm", "x");
+    expect((await judge(root, [sh("rev-parse", "HEAD").stdout.trim()])).kind).toBe("allow");
+    expect(excepts(argvs()[1]!)).toContain("bun run cat check:a");
+    expect(excepts(argvs()[1]!)).not.toContain("bun run cat check:b");
+    // Budget 0: every gate runs (only the whole suite is held out).
+    sh("config", "cat.gates.budgetSeconds", "0");
+    writeFileSync(join(root, "y.txt"), "y");
+    sh("add", "y.txt");
+    sh("commit", "-qm", "y");
+    expect((await judge(root, [sh("rev-parse", "HEAD").stdout.trim()])).kind).toBe("allow");
+    expect(excepts(argvs()[2]!)).toEqual(["bun test"]);
   });
 
   test("a red gate with no base outcome to compare against is undetermined, not refused, and leaves no record", async () => {
