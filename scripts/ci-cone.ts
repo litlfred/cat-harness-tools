@@ -80,7 +80,7 @@ import {
   type Fingerprint,
   type PairIO,
 } from "./input-hash.ts";
-import { openTrace } from "../schemas/sdlc/input-trace.ts";
+import { inputSiteReached, openTrace } from "../schemas/sdlc/input-trace.ts";
 import { isProjection, projectedState, type ProjectionName } from "../schemas/sdlc/read-projections.ts";
 import { collectTaskIo } from "./task-io.ts";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
@@ -89,6 +89,7 @@ import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 export const TRACER_VERSION = 3;
 
 /** Where the records live, relative to the checkout. `build/` is git-ignored, and the workflow caches this directory. */
+// input-site: inert #ff0c6593 — the cone's own records directory, which every read set leaves out
 export const CONE_DIR = join("build", "ci-cone");
 export const RECORD_FILE = join(CONE_DIR, "records.json");
 
@@ -601,6 +602,7 @@ function repoRelative(roots: readonly string[], abs: string): string | undefined
 export function excluded(rel: string, byGit: boolean): boolean {
   if (rel === "node_modules" || rel.startsWith("node_modules/")) return true;
   if (rel === CONE_DIR || rel.startsWith(`${CONE_DIR}/`)) return true;
+  // input-site: inert #6e4de56e — the input-hash cache directory, which every read set leaves out
   const cacheDir = join("build", "regen-cache");
   if (rel === cacheDir || rel.startsWith(`${cacheDir}/`)) return true;
   if (byGit && /(^|\/)\.git(\/|$)/.test(rel)) return true;
@@ -712,6 +714,8 @@ export function gitKey(c: GitCall): string {
 
 /** What a git command answers now: its exit status and the digests of what it printed. */
 export function gitState(root: string, c: GitCall): string {
+  // input-site: traced #a664a724 — replays a recorded git command to decide a skip; a run that reaches it records no hash
+  inputSiteReached("ci-cone: gitState");
   const r = Bun.spawnSync(["git", ...c.args], { cwd: c.cwd === "" ? root : join(root, c.cwd), stdout: "pipe", stderr: "pipe", stdin: "ignore" });
   const h = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
   return `exit ${r.exitCode} out ${h(r.stdout)} err ${h(r.stderr)}`;
@@ -838,12 +842,15 @@ export function coneRecordOf(args: {
 // ── CLI ─────────────────────────────────────────────────────────────────────
 
 function summary(line: string): void {
+  // input-site: inert #a4a61631 — the job summary is where the cone's report is shown, never an input of a check
   const path = process.env.GITHUB_STEP_SUMMARY;
   if (path) appendFileSync(path, `${line}\n`);
 }
 
 function straceWorks(): boolean {
   if (Bun.which("strace") === null) return false;
+  // input-site: traced #b2558986 — asks whether strace works, on the record path only
+  inputSiteReached("ci-cone: straceWorks");
   const r = Bun.spawnSync(["strace", "-f", "-qq", "-o", "/dev/null", "true"], { stdout: "ignore", stderr: "ignore" });
   return r.exitCode === 0;
 }
@@ -896,6 +903,8 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
         }
       : base;
   const plain = (why: string) => {
+    // input-site: traced #3f7614a5 — runs the check itself, untraced, on the record path
+    inputSiteReached("ci-cone: run plain");
     const r = Bun.spawnSync(cmdArgs, { cwd: o.root, stdin: stdio, stdout: stdio, stderr: stdio, env: cmdEnv(process.env) });
     return { code: r.exitCode ?? 1, note: `not traced — ${why}` };
   };
@@ -907,7 +916,11 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
   }
   if ("undetermined" in before) return plain(before.undetermined);
   const trace = openTrace(o.root);
+  // input-site: traced #ce261302 — the trace file's name, on the record path
+  inputSiteReached("ci-cone: trace log");
   const log = join(tmpdir(), `ci-cone-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.strace`);
+  // input-site: traced #db7dd1a6 — runs the check under strace, on the record path
+  inputSiteReached("ci-cone: run traced");
   const r = Bun.spawnSync(["strace", ...STRACE_ARGS, "-o", log, ...cmdArgs], {
     cwd: o.root,
     stdin: stdio,
@@ -919,6 +932,8 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
   if (code !== 0) {
     // The verdict must be the check's, never the tracer's. A traced run that
     // failed is asked again, untraced, and THAT exit status is the answer.
+    // input-site: traced #d365c714 — re-runs a failed traced check untraced, on the record path
+    inputSiteReached("ci-cone: run again");
     const again = Bun.spawnSync(cmdArgs, { cwd: o.root, stdin: stdio, stdout: stdio, stderr: stdio, env: cmdEnv(process.env) });
     code = again.exitCode ?? 1;
     rmSync(log, { force: true });
@@ -1010,6 +1025,8 @@ export function decideAll(o: {
 function main(argv: readonly string[]): number {
   const [cmd, script] = argv;
   const root = process.cwd();
+  // input-site: traced #c6583b74 — the cone CLI's environment; a check never runs this module's main()
+  inputSiteReached("ci-cone: main");
   const env = process.env;
   const scripts = scriptsOf(root);
   if (cmd === "decide-all") {
