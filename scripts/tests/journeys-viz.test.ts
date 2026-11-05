@@ -328,6 +328,15 @@ describe("helpers", () => {
     const j = (id: string, follows?: string) => ({ instance: "x", file: "", scenario: { id, follows } }) as never;
     expect(orderByFollows([j("c", "b"), j("a"), j("b", "a"), j("z", "elsewhere")]).map((x: { scenario: { id: string } }) => x.scenario.id)).toEqual(["a", "b", "c", "z"]);
   });
+  test("bpmnFigure never assembles a comment opener from a drawing's pieces", () => {
+    // A one-pass strip turned this into an unclosed `<!--` that hid the rest of the page.
+    const svg = '<svg><!<!---->--<g data-element-id="A"></g></svg>';
+    const out = bpmnFigure(svg, ["A"], "c");
+    expect(out).toContain("<!<!---->--<g");
+    expect(out).not.toMatch(/<!--(?!--)<g/);
+    expect(out).toContain('data-element-id="A" data-jv-hl=""');
+    expect(out).toContain("<figcaption>c</figcaption>");
+  });
   test("bpmnFigure leaves a drawing alone when no task is named", () => {
     expect(bpmnFigure('<svg><g data-element-id="A"></g></svg>', undefined, "c")).not.toContain("data-jv-hl");
   });

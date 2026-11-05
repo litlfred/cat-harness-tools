@@ -445,13 +445,17 @@ ${[head, ...lanes, curve, pain, enabler, record, handoff].join("\n")}
 
 let figureSeq = 0;
 
-/** A process drawing with the step's flow nodes highlighted: the SVG inlined, its XML prologue dropped. */
+/**
+ * A process drawing with the step's flow nodes highlighted: the SVG inlined,
+ * its XML prologue and doctype dropped. Comments are left as they are: they
+ * are harmless inside inline SVG, and a one-pass strip could JOIN the pieces
+ * of a nested one (`<!<!---->--`) into a `<!--` that swallows the page.
+ */
 export function bpmnFigure(svg: string, tasks: readonly string[] | undefined, caption: string): string {
   const id = `jv-fig-${++figureSeq}`;
   let body = svg
     .replace(/<\?xml[^>]*\?>/g, "")
     .replace(/<!DOCTYPE[^>]*>/gi, "")
-    .replace(/<!--[\s\S]*?-->/g, "")
     .trim();
   const hl = new Set(tasks ?? []);
   if (hl.size) {
