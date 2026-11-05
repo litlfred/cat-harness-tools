@@ -21,6 +21,8 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { gateOwnsFile } from "./lib/gate-own.ts";
+
 const REPO = resolve(import.meta.dir, "../..");
 const WORKFLOWS = join(REPO, ".github", "workflows");
 
@@ -52,7 +54,15 @@ export function ciInvocations(dir = WORKFLOWS): CiInvocation[] {
 }
 
 if (import.meta.main) {
-  const found = ciInvocations();
+  // In a layer's PR checks, only the caller's own workflows (owner ruling
+  // 2026-11-05, "Move the checks"; `lib/gate-own.ts`). In a layer root the
+  // workflows are the index's, so a layer is not judged on them.
+  const all = ciInvocations();
+  const found = all.filter((i) => gateOwnsFile(`.github/workflows/${i.workflow}`) !== false);
+  if (found.length === 0 && all.length > 0) {
+    console.log(`✓ check:ci-invocations: none of the ${all.length} invocation(s) is in a workflow the caller commits; the root's own CI judges them.`);
+    process.exit(0);
+  }
   if (found.length === 0) {
     console.error("no `--check` invocation found in .github/workflows/.");
     console.error("  Nothing was checked. That is `could not determine`, not a pass.");
