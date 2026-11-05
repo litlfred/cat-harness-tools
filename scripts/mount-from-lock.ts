@@ -33,6 +33,14 @@
  *   bun run cat mount:lock -- --root <dir> # the downstream instance root (default: cwd)
  *   bun run cat mount:lock -- --no-install # lay the bytes down, do not `bun install` in each mount
  *   bun run cat mount:lock -- --install-all # install devDependencies too (default: --omit dev)
+ *   bun run cat mount:lock -- --no-layers-cache # skip the shared layers cache ref, fetch each repository
+ *   bun run cat layers:publish             # (= --publish) build the overlay of the verified mounts, push refs/cat/layers/<key>
+ *   bun run cat layers:publish -- --main --prune 20 [--keep <key>]… [--url <index remote>] [--no-push]
+ *
+ * The FAST PATH: before fetching instance by instance, the replay tries ONE
+ * shallow fetch of the index's layers cache ref (`refs/cat/layers/<key>`, then
+ * `refs/cat/layers/main`) and verifies every byte it takes from it against the
+ * lock; see "The shared layers cache ref" below.
  *
  * `CAT_MOUNT_URL_PREFIX` replaces `https://github.com` in fetch URLs (tests
  * serve local bare repositories this way); a repository that is already a URL
@@ -43,7 +51,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
@@ -208,8 +216,13 @@ export function withoutBuiltAtPublish(files: readonly string[], declared: readon
   return files.filter((f) => !declared.some((p) => (p.endsWith("/") ? f.startsWith(p) : f === p)));
 }
 
+/** The files under `dir` a mount digest hashes: no install artefacts, no state mounts, nothing built at publish. */
+export function coveredFiles(dir: string, skip: readonly string[] = []): string[] {
+  return withoutBuiltAtPublish(withoutInstallArtefacts(withoutStateMounts(dir, treeFiles(dir), skip)), builtAtPublishOf(dir));
+}
+
 export function digestOf(dir: string, skip: readonly string[] = []): { treeDigest: string; files: number } {
-  const files = withoutBuiltAtPublish(withoutInstallArtefacts(withoutStateMounts(dir, treeFiles(dir), skip)), builtAtPublishOf(dir));
+  const files = coveredFiles(dir, skip);
   const listing = files.map((f) => `${sha256(readFileSync(join(dir, f)))}  ${f}\n`).join("");
   return { treeDigest: sha256(listing), files: files.length };
 }
@@ -569,49 +582,84 @@ function mountCacheDir(): string | undefined {
   return resolve(dir);
 }
 
-function tryMountFromCache(root: string, inst: LockInstance, absent: readonly string[], cacheDir: string): Outcome | undefined {
-  const declCache = join(cacheDir, "blobs", inst.declaration.sha256);
-  if (!existsSync(declCache) || sha256(readFileSync(declCache)) !== inst.declaration.sha256) return undefined;
-  for (const d of inst.directories) {
-    if (!absent.includes(d.path)) continue;
-    if (!existsSync(join(cacheDir, "trees", d.treeDigest))) return undefined;
-  }
+/**
+ * Where a ready-made copy of an instance's locked bytes sits: a local
+ * content-addressed cache, or the shared layers cache ref. Every path it
+ * names is UNTRUSTED — {@link layDownFrom} verifies each against the lock.
+ */
+interface MountSource {
+  label: string;
+  decl(inst: LockInstance): string;
+  dir(inst: LockInstance, d: LockDir): string;
+  asset(inst: LockInstance, a: LockAsset): string;
+  /** Told when a directory's copy did not hash to the lock (the local cache drops it). */
+  onBadDir?(inst: LockInstance, d: LockDir): void;
+}
+
+/**
+ * Lay the ABSENT parts of `inst` down from `src`, verifying every byte
+ * against the lock exactly as the fetch route does: the declaration's and
+ * each asset's sha256, each directory's `treeDigest`. Anything missing or
+ * mismatched undoes what this wrote and answers `undefined`, so the caller
+ * falls back to the per-repository fetch — a stale or tampered source costs
+ * time, never correctness.
+ */
+function layDownFrom(root: string, inst: LockInstance, absent: readonly string[], src: MountSource): Outcome | undefined {
+  const declSrc = src.decl(inst);
+  if (!inst.hydrated && (!existsSync(declSrc) || sha256(readFileSync(declSrc)) !== inst.declaration.sha256)) return undefined;
+  for (const d of inst.directories) if (absent.includes(d.path) && !existsSync(src.dir(inst, d))) return undefined;
   for (const a of inst.assets ?? []) {
     if (!absent.includes(`${inst.path}/${a.src}`)) continue;
-    const blob = join(cacheDir, "blobs", a.sha256);
+    const blob = src.asset(inst, a);
     if (!existsSync(blob) || sha256(readFileSync(blob)) !== a.sha256) return undefined;
   }
   const written: string[] = [];
+  const undo = (): undefined => {
+    for (const w of written) rmSync(join(root, w), { recursive: true, force: true });
+    return undefined;
+  };
   for (const d of inst.directories) {
     if (!absent.includes(d.path)) continue;
-    const src = join(cacheDir, "trees", d.treeDigest);
     const dst = join(root, d.path);
     mkdirSync(dirname(dst), { recursive: true });
-    cpSync(src, dst, { recursive: true, verbatimSymlinks: true, force: true });
+    cpSync(src.dir(inst, d), dst, { recursive: true, verbatimSymlinks: true, force: true });
     written.push(d.path);
     if (digestOf(dst).treeDigest !== d.treeDigest) {
-      for (const w of written) rmSync(join(root, w), { recursive: true, force: true });
-      rmSync(src, { recursive: true, force: true });
-      return undefined;
+      src.onBadDir?.(inst, d);
+      return undo();
     }
   }
   for (const a of inst.assets ?? []) {
     if (!absent.includes(`${inst.path}/${a.src}`)) continue;
-    const src = join(cacheDir, "blobs", a.sha256);
     const dst = join(root, inst.path, a.src);
     mkdirSync(dirname(dst), { recursive: true });
-    cpSync(src, dst, { force: true });
+    cpSync(src.asset(inst, a), dst, { force: true });
     written.push(join(inst.path, a.src));
+    if (sha256(readFileSync(dst)) !== a.sha256) return undo();
   }
   const declDst = join(root, inst.path, inst.declaration.file);
-  if (!existsSync(declDst)) {
+  if (!inst.hydrated && !existsSync(declDst)) {
     mkdirSync(dirname(declDst), { recursive: true });
-    cpSync(declCache, declDst);
+    cpSync(declSrc, declDst);
   }
   ensureIgnored(root, inst.path);
   for (const d of inst.directories) ensureIgnored(root, d.path);
   const files = inst.directories.reduce((n, d) => n + d.files, 0) + (inst.assets?.length ?? 0);
-  return { instance: inst.instance, state: "mounted", detail: `${written.length} director${written.length === 1 ? "y" : "ies"}, ${files} file(s) from ${inst.repository}@${inst.sha.slice(0, 12)}` };
+  return { instance: inst.instance, state: "mounted", detail: `${written.length} director${written.length === 1 ? "y" : "ies"}, ${files} file(s) from ${inst.repository}@${inst.sha.slice(0, 12)} (${src.label})` };
+}
+
+function localCacheSource(cacheDir: string): MountSource {
+  return {
+    label: "local mount cache",
+    decl: (inst) => join(cacheDir, "blobs", inst.declaration.sha256),
+    dir: (_inst, d) => join(cacheDir, "trees", d.treeDigest),
+    asset: (_inst, a) => join(cacheDir, "blobs", a.sha256),
+    onBadDir: (_inst, d) => rmSync(join(cacheDir, "trees", d.treeDigest), { recursive: true, force: true }),
+  };
+}
+
+function tryMountFromCache(root: string, inst: LockInstance, absent: readonly string[], cacheDir: string): Outcome | undefined {
+  return layDownFrom(root, inst, absent, localCacheSource(cacheDir));
 }
 
 function saveToMountCache(cacheDir: string, inst: LockInstance, root: string): void {
@@ -640,7 +688,7 @@ function saveToMountCache(cacheDir: string, inst: LockInstance, root: string): v
   }
 }
 
-export function mountInstance(root: string, inst: LockInstance): Outcome {
+export function mountInstance(root: string, inst: LockInstance, layers?: LayersCache): Outcome {
   const id = inst.instance;
   const bad = [inst.path, ...inst.directories.map((d) => d.path)].find((p) => !safeRel(p));
   if (bad !== undefined) return { instance: id, state: "could-not-determine", detail: `lock path \`${bad}\` climbs out of the checkout or is dot-prefixed` };
@@ -658,6 +706,12 @@ export function mountInstance(root: string, inst: LockInstance): Outcome {
   if (cacheDir) {
     const cached = tryMountFromCache(root, inst, absent, cacheDir);
     if (cached) return cached;
+  }
+  const shared = layers?.source();
+  if (shared) {
+    const hit = layDownFrom(root, inst, absent, shared);
+    if (hit) return hit;
+    layers!.fellBack.push(inst.instance);
   }
 
   const upstreamDecl = inst.upstreamRoot ? `${inst.upstreamRoot.replace(/\/+$/, "")}/${inst.declaration.file}` : inst.declaration.file;
@@ -754,6 +808,243 @@ export function mountInstance(root: string, inst: LockInstance): Outcome {
   }
 }
 
+// ── The shared layers cache ref ──────────────────────────────────────────────
+//
+// Replaying a lock fetches every pinned instance from its own repository: one
+// round trip, one negotiation, one sparse checkout per layer. The layers
+// cache is ONE git commit in the INDEX repository whose tree is the composed
+// overlay this file lays down — each locked directory at its mount path, each
+// declaration and asset, nothing an install or a state mount wrote — so a
+// fresh checkout mounts every layer with one shallow fetch.
+//
+// It is keyed by the lock: `refs/cat/layers/<sha256 of the lock's
+// instances>`, plus a moving `refs/cat/layers/main` that the writer on main
+// updates. The lock stays the SOLE authority. The cache is untrusted: every
+// byte taken from it is verified by {@link layDownFrom} exactly as a fetched
+// byte is, an instance whose copy does not verify falls back to its own
+// repository, and a missing ref falls back for all of them. So a stale cache
+// (`main` after a re-pin) still serves every layer that did not move, and a
+// tampered one can cost time, never correctness. Trust was checked when the
+// lock was written; nothing here changes that.
+//
+// Whoever writes the lock writes the ref: `bun run cat layers:publish`
+// (this file's `--publish`) over a checkout whose mounts `--check` reads
+// current. It refuses any other state, so it can only publish bytes that
+// already hash to the lock.
+
+/** The ref namespace, in the index repository. */
+export const LAYERS_REF_PREFIX = "refs/cat/layers/";
+/** The moving ref the writer on main updates. */
+export const LAYERS_MAIN_REF = `${LAYERS_REF_PREFIX}main`;
+
+/** The key of a lock: sha256 of its `instances`, as committed. */
+export function layersKey(instances: readonly LockInstance[]): string {
+  return sha256(JSON.stringify(instances));
+}
+export const layersRef = (key: string): string => `${LAYERS_REF_PREFIX}${key}`;
+
+/**
+ * Where the cache lives: `CAT_LAYERS_URL`, else the root's `origin`.
+ * `CAT_LAYERS_CACHE=0` turns the fast path off.
+ */
+export function layersUrl(root: string): string | undefined {
+  if (process.env.CAT_LAYERS_CACHE === "0") return undefined;
+  const env = process.env.CAT_LAYERS_URL?.trim();
+  if (env) return env;
+  const r = git(root, ["remote", "get-url", "origin"]);
+  return r.status === 0 && r.stdout.trim() ? r.stdout.trim() : undefined;
+}
+
+/** A lazily fetched layers cache: fetched the first time an instance needs it, at most once. */
+export interface LayersCache {
+  /** The ref that served, once fetched; `undefined` on a miss. */
+  ref?: string;
+  /** Instances whose cached copy did not verify and were fetched from their own repository. */
+  fellBack: string[];
+  /** Why there is no source, when there is none. */
+  miss?: string;
+  source(): MountSource | undefined;
+  dispose(): void;
+}
+
+export function openLayersCache(url: string | undefined, key: string): LayersCache {
+  let tried = false;
+  let dir: string | undefined;
+  let src: MountSource | undefined;
+  const cache: LayersCache = {
+    fellBack: [],
+    source() {
+      if (tried) return src;
+      tried = true;
+      if (!url) {
+        cache.miss = "no index remote (set CAT_LAYERS_URL, or CAT_LAYERS_CACHE=0 to stop looking)";
+        return undefined;
+      }
+      dir = mkdtempSync(join(tmpdir(), "mount-layers-"));
+      if (git(dir, ["init", "-q"]).status !== 0) return undefined;
+      for (const ref of [layersRef(key), LAYERS_MAIN_REF]) {
+        if (git(dir, ["fetch", "-q", "--depth", "1", url, ref]).status !== 0) continue;
+        if (git(dir, ["checkout", "-q", "FETCH_HEAD"]).status !== 0) continue;
+        cache.ref = ref;
+        const at = dir;
+        src = {
+          label: `layers cache ${ref === LAYERS_MAIN_REF ? "main" : key.slice(0, 12)}`,
+          decl: (inst) => join(at, inst.path, inst.declaration.file),
+          dir: (_inst, d) => join(at, d.path),
+          asset: (inst, a) => join(at, inst.path, a.src),
+        };
+        return src;
+      }
+      cache.miss = `neither ${layersRef(key).slice(0, LAYERS_REF_PREFIX.length + 12)}… nor ${LAYERS_MAIN_REF} at the index remote`;
+      return undefined;
+    },
+    dispose() {
+      if (dir) rmSync(dir, { recursive: true, force: true });
+    },
+  };
+  return cache;
+}
+
+/** One entry of the overlay tree: a path, its git mode, and the file (or link target) it holds. */
+interface OverlayEntry {
+  path: string;
+  mode: "100644" | "100755" | "120000";
+  abs: string;
+}
+
+/** Symlinks under `dir` that are not install artefacts — laid down by the fetch route, so carried too. */
+function treeLinks(dir: string): string[] {
+  const out: string[] = [];
+  const walk = (d: string): void => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name);
+      const rel = relative(dir, p).split("\\").join("/");
+      if (isInstallArtefact(rel)) continue;
+      if (e.isSymbolicLink()) out.push(rel);
+      else if (e.isDirectory()) walk(p);
+    }
+  };
+  if (existsSync(dir)) walk(dir);
+  return out.sort();
+}
+
+/** The composed overlay of every locked instance, as `mount-from-lock` lays it down. */
+export function overlayEntries(root: string, instances: readonly LockInstance[]): OverlayEntry[] {
+  const skip = stateMountedDirs(root);
+  const out = new Map<string, OverlayEntry>();
+  const add = (path: string, abs: string, link = false): void => {
+    const mode = link ? "120000" : lstatSync(abs).mode & 0o111 ? "100755" : "100644";
+    out.set(path, { path, mode, abs });
+  };
+  for (const inst of instances) {
+    if (!inst.hydrated) add(`${inst.path}/${inst.declaration.file}`, join(root, inst.path, inst.declaration.file));
+    for (const d of inst.directories) {
+      const abs = join(root, d.path);
+      const base = d.path.replace(/\/+$/, "");
+      for (const f of coveredFiles(abs, skip)) add(`${base}/${f}`, join(abs, f));
+      for (const l of withoutStateMounts(abs, treeLinks(abs), skip)) add(`${base}/${l}`, join(abs, l), true);
+    }
+    for (const a of inst.assets ?? []) add(`${inst.path}/${a.src}`, join(root, inst.path, a.src));
+  }
+  return [...out.values()].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+}
+
+export interface PublishResult {
+  ok: boolean;
+  detail: string;
+  key?: string;
+  commit?: string;
+  refs?: string[];
+  pruned?: string[];
+}
+
+const IDENTITY = { GIT_AUTHOR_NAME: "cat layers", GIT_AUTHOR_EMAIL: "cat-layers@users.noreply.github.com", GIT_COMMITTER_NAME: "cat layers", GIT_COMMITTER_EMAIL: "cat-layers@users.noreply.github.com" };
+
+function gitEnv(cwd: string, args: string[], env: Record<string, string>, input?: string): { status: number; stdout: string; stderr: string } {
+  const r = spawnSync("git", args, { cwd, encoding: "utf-8", maxBuffer: 1 << 28, env: { ...process.env, ...env }, input });
+  return { status: r.status ?? 128, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
+}
+
+/**
+ * Build the overlay commit for `root`'s lock and (unless `push: false`) push
+ * it to `refs/cat/layers/<key>` — and, with `main`, to `refs/cat/layers/main`.
+ * Refuses unless every locked instance reads `current`: only bytes that hash
+ * to the lock are ever published.
+ */
+export function publishLayers(root: string, opts: { url?: string; main?: boolean; push?: boolean; prune?: number; keep?: string[] } = {}): PublishResult {
+  const locks = readLocks(root);
+  if (locks.length !== 1) return { ok: false, detail: locks.length === 0 ? `no ${INDEX_LOCK} in ${root}` : "more than one lock — publish one index at a time" };
+  const lock = locks[0]!;
+  if (lock.error) return { ok: false, detail: lock.error };
+  const instances = lock.instances!;
+  const notCurrent = instances.map((i) => checkInstance(root, i)).filter((o) => o.state !== "current");
+  if (notCurrent.length) return { ok: false, detail: `refused — not every mount hashes to the lock (run \`bun run cat mount:lock\` first): ${notCurrent.map((o) => `${o.instance}: ${o.detail}`).join("; ")}` };
+  const key = layersKey(instances);
+  const entries = overlayEntries(root, instances);
+  const scratch = mkdtempSync(join(tmpdir(), "layers-publish-"));
+  try {
+    const env = { ...IDENTITY, ...pick(process.env, Object.keys(IDENTITY)), GIT_INDEX_FILE: join(scratch, "index") };
+    // `--no-filters`: the bytes as they sit, which are the bytes the digest hashed — never the root's own clean filters.
+    const files = entries.filter((e) => e.mode !== "120000");
+    const hashed = gitEnv(root, ["hash-object", "-w", "--no-filters", "--stdin-paths"], env, files.map((e) => e.abs).join("\n") + "\n");
+    if (hashed.status !== 0) return { ok: false, detail: `git hash-object failed: ${hashed.stderr.trim()}` };
+    const shas = hashed.stdout.trim().split("\n");
+    const blob = new Map(files.map((e, i) => [e.path, shas[i]!]));
+    for (const e of entries.filter((x) => x.mode === "120000")) {
+      const h = gitEnv(root, ["hash-object", "-w", "--stdin"], env, readlinkSync(e.abs));
+      if (h.status !== 0) return { ok: false, detail: `git hash-object (link ${e.path}) failed: ${h.stderr.trim()}` };
+      blob.set(e.path, h.stdout.trim());
+    }
+    const info = entries.map((e) => `${e.mode} ${blob.get(e.path)}\t${e.path}\0`).join("");
+    const idx = gitEnv(root, ["update-index", "-z", "--index-info"], env, info);
+    if (idx.status !== 0) return { ok: false, detail: `git update-index failed: ${idx.stderr.trim()}` };
+    const tree = gitEnv(root, ["write-tree"], env);
+    if (tree.status !== 0) return { ok: false, detail: `git write-tree failed: ${tree.stderr.trim()}` };
+    const lockSha = sha256(readFileSync(lock.file));
+    const msg = `cat layers ${key}\n\nThe composed overlay of ${instances.length} locked instance(s), ${entries.length} file(s).\nlock: ${relative(root, lock.file)} sha256 ${lockSha}\n${instances.map((i) => `${i.instance} ${i.repository}@${i.sha}`).join("\n")}\n`;
+    const commit = gitEnv(root, ["commit-tree", tree.stdout.trim(), "-m", msg], env);
+    if (commit.status !== 0) return { ok: false, detail: `git commit-tree failed: ${commit.stderr.trim()}` };
+    const sha = commit.stdout.trim();
+    const refs = [layersRef(key), ...(opts.main ? [LAYERS_MAIN_REF] : [])];
+    if (opts.push === false) return { ok: true, key, commit: sha, refs: [], detail: `built ${sha.slice(0, 12)} for ${key.slice(0, 12)} (${entries.length} files); not pushed` };
+    const url = opts.url ?? layersUrl(root);
+    if (!url) return { ok: false, key, commit: sha, detail: "no index remote to push to (pass --url or set CAT_LAYERS_URL)" };
+    const push = git(root, ["push", "-q", "--force", url, ...refs.map((r) => `${sha}:${r}`)]);
+    if (push.status !== 0) return { ok: false, key, commit: sha, detail: `git push failed: ${push.stderr.trim().split("\n").pop()}` };
+    const pruned = opts.prune !== undefined ? pruneLayers(url, opts.prune, [key, ...(opts.keep ?? [])]) : [];
+    return { ok: true, key, commit: sha, refs, pruned, detail: `pushed ${sha.slice(0, 12)} (${entries.length} files) to ${refs.join(", ")}${pruned.length ? `; pruned ${pruned.length}` : ""}` };
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+function pick(env: NodeJS.ProcessEnv, keys: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of keys) if (env[k]) out[k] = env[k]!;
+  return out;
+}
+
+/**
+ * Delete all but the newest `keep` lock refs at `url` (by committer date),
+ * never `main` nor a key in `keepKeys` (the one just published, and any an
+ * open PR still pins). Reads only commits, no trees or blobs.
+ */
+export function pruneLayers(url: string, keep: number, keepKeys: readonly string[] = []): string[] {
+  const dir = mkdtempSync(join(tmpdir(), "layers-prune-"));
+  try {
+    git(dir, ["init", "-q"]);
+    if (git(dir, ["fetch", "-q", "--depth", "1", "--filter=tree:0", url, `+${LAYERS_REF_PREFIX}*:refs/l/*`]).status !== 0) return [];
+    const listed = git(dir, ["for-each-ref", "--sort=-committerdate", "--format=%(refname)", "refs/l/"]).stdout.trim().split("\n").filter(Boolean);
+    const keys = listed.map((r) => r.slice("refs/l/".length)).filter((k) => k !== "main");
+    const doomed = keys.slice(Math.max(0, keep)).filter((k) => !keepKeys.includes(k));
+    if (doomed.length === 0) return [];
+    const r = git(dir, ["push", "-q", url, ...doomed.map((k) => `:${layersRef(k)}`)]);
+    return r.status === 0 ? doomed : [];
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 // ── All of them ──────────────────────────────────────────────────────────────
 
 export function exitCode(outcomes: Outcome[]): 0 | 1 | 2 {
@@ -762,8 +1053,19 @@ export function exitCode(outcomes: Outcome[]): 0 | 1 | 2 {
   return 0;
 }
 
-export function run(root: string, check: boolean, opts: { install?: InstallMode | false } = {}): { outcomes: Outcome[]; locks: number } {
+export interface LayersReport {
+  ref?: string;
+  miss?: string;
+  fellBack: string[];
+}
+
+export function run(
+  root: string,
+  check: boolean,
+  opts: { install?: InstallMode | false; layers?: false; layersUrl?: string } = {},
+): { outcomes: Outcome[]; locks: number; layers: LayersReport[] } {
   const outcomes: Outcome[] = [];
+  const layersReport: LayersReport[] = [];
   const locks = readLocks(root);
   const laid: Array<{ inst: LockInstance; outcome: Outcome }> = [];
   for (const l of locks) {
@@ -771,11 +1073,17 @@ export function run(root: string, check: boolean, opts: { install?: InstallMode 
       outcomes.push({ instance: relative(root, l.file), state: "could-not-determine", detail: l.error });
       continue;
     }
-    for (const inst of l.instances!) {
-      const outcome = check ? checkInstance(root, inst) : mountInstance(root, inst);
-      outcomes.push(outcome);
-      if (outcome.state === "mounted" || outcome.state === "current") laid.push({ inst, outcome });
+    const layers = check || opts.layers === false ? undefined : openLayersCache(opts.layersUrl ?? layersUrl(root), layersKey(l.instances!));
+    try {
+      for (const inst of l.instances!) {
+        const outcome = check ? checkInstance(root, inst) : mountInstance(root, inst, layers);
+        outcomes.push(outcome);
+        if (outcome.state === "mounted" || outcome.state === "current") laid.push({ inst, outcome });
+      }
+    } finally {
+      layers?.dispose();
     }
+    if (layers) layersReport.push({ ref: layers.ref, miss: layers.miss, fellBack: layers.fellBack });
   }
   // AFTER every instance is down, so a manifest's `workspaces` reaching a
   // sibling mount finds it. A failed install is reported against the instance
@@ -791,7 +1099,7 @@ export function run(root: string, check: boolean, opts: { install?: InstallMode 
       }
     }
   }
-  return { outcomes, locks: locks.length };
+  return { outcomes, locks: locks.length, layers: layersReport };
 }
 
 if (import.meta.main) {
@@ -799,12 +1107,28 @@ if (import.meta.main) {
   const check = argv.includes("--check");
   const at = argv.indexOf("--root");
   const root = resolve(at >= 0 && argv[at + 1] ? argv[at + 1]! : process.cwd());
-  const { outcomes, locks } = run(root, check, { install: argv.includes("--no-install") ? false : argv.includes("--install-all") ? "all" : "production" });
+  const val = (flag: string): string | undefined => {
+    const i = argv.indexOf(flag);
+    return i >= 0 ? argv[i + 1] : undefined;
+  };
+  if (argv.includes("--publish")) {
+    const prune = val("--prune");
+    const keep = argv.flatMap((a, i) => (a === "--keep" && argv[i + 1] ? [argv[i + 1]!] : []));
+    const r = publishLayers(root, { url: val("--url"), main: argv.includes("--main"), push: !argv.includes("--no-push"), prune: prune === undefined ? undefined : Number(prune), keep });
+    console.log(`layers:publish: ${r.ok ? "OK" : "REFUSED"} — ${r.detail}`);
+    if (r.pruned?.length) for (const k of r.pruned) console.log(`  pruned ${layersRef(k)}`);
+    process.exit(r.ok ? 0 : 1);
+  }
+  const { outcomes, locks, layers } = run(root, check, { install: argv.includes("--no-install") ? false : argv.includes("--install-all") ? "all" : "production", ...(argv.includes("--no-layers-cache") ? { layers: false as const } : {}) });
   if (locks === 0) {
     console.log(`mount:lock: not-enabled — no ${INDEX_LOCK} (or legacy *${LEGACY_LOCK_SUFFIX}) in ${root}`);
     process.exit(0);
   }
   for (const o of outcomes) console.log(`  ${o.state.padEnd(20)} ${o.instance.padEnd(22)} ${o.detail}`);
+  for (const l of layers) {
+    if (l.ref) console.log(`  layers cache: ${l.ref}${l.fellBack.length ? ` — did not verify for ${l.fellBack.join(", ")}, fetched from their own repositories` : ""}`);
+    else if (l.miss) console.log(`  layers cache: miss — ${l.miss}; fetched per repository`);
+  }
   const code = exitCode(outcomes);
   console.log(`mount:lock${check ? " --check" : ""}: ${outcomes.length} instance(s) — ${code === 0 ? "OK" : code === 1 ? "MISSING" : "COULD NOT DETERMINE"}`);
   process.exit(code);
