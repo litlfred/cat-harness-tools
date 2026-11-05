@@ -160,6 +160,14 @@ def index_scripts(path=INDEX_GATES_JSON):
 
 
 TIMEOUT_S = 1200
+# The caller's own instances, for the checks that judge only their files
+# (`scripts/lib/gate-own.ts` GATE_OWN_ENV). Owner ruling 2026-11-05, "Move the
+# checks": a check of a layer's own committed files runs only in the
+# repository that commits them. `check:schema-nodes` walked every declared
+# `schemas/` in the root, the mounted layers' included, so a defect on
+# cat-harness-tools main (#1478) was a new failure in every root mounting it
+# (smart-ra#228). Given this, it judges only the caller's own `schemas/`.
+GATE_OWN_ENV = "CAT_GATE_OWN_INSTANCES"
 # Gates that judge the REMOTE's live state, not the checkout: which workflows
 # are red on the default branch, whether a commit has a run, which advisories
 # the registry knows today. Base and head run minutes apart, so one can flip
@@ -1008,6 +1016,10 @@ def main():
         sys.exit(2)
     print(f"own: {', '.join(own)}; dependency harness: {', '.join(harness)}", flush=True)
     print(f"script runner: {runner}", flush=True)
+    # The instances whose committed files this run judges (scripts/lib/gate-own.ts;
+    # owner ruling 2026-11-05, "Move the checks"). A check that honours it leaves
+    # the mounted layers' files to their own CI. Every gate inherits it.
+    os.environ.setdefault(GATE_OWN_ENV, ",".join(own))
     skipped = {k: {"command": v["command"], "skipped": v["skipped"]} for k, v in skipped.items()}
     os.environ.setdefault("CAT_SKILL_REGISTER_VERIFIED_BY_GATES", verified_by_gates(gates))
     timings = read_timings(os.environ.get("GATE_TIMINGS"))

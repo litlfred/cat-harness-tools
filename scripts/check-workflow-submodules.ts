@@ -19,8 +19,15 @@
  * platform script, every non-publish checkout in that job must carry
  * `submodules`.** It can over-report; the remedy is one harmless line.
  *
+ * A later `uses: ./.github/actions/<name>` step counts as the replay when
+ * that action's own `action.yml` replays the lock (`mount-from-lock`) or runs
+ * `mount:lock:check`, which re-hashes every mount against the lock and fails
+ * when one is missing. Its steps run in the workspace, so it serves only a
+ * checkout at the workspace root. `.github/actions/ci-setup` (bean `ay33`)
+ * mounts this way, from the prepared CI image or by a replay.
+ *
  * Blind spot, printed every run: a composite action or reusable workflow that
- * runs platform code on the caller's behalf.
+ * RUNS platform code on the caller's behalf.
  *
  * A checkout of a PUBLISH branch (`gh-pages`, the `publish_branch` input) is
  * exempt: it carries built output, never source.
@@ -28,7 +35,7 @@
  * Exit: 0 clean, 1 a job runs platform code from a submodule-less checkout.
  */
 
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const WORKFLOWS = ".github/workflows";
@@ -133,8 +140,27 @@ export function ciScriptsOnly(block: readonly string[]): boolean {
   return clean.length > 0 && clean.every((p) => p === ".github" || p.startsWith(".github/"));
 }
 
+/** A local action's `action.yml` text, by its repository-relative directory; `undefined` when there is none. */
+export type ActionReader = (dir: string) => string | undefined;
+
+const LOCAL_ACTION = /uses:\s*\.\/(\.github\/actions\/[A-Za-z0-9._/-]+?)\/?\s*(?:#.*)?$/;
+const REPLAY_ROOT = /mount-from-lock\.(?:ts|sh)["']?\s+--root\s+["']?([^"'\s;]+)/;
+
+/**
+ * Whether a local composite action mounts the lock into the workspace root:
+ * a replay with `--root .` (or the workspace itself), or `mount:lock:check`.
+ */
+export function actionMountsWorkspace(text: string): boolean {
+  if (/\bmount:lock:check\b/.test(text)) return true;
+  for (const line of text.split("\n")) {
+    const m = REPLAY_ROOT.exec(line)?.[1];
+    if (m !== undefined && /^(?:\.|\.\/|"?\$\{?GITHUB_WORKSPACE\}?"?|\$\{\{\s*github\.workspace\s*\}\})$/.test(m)) return true;
+  }
+  return false;
+}
+
 /** Every `actions/checkout` in one job, with the `with:` keys that matter here. */
-export function checkoutsOf(job: Job): CheckoutStep[] {
+export function checkoutsOf(job: Job, readAction?: ActionReader): CheckoutStep[] {
   const out: CheckoutStep[] = [];
   for (const [i, line] of job.lines.entries()) {
     if (!/uses:\s*actions\/checkout/.test(line)) continue;
@@ -157,7 +183,15 @@ export function checkoutsOf(job: Job): CheckoutStep[] {
     const norm = (p: string) => p.replace(/\s+/g, " ").replace(/\/+$/, "");
     const root = norm(full ?? ".");
     const after = job.lines.slice(i + 1);
-    const mounted = after.some((l, k) => {
+    const byAction =
+      root === "." &&
+      readAction !== undefined &&
+      after.some((l) => {
+        const dir = LOCAL_ACTION.exec(l)?.[1];
+        const text = dir === undefined ? undefined : readAction(dir);
+        return text !== undefined && actionMountsWorkspace(text);
+      });
+    const mounted = byAction || after.some((l, k) => {
       // The replayer itself (`.ts`), or the index checkout's `.github/
       // mount-from-lock.sh`, which fetches the pinned replayer and runs it
       // with the same `--root` — every job in an index checkout calls the
@@ -200,11 +234,12 @@ export function bunRunsOf(job: Job): { line: number; script: string }[] {
 export function auditWorkflow(
   file: string,
   src: string,
+  readAction?: ActionReader,
 ): { findings: Finding[]; composites: Finding[] } {
   const findings: Finding[] = [];
   const composites: Finding[] = [];
   for (const job of jobsOf(src)) {
-    const checkouts = checkoutsOf(job).filter((c) => !c.publish);
+    const checkouts = checkoutsOf(job, readAction).filter((c) => !c.publish);
     const runs = bunRunsOf(job);
     if (runs.length === 0) {
       // A job that runs no platform script but delegates to a composite action
@@ -230,7 +265,8 @@ export function auditWorkflow(
         job: job.name,
         line: c.line,
         detail:
-          `checkout is not followed by a lock replay (\`bun <path>/cat-harness/scripts/mount-from-lock.ts --root <path>\` or \`bash .github/mount-from-lock.sh --root <path>\`), ` +
+          `checkout is not followed by a lock replay (\`bun <path>/cat-harness/scripts/mount-from-lock.ts --root <path>\`, \`bash .github/mount-from-lock.sh --root <path>\`, ` +
+          `or a local action that replays or checks the lock into the workspace), ` +
           `and this job runs ${runs.length} platform script(s) (first: \`${runs[0]?.script ?? "?"}\` at line ${runs[0]?.line ?? 0}) — ` +
           `one reaching \`cat-harness/schemas/\` dies on \`bootstrap-tools\`, which is a remote mount (bean nn8e)`,
       });
@@ -239,6 +275,15 @@ export function auditWorkflow(
   return { findings, composites };
 }
 
+/** `<dir>/action.yml` (or `.yaml`) from the working directory, the repository root. */
+export const readLocalAction: ActionReader = (dir) => {
+  for (const name of ["action.yml", "action.yaml"]) {
+    const f = join(dir, name);
+    if (existsSync(f)) return readFileSync(f, "utf8");
+  }
+  return undefined;
+};
+
 if (import.meta.main) {
   const files = readdirSync(WORKFLOWS)
     .filter((f) => f.endsWith(".yml") || f.endsWith(".yaml"))
@@ -246,7 +291,7 @@ if (import.meta.main) {
   const findings: Finding[] = [];
   const composites: Finding[] = [];
   for (const f of files) {
-    const r = auditWorkflow(f, readFileSync(join(WORKFLOWS, f), "utf8"));
+    const r = auditWorkflow(f, readFileSync(join(WORKFLOWS, f), "utf8"), readLocalAction);
     findings.push(...r.findings);
     composites.push(...r.composites);
   }

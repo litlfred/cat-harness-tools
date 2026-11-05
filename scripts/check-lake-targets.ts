@@ -18,6 +18,7 @@ import { basename, join, relative, resolve } from "node:path";
 import type { KgCriterionEntry, KgFinding } from "../schemas/sdlc/kg-qa.js";
 import { folioDir } from "../schemas/kg/cat-harness.js";
 import { fileDeclaresName } from "../pipeline/lean-lexer.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 export type LeanRefClassification = "built" | "sibling_only" | "dangling" | "unknown";
 
@@ -134,6 +135,7 @@ function scanLeanSourceFiles(
   const base = resolve(lakeRoot, srcDir);
   try {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      // input-site: inert #644fe977 — a directory the walk skips; its contents are never read
       if (entry.name === ".lake" || entry.name === "build" || entry.name === "node_modules") continue;
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
@@ -218,6 +220,7 @@ function discoverNearbyChapterLeanFiles(lakeRoot: string): Set<string> {
         if (
           entry.name === lakeBase ||
           entry.name === ".lake" ||
+          // input-site: inert #c05beb24 — a directory the walk skips; its contents are never read
           entry.name === "build" ||
           entry.name === "node_modules" ||
           entry.name === ".git"
@@ -304,10 +307,14 @@ export function classifyLeanRefTarget(
     if (content) {
       const targets = parseLakefileTargets(content, isToml);
       // Discover compiled module targets (.lake/build/lib/**/*.olean)
+      // input-site: traced #ca846819 — Lean build output (`.lake/build/lib`), which the tree digest leaves out; only where a lakefile exists
+      inputSiteReached("check-lake-targets: lean build output");
       const lakeBuildDir = join(opts.lakeRoot, ".lake", "build", "lib");
       if (existsSync(lakeBuildDir)) {
         scanOleanModules(lakeBuildDir, lakeBuildDir, targetModules);
       }
+      // input-site: traced #9826fc4d — Lean build output (`build/lib`), which the tree digest leaves out; only where a lakefile exists
+      inputSiteReached("check-lake-targets: lean build output");
       const altBuildDir = join(opts.lakeRoot, "build", "lib");
       if (existsSync(altBuildDir)) {
         scanOleanModules(altBuildDir, altBuildDir, targetModules);
@@ -364,8 +371,10 @@ export function scanBlockRefs(dir: string): BlockRefInfo[] {
           entry.name === ".git" ||
           entry.name === "node_modules" ||
           entry.name === ".lake" ||
+          // input-site: inert #c05beb24 — a directory the walk skips; its contents are never read
           entry.name === "build" ||
           entry.name === "cat-harness-tools" ||
+          // input-site: inert #0c3ce601 — a directory the walk skips; its contents are never read
           entry.name === "dist"
         ) {
           continue;

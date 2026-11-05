@@ -23,6 +23,15 @@ the code do this work?"*. Agent containers run the same pinned Bun as CI, so
 the fast set can run there, before the push, instead of only on a runner after
 it.
 
+## Off by default (2026-11-05, after the measurement)
+
+A typical push in a composed agent container (4 CPUs, cold cache) took
+**70 min** even with the whole suite held out (`skill:register:check` 18 min,
+`uml:overview:check` 11 min). So both hooks are now **off unless the checkout
+opts in** (`CAT_PREPUSH_GATES=1`, or `git config cat.gates.prePush true`); off,
+a push goes at once, says so, and logs an `off` entry. What a time-bounded
+subset should hold is the owner's open decision.
+
 ## 1. git's pre-push hook (built)
 
 `scripts/git-hooks/pre-push`, installed by `scripts/git-hooks/install.sh`,
@@ -172,3 +181,40 @@ committer built is accepted on the critical path and re-verified off it.
 **Why it is sound**: the record is never the verdict that merges; the sweep
 is. The record only reorders the work: a green PR shows sooner, and the
 merge-gating run happens later and off the PR's critical path.
+
+## Measured (2026-11-05, composed folio-assistant checkout, 4 CPUs)
+
+All in a fresh checkout mounted from the lock (`mount-from-lock.sh`, 10 s;
+`bun install`, 1 s; `state:mount`, 62 s; `ig-index:build`, 29 s).
+
+| what | measured |
+|---|---|
+| typical push through the hook (one-file change, cold cache, `bun test` held out) | **4224 s (70 min)**; gate run wall 3620 s, 294 gates |
+| longest gates (pool CPU-sum) | `skill:register:check` 1086 s, `uml:overview:check` 662 s, `kind:register:check` 229 s, `kg:audit:check` 115 s |
+| serial setup inside the gate set | `state:mount` x8, 284 s; `ig-index:build` x4, 85 s |
+| whole-suite `bun test` | 1858 s (31 min): 19 412 pass, 80 fail, mostly failing on main too |
+| affected-test selection, last 25 cat-harness-tools commits | median **1** test file, max 1059 (a hub module), "all" for 3 runtime changes |
+| same tree pushed again | 0 s (the record) |
+| `derive:publish` in an agent container | 833 s, then exit 1: GitHub releases API 403 through the proxy |
+| `state:mount`'s remote fan-out after a lock mount (cat-harness-tools#1489) | main 48.5 / 52.3 / 58.8 s; #1489 **1.1 / 1.2 / 1.2 s**, nothing fetched |
+
+Findings this measuring turned up, each fixed in its own PR:
+
+- `gates` crashed with a stack overflow (`push(...lines)` in
+  `input-trace.ts`) part-way through a large run, so the first "55 min"
+  figure covered only 70 of 295 gates (cat-harness-tools#1490).
+- `remote-mount.test.ts` hydrated-mount tests hit bun's 5 s default under load
+  (cat-harness-tools#1488, 30 s).
+- `state:mount` rewrites folio-assistant's tracked `.gitignore` when main's
+  ignore block lags, so a dirty tree is "not judged", never refused.
+- A branch-store push (`<sha>:refs/heads/cat/...`) is not HEAD, so it is left
+  to CI, never refused.
+- Selecting every test behind a computed import put 433 of 1533 test files
+  behind a few hub modules; the selection walks past them instead.
+
+The CI side (deferred verification) is folio-assistant#2957 (honour a record:
+identical tree, same bun and platform, first attempt only, pending
+`gates/verified` set first) and #2958 (the sweep re-runs the run and resolves
+the status; a red re-run revokes and opens an issue). Both are off until the
+repository variable `CQG_HONOUR_LOCAL_RECORDS` is set.
+
