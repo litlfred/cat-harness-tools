@@ -459,3 +459,41 @@ describe("merge-cone.py", () => {
     expect(run(shards({ version: 2, recipe: 1, checks: {} }), 1)).toMatchObject({ status: 0, file: undefined });
   });
 });
+
+describe("merge-results.py: the shards' result stores, unioned, newest 16 per gate", () => {
+  const MERGE_RESULTS = join(DIR, "merge-results.py");
+  // The stores are written by result-store.ts itself, so the union is tested on the real shape.
+  const store = async () => await import("../scripts/result-store.ts");
+
+  test("two shards' stores union into one, an entry both carried is kept once, and ci-cone.ts reads it back", async () => {
+    const { listResults, putResult } = await store();
+    const a = mkdtempSync(join(tmpdir(), "store-a-"));
+    const b = mkdtempSync(join(tmpdir(), "store-b-"));
+    const put = (root: string, p: string, at: string) => putResult(root, { gate: "x:check", recipe: "r", recordedAt: at, run: at, entry: { reads: { p } } });
+    put(a, "1", "2026-11-05T01:00:00Z");
+    put(a, "2", "2026-11-05T02:00:00Z");
+    put(b, "2", "2026-11-05T02:00:00Z");
+    put(b, "3", "2026-11-05T03:00:00Z");
+    const out = mkdtempSync(join(tmpdir(), "store-out-"));
+    const r = spawnSync("python3", ["-I", MERGE_RESULTS, join(out, "build", "result-store"), join(a, "build", "result-store"), join(b, "build", "result-store"), join(b, "absent")], { encoding: "utf-8" });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("3 result(s) of 1 gate(s) kept");
+    expect(listResults<{ reads: { p: string } }>(out, "x:check", "r").map((e) => e.entry.reads.p)).toEqual(["3", "2", "1"]);
+  });
+
+  test("past 16 per gate the oldest go, and an unreadable file is dropped", async () => {
+    const { listResults, putResult, gateDir } = await store();
+    const a = mkdtempSync(join(tmpdir(), "store-a-"));
+    const b = mkdtempSync(join(tmpdir(), "store-b-"));
+    for (let i = 0; i < 12; i++) putResult(a, { gate: "x:check", recipe: "r", recordedAt: `2026-11-05T00:00:${String(i).padStart(2, "0")}Z`, run: "a", entry: { i } });
+    for (let i = 12; i < 24; i++) putResult(b, { gate: "x:check", recipe: "r", recordedAt: `2026-11-05T00:00:${String(i).padStart(2, "0")}Z`, run: "b", entry: { i } });
+    writeFileSync(join(gateDir(b, "x:check"), "junk.json"), "{not json");
+    const out = mkdtempSync(join(tmpdir(), "store-out-"));
+    const r = spawnSync("python3", ["-I", MERGE_RESULTS, join(out, "build", "result-store"), join(a, "build", "result-store"), join(b, "build", "result-store")], { encoding: "utf-8" });
+    expect(r.status).toBe(0);
+    const kept = listResults<{ i: number }>(out, "x:check", "r").map((e) => e.entry.i);
+    expect(kept).toHaveLength(16);
+    expect(kept[0]).toBe(23);
+    expect(kept.at(-1)).toBe(8);
+  });
+});

@@ -264,6 +264,29 @@ describe("a successful mount is ignored by the checkout", () => {
     expect(readFileSync(join(root, ".gitignore"), "utf-8")).toBe(before);
   });
 
+  test("a FULL mount over layer mounts older than the lock leaves .gitignore byte-identical (bean x38u)", () => {
+    // Bean `x38u`: in every fresh session the instance mounts on disk were
+    // older than index.lock.json, and a plain `state:mount` (no `--id`)
+    // rewrote the block from their declarations, dropping a graph only the
+    // PINNED declaration names. Here the committed block names
+    // `/who-iris/test/attestations/**`, which the on-disk declaration lacks.
+    const { root, store } = stateFixture("state-mount-t-").checkout("a");
+    const before = `node_modules\n${STATE_IGNORE_BEGIN}\n/todos/**\n/who-iris/test/attestations/**\n${STATE_IGNORE_END}\n`;
+    writeFileSync(join(root, ".gitignore"), before);
+    git(root, "add", "-A");
+    git(root, "commit", "-q", "-m", "block from the pinned declarations");
+    for (const layerMounts of ["missing", "could-not-determine"] as const) {
+      const r = mountState({ repoRoot: root, store, layerMounts });
+      expect(r.state).toBe("mounted");
+      expect(r.reason).toContain(".gitignore left unchanged");
+      expect(readFileSync(join(root, ".gitignore"), "utf-8")).toBe(before);
+    }
+    // Over CURRENT layer mounts the declarations are authoritative, and the
+    // block is written from them.
+    expect(mountState({ repoRoot: root, store, layerMounts: "mounted" }).state).toBe("mounted");
+    expect(readFileSync(join(root, ".gitignore"), "utf-8")).toBe(`node_modules\n${STATE_IGNORE_BEGIN}\n/todos/**\n${STATE_IGNORE_END}\n`);
+  });
+
   test("a mount that did not happen writes nothing", () => {
     const { root, store } = stateFixture("state-mount-t-").checkout("a", { kind: "directory" });
     mountState({ repoRoot: root, store });
@@ -311,7 +334,7 @@ describe("checkout-relative markers and damaged mounts (bean 1ple)", () => {
   });
 });
 
-describe("staleLayerMounts — `--id` rewrites the .gitignore block only over current layer mounts (bean 792f)", () => {
+describe("staleLayerMounts — the .gitignore block is rewritten only over current layer mounts (beans 792f, x38u)", () => {
   test("a checkout with no lock has nothing to be stale against", () => {
     const root = mkdtempSync(join(tmpdir(), "stale-layers-"));
     try {

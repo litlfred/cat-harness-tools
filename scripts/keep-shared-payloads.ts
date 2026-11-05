@@ -64,10 +64,20 @@ export function payloadFiles(root: string): Set<string> {
 /** The retained record at `root`, or an empty one. */
 export function readRetained(root: string): Retained {
   try {
-    const r = JSON.parse(readFileSync(join(root, RETAINED_FILE), "utf-8")) as Retained;
-    if (r && r.version === 1 && r.kept && typeof r.kept === "object") return r;
+    return parseRetained(readFileSync(join(root, RETAINED_FILE), "utf-8"));
   } catch {
     // none yet
+  }
+  return { version: 1, kept: {} };
+}
+
+/** A retained record's text, or an empty one when it is not a record. */
+export function parseRetained(text: string): Retained {
+  try {
+    const r = JSON.parse(text) as Retained;
+    if (r && r.version === 1 && r.kept && typeof r.kept === "object") return r;
+  } catch {
+    // not a record
   }
   return { version: 1, kept: {} };
 }
