@@ -15,7 +15,7 @@
   "holds": "gate run records as git notes on commits",
   "producer": "gate-record.ts",
   "consumers": [
-    "—"
+    "\u2014"
   ],
   "savePolicy": "not wired in any workflow",
   "verify": "re-verified off the critical path (folio-assistant #2957/#2958), never read as a hit",
@@ -23,5 +23,9 @@
   "uses": [
     "cat-harness-tools/scripts/gate-record.ts:40"
   ],
-  "notes": "Not wired in any workflow yet."
+  "notes": "Not wired in any workflow yet.",
+  "stateInputs": {
+    "reads": "unmeasured",
+    "how": "not yet derived from a recorded read set; the producer may read state:mount graphs"
+  }
 }

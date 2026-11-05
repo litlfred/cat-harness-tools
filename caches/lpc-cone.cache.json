@@ -27,5 +27,9 @@
     ".github/workflows/layer-pr-checks.yml:1556",
     ".github/workflows/layer-pr-checks.yml:1923"
   ],
-  "notes": "Restore uses a key that never exists to get the newest entry by prefix."
+  "notes": "Restore uses a key that never exists to get the newest entry by prefix.",
+  "stateInputs": {
+    "reads": "unmeasured",
+    "how": "not yet derived from a recorded read set; the producer may read state:mount graphs"
+  }
 }

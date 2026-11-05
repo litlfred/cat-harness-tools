@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { CACHE_SCHEMA_TAG, CacheInventorySchema, CacheSchema, staleness, type Cache } from "./cache";
+import { CACHE_SCHEMA_TAG, CacheInventorySchema, CacheSchema, nodeStaleness, staleness, type Cache } from "./cache";
 
 const CACHES = join(import.meta.dir, "..", "..", "caches");
 
@@ -24,6 +24,7 @@ function cache(over: Partial<Cache> = {}): unknown {
     savePolicy: "main, or a PR into its own scope",
     verify: "the replayer checks every tree against the lock",
     uses: [".github/workflows/x.yml:12", ".github/workflows/x.yml:20-24"],
+    stateInputs: { reads: "none", how: "the lock pins everything it holds" },
     ...over,
   };
 }
@@ -44,6 +45,23 @@ describe("cache/1.0.0", () => {
   });
   test("a trust class outside the policy is refused", () => {
     expect(CacheSchema.safeParse(cache({ trustClass: "trusted" as never })).success).toBe(false);
+  });
+});
+
+describe("state a producer reads (#2966: the pages read the work plan, the key did not)", () => {
+  test("every node must say whether its producer reads state", () => {
+    const { stateInputs: _, ...without } = cache() as Record<string, unknown>;
+    expect(CacheSchema.safeParse(without).success).toBe(false);
+  });
+  test("keyed state names its refs", () => {
+    expect(CacheSchema.safeParse(cache({ stateInputs: { reads: "keyed", how: "x" } as never })).success).toBe(false);
+    expect(CacheSchema.safeParse(cache({ stateInputs: { reads: "keyed", refs: ["cat/cat-harness/beans"], how: "the ref's commit is in the key" } })).success).toBe(true);
+  });
+  test("unkeyed or unmeasured state is never current, whatever the keys say", () => {
+    for (const s of [{ reads: "unkeyed", how: "reads beans" }, { reads: "unmeasured" }] as const) {
+      expect(nodeStaleness({ stateInputs: s as never }, "abc", { key: "cs1-demo-abc" }, "cs1-demo-").state).toBe("undetermined");
+    }
+    expect(nodeStaleness({ stateInputs: { reads: "none", how: "x" } }, "abc", { key: "cs1-demo-abc" }, "cs1-demo-").state).toBe("current");
   });
 });
 

@@ -48,6 +48,7 @@ describe("render", () => {
       $schema: "cache/1.0.0", id: "demo", title: "Demo", instance: "x", kind: "actions-cache", trustClass: "a",
       location: "cs1-demo-", keyRecipe: { source: "hashFiles", files: ["lock.json"] }, derivedInputs: "the lock",
       holds: "h", producer: "p", consumers: ["c"], savePolicy: "s", verify: "v", uses: ["a.yml:1"],
+      stateInputs: { reads: "none", how: "the lock pins it" },
     };
     mkdirSync(join(d, "caches"));
     writeFileSync(join(d, "caches", "demo.cache.json"), JSON.stringify(node));

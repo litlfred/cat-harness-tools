@@ -20,7 +20,7 @@
     "prepare-head",
     "prepare-base",
     "record-writers",
-    "run (matrix, both sides × gate-shards)"
+    "run (matrix, both sides \u00d7 gate-shards)"
   ],
   "savePolicy": "any missed run",
   "verify": "mount-from-lock re-checks every mounted tree against the lock's digest; a bad entry is re-fetched",
@@ -32,5 +32,9 @@
     ".github/workflows/layer-pr-checks.yml:1530",
     ".github/workflows/pr-tests.yml:176"
   ],
-  "notes": "Superseded by the layers ref (refs/cat/layers/<key>, cat-harness-tools#1506), which verifies per layer. Saves on any missed run, PRs included (PR-scoped by GitHub)."
+  "notes": "Superseded by the layers ref (refs/cat/layers/<key>, cat-harness-tools#1506), which verifies per layer. Saves on any missed run, PRs included (PR-scoped by GitHub).",
+  "stateInputs": {
+    "reads": "unmeasured",
+    "how": "not yet derived from a recorded read set; the producer may read state:mount graphs"
+  }
 }
