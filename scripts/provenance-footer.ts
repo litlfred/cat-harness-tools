@@ -139,7 +139,10 @@ export function renderProvenanceFooter(entries: readonly ProvenanceEntry[]): str
       `This record was moved out of the text of the page.</p>`,
   ];
   for (const [section, items] of bySection) {
-    html.push(`  <h3 class="fa-provenance-section">${withInlineCode(section, escapeHtml)}</h3>`);
+    // The extraction's marker for "before the first heading" reads as a
+    // reader's label here.
+    const label = section === "(top of file)" ? "About this page" : section;
+    html.push(`  <h3 class="fa-provenance-section">${withInlineCode(label, escapeHtml)}</h3>`);
     html.push(`  <ul class="fa-provenance-list">`);
     for (const e of items) {
       const refs = e.refs.length
