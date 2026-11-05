@@ -45,6 +45,17 @@
  * whenever it rewrites a bean. The retag only edits files in the mount. It is
  * skipped on `--dry-run`, which must not write, and a retag that cannot run is
  * reported and does not stop the push.
+ *
+ * ## It judges the text it splices
+ *
+ * A state branch has no CI in front of it, and on 2026-11-05 a work item's
+ * link to a moved path reddened every layer's CI from there (bean `asq1`).
+ * So before each splice the Markdown files it writes are run through the
+ * dangling-link and retired-word checks (`state-push-checks.ts`), and a graph
+ * whose push would INTRODUCE a finding is refused, with the findings named.
+ * A finding already at the tip does not block. `CAT_GATES_BYPASS='<reason>'`
+ * pushes anyway and logs the reason with the findings, the same bypass and
+ * the same log as the pre-push gates (cat-harness-tools#1487).
  */
 
 import { isAbsolute, relative, resolve } from "node:path";
@@ -67,6 +78,8 @@ import {
 import { repoRootOf } from "./state-mount.js";
 import { locateStore, retagDir } from "./beans-retag.ts";
 import { HOMES_LINE, isBeanFile, originRepo, retiredBeanStore } from "./lib/bean-homes.ts";
+import { logPush } from "./gate-record.ts";
+import { findingsReason, harnessChecks, mountTexts, newFindings, type TextChecks, type TextFinding } from "./state-push-checks.ts";
 
 export interface PushOptions {
   repoRoot?: string;
@@ -91,6 +104,14 @@ export interface PushOptions {
    * often a damaged mount than a deliberate pruning (bean `1ple`).
    */
   allowMassDelete?: boolean;
+  /**
+   * The text checks to run on each graph's Markdown writes before its splice
+   * (`state-push-checks.ts`). The command passes the harness's; a library
+   * caller that passes none runs none.
+   */
+  checks?: TextChecks;
+  /** A stated reason to splice despite new text findings; logged with them. */
+  bypass?: string;
 }
 
 /**
@@ -118,6 +139,12 @@ export interface GraphPush {
   reason: string;
   changes?: Change[];
   write?: WriteResult;
+  /** New text findings this push carried through on a bypass. */
+  bypassed?: TextFinding[];
+  /** Files whose text at the tip could not be read, so nothing in them was judged new. */
+  notCompared?: string[];
+  /** Files no declared directory owns, so their links were not judged. */
+  notJudged?: string[];
 }
 
 /** A graph whose splice did not lose anything and needs no further action. */
@@ -131,6 +158,8 @@ export type PushResult = {
   graphs: GraphPush[];
   /** The pre-push bean retag, when the bean store is one of the graphs pushed. */
   retag?: RetagStep;
+  /** Text checks that could not be set up, so did not run. */
+  checksNotRun?: string[];
 };
 
 /**
@@ -185,6 +214,7 @@ function pushFanOut(root: string, locations: TipLocation[], opts: PushOptions): 
         const massDel =
           changes === undefined || opts.allowEmpty || opts.allowMassDelete ? undefined : mountMassDeletionReason(loc, { repoRoot: root });
         const retired = changes === undefined ? undefined : retiredBeanWrite(root, loc, changes);
+        const text = changes === undefined ? undefined : textVerdict(root, loc, changes, opts);
         if (changes === undefined) {
           graphs.push({ ...base, state: "refused", reason: `${key} is not mounted; run \`bun run cat state:mount\` first` });
         } else if (retired) {
@@ -193,8 +223,10 @@ function pushFanOut(root: string, locations: TipLocation[], opts: PushOptions): 
           graphs.push({ ...base, state: "refused", reason: emptying, changes });
         } else if (massDel) {
           graphs.push({ ...base, state: "refused", reason: massDel, changes });
+        } else if (text?.refused) {
+          graphs.push({ ...base, state: "refused", reason: text.refused, changes, ...text.extra });
         } else {
-          graphs.push({ ...base, state: "would-push", reason: `${changes.length} path(s) would be spliced onto the tip`, changes });
+          graphs.push({ ...base, state: "would-push", reason: `${changes.length} path(s) would be spliced onto the tip`, changes, ...text?.extra });
         }
         continue;
       }
@@ -215,13 +247,21 @@ function pushFanOut(root: string, locations: TipLocation[], opts: PushOptions): 
         graphs.push({ ...base, state: "refused", reason: massDel, changes });
         continue;
       }
+      const text = changes === undefined ? undefined : textVerdict(root, loc, changes, opts);
+      if (text?.refused !== undefined) {
+        graphs.push({ ...base, state: "refused", reason: text.refused, changes, ...text.extra });
+        continue;
+      }
+      if (text?.extra.bypassed?.length) {
+        logPush(root, { event: "bypass", via: "state-push", reason: opts.bypass, graph: key, findings: text.extra.bypassed });
+      }
       const message = opts.message ?? `state: ${loc.id} from its mount`;
       // `--allow-empty` is the one explicit request to delete a whole graph, so it
       // reaches pushMount's own emptying refusal too: refusing it there made
       // the flag a no-op (two guards of the same deletion, bean sp0e).
       const w = pushMount(loc, message, { repoRoot: root, store: opts.store, allowEmpty: opts.allowEmpty });
       if (w.state === "refused") graphs.push({ ...base, state: "refused", reason: w.reason });
-      else graphs.push({ ...base, state: w.state, reason: w.reason, write: w, changes });
+      else graphs.push({ ...base, state: w.state, reason: w.reason, write: w, changes, ...text?.extra });
     } catch (e) {
       // A throw for ONE graph must not take the others' pushes with it.
       graphs.push({ ...base, state: "failed", reason: `pushing ${key} threw: ${(e as Error).message}` });
@@ -254,6 +294,30 @@ function pushFanOut(root: string, locations: TipLocation[], opts: PushOptions): 
     reason: `${settled.length} of ${n} declared graph(s) settled; ${stuck.map((g) => `${g.id} (${g.state})`).join(", ")} did not`,
     graphs,
   };
+}
+
+/**
+ * What the text checks say about one graph's changes: a refusal when they
+ * would introduce a finding and no bypass reason was given, otherwise what to
+ * record (the findings a bypass carried, the files not compared).
+ */
+export function textVerdict(
+  root: string,
+  loc: TipLocation,
+  changes: readonly Change[],
+  opts: Pick<PushOptions, "checks" | "bypass" | "store">,
+): { refused?: string; extra: Pick<GraphPush, "bypassed" | "notCompared" | "notJudged"> } | undefined {
+  if (opts.checks === undefined) return undefined;
+  const m = markerFor(root, loc);
+  if (m === undefined) return undefined;
+  const { findings, notCompared, notJudged } = newFindings(opts.checks, mountTexts(root, m, changes, opts.store));
+  const extra: Pick<GraphPush, "bypassed" | "notCompared" | "notJudged"> = {
+    ...(notCompared.length ? { notCompared } : {}),
+    ...(notJudged.length ? { notJudged } : {}),
+  };
+  if (findings.length === 0) return { extra };
+  if (opts.bypass === undefined || opts.bypass.trim() === "") return { refused: findingsReason(findings), extra };
+  return { extra: { ...extra, bypassed: findings } };
 }
 
 /**
@@ -305,7 +369,8 @@ export function pushState(opts: PushOptions = {}): PushResult {
   // the fan-out below with its own remedy.
   const retag = opts.dryRun || opts.retag === false ? undefined : retagBeansBeforePush(root, locations.filter((l) => isMounted(root, l)));
   const result = pushFanOut(root, locations, opts);
-  return retag ? { ...result, retag } : result;
+  const notRun = opts.checks?.notRun?.length ? { checksNotRun: opts.checks.notRun } : {};
+  return retag ? { ...result, retag, ...notRun } : { ...result, ...notRun };
 }
 
 /**
@@ -367,8 +432,23 @@ function retagLine(t: RetagStep | undefined): string[] {
   return out.length ? [...out, ""] : [];
 }
 
+/** Lines on the text checks: what a bypass let through, what was not compared, what did not run. */
+function checksLines(r: PushResult): string[] {
+  const out: string[] = [];
+  for (const n of r.checksNotRun ?? []) out.push(`⚠️ Text check did not run — ${n}.`);
+  for (const g of r.graphs) {
+    if (g.bypassed?.length) {
+      out.push(`⚠️ \`${g.id}\`: ${g.bypassed.length} new text finding(s) pushed on a bypass (logged):`);
+      for (const f of g.bypassed) out.push(`  - \`${f.path}\` ${f.detail}`);
+    }
+    if (g.notJudged?.length) out.push(`⚠️ \`${g.id}\`: no declared directory owns ${g.notJudged.join(", ")}, so their links were not judged.`);
+    if (g.notCompared?.length) out.push(`⚠️ \`${g.id}\`: the tip's text of ${g.notCompared.join(", ")} could not be read, so nothing in them was judged new.`);
+  }
+  return out.length ? [...out, ""] : [];
+}
+
 export function report(r: PushResult): string {
-  const L: string[] = ["## State push", "", ...retagLine(r.retag)];
+  const L: string[] = ["## State push", "", ...retagLine(r.retag), ...checksLines(r)];
   // The fan-out: one splice per declared graph, each to its own branch.
   if (r.graphs.length) {
     const stuck = r.graphs.filter((g) => !isSettled(g));
@@ -428,12 +508,14 @@ if (import.meta.main) {
   const bad = unknownArgs(argv);
   if (bad.length > 0) {
     console.error(`state:push: not understood: ${bad.join(", ")}. Nothing was pushed.`);
-    console.error("Usage: bun run cat state:push -- [--id <graph>] [-m <message>] [--dry-run] [--allow-empty] [--allow-mass-delete] [--json]");
+    console.error("Usage: bun run cat state:push -- [--id <graph>] [-m <message>] [--dry-run] [--allow-empty] [--allow-mass-delete] [--json]   (CAT_GATES_BYPASS='<reason>' to push past new text findings; logged)");
     process.exit(2);
   }
   const at = argv.indexOf("-m");
   const i = argv.indexOf("--id");
   const r = pushState({
+    checks: await harnessChecks(),
+    bypass: process.env.CAT_GATES_BYPASS,
     dryRun: argv.includes("--dry-run"),
     allowEmpty: argv.includes("--allow-empty"),
     allowMassDelete: argv.includes("--allow-mass-delete"),

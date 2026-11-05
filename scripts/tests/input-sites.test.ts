@@ -17,6 +17,8 @@ import { join, relative, resolve } from "node:path";
 import { instanceDirectoriesForGraph } from "../../schemas/kg/cat-harness.ts";
 import { declaredDirectories } from "../../schemas/kg/declared-nodes.ts";
 import { orderedDependencies } from "../../schemas/kg/harness-config.ts";
+import { defaultGraphTypologies } from "../../schemas/kg/graph-typology-registry.ts";
+import { moduleRootOf, parseValidatorRef } from "../../schemas/kg/kind-validator.ts";
 import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "../../schemas/ui/theme-by-ref.ts";
 
@@ -386,6 +388,41 @@ describe("annotations hold to the data that chooses their targets", () => {
     for (const g of globs) expect(annotated(relTo(join(TOOLS_ROOT, "schemas/kg/harness-config.ts")), g), g).toBe(true);
   });
 
+
+  test("every declared validator module lies under kind-validator's and node-kind-index's `imports` globs", () => {
+    const globs = [
+      "*/schemas/**/*.ts",
+      "schemas/**/*.ts",
+      "*/archimate/schemas/*.ts",
+      "*/openapi/schemas/*.ts",
+      "*/scripts/gen-slice-sqlite.ts",
+      "*/scripts/workflow-view.ts",
+      "*/src/issue-watch/seen-comments.ts",
+    ];
+    const all = roots();
+    const ownerOf = (file: string) => all.filter((r) => file.startsWith(`${r}/`)).sort((a, b) => b.length - a.length)[0] ?? repo;
+    const registry = defaultGraphTypologies;
+    registry.ensureCheckout(repo);
+    let seen = 0;
+    for (const kind of registry.names()) {
+      const def = registry.get(kind);
+      const declared = registry.declaredBy(kind);
+      const instanceRoot = declared === undefined ? repo : ownerOf(resolve(declared));
+      const refs = [def?.validator, ...Object.values(def?.nodeSchemas ?? {}).map((r) => (r as { validator?: string }).validator)];
+      for (const raw of refs) {
+        if (typeof raw !== "string") continue;
+        const ref = parseValidatorRef(raw);
+        const base = moduleRootOf(ref, instanceRoot);
+        if (base === undefined) continue; // unresolvable: loads nothing
+        const target = relTo(resolve(base, ref.module));
+        seen++;
+        expect(globs.some((g) => globMatch(g, target)), `${kind}: ${raw} -> ${target} is outside ${globs.join(", ")}`).toBe(true);
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
+    // declared-path-literal: the two modules that load the declared validator refs, whose `input-site` annotations are the subject of this assertion; no declaration answers where a module of this layer sits.
+    for (const file of ["kind-validator.ts", "node-kind-index.ts"]) for (const g of globs) expect(annotated(relTo(join(TOOLS_ROOT, "schemas/kg", file)), g), `${file}: ${g}`).toBe(true);
+  });
 
   test("every instance themes module lies under theme-by-ref's `imports` glob", () => {
     for (const root of roots()) {

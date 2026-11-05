@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -18,6 +18,7 @@ import {
   materialiseDeclaredDirectories,
 } from "./kg/harness-config.ts";
 import { instanceConfigPathIn, writeInstanceConfig } from "../test/support/instance-fixture.js";
+import { instanceRootNamed } from "./kg/instance-roots.ts";
 
 // Under the system temp directory, not beside this file (bean `dlqu`): an
 // in-tree scratch directory is visible to every test that enumerates the
@@ -289,6 +290,15 @@ describe("resolveTranslationDirs", () => {
  * a dependency on purpose, and the folio would simply have nowhere to drop a
  * file. Nothing would fail. This is what makes that loud.
  */
+// TRANSITIONAL, like `scripts/lib/harness-layout.ts`: which layer passes
+// `library/` down depends on whether this harness checkout has made the
+// library move (its marker, `library/graph.json`). Before it, the harness
+// passes both conventions down; after it, the harness passes `uploads/` and the
+// content core passes `library/` (owner, 2026-11-04, card "Library rule" option 1).
+const LIBRARY_SUBGRAPH = existsSync(join(HARNESS_ROOT, "library", "graph.json"));
+const FROM_HARNESS = LIBRARY_SUBGRAPH ? ["uploads"] : ["uploads", "library"];
+const CORE_ROOT = instanceRootNamed(join(HARNESS_ROOT, ".."), "folio-assistant-core");
+
 describe("a dependent instance inherits the ingestion directories", () => {
   // Its OWN temporary root, deliberately NOT under `TMP`. `TMP` already holds a
   // `translations/` for the tests above, and `materialiseDirectories` now
@@ -316,13 +326,15 @@ describe("a dependent instance inherits the ingestion directories", () => {
     );
   });
 
-  it("materialises uploads/ and library/ in the DEPENDENT's own root", () => {
+  it("materialises the ingestion directories it passes down in the DEPENDENT's own root", () => {
     // An instance inherits the CONVENTION — an id and a relative path — not a
     // licence to write into the dependency's checkout. `absPath` pointing back
     // into cat-harness/ would be the equivalent of creating folders inside
     // node_modules.
     const made = materialiseDeclaredDirectories(DOWN, { dryRun: true });
-    for (const id of ["uploads", "library"]) {
+    // `library/` is passed down by the content core once the harness has its
+    // `library` sub-graph (2026-11-04) — see the describe below this one.
+    for (const id of FROM_HARNESS) {
       const dir = made.find((d) => d.id === id);
       expect(dir, `no "${id}" among ${made.map((d) => d.id).join(", ")}`).toBeDefined();
       expect(dir!.absPath.startsWith(DOWN)).toBe(true);
@@ -335,9 +347,22 @@ describe("a dependent instance inherits the ingestion directories", () => {
     // through that path instead, an instance declaring nothing would still get
     // them and the declaration would have stopped being what decides.
     const made = materialiseDeclaredDirectories(DOWN, { dryRun: true });
-    for (const id of ["uploads", "library"]) {
+    for (const id of FROM_HARNESS) {
       expect(made.find((d) => d.id === id)!.declaredBy).not.toBe("(default)");
     }
+  });
+
+  it.skipIf(LIBRARY_SUBGRAPH)("uploads/ and library/ are DISTINCT declarations, not one directory twice", () => {
+    // Their own keep-markers record why: `uploads/` is the incoming queue, raw
+    // files as dropped, and is NOT greppable as corpus — the corpus checklist
+    // searches `library/` only. A source still sitting in uploads/ therefore
+    // reads as absent to every consumer while the file is on disk. Collapsing
+    // them would make that failure silent.
+    const made = materialiseDeclaredDirectories(DOWN, { dryRun: true });
+    const up = made.find((d) => d.id === "uploads")!;
+    const lib = made.find((d) => d.id === "library")!;
+    expect(up.absPath).not.toBe(lib.absPath);
+    expect(up.path).not.toBe(lib.path);
   });
 
   it("the work plan is NOT inherited, which is the contrast that makes this mean something", () => {
@@ -350,18 +375,6 @@ describe("a dependent instance inherits the ingestion directories", () => {
     expect(ids).not.toContain("todos");
   });
 
-  it("uploads/ and library/ are DISTINCT declarations, not one directory twice", () => {
-    // Their own keep-markers record why: `uploads/` is the incoming queue, raw
-    // files as dropped, and is NOT greppable as corpus — the corpus checklist
-    // searches `library/` only. A source still sitting in uploads/ therefore
-    // reads as absent to every consumer while the file is on disk. Collapsing
-    // them would make that failure silent.
-    const made = materialiseDeclaredDirectories(DOWN, { dryRun: true });
-    const up = made.find((d) => d.id === "uploads")!;
-    const lib = made.find((d) => d.id === "library")!;
-    expect(up.absPath).not.toBe(lib.absPath);
-    expect(up.path).not.toBe(lib.path);
-  });
 });
 
 /**
@@ -431,5 +444,46 @@ describe("a dependent instance materialises its own docs/", () => {
     const ids = materialiseDeclaredDirectories(DOWN, { dryRun: true }).map((d) => d.id);
     expect(ids).not.toContain("beans");
     expect(ids).not.toContain("todos");
+  });
+});
+
+// The convention's other half (owner, 2026-11-04, card "Library rule" option 1):
+// cat-harness's own corpus became opt-in inside its `library` sub-graph, so
+// `library/` is passed down by the content core, the layer that owns content.
+// Skipped in a checkout that does not hold core (this layer standing alone).
+describe.skipIf(!LIBRARY_SUBGRAPH || CORE_ROOT === undefined)("a dependent of the content core inherits library/", () => {
+  const DOWN = mkdtempSync(join(tmpdir(), "downstream-of-core-"));
+
+  beforeAll(() => {
+    writeInstanceConfig(
+      DOWN,
+      JSON.stringify({
+        contentType: "document",
+        dependencies: { folioAssistant: [{ name: "folio-assistant-core", path: CORE_ROOT! }] },
+      }),
+    );
+  });
+
+  afterAll(() => rmSync(DOWN, { recursive: true, force: true }));
+
+  it("materialises library/ in the DEPENDENT's own root, declared by core and not a default", () => {
+    const made = materialiseDeclaredDirectories(DOWN, { dryRun: true });
+    const lib = made.find((d) => d.id === "library");
+    expect(lib, `no "library" among ${made.map((d) => d.id).join(", ")}`).toBeDefined();
+    expect(lib!.absPath.startsWith(DOWN)).toBe(true);
+    expect(lib!.declaredBy).toBe("folio-assistant-core");
+  });
+
+  it("uploads/ and library/ are DISTINCT declarations, not one directory twice", () => {
+    // Their own keep-markers record why: `uploads/` is the incoming queue, raw
+    // files as dropped, and is NOT greppable as corpus — the corpus checklist
+    // searches `library/` only. A source still sitting in uploads/ therefore
+    // reads as absent to every consumer while the file is on disk. Collapsing
+    // them would make that failure silent.
+    const made = materialiseDeclaredDirectories(DOWN, { dryRun: true });
+    const up = made.find((d) => d.id === "uploads")!;
+    const lib = made.find((d) => d.id === "library")!;
+    expect(up.absPath).not.toBe(lib.absPath);
+    expect(up.path).not.toBe(lib.path);
   });
 });

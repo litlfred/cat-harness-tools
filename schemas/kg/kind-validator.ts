@@ -181,7 +181,7 @@ async function loadValidator(
 
   let mod: Record<string, unknown>;
   try {
-    // input-site: imports */schemas/**/*.ts,*/src/**/*.ts,schemas/**/*.ts,src/**/*.ts #771876e3 — validator modules referenced by graph typology and node-kind declarations
+    // input-site: imports */schemas/**/*.ts,schemas/**/*.ts,*/archimate/schemas/*.ts,*/openapi/schemas/*.ts,*/scripts/gen-slice-sqlite.ts,*/scripts/workflow-view.ts,*/src/issue-watch/seen-comments.ts #771876e3 — validator modules referenced by graph typology and node-kind declarations; input-sites.test.ts holds every declared ref to these globs
     mod = (await import(abs)) as Record<string, unknown>;
   } catch (e) {
     return {
