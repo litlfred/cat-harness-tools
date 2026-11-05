@@ -3921,6 +3921,24 @@ const SUBJECT_DARK = darkRules(":root { --fg: #f5f5f7; --bg: #1c1c1e; --muted: #
 
 const SUBJECT_SEARCH_EXCLUDE = '<meta name="fa-search-exclude" content="true">';
 
+const SUBJECT_NODE_KIND: Readonly<Record<string, string>> = {
+  skill: "skills",
+  process: "processes",
+  globalTask: "processes",
+  decision: "processes",
+  actor: "scenarios",
+  role: "scenarios",
+  capability: "scenarios",
+  schema: "schemas",
+  convention: "schemas",
+  externalSchema: "external-schema",
+  "glossary-usage": "swimlane-glossary",
+  requirement: "requirements",
+  directory: "cat-harness",
+  asset: "cat-harness",
+  package: "skills",
+};
+
 /**
  * One subject's page: its fields, its flows (each at the `id` its fragment
  * names, so `…/process/P#flow/F` lands on it), and the same JSON-LD as the
@@ -3938,6 +3956,10 @@ export function subjectPage(
   const id = String(node["@id"]);
   const title = String(node.title ?? node.name ?? id.split("/").pop());
   const type = stripNamespace(String(node["@type"]));
+  const pathKind = (subjectPathOf(id, docIri) ?? id).split("/").find((seg) => seg in SUBJECT_NODE_KIND) ?? "";
+  const nodeKind = SUBJECT_NODE_KIND[pathKind] ?? "skills";
+  const pageHref = jsonldHref.replace(/\.jsonld$/, ".html");
+  const graphName = docIri.split("/").pop()!.replace(/\.jsonld$/, "");
   // The node this one is part of (a lane's or a step's process), named at the top.
   const parent = typeof node.partOf === "string" && /^https?:\/\//.test(node.partOf) ? node.partOf : undefined;
   const rows = (n: Node): string =>
@@ -3974,6 +3996,8 @@ code, .iri { font-family: ui-monospace, monospace; font-size: 0.9em; overflow-wr
 .muted { color: var(--fa-pl-muted, var(--muted)); }
 .fa-page-main .subject-kind { margin: 0; }
 .fa-page-main h1 { margin-top: 0.25rem; }
+.subject-pin { margin-left: 0.35rem; padding: 0.1rem 0.5rem; font: inherit; font-size: 0.85em; border: 1px solid var(--fa-pl-line, var(--line)); border-radius: 999px; background: transparent; color: inherit; cursor: pointer; }
+.subject-pin[aria-pressed="true"] { border-color: #2e7d32; background: #2e7d32; color: #fff; }
 table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1.5rem; table-layout: fixed; }
 th, td { text-align: left; vertical-align: top; padding: 0.3rem 0.5rem; border-top: 1px solid var(--fa-pl-line, var(--line)); overflow-wrap: anywhere; }
 th { width: 10rem; font-weight: 600; }
@@ -3986,7 +4010,7 @@ td .iri { font-size: 0.8em; }
 <p class="muted subject-kind">${escHtml(type)}</p>
 <h1>${escHtml(title)}</h1>
 ${parent === undefined ? "" : `<p>Part of <a href="${escHtml(parent)}">${escHtml(labels.get(parent) ?? parent.split("/").pop()!)}</a></p>\n`}<p class="iri muted">${escHtml(id)}</p>
-<p><a href="${escHtml(jsonldHref)}">JSON-LD</a>${diagram === undefined ? "" : ` · <a href="${escHtml(diagram)}">diagram</a>`} · in graph <a class="iri" href="${escHtml(docIri)}">${escHtml(docIri.split("/").pop()!)}</a></p>${
+<p data-fa-pin="${escHtml(id)}" data-fa-pin-kind="pin" data-fa-pin-node-kind="${escHtml(nodeKind)}" data-fa-pin-title="${escHtml(title)}" data-fa-pin-href="${escHtml(pageHref)}" data-fa-pin-source="${escHtml(graphName)}"><a href="${escHtml(jsonldHref)}">JSON-LD</a>${diagram === undefined ? "" : ` · <a href="${escHtml(diagram)}">diagram</a>`} · in graph <a class="iri" href="${escHtml(docIri)}">${escHtml(docIri.split("/").pop()!)}</a> · <button type="button" class="subject-pin" data-fa-pin-control aria-pressed="false" aria-label="Pin ${escHtml(title)} to your folio glass" title="Pin to your folio">&#x1f4cc; Pin to folio</button></p>${
     typeof doc.sameAs === "string" ? `\n<p class="muted">A copy published here. The canonical address is <span class="iri">${escHtml(id)}</span> (<code>owl:sameAs</code>).</p>` : ""
   }
 <table class="fa-page-wide">
