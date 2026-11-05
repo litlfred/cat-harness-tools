@@ -78,9 +78,13 @@ index's `.claude/settings.json`:
 ```json
 { "hooks": { "PreToolUse": [ { "matcher": "Bash", "hooks": [ {
   "type": "command",
-  "command": "bun run \"$CLAUDE_PROJECT_DIR/cat-harness-tools/scripts/pre-push-gates.ts\" --claude-hook",
+  "command": "f=\"$CLAUDE_PROJECT_DIR/cat-harness-tools/scripts/git-hooks/claude-pre-push.sh\"; [ ! -f \"$f\" ] || sh \"$f\"",
   "timeout": 1800 } ] } ] } }
 ```
+
+`claude-pre-push.sh` starts bun only when the tool call mentions `push`, so
+every other Bash call costs one shell `case`; the `[ ! -f ]` guard makes it a
+no-op where the cat-harness-tools pin predates the hook.
 
 It reads the tool call, passes anything that is not a `git push` (or is a dry
 run) at once, resolves the refspec sources (HEAD when none is named), and
