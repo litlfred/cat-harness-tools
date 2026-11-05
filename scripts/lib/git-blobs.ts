@@ -82,22 +82,66 @@ export function isSparse(dir: string): boolean {
   return r.status === 0 && r.stdout.toString("utf-8").trim() === "true";
 }
 
+export interface IndexEntry extends GitEntry {
+  /** Outside the sparse checkout's cone, whatever is on disk at its path. */
+  outside: boolean;
+}
+
 /**
- * The index entries a SPARSE checkout leaves out of the working tree
- * (skip-worktree, `git ls-files -t` tag `S`), by path. `undefined` when `dir`
- * is not a sparse checkout at its top — the caller then reads only the working
- * tree, as it always did.
+ * Whether a path is inside a cone-mode sparse checkout of `dirs`: a file at
+ * the root, a file directly in a directory that leads to a cone directory, or
+ * anything under one — git's own cone rule.
  */
-export function sparseEntries(dir: string): Map<string, GitEntry> | undefined {
+export function inCone(path: string, dirs: readonly string[]): boolean {
+  const slash = path.lastIndexOf("/");
+  if (slash < 0) return true;
+  const parent = path.slice(0, slash);
+  return dirs.some((d) => path.startsWith(`${d}/`) || d.startsWith(`${parent}/`));
+}
+
+/** The cone's directories, when the checkout is cone-mode sparse. */
+function coneDirs(dir: string): string[] | undefined {
+  const r = git(dir, ["config", "--bool", "core.sparseCheckoutCone"]);
+  if (r.status !== 0 || r.stdout.toString("utf-8").trim() !== "true") return undefined;
+  return ok(dir, ["sparse-checkout", "list"])
+    .toString("utf-8")
+    .split("\n")
+    .map((l) => l.trim().replace(/^\/+|\/+$/g, ""))
+    .filter((l) => l !== "");
+}
+
+/**
+ * Every index entry of a SPARSE checkout, each marked whether it is outside
+ * the cone. `undefined` when `dir` is not a sparse checkout at its top — the
+ * caller then reads only the working tree, as it always did.
+ *
+ * The CONE, not the disk, is what says a path is outside. A file written on
+ * disk outside the cone (an earlier write, a leftover `reset --hard` does not
+ * remove) is not what the next commit holds: `git add -A` does not stage it.
+ * Nor is the skip-worktree bit enough, since git (2.37 on) clears it for a
+ * file present on disk while `git add` still leaves that file alone. In cone
+ * mode the cone's own rule ({@link inCone}) decides; in non-cone mode, whose
+ * patterns git alone evaluates, the skip-worktree bit does.
+ */
+export function indexEntries(dir: string): Map<string, IndexEntry> | undefined {
   if (!isSparse(dir)) return undefined;
-  const out = new Map<string, GitEntry>();
+  const out = new Map<string, IndexEntry>();
+  const cone = coneDirs(dir);
   for (const rec of ok(dir, ["ls-files", "-z", "-t", "-s"]).toString("utf-8").split("\0")) {
     // `S 100644 <oid> 0\t<path>`
     const m = /^(\S) (\d{6}) ([0-9a-f]+) \d\t([\s\S]*)$/.exec(rec);
-    if (m === null || m[1] !== "S") continue;
-    out.set(m[4], { mode: m[2], oid: m[3], path: m[4] });
+    if (m === null) continue;
+    const outside = cone === undefined ? m[1] === "S" : !inCone(m[4], cone);
+    out.set(m[4], { mode: m[2], oid: m[3], path: m[4], outside });
   }
   return out;
+}
+
+/** The entries of {@link indexEntries} outside the cone, by path. */
+export function sparseEntries(dir: string): Map<string, GitEntry> | undefined {
+  const all = indexEntries(dir);
+  if (all === undefined) return undefined;
+  return new Map([...all].filter(([, e]) => e.outside));
 }
 
 /** Every file entry of `rev`'s tree (`git ls-tree -r`): no blob is read. */
@@ -138,15 +182,17 @@ function promisorRemote(dir: string): string | undefined {
 }
 
 /**
- * Fetch the absent blobs among `oids` in ONE request. A no-op in a clone that
- * has every object. Absence is read with `rev-list --missing=print`, which
- * never fetches; asking `cat-file` would fetch each one on its own.
+ * The objects present in a clone, as reachable from `rev`, read once per
+ * repository and commit: a scan walks the whole tree, and a run asks many
+ * times. Blobs a fetch brings are added as it brings them.
  */
-export function prefetchBlobs(dir: string, oids: Iterable<string>, rev = "HEAD"): number {
-  const remote = promisorRemote(dir);
-  if (remote === undefined) return 0;
-  const want = new Set(oids);
-  if (want.size === 0) return 0;
+const presentCache = new Map<string, Set<string>>();
+
+function presentObjects(dir: string, rev: string): Set<string> {
+  const commit = git(dir, ["rev-parse", "--verify", "--quiet", `${rev}^{commit}`]).stdout.toString("utf-8").trim();
+  const key = `${realpathSync(resolve(dir))}\0${commit}`;
+  const hit = presentCache.get(key);
+  if (hit !== undefined) return hit;
   const present = new Set<string>();
   const r = git(dir, ["rev-list", "--objects", "--missing=print", rev]);
   if (r.status === 0) {
@@ -155,6 +201,22 @@ export function prefetchBlobs(dir: string, oids: Iterable<string>, rev = "HEAD")
       present.add(line.slice(0, line.indexOf(" ") < 0 ? undefined : line.indexOf(" ")));
     }
   }
+  presentCache.set(key, present);
+  return present;
+}
+
+/**
+ * Fetch the absent blobs among `oids` in ONE request, and throw when the fetch
+ * fails. A no-op in a clone that has every object. Absence is read with
+ * `rev-list --missing=print`, which never fetches (asking `cat-file` would
+ * fetch each one on its own), once per run ({@link presentObjects}).
+ */
+export function prefetchBlobs(dir: string, oids: Iterable<string>, rev = "HEAD"): number {
+  const remote = promisorRemote(dir);
+  if (remote === undefined) return 0;
+  const want = new Set(oids);
+  if (want.size === 0) return 0;
+  const present = presentObjects(dir, rev);
   const missing = [...want].filter((o) => !present.has(o));
   if (missing.length === 0) return 0;
   // The same command git runs for one lazily fetched object, given them all.
@@ -164,6 +226,7 @@ export function prefetchBlobs(dir: string, oids: Iterable<string>, rev = "HEAD")
     missing.join("\n") + "\n",
   );
   if (f.status !== 0) throw new Error(`could not fetch ${missing.length} blob(s) from ${remote}: ${f.stderr.trim()}`);
+  for (const o of missing) present.add(o);
   return missing.length;
 }
 

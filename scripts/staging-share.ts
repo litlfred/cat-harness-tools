@@ -111,11 +111,12 @@ export interface SharePlan {
  *
  * `root` may be a SPARSE checkout of the publish branch (cone `STAGING/<slug>`,
  * `STAGING/_retired`, `_render-log`, cloned `--filter=blob:none`). A live file
- * the working tree does not hold is then read from git: the same bytes is the
- * same blob id, so a non-HTML file needs no blob, and only the live HTML pages
- * whose bytes differ are fetched, in one request, to compare with the
- * per-preview edits set aside. A file the working tree holds is read from it,
- * so a full checkout gives the plan it always gave.
+ * outside the cone (a skip-worktree index entry, whatever is on disk at its
+ * path) is then read from git: the same bytes is the same blob id, so a
+ * non-HTML file needs no blob, and only the live HTML pages whose bytes differ
+ * are fetched, in one request, to compare with the per-preview edits set
+ * aside. Every other file is read from the working tree, so a full checkout,
+ * which has no such entry, gives the plan it always gave.
  */
 export function planShare(root: string, preview: string, slug: string): SharePlan {
   const outside = sparseEntries(root);
@@ -128,11 +129,12 @@ export function planShare(root: string, preview: string, slug: string): SharePla
   for (const rel of files) {
     const live = join(root, rel);
     if (rel.startsWith("STAGING/") || retained.has(rel)) { verdict.set(rel, false); continue; }
-    if (existsSync(live)) {
+    // Outside the cone the index is what is published, whatever is on disk there.
+    const entry = outside?.get(rel);
+    if (entry === undefined && existsSync(live)) {
       verdict.set(rel, statSync(live).isFile() && sameAsLive(rel, readFileSync(join(preview, rel)), readFileSync(live), slug));
       continue;
     }
-    const entry = outside?.get(rel);
     // A link is never compared through git: keeping it costs bytes, never a wrong page.
     if (entry === undefined || !isRegular(entry.mode)) { verdict.set(rel, false); continue; }
     fromGit.push({ rel, live: entry });
@@ -165,7 +167,7 @@ export function planShare(root: string, preview: string, slug: string): SharePla
 /** The retained record, from the working tree or, outside a sparse checkout's cone, from its blob. */
 function retainedAt(root: string, outside: Map<string, GitEntry> | undefined): Retained {
   const entry = outside?.get(RETAINED_FILE);
-  if (entry === undefined || existsSync(join(root, RETAINED_FILE))) return readRetained(root);
+  if (entry === undefined) return readRetained(root);
   let text = "";
   prefetchBlobs(root, [entry.oid]);
   forEachBlob(root, [entry.oid], (_oid, bytes) => { text = bytes.toString("utf-8"); });

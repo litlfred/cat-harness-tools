@@ -97,7 +97,7 @@ import {
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 
-import { blobId, blobSizes, forEachBlob, isRegular, objectFormat, prefetchBlobs, removeFromIndex, sparseEntries, type GitEntry } from "./lib/git-blobs.ts";
+import { blobId, blobSizes, forEachBlob, indexEntries, isRegular, objectFormat, prefetchBlobs, removeFromIndex, type GitEntry, type IndexEntry } from "./lib/git-blobs.ts";
 
 import { RENDER_LOG_DIR, readRenderLog } from "../schemas/ui/render-log.ts";
 import { readStagingPreview, retireStagingPreview, serializeStagingPreview } from "../schemas/sdlc/staging-preview.ts";
@@ -236,19 +236,27 @@ function sizeOf(path: string): number {
   return total;
 }
 
-/** The digest a size record carries: the preview's regular files (but the record) by blob id and path. */
+/**
+ * The digest a size record carries: the preview's regular files (but the
+ * record) as `path NUL oid NUL`, sorted by path. NUL is the one byte a git path
+ * cannot hold, so two different file sets never give the same text.
+ */
 export function sizeDigest(files: readonly { path: string; oid: string }[]): string {
-  const lines = files
+  const text = files
     .filter((f) => f.path !== STAGED_SIZE_FILE)
-    .map((f) => `${f.oid} ${f.path}\n`)
-    .sort();
-  return `sha256:${createHash("sha256").update(lines.join("")).digest("hex")}`;
+    .map((f) => [f.path, f.oid] as const)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([path, oid]) => `${path}\0${oid}\0`)
+    .join("");
+  return `sha256:${createHash("sha256").update(text).digest("hex")}`;
 }
 
 interface SizeRecord {
   version: 1;
   /** Bytes of every regular file in the preview but this record. */
   bytes: number;
+  /** How many files those bytes are of. */
+  files: number;
   digest: string;
 }
 
@@ -272,23 +280,42 @@ export function writeSizeRecord(dir: string, previewAbs: string): void {
       const bytes = readFileSync(f.abs);
       return { path: f.path, oid: blobId(bytes, format), size: bytes.length };
     });
-  const rec: SizeRecord = { version: 1, bytes: files.reduce((n, f) => n + f.size, 0), digest: sizeDigest(files) };
+  const rec: SizeRecord = { version: 1, bytes: files.reduce((n, f) => n + f.size, 0), files: files.length, digest: sizeDigest(files) };
   writeFileSync(join(previewAbs, STAGED_SIZE_FILE), `${JSON.stringify(rec)}\n`);
 }
 
-/** The size of a preview known only from git: its record when the digest agrees, else its blobs. */
+/**
+ * The size of a preview known only from git: its record when it describes
+ * these very files, else its blobs.
+ *
+ * What is checked, and what cannot be. The digest binds the record to the
+ * exact set of (path, blob id) pairs, and a blob id is a hash of the bytes, so
+ * the sizes the record sums are fixed by what the digest names. What is NOT
+ * checked is the sum itself: no size of a blob outside the cone is known
+ * without fetching it, which is the cost the record exists to avoid. So a
+ * record is refused when it is not well formed, when its file count is not the
+ * tree's, or when its bytes are not a non-negative safe integer; a record whose
+ * digest matches but whose sum is wrong could only come from a writer that
+ * hashed the right files and added their sizes wrongly. The writer is
+ * {@link writeSizeRecord}, tested; anyone else able to write such a record can
+ * push to `gh-pages`, and could as well delete the previews it describes.
+ */
 function sizeFromGit(dir: string, entries: readonly GitEntry[], prefix: string, record: Buffer | undefined): number {
-  const files = entries.filter((e) => isRegular(e.mode)).map((e) => ({ path: e.path.slice(prefix.length), oid: e.oid }));
+  const files = entries
+    .filter((e) => isRegular(e.mode) && e.path !== `${prefix}${STAGED_SIZE_FILE}`)
+    .map((e) => ({ path: e.path.slice(prefix.length), oid: e.oid }));
   if (record !== undefined) {
     try {
       const r = JSON.parse(record.toString("utf-8")) as SizeRecord;
-      if (r.version === 1 && Number.isInteger(r.bytes) && r.bytes >= 0 && r.digest === sizeDigest(files)) return r.bytes + record.length;
+      const wellFormed = r.version === 1 && Number.isSafeInteger(r.bytes) && r.bytes >= 0 && r.files === files.length;
+      if (wellFormed && r.digest === sizeDigest(files)) return r.bytes + record.length;
     } catch {
       // not a record: read the blobs
     }
   }
-  const sizes = blobSizes(dir, [...new Set(files.map((f) => f.oid))]);
-  return files.reduce((n, f) => n + (sizes.get(f.oid) ?? 0), 0);
+  const all = entries.filter((e) => isRegular(e.mode));
+  const sizes = blobSizes(dir, [...new Set(all.map((f) => f.oid))]);
+  return all.reduce((n, f) => n + (sizes.get(f.oid) ?? 0), 0);
 }
 
 /** The small blobs a preview's age and size are read from, for every preview known only from git. */
@@ -313,21 +340,25 @@ function timeOf(raw: string | undefined): number | undefined {
   return Number.isNaN(t) ? undefined : t;
 }
 
-/** The previews a sparse checkout holds only in git, with their index entries, by slug. */
-function previewsInGit(dir: string, outside: Map<string, GitEntry> | undefined): Map<string, GitEntry[]> {
-  const out = new Map<string, GitEntry[]>();
-  if (outside === undefined) return out;
+/**
+ * The previews a sparse checkout holds outside its cone, with all their index
+ * entries, by slug. A preview is outside when ANY entry of it is outside the
+ * cone ({@link indexEntries}) — never decided by whether its directory is on
+ * disk: a directory left there outside the cone is not what the commit holds.
+ */
+function previewsInGit(index: Map<string, IndexEntry> | undefined): Map<string, GitEntry[]> {
+  const bySlug = new Map<string, IndexEntry[]>();
+  if (index === undefined) return new Map();
   const prefix = `${STAGING_PREFIX}/`;
-  for (const e of outside.values()) {
+  for (const e of index.values()) {
     if (!e.path.startsWith(prefix)) continue;
     const rest = e.path.slice(prefix.length);
     const slash = rest.indexOf("/");
     if (slash <= 0) continue;
     const name = rest.slice(0, slash);
-    if (existsSync(join(dir, STAGING_PREFIX, name))) continue;
-    out.set(name, [...(out.get(name) ?? []), e]);
+    bySlug.set(name, [...(bySlug.get(name) ?? []), e]);
   }
-  return out;
+  return new Map([...bySlug].filter(([, es]) => es.some((e) => e.outside)));
 }
 
 /**
@@ -337,7 +368,7 @@ function previewsInGit(dir: string, outside: Map<string, GitEntry> | undefined):
  */
 export function readPreviews(dir: string, git: GitTime = gitLastCommit): Preview[] {
   const staging = join(dir, STAGING_PREFIX);
-  const inGit = previewsInGit(dir, sparseEntries(dir));
+  const inGit = previewsInGit(indexEntries(dir));
   if (!existsSync(staging) && inGit.size === 0) return [];
   const logTimes = renderLogTimes(dir);
   const small = readSmallBlobs(dir, inGit);
@@ -433,14 +464,32 @@ export function rotate(o: RotateOptions): { plan: RotationPlan; lines: string[] 
   if (!isPreviewName(o.current)) throw new Error(`--current \`${o.current}\` is not a preview slug`);
 
   const curDir = join(o.dir, STAGING_PREFIX, o.current);
+  const index = indexEntries(o.dir);
+  const inGit = previewsInGit(index);
+  // The preview being staged is written on disk, and `git add -A` does not
+  // stage a path outside the cone: refuse rather than publish a preview the
+  // commit does not hold.
+  if (inGit.has(o.current)) {
+    throw new Error(
+      `STAGING/${o.current} is outside the sparse checkout's cone, so what is written there is not committed — ` +
+        `add it first (git sparse-checkout add STAGING/${o.current})`,
+    );
+  }
   if (existsSync(curDir)) writeFileSync(join(curDir, STAGED_AT_FILE), `${o.now}\n`);
-  const outside = sparseEntries(o.dir);
-  const inGit = previewsInGit(o.dir, outside);
 
   const plan = planRotation(readPreviews(o.dir, o.git ?? gitLastCommit), o.current, budget);
   // After the plan, so this run decides on the bytes it always did; the next
   // run, and any read from git, counts the record too.
   if (existsSync(curDir)) writeSizeRecord(o.dir, curDir);
+  // Every blob a removal reads, fetched BEFORE the first removal: a fetch that
+  // fails then stops the run with nothing removed, rather than part-way.
+  const retiredAt = (slug: string) => index?.get(`${STAGING_PREFIX}/${RETIRED_DIR}/${slug}.json`);
+  const recordIn = (slug: string) =>
+    inGit.get(slug)?.find((e) => e.path === `${STAGING_PREFIX}/${slug}/${RECORD_FILE}` && isRegular(e.mode));
+  prefetchBlobs(
+    o.dir,
+    plan.remove.flatMap((p) => [recordIn(p.slug), retiredAt(p.slug)?.outside ? retiredAt(p.slug) : undefined]).flatMap((e) => (e ? [e.oid] : [])),
+  );
   const reason =
     `rotated off: the previews on gh-pages came to more than ${human(budget)} ` +
     `(owner ruling 2026-10-02, issue #1868, amended 2026-10-04 to a size budget); ` +
@@ -455,20 +504,20 @@ export function rotate(o: RotateOptions): { plan: RotationPlan; lines: string[] 
     // Retire the record first, the same way both cleanup jobs do: the record
     // goes to `_retired/`, never with the directory. Retiring twice keeps the
     // first retirement.
-    const rec = join(abs, RECORD_FILE);
     const entries = inGit.get(p.slug);
-    // Outside a sparse checkout's cone, the record is its blob.
-    const recBlob = entries?.find((e) => e.path === `${STAGING_PREFIX}/${p.slug}/${RECORD_FILE}` && isRegular(e.mode));
-    if (existsSync(rec) || recBlob !== undefined) {
+    // Outside a sparse checkout's cone, the record is its blob, whatever is on disk.
+    const rec = entries === undefined ? join(abs, RECORD_FILE) : undefined;
+    const recBlob = recordIn(p.slug);
+    if ((rec !== undefined && existsSync(rec)) || recBlob !== undefined) {
       const retiredDir = join(o.dir, STAGING_PREFIX, RETIRED_DIR);
       const out = join(retiredDir, `${p.slug}.json`);
       mkdirSync(retiredDir, { recursive: true });
       try {
         // A retired record outside the cone is materialised first, so retiring twice still keeps the first.
-        const already = outside?.get(`${STAGING_PREFIX}/${RETIRED_DIR}/${p.slug}.json`);
-        if (!existsSync(out) && already !== undefined) writeBlob(o.dir, already.oid, out);
+        const already = retiredAt(p.slug);
+        if (!existsSync(out) && already?.outside) writeBlob(o.dir, already.oid, out);
         if (!existsSync(out)) {
-          if (existsSync(rec)) copyFileSync(rec, out);
+          if (rec !== undefined) copyFileSync(rec, out);
           else writeBlob(o.dir, recBlob!.oid, out);
         }
         const node = loadExisting(out);
@@ -499,7 +548,7 @@ export function rotate(o: RotateOptions): { plan: RotationPlan; lines: string[] 
     );
 
     rmSync(abs, { recursive: true, force: true });
-    // Not on disk to delete: take it out of the index, so the commit removes it.
+    // Outside the cone the disk is not what is committed: take it out of the index, so the commit removes it.
     if (entries !== undefined) removeFromIndex(o.dir, [`${STAGING_PREFIX}/${p.slug}`]);
   }
   return { plan, lines };
