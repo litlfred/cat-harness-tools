@@ -20,9 +20,14 @@
  *
  * A change to what every test runs under (the lockfile, a manifest, a bunfig,
  * a tsconfig, a test preload) can affect every test, so it selects them all,
- * and the hook leaves the suite to CI rather than run it for 30 minutes. A
- * closure that cannot be determined (a computed import, an import that does
- * not resolve) selects its test: running it is the safe answer.
+ * and the hook leaves the suite to CI rather than run it for 30 minutes.
+ *
+ * A computed `import()` or an import that does not resolve is walked past:
+ * the literal imports around it still count, and the edge it hides is CI's to
+ * catch, like a fixture read. Selecting every test behind such a module was
+ * tried first and measured useless (2026-11-05): a handful of hub modules put
+ * 433 of 1533 test files behind one, so a one-line change to a Markdown file
+ * selected 28% of the suite.
  *
  * Deliberately free of package imports, like the hook that calls it.
  *
@@ -89,15 +94,14 @@ export function affectedTests(root: string, changed: readonly string[], tests: r
 
   const changedAbs = new Set(changed.map((c) => resolve(root, c)));
   // One read per file, shared by every test's walk.
-  const edges = new Map<string, string[] | string>();
-  const importsOf = (abs: string): string[] | string => {
+  const edges = new Map<string, string[]>();
+  const importsOf = (abs: string): string[] => {
     let e = edges.get(abs);
     if (e === undefined) {
       try {
-        const d = directRelativeImports(abs);
-        e = "undetermined" in d ? d.undetermined : d.targets;
-      } catch (err) {
-        e = `could not be read (${(err as Error).message})`;
+        e = directRelativeImports(abs).targets;
+      } catch {
+        e = []; // unreadable: walked past, like a computed import
       }
       edges.set(abs, e);
     }
@@ -119,12 +123,7 @@ export function affectedTests(root: string, changed: readonly string[], tests: r
         hit = f === start ? "the test file itself changed" : `imports ${relative(root, f)}`;
         break;
       }
-      const e = importsOf(f);
-      if (typeof e === "string") {
-        hit = `${relative(root, f)} ${e}, so its closure is not known`;
-        break;
-      }
-      stack.push(...e);
+      stack.push(...importsOf(f));
     }
     if (hit !== undefined) {
       files.push(t);

@@ -55,9 +55,12 @@ describe("affectedTests", () => {
     expect(affectedTests(root, ["package.json"]).kind).toBe("all");
     expect(affectedTests(root, ["test/setup.ts"]).kind).toBe("all");
   });
-  test("a closure that cannot be determined selects its test", () => {
-    put({ "test/broken.test.ts": 'import { q } from "./missing.ts";\n' });
-    const s = affectedTests(root, ["src/c.ts"]);
-    expect(s).toMatchObject({ kind: "some", files: ["test/broken.test.ts", "test/c.test.ts"] });
+  test("a computed or unresolvable import is walked past: literal edges still count, the hidden one does not select", () => {
+    put({
+      "src/hub.ts": 'import { c } from "./c.ts";\nexport const load = (m: string) => import(m);\nimport { q } from "./missing.ts";\n',
+      "test/hub.test.ts": 'import { load } from "../src/hub.ts";\n',
+    });
+    expect(affectedTests(root, ["src/c.ts"])).toMatchObject({ files: ["test/c.test.ts", "test/hub.test.ts"] });
+    expect(affectedTests(root, ["src/a.ts"])).toMatchObject({ files: ["test/b.test.ts"] });
   });
 });

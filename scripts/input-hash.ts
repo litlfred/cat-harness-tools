@@ -267,31 +267,32 @@ export function sourceClosure(root: string, entries: readonly string[]): { files
     if (seen.has(file)) continue;
     seen.add(file);
     const d = directRelativeImports(file);
-    if ("undetermined" in d) return { undetermined: `${relative(root, file)} ${d.undetermined}` };
+    if (d.doubt !== undefined) return { undetermined: `${relative(root, file)} ${d.doubt}` };
     stack.push(...d.targets);
   }
   return { files: [...seen].map((f) => relative(root, f)).sort() };
 }
 
 /**
- * The files one source file imports by a RELATIVE specifier, absolute; a
- * non-source file imports nothing. Undetermined for a non-literal dynamic
- * import, or an import that does not resolve: Bun would fail to load the
- * module, so whoever asks should run it rather than skip it.
+ * The files one source file imports by a literal RELATIVE specifier,
+ * absolute; a non-source file imports nothing. `doubt` says why that list may
+ * be incomplete: a non-literal dynamic import, or an import that does not
+ * resolve (Bun would fail to load the module). {@link sourceClosure} treats a
+ * doubt as undetermined; a caller selecting tests walks what is literal.
  */
-export function directRelativeImports(file: string): { targets: string[] } | { undetermined: string } {
+export function directRelativeImports(file: string): { targets: string[]; doubt?: string } {
   if (!/\.(m?[jt]sx?)$/.test(file)) return { targets: [] };
   const text = stripComments(readFileSync(file, "utf-8"));
-  if (DYNAMIC_NONLITERAL_RE.test(text)) return { undetermined: "has a non-literal dynamic import" };
+  let doubt = DYNAMIC_NONLITERAL_RE.test(text) ? "has a non-literal dynamic import" : undefined;
   const targets: string[] = [];
   for (const m of text.matchAll(IMPORT_RE)) {
     const spec = m[1] ?? m[2] ?? m[3];
     if (spec === undefined || !spec.startsWith(".")) continue;
     const target = resolveModule(file, spec);
-    if (target === undefined) return { undetermined: `imports unresolvable ${spec}` };
-    targets.push(target);
+    if (target === undefined) doubt ??= `imports unresolvable ${spec}`;
+    else targets.push(target);
   }
-  return { targets };
+  return { targets, ...(doubt !== undefined ? { doubt } : {}) };
 }
 
 /** Expand declared globs to repo-relative files, sorted. A glob matching nothing is reported. */
