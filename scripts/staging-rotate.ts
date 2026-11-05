@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Cap the number of `STAGING/<slug>/` review previews on the publish branch,
+ * Cap the number of `branches/<slug>/` review previews on the publish branch,
  * rotating the oldest off.
  *
  * @module scripts/staging-rotate
@@ -13,7 +13,7 @@
  * ## Why this exists — issue #1868
  *
  * GitHub Pages deploys `gh-pages` as-is, and every per-PR preview under
- * `STAGING/<slug>/` is a full copy of the site — roughly 200–500 MB each. With
+ * `branches/<slug>/` is a full copy of the site — roughly 200–500 MB each. With
  * nothing bounding how many existed at once, the branch passed GitHub's 10 GB
  * Pages artifact limit and the LIVE site stopped deploying on 2026-10-01. The
  * removal paths that existed (`cleanup` on PR close, `cleanup-dispatch` for
@@ -32,7 +32,7 @@
  * whole class rather than per preview. What the skill still asks of every
  * removal is a RECORD, and this script leaves three: a `removed` entry in the
  * render log, the preview's `staging-preview.json` retired into
- * `STAGING/_retired/` (bean `6pfo` — retirement is a state, not a deletion),
+ * `branches/_retired/` (bean `6pfo` — retirement is a state, not a deletion),
  * and a line per preview in the commit message and the job log, with its age
  * and size.
  *
@@ -45,17 +45,17 @@
  *
  * ## How "last updated" is determined, in order
  *
- * 1. **`STAGING/<slug>/.staged-at`** — an ISO timestamp this script writes into
+ * 1. **`branches/<slug>/.staged-at`** — an ISO timestamp this script writes into
  *    the preview being staged, every time it is staged. The authoritative
  *    answer for every preview staged after this script landed.
  * 2. **The render log** — the latest `rendered` or `restored` entry for
- *    `STAGING/<slug>` in `_render-log/*.jsonl` (bean `5mg5`). Accurate for any
+ *    `branches/<slug>` in `_render-log/*.jsonl` (bean `5mg5`). Accurate for any
  *    preview staged since the log existed.
  * 3. **`staging-preview.json`'s `builtAt`** — when the preview FIRST appeared
  *    (`staging-record.ts` deliberately does not walk it forward). A lower bound
  *    on the last update, so a preview known only this way sorts as older than
  *    it may be.
- * 4. **`git log -1 --format=%ct -- STAGING/<slug>`** — last resort. The
+ * 4. **`git log -1 --format=%ct -- branches/<slug>`** — last resort. The
  *    workflow's checkout of `gh-pages` is depth 1, where this returns the TIP
  *    commit's time for every path, so it cannot order previews against each
  *    other; ties then break by slug so the choice is at least deterministic.
@@ -70,7 +70,7 @@
  *
  * - **The preview being staged** (`--current`). It always takes one of the N
  *   slots, so the cap counts it.
- * - **`STAGING/_retired/`** and anything that is not a preview directory: plain
+ * - **`branches/_retired/`** and anything that is not a preview directory: plain
  *   files, dot-entries, `_`-prefixed reserved names, and names the staging
  *   slug pipeline could not have produced. Conservative on purpose — an entry
  *   this script does not recognise is somebody else's, and a cap that deleted
@@ -107,7 +107,7 @@ import { loadExisting } from "./staging-record.ts";
  * THE CAP — defined here and nowhere else. The workflow passes no number, so
  * there is no second copy to drift.
  *
- * The TOTAL size of every preview under `STAGING/`, in bytes as checked out
+ * The TOTAL size of every preview under `branches/`, in bytes as checked out
  * (what Pages publishes, not what git stores). Owner ruling 2026-10-02
  * (issue #1868) capped the COUNT at ten; amended 2026-10-04 to a size budget
  * of *"3gb"*. Binary, 3 x 1024^3: every byte formatter in this repository
@@ -140,7 +140,7 @@ export interface RotationPlan {
   remove: Preview[];
 }
 
-/** Is this `STAGING/` entry name one this script may treat as a preview? */
+/** Is this `branches/` entry name one this script may treat as a preview? */
 export function isPreviewName(name: string): boolean {
   if (name === RETIRED_DIR) return false;
   if (name.startsWith(".") || name.startsWith("_")) return false;
@@ -231,7 +231,7 @@ function sizeOf(path: string): number {
   return total;
 }
 
-/** Every preview under `<dir>/STAGING`, with its age and where the age came from. */
+/** Every preview under `<dir>/branches/`, with its age and where the age came from. */
 export function readPreviews(dir: string, git: GitTime = gitLastCommit): Preview[] {
   const staging = join(dir, STAGING_PREFIX);
   if (!existsSync(staging)) return [];

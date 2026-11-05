@@ -299,7 +299,7 @@ test.describe("kg viewer", () => {
   test("the page links back to the document it renders, relatively", async ({ page }) => {
     // RELATIVE, not composed. The page already fetched its sibling by this
     // path, so the link is right wherever the page is served from — canonical
-    // or STAGING/<slug>/. Composing <base>/kg/<stub>.jsonld from the
+    // or branches/<slug>/. Composing <base>/kg/<stub>.jsonld from the
     // declaration would be a second answer to a question already answered,
     // and the one that breaks on a preview.
     //

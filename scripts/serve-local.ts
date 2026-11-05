@@ -16,7 +16,7 @@
  * - `--repos a,b` fetches each repo's published `gh-pages` branch into a
  *   cache (`$XDG_CACHE_HOME/cat-harness/serve-local/<repo>`, else
  *   `~/.cache/...`): a shallow, blob-less, sparse clone, so only the files
- *   checked out are downloaded. A later run updates it. `STAGING/` is left
+ *   checked out are downloaded. A later run updates it. `branches/` is left
  *   out, because previews are most of a large gh-pages branch
  *   (folio-assistant's held 156,803 files on 2026-10-31); `--staging <branch>`
  *   adds the previews you name.
@@ -68,7 +68,7 @@ export function remoteUrl(template: string, owner: string, repo: string): string
 }
 
 /**
- * Sparse patterns (non-cone): everything except `STAGING/`, then each named
+ * Sparse patterns (non-cone): everything except `branches/`, then each named
  * preview. A branch name is one safe segment or it is refused.
  */
 export function sparsePatterns(staging: readonly string[]): string[] {
@@ -127,7 +127,7 @@ const USAGE = `usage: serve-local.ts [--repos a,b] [--site <repo>=<dir>]... [--s
 
   --repos      fetch each repo's gh-pages branch (cached; updated each run) and serve it at /<repo>/
   --site       serve a directory you built yourself at /<repo>/ instead; repeatable
-  --staging    also fetch branches/<branch>/ (or old STAGING/<branch>/) previews; repeatable (previews are left out otherwise)
+  --staging    also fetch branches/<branch>/ (or old branches/<branch>/) previews; repeatable (previews are left out otherwise)
   --offline    use the cache as it is, no fetch
   --port       default ${DEFAULT_PORT}
   --iri-origin where IRIs are published (default: the declared canonicalUrl's origin)

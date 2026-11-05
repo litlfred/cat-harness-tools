@@ -2,11 +2,11 @@
  * Remove the SEO IDENTITY CLAIMS from a built preview site.
  *
  * A staging preview is a build of a branch, served from
- * `…/STAGING/<slug>/`. `jekyll-seo-tag` gives every page three assertions
+ * `…/branches/<slug>/`. `jekyll-seo-tag` gives every page three assertions
  * about its own identity, composed from `site.url + baseurl + page.url`:
  *
- *   <link rel="canonical" href="https://…/STAGING/<slug>/x.html">
- *   <meta property="og:url" content="https://…/STAGING/<slug>/x.html">
+ *   <link rel="canonical" href="https://…/branches/<slug>/x.html">
+ *   <meta property="og:url" content="https://…/branches/<slug>/x.html">
  *   <script type="application/ld+json">{… "@type":"WebPage","url":"…"}</script>
  *
  * **A preview must not make them.** `canonical` tells a crawler which URL is

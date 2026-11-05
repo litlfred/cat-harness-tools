@@ -196,7 +196,7 @@ export const FolioAssistantDependencySchema = z.object({
   path: z.string().optional(),
   git: z.string().url().optional(),
   /**
-   * HOW TO FETCH WHILE STAGING, and the provenance of the bytes — not what is
+   * HOW TO FETCH WHILE branches/, and the provenance of the bytes — not what is
    * depended on.
    *
    * A SHA is a perfectly good pin and a **useless published reference**: it

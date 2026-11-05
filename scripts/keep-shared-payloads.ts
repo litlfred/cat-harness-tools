@@ -26,7 +26,7 @@
  * ## The rule
  *
  * `payload/retained.json` maps each kept blob's path to when main first
- * dropped it. A blob stays while some preview under `STAGING/` has a
+ * dropped it. A blob stays while some preview under `branches/` has a
  * `shared.json` (it borrows) and a `.staged-at` earlier than that time (it
  * was staged while main still wrote the blob). A preview with no `.staged-at`
  * counts as older: keeping a blob too long costs bytes, dropping it too soon
@@ -76,7 +76,7 @@ export function readRetained(root: string): Retained {
   return { version: 1, kept: {} };
 }
 
-/** When each preview under `site/STAGING/` that borrows from the live site was staged (`undefined`: not known). */
+/** When each preview under `site/branches/` that borrows from the live site was staged (`undefined`: not known). */
 export function sharingPreviews(site: string): (number | undefined)[] {
   const out: (number | undefined)[] = [];
   for (const prefix of PREVIEW_PREFIXES) {

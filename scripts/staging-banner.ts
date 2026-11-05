@@ -210,7 +210,7 @@ const BANNER_STYLE =
  *
  * Reported by the owner 2026-10-02 with a screenshot: the banner was **not at
  * the top**. Measured in Chromium against the served bytes of
- * `STAGING/…/cat-harness/library/<dak-base>/<dak-ig>/`, the banner rendered
+ * `branches/…/cat-harness/library/<dak-base>/<dak-ig>/`, the banner rendered
  * at `top: 8, left: 64` where it should have been `0, 56`.
  *
  * **It assumed the page resets `body`'s margin.** `position: sticky; top: 0`

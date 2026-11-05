@@ -78,7 +78,7 @@ export type StoreProbe<T> = Probe<T> | { state: "absent"; reason: string };
 
 /** One preview directory on the publish branch. */
 export interface StagingPreview {
-  /** The directory name under `STAGING/` — the sanitised branch slug. */
+  /** The directory name under `branches/` — the sanitised branch slug. */
   slug: string;
   bytes: number;
   files: number;
@@ -920,7 +920,7 @@ export const ORPHAN_THRESHOLDS: HealthThreshold[] = [
  * ## Why "no open pull request" is not the question — bean `w2g5`
  *
  * It was, until 2026-09-19, and on that day it named
- * `STAGING/claude-brave-hypatia-r820sf` an orphan while the branch carried an
+ * `branches/claude-brave-hypatia-r820sf` an orphan while the branch carried an
  * unmerged commit **two minutes old**, on a branch a sibling session had used
  * for five successive pull requests, each merged and closed before the next
  * opened. "No open PR" is true of such a branch for the entire gap between
@@ -986,7 +986,7 @@ export function stagingOrphanCheck(ctx: HealthContext): HealthCheckResult {
   // that would silence it is exactly how a three-state value gets treated as
   // a two-state one.
   const openHeads = ctx.openPrHeads.value;
-  // `STAGING/_retired/` is the retired-record store (bean `6pfo`), and other
+  // `branches/_retired/` is the retired-record store (bean `6pfo`), and other
   // `_`/dot names are reserved: none is a preview, so none has a branch or a
   // pull request to claim it. Judging them would name the record store an
   // orphan every day (folio-assistant#860). The same rule `staging-rotate.ts`
@@ -1839,7 +1839,7 @@ const TODO_THRESHOLDS: HealthThreshold[] = [
  * | route | result |
  * |---|---|
  * | `GET https://litlfred.github.io/folio-assistant/` | `connect_rejected`, egress policy |
- * | the same for a `STAGING/<slug>/` page | `connect_rejected` |
+ * | the same for a `branches/<slug>/` page | `connect_rejected` |
  * | `GET /repos/:o/:r/pages` | every field `null` |
  * | `GET /repos/:o/:r/pages/builds` | "not permitted through this proxy" |
  * | `actions/workflows/pages-build-deployment/runs` | `total_count` absent |

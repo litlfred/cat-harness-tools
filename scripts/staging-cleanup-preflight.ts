@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Is it safe to remove one `STAGING/<slug>/` review preview, RIGHT NOW?
+ * Is it safe to remove one `branches/<slug>/` review preview, RIGHT NOW?
  *
  * ```sh
  * bun run cat-harness-tools/scripts/staging-cleanup-preflight.ts --slug claude-health-checks

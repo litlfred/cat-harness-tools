@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * staging-share — a STAGING preview stores only the files that differ from
+ * staging-share — a branches/ preview stores only the files that differ from
  * the live site, and serves the rest from the live site's copy.
  *
  * @module scripts/staging-share
@@ -8,8 +8,8 @@
  * its fallback worker; it judges no graph
  *
  * ```sh
- * bun run cat-harness-tools/scripts/staging-share.ts plan  --root pages --preview pages/STAGING/<slug> --slug <slug>
- * bun run cat-harness-tools/scripts/staging-share.ts apply --root pages --preview pages/STAGING/<slug> --slug <slug>
+ * bun run cat-harness-tools/scripts/staging-share.ts plan  --root pages --preview pages/branches/<slug> --slug <slug>
+ * bun run cat-harness-tools/scripts/staging-share.ts apply --root pages --preview pages/branches/<slug> --slug <slug>
  * bun run cat-harness-tools/scripts/staging-share.ts write-404 --site _site
  * ```
  *

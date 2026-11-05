@@ -176,7 +176,7 @@ export function probeStaging(o: StagingProbeOptions): Probe<StagingEvidence> {
   }
 
   const command = `git ls-tree -r -l ${rev}:${o.prefix}/<slug>`;
-  // Is there a STAGING directory at all? An absent one is a determined empty:
+  // Is there a branches/ directory at all? An absent one is a determined empty:
   // the branch was read and carries no previews.
   const has = git(o.repoRoot, ["ls-tree", "--name-only", rev, o.prefix]);
   if (has.code !== 0) {

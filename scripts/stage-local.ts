@@ -300,7 +300,7 @@ export function readStagingInputs(yaml: string): StagingInputs | undefined {
 /**
  * The workflow's slug rule: anything outside `[A-Za-z0-9._-]` becomes `-`,
  * runs collapse, ends trim. Undefined when the result names no single path
- * segment, because the deploy then deletes `STAGING/<slug>` (bean `plj1`).
+ * segment, because the deploy then deletes `branches/<slug>` (bean `plj1`).
  */
 export function slugOf(branch: string): string | undefined {
   const s = branch.replace(/[^a-zA-Z0-9._-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
@@ -379,7 +379,7 @@ export type Target = "main" | "preview";
 export function chooseTarget(o: { branch: string; defaultBranch?: string; main?: boolean }): Target {
   // A detached checkout names no branch: `rev-parse --abbrev-ref HEAD` answers
   // the literal "HEAD", which would otherwise publish a preview at
-  // STAGING/HEAD/. Say which branch this is rather than guess.
+  // branches/HEAD/. Say which branch this is rather than guess.
   if (o.branch === "HEAD") throw new Error("the checkout is detached, so it names no branch; check out the branch, or pass --branch <name>");
   if (o.main) {
     if (o.defaultBranch && o.branch !== o.defaultBranch) throw new Error(`--main publishes the site at the publish root, and '${o.branch}' is not the default branch '${o.defaultBranch}'; refusing`);
@@ -411,7 +411,7 @@ function renderLog(script: Script, pages: string, o: { kind: string; path: strin
   execFileSync("bun", ["run", script("render-log.ts"), "--dir", pages, "--event", "rendered", "--kind", o.kind, "--path", o.path, "--slug", o.slug, "--branch", o.branch, "--commit", o.sha, "--run", o.runUrl], { input: JSON.stringify({ summary: o.summary }), stdio: ["pipe", "inherit", "inherit"] });
 }
 
-/** A preview: `STAGING/<slug>/` replaced wholesale (bean `85im`), and its render-log entry. */
+/** A preview: `branches/<slug>/` replaced wholesale (bean `85im`), and its render-log entry. */
 export function composePreview(pages: string, site: string, o: { slug: string; branch: string; sha: string; runUrl: string; script: Script }): Composed {
   const dest = join(pages, PREVIEW_PREFIX, o.slug);
   rmSync(dest, { recursive: true, force: true });
@@ -422,7 +422,7 @@ export function composePreview(pages: string, site: string, o: { slug: string; b
 
 /**
  * The main site, as `publish-main` lays it: the platform's
- * `publish-main-site.ts` replaces only what its manifest names, so `STAGING/`,
+ * `publish-main-site.ts` replaces only what its manifest names, so `branches/`,
  * `_render-log/` and anything a person put at the root stay; then the
  * `main-site` render-log entry for `/`.
  */
@@ -868,7 +868,7 @@ export interface DeclaredResult {
  * its own `site.build`. The target follows the branch exactly as
  * {@link chooseTarget} decides it for a workflow-described folio. The root is
  * published only from the pushed default branch, a preview at
- * `STAGING/<branch>/`, and `--plan` and `--dry-run` publish nothing.
+ * `branches/<branch>/`, and `--plan` and `--dry-run` publish nothing.
  */
 export async function stageDeclared(
   o: StageOptions,
@@ -1012,7 +1012,7 @@ export async function openPrFor(owner: string, name: string, branch: string, log
  * "compare with main" link fell back to the site root (owner, 2026-10-30:
  * "compare with main should show same page as on main"). The ref is read in
  * a throwaway bare repository, shallow and blob-less, so the checkout's own
- * history and refs are never touched. STAGING/ and _render-log/ are not main
+ * history and refs are never touched. branches/ and _render-log/ are not main
  * pages, so they are left out.
  */
 export function mainPagesFile(repo: string, publishBranch: string, log: (s: string) => void): string | undefined {

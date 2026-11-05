@@ -7,7 +7,7 @@ import { FRAGMENT } from "../../scripts/staging-banner.ts";
  * `staging-banner-constant.test.ts` pins the property the bean is about — the
  * injected bytes do not depend on the build. It cannot say whether the script
  * those bytes carry actually WORKS, because the script only runs in a browser
- * with a `location.pathname` under `STAGING/` and a `staging.json` to fetch.
+ * with a `location.pathname` under `branches/` and a `staging.json` to fetch.
  * That is this file.
  *
  * The three states below are the ones that matter, and the middle one is the
@@ -15,7 +15,7 @@ import { FRAGMENT } from "../../scripts/staging-banner.ts";
  *
  *   staging.json fetched     -> the full banner, links and compare target
  *   fetch fails / 404        -> still says FEATURE BRANCH, says detail is gone
- *   not under a STAGING path -> says so, and does not fetch someone else's
+ *   not under a branches/ path -> says so, and does not fetch someone else's
  *
  * **"Could not determine" is never rendered as "this is the real site."** The
  * banner exists so a reviewer cannot mistake staged content for the published
@@ -221,7 +221,7 @@ test("a 404 on staging.json STILL announces the preview", async ({ page }) => {
 });
 
 test("served from outside a preview path, it says so rather than fetching", async ({ page }) => {
-  // No `STAGING/<slug>/` in the pathname means there is no staging.json that
+  // No `branches/<slug>/` in the pathname means there is no staging.json that
   // belongs to this page; fetching one anyway would read another preview's.
   await serve(page, "/folio-assistant/index.html", FACTS);
   const banner = page.locator("[data-fa-staging-banner]");

@@ -399,7 +399,7 @@ describe("the merge rule itself", () => {
  * `tebu` cut `reference/` and `api/` from a preview whose branch cannot have
  * changed them. This is the same cut one directory over, and by 2026-09-23 the
  * bigger one: measured across `origin/gh-pages`, `smart-trust/` was **776.6 MB
- * over 13 previews, 37 % of a 2.10 GB `STAGING/` tree**, against `reference/`'s
+ * over 13 previews, 37 % of a 2.10 GB `branches/` tree**, against `reference/`'s
  * 464.7 MB — because `smart-trust/docs/` is 3.2 MB of markdown that Jekyll
  * inflates to 111.6 MB of themed HTML across 681 pages.
  *

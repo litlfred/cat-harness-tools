@@ -25,7 +25,7 @@
  *   Either the shared `gh-pages-push` concurrency group, or a retry. One or
  *   the other, because they all contend for a single ref.
  * - **A job that REPLACES the whole publish branch without carrying the open
- *   PRs' `STAGING/` previews across.** Bean `plj1`.
+ *   PRs' `branches/` previews across.** Bean `plj1`.
  * - **A push to `qa-reports` that does not go through `qa-store.ts`.** Bean
  *   `16ei`: `qa-reports-unretried`.
  *
@@ -292,7 +292,7 @@ const RESTORE_SCRIPT = "scripts/restore-staging.ts";
  * `docs-site.yml` was the only one of this repository's six `gh-pages`
  * publishers in that shape, and it is the one that fires on every push to
  * `main` — so the most frequently run publisher was the only one that wiped,
- * and what it wiped was `STAGING/`.
+ * and what it wiped was `branches/`.
  *
  * Measured on the real branch, 2026-09-19: three `docs(gh-pages)` commits in a
  * 25-minute window, carrying 1, 3 and 1 previews on their respective parents
@@ -314,7 +314,7 @@ const RESTORE_SCRIPT = "scripts/restore-staging.ts";
  *   the main site's own deleted pages from ever disappearing.)
  * - **a non-empty `destination_dir`** — the replace is scoped to a
  *   subdirectory, so the previews beside it are untouched. `feature-staging`
- *   writes `STAGING/<slug>` this way.
+ *   writes `branches/<slug>` this way.
  * - **a publish branch other than the one the previews live on** — a different
  *   branch is a different site.
  */

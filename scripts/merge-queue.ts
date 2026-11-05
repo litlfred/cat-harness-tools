@@ -55,7 +55,7 @@ export const PRIORITY_DMN = join(ownDirectoryById(HARNESS_ROOT, "sdlc-processes"
 export const PRIORITY_DECISION = "Decision_MergePriority";
 
 /**
- * The beans whose descendants SEED THE STAGING REPOS — input (a). The
+ * The beans whose descendants SEED THE branches/ REPOS — input (a). The
  * separation goal and its arc. A bean id, not a title: ids are stable.
  */
 export const SEPARATION_ROOTS: readonly string[] = ["folio-assistant-vuip", "folio-assistant-7x5n"];

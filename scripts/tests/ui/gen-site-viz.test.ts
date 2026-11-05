@@ -18,7 +18,7 @@ const TREE = [".nojekyll", "index.html", "en/a/index.html", "en/a/x.css", "en/b/
 describe("summariseTree", () => {
   const s = summariseTree(TREE);
   it("groups by top-level route, staging previews by slug, and counts root files apart", () => {
-    // a file directly under STAGING/ belongs to no preview, so it is counted as a route of its own
+    // a file directly under branches/ belongs to no preview, so it is counted as a route of its own
     expect(s.routes.map((r) => r.route)).toEqual(["assets", "en", "STAGING"]);
     expect(s.previews).toEqual([{ route: "STAGING/pr-1", pages: 2, files: 2, index: true }]);
     expect(s.rootFiles).toBe(2);

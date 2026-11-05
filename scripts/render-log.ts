@@ -25,7 +25,7 @@
  *
  * Usage:
  *   render-log.ts --dir DIR --event rendered --kind staging-preview \
- *     --path STAGING/slug [--slug S] --summary "..." [--reason "..."] \
+ *     --path branches/slug [--slug S] --summary "..." [--reason "..."] \
  *     [--branch B] [--commit C] [--run URL] [--detail "..."]
  */
 

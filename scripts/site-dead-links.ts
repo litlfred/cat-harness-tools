@@ -36,7 +36,7 @@
  *    preview builds only the composed instances its branch reaches
  *    (`compose-docs.ts`, `carriedInstances`), so a link into one it left out
  *    is dead here and live on the published site. When the build is a
- *    preview (`--base-path …/STAGING/<slug>`), the target's first segment is
+ *    preview (`--base-path …/branches/<slug>`), the target's first segment is
  *    a composed instance, and that instance's composed directory holds the
  *    page's source, the link goes to the same path on the published site.
  *    A canonical build never takes this rule: there a missing page is a
@@ -310,7 +310,7 @@ export function sourceCandidates(rel: string): string[] {
 
 /**
  * The published site's root path for a PREVIEW's base path, or undefined when
- * the build is not a preview: `/folio-assistant/STAGING/x` → `/folio-assistant`.
+ * the build is not a preview: `/folio-assistant/branches/x` → `/folio-assistant`.
  */
 export function publishedRootOf(basePath: string): string | undefined {
   const m = new RegExp(`^(.*)/${PREVIEW_PREFIX_ALT}/[^/]+/?$`).exec(basePath);

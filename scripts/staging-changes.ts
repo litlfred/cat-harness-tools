@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 /**
- * The CHANGES page of a staging preview: `STAGING/<slug>/changes/`.
+ * The CHANGES page of a staging preview: `branches/<slug>/changes/`.
  *
- * Owner, 2026-10-14: *"when we have a STAGING preview branch, we need a new
+ * Owner, 2026-10-14: *"when we have a branches/ preview branch, we need a new
  * visualizer endpoint that at least in an index.html lists all of the changed
  * assets in the repo and, where known, downstream changed/derivative assets in
  * its dependency cone ... it should also check difference between gh-pages
- * root and the STAGING/<BRANCH> dirs in a list of its changes (QA check - some
+ * root and the branches/<BRANCH> dirs in a list of its changes (QA check - some
  * were not in the dependency cone)"*.
  *
  * Three lists, each from a tool that already answers it; this file computes
@@ -30,7 +30,7 @@
  *
  * ## Why the QA diff compares the page BODY, with the base folded
  *
- * A preview is built under `/<repo>/STAGING/<slug>/` and main under `/<repo>/`,
+ * A preview is built under `/<repo>/branches/<slug>/` and main under `/<repo>/`,
  * and each stamps its own build into the chrome. Compared byte for byte every
  * page differs, and the QA list would name all of them. So, in text files,
  * the preview's base is folded to main's, the `BUILD_STAMPS` are blanked, and
@@ -44,8 +44,8 @@
  *     --out-list changed-expanded.txt --out-json sources.json [--out-impact rendered-impact.json]
  *   bun run cat-harness-tools/scripts/staging-changes.ts render --sources sources.json \
  *     [--predicted rendered-impact.json] [--before pages-root --after _site \
- *      --staging-base /repo/STAGING/slug --site-base /repo --base <sha>] \
- *     --site-url https://o.github.io/repo/ --staging-url https://o.github.io/repo/STAGING/slug/ \
+ *      --staging-base /repo/branches/slug --site-base /repo --base <sha>] \
+ *     --site-url https://o.github.io/repo/ --staging-url https://o.github.io/repo/branches/slug/ \
  *     --repo o/repo --head <sha> --branch <b> --slug <s> [--pr <n>] --out _site/changes
  *
  * @module cat-harness-tools/scripts/staging-changes
@@ -381,7 +381,7 @@ export const PREVIEW_ARTEFACTS =
 
 const TEXTUAL = /\.(html?|css|js|json|jsonld|xml|txt|svg|md)$/i;
 
-/** Every occurrence of the preview's base, as main's (`/r/STAGING/s` → `/r`), path-aligned. */
+/** Every occurrence of the preview's base, as main's (`/r/branches/s` → `/r`), path-aligned. */
 export function foldBase(text: string, stagingBase: string, siteBase: string): string {
   const from = stagingBase.replace(/\/+$/, "");
   const to = siteBase.replace(/\/+$/, "");

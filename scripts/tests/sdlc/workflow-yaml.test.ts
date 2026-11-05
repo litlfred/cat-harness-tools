@@ -235,7 +235,7 @@ describe("gh-pages full-replace vs the STAGING previews", () => {
 describe("every path that publishes or removes a preview also LOGS it", () => {
   /**
    * The log's whole value is that entries persist and a reader will believe
-   * they did. A path that changes `STAGING/` without appending an entry
+   * they did. A path that changes `branches/` without appending an entry
    * silently breaks that belief — and a silent break is worse than no log,
    * because the next reader concludes from an absent entry that nothing
    * happened. So the wiring is asserted rather than remembered.

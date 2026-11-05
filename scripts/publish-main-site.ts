@@ -13,7 +13,7 @@
  *
  * ## It deletes only what it wrote
  *
- * The root of the publish branch is shared: `STAGING/` holds every open PR's
+ * The root of the publish branch is shared: `branches/` holds every open PR's
  * preview, `PC/` the frozen public comment releases, `_render-log/` the render history, and a folio may keep files there
  * by hand (a `CNAME`, a verification file). Replacing the root wholesale would
  * delete all of it, which is the `plj1` failure. Overlaying without deleting

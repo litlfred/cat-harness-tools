@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Build an instance's own site from its checkout, check it, and (optionally)
- * publish it: the root site, or a branch preview at `STAGING/<branch>/`.
+ * publish it: the root site, or a branch preview at `branches/<branch>/`.
  *
  * @module cat-harness-tools/scripts/build-instance-site
  *
@@ -47,7 +47,7 @@
  * so what runs is what the instance's own package.json says, and nothing else.
  *  5. Jekyll, as preview-site.sh does it: remote_theme dropped (codeload is not reachable
  *     everywhere), title and description from the instance's declaration, baseurl from the
- *     git remote (`/<repo>`, or `/<repo>/STAGING/<branch>` for a preview)
+ *     git remote (`/<repo>`, or `/<repo>/branches/<branch>` for a preview)
  *  6. each `--site-step` package script, as `bun run <name> <built site>`: a generator that
  *     writes finished pages AFTER the site is built (gen-node-kind-pages says so of itself).
  *     As a source step its pages would pass through Jekyll, which drops every `_`-prefixed
@@ -64,8 +64,8 @@
  *     directories, the `folio-build.json` stamp. With `--publish` a shortfall refuses; without,
  *     it is said. Owner, 2026-10-14: an IG's main site published by this path loses nothing
  *     `folio-site.yml` gave it.
- *  9. with `--publish`: the root replaces the branch but keeps `STAGING/`, `PC/`, `_render-log/` and
- *     every `site.build.keep` entry (an IG's `branches/`); a preview replaces only `STAGING/<branch>/`
+ *  9. with `--publish`: the root replaces the branch but keeps `branches/`, `PC/`, `_render-log/` and
+ *     every `site.build.keep` entry (an IG's `branches/`); a preview replaces only `branches/<branch>/`
  *
  * Every step runs with the build's own values in its environment ({@link siteStepEnv}:
  * `SITE_INSTANCE`, `SITE_TITLE`, `SITE_BASEURL`, `SITE_URL`, `SITE_LINK_ROOT`,
@@ -158,7 +158,7 @@ export interface BuildOptions {
    * instance the checkout mounts, and the title is the site's own.
    */
   identity?: { title: string; description?: string };
-  /** Root entries a root publish keeps besides `STAGING/` and `_render-log/` (an IG's `branches/` previews). */
+  /** Root entries a root publish keeps besides `branches/` and `_render-log/` (an IG's `branches/` previews). */
   keep?: string[];
   /**
    * The root publish's guard ({@link parityShortfall}): the built site is measured against
@@ -282,7 +282,7 @@ export interface SiteRecipe {
   siteSteps: string[];
   /** Run after the platform's own writers ({@link BuildOptions.finalSteps}). */
   finalSteps?: string[];
-  /** Root entries a root publish keeps, besides `STAGING/` and `_render-log/`: an IG keeps `branches/`, its Publisher previews. */
+  /** Root entries a root publish keeps, besides `branches/` and `_render-log/`: an IG keeps `branches/`, its Publisher previews. */
   keep?: string[];
   /**
    * Which platform steps run around the declared ones ({@link PROFILE_STEPS}): `folio` (the
@@ -467,7 +467,7 @@ export async function pageUrls(html: string): Promise<string[]> {
 /**
  * Where a URL lands under the site, or undefined when it is not ours to check
  * (external, a scheme, a bare anchor). `base` is the site's path prefix
- * (`/repo/` or `/repo/STAGING/x/`); a root-absolute path outside it is a MISS,
+ * (`/repo/` or `/repo/branches/x/`); a root-absolute path outside it is a MISS,
  * reported as such, because the published site cannot serve it.
  */
 export function targetOf(url: string, pageRel: string, base: string): string | "outside-base" | undefined {

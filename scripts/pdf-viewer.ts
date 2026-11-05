@@ -33,7 +33,7 @@
  *
  * As in `folio-mount.ts`, which this reuses: one generated page is served at
  * several depths (`/<instance>/`,
- * `/folio-assistant/<instance>/`, `/STAGING/<branch>/<instance>/`), so a relative
+ * `/folio-assistant/<instance>/`, `/branches/<branch>/<instance>/`), so a relative
  * or absolute viewer URL is right on at most one of them. The caller passes
  * the route pattern; `siteRootOf` and the inlined client apply the same one.
  *

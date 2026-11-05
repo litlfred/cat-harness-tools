@@ -1076,7 +1076,7 @@ export interface DeployCommit {
  *
  * Three spellings, and **the order between them is load-bearing** — which a
  * mutation established rather than a reading. The first version tried the
- * `staging(<slug>):` subject first and a `render-log: … STAGING/<slug>`
+ * `staging(<slug>):` subject first and a `render-log: … branches/<slug>`
  * trailer second, on the rationale that the subject is authoritative. Stubbing
  * the order gave a SURVIVING mutation, so the rationale was checked against
  * `feature-staging.yml` and was wrong twice over.
@@ -1086,19 +1086,19 @@ export interface DeployCommit {
  * cannot disagree and the order decides nothing.
  *
  * And it was wrong where it mattered: the cleanup commits spell the subject
- * `staging(cleanup): remove STAGING/<slug>`, where `cleanup` is the OPERATION
+ * `staging(cleanup): remove branches/<slug>`, where `cleanup` is the OPERATION
  * and the slug is in the path. Subject-first read every removal as a deploy of
  * a branch called `cleanup` — so two removals for two unrelated PRs became one
  * slug, and {@link selfSupersedes} reported them as this repository contending
  * with itself. A false finding in exactly the direction `3yi4` exists to
  * remove.
  *
- * So a `STAGING/<slug>` path wins wherever it appears, and the bare subject is
+ * So a `branches/<slug>` path wins wherever it appears, and the bare subject is
  * the fallback for a deploy commit that carries no path. Order alone carries
  * it — the first fix also excluded the literal `cleanup` from the subject
  * branch, and a test written for the cost of the fix rather than its benefit
  * caught that this breaks a branch genuinely NAMED `cleanup`, whose deploy
- * commit has no `remove STAGING/` for the first branch to find. A blanket
+ * commit has no `remove branches/` for the first branch to find. A blanket
  * exclusion would have made one real branch permanently invisible to the
  * report, to guard a case the ordering already handles.
  */

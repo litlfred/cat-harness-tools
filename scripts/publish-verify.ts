@@ -192,11 +192,11 @@ function contextOnly(doc: Record<string, unknown>): boolean {
  * document that needs the network to be understood is a finding, not
  * something to fetch at deploy time.
  *
- * The longest base wins, so a staging preview's `--base …/STAGING/<slug>`
- * maps its URLs onto the tree rather than under a `STAGING/<slug>/` directory
+ * The longest base wins, so a staging preview's `--base …/branches/<slug>`
+ * maps its URLs onto the tree rather than under a `branches/<slug>/` directory
  * the tree does not have. A staging run given no `--base` still mints under
  * its preview address (`kg-export --base-url`), so a URL whose direct path is
- * missing and whose rest begins `STAGING/<slug>/` is tried without that
+ * missing and whose rest begins `branches/<slug>/` is tried without that
  * prefix: the preview's tree is the site's root, not a copy nested under it.
  */
 export function localLoader(dir: string, bases: readonly string[] = []) {
@@ -510,7 +510,7 @@ export const JSONLD_OWN_BASE: Verifier = {
  * Bean `uknu`: the theme renders `nav_footer_custom.html` twice, so 1,222
  * published pages carried `id="fa-nav-open"` twice while the source was
  * correct and every gate was green. #1213 fixed it and added
- * `check:duplicate-ids`, which runs on a PR's STAGING build — this runs the
+ * `check:duplicate-ids`, which runs on a PR's branches/ build — this runs the
  * same scanner on the build that DEPLOYS, so a duplicate that reaches `main`
  * blocks the release and raises the publication-manager alert instead of
  * going live. One scanner, two call sites.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Carry the open PRs' `STAGING/` previews across a full-replace `gh-pages` deploy.
+ * Carry the open PRs' `branches/` previews across a full-replace `gh-pages` deploy.
  *
  * ## The defect this exists for — bean `plj1`
  *
@@ -10,7 +10,7 @@
  *
  * ```
  * git clone --depth=1 --single-branch --branch gh-pages <remote> workDir
- * git rm -r --ignore-unmatch '*'      # ← everything on the branch, STAGING included
+ * git rm -r --ignore-unmatch '*'      # ← everything on the branch, branches/ included
  * cp -R publish_dir/* workDir/
  * ```
  *
@@ -44,7 +44,7 @@
  * ever disappearing: rename a doc and both the old and the new URL serve
  * forever, and nothing would ever report it.
  *
- * Restoring `STAGING/` into the publish directory keeps both halves: the main
+ * Restoring `branches/` into the publish directory keeps both halves: the main
  * site is still a full replace, so a removed page goes; the previews are part
  * of what is published, so they stay.
  *
@@ -130,7 +130,7 @@ export const SLUG_PATTERN = /^[A-Za-z0-9._-]+$/;
  * **Unconditionally, and that is the difference from a preview.** A preview
  * belongs to an open pull request; a log entry about a CLOSED one is exactly
  * what a liveness-gated carry would drop, and exactly what somebody asking
- * "what happened to `STAGING/x`" needs most.
+ * "what happened to `branches/x`" needs most.
  *
  * A list rather than one constant because this is the second tenant of the
  * same rule — `skills/ui/ui-core/render-logging.md` for the first, and bean
@@ -153,7 +153,7 @@ export interface RestoreOptions {
   /** The directory on the branch holding the previews. */
   prefix: string;
   /**
-   * Older preview directories carried as well (`STAGING/`, `lib/preview-prefix.ts`).
+   * Older preview directories carried as well (`branches/`, `lib/preview-prefix.ts`).
    * Their previews are named `<legacy prefix>/<slug>` in the outcome, so a
    * slug under `prefix` keeps its bare name.
    */
@@ -253,7 +253,7 @@ function retiredSlugs(repo: string, rev: string, prefix: string): Set<string> | 
  * deploy then restored the branch's previews from a read taken before that
  * commit and put all of them back. Measured 2026-10-02 on `gh-pages`:
  * `a46c58ca9df` removed 1615 files under
- * `STAGING/claude-fervent-brahmagupta-rbwhzm/` and `93ffa64488c`, the next
+ * `branches/claude-fervent-brahmagupta-rbwhzm/` and `93ffa64488c`, the next
  * `docs(gh-pages)` full replace, re-added all 1615 — leaving a retirement
  * record asserting a removal that had been undone.
  *
@@ -316,7 +316,7 @@ function prefixExists(repo: string, rev: string, prefix: string): boolean | { re
  *
  * **A LIST rather than one prefix**, because the previews are no longer carried
  * wholesale: a retired slug must not be laid back down, and archiving
- * `STAGING/` entire would copy it whatever the caller had decided. Naming the
+ * `branches/` entire would copy it whatever the caller had decided. Naming the
  * paths keeps the decision in {@link previewsAt}, where it is tested, instead
  * of writing the directories out and deleting some again.
  *
@@ -350,7 +350,7 @@ function copyPaths(repo: string, rev: string, paths: readonly string[], into: st
  *
  * Two things, and the difference between them is the point:
  *
- * - **the previews**, `STAGING/`, because a reviewer's link would 404;
+ * - **the previews**, `branches/`, because a reviewer's link would 404;
  * - **{@link CARRIED_PREFIXES}**, UNCONDITIONALLY — before the preview check
  *   and whatever it says. The early `empty` return used to leave this function
  *   the moment there were no previews, which would carry the record of the
@@ -430,7 +430,7 @@ export function restoreStaging(o: RestoreOptions): RestoreOutcome {
  * this argument is not hypothetical**: `gh-pages` commit `96926833b5`, a
  * `docs(gh-pages)` full replace, deleted `_render-log/2026-09-20.jsonl` —
  * present at its parent, `D` at the commit — and the deploy's own verify step
- * passed, because it only ever looked at `STAGING/`. A verifier blind to half
+ * passed, because it only ever looked at `branches/`. A verifier blind to half
  * of what the restore carried reports a clean run over the loss it exists to
  * catch.
  */

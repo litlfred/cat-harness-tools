@@ -328,7 +328,7 @@ describe("the render log is carried UNCONDITIONALLY — the property previews do
   // A preview belongs to an open pull request, so gating its carry on liveness
   // is defensible. A log entry about a CLOSED pull request is exactly what such
   // a gate would drop and exactly what a reader asking "what happened to
-  // `STAGING/x`" needs most. These tests pin the difference.
+  // `branches/x`" needs most. These tests pin the difference.
 
   const LOG = "_render-log/2026-09-20.jsonl";
   const LINE = `{"$schema":"folio-render-log/v1","id":"e1","event":"rendered"}\n`;
@@ -426,7 +426,7 @@ describe("the verifier checks the CARRIED prefixes, not only the previews", () =
    * `gh-pages` commit `96926833b5`, a `docs(gh-pages)` full replace, deleted
    * `_render-log/2026-09-20.jsonl` — present at its parent, `D` at the commit,
    * three entries gone. The deploy's own verify step PASSED, because it only
-   * ever looked at `STAGING/`.
+   * ever looked at `branches/`.
    *
    * A verifier blind to half of what the restore carried reports a clean run
    * over exactly the loss it exists to catch, which is bean `plj1`'s shape one
@@ -549,7 +549,7 @@ describe("the retired-record store is carried unconditionally and is not a previ
 describe("a RETIRED preview is not restored", () => {
   /**
    * The measured sequence, replayed. `feature-staging.yml`'s cleanup removes
-   * `STAGING/<slug>/` and writes `_retired/<slug>.json` in one commit, so this
+   * `branches/<slug>/` and writes `_retired/<slug>.json` in one commit, so this
    * is the branch state the next full-replace deploy reads: one live preview,
    * one retirement record, and no directory for the retired slug.
    *

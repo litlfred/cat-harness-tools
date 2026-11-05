@@ -63,7 +63,7 @@
  *  8. **prepare** — the checkout script `prepare:<harness>`, when declared:
  *     what the harness's site is built from and nobody commits (an IG's AST).
  *  9. **render** — `stage-local.ts`: on this branch, the preview at
- *     `gh-pages:STAGING/<branch>/`; with `--local`, `--dry-run` (built and
+ *     `gh-pages:branches/<branch>/`; with `--local`, `--dry-run` (built and
  *     composed, nothing pushed). The site, its JSON-LD and its chrome are the
  *     steps the mounted layers declare; this file names none of them.
  *

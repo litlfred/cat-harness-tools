@@ -3,10 +3,10 @@
  *
  * @module scripts/tests/staging-slug
  *
- * Bean `fuzm`. `feature-staging.yml` builds `rm -rf "STAGING/$SLUG"` and
- * `git add -A "STAGING/$SLUG"` from a sanitised branch name. `.` is in the
+ * Bean `fuzm`. `feature-staging.yml` builds `rm -rf "branches/$SLUG"` and
+ * `git add -A "branches/$SLUG"` from a sanitised branch name. `.` is in the
  * permitted class and `sed` REPLACES rather than deletes, so input `..` gives
- * output `..` — and `STAGING/..` is the checkout root.
+ * output `..` — and `branches/..` is the checkout root.
  *
  * The bean's finding was that the safety rested on invariants nothing stated
  * and no test pinned. These tests state them, and they RUN the real things
@@ -167,7 +167,7 @@ describe("GUARD 3 — the workflow checks the VALUE, in every job that builds a 
   });
 
   test("ALL THREE jobs also refuse `_retired` — the retired-record store is not a preview (bean 6pfo)", () => {
-    // Staging a preview AT `STAGING/_retired` would replace every retired
+    // Staging a preview AT `branches/_retired` would replace every retired
     // record in one deploy, and cleaning one up would delete them all.
     const jobs = (
       Bun.YAML.parse(yml) as { jobs?: Record<string, { steps?: { run?: string }[] }> }
@@ -183,7 +183,7 @@ describe("GUARD 3 — the workflow checks the VALUE, in every job that builds a 
   });
 
   test("every `rm -rf` on a slug is in a job whose slug was checked", () => {
-    // The structural claim the bean asks for: no `rm -rf "STAGING/$X"` exists
+    // The structural claim the bean asks for: no `rm -rf "branches/$X"` exists
     // in a job that did not first refuse an unsafe X.
     // The preview directory is a variable since previews moved to `branches/`
     // (`$PREVIEW_DIR`, or `$PD` for a legacy `STAGING/` one); a literal is still matched.

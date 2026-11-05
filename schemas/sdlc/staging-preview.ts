@@ -95,7 +95,7 @@ export const STAGING_PREVIEW_KIND = "staging-preview";
  * removing this" would name the wrong thing).
  */
 export const StagingDeployFactsSchema = z.object({
-  /** The `STAGING/<slug>` path segment. Derived, never reversed. */
+  /** The `branches/<slug>` path segment. Derived, never reversed. */
   slug: z.string().min(1),
   /** Branch the preview was built from. */
   branch: z.string().min(1),
@@ -215,7 +215,7 @@ export function enrichStagingPreview(
  *
  * Never a deletion — `deletion-requires-confirmation` and the never-delete rule
  * that governs the whole trashcan. A retired record still answers "what was
- * `STAGING/<slug>` for", which is exactly the question somebody asks after the
+ * `branches/<slug>` for", which is exactly the question somebody asks after the
  * preview is gone and the link in a PR comment no longer resolves.
  *
  * Idempotent: retiring an already-retired node keeps the FIRST retirement, so a
