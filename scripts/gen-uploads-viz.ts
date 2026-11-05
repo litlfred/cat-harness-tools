@@ -69,7 +69,7 @@ export function itemState(u: UploadItem): "waiting" | "ingested" {
 
 /**
  * The viewer. Zero dependencies, fetches its projection by a RELATIVE href so
- * the same bytes serve the canonical deploy and a STAGING preview — the
+ * the same bytes serve the canonical deploy and a branches/ preview — the
  * baseurl lesson #801 paid for, one layer along.
  *
  * A THEMED Jekyll page since 2026-10-07 (`lib/themed-page.ts`): on the

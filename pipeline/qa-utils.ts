@@ -124,6 +124,40 @@ export function gitHeadSha(repoRoot?: string): string {
 }
 
 /**
+ * Tree id of HEAD (`HEAD^{tree}`, full). Returns the `unknown` sentinel
+ * outside a git repo. `-C repoRoot` is handled as in {@link gitHeadSha}.
+ *
+ * A QA verdict records this as `reviewed_tree` rather than HEAD's commit id
+ * (bean 69lr; owner card Q4, 2026-11-05: "the tree is the identity"). On a
+ * pull_request CI run HEAD is GitHub's synthetic `refs/pull/<n>/merge`
+ * commit, which is replaced when main moves and may be garbage-collected, so
+ * a commit id recorded there stops being an address. The commit that lands on
+ * main has the same tree, so the tree id stays reachable and names exactly the
+ * inputs the verdict was computed from — and a bundle built on the PR names
+ * the same thing main would.
+ *
+ * Like `reviewed_sha` before it, the tree is an honest address of what was
+ * reviewed only when the working tree is clean: uncommitted edits are not in
+ * `HEAD^{tree}`. Under CI the checkout is clean but for generated outputs;
+ * nothing here detects a dirty tree, exactly as nothing did for the sha.
+ */
+export function gitHeadTree(repoRoot?: string): string {
+  try {
+    const args = repoRoot
+      ? ["-C", repoRoot, "rev-parse", "HEAD^{tree}"]
+      : ["rev-parse", "HEAD^{tree}"];
+    // input-site: head #0901bc77 — rev-parse HEAD^{tree}: the tree of HEAD
+    return execFileSync("git", args, {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+  } catch {
+    return GIT_SHA_UNKNOWN;
+  }
+}
+
+/**
  * Full git SHA of the most recent commit touching `relPath`, where
  * `relPath` is repo-relative (e.g. `pipeline/foo.ts`).
  * Returns the `unknown` sentinel if `path` is not tracked / outside
@@ -1496,7 +1530,8 @@ export function preserveNonScriptEntries(
  * Compares everything that carries meaning — verdict, the input hashes it was
  * computed from, the reviewer identity and its script/deps hashes, and the
  * checker's own output (notes, evidence, metrics, severity) — while ignoring
- * `reviewed_at` and `reviewed_sha`, which say only WHEN the sweep last ran.
+ * `reviewed_at`, `reviewed_tree` and the legacy `reviewed_sha`, which say only
+ * WHEN (at which tree, or commit) the sweep last ran.
  *
  * Callers use this to keep the existing entry verbatim when a re-run reproduces
  * it, so re-running a checker is not by itself a change to the sidecar. That
@@ -1505,9 +1540,10 @@ export function preserveNonScriptEntries(
  * became applicable); without this, each such re-check restamped the entry and
  * dirtied the file forever.
  *
- * `reviewed_sha` is deliberately NOT refreshed on an unchanged verdict: the
- * matching `field_hash` already proves the inputs are identical, so the older
- * sha remains a truthful record of when the verdict was established.
+ * `reviewed_tree` (like `reviewed_sha` before it) is deliberately NOT
+ * refreshed on an unchanged verdict: the matching `field_hash` already proves
+ * the inputs are identical, so the older tree remains a truthful record of
+ * when the verdict was established (bean 69lr; owner card Q4, 2026-11-05).
  *
  * `script_commit_sha` is excluded for the same reason. It is a FILE-level
  * pointer — the last commit to touch the checker module — so it moves when a

@@ -32,8 +32,8 @@ describe("syncState", () => {
   });
 
   test("an unknown staging sha is NOT reported as dirty", () => {
-    // The distinction that matters. "We cannot tell whether STAGING is
-    // current" is not "STAGING is stale" — reporting the latter sends a
+    // The distinction that matters. "We cannot tell whether branches/ is
+    // current" is not "branches/ is stale" — reporting the latter sends a
     // reviewer away from a preview that may be perfectly fine.
     expect(syncState({ headSha: "e".repeat(40), commitsAhead: 2 })).toBe("not-determined");
   });

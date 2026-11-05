@@ -2,7 +2,7 @@
  * A workflow reads this repository's name; it never spells it.
  *
  * Bean `kuxk`. `feature-staging.yml` wrote
- * `baseurl: "/folio-assistant/STAGING/<slug>"` into the Jekyll config, and
+ * `baseurl: "/folio-assistant/branches/<slug>"` into the Jekyll config, and
  * Jekyll builds every internal link from `baseurl` — so in any folio whose
  * repository is not named `folio-assistant`, every link on every staging page
  * pointed at a path that does not exist. The build succeeded, the deploy
@@ -75,7 +75,7 @@ describe("workflows do not spell the repository name", () => {
           const m = BASEURL.exec(line);
           if (!m) return;
           // The FIRST path segment is the one Pages serves the repo at. A
-          // later literal segment (STAGING) is a real constant, not a name.
+          // later literal segment (branches/) is a real constant, not a name.
           const firstSegment = m[1]!.split("/").filter(Boolean)[0];
           if (!firstSegment) return;
           if (IS_EXPRESSION.test(firstSegment)) return;

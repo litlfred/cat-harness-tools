@@ -194,7 +194,7 @@ export function renderLogTimes(dir: string): Map<string, number> {
     const { entries } = readRenderLog(readFileSync(join(logDir, f), "utf8"));
     for (const e of entries) {
       if (e.event !== "rendered" && e.event !== "restored") continue;
-      const m = /^STAGING\/([^/]+)$/.exec(e.subject.path);
+      const m = new RegExp(`^${STAGING_PREFIX}/([^/]+)$`).exec(e.subject.path);
       if (m === null) continue;
       const t = Date.parse(e.at);
       if (Number.isNaN(t)) continue;
@@ -440,7 +440,7 @@ function age(p: Preview, nowMs: number): string {
 
 /** One line per rotated preview — the job log and the commit message both carry these. */
 export function describeRemoval(p: Preview, nowMs: number): string {
-  return `rotated off STAGING/${p.slug}: ${age(p, nowMs)} (last update from ${p.source}), ${human(p.bytes)}`;
+  return `rotated off ${STAGING_PREFIX}/${p.slug}: ${age(p, nowMs)} (last update from ${p.source}), ${human(p.bytes)}`;
 }
 
 export interface RotateOptions {
@@ -474,8 +474,8 @@ export function rotate(o: RotateOptions): { plan: RotationPlan; lines: string[] 
   const cone = index ? coneDirs(o.dir) : undefined;
   if (inGit.has(o.current) || (cone !== undefined && !inCone(`${STAGING_PREFIX}/${o.current}/${STAGED_AT_FILE}`, cone))) {
     throw new Error(
-      `STAGING/${o.current} is outside the sparse checkout's cone, so what is written there is not committed — ` +
-        `add it first (git sparse-checkout add STAGING/${o.current})`,
+      `${STAGING_PREFIX}/${o.current} is outside the sparse checkout's cone, so what is written there is not committed — ` +
+        `add it first (git sparse-checkout add ${STAGING_PREFIX}/${o.current})`,
     );
   }
   if (existsSync(curDir)) writeFileSync(join(curDir, STAGED_AT_FILE), `${o.now}\n`);
@@ -496,7 +496,7 @@ export function rotate(o: RotateOptions): { plan: RotationPlan; lines: string[] 
   const reason =
     `rotated off: the previews on gh-pages came to more than ${human(budget)} ` +
     `(owner ruling 2026-10-02, issue #1868, amended 2026-10-04 to a size budget); ` +
-    `STAGING/${o.current} was staged and the least recently updated preview goes. ` +
+    `${STAGING_PREFIX}/${o.current} was staged and the least recently updated preview goes. ` +
     `The next push to its branch re-stages it.`;
   const lines: string[] = [];
   for (const p of plan.remove) {
@@ -529,7 +529,7 @@ export function rotate(o: RotateOptions): { plan: RotationPlan; lines: string[] 
         // Same posture as the cleanup jobs: the record copy stays as it was and
         // the failure is an annotation, not a blocked deploy.
         console.log(
-          `::error title=staging-preview record::could not retire STAGING/${p.slug} — ` +
+          `::error title=staging-preview record::could not retire ${STAGING_PREFIX}/${p.slug} — ` +
             `${e instanceof Error ? e.message : String(e)}`,
         );
       }
@@ -589,9 +589,9 @@ if (import.meta.main) {
         `${plan.remove.length} rotated off`,
     );
     if (kept > MAX_PREVIEW_BYTES) {
-      console.log(`::warning title=staging preview over budget::STAGING/${current} alone is ${human(kept)}, over the ${human(MAX_PREVIEW_BYTES)} budget; it is published and every other preview was rotated off`);
+      console.log(`::warning title=staging preview over budget::${STAGING_PREFIX}/${current} alone is ${human(kept)}, over the ${human(MAX_PREVIEW_BYTES)} budget; it is published and every other preview was rotated off`);
     }
-    for (const p of plan.keep) console.log(`  keep STAGING/${p.slug}: ${age(p, Date.parse(now))} (${p.source}), ${human(p.bytes)}`);
+    for (const p of plan.keep) console.log(`  keep ${STAGING_PREFIX}/${p.slug}: ${age(p, Date.parse(now))} (${p.source}), ${human(p.bytes)}`);
     for (const l of lines) console.log(`::notice title=staging preview rotated off::${l}`);
     const out = flag(argv, "summary-out");
     if (out !== undefined) writeFileSync(out, lines.length === 0 ? "" : `${lines.join("\n")}\n`);

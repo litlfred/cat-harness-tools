@@ -347,7 +347,7 @@ export type ToolRemedy = z.infer<typeof ToolRemedySchema>;
  *
  * `source` is repo-relative and stable: it names a file in the tree the graph
  * describes. `artefact` is the PUBLISHED path relative to the instance's base,
- * because the base differs per deployment — main, a STAGING preview, a local
+ * because the base differs per deployment — main, a branches/ preview, a local
  * checkout — and baking one in would make the node wrong everywhere else.
  * `renderingPath()` in `schemas/kg/cat-harness.ts` is what joins the two, and is
  * the single place that knows the layout.

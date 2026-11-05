@@ -53,6 +53,7 @@
  * @conformsTo w3c-xsd11-datatypes
  */
 import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { PROVENANCE_INLINE_STYLE, provenanceSectionFor } from "./provenance-footer.ts";
 import { tmpdir } from "node:os";
 import { basename, join, dirname, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -1663,7 +1664,10 @@ async function collectProcesses(
   const depictionOf = (abs: string): string | undefined => {
     if (svgDir === undefined) return undefined;
     const name = `${basename(abs, ".bpmn")}.svg`;
-    return existsSync(join(svgDir, name)) ? `${base!.replace(/\/+$/, "")}/assets/img/workflows/${name}` : undefined;
+    // The site copy is built at publish (cat-harness#1047); the drawing
+    // committed beside the .bpmn (bean akiq) says the same diagram is drawn.
+    const drawn = existsSync(join(svgDir, name)) || existsSync(abs.replace(/\.bpmn$/, ".svg"));
+    return drawn ? `${base!.replace(/\/+$/, "")}/assets/img/workflows/${name}` : undefined;
   };
   // Zero diagrams is a determined empty ONLY if we looked. Say which.
   //
@@ -3398,7 +3402,7 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
     ...(schemaIndex !== undefined ? { conformsTo: schemaIndex } : {}),
     // A preview says so in its TYPE, not only in a side-car field: "is this
     // the canonical graph?" must be answerable from the document's own type
-    // without reading a convention. This is where the `#STAGING` marker idea
+    // without reading a convention. This is where the `#branches/` marker idea
     // belongs — as a type, not as a fragment on a URL the document is not
     // served from.
     "@type": isPreview ? [`${PROV}Entity`, termIri("PreviewGraph")] : `${PROV}Entity`,
@@ -3779,8 +3783,19 @@ export function writeSubjectDocuments(
   out: string,
   servedDocIri?: string,
   diagrams: ReadonlyMap<string, string> = new Map(),
+  sourceRoots: readonly string[] = [],
 ): string[] {
   const docIri = String(published["@id"]);
+  // The provenance footer (owner, 2026-11-05, "2B"): a subject whose node
+  // names its `sourcePath` (a process's `.bpmn`) shows the log beside it. The
+  // path is relative to the instance, or to the repository; the first root
+  // that holds the file answers.
+  const provenanceOf = (n: Node): string => {
+    const rel = typeof n.sourcePath === "string" ? n.sourcePath : undefined;
+    if (rel === undefined) return "";
+    const abs = sourceRoots.map((r) => join(r, rel)).find((f) => existsSync(f));
+    return abs === undefined ? "" : provenanceSectionFor(abs, { liquid: false });
+  };
   const copyBase = servedDocIri !== undefined && subjectBase(servedDocIri) !== subjectBase(docIri) ? subjectBase(servedDocIri) : undefined;
   const graph = (published["@graph"] ?? []) as Node[];
   const stamp = Object.fromEntries(Object.entries(stagingFields()).filter(([k]) => k in published));
@@ -3848,12 +3863,13 @@ export function writeSubjectDocuments(
     // has no banner, so it says in-band which build it came from.
     const pageView = Object.fromEntries(Object.entries(doc).filter(([k]) => !(k in stamp)));
     const page = join(dir, `${stem}.html`);
-    writeFileSync(page, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, pageDoc, diagram, labels));
+    const provenance = provenanceOf(node);
+    writeFileSync(page, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, pageDoc, diagram, labels, provenance));
     written.push(page);
     if (parentStems.has(stem)) {
       const index = join(dir, stem, "index.html");
       mkdirSync(dirname(index), { recursive: true });
-      writeFileSync(index, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc, diagram, labels));
+      writeFileSync(index, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc, diagram, labels, provenance));
       written.push(index);
     }
   }
@@ -3952,6 +3968,7 @@ export function subjectPage(
   docIri: string,
   diagram?: string,
   labels: ReadonlyMap<string, string> = new Map(),
+  provenance = "",
 ): string {
   const id = String(node["@id"]);
   const title = String(node.title ?? node.name ?? id.split("/").pop());
@@ -4002,7 +4019,7 @@ table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1.5rem; table-l
 th, td { text-align: left; vertical-align: top; padding: 0.3rem 0.5rem; border-top: 1px solid var(--fa-pl-line, var(--line)); overflow-wrap: anywhere; }
 th { width: 10rem; font-weight: 600; }
 td .iri { font-size: 0.8em; }
-@media (max-width: 40rem) { th { width: 6.5rem; } }
+@media (max-width: 40rem) { th { width: 6.5rem; } }${provenance === "" ? "" : PROVENANCE_INLINE_STYLE}
 </style>
 </head>
 <body>
@@ -4017,7 +4034,7 @@ ${parent === undefined ? "" : `<p>Part of <a href="${escHtml(parent)}">${escHtml
 ${rows(node)}
 </table>
 ${flows === "" ? "" : `<h2>Flows</h2>\n${flows}`}
-</main>
+${provenance}</main>
 </body>
 </html>
 `;
@@ -4110,7 +4127,7 @@ if (import.meta.main) {
   // (an own-canonical instance published on this site, #638). Its subject
   // documents are then copies named by where they are served.
   const servedAt = arg("--served-at");
-  const subjectDocs = writeSubjectDocuments(published, out, servedAt, diagramPages(published));
+  const subjectDocs = writeSubjectDocuments(published, out, servedAt, diagramPages(published), [instanceRoot ?? ROOT, repoRootFor(ROOT)]);
 
   console.log(`KG export → ${relative(ROOT, out)}\n  @id  ${data["@id"]}`);
   if (toolDocs.length > 0) console.log(`  + ${toolDocs.length} Tool document(s) → ${relative(ROOT, join(dirname(out), "tools"))}/`);

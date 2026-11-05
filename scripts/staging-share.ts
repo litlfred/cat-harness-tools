@@ -55,6 +55,7 @@ import { FRAGMENT } from "./staging-banner.ts";
 import { stripSeo } from "./strip-preview-seo.ts";
 import { parseRetained, readRetained, RETAINED_FILE, type Retained } from "./keep-shared-payloads.ts";
 import { blobId, forEachBlob, isRegular, objectFormat, prefetchBlobs, sparseEntries, type GitEntry } from "./lib/git-blobs.ts";
+import { isPreviewPath } from "./lib/preview-prefix.ts";
 
 /**
  * Files a preview always keeps: they describe this preview, or serve it. The
@@ -128,7 +129,7 @@ export function planShare(root: string, preview: string, slug: string): SharePla
   const retained = new Set(Object.keys(retainedAt(root, outside).kept));
   for (const rel of files) {
     const live = join(root, rel);
-    if (rel.startsWith("STAGING/") || retained.has(rel)) { verdict.set(rel, false); continue; }
+    if (isPreviewPath(rel) || retained.has(rel)) { verdict.set(rel, false); continue; }
     // Outside the cone the index is what is published, whatever is on disk there.
     const entry = outside?.get(rel);
     if (entry === undefined && existsSync(live)) {
@@ -203,7 +204,7 @@ self.addEventListener('fetch',function(e){
   var req=e.request;if(req.method!=='GET')return;
   var u=new URL(req.url),scope=new URL(self.registration.scope);
   if(u.origin!==scope.origin||u.pathname.indexOf(scope.pathname)!==0)return;
-  var live=scope.pathname.replace(/STAGING\\/[^/]+\\/$/,'')+u.pathname.slice(scope.pathname.length);
+  var live=scope.pathname.replace(/(?:branches|STAGING)\\/[^/]+\\/$/,'')+u.pathname.slice(scope.pathname.length);
   e.respondWith(fetch(req).then(function(r){
     if(r.status!==404)return r;
     return fetch(live+u.search,{credentials:'same-origin'}).then(function(m){
@@ -227,8 +228,8 @@ export const NOT_FOUND_HTML = `<!DOCTYPE html>
 <body><h1>Page not found</h1><p id="fa-404-detail">This page does not exist on this site.</p>
 <p><a id="fa-404-live" href="/">Go to the home page</a></p>
 <script>(function(){
-var path=location.pathname,m=path.match(/^(.*\\/STAGING\\/[^/]+\\/)/);if(!m)return;
-var root=m[1],live=root.replace(/STAGING\\/[^/]+\\/$/,'')+path.slice(root.length);
+var path=location.pathname,m=path.match(/^(.*\\/(?:branches|STAGING)\\/[^/]+\\/)/);if(!m)return;
+var root=m[1],live=root.replace(/(?:branches|STAGING)\\/[^/]+\\/$/,'')+path.slice(root.length);
 var d=document.getElementById('fa-404-detail'),a=document.getElementById('fa-404-live');
 a.href=live;a.textContent='Open the live site\\u2019s copy of this page';
 d.textContent='This preview does not carry this page. It may be unchanged on the branch, so the preview serves the live site\\u2019s copy through a script.';

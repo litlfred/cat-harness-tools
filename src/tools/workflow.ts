@@ -236,6 +236,8 @@ export interface WorkflowStartInput {
   process: string;
   subject: string;
   bean?: string;
+  /** The work plan this run is part of: an epic or milestone id (`schemas/sdlc/work-plan.ts`). */
+  plan?: string;
 }
 
 export interface WorkflowNextInput {
@@ -357,15 +359,15 @@ function withMemory(
 /** Shared implementation of `workflow_start` for MCP and CLI (`workflow:start`). */
 export async function workflowStart(
   repoRoot: string,
-  { process, subject, bean }: WorkflowStartInput,
+  { process, subject, bean, plan }: WorkflowStartInput,
   opts?: WorkflowToolEnv,
 ): Promise<string> {
-  return (await workflowStartAnswer(repoRoot, { process, subject, bean }, opts)).text;
+  return (await workflowStartAnswer(repoRoot, { process, subject, bean, plan }, opts)).text;
 }
 
 export async function workflowStartAnswer(
   repoRoot: string,
-  { process, subject, bean }: WorkflowStartInput,
+  { process, subject, bean, plan }: WorkflowStartInput,
   opts?: WorkflowToolEnv,
 ): Promise<WorkflowAnswer<WorkflowStarted>> {
   const root = resolve(repoRoot);
@@ -395,7 +397,7 @@ export async function workflowStartAnswer(
   const gate = preflight(model);
   const refusal = preflightRefusal(gate);
   if (refusal) throw new Error(refusal);
-  const state = startInstance(model, { id, subject, bean });
+  const state = startInstance(model, { id, subject, bean, plan });
   const path = saveInstance(root, state);
   // Work context (§4.13): a process that no longer draws the work plan has
   // its item taken up by the engine, as Process_BeanOpen did for one that does.
@@ -423,6 +425,7 @@ export async function workflowStartAnswer(
   return {
     text:
       `Started. State in \`${path.replace(`${root}/`, "")}\`.\n` +
+      (plan !== undefined ? `Part of work plan \`${plan}\`.\n` : "") +
       // Said on the tool's own output, on the same argument the capture
       // state is: a caller that has to go and look somewhere else to find
       // out whether the gate ran does not have one it can rely on.
@@ -743,6 +746,10 @@ export function registerWorkflowTools(server: McpServer, repoRoot: string, opts?
       process: z.string().describe("File stem, e.g. `editing-hci-validation`, or the bpmn:process id"),
       subject: z.string().describe("What this run is about — a block label, a release name"),
       bean: z.string().optional().describe("Bean id this work is tracked under"),
+      plan: z
+        .string()
+        .optional()
+        .describe("Work plan this run is part of: the id of an epic or milestone whose `process:` tag names this process. Optional; not every process needs a plan"),
     },
     async (args) => answer(await workflowStartAnswer(root, args, callOpts)),
   );

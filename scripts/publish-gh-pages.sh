@@ -19,7 +19,7 @@
 # ## Why a REBASE would have been the wrong retry — the part that matters
 #
 # `feature-staging` retries by rebasing, and that is right for IT: its commit
-# adds or removes one `STAGING/<slug>/` directory, so replaying it onto whoever
+# adds or removes one `branches/<slug>/` directory, so replaying it onto whoever
 # won touches nothing else.
 #
 # This commit replaces the WHOLE TREE. Rebasing it onto a newer `gh-pages`

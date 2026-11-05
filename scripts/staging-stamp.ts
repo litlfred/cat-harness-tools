@@ -2,7 +2,7 @@
 /**
  * Which build produced this file, for the artefacts that can say so in-band.
  *
- * A staging preview publishes a whole site under `STAGING/<slug>/`, and the
+ * A staging preview publishes a whole site under `branches/<slug>/`, and the
  * question a reviewer has about any file in it is *which commit am I looking
  * at*. HTML answers with the injected banner. Everything else is data, and
  * data needs the answer written into the document.

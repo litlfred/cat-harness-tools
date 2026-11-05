@@ -79,6 +79,26 @@ describe("whose prose it is", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  test("a page declared built at publish is its generator's, whether or not a build has written it", () => {
+    const root = mkdtempSync(join(tmpdir(), "retired-words-"));
+    try {
+      writeFileSync(
+        join(root, "inst.json"),
+        JSON.stringify({
+          $schema: "cat-harness-declaration/1.0.0",
+          builtAtPublish: [{ path: "docs/kind-table.md" }, { path: "docs/auto/" }],
+        }),
+      );
+      mkdirSync(join(root, "docs", "auto"), { recursive: true });
+      writeFileSync(join(root, "docs", "own.md"), "Own prose.\n");
+      writeFileSync(join(root, "docs", "kind-table.md"), "| Bean | built |\n");
+      writeFileSync(join(root, "docs", "auto", "page.md"), "A bean page.\n");
+      expect(ownProseFiles(root)).toEqual(["docs/own.md"]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("this harness's own prose", () => {
