@@ -36,10 +36,13 @@ import {
   buildGlossary,
   glossaryIri,
   kindsDeclaredBy,
+  ledgerPath,
   liveLedgerEntry,
+  pendingKind,
   readLanes,
   type Ledger,
 } from "../glossary-export.ts";
+import { DECLARED_BY, defaultGraphTypologies } from "../../schemas/kg/graph-typology-registry.ts";
 import { LEDGER_KEY, LedgerSchema } from "../../schemas/library/glossary-ledger.ts";
 import { placedOut } from "../lib/moved-document.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -292,11 +295,17 @@ describe("retirement — reported, never deleted", () => {
     const a = buildGlossary({ today: () => "2026-09-21" });
     const b = buildGlossary({ today: () => "2030-01-01" });
     // Every key already on disk keeps the date the committed ledger gave it.
+    // A key the ledger does not hold yet is minted on the day it is built, so
+    // it differs between the two builds BY DESIGN; whether the committed
+    // ledger is missing it is the staleness gate's question, below, not this
+    // one's.
+    const onDisk = (JSON.parse(readFileSync(ledgerPath(HARNESS_ROOT), "utf-8")) as Ledger).concepts;
     let checked = 0;
     for (const [k, v] of Object.entries(b.ledger.concepts)) {
       const prior = a.ledger.concepts[k];
-      if (prior === undefined) continue;
+      if (prior === undefined || onDisk[k] === undefined) continue;
       expect(v.firstSeen).toBe(prior.firstSeen);
+      expect(v.firstSeen).toBe(onDisk[k]!.firstSeen);
       checked += 1;
     }
     expect(checked).toBeGreaterThan(0);
@@ -515,5 +524,72 @@ describe("graph kinds, node kinds and the harness are glossary terms", () => {
 
   test.skipIf(NO_KIND_TABLES || NO_HIGHER_ROLES)("the committed ledger is current with every family built", async () => {
     expect((await buildFullGlossary({ today: () => "2026-09-21" })).report.ledgerStale).toBe(false);
+  });
+});
+
+// ── A kind the registry's code defines may LAG the ledger ───────
+
+describe("pending — a graph kind defined in code, not yet in the ledger", () => {
+  // The ledger is cat-harness's file; the registry that defines a base kind is
+  // cat-harness-tools' code, a layer above, and each layer's PR is judged
+  // against the other's main. Built from the instance's own ledger with ONE
+  // entry taken out or changed, so each case differs from current by one fact.
+  const today = () => "2026-09-21";
+  const current = (): Ledger => buildGlossary({ today }).ledger;
+  const without = (l: Ledger, key: string): Ledger => {
+    const { [key]: _gone, ...rest } = l.concepts;
+    return { ...l, concepts: rest };
+  };
+  const codeKind = (l: Ledger): string =>
+    Object.keys(l.concepts).find((k) => k.startsWith("kind/") && pendingKind(defaultGraphTypologies.get(k.slice(5))))!;
+
+  test.skipIf(NO_KIND_TABLES)("a code-defined kind's term MISSING from the ledger is pending, not stale, and is still written", () => {
+    const l = current();
+    const key = codeKind(l);
+    expect(key).toBeDefined();
+    const { ledger, report } = buildGlossary({ today, ledger: without(l, key) });
+    expect(report.pending).toEqual([key]);
+    expect(report.ledgerStale).toBe(false);
+    // The writer records it, minted on the build day.
+    expect(ledger.concepts[key]).toEqual({ prefLabel: l.concepts[key]!.prefLabel, firstSeen: "2026-09-21", retiredOn: null });
+  });
+
+  test.skipIf(NO_KIND_TABLES)("the same ledger, current, has nothing pending", () => {
+    const { report } = buildGlossary({ today, ledger: current() });
+    expect(report.pending).toEqual([]);
+    expect(report.ledgerStale).toBe(false);
+  });
+
+  test.skipIf(NO_KIND_TABLES)("a recorded kind term whose label CHANGED is stale, never pending", () => {
+    const l = current();
+    const key = codeKind(l);
+    const changed = { ...l, concepts: { ...l.concepts, [key]: { ...l.concepts[key]!, prefLabel: "Something else" } } };
+    const { report } = buildGlossary({ today, ledger: changed });
+    expect(report.pending).toEqual([]);
+    expect(report.ledgerStale).toBe(true);
+  });
+
+  test.skipIf(NO_KIND_TABLES)("a kind term the ledger holds and the registry no longer defines is retired: stale", () => {
+    const l = current();
+    const extra = { ...l, concepts: { ...l.concepts, "kind/no-such-kind": { prefLabel: "No such kind", firstSeen: "2026-01-01", retiredOn: null } } };
+    const { report } = buildGlossary({ today, ledger: extra });
+    expect(report.newlyRetired).toEqual(["kind/no-such-kind"]);
+    expect(report.ledgerStale).toBe(true);
+  });
+
+  test("a term of a family derived from the instance's OWN files missing is stale, never pending", () => {
+    const l = current();
+    const key = Object.keys(l.concepts).find((k) => k.startsWith("role/") && l.concepts[k]!.retiredOn === null)!;
+    expect(key).toBeDefined();
+    const { report } = buildGlossary({ today, ledger: without(l, key) });
+    expect(report.pending).toEqual([]);
+    expect(report.ledgerStale).toBe(true);
+  });
+
+  test("a kind a typologies/ node declares is the instance's own: never pending", () => {
+    const def = defaultGraphTypologies.get("beans")!;
+    expect(pendingKind(def)).toBe(true);
+    expect(pendingKind({ ...def, [DECLARED_BY]: { prefix: "x", name: "x", root: "/x", namespace: "https://x/" } })).toBe(false);
+    expect(pendingKind(undefined)).toBe(false);
   });
 });

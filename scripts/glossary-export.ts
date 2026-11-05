@@ -417,8 +417,41 @@ export interface GlossaryReport {
   readonly drawnElsewhere: ReadonlyArray<{ role: string; files: string[] }>;
   /** Lanes whose binding is dangling or contradictory — reported, not gated. */
   readonly problems: string[];
-  /** True when the ledger on disk differs from the one this run computed. */
+  /**
+   * Graph-kind terms this run derives that the committed ledger does not hold
+   * YET, for kinds defined in the registry's code rather than by a node of
+   * the instance's own ({@link pendingKind}). Minted on the build day, written
+   * by the next `glossary:export`, and reported; not stale on their own.
+   */
+  readonly pending: string[];
+  /**
+   * True when the ledger on disk differs from the one this run computed, the
+   * {@link pending} terms aside: a recorded term changed, was retired or came
+   * back, the ledger names another instance, or a term of any other family is
+   * missing.
+   */
   readonly ledgerStale: boolean;
+}
+
+/**
+ * Whether a graph kind's term may be PENDING in the ledger: the kind is defined
+ * by the registry's code (`BASE_GRAPH_TYPOLOGIES`, in cat-harness-tools), not by
+ * a `typologies/` node of the instance whose ledger records it.
+ *
+ * The ledger is committed in cat-harness (`glossary/`), a layer BELOW the code
+ * that defines these kinds, and each layer's pull request is judged against
+ * the other's main. A kind added to the registry therefore makes the ledger
+ * lack its term on the registry's own pull request, and adding the term first
+ * makes the ledger name a kind that main does not define; with an equality
+ * check, one of the two mains is red until the other merges. So the term may
+ * lag: it is minted on the build day, reported as pending, and recorded by the
+ * ledger's writer in a cat-harness pull request after the kind lands. It is
+ * the ONLY lag allowed: a recorded term whose label changed, a term retired or
+ * restored, and every term of a family the instance derives from its own
+ * files (roles, the harness, node kinds) are still stale.
+ */
+export function pendingKind(def: object | undefined): boolean {
+  return def !== undefined && declaringInstanceOf(def) === undefined;
 }
 
 export interface GlossaryBuild {
@@ -461,6 +494,8 @@ export function buildGlossary(opts: {
    * kinds are gone. {@link buildFullGlossary} asks.
    */
   nodeKinds?: readonly NodeKindTerm[];
+  /** The committed ledger to judge against. Absent: the one on disk ({@link readLedger}). */
+  ledger?: Ledger;
 } = {}): GlossaryBuild {
   const instanceRoot = resolve(opts.instanceRoot ?? ROOT);
   const repoRoot =
@@ -717,10 +752,12 @@ export function buildGlossary(opts: {
 
   // Node kinds: one concept per kind this instance declares.
   let kinds = 0;
+  const mayLag = new Set<string>();
   for (const kind of kindMap === undefined ? [] : kindsDeclaredBy(instanceRoot)) {
     const def = defaultGraphTypologies.get(kind);
     if (def === undefined) continue;
     const localPart = `kind/${kind}`;
+    if (pendingKind(def)) mayLag.add(localPart);
     const iri = graphTypologyIri(kind, def);
     // The kind's display name ("Work items"). The word for ONE node ("Work
     // item") is the node kind's term, defined below; two concepts with one
@@ -812,7 +849,7 @@ export function buildGlossary(opts: {
       renamedTo.set(f.name.trim().toLowerCase(), { iri: makeIri(id.docIri, "role", r.id), title: r.title });
     }
   }
-  const prior = readLedger(instanceRoot, id.stub);
+  const prior = opts.ledger ?? readLedger(instanceRoot, id.stub);
   const concepts: Record<string, LedgerEntry> = {};
   const retired: string[] = [];
   const newlyRetired: string[] = [];
@@ -883,7 +920,11 @@ export function buildGlossary(opts: {
   // (retired terms last) holds the same facts and is not stale for that.
   const canonical = (c: Record<string, LedgerEntry>) =>
     JSON.stringify(Object.entries(c).sort(([a], [b]) => a.localeCompare(b)));
-  const ledgerStale = canonical(prior.concepts) !== canonical(sortedConcepts) || prior.instance !== id.stub;
+  // A pending term (`pendingKind`) is written to the ledger like any other,
+  // but its absence from the committed one is not, by itself, staleness.
+  const pending = Object.keys(sortedConcepts).filter((k) => mayLag.has(k) && prior.concepts[k] === undefined);
+  const recorded = Object.fromEntries(Object.entries(sortedConcepts).filter(([k]) => !pending.includes(k)));
+  const ledgerStale = canonical(prior.concepts) !== canonical(recorded) || prior.instance !== id.stub;
 
   // Declared but undrawn. A role no longer lists lanes (data-modelling step 8,
   // #1168), so a "role names a lane no diagram contains" (`fd6i`) cannot occur
@@ -979,6 +1020,7 @@ export function buildGlossary(opts: {
       undrawn,
       drawnElsewhere,
       problems,
+      pending,
       ledgerStale,
     },
   };
@@ -1048,6 +1090,13 @@ if (import.meta.main) {
   if (report.concepts === 0) {
     console.error(`\nNo concepts derived from ${relative(repoRootFor(ROOT), instanceDir)} — refusing to call that clean.`);
     process.exit(2);
+  }
+
+  if (report.pending.length > 0) {
+    console.log(
+      `\n  ${report.pending.length} graph-kind term(s) PENDING — defined by the registry's code and not in ` +
+        `${relative(repoRootFor(ROOT), ledgerPath(instanceDir))} yet; \`glossary:export\` records them: ${report.pending.join(", ")}`,
+    );
   }
 
   if (check) {
