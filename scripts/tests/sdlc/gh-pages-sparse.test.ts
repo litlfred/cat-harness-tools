@@ -225,6 +225,15 @@ describe("staging-rotate — the same plan, and the same commit, on a sparse che
     expect(existsSync(join(sparse, "STAGING", "a", STAGED_AT_FILE))).toBe(false);
   });
 
+  test("a preview NEW to gh-pages, outside the cone, is refused too, before anything is written", () => {
+    const sparse = sparseClone(o, cone("cur"));
+    const index = git(sparse, "ls-files", "-s");
+    put(join(sparse, "STAGING", "brand-new"), { "index.html": "new" });
+    expect(() => rotate({ dir: sparse, current: "brand-new", now: NOW, git: noGit, budget: 1 })).toThrow(/outside the sparse checkout's cone/);
+    expect(existsSync(join(sparse, "STAGING", "brand-new", STAGED_AT_FILE))).toBe(false);
+    expect(git(sparse, "ls-files", "-s")).toBe(index);
+  });
+
   test("a blob fetch that fails stops the rotation before any removal", () => {
     const { sparse } = fresh();
     git(sparse, "remote", "set-url", "origin", `file://${join(tmpdir(), "no-such-origin")}`);

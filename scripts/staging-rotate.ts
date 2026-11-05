@@ -97,7 +97,7 @@ import {
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 
-import { blobId, blobSizes, forEachBlob, indexEntries, isRegular, objectFormat, prefetchBlobs, removeFromIndex, type GitEntry, type IndexEntry } from "./lib/git-blobs.ts";
+import { blobId, blobSizes, coneDirs, forEachBlob, inCone, indexEntries, isRegular, objectFormat, prefetchBlobs, removeFromIndex, type GitEntry, type IndexEntry } from "./lib/git-blobs.ts";
 
 import { RENDER_LOG_DIR, readRenderLog } from "../schemas/ui/render-log.ts";
 import { readStagingPreview, retireStagingPreview, serializeStagingPreview } from "../schemas/sdlc/staging-preview.ts";
@@ -468,8 +468,11 @@ export function rotate(o: RotateOptions): { plan: RotationPlan; lines: string[] 
   const inGit = previewsInGit(index);
   // The preview being staged is written on disk, and `git add -A` does not
   // stage a path outside the cone: refuse rather than publish a preview the
-  // commit does not hold.
-  if (inGit.has(o.current)) {
+  // commit does not hold. A slug new to gh-pages has no index entry, so in
+  // cone mode the cone itself is asked too; otherwise it would rotate others
+  // and leave the deploy's `git add` to fail one step later.
+  const cone = index ? coneDirs(o.dir) : undefined;
+  if (inGit.has(o.current) || (cone !== undefined && !inCone(`${STAGING_PREFIX}/${o.current}/${STAGED_AT_FILE}`, cone))) {
     throw new Error(
       `STAGING/${o.current} is outside the sparse checkout's cone, so what is written there is not committed — ` +
         `add it first (git sparse-checkout add STAGING/${o.current})`,

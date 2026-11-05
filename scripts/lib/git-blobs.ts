@@ -100,7 +100,7 @@ export function inCone(path: string, dirs: readonly string[]): boolean {
 }
 
 /** The cone's directories, when the checkout is cone-mode sparse. */
-function coneDirs(dir: string): string[] | undefined {
+export function coneDirs(dir: string): string[] | undefined {
   const r = git(dir, ["config", "--bool", "core.sparseCheckoutCone"]);
   if (r.status !== 0 || r.stdout.toString("utf-8").trim() !== "true") return undefined;
   return ok(dir, ["sparse-checkout", "list"])
