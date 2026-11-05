@@ -4,14 +4,14 @@
  * the report a real `bun run cat gates --report` would.
  */
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { failedTests, gatesEnabled, judge, parsePushCommand, parsePushStdin, testEnv } from "../pre-push-gates.ts";
 import { readDurations } from "../gate-durations.ts";
-import { buildRecord, covers, newFailures, readRecord, readResults, stateDir, toolVersions, treeOf, type GatesReportLike } from "../gate-record.ts";
+import { buildRecord, covers, newFailures, readRecord, readResults, readVerdict, scriptOfGate, verdictRef, verdictsFor, stateDir, toolVersions, treeOf, type GatesReportLike } from "../gate-record.ts";
 
 const PASS: GatesReportLike = {
   $schema: "folio-gates-report/v1",
@@ -103,7 +103,7 @@ process.exit(${code});\n`,
     sh("config", "user.email", "t@example.invalid");
     sh("config", "user.name", "t");
     writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: { cat: "bun run fake-cat.ts" } }));
-    writeFileSync(join(root, ".gitignore"), "fake-cat.ts\nreport.fixture.json\nruns.txt\nargv.txt\n");
+    writeFileSync(join(root, ".gitignore"), "fake-cat.ts\nreport.fixture.json\nruns.txt\nargv.txt\nbuild/\n");
     sh("add", "-A");
     sh("commit", "-qm", "init");
   });
@@ -159,6 +159,23 @@ process.exit(`,
     sh("commit", "-qm", "y");
     expect((await judge(root, [sh("rev-parse", "HEAD").stdout.trim()])).kind).toBe("allow");
     expect(excepts(argvs()[2]!)).toEqual(["bun test"]);
+  });
+
+  test("a pass also writes one Class B entry per gate that has an f017 key, and none for one without", async () => {
+    stub(0, PASS);
+    const K = "ab".repeat(32);
+    mkdirSync(join(root, "build", "regen-cache"), { recursive: true });
+    // check:a has a key; check:b has none (no input declaration, or inputs moved under it).
+    writeFileSync(join(root, "build", "regen-cache", "input-hashes.json"), JSON.stringify({ version: 1, pairs: {}, checks: { "check:a": K, "check:other": "cd".repeat(32) } }));
+    const head = sh("rev-parse", "HEAD").stdout.trim();
+    expect((await judge(root, [head])).kind).toBe("allow");
+    const v = readVerdict(root, "check:a", K)!;
+    expect(v).toMatchObject({ schema: "cat-local-gate-verdict/v1", gate: "bun run cat check:a", key: K, verdict: "pass", source: "local", tree: treeOf(root, head) });
+    const refs = sh("for-each-ref", "--format=%(refname)", "refs/cat-gates/local/").stdout.trim().split("\n");
+    // Only gates of the record get entries: check:other is in the cache, not in the set.
+    expect(refs).toEqual([`refs/cat-gates/local/check--a/${K}`]);
+    // A lookup under another key finds nothing: the key is what matches.
+    expect(readVerdict(root, "check:a", "ef".repeat(32))).toBeUndefined();
   });
 
   test("a red gate with no base outcome to compare against is undetermined, not refused, and leaves no record", async () => {
@@ -369,6 +386,23 @@ describe("off by default: the gates run only when the checkout opts in", () => {
     });
     expect(r.status).toBe(0);
     expect(r.stderr).toContain("off by default");
+  });
+});
+
+describe("Class B entries (cat-local-gate-verdict/v1)", () => {
+  test("only `bun run [cat] <script>` gates are keyed, and the ref spells `:` as `--`", () => {
+    expect(scriptOfGate("bun run cat check:a")).toBe("check:a");
+    expect(scriptOfGate("bun run smart:pages")).toBe("smart:pages");
+    expect(scriptOfGate("bun run cat check:import-direction --all")).toBeUndefined();
+    expect(scriptOfGate("bun test")).toBeUndefined();
+    expect(verdictRef("check:a", "ab".repeat(32))).toBe(`refs/cat-gates/local/check--a/${"ab".repeat(32)}`);
+    expect(() => verdictRef("check:a", "undetermined: no input declaration")).toThrow(/not a cache key/);
+  });
+  test("verdictsFor skips a gate with no key, and a held-out gate is never in the record's set", () => {
+    const rec = buildRecord({ ...PASS, heldOut: ["bun test"] }, { tree: "a".repeat(40), commit: "b".repeat(40), tools: toolVersions("."), runBy: "agent", startedAt: "s", finishedAt: "f" })!;
+    const vs = verdictsFor(rec, { "check:b": "12".repeat(32), "bun test": "34".repeat(32) });
+    expect(vs.map((v) => v.gate)).toEqual(["bun run cat check:b"]);
+    expect(vs[0]).toMatchObject({ runBy: "agent", tree: "a".repeat(40), startedAt: "s", finishedAt: "f" });
   });
 });
 
