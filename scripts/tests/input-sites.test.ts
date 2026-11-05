@@ -15,7 +15,6 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
 import { instanceDirectoriesForGraph } from "../../schemas/kg/cat-harness.ts";
-import { declaredDirectories } from "../../schemas/kg/declared-nodes.ts";
 import { orderedDependencies } from "../../schemas/kg/harness-config.ts";
 import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "../../schemas/ui/theme-by-ref.ts";
@@ -361,31 +360,16 @@ describe("annotations hold to the data that chooses their targets", () => {
     }
   });
 
-  test("every qa-checker and pipeline-plugin ref lies under harness-config's `imports` globs", () => {
-    const globs = ["*/pipeline/plugin-slots.ts", "*/pipeline/qa-checkers-*.ts"];
-    const all = roots();
-    // A ref is relative to the instance that owns the node: the deepest root holding it.
-    const ownerOf = (dir: string) => all.filter((r) => dir.startsWith(`${r}/`)).sort((a, b) => b.length - a.length)[0]!;
-    {
-      for (const graph of ["qa-checkers", "pipeline-plugins"]) {
-        for (const dir of declaredDirectories(repo, graph)) {
-          if (!existsSync(dir)) continue;
-          const root = ownerOf(resolve(dir));
-          for (const f of readdirSync(dir).filter((n) => n.endsWith(".json"))) {
-            const raw = JSON.parse(readFileSync(join(dir, f), "utf-8")) as { check?: string; implementation?: string };
-            const ref = raw.check ?? raw.implementation;
-            if (typeof ref !== "string" || !ref.includes("#")) continue;
-            const target = relTo(resolve(root, ref.split("#")[0]!));
-            expect(globs.some((g) => globMatch(g, target)), `${dir}/${f}: ${target} is outside ${globs.join(", ")}`).toBe(true);
-          }
-        }
-      }
-    }
-    // The module moved into this layer with schemas/kg/ (8lcl); named from TOOLS_ROOT, not spelled.
+  test("harness-config's plugin-table load is `traced`, so a run that loads a plugin records no hash", () => {
+    // Not `imports`: a plugin's closure (IG staging, site building) then entered the static
+    // audit of every check importing harness-config, whether its run loaded a plugin or not.
     // declared-path-literal: the module whose `input-site` annotation is the subject of this assertion, the same file this test imports; no declaration answers where a module of this layer sits.
-    for (const g of globs) expect(annotated(relTo(join(TOOLS_ROOT, "schemas/kg/harness-config.ts")), g), g).toBe(true);
+    const file = relTo(join(TOOLS_ROOT, "schemas/kg/harness-config.ts"));
+    const sites = scanSource(file, readFileSync(join(repo, file), "utf-8"));
+    const load = sites.filter((s) => s.risks.includes("computed"));
+    expect(load.length).toBeGreaterThan(0);
+    for (const s of load) expect(Array.isArray(s.verdicts) && s.verdicts.some((v) => v.kind === "traced"), `${file}:${s.line}`).toBe(true);
   });
-
 
   test("every instance themes module lies under theme-by-ref's `imports` glob", () => {
     for (const root of roots()) {

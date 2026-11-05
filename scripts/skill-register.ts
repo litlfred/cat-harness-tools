@@ -494,6 +494,7 @@ export const CHECKS: readonly string[] = STEPS.map((s) => s.verify.join(" "));
  */
 export function stepsToRun(
   steps: readonly Step[] = STEPS,
+  // input-site: env QA_WORKING_COPY_BUILDING,CAT_BUILD_TYPE #949cc29c — whether this run is part of a QA working-copy build, and of which build type (buildTypeOf): both decide which steps run here
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): { run: Step[]; deferred: Step[] } {
   if (env[BUILDING_ENV] !== "1") return { run: [...steps], deferred: [] };
@@ -536,6 +537,7 @@ export const VERIFIED_BY_GATES_ENV = "CAT_SKILL_REGISTER_VERIFIED_BY_GATES";
 export function verifyHere(
   steps: readonly Step[],
   checking: boolean,
+  // input-site: env CI,CAT_SKILL_REGISTER_VERIFIED_BY_GATES #949cc29c — in CI, the steps the gates job verifies itself are left to it
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): { verify: Step[]; byGates: Step[] } {
   const ci = (env.CI ?? "").trim().toLowerCase();
