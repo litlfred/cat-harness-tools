@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { decideRun, excluded, gitReplayable, loadRecords, parseTrace, pathState, preloadScripts, recordRun, splitArgs, testGates, unquote } from "../../ci-cone.ts";
+import { decideRun, excluded, gitReplayable, loadRecords, parseTrace, pathState, preloadScripts, recordRun, inlineCodeOf, splitArgs, testGates, unquote } from "../../ci-cone.ts";
 import { BUILD_OUTPUT_DIRS, FileDigests, TRACKED, type BaselineResolver, type PairIO } from "../../input-hash.ts";
 import { NOT_INSTANCE_DIRS } from "../../../schemas/kg/instance-roots.ts";
 import { statementPin } from "../../input-sites.ts";
@@ -151,6 +151,36 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
       ].join("\n"),
     );
     expect(r).toEqual({ paths: [], git: [], children: ["/usr/bin/bun"] });
+  });
+
+  test("a child that ran inline code is named; installed package files it read are kept outside the read set", () => {
+    const r = read(
+      [
+        `10 execve("/usr/bin/bun", ["bun", "test"], 0x1 /* 3 vars */) = 0`,
+        `20 execve("/usr/bin/python3", ["python3", "-c", "import x"], 0x1 /* 3 vars */) = 0`,
+        `20 openat(AT_FDCWD</work/repo>, "/usr/lib/python3/dist-packages/x/__init__.py", O_RDONLY|O_CLOEXEC) = 3</usr/lib/python3/dist-packages/x/__init__.py>`,
+        `20 openat(AT_FDCWD</work/repo>, "/usr/lib/python3/dist-packages/y.py", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)`,
+      ].join("\n"),
+    );
+    expect(r).toEqual({
+      paths: [],
+      git: [],
+      children: ["/usr/bin/python3"],
+      inline: [{ program: "/usr/bin/python3", code: "import x" }],
+      external: ["/usr/lib/python3/dist-packages/x/__init__.py"],
+    });
+  });
+
+  test("inlineCodeOf: python -c and bun -e give their code; a script on stdin is null; a file or -m is none", () => {
+    expect(inlineCodeOf("/usr/bin/python3", ["python3", "-c", "x", "arg"])).toBe("x");
+    expect(inlineCodeOf("/usr/bin/python3", ["python3", "-Bc", "y"])).toBe("y");
+    expect(inlineCodeOf("/usr/bin/python3", ["python3"])).toBeNull();
+    expect(inlineCodeOf("/usr/bin/python3", ["python3", "-u", "-"])).toBeNull();
+    expect(inlineCodeOf("/usr/bin/python3", ["python3", "-W", "ignore", "s.py"])).toBeUndefined();
+    expect(inlineCodeOf("/usr/bin/python3.12", ["python3.12", "-m", "json.tool"])).toBeUndefined();
+    expect(inlineCodeOf("/usr/bin/bun", ["bun", "-e", "1"])).toBe("1");
+    expect(inlineCodeOf("/usr/bin/bun", ["bun", "x.ts"])).toBeUndefined();
+    expect(inlineCodeOf("/usr/bin/git", ["git", "-c", "a=b", "log"])).toBeUndefined();
   });
 
   test("git outside the checkout in a directory the run did not create is still undetermined", () => {
@@ -534,5 +564,90 @@ describe.skipIf(!HAS_STRACE)("a test's bun children: their environment is derive
     expect(r.code).toBe(0);
     expect(r.note).toContain("a bun child's modules");
     expect(decide().skip).toBe(false);
+  });
+});
+
+describe.skipIf(!HAS_STRACE || Bun.which("python3") === null)("a test's python children: their sources are audited from the trace", () => {
+  let root: string;
+  const write = (rel: string, text: string) => writeFileSync(join(root, rel), text);
+  const T = "test:t/py.test.ts";
+  const scripts = () => testGates(root, ["t/py.test.ts"]);
+  const record = () => recordRun({ root, scripts: scripts(), script: T, io: undefined, baseline: undefined, sha: "mainsha", stdio: "ignore" });
+  const decide = () => decideRun({ root, scripts: scripts(), script: T, io: undefined, baseline: undefined });
+  const VAR = "CONE_PY_FIXTURE";
+  /** The child, its env read annotated and pinned the way a reviewer would. */
+  const child = (extra = "") => {
+    const lines = ["import os", `v = os.environ.get("${VAR}", "")`, "print(v)", extra];
+    lines.splice(1, 0, `# input-site: env ${VAR} #${statementPin(lines, 1)} — the fixture's variable`);
+    write("t/child.py", lines.join("\n") + "\n");
+  };
+  const testFile = (args: string) =>
+    write(
+      "t/py.test.ts",
+      ['import { expect, test } from "bun:test";', 'test("runs its child", () => {', `  const r = Bun.spawnSync(["python3", ${args}], { stdout: "pipe" });`, "  expect(r.exitCode).toBe(0);", "});"].join("\n") + "\n",
+    );
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), "ci-cone-py-"));
+    mkdirSync(join(root, "t"));
+    write("package.json", JSON.stringify({ name: "fixture" }));
+    testFile('"t/child.py"');
+    child();
+    process.env[VAR] = "one";
+  });
+  afterEach(() => {
+    delete process.env[VAR];
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  test("the child's variable and interpreter are recorded; changing the variable or the script makes the test RUN", () => {
+    const r = record();
+    expect(r.note).toStartWith("recorded");
+    const rec = loadRecords(root)!.checks[T]!;
+    expect(rec.env![VAR]).toBe("one");
+    expect(rec.env).toHaveProperty("PYTHONPATH");
+    expect(Object.keys(rec.tools ?? {}).some((p) => /python3/.test(p))).toBe(true);
+    expect(decide().skip).toBe(true);
+    process.env[VAR] = "two";
+    expect(decide()).toMatchObject({ skip: false, why: expect.stringContaining(VAR) });
+    process.env[VAR] = "one";
+    expect(decide().skip).toBe(true);
+    child("# edited");
+    expect(decide().skip).toBe(false);
+  });
+
+  test("a python source with a site nobody reviewed records nothing", () => {
+    write("t/child.py", "import time\nprint(time.time())\n");
+    const r = record();
+    expect(r.code).toBe(0);
+    expect(r.note).toContain("a python child's sources");
+  });
+
+  test("inline code is audited from its command line: clean code records, a site nobody reviewed does not", () => {
+    testFile('"-c", "print(1)"');
+    expect(record().note).toStartWith("recorded");
+    expect(decide().skip).toBe(true);
+    testFile('"-c", "import time; print(time.time())"');
+    const r = record();
+    expect(r.code).toBe(0);
+    expect(r.note).toContain("inline code");
+  });
+
+  test("a script read from stdin records nothing", () => {
+    write(
+      "t/py.test.ts",
+      ['import { expect, test } from "bun:test";', 'test("stdin", () => {', '  const r = Bun.spawnSync(["python3"], { stdin: new TextEncoder().encode("print(1)"), stdout: "pipe" });', "  expect(r.exitCode).toBe(0);", "});"].join("\n") + "\n",
+    );
+    const r = record();
+    expect(r.code).toBe(0);
+    expect(r.note).toContain("from stdin");
+  });
+
+  test("an imported python module's __pycache__ is neither an input nor a write", () => {
+    write("t/helper.py", "def f():\n    return 1\n");
+    write("t/child.py", "import sys\nsys.path.insert(0, 't')\nimport helper\nprint(helper.f())\n");
+    expect(record().note).toStartWith("recorded");
+    expect(Object.keys(loadRecords(root)!.checks[T]!.reads).some((p) => p.includes("__pycache__"))).toBe(false);
+    expect(decide().skip).toBe(true);
   });
 });

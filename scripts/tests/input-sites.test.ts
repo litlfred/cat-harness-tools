@@ -607,11 +607,13 @@ describe("the test bun-spawn rule", () => {
   test("a spawn of bun itself in a test file is `spawned`; beside git, also `tree`", () => {
     expect(verdictsOf("x/a.test.ts", 'const r = Bun.spawnSync(["bun", "scripts/x.ts"], { cwd });')).toEqual([[{ kind: "spawned" }]]);
     expect(verdictsOf("x/a.test.ts", 'spawnSync(process.execPath, ["x.ts"]);')).toEqual([[{ kind: "spawned" }]]);
+    expect(verdictsOf("x/a.test.ts", 'const r = Bun.spawnSync(["python3", SCRIPT, ...args], { cwd: root });')).toEqual([[{ kind: "spawned" }]]);
+    expect(verdictsOf("x/a.test.ts", 'spawnSync("python", [SCRIPT]);')).toEqual([[{ kind: "spawned" }]]);
     expect(verdictsOf("x/a.test.ts", 'spawnSync("bun", ["x.ts"]); spawnSync("git", ["init"]);')).toEqual([[{ kind: "spawned" }, { kind: "tree" }]]);
   });
   test("outside a test file, or beside another program, it still needs one", () => {
     expect(verdictsOf("x/a.ts", 'Bun.spawnSync(["bun", "x.ts"]);')).toEqual([undefined]);
-    expect(verdictsOf("x/a.test.ts", 'spawnSync("bun", ["x.ts"]); spawnSync("python3", []);')).toEqual([undefined]);
+    expect(verdictsOf("x/a.test.ts", 'spawnSync("bun", ["x.ts"]); spawnSync("ruby", []);')).toEqual([undefined]);
     expect(verdictsOf("x/a.test.ts", 'spawnSync("bunx", ["x"]);')).toEqual([undefined]);
   });
 });
