@@ -5,8 +5,10 @@
  * human) must perform, so it is *transparent to the audit*: a reviewer
  * supplies only the verdict (result / severity / evidence); this helper
  * captures the `field_hash` (current md/ts/lean source hashes),
- * `reviewed_at`, and `reviewed_sha` uniformly — identical to the
- * provenance `qa-sweep.ts` stamps on script entries.
+ * `reviewed_at`, and `reviewed_tree` uniformly — the provenance
+ * `qa-sweep.ts` stamps on script entries, with HEAD's tree in place of its
+ * commit (bean 69lr; owner card Q4, 2026-11-05: a PR run's HEAD is a
+ * synthetic merge commit that can vanish, while its tree survives onto main).
  *
  * This is the write path used by the parallel agent-drain campaign:
  * a sub-agent evaluates one criterion on one block, then calls
@@ -34,7 +36,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve, relative } from "node:path";
 import {
   hashBlockFiles,
-  gitHeadSha,
+  gitHeadTree,
   loadQaReport,
   saveQaReport,
   readBlockManifest,
@@ -183,7 +185,7 @@ const qaPath = blockQaPath(contentRepoRoot, resolve(base));
 
 const paths = { ts: tsPath, md: mdPath, lean: leanPath };
 const currentHashes = hashBlockFiles(paths);
-const headSha = gitHeadSha();
+const headTree = gitHeadTree();
 const nowIso = new Date().toISOString();
 const today = nowIso.slice(0, 10);
 
@@ -255,7 +257,7 @@ const entry: QaCriterionEntry = {
     agent_skill: skill,
   },
   reviewed_at: nowIso,
-  reviewed_sha: headSha,
+  reviewed_tree: headTree,
   ...(notes ? { notes } : {}),
 };
 

@@ -41,8 +41,14 @@ export interface QaWitness {
   version?: string;
   /** When the review ran (ISO-8601), or absent when the sidecar records none. */
   at?: string;
-  /** Repo HEAD at review time. */
+  /** Repo HEAD at review time — read from older sidecars, no longer written. */
   sha?: string;
+  /**
+   * Tree of repo HEAD at review time — what verdicts record since bean 69lr
+   * (owner card Q4, 2026-11-05): a PR run's HEAD commit can vanish, its tree
+   * cannot.
+   */
+  tree?: string;
   /** Hash of the checker's own source, and the commit it was last changed in. */
   scriptHash?: string;
   scriptCommitSha?: string;

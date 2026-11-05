@@ -37,7 +37,18 @@ describe("roundTripEntries — provenance is recorded, never invented", () => {
   test("without them it stamps now, so a first recording is not left blank", () => {
     const e = roundTripEntries(base, { md: "h" });
     expect(Date.parse(e[0]!.reviewed_at)).toBeGreaterThan(Date.now() - 60_000);
-    expect(e[0]!.reviewed_sha).toBeDefined();
+    // The tree, not the commit (bean 69lr; owner card Q4, 2026-11-05).
+    expect(e[0]!.reviewed_tree).toBeDefined();
+    expect(e[0]!.reviewed_sha).toBeUndefined();
+  });
+
+  test("a re-record by tree keeps that tree on BOTH entries", () => {
+    const tree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+    const e = roundTripEntries({ ...base, reviewedAt: "2026-09-18T20:32:46.150Z", reviewedTree: tree }, { md: "h" });
+    for (const entry of e) {
+      expect(entry.reviewed_tree).toBe(tree);
+      expect(entry.reviewed_sha).toBeUndefined();
+    }
   });
 
   test("a model identifier carries the basis for it, beside the model", () => {

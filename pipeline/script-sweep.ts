@@ -53,6 +53,7 @@ import {
 } from "./qa-criteria-registry";
 import {
   gitHeadSha,
+  gitHeadTree,
   computeCriterionScriptHashes,
   entryIsFresh,
   freshnessKeys,
@@ -229,6 +230,9 @@ async function run(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const nowIso = new Date().toISOString();
   const headSha = gitHeadSha();
+  // What a verdict records as `reviewed_tree`: the tree outlives a PR run's
+  // synthetic merge commit (bean 69lr; owner card Q4, 2026-11-05).
+  const headTree = gitHeadTree();
 
   // Resolve criteria under sweep — default to every script-quality
   // criterion that has a registered checker.
@@ -337,7 +341,7 @@ async function run(): Promise<void> {
           deps_hash: sh?.deps_hash,
         },
         reviewed_at: nowIso,
-        reviewed_sha: headSha,
+        reviewed_tree: headTree,
       };
       if (checkRes.result === "fail") {
         entry.severity = def.default_severity;
