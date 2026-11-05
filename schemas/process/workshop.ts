@@ -22,6 +22,7 @@
  * | `discussion` | closing questions, each in a module and tied to the steps it is about |
  * | `sheets` | the printable canvases (A3 or A4), each filled in one or more modules |
  * | `resources` | job aids, handouts, readings, slides and links, each tied to modules or steps |
+ * | `presentation` | how the journeys viewer presents the workshop in a room: the app frame's words, the story in one sentence, whose record the trust ladder follows, the presenter's note, the outward links |
  *
  * A question is a question: a module asks a room to NAME, not to decide.
  *
@@ -145,6 +146,44 @@ export const WorkshopSheetSchema = z
   .strict();
 export type WorkshopSheet = z.infer<typeof WorkshopSheetSchema>;
 
+/**
+ * How the journeys viewer presents a workshop in a room (its overview and
+ * walkthrough pages, which wear no site chrome): the words of the app frame,
+ * the story in one sentence, and the links out. Every field is optional; the
+ * viewer falls back to the workshop's own title and description.
+ */
+export const WorkshopPresentationSchema = z
+  .object({
+    /** The app's name in its frame ("VaxLink"); the workshop title when absent. */
+    name: Text.optional(),
+    /** A short badge beside the name ("Interactive Spec"). */
+    badge: Text.optional(),
+    /** One line under the name. */
+    tagline: Text.optional(),
+    /** The occasion, first on the frame's top bar ("WHO Pre-GDHF Vignette"). */
+    occasion: Text.optional(),
+    /** What the story is about, beside the occasion. */
+    subject: Text.optional(),
+    /** Where the story moves, after the step range ("Thailand ⇄ Lao PDR"). */
+    scope: Text.optional(),
+    /** A status line at the right of the top bar. */
+    status: Text.optional(),
+    /** The story in one sentence: the overview's headline. */
+    story: Text.optional(),
+    /** A line under it. */
+    lede: Text.optional(),
+    /** The actor whose record the trust ladder follows ("Somsack's record"). */
+    recordOf: Id.optional(),
+    /** The presenter's note on the overview; a step's note is its `facilitatorCue`. */
+    presenterNote: Text.optional(),
+    /** A band on the overview naming what the walkthrough demonstrates, with `links`. */
+    about: z.object({ title: Text, text: Text.optional() }).strict().optional(),
+    /** Links out (the IG, its source, its journeys), drawn in the `about` band; one with `frame` is also on the app bar, under that label. */
+    links: z.array(z.object({ label: Text, href: Text, frame: Text.optional() }).strict()).optional(),
+  })
+  .strict();
+export type WorkshopPresentation = z.infer<typeof WorkshopPresentationSchema>;
+
 /** `workshop/0.1.0`, as a node kind. */
 export const WorkshopKind = nodeKind(
   WORKSHOP_V01,
@@ -175,6 +214,7 @@ export const WorkshopKind = nodeKind(
       .optional(),
     sheets: z.array(WorkshopSheetSchema).optional(),
     resources: z.array(WorkshopResourceSchema).optional(),
+    presentation: WorkshopPresentationSchema.optional(),
   },
   { strict: true, refine: (w, ctx) => {
     const issue = (message: string) => ctx.addIssue({ code: "custom", message });

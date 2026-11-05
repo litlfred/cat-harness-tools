@@ -24,7 +24,9 @@
  * | `<instance>/workshops/<workshop id>/index.html` | one workshop |
  * | `<instance>/workshops/<workshop id>/<module>/index.html` | one module |
  * | `<instance>/workshops/<workshop id>/sheets/index.html` | the printable sheets |
+ * | `<instance>/workshops/<workshop id>/overview/`, `…/walkthrough/<step>/` | the workshop told in a room, with no site chrome (`present.ts`) |
  * | `assets/journeys.css`, `assets/journeys.js` | the style and the script |
+ * | `assets/present.css`, `assets/present.js` | the presentation pages' style and script |
  */
 import { readFileSync } from "node:fs";
 import { extname, join, posix } from "node:path";
@@ -49,10 +51,11 @@ import {
   type JourneyCorpus,
   type WorkshopEntry,
 } from "./read.ts";
+import { PRESENT_ASSETS, PRESENT_SEGMENTS, renderPresentationPages } from "./present.ts";
 
 export const TOOL_ID = "journeys-viewer";
 const ASSET_DIR = join(import.meta.dir, "assets");
-export const ASSETS = ["journeys.css", "journeys.js"] as const;
+export const ASSETS = ["journeys.css", "journeys.js", ...PRESENT_ASSETS] as const;
 
 export interface PageFile {
   path: string;
@@ -95,7 +98,7 @@ const FACES: Record<number, [string, string]> = {
   [2]: ["😄", "delighted"],
 };
 
-interface PersonaView {
+export interface PersonaView {
   id: string;
   name: string;
   role?: string;
@@ -105,7 +108,7 @@ interface PersonaView {
   goal?: string;
 }
 
-function personaOf(corpus: JourneyCorpus, instance: string, id: string, i: number): PersonaView {
+export function personaOf(corpus: JourneyCorpus, instance: string, id: string, i: number): PersonaView {
   const a: Actor | undefined = lookup(corpus.actors, instance, id);
   const p = a?.persona;
   const name = p?.name ?? a?.title ?? id;
@@ -150,7 +153,7 @@ function codeRange(corpus: JourneyCorpus, j: Journey, seen = new Set<string>()):
   return codes.length === 1 ? codes[0]! : `${codes[0]}–${codes[codes.length - 1]}`;
 }
 
-function allSteps(corpus: JourneyCorpus, j: Journey, seen = new Set<string>()): ScenarioStep[] {
+export function allSteps(corpus: JourneyCorpus, j: Journey, seen = new Set<string>()): ScenarioStep[] {
   if (seen.has(`${j.instance}/${j.scenario.id}`)) return [];
   seen.add(`${j.instance}/${j.scenario.id}`);
   return [...j.scenario.steps, ...childrenOf(corpus, j).flatMap((c) => allSteps(corpus, c, seen))];
@@ -178,12 +181,12 @@ export function orderByFollows(journeys: readonly Journey[]): Journey[] {
   return out;
 }
 
-function childrenOf(corpus: JourneyCorpus, j: Journey): Journey[] {
+export function childrenOf(corpus: JourneyCorpus, j: Journey): Journey[] {
   const partOf = (c: Journey) => (c.scenario as UserScenario & { partOf?: string }).partOf;
   return orderByFollows(corpus.journeys.filter((c) => c.instance === j.instance && partOf(c) === j.scenario.id));
 }
 
-function parentOf(corpus: JourneyCorpus, j: Journey): Journey | undefined {
+export function parentOf(corpus: JourneyCorpus, j: Journey): Journey | undefined {
   const p = (j.scenario as UserScenario & { partOf?: string }).partOf;
   return p === undefined ? undefined : corpus.journeys.find((c) => c.instance === j.instance && c.scenario.id === p);
 }
@@ -198,11 +201,11 @@ function journeyHref(j: Journey, up: string): string {
   return `${up}${j.instance}/${j.scenario.id}/`;
 }
 
-function workshopHref(w: WorkshopEntry, up: string): string {
+export function workshopHref(w: WorkshopEntry, up: string): string {
   return `${up}${w.instance}/workshops/${w.workshop.id}/`;
 }
 
-function moduleSegment(id: string): string {
+export function moduleSegment(id: string): string {
   return slug(id);
 }
 
@@ -230,12 +233,12 @@ function workshopsAt(corpus: JourneyCorpus, j: Journey, step: string): { w: Work
   return out;
 }
 
-function sourceHref(corpus: JourneyCorpus, instance: string, file: string): string | undefined {
+export function sourceHref(corpus: JourneyCorpus, instance: string, file: string): string | undefined {
   const repo = corpus.instances.get(instance)?.repository;
   return repo ? `https://github.com/${repo}/blob/HEAD/${file}` : undefined;
 }
 
-function instanceTitle(corpus: JourneyCorpus, name: string): string {
+export function instanceTitle(corpus: JourneyCorpus, name: string): string {
   return corpus.instances.get(name)?.title ?? name;
 }
 
@@ -760,13 +763,13 @@ function workshopPage(corpus: JourneyCorpus, w: WorkshopEntry): string {
 ${ws.audience ? `<p><b>For:</b> ${e(ws.audience)}</p>` : ""}
 ${ws.promise ? `<p class="jv-promise">${e(ws.promise)}</p>` : ""}
 ${ws.useCaseStatement ? `<p class="jv-usecase">${e(ws.useCaseStatement)}</p>` : ""}
-${ws.sheets?.length ? `<p><a class="jv-btn" href="sheets/">Printable sheets (${ws.sheets.length})</a></p>` : ""}
+<p><a class="jv-btn" href="overview/">Present it: overview and walkthrough</a>${ws.sheets?.length ? ` <a class="jv-btn" href="sheets/">Printable sheets (${ws.sheets.length})</a>` : ""}</p>
 </header>
 <section><h2>Taught from</h2><ol class="jv-tree">${scenarios.map((j, i) => (j ? journeyCard(corpus, j, up) : `<li class="jv-unresolved">${e(ws.scenarios[i]!)}: no such journey in this checkout</li>`)).join("\n")}</ol></section>
 <section><h2>Modules</h2>${modulesHtml}</section>
 ${ws.tables?.length ? `<section><h2>Reference tables</h2>${ws.tables.map((t) => tableHtml(t)).join("\n")}</section>` : ""}
 ${ws.assessment ? `<section><h2>How a table rates what it needs</h2><ul>${ws.assessment.scales.map((s) => `<li><b>${e(s.label)}:</b> ${s.options.map((o) => e(o.label)).join(" · ")}</li>`).join("")}</ul>${ws.assessment.standingLine ? `<p class="jv-standing">${e(ws.assessment.standingLine)}</p>` : ""}</section>` : ""}
-${ws.discussion?.length ? `<section><h2>Closing discussion</h2><ol class="jv-disc">${ws.discussion.map((d) => discussionItem(corpus, w, d, up, "")).join("")}</ol></section>` : ""}
+${ws.discussion?.length ? `<section id="discussion"><h2>Closing discussion</h2><ol class="jv-disc">${ws.discussion.map((d) => discussionItem(corpus, w, d, up, "")).join("")}</ol></section>` : ""}
 ${ws.resources?.length ? `<section><h2>Job aids and resources</h2><ul class="jv-resources">${ws.resources.map((r) => resourceItem(w, r, up, "")).join("")}</ul></section>` : ""}
 <p class="jv-src">${(() => {
     const h = sourceHref(corpus, w.instance, w.file);
@@ -886,11 +889,13 @@ export function renderJourneyPages(corpus: JourneyCorpus, links: SiteLinks, decl
     const base = `${w.instance}/workshops/${w.workshop.id}`;
     out.push({ path: `${base}/index.html`, content: workshopPage(corpus, w) });
     for (const m of w.workshop.modules) {
-      if (moduleSegment(m.id) === "sheets") throw new Error(`${w.file}: a module may not be called "sheets", the viewer's own segment`);
+      const seg = moduleSegment(m.id);
+      if (seg === "sheets" || (PRESENT_SEGMENTS as readonly string[]).includes(seg)) throw new Error(`${w.file}: a module may not be called "${seg}", the viewer's own segment`);
       out.push({ path: `${base}/${moduleSegment(m.id)}/index.html`, content: modulePage(corpus, w, m.id) });
     }
     out.push({ path: `${base}/sheets/index.html`, content: sheetsPage(corpus, w) });
   }
+  out.push(...renderPresentationPages(corpus, links));
   for (const a of ASSETS) out.push({ path: posix.join("assets", a), content: readFileSync(join(ASSET_DIR, a), "utf8") });
   return out;
 }
