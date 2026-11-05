@@ -818,6 +818,10 @@ export const RULES: Rule[] = [
       // mints the edge it was meant to retire. `staging-preview.ts` imports
       // only zod and `fsh-guts.ts` (harness), so it carries no content model.
       "schemas/sdlc/staging-preview.ts",
+      // Where a preview is published (`branches/`, owner 2026-11-05). Same
+      // family: `staging-preview.ts` above imports it, and its only import is
+      // nothing, so it carries no content model.
+      "schemas/sdlc/preview-prefix.ts",
       // The render log — same family, same argument, and the schema moves WITH
       // the script for the reason stated just above. It describes what is on
       // the PUBLISH BRANCH, which is a property of the repository rather than
