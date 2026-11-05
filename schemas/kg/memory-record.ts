@@ -19,6 +19,7 @@
  * written by one") is a different thing and stays separate.
  *
  * @module schemas/kg/memory-record
+ * @graphNode schema
  */
 import { z } from "zod";
 import { nodeKind } from "./node-kind.ts";

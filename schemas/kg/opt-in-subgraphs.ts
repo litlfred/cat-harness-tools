@@ -3,6 +3,7 @@
  * directory sits inside one that is switched off.
  *
  * @module schemas/kg/opt-in-subgraphs
+ * @graphNode none — a function library over `enableSubgraphs`; it defines no schema
  *
  * ## The rule
  *
