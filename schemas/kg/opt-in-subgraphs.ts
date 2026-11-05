@@ -3,6 +3,7 @@
  * directory sits inside one that is switched off.
  *
  * @module schemas/kg/opt-in-subgraphs
+ * @graphNode none — a reader and predicates over declared opt-in sub-graphs; it defines no schema
  *
  * ## The rule
  *
