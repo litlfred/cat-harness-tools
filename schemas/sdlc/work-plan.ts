@@ -2,7 +2,8 @@
  * A work plan is an epic or a milestone that names the process it instantiates.
  *
  * @module schemas/sdlc/work-plan
- * @graphNode none — a reading of a work item's tags; it defines no kind
+ * @graphNode none — a reading of a work item's tags; its one kind, {@link WorkPlanKind},
+ *   adds no field and no file, only the glossary's word for such a work item
  *
  * Work item folio-assistant-exrp. Owner, 2026-11-05: *"At the beginning of a
  * large process (like creating a new collaborative document, or adding
@@ -34,6 +35,23 @@
  * position of work lives in the instances (ruling Q1), and a list kept on
  * both ends would disagree.
  */
+
+import { nodeKind } from "../kg/node-kind";
+import { BeanKind } from "./bean-graph.ts";
+
+/**
+ * A WORK PLAN, as a kind: a work item that names the process it runs. It adds
+ * no field and no file of its own, because a plan is told apart by its
+ * `process:` tag, which {@link workPlanOf} reads. It exists so the glossary
+ * carries "Work plan" as a narrower "Work item" (owner, 2026-11-05: "add the
+ * Work plan glossary term too"). No typology holds it; the node-kind index
+ * finds it by its name rule, `process-tag`.
+ */
+export const WorkPlanKind = nodeKind("work-plan", [BeanKind], {}, {
+  term: "Work plan",
+  summary:
+    "An epic or milestone that names the process it runs, with a `process:` tag, and the proposal it came from, with a `proposal:` tag. Not every process needs one; the work items under it are its work.",
+});
 
 /** The tag prefix naming a process a work plan instantiates. */
 export const PLAN_PROCESS_TAG = "process:";
