@@ -44,6 +44,7 @@ import {
 import { checkoutDirectories } from "../schemas/kg/harness-config.js";
 import type { GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.js";
 import { corpusScopeFor } from "./known-skills.js";
+import { gateOwnInstances, nothingOwnLine } from "./lib/gate-own.ts";
 import { mayLeaveMain } from "./qa-results.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -402,7 +403,13 @@ export function resolveAcrossArchive(
   return undefined;
 }
 
-export function scanSubgraphs(root: string = ROOT): SubgraphReport {
+/**
+ * `scope`, when given, sweeps only the directories those instances commit
+ * (owner ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`). Every
+ * directory stays a link TARGET, so an edge into a mounted layer is still
+ * resolved and reported.
+ */
+export function scanSubgraphs(root: string = ROOT, scope?: ReadonlySet<string>): SubgraphReport {
   // The CORPUS on the platform's own run (placement PR0, bean `ejye`): what
   // the platform's `scope: "repository"` mirrors used to bring into this sweep
   // is asked of the checkout now. Ids repeat across instances there (several
@@ -435,6 +442,7 @@ export function scanSubgraphs(root: string = ROOT): SubgraphReport {
   const archiveViews = beanArchiveViews(dirs, root);
 
   for (const dir of dirs) {
+    if (scope !== undefined && dirs !== own && !scope.has((dir as { member?: string }).member ?? (dir as { declaredBy?: string }).declaredBy ?? "")) continue;
     const abs = dir.absPath ?? join(root, dir.path);
     if (!existsSync(abs) || !statSync(abs).isDirectory()) continue;
     // Retired content is not held to link resolution — see `exempt`.
@@ -529,8 +537,10 @@ export function scanSubgraphs(root: string = ROOT): SubgraphReport {
 
 if (import.meta.main) {
   const check = process.argv.includes("--check");
+  // In a layer's PR checks, only the caller's own directories are swept (owner ruling 2026-11-05).
+  const scope = gateOwnInstances();
   const { tree, edges, dangling, unverifiable, derivedLinks, exempt, siteResolved, unreadable, notExamined, scanned } =
-    scanSubgraphs(ROOT);
+    scanSubgraphs(ROOT, scope);
 
   console.log(`Subgraphs  (${scanned} markdown node(s) attributed to a declared directory)\n`);
 
@@ -543,6 +553,10 @@ if (import.meta.main) {
 
   // Vacuity before the verdict. With nothing attributed, "no cross edges"
   // is a statement about the sweep and not about the corpus.
+  if (scanned === 0 && scope) {
+    console.log(nothingOwnLine("check:subgraphs", "markdown in a declared directory", scope));
+    process.exit(0);
+  }
   if (scanned === 0) {
     console.error("\n✗ ATTRIBUTED NO FILES. This is not a pass: nothing was examined.");
     process.exit(1);

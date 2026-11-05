@@ -168,6 +168,8 @@ TIMEOUT_S = 1200
 # cat-harness-tools main (#1478) was a new failure in every root mounting it
 # (smart-ra#228). Given this, it judges only the caller's own `schemas/`.
 GATE_OWN_ENV = "CAT_GATE_OWN_INSTANCES"
+GATE_OWN_PATHS_ENV = "CAT_GATE_OWN_PATHS"
+GATE_FOREIGN_PATHS_ENV = "CAT_GATE_FOREIGN_PATHS"
 # Gates that judge the REMOTE's live state, not the checkout: which workflows
 # are red on the default branch, whether a commit has a run, which advisories
 # the registry knows today. Base and head run minutes apart, so one can flip
@@ -1020,6 +1022,12 @@ def main():
     # owner ruling 2026-11-05, "Move the checks"). A check that honours it leaves
     # the mounted layers' files to their own CI. Every gate inherits it.
     os.environ.setdefault(GATE_OWN_ENV, ",".join(own))
+    # The same by directory, for a check whose subjects are files rather than
+    # declared directories (`gateOwnsFile`): the own instances' and every
+    # other instance's, so a file is the caller's when its deepest instance is.
+    known = instances_in(root)
+    os.environ.setdefault(GATE_OWN_PATHS_ENV, ",".join(known.get(n, n) for n in own))
+    os.environ.setdefault(GATE_FOREIGN_PATHS_ENV, ",".join(d for n, d in sorted(known.items()) if n not in own and d != "."))
     skipped = {k: {"command": v["command"], "skipped": v["skipped"]} for k, v in skipped.items()}
     os.environ.setdefault("CAT_SKILL_REGISTER_VERIFIED_BY_GATES", verified_by_gates(gates))
     timings = read_timings(os.environ.get("GATE_TIMINGS"))
