@@ -1367,6 +1367,7 @@ export function originUrl(repoRoot: string): string {
   // and CI's mount runs under a rewrite of GitHub to local mirrors
   // (layer-pr-checks' state-pin.sh), so the record would name a mirror path
   // no reader outside that step ever sees.
+  // input-site: store #84832698 — configures a branch-store read: which absence records answer for this checkout's origin; the read itself goes through TreeStore.git(), which is traced
   const r = spawnSync("git", ["config", "--get", "remote.origin.url"], { cwd: repoRoot, encoding: "utf-8" });
   return r.status === 0 ? normaliseOrigin(r.stdout) : "";
 }
