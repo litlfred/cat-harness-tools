@@ -40,6 +40,13 @@
  * (`input-sites.ts`) hashes or refuses every other input (environment, clock,
  * network, git history). So it reads the same R and gives the same answer.
  *
+ * "The same code" is the static import closure, which the fingerprint hashes,
+ * and every module the run loaded by a computed `import()` / `require()`,
+ * which is in R: the run opened it. Which modules a computed load reaches is
+ * decided by code and data the run read, so a module it did not load cannot
+ * change its answer, and the fingerprint does not hash it (bean vgfp). The
+ * audit still walks every module the declarations could name.
+ *
  * A trace covers only the path that run took, so a run whose reads cannot be
  * enumerated is recorded as undetermined and always runs:
  * - a write inside the checkout;

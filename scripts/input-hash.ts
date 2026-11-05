@@ -86,6 +86,7 @@ import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSy
 import { dirname, join, relative, resolve } from "node:path";
 import { readQaManifest, type QaStoreOptions } from "./qa-store.ts";
 import { auditClosure, followedSpecifier, outsideTemplates, SiteMemo } from "./input-sites.ts";
+import { DeclaredImports } from "./declared-imports.ts";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 /** Where the cache lives, relative to the repository root. `build/` is git-ignored. */
@@ -93,7 +94,7 @@ import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 export const CACHE_FILE = join("build", "regen-cache", "input-hashes.json");
 
 /** Bump to invalidate every recorded hash when the fingerprint's recipe changes. */
-export const RECIPE_VERSION = 5;
+export const RECIPE_VERSION = 6;
 
 export type Fingerprint = { hash: string; files: number; wholeTree?: boolean } | { undetermined: string };
 
@@ -607,7 +608,9 @@ export class FileDigests {
   private memo = new Map<string, { key: string; digest: string }>();
   /** The tracked-tree digest, computed at most once per instance. */
   tree: ReturnType<typeof trackedTreeDigest> | undefined;
-  constructor(private root: string) {}
+  constructor(private root: string) {
+    this.declared = new DeclaredImports(root);
+  }
   digest(rel: string): string {
     const abs = join(this.root, rel);
     const st = statSync(abs);
@@ -633,11 +636,14 @@ export class FileDigests {
   }
   /** Per-file input-site scans (`input-sites.ts`), shared by every fingerprint of a run. */
   readonly sites = new SiteMemo();
+  /** The modules a `declared` input-site verdict names, read from the declarations once per run (`declared-imports.ts`). */
+  readonly declared: DeclaredImports;
   /** Forget everything — call after writers ran, since mtimes can tie within a tick. */
   clear(): void {
     this.memo.clear();
     this.blobs.clear();
     this.sites.clear();
+    this.declared.clear();
     this.tree = undefined;
   }
 }
@@ -657,8 +663,10 @@ export function fingerprint(
   /**
    * `treeReplayed`: the caller answers git's view of the tree itself, by
    * replaying every git command the run executed (`ci-cone.ts`, bean `4rbc`),
-   * so a `tree` site does not need a `{tracked}` declaration. Nothing else
-   * may pass it.
+   * so a `tree` site does not need a `{tracked}` declaration; and its
+   * read set holds every module file the run opened, so the modules reached
+   * only by a computed load (`input-sites.ts`, `computed`) are audited but
+   * not hashed. Nothing else may pass it.
    */
   opts: { treeReplayed?: boolean } = {},
 ): Fingerprint {
@@ -697,7 +705,14 @@ export function fingerprint(
   // input. A non-TypeScript script cannot be audited, so it is undetermined.
   const foreign = entries.find((e) => !/\.(m?[jt]sx?)$/.test(e));
   if (foreign !== undefined) return { undetermined: `${foreign} is not TypeScript/JavaScript, so its reads cannot be audited` };
-  const audit = auditClosure(root, entries, digests.sites, undefined, (name) => entryFiles(root, scripts, name));
+  const audit = auditClosure(
+    root,
+    entries,
+    digests.sites,
+    undefined,
+    (name) => entryFiles(root, scripts, name),
+    (source) => digests.declared.resolve(source),
+  );
   if ("undetermined" in audit) return audit;
   if (audit.needsTree && !wholeTree && opts.treeReplayed !== true) {
     return { undetermined: "a source reads the working tree through git (`tree` site), which only a {tracked} declaration covers" };
@@ -707,7 +722,13 @@ export function fingerprint(
     inputSiteReached("input-hash: fingerprint reads env-unset names");
     if ((process.env[name] ?? "") !== "") return { undetermined: `$${name} is set, and names something outside the tree` };
   }
-  const closure = { files: wholeTree ? ([] as string[]) : audit.files };
+  // A traced run's read set records every module file it opened, so the
+  // modules it reached by a computed load are hashed there, as the ones THAT
+  // run loaded; hashing every module the declarations could name would tie
+  // each check to every other check's kinds and plugins (bean vgfp). They are
+  // still audited above, so what they read from the environment is hashed.
+  const computed = opts.treeReplayed === true ? new Set(audit.computed) : undefined;
+  const closure = { files: wholeTree ? ([] as string[]) : computed === undefined ? audit.files : audit.files.filter((f) => !computed.has(f)) };
 
   const h = createHash("sha256");
   h.update(`recipe ${RECIPE_VERSION}\n`);
