@@ -17,6 +17,7 @@
 #   setup-elan-symlinks.sh, adapters/mcp-server/install.sh   (Linux host: apt/sudo/symlinks)
 #   scripts/lib/*.sh                                         (sourced, not run)
 #   scripts/git-hooks/auto-commit-feedback.sh                (git runs it via sh)
+#   scripts/git-hooks/claude-pre-push.sh                     (Claude Code runs it via sh)
 #   .github/scripts/generate-diff.sh, latexmk-compile.sh     (CI only)
 #   docker-latex-build/build-pdf.sh, smoke-test-libraries.sh (qou-specific leftovers)
 set -euo pipefail
