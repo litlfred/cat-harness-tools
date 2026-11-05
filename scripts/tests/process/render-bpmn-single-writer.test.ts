@@ -34,6 +34,13 @@ describe("the platform renderer delegates beside-source SVGs (bean gm9g)", () =>
     expect(src).toContain("besideSourceSvg(renderer, file, processPath)");
   });
 
+  test("every diagram gets a copy beside its source, not only an exempt layer's (bean akiq)", () => {
+    // Owner, 2026-11-05: each layer draws its own diagrams. Filtering this set
+    // to the layers exempt from `workflow-visualiser` left every other layer's
+    // drawing in cat-harness, which then hand-listed each one.
+    expect(src).toContain("const besideSource = new Set(sources);");
+  });
+
   test("it does not carry its own copy of the beside-source writer", () => {
     // `siblingLinks` was the platform's re-implementation; its return is the
     // regression this test exists to catch.

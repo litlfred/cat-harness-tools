@@ -40,9 +40,6 @@ import {
   siteDirFor,
   repoRootFor,
   instanceRootsIn,
-  findInstanceRoot,
-  readDeclaration,
-  isExemptFrom,
 } from "../schemas/kg/cat-harness.ts";
 import { checkoutProcessPresentations, processTarget } from "./process-presentations.js";
 import { isGlobalTasksFile } from "../src/workflow/process-model.js";
@@ -206,22 +203,22 @@ function subprocessLinks(xml: string): Map<string, string> {
 }
 
 /**
- * Diagrams that ALSO get an SVG beside their own `.bpmn`.
+ * Every diagram ALSO gets an SVG beside its own `.bpmn`, which its layer
+ * commits.
  *
- * An instance exempt from the `workflow-visualiser` obligation has no site of
- * its own, so this site's `workflows/` copy is the only drawing of its
- * diagrams, and its README cannot link to it: an instance's README links only
- * inside the instance, and the link would break the day the instance becomes
- * a repository of its own. Owner, 2026-09-29: *"display bpmn(s) etc in
- * README.md"*. Keyed on the declared exemption, never on an instance's name.
+ * Owner, 2026-11-05 (bean folio-assistant-akiq): *"why would source drawings
+ * be in another layer?"* — each layer draws its own diagrams. The copy in
+ * this site's `workflows/` links every step and [+] to this site's pages, so
+ * it changes with the index's pins and is built at publish (one declared
+ * directory). The copy beside the source links only to sibling diagrams, so
+ * it is a function of its own layer's commit and that layer commits it:
+ * a new diagram is judged in the layer that added it, and no lower layer
+ * lists a higher layer's files. Once only the layers exempt from the
+ * `workflow-visualiser` obligation got one (owner, 2026-09-29: *"display
+ * bpmn(s) etc in README.md"*); that left every other layer's drawing in a
+ * layer below it.
  */
-const besideSource = new Set(
-  sources.filter((f) => {
-    const inst = findInstanceRoot(dirname(f));
-    const decl = inst ? readDeclaration(inst) : undefined;
-    return decl !== undefined && isExemptFrom(decl, "workflow-visualiser");
-  }),
-);
+const besideSource = new Set(sources);
 
 let stale = 0;
 
