@@ -316,7 +316,13 @@ describe("the stage job waits at the gate before every push", () => {
   test("gate after the re-read, before the copy and the push; slept means re-read", () => {
     const reset = body.indexOf("git -C pages reset --hard FETCH_HEAD");
     const gate = body.indexOf("staging-push-gate.ts gate --dir pages");
-    const copy = body.indexOf('cp -R _site/. "pages/$PREVIEW_DIR/$STAGING_SLUG/"');
+    // The copy names the preview directory; either form is accepted, because
+    // this runs against the folio-assistant workflow as it is on main, which
+    // moves from `STAGING/` to `$PREVIEW_DIR` (branches/) in its own PR.
+    const copy = Math.max(
+      body.indexOf('cp -R _site/. "pages/$PREVIEW_DIR/$STAGING_SLUG/"'),
+      body.indexOf('cp -R _site/. "pages/STAGING/$STAGING_SLUG/"'),
+    );
     const push = body.indexOf("git -C pages push origin gh-pages");
     expect([reset, gate, copy, push].every((i) => i > -1)).toBe(true);
     expect(gate).toBeGreaterThan(reset);
