@@ -15,6 +15,9 @@ import { dirname, join } from "node:path";
 import { readJourneyCorpus } from "../journeys/read.ts";
 import { bpmnFigure, orderByFollows, renderJourneyPages, stepAnchor, type PageFile } from "../journeys/render.ts";
 import { journeyFiles, journeysRoute } from "../gen-journeys-viz.ts";
+import { chapterRoots, countryTones, countWord, personaText, presentationOf, rangeLabel, rungOf, shortTitle, viewBoxWidth } from "../journeys/present.ts";
+import { NAVBAR_LINKED } from "../lib/harness-rail.ts";
+import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { clearDeclaredVisualisers, renderedByOf } from "../viewer-declarations.ts";
 
 const REPO = mkdtempSync(join(tmpdir(), "journeys-viz-"));
@@ -180,6 +183,20 @@ put("top/workshops/policy.json", {
   assessment: { scales: [{ id: "status", label: "Where we stand", options: [{ id: "yes", label: "Exists" }, { id: "no", label: "Absent" }] }] },
   sheets: [{ id: "s1", label: "Sheet 1", title: "Our journey", modules: ["M1"], assessmentStrip: true }],
   resources: [{ id: "card", title: "Facilitator card", kind: "job-aid", body: "1. Ask.", steps: ["p2-treated#P2"], modules: ["M1"] }],
+  presentation: {
+    name: "PilgrimLink",
+    badge: "Interactive Spec",
+    occasion: "Fixture vignette",
+    scope: "here ⇄ there",
+    story: "Ana is checked at home and treated abroad.",
+    recordOf: "ana",
+    presenterNote: "Lead with people.",
+    about: { title: "This walkthrough is the demo of an IG" },
+    links: [
+      { label: "The IG", href: "https://example.org/ig/", frame: "FHIR IG" },
+      { label: "Journeys", href: "https://example.org/ig/journeys.html" },
+    ],
+  },
 });
 clearDeclaredVisualisers();
 
@@ -320,6 +337,113 @@ describe("the workshop layer", () => {
     expect((sheets.match(/class="jv-sheet /g) ?? []).length).toBe(1);
     expect(sheets).toContain('class="jv-strip"');
     expect(sheets).toContain("A viewer");
+  });
+});
+
+describe("the presentation pages: a workshop told in a room, with no site chrome", () => {
+  const base = "top/workshops/policy";
+  const overview = at(`${base}/overview/index.html`);
+  const p1 = at(`${base}/walkthrough/P1/index.html`);
+  const p2 = at(`${base}/walkthrough/P2/index.html`);
+  test("an overview and one page per step, in the workshop's teaching order", () => {
+    expect(files.filter((f) => f.path.startsWith(`${base}/walkthrough/`)).map((f) => f.path)).toEqual([`${base}/walkthrough/P1/index.html`, `${base}/walkthrough/P2/index.html`]);
+    expect(files.some((f) => f.path === "assets/present.css")).toBe(true);
+    expect(files.some((f) => f.path === "assets/present.js")).toBe(true);
+  });
+  test("they decline the harness rail and draw their own frame from the workshop's presentation", () => {
+    for (const page of [overview, p1, p2]) {
+      expect(page).toContain(NAVBAR_OPT_OUT);
+      expect(page).not.toContain(NAVBAR_LINKED);
+      expect(page).toContain('<span class="jp-name">PilgrimLink</span>');
+      expect(page).toContain("P1 → P2 (here ⇄ there)");
+      expect(renderedByOf(page)).toBe("journeys-viewer");
+    }
+    expect(overview).toContain('href="https://example.org/ig/" target="_blank" rel="noopener noreferrer"><svg');
+    expect(overview).toContain("<span>FHIR IG</span>");
+  });
+  test("the overview: the story, a card per chapter opening its first step, the cast, the ladder", () => {
+    expect(overview).toContain("Ana is checked at home and treated abroad.");
+    expect(overview).toContain("Two moments that matter");
+    expect(overview).toContain('<a class="jp-card jp-moment" href="../walkthrough/P1/">');
+    expect(overview).toContain('<span class="jp-moment-title">Checked</span>');
+    expect(overview).toContain("Appears in 2 of 2 steps");
+    expect(overview).toContain('<a href="../walkthrough/P2/">P2</a>');
+    expect(overview).toContain("Lead with people.");
+  });
+  test("a step: prev and next for the keys, the last one going on to the discussion", () => {
+    expect(p1).toContain('<link rel="prev" href="../../overview/"><link rel="next" href="../P2/">');
+    expect(p2).toContain('<link rel="prev" href="../P1/">');
+    expect(p2).toContain("<span>Discuss</span>");
+  });
+  test("a step: its record on the ladder, whose record it is, and that it moved up", () => {
+    expect(p2).toContain("Ana’s record");
+    expect(p2).toContain('<div class="jp-state">Shared</div>');
+    expect(p2).toContain("▲ Moved up");
+  });
+  test("a step: the room's question, the questions by module, the tables it touches, the gap strip", () => {
+    expect(p2).toContain("Should the family be told?");
+    expect(p2).toContain('<a class="jp-mod" href="../../m1/"');
+    expect(p2).toContain("Trust anchor ★");
+    expect(p2).toContain("— a signature crosses");
+    expect(p2).toContain('name="policy:viewer:status"');
+  });
+  test("a step: the people, each with the avatar beside the name, and under the hood", () => {
+    expect(p2).toContain('class="jp-who" style="--c:#123456"');
+    expect(p2).toContain('<span class="jp-named">Ben (nurse)<span class="jp-av jp-av-sm"');
+    expect(p2).toContain('<b>Health wallet</b><span>shows the QR</span>');
+    expect(p2).toContain('data-element-id="Task_Read" data-jv-hl=""');
+    expect(p2).toContain('data-jp-hood');
+  });
+  test("the workshop page links to the presentation, and its discussion has an anchor", () => {
+    expect(at(`${base}/index.html`)).toContain('href="overview/"');
+  });
+});
+
+describe("presentation helpers", () => {
+  test("shortTitle drops a step code and its dash, and nothing else", () => {
+    expect(shortTitle("J1 — Born abroad")).toBe("Born abroad");
+    expect(shortTitle("J4.0 — Crossing back: one family")).toBe("Crossing back: one family");
+    expect(shortTitle("T — The whole trip")).toBe("The whole trip");
+    expect(shortTitle("P0 · Before the season")).toBe("Before the season");
+    expect(shortTitle("Born abroad")).toBe("Born abroad");
+    expect(shortTitle("Ministry of Health — the track")).toBe("Ministry of Health — the track");
+  });
+  test("chapterRoots: one level below what every taught journey shares", () => {
+    const j = (id: string) => corpus.journeys.find((x) => x.scenario.id === id)!;
+    // Both part of t-group: each is its own chapter.
+    expect(chapterRoots(corpus, [j("t1-away"), j("t2-home")]).map((x) => x.scenario.id)).toEqual(["t1-away", "t2-home"]);
+    // With a journey outside the group, the group is the chapter.
+    expect(chapterRoots(corpus, [j("p1-checked"), j("t1-away"), j("t2-home")]).map((x) => x.scenario.id)).toEqual(["p1-checked", "t-group", "t-group"]);
+  });
+  test("presentationOf: chapters, keys and the cast in order of first appearance", () => {
+    const p = presentationOf(corpus, corpus.workshops[0]!);
+    expect(p.chapters.map((c) => c.title)).toEqual(["Checked", "Treated"]);
+    expect(p.steps.map((s) => `${s.key}@${s.chapter}`)).toEqual(["P1@0", "P2@1"]);
+    expect(p.cast.map((c) => c.id)).toEqual(["ana", "ben"]);
+    expect(p.steps[1]!.ws?.askTheRoom).toBe("Should the family be told?");
+  });
+  test("personaText puts the avatar beside whole-word names, longest first, and escapes the rest", () => {
+    const people = [
+      { id: "a", name: "Anan", initials: "AN", color: "#000000" },
+      { id: "d", name: "Dr. Anan", initials: "DA", color: "#111111" },
+    ];
+    const out = personaText("Dr. Anan meets Ananda <b>", people);
+    expect(out).toContain('<span class="jp-named">Dr. Anan<span class="jp-av jp-av-sm" style="--c:#111111"');
+    expect(out).not.toContain(">Anan<span");
+    expect(out).toContain("Ananda &lt;b&gt;");
+  });
+  test("small ones", () => {
+    expect(countWord(4)).toBe("Four");
+    expect(countWord(40)).toBe("40");
+    expect(rangeLabel([{ step: { id: "J1" } }, { step: { id: "J4.1" } }], "A ⇄ B")).toBe("J1 → J4.1 (A ⇄ B)");
+    expect(rangeLabel([{ step: { id: "J1" } }])).toBe("J1");
+    expect([...countryTones(["Thailand", "Lao PDR", "Thailand", undefined, "Cross-Border"])]).toEqual([["Thailand", "amber"], ["Lao PDR", "sky"], ["Cross-Border", "indigo"]]);
+    const ladder = [{ code: "a", label: "A" }, { code: "b", label: "B" }];
+    expect(rungOf(ladder, { record: { state: "b" } } as never)).toBe(1);
+    expect(rungOf(ladder, {} as never)).toBe(-1);
+    expect(viewBoxWidth('<svg width="100%" viewBox="95 55 1580 690">')).toBe(1580);
+    expect(viewBoxWidth('<svg width="640px">')).toBe(640);
+    expect(viewBoxWidth("<g/>")).toBeUndefined();
   });
 });
 

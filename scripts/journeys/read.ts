@@ -137,6 +137,8 @@ export interface JourneyCorpus {
   blocks: Map<string, { layers: BuildingBlocks["layers"]; blocks: Map<string, BuildingBlock> }>;
   /** Per instance: its code lists (trust ladders), by id. */
   ladders: Map<string, Map<string, { code: string; label: string; definition?: string }[]>>;
+  /** Per instance: each code list's title and description, by id. */
+  ladderInfo: Map<string, Map<string, { title?: string; description?: string }>>;
   /** Requirement ids, upper-cased without `req:`, across the checkout. */
   requirements: Map<string, Requirement>;
   /** `Type/id` across the checkout's artifact indexes. */
@@ -206,6 +208,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
     stories: new Map(),
     blocks: new Map(),
     ladders: new Map(),
+    ladderInfo: new Map(),
     requirements: new Map(),
     examples: new Map(),
     examplesUnbuilt: [],
@@ -254,6 +257,10 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
             const into = corpus.ladders.get(instance) ?? new Map();
             into.set(raw.id, raw.codes as { code: string; label: string; definition?: string }[]);
             corpus.ladders.set(instance, into);
+            const info = corpus.ladderInfo.get(instance) ?? new Map();
+            const r = raw as { title?: unknown; description?: unknown };
+            info.set(raw.id, { ...(typeof r.title === "string" ? { title: r.title } : {}), ...(typeof r.description === "string" ? { description: r.description } : {}) });
+            corpus.ladderInfo.set(instance, info);
           } else if (kinds.includes(WORKSHOP_KIND) && tag === WORKSHOP_V01) {
             seenFiles.add(p);
             corpus.workshops.push({ instance, file: rel(p), dir: dirname(p), workshop: parseWorkshop(raw, rel(p)) });
