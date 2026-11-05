@@ -2,6 +2,13 @@
 /**
  * The CHANGES page of a staging preview: `STAGING/<slug>/changes/`.
  *
+ * Owner, 2026-10-14: *"when we have a STAGING preview branch, we need a new
+ * visualizer endpoint that at least in an index.html lists all of the changed
+ * assets in the repo and, where known, downstream changed/derivative assets in
+ * its dependency cone ... it should also check difference between gh-pages
+ * root and the STAGING/<BRANCH> dirs in a list of its changes (QA check - some
+ * were not in the dependency cone)"*.
+ *
  * Three lists, each from a tool that already answers it; this file computes
  * none of them anew except the first one's mount expansion and the folding
  * the third needs:
@@ -14,20 +21,22 @@
  *
  * ## Why a re-pin has to be expanded
  *
- * A change to a mounted instance reaches this site as a one-line edit to
- * `index.lock.json`, which predicts nothing on its own. So each mount whose
- * commit moved is diffed in its OWN repository between the two pins, and each
- * changed file is mapped through the lock's `directories` to the path it is
- * mounted at. A pin that cannot be diffed is said, never dropped.
+ * A change to a mounted instance (a content layer, say) reaches this site as a
+ * one-line edit to `index.lock.json`. Handed to a renderer as it is, that
+ * predicts nothing, and the reviewer is shown one JSON file. So each mount
+ * whose commit moved is diffed in its OWN repository between the two pins,
+ * and each changed file is mapped through the lock's `directories` to the
+ * path it is mounted at. A pin that cannot be diffed is said, never dropped.
  *
  * ## Why the QA diff compares the page BODY, with the base folded
  *
  * A preview is built under `/<repo>/STAGING/<slug>/` and main under `/<repo>/`,
- * and each stamps its own build into the chrome, so byte for byte every page
- * differs. In text files the preview's base is folded to main's, the
- * `BUILD_STAMPS` are blanked, and an HTML page is compared by its `<main>`
- * element when it has one. The page states this rule, because a difference
- * outside `<main>` is not reported.
+ * and each stamps its own build into the chrome. Compared byte for byte every
+ * page differs, and the QA list would name all of them. So, in text files,
+ * the preview's base is folded to main's, the `BUILD_STAMPS` are blanked, and
+ * an HTML page is compared by its `<main>` element when it has one: the
+ * content a reader reviews, not the navigation every page repeats. The page
+ * states this rule, because a difference outside `<main>` is not reported.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/staging-changes.ts expand \
@@ -48,6 +57,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
+import { PREVIEW_PREFIX_ALT } from "./lib/preview-prefix.ts";
 
 import {
   BUILD_STAMPS,
@@ -364,7 +374,7 @@ export function predictByProvenance(sources: Sources, index: ReadonlyMap<string,
 // ─── 3. The QA check: the preview against the gh-pages root ────────────────
 
 /** Never compared: other previews, the render log, git's own files. */
-export const PUBLISH_ROOT_OTHERS = /^(STAGING|_render-log|\.git)(\/|$)/;
+export const PUBLISH_ROOT_OTHERS = new RegExp(`^(${PREVIEW_PREFIX_ALT}|_render-log|\\.git)(/|$)`);
 /** The staging job's own files beside a preview, which main's publish never writes. */
 export const PREVIEW_ARTEFACTS =
   /^(changes\/.*|changeset\.json|changeset-text\.json|rendered-impact\.json|rendered-measured\.json|blocks\.json|block-qa\.json|review-comments\.json|visual-diff\.json|visual\/.*|\.staged-at|staging-preview\.json)$/;

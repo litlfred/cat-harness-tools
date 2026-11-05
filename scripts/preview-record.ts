@@ -13,9 +13,15 @@
  * bun run cat-harness-tools/scripts/preview-record.ts compare --claimed <file> --rebuilt <file> [--slug <slug>] [--run <url>] [--out <file>]
  * ```
  *
- * An agent session may build a PREVIEW itself and put it live at once (main
- * and release stay CI-built); CI then checks it by a FULL rebuild, off the
- * critical path, compared through these records.
+ * ## Why (owner, 2026-11-01, Q-SPD-9 B and Q-SPD-9b A; folio-assistant#2881)
+ *
+ * An agent's session has the checkout and the tools in hand, so it can build
+ * a preview itself and put it live at once, instead of waiting 25 to 50
+ * minutes for a runner. The owner chose that for PREVIEWS ONLY (main and
+ * release stay CI-built), checked by a FULL rebuild in CI afterwards, off the
+ * critical path, rather than by a random sample: *"why random sample? what is
+ * the intent?"*. A full rebuild is a complete check, with nothing left to
+ * chance.
  *
  * ## What a record holds
  *
@@ -23,8 +29,9 @@
  *   the branch merged into its base, and a clean merge of the same two commits
  *   gives the same tree, so this is the one exact identity of "the same
  *   input". The head and base commits are kept beside it to rebuild from.
- * - `lock`: the sha256 of `index.lock.json` (the tree already covers it; the
- *   field makes a mismatch readable).
+ * - `lock`: the sha256 of `index.lock.json`, so a re-pin is a different input
+ *   even when someone hand-edits around it. (The tree already covers it; the
+ *   field makes a mismatch readable.)
  * - `files`: every file of the built site, path to sha256, before
  *   `staging-share` prunes it. HTML is hashed after the per-preview edits
  *   are set aside ({@link normalisePreviewHtml}), so the record says the same
@@ -40,7 +47,8 @@
  *
  * Any other difference counts. When a writer turns out to stamp a time or a
  * run into its output, the fix is to make that writer reproducible, not to
- * add its file here.
+ * add its file here: a file left out of the check is a file an agent build
+ * could get wrong unseen.
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -48,6 +56,7 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "
 import { join, relative, resolve } from "node:path";
 
 import { normalisePreviewHtml } from "./staging-share.ts";
+import { previewPath } from "./lib/preview-prefix.ts";
 
 /** The record's own file name, at the preview root. */
 export const RECORD_FILE = "_build-record.json";
@@ -214,10 +223,10 @@ export function comparisonText(c: Comparison, o: { slug: string; run?: string; l
   const limit = o.limit ?? 20;
   const head = "<!-- preview-build-verify -->\n";
   const run = o.run ? `\n\nCI run: ${o.run}` : "";
-  if (c.incomparable) return `${head}**Agent-built preview was stale:** ${c.incomparable}, so the base or the branch moved after the agent built it. CI's build of the current tree replaced \`STAGING/${o.slug}/\`. The agent build was not judged.${run}\n`;
-  if (c.same) return `${head}**Agent-built preview verified.** A full CI rebuild of the same tree produced the same files. \`STAGING/${o.slug}/\` stays as the agent built it.${run}\n`;
+  if (c.incomparable) return `${head}**Agent-built preview was stale:** ${c.incomparable}, so the base or the branch moved after the agent built it. CI's build of the current tree replaced \`${previewPath(o.slug)}/\`. The agent build was not judged.${run}\n`;
+  if (c.same) return `${head}**Agent-built preview verified.** A full CI rebuild of the same tree produced the same files. \`${previewPath(o.slug)}/\` stays as the agent built it.${run}\n`;
   const list = (title: string, ps: string[]) => (ps.length === 0 ? "" : `\n\n${title} (${ps.length}):\n${ps.slice(0, limit).map((p) => `- \`${p}\``).join("\n")}${ps.length > limit ? `\n- … and ${ps.length - limit} more` : ""}`);
-  return `${head}**Agent-built preview differed from CI's rebuild, so CI's build replaced it.** \`STAGING/${o.slug}/\` now shows the CI build.`
+  return `${head}**Agent-built preview differed from CI's rebuild, so CI's build replaced it.** \`${previewPath(o.slug)}/\` now shows the CI build.`
     + list("Changed", c.changed) + list("Only in the agent build", c.onlyClaimed) + list("Only in the CI build", c.onlyRebuilt)
     + `\n\nA difference in a file that should not change between builds (a time, a run link) means its writer is not reproducible yet: fix the writer, not this check.${run}\n`;
 }

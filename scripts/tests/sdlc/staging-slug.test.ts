@@ -185,7 +185,9 @@ describe("GUARD 3 — the workflow checks the VALUE, in every job that builds a 
   test("every `rm -rf` on a slug is in a job whose slug was checked", () => {
     // The structural claim the bean asks for: no `rm -rf "STAGING/$X"` exists
     // in a job that did not first refuse an unsafe X.
-    const rms = yml.match(/rm -rf (?:-- )?"?(?:pages\/)?STAGING\/\$\w+"?/g) ?? [];
+    // The preview directory is a variable since previews moved to `branches/`
+    // (`$PREVIEW_DIR`, or `$PD` for a legacy `STAGING/` one); a literal is still matched.
+    const rms = yml.match(/rm -rf (?:-- )?"?(?:pages\/)?(?:STAGING|branches|\$PREVIEW_DIR|\$PD)\/\$\w+"?/g) ?? [];
     expect(rms.length).toBeGreaterThan(0);
     const guardCount = (yml.match(/""\|\.\|\.\.(?:\|_retired)?\)/g) ?? []).length;
     expect(guardCount).toBeGreaterThanOrEqual(rms.length);

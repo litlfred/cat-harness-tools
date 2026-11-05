@@ -57,6 +57,7 @@ import {
   type BranchEvidence,
   type BranchEvidenceSet,
 } from "./checks.ts";
+import { PREVIEW_PREFIX } from "../../schemas/sdlc/preview-prefix.ts";
 import type {
   PagesServingEvidence,
   RemoteMountEvidence,
@@ -75,7 +76,7 @@ import type {
 } from "./checks.ts";
 
 /** Where the review previews live on the publish branch. Same constant as `restore-staging.ts`. */
-export const STAGING_PREFIX = "STAGING";
+export const STAGING_PREFIX = PREVIEW_PREFIX;
 
 interface Ran {
   code: number;

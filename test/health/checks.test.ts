@@ -306,7 +306,7 @@ describe("staging-preview-orphans", () => {
     }));
     expect(r.state).toBe("finding");
     expect(r.findings.map((f) => f.summary)).toEqual([
-      expect.stringContaining("STAGING/claude-merged-last-week"),
+      expect.stringContaining("branches/claude-merged-last-week"),
     ]);
     expect(r.findings[0].severity).toBe("minor");
     expect(r.findings[0].action).toContain("Ask the owner");
@@ -529,7 +529,7 @@ describe("staging-preview-orphans — liveness", () => {
     );
     expect(r.state).toBe("finding");
     expect(r.findings.map((f) => f.summary)).toEqual([
-      expect.stringContaining("STAGING/claude-merged-last-week"),
+      expect.stringContaining("branches/claude-merged-last-week"),
     ]);
     // The evidence travels with the name, so a reader can see WHICH signals were silent.
     expect(r.findings[0].summary).toContain("no open pull request");
@@ -544,7 +544,7 @@ describe("staging-preview-orphans — liveness", () => {
     // failure to look.
     const r = stagingOrphanCheck(withPreview("claude-branch-gone", [], branchSet({ candidates: [] })));
     expect(r.state).toBe("finding");
-    expect(r.findings[0].summary).toContain("STAGING/claude-branch-gone");
+    expect(r.findings[0].summary).toContain("branches/claude-branch-gone");
     expect(r.findings[0].summary).toContain("no branch on the remote slugifies to it");
   });
 
@@ -572,7 +572,7 @@ describe("staging-preview-orphans — liveness", () => {
       );
       expect(r.state).toBe("unknown");
       expect(r.findings).toEqual([]);
-      expect(r.reason).toContain("STAGING/claude-unreadable");
+      expect(r.reason).toContain("branches/claude-unreadable");
       expect(r.reason).toContain("bad object");
     });
 
@@ -588,7 +588,7 @@ describe("staging-preview-orphans — liveness", () => {
       );
       expect(r.state).toBe("unknown");
       expect(r.findings).toEqual([]);
-      expect(r.reason).toContain("STAGING/claude-clearly-dead");
+      expect(r.reason).toContain("branches/claude-clearly-dead");
       expect(r.reason).toContain("Determined but NOT reported");
     });
 

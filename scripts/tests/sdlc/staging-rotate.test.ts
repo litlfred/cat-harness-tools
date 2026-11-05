@@ -47,7 +47,7 @@ function p(slug: string, hoursAgo: number | undefined, bytes = 100): Preview {
 function pages(previews: [string, number | undefined][]): string {
   const dir = mkdtempSync(join(tmpdir(), "staging-rotate-"));
   for (const [slug, h] of previews) {
-    const d = join(dir, "STAGING", slug);
+    const d = join(dir, "branches", slug);
     mkdirSync(d, { recursive: true });
     // 100 bytes each, so a budget of N x 100 holds N previews. The stamp
     // written below adds its own bytes, which is why budgets here leave room.
@@ -57,7 +57,7 @@ function pages(previews: [string, number | undefined][]): string {
   return dir;
 }
 
-const remaining = (dir: string) => readdirSync(join(dir, "STAGING")).sort();
+const remaining = (dir: string) => readdirSync(join(dir, "branches")).sort();
 
 describe("the cap is the owner's number", () => {
   test("3 GB of previews in total, defined once", () => {
@@ -146,7 +146,7 @@ describe("rotate — on a checkout", () => {
     const { plan } = rotate({ dir, current: "cur", now: NOW, git: noGit });
     expect(plan.remove).toEqual([]);
     expect(remaining(dir)).toEqual(["a", "b", "cur"]);
-    expect(readFileSync(join(dir, "STAGING", "cur", STAGED_AT_FILE), "utf8").trim()).toBe(NOW);
+    expect(readFileSync(join(dir, "branches", "cur", STAGED_AT_FILE), "utf8").trim()).toBe(NOW);
   });
 
   test("over the budget, the oldest go, each with a render-log entry and a retired record", () => {
@@ -159,34 +159,34 @@ describe("rotate — on a checkout", () => {
       commit: "abc1234",
       builtAt: "2026-09-01T00:00:00Z",
     });
-    writeFileSync(join(dir, "STAGING", "p10", "staging-preview.json"), serializeStagingPreview(rec));
+    writeFileSync(join(dir, "branches", "p10", "staging-preview.json"), serializeStagingPreview(rec));
 
     const { plan, lines } = rotate({ dir, current: "cur", now: NOW, git: noGit, budget: 1300 });
     expect(plan.remove.map((x) => x.slug)).toEqual(["p09", "p10"]);
-    expect(existsSync(join(dir, "STAGING", "p09"))).toBe(false);
-    expect(existsSync(join(dir, "STAGING", "p10"))).toBe(false);
-    expect(existsSync(join(dir, "STAGING", "cur"))).toBe(true);
-    expect(lines[0]).toMatch(/rotated off STAGING\/p09: 10\.0h old/);
+    expect(existsSync(join(dir, "branches", "p09"))).toBe(false);
+    expect(existsSync(join(dir, "branches", "p10"))).toBe(false);
+    expect(existsSync(join(dir, "branches", "cur"))).toBe(true);
+    expect(lines[0]).toMatch(/rotated off branches\/p09: 10\.0h old/);
 
-    const retired = readStagingPreview(readFileSync(join(dir, "STAGING", "_retired", "p10.json"), "utf8")).node;
+    const retired = readStagingPreview(readFileSync(join(dir, "branches", "_retired", "p10.json"), "utf8")).node;
     expect(retired?.staging.retiredOn).toBe(NOW);
     expect(retired?.staging.retiredReason).toContain("#1868");
 
     const log = readFileSync(join(dir, "_render-log", "2026-10-02.jsonl"), "utf8").trim().split("\n");
-    expect(log.map((l) => JSON.parse(l).subject.path).sort()).toEqual(["STAGING/p09", "STAGING/p10"]);
+    expect(log.map((l) => JSON.parse(l).subject.path).sort()).toEqual(["branches/p09", "branches/p10"]);
     expect(log.every((l) => JSON.parse(l).event === "removed")).toBe(true);
   });
 
   test("_retired and non-preview entries are untouched, and do not count toward the budget", () => {
     const dir = pages([["cur", undefined], ["a", 1], ["b", 2]]);
-    mkdirSync(join(dir, "STAGING", "_retired"), { recursive: true });
-    writeFileSync(join(dir, "STAGING", "_retired", "old.json"), "{}");
-    writeFileSync(join(dir, "STAGING", "README.txt"), "not a preview");
-    mkdirSync(join(dir, "STAGING", ".hidden"));
+    mkdirSync(join(dir, "branches", "_retired"), { recursive: true });
+    writeFileSync(join(dir, "branches", "_retired", "old.json"), "{}");
+    writeFileSync(join(dir, "branches", "README.txt"), "not a preview");
+    mkdirSync(join(dir, "branches", ".hidden"));
     const { plan } = rotate({ dir, current: "cur", now: NOW, git: noGit, budget: 300 });
     expect(plan.remove.map((x) => x.slug)).toEqual(["b"]);
     expect(remaining(dir)).toEqual([".hidden", "README.txt", "_retired", "a", "cur"]);
-    expect(readFileSync(join(dir, "STAGING", "_retired", "old.json"), "utf8")).toBe("{}");
+    expect(readFileSync(join(dir, "branches", "_retired", "old.json"), "utf8")).toBe("{}");
   });
 
   test("a missing stamp falls back: render log, then record, then git", () => {
@@ -199,19 +199,19 @@ describe("rotate — on a checkout", () => {
         id: "x",
         at: "2026-10-01T12:00:00.000Z",
         event: "rendered",
-        subject: { kind: "staging-preview", path: "STAGING/logged", slug: "logged" },
+        subject: { kind: "staging-preview", path: "branches/logged", slug: "logged" },
         summary: "staging preview published",
         process: "Process_RenderLog",
         capture: "on",
       }) + "\n",
     );
     writeFileSync(
-      join(dir, "STAGING", "recorded", "staging-preview.json"),
+      join(dir, "branches", "recorded", "staging-preview.json"),
       serializeStagingPreview(
         createStagingPreview({ slug: "recorded", branch: "b", commit: "c", builtAt: "2026-09-25T00:00:00Z" }),
       ),
     );
-    const git: GitTime = (_d, path) => (path === "STAGING/gitonly" ? Date.parse("2026-09-01T00:00:00Z") : undefined);
+    const git: GitTime = (_d, path) => (path === "branches/gitonly" ? Date.parse("2026-09-01T00:00:00Z") : undefined);
 
     const byslug = Object.fromEntries(readPreviews(dir, git).map((x) => [x.slug, x]));
     expect(byslug.logged.source).toBe("render-log");

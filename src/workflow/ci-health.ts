@@ -1103,9 +1103,9 @@ export interface DeployCommit {
  * report, to guard a case the ordering already handles.
  */
 export function slugOfDeployCommit(message: string): string | undefined {
-  const removed = /^staging\(cleanup\): \w+ STAGING\/(\S+)/m.exec(message);
+  const removed = /^staging\(cleanup\): \w+ (?:branches|STAGING)\/(\S+)/m.exec(message);
   if (removed) return removed[1];
-  const logged = /^render-log: \w+ STAGING\/(\S+)/m.exec(message);
+  const logged = /^render-log: \w+ (?:branches|STAGING)\/(\S+)/m.exec(message);
   if (logged) return logged[1];
   const staged = /^staging\(([^)]+)\):/m.exec(message);
   if (staged) return staged[1];

@@ -83,7 +83,7 @@ describe("inputs", () => {
   });
 
   test("STAGING is excluded and named previews added back", () => {
-    expect(sparsePatterns(["claude-x"])).toEqual(["/*", "!/STAGING/", "/STAGING/claude-x/"]);
+    expect(sparsePatterns(["claude-x"])).toEqual(["/*", "!/branches/", "!/STAGING/", "/branches/claude-x/", "/STAGING/claude-x/"]);
     expect(() => sparsePatterns(["../x"])).toThrow();
   });
 

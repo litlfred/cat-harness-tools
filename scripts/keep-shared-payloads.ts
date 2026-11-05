@@ -13,12 +13,15 @@
  *
  * ## Why
  *
- * A preview (`staging-share.ts`) stores only what differs from the live site
- * and borrows the rest. A main deploy is a FULL REPLACE
+ * Since `staging-share.ts` a preview stores only what differs from the live
+ * site and borrows the rest. A main deploy is a FULL REPLACE
  * (`publish-gh-pages.sh`), and payloads under `payload/sha256/` are named by
- * their hash, so a blob the new build no longer writes would be gone and a
- * preview that borrowed it would 404. Previews never copy main's files, so
- * main keeps the dropped blob for as long as an older sharing preview stands.
+ * their hash, so a blob the new build no longer writes is simply gone. A
+ * preview staged before that deploy, which borrowed the blob, then gets a 404
+ * for it. Keeping a copy in every preview would break the owner's ruling
+ * (2026-10-31, "link to main asset so no file content duplication"), so main
+ * keeps the dropped blob instead, for as long as an older sharing preview
+ * stands (bean fwtz, Q-S2-2).
  *
  * ## The rule
  *
@@ -32,6 +35,7 @@
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { PREVIEW_PREFIXES } from "./lib/preview-prefix.ts";
 
 /** Where content-addressed payloads live, relative to the site root. */
 export const PAYLOAD_DIR = "payload/sha256";
@@ -74,20 +78,22 @@ export function readRetained(root: string): Retained {
 
 /** When each preview under `site/STAGING/` that borrows from the live site was staged (`undefined`: not known). */
 export function sharingPreviews(site: string): (number | undefined)[] {
-  const staging = join(site, "STAGING");
-  if (!existsSync(staging)) return [];
   const out: (number | undefined)[] = [];
-  for (const slug of readdirSync(staging)) {
-    const dir = join(staging, slug);
-    if (slug.startsWith("_") || !statSync(dir).isDirectory() || !existsSync(join(dir, "shared.json"))) continue;
-    let at: number | undefined;
-    try {
-      const t = Date.parse(readFileSync(join(dir, ".staged-at"), "utf-8").trim());
-      at = Number.isNaN(t) ? undefined : t;
-    } catch {
-      at = undefined;
+  for (const prefix of PREVIEW_PREFIXES) {
+    const staging = join(site, prefix);
+    if (!existsSync(staging)) continue;
+    for (const slug of readdirSync(staging)) {
+      const dir = join(staging, slug);
+      if (slug.startsWith("_") || !statSync(dir).isDirectory() || !existsSync(join(dir, "shared.json"))) continue;
+      let at: number | undefined;
+      try {
+        const t = Date.parse(readFileSync(join(dir, ".staged-at"), "utf-8").trim());
+        at = Number.isNaN(t) ? undefined : t;
+      } catch {
+        at = undefined;
+      }
+      out.push(at);
     }
-    out.push(at);
   }
   return out;
 }

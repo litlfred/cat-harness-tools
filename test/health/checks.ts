@@ -50,6 +50,7 @@ import type {
   PagesServingObservation,
 } from "../../schemas/sdlc/health-report.ts";
 import { isPreviewName, MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
+import { PREVIEW_PREFIX } from "../../schemas/sdlc/preview-prefix.ts";
 import {
   EXPIRY_BASIS,
   EXPIRY_URGENT_DAYS,
@@ -1001,7 +1002,7 @@ export function stagingOrphanCheck(ctx: HealthContext): HealthCheckResult {
   if (blind.length > 0) {
     const determined =
       orphans.length > 0
-        ? `Determined but NOT reported this run: ${orphans.map((j) => `\`STAGING/${j.preview.slug}\``).join(", ")} — ` +
+        ? `Determined but NOT reported this run: ${orphans.map((j) => `\`${PREVIEW_PREFIX}/${j.preview.slug}\``).join(", ")} — ` +
           "named here so the measurement is not lost, but nothing should be acted on while a signal is unreadable."
         : "No other preview was determined to be an orphan this run.";
     return unknownResult(
@@ -1009,7 +1010,7 @@ export function stagingOrphanCheck(ctx: HealthContext): HealthCheckResult {
       summary,
       ORPHAN_THRESHOLDS,
       `${blind.length} preview(s) could not be judged: ` +
-        `${blind.map((j) => `\`STAGING/${j.preview.slug}\` — ${j.liveness.undetermined}`).join("; ")}. ` +
+        `${blind.map((j) => `\`${PREVIEW_PREFIX}/${j.preview.slug}\` — ${j.liveness.undetermined}`).join("; ")}. ` +
         "A signal that cannot be evaluated sends that preview to `unknown`, never to the orphan list. " +
         determined,
     );
@@ -1036,7 +1037,7 @@ export function stagingOrphanCheck(ctx: HealthContext): HealthCheckResult {
   const findings: HealthFinding[] = orphans.map((j) => ({
     severity: "minor" as const,
     summary:
-      `\`STAGING/${j.preview.slug}\` (${formatBytes(j.preview.bytes)}, ${j.preview.files} files) — ` +
+      `\`${PREVIEW_PREFIX}/${j.preview.slug}\` (${formatBytes(j.preview.bytes)}, ${j.preview.files} files) — ` +
       `${j.liveness.evidence}.`,
     // THE LABEL CANNOT REACH AN ORPHAN, so it is not offered here — bean
     // `7umv`. `feature-staging.yml` says why, in its own words: `cleanup`

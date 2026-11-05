@@ -27,6 +27,8 @@
 
 import { z } from "zod";
 
+import { previewPath } from "./preview-prefix.ts";
+
 // ── Types ───────────────────────────────────────────────────────
 
 /**
@@ -118,7 +120,7 @@ export function branchToSlug(branch: string): string {
  */
 export function stagingBaseUrl(owner: string, repo: string, branch: string): string {
   const slug = branchToSlug(branch);
-  return `https://${owner}.github.io/${repo}/STAGING/${slug}`;
+  return `https://${owner}.github.io/${repo}/${previewPath(slug)}`;
 }
 
 /**

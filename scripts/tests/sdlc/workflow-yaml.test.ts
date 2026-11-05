@@ -195,7 +195,7 @@ describe("gh-pages full-replace vs the STAGING previews", () => {
     const found = ghPagesWipesStaging(wipes, "w.yml");
     expect(found.length).toBe(1);
     expect(found[0].kind).toBe("gh-pages-wipes-staging");
-    expect(found[0].detail).toContain("STAGING/");
+    expect(found[0].detail).toContain("branches/");
   });
 
   test("a restore step in front of the push clears it", () => {
@@ -277,7 +277,7 @@ describe("every path that publishes or removes a preview also LOGS it", () => {
     // establishes it.
     for (const job of ["stage", "cleanup", "cleanup-dispatch"]) {
       const runs = runsOf(job);
-      expect(runs).toMatch(/git (?:-C pages )?add -A "STAGING\/\$\w+" _render-log/);
+      expect(runs).toMatch(/git (?:-C pages )?add -A "(?:STAGING|branches|\$\w+)\/\$\w+" _render-log/);
     }
   });
 

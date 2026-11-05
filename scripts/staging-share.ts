@@ -13,8 +13,14 @@
  * bun run cat-harness-tools/scripts/staging-share.ts write-404 --site _site
  * ```
  *
- * A full-copy preview duplicates most of the live site, and every copy is
- * checked out, pushed, and uploaded by every Pages deploy.
+ * ## Why (owner, 2026-10-31)
+ *
+ * *"if asset not changed in staging then link to main asset so no file
+ * content duplication."* Every preview was a full copy of the site: about
+ * 33,000 files, of which 19,260 were the same as the live site's once the
+ * per-preview edits were set aside (measured on `gh-pages` that day, the
+ * content-change-review preview). Every copy is checked out, pushed, and
+ * uploaded by every Pages deploy, the main site's included.
  *
  * ## What counts as the same
  *
@@ -22,14 +28,15 @@
  * edits a preview makes to EVERY page are set aside on both sides, and only
  * those, each named in {@link normalisePreviewHtml}:
  *
- * - the staging banner fragment ({@link FRAGMENT}, constant);
+ * - the staging banner fragment ({@link FRAGMENT}, constant by bean `g196`);
  * - the SEO identity claims a preview strips (`stripSeo`), stripped from the
  *   live page too;
  * - the `fa-staging` and `fa-search-index` meta values;
  * - TypeDoc's ` (staging: <slug>)` title suffix.
  *
- * A difference anywhere else keeps the preview's own copy: a page that reads
- * differently is never served from the live site.
+ * A difference anywhere else keeps the preview's own copy. Nothing is
+ * shared on a guess: a page that reads differently is never served from the
+ * live site.
  *
  * ## How a shared file is served
  *
@@ -54,6 +61,7 @@ import { join, relative } from "node:path";
 import { FRAGMENT } from "./staging-banner.ts";
 import { stripSeo } from "./strip-preview-seo.ts";
 import { readRetained } from "./keep-shared-payloads.ts";
+import { isPreviewPath } from "./lib/preview-prefix.ts";
 
 /**
  * Files a preview always keeps: they describe this preview, or serve it. The
@@ -115,7 +123,7 @@ export function planShare(root: string, preview: string, slug: string): SharePla
   const retained = new Set(Object.keys(readRetained(root).kept));
   for (const rel of filesUnder(preview)) {
     const live = join(root, rel);
-    if (rel.startsWith("STAGING/") || retained.has(rel) || !existsSync(live) || !statSync(live).isFile()) { kept++; continue; }
+    if (isPreviewPath(rel) || retained.has(rel) || !existsSync(live) || !statSync(live).isFile()) { kept++; continue; }
     const p = readFileSync(join(preview, rel));
     if (sameAsLive(rel, p, readFileSync(live), slug)) { shared.push(rel); bytesShared += p.length; }
     else kept++;

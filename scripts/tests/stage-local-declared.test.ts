@@ -83,12 +83,12 @@ describe("stageDeclared --plan", () => {
     expect(lines.join("\n")).toContain("site:node-kinds");
   });
 
-  test("another branch plans a STAGING/ preview", async () => {
+  test("another branch plans a branches/ preview", async () => {
     const d = checkout({ site: { build: RECIPE } });
     gitRepo(d, "main");
     const r = await stageDeclared({ repo: d, branch: "claude/x", plan: true, log: () => {} }, { instance: "demo", recipe: RECIPE });
     expect(r.target).toBe("preview");
-    expect(r.url).toBe("https://o.github.io/demo/STAGING/claude-x/");
+    expect(r.url).toBe("https://o.github.io/demo/branches/claude-x/");
   });
 
   test("--artifact is refused rather than ignored", async () => {

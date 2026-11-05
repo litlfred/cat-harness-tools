@@ -2,8 +2,7 @@
 /**
  * stage-local — the ONE agent publish path: build a folio's or an IG's site in
  * the agent's own checkout and push it to the publish branch, as a preview
- * or as the main site, without an Actions runner (and so without waiting for
- * one).
+ * or as the main site, without an Actions runner.
  *
  * @module scripts/stage-local
  * @covers none — a PUBLISHER, not an audit: it builds and deploys one preview and judges nothing
@@ -12,13 +11,15 @@
  * bun run cat-harness-tools/scripts/stage-local.ts --repo ../<repository> [--branch B] [--plan | --dry-run | --artifact DIR]
  * ```
  *
- * ## One command, every agent-run publish
+ * ## One command, every agent-run publish (owner, 2026-10-10)
  *
- * A repository is AGENT-RUN when it declares so in its own
- * `index.config.json`, `"site": { "agentRun": true }` ({@link agentRunOf}).
- * Its publish workflows are then dispatch-only documentation of what this
- * path must match, never dispatched by an agent, and every plan says whether
- * the repository declares it. This file keeps no list of them.
+ * The owner, asking on 2026-10-10 about the IG repositories then publishing
+ * by hand: *"i want one consolidated worfklow."* A repository is AGENT-RUN
+ * when it declares so in its own `index.config.json`, `"site": { "agentRun":
+ * true }` (owner, 2026-10-14, Q7: "Yes, declare it"; {@link agentRunOf}).
+ * Its publish workflows are dispatch-only, documentation of what this path
+ * must match and never something an agent dispatches, and every plan says
+ * whether the repository declares it. This file keeps no list of them. So:
  *
  * - **a declared site first**: a repository whose instance config (its
  *   `index.config.json` entry; a legacy `<instance>.config.json` is a reported fallback)
@@ -27,9 +28,12 @@
  * - otherwise **which publisher** is read from the repository's own workflow files
  *   (`detectPublisher`, `site-publisher.ts`): a caller of `folio-staging.yml`
  *   is a folio, published here; a caller of a workflow another publisher
- *   declares is handed to THAT publisher's code, a mounted layer's declared
- *   `site-publisher-<kind>` pipeline slot. This layer names no publisher
- *   above it;
+ *   declares is handed to THAT publisher's code. A publisher other than the
+ *   folio's is a mounted layer's declared `site-publisher-<kind>` pipeline
+ *   slot (owner, 2026-10-14, Q4 of the folio-assistant#2529
+ *   reference-direction review: the FHIR-IG publish path moved to the layer
+ *   that owns IG builds). This layer names no publisher above it: what can
+ *   publish a repository is whatever that repository's mounts declare;
  * - **main site or preview** follows the branch ({@link chooseTarget}): the
  *   default branch publishes the main site at the root as `publish-main`
  *   does ({@link composeMain}: `publish-main-site.ts`, the `main-site`
@@ -38,38 +42,50 @@
  *   builds and composes the commit in a temporary publish-branch worktree
  *   without pushing.
  *
- * ## What it does NOT remove
+ * ## Why this exists
+ *
+ * Owner, 2026-10-07: *"do agent-triggered staging next"* — chosen over
+ * logging it, after a measurement. smart-ra's dispatch of `staging.yml` that
+ * morning (run 37584204273) waited **33 min** for a runner and then ran for
+ * 45 s. The agent that asked for it had the checkout, the platform and bun in
+ * hand the whole time.
+ *
+ * ## What it does NOT remove, and says so
  *
  * A push to the publish branch is deployed by GitHub's own `pages build and
- * deployment`, which is ALSO an Actions run, and the official URL is served
- * by Pages. So the output says the preview is live only once that deploy has
- * run.
+ * deployment`, which is ALSO an Actions run. The same morning that run took
+ * **47 min**, of which about a minute was work. Nothing here can skip it: the
+ * official URL is served by Pages, and Pages deploys on a runner. So this
+ * removes the first wait and not the second, and its output says the preview
+ * is live only once that deploy has run.
  *
  * ## A folio's preview: the same steps as the workflow, read from the folio
  *
  * The folio's own workflow (`staging.yml`) passes `build_command`,
  * `site_dir`, `folio_dir`, `platform_dir` and `publish_branch` to the
  * reusable `folio-staging.yml`. Those inputs are READ from that file, never
- * restated here. Then, in the workflow's order:
+ * restated here, so a folio that changes its build changes it once. Then, in
+ * the workflow's order:
  *
  * 1. the slug, by the workflow's rule ({@link slugOf}), refused when it names
- *    no single path segment;
+ *    no single path segment (bean `fuzm`);
  * 2. the folio's build command, run in the folio checkout;
  * 3. the rail, `rail-standalone-pages.ts`, with the workflow's arguments;
  * 4. the ChangeSet and the rendered impact against the base branch, so the
  *    review page has its data;
  * 5. the banner, `staging-banner.ts`, saying the preview was built locally;
- * 6. the push, held by `staging-push-gate.ts` exactly as the workflow is:
- *    a preview never lands while the main site's Pages build it would cancel
- *    is running. The commit message starts `staging(<slug>)`, which is how
- *    the gate and every later push recognise a staging commit. The preview
- *    REPLACES the slug's directory, the build is checked non-empty before
- *    anything is deleted, and the render log gets its entry (`render-log.ts`).
+ * 6. the push, held by `staging-push-gate.ts` exactly as the workflow is
+ *    (issue #1956): a preview never lands while the main site's Pages build
+ *    it would cancel is running. The commit message starts `staging(<slug>)`,
+ *    which is how the gate and every later push recognise a staging commit.
+ *    The preview REPLACES the slug's directory (bean `85im`), the build is
+ *    checked non-empty before anything is deleted (bean `oisv`), and the
+ *    render log gets its entry (`render-log.ts`).
  *
  * A preview also carries its build record, `_build-record.json`
  * ({@link writePreviewRecord}): the tree it was built from and a hash of every
  * file. CI rebuilds that tree in full afterwards, off the critical path, and
- * replaces the preview when anything differs.
+ * replaces the preview when anything differs (folio-assistant#2881).
  *
  * Not run: the QA sweep, block screenshots, review-comment ingestion and the
  * PR comment. The banner names the preview as built locally so a reviewer is
@@ -77,13 +93,16 @@
  *
  * ## `--artifact <dir>`: a preview with no GitHub in the loop
  *
- * The same build, written as a BUNDLE a claude.ai Artifact can carry, and
- * nothing pushed. The agent then publishes `<dir>/index.html` with the files
- * `<dir>/artifact.json` lists; it is private until shared. An Artifact holds
- * at most {@link ARTIFACT_MAX_FILES} files per publish and
- * {@link ARTIFACT_MAX_BYTES} bytes, so when the site is bigger, whole
- * top-level directories are left out, the ones holding the most files first,
- * and `artifact.json` names each one left out and how many files it held.
+ * The second half of the owner's choice: the same build, written as a BUNDLE a
+ * claude.ai Artifact can carry, and nothing pushed. The agent then publishes
+ * `<dir>/index.html` with the files `<dir>/artifact.json` lists; it is live in
+ * about a minute and private until shared. An Artifact holds at most
+ * {@link ARTIFACT_MAX_FILES} files per publish and {@link ARTIFACT_MAX_BYTES}
+ * bytes, so when the site is bigger, whole top-level directories are left out,
+ * the ones holding the most files first (smart-ra's 2,931 node-kind pages
+ * under `en/`), and `artifact.json` names each one left out and how many
+ * files it held: a link into one of them 404s in the Artifact, and a reviewer
+ * is told rather than left to find out.
  */
 import { execFileSync, spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -113,6 +132,7 @@ import { findDeclarationFile } from "../schemas/kg/instance-roots.ts";
 import { readIndexConfig } from "../schemas/kg/index-config.ts";
 import { buildInstanceSite, recipeFromConfig, siteFields, type SiteRecipe } from "./build-instance-site.ts";
 import { makeRecord, RECORD_FILE } from "./preview-record.ts";
+import { isPreviewPath, PREVIEW_PREFIX, previewPath } from "./lib/preview-prefix.ts";
 
 /** Files one Artifact publish may carry, the page included (the Artifact tool's limit is 255; one is the page). */
 export const ARTIFACT_MAX_FILES = 254;
@@ -376,7 +396,7 @@ export function mainCommitMessage(sha: string, branch: string, runUrl: string): 
 
 /** The commit a staging preview writes. `staging(` is how the push gate recognises one. */
 export function previewCommitMessage(slug: string, sha: string, runUrl: string): string[] {
-  return [`staging(${slug}): from ${sha}`, `render-log: rendered STAGING/${slug}`, `built locally: ${runUrl}`];
+  return [`staging(${slug}): from ${sha}`, `render-log: rendered ${previewPath(slug)}`, `built locally: ${runUrl}`];
 }
 
 /** What one publish wrote into the publish-branch checkout: the commit to make, and the paths to stage. */
@@ -393,11 +413,11 @@ function renderLog(script: Script, pages: string, o: { kind: string; path: strin
 
 /** A preview: `STAGING/<slug>/` replaced wholesale (bean `85im`), and its render-log entry. */
 export function composePreview(pages: string, site: string, o: { slug: string; branch: string; sha: string; runUrl: string; script: Script }): Composed {
-  const dest = join(pages, "STAGING", o.slug);
+  const dest = join(pages, PREVIEW_PREFIX, o.slug);
   rmSync(dest, { recursive: true, force: true });
   cpSync(site, dest, { recursive: true });
-  renderLog(o.script, pages, { kind: "staging-preview", path: `STAGING/${o.slug}`, slug: o.slug, branch: o.branch, sha: o.sha, runUrl: o.runUrl, summary: "folio staging preview published (built locally by an agent)" });
-  return { commit: previewCommitMessage(o.slug, o.sha, o.runUrl), add: [`STAGING/${o.slug}`, "_render-log"] };
+  renderLog(o.script, pages, { kind: "staging-preview", path: previewPath(o.slug), slug: o.slug, branch: o.branch, sha: o.sha, runUrl: o.runUrl, summary: "folio staging preview published (built locally by an agent)" });
+  return { commit: previewCommitMessage(o.slug, o.sha, o.runUrl), add: [previewPath(o.slug), "_render-log"] };
 }
 
 /**
@@ -746,19 +766,19 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
   if (!inputs) throw new Error(`${caller}: no build_command — this folio has no staging workflow to mirror`);
   const slug = target === "main" ? branch : slugOf(branch);
   if (!slug) throw new Error(`branch '${branch}' gives no safe staging slug`);
-  const url = target === "main" ? `${pagesRoot}/` : `${pagesRoot}/STAGING/${slug}/`;
+  const url = target === "main" ? `${pagesRoot}/` : `${pagesRoot}/${previewPath(slug)}/`;
   const platform = resolve(repo, inputs.platform_dir);
   const site = resolve(repo, inputs.site_dir);
   const base = o.base ?? defaultBranch ?? "main";
   const plan: StagePlan = {
     kind: "folio", caller, workflow, target, branch, ...(defaultBranch ? { defaultBranch } : {}), sha,
     publishBranch: inputs.publish_branch,
-    dest: target === "main" ? "/" : `STAGING/${slug}/`,
+    dest: target === "main" ? "/" : `${previewPath(slug)}/`,
     url,
-    replaces: target === "main" ? `only the files the last main publish listed in ${MANIFEST}` : `STAGING/${slug}/, wholesale (bean 85im)`,
-    preserved: target === "main" ? [...RESERVED, "any root file no manifest names"] : ["everything outside STAGING/" + slug + "/"],
+    replaces: target === "main" ? `only the files the last main publish listed in ${MANIFEST}` : `${previewPath(slug)}/, wholesale (bean 85im)`,
+    preserved: target === "main" ? [...RESERVED, "any root file no manifest names"] : [`everything outside ${previewPath(slug)}/`],
     build: [inputs.build_command, "rail-standalone-pages.ts", ...(target === "preview" ? ["changeset.ts + document-rendered-impact.ts (when the platform has them)", "staging-banner.ts"] : [])],
-    renderLog: target === "main" ? { kind: "main-site", path: "/" } : { kind: "staging-preview", path: `STAGING/${slug}` },
+    renderLog: target === "main" ? { kind: "main-site", path: "/" } : { kind: "staging-preview", path: previewPath(slug) },
     gate: target === "main" ? "none, as publish-main: the main publish is what staging-push-gate protects; 3 push attempts" : "staging-push-gate.ts (issue #1956)",
     commit: target === "main" ? mainCommitMessage(sha, branch, runUrl) : previewCommitMessage(slug, sha, runUrl),
     notRun: FOLIO_NOT_RUN[target],
@@ -870,9 +890,9 @@ export async function stageDeclared(
     const tip = git(repo, ["rev-parse", "FETCH_HEAD"]);
     if (tip !== sha) throw new Error(`HEAD ${sha.slice(0, 7)} is not origin/${defaultBranch ?? branch}'s tip ${tip.slice(0, 7)}; the main site is published from the pushed default branch only`);
   }
-  const url = `https://${owner}.github.io/${name}/${target === "preview" ? `STAGING/${branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")}/` : ""}`;
+  const url = `https://${owner}.github.io/${name}/${target === "preview" ? `${PREVIEW_PREFIX}/${branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")}/` : ""}`;
   const publish = !o.plan && !o.dryRun;
-  log(`plan: ${d.instance}'s declared site (site.build) → ${target === "main" ? "the publish root" : `STAGING/ preview of ${branch}`}`);
+  log(`plan: ${d.instance}'s declared site (site.build) → ${target === "main" ? "the publish root" : `${PREVIEW_PREFIX}/ preview of ${branch}`}`);
   log(agentRunLine(agentRunOf(repo)).trimStart());
   log(`via         build-instance-site.ts --instance ${d.instance}${target === "preview" ? ` --staging ${branch}` : ""}${publish ? " --publish" : ""}`);
   log(`pre         ${d.recipe.pre.join(", ") || "(none)"}`);
@@ -1003,7 +1023,7 @@ export function mainPagesFile(repo: string, publishBranch: string, log: (s: stri
     execFileSync("git", ["-C", tmp, "fetch", "-q", "--depth=1", "--filter=blob:none", remote, publishBranch], { stdio: ["ignore", "pipe", "pipe"] });
     const pages = execFileSync("git", ["-C", tmp, "ls-tree", "-r", "--name-only", "FETCH_HEAD"], { encoding: "utf-8", maxBuffer: 512 * 1024 * 1024 })
       .split("\n")
-      .filter((l) => l.endsWith(".html") && !l.startsWith("STAGING/") && !l.startsWith("_render-log/"));
+      .filter((l) => l.endsWith(".html") && !isPreviewPath(l) && !l.startsWith("_render-log/"));
     const out = join(mkdtempSync(join(tmpdir(), "main-pages-list-")), "main-pages.txt");
     writeFileSync(out, pages.join("\n") + "\n");
     log(`· the publish ref ${publishBranch} holds ${pages.length} main page(s): compare links go to the same page on main`);

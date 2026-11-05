@@ -89,6 +89,26 @@ test("the banner fills in from staging.json", async ({ page }) => {
   await expect(banner.getByText("build log")).toBeVisible();
 });
 
+test("a preview is green and a release (build type full) is purple — owner, 2026-11-05", async ({ page }) => {
+  const banner = page.locator("[data-fa-staging-banner]");
+  await serve(page, `${ROOT}index.html`, { ...FACTS, buildType: "preview" });
+  await expect(banner).toContainText("claude/example");
+  expect(await banner.evaluate((b) => getComputedStyle(b).backgroundColor)).toBe("rgb(79, 111, 82)");
+  await expect(banner).toContainText("FEATURE BRANCH");
+
+  await page.unrouteAll();
+  await serve(page, `${ROOT}index.html`, { ...FACTS, buildType: "full" });
+  await expect(banner).toContainText("claude/example");
+  expect(await banner.evaluate((b) => getComputedStyle(b).backgroundColor)).toBe("rgb(107, 63, 160)");
+  await expect(banner).toContainText("RELEASE BUILD");
+  await expect(banner).toHaveAttribute("data-fa-build-type", "full");
+});
+
+test("a preview under the new branches/ prefix finds its staging.json", async ({ page }) => {
+  await serve(page, "/folio-assistant/branches/claude-example/guides/a.html", FACTS);
+  await expect(page.locator("[data-fa-staging-banner]")).toContainText("claude/example");
+});
+
 test("with no open PR it says so in words, never \"PR #n/a\" — bean `zvl0`", async ({ page }) => {
   // A preview built by hand (`workflow_dispatch`) on a branch with no open PR
   // records `"pr": "n/a"`. The link still searches the branch's PRs.
