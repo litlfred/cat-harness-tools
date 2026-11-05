@@ -7,7 +7,7 @@
  *
  * ## What a user scenario is
  *
- * smart-base's logical model `UserScenario` has `id`, `title`,
+ * The DAK logical model `UserScenario` has `id`, `title`,
  * `description[x]` and `personas`. This kind keeps those fields as they are
  * and adds the ordered **steps** a journey map is made of: for each step, who
  * does what and how they feel (one experience per actor present), what goes

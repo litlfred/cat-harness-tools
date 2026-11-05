@@ -924,7 +924,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     // declared-path-literal: this table IS the declaration, as on `tool-release`.
     schema: "schemas/process/user-scenario.ts",
     // Every family listed: declaring `nodeSchemas` claims the map is complete.
-    // The validators are `validators/user-scenario*.json`, each naming a node
+    // The validators are this layer's `validators/user-scenario*.json`, each naming a node
     // kind. A trust ladder is a code list, so it lives in a `code-list`
     // directory; a building-block catalogue is the `building-blocks` kind.
     nodeSchemas: {

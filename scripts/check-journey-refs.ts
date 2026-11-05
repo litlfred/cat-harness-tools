@@ -18,7 +18,9 @@
  *
  * Exit 0 every reference resolves, or no instance declares a journey or a
  * workshop (said, with the count); 1 a reference does not resolve or a file
- * does not parse; 2 the declarations could not be read.
+ * does not parse; 2 the declarations could not be read, or a reference could
+ * be neither resolved nor called missing (a FHIR example while a declared
+ * artifact index is built at publish and absent from this checkout).
  */
 import { relative, resolve } from "node:path";
 
@@ -36,8 +38,11 @@ if (import.meta.main) {
     console.log(JSON.stringify(report, null, 2));
   } else {
     for (const f of report.findings) console.error(`✗ ${f.instance}/${f.file} · ${f.at}: ${f.message}`);
+    for (const f of report.couldNotDetermine) console.error(`? ${f.instance}/${f.file} · ${f.at}: ${f.message}`);
     if (report.undetermined !== undefined) {
       console.error(`? journey-refs: could not read the checkout's declarations (${report.undetermined}). Not a pass.`);
+    } else if (report.findings.length === 0 && report.couldNotDetermine.length > 0) {
+      console.error(`? journey-refs: ${report.couldNotDetermine.length} reference(s) could not be determined here. Not a pass.`);
     } else if (report.findings.length === 0) {
       console.log(
         report.journeys + report.workshops === 0
@@ -48,5 +53,5 @@ if (import.meta.main) {
       console.error(`journey-refs: ${report.findings.length} finding(s) over ${report.references} reference(s) of ${report.journeys} journey(s) and ${report.workshops} workshop(s)`);
     }
   }
-  process.exit(report.findings.length > 0 ? 1 : report.undetermined !== undefined ? 2 : 0);
+  process.exit(report.findings.length > 0 ? 1 : report.undetermined !== undefined || report.couldNotDetermine.length > 0 ? 2 : 0);
 }

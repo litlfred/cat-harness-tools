@@ -77,9 +77,29 @@ describe("viewer Tools declare what they render", () => {
     expect([...rendered].filter((k) => !declared.has(k) && !(k in HELD_OUTSIDE))).toEqual([]);
   });
 
+  /**
+   * TRANSITIONAL (remove after cat-harness#1058 merges): the Tool that renders
+   * these kinds is DEFINED in cat-harness (#1058) and implemented here (#1516),
+   * and this layer merges first. Until the definition is on cat-harness main no
+   * Tool renders them; that is checked as exactly that — the named Tool is
+   * absent and nothing else renders them — never waived. Once the Tool exists
+   * the ordinary check below holds them like every other entry.
+   */
+  const RENDERED_BY_A_TOOL_NOT_YET_DEFINED: Record<string, string> = {
+    "user-scenario": "journeys-viewer",
+    workshop: "journeys-viewer",
+  };
+
   it("every kind listed as held outside is still rendered here and still not held here", () => {
     const declared = new Set(dirs.flatMap(({ dir }) => dir.graphTypologies ?? []));
+    const ids = new Set(all.map((t) => t.id));
     for (const k of Object.keys(HELD_OUTSIDE)) {
+      const pending = RENDERED_BY_A_TOOL_NOT_YET_DEFINED[k];
+      if (pending !== undefined && !ids.has(pending)) {
+        expect(rendered.has(k), `${k} is rendered by a Tool other than ${pending}, which is not defined yet`).toBe(false);
+        expect(declared.has(k), `${k} is declared in this checkout now — drop it from HELD_OUTSIDE`).toBe(false);
+        continue;
+      }
       expect(rendered.has(k), `${k} is no longer rendered by any Tool — drop it from HELD_OUTSIDE`).toBe(true);
       expect(declared.has(k), `${k} is declared in this checkout now — drop it from HELD_OUTSIDE`).toBe(false);
     }

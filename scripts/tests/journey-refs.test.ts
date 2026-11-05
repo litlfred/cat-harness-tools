@@ -126,6 +126,7 @@ describe("a checkout whose every reference resolves", () => {
   const report = checkJourneyRefsAt(checkout(clean()));
   test("passes, having examined every sort of reference", () => {
     expect(report.findings).toEqual([]);
+    expect(report.couldNotDetermine).toEqual([]);
     expect(report.undetermined).toBeUndefined();
     expect(report.journeys).toBe(3);
     expect(report.workshops).toBe(1);
@@ -203,7 +204,37 @@ describe("the negative fixture: one broken reference of each sort", () => {
   });
 });
 
+describe("an artifact index built at publish", () => {
+  test("absent from the checkout: an example it would hold is could-not-determine, never missing", () => {
+    const files = clean();
+    delete files["base/fhir/index.json"];
+    const report = checkJourneyRefsAt(checkout(files));
+    expect(report.findings).toEqual([]);
+    expect(report.couldNotDetermine.map((f) => `${f.file} · ${f.at}`)).toEqual(["journeys/p4.json · step P4"]);
+    expect(report.couldNotDetermine[0]!.message).toContain('"Bundle/kamal-ips"');
+    expect(report.couldNotDetermine[0]!.message).toContain("built at publish");
+  });
+
+  test("present without the key: the example is missing, a finding", () => {
+    const files = clean();
+    edit(files, "demo/journeys/p4.json", (j) => {
+      j.steps[0].examples = ["Bundle/missing"];
+    });
+    const report = checkJourneyRefsAt(checkout(files));
+    expect(report.couldNotDetermine).toEqual([]);
+    expect(report.findings.map((f) => f.message)).toEqual(['FHIR example "Bundle/missing" is in no declared fhir-artifact-index']);
+  });
+});
+
 describe("the command", () => {
+  test("exits 2, not 0 or 1, when the only open reference is in an index built at publish", () => {
+    const files = clean();
+    delete files["base/fhir/index.json"];
+    const run = spawnSync("bun", [join(import.meta.dir, "..", "check-journey-refs.ts"), "--root", checkout(files)], { encoding: "utf8" });
+    expect(run.status).toBe(2);
+    expect(run.stderr).toContain("could not be determined");
+  });
+
   const SCRIPT = join(import.meta.dir, "..", "check-journey-refs.ts");
   test("exits 0 on the clean checkout and 1 on a broken one, naming the finding", () => {
     const ok = spawnSync("bun", [SCRIPT, "--root", checkout(clean())], { encoding: "utf8" });

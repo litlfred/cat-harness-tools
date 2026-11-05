@@ -141,6 +141,13 @@ export interface JourneyCorpus {
   requirements: Map<string, Requirement>;
   /** `Type/id` across the checkout's artifact indexes. */
   examples: Map<string, FhirExample>;
+  /**
+   * Declared `fhir-artifact-index` directories (instance/path) with no
+   * `index.json` on disk: the index is built at publish, so a checkout or a CI
+   * runner has none, and an example it would hold can be neither found nor
+   * called missing.
+   */
+  examplesUnbuilt: string[];
   /** Files of the two kinds that would not parse: drawn as findings, never silently skipped. */
   problems: Problem[];
   /** Why the checkout's declared directories could not be read: set, the corpus is NOT complete. */
@@ -201,6 +208,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
     ladders: new Map(),
     requirements: new Map(),
     examples: new Map(),
+    examplesUnbuilt: [],
     problems: [],
   };
   let dirs: ReturnType<typeof checkoutDirectories> = [];
@@ -214,9 +222,16 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
   for (const d of dirs) {
     const instance = d.member ?? d.declaredBy;
     const info = instances.get(instance);
-    if (info === undefined || !existsSync(d.absPath) || !statSync(d.absPath).isDirectory()) continue;
+    if (info === undefined) continue;
     const kinds = d.graphTypologies as readonly string[];
     const rel = (p: string) => relative(info.root, p).split("\\").join("/");
+    // An artifact index is BUILT AT PUBLISH: its directory, or its index.json,
+    // is absent from a checkout. Recorded, so an example it would hold is
+    // reported as could-not-determine rather than as missing.
+    if (kinds.includes("fhir-artifact-index") && !existsSync(join(d.absPath, "index.json"))) {
+      corpus.examplesUnbuilt.push(`${instance}/${rel(d.absPath)}`);
+    }
+    if (!existsSync(d.absPath) || !statSync(d.absPath).isDirectory()) continue;
     if (kinds.includes(SCENARIO_KIND) || kinds.includes(WORKSHOP_KIND) || kinds.includes(CODE_LIST_KIND) || kinds.includes(BUILDING_BLOCKS_KIND)) {
       for (const p of jsonFilesUnder(d.absPath, 2)) {
         if (seenFiles.has(p)) continue;

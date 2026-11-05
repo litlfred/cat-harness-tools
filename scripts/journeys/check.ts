@@ -72,6 +72,12 @@ export interface RefReport {
   /** References examined, resolved or not. */
   references: number;
   findings: RefFinding[];
+  /**
+   * References that could be neither resolved nor called missing: a FHIR
+   * example no index on disk holds while a declared artifact index is built at
+   * publish and so absent here. Non-empty, the report is NOT a pass (exit 2).
+   */
+  couldNotDetermine: RefFinding[];
   /** Set when the checkout's declarations could not be read: the report is NOT a pass. */
   undetermined?: string;
 }
@@ -79,6 +85,7 @@ export interface RefReport {
 /** Check every journey and workshop of a corpus. */
 export function checkJourneyRefs(corpus: JourneyCorpus): RefReport {
   const findings: RefFinding[] = corpus.problems.map((p) => ({ instance: p.instance, file: p.file, at: "(root)", message: `does not parse: ${p.message}` }));
+  const couldNotDetermine: RefFinding[] = [];
   let references = 0;
   const archimate = siteLinks(corpus, "journeys", "journeys").archimateView;
 
@@ -119,7 +126,17 @@ export function checkJourneyRefs(corpus: JourneyCorpus): RefReport {
       for (const id of [...(s.requirements ?? []), ...(s.preconditions ?? []).flatMap((p) => p.requirements ?? [])]) {
         ref(requirementFor(corpus, id) !== undefined, at, `requirement "${id}" is no req: node in this checkout`);
       }
-      for (const k of s.examples ?? []) ref(corpus.examples.has(k), at, `FHIR example "${k}" is in no declared fhir-artifact-index`);
+      for (const k of s.examples ?? []) {
+        if (!corpus.examples.has(k) && corpus.examplesUnbuilt.length > 0) {
+          references++;
+          couldNotDetermine.push({
+            instance: j.instance,
+            file: j.file,
+            at,
+            message: `FHIR example "${k}" is in no artifact index on disk, and ${corpus.examplesUnbuilt.join(", ")} is built at publish and absent here`,
+          });
+        } else ref(corpus.examples.has(k), at, `FHIR example "${k}" is in no declared fhir-artifact-index`);
+      }
       if (s.record !== undefined && ladder !== undefined) {
         ref(ladder.some((c) => c.code === s.record!.state), at, `record.state "${s.record.state}" is no code of trust ladder ${sc.trustLadder}`);
       }
@@ -158,6 +175,7 @@ export function checkJourneyRefs(corpus: JourneyCorpus): RefReport {
     workshops: corpus.workshops.length,
     references,
     findings,
+    couldNotDetermine,
     ...(corpus.undetermined !== undefined ? { undetermined: corpus.undetermined } : {}),
   };
 }
