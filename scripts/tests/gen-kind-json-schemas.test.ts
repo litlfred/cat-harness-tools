@@ -19,6 +19,7 @@ import {
   harnessKinds,
   harnessRegistry,
   KINDS_SUBDIR,
+  judgeRendered,
   pointerToken,
   renderKind,
 } from "../gen-kind-json-schemas.ts";
@@ -174,5 +175,24 @@ describe("the output does not depend on the layers mounted above the harness", (
       expect(d.text).toContain('"appliesTo"');
       expect(d.text).not.toContain('"not": {}');
     }
+  });
+});
+
+// The judgement `--check` makes when the harness builds the kind schemas at
+// publish and nothing committed is left to compare (owner card, 2026-11-05).
+describe("judgeRendered: the generator's own output, with no committed copy", () => {
+  const id = "https://example.org/schemas/kinds/x.schema.json";
+  const good = JSON.stringify({ $id: id, anyOf: [{ $ref: "#/$defs/a~1b" }], $defs: { "a/b": { type: "string" } } });
+  const again = (t: string) => new Map([["x", t]]);
+  test("a document that parses, names its path, resolves its refs and renders the same twice passes", () => {
+    expect(judgeRendered([{ kind: "x", id, text: good }], again(good))).toEqual([]);
+  });
+  test("each failure is named", () => {
+    const badId = JSON.stringify({ $id: "elsewhere" });
+    expect(judgeRendered([{ kind: "x", id, text: badId }], again(badId))[0]).toContain("is not its path");
+    const dangling = JSON.stringify({ $id: id, $ref: "#/$defs/missing" });
+    expect(judgeRendered([{ kind: "x", id, text: dangling }], again(dangling))[0]).toContain("resolves to nothing");
+    expect(judgeRendered([{ kind: "x", id, text: good }], again(good + " "))[0]).toContain("not deterministic");
+    expect(judgeRendered([{ kind: "x", id, text: "{" }], again("{"))[0]).toContain("does not parse");
   });
 });
