@@ -16,6 +16,22 @@
  *   are cloned fresh and never run `install.sh`, so this is the hook they get.
  *   The recipe is in bean `cat-tools-pp9g`.
  *
+ * ## Off by default (2026-11-05)
+ *
+ * Measured on a 4-CPU agent container, the gates below took 70 minutes for a
+ * typical push, so neither hook runs them unless the checkout opts in
+ * ({@link gatesEnabled}: `CAT_PREPUSH_GATES=1`, or `git config
+ * cat.gates.prePush true`). Off, a push goes at once, with one line saying so
+ * and an `off` entry in the push log.
+ *
+ * ## The time budget (owner, 2026-11-05: "gates under about 60 s")
+ *
+ * On, the run holds out every read-only gate measured over 60 s on this
+ * machine (`scripts/gate-durations.ts`): named in the report and the record
+ * as `heldOut`, like the whole suite, and run by CI. Seven gates were 2324 of
+ * the pool's 3241 CPU-seconds. `git config cat.gates.budgetSeconds <s>`
+ * changes the budget, and `0` runs every gate.
+ *
  * ## Which gates, and which tests (owner, 2026-11-05: "Affected tests only")
  *
  * The fast set, derived from the workflow by `scripts/gates.ts`, never listed
@@ -83,6 +99,7 @@ import { join } from "node:path";
 import { spawn } from "node:child_process";
 
 import { affectedTests } from "./affected-tests.ts";
+import { budgetSeconds, durationsFromLog, mergeDurations, overBudget, readDurations, readSeed, writeDurations } from "./gate-durations.ts";
 import {
   attachNote,
   buildRecord,
@@ -248,8 +265,29 @@ export async function judge(
   mkdirSync(dir, { recursive: true });
   const reportPath = join(dir, "last-report.json");
   const logPath = join(dir, "last-run.log");
+  // ── The time budget (owner, 2026-11-05): read-only gates measured over it are held out ──
+  let budget: number | undefined;
+  try {
+    budget = budgetSeconds(root);
+  } catch (e) {
+    return { kind: "undetermined", why: (e as Error).message };
+  }
+  const slow = overBudget(readDurations(root)?.seconds ?? {}, readSeed(), budget);
+  if (slow.length > 0) {
+    const shown = slow.map((g) => `${g.command.replace(/^bun run cat /, "")} ${Math.round(g.seconds)}s${g.source === "seed" ? "*" : ""}`);
+    stream?.write(
+      `pre-push: ${slow.length} gate(s) over the ${budget}s budget held out, CI runs them: ${shown.join(", ")}` +
+        `${slow.some((g) => g.source === "seed") ? " (* not yet timed here; the committed estimate)" : ""}. ` +
+        "Every gate: `git config cat.gates.budgetSeconds 0`.\n",
+    );
+  }
   const startedAt = new Date().toISOString();
-  const code = await runGates(root, reportPath, logPath, stream);
+  const code = await runGates(root, reportPath, logPath, stream, slow.map((g) => g.command));
+  try {
+    writeDurations(root, mergeDurations(readDurations(root), durationsFromLog(readFileSync(logPath, "utf-8")), now, new Date().toISOString()));
+  } catch {
+    // a missing log teaches nothing; the next run measures again
+  }
 
   let report: GatesReportLike | undefined;
   try {
@@ -299,7 +337,8 @@ export async function judge(
   writeRecord(root, rec);
   if (git(root, ["config", "--bool", "cat.gates.noteRecords"]) !== "false") attachNote(root, rec);
   const testNote = tests.kind === "all" ? `; tests left to CI (${tests.why})` : `; ${tests.files} affected test file(s) passed`;
-  return { kind: "allow", why: `${rec.gates.length - rec.skipped.length} gate(s) passed, ${rec.skipped.length} skipped on unchanged inputs${testNote}` };
+  const heldNote = slow.length > 0 ? `; ${slow.length} over the ${budget}s budget left to CI` : "";
+  return { kind: "allow", why: `${rec.gates.length - rec.skipped.length} gate(s) passed, ${rec.skipped.length} skipped on unchanged inputs${heldNote}${testNote}` };
 }
 
 /** The whole-suite gate the hook holds out of `gates` and replaces with the affected tests. */
@@ -464,10 +503,11 @@ export function baseTreeFor(root: string, commit: string, bases: readonly (strin
   return undefined;
 }
 
-function runGates(root: string, reportPath: string, logPath: string, stream?: NodeJS.WritableStream): Promise<number> {
+function runGates(root: string, reportPath: string, logPath: string, stream?: NodeJS.WritableStream, holdOut: readonly string[] = []): Promise<number> {
   return new Promise((done) => {
     const log = createWriteStream(logPath);
-    const child = spawn("bun", ["run", "cat", "gates", "--report", reportPath, "--except", WHOLE_SUITE], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    const except = [WHOLE_SUITE, ...holdOut].flatMap((c) => ["--except", c]);
+    const child = spawn("bun", ["run", "cat", "gates", "--report", reportPath, ...except], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
     const tee = (b: Buffer) => {
       log.write(b);
       stream?.write(b);
@@ -486,9 +526,31 @@ function say(lines: readonly string[]): void {
   for (const l of lines) process.stderr.write(`${l}\n`);
 }
 
+/**
+ * Whether the gates run before a push at all. OFF unless asked for: measured
+ * 2026-11-05 on a 4-CPU agent container, the fast set minus the whole suite
+ * took 70 minutes per push (`skill:register:check` 18 min and
+ * `uml:overview:check` 11 min alone), far past what a push can wait on. The
+ * time budget cuts that, but a cold run is still minutes, not seconds, so a
+ * checkout opts in with `CAT_PREPUSH_GATES=1` or
+ * `git config cat.gates.prePush true`.
+ */
+export function gatesEnabled(root: string, env: Readonly<Record<string, string | undefined>> = process.env): boolean {
+  const v = env.CAT_PREPUSH_GATES;
+  if (v !== undefined && v !== "") return v === "1" || v.toLowerCase() === "true";
+  return git(root, ["config", "--bool", "cat.gates.prePush"]) === "true";
+}
+
+const OFF_NOTE = "pre-push: gates not run (off by default: the fast set takes ~70 min on an agent container); opt in with CAT_PREPUSH_GATES=1 or `git config cat.gates.prePush true`";
+
 async function gitHook(root: string, remote: string): Promise<number> {
   const refs = parsePushStdin(await Bun.stdin.text()).filter((r) => !ZERO.test(r.localSha));
   if (refs.length === 0) return 0;
+  if (!gatesEnabled(root)) {
+    logPush(root, { event: "off", via: "git-hook", remote, refs });
+    say([OFF_NOTE]);
+    return 0;
+  }
   const bypass = process.env.CAT_GATES_BYPASS;
   if (bypass !== undefined && bypass !== "") {
     const p = logPush(root, { event: "bypass", via: "git-hook", reason: bypass, remote, refs });
@@ -520,6 +582,11 @@ async function claudeHook(): Promise<number> {
   if (push === undefined || push.dryRun) return 0;
   const root = git(input.cwd ?? process.cwd(), ["rev-parse", "--show-toplevel"]);
   if (root === undefined) return 0;
+  if (!gatesEnabled(root)) {
+    logPush(root, { event: "off", via: "claude-hook", command: input.tool_input.command });
+    say([OFF_NOTE]);
+    return 0;
+  }
   const bypass = push.bypass ?? process.env.CAT_GATES_BYPASS;
   if (bypass !== undefined && bypass !== "") {
     const p = logPush(root, { event: "bypass", via: "claude-hook", reason: bypass, command: input.tool_input.command });

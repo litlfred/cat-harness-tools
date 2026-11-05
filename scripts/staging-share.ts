@@ -53,7 +53,8 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync 
 import { join, relative } from "node:path";
 import { FRAGMENT } from "./staging-banner.ts";
 import { stripSeo } from "./strip-preview-seo.ts";
-import { readRetained } from "./keep-shared-payloads.ts";
+import { parseRetained, readRetained, RETAINED_FILE, type Retained } from "./keep-shared-payloads.ts";
+import { blobId, forEachBlob, isRegular, objectFormat, prefetchBlobs, sparseEntries, type GitEntry } from "./lib/git-blobs.ts";
 
 /**
  * Files a preview always keeps: they describe this preview, or serve it. The
@@ -105,22 +106,72 @@ export interface SharePlan {
   bytesShared: number;
 }
 
-/** Which of the preview's files are the live site's, compared against `root`. */
+/**
+ * Which of the preview's files are the live site's, compared against `root`.
+ *
+ * `root` may be a SPARSE checkout of the publish branch (cone `STAGING/<slug>`,
+ * `STAGING/_retired`, `_render-log`, cloned `--filter=blob:none`). A live file
+ * outside the cone (a skip-worktree index entry, whatever is on disk at its
+ * path) is then read from git: the same bytes is the same blob id, so a
+ * non-HTML file needs no blob, and only the live HTML pages whose bytes differ
+ * are fetched, in one request, to compare with the per-preview edits set
+ * aside. Every other file is read from the working tree, so a full checkout,
+ * which has no such entry, gives the plan it always gave.
+ */
 export function planShare(root: string, preview: string, slug: string): SharePlan {
+  const outside = sparseEntries(root);
+  const files = filesUnder(preview);
+  const verdict = new Map<string, boolean>();
+  const fromGit: { rel: string; live: GitEntry }[] = [];
+  // A blob main keeps only for older previews (keep-shared-payloads.ts) is never
+  // borrowed: it goes once those previews rotate off, and this one would 404.
+  const retained = new Set(Object.keys(retainedAt(root, outside).kept));
+  for (const rel of files) {
+    const live = join(root, rel);
+    if (rel.startsWith("STAGING/") || retained.has(rel)) { verdict.set(rel, false); continue; }
+    // Outside the cone the index is what is published, whatever is on disk there.
+    const entry = outside?.get(rel);
+    if (entry === undefined && existsSync(live)) {
+      verdict.set(rel, statSync(live).isFile() && sameAsLive(rel, readFileSync(join(preview, rel)), readFileSync(live), slug));
+      continue;
+    }
+    // A link is never compared through git: keeping it costs bytes, never a wrong page.
+    if (entry === undefined || !isRegular(entry.mode)) { verdict.set(rel, false); continue; }
+    fromGit.push({ rel, live: entry });
+  }
+  if (fromGit.length > 0) {
+    const format = objectFormat(root);
+    const pages = new Map<string, string[]>();
+    for (const { rel, live } of fromGit) {
+      if (NEVER_SHARED.has(rel)) { verdict.set(rel, false); continue; }
+      if (blobId(readFileSync(join(preview, rel)), format) === live.oid) { verdict.set(rel, true); continue; }
+      if (!rel.endsWith(".html")) { verdict.set(rel, false); continue; }
+      pages.set(live.oid, [...(pages.get(live.oid) ?? []), rel]);
+    }
+    const oids = [...pages.keys()];
+    prefetchBlobs(root, oids);
+    forEachBlob(root, oids, (oid, bytes) => {
+      for (const rel of pages.get(oid) ?? []) verdict.set(rel, sameAsLive(rel, readFileSync(join(preview, rel)), bytes, slug));
+    });
+  }
   const shared: string[] = [];
   let kept = 0;
   let bytesShared = 0;
-  // A blob main keeps only for older previews (keep-shared-payloads.ts) is never
-  // borrowed: it goes once those previews rotate off, and this one would 404.
-  const retained = new Set(Object.keys(readRetained(root).kept));
-  for (const rel of filesUnder(preview)) {
-    const live = join(root, rel);
-    if (rel.startsWith("STAGING/") || retained.has(rel) || !existsSync(live) || !statSync(live).isFile()) { kept++; continue; }
-    const p = readFileSync(join(preview, rel));
-    if (sameAsLive(rel, p, readFileSync(live), slug)) { shared.push(rel); bytesShared += p.length; }
+  for (const rel of files) {
+    if (verdict.get(rel) === true) { shared.push(rel); bytesShared += statSync(join(preview, rel)).size; }
     else kept++;
   }
   return { shared, kept, bytesShared };
+}
+
+/** The retained record, from the working tree or, outside a sparse checkout's cone, from its blob. */
+function retainedAt(root: string, outside: Map<string, GitEntry> | undefined): Retained {
+  const entry = outside?.get(RETAINED_FILE);
+  if (entry === undefined) return readRetained(root);
+  let text = "";
+  prefetchBlobs(root, [entry.oid]);
+  forEachBlob(root, [entry.oid], (_oid, bytes) => { text = bytes.toString("utf-8"); });
+  return parseRetained(text);
 }
 
 /** The `fa-search-index` value the preview's pages carry, for pages served from the live site. */

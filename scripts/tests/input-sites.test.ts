@@ -22,7 +22,7 @@ import { moduleRootOf, parseValidatorRef } from "../../schemas/kg/kind-validator
 import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { INSTANCE_THEMES_MODULE, THEMES_GRAPH_TYPOLOGY } from "../../schemas/ui/theme-by-ref.ts";
 
-import { blankSource, auditClosure, mainBlockLines, parseVerdicts, scanSource, SiteMemo, statementPin } from "../input-sites.ts";
+import { blankSource, auditClosure, mainBlockLines, outsideTemplates, parseVerdicts, scanSource, SiteMemo, statementPin } from "../input-sites.ts";
 import { pluginTableModules, validatorModules } from "../declared-imports.ts";
 import { checkFingerprint, entryFiles, FileDigests, TRACKED, type Fingerprint } from "../input-hash.ts";
 import { inputSiteReached, openTrace, qaRefLine, quietly, TRACE_ENV } from "../../schemas/sdlc/input-trace.ts";
@@ -443,6 +443,31 @@ describe("annotations hold to the data that chooses their targets", () => {
 });
 
 describe("the audit walks only what can run", () => {
+  test("outsideTemplates blanks template text only, and only on a balanced lex", () => {
+    const src = 'import { a } from "./a.ts"; // x\nconst t = `import "./w.ts" ${f("./k")}`;\n';
+    const out = outsideTemplates(src);
+    expect(out).toContain('from "./a.ts"');
+    expect(out).toContain('f("./k")');
+    expect(out).not.toContain("./w.ts");
+    const unbalanced = 'const t = `never closed\nimport { b } from "./b.ts";\n';
+    expect(outsideTemplates(unbalanced)).toBe(unbalanced);
+  });
+
+  test("an import inside a template literal is the text of a written file, not an edge; a literal unresolvable one still blocks", () => {
+    const root = mkdtempSync(join(tmpdir(), "f017-tpl-"));
+    try {
+      writeFileSync(join(root, "a.ts"), 'export const shim = (d: string) => `export * from "../../${d}/schemas/builders";\n`;\n');
+      expect(auditClosure(root, ["a.ts"], new SiteMemo())).toMatchObject({ files: ["a.ts"] });
+      writeFileSync(join(root, "m.ts"), 'export const manifest = () => `import { paper } from "../schema/builders";\nexport default paper({});\n`;\n');
+      expect(auditClosure(root, ["m.ts"], new SiteMemo())).toMatchObject({ files: ["m.ts"] });
+      writeFileSync(join(root, "b.ts"), 'export * from "./nowhere";\n');
+      const c = auditClosure(root, ["b.ts"], new SiteMemo());
+      expect("undetermined" in c && c.undetermined).toContain("imports unresolvable ./nowhere");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("a closure is memoised per file and re-read after an edit", () => {
     const root = mkdtempSync(join(tmpdir(), "f017-memo-"));
     try {

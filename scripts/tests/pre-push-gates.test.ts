@@ -9,7 +9,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { failedTests, judge, parsePushCommand, parsePushStdin } from "../pre-push-gates.ts";
+import { failedTests, gatesEnabled, judge, parsePushCommand, parsePushStdin } from "../pre-push-gates.ts";
+import { readDurations } from "../gate-durations.ts";
 import { buildRecord, covers, newFailures, readRecord, readResults, stateDir, toolVersions, treeOf, type GatesReportLike } from "../gate-record.ts";
 
 const PASS: GatesReportLike = {
@@ -102,7 +103,7 @@ process.exit(${code});\n`,
     sh("config", "user.email", "t@example.invalid");
     sh("config", "user.name", "t");
     writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: { cat: "bun run fake-cat.ts" } }));
-    writeFileSync(join(root, ".gitignore"), "fake-cat.ts\nreport.fixture.json\nruns.txt\n");
+    writeFileSync(join(root, ".gitignore"), "fake-cat.ts\nreport.fixture.json\nruns.txt\nargv.txt\n");
     sh("add", "-A");
     sh("commit", "-qm", "init");
   });
@@ -120,6 +121,44 @@ process.exit(${code});\n`,
     sh("commit", "-q", "--amend", "-m", "reworded");
     expect((await judge(root, [sh("rev-parse", "HEAD").stdout.trim()])).kind).toBe("allow");
     expect(runs()).toBe(1);
+  });
+
+  test("the time budget: a read-only gate timed over it here is held out of the next run, and the seed covers what is not timed yet", async () => {
+    stub(0, PASS);
+    // The stub also prints two pool lines, and keeps the argv it was given.
+    writeFileSync(
+      join(root, "fake-cat.ts"),
+      readFileSync(join(root, "fake-cat.ts"), "utf-8").replace(
+        "process.exit(",
+        `appendFileSync(${JSON.stringify(join(root, "argv.txt"))}, JSON.stringify(a.slice(2)) + "\\n");
+console.log("▸ bun run cat check:a   (75.0s, parallel)");
+console.log("▸ bun run cat check:b   (3.0s, parallel)");
+process.exit(`,
+      ),
+    );
+    const argvs = () => readFileSync(join(root, "argv.txt"), "utf-8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
+    const excepts = (a: string[]) => a.flatMap((x, i) => (a[i - 1] === "--except" ? [x] : []));
+    const first = await judge(root, [sh("rev-parse", "HEAD").stdout.trim()]);
+    expect(first.kind).toBe("allow");
+    // Nothing timed here yet: the committed seed's gates are held out, with the whole suite.
+    expect(excepts(argvs()[0]!)).toContain("bun test");
+    expect(excepts(argvs()[0]!)).toContain("bun run cat skill:register:check");
+    expect(excepts(argvs()[0]!)).not.toContain("bun run cat check:a");
+    expect(readDurations(root)!.seconds).toEqual({ "bun run cat check:a": 75, "bun run cat check:b": 3 });
+    // A new tree: check:a, timed at 75 s here, is now held out; check:b is not.
+    writeFileSync(join(root, "x.txt"), "x");
+    sh("add", "x.txt");
+    sh("commit", "-qm", "x");
+    expect((await judge(root, [sh("rev-parse", "HEAD").stdout.trim()])).kind).toBe("allow");
+    expect(excepts(argvs()[1]!)).toContain("bun run cat check:a");
+    expect(excepts(argvs()[1]!)).not.toContain("bun run cat check:b");
+    // Budget 0: every gate runs (only the whole suite is held out).
+    sh("config", "cat.gates.budgetSeconds", "0");
+    writeFileSync(join(root, "y.txt"), "y");
+    sh("add", "y.txt");
+    sh("commit", "-qm", "y");
+    expect((await judge(root, [sh("rev-parse", "HEAD").stdout.trim()])).kind).toBe("allow");
+    expect(excepts(argvs()[2]!)).toEqual(["bun test"]);
   });
 
   test("a red gate with no base outcome to compare against is undetermined, not refused, and leaves no record", async () => {
@@ -282,4 +321,53 @@ const a = process.argv; writeFileSync(a[a.indexOf("--report") + 1]!, JSON.string
     expect(v.kind).toBe("allow");
     expect(v.kind === "allow" && v.why).toContain("0 affected test file(s)");
   }, 60_000);
+});
+
+describe("off by default: the gates run only when the checkout opts in", () => {
+  const HOOK = join(import.meta.dir, "..", "pre-push-gates.ts");
+  let root: string;
+  const sh = (...args: string[]) => spawnSync("git", args, { cwd: root, encoding: "utf-8" });
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), "pre-push-off-"));
+    sh("init", "-q");
+    sh("config", "user.email", "t@example.invalid");
+    sh("config", "user.name", "t");
+    // A `cat` runner that would FAIL every gate, so a run of it would refuse the push.
+    writeFileSync(join(root, "package.json"), JSON.stringify({ scripts: { cat: "exit 1" } }));
+    sh("add", "-A");
+    sh("commit", "-qm", "c");
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  test("gatesEnabled reads the env first, then git config", () => {
+    expect(gatesEnabled(root, {})).toBe(false);
+    expect(gatesEnabled(root, { CAT_PREPUSH_GATES: "1" })).toBe(true);
+    sh("config", "cat.gates.prePush", "true");
+    expect(gatesEnabled(root, {})).toBe(true);
+    expect(gatesEnabled(root, { CAT_PREPUSH_GATES: "0" })).toBe(false);
+  });
+
+  test("the git hook, off, lets the push go at once, says so and logs it", () => {
+    const head = sh("rev-parse", "HEAD").stdout.trim();
+    const r = spawnSync("bun", ["run", HOOK, "--git-hook", "origin"], {
+      cwd: root,
+      input: `refs/heads/main ${head} refs/heads/main ${"0".repeat(40)}\n`,
+      encoding: "utf-8",
+      env: { ...process.env, CAT_PREPUSH_GATES: "" },
+    });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain("gates not run (off by default");
+    expect(readFileSync(join(stateDir(root), "push.log"), "utf-8")).toContain('"event":"off"');
+  });
+
+  test("the Claude hook, off, never blocks, even a --no-verify push", () => {
+    const r = spawnSync("bun", ["run", HOOK, "--claude-hook"], {
+      cwd: root,
+      input: JSON.stringify({ tool_name: "Bash", tool_input: { command: "git push --no-verify origin main" }, cwd: root }),
+      encoding: "utf-8",
+      env: { ...process.env, CAT_PREPUSH_GATES: "" },
+    });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toContain("off by default");
+  });
 });

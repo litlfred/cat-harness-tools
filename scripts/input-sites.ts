@@ -227,6 +227,25 @@ function isPlainImport(code: string): boolean {
  * lines it then mis-blanks are still scanned.
  */
 export function blankSource(text: string): string[] {
+  return lexSource(text, false).lines;
+}
+
+/**
+ * The source with comments removed and every TEMPLATE literal's text blanked,
+ * its `${…}` expressions kept, while quoted strings stay whole — so an import
+ * specifier can still be read, but an import a template literal WRITES
+ * (`init-folio.ts`'s generated manifests and shims) is not taken for one of
+ * this file. Only when the lexer ends the file balanced (in code, every brace
+ * and `${` closed): a misread regex that opens a template would blank real
+ * code to the end of the file, so an unbalanced lex returns the text
+ * unchanged, and a doubtful file keeps every import it had.
+ */
+export function outsideTemplates(text: string): string {
+  const { lines, balanced } = lexSource(text, true);
+  return balanced ? lines.join("\n") : text;
+}
+
+function lexSource(text: string, keepQuoted: boolean): { lines: string[]; balanced: boolean } {
   const out: string[] = [];
   let cur = "";
   type Mode = "code" | "line" | "block" | "sq" | "dq" | "tpl" | "re";
@@ -257,13 +276,13 @@ export function blankSource(text: string): string[] {
       case "sq":
       case "dq":
         if (c === "\\") {
-          cur += "  ";
+          cur += keepQuoted ? text.slice(i, i + 2) : "  ";
           i++;
         } else if ((mode === "sq" && c === "'") || (mode === "dq" && c === '"')) {
           cur += c;
           mode = "code";
           prevSig = c;
-        } else cur += " ";
+        } else cur += keepQuoted ? c : " ";
         continue;
       case "re":
         if (c === "\\") {
@@ -334,7 +353,7 @@ export function blankSource(text: string): string[] {
     }
   }
   out.push(cur);
-  return out;
+  return { lines: out, balanced: (mode === "code" || mode === "line") && depth === 0 && tplDepth.length === 0 };
 }
 
 /** Risks whose evidence is a string's CONTENT, matched on the raw line of a code line. */
@@ -428,6 +447,17 @@ export function scanSource(file: string, text: string): Site[] {
 const IMPORT_RE =
   /(?:^|[^\w$.])(?:import|export)\s[^'"`;]*?from\s*["']([^"']+)["']|(?:^|[^\w$.])import\s*["']([^"']+)["']|(?:import|require)\s*\(\s*["']([^"']+)["']\s*\)/g;
 
+/**
+ * Whether an import specifier names a module of this tree to follow: a
+ * relative one, and not template text. A `${` in a quoted specifier is the
+ * text of a file a template literal writes; it survives {@link outsideTemplates}
+ * only when that lex was unbalanced. A real import spelled so names a literal
+ * `${` path and fails to load, so its check can never give a skip.
+ */
+export function followedSpecifier(spec: string | undefined): spec is string {
+  return spec !== undefined && spec.startsWith(".") && !spec.includes("${");
+}
+
 function resolveModule(fromFile: string, spec: string): string | undefined {
   const base = resolve(dirname(fromFile), spec);
   for (const c of [base, base.replace(/\.js$/, ".ts"), `${base}.ts`, `${base}.tsx`, `${base}.js`, join(base, "index.ts"), join(base, "index.js")]) {
@@ -478,14 +508,14 @@ export class SiteMemo {
     // docblock is not followed.
     // `import type` / `export type … from` are erased before the module runs,
     // so they load nothing and are not followed.
-    const code = text
+    const code = outsideTemplates(text)
       .split("\n")
       .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
       .join("\n")
       .replace(/(^|\n)\s*(?:import|export)\s+type\s[^;]*?from\s*["'][^"']+["']/g, "$1");
     for (const m of code.matchAll(IMPORT_RE)) {
       const spec = m[1] ?? m[2] ?? m[3];
-      if (spec !== undefined && spec.startsWith(".")) imports.push(spec);
+      if (followedSpecifier(spec)) imports.push(spec);
     }
     const entry = { key, sites, imports };
     this.memo.set(abs, entry);
