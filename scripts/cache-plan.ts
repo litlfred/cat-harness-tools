@@ -28,7 +28,7 @@
  *
  * ## Stale — computed, undetermined counts as stale
  *
- * Staleness is #1519's computation ({@link staleness} over
+ * Staleness is #1519's computation ({@link nodeStaleness}: a node whose producer reads unkeyed or unmeasured state is never fresh; then the key over
  * {@link impliedKey}), against the stored facts of the daily cache report
  * (`--stored <cache-report.json>`, matched by {@link storedFromReport}). A
  * staleness that cannot be determined is treated as stale: refresh.
@@ -47,7 +47,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { staleness, type Cache, type Staleness, type StoredFacts } from "../schemas/sdlc/cache.ts";
+import { nodeStaleness, type Cache, type Staleness, type StoredFacts } from "../schemas/sdlc/cache.ts";
 import { impliedKey, loadCaches, storedFromReport } from "./gen-caches-viz.ts";
 
 const LAYER_ROOT = resolve(import.meta.dir, "..");
@@ -172,7 +172,7 @@ export function plan(o: {
   const rows: PlanRow[] = [];
   for (const c of [...o.caches].sort((a, b) => (batchOf.get(a.id) ?? 1e9) - (batchOf.get(b.id) ?? 1e9) || a.id.localeCompare(b.id))) {
     const facts = o.stored?.[c.id];
-    const st = staleness(impliedKey(c.keyRecipe, o.root), facts);
+    const st = nodeStaleness(c, impliedKey(c.keyRecipe, o.root), facts);
     const needed = why.has(c.id);
     const neededWhy = refusedIds.has(c.id)
       ? `refused: ${refused.find((r) => r.id === c.id)!.why}`

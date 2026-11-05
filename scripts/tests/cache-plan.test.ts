@@ -25,6 +25,7 @@ const node = (id: string, over: Partial<Cache> = {}): Cache =>
     savePolicy: "main",
     verify: "v",
     uses: ["x.sh:1"],
+    stateInputs: { reads: "none", how: "fixture" },
     ...over,
   }) as Cache;
 
@@ -136,3 +137,12 @@ test("fresh (implied key equals the stored key) → restore; a different stored 
   expect(stale.rows[0].staleness).toBe("stale");
   expect(stale.rows[0].action).toBe("refresh-whole");
 });
+
+test("a needed node whose producer reads unmeasured state is refreshed, never restored", () => {
+  const n = node("pages", { materializes: ["docs/"], needs: [], stateInputs: { reads: "unmeasured" } });
+  const p = plan({ caches: [n], recorded: [{ writers: { w: { reads: { "docs/a.html": "f" } } } }], targets: ["w"], root: "/", stored: { pages: { key: "pages-x" } } });
+  const row = p.rows.find((r) => r.id === "pages")!;
+  expect(row.staleness).toBe("undetermined");
+  expect(row.action).not.toBe("restore");
+});
+
