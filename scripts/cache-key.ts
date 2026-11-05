@@ -43,6 +43,7 @@
  * #2957/#2958, re-verify those).
  *
  *   bun run cat cache:key <script>
+ *   bun run cat cache:key --base <script>     # the cone's tree-free base (`coneFingerprint`)
  *   bun run cat cache:key --hash-files <path>...
  *   bun run cat cache:publish <step> [--dry-run] [--remote origin]
  *   bun run cat cache:publish <step> (--script <s> | --hash-files <p>...) --paths <p>... [--dry-run]
@@ -55,6 +56,7 @@ import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 
 import { homedir, tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { checkoutRootFor } from "../schemas/kg/cat-harness.ts";
+import { coneFingerprint } from "./ci-cone.ts";
 import { checkFingerprint, FileDigests, qaBaselineIdentity, type Fingerprint } from "./input-hash.ts";
 import { collectTaskIo } from "./task-io.ts";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
@@ -63,8 +65,12 @@ import { HARNESS_ROOT } from "./lib/roots.ts";
 /** Bump with the `cs1` of `cached-step.sh`: the namespace of every entry. */
 export const NS = "cs1";
 
-/** How a key is derived: from a script's fingerprint, or from files a lock pins. */
-export type KeySource = { script: string } | { hashFiles: readonly string[] };
+/**
+ * How a key is derived: from a script's fingerprint, from its TREE-FREE cone
+ * base (`base`: the result store's and the cone's own key half, whose read-set
+ * match stays in `ci-cone.ts`), or from files a lock pins.
+ */
+export type KeySource = { script: string; base?: boolean } | { hashFiles: readonly string[] };
 
 /** The `exact` steps a committer may publish, as the workflows call them. */
 export const STEPS: Readonly<Record<string, { key: KeySource; paths: readonly string[] }>> = {
@@ -91,7 +97,11 @@ export function keyOf(root: string, source: KeySource): string | { undetermined:
   const scripts = scriptsOf(root);
   if (scripts[source.script] === undefined) return { undetermined: `no package script \`${source.script}\`` };
   const io = collectTaskIo(root)[source.script];
-  const fp: Fingerprint = checkFingerprint(root, scripts, source.script, io, new FileDigests(root), qaBaselineIdentity());
+  const digests = new FileDigests(root);
+  const baseline = qaBaselineIdentity({ repoRoot: root });
+  const fp: Fingerprint = source.base === true
+    ? coneFingerprint(root, scripts, source.script, io, digests, baseline)
+    : checkFingerprint(root, scripts, source.script, io, digests, baseline);
   return "hash" in fp ? fp.hash : { undetermined: fp.undetermined };
 }
 
@@ -161,9 +171,10 @@ function main(argv: string[]): number {
   if (cmd === "key") {
     const hf = list("--hash-files");
     if (hf !== undefined) return report(keyOf(root, { hashFiles: hf }));
-    const script = rest[0];
-    if (script === undefined || script.startsWith("--")) { console.error("usage: cache:key <script> | --hash-files <path>..."); return 2; }
-    return report(keyOf(root, { script }));
+    const base = flag("--base");
+    const script = rest.find((a) => !a.startsWith("--"));
+    if (script === undefined) { console.error("usage: cache:key [--base] <script> | --hash-files <path>..."); return 2; }
+    return report(keyOf(root, { script, base }));
   }
 
   if (cmd === "publish") {
