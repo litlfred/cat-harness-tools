@@ -23,8 +23,8 @@ name: Folio site publish
 #       with:
 #         plan: ${{ inputs.plan }}
 #
-# On the default branch it publishes the gh-pages root (keeping STAGING/ and
-# _render-log/); on any other branch, the preview at STAGING/<branch>/.
+# On the default branch it publishes the gh-pages root (keeping branches/ and
+# _render-log/); on any other branch, the preview at branches/<branch>/.
 
 on:
   workflow_call:

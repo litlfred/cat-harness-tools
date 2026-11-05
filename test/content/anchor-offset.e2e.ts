@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 /**
- * A JUMP LANDS BELOW THE STAGING BANNER AND THE SITE BAR — owner, 2026-10-31,
+ * A JUMP LANDS BELOW THE branches/ BANNER AND THE SITE BAR — owner, 2026-10-31,
  * on dth-pc staging: "clicking on anchor link for Zambia scrolls the title out
  * of frame" (option A: offset every jump target by the live header height).
  *

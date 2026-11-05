@@ -2,24 +2,32 @@
 /**
  * Workflow YAML that GitHub will actually parse.
  *
- * A workflow GitHub cannot parse does not fail loudly: it produces a run
- * named by its file path instead of its `name:`. And `yaml.safe_load`
- * accepts duplicate keys (most loaders keep the last), so "it parses
- * locally" is not evidence.
+ * ## Why a local check, when CI already runs the workflows
  *
- * Checked:
+ * Because a workflow GitHub cannot parse does not fail loudly — it produces a
+ * run **named by its file path instead of its `name:`**, because there is no
+ * `name:` to read. `AGENTS.md` records two workflows that failed this way on
+ * 2026-08-07 and stayed red for a day. I reproduced it on 2026-09-18 by adding
+ * a second `env:` block to a step that already had one.
  *
- * - **Duplicate keys at any level.**
+ * The trap is that **`yaml.safe_load` accepts duplicate keys** — the YAML spec
+ * says they are invalid, but most loaders take the last one silently. So
+ * "it parses locally" is not evidence, and that is exactly what I relied on.
+ *
+ * ## What is checked
+ *
+ * - **Duplicate keys at any level.** The failure above.
  * - **`${{ }}` inside a `run:` body**, where the expression is substituted into
  *   the script TEXT before the shell parses it. Trusted contexts are allowed;
  *   anything attacker-controlled is an error. See
  *   `skills/conduct/conduct-core/untrusted-input.md`.
  * - **A job that pushes `gh-pages` with no protection against the race.**
- *   Either the shared `gh-pages-push` concurrency group, or a retry.
+ *   Either the shared `gh-pages-push` concurrency group, or a retry. One or
+ *   the other, because they all contend for a single ref.
  * - **A job that REPLACES the whole publish branch without carrying the open
- *   PRs' `STAGING/` previews across.**
- * - **A push to `qa-reports` that does not go through `qa-store.ts`**
- *   (`qa-reports-unretried`).
+ *   PRs' `branches/` previews across.** Bean `plj1`.
+ * - **A push to `qa-reports` that does not go through `qa-store.ts`.** Bean
+ *   `16ei`: `qa-reports-unretried`.
  *
  * @module scripts/check-workflows
  * @covers none — .github/workflows/ is not a declared graph typology
@@ -29,6 +37,7 @@ import { parse, parseDocument } from "yaml";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { repoRootFor } from "../schemas/kg/cat-harness.js";
+import { PREVIEW_PREFIX } from "./lib/preview-prefix.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DIR = join(repoRootFor(ROOT), ".github", "workflows");
@@ -267,7 +276,7 @@ function ghPagesUngrouped(text: string, file: string): WorkflowFinding[] {
 }
 
 /** The directory on the publish branch that holds the per-PR review previews. */
-const STAGING_PREFIX = "STAGING";
+const STAGING_PREFIX = PREVIEW_PREFIX;
 
 /** The script that carries them across a full replace. */
 const RESTORE_SCRIPT = "scripts/restore-staging.ts";
@@ -283,7 +292,7 @@ const RESTORE_SCRIPT = "scripts/restore-staging.ts";
  * `docs-site.yml` was the only one of this repository's six `gh-pages`
  * publishers in that shape, and it is the one that fires on every push to
  * `main` — so the most frequently run publisher was the only one that wiped,
- * and what it wiped was `STAGING/`.
+ * and what it wiped was `branches/`.
  *
  * Measured on the real branch, 2026-09-19: three `docs(gh-pages)` commits in a
  * 25-minute window, carrying 1, 3 and 1 previews on their respective parents
@@ -305,7 +314,7 @@ const RESTORE_SCRIPT = "scripts/restore-staging.ts";
  *   the main site's own deleted pages from ever disappearing.)
  * - **a non-empty `destination_dir`** — the replace is scoped to a
  *   subdirectory, so the previews beside it are untouched. `feature-staging`
- *   writes `STAGING/<slug>` this way.
+ *   writes `branches/<slug>` this way.
  * - **a publish branch other than the one the previews live on** — a different
  *   branch is a different site.
  */

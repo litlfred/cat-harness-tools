@@ -19,7 +19,7 @@
  * | `_data/<name>.*` | every page whose Liquid reads `site.data.<name>`, and every page an include that reads it reaches |
  * | `_layouts/`, `_sass/`, `_config.yml`, another `_` directory | any page: `undetermined`, `scope: all` |
  * | `payload/` (excluded from Jekyll, copied verbatim after the build) | the same path, as data |
- * | a file outside the composed tree | through the STAGING CONE (`staging-cone.ts`) |
+ * | a file outside the composed tree | through the branches/ CONE (`staging-cone.ts`) |
  *
  * ## An include the theme may call is reached by every page
  *

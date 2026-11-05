@@ -354,7 +354,7 @@ export interface NavbarModel {
    *   Jekyll's `relative_url` filter, which applies the baseurl at build time.
    *   A Jekyll page cannot use a resolved href: the same include is rendered
    *   into pages at every depth, and the site is served from `/folio-assistant/`
-   *   on the canonical deploy and from `/folio-assistant/STAGING/<branch>/` on a
+   *   on the canonical deploy and from `/folio-assistant/branches/<branch>/` on a
    *   preview. `68au` is what omitting the filter costs — every graph tile in
    *   the navbar 404'd.
    *

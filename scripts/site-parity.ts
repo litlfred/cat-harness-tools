@@ -24,7 +24,7 @@
  * carries on none, or carries on its `index.html` and the candidate's
  * `index.html` does not, is a SHORTFALL; so is a directory or the stamp that
  * the current root has and the candidate lacks. Directories the publish keeps
- * (previews under `branches/`, `STAGING/`) are not the candidate's to carry
+ * (previews under `branches/`, `branches/`) are not the candidate's to carry
  * and are left out of both sides.
  *
  * ## Directories and features dropped by a ruling

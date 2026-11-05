@@ -70,6 +70,7 @@
     "scripts/partition/instance-rules.ts::schemas/sdlc/input-trace.ts",
     "scripts/partition/instance-rules.ts::schemas/sdlc/kg-qa.ts",
     "scripts/partition/instance-rules.ts::schemas/sdlc/log-entry.ts",
+    "scripts/partition/instance-rules.ts::schemas/sdlc/preview-prefix.ts",
     "scripts/partition/instance-rules.ts::schemas/sdlc/python-deps.ts",
     "scripts/partition/instance-rules.ts::schemas/sdlc/staging-preview.ts",
     "scripts/partition/instance-rules.ts::schemas/sdlc/test-plan.ts",

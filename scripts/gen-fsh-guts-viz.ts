@@ -9,7 +9,7 @@
  *
  * The graph is deliberately absent from the published site, so the page is
  * declared `publish: "staging-only"` and `compose-docs.ts` withholds it unless
- * told `--staging`. A local build or a `STAGING/<slug>/` preview has the page;
+ * told `--staging`. A local build or a `branches/<slug>/` preview has the page;
  * the published site does not.
  *
  * It is an INDEX: each entry links to the file on GitHub rather than

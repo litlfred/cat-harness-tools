@@ -28,7 +28,7 @@ describe("safeSegment refuses what a path segment must not be", () => {
 
   it("refuses the empty string, because join(base, '') is base itself", () => {
     // This is `plj1` one layer down: an empty slug made
-    // `rm -rf "pages/STAGING/$SLUG"` delete every preview. An empty id turns a
+    // `rm -rf "pages/branches/$SLUG"` delete every preview. An empty id turns a
     // per-item operation into a whole-store one.
     expect(safeSegment("")).toBeUndefined();
   });

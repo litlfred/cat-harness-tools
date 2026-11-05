@@ -19,7 +19,7 @@
  * `/docs/<instance>/` — so a document-relative `href` 404s under one of them,
  * and an absolute site URL would bake in the publication base (what
  * `canonicalUrl` exists to stop) and break staging previews under
- * `/STAGING/<branch>/`. `siteRootOf` below derives the root and the inlined
+ * `/branches/<branch>/`. `siteRootOf` below derives the root and the inlined
  * `client` applies the SAME pattern object, passed in by the caller, so there
  * is one expression. `folio-mount.test.ts` runs the shipped bytes to check it.
  *

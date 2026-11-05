@@ -1,6 +1,8 @@
 #!/usr/bin/env bun
 /**
- * Carry the open PRs' `STAGING/` previews across a full-replace `gh-pages` deploy.
+ * Carry the open PRs' `branches/` previews across a full-replace `gh-pages` deploy.
+ *
+ * ## The defect this exists for — bean `plj1`
  *
  * `peaceiris/actions-gh-pages@v4` with `keep_files: false` and no
  * `destination_dir` does exactly this at push time (its own
@@ -8,26 +10,49 @@
  *
  * ```
  * git clone --depth=1 --single-branch --branch gh-pages <remote> workDir
- * git rm -r --ignore-unmatch '*'      # ← everything on the branch, STAGING included
+ * git rm -r --ignore-unmatch '*'      # ← everything on the branch, branches/ included
  * cp -R publish_dir/* workDir/
  * ```
  *
- * so a full-replace publisher (`docs-site.yml`) would silently delete every
- * open PR's review preview.
+ * `docs-site.yml` is the ONLY `gh-pages` publisher in this repository without
+ * `keep_files: true` — measured against all six, 2026-09-19 — and it is the one
+ * that fires on every push to `main` touching `docs/`, `processes/`,
+ * `schemas/` or four scripts. So the most frequently run publisher was the only
+ * one that wiped, and what it wiped was every open PR's review preview.
+ *
+ * Measured on the real `gh-pages` history, 2026-09-19 — every `docs(gh-pages)`
+ * commit in the window deleted every preview its own parent carried:
+ *
+ * | deploy | previews on parent | previews after |
+ * |---|---|---|
+ * | `a9c58f8ec` | 1 | 0 |
+ * | `498edc4d1` | 3 | 0 |
+ * | `d98ad6c82` | 1 | 0 |
+ *
+ * It is silent: the staging push succeeds, the bot comments the URL on the PR,
+ * the check run is green, and an unrelated merge to `main` removes the artefact
+ * minutes later. A reviewer following the link gets a 404 with nothing anywhere
+ * saying why — and `AGENTS.md`'s merge discipline turns on staging being the
+ * place a human assesses a rendered artefact.
  *
  * ## Why not `keep_files: true`
  *
- * `keep_files` is not path-scoped (and `exclude_assets` filters the SOURCE
- * directory, not the branch), so it would also keep the main site's deleted
- * pages forever. Restoring `STAGING/` into the publish directory keeps both
- * halves: the main site is still a full replace, so a removed page goes; the
- * previews are part of what is published, so they stay.
+ * Because `keep_files` is not path-scoped and the action offers nothing that
+ * is — its `action.yml` has `keep_files`, `force_orphan` and `exclude_assets`,
+ * and `exclude_assets` filters the SOURCE directory, not the branch. So
+ * `keep_files: true` would also stop the main site's own deleted pages from
+ * ever disappearing: rename a doc and both the old and the new URL serve
+ * forever, and nothing would ever report it.
+ *
+ * Restoring `branches/` into the publish directory keeps both halves: the main
+ * site is still a full replace, so a removed page goes; the previews are part
+ * of what is published, so they stay.
  *
  * ## "Could not determine" is a third state, and it is the important one
  *
  * An unreadable `gh-pages` must NEVER render as "there are no previews to
- * keep" — that reading deploys the wipe. Four outcomes, and only the first
- * three are allowed to continue:
+ * keep" — that reading deploys the wipe this module exists to stop. Four
+ * outcomes, and only the first three are allowed to continue:
  *
  * - **`restored`** — the branch was read and carries previews; they are now in
  *   the publish directory.
@@ -36,17 +61,22 @@
  *   `git ls-remote --exit-code` says so with exit 2, which is distinct from a
  *   failure.
  * - **`unknown`** — the branch could not be read. Exit **2**, which fails the
- *   deploy step on purpose.
+ *   deploy step on purpose, the same way `translation:index` fails it rather
+ *   than publish a navbar whose translation set could not be determined.
  *
- * ## `--verify`
+ * ## `--verify`, because a green run proves nothing here
  *
- * The action re-clones `gh-pages` itself at push time, so a `feature-staging`
- * deploy landing in the seconds between this restore and that clone could
- * still be removed. So the restore records what it restored (`--state`), and
- * `--verify` re-reads the branch afterwards and exits non-zero naming any
- * preview that did not survive. A new preview pushed in the window is ADDED,
- * never missing, so the comparison has no false positives. `unknown` there is
- * exit 2 again.
+ * The action re-clones `gh-pages` itself at push time, so there is a window of
+ * a few seconds between this restore and that clone in which a
+ * `feature-staging` deploy can land a preview that the push then removes. That
+ * window is seconds against the whole of every deploy before this change, but
+ * it is not zero, and a loss inside it would be exactly as silent as the defect.
+ *
+ * So the restore records what it restored (`--state`), and `--verify` re-reads
+ * the branch afterwards and exits non-zero naming any preview that did not
+ * survive. A new preview pushed in the window is ADDED, never missing, so the
+ * comparison has no false positives. `unknown` there is exit 2 again — a
+ * verifier that has gone blind must not read as a pass.
  *
  * Usage:
  * ```sh
@@ -63,9 +93,10 @@ import { join, resolve } from "node:path";
 
 import { RENDER_LOG_DIR } from "../schemas/ui/render-log.ts";
 import { PC_PREFIX } from "./publish-main-site.ts";
+import { LEGACY_PREVIEW_PREFIX, PREVIEW_PREFIX, PREVIEW_PREFIXES } from "./lib/preview-prefix.ts";
 
-/** Where the previews live on the publish branch. */
-export const STAGING_PREFIX = "STAGING";
+/** Where the previews are written on the publish branch (`lib/preview-prefix.ts`); the old name, kept for its importers. */
+export const STAGING_PREFIX = PREVIEW_PREFIX;
 
 /**
  * The retired-record store under {@link STAGING_PREFIX} — bean `6pfo`. A
@@ -99,7 +130,7 @@ export const SLUG_PATTERN = /^[A-Za-z0-9._-]+$/;
  * **Unconditionally, and that is the difference from a preview.** A preview
  * belongs to an open pull request; a log entry about a CLOSED one is exactly
  * what a liveness-gated carry would drop, and exactly what somebody asking
- * "what happened to `STAGING/x`" needs most.
+ * "what happened to `branches/x`" needs most.
  *
  * A list rather than one constant because this is the second tenant of the
  * same rule — `skills/ui/ui-core/render-logging.md` for the first, and bean
@@ -110,7 +141,7 @@ export const SLUG_PATTERN = /^[A-Za-z0-9._-]+$/;
  * (`pc-release.ts`): the public cited their lines, so a deploy must never
  * drop one.
  */
-export const CARRIED_PREFIXES: readonly string[] = [RENDER_LOG_DIR, `${STAGING_PREFIX}/${RETIRED_DIR}`, PC_PREFIX];
+export const CARRIED_PREFIXES: readonly string[] = [RENDER_LOG_DIR, ...PREVIEW_PREFIXES.map((p) => `${p}/${RETIRED_DIR}`), PC_PREFIX];
 
 export interface RestoreOptions {
   /** Git working directory the commands run in. */
@@ -121,6 +152,12 @@ export interface RestoreOptions {
   branch: string;
   /** The directory on the branch holding the previews. */
   prefix: string;
+  /**
+   * Older preview directories carried as well (`branches/`, `lib/preview-prefix.ts`).
+   * Their previews are named `<legacy prefix>/<slug>` in the outcome, so a
+   * slug under `prefix` keeps its bare name.
+   */
+  legacyPrefixes?: readonly string[];
   /** The publish directory the deploy will replace the branch with. */
   site: string;
 }
@@ -216,7 +253,7 @@ function retiredSlugs(repo: string, rev: string, prefix: string): Set<string> | 
  * deploy then restored the branch's previews from a read taken before that
  * commit and put all of them back. Measured 2026-10-02 on `gh-pages`:
  * `a46c58ca9df` removed 1615 files under
- * `STAGING/claude-fervent-brahmagupta-rbwhzm/` and `93ffa64488c`, the next
+ * `branches/claude-fervent-brahmagupta-rbwhzm/` and `93ffa64488c`, the next
  * `docs(gh-pages)` full replace, re-added all 1615 — leaving a retirement
  * record asserting a removal that had been undone.
  *
@@ -236,8 +273,30 @@ function previewsAt(repo: string, rev: string, prefix: string): string[] | { rea
   return kids.out
     .split("\n")
     .map((s) => s.trim())
-    .filter((s) => s !== "" && !(prefix === STAGING_PREFIX && s === RETIRED_DIR) && !retired.has(s))
+    .filter((s) => s !== "" && s !== RETIRED_DIR && !retired.has(s))
     .sort();
+}
+
+/**
+ * The previews under `o.prefix` (bare slugs) and under each legacy prefix
+ * (`<legacy>/<slug>`), or a reason they could not be read.
+ */
+function allPreviewsAt(o: RestoreOptions, rev: string): string[] | { reason: string } {
+  const found = previewsAt(o.repo, rev, o.prefix);
+  if (!Array.isArray(found)) return found;
+  const all = [...found];
+  for (const legacy of o.legacyPrefixes ?? []) {
+    if (legacy === o.prefix) continue;
+    const old = previewsAt(o.repo, rev, legacy);
+    if (!Array.isArray(old)) return old;
+    all.push(...old.map((s) => `${legacy}/${s}`));
+  }
+  return all;
+}
+
+/** The branch path of an {@link allPreviewsAt} entry. */
+function previewBranchPath(o: RestoreOptions, entry: string): string {
+  return (o.legacyPrefixes ?? []).some((l) => l !== o.prefix && entry.startsWith(`${l}/`)) ? entry : `${o.prefix}/${entry}`;
 }
 
 /** Does `rev` carry anything at `prefix`? A reason rather than a bare false. */
@@ -257,7 +316,7 @@ function prefixExists(repo: string, rev: string, prefix: string): boolean | { re
  *
  * **A LIST rather than one prefix**, because the previews are no longer carried
  * wholesale: a retired slug must not be laid back down, and archiving
- * `STAGING/` entire would copy it whatever the caller had decided. Naming the
+ * `branches/` entire would copy it whatever the caller had decided. Naming the
  * paths keeps the decision in {@link previewsAt}, where it is tested, instead
  * of writing the directories out and deleting some again.
  *
@@ -291,7 +350,7 @@ function copyPaths(repo: string, rev: string, paths: readonly string[], into: st
  *
  * Two things, and the difference between them is the point:
  *
- * - **the previews**, `STAGING/`, because a reviewer's link would 404;
+ * - **the previews**, `branches/`, because a reviewer's link would 404;
  * - **{@link CARRIED_PREFIXES}**, UNCONDITIONALLY — before the preview check
  *   and whatever it says. The early `empty` return used to leave this function
  *   the moment there were no previews, which would carry the record of the
@@ -341,13 +400,13 @@ export function restoreStaging(o: RestoreOptions): RestoreOutcome {
     carried.push({ prefix, state: "carried" });
   }
 
-  const found = previewsAt(o.repo, "FETCH_HEAD", o.prefix);
+  const found = allPreviewsAt(o, "FETCH_HEAD");
   if (!Array.isArray(found)) return { state: "unknown", previews: [], carried: [], reason: found.reason };
   if (found.length === 0) return { state: "empty", previews: [], carried };
 
   // Only the previews `previewsAt` kept — naming them is what leaves a retired
   // slug on the branch instead of laying it back down.
-  const copied = copyPaths(o.repo, "FETCH_HEAD", found.map((s) => `${o.prefix}/${s}`), into);
+  const copied = copyPaths(o.repo, "FETCH_HEAD", found.map((s) => previewBranchPath(o, s)), into);
   if (copied !== true) return { state: "unknown", previews: [], carried: [], reason: copied.reason };
   return { state: "restored", previews: found, carried };
 }
@@ -371,7 +430,7 @@ export function restoreStaging(o: RestoreOptions): RestoreOutcome {
  * this argument is not hypothetical**: `gh-pages` commit `96926833b5`, a
  * `docs(gh-pages)` full replace, deleted `_render-log/2026-09-20.jsonl` —
  * present at its parent, `D` at the commit — and the deploy's own verify step
- * passed, because it only ever looked at `STAGING/`. A verifier blind to half
+ * passed, because it only ever looked at `branches/`. A verifier blind to half
  * of what the restore carried reports a clean run over the loss it exists to
  * catch.
  */
@@ -388,7 +447,7 @@ export function verifyStaging(o: RestoreOptions, expected: string[], carried: st
   if (fetched.code !== 0) {
     return { state: "unknown", expected, reason: `git fetch exited ${fetched.code}: ${fetched.err.trim()}` };
   }
-  const now = previewsAt(o.repo, "FETCH_HEAD", o.prefix);
+  const now = allPreviewsAt(o, "FETCH_HEAD");
   if (!Array.isArray(now)) return { state: "unknown", expected, reason: now.reason };
 
   // A prefix whose presence cannot be READ is `unknown`, never "lost" and
@@ -484,7 +543,9 @@ if (import.meta.main) {
     repo: arg("repo", process.cwd()),
     remote: arg("remote", "origin"),
     branch: arg("branch", "gh-pages"),
-    prefix: arg("prefix", STAGING_PREFIX),
+    prefix: arg("prefix", PREVIEW_PREFIX),
+    // With no `--prefix`, the previews still under the old directory are carried too.
+    legacyPrefixes: process.argv.includes("--prefix") ? [] : [LEGACY_PREVIEW_PREFIX],
     site: arg("site", "./_site"),
   };
   const statePath = arg("state", "");

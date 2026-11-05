@@ -111,7 +111,7 @@ describe("the PR comment", () => {
     const tip = { committedMs: NOW - MIN, subject: "staging(foo): x" };
     const body = stagingComment({ ...base, state: "queued", tip });
     expect(body.startsWith(COMMENT_MARKER)).toBe(true);
-    expect(body).toContain("https://o.github.io/r/STAGING/my-branch/");
+    expect(body).toContain("https://o.github.io/r/branches/my-branch/");
     expect(body).toContain("`0123456`");
     expect(body).toMatch(/staged/);
     const e = estimateLive(tip, NOW);
@@ -135,7 +135,7 @@ describe("the PR comment", () => {
 });
 
 describe("the pages to review (deep links, bean g4dv)", () => {
-  const STAGING = "https://o.github.io/r/STAGING/s/";
+  const STAGING = "https://o.github.io/r/branches/s/";
   const MAIN = "https://o.github.io/r/";
   type ImpactFile = RenderedImpact["files"][number];
   const impact = (
@@ -155,7 +155,7 @@ describe("the pages to review (deep links, bean g4dv)", () => {
     const body = stagingComment(base);
     expect(body).toContain("No page list was computed for this build");
     expect(body).not.toMatch(/no rendered page|nothing changed/i);
-    expect(body).toContain("https://o.github.io/r/STAGING/s/");
+    expect(body).toContain("https://o.github.io/r/branches/s/");
   });
 
   test("a changed page links deep into the preview and the same page on main, per anchor", () => {
@@ -316,7 +316,13 @@ describe("the stage job waits at the gate before every push", () => {
   test("gate after the re-read, before the copy and the push; slept means re-read", () => {
     const reset = body.indexOf("git -C pages reset --hard FETCH_HEAD");
     const gate = body.indexOf("staging-push-gate.ts gate --dir pages");
-    const copy = body.indexOf('cp -R _site/. "pages/STAGING/$STAGING_SLUG/"');
+    // The copy names the preview directory; either form is accepted, because
+    // this runs against the folio-assistant workflow as it is on main, which
+    // moves from `STAGING/` to `$PREVIEW_DIR` (branches/) in its own PR.
+    const copy = Math.max(
+      body.indexOf('cp -R _site/. "pages/$PREVIEW_DIR/$STAGING_SLUG/"'),
+      body.indexOf('cp -R _site/. "pages/STAGING/$STAGING_SLUG/"'),
+    );
     const push = body.indexOf("git -C pages push origin gh-pages");
     expect([reset, gate, copy, push].every((i) => i > -1)).toBe(true);
     expect(gate).toBeGreaterThan(reset);

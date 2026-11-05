@@ -214,7 +214,7 @@ describe("what it must NOT touch — each failure renders fine and is therefore 
   });
 
   test("STAGING previews are not this site", () => {
-    // Every open branch's build lives under STAGING. Railing those would
+    // Every open branch's build lives under branches/. Railing those would
     // rewrite other people's previews with THIS branch's navigation, and the
     // preview would then disagree with the branch it claims to show.
     const root = site();

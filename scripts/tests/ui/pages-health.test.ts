@@ -156,7 +156,7 @@ describe("slugOfDeployCommit — which preview a publish-branch commit is about"
 
   test("a cleanup commit names the slug it REMOVED, not the word `cleanup`", () => {
     // The defect the surviving mutation led to. `feature-staging.yml` writes
-    // `staging(cleanup): remove STAGING/<slug>` on a closed PR — `cleanup` is
+    // `staging(cleanup): remove branches/<slug>` on a closed PR — `cleanup` is
     // the operation and the slug is in the path. Read subject-first, every
     // removal in the repository became one branch called `cleanup`, and two
     // removals for two unrelated PRs then looked like this repository
@@ -176,7 +176,7 @@ describe("slugOfDeployCommit — which preview a publish-branch commit is about"
 
   test("a branch genuinely named `cleanup` still resolves", () => {
     // The cost of the fix, checked rather than assumed. A deploy commit for
-    // such a branch carries no `remove STAGING/`, so the fallback reaches it.
+    // such a branch carries no `remove branches/`, so the fallback reaches it.
     expect(slugOfDeployCommit("staging(cleanup): from abc123")).toBe("cleanup");
   });
 

@@ -68,7 +68,7 @@
  *
  * It does NOT open from `file://` — the code is inlined but the data is
  * fetched, and Chromium blocks that as cross-origin. Over any HTTP root,
- * including a staging preview under `STAGING/<slug>/`, it works with no
+ * including a staging preview under `branches/<slug>/`, it works with no
  * configuration, because every path is relative to the page.
  *
  * Usage:

@@ -3399,7 +3399,7 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
     ...(schemaIndex !== undefined ? { conformsTo: schemaIndex } : {}),
     // A preview says so in its TYPE, not only in a side-car field: "is this
     // the canonical graph?" must be answerable from the document's own type
-    // without reading a convention. This is where the `#STAGING` marker idea
+    // without reading a convention. This is where the `#branches/` marker idea
     // belongs — as a type, not as a fragment on a URL the document is not
     // served from.
     "@type": isPreview ? [`${PROV}Entity`, termIri("PreviewGraph")] : `${PROV}Entity`,

@@ -1344,7 +1344,7 @@ export const VisualisationSchema = z.object({
    * is what every visualisation did before this field existed.
    *
    * `"staging-only"` renders the page and keeps it OUT of the canonical
-   * deploy: visible in a local build and in a `STAGING/<slug>/` preview,
+   * deploy: visible in a local build and in a `branches/<slug>/` preview,
    * absent from the published site.
    *
    * ## Why a graph would want that

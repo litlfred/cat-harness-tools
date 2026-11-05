@@ -63,7 +63,7 @@ const CHECKED = checkTools();
 /**
  * A STAGING-based export, built once — the base the `io IRIs` test needs.
  *
- * Bean `sff8`. It was `await buildExport({ baseUrl: STAGING })` in the test body at
+ * Bean `sff8`. It was `await buildExport({ baseUrl: branches/ })` in the test body at
  * 4.23 s of a 5000 ms budget (85 %), and 2.6 s once `checkTools` above stopped being
  * re-run five times. Hoisted for the same reason as the rest: module scope belongs to
  * no test's timeout.
@@ -249,7 +249,7 @@ describe("tools", () => {
   });
 
   test("io IRIs follow the publication base, not the declaration", () => {
-    // A staging build published tool-types.schema.json at the STAGING url while
+    // A staging build published tool-types.schema.json at the branches/ url while
     // its Tool nodes referenced the CANONICAL one — a document that did not
     // exist yet, because the same PR introduced it. The refs looked resolvable
     // and 404'd. Found by fetching the published artefacts rather than assuming
