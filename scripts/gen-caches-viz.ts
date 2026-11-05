@@ -109,8 +109,8 @@ export function loadCaches(dir = CACHES_DIR): Loaded {
   return out;
 }
 
-/** A Markdown table cell: backslashes first (so `\|` cannot be un-escaped by a trailing `\`), then pipes, then line breaks. */
-export const cell = (s: string) => s.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+/** A Markdown table cell: backslashes and pipes in one pass (so `\|` cannot be un-escaped by a trailing `\`), then line breaks. */
+export const cell = (s: string) => s.replace(/[\\|]/g, "\\$&").replace(/\r?\n/g, " ");
 const code = (s: string) => `\`${s.replace(/`/g, "'")}\``;
 
 /** The page, deterministic: no clock, no environment, sorted. */
