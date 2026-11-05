@@ -27,5 +27,9 @@
     ".github/workflows/layer-pr-checks.yml:1418",
     ".github/workflows/layer-pr-checks.yml:1466"
   ],
-  "notes": "Saved on push only."
+  "notes": "Saved on push only.",
+  "stateInputs": {
+    "reads": "unmeasured",
+    "how": "not yet derived from a recorded read set; the producer may read state:mount graphs"
+  }
 }

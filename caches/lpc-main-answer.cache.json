@@ -18,7 +18,7 @@
     "prepare-base (skip main side)",
     "compare"
   ],
-  "savePolicy": "compare saves when join succeeded and not cached — on PRs too (PR-scoped, so only that PR re-reads)",
+  "savePolicy": "compare saves when join succeeded and not cached \u2014 on PRs too (PR-scoped, so only that PR re-reads)",
   "verify": "none: the answer is trusted by key. FINDING: no bun or runner tool versions in the key",
   "owner": "cache-first CI (CI speed 14)",
   "uses": [
@@ -28,5 +28,9 @@
     ".github/workflows/layer-pr-checks.yml:1884",
     ".github/workflows/layer-pr-checks.yml:1942"
   ],
-  "notes": "PR saves are PR-scoped, so only that PR re-reads them."
+  "notes": "PR saves are PR-scoped, so only that PR re-reads them.",
+  "stateInputs": {
+    "reads": "unmeasured",
+    "how": "not yet derived from a recorded read set; the producer may read state:mount graphs"
+  }
 }

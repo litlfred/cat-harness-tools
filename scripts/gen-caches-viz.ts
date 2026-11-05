@@ -38,6 +38,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import {
   CacheInventorySchema,
   CacheSchema,
+  nodeStaleness,
   staleness,
   type Cache,
   type CacheInventory,
@@ -135,7 +136,7 @@ export function render(loaded: Loaded, root: string, stored: Readonly<Record<str
   for (const c of [...loaded.caches].sort((a, b) => a.id.localeCompare(b.id))) {
     const implied = impliedKey(c.keyRecipe, root);
     const facts = stored?.[c.id];
-    const st = staleness(implied, facts);
+    const st = nodeStaleness(c, implied, facts);
     const stCell = st.state === "current" ? "current" : st.state === "stale" ? `**stale** (holds ${code(st.stored.slice(0, 24))}…)` : `undetermined — ${st.why}`;
     const recipe = `${c.keyRecipe.source}${c.keyRecipe.expression ? `: ${code(c.keyRecipe.expression)}` : ""}`;
     const facts3 = facts === undefined

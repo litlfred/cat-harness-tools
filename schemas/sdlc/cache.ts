@@ -127,6 +127,25 @@ export const CacheSchema = z
      * the target builds).
      */
     materializes: z.array(z.string().min(1)).min(1).optional(),
+    /**
+     * Whether the producer reads MUTABLE STATE the tree does not pin — a
+     * branch-kept graph (`state:mount`: the work plan `beans/`, `qa-reports`,
+     * fsh-guts…). A producer that reads one must carry that ref's commit in
+     * its key, or its entry is never current (#2966: the publish pages read
+     * the work plan's finished instances, and a cache keyed on the tree
+     * alone served a stale page). REQUIRED, so no node is silent on it:
+     * - `none`: shown to read no state mount (by construction, or by a
+     *   recorded read set that touches no state path);
+     * - `keyed`: every state ref it reads is in the key (`refs`);
+     * - `unkeyed`: it reads state the key does not carry — never current;
+     * - `unmeasured`: not shown either way yet — never current.
+     */
+    stateInputs: z.discriminatedUnion("reads", [
+      z.object({ reads: z.literal("none"), how: z.string().min(1) }).strict(),
+      z.object({ reads: z.literal("keyed"), refs: z.array(z.string().min(1)).min(1), how: z.string().min(1) }).strict(),
+      z.object({ reads: z.literal("unkeyed"), refs: z.array(z.string().min(1)).min(1).optional(), how: z.string().min(1) }).strict(),
+      z.object({ reads: z.literal("unmeasured"), how: z.string().min(1).optional() }).strict(),
+    ]),
     /** The ids of the caches this one is built over, so restores and refreshes go in order (`Process_Cache`). */
     needs: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]*$/)).optional(),
     /**
@@ -194,6 +213,25 @@ export type Staleness =
  * Staleness, computed: the implied key against the stored key. Either side
  * unknown is `undetermined`, never `current`.
  */
+/** Why a node's entry can never be current because of the state it reads, or undefined. */
+export function stateBlocker(c: Pick<Cache, "stateInputs">): string | undefined {
+  const s = c.stateInputs;
+  if (s.reads === "unkeyed") return `its producer reads state the key does not carry${s.refs ? ` (${s.refs.join(", ")})` : ""}`;
+  if (s.reads === "unmeasured") return "whether its producer reads a state branch is not measured yet";
+  return undefined;
+}
+
+/**
+ * Staleness, computed: the implied key against the stored key. Either side
+ * that cannot be read is undetermined, and so is a node whose producer reads
+ * state its key does not carry, or might ({@link stateBlocker}).
+ */
+export function nodeStaleness(c: Pick<Cache, "stateInputs">, implied: string | { undetermined: string }, stored: StoredFacts | undefined, prefix = ""): Staleness {
+  const blocked = stateBlocker(c);
+  if (blocked !== undefined) return { state: "undetermined", why: blocked };
+  return staleness(implied, stored, prefix);
+}
+
 export function staleness(implied: string | { undetermined: string }, stored: StoredFacts | undefined, prefix = ""): Staleness {
   if (typeof implied !== "string") return { state: "undetermined", why: `the implied key: ${implied.undetermined}` };
   if (stored?.key === undefined) return { state: "undetermined", why: "no stored key read (the daily cache report supplies it)" };
