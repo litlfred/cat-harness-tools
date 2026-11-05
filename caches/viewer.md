@@ -7,6 +7,7 @@ Every cache this layer declares (`cache/1.0.0`, `caches/`), and the key today's 
 | cache | kind | trust | location | key recipe | implied key | stored key | staleness | size · last access · hit rate |
 |---|---|---|---|---|---|---|---|---|
 | [cat-gates-notes](#cat-gates-notes) | git-ref | b | `refs/notes/cat-gates` | cache:key: `refs/notes/cat-gates` | undetermined — one key per gate (`cache:key <gate>`), not one for the cache | from the daily report (not read) | undetermined — the implied key: one key per gate (`cache:key <gate>`), not one for the cache | from the daily report (not read) |
+| [layers-ref](#layers-ref) | git-ref | a | `refs/cat/layers/<key> (and the moving refs/cat/layers/main), in the INDEX repository` | script: `sha256(JSON.stringify(index.lock.json .instances))` | undetermined — computed only by scripts/mount-from-lock.ts#layersKey | from the daily report (not read) | undetermined — the implied key: computed only by scripts/mount-from-lock.ts#layersKey | from the daily report (not read) |
 | [lpc-cat-mount](#lpc-cat-mount) | actions-cache | a | `cat-mount-v1-` | hashFiles: `cat-mount-v1-${{ hashFiles('fa/index.lock.json') }}` | undetermined — fa/index.lock.json is not a file in this checkout | from the daily report (not read) | undetermined — the implied key: fa/index.lock.json is not a file in this checkout | from the daily report (not read) |
 | [lpc-cone](#lpc-cone) | actions-cache | c | `layer-pr-checks-cone-v1-` | cache:key --base: `layer-pr-checks-cone-v1-${repo}-<hash of the base key>` | undetermined — one key per gate (`cache:key --base <gate>`), not one for the cache | from the daily report (not read) | undetermined — the implied key: one key per gate (`cache:key --base <gate>`), not one for the cache | from the daily report (not read) |
 | [lpc-derive-cache](#lpc-derive-cache) | actions-cache | c | `derive-cache-v1-` | per-run: `derive-cache-v1-${{ github.repository }}-${{ env.SIDE }}-${{ github.run_id }}-${{ github.run_attempt }}` | undetermined — run-scoped: no key is implied between runs | from the daily report (not read) | undetermined — the implied key: run-scoped: no key is implied between runs | from the daily report (not read) |
@@ -30,6 +31,19 @@ Every cache this layer declares (`cache/1.0.0`, `caches/`), and the key today's 
 - **Verify:** re-verified off the critical path (folio-assistant #2957/#2958), never read as a hit
 - **Uses:** `cat-harness-tools/scripts/gate-record.ts:40`
 - **Notes:** Not wired in any workflow yet.
+
+### layers-ref
+
+**Layers cache ref: the composed overlay of a lock's pinned layers** — cat-harness-tools, trust class a, owner layers cache (session_01VQDpPg3qqw5ugnQBEYASrP), under cache-first CI.
+
+- **Holds:** one commit whose tree is every locked directory, declaration and asset at its mount path, exactly as mount-from-lock lays it down (no node_modules, no state mounts, nothing built at publish)
+- **Derived inputs:** the index's committed lock (index.lock.json), whose instances pin every layer's repository, commit, directories and digests
+- **Producer:** the committer who changes the lock: mount:remote publishes it after a lock change, or `bun run cat layers:publish`; fallbacks: the re-pin train and the index's layers-cache workflow on main
+- **Consumers:** mount-from-lock.ts (mount:lock), and through it .github/mount-from-lock.sh: the session-start hook, every CI job's mount, merge-main, the re-pin train, the prepared CI image build
+- **Save policy:** written when the lock changes, by its writer; refused unless every mount hashes to the lock; pruned to the newest 20 lock refs plus main and every open PR's lock
+- **Verify:** per instance, against the lock: the declaration's and each asset's sha256 and each directory's treeDigest (mount-from-lock layDownFrom); a layer that does not verify is fetched from its own repository, a missing ref falls back for all
+- **Uses:** `scripts/mount-from-lock.ts:841 layersKey`, `scripts/mount-from-lock.ts:870 openLayersCache (reader)`, `scripts/mount-from-lock.ts:974 publishLayers (writer)`, `scripts/mount-from-lock.ts:1086 layersSummaryLine (hit/warm/miss)`, `scripts/remote-mount.ts:2141 the committer's publish after a lock change`
+- **Notes:** Supersedes lpc-cat-mount and the other cat-mount Actions caches. Untrusted but exactly verified, so a stale or tampered ref only costs time. Measured on folio-assistant's lock (12 layers, ~32k files): 69 s per repository against 27 s on a hit with every byte verified. Lines are those of cat-harness-tools#1506 (head 05c346b). Every target needs it (it is the root of every needs closure), so it carries no `materializes`.
 
 ### lpc-cat-mount
 

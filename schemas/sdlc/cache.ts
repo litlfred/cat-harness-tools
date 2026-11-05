@@ -111,7 +111,31 @@ export const CacheSchema = z
     derivedInputs: z.string().min(1),
     holds: z.string().min(1),
     producer: z.string().min(1),
+    /**
+     * Who is known to read it, in words — INFORMATIVE. Which targets need a
+     * cache is derived, never taken from here (owner, 2026-11-05: "not all
+     * rendering/CI/merge processes need all caches"): a target needs it when
+     * the target's recorded read set (the CI cone, the writer cone) touches
+     * one of {@link materializes}, plus the `needs` closure of what it needs.
+     */
     consumers: z.array(z.string().min(1)).min(1),
+    /**
+     * The paths a restore lays down (checkout-relative, or `~/` for the
+     * home directory) — what lets a target's read set say it needs this
+     * cache. Absent: no read set can name it, so a plan restores it only
+     * through another cache's `needs`, or not at all (the safe direction:
+     * the target builds).
+     */
+    materializes: z.array(z.string().min(1)).min(1).optional(),
+    /** The ids of the caches this one is built over, so restores and refreshes go in order (`Process_Cache`). */
+    needs: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]*$/)).optional(),
+    /**
+     * How a stale entry is brought up to date: `incremental` (only what
+     * changed — the changed writers, modules, layers or IG delta — over the
+     * restored entry) or `whole`. A refresh never rebuilds wholesale when an
+     * incremental one is valid (owner, 2026-11-05).
+     */
+    refresh: z.object({ mode: z.enum(["incremental", "whole"]), how: z.string().min(1) }).strict().optional(),
     savePolicy: z.string().min(1),
     /** How a restored entry is checked, or why it is not. */
     verify: z.string().min(1),
