@@ -62,11 +62,17 @@ describe("auditSchemaNodes with own instances", () => {
 
   test("this layer's own run reads only this layer's directories, a subset of the whole", () => {
     const a = auditSchemaNodes(HARNESS_ROOT, "checkout", new Set(["cat-harness-tools"]));
-    expect(a.directories.length).toBeGreaterThan(0);
     for (const d of a.directories) expect(underTools(d)).toBe(true);
     const whole = new Set(modules(all));
     for (const m of modules(a)) expect(whole.has(m)).toBe(true);
-    expect(modules(a).length).toBeGreaterThan(0);
+    // Whether this layer is in the harness's corpus at all depends on the
+    // composition: a composing index stacks it on the harness, while the
+    // standalone rehearsal lays the layers out as siblings with no root
+    // above them, so from the harness this layer is not there. The scoped
+    // audit must find it exactly when the whole corpus holds it.
+    const wholeHasTools = auditSchemaNodes(HARNESS_ROOT, "checkout").directories.some(underTools);
+    expect(a.directories.length > 0).toBe(wholeHasTools);
+    expect(modules(a).length > 0).toBe(wholeHasTools);
   });
 });
 
