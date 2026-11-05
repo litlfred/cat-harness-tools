@@ -93,6 +93,25 @@ export type SiteVerdict =
   | { kind: "runs"; globs: string[] }
   | { kind: "scripts"; names: string[] };
 
+/** What `bun test` collects: `*.test.*`, `*_test.*`, `*.spec.*`, `*_spec.*` (also `affected-tests.ts`'s). */
+export const TEST_FILE_RE = /(?:\.test|_test|\.spec|_spec)\.(?:[cm]?[jt]sx?)$/;
+
+/**
+ * The one site that needs no annotation (owner ruling, 2026-11-05: "Rule for
+ * test scratch dirs"): in a TEST file, a line whose only risk is `host` and
+ * whose every host match is `tmpdir()` asks where the scratch directory goes,
+ * almost always for `mkdtempSync(join(tmpdir(), …))`. It is `inert`: what a
+ * test writes there and reads back is its own, and paths outside the
+ * checkout are the environment the cone already leaves out of read sets.
+ * `homedir()`, `hostname()`, `userInfo()` and the rest still need a reviewed
+ * annotation, in a test as anywhere.
+ */
+export function isTestScratchDir(file: string, risks: readonly string[], code: string): boolean {
+  if (!TEST_FILE_RE.test(file)) return false;
+  if (risks.length !== 1 || risks[0] !== "host") return false;
+  return /\btmpdir\s*\(/.test(code) && !RISKS.host!.test(code.replace(/\btmpdir\s*\(/g, ""));
+}
+
 /** A line of a source file that matched a risk. */
 export interface Site {
   file: string;
@@ -422,6 +441,7 @@ export function scanSource(file: string, text: string): Site[] {
       if ("error" in parsed) malformed = `SUBMODULE_SITES: ${parsed.error}`;
       else verdicts = parsed;
     }
+    if (verdicts === undefined && malformed === undefined && isTestScratchDir(file, [...risks], c)) verdicts = [{ kind: "inert" }];
     sites.push({ file, line: i + 1, risks: [...risks], pin, verdicts, ...(malformed ? { malformed } : {}), ...(main.has(i) ? { inMain: true } : {}) });
   }
   return sites;

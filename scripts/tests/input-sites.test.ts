@@ -472,3 +472,20 @@ describe("the audit walks only what can run", () => {
     expect(unannotated).toEqual([]);
   });
 });
+
+describe("the test scratch-dir rule (owner, 2026-11-05)", () => {
+  const sites = (file: string, line: string) => scanSource(file, `import { tmpdir, homedir } from "node:os";\nimport { mkdtempSync } from "node:fs";\nimport { join } from "node:path";\n${line}\n`);
+  test("tmpdir() in a test file needs no annotation: it is inert", () => {
+    const s = sites("x/a.test.ts", 'const root = mkdtempSync(join(tmpdir(), "a-"));');
+    expect(s).toHaveLength(1);
+    expect(s[0]!.verdicts).toEqual([{ kind: "inert" }]);
+  });
+  test("the same line outside a test file still needs one", () => {
+    expect(sites("x/a.ts", 'const root = mkdtempSync(join(tmpdir(), "a-"));')[0]!.verdicts).toBeUndefined();
+  });
+  test("homedir(), or tmpdir() beside another risk, still needs one in a test", () => {
+    expect(sites("x/a.test.ts", "const h = homedir();")[0]!.verdicts).toBeUndefined();
+    expect(sites("x/a.test.ts", "const p = join(tmpdir(), homedir());")[0]!.verdicts).toBeUndefined();
+    expect(sites("x/a.test.ts", "const p = join(tmpdir(), process.env.HOME!);")[0]!.verdicts).toBeUndefined();
+  });
+});
