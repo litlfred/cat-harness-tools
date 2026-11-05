@@ -30,9 +30,9 @@
     "scripts/mount-from-lock.ts:870 openLayersCache (reader)",
     "scripts/mount-from-lock.ts:974 publishLayers (writer)",
     "scripts/mount-from-lock.ts:1086 layersSummaryLine (hit/warm/miss)",
-    "scripts/remote-mount.ts:2141 the committer's publish after a lock change"
+    "scripts/remote-mount.ts:2186 the committer's publish after a lock change"
   ],
-  "notes": "Supersedes lpc-cat-mount and the other cat-mount Actions caches. Untrusted but exactly verified, so a stale or tampered ref only costs time. Measured on folio-assistant's lock (12 layers, ~32k files): 69 s per repository against 27 s on a hit with every byte verified. Lines are those of cat-harness-tools#1506 (head 05c346b). Every target needs it (it is the root of every needs closure), so it carries no `materializes`.",
+  "notes": "Supersedes lpc-cat-mount and the other cat-mount Actions caches. Untrusted but exactly verified, so a stale or tampered ref only costs time. Measured on folio-assistant's lock (12 layers, ~32k files): 69 s per repository against 27 s on a hit with every byte verified. Every target needs it (it is the root of every needs closure), so it carries no `materializes`.",
   "stateInputs": {
     "reads": "none",
     "how": "by construction: the ref holds every locked directory with no state mounts (mount-from-lock layDownFrom), and its key is the lock alone"
