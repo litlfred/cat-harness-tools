@@ -271,6 +271,21 @@ describe.skipIf(!HAS_STRACE)("the falsifiers, under a real strace (skipped where
     expect(decide("g:check").skip).toBe(false);
   });
 
+  test("the result store: a result main's latest record no longer holds is REUSED; an unseen state still runs", () => {
+    expect(record().note).toContain("result store");
+    write("data/c.json", "c2\n");
+    expect(record().note).toContain("result store");
+    // records.json now holds the c2 run; the c run lives only in the store.
+    write("data/c.json", "c\n");
+    const back = decide();
+    expect(back.skip).toBe(true);
+    expect(back.why).toContain("reused");
+    write("data/c.json", "c3\n");
+    const unseen = decide();
+    expect(unseen.skip).toBe(false);
+    expect(unseen.why).toContain("result store: none of 2 stored result(s) matches");
+  });
+
   test("a green run is recorded with what it read, and an untouched tree SKIPS", () => {
     const r = record();
     expect(r.code).toBe(0);
@@ -357,6 +372,9 @@ describe.skipIf(!HAS_STRACE)("the falsifiers, under a real strace (skipped where
     const path = join(root, "build", "ci-cone", "records.json");
     const rec = JSON.parse(readFileSync(path, "utf-8"));
     writeFileSync(path, JSON.stringify({ ...rec, version: -1 }));
+    // The same green run is also in the result store, under THIS tracer's
+    // recipe, and would rightly be reused. Without it, records.json alone decides.
+    rmSync(join(root, "build", "result-store"), { recursive: true, force: true });
     expect(decide().skip).toBe(false);
   });
 });

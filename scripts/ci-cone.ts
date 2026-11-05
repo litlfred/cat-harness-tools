@@ -84,6 +84,7 @@ import { inputSiteReached, openTrace } from "../schemas/sdlc/input-trace.ts";
 import { isProjection, projectedState, type ProjectionName } from "../schemas/sdlc/read-projections.ts";
 import { collectTaskIo } from "./task-io.ts";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
+import { findReusable, putResult, STORE_DIR } from "./result-store.ts";
 
 /** Bump when the parser or the read-set rules change. A record from another version is ignored, so every check runs. */
 export const TRACER_VERSION = 3;
@@ -602,6 +603,7 @@ function repoRelative(roots: readonly string[], abs: string): string | undefined
 export function excluded(rel: string, byGit: boolean): boolean {
   if (rel === "node_modules" || rel.startsWith("node_modules/")) return true;
   if (rel === CONE_DIR || rel.startsWith(`${CONE_DIR}/`)) return true;
+  if (rel === STORE_DIR || rel.startsWith(`${STORE_DIR}/`)) return true;
   // input-site: inert #6e4de56e — the input-hash cache directory, which every read set leaves out
   const cacheDir = join("build", "regen-cache");
   if (rel === cacheDir || rel.startsWith(`${cacheDir}/`)) return true;
@@ -781,11 +783,36 @@ export function coneFingerprint(
 
 export type ConeDecision = { skip: true; sha: string; why: string } | { skip: false; why: string };
 
+/** The recipe a stored result is filed under: an entry from another tracer or fingerprint recipe is never offered. */
+export const STORE_RECIPE = `cone-${TRACER_VERSION}/f017-${RECIPE_VERSION}`;
+
+/**
+ * Main's record first, then every stored green result of the same check
+ * (`result-store.ts`). The store is what lets a PR on an older base, or a
+ * merge-train run, reuse a result main's latest record no longer holds.
+ */
+export function decideWithStore(records: ConeRecords | undefined, script: string, fp: Fingerprint, root: string, digests: FileDigests): ConeDecision {
+  const first = decideCone(records, script, fp, root, digests);
+  if (first.skip || "undetermined" in fp) return first;
+  const found = findReusable<ConeCheck>(root, script, STORE_RECIPE, (e) => matchCheck(e, fp, root, digests));
+  return found.reuse ? { skip: true, sha: found.result.entry.sha, why: found.why } : { skip: false, why: `${first.why}; result store: ${found.why}` };
+}
+
 /** Whether a PR may skip `script`: its fingerprint and every recorded path match main's green run exactly. */
 export function decideCone(records: ConeRecords | undefined, script: string, fp: Fingerprint, root: string, digests: FileDigests): ConeDecision {
   if (records === undefined) return { skip: false, why: "no record from a green main run" };
   const rec = records.checks[script];
   if (rec === undefined) return { skip: false, why: `main's run ${records.sha.slice(0, 12)} recorded nothing for this check` };
+  return matchCheck(rec, fp, root, digests);
+}
+
+/**
+ * Whether the inputs now are exactly those of one recorded green run: the same
+ * fingerprint, the same state at every path it read, and the same answer from
+ * every git command it ran. The one rule both `records.json` and the result
+ * store (`result-store.ts`) decide by.
+ */
+export function matchCheck(rec: ConeCheck, fp: Fingerprint, root: string, digests: FileDigests): ConeDecision {
   if ("undetermined" in fp) return { skip: false, why: `inputs could not be determined: ${fp.undetermined}` };
   if (fp.hash !== rec.base) return { skip: false, why: "the script, its imports, the audited environment or the baseline changed" };
   for (const [p, state] of Object.entries(rec.reads)) {
@@ -864,6 +891,10 @@ export interface ConeRunOpts {
   baseline: BaselineResolver | undefined;
   /** The main commit this run is on (`GITHUB_SHA`). */
   sha: string;
+  /** When the run finished, for ordering result-store entries; never part of a key. */
+  recordedAt?: string;
+  /** What names the run in a reuse report (`<sha> run <id>`); defaults to `sha`. */
+  run?: string;
   /** `ignore` silences the check's own output (tests). */
   stdio?: "inherit" | "ignore";
   /** What runs a script by name: `bun run cat` (bean `ar1s` P4), which tests replace. */
@@ -962,7 +993,8 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
       note = `not recorded — ${rec.none}`;
     } else {
       records.checks[o.script] = rec;
-      note = `recorded (${Object.keys(rec.reads).length} paths)`;
+      const digest = putResult<ConeCheck>(o.root, { gate: o.script, recipe: STORE_RECIPE, recordedAt: o.recordedAt ?? "", run: o.run ?? o.sha, entry: rec });
+      note = `recorded (${Object.keys(rec.reads).length} paths; result store ${digest.slice(0, 12)})`;
     }
     saveRecords(o.root, records);
   } catch (e) {
@@ -979,7 +1011,7 @@ export function decideRun(o: Omit<ConeRunOpts, "sha" | "stdio" | "runner">): Con
   try {
     const digests = new FileDigests(o.root);
     const fp = coneFingerprint(o.root, o.scripts, o.script, o.io, digests, o.baseline);
-    return decideCone(loadRecords(o.root), o.script, fp, o.root, digests);
+    return decideWithStore(loadRecords(o.root), o.script, fp, o.root, digests);
   } catch (e) {
     return { skip: false, why: `could not decide: ${(e as Error).message}` };
   }
@@ -1014,7 +1046,7 @@ export function decideAll(o: {
   for (const script of o.names) {
     try {
       const fp = coneFingerprint(o.root, o.scripts, script, o.ioOf(script), digests, o.baseline);
-      decisions[script] = { ...decideCone(records, script, fp, o.root, digests), candidate: !("undetermined" in fp) };
+      decisions[script] = { ...decideWithStore(records, script, fp, o.root, digests), candidate: !("undetermined" in fp) };
     } catch (e) {
       decisions[script] = { skip: false, why: `could not decide: ${(e as Error).message}`, candidate: false };
     }
@@ -1095,7 +1127,11 @@ function main(argv: readonly string[]): number {
     summary(`- \`${script}\` SKIPPED — ${d.why}`);
     return 0;
   }
-  const { code, note } = recordRun({ ...opts, sha: env.GITHUB_SHA ?? "local" });
+  const sha = env.GITHUB_SHA ?? "local";
+  const run = env.GITHUB_RUN_ID ? `${sha.slice(0, 12)} run ${env.GITHUB_RUN_ID}` : sha.slice(0, 12);
+  // input-site: inert #7dd167ca — when the run finished, which orders result-store entries and is never part of a key
+  const recordedAt = new Date().toISOString();
+  const { code, note } = recordRun({ ...opts, sha, run, recordedAt });
   console.log(`ci-cone: ${script} ${note}`);
   return code;
 }
