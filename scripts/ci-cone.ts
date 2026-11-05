@@ -95,7 +95,8 @@ import { collectTaskIo } from "./task-io.ts";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { findReusable, putResult, STORE_DIR } from "./result-store.ts";
 import { testFilesUnder, testPreloads } from "./affected-tests.ts";
-import { auditClosure } from "./input-sites.ts";
+import { auditClosure, scanSource, siteProblem, type SiteVerdict } from "./input-sites.ts";
+import { auditPython } from "./input-sites-py.ts";
 
 /** Bump when the parser or the read-set rules change. A record from another version is ignored, so every check runs. */
 export const TRACER_VERSION = 3;
@@ -150,6 +151,10 @@ export type ReadSet =
       opened?: Record<string, number>;
       /** The programs a CHILD of the traced command exec'd (absolute paths, sorted); left out when none. */
       children?: string[];
+      /** The code children ran from their command line (`python3 -c`, `bun -e`); `null` for a script read from stdin, which no trace shows. */
+      inline?: { program: string; code: string | null }[];
+      /** Files outside the checkout under a `site-packages` / `dist-packages` directory the run read: installed Python packages. */
+      external?: string[];
     }
   | { undetermined: string };
 
@@ -466,6 +471,8 @@ export function parseTrace(
   /** The first process in the trace is the command itself; every other execve is a child's. */
   const top = parsed[0]?.pid;
   const children = new Set<string>();
+  const inline = new Map<string, { program: string; code: string | null }>();
+  const external = new Set<string>();
   for (const c of parsed) {
     const me = cell(c.pid);
     for (const a of c.args) {
@@ -521,7 +528,13 @@ export function parseTrace(
         if (base === undefined) return { undetermined: `${c.name}("${p}") from pid ${c.pid}: relative to a directory the trace does not name` };
         abs = normalize(join(base, p)).replace(/(.)\/+$/, "$1");
       }
-      if (c.name === "execve" && c.pid !== top && /^0\b/.test(c.ret)) children.add(abs);
+      if (c.name === "execve" && c.pid !== top && /^0\b/.test(c.ret)) {
+        children.add(abs);
+        const argv = arrayArg(c.args[1] ?? "");
+        if (argv === undefined) return { undetermined: `a child's command line strace did not print whole (${(c.args[1] ?? "").slice(0, 80)})` };
+        const code = inlineCodeOf(abs, argv);
+        if (code !== undefined) inline.set(JSON.stringify([abs, code]), { program: abs, code });
+      }
       if ((c.name === "mkdir" || c.name === "mkdirat") && /^0\b/.test(c.ret) && repoRelative(roots, abs) === undefined) scratch.add(abs);
       if (c.name === "execve" && /(^|\/)git$/.test(abs) && /^0\b/.test(c.ret)) {
         const argv = arrayArg(c.args[1] ?? "");
@@ -540,6 +553,7 @@ export function parseTrace(
         write = false;
       }
       const rel = repoRelative(roots, abs);
+      if (rel === undefined && !write && SITE_PACKAGES_RE.test(abs) && /^\d/.test(c.ret)) external.add(abs);
       if (rel === undefined || excluded(rel, gitPids.has(c.pid))) continue;
       if (write) writes.push(`${c.name} ${rel || "."}`);
       else paths.add(rel);
@@ -590,7 +604,50 @@ export function parseTrace(
   }
   if (writes.length > 0) return { undetermined: `the check writes inside the checkout (${writes.slice(0, 3).join(", ")})` };
   if (paths.size > MAX_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_PATHS}` };
-  return { paths: [...paths].sort(), git: [...git.values()], ...listedOf(listed, paths), ...(children.size ? { children: [...children].sort() } : {}) };
+  return {
+    paths: [...paths].sort(),
+    git: [...git.values()],
+    ...listedOf(listed, paths),
+    ...(children.size ? { children: [...children].sort() } : {}),
+    ...(inline.size ? { inline: [...inline.keys()].sort().map((k) => inline.get(k)!) } : {}),
+    ...(external.size ? { external: [...external].sort() } : {}),
+  };
+}
+
+/** A directory Python installs packages in. A file read under one is an input the checkout does not hold. */
+const SITE_PACKAGES_RE = /\/(?:site|dist)-packages\//;
+
+/** A Python interpreter, by the name it was exec'd under. */
+const PYTHON_RE = /(?:^|\/)python(?:3(?:\.\d+)?)?$/;
+
+/**
+ * The code a child ran from its command line, which no file in the read set
+ * holds: `python3 -c <code>`, `bun` / `node` `-e` / `-p <code>`. `null` for a
+ * Python script read from stdin (no script argument, or `-`), whose text no
+ * trace shows. `undefined` when the child ran a file, or `-m` a module.
+ */
+export function inlineCodeOf(program: string, argv: readonly string[]): string | null | undefined {
+  const args = argv.slice(1);
+  if (PYTHON_RE.test(program)) {
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i]!;
+      if (a === "-c") return args[i + 1] ?? "";
+      if (/^-[A-Za-z]*c/.test(a) && !a.startsWith("--")) return a.slice(a.indexOf("c") + 1) || (args[i + 1] ?? "");
+      if (a === "-m") return undefined;
+      if (a === "-W" || a === "-X") {
+        i++;
+        continue;
+      }
+      if (a.startsWith("-") && a !== "-") continue;
+      return a === "-" ? null : undefined;
+    }
+    return null; // no script: it reads one from stdin
+  }
+  if (JS_RUNTIME_RE.test(program)) {
+    const i = args.findIndex((a) => a === "-e" || a === "--eval" || a === "-p" || a === "--print");
+    return i < 0 ? undefined : (args[i + 1] ?? "");
+  }
+  return undefined;
 }
 
 /** `{ listed }` for the read paths that were listed, left out when there are none. */
@@ -637,8 +694,14 @@ export function excluded(rel: string, byGit: boolean): boolean {
   const cacheDir = join("build", "regen-cache");
   if (rel === cacheDir || rel.startsWith(`${cacheDir}/`)) return true;
   if (byGit && /(^|\/)\.git(\/|$)/.test(rel)) return true;
+  // Python's bytecode cache: a .pyc is used only while it matches its source,
+  // which the read set holds, so it is neither an input nor an output.
+  if (PYCACHE_RE.test(rel)) return true;
   return false;
 }
+
+/** A path inside a Python `__pycache__` directory, or the directory itself. */
+const PYCACHE_RE = /(^|\/)__pycache__(\/|$)/;
 
 // ── The state of a path ─────────────────────────────────────────────────────
 
@@ -730,7 +793,8 @@ function statState(abs: string, rel: string, digests: FileDigests, listed: boole
   }
   let names: string[] | undefined;
   try {
-    names = readdirSync(abs).sort();
+    // A listing never shows `__pycache__`: Python creates it as it runs ({@link excluded}).
+    names = readdirSync(abs).filter((n) => n !== "__pycache__").sort();
   } catch {
     names = undefined;
   }
@@ -766,10 +830,14 @@ export interface ConeCheck {
   git: Record<string, string>;
   /**
    * A test gate whose run started a `bun` child: every variable the modules it
-   * read can read ({@link childEnvOf}), and its value then (`null`: unset).
+   * read can read ({@link childInputsOf}), and its value then (`null`: unset).
    * Derived from the run, never declared; absent when it started none.
    */
   env?: Record<string, string | null>;
+  /** A test gate whose run started children: each program outside the checkout it exec'd, and the sha-256 of its binary then ({@link childInputsOf}). */
+  tools?: Record<string, string>;
+  /** The installed Python package files it read, outside the checkout, and their state then. */
+  external?: Record<string, string>;
 }
 
 export interface ConeRecords {
@@ -911,7 +979,13 @@ export function matchCheck(rec: ConeCheck, fp: Fingerprint, root: string, digest
     // input-site: traced #c6583b74 — compares a test's children's recorded environment, on the decide path
     inputSiteReached("ci-cone: child env now");
     const env = process.env;
-    for (const [n, v] of Object.entries(rec.env)) if ((env[n] ?? null) !== v) return { skip: false, why: `$${n}, which a bun child's module reads, changed` };
+    for (const [n, v] of Object.entries(rec.env)) if ((env[n] ?? null) !== v) return { skip: false, why: `$${n}, which a child's source reads, changed` };
+  }
+  for (const [program, state] of Object.entries(rec.tools ?? {})) {
+    if (externalState(program) !== state) return { skip: false, why: `the program ${program} changed` };
+  }
+  for (const [path, state] of Object.entries(rec.external ?? {})) {
+    if (externalState(path) !== state) return { skip: false, why: `the installed package file ${path} changed` };
   }
   return { skip: true, sha: rec.sha, why: `inputs unchanged since ${rec.sha} (${Object.keys(rec.reads).length} paths)` };
 }
@@ -932,7 +1006,7 @@ export function coneRecordOf(args: {
   digests: FileDigests;
   /** The package scripts, for a `scripts` site a child's module carries. */
   scripts?: Readonly<Record<string, string>>;
-  /** A test gate: its `bun` children's environment is derived ({@link childEnvOf}). */
+  /** A test gate: its `bun` children's environment is derived ({@link childInputsOf}). */
   testGate?: boolean;
 }): ConeCheck | { none: string } {
   if (!args.passed) return { none: "the check did not pass" };
@@ -945,17 +1019,39 @@ export function coneRecordOf(args: {
   for (const p of args.reads.paths) reads[p] = readState(args.root, p, args.digests, listed);
   const git: Record<string, string> = {};
   for (const c of args.reads.git) git[gitKey(c)] = gitState(args.root, c);
-  const env = args.testGate === true ? childEnvOf(args.root, args.reads, args.digests, args.scripts ?? {}) : {};
-  if ("none" in env) return { none: String(env.none) };
-  return { sha: args.sha, base: args.before.hash, reads, git, ...(Object.keys(env).length ? { env } : {}) };
+  const child = args.testGate === true ? childInputsOf(args.root, args.reads, args.digests, args.scripts ?? {}) : { env: {}, tools: {}, external: {} };
+  if ("none" in child) return { none: child.none };
+  const nonEmpty = (k: "env" | "tools" | "external") => (Object.keys(child[k]).length ? { [k]: child[k] } : {});
+  return { sha: args.sha, base: args.before.hash, reads, git, ...nonEmpty("env"), ...nonEmpty("tools"), ...nonEmpty("external") };
+}
+
+/**
+ * The variables that change how a Python interpreter runs any script,
+ * whatever the script reads itself: recorded for every run that started one.
+ */
+export const PYTHON_RUNTIME_ENV = [
+  "PYTHONPATH", "PYTHONHOME", "PYTHONHASHSEED", "PYTHONSAFEPATH", "PYTHONUTF8", "PYTHONIOENCODING",
+  "PYTHONWARNINGS", "PYTHONOPTIMIZE", "PYTHONNOUSERSITE", "PYTHONUSERBASE", "PYTHONDONTWRITEBYTECODE", "PYTHONPYCACHEPREFIX", "VIRTUAL_ENV",
+] as const;
+
+/** The state of a file outside the checkout (an installed package file, a child's program): its sha-256, `dir`, or `absent`. */
+export function externalState(path: string): string {
+  try {
+    const st = lstatSync(path);
+    if (st.isDirectory()) return "dir";
+    return createHash("sha256").update(readFileSync(path)).digest("hex");
+  } catch {
+    return "absent";
+  }
 }
 
 /** A program that runs this tree's TypeScript: what a test's `spawned` site starts. */
-const JS_RUNTIME_RE = /(?:^|\/)(?:bun|bunx|node)$/;
+export const JS_RUNTIME_RE = /(?:^|\/)(?:bun|bunx|node)$/;
 
 /**
- * What a test's `bun` children read from the environment, derived from its
- * trace (owner, 2026-11-05: "Read them from the trace"). A child's modules are
+ * What a test's `bun` and `python3` children read beyond the checkout,
+ * derived from its trace (owner, 2026-11-05: "Read them from the trace";
+ * Python: "Build it anyway"). A child's modules are
  * in the read set, so a change to one reruns the test; its environment is
  * not, so every source module the run read is audited as an entry (its
  * `import.meta.main` block included, since a child runs it as one), and the
@@ -963,15 +1059,88 @@ const JS_RUNTIME_RE = /(?:^|\/)(?:bun|bunx|node)$/;
  * as text is audited too: that can only make the test run more often. Any
  * site the audit cannot answer records nothing. A run that started no bun
  * child records no variables.
+ *
+ * A Python child the same, by `input-sites-py.ts` over every `.py` file the
+ * run read, plus {@link PYTHON_RUNTIME_ENV} and every installed package file
+ * it read (outside the checkout, so in no read set). Every program a child
+ * exec'd outside the checkout is recorded by the digest of its binary. Code a child ran from its command line (`-c`, `-e`) is audited from
+ * the traced command line; a script read from stdin records nothing.
  */
-export function childEnvOf(
+export function childInputsOf(
   root: string,
   reads: Extract<ReadSet, { paths: string[] }>,
   digests: FileDigests,
   scripts: Readonly<Record<string, string>>,
-): Record<string, string | null> | { none: string } {
-  if (!(reads.children ?? []).some((p) => JS_RUNTIME_RE.test(p))) return {};
-  const modules = reads.paths.filter((p) => /\.(m?[jt]sx?)$/.test(p) && existsSync(join(root, p)) && statSync(join(root, p)).isFile());
+): { env: Record<string, string | null>; tools: Record<string, string>; external: Record<string, string> } | { none: string } {
+  const env: string[] = [];
+  const envUnset: string[] = [];
+  // Code a child ran from its command line is audited from that line, as a file would be.
+  for (const { program, code } of reads.inline ?? []) {
+    if (code === null) return { none: `${program} ran a script from stdin, which no trace shows` };
+    const where = `${program} inline code`;
+    const audit = PYTHON_RE.test(program) ? auditPython([{ file: where, text: code }]) : auditInlineScript(where, code);
+    if ("undetermined" in audit) return { none: `inline code: ${audit.undetermined}` };
+    env.push(...audit.env);
+    envUnset.push(...audit.envUnset);
+  }
+  const tools: Record<string, string> = {};
+  const external: Record<string, string> = {};
+  const isFile = (p: string) => existsSync(join(root, p)) && statSync(join(root, p)).isFile();
+  if ((reads.children ?? []).some((p) => JS_RUNTIME_RE.test(p))) {
+    const js = jsChildEnv(root, reads, digests, scripts, isFile);
+    if ("none" in js) return js;
+    env.push(...js.env);
+    envUnset.push(...js.envUnset);
+  }
+  const pythons = [...new Set((reads.children ?? []).filter((p) => PYTHON_RE.test(p)))];
+  if (pythons.length > 0) {
+    const py = auditPython(reads.paths.filter((p) => p.endsWith(".py") && isFile(p)).map((file) => ({ file, text: readFileSync(join(root, file), "utf-8") })));
+    if ("undetermined" in py) return { none: `a python child's sources: ${py.undetermined}` };
+    env.push(...py.env, ...PYTHON_RUNTIME_ENV);
+    envUnset.push(...py.envUnset);
+    if ((reads.external ?? []).length > MAX_PATHS) return { none: `the run read ${reads.external!.length} installed package files, more than ${MAX_PATHS}` };
+    for (const p of reads.external ?? []) external[p] = externalState(p);
+  }
+  // Every program a child exec'd outside the checkout, by the bytes that ran:
+  // `pandoc`, the interpreter, `git`. One in the checkout is in the read set.
+  for (const p of reads.children ?? []) if (!p.startsWith(`${resolve(root)}/`)) tools[p] = externalState(p);
+  const out: Record<string, string | null> = {};
+  // input-site: traced #659ad351 — records a test's children's environment, on the record path only
+  inputSiteReached("ci-cone: child env");
+  const now = process.env;
+  for (const n of envUnset) {
+    if ((now[n] ?? "") !== "") return { none: `$${n} is set, and a child's source names it as outside the tree` };
+    out[n] = null;
+  }
+  for (const n of env) out[n] = now[n] ?? null;
+  return { env: out, tools, external };
+}
+
+/** What `bun -e <code>` can read from the environment: its sites, read as one TypeScript module's. */
+function auditInlineScript(where: string, code: string): { env: string[]; envUnset: string[] } | { undetermined: string } {
+  const env = new Set<string>();
+  const envUnset = new Set<string>();
+  for (const s of scanSource(`${where}.ts`, code)) {
+    const problem = siteProblem(s);
+    if (problem !== undefined) return { undetermined: problem };
+    for (const v of s.verdicts as SiteVerdict[]) {
+      if (v.kind === "env") v.names.forEach((n) => env.add(n));
+      else if (v.kind === "env-unset") v.names.forEach((n) => envUnset.add(n));
+      else if (v.kind !== "inert" && v.kind !== "tree" && v.kind !== "head" && v.kind !== "refs") return { undetermined: `${where}: a \`${v.kind}\` site, which inline code cannot carry` };
+    }
+  }
+  return { env: [...env], envUnset: [...envUnset] };
+}
+
+/** What a test's `bun` children's modules can read from the environment: {@link childInputsOf}'s TypeScript half. */
+function jsChildEnv(
+  root: string,
+  reads: Extract<ReadSet, { paths: string[] }>,
+  digests: FileDigests,
+  scripts: Readonly<Record<string, string>>,
+  isFile: (p: string) => boolean,
+): { env: string[]; envUnset: string[] } | { none: string } {
+  const modules = reads.paths.filter((p) => /\.(m?[jt]sx?)$/.test(p) && isFile(p));
   const audit = auditClosure(
     root,
     modules,
@@ -981,16 +1150,7 @@ export function childEnvOf(
     (source) => digests.declared.resolve(source),
   );
   if ("undetermined" in audit) return { none: `a bun child's modules: ${audit.undetermined}` };
-  const out: Record<string, string | null> = {};
-  // input-site: traced #c6583b74 — records a test's children's environment, on the record path only
-  inputSiteReached("ci-cone: child env");
-  const env = process.env;
-  for (const n of audit.envUnset) {
-    if ((env[n] ?? "") !== "") return { none: `$${n} is set, and a bun child's module names it as outside the tree` };
-    out[n] = null;
-  }
-  for (const n of audit.env) out[n] = env[n] ?? null;
-  return out;
+  return { env: audit.env, envUnset: audit.envUnset };
 }
 
 // ── CLI ─────────────────────────────────────────────────────────────────────

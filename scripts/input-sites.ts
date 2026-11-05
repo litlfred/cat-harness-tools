@@ -131,23 +131,24 @@ export function isTestScratchDir(file: string, risks: readonly string[], code: s
 const SPAWN_CALL = String.raw`(?:\bBun\.spawn(?:Sync)?|\bspawnSync|(?<!\w)spawn|\bexecFileSync|(?<!\w)execFile)\s*\(\s*\[?\s*`;
 /** A spawn of a literal `git`. */
 const GIT_SPAWN_RE = new RegExp(`${SPAWN_CALL}["']git["']`, "g");
-/** A spawn of `bun` itself: the literal, or the running binary. */
-const BUN_SPAWN_RE = new RegExp(`${SPAWN_CALL}(?:["']bun["']|process\\.execPath\\b)`, "g");
+/** A spawn of `bun` itself (the literal, or the running binary) or of `python3`: a child whose sources the cone audits. */
+const CHILD_SPAWN_RE = new RegExp(`${SPAWN_CALL}(?:["'](?:bun|python3?)["']|process\\.execPath\\b)`, "g");
 
 /**
  * The implicit verdict of a TEST file's spawn line, if it has one: the second
  * site, after the scratch dir, that needs no annotation in a test. Its only
- * risk is `spawn`, and every spawn on it runs a literal `git` or `bun` itself.
+ * risk is `spawn`, and every spawn on it runs a literal `git`, `bun` itself or `python3`.
  * A test is only ever fingerprinted as a cone gate (`ci-cone.ts`, `test:`):
  *
  * - `git` is `tree`. The cone replays every git command the run executed in
  *   the checkout, and keeps the reads of one it ran in a scratch directory it
  *   created (its own repository, `parseTrace`); any other git command leaves
  *   the run unrecorded.
- * - `bun` is `spawned`. The child's modules are in the traced read set, so a
- *   change to one reruns the test, and what they read from the environment is
- *   audited from that read set when the run is recorded (`ci-cone.ts`
- *   `childEnvOf`), never declared.
+ * - `bun` or `python3` is `spawned`. The child's sources are in the traced
+ *   read set, so a change to one reruns the test, and what they read from the
+ *   environment is audited from that read set when the run is recorded
+ *   (`ci-cone.ts` `childInputsOf`; Python by `input-sites-py.ts`), never
+ *   declared. A child that ran inline code (`-c`, `-e`) records nothing.
  *
  * A fingerprint that does not replay a trace answers neither, so it stays
  * undetermined.
@@ -157,7 +158,7 @@ export function testSpawnVerdict(file: string, risks: readonly string[], raw: st
   if (risks.length !== 1 || risks[0] !== "spawn") return undefined;
   // `raw` is the line as written: the blanked code has no string text to name the command.
   const noGit = raw.replace(GIT_SPAWN_RE, "");
-  const rest = noGit.replace(BUN_SPAWN_RE, "");
+  const rest = noGit.replace(CHILD_SPAWN_RE, "");
   if (rest === raw || RISKS.spawn!.test(rest)) return undefined;
   const out: SiteVerdict[] = [];
   if (rest !== noGit) out.push({ kind: "spawned" });
