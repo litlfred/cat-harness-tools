@@ -38,10 +38,12 @@ import {
   isPublishedGraphTypology,
   isRenderable,
   owningDirectory,
+  readDeclaration,
   resolveDirectories,
   subgraphTree,
 } from "../schemas/kg/cat-harness.js";
-import { checkoutDirectories } from "../schemas/kg/harness-config.js";
+import { checkoutDirectories, checkoutRootFor } from "../schemas/kg/harness-config.js";
+import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
 import type { GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.js";
 import { corpusScopeFor } from "./known-skills.js";
 import { mayLeaveMain } from "./qa-results.js";
@@ -81,6 +83,15 @@ export interface SubgraphReport {
    * prevent.
    */
   dangling: Array<{ from: string; fromDir: string; target: string }>;
+  /**
+   * Links that name a path an instance has MOVED, resolved at its new place
+   * through that instance's declared `moves` (sdlc skill `two-phase-move`).
+   * Not dangling while the move's window is open; each is a link its layer
+   * still has to switch to the new path. `to` is the file it resolved to.
+   */
+  moved: Array<{ from: string; fromDir: string; target: string; to: string; move: string }>;
+  /** Every move the instances of this checkout declare, with how many links still use the old path. */
+  moves: Array<ResolvedMove & { inbound: number }>;
   /**
    * Links into a declared directory that is ABSENT from this checkout and may
    * be (`mayLeaveMain`: every kind it holds is one the qa-reports arc moves
@@ -402,6 +413,62 @@ export function resolveAcrossArchive(
   return undefined;
 }
 
+/** One entry of an instance's `moves`, with its paths made absolute. */
+export interface ResolvedMove {
+  /** `<instance>:<from>`, how the report names it. */
+  id: string;
+  absFrom: string;
+  absTo: string;
+  until: string;
+  /** `until` is before today: the move is no longer honoured. */
+  expired: boolean;
+}
+
+/**
+ * The moves the instances under {@link roots} declare (`moves` on each
+ * declaration). An unreadable declaration contributes none; reporting it is
+ * `check:harness-dirs`'s job.
+ */
+export function declaredMoves(roots: readonly string[], today: string = new Date().toISOString().slice(0, 10)): ResolvedMove[] {
+  const out: ResolvedMove[] = [];
+  for (const root of new Set(roots.map((r) => resolve(r)))) {
+    let decl;
+    try {
+      decl = readDeclaration(root);
+    } catch {
+      continue;
+    }
+    for (const m of decl?.moves ?? []) {
+      out.push({
+        id: `${decl!.name}:${m.from}`,
+        absFrom: resolve(root, m.from),
+        absTo: resolve(root, m.to),
+        until: m.until,
+        expired: m.until < today,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Where {@link wanted} resolves through a move whose window is still open, or
+ * `undefined`. The old path is answered for, not kept on disk: a copy left in
+ * both places mints one IRI twice (`kg-separation`, "A file left in BOTH layers").
+ */
+export function resolveThroughMove(
+  wanted: string,
+  moves: readonly ResolvedMove[],
+): { resolved: string; move: ResolvedMove } | undefined {
+  for (const move of moves) {
+    if (move.expired) continue;
+    if (wanted !== move.absFrom && !wanted.startsWith(move.absFrom + "/")) continue;
+    const resolved = resolveInTree(join(move.absTo, relative(move.absFrom, wanted)));
+    if (resolved !== undefined) return { resolved, move };
+  }
+  return undefined;
+}
+
 /**
  * What a link sweep needs to know about the corpus, computed once: the
  * declared directories, how each is labelled, which absent ones may be, and
@@ -416,6 +483,8 @@ export interface LinkContext {
   label: (d: ReturnType<typeof resolveDirectories>[number]) => string;
   absentOffMain: string[];
   archiveViews: Array<{ store: string; view: string }>;
+  /** The `moves` the checkout's instances declare (sdlc skill `two-phase-move`). */
+  moves?: ResolvedMove[];
 }
 
 export function linkContext(root: string = ROOT): LinkContext {
@@ -438,7 +507,8 @@ export function linkContext(root: string = ROOT): LinkContext {
     .filter((d) => mayLeaveMain(d as { graphTypologies?: string[]; storage?: unknown }))
     .map((d) => resolve(d.absPath ?? join(root, d.path)))
     .filter((a) => !existsSync(a));
-  return { root, own, dirs, label, absentOffMain, archiveViews: beanArchiveViews(dirs, root) };
+  const moves = declaredMoves([root, ...instanceRootsIn(checkoutRootFor(root))]);
+  return { root, own, dirs, label, absentOffMain, archiveViews: beanArchiveViews(dirs, root), moves };
 }
 
 /** Retired content is not held to link resolution — see `exempt`. */
@@ -455,7 +525,7 @@ function judgeLink(
   file: string,
   owner: { graphTypologies: readonly string[] },
   target: string,
-): { resolved: string } | { bucket: "unverifiable" | "siteResolved" | "derivedLinks" | "dangling" } {
+): { resolved: string; move?: ResolvedMove } | { bucket: "unverifiable" | "siteResolved" | "derivedLinks" | "dangling" } {
   // `resolveInTree` carries the `.html` → `.md` rule and its reasoning.
   // A link destination is a URL: `%20`, `%28`, `%40` name the file's own
   // characters (`linkTarget` in subgraph-readmes writes them), so decode
@@ -464,6 +534,9 @@ function judgeLink(
   const wanted = resolve(dirname(file), decoded);
   const resolved = resolveAcrossArchive(file, decoded, wanted, ctx.archiveViews);
   if (resolved !== undefined) return { resolved };
+  // Through a declared move whose window is open: resolved, and reported as moved.
+  const through = resolveThroughMove(wanted, ctx.moves ?? []);
+  if (through !== undefined) return { resolved: through.resolved, move: through.move };
   if (ctx.absentOffMain.some((a) => wanted === a || wanted.startsWith(a + "/"))) return { bucket: "unverifiable" };
   // A renderable graph addresses the PUBLISHED tree, not this one.
   // A typology `within` a renderable one is published BY it — the
@@ -507,6 +580,7 @@ export function scanSubgraphs(root: string = ROOT): SubgraphReport {
   const tree = subgraphTree(own);
   const edges: CrossEdge[] = [];
   const dangling: SubgraphReport["dangling"] = [];
+  const moved: SubgraphReport["moved"] = [];
   const unverifiable: SubgraphReport["unverifiable"] = [];
   const derivedLinks: SubgraphReport["derivedLinks"] = [];
   const unreadable: string[] = [];
@@ -559,6 +633,9 @@ export function scanSubgraphs(root: string = ROOT): SubgraphReport {
           continue;
         }
         const resolved = j.resolved;
+        if (j.move !== undefined) {
+          moved.push({ from: relative(root, file), fromDir: label(owner), target, to: relative(root, resolved), move: j.move.id });
+        }
         const to = owningDirectory(dirs, resolved);
         if (to === undefined || to.absPath === owner.absPath) continue;
         edges.push({
@@ -578,12 +655,13 @@ export function scanSubgraphs(root: string = ROOT): SubgraphReport {
       notExamined.push(`${label(dir)} (${dir.path})`);
     }
   }
-  return { tree, edges, dangling, unverifiable, derivedLinks, exempt, siteResolved, unreadable, notExamined, scanned };
+  const moves = (ctx.moves ?? []).map((m) => ({ ...m, inbound: moved.filter((l) => l.move === m.id).length }));
+  return { tree, edges, dangling, moved, moves, unverifiable, derivedLinks, exempt, siteResolved, unreadable, notExamined, scanned };
 }
 
 if (import.meta.main) {
   const check = process.argv.includes("--check");
-  const { tree, edges, dangling, unverifiable, derivedLinks, exempt, siteResolved, unreadable, notExamined, scanned } =
+  const { tree, edges, dangling, moves, unverifiable, derivedLinks, exempt, siteResolved, unreadable, notExamined, scanned } =
     scanSubgraphs(ROOT);
 
   console.log(`Subgraphs  (${scanned} markdown node(s) attributed to a declared directory)\n`);
@@ -642,6 +720,14 @@ if (import.meta.main) {
     for (const [dir, list] of [...byDir].sort((a, b) => b[1].length - a[1].length)) {
       console.log(`  ${String(list.length).padStart(3)}  ${dir}`);
       for (const d of list) console.log(`         ${d.from}  →  ${d.target}`);
+    }
+  }
+
+  if (moves.length > 0) {
+    console.log(`\nMOVES — ${moves.length} declared; a link to the old path resolves at the new one until \`until\` (skill \`two-phase-move\`):`);
+    for (const m of moves) {
+      const state = m.expired ? "EXPIRED, not honoured" : m.inbound === 0 ? "nothing links to the old path: remove the entry" : `${m.inbound} link(s) still to switch`;
+      console.log(`  ${m.id}  until ${m.until}  — ${state}`);
     }
   }
 
@@ -714,6 +800,15 @@ if (import.meta.main) {
         "fall out. Retired content under `fsh-guts/` is deliberately not held to\n" +
         "link resolution; the others are a gap, not a decision.",
     );
+  }
+
+  const expired = moves.filter((m) => m.expired);
+  if (check && expired.length > 0) {
+    console.error(
+      `\n✗ ${expired.length} declared move(s) are past \`until\`: ${expired.map((m) => m.id).join(", ")}.\n` +
+        "Remove the entry from the declaration; any link above still using the old path is now broken.",
+    );
+    process.exit(1);
   }
 
   // GATED, as of 2026-09-20 — and only now, because only now is the number
