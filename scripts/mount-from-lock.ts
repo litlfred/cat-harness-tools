@@ -22,7 +22,11 @@
  *   reported, never kept. Trust was checked when the lock was written; the
  *   digest is what makes replaying it safe.
  * - **Never over somebody's work.** A path that holds tracked files, or holds
- *   bytes that no longer hash to the lock, is left untouched and reported.
+ *   bytes that no longer hash to the lock, is left untouched and reported —
+ *   unless those bytes hash to what an EARLIER committed version of the same
+ *   lock pinned at that path ({@link priorPins}). Those are a stale mount, not
+ *   an edit (bean folio-assistant-jstq), and are replaced; the state mounts and
+ *   `node_modules/` inside them are carried over.
  * - **Three states.** `mounted` / `current` exit 0, `missing` (refused or
  *   absent) exits 1, `could-not-determine` (fetch failed, lock unreadable)
  *   exits 2 — never folded into one another.
@@ -43,7 +47,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
@@ -523,6 +527,101 @@ function fetchAt(repository: string, sha: string, paths: string[]): string {
   return dir;
 }
 
+// ── Earlier pins (bean folio-assistant-jstq) ───────────────────────────────
+
+/**
+ * How many earlier commits of a lock are read to recognise a stale mount.
+ * folio-assistant's lock had 112 commits on 2026-11-05; reading them all took
+ * well under a second. A mount older than this is refused as before.
+ */
+export const PRIOR_LOCK_DEPTH = 500;
+
+/** Every digest an earlier committed version of one lock recorded, keyed by the root-relative path it pinned. */
+export interface PriorPins {
+  /** Directory path → the `treeDigest`s pinned there. */
+  trees: Map<string, Set<string>>;
+  /** File path (a declaration or an asset) → the `sha256`s pinned there. */
+  blobs: Map<string, Set<string>>;
+}
+
+/**
+ * The digests every committed version of `lockFile` (newest {@link PRIOR_LOCK_DEPTH})
+ * pinned, read from the checkout's own history with no network.
+ *
+ * A mount whose bytes hash to one of them is exactly a tree some earlier lock
+ * of THIS checkout laid down, so nobody edited it: it is a stale mount.
+ * Measured 2026-11-05 (bean folio-assistant-jstq): every fresh folio-assistant
+ * container held 20 locked directories at an older pin, each matching one of
+ * these digests, and the replay refused all 20 as "somebody's work", so the
+ * checkout ran on tools and declarations days older than its lock.
+ *
+ * Not a git checkout, or no history: empty, and every drift is refused as before.
+ */
+export function priorPins(root: string, lockFile: string, depth = PRIOR_LOCK_DEPTH): PriorPins {
+  const out: PriorPins = { trees: new Map(), blobs: new Map() };
+  const add = (m: Map<string, Set<string>>, k: string, v: unknown) => {
+    if (typeof v !== "string") return;
+    if (!m.has(k)) m.set(k, new Set());
+    m.get(k)!.add(v);
+  };
+  const rel = relative(root, lockFile).split("\\").join("/");
+  const log = git(root, ["log", "--format=%H", "-n", String(depth), "--", rel]);
+  if (log.status !== 0) return out;
+  for (const h of log.stdout.split("\n").filter((l) => SHA.test(l))) {
+    const shown = git(root, ["show", `${h}:${rel}`]);
+    if (shown.status !== 0) continue;
+    try {
+      const l = JSON.parse(shown.stdout) as { instances?: LockInstance[] };
+      for (const i of Array.isArray(l.instances) ? l.instances : []) {
+        if (typeof i?.path !== "string") continue;
+        if (i.declaration && typeof i.declaration.file === "string") add(out.blobs, `${i.path}/${i.declaration.file}`, i.declaration.sha256);
+        for (const d of Array.isArray(i.directories) ? i.directories : []) if (typeof d?.path === "string") add(out.trees, d.path, d.treeDigest);
+        for (const a of Array.isArray(i.assets) ? i.assets : []) if (typeof a?.src === "string") add(out.blobs, `${i.path}/${a.src}`, a.sha256);
+      }
+    } catch {
+      // A commit whose lock is not JSON recognises nothing.
+    }
+  }
+  return out;
+}
+
+/** Is the drifted `path` of `inst` exactly what an earlier pin laid there? */
+function isOlderPin(root: string, inst: LockInstance, path: string, pins: PriorPins, skip: readonly string[]): boolean {
+  const abs = join(root, path);
+  if (inst.directories.some((d) => d.path === path)) return pins.trees.get(path)?.has(digestOf(abs, skip).treeDigest) === true;
+  return pins.blobs.get(path)?.has(sha256(readFileSync(abs))) === true;
+}
+
+/** Where stale mounts are set aside while their replacement lands: inside the git dir, so nothing of it is ever in the worktree. */
+function asideRoot(root: string): string | undefined {
+  const r = git(root, ["rev-parse", "--git-path", "mount-prior"]);
+  if (r.status !== 0) return undefined;
+  const dir = resolve(root, r.stdout.trim());
+  mkdirSync(dir, { recursive: true });
+  return mkdtempSync(join(dir, "set-aside-"));
+}
+
+/**
+ * What of a set-aside mount is carried into its replacement: each state mount
+ * under it (the state store's bytes, never the pin's: `state:push` judges
+ * them) and its top-level `node_modules/` (an install artefact; remote-mount
+ * keeps it on a re-mount for the reason its test 19c gives).
+ */
+function carryOver(from: string, to: string, stateDirs: readonly string[]): string[] {
+  const kept: string[] = [];
+  const under = stateDirs.filter((s) => s.startsWith(to + "/"));
+  for (const rel of [...under.map((s) => relative(to, s)), "node_modules"]) {
+    const src = join(from, rel);
+    if (!existsSync(src)) continue;
+    const dst = join(to, rel);
+    rmSync(dst, { recursive: true, force: true });
+    mkdirSync(dirname(dst), { recursive: true });
+    renameSync(src, dst);
+    kept.push(rel);
+  }
+  return kept;
+}
+
 // ── One instance ─────────────────────────────────────────────────────────────
 
 /** Is every locked directory of `inst` on disk with the locked digest? Lists the ones that are not. */
@@ -547,9 +646,15 @@ function drift(root: string, inst: LockInstance): { absent: string[]; changed: s
   return { absent, changed };
 }
 
-export function checkInstance(root: string, inst: LockInstance): Outcome {
+export function checkInstance(root: string, inst: LockInstance, prior?: () => PriorPins): Outcome {
   const { absent, changed } = drift(root, inst);
-  if (changed.length) return { instance: inst.instance, state: "missing", detail: `${changed.join(", ")} no longer hash to the lock` };
+  if (changed.length) {
+    const pins = prior?.();
+    const skip = stateMountedDirs(root);
+    const stale = pins !== undefined && changed.every((p) => isOlderPin(root, inst, p, pins, skip));
+    const why = stale ? " (an earlier pin's bytes, not an edit: `bun run cat mount:lock` replaces them)" : "";
+    return { instance: inst.instance, state: "missing", detail: `${changed.join(", ")} no longer hash to the lock${why}` };
+  }
   if (absent.length) return { instance: inst.instance, state: "missing", detail: `not on disk: ${absent.join(", ")} — run \`bun run cat mount:lock\`` };
   return { instance: inst.instance, state: "current", detail: `${inst.directories.length} director${inst.directories.length === 1 ? "y" : "ies"} at ${inst.sha.slice(0, 12)}` };
 }
@@ -640,15 +745,59 @@ function saveToMountCache(cacheDir: string, inst: LockInstance, root: string): v
   }
 }
 
-export function mountInstance(root: string, inst: LockInstance): Outcome {
+export function mountInstance(root: string, inst: LockInstance, prior?: () => PriorPins): Outcome {
   const id = inst.instance;
   const bad = [inst.path, ...inst.directories.map((d) => d.path)].find((p) => !safeRel(p));
   if (bad !== undefined) return { instance: id, state: "could-not-determine", detail: `lock path \`${bad}\` climbs out of the checkout or is dot-prefixed` };
   const { absent, changed } = drift(root, inst);
-  if (changed.length) {
-    return { instance: id, state: "missing", detail: `left untouched: ${changed.join(", ")} no longer hash to the lock — edits there are somebody's work; move them upstream or delete the directory, then re-mount` };
+  if (changed.length === 0) return absent.length === 0 ? checkInstance(root, inst) : layDown(root, inst, absent);
+  const refuse = (paths: readonly string[]): Outcome => ({
+    instance: id,
+    state: "missing",
+    detail: `left untouched: ${paths.join(", ")} no longer hash to the lock — edits there are somebody's work; move them upstream or delete the directory, then re-mount`,
+  });
+  // A drift is replaced only when EVERY drifted path is an earlier pin's
+  // exact bytes: one edited path keeps the whole instance as it stands.
+  const pins = prior?.();
+  const stateDirs = stateMountedDirs(root);
+  const edited = pins === undefined ? changed : changed.filter((p) => !isOlderPin(root, inst, p, pins, stateDirs));
+  if (edited.length) return refuse(edited);
+  const trackedPath = changed.find((p) => tracked(root, p));
+  if (trackedPath) return { instance: id, state: "missing", detail: `\`${trackedPath}\` holds tracked files — a mount never lands on tracked bytes` };
+  const holder = asideRoot(root);
+  if (holder === undefined) return refuse(changed);
+  // Outermost first, so a declaration inside a set-aside directory moves with it.
+  const outer = [...changed].sort((a, b) => a.length - b.length).filter((p, i, all) => !all.slice(0, i).some((q) => p.startsWith(q + "/")));
+  const aside = outer.map((p, i) => ({ path: p, at: join(holder, String(i)) }));
+  const restore = () => {
+    for (const a of aside) {
+      if (!existsSync(a.at)) continue;
+      rmSync(join(root, a.path), { recursive: true, force: true });
+      mkdirSync(dirname(join(root, a.path)), { recursive: true });
+      renameSync(a.at, join(root, a.path));
+    }
+  };
+  try {
+    for (const a of aside) renameSync(join(root, a.path), a.at);
+    const out = layDown(root, inst, [...new Set([...absent, ...changed])]);
+    if (out.state !== "mounted") {
+      restore();
+      return { ...out, detail: `${out.detail}; the earlier pin's ${outer.join(", ")} restored as it was` };
+    }
+    const kept = aside.flatMap((a) => carryOver(a.at, join(root, a.path), stateDirs).map((k) => `${a.path}/${k}`));
+    out.detail += `; replaced an earlier pin's ${outer.join(", ")}${kept.length ? `, keeping ${kept.join(", ")}` : ""}`;
+    return out;
+  } catch (e) {
+    restore();
+    return { instance: id, state: "could-not-determine", detail: `could not replace the earlier pin's ${outer.join(", ")}: ${(e as Error).message} — restored as it was` };
+  } finally {
+    rmSync(holder, { recursive: true, force: true });
   }
-  if (absent.length === 0) return checkInstance(root, inst);
+}
+
+/** Fetch and lay down the `absent` paths of `inst`, verifying each against the lock. */
+function layDown(root: string, inst: LockInstance, absent: readonly string[]): Outcome {
+  const id = inst.instance;
   const trackedPath = inst.directories.map((d) => d.path).find((p) => tracked(root, p));
   if (trackedPath) return { instance: id, state: "missing", detail: `\`${trackedPath}/\` holds tracked files — a mount never lands on tracked bytes` };
 
@@ -771,8 +920,10 @@ export function run(root: string, check: boolean, opts: { install?: InstallMode 
       outcomes.push({ instance: relative(root, l.file), state: "could-not-determine", detail: l.error });
       continue;
     }
+    let pins: PriorPins | undefined;
+    const prior = () => (pins ??= priorPins(root, l.file));
     for (const inst of l.instances!) {
-      const outcome = check ? checkInstance(root, inst) : mountInstance(root, inst);
+      const outcome = check ? checkInstance(root, inst, prior) : mountInstance(root, inst, prior);
       outcomes.push(outcome);
       if (outcome.state === "mounted" || outcome.state === "current") laid.push({ inst, outcome });
     }
