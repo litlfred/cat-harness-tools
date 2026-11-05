@@ -85,7 +85,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { readQaManifest, type QaStoreOptions } from "./qa-store.ts";
-import { auditClosure, SiteMemo } from "./input-sites.ts";
+import { auditClosure, followedSpecifier, outsideTemplates, SiteMemo } from "./input-sites.ts";
 import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 /** Where the cache lives, relative to the repository root. `build/` is git-ignored. */
@@ -282,12 +282,12 @@ export function sourceClosure(root: string, entries: readonly string[]): { files
  */
 export function directRelativeImports(file: string): { targets: string[]; doubt?: string } {
   if (!/\.(m?[jt]sx?)$/.test(file)) return { targets: [] };
-  const text = stripComments(readFileSync(file, "utf-8"));
+  const text = stripComments(outsideTemplates(readFileSync(file, "utf-8")));
   let doubt = DYNAMIC_NONLITERAL_RE.test(text) ? "has a non-literal dynamic import" : undefined;
   const targets: string[] = [];
   for (const m of text.matchAll(IMPORT_RE)) {
     const spec = m[1] ?? m[2] ?? m[3];
-    if (spec === undefined || !spec.startsWith(".")) continue;
+    if (!followedSpecifier(spec)) continue;
     const target = resolveModule(file, spec);
     if (target === undefined) doubt ??= `imports unresolvable ${spec}`;
     else targets.push(target);
