@@ -14,11 +14,14 @@ import { join } from "node:path";
 import {
   AVAILABILITY_SCHEMA,
   STATE_SCHEMA,
+  TREE_COMMITS_FILE,
+  TREE_COMMITS_SCHEMA,
   countPublished,
   countResults,
   decideSource,
   holdsCorpus,
   judgePublished,
+  treeCommitIndex,
   type QaFetchState,
 } from "../../qa-site-assets.ts";
 
@@ -178,5 +181,38 @@ describe("judgePublished — the C10 shrink fails the step", () => {
     expect(w.warnings.length).toBe(1);
     const r = judgePublished(s, { witnesses: 10, results: 1, files: 11 }, { witnesses: 10, results: 1 });
     expect(r.errors.join("\n")).toContain("SHRINK");
+  });
+});
+
+// The tree-to-commit index the QA panel links a verdict's tree through
+// (folio-assistant bean 69lr; owner card Q5, 2026-11-05, option 1).
+describe("tree-commits: the tree-to-commit index", () => {
+  const T = (c: string) => c.repeat(40);
+  test("each tree keeps the OLDEST first-parent commit carrying it", () => {
+    // git prints newest first; trees `a` is on two commits, `1` (newer) and `3` (older).
+    const log = [`${T("a")} ${T("1")}`, `${T("b")} ${T("2")}`, `${T("a")} ${T("3")}`].join("\n");
+    const i = treeCommitIndex(log, "https://github.com/o/r");
+    expect(i.$schema).toBe(TREE_COMMITS_SCHEMA);
+    expect(i.commits).toEqual({ [T("a")]: T("3"), [T("b")]: T("2") });
+    expect(i.depth).toBe(3);
+    expect(i.repo).toBe("https://github.com/o/r");
+  });
+  test("no GitHub origin: no repo, so the panel builds no link", () => {
+    expect(treeCommitIndex("", undefined).repo).toBeNull();
+    expect(treeCommitIndex("", "https://gitlab.com/o/r").repo).toBeNull();
+    expect(treeCommitIndex("", "https://github.com/o/r/extra").repo).toBeNull();
+  });
+  test("lines that are not two full ids are skipped, never guessed", () => {
+    const i = treeCommitIndex(`garbage\n${T("a")}\n${T("a")} ${T("1")} extra\n`, undefined);
+    expect(i.commits).toEqual({});
+    expect(i.depth).toBe(0);
+  });
+  test("the index is not counted as QA evidence", () => {
+    const { dir, cleanup } = tree([`assets/qa/${TREE_COMMITS_FILE}`, "assets/qa/x/a.json"]);
+    try {
+      expect(countPublished(dir).witnesses).toBe(1);
+    } finally {
+      cleanup();
+    }
   });
 });
