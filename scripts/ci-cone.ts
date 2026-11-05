@@ -80,6 +80,7 @@ import {
   againstRefsOf,
   checkFingerprint,
   FileDigests,
+  fingerprint,
   qaBaselineIdentity,
   RECIPE_VERSION,
   TRACKED,
@@ -92,6 +93,7 @@ import { isProjection, projectedState, type ProjectionName } from "../schemas/sd
 import { collectTaskIo } from "./task-io.ts";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { findReusable, putResult, STORE_DIR } from "./result-store.ts";
+import { testFilesUnder, testPreloads } from "./affected-tests.ts";
 
 /** Bump when the parser or the read-set rules change. A record from another version is ignored, so every check runs. */
 export const TRACER_VERSION = 3;
@@ -784,8 +786,45 @@ export function coneFingerprint(
   digests: FileDigests,
   baseline: BaselineResolver | undefined,
 ): Fingerprint {
+  if (isTestGate(script)) {
+    // A test file is a candidate like a `{tracked}` gate: its traced read set
+    // stands in for the tree. Its fingerprint's code is the file's closure AND
+    // the bunfig `[test] preload` modules `bun test` runs before it.
+    const pre = preloadScripts(root);
+    return fingerprint(root, { ...scripts, ...pre }, [script, ...Object.keys(pre)], { inputs: [], outputs: [] }, digests, baseline, { treeReplayed: true });
+  }
   if (io?.inputs?.includes(TRACKED) !== true) return { undetermined: "not declared {tracked} in task-io, so not a candidate" };
   return checkFingerprint(root, scripts, script, { inputs: [], outputs: io.outputs }, digests, baseline, { treeReplayed: true });
+}
+
+// ── Test files as gates ──────────────────────────────────────────────────────
+
+/**
+ * A test file is asked about, recorded and reused like a gate, under the name
+ * `test:<repo-relative path>` (owner, 2026-11-05: "Traced, like gates"). Its
+ * command runs that one file: `bun test ./<path>`, the `./` so bun reads it as
+ * a path and not a name filter. Its result is reused only when its derived
+ * read set matches exactly, never on its import closure alone, which does not
+ * see fixtures, directory walks or spawned scripts (the 4rbc rule).
+ */
+export const TEST_GATE_PREFIX = "test:";
+
+export function isTestGate(name: string): boolean {
+  return name.startsWith(TEST_GATE_PREFIX);
+}
+
+/** `test:<path>` → `bun test ./<path>`, for every test file `bun test` would collect under `root`. */
+export function testGates(root: string, files: readonly string[] = testFilesUnder(root)): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const f of files) out[`${TEST_GATE_PREFIX}${f}`] = `bun test ./${f}`;
+  return out;
+}
+
+/** The bunfig `[test] preload` modules, as pseudo-scripts whose entry is the module, so the fingerprint audits their closures too. */
+export function preloadScripts(root: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const p of testPreloads(root)) out[`test-preload:${p}`] = `bun ./${p}`;
+  return out;
 }
 
 export type ConeDecision = { skip: true; sha: string; why: string } | { skip: false; why: string };
@@ -1067,7 +1106,10 @@ function main(argv: readonly string[]): number {
   // input-site: traced #c6583b74 — the cone CLI's environment; a check never runs this module's main()
   inputSiteReached("ci-cone: main");
   const env = process.env;
-  const scripts = scriptsOf(root);
+  // A `test:<path>` name is a test file (see TEST_GATE_PREFIX); only asked
+  // for, so a run about package scripts never walks the tree for tests.
+  const asked = cmd === "decide-all" ? argv.slice(2) : [script ?? ""];
+  const scripts = asked.some(isTestGate) ? { ...scriptsOf(root), ...testGates(root) } : scriptsOf(root);
   if (cmd === "decide-all") {
     // `decide-all <out.json> <script>...` (cat-harness-tools#398): every
     // decision in one file, for `run-gates.py`. Exit 0 whenever the file was
