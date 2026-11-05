@@ -213,9 +213,9 @@ describe("a link is DECLARATION-driven and PRESENCE-checked", () => {
     // owner's rule is `<base>/<harness>/<visualizer>`; `/beans/` survives as
     // a declared alias, composed as a redirect, and is never what a tile links.
     const f = fixture({ host: host() }, ["host/beans"]);
-    expect(tilesOf(f)[0]!.visualisations).toEqual([{ kind: "beans", label: "Work plan", path: "/host/beans/" }]);
+    expect(tilesOf(f)[0]!.visualisations).toEqual([{ kind: "beans", label: "Plans and work", path: "/host/beans/" }]);
     const stale = fixture({ host: host() }, ["beans"]);
-    expect(tilesOf(stale)[0]!.visualisations).toEqual([{ kind: "beans", label: "Work plan", note: "no viewer yet" }]);
+    expect(tilesOf(stale)[0]!.visualisations).toEqual([{ kind: "beans", label: "Plans and work", note: "no viewer yet" }]);
   });
 
   test("there is no elided namespace to squat: a sibling's graph opens the visualiser DECLARED over it", () => {
@@ -227,7 +227,7 @@ describe("a link is DECLARATION-driven and PRESENCE-checked", () => {
       "host/beans",
       "beans",
     ]);
-    expect(tilesOf(f).find((t) => t.name === "who")!.visualisations).toEqual([{ kind: "beans", label: "Work plan", path: "/host/beans/" }]);
+    expect(tilesOf(f).find((t) => t.name === "who")!.visualisations).toEqual([{ kind: "beans", label: "Plans and work", path: "/host/beans/" }]);
   });
 });
 

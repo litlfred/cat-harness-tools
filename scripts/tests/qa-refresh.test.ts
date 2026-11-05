@@ -88,7 +88,9 @@ describe("the declaration", () => {
     for (const w of QA_WRITERS) {
       for (const g of w.writes) {
         const fixed = g.split("*")[0]!;
-        const underOne = roots.some((r) => fixed.startsWith(`${r}/`)) || /^\*\/test\/results\//.test(g);
+        // `*/test/results/` is each instance's own record; `test/results/` is the
+        // ROOT instance's, the same case one level up (smart-ra#228, check:l1-complete).
+        const underOne = roots.some((r) => fixed.startsWith(`${r}/`)) || /^(\*\/)?test\/results\//.test(g);
         expect(underOne, `${w.id}: ${g}`).toBe(true);
       }
     }
