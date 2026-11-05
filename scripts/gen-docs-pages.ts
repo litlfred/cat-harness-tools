@@ -2003,9 +2003,24 @@ function processHierarchy(): Record<string, string[]> {
         : instancesRead
             .filter((i) => i.plan === id)
             .map((i) => ({ id: i.id, processId: i.processId, status: i.status, at: i.tokens, updatedAt: i.updatedAt }));
+    // The proposal's link, resolved HERE from the declarations: a proposal
+    // path is checkout-relative (`cat-harness/docs/proposals/x.md`), and the
+    // board's own `fileWeb` is the work-item store's repository, which does
+    // not hold it. The declaring instance's repository does (as edit links).
+    const proposalHref = (path: string): string => {
+      const at = declaredEditLocation(path);
+      return at.repo ? `https://github.com/${at.repo}/blob/main/${at.source}` : `${REPO_WEB}/blob/main/${path}`;
+    };
     const planField = (id: string, tags: readonly string[] | undefined) => {
       const plan = workPlanOf(tags);
-      return plan === undefined ? {} : { plan: { ...plan, runs: runsOf(id) } };
+      if (plan === undefined) return {};
+      return {
+        plan: {
+          ...plan,
+          ...(plan.proposal !== undefined ? { proposalHref: proposalHref(plan.proposal) } : {}),
+          runs: runsOf(id),
+        },
+      };
     };
     const items = beans.map((b) => ({
       id: b.id,
