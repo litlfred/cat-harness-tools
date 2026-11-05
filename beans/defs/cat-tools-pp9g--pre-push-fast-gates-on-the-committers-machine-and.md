@@ -9,9 +9,13 @@ tags:
     - ci-speed
     - f017
     - 4rbc
-created_at: 2026-11-05T12:00:00Z
-updated_at: 2026-11-05T12:00:00Z
+created_at: 2026-11-05T08:20:00Z
+updated_at: 2026-11-05T08:20:00Z
+parent: folio-assistant-fn8q
 ---
+
+The layer half of **folio-assistant-fn8q** (gates before push, epic `k3vv`),
+which is the work item; this bean holds what was built here and the design.
 
 Asked by the owner through the "CI pipeline performance analysis" session
 (folio-assistant): *"all speed improvements; can agents and coders who commit
