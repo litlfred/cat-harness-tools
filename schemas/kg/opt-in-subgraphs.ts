@@ -31,6 +31,8 @@
  * An `enableSubgraphs` id that names nothing opt-in is refused by
  * `check:declaration-resolution` ({@link enableSubgraphsProblems}), never
  * ignored.
+ *
+ * @graphNode none — a function library over the `enableSubgraphs` field; it defines no schema
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
