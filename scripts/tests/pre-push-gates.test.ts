@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { judge, parsePushCommand, parsePushStdin } from "../pre-push-gates.ts";
-import { buildRecord, covers, readRecord, stateDir, toolVersions, treeOf, type GatesReportLike } from "../gate-record.ts";
+import { buildRecord, covers, newFailures, readRecord, readResults, stateDir, toolVersions, treeOf, type GatesReportLike } from "../gate-record.ts";
 
 const PASS: GatesReportLike = {
   $schema: "folio-gates-report/v1",
@@ -71,6 +71,14 @@ describe("the record", () => {
   });
 });
 
+test("newFailures: only a gate green on the base, under the same bun, is this push's", () => {
+  const tools = { bun: "1", git: "2", platform: "x" };
+  const base = { $schema: "cat-local-gate-results/v1" as const, tree: "t", tools, at: "", outcomes: { a: "pass" as const, b: "fail" as const, c: "skipped" as const } };
+  expect(newFailures(["a", "b", "c", "d"], base, tools)).toEqual(["a", "c"]);
+  expect(newFailures(["a"], base, { ...tools, bun: "2" })).toEqual([]);
+  expect(newFailures(["a"], undefined, tools)).toEqual([]);
+});
+
 describe("judge, on a throwaway repository", () => {
   let root: string;
   const sh = (...args: string[]) => spawnSync("git", args, { cwd: root, encoding: "utf-8" });
@@ -114,13 +122,69 @@ process.exit(${code});\n`,
     expect(runs()).toBe(1);
   });
 
-  test("a red gate refuses, and leaves no record", async () => {
+  test("a red gate with no base outcome to compare against is undetermined, not refused, and leaves no record", async () => {
     stub(1, { ...PASS, outcome: "fail", exitCode: 1, failed: [{ command: "bun run cat check:a", job: "j", step: "s", why: ["boom"] }] });
     const head = sh("rev-parse", "HEAD").stdout.trim();
     const v = await judge(root, [head]);
-    expect(v.kind).toBe("refuse");
-    expect(v.kind === "refuse" && v.why.join("\n")).toContain("check:a");
+    expect(v.kind).toBe("undetermined");
     expect(readRecord(root, treeOf(root, head)!)).toBeUndefined();
+    // ...but its outcomes are kept, as the next push's base.
+    expect(readResults(root, treeOf(root, head)!)?.outcomes["bun run cat check:a"]).toBe("fail");
+  });
+
+  /**
+   * A gate runner whose `check:pages` needs publish-time pages (`_site/`,
+   * never committed, written by `derive:publish`) and whose `check:a` reds
+   * on a committed `broken` file: the shape of the 11 false reds measured in
+   * a fresh agent container (folio-assistant#2946).
+   */
+  const pagesStub = () => {
+    writeFileSync(
+      join(root, "fake-cat.ts"),
+      `import { existsSync, writeFileSync, appendFileSync } from "node:fs";
+const a = process.argv; const out = a[a.indexOf("--report") + 1]!;
+appendFileSync(${JSON.stringify(join(root, "runs.txt"))}, "x");
+const failed = [];
+if (!existsSync("_site/index.html")) failed.push({ command: "bun run cat check:pages", job: "j", step: "pages", why: ["no publish-time pages"] });
+if (existsSync("broken")) failed.push({ command: "bun run cat check:a", job: "j", step: "a", why: ["broken"] });
+writeFileSync(out, JSON.stringify({ $schema: "folio-gates-report/v1", outcome: failed.length ? "fail" : "pass", exitCode: failed.length ? 1 : 0,
+  set: "fast", gates: 2, commands: ["bun run cat check:a", "bun run cat check:pages"], failed, skipped: [], undetermined: [] }));
+process.exit(failed.length ? 1 : 0);\n`,
+    );
+  };
+
+  test("a tree lacking the publish pages: the environment's red is not this push's, so the push is not refused", async () => {
+    pagesStub();
+    const base = sh("rev-parse", "HEAD").stdout.trim();
+    expect((await judge(root, [base])).kind).toBe("undetermined"); // check:pages red on the base too
+    writeFileSync(join(root, "change.txt"), "a change that breaks nothing\n");
+    sh("add", "change.txt");
+    sh("commit", "-qm", "change");
+    const v = await judge(root, [sh("rev-parse", "HEAD").stdout.trim()], undefined, [base]);
+    expect(v.kind).toBe("undetermined");
+    expect(v.kind === "undetermined" && v.why).toContain("check:pages");
+  });
+
+  test("a gate green on the base and red now is this push's, and refuses", async () => {
+    pagesStub();
+    const base = sh("rev-parse", "HEAD").stdout.trim();
+    await judge(root, [base]);
+    writeFileSync(join(root, "broken"), "x\n");
+    sh("add", "broken");
+    sh("commit", "-qm", "break check:a");
+    const v = await judge(root, [sh("rev-parse", "HEAD").stdout.trim()], undefined, [base]);
+    expect(v.kind).toBe("refuse");
+    const why = v.kind === "refuse" ? v.why.join("\n") : "";
+    expect(why).toContain("check:a");
+    expect(why).not.toContain("check:pages");
+  });
+
+  test("a passing record stands as the base's outcomes", async () => {
+    stub(0, PASS);
+    const base = sh("rev-parse", "HEAD").stdout.trim();
+    await judge(root, [base]);
+    rmSync(join(stateDir(root), "results"), { recursive: true, force: true });
+    expect(readResults(root, treeOf(root, base)!)?.outcomes["bun run cat check:a"]).toBe("pass");
   });
 
   test("exit 2 is undetermined, not a pass", async () => {

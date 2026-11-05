@@ -30,12 +30,29 @@
  * ## Verdicts
  *
  * - gates exit 0: write the tree's record, allow the push;
- * - gates exit 1 (a gate failed, or a gate changed the tree): refuse;
- * - gates exit 2, or no `cat` runner in this checkout (a layer cloned on its
- *   own): allow, say so, and log it. A third state is not a pass, so no record
- *   is written and CI runs everything, exactly as it would without the hook;
- * - the pushed tree is not the tree on disk (a dirty tracked file, or a ref
- *   other than HEAD): refuse, because the gates would judge the wrong tree.
+ * - gates exit 1 with a gate that was GREEN on the push's base in this same
+ *   environment and is red now: refuse, quoting those gates. That is CI's own
+ *   "no new failures" rule. The base is what the remote branch holds (the
+ *   previous push, whose outcomes this hook recorded), else the merge base
+ *   with `origin`'s default branch;
+ * - gates exit 1 where every red gate was red on the base too, or the base has
+ *   no recorded outcomes here: allow, say which gates were red, log it. A
+ *   fresh agent container is not CI: measured 2026-11-05 (folio-assistant
+ *   #2946), it reddened 11 `bun test` cases that pass in CI on the same tree,
+ *   for want of the publish-time pages and a faster machine. A red that may be
+ *   the environment's is could-not-determine here, never a refusal;
+ * - a gate that changed the tree (not-clean), gates exit 2, or no `cat` runner
+ *   in this checkout (a layer cloned on its own): allow, say so, log it.
+ *
+ * In every allow but the first, no record is written, so CI runs everything,
+ * exactly as it would without the hook. Each run's per-gate outcomes ARE
+ * written (`<git dir>/cat-gates/results/<tree>.json`), so the next push of the
+ * branch has a base to compare against; `--baseline` records them for HEAD
+ * without pushing, e.g. on `main` right after a container's cold start.
+ *
+ * Refused before any gate runs: the pushed tree is not the tree on disk (a
+ * dirty tracked file, or a ref other than HEAD), because the gates would judge
+ * the wrong tree.
  *
  * ## The bypass is explicit and logged
  *
@@ -58,11 +75,16 @@ import {
   covers,
   git,
   logPush,
+  newFailures,
+  outcomesOf,
   readRecord,
+  readResults,
   stateDir,
   toolVersions,
   treeOf,
   writeRecord,
+  writeResults,
+  LOCAL_GATE_RESULTS_SCHEMA,
   RECORD_NOTES_REF,
   type GatesReportLike,
 } from "./gate-record.ts";
@@ -165,7 +187,12 @@ const BYPASS_HINT =
  * `stream` receives the gate run's output as it goes (git's hook shows it;
  * the Claude hook keeps it in the log and quotes only the failures).
  */
-export async function judge(root: string, commits: readonly string[], stream?: NodeJS.WritableStream): Promise<Verdict> {
+export async function judge(
+  root: string,
+  commits: readonly string[],
+  stream?: NodeJS.WritableStream,
+  bases: readonly (string | undefined)[] = [],
+): Promise<Verdict> {
   const now = toolVersions(root);
   const uncovered: { commit: string; tree: string }[] = [];
   for (const c of new Set(commits)) {
@@ -230,17 +257,54 @@ export async function judge(root: string, commits: readonly string[], stream?: N
     if (git(root, ["config", "--bool", "cat.gates.noteRecords"]) !== "false") attachNote(root, rec);
     return { kind: "allow", why: `${rec.gates.length - rec.skipped.length} gate(s) passed, ${rec.skipped.length} skipped on unchanged inputs` };
   }
-  if (code === 1) {
-    const lines = ["A gate is red on the tree being pushed, so the push was refused."];
-    for (const f of report?.failed ?? []) {
+  const outcomes = report !== undefined ? outcomesOf(report) : undefined;
+  if (outcomes !== undefined) {
+    writeResults(root, { $schema: LOCAL_GATE_RESULTS_SCHEMA, tree: uncovered[0]!.tree, tools: now, at: finishedAt, outcomes });
+  }
+  if (code === 1 && report !== undefined) {
+    if (report.outcome === "not-clean") {
+      return { kind: "undetermined", why: `every gate passed but one changed the tree (${report.mutatedBy?.join(", ") ?? "see the log"}), so nothing was decided here (output: ${logPath})` };
+    }
+    const failedNow = report.failed.map((f) => f.command);
+    const baseTree = baseTreeFor(root, uncovered[0]!.commit, bases);
+    const fresh = newFailures(failedNow, baseTree === undefined ? undefined : readResults(root, baseTree), now);
+    if (fresh.length === 0) {
+      return {
+        kind: "undetermined",
+        why:
+          `${failedNow.length} gate(s) red here, and none is known green on the base ${baseTree?.slice(0, 12) ?? "(none found)"} in this ` +
+          `environment, so these reds may be the environment's rather than this push's (${failedNow.join(", ")}; output: ${logPath})`,
+      };
+    }
+    const lines = [`${fresh.length} gate(s) were green on the base in this environment and are red on the tree being pushed, so the push was refused.`];
+    for (const f of report.failed.filter((x) => fresh.includes(x.command))) {
       lines.push(`  · ${f.command}   (${f.job} / ${f.step})`);
       for (const w of f.why.slice(0, 5)) lines.push(`      ${w}`);
     }
-    if (report?.outcome === "not-clean") lines.push("  Every gate passed, but one changed the tree. Commit what it wrote, or see the log.");
     lines.push(`  Full output: ${logPath}`);
     return { kind: "refuse", why: lines };
   }
   return { kind: "undetermined", why: `\`bun run cat gates\` exited ${code}, which is could-not-determine, not a pass (output: ${logPath})` };
+}
+
+/**
+ * The tree to compare a push against: what the remote holds now (the last
+ * push of this branch, whose results this hook recorded), else the merge
+ * base with the remote's default branch. Undefined when neither is on disk.
+ */
+export function baseTreeFor(root: string, commit: string, bases: readonly (string | undefined)[]): string | undefined {
+  const candidates = [
+    ...bases.filter((b): b is string => b !== undefined && !ZERO.test(b)),
+    git(root, ["rev-parse", "--verify", "--quiet", "@{upstream}"]),
+    git(root, ["merge-base", commit, "refs/remotes/origin/HEAD"]),
+    git(root, ["merge-base", commit, "refs/remotes/origin/main"]),
+  ];
+  for (const c of candidates) {
+    if (c === undefined || c === commit) continue;
+    const t = treeOf(root, c);
+    if (t !== undefined && readResults(root, t) !== undefined) return t;
+  }
+  return undefined;
 }
 
 function runGates(root: string, reportPath: string, logPath: string, stream?: NodeJS.WritableStream): Promise<number> {
@@ -278,7 +342,7 @@ async function gitHook(root: string, remote: string): Promise<number> {
   const judged = refs.filter((r) => r.localRef !== RECORD_NOTES_REF);
   if (judged.length === 0) return 0;
   say([`pre-push: running the fast gates on ${judged.map((r) => r.localRef).join(", ")} (bypass: CAT_GATES_BYPASS='<reason>')`]);
-  const v = await judge(root, judged.map((r) => r.localSha), process.stderr);
+  const v = await judge(root, judged.map((r) => r.localSha), process.stderr, judged.map((r) => r.remoteSha));
   return finish(root, v, { via: "git-hook", remote, refs: judged }, 1, () => {
     if (git(root, ["config", "--bool", "cat.gates.pushRecords"]) === "true") {
       // `--no-verify`: this push carries only notes, and re-entering this hook would judge nothing.
@@ -346,10 +410,16 @@ if (import.meta.main) {
   if (argv[0] === "--git-hook") {
     const root = git(process.cwd(), ["rev-parse", "--show-toplevel"]) ?? process.cwd();
     process.exit(await gitHook(root, argv[1] ?? "origin"));
+  } else if (argv[0] === "--baseline") {
+    // Record this environment's per-gate outcomes for HEAD, pushing nothing.
+    const root = git(process.cwd(), ["rev-parse", "--show-toplevel"]) ?? process.cwd();
+    const v = await judge(root, [git(root, ["rev-parse", "HEAD"]) ?? "HEAD"], process.stderr);
+    say([`baseline: ${v.kind} — ${v.kind === "refuse" ? v.why.join("\n") : v.why}`]);
+    process.exit(0);
   } else if (argv[0] === "--claude-hook") {
     process.exit(await claudeHook());
   } else {
-    console.error("usage: pre-push-gates.ts --git-hook <remote> < refs | --claude-hook < tool-call.json");
+    console.error("usage: pre-push-gates.ts --git-hook <remote> < refs | --claude-hook < tool-call.json | --baseline");
     process.exit(2);
   }
 }

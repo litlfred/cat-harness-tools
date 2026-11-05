@@ -38,10 +38,27 @@ runs `scripts/pre-push-gates.ts --git-hook <remote>`:
   narrow, strace-derived read sets of the CI cone exist only in main's CI
   cache, so they do not help here; making them fetchable locally is a
   possible follow-up;
-- exit 0: a record is written (section 3) and the push goes; exit 1 (a gate
-  red, or a gate changed the tree): refused, the failing gates quoted; exit 2,
-  or no `cat` runner in the checkout (a layer cloned on its own): pushed, said
-  so, logged, and no record, so CI runs everything as it does today.
+- exit 0: a record is written (section 3) and the push goes;
+- exit 1: refused **only for a new failure**: a gate red now that was green on
+  the push's base in this same environment (the remote branch's current tip,
+  i.e. the previous push, else the merge base with `origin`'s default). That
+  is CI's own "no new failures" rule. Every run keeps its per-gate outcomes in
+  `<git dir>/cat-gates/results/<tree>.json` so the next push has a base, and
+  `pre-push-gates.ts --baseline` records them for HEAD (e.g. on main after a
+  cold start);
+- a red with no green base to compare against, a gate that changed the tree,
+  exit 2, or no `cat` runner (a layer cloned on its own): pushed, said so,
+  logged, and no record, so CI runs everything as it does today.
+
+**Why not refuse on any red** (2026-11-05, from the CI-analysis session): in a
+fresh folio-assistant agent container (mounted from the lock, `bun install`,
+`state:mount`, `smart:pages`, `ig-index:build`, no `derive:publish`),
+`CI=1 bun run cat gates` reddened 11 `bun test` cases that pass in CI on the
+same tree (folio-assistant#2946), for want of publish-time pages and of a
+faster machine (5000 ms timeouts). Refusing on those would block good pushes.
+Running the producers CI runs first (`derive:publish`) is the other fix; it is
+left for when its cost in a container is measured, since the baseline rule
+already keeps an environment red from refusing.
 
 **Bypass**: `CAT_GATES_BYPASS='<reason>' git push ...`, appended with the refs
 and time to `<git dir>/cat-gates/push.log`. `git push --no-verify` skips git's

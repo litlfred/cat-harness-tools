@@ -49,6 +49,7 @@ export interface GatesReportLike {
   commands?: string[];
   failed: { command: string; job: string; step: string; why: string[] }[];
   skipped: { command: string; why: string }[];
+  mutatedBy?: string[];
   undetermined: string[];
 }
 
@@ -177,4 +178,73 @@ export function logPush(root: string, entry: Record<string, unknown>): string {
   mkdirSync(dirname(p), { recursive: true });
   appendFileSync(p, JSON.stringify({ at: new Date().toISOString(), ...entry }) + "\n");
   return p;
+}
+
+// ── Per-gate outcomes, pass or fail (the "no new failures" baseline) ─────
+//
+// A fresh agent container is not CI: measured 2026-11-05 (folio-assistant
+// #2946), `CI=1 bun run cat gates` there reddened 11 `bun test` cases that
+// pass in CI on the same tree, for want of the publish-time pages and of a
+// faster machine. A red here is therefore a finding about THIS PUSH only when
+// the same gate was green on the push's base in the same environment, which
+// is the rule CI's own "no new failures" jobs apply. So every run records how
+// each gate came out, keyed by tree, and a push compares against its base.
+
+export const LOCAL_GATE_RESULTS_SCHEMA = "cat-local-gate-results/v1";
+
+export type GateOutcomeHere = "pass" | "fail" | "skipped";
+
+export interface LocalGateResults {
+  $schema: typeof LOCAL_GATE_RESULTS_SCHEMA;
+  tree: string;
+  tools: ToolVersions;
+  at: string;
+  outcomes: Record<string, GateOutcomeHere>;
+}
+
+/** Each gate's outcome in a report, or undefined when the report cannot name its gates or reached no verdict. */
+export function outcomesOf(report: GatesReportLike): Record<string, GateOutcomeHere> | undefined {
+  if (report.commands === undefined || report.exitCode === 2 || report.outcome === "undetermined") return undefined;
+  const failed = new Set(report.failed.map((f) => f.command));
+  const skipped = new Set(report.skipped.map((s) => s.command));
+  const out: Record<string, GateOutcomeHere> = {};
+  for (const c of report.commands) out[c] = failed.has(c) ? "fail" : skipped.has(c) ? "skipped" : "pass";
+  return out;
+}
+
+export function resultsPath(root: string, tree: string): string {
+  if (!/^[0-9a-f]{40,64}$/.test(tree)) throw new Error(`not a tree id: ${tree}`);
+  return join(stateDir(root), "results", `${tree}.json`);
+}
+
+export function writeResults(root: string, r: LocalGateResults): void {
+  const p = resultsPath(root, r.tree);
+  mkdirSync(dirname(p), { recursive: true });
+  writeFileSync(p, JSON.stringify(r, null, 2) + "\n");
+}
+
+/** The outcomes recorded for `tree`; a passing record stands for them when no results file was written. */
+export function readResults(root: string, tree: string): LocalGateResults | undefined {
+  try {
+    const r = JSON.parse(readFileSync(resultsPath(root, tree), "utf-8")) as LocalGateResults;
+    if (r.$schema === LOCAL_GATE_RESULTS_SCHEMA && r.tree === tree) return r;
+  } catch {
+    // fall through to the record
+  }
+  const rec = readRecord(root, tree);
+  if (rec === undefined) return undefined;
+  const skipped = new Set(rec.skipped.map((s) => s.command));
+  const outcomes: Record<string, GateOutcomeHere> = {};
+  for (const c of rec.gates) outcomes[c] = skipped.has(c) ? "skipped" : "pass";
+  return { $schema: LOCAL_GATE_RESULTS_SCHEMA, tree, tools: rec.tools, at: rec.finishedAt, outcomes };
+}
+
+/**
+ * The gates red now that were green (passed, or skipped on a pass) on the
+ * base, in the same Bun. Only these are this push's. A gate red on both, or
+ * one the base has no result for, is not decided here: CI decides it.
+ */
+export function newFailures(failedNow: readonly string[], base: LocalGateResults | undefined, now: ToolVersions): string[] {
+  if (base === undefined || base.tools.bun !== now.bun) return [];
+  return failedNow.filter((c) => base.outcomes[c] === "pass" || base.outcomes[c] === "skipped");
 }
