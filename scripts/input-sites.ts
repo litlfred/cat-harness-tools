@@ -38,8 +38,20 @@
  * | `traced` | a read no check is known to reach, behind a call to `inputSiteReached()` on the line directly above it (`input-trace.ts`) | nothing — a run that reaches it records no hash |
  * | `inert` | the value read never reaches the exit code: a timestamp in a message, a duration, a temp dir removed before exit | nothing |
  * | `imports <glob>,…` | a computed `import()` / `require()` whose targets all lie under these globs | adds the globs' files to the closure as IMPORTED modules |
+ * | `declared <source>,…` | a computed `import()` / `require()` whose targets are the modules these DECLARATION SOURCES name (`declared-imports.ts`): what the site itself reads to choose them | adds the modules the declarations name NOW, resolved at fingerprint time, as IMPORTED modules; a source that does not resolve is undetermined |
  * | `scripts <name>,…` | a spawned `bun run <name>` of these package.json scripts, with this process's environment | adds each script's entry files (`entryFiles`) as ENTRIES; a name that does not resolve is undetermined |
  * | `runs <glob>,…` | a spawned `bun` script whose entry files all lie under these globs, run with this process's environment | adds the globs' files to the closure as ENTRIES — their `import.meta.main` blocks run |
+ *
+ * ## A computed load is audited in full, and hashed only where no trace is
+ *
+ * What an `imports` or `declared` verdict adds — and everything those modules
+ * import or run — is AUDITED like any other source, so an environment read in
+ * a validator module still reaches the fingerprint. Which of them a run
+ * actually loads is a function of code and data, so {@link AuditedClosure}
+ * lists them apart (`computed`): a fingerprint whose run is traced
+ * (`ci-cone.ts`, whose read set records every module file the run opened)
+ * need not hash them, since the trace holds the ones that run loaded, and only
+ * those can change its answer (`input-hash.ts`).
  *
  * The PIN is the first 8 hex digits of the sha-256 of the site's STATEMENT
  * (the site line plus the lines up to where its brackets balance, at most
@@ -90,6 +102,7 @@ export type SiteVerdict =
   | { kind: "refs"; names: string[] }
   | { kind: "inert" }
   | { kind: "imports"; globs: string[] }
+  | { kind: "declared"; sources: string[] }
   | { kind: "runs"; globs: string[] }
   | { kind: "scripts"; names: string[] };
 
@@ -150,6 +163,10 @@ export function parseVerdicts(text: string): SiteVerdict[] | { error: string } {
       case "refs":
         if (args.length === 0 || !args.every((a) => /^[A-Za-z0-9_./-]+$/.test(a))) return { error: "`refs` needs ref names" };
         out.push({ kind: "refs", names: args });
+        break;
+      case "declared":
+        if (args.length === 0 || !args.every((a) => /^[a-z][a-z0-9-]*$/.test(a))) return { error: "`declared` needs declaration source names" };
+        out.push({ kind: "declared", sources: args });
         break;
       case "imports":
       case "runs":
@@ -427,6 +444,13 @@ function resolveModule(fromFile: string, spec: string): string | undefined {
 export interface AuditedClosure {
   /** Every source file reached, repo-relative, sorted. */
   files: string[];
+  /**
+   * The part of `files` reached ONLY through a computed load (`imports`,
+   * `declared`) — the modules a run loads or not, depending on its data, and
+   * what they import or run. Audited like the rest; a traced fingerprint does
+   * not hash them (see the module comment).
+   */
+  computed: string[];
   /** Variables whose values must be hashed. */
   env: string[];
   /** Variables that must be unset or empty. */
@@ -504,8 +528,8 @@ export function siteProblem(s: Site): string | undefined {
 /**
  * Walk the RELATIVE-import closure of `entries` and audit every site in it.
  * Returns undetermined on the first site that is unannotated, stale or
- * malformed, on an import that does not resolve, and on an `imports` glob
- * that matches nothing.
+ * malformed, on an import that does not resolve, and on a `declared` source
+ * that does not resolve. An `imports` glob that matches nothing is allowed.
  */
 export function auditClosure(
   root: string,
@@ -515,37 +539,48 @@ export function auditClosure(
   problems?: string[],
   /** Resolves a `scripts` verdict's package script to its entry files; absent, such a site is undetermined. */
   scriptEntries?: (name: string) => string[] | undefined,
+  /** Resolves a `declared` verdict's source to the repo-relative modules it names; absent, such a site is undetermined. */
+  declaredImports?: (source: string) => readonly string[] | undefined,
 ): AuditedClosure | { undetermined: string } {
-  // A file is visited at most twice: once IMPORTED (its `import.meta.main`
-  // block does not run) and once as an ENTRY (it does). Entry subsumes import.
-  const seen = new Map<string, "import" | "entry">();
+  // A file is visited at most four times: IMPORTED (its `import.meta.main`
+  // block does not run) or as an ENTRY (it does), each reached only through a
+  // computed load or not. Entry subsumes import, and static subsumes computed;
+  // a file reached again with a state its first visit did not cover is
+  // walked again, so what it reaches inherits the stronger state.
+  const seen = new Map<string, { entry: boolean; computed: boolean }>();
   const env = new Set<string>();
   const envUnset = new Set<string>();
   let needsTree = false;
   let needsHead = false;
   const refs = new Set<string>();
-  const stack: { file: string; entry: boolean }[] = entries.map((e) => ({ file: resolve(root, e), entry: true }));
-  const pushGlobs = (globs: readonly string[], entry: boolean) => {
+  const stack: { file: string; entry: boolean; computed: boolean }[] = entries.map((e) => ({ file: resolve(root, e), entry: true, computed: false }));
+  const fail = (why: string): { undetermined: string } | undefined => {
+    if (problems === undefined) return { undetermined: why };
+    if (!problems.includes(why)) problems.push(why);
+    return undefined;
+  };
+  const pushGlobs = (globs: readonly string[], entry: boolean, computed: boolean) => {
     // A glob matching nothing is allowed: a computed load that today loads
     // nothing reads nothing. That the globs cover what the DATA names is a
     // test's job (`input-sites.test.ts`), since the data is in the tree a
     // {tracked} fingerprint hashes anyway. Tests are never a target: bun runs
     // them, a check does not.
-    for (const g of globs) for (const f of memo.glob(root, g)) stack.push({ file: join(root, f), entry });
+    for (const g of globs) for (const f of memo.glob(root, g)) stack.push({ file: join(root, f), entry, computed });
   };
   while (stack.length > 0) {
-    const { file, entry } = stack.pop()!;
+    const { file, entry, computed } = stack.pop()!;
     const prior = seen.get(file);
-    if (prior === "entry" || (prior === "import" && !entry)) continue;
-    seen.set(file, entry ? "entry" : "import");
+    if (prior !== undefined && (prior.entry || !entry) && (!prior.computed || computed)) continue;
+    const now = { entry: entry || (prior?.entry ?? false), computed: computed && (prior?.computed ?? true) };
+    seen.set(file, now);
     if (!/\.(m?[jt]sx?)$/.test(file)) continue;
     const { sites, imports } = memo.read(file, root);
     for (const s of sites) {
-      if (s.inMain === true && !entry) continue;
+      if (s.inMain === true && !now.entry) continue;
       const problem = siteProblem(s);
       if (problem !== undefined) {
-        if (problems === undefined) return { undetermined: problem };
-        problems.push(problem);
+        const out = fail(problem);
+        if (out !== undefined) return out;
         continue;
       }
       for (const v of s.verdicts as SiteVerdict[]) {
@@ -554,33 +589,42 @@ export function auditClosure(
         else if (v.kind === "tree") needsTree = true;
         else if (v.kind === "head") needsHead = true;
         else if (v.kind === "refs") v.names.forEach((n) => refs.add(n));
-        else if (v.kind === "imports") pushGlobs(v.globs, false);
-        else if (v.kind === "runs") pushGlobs(v.globs, true);
-        else if (v.kind === "scripts") {
+        else if (v.kind === "imports") pushGlobs(v.globs, false, true);
+        else if (v.kind === "runs") pushGlobs(v.globs, true, now.computed);
+        else if (v.kind === "declared") {
+          for (const source of v.sources) {
+            const files = declaredImports?.(source);
+            if (files === undefined) {
+              const out = fail(`input-site at ${s.file}:${s.line} loads the modules declaration source ${source} names, which does not resolve`);
+              if (out !== undefined) return out;
+              continue;
+            }
+            for (const f of files) stack.push({ file: resolve(root, f), entry: false, computed: true });
+          }
+        } else if (v.kind === "scripts") {
           for (const name of v.names) {
             const files = scriptEntries?.(name);
             if (files === undefined) {
-              const why = `input-site at ${s.file}:${s.line} runs package script ${name}, which does not resolve to script files`;
-              if (problems === undefined) return { undetermined: why };
-              problems.push(why);
+              const out = fail(`input-site at ${s.file}:${s.line} runs package script ${name}, which does not resolve to script files`);
+              if (out !== undefined) return out;
               continue;
             }
-            for (const f of files) stack.push({ file: resolve(root, f), entry: true });
+            for (const f of files) stack.push({ file: resolve(root, f), entry: true, computed: now.computed });
           }
         }
       }
     }
-    if (prior === "import") continue; // its imports were followed on the first visit
     for (const spec of imports) {
       const target = resolveModule(file, spec);
       // A module Bun cannot load fails the script when run; running it is the answer.
       if (target === undefined) return { undetermined: `${relative(root, file)} imports unresolvable ${spec}` };
-      stack.push({ file: target, entry: false });
+      stack.push({ file: target, entry: false, computed: now.computed });
     }
   }
   if (problems !== undefined && problems.length > 0) return { undetermined: problems[0]! };
   return {
     files: [...seen.keys()].map((f) => relative(root, f)).sort(),
+    computed: [...seen].filter(([, v]) => v.computed).map(([f]) => relative(root, f)).sort(),
     env: [...env].sort(),
     envUnset: [...envUnset].sort(),
     needsTree,
