@@ -50,6 +50,9 @@ export const RETIRED_WORDS_LIST = "retired-prose-words";
 /** Top-level directories whose Markdown is not this instance's own prose. */
 const NOT_OWN_PROSE = new Set(["library", "translations", "upstream", "uploads", "test", "node_modules"]);
 
+/** The record `kg:materialize` writes beside another graph's bytes; a directory holding one is not walked. */
+export const MATERIALIZATION_RECORD = "materialization.json";
+
 /** Any character except one that would cross a blank line. */
 const NB = String.raw`(?:(?!\n[ \t]*\n)[\s\S])`;
 
@@ -172,6 +175,10 @@ export function ownProseFiles(instanceRoot: string): string[] {
       if (e.isDirectory()) {
         if (rel === "" && NOT_OWN_PROSE.has(e.name)) continue;
         if (e.name === "node_modules") continue;
+        // Another graph's bytes, materialised here with a digest beside them
+        // (`kg:materialize`): its owner's prose, not this instance's, and
+        // editing it in place breaks fixity (folio-assistant main, 2026-11-05).
+        if (existsSync(join(dir, e.name, MATERIALIZATION_RECORD))) continue;
         walk(join(dir, e.name), r);
       } else if (e.isFile() && e.name.endsWith(".md")) out.push(r);
     }

@@ -13,6 +13,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { harnessPath } from "../../lib/harness-layout.ts";
 
 import { processFiles, processRoots, registerWorkflowTools } from "../../../src/tools/workflow.ts";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
@@ -111,7 +112,7 @@ describe("a name collision", () => {
   test("the root's own diagram shadows the dependency's", () => {
     // cat-harness owns the diagram (again, since bean `j7ql`), and the
     // fixture reaches it by depending on cat-harness (placement PR0).
-    const root = rootWithDependency(join(CAT_HARNESS, "processes", "library", "sample-import.bpmn"));
+    const root = rootWithDependency(harnessPath("library/processes/sample-import.bpmn", CAT_HARNESS));
     const hits = processFiles(root).filter((f) => f.endsWith("/sample-import.bpmn"));
     expect(hits).toEqual([join(root, "processes", "sample-import.bpmn")]);
     expect(readFileSync(hits[0], "utf-8")).toContain("Process_SampleImport");
