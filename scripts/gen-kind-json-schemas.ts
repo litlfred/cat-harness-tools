@@ -287,6 +287,50 @@ export async function renderKind(
   return { kind, file, id, text: `${JSON.stringify(doc, null, 2)}\n` };
 }
 
+/**
+ * Judge rendered kind documents without a committed copy (the harness builds
+ * them at publish): each parses, carries `$id` equal to its own id, every
+ * local `$ref` (`#/...`) resolves inside it, and `again` (a second render)
+ * matches byte for byte. Returns one line per problem, empty when all hold.
+ */
+export function judgeRendered(
+  docs: readonly { kind: string; id: string; text: string }[],
+  again: ReadonlyMap<string, string>,
+): string[] {
+  const out: string[] = [];
+  for (const d of docs) {
+    let doc: Record<string, unknown>;
+    try {
+      doc = JSON.parse(d.text) as Record<string, unknown>;
+    } catch (e) {
+      out.push(`${d.kind}: does not parse (${(e as Error).message})`);
+      continue;
+    }
+    if (doc.$id !== d.id) out.push(`${d.kind}: $id ${JSON.stringify(doc.$id)} is not its path (${d.id})`);
+    const refs: string[] = [];
+    const walk = (v: unknown): void => {
+      if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === "object") {
+        for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+          if (k === "$ref" && typeof x === "string" && x.startsWith("#")) refs.push(x);
+          else walk(x);
+        }
+      }
+    };
+    walk(doc);
+    for (const r of refs) {
+      let at: unknown = doc;
+      for (const tok of r.slice(1).split("/").filter(Boolean)) {
+        const key = decodeURIComponent(tok).replace(/~1/g, "/").replace(/~0/g, "~");
+        at = at && typeof at === "object" ? (at as Record<string, unknown>)[key] : undefined;
+      }
+      if (at === undefined) out.push(`${d.kind}: $ref ${r} resolves to nothing`);
+    }
+    if (again.get(d.kind) !== d.text) out.push(`${d.kind}: a second render differs (not deterministic)`);
+  }
+  return out;
+}
+
 if (import.meta.main) {
   const check = process.argv.includes("--check");
   const schemasDir = declaredSchemasDir();
@@ -316,7 +360,21 @@ if (import.meta.main) {
   const builtAtPublish = (file: string): boolean =>
     isBuiltAtPublish(readDeclaration(HARNESS_ROOT)?.builtAtPublish ?? [], relative(HARNESS_ROOT, file).split("\\").join("/"));
   if (check && written.every((d) => builtAtPublish(d.file))) {
-    console.log(`kind JSON Schemas are built at publish: ${written.length} rendered, none committed to compare`);
+    // Nothing committed to compare, so the generator's OWN output is judged:
+    // each document parses, its `$id` is its path, every local `$ref`
+    // resolves, and a second render gives the same bytes (deterministic).
+    const again = new Map<string, string>();
+    for (const k of kinds) {
+      const d = await renderKind(k, schemasDir);
+      if ("file" in d) again.set(d.kind, d.text);
+    }
+    const problems = judgeRendered(written, again);
+    for (const p of problems) console.error(`  ✗ ${p}`);
+    if (problems.length) {
+      console.error(`\n✗ ${problems.length} finding(s) in the generated kind JSON Schemas (built at publish).`);
+      process.exit(1);
+    }
+    console.log(`kind JSON Schemas are built at publish: ${written.length} rendered, each parsed, its $id its path, every local $ref resolved, and rendered identically twice`);
     process.exit(0);
   }
 
