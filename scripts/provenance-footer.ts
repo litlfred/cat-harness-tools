@@ -133,14 +133,34 @@ export function withEmphasis(html: string): string {
  * escaped. The whole fragment is wrapped in a Liquid raw block, because a
  * passage may contain `{{` and the fragment is read through `include`.
  */
-export function renderProvenanceFooter(entries: readonly ProvenanceEntry[], opts: { liquid?: boolean } = {}): string {
+/**
+ * How a section is shown. A page's own footer takes the defaults. A page that
+ * lists several logs (the tools page) names each one: `item` drops the lead
+ * and the rule, `summary` replaces the heading text, and `id` makes each one
+ * its own anchor.
+ */
+export interface ProvenanceRenderOptions {
+  liquid?: boolean;
+  item?: boolean;
+  /** Plain text: escaped, with inline code. */
+  summary?: string;
+  id?: string;
+}
+
+export function renderProvenanceFooter(entries: readonly ProvenanceEntry[], opts: ProvenanceRenderOptions = {}): string {
   const bySection = new Map<string, ProvenanceEntry[]>();
   for (const e of entries) bySection.set(e.section, [...(bySection.get(e.section) ?? []), e]);
+  const summary = opts.summary === undefined ? "Provenance" : withInlineCode(opts.summary, escapeHtml);
   const html: string[] = [
-    `<details class="fa-provenance" id="fa-provenance" data-fa-provenance-count="${entries.length}">`,
-    `  <summary class="fa-provenance-summary">Provenance (${entries.length})</summary>`,
-    `  <p class="fa-provenance-lead">Who decided, when, and under which work item. ` +
-      `This record was moved out of the text of the page.</p>`,
+    `<details class="fa-provenance${opts.item ? " fa-provenance-item" : ""}" id="${escapeHtml(opts.id ?? "fa-provenance")}" ` +
+      `data-fa-provenance-count="${entries.length}">`,
+    `  <summary class="fa-provenance-summary">${summary} (${entries.length})</summary>`,
+    ...(opts.item
+      ? []
+      : [
+          `  <p class="fa-provenance-lead">Who decided, when, and under which work item. ` +
+            `This record was moved out of the text of the page.</p>`,
+        ]),
   ];
   for (const [section, items] of bySection) {
     // The extraction's marker for "before the first heading" reads as a
@@ -179,7 +199,7 @@ export function renderProvenanceFooter(entries: readonly ProvenanceEntry[], opts
  * `liquid` is true only when Jekyll will read the page (a themed node page),
  * so a passage containing `{{` is not evaluated there.
  */
-export function provenanceSectionFor(source: string, opts: { liquid: boolean }): string {
+export function provenanceSectionFor(source: string, opts: ProvenanceRenderOptions & { liquid: boolean }): string {
   const entries = readProvenanceLog(provenanceLogFor(source)) ?? [];
   return entries.length === 0 ? "" : renderProvenanceFooter(entries, opts);
 }
@@ -191,6 +211,7 @@ export function provenanceSectionFor(source: string, opts: { liquid: boolean }):
 export const PROVENANCE_INLINE_STYLE = `
 .fa-provenance { margin: 2rem 0 0; padding-top: 1rem; border-top: 1px solid rgba(128,128,128,.35); font-size: .8125rem; }
 .fa-provenance-summary { cursor: pointer; font-weight: 600; }
+.fa-provenance.fa-provenance-item { margin: 0; padding: .375rem 0; border-top: 0; }
 .fa-provenance-lead { opacity: .8; margin: .5rem 0 1rem; }
 .fa-provenance .fa-provenance-section { font-size: .875rem; font-weight: 600; margin: 1rem 0 .25rem; }
 .fa-provenance-list { margin: 0; padding-left: 1.25rem; }

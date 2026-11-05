@@ -267,7 +267,12 @@ function toolProvenanceResolver(repo: string, opts: { instanceRoot?: string } = 
   }
   return (toolId) => {
     for (const d of dirs) {
-      const html = provenanceSectionFor(join(d, toolId, `${toolId}.json`), { liquid: false });
+      const html = provenanceSectionFor(join(d, toolId, `${toolId}.json`), {
+        liquid: false,
+        item: true,
+        summary: `\`${toolId}\``,
+        id: `provenance-${toolId}`,
+      });
       if (html !== "") return html;
     }
     return undefined;
@@ -665,10 +670,12 @@ export function page(
     b.push(
       "## Provenance",
       "",
-      `Who decided, when, and under which work item, for the ${withLog.length} tool(s) whose provenance log has entries.`,
+      `Who decided, when, and under which work item, for the ${withLog.length} tool(s) whose provenance log has entries. Open a tool to read its record.`,
       "",
     );
-    for (const r of withLog) b.push(`### \`${cell(r.id)}\` {#provenance-${cell(r.id)}}`, "", r.provenance!.trimEnd(), "");
+    // One collapsed row per tool, named by its id: a heading each made a page
+    // of 35 headings with a box under every one.
+    b.push(`<div class="fa-provenance-items">`, ...withLog.map((r) => r.provenance!.trimEnd()), `</div>`, "");
   }
   return b.join("\n").trimEnd() + "\n";
 }
