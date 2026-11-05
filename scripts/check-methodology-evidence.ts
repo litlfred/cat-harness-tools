@@ -54,6 +54,7 @@ import {
 } from "./qa-results.ts";
 import { isDirectoryReadme } from "../schemas/kg/kg-node.ts";
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
+import { gateDirectoriesForGraph, nothingOwnLine } from "./lib/gate-own.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { isSkillMd, skillMdDirs } from "./known-skills.ts";
 import { libraryEntryDir } from "./lib/library-entry-graphs.ts";
@@ -128,10 +129,13 @@ export function methodologyUses(root: string): MethodologyUse[] {
   return out;
 }
 
-/** Every `.md` under every directory declaring a `methodology` graph. */
-export function methodologyFiles(root: string): string[] {
+/**
+ * Every `.md` under every directory declaring a `methodology` graph, or under
+ * `dirs` when a gate scoped them to its caller's own (owner ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`).
+ */
+export function methodologyFiles(root: string, dirs: readonly string[] = corpusDirectoriesForGraph(root, "methodology")): string[] {
   const out: string[] = [];
-  for (const dir of corpusDirectoriesForGraph(root, "methodology")) {
+  for (const dir of dirs) {
     if (!existsSync(dir)) continue;
     for (const e of readdirSync(dir)) {
       const p = join(dir, e);
@@ -225,9 +229,9 @@ export interface MethodologyNode {
 }
 
 /** Every methodology node in the graph, parsed once, valid or not. */
-export function methodologyNodes(root = INSTANCE_ROOT): MethodologyNode[] {
+export function methodologyNodes(root = INSTANCE_ROOT, dirs?: readonly string[]): MethodologyNode[] {
   const out: MethodologyNode[] = [];
-  for (const f of methodologyFiles(root)) {
+  for (const f of methodologyFiles(root, dirs)) {
     const node = relative(root, f);
     const fm = frontMatterOf(readFileSync(f, "utf-8"));
 
@@ -263,9 +267,14 @@ export function methodologyNodes(root = INSTANCE_ROOT): MethodologyNode[] {
   return out;
 }
 
-export function checkMethodologyEvidence(root = INSTANCE_ROOT): EvidenceReport {
+/**
+ * `dirs` scopes the SUBJECTS (the methodology nodes judged); a citation still
+ * resolves against every library in the corpus, since a caller may cite what
+ * it mounts.
+ */
+export function checkMethodologyEvidence(root = INSTANCE_ROOT, dirs: readonly string[] = corpusDirectoriesForGraph(root, "methodology")): EvidenceReport {
   const r: EvidenceReport = {
-    undetermined: corpusDirectoriesForGraph(root, "methodology").length === 0,
+    undetermined: dirs.length === 0,
     nodes: 0,
     invalid: [],
     unresolved: [],
@@ -276,7 +285,7 @@ export function checkMethodologyEvidence(root = INSTANCE_ROOT): EvidenceReport {
   };
   if (r.undetermined) return r;
 
-  for (const n of methodologyNodes(root)) {
+  for (const n of methodologyNodes(root, dirs)) {
     const node = n.node;
     if (n.state === "untagged") {
       r.untagged.push({ node, detail: n.detail ?? "" });
@@ -353,13 +362,21 @@ export function judgeMethodologyEvidence(r: EvidenceReport, strict = false): Jud
 if (import.meta.main) {
   const strict = process.argv.includes("--strict");
   const GATE = "check:methodology-evidence";
+  // In a layer's PR checks, only the caller's own methodologies (owner ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`).
+  // The committed QA document covers the whole corpus and is the owning
+  // repository's, so a scoped run neither writes nor compares it.
+  const { dirs: subjects, scoped } = gateDirectoriesForGraph(INSTANCE_ROOT, "methodology");
+  if (scoped && subjects.length === 0) {
+    console.log(nothingOwnLine(GATE, "methodology/", scoped));
+    process.exit(0);
+  }
   if (judging()) {
     // Judge mode: compute, judge, write NOTHING (bean `bo44`).
     const usage = judgeUsage(GATE, process.argv.slice(2), ["--strict"]);
     if (usage !== undefined) process.exit(usage);
     let jr: EvidenceReport;
     try {
-      jr = checkMethodologyEvidence();
+      jr = checkMethodologyEvidence(INSTANCE_ROOT, subjects);
     } catch (e) {
       process.exit(concludeJudgement({ gate: GATE, judgement: "error", detail: (e as Error).message }));
     }
@@ -374,7 +391,7 @@ if (import.meta.main) {
           ? "no directory declares a `methodology` graph"
           : `${jr.nodes} node(s): ${jr.unresolved.length} unresolved, ${jr.invalid.length} invalid, ` +
             `${jr.noEvidence.length} with no evidence${strict ? " (gated: --strict)" : " (reported)"}`,
-        ...(jr.undetermined
+        ...(jr.undetermined || scoped
           ? {}
           : {
               committed: {
@@ -387,7 +404,7 @@ if (import.meta.main) {
       }),
     );
   }
-  const r = checkMethodologyEvidence();
+  const r = checkMethodologyEvidence(INSTANCE_ROOT, subjects);
 
   if (r.undetermined) {
     console.error("UNDETERMINED: no directory declares a `methodology` graph — nothing was checked.");
@@ -395,7 +412,7 @@ if (import.meta.main) {
     process.exit(2);
   }
 
-  writeQaResult(INSTANCE_ROOT, "methodology-evidence", methodologyEvidenceDocument(r));
+  if (!scoped) writeQaResult(INSTANCE_ROOT, "methodology-evidence", methodologyEvidenceDocument(r));
 
   if (!process.argv.includes("--json")) {
     printReport(r);

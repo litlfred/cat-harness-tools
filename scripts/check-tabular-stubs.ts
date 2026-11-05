@@ -27,7 +27,7 @@ import { join } from "node:path";
 
 import { tools } from "../schemas/tools/harness-tools.ts";
 import { TABULAR_CSVW_FILENAME, TabularCsvwSchema } from "../schemas/library/tabular-csvw.ts";
-import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
+import { gateDirectoriesForGraph, nothingOwnLine } from "./lib/gate-own.ts";
 
 const ROOT = HARNESS_ROOT;
 
@@ -131,7 +131,13 @@ function run(): number {
   // the other two as expired-nowhere — a clean run over the documents that
   // actually carry them.
   // Declared-but-absent is REPORTED, not dropped (bean `95ir`).
-  const { present: libs, absent } = splitDeclared(corpusDirectoriesForGraph(ROOT, "library"));
+  // In a layer's PR checks, only the caller's own libraries (owner ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`).
+  const { dirs: declared, scoped } = gateDirectoriesForGraph(ROOT, "library");
+  if (scoped && declared.length === 0) {
+    console.log(nothingOwnLine("check:tabular-stubs", "library/", scoped));
+    return 0;
+  }
+  const { present: libs, absent } = splitDeclared(declared);
   noteAbsent(absent, "a library");
   if (libs.length === 0) {
     console.error("Could not resolve a `library` directory. This is NOT a pass.");
