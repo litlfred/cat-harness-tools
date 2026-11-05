@@ -23,6 +23,8 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { ownName } from "./workflow-pins.ts";
+
 const TOOLS_ROOT = resolve(import.meta.dir, "..");
 const ROOT = join(import.meta.dir, "..", "..");
 const WORKFLOWS = join(ROOT, ".github", "workflows");
@@ -104,9 +106,23 @@ export function baselineKey(f: PinFinding): string {
   return `${f.workflow}: ${f.text}`;
 }
 
-function readBaseline(): string[] {
-  if (!existsSync(BASELINE)) return [];
-  return (JSON.parse(readFileSync(BASELINE, "utf-8")) as { known: string[] }).known;
+export interface PinBaseline {
+  /** The root the entries were recorded in (`ownName`); absent, they apply in every root. */
+  root?: string;
+  known: string[];
+}
+
+/** The entries that judge `here`: none when the baseline was recorded in another
+ * root. Every repository that mounts this layer runs the gate, and a site does
+ * not carry the index's workflows, so the index's entries there read as stale
+ * (owner, 2026-11-05: "scope to fa"). */
+export function knownFor(baseline: PinBaseline, here: string): string[] {
+  return baseline.root === undefined || baseline.root === here ? baseline.known : [];
+}
+
+function readBaseline(): PinBaseline {
+  if (!existsSync(BASELINE)) return { known: [] };
+  return JSON.parse(readFileSync(BASELINE, "utf-8")) as PinBaseline;
 }
 
 if (import.meta.main) {
@@ -119,6 +135,7 @@ if (import.meta.main) {
   const degrading = findings.filter((f) => f.kind === "degrading");
   const unpinned = findings.filter((f) => f.kind === "unpinned");
 
+  const here = ownName(ROOT);
   if (process.argv.includes("--write-baseline")) {
     const known = [...new Set(unpinned.map(baselineKey))].sort();
     writeFileSync(
@@ -130,7 +147,9 @@ if (import.meta.main) {
             "presence guard, which emits ::warning:: when it takes them — failing on those would make the honest " +
             "branch unreachable. A DEGRADING pin is never baselined: the failure it swallows is the one it exists " +
             "to raise, and no instance of that is defensible. Keyed by command rather than line number, so an " +
-            "unrelated step added above does not churn the file. Refresh with --write-baseline.",
+            "unrelated step added above does not churn the file. Refresh with --write-baseline. `root` is the " +
+            "repository the entries were recorded in; in any other root they judge nothing.",
+          root: here,
           known,
         },
         null,
@@ -141,7 +160,8 @@ if (import.meta.main) {
     process.exit(0);
   }
 
-  const known = new Set(readBaseline());
+  const baseline = readBaseline();
+  const known = new Set(knownFor(baseline, here));
   const keys = new Set(unpinned.map(baselineKey));
   const novel = [...keys].filter((k) => !known.has(k));
   const stale = [...known].filter((k) => !keys.has(k));
@@ -150,6 +170,9 @@ if (import.meta.main) {
     `Lockfile pinning (${pinned} pinned install step(s), ${guarded} behind a presence guard, ` +
       `${unpinned.length} deliberately unpinned)`,
   );
+  if (baseline.root !== undefined && baseline.root !== here) {
+    console.log(`  note: the baseline was recorded in ${baseline.root}, not ${here}; none of its entries apply here`);
+  }
 
   let bad = false;
   for (const f of degrading) {

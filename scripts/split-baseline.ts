@@ -38,6 +38,7 @@ import { join, resolve } from "node:path";
 
 import { captureTools } from "./capture-mcp-tools.ts";
 import { knownSkills } from "./known-skills.ts";
+import { ownName } from "./workflow-pins.ts";
 
 const REPO_ROOT = resolve(import.meta.dir, "..", "..");
 export const BASELINE_FILE = join(import.meta.dir, "split-baseline.json");
@@ -51,6 +52,8 @@ export interface ToolContract {
 export interface SplitBaseline {
   /** The commit the baseline describes. */
   sha: string;
+  /** The repository `sha` is in (`ownName`); absent, the baseline judges every root. */
+  root?: string;
   mcpTools: ToolContract[];
   knownSkills: string[];
   /** From CI on `main` at `sha`; `null` until entered. */
@@ -92,6 +95,16 @@ export function diff(base: Pick<SplitBaseline, "mcpTools" | "knownSkills">, now:
   return out;
 }
 
+/**
+ * Whether the baseline judges the root named `here`. It records the skills and
+ * tools of the root it was written in; a site that mounts this layer resolves a
+ * different skill set (none of an instance it does not mount), so there every
+ * such skill read as "no longer resolves" (owner, 2026-11-05: "scope to fa").
+ */
+export function judges(base: Pick<SplitBaseline, "root">, here: string): boolean {
+  return base.root === undefined || base.root === here;
+}
+
 /** Splits {@link diff}'s lines into failures and notes: a skill that newly resolves is a note. */
 export function splitFindings(lines: string[]): { failing: string[]; notes: string[] } {
   const isNote = (line: string) => line.startsWith("skill newly resolves: ");
@@ -100,6 +113,14 @@ export function splitFindings(lines: string[]): { failing: string[]; notes: stri
 
 async function main(): Promise<number> {
   const check = process.argv.includes("--check");
+  const here = ownName(REPO_ROOT);
+  if (check && existsSync(BASELINE_FILE)) {
+    const base = JSON.parse(readFileSync(BASELINE_FILE, "utf-8")) as SplitBaseline;
+    if (!judges(base, here)) {
+      console.log(`– not judged here: the baseline describes ${base.root} at ${base.sha.slice(0, 12)}, and this root is ${here}.`);
+      return 0;
+    }
+  }
   const now = await measure();
   if (now.knownSkills.length === 0) now.problems.push("knownSkills read 0 skills — a baseline of nothing compares equal to anything");
   if (now.problems.length > 0) {
@@ -134,6 +155,7 @@ async function main(): Promise<number> {
   const sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: REPO_ROOT, encoding: "utf-8" }).trim();
   const out: SplitBaseline = {
     sha,
+    root: here,
     mcpTools: now.mcpTools,
     knownSkills: now.knownSkills,
     // Kept across rewrites only when it describes the same commit.
