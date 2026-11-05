@@ -19,12 +19,29 @@
  */
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
+import { gateOwnInstances } from "./lib/gate-own.ts";
 import { auditSchemaNodes } from "./schema-nodes.js";
 
 const ROOT = HARNESS_ROOT;
 
 if (import.meta.main) {
-  const a = auditSchemaNodes(ROOT);
+  // In a layer's PR checks, only the caller's own instances' `schemas/`
+  // (owner ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`). A lower
+  // layer's are judged by that layer's own CI.
+  const own = gateOwnInstances();
+  const a = auditSchemaNodes(ROOT, "checkout", own);
+
+  // Scoped, and the caller commits no `schemas/*.ts` at all (none declared, or
+  // a data-only one, as cat-harness's has been since bean 8lcl): nothing of
+  // its own to judge. The refusal below guards the WHOLE corpus, which always
+  // holds the harness's modules, against a renamed directory.
+  if (own && a.nodes.length + a.exempt.length + a.undeclared.length + a.reasonless.length === 0) {
+    console.log(
+      `✓ ${[...own].join(", ")} commits no schemas/*.ts (${a.directories.length} declared director(ies) read); ` +
+        "the mounted layers' are judged by their own CI.",
+    );
+    process.exit(0);
+  }
 
   // An empty corpus is not a pass. A renamed or moved `schemas/` would
   // otherwise turn this gate into a silent success over nothing — the same
