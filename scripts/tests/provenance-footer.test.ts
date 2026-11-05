@@ -5,6 +5,7 @@ import { join } from "node:path";
 
 import {
   passageText,
+  provenanceSectionFor,
   withEmphasis,
   provenanceLogFor,
   readProvenanceLog,
@@ -106,5 +107,14 @@ describe("provenance footer", () => {
     const r = writeProvenanceListing({ siteDir: site, producer: "test", pages: new Map(), check: true });
     expect(r.stale).toEqual(["guides__a.html"]);
     expect(existsSync(frag)).toBe(true);
+  });
+
+  test("a page Jekyll never reads gets the section without raw tags; no log gives nothing", () => {
+    const { md, site } = fixture();
+    const plain = provenanceSectionFor(md, { liquid: false });
+    expect(plain.startsWith("<details")).toBe(true);
+    expect(plain).not.toContain("{% raw");
+    expect(provenanceSectionFor(md, { liquid: true }).startsWith("{% raw %}")).toBe(true);
+    expect(provenanceSectionFor(join(site, "none.bpmn"), { liquid: false })).toBe("");
   });
 });

@@ -129,7 +129,7 @@ export function withEmphasis(html: string): string {
  * escaped. The whole fragment is wrapped in a Liquid raw block, because a
  * passage may contain `{{` and the fragment is read through `include`.
  */
-export function renderProvenanceFooter(entries: readonly ProvenanceEntry[]): string {
+export function renderProvenanceFooter(entries: readonly ProvenanceEntry[], opts: { liquid?: boolean } = {}): string {
   const bySection = new Map<string, ProvenanceEntry[]>();
   for (const e of entries) bySection.set(e.section, [...(bySection.get(e.section) ?? []), e]);
   const html: string[] = [
@@ -161,8 +161,40 @@ export function renderProvenanceFooter(entries: readonly ProvenanceEntry[]): str
     html.push(`  </ul>`);
   }
   html.push(`</details>`);
+  // A page Jekyll never reads must not carry the raw tags, which would show.
+  if (opts.liquid === false) return html.join("\n") + "\n";
   return wrapRaw(html.join("\n")).join("\n") + "\n";
 }
+
+/**
+ * The section for ONE source file, for a page that is not a Jekyll page and
+ * so never reaches `footer_custom.html`. `kg-export`'s process pages and the
+ * node-kind node pages put it inline after their fields. Empty when the file
+ * has no log or the log has no entry.
+ *
+ * `liquid` is true only when Jekyll will read the page (a themed node page),
+ * so a passage containing `{{` is not evaluated there.
+ */
+export function provenanceSectionFor(source: string, opts: { liquid: boolean }): string {
+  const entries = readProvenanceLog(provenanceLogFor(source)) ?? [];
+  return entries.length === 0 ? "" : renderProvenanceFooter(entries, opts);
+}
+
+/**
+ * The section's styles, for a page that does not load `docs-ui.css` (a process
+ * page, a standalone node page). The same rules as `docs-ui.css`, kept short.
+ */
+export const PROVENANCE_INLINE_STYLE = `
+.fa-provenance { margin: 2rem 0 0; padding-top: 1rem; border-top: 1px solid rgba(128,128,128,.35); font-size: .8125rem; }
+.fa-provenance-summary { cursor: pointer; font-weight: 600; }
+.fa-provenance-lead { opacity: .8; margin: .5rem 0 1rem; }
+.fa-provenance .fa-provenance-section { font-size: .875rem; font-weight: 600; margin: 1rem 0 .25rem; }
+.fa-provenance-list { margin: 0; padding-left: 1.25rem; }
+.fa-provenance-entry { margin: 0 0 .5rem; }
+.fa-provenance-kind { display: inline-block; font-size: .6875rem; text-transform: uppercase; letter-spacing: .04em; opacity: .75; margin-right: .375rem; }
+.fa-provenance-refs code { font-size: .75rem; margin-right: .25rem; }
+.fa-provenance-text { margin-top: .125rem; overflow-wrap: anywhere; }
+`;
 
 /** What {@link writeProvenanceListing} did, for the generator's log line. */
 export interface ProvenanceListingResult {
