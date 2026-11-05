@@ -28,8 +28,11 @@ it.
 `scripts/git-hooks/pre-push`, installed by `scripts/git-hooks/install.sh`,
 runs `scripts/pre-push-gates.ts --git-hook <remote>`:
 
-- the tree being pushed must be the tree on disk (HEAD, no tracked file
-  differing from it), or the push is refused: the gates judge files;
+- only the checked-out commit is judged, and tracked files must not differ
+  from HEAD (else refused: the gates judge files). A pushed commit that is not
+  HEAD is allowed unjudged, because the branch store pushes
+  `<commit>:refs/heads/cat/...` from the same repository on every
+  `beans:claim` / `state:push`, and refusing those would break claiming;
 - it runs `bun run cat gates --report <git dir>/cat-gates/last-report.json`,
   the fast set derived from the workflow. Gates whose inputs are unchanged
   since they last passed are SKIPPED by the f017 input-hash cache, which is

@@ -50,9 +50,11 @@
  * branch has a base to compare against; `--baseline` records them for HEAD
  * without pushing, e.g. on `main` right after a container's cold start.
  *
- * Refused before any gate runs: the pushed tree is not the tree on disk (a
- * dirty tracked file, or a ref other than HEAD), because the gates would judge
- * the wrong tree.
+ * Refused before any gate runs: tracked files differ from HEAD, because the
+ * gates would judge a tree that is not being pushed. A pushed commit that is
+ * not HEAD is not judged at all (allowed, CI judges it): the branch store
+ * pushes `<commit>:refs/heads/cat/...` from this same repository on every
+ * `beans:claim` and `state:push`.
  *
  * ## The bypass is explicit and logged
  *
@@ -207,17 +209,16 @@ export async function judge(
     return { kind: "undetermined", why: "this checkout has no `cat` runner (a layer cloned on its own), so no gate can run here" };
   }
 
+  // Only the checked-out tree can be judged: the gates read the files on disk.
+  // A push of another commit is left to CI, never refused: the branch store
+  // (`beans:claim`, `state:push`) pushes `<commit>:refs/heads/cat/...` from
+  // this same repository, and refusing it would break every claim.
   const headTree = treeOf(root, "HEAD");
   const elsewhere = uncovered.filter((u) => u.tree !== headTree);
-  if (elsewhere.length > 0) {
-    return {
-      kind: "refuse",
-      why: [
-        `The gates judge the files on disk, and ${elsewhere.map((u) => u.commit.slice(0, 12)).join(", ")} is not what is checked out.`,
-        "  Check that commit out and push again, or push the branch you are on.",
-      ],
-    };
+  if (elsewhere.length === uncovered.length) {
+    return { kind: "allow", why: `not judged here: ${elsewhere.map((u) => u.commit.slice(0, 12)).join(", ")} is not the checked-out commit, so CI judges it` };
   }
+  uncovered.splice(0, uncovered.length, ...uncovered.filter((u) => u.tree === headTree));
   if (git(root, ["diff", "--quiet", "HEAD", "--"]) === undefined) {
     return {
       kind: "refuse",

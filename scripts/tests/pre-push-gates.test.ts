@@ -192,13 +192,19 @@ process.exit(failed.length ? 1 : 0);\n`,
     expect((await judge(root, [sh("rev-parse", "HEAD").stdout.trim()])).kind).toBe("undetermined");
   });
 
-  test("a dirty tracked file, or a commit not checked out, is refused before any gate runs", async () => {
+  test("a dirty tracked file is refused before any gate runs", async () => {
     stub(0, PASS);
-    const first = sh("rev-parse", "HEAD").stdout.trim();
     writeFileSync(join(root, ".gitignore"), "changed\n");
-    expect((await judge(root, [first])).kind).toBe("refuse");
-    sh("commit", "-qam", "second");
-    expect((await judge(root, [first])).kind).toBe("refuse");
+    expect((await judge(root, [sh("rev-parse", "HEAD").stdout.trim()])).kind).toBe("refuse");
+    expect(runs()).toBe(0);
+  });
+
+  test("a commit that is not checked out (a branch-store push) is allowed unjudged, never refused", async () => {
+    stub(1, { ...PASS, outcome: "fail", exitCode: 1, failed: [{ command: "bun run cat check:a", job: "j", step: "s", why: ["x"] }] });
+    const store = sh("commit-tree", "-m", "store", sh("mktree").stdout.trim() || "4b825dc642cb6eb9a060e54bf8d69288fbee4904").stdout.trim();
+    const v = await judge(root, [store]);
+    expect(v.kind).toBe("allow");
+    expect(v.kind === "allow" && v.why).toContain("not judged");
     expect(runs()).toBe(0);
   });
 
