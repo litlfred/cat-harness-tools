@@ -134,7 +134,7 @@ function run(): number {
   // In a layer's PR checks, only the caller's own libraries (owner ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`).
   const { dirs: declared, scoped } = gateDirectoriesForGraph(ROOT, "library");
   if (scoped && declared.length === 0) {
-    console.log(nothingOwnLine("check:tabular-stubs", "library/", scoped));
+    console.log(nothingOwnLine("check:tabular-stubs", "library directory", scoped));
     return 0;
   }
   const { present: libs, absent } = splitDeclared(declared);
