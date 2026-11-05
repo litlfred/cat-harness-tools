@@ -64,3 +64,22 @@ test("every published step derives its key, never from a hand list of inputs", (
     expect(s.paths.length).toBeGreaterThan(0);
   }
 });
+
+test("cache:key is the key `gates` records: the same fingerprint, the same io projection, the same baseline", async () => {
+  const { keyOf } = await import("../cache-key.ts");
+  const { GateSkipper } = await import("../gates.ts");
+  const { FileDigests, qaBaselineIdentity } = await import("../input-hash.ts");
+  const { TASK_IO } = await import("../task-io.ts");
+  const { scriptsOf } = await import("../../schemas/sdlc/script-table.ts");
+  const { checkoutRootFor } = await import("../../schemas/kg/cat-harness.ts");
+  const { HARNESS_ROOT } = await import("../lib/roots.ts");
+  const root = checkoutRootFor(HARNESS_ROOT);
+  const skipper = new GateSkipper(root, scriptsOf(root), undefined, qaBaselineIdentity({ repoRoot: root }));
+  const sample = Object.keys(TASK_IO).filter((s) => TASK_IO[s]?.inputs !== undefined).sort().slice(0, 5);
+  expect(sample.length).toBeGreaterThan(0);
+  for (const s of sample) {
+    const fp = skipper.fingerprint(s, new FileDigests(root));
+    const k = keyOf(root, { script: s });
+    expect(typeof k === "string" ? k : "undetermined").toBe("hash" in fp ? fp.hash : "undetermined");
+  }
+}, 120_000);

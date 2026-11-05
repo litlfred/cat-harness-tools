@@ -58,7 +58,7 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { checkoutRootFor } from "../schemas/kg/cat-harness.ts";
 import { coneFingerprint } from "./ci-cone.ts";
 import { checkFingerprint, FileDigests, qaBaselineIdentity, type Fingerprint } from "./input-hash.ts";
-import { collectTaskIo } from "./task-io.ts";
+import { collectTaskIo, pairIO } from "./task-io.ts";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -96,12 +96,15 @@ export function keyOf(root: string, source: KeySource): string | { undetermined:
   if ("hashFiles" in source) return hashFiles(root, source.hashFiles);
   const scripts = scriptsOf(root);
   if (scripts[source.script] === undefined) return { undetermined: `no package script \`${source.script}\`` };
-  const io = collectTaskIo(root)[source.script];
   const digests = new FileDigests(root);
   const baseline = qaBaselineIdentity({ repoRoot: root });
+  // Exactly the arguments the callers whose keys this must equal pass: `gates`
+  // (`GateSkipper.fingerprint`: `pairIO`, the `{inputs, outputs}` projection,
+  // since the fingerprint hashes the io's JSON) and `ci-cone` (`coneFingerprint`
+  // over `collectTaskIo()`). A test holds `cache:key` equal to `gates`'s key.
   const fp: Fingerprint = source.base === true
-    ? coneFingerprint(root, scripts, source.script, io, digests, baseline)
-    : checkFingerprint(root, scripts, source.script, io, digests, baseline);
+    ? coneFingerprint(root, scripts, source.script, collectTaskIo(root)[source.script], digests, baseline)
+    : checkFingerprint(root, scripts, source.script, pairIO(source.script), digests, baseline);
   return "hash" in fp ? fp.hash : { undetermined: fp.undetermined };
 }
 
