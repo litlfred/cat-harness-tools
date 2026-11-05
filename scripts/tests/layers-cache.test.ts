@@ -203,6 +203,16 @@ describe("layers cache: publish and the fast path", () => {
     expect(r.layers).toEqual([]);
   });
 
+  test("publishing leaves no objects behind in the index checkout", () => {
+    const { work } = index([a.inst(), b.inst()]);
+    replay(work);
+    const count = () => git(work, "count-objects").split(" ")[0];
+    const before = count();
+    expect(publishLayers(work).ok).toBe(true);
+    expect(publishLayers(work, { push: false }).ok).toBe(true);
+    expect(count()).toBe(before);
+  });
+
   test("node_modules and other install artefacts are never published", () => {
     const { origin, work } = index([a.inst()]);
     replay(work);

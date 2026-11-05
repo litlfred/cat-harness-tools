@@ -983,7 +983,18 @@ export function publishLayers(root: string, opts: { url?: string; main?: boolean
   const entries = overlayEntries(root, instances);
   const scratch = mkdtempSync(join(tmpdir(), "layers-publish-"));
   try {
-    const env = { ...IDENTITY, ...pick(process.env, Object.keys(IDENTITY)), GIT_INDEX_FILE: join(scratch, "index") };
+    // Every object goes to a SCRATCH object directory (the root's own is only
+    // read, as an alternate), so a publish leaves no loose objects behind in
+    // the index checkout: ~32k for folio-assistant's lock, enough to trip gc.
+    const ownObjects = resolve(root, git(root, ["rev-parse", "--git-path", "objects"]).stdout.trim());
+    mkdirSync(join(scratch, "objects"), { recursive: true });
+    const env = {
+      ...IDENTITY,
+      ...pick(process.env, Object.keys(IDENTITY)),
+      GIT_INDEX_FILE: join(scratch, "index"),
+      GIT_OBJECT_DIRECTORY: join(scratch, "objects"),
+      GIT_ALTERNATE_OBJECT_DIRECTORIES: ownObjects,
+    };
     // `--no-filters`: the bytes as they sit, which are the bytes the digest hashed — never the root's own clean filters.
     const files = entries.filter((e) => e.mode !== "120000");
     const hashed = gitEnv(root, ["hash-object", "-w", "--no-filters", "--stdin-paths"], env, files.map((e) => e.abs).join("\n") + "\n");
@@ -1009,7 +1020,7 @@ export function publishLayers(root: string, opts: { url?: string; main?: boolean
     if (opts.push === false) return { ok: true, key, commit: sha, refs: [], detail: `built ${sha.slice(0, 12)} for ${key.slice(0, 12)} (${entries.length} files); not pushed` };
     const url = opts.url ?? layersUrl(root);
     if (!url) return { ok: false, key, commit: sha, detail: "no index remote to push to (pass --url or set CAT_LAYERS_URL)" };
-    const push = git(root, ["push", "-q", "--force", url, ...refs.map((r) => `${sha}:${r}`)]);
+    const push = gitEnv(root, ["push", "-q", "--force", url, ...refs.map((r) => `${sha}:${r}`)], env);
     if (push.status !== 0) return { ok: false, key, commit: sha, detail: `git push failed: ${push.stderr.trim().split("\n").pop()}` };
     const pruned = opts.prune !== undefined ? pruneLayers(url, opts.prune, [key, ...(opts.keep ?? [])]) : [];
     return { ok: true, key, commit: sha, refs, pruned, detail: `pushed ${sha.slice(0, 12)} (${entries.length} files) to ${refs.join(", ")}${pruned.length ? `; pruned ${pruned.length}` : ""}` };
