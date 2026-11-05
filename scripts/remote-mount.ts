@@ -55,6 +55,13 @@
  * fails fails the run. `--no-agent-surface` skips it; `--check`, `--plan` and
  * `--staging` never run it.
  *
+ * The same run then publishes the new lock's LAYERS CACHE REF
+ * (`refs/cat/layers/<key>` at the index's origin; `mount-from-lock.ts`
+ * `publishLayers`), so the committer who changed the lock is its writer and CI
+ * only fetches and verifies it. It is time only: a refusal (a mount not
+ * `current`), no remote, or a push the credential cannot make is reported and
+ * never changes the exit code. `--no-layers-publish` skips it.
+ *
  * ## A mount is runnable, and an install does not make it modified
  *
  * After the bytes are locked, each mounted instance that carries a
@@ -183,7 +190,7 @@ import { contentIsOffCheckout, HydratedSourceSchema, type HydratedSource, type S
 import { enabledSubgraphs, isSubgraphEnabled, qualifiedSubgraphId, type EnabledSubgraphs } from "../schemas/kg/opt-in-subgraphs.js";
 import { publishedSubgraphDir, SUBGRAPH_HYDRATED_FILE, SubgraphHydratedSchema } from "../schemas/kg/subgraph-manifest.js";
 import { treeDigest, treeEntries } from "./kg-parts.ts";
-import { builtAtPublishOf, installDependencies, isInstallArtefact, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
+import { builtAtPublishOf, installDependencies, isInstallArtefact, publishLayers, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from "./subgraph-index-package.ts";
 import { toolClosure, type ClosureInstance, type ResolvedTool, type ToolChoice } from "./tool-closure.ts";
@@ -2046,6 +2053,36 @@ export function declaringInstances(checkout: string): { roots: string[]; unreada
 }
 
 /**
+ * The lock check of `root` when it says every instance is already mounted at
+ * its pinned bytes, else undefined. Only a clean verdict counts: a missing,
+ * refused or undetermined instance anywhere sends the root to the full mount.
+ */
+export function currentPerLock(root: string): CheckResult | undefined {
+  const c = checkRemote({ instanceRoot: root });
+  if (c.state !== "mounted" && c.state !== "unverified-approver") return undefined;
+  if (c.outcomes.length === 0 || c.outcomes.some((o) => o.state !== "mounted" && o.state !== "unverified-approver")) return undefined;
+  return c;
+}
+
+/**
+ * What the full mount's install step would do for a current root, without
+ * the fetch: `bun install` in a mounted instance that has a manifest and no
+ * `node_modules/` yet. node_modules is outside every digest, so the lock check
+ * cannot see it; a mount laid with `--no-install` is runnable after this.
+ */
+function installMissingDependencies(root: string, outcomes: readonly InstanceOutcome[], mode: InstallMode): void {
+  for (const o of outcomes) {
+    const path = (o as { path?: string }).path;
+    if (path === undefined) continue;
+    const dir = join(root, path);
+    if (!existsSync(join(dir, "package.json")) || existsSync(join(dir, "node_modules"))) continue;
+    const r = installDependencies(dir, mode);
+    if (r.state === "installed") o.detail += `; ${r.detail}`;
+    else if (r.state === "failed") Object.assign(o, { state: "missing", detail: `${o.detail}; the pinned bytes are on disk but its dependencies are NOT installed, so its tools will not run: ${r.detail}` });
+  }
+}
+
+/**
  * Mount (or, with `check`, verify) every declaring instance in `checkout` —
  * what `state:mount` and the session-start hook call. An instance whose
  * declaration cannot be read is could-not-determine for the whole fan-out:
@@ -2071,6 +2108,21 @@ export function remoteFanOut(checkout: string, opts: { check?: boolean; plan?: b
       states.push(sum.state);
       parts.push(reportOutcomes(`Remote mounts — plan for ${root}`, sum.state, sum.reason, p.outcomes));
     } else {
+      // Bean `folio-assistant-x35i`: a root whose lock check is already clean
+      // (declaration pins = lock pins, every locked directory on disk at its
+      // digest, every declaration byte-identical) fetches nothing. CI lays
+      // every mount from the lock first (`mount-from-lock.sh`, ~2 s to
+      // verify), and the resolve below re-fetched every remote over the
+      // network for 43-68 s in each of ~17 jobs. Anything missing, stale or
+      // unreadable still takes the full mount, and `--fresh` always does.
+      const current = opts.discardEdits ? undefined : currentPerLock(root);
+      if (current !== undefined) {
+        if (opts.install !== false) installMissingDependencies(root, current.outcomes, opts.install ?? "production");
+        const sum = summarise(current.outcomes);
+        states.push(sum.state);
+        parts.push(reportOutcomes(`Remote mounts — ${root} (current per the lock; nothing fetched)`, sum.state, sum.reason, current.outcomes));
+        continue;
+      }
       const r = mountRemote({ instanceRoot: root, urlFor: opts.urlFor, purpose: opts.purpose, install: opts.install, discardEdits: opts.discardEdits });
       const sum = summarise(r.plan.outcomes);
       states.push(sum.state);
@@ -2121,10 +2173,19 @@ export function lockBytes(root: string): string | undefined {
  * re-render the agent surface and fold its outcome into the exit code.
  */
 export function afterMount(root: string, before: string | undefined, argv: string[], code: number): number {
-  if (argv.includes("--no-agent-surface") || lockBytes(root) === before) return code;
-  const r = regenerateAgentSurface(root);
-  console.log(`\n## Agent surface — the lock changed, so the skills and memory agents read were re-rendered\n\n${r.lines.join("\n")}`);
-  if (!r.ok) console.log("\nRe-run the failed generator before committing this re-pin: the new layer and the old agent surface disagree.");
+  if (lockBytes(root) === before) return code;
+  const r = argv.includes("--no-agent-surface") ? { ok: true, lines: [] as string[] } : regenerateAgentSurface(root);
+  if (!argv.includes("--no-agent-surface")) {
+    console.log(`\n## Agent surface — the lock changed, so the skills and memory agents read were re-rendered\n\n${r.lines.join("\n")}`);
+    if (!r.ok) console.log("\nRe-run the failed generator before committing this re-pin: the new layer and the old agent surface disagree.");
+  }
+  if (code === 0 && !argv.includes("--no-layers-publish")) {
+    // The committer who changed the lock writes its layers cache ref, so CI
+    // only fetches and verifies it (skill `remote-mount`, "The layers cache").
+    // Time only: a refusal or a failed push never changes the exit code.
+    const p = publishLayers(root);
+    console.log(`\n## Layers cache — ${p.ok ? p.detail : `not published (${p.detail}); CI falls back to the per-repository fetch, and \`bun run cat layers:publish\` retries`}`);
+  }
   return r.ok ? code : Math.max(code, 1);
 }
 
@@ -2144,6 +2205,7 @@ export const MOUNT_REMOTE_FLAGS: ReadonlyMap<string, "switch" | "value"> = new M
   ["--no-install", "switch"],
   ["--install-all", "switch"],
   ["--no-agent-surface", "switch"],
+  ["--no-layers-publish", "switch"],
   ["--fresh", "switch"],
   ["--whole", "switch"],
   ["--instance", "value"],

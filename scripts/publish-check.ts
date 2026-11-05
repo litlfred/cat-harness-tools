@@ -59,9 +59,11 @@ import { built, declaredPlan } from "./derive-at-publish.ts";
 import { readInstances } from "./check-import-direction.ts";
 import { BUILD_OUTPUT_DIRS } from "./input-hash.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
 /** Never content: install artefacts, git, and the scratch a build writes. */
+// input-site: inert #062e600e — the directories a snapshot never reads; their contents never reach the answer
 const SKIP_DIRS = new Set(["node_modules", ".git", "_site", "build"]);
 
 /** sha256 of every file under each root, keyed repo-relative. */
@@ -118,14 +120,17 @@ export function ignoredBy(paths: readonly string[], roots: readonly string[], re
     // A scratch repository holding ONLY this instance's `.gitignore` files, at
     // their own relative paths, so nested ones apply exactly as they do in the
     // instance's own repository, and nothing above the instance does.
+    // input-site: inert #0c7d0248 — a scratch directory, removed before this returns; its path never reaches the answer
     const scratch = mkdtempSync(join(tmpdir(), "publish-check-"));
     try {
+      // input-site: inert #a52cbc90 — initialises the empty scratch repository; nothing it answers is read
       spawnSync("git", ["init", "-q"], { cwd: scratch });
       for (const g of gitignoresUnder(root)) {
         mkdirSync(dirname(join(scratch, g)), { recursive: true });
         copyFileSync(join(root, g), join(scratch, g));
       }
       const rel = ps.map((p) => relative(root, resolve(repoRoot, p)).split(sep).join("/"));
+      // input-site: tree #b7962d6a — `git check-ignore --no-index` against copies of the instance's own `.gitignore` files: a function of the working tree
       const r = spawnSync("git", ["check-ignore", "--no-index", "--stdin"], { cwd: scratch, input: rel.join("\n"), encoding: "utf-8" });
       // 0: some ignored, 1: none; anything else is "could not ask", which must not read as "none".
       if (r.status !== 0 && r.status !== 1) throw new Error(`git check-ignore failed: ${r.stderr.trim()}`);
@@ -196,7 +201,8 @@ export function outsideMounts(paths: readonly string[], repoRoot = REPO_ROOT): S
 }
 
 function run(cmd: string, cwd = REPO_ROOT): number {
-  // input-site: scripts — the writer's own command line, from the script table
+  // input-site: traced #120f94a1 — a writer's command line from the script table, a list no annotation can name; a run that reaches it records no hash
+  inputSiteReached("publish-check: run");
   const r = spawnSync("sh", ["-c", cmd], { cwd, stdio: "inherit" });
   return r.status ?? 1;
 }
@@ -215,6 +221,7 @@ function run(cmd: string, cwd = REPO_ROOT): number {
  * Returns the copy's root. The caller removes it.
  */
 export function scratchCopy(repoRoot = REPO_ROOT): string {
+  // input-site: inert #3d98cecf — the scratch copy's directory, which the caller removes; its path never reaches the answer
   const dest = mkdtempSync(join(tmpdir(), "publish-check-tree-"));
   const linked: Array<[string, string]> = [];
   cpSync(repoRoot, dest, {

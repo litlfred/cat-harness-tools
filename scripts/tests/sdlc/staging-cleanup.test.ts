@@ -21,7 +21,7 @@
  *
  * @module scripts/tests/staging-cleanup.test
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { describe, expect, it } from "bun:test";
@@ -168,7 +168,24 @@ describe("the preflight's verdicts", () => {
   });
 });
 
+/**
+ * The skill body and, when there is one, its provenance log beside it
+ * (`<skill>.prov.jsonld`). Since the Docs QA pass a work-item id lives in the
+ * log rather than the narrative (owner, 2026-11-05, decision card "A. Check
+ * the logs"); a cat-harness pinned before that pass still has it in the body.
+ */
+function skillWithProvenance(name: string): string {
+  const md = skillMdFile(ROOT, name)!;
+  const prov = md.replace(/\.md$/, ".prov.jsonld");
+  return readFileSync(md, "utf-8") + (existsSync(prov) ? `\n${readFileSync(prov, "utf-8")}` : "");
+}
+
 describe("skills documentation covers bean oz5w failure modes", () => {
+  it("the work item these modes came from is recorded, in the skill or its provenance log", () => {
+    expect(skillWithProvenance("ci-health")).toContain("folio-assistant-oz5w");
+    expect(skillWithProvenance("staging-review")).toContain("oz5w");
+  });
+
   it("ci-health documents that cancelled is NOT benign when previous state is a deletion", () => {
     const ciHealthText = readFileSync(skillMdFile(ROOT, "ci-health")!, "utf-8");
     expect(ciHealthText).toContain("never when the previous state is a deletion");

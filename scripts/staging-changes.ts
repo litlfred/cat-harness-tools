@@ -1,13 +1,6 @@
 #!/usr/bin/env bun
 /**
- * The CHANGES page of a staging preview: `branches/<slug>/changes/`.
- *
- * Owner, 2026-10-14: *"when we have a branches/ preview branch, we need a new
- * visualizer endpoint that at least in an index.html lists all of the changed
- * assets in the repo and, where known, downstream changed/derivative assets in
- * its dependency cone ... it should also check difference between gh-pages
- * root and the branches/<BRANCH> dirs in a list of its changes (QA check - some
- * were not in the dependency cone)"*.
+ * The CHANGES page of a staging preview: `STAGING/<slug>/changes/`.
  *
  * Three lists, each from a tool that already answers it; this file computes
  * none of them anew except the first one's mount expansion and the folding
@@ -21,32 +14,43 @@
  *
  * ## Why a re-pin has to be expanded
  *
- * A change to a mounted instance (a content layer, say) reaches this site as a
- * one-line edit to `index.lock.json`. Handed to a renderer as it is, that
- * predicts nothing, and the reviewer is shown one JSON file. So each mount
- * whose commit moved is diffed in its OWN repository between the two pins,
- * and each changed file is mapped through the lock's `directories` to the
- * path it is mounted at. A pin that cannot be diffed is said, never dropped.
+ * A change to a mounted instance reaches this site as a one-line edit to
+ * `index.lock.json`, which predicts nothing on its own. So each mount whose
+ * commit moved is diffed in its OWN repository between the two pins, and each
+ * changed file is mapped through the lock's `directories` to the path it is
+ * mounted at. A pin that cannot be diffed is said, never dropped.
  *
  * ## Why the QA diff compares the page BODY, with the base folded
  *
- * A preview is built under `/<repo>/branches/<slug>/` and main under `/<repo>/`,
- * and each stamps its own build into the chrome. Compared byte for byte every
- * page differs, and the QA list would name all of them. So, in text files,
- * the preview's base is folded to main's, the `BUILD_STAMPS` are blanked, and
- * an HTML page is compared by its `<main>` element when it has one: the
- * content a reader reviews, not the navigation every page repeats. The page
- * states this rule, because a difference outside `<main>` is not reported.
+ * A preview is built under `/<repo>/STAGING/<slug>/` and main under `/<repo>/`,
+ * and each stamps its own build into the chrome, so byte for byte every page
+ * differs. In text files the preview's base is folded to main's, the
+ * `BUILD_STAMPS` are blanked, and an HTML page is compared by its `<main>`
+ * element when it has one. The page states this rule, because a difference
+ * outside `<main>` is not reported.
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/staging-changes.ts expand \
  *     --changed-files pr-files.txt --base-lock base.lock.json --head-lock index.lock.json \
  *     --out-list changed-expanded.txt --out-json sources.json [--out-impact rendered-impact.json]
  *   bun run cat-harness-tools/scripts/staging-changes.ts render --sources sources.json \
- *     [--predicted rendered-impact.json] [--before pages-root --after _site \
- *      --staging-base /repo/branches/slug --site-base /repo --base <sha>] \
- *     --site-url https://o.github.io/repo/ --staging-url https://o.github.io/repo/branches/slug/ \
+ *     [--predicted rendered-impact.json] [--before pages-root | --before-git gh-pages-clone [--before-rev REV]] [--after _site \
+ *      --staging-base /repo/STAGING/slug --site-base /repo --base <sha>] \
+ *     --site-url https://o.github.io/repo/ --staging-url https://o.github.io/repo/STAGING/slug/ \
  *     --repo o/repo --head <sha> --branch <b> --slug <s> [--pr <n>] --out _site/changes
+ *
+ * ## The publish root as a directory, or as git objects
+ *
+ * `--before` is a checkout of the publish root. `--before-git` is a clone of
+ * the publish branch that need hold no checkout and no blob
+ * (`git clone --depth 1 --filter=blob:none --no-checkout --branch gh-pages`):
+ * the root's files are its tree (`--before-rev`, default `HEAD`), and the
+ * page is the one `--before` gives for the same root ({@link measureGitRoot}).
+ * A file that is not text is the same when its blob id is the preview file's,
+ * so no binary blob is fetched. A text file is compared after the folding
+ * above, which needs its bytes, so the root's text blobs are fetched in one
+ * request — all of its HTML, which the provenance prediction reads, and any
+ * other text file whose blob is not the preview's own bytes.
  *
  * @module cat-harness-tools/scripts/staging-changes
  * @covers none — it reports what a preview changed and judges no declared
@@ -57,7 +61,8 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-import { PREVIEW_PREFIX_ALT } from "./lib/preview-prefix.ts";
+
+import { blobId, forEachBlob, isRegular, objectFormat, prefetchBlobs, treeEntries } from "./lib/git-blobs.ts";
 
 import {
   BUILD_STAMPS,
@@ -70,6 +75,7 @@ import {
   type RenderedImpact,
   type RenderedRole,
 } from "../schemas/ui/rendered-impact.ts";
+import { PREVIEW_PREFIX_ALT } from "./lib/preview-prefix.ts";
 
 export const STAGING_CHANGES_TAG = "staging-changes/v1" as const;
 
@@ -377,11 +383,11 @@ export function predictByProvenance(sources: Sources, index: ReadonlyMap<string,
 export const PUBLISH_ROOT_OTHERS = new RegExp(`^(${PREVIEW_PREFIX_ALT}|_render-log|\\.git)(/|$)`);
 /** The staging job's own files beside a preview, which main's publish never writes. */
 export const PREVIEW_ARTEFACTS =
-  /^(changes\/.*|changeset\.json|changeset-text\.json|rendered-impact\.json|rendered-measured\.json|blocks\.json|block-qa\.json|review-comments\.json|visual-diff\.json|visual\/.*|\.staged-at|staging-preview\.json)$/;
+  /^(changes\/.*|changeset\.json|changeset-text\.json|rendered-impact\.json|rendered-measured\.json|blocks\.json|block-qa\.json|review-comments\.json|visual-diff\.json|visual\/.*|\.staged-at|\.staged-size\.json|staging-preview\.json)$/;
 
 const TEXTUAL = /\.(html?|css|js|json|jsonld|xml|txt|svg|md)$/i;
 
-/** Every occurrence of the preview's base, as main's (`/r/branches/s` → `/r`), path-aligned. */
+/** Every occurrence of the preview's base, as main's (`/r/STAGING/s` → `/r`), path-aligned. */
 export function foldBase(text: string, stagingBase: string, siteBase: string): string {
   const from = stagingBase.replace(/\/+$/, "");
   const to = siteBase.replace(/\/+$/, "");
@@ -436,14 +442,20 @@ function walk(root: string, skip: RegExp, rule: CompareRule | undefined): Map<st
 export function measureSites(o: { before: string; after: string; rule?: CompareRule; head?: string; base?: string }): RenderedImpact {
   const a = walk(o.before, PUBLISH_ROOT_OTHERS, undefined);
   const b = walk(o.after, PREVIEW_ARTEFACTS, o.rule);
+  return buildDiff([...b.keys()], [...a.keys()], (p) => a.get(p) !== b.get(p), o);
+}
+
+/** The `publish-root-diff` impact: `after` against `before`, by a `differs` test on the paths both have. */
+function buildDiff(after: readonly string[], before: readonly string[], differs: (p: string) => boolean, o: { head?: string; base?: string }): RenderedImpact {
   const role = (p: string): RenderedRole => (isGenericIndex(p) ? "index" : p.endsWith(".html") ? "content" : "data");
+  const had = new Set(before);
+  const has = new Set(after);
   const files: RenderedFile[] = [];
-  for (const [p, h] of b) {
-    const old = a.get(p);
-    if (old === undefined) files.push({ path: p, change: "added", role: role(p), via: [] });
-    else if (old !== h) files.push({ path: p, change: "changed", role: role(p), via: [] });
+  for (const p of after) {
+    if (!had.has(p)) files.push({ path: p, change: "added", role: role(p), via: [] });
+    else if (differs(p)) files.push({ path: p, change: "changed", role: role(p), via: [] });
   }
-  for (const p of a.keys()) if (!b.has(p)) files.push({ path: p, change: "removed", role: role(p), via: [] });
+  for (const p of before) if (!has.has(p)) files.push({ path: p, change: "removed", role: role(p), via: [] });
   files.sort((x, y) => x.path.localeCompare(y.path));
   return RenderedImpactSchema.parse({
     $schema: RENDERED_IMPACT_TAG,
@@ -453,6 +465,95 @@ export function measureSites(o: { before: string; after: string; rule?: CompareR
     ...(o.head ? { head: o.head } : {}),
     files,
   });
+}
+
+/** Whether folding the base leaves this text as it was. */
+function foldsToItself(text: string, rule: CompareRule | undefined): boolean {
+  if (!rule) return true;
+  const from = rule.stagingBase.replace(/\/+$/, "");
+  return !from || from === rule.siteBase.replace(/\/+$/, "") || !text.includes(from);
+}
+
+export interface GitRoot {
+  /** Whether the root holds a site (an `index.html`). */
+  site: boolean;
+  /** The same index {@link provenanceIndex} gives for a checkout of it. */
+  provenance: Map<string, string[]>;
+  /** The same diff {@link measureSites} gives, when an `after` was given. */
+  measured?: RenderedImpact;
+  /** The root's `build.json`, when it has one. */
+  build?: { sha?: string };
+}
+
+/**
+ * The publish root read from a clone's TREE rather than a checkout: the same
+ * provenance index, build stamp and diff that `--before` gives for the same
+ * root, fetching only the text blobs the comparison reads (module header).
+ */
+export function measureGitRoot(o: { dir: string; rev?: string; after?: string; rule?: CompareRule; head?: string; base?: string }): GitRoot {
+  const rev = o.rev ?? "HEAD";
+  const format = objectFormat(o.dir);
+  const root = new Map<string, string>();
+  for (const e of treeEntries(o.dir, rev)) {
+    if (PUBLISH_ROOT_OTHERS.test(e.path)) continue;
+    if (e.mode === "160000") continue; // a checkout writes an empty directory, which no walk reads
+    if (!isRegular(e.mode)) throw new Error(`the publish root has a symbolic link at ${e.path}; a checkout would follow it, a tree cannot — give --before a checkout instead`);
+    root.set(e.path, e.oid);
+  }
+  const site = root.has("index.html");
+
+  // The preview side, exactly as `walk` reads it, with each file's blob id beside.
+  const after = new Map<string, { hash: string; oid: string; same: boolean }>();
+  if (o.after !== undefined && site) {
+    const stack = existsSync(o.after) ? [o.after] : [];
+    while (stack.length) {
+      const dir = stack.pop()!;
+      for (const name of readdirSync(dir)) {
+        const p = join(dir, name);
+        const rel = relative(o.after, p).split("\\").join("/");
+        if (PREVIEW_ARTEFACTS.test(rel) || PREVIEW_ARTEFACTS.test(`${rel}/`)) continue;
+        const st = statSync(p);
+        if (st.isDirectory()) stack.push(p);
+        else if (st.isFile()) {
+          const bytes = readFileSync(p);
+          const oid = blobId(bytes, format);
+          // Text with the root's own bytes, which folding leaves alone, hashes as the root's: no blob needed.
+          const same = root.get(rel) === oid && (!TEXTUAL.test(rel) || foldsToItself(bytes.toString("utf-8"), o.rule));
+          after.set(rel, { hash: TEXTUAL.test(rel) ? comparableHash(rel, bytes, o.rule) : "", oid, same });
+        }
+      }
+    }
+  }
+
+  // The root's text blobs the comparison reads: every page, for provenance; other text unless proved the same.
+  const html = /\.html?$/i;
+  const want = new Map<string, string[]>();
+  for (const [path, oid] of root) {
+    const base = path.slice(path.lastIndexOf("/") + 1);
+    const a = after.get(path);
+    const needed = (site && html.test(base)) || (a !== undefined && !a.same && TEXTUAL.test(path)) || (path === "build.json" && site && o.after !== undefined);
+    if (needed) want.set(oid, [...(want.get(oid) ?? []), path]);
+  }
+  const provenance = new Map<string, string[]>();
+  const rootHash = new Map<string, string>();
+  let build: { sha?: string } | undefined;
+  const oids = [...want.keys()];
+  prefetchBlobs(o.dir, oids, rev);
+  forEachBlob(o.dir, oids, (oid, bytes) => {
+    for (const path of want.get(oid) ?? []) {
+      const base = path.slice(path.lastIndexOf("/") + 1);
+      if (site && html.test(base)) for (const src of pageSources(bytes.toString("utf-8"))) provenance.set(src, [...(provenance.get(src) ?? []), path]);
+      if (TEXTUAL.test(path)) rootHash.set(path, comparableHash(path, bytes, undefined));
+      if (path === "build.json") build = JSON.parse(bytes.toString("utf-8")) as { sha?: string };
+    }
+  });
+  if (o.after === undefined || !site) return { site, provenance, ...(build ? { build } : {}) };
+  const measured = buildDiff([...after.keys()], [...root.keys()], (p) => {
+    const a = after.get(p)!;
+    if (a.same) return false;
+    return TEXTUAL.test(p) ? rootHash.get(p) !== a.hash : root.get(p) !== a.oid;
+  }, o);
+  return { site, provenance, measured, ...(build ? { build } : {}) };
 }
 
 export interface QaCheck {
@@ -726,29 +827,41 @@ if (import.meta.main) {
     const out = arg("--out");
     const [siteUrl, stagingUrl] = [arg("--site-url"), arg("--staging-url")];
     if (!sources || !out || !siteUrl || !stagingUrl) {
-      console.error("usage: staging-changes.ts render --sources <json> --out <dir> --site-url <url> --staging-url <url> [--predicted <json>] [--before <dir> --after <dir> --staging-base <path> --site-base <path> --base <sha>]");
+      console.error("usage: staging-changes.ts render --sources <json> --out <dir> --site-url <url> --staging-url <url> [--predicted <json>] [--before <dir> | --before-git <clone> [--before-rev <rev>]] [--after <dir> --staging-base <path> --site-base <path> --base <sha>]");
       process.exit(2);
     }
     const raw = readJson<unknown>(arg("--predicted"));
     const impacts = raw === undefined ? [] : (Array.isArray(raw) ? raw : [raw]).map((r) => RenderedImpactSchema.parse(r));
     let qa: QaCheck | undefined;
     let qaAbsent: string | undefined;
-    const [before, after] = [arg("--before"), arg("--after")];
-    const rootSite = before && existsSync(join(before, "index.html"));
-    if (rootSite) impacts.push(predictByProvenance(sources, provenanceIndex(before)));
-    const predicted = impacts.length ? mergeImpacts(impacts) : undefined;
-    if (!before || !after) qaAbsent = "no --before/--after site given";
-    else if (!rootSite) qaAbsent = `the publish root (${before}) holds no site`;
-    else {
-      const measured = measureSites({
-        before,
-        after,
-        rule: arg("--staging-base") ? { stagingBase: arg("--staging-base")!, siteBase: arg("--site-base") ?? "" } : undefined,
-        base: arg("--base"),
-        head: sources.head,
-      });
-      const stamp = readJson<{ sha?: string }>(join(before, "build.json"));
-      qa = qaCheck(predicted ?? mergeImpacts([]), measured, stamp?.sha ?? null, arg("--base") ?? null);
+    let predicted: RenderedImpact | undefined;
+    const [before, after, beforeGit] = [arg("--before"), arg("--after"), arg("--before-git")];
+    const rule = arg("--staging-base") ? { stagingBase: arg("--staging-base")!, siteBase: arg("--site-base") ?? "" } : undefined;
+    if (beforeGit) {
+      // The root from a clone's tree: the same page `--before` gives for it.
+      const g = measureGitRoot({ dir: beforeGit, rev: arg("--before-rev"), after, rule, base: arg("--base"), head: sources.head });
+      if (g.site) impacts.push(predictByProvenance(sources, g.provenance));
+      predicted = impacts.length ? mergeImpacts(impacts) : undefined;
+      if (!after) qaAbsent = "no --before/--after site given";
+      else if (!g.site) qaAbsent = `the publish root (${beforeGit}) holds no site`;
+      else qa = qaCheck(predicted ?? mergeImpacts([]), g.measured!, g.build?.sha ?? null, arg("--base") ?? null);
+    } else {
+      const rootSite = before && existsSync(join(before, "index.html"));
+      if (rootSite) impacts.push(predictByProvenance(sources, provenanceIndex(before)));
+      predicted = impacts.length ? mergeImpacts(impacts) : undefined;
+      if (!before || !after) qaAbsent = "no --before/--after site given";
+      else if (!rootSite) qaAbsent = `the publish root (${before}) holds no site`;
+      else {
+        const measured = measureSites({
+          before,
+          after,
+          rule,
+          base: arg("--base"),
+          head: sources.head,
+        });
+        const stamp = readJson<{ sha?: string }>(join(before, "build.json"));
+        qa = qaCheck(predicted ?? mergeImpacts([]), measured, stamp?.sha ?? null, arg("--base") ?? null);
+      }
     }
     mkdirSync(out, { recursive: true });
     const page: PageInput = {

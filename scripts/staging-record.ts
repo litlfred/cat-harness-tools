@@ -56,6 +56,7 @@ import {
   type StagingPreviewNode,
 } from "../schemas/sdlc/staging-preview.ts";
 import { previewPath } from "./lib/preview-prefix.ts";
+import { PREVIEW_PREFIX } from "./lib/preview-prefix.ts";
 
 /** What `create` does to a record that is already there. */
 export type CreateOutcome =
@@ -85,7 +86,7 @@ export function createOrUpdate(
     return {
       action: "refused-retired",
       why:
-        `STAGING/${existing.staging.slug} was retired on ${existing.staging.retiredOn} ` +
+        `${PREVIEW_PREFIX}/${existing.staging.slug} was retired on ${existing.staging.retiredOn} ` +
         `(${existing.staging.retiredReason ?? "no reason recorded"}); not overwriting it as live`,
     };
   }

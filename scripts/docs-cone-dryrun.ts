@@ -57,6 +57,7 @@ import {
   type RenderedImpact,
 } from "../schemas/ui/rendered-impact.ts";
 import { BranchStore, type BranchStoreOptions, storeOptionsFor } from "./branch-store.ts";
+import { PREVIEW_PREFIX_ALT } from "./lib/preview-prefix.ts";
 
 export const DOCS_CONE_DRYRUN_TAG = "docs-cone-dryrun/v1" as const;
 
@@ -267,7 +268,7 @@ export const DEPLOY_STAMPS: ReadonlyArray<readonly [RegExp, string]> = [
 export const ALWAYS_REWRITTEN = /^(build\.json|\.nojekyll|writer-cone\/records\.json)$/;
 
 /** On the publish root, not the main site: other previews, the render log, git. */
-export const NOT_THE_MAIN_SITE = /^(STAGING|_render-log|\.git)(\/|$)/;
+export const NOT_THE_MAIN_SITE = new RegExp(`^(${PREVIEW_PREFIX_ALT}|_render-log|\\.git)(/|$)`);
 
 const SPLIT_SEARCH_INDEX = /^assets\/js\/search\/[^/]+\.json$/;
 const TEXTUAL = /\.(html?|css|js|json|jsonld|xml|txt|svg|md|map)$/i;

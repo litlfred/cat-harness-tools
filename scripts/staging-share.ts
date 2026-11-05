@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * staging-share — a branches/ preview stores only the files that differ from
+ * staging-share — a STAGING preview stores only the files that differ from
  * the live site, and serves the rest from the live site's copy.
  *
  * @module scripts/staging-share
@@ -8,19 +8,13 @@
  * its fallback worker; it judges no graph
  *
  * ```sh
- * bun run cat-harness-tools/scripts/staging-share.ts plan  --root pages --preview pages/branches/<slug> --slug <slug>
- * bun run cat-harness-tools/scripts/staging-share.ts apply --root pages --preview pages/branches/<slug> --slug <slug>
+ * bun run cat-harness-tools/scripts/staging-share.ts plan  --root pages --preview pages/STAGING/<slug> --slug <slug>
+ * bun run cat-harness-tools/scripts/staging-share.ts apply --root pages --preview pages/STAGING/<slug> --slug <slug>
  * bun run cat-harness-tools/scripts/staging-share.ts write-404 --site _site
  * ```
  *
- * ## Why (owner, 2026-10-31)
- *
- * *"if asset not changed in staging then link to main asset so no file
- * content duplication."* Every preview was a full copy of the site: about
- * 33,000 files, of which 19,260 were the same as the live site's once the
- * per-preview edits were set aside (measured on `gh-pages` that day, the
- * content-change-review preview). Every copy is checked out, pushed, and
- * uploaded by every Pages deploy, the main site's included.
+ * A full-copy preview duplicates most of the live site, and every copy is
+ * checked out, pushed, and uploaded by every Pages deploy.
  *
  * ## What counts as the same
  *
@@ -28,15 +22,14 @@
  * edits a preview makes to EVERY page are set aside on both sides, and only
  * those, each named in {@link normalisePreviewHtml}:
  *
- * - the staging banner fragment ({@link FRAGMENT}, constant by bean `g196`);
+ * - the staging banner fragment ({@link FRAGMENT}, constant);
  * - the SEO identity claims a preview strips (`stripSeo`), stripped from the
  *   live page too;
  * - the `fa-staging` and `fa-search-index` meta values;
  * - TypeDoc's ` (staging: <slug>)` title suffix.
  *
- * A difference anywhere else keeps the preview's own copy. Nothing is
- * shared on a guess: a page that reads differently is never served from the
- * live site.
+ * A difference anywhere else keeps the preview's own copy: a page that reads
+ * differently is never served from the live site.
  *
  * ## How a shared file is served
  *
@@ -60,7 +53,8 @@ import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync 
 import { join, relative } from "node:path";
 import { FRAGMENT } from "./staging-banner.ts";
 import { stripSeo } from "./strip-preview-seo.ts";
-import { readRetained } from "./keep-shared-payloads.ts";
+import { parseRetained, readRetained, RETAINED_FILE, type Retained } from "./keep-shared-payloads.ts";
+import { blobId, forEachBlob, isRegular, objectFormat, prefetchBlobs, sparseEntries, type GitEntry } from "./lib/git-blobs.ts";
 import { isPreviewPath } from "./lib/preview-prefix.ts";
 
 /**
@@ -113,22 +107,72 @@ export interface SharePlan {
   bytesShared: number;
 }
 
-/** Which of the preview's files are the live site's, compared against `root`. */
+/**
+ * Which of the preview's files are the live site's, compared against `root`.
+ *
+ * `root` may be a SPARSE checkout of the publish branch (cone `STAGING/<slug>`,
+ * `STAGING/_retired`, `_render-log`, cloned `--filter=blob:none`). A live file
+ * outside the cone (a skip-worktree index entry, whatever is on disk at its
+ * path) is then read from git: the same bytes is the same blob id, so a
+ * non-HTML file needs no blob, and only the live HTML pages whose bytes differ
+ * are fetched, in one request, to compare with the per-preview edits set
+ * aside. Every other file is read from the working tree, so a full checkout,
+ * which has no such entry, gives the plan it always gave.
+ */
 export function planShare(root: string, preview: string, slug: string): SharePlan {
+  const outside = sparseEntries(root);
+  const files = filesUnder(preview);
+  const verdict = new Map<string, boolean>();
+  const fromGit: { rel: string; live: GitEntry }[] = [];
+  // A blob main keeps only for older previews (keep-shared-payloads.ts) is never
+  // borrowed: it goes once those previews rotate off, and this one would 404.
+  const retained = new Set(Object.keys(retainedAt(root, outside).kept));
+  for (const rel of files) {
+    const live = join(root, rel);
+    if (isPreviewPath(rel) || retained.has(rel)) { verdict.set(rel, false); continue; }
+    // Outside the cone the index is what is published, whatever is on disk there.
+    const entry = outside?.get(rel);
+    if (entry === undefined && existsSync(live)) {
+      verdict.set(rel, statSync(live).isFile() && sameAsLive(rel, readFileSync(join(preview, rel)), readFileSync(live), slug));
+      continue;
+    }
+    // A link is never compared through git: keeping it costs bytes, never a wrong page.
+    if (entry === undefined || !isRegular(entry.mode)) { verdict.set(rel, false); continue; }
+    fromGit.push({ rel, live: entry });
+  }
+  if (fromGit.length > 0) {
+    const format = objectFormat(root);
+    const pages = new Map<string, string[]>();
+    for (const { rel, live } of fromGit) {
+      if (NEVER_SHARED.has(rel)) { verdict.set(rel, false); continue; }
+      if (blobId(readFileSync(join(preview, rel)), format) === live.oid) { verdict.set(rel, true); continue; }
+      if (!rel.endsWith(".html")) { verdict.set(rel, false); continue; }
+      pages.set(live.oid, [...(pages.get(live.oid) ?? []), rel]);
+    }
+    const oids = [...pages.keys()];
+    prefetchBlobs(root, oids);
+    forEachBlob(root, oids, (oid, bytes) => {
+      for (const rel of pages.get(oid) ?? []) verdict.set(rel, sameAsLive(rel, readFileSync(join(preview, rel)), bytes, slug));
+    });
+  }
   const shared: string[] = [];
   let kept = 0;
   let bytesShared = 0;
-  // A blob main keeps only for older previews (keep-shared-payloads.ts) is never
-  // borrowed: it goes once those previews rotate off, and this one would 404.
-  const retained = new Set(Object.keys(readRetained(root).kept));
-  for (const rel of filesUnder(preview)) {
-    const live = join(root, rel);
-    if (isPreviewPath(rel) || retained.has(rel) || !existsSync(live) || !statSync(live).isFile()) { kept++; continue; }
-    const p = readFileSync(join(preview, rel));
-    if (sameAsLive(rel, p, readFileSync(live), slug)) { shared.push(rel); bytesShared += p.length; }
+  for (const rel of files) {
+    if (verdict.get(rel) === true) { shared.push(rel); bytesShared += statSync(join(preview, rel)).size; }
     else kept++;
   }
   return { shared, kept, bytesShared };
+}
+
+/** The retained record, from the working tree or, outside a sparse checkout's cone, from its blob. */
+function retainedAt(root: string, outside: Map<string, GitEntry> | undefined): Retained {
+  const entry = outside?.get(RETAINED_FILE);
+  if (entry === undefined) return readRetained(root);
+  let text = "";
+  prefetchBlobs(root, [entry.oid]);
+  forEachBlob(root, [entry.oid], (_oid, bytes) => { text = bytes.toString("utf-8"); });
+  return parseRetained(text);
 }
 
 /** The `fa-search-index` value the preview's pages carry, for pages served from the live site. */
@@ -160,7 +204,7 @@ self.addEventListener('fetch',function(e){
   var req=e.request;if(req.method!=='GET')return;
   var u=new URL(req.url),scope=new URL(self.registration.scope);
   if(u.origin!==scope.origin||u.pathname.indexOf(scope.pathname)!==0)return;
-  var live=scope.pathname.replace(/STAGING\\/[^/]+\\/$/,'')+u.pathname.slice(scope.pathname.length);
+  var live=scope.pathname.replace(/(?:branches|STAGING)\\/[^/]+\\/$/,'')+u.pathname.slice(scope.pathname.length);
   e.respondWith(fetch(req).then(function(r){
     if(r.status!==404)return r;
     return fetch(live+u.search,{credentials:'same-origin'}).then(function(m){
@@ -184,8 +228,8 @@ export const NOT_FOUND_HTML = `<!DOCTYPE html>
 <body><h1>Page not found</h1><p id="fa-404-detail">This page does not exist on this site.</p>
 <p><a id="fa-404-live" href="/">Go to the home page</a></p>
 <script>(function(){
-var path=location.pathname,m=path.match(/^(.*\\/STAGING\\/[^/]+\\/)/);if(!m)return;
-var root=m[1],live=root.replace(/STAGING\\/[^/]+\\/$/,'')+path.slice(root.length);
+var path=location.pathname,m=path.match(/^(.*\\/(?:branches|STAGING)\\/[^/]+\\/)/);if(!m)return;
+var root=m[1],live=root.replace(/(?:branches|STAGING)\\/[^/]+\\/$/,'')+path.slice(root.length);
 var d=document.getElementById('fa-404-detail'),a=document.getElementById('fa-404-live');
 a.href=live;a.textContent='Open the live site\\u2019s copy of this page';
 d.textContent='This preview does not carry this page. It may be unchanged on the branch, so the preview serves the live site\\u2019s copy through a script.';

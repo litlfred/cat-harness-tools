@@ -13,20 +13,17 @@
  *
  * ## Why
  *
- * Since `staging-share.ts` a preview stores only what differs from the live
- * site and borrows the rest. A main deploy is a FULL REPLACE
+ * A preview (`staging-share.ts`) stores only what differs from the live site
+ * and borrows the rest. A main deploy is a FULL REPLACE
  * (`publish-gh-pages.sh`), and payloads under `payload/sha256/` are named by
- * their hash, so a blob the new build no longer writes is simply gone. A
- * preview staged before that deploy, which borrowed the blob, then gets a 404
- * for it. Keeping a copy in every preview would break the owner's ruling
- * (2026-10-31, "link to main asset so no file content duplication"), so main
- * keeps the dropped blob instead, for as long as an older sharing preview
- * stands (bean fwtz, Q-S2-2).
+ * their hash, so a blob the new build no longer writes would be gone and a
+ * preview that borrowed it would 404. Previews never copy main's files, so
+ * main keeps the dropped blob for as long as an older sharing preview stands.
  *
  * ## The rule
  *
  * `payload/retained.json` maps each kept blob's path to when main first
- * dropped it. A blob stays while some preview under `branches/` has a
+ * dropped it. A blob stays while some preview under `STAGING/` has a
  * `shared.json` (it borrows) and a `.staged-at` earlier than that time (it
  * was staged while main still wrote the blob). A preview with no `.staged-at`
  * counts as older: keeping a blob too long costs bytes, dropping it too soon
@@ -68,15 +65,25 @@ export function payloadFiles(root: string): Set<string> {
 /** The retained record at `root`, or an empty one. */
 export function readRetained(root: string): Retained {
   try {
-    const r = JSON.parse(readFileSync(join(root, RETAINED_FILE), "utf-8")) as Retained;
-    if (r && r.version === 1 && r.kept && typeof r.kept === "object") return r;
+    return parseRetained(readFileSync(join(root, RETAINED_FILE), "utf-8"));
   } catch {
     // none yet
   }
   return { version: 1, kept: {} };
 }
 
-/** When each preview under `site/branches/` that borrows from the live site was staged (`undefined`: not known). */
+/** A retained record's text, or an empty one when it is not a record. */
+export function parseRetained(text: string): Retained {
+  try {
+    const r = JSON.parse(text) as Retained;
+    if (r && r.version === 1 && r.kept && typeof r.kept === "object") return r;
+  } catch {
+    // not a record
+  }
+  return { version: 1, kept: {} };
+}
+
+/** When each preview under `site/branches/` (or a legacy `site/STAGING/`) that borrows from the live site was staged (`undefined`: not known). */
 export function sharingPreviews(site: string): (number | undefined)[] {
   const out: (number | undefined)[] = [];
   for (const prefix of PREVIEW_PREFIXES) {

@@ -902,7 +902,7 @@ export async function stageDeclared(
   log(`profile     ${d.recipe.profile ?? "folio"}${d.recipe.profile === "ig-repo-site" ? " (the platform steps folio-site.yml runs: the shell, its navbar, Jekyll, the rail)" : ""}`);
   if (d.recipe.links === "report") log("links       report: unresolved links are said, not refused (the recipe says so)");
   if (target === "main") {
-    log(`keeps       STAGING/, _render-log/${(d.recipe.keep ?? []).map((k) => `, ${k}/`).join("")}`);
+    log(`keeps       branches/, STAGING/, _render-log/${(d.recipe.keep ?? []).map((k) => `, ${k}/`).join("")}`);
     log(`guard       the build is measured against the published root (site-parity.ts: theme side bar and search, icon row, rail, top-level directories, folio-build.json); a shortfall refuses the publish${publish ? "" : " (said, not refused, as nothing is published)"}`);
   }
   if (o.plan) return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: false };

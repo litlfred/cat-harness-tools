@@ -2208,7 +2208,7 @@ function tableEntry(dep: ResolvedDependency, nodeFile: string, ref: string, key:
   const { path, exportName } = splitOwnCodeRef(ref);
   const abs = resolve(dep.rootPath, path);
   if (!existsSync(abs)) throw new Error(`${nodeFile}: ${ref} — ${abs} does not exist`);
-  // input-site: imports */pipeline/plugin-slots.ts,*/pipeline/qa-checkers-*.ts #f17e81a6 — own-code refs of declared qa-checkers / pipeline-plugins nodes; input-sites.test.ts holds every ref to these globs
+  // input-site: declared plugin-tables #f17e81a6 — own-code refs of declared qa-checkers / pipeline-plugins nodes, resolved from them at fingerprint time (`scripts/declared-imports.ts`); input-sites.test.ts holds the two to each other
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const table = (require(abs) as Record<string, unknown>)[exportName];
   if (typeof table !== "object" || table === null) throw new Error(`${nodeFile}: ${ref} exports no table named ${exportName}`);
