@@ -64,6 +64,7 @@ import { z } from "zod";
 import { releaseIri, releaseIris } from "@litlfred/bootstrap-tools/schemas/release-iri.ts";
 
 import { readDeclaration, siblingScopeFor } from "../schemas/kg/cat-harness.js";
+import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.ts";
 import { DISCOVERED_VOCABULARIES } from "../schemas/kg/discovered-vocabulary.js";
 import {
   BASE_GRAPH_TYPOLOGIES,
@@ -300,6 +301,23 @@ if (import.meta.main) {
   if (kinds.length === 0 || written.length === 0) {
     console.error(`✗ EXAMINED NOTHING — ${kinds.length} kind(s), ${written.length} document(s)`);
     process.exit(1);
+  }
+
+  // Built at publish, not committed (owner card, 2026-11-05, via the merge
+  // steward: "build it at publish"). The documents are generated from this
+  // layer's Zod but were committed in cat-harness, a layer BELOW, so each
+  // layer's CI checked them against the other's main: a schema change could
+  // go green in neither repository (cat-harness#1056 / cat-harness-tools#1509,
+  // bean 69lr). A harness that declares the directory `builtAtPublish` has no
+  // committed bytes to compare, so `--check` skips the comparison (the
+  // `folio:viz` rule, as `gen-schema-viz.ts` applies it) and still fails on a
+  // run that renders nothing (above). A harness that still commits them is
+  // checked exactly as before.
+  const builtAtPublish = (file: string): boolean =>
+    isBuiltAtPublish(readDeclaration(HARNESS_ROOT)?.builtAtPublish ?? [], relative(HARNESS_ROOT, file).split("\\").join("/"));
+  if (check && written.every((d) => builtAtPublish(d.file))) {
+    console.log(`kind JSON Schemas are built at publish: ${written.length} rendered, none committed to compare`);
+    process.exit(0);
   }
 
   let findings = 0;
