@@ -72,10 +72,14 @@ export const NS = "cs1";
  */
 export type KeySource = { script: string; base?: boolean } | { hashFiles: readonly string[] };
 
-/** The `exact` steps a committer may publish, as the workflows call them. */
-export const STEPS: Readonly<Record<string, { key: KeySource; paths: readonly string[] }>> = {
-  "cat-mount": { key: { hashFiles: ["index.lock.json"] }, paths: ["~/.cache/cat-mount"] },
-};
+/**
+ * The class-(a) steps a committer may publish, as the workflows call them.
+ * Empty today: the mounts, the first class-(a) cache, have their own
+ * committer path, the layers ref (`refs/cat/layers/<key>`, `layers:publish`),
+ * whose replayer verifies per instance and serves every layer that did not
+ * move. One committer path per cache, so the mounts are not published here.
+ */
+export const STEPS: Readonly<Record<string, { key: KeySource; paths: readonly string[] }>> = {};
 
 /** What the runner's `hashFiles()` computes: sha256 over each file's RAW sha256, in path order. */
 export function hashFiles(root: string, paths: readonly string[]): string | { undetermined: string } {
