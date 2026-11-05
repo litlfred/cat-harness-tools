@@ -119,7 +119,7 @@ describe("--check reads every proposal against the store", () => {
     const { checkProposals } = await import("../../proposal-approve.ts");
     const root = checkout();
     writeFileSync(join(root, "docs/proposals/q.md"), "---\ntitle: Q\nstatus: approved\n---\n");
-    writeFileSync(join(root, "docs/proposals/README.md"), "---\ngenerated: x\n---\n");
+    writeFileSync(join(root, "docs/proposals", "README.md"), "---\ngenerated: x\n---\n");
     approveProposal({ root, proposal: PROPOSAL, processes: ["P"] });
     const r = checkProposals(root, "docs/proposals");
     expect(r.proposals).toBe(2);
