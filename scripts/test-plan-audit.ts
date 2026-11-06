@@ -31,11 +31,12 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import type { KgCriterionEntry, KgFinding } from "../schemas/sdlc/kg-qa.js";
-import { TestPlanSchema, TEST_PLAN_SCHEMA_ID, type TestPlan } from "../schemas/sdlc/test-plan.js";
+import { TestPlanSchema, TEST_PLAN_SCHEMA_ID, isTestPlanSchemaId, type TestPlan } from "../schemas/sdlc/test-plan.js";
 import { TestRunSchema, UNKNOWN_HASH, type SutRef } from "../schemas/sdlc/test-run.js";
 import { TestReportSchema, TEST_REPORT_SCHEMA_ID, checkAgainstPlan } from "../schemas/sdlc/test-report.js";
 import { CertificationAttestationsSchema } from "../schemas/sdlc/qa-attestations.js";
 import type { SutKind } from "../schemas/sdlc/test-plan.js";
+import { parseFeature, scanTree, type GherkinFinding } from "./lib/test-gherkin.ts";
 
 /** The four criterion ids, in registry order. */
 export const TEST_PLAN_CRITERIA = [
@@ -129,10 +130,10 @@ export function auditTestPlans(input: TestPlanAuditInput): Record<TestPlanCriter
     }
     // A JSON file in a plan directory that does not declare itself a plan is
     // not judged as one — the declaration is the contract, not the directory.
-    if ((raw.value as { $schema?: unknown })?.$schema !== TEST_PLAN_SCHEMA_ID) continue;
+    if (!isTestPlanSchemaId((raw.value as { $schema?: unknown })?.$schema)) continue;
     const parsed = TestPlanSchema.safeParse(raw.value);
     if (!parsed.success) {
-      resolves.push({ where: rel(f), detail: `does not parse as ${TEST_PLAN_SCHEMA_ID}: ${issues(parsed.error)}` });
+      resolves.push({ where: rel(f), detail: `does not parse as ${String((raw.value as { $schema?: unknown }).$schema)}: ${issues(parsed.error)}` });
       continue;
     }
     const plan = parsed.data;
@@ -298,11 +299,11 @@ export function auditTestPlanExitCriteria(input: TestPlanExitCriteriaAuditInput)
       findings.push({ where: rel(f), detail: `is not JSON: ${raw.error}` });
       continue;
     }
-    if ((raw.value as { $schema?: unknown })?.$schema !== TEST_PLAN_SCHEMA_ID) continue;
+    if (!isTestPlanSchemaId((raw.value as { $schema?: unknown })?.$schema)) continue;
     plansChecked++;
     const parsed = TestPlanSchema.safeParse(raw.value);
     if (!parsed.success) {
-      findings.push({ where: rel(f), detail: `does not parse as ${TEST_PLAN_SCHEMA_ID}: ${issues(parsed.error)}` });
+      findings.push({ where: rel(f), detail: `does not parse as ${String((raw.value as { $schema?: unknown }).$schema)}: ${issues(parsed.error)}` });
       continue;
     }
     const plan = parsed.data;
@@ -386,4 +387,76 @@ export function auditCertifications(input: CertificationAuditInput): KgCriterion
   if (findings.length > 0) return { result: "fail", findings: [...findings, ...unseen] };
   if (unseen.length > 0) return { result: "unknown", findings: unseen };
   return { result: "pass", findings: [] };
+}
+
+// ── `test-has-gherkin` (owner, 2026-11-06: "A test should always have a Gherkin") ──
+
+export interface TestGherkinAuditInput {
+  /** The instance root: tests and `.feature` files are scanned, and named, relative to it. */
+  root: string;
+  plans: string[];
+}
+
+/** At most this many test names quoted per finding: a finding per file, not per test. */
+const NAMES_PER_FINDING = 5;
+
+/**
+ * Audit criterion `test-has-gherkin`.
+ *
+ * Joins every test the language adapters find to the `@test:` tags of the
+ * instance's `.feature` files (`scripts/lib/test-gherkin.ts`), and every plan
+ * case to the `.feature` it names. Fails on an orphan either way: a test no
+ * Scenario names, a tag naming no test, a test named twice, a Scenario naming
+ * no test, and a plan case with no `.feature` (a `test-plan/v1` plan parses,
+ * and is reported here until it names one) or one that does not resolve.
+ *
+ * Findings are grouped per file and kind, so a repository that has not
+ * backfilled yet records one finding per test file rather than one per test.
+ * `n/a` when there is no test, no Scenario and no plan case.
+ */
+export function auditTestGherkin(input: TestGherkinAuditInput): KgCriterionEntry {
+  const rel = (p: string) => relative(input.root, p);
+  const scan = scanTree(input.root);
+  const findings: KgFinding[] = [];
+
+  const groups = new Map<string, GherkinFinding[]>();
+  for (const f of scan.findings) {
+    const key = `${f.kind}\u0000${f.file}`;
+    groups.set(key, [...(groups.get(key) ?? []), f]);
+  }
+  for (const fs of groups.values()) {
+    if (fs.length === 1) {
+      findings.push({ where: `${fs[0].file}:${fs[0].line}`, detail: `${fs[0].kind}: ${fs[0].detail}` });
+      continue;
+    }
+    const quoted = fs.slice(0, NAMES_PER_FINDING).map((f) => `\`${f.test ?? `line ${f.line}`}\``);
+    const more = fs.length > NAMES_PER_FINDING ? `, and ${fs.length - NAMES_PER_FINDING} more` : "";
+    findings.push({ where: fs[0].file, detail: `${fs[0].kind}: ${fs.length} — ${quoted.join(", ")}${more}` });
+  }
+
+  let cases = 0;
+  for (const f of input.plans) {
+    const raw = readJson(f);
+    if (!raw.ok || !isTestPlanSchemaId((raw.value as { $schema?: unknown })?.$schema)) continue;
+    const parsed = TestPlanSchema.safeParse(raw.value);
+    // A plan that does not parse is `test-plan-resolves`'s finding, not this one's.
+    if (!parsed.success) continue;
+    for (const c of parsed.data.testCases) {
+      cases++;
+      if (c.feature === undefined) {
+        findings.push({ where: `${rel(f)}#${c.id}`, detail: `plan case names no \`.feature\` (${parsed.data.$schema}; required from ${TEST_PLAN_SCHEMA_ID}).` });
+        continue;
+      }
+      const at = [join(input.root, c.feature), join(resolve(f, ".."), c.feature)].find((p) => existsSync(p));
+      if (!at) {
+        findings.push({ where: `${rel(f)}#${c.id}`, detail: `plan case names \`${c.feature}\`, which does not exist (looked beside the plan and at the root).` });
+        continue;
+      }
+      if (parseFeature(rel(at), readFileSync(at, "utf-8")).scenarios.length === 0) {
+        findings.push({ where: `${rel(f)}#${c.id}`, detail: `plan case names \`${c.feature}\`, which holds no Scenario.` });
+      }
+    }
+  }
+
+  return entryOf(findings, scan.tests.length > 0 || scan.scenarios.length > 0 || cases > 0);
 }

@@ -6,7 +6,15 @@
 import { describe, expect, test } from "bun:test";
 
 import { defaultGraphTypologies, graphLayer, isRenderable, processMayWrite } from "../kg/cat-harness";
-import { TEST_PLAN_SCHEMA_ID, TestDataRefSchema, TestPlanSchema, isEvidence, type TestPlan } from "./test-plan";
+import {
+  TEST_PLAN_SCHEMA_ID,
+  TEST_PLAN_SCHEMA_ID_V1,
+  TestDataRefSchema,
+  TestPlanSchema,
+  isEvidence,
+  testPlanDeprecations,
+  type TestPlan,
+} from "./test-plan";
 
 /** Plan #1 of the dogfood order (§3.3): `crdm-detect`, as a plan. */
 function samplePlan(): TestPlan {
@@ -35,6 +43,7 @@ function samplePlan(): TestPlan {
         id: "silent-on-content-work",
         assertions: [{ id: "crdm-detect-silent", type: "required" }],
         testData: [{ kind: "generated", template: "templates/issue.tmpl", params: { n: 50 }, seed: 7 }],
+        feature: "features/crdm-detect.feature",
         dependsOn: ["fires-on-feature-request"],
       },
     ],
@@ -79,6 +88,21 @@ describe("the shape", () => {
     const p = raw();
     p.testCases[0].feature = "features/crdm-detect.md";
     expect(TestPlanSchema.safeParse(p).success).toBe(false);
+  });
+
+  test("under v1.1 every case names its .feature; a v1 plan without one parses, deprecated", () => {
+    const p = raw();
+    delete p.testCases[1].feature;
+    const refused = TestPlanSchema.safeParse(p);
+    expect(refused.success).toBe(false);
+    expect(refused.error?.issues.map((i) => i.path.join("."))).toEqual(["testCases.1.feature"]);
+
+    const old = TestPlanSchema.parse({ ...p, $schema: TEST_PLAN_SCHEMA_ID_V1 });
+    expect(testPlanDeprecations(old)).toEqual([
+      `declares ${TEST_PLAN_SCHEMA_ID_V1}, which is deprecated — write ${TEST_PLAN_SCHEMA_ID}`,
+      `case(s) \`silent-on-content-work\` name no \`.feature\` — required from ${TEST_PLAN_SCHEMA_ID}`,
+    ]);
+    expect(testPlanDeprecations(samplePlan())).toEqual([]);
   });
 
   test("a plan names no run — there is no field for one, and a strict object refuses it", () => {
