@@ -1,31 +1,78 @@
-# Post-merge regeneration check and repair for a harnessed LAYER, as ONE
+# Regenerate a harnessed LAYER's derived artefacts and judge them, as ONE
 # reusable workflow (bean folio-assistant-ey1c; owner, 2026-10-15: "a").
 #
-# `post-merge:regen` (scripts/post-merge-regen.ts) runs in a composed index:
-# it is a cat-harness-tools script, so a layer's own checkout has no `cat`
-# command to run it with. cat-harness's copy of the old workflow ran
-# `bun run cat post-merge:regen` in cat-harness alone after the split (bean
-# 70lx), where `cat` is /usr/bin/cat, and it failed on every push.
+# WHERE IT RUNS (owner, 2026-11-06, options "1 3"). Derived files reach main
+# through the PR that changes their inputs, tested, and the release build
+# regenerates again before it publishes. Nothing pushes to main, and no repair
+# branch or repair PR is made any more: the `automation/post-merge-regen-*`
+# branches and their PRs piled up with no CI once Actions could no longer open
+# PRs in cat-harness. Three modes, one per caller:
 #
-# A caller is one `uses:` line, on push to main:
+#   pr       on a pull request (owner's option 1). Regenerate at the PR's head.
+#            When a tracked file changed and the PR's branch is in this
+#            repository, commit the regen to that branch, ONE commit
+#            "chore(derived): regenerate derived artefacts for <sha>". From a
+#            fork, push nothing and fail with the command that regenerates.
+#            A push made with GITHUB_TOKEN starts no workflow run, so the
+#            regen commit would carry no CI. The caller passes the secret
+#            `regen-push-token` (a fine-grained token or app token with
+#            contents: write on this repository) and the commit is pushed with
+#            it, so the PR's checks run on it. Without the secret the commit is
+#            still pushed, with GITHUB_TOKEN, and this check FAILS saying that
+#            no CI ran on the new head and how to start it. Either way, a regen
+#            that still changes files on a head that is itself a regen commit
+#            fails (no fixpoint), so it cannot loop.
+#   release  in the release build (owner's option 3). Regenerate INTO THE
+#            PUBLISHED ARTEFACT only: the regenerated tree is uploaded as the
+#            run artifact `regenerated-<instance>` (output `artifact`), which
+#            the release job lays over its checkout before it packs. Nothing is
+#            committed. Unrepaired checks, or READMEs that reach no fixpoint,
+#            fail the run, so the release job (which `needs:` this one) never
+#            publishes stale output.
+#   verify   the default, after a merge to main: verify and WARN. It
+#            regenerates in its own runner, says what was stale, and commits,
+#            pushes and opens nothing.
 #
-#   on: { push: { branches: [main] }, workflow_dispatch: { inputs: { dry_run: { type: boolean, default: false } } } }
-#   permissions: { contents: write, pull-requests: write }
+# NOT in branch or staging preview builds (owner, 2026-11-06: "preview builds
+# not required regen"). `folio-site-publish.yml` and the stage-local previews
+# under `STAGING/` and `branches/` do not call this workflow; do not add it.
+#
+# A caller is one `uses:` line a mode. The PR side, as its own job beside the
+# checks (a ready PR only; it regenerates the whole composed index, about an
+# hour of runner time):
+#
+#   on: { pull_request: { types: [opened, synchronize, reopened, ready_for_review] } }
 #   jobs:
 #     regen:
+#       if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
+#       permissions: { contents: write, pull-requests: write }
 #       uses: litlfred/cat-harness-tools/.github/workflows/layer-post-merge-regen.yml@main
-#       with: { dry-run: ${{ inputs.dry_run == true }} }
+#       with: { mode: pr }
+#       secrets: { regen-push-token: ${{ secrets.REGEN_PUSH_TOKEN }} }
+#
+# The release side, ahead of the job that publishes:
+#
+#   jobs:
+#     regen:
+#       permissions: { contents: read }
+#       uses: litlfred/cat-harness-tools/.github/workflows/layer-post-merge-regen.yml@main
+#       with: { mode: release }
+#     release:
+#       needs: regen
+#       steps:
+#         - uses: actions/checkout@...
+#         - uses: actions/download-artifact@...
+#           with: { name: ${{ needs.regen.outputs.artifact }}, path: . }
 #
 # What it does, in the layout `layer-publish-context.yml` uses:
 #   1. Check out the folio-assistant index at `index-ref` and mount every
 #      instance from its lock.
-#   2. Put THE CALLER, at the pushed commit and WITHOUT its `.git`, in place of
-#      its locked mount; keep its git checkout aside in `src`.
+#   2. Put THE CALLER, at the commit under test (the PR's head in `pr` mode,
+#      the pushed or dispatched commit otherwise) and WITHOUT its `.git`, in
+#      place of its locked mount; keep its git checkout aside in `src`.
 #   3. Take its dependency harness and cat-harness-tools at main.
 #   4. Run `post-merge:regen` there. Its writers repair files in the composed
-#      tree. The script's own PR step is NOT used: the mounts are gitignored in
-#      the index, so it sees no changed file, and the repair belongs in the
-#      CALLER's repository, not folio-assistant.
+#      tree. The script's own PR step is NOT used (no `--create-pr`).
 #   5. Copy the caller's directory back over `src`.
 #   6. Regenerate the caller's directory READMEs IN `src`, its own git
 #      checkout (`subgraph-readmes.ts --repo`; owner, 2026-10-15). Step 4
@@ -34,23 +81,25 @@
 #      because it has no `.git` and the index ignores its mounts. Run from
 #      `fa`, so the graph typologies are the composed set. The owner's
 #      2026-11-04 ruling ("keep READMEs current automatically", option 3)
-#      restores this writer and reverses the 2026-10-23 ruling (bean `p7mb`,
-#      cat-harness-tools#590) that had made it an advisory check that let the
-#      READMEs lag until the next PR touching the directory.
-#   7. Open the repair PR in the caller's repository with its GITHUB_TOKEN
-#      when, and only when, a file the caller tracks changed (the negative
-#      control). Another layer's changes are that layer's to repair. Where the
-#      repository forbids Actions to open PRs, the branch is still pushed and
-#      the warning names the setting that allows it.
+#      restores this writer.
+#   7. By mode, as above: commit to the PR's branch, upload the release
+#      artifact, or warn. Only files the CALLER tracks count (the negative
+#      control: nothing changed, nothing is committed or warned about).
 #   8. Exit with the script's own code, or red when the READMEs could not be
-#      judged or did not reach a fixpoint: an unrepaired or writer-less check
-#      is a red run (principle 4), even when a repair PR was opened.
+#      judged or did not reach a fixpoint, or (`pr`) when the PR is left with
+#      stale files or with a head no CI ran on. The step summary always lists
+#      the checks that were regenerated and the files they changed.
 
 name: Layer post-merge regen
 
 on:
   workflow_call:
     inputs:
+      mode:
+        description: "pr (commit the regen to the PR's own branch), release (regenerate into the published artifact), or verify (after a merge: verify and warn)."
+        required: false
+        type: string
+        default: "verify"
       instance:
         description: "The instance's directory in the folio-assistant index (its mount path); empty means the calling repository's name."
         required: false
@@ -67,31 +116,52 @@ on:
         type: string
         default: "main"
       dry-run:
-        description: "Report only: run the audit, open no PR."
+        description: "Report only: run the audit, write and push nothing."
         required: false
         type: boolean
         default: false
+    secrets:
+      regen-push-token:
+        description: "pr mode: a token with contents: write here, so the regen commit's push starts the PR's checks. Without it the push uses GITHUB_TOKEN, which starts none, and the check fails saying so."
+        required: false
+    outputs:
+      artifact:
+        description: "release mode: the name of the run artifact holding the regenerated caller tree."
+        value: ${{ jobs.regen.outputs.artifact }}
+      changed:
+        description: "true when the regen changed a file the caller tracks."
+        value: ${{ jobs.regen.outputs.changed }}
 
-permissions:
-  contents: write
-  pull-requests: write
+# No `permissions:` here or on the job: the job takes the caller's, so each
+# mode asks only for what it uses. `pr` needs contents: write (the commit) and
+# pull-requests: write (the comment); `release` and `verify` need contents:
+# read. A reusable workflow asking for more than its caller grants fails to
+# start, so a fixed block here would force write on every caller.
 
 concurrency:
-  group: layer-post-merge-regen-${{ github.repository }}
-  cancel-in-progress: false
+  # A PR's runs replace each other; main's (verify, release) queue.
+  group: layer-post-merge-regen-${{ github.repository }}-${{ inputs.mode }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ inputs.mode == 'pr' }}
 
 env:
   INSTANCE: ${{ inputs.instance != '' && inputs.instance || github.event.repository.name }}
+  MODE: ${{ inputs.mode }}
 
 jobs:
   regen:
-    name: Check post-merge derived artefacts
+    name: ${{ inputs.mode == 'pr' && 'Derived artefacts regenerated in this PR' || inputs.mode == 'release' && 'Regenerate derived artefacts for the release' || 'Check post-merge derived artefacts' }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    permissions:
-      contents: write
-      pull-requests: write
+    outputs:
+      artifact: ${{ steps.upload.outputs.name }}
+      changed: ${{ steps.changes.outputs.changed }}
     steps:
+      - name: Which mode?
+        run: |
+          case "$MODE" in
+            pr|release|verify) echo "mode: $MODE" ;;
+            *) echo "::error::mode must be pr, release or verify, not '$MODE'"; exit 2 ;;
+          esac
       - name: Check out the folio-assistant index
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -104,9 +174,15 @@ jobs:
       - name: Mount every instance from the index's lock
         run: bash fa/.github/mount-from-lock.sh --root fa
       - name: Check out the caller
+        # In `pr` mode, the PR's HEAD (not the merge commit), from the
+        # repository it lives in, so a regen commit sits on top of it. The
+        # token is the one the push will use.
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: src
+          repository: ${{ inputs.mode == 'pr' && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ inputs.mode == 'pr' && github.event.pull_request.head.sha || github.sha }}
+          token: ${{ secrets.regen-push-token || github.token }}
       - name: Put a copy of the caller in place of its locked mount
         env:
           SUBDIR: ${{ inputs.path-in-repo }}
@@ -162,7 +238,7 @@ jobs:
         run: |
           # `+e`: Actions runs this as `bash -e`, so a non-zero regen (stale or
           # unrepaired, which is its verdict, not a crash) ended the step before
-          # `code=$?` and skipped every step after it, the repair PR included:
+          # `code=$?` and skipped every step after it, the commit or upload included:
           # cat-harness's READMEs went unrepaired on every push (bean ey1c).
           set +e -uo pipefail
           args=(--json)
@@ -171,8 +247,8 @@ jobs:
           code=$?
           cat "$RUNNER_TEMP/regen.json"
           echo "code=$code" >> "$GITHUB_OUTPUT"
-          # The verdict step at the end exits with this code, after the repair
-          # PR has been opened (step 8 above).
+          # The verdict step at the end exits with this code, after the commit or
+          # upload (step 8 above).
           exit 0
       - name: Copy the caller's directory back over its checkout
         env:
@@ -182,7 +258,7 @@ jobs:
         # Owner, 2026-11-04: "keep READMEs current automatically" (option 3).
         # Reverses the 2026-10-23 ruling (bean `folio-assistant-p7mb`,
         # cat-harness-tools#590) that had made this an advisory check: the
-        # READMEs it writes now ride the repair branch with the rest.
+        # READMEs it writes go with the rest of the regen (step 7).
         id: readmes
         working-directory: fa
         env:
@@ -203,7 +279,7 @@ jobs:
             # CREATES is untracked, and the writer lists only what git tracks,
             # so its parent's table changes once it is staged (measured on
             # cat-harness 2026-10-16: 19 written, then docs/README.md stale).
-            # The repair PR commits everything anyway.
+            # The commit step stages everything anyway.
             code=1
             for pass in 1 2 3; do
               bun "$script" --repo "$OWN" || { code=2; break; }
@@ -217,59 +293,136 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
           [ -n "$(git -C "$OWN" status --porcelain -- '*README.md')" ] && echo "changed=true" >> "$GITHUB_OUTPUT"
           exit 0
-      - name: Open the repair PR in the caller's repository
-        if: inputs.dry-run == false
+      - name: What the regen changed in the caller's checkout
+        # The negative control: only files the caller tracks (or new files
+        # under it) count, and none means nothing is committed, uploaded as a
+        # change, or warned about.
+        id: changes
+        if: always() && steps.regen.outcome == 'success'
         env:
-          GH_TOKEN: ${{ github.token }}
-          SHA: ${{ github.sha }}
-          BASE: ${{ github.event.repository.default_branch }}
           READMES_CHANGED: ${{ steps.readmes.outputs.changed }}
         run: |
           set -euo pipefail
-          cd src
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "Negative control: no file $INSTANCE tracks changed; no repair PR."
-            exit 0
-          fi
-          branch="automation/post-merge-regen-${SHA:0:10}"
-          if [ -n "$(gh pr list --head "$branch" --base "$BASE" --json number --jq '.[].number')" ]; then
-            echo "A repair PR for $branch is already open."
-            exit 0
-          fi
+          git -C src add -A
+          git -C src diff --cached --name-status > "$RUNNER_TEMP/changed.txt"
           checks="$(bun -e 'const r = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf-8")); console.log([...(r.repairedChecks ?? []), ...(r.staleChecks ?? []), ...(process.env.READMES_CHANGED === "true" ? ["readme:subgraphs --repo (own checkout)"] : [])].filter((v, i, a) => a.indexOf(v) === i).join(", ") || "derived artefacts")' "$RUNNER_TEMP/regen.json" 2>/dev/null || echo "derived artefacts")"
+          echo "$checks" > "$RUNNER_TEMP/checks.txt"
+          if [ -s "$RUNNER_TEMP/changed.txt" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Regenerated ($checks):"
+            cat "$RUNNER_TEMP/changed.txt"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Negative control: no file $INSTANCE tracks changed."
+          fi
+      - name: Commit the regen to the PR's own branch
+        # One commit, on top of the PR's head, pushed to the head branch. Never
+        # to main, never a new branch, never a new PR.
+        if: inputs.mode == 'pr' && inputs.dry-run == false && steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HAS_PUSH_TOKEN: ${{ secrets.regen-push-token != '' }}
+        run: |
+          set -euo pipefail
+          cd src
+          checks="$(cat "$RUNNER_TEMP/checks.txt")"
+          prefix="chore(derived): regenerate derived artefacts for "
+          if [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then
+            echo "::error title=Derived artefacts are stale (fork PR: not committed)::This PR comes from $HEAD_REPO, so the regen is not pushed to it. Stale: $checks. Regenerate in a folio-assistant checkout with your $INSTANCE checkout in place of its mount: 'bun run cat post-merge:regen' then 'bun cat-harness-tools/scripts/subgraph-readmes.ts --repo <your $INSTANCE checkout>', and push the result. Files: $(cut -f2- "$RUNNER_TEMP/changed.txt" | paste -sd ' ')"
+            exit 1
+          fi
+          if [[ "$(git log -1 --format=%s)" == "$prefix"* ]]; then
+            echo "::error title=Regen did not reach a fixpoint::The PR's head ${HEAD_SHA:0:10} is itself a regen commit and regenerating it still changed files ($checks). Nothing was pushed, so this cannot loop; a writer is not idempotent."
+            exit 1
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -q -B "$branch"
-          git add -A
-          git commit -q -m "fix(derived): regenerate post-merge derived artefacts ($checks)"
-          git push -q -u origin "$branch"
           {
-            echo "Automated post-merge repair for \`${SHA:0:10}\`, regenerated in the composed folio-assistant index (\`layer-post-merge-regen.yml\`)."
+            echo "${prefix}${HEAD_SHA:0:10}"
             echo
-            echo "Checks: $checks"
+            echo "Regenerated by layer-post-merge-regen.yml (mode pr): $checks"
             echo
-            echo "Files:"
-            git diff --name-only "HEAD~1" | sed 's/^/- `/; s/$/`/'
-          } > "$RUNNER_TEMP/body.md"
-          if ! err="$(gh pr create --base "$BASE" --head "$branch" --title "fix(derived): regenerate post-merge derived artefacts" --body-file "$RUNNER_TEMP/body.md" 2>&1)"; then
-            echo "$err"
-            if grep -q "not permitted to create or approve pull requests" <<<"$err"; then
-              # Only the repository's owner can lift this. The branch is
-              # pushed either way; this names the setting and the compare link.
-              echo "::warning title=Repair PR not opened (Actions may not create PRs here)::Repair branch $branch was pushed, but GITHUB_TOKEN is not permitted to create pull requests here. The repository owner can allow it in $GITHUB_REPOSITORY, Settings, Actions, General, under Workflow permissions: tick \"Allow GitHub Actions to create and approve pull requests\" (https://github.com/$GITHUB_REPOSITORY/settings/actions). Until then, open it by hand: https://github.com/$GITHUB_REPOSITORY/compare/$BASE...$branch?expand=1"
-            else
-              exit 1
-            fi
+            sed 's/^/  /' "$RUNNER_TEMP/changed.txt"
+          } > "$RUNNER_TEMP/msg.txt"
+          git commit -q -F "$RUNNER_TEMP/msg.txt"
+          new="$(git rev-parse HEAD)"
+          if ! git push -q origin "HEAD:refs/heads/$HEAD_REF"; then
+            # The branch moved while this ran: its new head has a run of its
+            # own, which regenerates from there.
+            echo "::warning title=Regen not pushed (the branch moved)::$HEAD_REF moved past ${HEAD_SHA:0:10} while the regen ran; the run on its new head regenerates."
+            exit 0
           fi
+          echo "Pushed ${new:0:10} to $HEAD_REF: $checks"
+          if [ "$HAS_PUSH_TOKEN" = "true" ]; then
+            echo "::notice title=Regen committed to the PR::${new:0:10} regenerates $checks. It was pushed with regen-push-token, so the PR's checks run on it."
+            exit 0
+          fi
+          # GITHUB_TOKEN's push starts no workflow run: the new head has no
+          # checks. Say so where the PR's reader sees it, and fail.
+          msg="The regen check committed ${new:0:10} (\`chore(derived)\`, regenerating: $checks) to this branch. It was pushed with GITHUB_TOKEN, which starts no workflow run, so **no CI has run on the new head**. Push any commit to the branch (or close and reopen the PR) to run it. For the checks to start by themselves, the repository owner adds a \`REGEN_PUSH_TOKEN\` secret (a token with contents: write on this repository)."
+          gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -f body="$msg" > /dev/null || echo "could not comment on the PR"
+          echo "::error title=Regen committed, but no CI ran on it::$msg"
+          exit 1
+      - name: Keep the regen as a patch, for the release job
+        # Into the published artefact only: the release job applies this patch
+        # to its checkout of the same commit before it packs. Nothing is
+        # committed. Uploaded even when empty, so the release job's step is the
+        # same either way.
+        if: inputs.mode == 'release' && inputs.dry-run == false && steps.changes.outcome == 'success'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/regen-artifact"
+          git -C src diff --cached --binary > "$RUNNER_TEMP/regen-artifact/regen.patch"
+          git -C src rev-parse HEAD > "$RUNNER_TEMP/regen-artifact/base-sha"
+          cp "$RUNNER_TEMP/changed.txt" "$RUNNER_TEMP/checks.txt" "$RUNNER_TEMP/regen-artifact/"
+          if [ -s "$RUNNER_TEMP/regen-artifact/regen.patch" ]; then
+            echo "::warning title=main was stale; the release regenerated it::The release package carries regenerated $(cat "$RUNNER_TEMP/checks.txt"); main still holds the stale files until a PR regenerates them."
+          fi
+      - name: Upload the regen patch
+        id: upload-step
+        if: inputs.mode == 'release' && inputs.dry-run == false && steps.changes.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: regenerated-${{ env.INSTANCE }}
+          path: ${{ runner.temp }}/regen-artifact/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Name the artifact
+        id: upload
+        if: steps.upload-step.outcome == 'success'
+        run: echo "name=regenerated-$INSTANCE" >> "$GITHUB_OUTPUT"
+      - name: Warn that main is stale (verify only)
+        # After a merge: verify and warn. Nothing is committed, pushed or
+        # opened; the next PR's regen check commits these.
+        if: inputs.mode == 'verify' && steps.changes.outputs.changed == 'true'
+        run: |
+          echo "::warning title=main is stale on derived artefacts::Regenerating main changed files $INSTANCE tracks ($(cat "$RUNNER_TEMP/checks.txt")). Nothing was committed: the next PR's regen check commits them, and a release regenerates them into its package. Files: $(cut -f2- "$RUNNER_TEMP/changed.txt" | paste -sd ' ')"
       - name: Report the regen verdict
         if: always()
         env:
           CODE: ${{ steps.regen.outputs.code }}
           READMES: ${{ steps.readmes.outputs.code }}
           READMES_CHANGED: ${{ steps.readmes.outputs.changed }}
+          CHANGED: ${{ steps.changes.outputs.changed }}
+          DRY_RUN: ${{ inputs.dry-run }}
         run: |
           {
-            echo "### post-merge regen: $INSTANCE"
+            echo "### regen ($MODE): $INSTANCE"
+            echo
+            if [ -s "$RUNNER_TEMP/changed.txt" ]; then
+              echo "Regenerated: $(cat "$RUNNER_TEMP/checks.txt" 2>/dev/null)"
+              echo
+              echo '```'
+              cat "$RUNNER_TEMP/changed.txt"
+              echo '```'
+            else
+              echo "Nothing regenerated: every derived file $INSTANCE tracks is current."
+            fi
+            echo
             echo '```json'
             cat "$RUNNER_TEMP/regen.json" 2>/dev/null || echo "(no report)"
             echo '```'
@@ -277,4 +430,9 @@ jobs:
             echo "Directory READMEs in the caller's own checkout: exit ${READMES:-not run}, $([ "${READMES_CHANGED:-}" = true ] && echo changed || echo unchanged)."
           } >> "$GITHUB_STEP_SUMMARY"
           [ "${CODE:-1}" = 0 ] || exit "${CODE:-1}"
+          # A PR left stale (a dry run commits nothing) is not current.
+          if [ "$MODE" = pr ] && [ "$DRY_RUN" = true ] && [ "${CHANGED:-}" = true ]; then
+            echo "::error::Derived artefacts are stale in this PR (dry run: nothing committed)."
+            exit 1
+          fi
           exit "${READMES:-1}"
