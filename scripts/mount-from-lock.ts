@@ -196,7 +196,7 @@ export function withoutStateMounts(dir: string, files: readonly string[], skip: 
  */
 export function builtAtPublishOf(dir: string): string[] {
   // `dir` is the instance root, or one of the directories the lock pins of an
-  // instance mounted as several (smart-trust pins `fhir-artifact-index`,
+  // instance mounted as several (an IG pinned as `fhir-artifact-index`,
   // `document-kinds`, …). The entries are instance-relative, so they are
   // read from the instance's declaration and rebased onto `dir`: before
   // 2026-11-06 they were looked for in `dir` itself and compared as

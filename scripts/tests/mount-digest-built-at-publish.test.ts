@@ -3,13 +3,13 @@
  * builds at publish (`builtAtPublish`), in EVERY directory the lock pins of
  * it, not only when the lock pins the instance root.
  *
- * Found 2026-11-06 (bean `cat-tools-sm8r`): smart-trust is pinned as seven
- * directories (`smart-trust/fhir-artifact-index`, `smart-trust/document-kinds`,
+ * Found 2026-11-06 (bean `cat-tools-sm8r`): an IG instance is pinned as seven
+ * directories (`<ig>/fhir-artifact-index`, `<ig>/document-kinds`,
  * …) and declares `fhir-artifact-index/index.json` built by `ig-index:build`.
  * The declaration was looked for inside each pinned directory and its
  * instance-relative paths compared with directory-relative ones, so it never
  * applied: once `ig-index:build` wrote the index, every later mount check read
- * smart-trust as edited and refused it, and a local gate run's eight
+ * the IG as edited and refused it, and a local gate run's eight
  * `state:mount` steps all exited 1.
  */
 import { afterAll, describe, expect, test } from "bun:test";
