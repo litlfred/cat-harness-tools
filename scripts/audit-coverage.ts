@@ -91,7 +91,7 @@ import { contentIsOffCheckout, resolveSubgraphSource, type SubgraphSource } from
 // The same single reader `check:declared-dirs` uses, so the two gates cannot
 // disagree about whether a tip-keyed graph is readable here (bean `9ofm`).
 import { routePresence, tipPresence } from "./check-declared-dirs.ts";
-import { loadGatesCiRuns } from "./gates.js";
+import { loadGatesCiRuns, SCRIPT_EXEMPTIONS } from "./gates.js";
 import {
   againstOrUsage,
   buildQaResult,
@@ -509,7 +509,20 @@ export function gateCoverage(root: string, repo: string): GateCoverage[] {
   // kind regardless of this tool's ability to invoke it. Using the runner's
   // list here made the census 209 and the "all N have declared" verdict narrower
   // than reality.
-  const gates = loadGatesCiRuns(repo, { all: true });
+  const ciRuns = loadGatesCiRuns(repo, { all: true });
+  const ranHere = new Set(ciRuns.map((g) => g.command));
+  const elsewhere = SCRIPT_EXEMPTIONS.filter((e) => e.kind === "covered-by")
+    .map((e) => ({ job: "(the declaring layer's own CI)", step: e.script, command: `bun run cat ${e.script}` }))
+    .filter((g) => !ranHere.has(g.command));
+  const elsewhereCommands = new Set(elsewhere.map((g) => g.command));
+  const gates = [
+    ...ciRuns,
+    // A check an instance declares `covered-by` runs in that layer's OWN CI
+    // (owner ruling 2026-11-05, "Move the checks"), not in this checkout's
+    // workflows, and it judges the kinds it declares `@covers` there all the
+    // same: `caches:viz:check` is what reads cat-harness-tools' `cache` nodes.
+    ...elsewhere,
+  ];
   const out: GateCoverage[] = [];
   const byCommand = new Map<string, GateCoverage>();
   for (const g of gates) {
@@ -580,7 +593,10 @@ export function gateCoverage(root: string, repo: string): GateCoverage[] {
   }
   // `relative` is applied by the caller for display; paths stay repo-relative.
   void root;
-  return out;
+  // Run elsewhere, they count only for the kinds they DECLARE: this checkout
+  // does not run them, so one with no `@covers` is not this checkout's
+  // undeclared gate.
+  return out.filter((c) => !elsewhereCommands.has(c.command) || c.state === "declared");
 }
 
 /** The universe of kinds: the registry, plus anything an instance declares that it does not know. */

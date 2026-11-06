@@ -63,4 +63,16 @@ describe("gateCoverage", () => {
     const self = g.find((x) => x.command.includes("audit:coverage"));
     expect(self?.state).toBe("none");
   });
+
+  test("a check declared covered-by runs in its own layer's CI and counts for the kinds it @covers", () => {
+    // `caches:viz:check` is in cat-harness-tools' `gateExemptions` as
+    // covered-by, so no workflow of this checkout runs it; it is still what
+    // judges the `cache` kind (owner ruling 2026-11-05, "Move the checks").
+    const g = gateCoverage(INSTANCE, REPO);
+    const caches = g.find((x) => x.command === "bun run cat caches:viz:check");
+    expect(caches?.state).toBe("declared");
+    expect(caches?.covers).toContain("cache");
+    // And one run elsewhere with no @covers is not this checkout's undeclared gate.
+    expect(g.filter((x) => x.command === "bun run cat check:merged")).toEqual([]);
+  });
 });
