@@ -147,7 +147,6 @@
     "iris:covers:check": "NOT YET ASSESSED — seeded by --write-baseline so the gate fails on a NEW artefact kind rather than on the backlog. Replace with what verifies this artefact for its consumer, or with the reason nothing does.",
     "iris:pages:check": "NOT YET ASSESSED — seeded by --write-baseline so the gate fails on a NEW artefact kind rather than on the backlog. Replace with what verifies this artefact for its consumer, or with the reason nothing does.",
     "jsonld:contexts:check": "NOT YET ASSESSED — seeded by --write-baseline so the gate fails on a NEW artefact kind rather than on the backlog. Replace with what verifies this artefact for its consumer, or with the reason nothing does.",
-    "smart-base:processes:render:check": "NOT YET ASSESSED — seeded by --write-baseline so the gate fails on a NEW artefact kind rather than on the backlog. Replace with what verifies this artefact for its consumer, or with the reason nothing does.",
     "check:bean-one-home": "A DRY RUN: `bean-dedupe.ts --check` writes nothing to any store, and its report is read by the owner, not consumed by a program. What verifies the merge it plans is test/bean-dedupe.test.ts (the home of a bean by its prefix, and the three-way merge keeping both dated notes and both sides of a close). Nothing verifies the report's file for a consumer, because none reads it (litlfred/cat-harness-tools#1299)."
   },
   "unchecked": {
