@@ -33,6 +33,7 @@ import { relative } from "node:path";
 
 import { CLOSED_STATUSES, OPEN_STATUSES, scalar } from "./bean-store-read.ts";
 import { beanDefsDir } from "./beans.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 /** The four fields a burn-down needs from a bean. */
 export interface BeanState {
@@ -110,6 +111,8 @@ export function burndown(snapshots: readonly Snapshot[], epic: string): Burndown
 }
 
 function gitText(cwd: string, args: readonly string[], input?: string): string {
+  // input-site: traced #1e479f0f — git history of a bean-history ref, fetched from elsewhere, not HEAD's: a run that reads it records no hash
+  inputSiteReached("epic-burndown: git");
   const r = spawnSync("git", args, { cwd, encoding: "utf-8", input, maxBuffer: 1 << 30 });
   if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr.trim() || `exit ${r.status}`}`);
   return r.stdout;
@@ -155,7 +158,9 @@ export function snapshotsFromGit(cwd: string, ref: string, path: string, days: n
   const parsed = new Map<string, BeanState | undefined>();
   if (wanted.length > 0) {
     // `cat-file --batch`: "<sha> blob <size>\n<content>\n" per object.
-    const r = spawnSync("git", ["cat-file", "--batch"], { cwd, input: wanted.join("\n") + "\n", maxBuffer: 1 << 30 });
+    // input-site: traced #2d39fd3a — blobs of that history, by the ids ls-tree gave: a run that reads them records no hash
+    inputSiteReached("epic-burndown: cat-file");
+  const r = spawnSync("git", ["cat-file", "--batch"], { cwd, input: wanted.join("\n") + "\n", maxBuffer: 1 << 30 });
     if (r.status !== 0) throw new Error(`git cat-file --batch: exit ${r.status}`);
     const buf = r.stdout as Buffer;
     let at = 0;
