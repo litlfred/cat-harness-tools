@@ -709,12 +709,16 @@ describe("injectMarkdown preserves document structure", () => {
     // saying so is the point: with both defects present the final output matches,
     // because the second hid the first. What it guards is a future "fix" that makes
     // the filter precise while still emptying lines — the obvious half-repair.
+    //
+    // The continuation is part of the ITEM (bean `lvk9`), so the catalogue's
+    // msgid is the joined item; this fixture used to key the continuation alone,
+    // which is the injector-side half of that defect.
     const source = "- an item\n  continued line one\n  continued line two\n- second item";
     const result = injectMarkdown(
       source,
-      new Map([["continued line one continued line two", "suite traduite"]]),
+      new Map([["an item continued line one continued line two", "article traduit"]]),
     );
-    expect(result.translated).toBe("- an item\nsuite traduite\n- second item");
+    expect(result.translated).toBe("- article traduit\n- second item");
     expect(result.translated).not.toContain("\n\n");
   });
 
@@ -771,6 +775,101 @@ describe("injectMarkdown preserves document structure", () => {
     expect(pairs).toBeGreaterThanOrEqual(55);
     expect(injected).toBe(pairs);
     expect(collapsed).toBeGreaterThan(0);
+  });
+});
+
+// ── A wrapped list item or blockquote is ONE unit on both sides ──
+//
+// The extractor joins a list item, or a run of `>` lines at one depth, across
+// the lines it wraps over and writes ONE msgid (bean `lvk9`). The injector kept
+// its own state machine, which looked each list or quote line up on its own:
+// the first line's half-sentence is in no catalogue, the continuation is not a
+// list line at all, and the page came out in English. Found by the ar
+// translator on injected pages whose `.po` was complete. Asserted on the whole
+// output, because `toContain` would pass with the English continuation still
+// sitting under the item.
+
+describe("injectMarkdown translates a wrapped list item and blockquote whole", () => {
+  const source = [
+    "Intro paragraph that is short.",
+    "",
+    "- The first item of the list wraps",
+    "  onto a second line here.",
+    "  1. A nested item that also wraps",
+    "     across two lines.",
+    "- An item whose continuation starts with markup:",
+    "  **bold words** and a [link](https://example.org/x).",
+    "",
+    "> A quoted sentence that wraps",
+    "> onto the next quoted line.",
+    "",
+    "Outro paragraph that is short.",
+    "",
+  ].join("\n");
+
+  const po = [
+    'msgid ""',
+    'msgstr ""',
+    '"Content-Type: text/plain; charset=UTF-8\\n"',
+    "",
+    'msgid "The first item of the list wraps onto a second line here."',
+    'msgstr "العنصر الأول من القائمة يلتف على سطر ثانٍ هنا."',
+    "",
+    'msgid "A nested item that also wraps across two lines."',
+    'msgstr "عنصر متداخل يلتف أيضًا عبر سطرين."',
+    "",
+    'msgid "An item whose continuation starts with markup: bold words and a <a0>link</a0>."',
+    'msgstr "عنصر يبدأ استمراره بترميز: كلمات عريضة و<a0>رابط</a0>."',
+    "",
+    'msgid "A quoted sentence that wraps onto the next quoted line."',
+    'msgstr "جملة مقتبسة تلتف على السطر المقتبس التالي."',
+    "",
+  ].join("\n");
+
+  test("the catalogue's msgids are the joined units the extractor writes", () => {
+    const ids = extractMarkdown(source, "page.md").map((e) => [e.kind, e.msgid]);
+    expect(ids).toEqual([
+      ["paragraph", "Intro paragraph that is short."],
+      ["list-item", "The first item of the list wraps onto a second line here."],
+      ["list-item", "A nested item that also wraps across two lines."],
+      [
+        "list-item",
+        "An item whose continuation starts with markup: bold words and a <a0>link</a0>.",
+      ],
+      ["blockquote", "A quoted sentence that wraps onto the next quoted line."],
+      ["paragraph", "Outro paragraph that is short."],
+    ]);
+  });
+
+  test("every wrapped unit is translated whole, under its own marker and indentation", () => {
+    const result = injectMarkdown(source, parsePo(po));
+    expect(result.translated).toBe(
+      [
+        "Intro paragraph that is short.",
+        "",
+        "- العنصر الأول من القائمة يلتف على سطر ثانٍ هنا.",
+        "  1. عنصر متداخل يلتف أيضًا عبر سطرين.",
+        "- عنصر يبدأ استمراره بترميز: كلمات عريضة و[رابط](https://example.org/x).",
+        "",
+        "> جملة مقتبسة تلتف على السطر المقتبس التالي.",
+        "",
+        "Outro paragraph that is short.",
+        "",
+      ].join("\n"),
+    );
+    expect(result.stats).toEqual({ totalSpans: 6, translatedSpans: 4, untranslatedSpans: 2 });
+  });
+
+  test("a depth change inside a quote is a separate unit", () => {
+    const md = "> Outer quote that\n> wraps here.\n>> Inner quote that\n>> wraps too.\n";
+    const result = injectMarkdown(
+      md,
+      new Map([
+        ["Outer quote that wraps here.", "اقتباس خارجي."],
+        ["Inner quote that wraps too.", "اقتباس داخلي."],
+      ]),
+    );
+    expect(result.translated).toBe("> اقتباس خارجي.\n>> اقتباس داخلي.\n");
   });
 });
 
