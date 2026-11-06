@@ -2369,6 +2369,11 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "CI caches -- one `cache/1.0.0` node per cache a layer declares: key recipe, trust class, location, producer, " +
       "consumers, save policy, verify and budget. Never the entries; the stored key, size and hit rate come from the " +
       "daily cache report, so staleness is computed, never claimed.",
+    avatar: {
+      glyph: "M5 6c0-1.66 3.13-3 7-3s7 1.34 7 3v12c0 1.66-3.13 3-7 3s-7-1.34-7-3V6zm0 0c0 1.66 3.13 3 7 3s7-1.34 7-3M5 12c0 1.66 3.13 3 7 3s7-1.34 7-3M16.5 16.5l2 2 3.5-4",
+      tone: 172,
+      reads: "a stack of stored results with a tick — an output kept under its key and reused once verified",
+    },
   },
   // Tool releases and tool profiles -- the external tools this platform RUNS,
   // each at one version with the sha256 of its bytes and the runtime THAT
