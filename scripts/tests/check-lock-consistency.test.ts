@@ -43,20 +43,20 @@ test("a lock not on disk is read at the pinned commit; a layer pinning what the 
     asked.push(`${repo}@${sha}`);
     return { instances: [inst("bootstrap", "b2"), inst("not-mounted-here", "x")] };
   };
-  const root = index({ instances: [inst("bootstrap", "b1"), inst("smart-trust", "s1")] });
+  const root = index({ instances: [inst("bootstrap", "b1"), inst("upper-layer", "s1")] });
   const r = lockSkews(root, fetch);
-  expect(asked).toContain("o/smart-trust@s1");
-  expect(r.skews).toEqual([{ instance: "bootstrap", index: "b1", layer: "smart-trust", layerPins: "b2" }]);
+  expect(asked).toContain("o/upper-layer@s1");
+  expect(r.skews).toEqual([{ instance: "bootstrap", index: "b1", layer: "upper-layer", layerPins: "b2" }]);
   expect(r.compared).toBe(1);
 });
 
 test("a lock that cannot be read is could-not-determine, never a pass", () => {
-  const root = index({ instances: [inst("bootstrap", "b1"), inst("smart-trust", "s1")] });
+  const root = index({ instances: [inst("bootstrap", "b1"), inst("upper-layer", "s1")] });
   const r = lockSkews(root, () => {
-    throw new Error("cannot fetch o/smart-trust@s1");
+    throw new Error("cannot fetch o/upper-layer@s1");
   });
   // Neither layer's lock is on disk, so both are asked for, and both are unreadable.
-  expect(r.undetermined).toContain("smart-trust: cannot fetch o/smart-trust@s1");
+  expect(r.undetermined).toContain("upper-layer: cannot fetch o/upper-layer@s1");
   expect(r.undetermined).toHaveLength(2);
   expect(r.skews).toEqual([]);
 });

@@ -6,12 +6,12 @@
  * @graphNode none — a check over the index's lock and the locks of the layers it mounts
  *
  * An index mounts layers that have locks of their own: cat-harness pins
- * bootstrap, folio-assistant pins bootstrap AND cat-harness. When the two
+ * bootstrap, an index above it pins bootstrap AND cat-harness. When the two
  * pin different commits of bootstrap, everything cat-harness computed from
  * bootstrap and committed (its glossaries, for one) is stale in the index,
  * and the index's writers rewrite those files inside the mount on every run.
  * Measured 2026-11-06 (bean `cat-tools-sm8r`): bootstrap a83ae82d in
- * cat-harness's lock against c90ef456 in folio-assistant's, and every
+ * cat-harness's lock against c90ef456 in the index's, and every
  * later `state:mount` in a local gate run read cat-harness as edited. The
  * owner's ruling was "align pins"; this check keeps them aligned, red
  * instead of silent.
