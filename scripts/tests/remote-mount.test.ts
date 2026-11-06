@@ -23,7 +23,7 @@ import { declarationChain } from "../../schemas/kg/harness-config.ts";
 import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { RemoteSourceSchema, resolveSubgraphSource } from "../../schemas/kg/subgraph-source.ts";
 import { MountLockSchema, mountedInstanceRoots } from "../../schemas/kg/remote-mount.ts";
-import { AGENT_SURFACE_GENERATORS, checkRemote, exitCode, mountRemote, planRemote, remoteFanOut, summarise } from "../remote-mount.ts";
+import { AGENT_SURFACE_GENERATORS, checkRemote, editedOnlyPerLock, exitCode, mountRemote, planRemote, remoteFanOut, summarise } from "../remote-mount.ts";
 import { IGNORE_BLOCK_BEGIN, IGNORE_BLOCK_END, INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "../../schemas/kg/index-config.ts";
 import { run as replayLocks } from "../mount-from-lock.ts";
 import { gitCorpus } from "../../schemas/sdlc/git-corpus.ts";
@@ -407,6 +407,34 @@ describe("mount:remote over fixture repositories", () => {
     expect(asked).toBeGreaterThan(0);
     expect(healed.state).toBe("mounted");
     expect(existsSync(join(root, dir))).toBe(true);
+  });
+
+  test("14c. a fan-out whose only off-lock mounts are edited fetches nothing and stays missing (bean cat-tools-sm8r); an absent one is fetched", () => {
+    const root = downstream({});
+    expect(remoteFanOut(root, { urlFor }).state).toBe("mounted");
+    let asked = 0;
+    const counting = (r: string): string => {
+      asked++;
+      return urlFor(r);
+    };
+    // A step writes a file into a mounted directory: the mount is edited, not absent.
+    const dir = readLock(root).instances[0]!.directories[0]!.path;
+    writeFileSync(join(root, dir, "written-by-a-step.json"), "{}\n");
+    expect(editedOnlyPerLock(root)).toBeDefined();
+    const r = remoteFanOut(root, { urlFor: counting });
+    expect(asked).toBe(0);
+    expect(r.state).toBe("missing");
+    expect(r.text).toContain("nothing fetched");
+    expect(r.text).toContain("left untouched");
+    // The edit is still there: nothing was laid over it.
+    expect(existsSync(join(root, dir, "written-by-a-step.json"))).toBe(true);
+    // With a second mount ABSENT as well, the fetch can help, so it runs as before.
+    rmSync(join(root, dir, "written-by-a-step.json"));
+    rmSync(join(root, dir), { recursive: true, force: true });
+    expect(editedOnlyPerLock(root)).toBeUndefined();
+    const healed = remoteFanOut(root, { urlFor: counting });
+    expect(asked).toBeGreaterThan(0);
+    expect(healed.state).toBe("mounted");
   });
 
   test("15. a declaration whose directory is NOT its name is found, and lands at livesAt.path", () => {
