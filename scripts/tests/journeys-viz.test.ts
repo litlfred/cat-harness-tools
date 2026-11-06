@@ -668,6 +668,17 @@ describe("the drawings are clickable the way the KG site renders them", () => {
     const html = String(abs.find((f) => f.path === "lower/p2-treated/index.html")!.content);
     expect(hrefsOf(html, 'class="fa-task-link"')).toContain("https://example.org/kg/process/P/node/Task_Read");
   });
+  test("where no step page is published (a downstream site), a title links the process's section in the IG instead", () => {
+    const none = renderJourneyPages(corpus, { ...LINKS, stepPage: () => undefined }, "top");
+    for (const [path, page] of [["lower/p2-treated/index.html", sitePath("lower/p2-treated/index.html")], ["top/workshops/policy/walkthrough/P2/index.html", sitePath("top/workshops/policy/walkthrough/P2/index.html")]] as const) {
+      const html = String(none.find((f) => f.path === path)!.content);
+      const titles = hrefsOf(html, 'class="fa-task-link"');
+      expect(titles.length).toBe(2);
+      // `landsAt` drops the anchor: the page, then the anchor itself.
+      expect(new Set(titles.map((h) => landsAt(page, h)))).toEqual(new Set(["business-processes.html"]));
+      expect(titles.every((h) => h.endsWith("business-processes.html#read-the-patients-summary"))).toBe(true);
+    }
+  });
   test("an ArchiMate view is an <object>, so the elements in it open their pages; its data and caption resolve from the page", () => {
     const html = at("lower/p2-treated/index.html");
     expect(html).not.toMatch(/<img[^>]*archimate/);
@@ -712,12 +723,18 @@ describe("the check over a staged site: every DAK link resolves to a file", () =
   };
   for (const f of files) write(sitePath(f.path), f.content);
   // What the rest of the site publishes: the IG's pages, the step pages, the ArchiMate view and the element it links.
-  const targets = new Set<string>();
+  // Each target page, with an element for every anchor a link names on it.
+  const anchors = new Map<string, Set<string>>();
   for (const f of files) if (f.path.endsWith(".html")) for (const h of hrefsOf(String(f.content), DAK_ATTR).concat(hrefsOf(String(f.content), 'class="fa-task-link"'))) {
     const t = landsAt(sitePath(f.path), h);
-    if (!/^[a-z]+:/.test(t)) targets.add(t);
+    if (/^[a-z]+:/.test(t)) continue;
+    const ids = anchors.get(t) ?? new Set<string>();
+    const id = /#(.+)$/.exec(h)?.[1];
+    if (id) ids.add(id);
+    anchors.set(t, ids);
   }
-  for (const t of targets) if (!t.endsWith(".svg")) write(t.endsWith("/") ? `${t}index.html` : t, "<!doctype html>");
+  const targets = new Set(anchors.keys());
+  for (const [t, ids] of anchors) if (!t.endsWith(".svg")) write(t.endsWith("/") ? `${t}index.html` : t, `<!doctype html>${[...ids].map((id) => `<h3 id="${id}">x</h3>`).join("")}`);
   write("archimate/ra/views/v-p2.svg", '<svg xmlns="http://www.w3.org/2000/svg"><a href="../../../en/lower/archimate/ra/elements/wallet/" target="_top"><rect/></a></svg>');
   write("en/lower/archimate/ra/elements/wallet/index.html", "<!doctype html>");
   test("every rendered DAK link names a page the IG and the KG publish", () => {
@@ -734,6 +751,9 @@ describe("the check over a staged site: every DAK link resolves to a file", () =
     expect(why.some((w) => w.includes("no file at ActorDefinition-Demo.Role.Pilgrim.html"))).toBe(true);
     expect(why.some((w) => w.startsWith("archimate/ra/views/v-p2.svg no file at en/lower/archimate/ra/elements/wallet/index.html"))).toBe(true);
     expect(why.filter((w) => w.includes("bare IHE VHL root"))).toHaveLength(1);
+    // A page that is there, with an anchor that is not.
+    write(sitePath("anchor/index.html"), '<a data-jv-dak href="../../../../Bundle-ana-ips.html#nowhere">x</a>');
+    expect(checkDakLinks(site, LINKS.route).findings.some((f) => f.why === 'no id "nowhere" in Bundle-ana-ips.html')).toBe(true);
     expect(BARE_VHL.test("https://profiles.ihe.net/ITI/VHL")).toBe(true);
     expect(BARE_VHL.test("https://profiles.ihe.net/ITI/VHL/volume-1.html")).toBe(false);
   });

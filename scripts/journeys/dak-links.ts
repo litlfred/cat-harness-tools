@@ -42,18 +42,29 @@ export const fromSiteRoot = (href: string, siteRoot: string): string => (ABSOLUT
 
 /**
  * The drawing beside a BPMN file, with each step's TITLE linked to the step's
- * page the way the KG site's own rendering links it (`linkSteps`). Undefined
- * when there is no drawing; the drawing unlinked when no step page is known.
+ * page the way the KG site's own rendering links it (`linkSteps`). Where no
+ * page is published for a step (`stepPage` answers undefined: a downstream
+ * site writes no subject pages), the title links `fallback`, the process's
+ * own page in the IG, when the caller has one. Undefined when there is no
+ * drawing; the drawing unlinked when no step has a page.
  */
-export function linkedProcessDrawing(corpus: JourneyCorpus, links: StepPageLinks, instance: string, process: string, siteRoot: string): { svg: string; file: string } | undefined {
+export function linkedProcessDrawing(
+  corpus: JourneyCorpus,
+  links: StepPageLinks,
+  instance: string,
+  process: string,
+  siteRoot: string,
+  fallback?: string,
+): { svg: string; file: string } | undefined {
   const d = processDrawing(corpus, instance, process);
-  if (d === undefined || links.stepPage === undefined) return d;
+  if (d === undefined || (links.stepPage === undefined && fallback === undefined)) return d;
   const file = instanceFile(corpus, instance, process);
   if (file === undefined) return d;
   const titles = new Map<string, { href: string; name: string }>();
   for (const s of stepsOf(readFileSync(file, "utf8"))) {
-    const href = links.stepPage(instance, process, s.process, s.id);
-    if (href !== undefined) titles.set(s.id, { href: fromSiteRoot(href, siteRoot), name: s.name });
+    const page = links.stepPage?.(instance, process, s.process, s.id);
+    const href = page !== undefined ? fromSiteRoot(page, siteRoot) : fallback;
+    if (href !== undefined) titles.set(s.id, { href, name: s.name });
   }
   return titles.size ? { ...d, svg: linkSteps(d.svg, titles, new Map()) } : d;
 }
@@ -135,7 +146,8 @@ const attrOf = (tag: string, name: string): string | undefined => {
  * `<a>` with {@link DAK_ATTR}, a BPMN step's title or [+], and an ArchiMate
  * drawing's `<object>` together with every link INSIDE that drawing, which
  * resolves from the drawing's own address. A relative link must name a file in
- * the site; no link on a page may name the bare IHE VHL root. Absolute links
+ * the site, and its anchor, if any, an element of that page; no link on a page
+ * may name the bare IHE VHL root. Absolute links
  * to other hosts are not fetched.
  */
 export function checkDakLinks(site: string, route: string): { checked: number; findings: DakLinkFinding[] } {
@@ -152,6 +164,11 @@ export function checkDakLinks(site: string, route: string): { checked: number; f
     if (relative(root, t).startsWith("..")) return { why: "resolves outside the site" };
     const f = path.endsWith("/") || path === "" ? join(t, "index.html") : t;
     if (!existsSync(f) || (statSync(f).isDirectory() && !existsSync(join(f, "index.html")))) return { why: `no file at ${posix.normalize(relative(root, f).split("\\").join("/"))}` };
+    // An anchor must name an element of the page it lands on.
+    const anchor = /#(.+)$/.exec(href)?.[1];
+    if (anchor !== undefined && f.endsWith(".html") && !new RegExp(`\\sid="${decodeURIComponent(anchor).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`).test(readFileSync(f, "utf8"))) {
+      return { why: `no id "${anchor}" in ${posix.normalize(relative(root, f).split("\\").join("/"))}` };
+    }
     return { file: f };
   };
   const drawingsSeen = new Set<string>();

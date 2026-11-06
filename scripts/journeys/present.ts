@@ -706,6 +706,13 @@ ${caps ? `<div class="jp-gap"><h4 class="jp-h">${icon("clipboard", "jp-indigo")}
  * processes page (anchored by the BPMN process's name, as kramdown writes a
  * heading), and the journey's `references` with `rel: "scenario"`.
  */
+/** A process's section in the IG's business-process page, from a page at `siteRoot`: undefined when the workshop names no such page. */
+export function igProcessPage(corpus: JourneyCorpus, pr: WorkshopPresentation | undefined, instance: string, process: string, siteRoot: string): string | undefined {
+  if (!pr?.ig?.processes) return undefined;
+  const name = processName(corpus, instance, process);
+  return `${fromSite(`${pr.ig.href}${pr.ig.processes}`, siteRoot)}${name ? `#${kramdownSlug(name)}` : ""}`;
+}
+
 export function processLinks(corpus: JourneyCorpus, pr: WorkshopPresentation, j: Journey, process: string, siteRoot: string): string {
   const out: string[] = [];
   const name = processName(corpus, j.instance, process);
@@ -798,7 +805,7 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
   const procPage = links.processesPage?.(s.journey.instance)?.replace(/^(\.\.\/)+/, "");
   const procs = (st.realisedBy ?? [])
     .map((r) => {
-      const d = linkedProcessDrawing(corpus, links, s.journey.instance, r.process, siteRoot);
+      const d = linkedProcessDrawing(corpus, links, s.journey.instance, r.process, siteRoot, igProcessPage(corpus, pr, s.journey.instance, r.process, siteRoot));
       const src = sourceHref(corpus, s.journey.instance, r.process);
       const head = `<div class="jp-proc-h">${icon("workflow")}<span class="jp-label">Business process (BPMN)</span><span class="jp-small">${e(s.journey.scenario.title)}</span></div>
 <div class="jp-proc-links">${processLinks(corpus, pr, s.journey, r.process, siteRoot)}${procPage ? `<a href="${e(toSite + procPage)}">Process viewer (tasks and skills)</a>` : ""}<a href="${e(`${root}${s.journey.instance}/${s.journey.scenario.id}/`)}">User scenario</a>${src ? ext(src, "BPMN source") : ""}</div>`;

@@ -51,7 +51,7 @@ import {
   type JourneyCorpus,
   type WorkshopEntry,
 } from "./read.ts";
-import { PRESENT_ASSETS, PRESENT_SEGMENTS, presentationOf, renderPresentationPages } from "./present.ts";
+import { igProcessPage, PRESENT_ASSETS, PRESENT_SEGMENTS, presentationOf, renderPresentationPages } from "./present.ts";
 import { artifactPage, DAK_ATTR, igOf, linkedProcessDrawing, personaArtifact, type StepPageLinks } from "./dak-links.ts";
 
 export const TOOL_ID = "journeys-viewer";
@@ -637,7 +637,7 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
   const hood = [s.technicalSummary ? `<p class="jv-tech">${e(s.technicalSummary)}</p>` : "", usesHtml, handoffHtml, storiesHtml, reqHtml, exHtml, refsHtml].join("\n");
   const processes = (s.realisedBy ?? [])
     .map((r) => {
-      const d = linkedProcessDrawing(corpus, links, j.instance, r.process, toSite);
+      const d = linkedProcessDrawing(corpus, links, j.instance, r.process, toSite, igProcessPage(corpus, igOf(corpus, j.instance), j.instance, r.process, toSite));
       const page = links.processesPage?.(j.instance);
       const caption = `<code>${e(r.process)}</code>${r.tasks?.length ? ` · ${r.tasks.length} flow node${r.tasks.length === 1 ? "" : "s"} highlighted: ${r.tasks.map((t) => `<code>${e(t)}</code>`).join(" ")}` : " · the whole process"}${page ? ` · <a href="${e(page)}">processes viewer</a>` : ""}`;
       return d ? bpmnFigure(d.svg, r.tasks, caption) : `<p class="jv-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`;
