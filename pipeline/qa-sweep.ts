@@ -71,7 +71,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const INSTANCE_ROOT = resolve(dirname(__filename), "..");
 
-import { GIT_SHA_UNKNOWN, applicabilityGap, scriptSidecarTarget, computeCriterionScriptHashes, entryIsFresh, freshnessKeys, gitHeadSha, hashBlockFiles, loadPriorBlockReport, loadQaScriptSidecar, priorRefusalLine, missingCompanionNote, preserveNonScriptEntries, sameScriptVerdict, saveQaReport, saveQaScriptSidecar, sweepActor, type CriterionScriptHashes, walkBlocks } from "./qa-utils.ts";
+import { GIT_SHA_UNKNOWN, applicabilityGap, scriptSidecarTarget, computeCriterionScriptHashes, entryIsFresh, freshnessKeys, gitHeadSha, gitHeadTree, hashBlockFiles, loadPriorBlockReport, loadQaScriptSidecar, priorRefusalLine, missingCompanionNote, preserveNonScriptEntries, sameScriptVerdict, saveQaReport, saveQaScriptSidecar, sweepActor, type CriterionScriptHashes, walkBlocks } from "./qa-utils.ts";
 import {
   qaCriteriaFor,
   qaCriteriaByIdFor,
@@ -290,6 +290,9 @@ async function run(): Promise<void> {
   }
 
   const headSha = gitHeadSha();
+  // What a block verdict records as `reviewed_tree`: the tree outlives a PR
+  // run's synthetic merge commit (bean 69lr; owner card Q4, 2026-11-05).
+  const headTree = gitHeadTree();
   const nowIso = new Date().toISOString();
   // Criterion-selection precedence (most-specific first):
   //   --only ID[,ID]    explicit criterion IDs (any axis)
@@ -589,7 +592,7 @@ async function run(): Promise<void> {
           result: "n/a",
           reviewer: { ...scriptReviewer },
           reviewed_at: nowIso,
-          reviewed_sha: headSha,
+          reviewed_tree: headTree,
           notes: blockAdapter
             ? `criterion applies to ${criterionScope.join("/")}; block kind "${block.kind}" is ${blockAdapter}`
             : `unknown block kind "${block.kind}" — no adapter`,
@@ -639,7 +642,7 @@ async function run(): Promise<void> {
           result: "n/a",
           reviewer: { ...scriptReviewer },
           reviewed_at: nowIso,
-          reviewed_sha: headSha,
+          reviewed_tree: headTree,
           // `folioProfile` is necessarily defined here: the undetermined
           // case returns `false` from `profileExcludesCriterion`.
           notes:
@@ -675,7 +678,7 @@ async function run(): Promise<void> {
           result: "n/a",
           reviewer: { ...scriptReviewer },
           reviewed_at: nowIso,
-          reviewed_sha: headSha,
+          reviewed_tree: headTree,
           notes: missingCompanionNote(missingRole),
         };
         const priorNa = existing.find((e) => e?.reviewer?.kind === "script");
@@ -714,7 +717,7 @@ async function run(): Promise<void> {
         result: checkRes.result,
         reviewer: { ...scriptReviewer },
         reviewed_at: nowIso,
-        reviewed_sha: headSha,
+        reviewed_tree: headTree,
       };
       // Surface checker-supplied context (e.g. a cache-staleness reason
       // from `proof-lean-compiles`) so the sidecar records WHY a result
@@ -838,7 +841,7 @@ async function run(): Promise<void> {
         last_run_at: nowIso,
         // The PLATFORM's HEAD, not `headSha`. This sidecar lives in and
         // describes folio-assistant's own checker scripts; `headSha` is the
-        // CONTENT repo's HEAD (correct for a block's `reviewed_sha`, since
+        // CONTENT repo's HEAD (correct for a block's `reviewed_tree`, since
         // that verdict is about content at that commit). Stamping the
         // content SHA here recorded a foreign repo's commit as this repo's
         // "HEAD at last run".

@@ -5,5 +5,5 @@
     "kind": "cache",
     "family": "cache/1.0.0"
   },
-  "schema": "cat-harness-tools:schemas/sdlc/cache.ts#CacheSchema"
+  "schema": "cat-harness-tools:schemas/sdlc/cache.ts#CacheKind"
 }

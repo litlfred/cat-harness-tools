@@ -107,9 +107,13 @@ export function readBaseline(file = BASELINE): Record<string, number> {
 function renderedDiagrams(repoRoot: string): string[] | undefined {
   const corpus = gitCorpus(repoRoot, ["*.svg"]);
   if (corpus === undefined) return undefined;
+  // A drawing is either under a `workflows/` folder (the built-at-publish
+  // copies) or committed beside its own `.bpmn` (cat-harness#1047: a layer's
+  // own drawings sit next to their source).
   return corpus.filter((p) => {
+    if (!p.endsWith(".svg")) return false;
     const rel = relative(repoRoot, p);
-    return rel.includes(`${"workflows"}/`) && rel.endsWith(".svg");
+    return rel.includes(`${"workflows"}/`) || existsSync(p.slice(0, -".svg".length) + ".bpmn");
   });
 }
 

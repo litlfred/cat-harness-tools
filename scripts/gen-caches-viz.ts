@@ -23,9 +23,10 @@
  * would come from: never a number nobody measured. So without a report every
  * staleness cell is `undetermined`, which is the honest answer.
  *
- * The cross-repo inventory snapshot (`cache-inventory/1.0.0`) is listed after
- * the declared caches, as a snapshot with its date and method, never as
- * declarations.
+ * An inventory snapshot (`cache-inventory/1.0.0`) in `caches/` is listed
+ * after the declared caches, with its date and method, never as
+ * declarations. A survey of a whole index names the layers above this one,
+ * so it is kept by the index that took it, not here (`check:reference-direction`).
  *
  * Usage:
  *   bun run cat-harness-tools/scripts/gen-caches-viz.ts                       # the committed caches/viewer.md
@@ -39,7 +40,6 @@ import {
   CacheInventorySchema,
   CacheSchema,
   nodeStaleness,
-  staleness,
   type Cache,
   type CacheInventory,
   type KeyRecipe,

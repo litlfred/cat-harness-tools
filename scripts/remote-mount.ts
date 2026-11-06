@@ -55,6 +55,13 @@
  * fails fails the run. `--no-agent-surface` skips it; `--check`, `--plan` and
  * `--staging` never run it.
  *
+ * The same run then publishes the new lock's LAYERS CACHE REF
+ * (`refs/cat/layers/<key>` at the index's origin; `mount-from-lock.ts`
+ * `publishLayers`), so the committer who changed the lock is its writer and CI
+ * only fetches and verifies it. It is time only: a refusal (a mount not
+ * `current`), no remote, or a push the credential cannot make is reported and
+ * never changes the exit code. `--no-layers-publish` skips it.
+ *
  * ## A mount is runnable, and an install does not make it modified
  *
  * After the bytes are locked, each mounted instance that carries a
@@ -183,7 +190,7 @@ import { contentIsOffCheckout, HydratedSourceSchema, type HydratedSource, type S
 import { enabledSubgraphs, isSubgraphEnabled, qualifiedSubgraphId, type EnabledSubgraphs } from "../schemas/kg/opt-in-subgraphs.js";
 import { publishedSubgraphDir, SUBGRAPH_HYDRATED_FILE, SubgraphHydratedSchema } from "../schemas/kg/subgraph-manifest.js";
 import { treeDigest, treeEntries } from "./kg-parts.ts";
-import { builtAtPublishOf, installDependencies, isInstallArtefact, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
+import { builtAtPublishOf, installDependencies, isInstallArtefact, publishLayers, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from "./subgraph-index-package.ts";
 import { toolClosure, type ClosureInstance, type ResolvedTool, type ToolChoice } from "./tool-closure.ts";
@@ -2166,10 +2173,19 @@ export function lockBytes(root: string): string | undefined {
  * re-render the agent surface and fold its outcome into the exit code.
  */
 export function afterMount(root: string, before: string | undefined, argv: string[], code: number): number {
-  if (argv.includes("--no-agent-surface") || lockBytes(root) === before) return code;
-  const r = regenerateAgentSurface(root);
-  console.log(`\n## Agent surface — the lock changed, so the skills and memory agents read were re-rendered\n\n${r.lines.join("\n")}`);
-  if (!r.ok) console.log("\nRe-run the failed generator before committing this re-pin: the new layer and the old agent surface disagree.");
+  if (lockBytes(root) === before) return code;
+  const r = argv.includes("--no-agent-surface") ? { ok: true, lines: [] as string[] } : regenerateAgentSurface(root);
+  if (!argv.includes("--no-agent-surface")) {
+    console.log(`\n## Agent surface — the lock changed, so the skills and memory agents read were re-rendered\n\n${r.lines.join("\n")}`);
+    if (!r.ok) console.log("\nRe-run the failed generator before committing this re-pin: the new layer and the old agent surface disagree.");
+  }
+  if (code === 0 && !argv.includes("--no-layers-publish")) {
+    // The committer who changed the lock writes its layers cache ref, so CI
+    // only fetches and verifies it (skill `remote-mount`, "The layers cache").
+    // Time only: a refusal or a failed push never changes the exit code.
+    const p = publishLayers(root);
+    console.log(`\n## Layers cache — ${p.ok ? p.detail : `not published (${p.detail}); CI falls back to the per-repository fetch, and \`bun run cat layers:publish\` retries`}`);
+  }
   return r.ok ? code : Math.max(code, 1);
 }
 
@@ -2189,6 +2205,7 @@ export const MOUNT_REMOTE_FLAGS: ReadonlyMap<string, "switch" | "value"> = new M
   ["--no-install", "switch"],
   ["--install-all", "switch"],
   ["--no-agent-surface", "switch"],
+  ["--no-layers-publish", "switch"],
   ["--fresh", "switch"],
   ["--whole", "switch"],
   ["--instance", "value"],

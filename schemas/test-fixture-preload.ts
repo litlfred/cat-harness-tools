@@ -36,7 +36,12 @@ const CHECKOUT = repoRootFor(harnessRoot() ?? resolve(import.meta.dir, ".."));
 const FIXTURE = resolve(import.meta.dir, "..", "test", "fixtures", "standalone-checkout");
 const ownNames = new Set(instanceRootsIn(CHECKOUT).map((r) => basename(r)));
 const allFixtureInstancesPresent = instanceRootsIn(FIXTURE).every((r) => ownNames.has(basename(r)));
-if (!allFixtureInstancesPresent && process.env.FOLIO_FIXTURE_CHECKOUT === undefined) {
-  // The fixture moved here from cat-harness with the tests that read it (bean `8lcl`).
+// input-site: env-unset FOLIO_FIXTURE_CHECKOUT #7c8758d4 — a test-only override naming a checkout outside the tree
+const override = process.env.FOLIO_FIXTURE_CHECKOUT;
+if (!allFixtureInstancesPresent && override === undefined) setFixtureCheckout();
+
+/** The fixture moved here from cat-harness with the tests that read it (bean `8lcl`). */
+function setFixtureCheckout(): void {
+  // input-site: inert #16254c9e — points the tests at the fixture checkout inside this layer; what they read there is in their read set and the tree
   process.env.FOLIO_FIXTURE_CHECKOUT = FIXTURE;
 }

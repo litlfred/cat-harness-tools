@@ -213,9 +213,9 @@ describe("a link is DECLARATION-driven and PRESENCE-checked", () => {
     // owner's rule is `<base>/<harness>/<visualizer>`; `/beans/` survives as
     // a declared alias, composed as a redirect, and is never what a tile links.
     const f = fixture({ host: host() }, ["host/beans"]);
-    expect(tilesOf(f)[0]!.visualisations).toEqual([{ kind: "beans", label: "Work plan", path: "/host/beans/" }]);
+    expect(tilesOf(f)[0]!.visualisations).toEqual([{ kind: "beans", label: "Plans and work", path: "/host/beans/" }]);
     const stale = fixture({ host: host() }, ["beans"]);
-    expect(tilesOf(stale)[0]!.visualisations).toEqual([{ kind: "beans", label: "Work plan", note: "no viewer yet" }]);
+    expect(tilesOf(stale)[0]!.visualisations).toEqual([{ kind: "beans", label: "Plans and work", note: "no viewer yet" }]);
   });
 
   test("there is no elided namespace to squat: a sibling's graph opens the visualiser DECLARED over it", () => {
@@ -227,7 +227,7 @@ describe("a link is DECLARATION-driven and PRESENCE-checked", () => {
       "host/beans",
       "beans",
     ]);
-    expect(tilesOf(f).find((t) => t.name === "who")!.visualisations).toEqual([{ kind: "beans", label: "Work plan", path: "/host/beans/" }]);
+    expect(tilesOf(f).find((t) => t.name === "who")!.visualisations).toEqual([{ kind: "beans", label: "Plans and work", path: "/host/beans/" }]);
   });
 });
 
@@ -380,7 +380,7 @@ describe("an icon is PUBLISHED, never declared — owner: \"broken image on LHS 
 
   test("the site directory's prefix is STRIPPED, because the mount does not carry it", () => {
     // Measured on the served bytes, 2026-09-21:
-    //   src="/folio-assistant/STAGING/<branch>/docs/assets/img/icons/cat-mark.svg"
+    //   src="/folio-assistant/branches/<branch>/docs/assets/img/icons/cat-mark.svg"
     // `docs/` is the instance's site directory and the build copies its
     // CONTENTS to the mount, so every reader got a 404 and a placeholder.
     const f = fixture({ host: withIcon("host") });

@@ -172,6 +172,7 @@ describe("readWitnessDoc — block family", () => {
               result: "pass",
               reviewer: { kind: "human", id: "litlfred" },
               reviewed_at: "2026-09-17T09:00:00.000Z",
+              reviewed_tree: "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
             },
           ],
         },
@@ -204,6 +205,17 @@ describe("readWitnessDoc — block family", () => {
       const doc = readWitnessDoc("block", join(dir, "b.md"), dir)!;
       expect(doc.criteria[0]!.witnesses[0]!.freshness).toBe("stale");
       expect(doc.criteria[0]!.witnesses[0]!.changed).toEqual(["md", "ts"]);
+    });
+  });
+
+  test("a legacy entry keeps its commit; a current one carries its tree (bean 69lr)", () => {
+    inTmp((dir) => {
+      block(dir, "body\n", { md: "x", ts: "y" });
+      const [legacy, current] = readWitnessDoc("block", join(dir, "b.md"), dir)!.criteria[0]!.witnesses;
+      expect(legacy!.sha).toBe("efea5b8f6d19818dc8fa85baa031944564d72c87");
+      expect(legacy!.tree).toBeUndefined();
+      expect(current!.tree).toBe("4b825dc642cb6eb9a060e54bf8d69288fbee4904");
+      expect(current!.sha).toBeUndefined();
     });
   });
 

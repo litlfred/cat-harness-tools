@@ -7,7 +7,7 @@ import { FRAGMENT } from "../../scripts/staging-banner.ts";
  * `staging-banner-constant.test.ts` pins the property the bean is about — the
  * injected bytes do not depend on the build. It cannot say whether the script
  * those bytes carry actually WORKS, because the script only runs in a browser
- * with a `location.pathname` under `STAGING/` and a `staging.json` to fetch.
+ * with a `location.pathname` under `branches/` and a `staging.json` to fetch.
  * That is this file.
  *
  * The three states below are the ones that matter, and the middle one is the
@@ -15,7 +15,7 @@ import { FRAGMENT } from "../../scripts/staging-banner.ts";
  *
  *   staging.json fetched     -> the full banner, links and compare target
  *   fetch fails / 404        -> still says FEATURE BRANCH, says detail is gone
- *   not under a STAGING path -> says so, and does not fetch someone else's
+ *   not under a branches/ path -> says so, and does not fetch someone else's
  *
  * **"Could not determine" is never rendered as "this is the real site."** The
  * banner exists so a reviewer cannot mistake staged content for the published
@@ -87,6 +87,26 @@ test("the banner fills in from staging.json", async ({ page }) => {
   await expect(banner.getByText("PR #563")).toBeVisible();
   await expect(banner.getByText("issue #215")).toBeVisible();
   await expect(banner.getByText("build log")).toBeVisible();
+});
+
+test("a preview is green and a release (build type full) is purple — owner, 2026-11-05", async ({ page }) => {
+  const banner = page.locator("[data-fa-staging-banner]");
+  await serve(page, `${ROOT}index.html`, { ...FACTS, buildType: "preview" });
+  await expect(banner).toContainText("claude/example");
+  expect(await banner.evaluate((b) => getComputedStyle(b).backgroundColor)).toBe("rgb(79, 111, 82)");
+  await expect(banner).toContainText("FEATURE BRANCH");
+
+  await page.unrouteAll();
+  await serve(page, `${ROOT}index.html`, { ...FACTS, buildType: "full" });
+  await expect(banner).toContainText("claude/example");
+  expect(await banner.evaluate((b) => getComputedStyle(b).backgroundColor)).toBe("rgb(107, 63, 160)");
+  await expect(banner).toContainText("RELEASE BUILD");
+  await expect(banner).toHaveAttribute("data-fa-build-type", "full");
+});
+
+test("a preview under the new branches/ prefix finds its staging.json", async ({ page }) => {
+  await serve(page, "/folio-assistant/branches/claude-example/guides/a.html", FACTS);
+  await expect(page.locator("[data-fa-staging-banner]")).toContainText("claude/example");
 });
 
 test("with no open PR it says so in words, never \"PR #n/a\" — bean `zvl0`", async ({ page }) => {
@@ -201,7 +221,7 @@ test("a 404 on staging.json STILL announces the preview", async ({ page }) => {
 });
 
 test("served from outside a preview path, it says so rather than fetching", async ({ page }) => {
-  // No `STAGING/<slug>/` in the pathname means there is no staging.json that
+  // No `branches/<slug>/` in the pathname means there is no staging.json that
   // belongs to this page; fetching one anyway would read another preview's.
   await serve(page, "/folio-assistant/index.html", FACTS);
   const banner = page.locator("[data-fa-staging-banner]");

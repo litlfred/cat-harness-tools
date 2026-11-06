@@ -48,7 +48,7 @@ import { join, normalize, resolve, sep } from "node:path";
  *
  * - **empty** — names nothing, and `join(base, "")` is `base` itself, so an
  *   empty id makes a per-item operation act on the whole store. This is the
- *   `plj1` shape one layer down: `rm -rf "pages/STAGING/$SLUG"` with an empty
+ *   `plj1` shape one layer down: `rm -rf "pages/branches/$SLUG"` with an empty
  *   slug deleted every preview.
  * - **`.` and `..`** — name a directory rather than an item, and `..` escapes.
  * - **a separator** (`/` or `\`) — `a/b` is contained but is not ONE segment,

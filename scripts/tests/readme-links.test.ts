@@ -267,3 +267,27 @@ describe("runReadmeAudit", () => {
     expect(runReadmeAudit({ root: repo() }).exitCode).toBe(2);
   });
 });
+
+// folio-assistant-tsh9: `readme:audit` honours a move the instance declares
+// (sdlc skill `two-phase-move`) until its `until`, and not after.
+describe("runReadmeAudit and a declared move", () => {
+  const moved = (until: string): string => {
+    const root = repo(["new/x.md"]);
+    const name = root.split("/").pop()!;
+    writeFileSync(join(root, `${name}.json`), JSON.stringify({ name, directories: [], moves: [{ from: "old", to: "new", until }] }));
+    writeFileSync(join(root, "README.md"), "# T\n\n[x](old/x.md)\n");
+    return root;
+  };
+
+  test("a link to the old path passes in the window, reported as moved", () => {
+    const result = runReadmeAudit({ root: moved("2099-12-31") });
+    expect(result.exitCode).toBe(0);
+    expect(result.text).toContain("1 through a declared move");
+  });
+
+  test("an expired move gives no relief", () => {
+    const result = runReadmeAudit({ root: moved("2020-01-01") });
+    expect(result.exitCode).toBe(1);
+    expect(result.text).toContain("1 dead");
+  });
+});

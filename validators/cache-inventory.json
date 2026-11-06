@@ -5,5 +5,5 @@
     "kind": "cache",
     "family": "cache-inventory/1.0.0"
   },
-  "schema": "cat-harness-tools:schemas/sdlc/cache.ts#CacheInventorySchema"
+  "schema": "cat-harness-tools:schemas/sdlc/cache.ts#CacheInventoryKind"
 }

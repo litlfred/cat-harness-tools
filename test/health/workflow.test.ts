@@ -108,7 +108,7 @@ describe("the issue body", () => {
     const md = render(report);
     expect(md).toContain("staging-preview-size");
     expect(md).toContain("3.13 GB");
-    expect(md).toContain("STAGING/claude-two");
+    expect(md).toContain("branches/claude-two");
     expect(md).toContain("staging:cleanup");
     // The preview whose PR is open is not proposed for anything.
     expect(md).not.toContain("STAGING/claude-one` (");

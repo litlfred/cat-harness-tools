@@ -6,7 +6,7 @@
  * ```sh
  * # copy a built preview, or any built site, to PC/<version>/ (write-once)
  * bun run cat-harness-tools/scripts/pc-release.ts freeze --pages <gh-pages checkout> \
- *   --version v0.9 --from STAGING/<slug> [--site <built dir>] \
+ *   --version v0.9 --from branches/<slug> [--site <built dir>] \
  *   [--pdf draft.pdf] [--line-map line-map.json] [--title "…"] [--document en/<slug>/] \
  *   [--commit <sha>] [--opens 2026-11-01] [--closes 2026-12-01]
  *
@@ -20,7 +20,7 @@
  * ## Why a path of its own
  *
  * A public comment cites a page and a line of ONE draft, and
- * `STAGING/<slug>/` is replaced on every push and deleted when the PR closes.
+ * `branches/<slug>/` is replaced on every push and deleted when the PR closes.
  * `PC/` is written or deleted by no publish path: the main publish
  * (`publish-main-site.ts`, `build-instance-site.ts`) keeps it, and the
  * full-replace deploys carry it (`restore-staging.ts`). This script refuses to
@@ -134,7 +134,7 @@ export interface FreezeOptions {
   version: string;
   /** The copied directory: `--site`, else `<pages>/<from>`. */
   site?: string;
-  /** The path the copied site was published at, e.g. `STAGING/<slug>`; its links are rewritten. */
+  /** The path the copied site was published at, e.g. `branches/<slug>`; its links are rewritten. */
   from?: string;
   title?: string;
   document?: string;

@@ -58,7 +58,9 @@ import { scriptsOf } from "../schemas/sdlc/script-table.ts";
 import { built, declaredPlan } from "./derive-at-publish.ts";
 import { readInstances } from "./check-import-direction.ts";
 import { BUILD_OUTPUT_DIRS } from "./input-hash.ts";
+import { gateOwnInstances, gateOwnsFile } from "./lib/gate-own.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 const REPO_ROOT = resolve(dirname(HARNESS_ROOT));
 /** Never content: install artefacts, git, and the scratch a build writes. */
@@ -119,14 +121,17 @@ export function ignoredBy(paths: readonly string[], roots: readonly string[], re
     // A scratch repository holding ONLY this instance's `.gitignore` files, at
     // their own relative paths, so nested ones apply exactly as they do in the
     // instance's own repository, and nothing above the instance does.
+    // input-site: inert #0c7d0248 — a scratch directory, removed before this returns; its path never reaches the answer
     const scratch = mkdtempSync(join(tmpdir(), "publish-check-"));
     try {
+      // input-site: inert #a52cbc90 — initialises the empty scratch repository; nothing it answers is read
       spawnSync("git", ["init", "-q"], { cwd: scratch });
       for (const g of gitignoresUnder(root)) {
         mkdirSync(dirname(join(scratch, g)), { recursive: true });
         copyFileSync(join(root, g), join(scratch, g));
       }
       const rel = ps.map((p) => relative(root, resolve(repoRoot, p)).split(sep).join("/"));
+      // input-site: tree #b7962d6a — `git check-ignore --no-index` against copies of the instance's own `.gitignore` files: a function of the working tree
       const r = spawnSync("git", ["check-ignore", "--no-index", "--stdin"], { cwd: scratch, input: rel.join("\n"), encoding: "utf-8" });
       // 0: some ignored, 1: none; anything else is "could not ask", which must not read as "none".
       if (r.status !== 0 && r.status !== 1) throw new Error(`git check-ignore failed: ${r.stderr.trim()}`);
@@ -197,7 +202,8 @@ export function outsideMounts(paths: readonly string[], repoRoot = REPO_ROOT): S
 }
 
 function run(cmd: string, cwd = REPO_ROOT): number {
-  // input-site: scripts — the writer's own command line, from the script table
+  // input-site: traced #120f94a1 — a writer's command line from the script table, a list no annotation can name; a run that reaches it records no hash
+  inputSiteReached("publish-check: run");
   const r = spawnSync("sh", ["-c", cmd], { cwd, stdio: "inherit" });
   return r.status ?? 1;
 }
@@ -216,6 +222,7 @@ function run(cmd: string, cwd = REPO_ROOT): number {
  * Returns the copy's root. The caller removes it.
  */
 export function scratchCopy(repoRoot = REPO_ROOT): string {
+  // input-site: inert #3d98cecf — the scratch copy's directory, which the caller removes; its path never reaches the answer
   const dest = mkdtempSync(join(tmpdir(), "publish-check-tree-"));
   const linked: Array<[string, string]> = [];
   cpSync(repoRoot, dest, {
@@ -308,16 +315,34 @@ if (import.meta.main) {
     console.error(`✗ publish:check: \`${writer}\`'s own --check fails against the output it just wrote — not a fixed point, or a refusal above`);
     process.exit(1);
   }
-  const empty = declared.filter((a) => a.writer.includes(writer) && a.writer.at(-1) === writer && !built(a));
+  // In a layer's PR checks, only artefacts the caller commits (owner ruling
+  // 2026-11-05, "Move the checks", generator checks included; `lib/gate-own.ts`).
+  // A lower layer's committed output gone stale is that layer's to regenerate,
+  // in its own CI; it is counted here, never charged to the caller.
+  const ownInstances = gateOwnInstances();
+  const owns = (repoPath: string) => gateOwnsFile(repoPath) !== false;
+  const empty = declared.filter(
+    (a) => a.writer.includes(writer) && a.writer.at(-1) === writer && !built(a) && (!ownInstances || ownInstances.has(a.instance)),
+  );
   for (const a of empty) console.error(`✗ publish:check: ${a.instance}/${a.path} is declared built by \`${writer}\` and is missing or empty`);
 
   const changed = moved(before, snapshot(roots, work)).filter((p) => !under(p));
   const ignored = ignoredBy(changed, roots, work);
   const outside = outsideInstances(changed, roots, work);
   const unmounted = outsideMounts(changed, work);
-  const stale = changed.filter((p) => !ignored.has(p) && !outside.has(p) && !unmounted.has(p));
+  const movedCommitted = changed.filter((p) => !ignored.has(p) && !outside.has(p) && !unmounted.has(p));
+  const stale = movedCommitted.filter(owns);
+  const othersStale = movedCommitted.length - stale.length;
+  if (othersStale > 0) {
+    console.log(`· ${othersStale} committed file(s) of other layers moved too — not this caller's; their own CI judges them`);
+  }
   for (const p of stale) console.error(`✗ ${p} is a COMMITTED artefact and \`${writer}\` changed it — run \`bun run cat ${writer}\` and commit it`);
 
   if (empty.length + stale.length > 0) process.exit(1);
-  console.log(`✓ publish:check ${writer}: ran, its --check passes on its own output, ${mine.length} declared artefact(s) built, 0 committed file(s) moved`);
+  const judged = ownInstances ? mine.filter((a) => ownInstances.has(a.instance)).length : mine.length;
+  console.log(
+    `✓ publish:check ${writer}: ran, its --check passes on its own output, ` +
+      (ownInstances ? `${judged} of ${mine.length} declared artefact(s) are the caller's and built` : `${mine.length} declared artefact(s) built`) +
+      ", 0 committed file(s) moved",
+  );
 }

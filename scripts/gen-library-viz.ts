@@ -66,6 +66,7 @@ import { themedPage } from "./lib/themed-page.ts";
 import { escHtml, thinPageConfigOf } from "./thin-page.ts";
 import { declaredPageRoute, declaredRoute, withRenderedByFrontMatter, tileDirectories } from "./viewer-declarations.js";
 import { checkoutDirectoriesForGraph, corpusDirectoriesForGraph, declarationChain } from "../schemas/kg/harness-config.js";
+import { gateOwnsFile } from "./lib/gate-own.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteTarget } from "./lib/site-target.ts";
 
@@ -74,6 +75,13 @@ const VIEWER_TOOL = "library-viewer";
 
 const ROOT = join(HARNESS_ROOT);
 const REPO_ROOT = repoRootFor(ROOT);
+/**
+ * In a layer's PR checks, `--check` judges only the output the caller commits
+ * (owner ruling 2026-11-05, "Move the checks", generator checks included; `lib/gate-own.ts`). The
+ * viewer is written into the harness's docs site, so a layer above is not
+ * judged on it; the index's own gates, unscoped, still are.
+ */
+const mineToCheck = (abs: string): boolean => gateOwnsFile(relative(REPO_ROOT, abs)) !== false;
 const check = process.argv.includes("--check");
 /**
  * This harness's own repository. NOT where an entry's links point: an entry
@@ -1481,11 +1489,17 @@ let stale = 0;
  * (bean `edx7`) until 2026-10-07. They are THEMED pages now
  * ({@link libraryPageHtml}), and the theme's sidebar is their navigation.
  */
-const emit = makeEmit({ check, onStale: () => { stale++; } });
+const emitAny = makeEmit({ check, onStale: () => { stale++; } });
+/** `emitAny`, but a `--check` skips output the caller does not commit (see {@link mineToCheck}). */
+const emit = (path: string, content: string): void => {
+  if (check && !mineToCheck(path)) return;
+  emitAny(path, content);
+};
 
 /** `emit` for a binary file: same check-or-write contract, compared byte for byte. */
 function emitBytes(path: string, content: Buffer): void {
   if (check) {
+    if (!mineToCheck(path)) return;
     if (existsSync(path) && readFileSync(path).equals(content)) return;
     console.error(`  ✗ ${path} ${existsSync(path) ? "is stale" : "is missing"}`);
     stale++;
@@ -1781,6 +1795,7 @@ if (import.meta.main) {
     const wanted = new Set(copies.keys());
     for (const abs of orphanAvatars(avatarRoot, wanted)) {
       if (check) {
+        if (!mineToCheck(abs)) continue;
         console.error(`  ✗ ${abs} is an orphan avatar — no entry names it`);
         stale++;
         continue;
@@ -1930,6 +1945,7 @@ if (import.meta.main) {
     for (const name of shells.owned) {
       const dir = join(sub.pageDir, name);
       if (check) {
+        if (!mineToCheck(dir)) continue;
         console.error(`  ✗ ${dir} is an orphan entry page — no ${subject} entry is named ${name}`);
         stale++;
         continue;

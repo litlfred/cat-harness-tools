@@ -213,6 +213,7 @@ function mintId(cfg: StoreConfig, taken: Set<string>): string {
   for (let attempt = 0; attempt < 1000; attempt++) {
     let s = "";
     for (let i = 0; i < cfg.idLength; i++) {
+      // input-site: inert #5b7a5266 — mints a new bean's id when one is created, a write; never part of a check's answer
       s += alphabet[Math.floor(Math.random() * alphabet.length)];
     }
     const id = `${cfg.prefix}${s}`;
@@ -221,6 +222,7 @@ function mintId(cfg: StoreConfig, taken: Set<string>): string {
   throw new Error(`Could not mint a free id of length ${cfg.idLength} after 1000 attempts.`);
 }
 
+// input-site: inert #3e6aafde — the created_at / updated_at stamp written into a bean; never part of a check's answer
 const nowStamp = (): string => new Date().toISOString().replace(/\.\d+Z$/, "Z");
 
 export interface CreateOptions {

@@ -904,6 +904,83 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     // bootstrap's own sentence, read rather than restated (bean r3gy, D1).
     summary: BOOTSTRAP_GRAPH_TYPOLOGIES["scenarios"],
   },
+  // ── Journeys: user scenarios told as journey maps ──────────────────────
+  //
+  // Owner, 2026-11-05 (option A): "a specialized viewer of a journey. should
+  // be able to see all journeys in repo, each individual journey and journeys
+  // in subgraphs", with smart-trust-demo and smart-ips-pilgrimage as content
+  // instances. Promoted from smart-trust-demo's draft (bean
+  // smart-trust-demo-kg01, gaps 1 and 2). `content`: a journey is authored and
+  // true whether or not anything reads it. Its own kind rather than a family
+  // of bootstrap's `scenarios`, because it has its own viewer
+  // (`journeys-viewer`) and a directory of it is what that viewer covers.
+  "user-scenario": {
+    anyLayer: true,
+    description:
+      "user scenarios told as journey maps (`scenarios/user-scenarios/`, by convention): one `user-scenario/0.2.0` file per journey (the smart-trust-demo draft `user-scenario/0.1.0` is read unchanged), keeping the DAK `UserScenario` fields (`id`, `title`, `description`, `personas`) and adding the ordered steps: per actor what they do and feel (emotion -2..2), the pain point and enabler, the policy point, how far the record can be trusted (a code of the scenario's `trustLadder` code list), the hand-off, what-ifs and gaps, and edges to user stories, BPMN tasks (`realisedBy`), `req:` requirements, FHIR examples and the building blocks it `uses`, each in its role. `follows` chains journeys into one story; `partOf` groups sub-journeys. A step may carry an `illustration` (an image, or the prompt to draw it), with the style and cast the scenario's `illustrationStyle` shares. The catalogue those `uses` edges point into is the `building-blocks` kind; a trust ladder is a code list, kept in a `code-list` directory. Every reference a step names must resolve (`check:journey-refs`). Drawn by the journeys viewer. Shapes in `schemas/process/user-scenario.ts`.",
+    title: "User scenarios",
+    renderable: false,
+    holds: "content",
+    // declared-path-literal: this table IS the declaration, as on `tool-release`.
+    schema: "schemas/process/user-scenario.ts",
+    // Every family listed: declaring `nodeSchemas` claims the map is complete.
+    // The validators are this layer's `validators/user-scenario*.json`, each naming a node
+    // kind. A trust ladder is a code list, so it lives in a `code-list`
+    // directory; a building-block catalogue is the `building-blocks` kind.
+    nodeSchemas: {
+      "user-scenario/0.1.0": {},
+      "user-scenario/0.2.0": {},
+    },
+    summary:
+      "User scenarios as journey maps -- one file per journey: ordered steps, per actor what " +
+      "they do and feel, pain points, enablers, the record's trust state, and edges to user " +
+      "stories, BPMN tasks, requirements, FHIR examples and the building blocks each step uses.",
+  },
+  // The building blocks a journey step `uses`. Owner, 2026-11-05: the
+  // catalogue lives in an instance's `archimate/` directory, read by its
+  // ArchiMate overlay. A family of `user-scenario` could only be read from a
+  // journeys directory, so it is a kind of its own, and a directory DECLARES
+  // it: `archimate/building-blocks/`, declared inside the `archimate`
+  // directory. Not `["archimate", "building-blocks"]` on `archimate/` itself:
+  // every kind of a directory claims every typed node in it, so
+  // `check:kind-validators` would call each kind's node unmapped under the
+  // other. Readers ask for the kind, never the folder. `content`, as
+  // `user-scenario`.
+  "building-blocks": {
+    anyLayer: true,
+    description:
+      "building-block catalogues: one `building-blocks/0.1.0` file per catalogue, its layers (each with the question it answers) and its blocks (a tool, a deployed system, a standard or a trust network, with its jurisdiction, owner, what it is and why it matters, the ArchiMate element keys that deploy it, and links). The target of a `user-scenario` step's `uses` edges, resolved by block id. Usually kept beside the instance's ArchiMate model, in a directory declared inside its `archimate` one (`archimate/building-blocks/`). Shape in `schemas/process/user-scenario.ts`.",
+    title: "Building blocks",
+    renderable: false,
+    holds: "content",
+    // declared-path-literal: this table IS the declaration, as on `tool-release`.
+    schema: "schemas/process/user-scenario.ts",
+    nodeSchemas: {
+      "building-blocks/0.1.0": {},
+    },
+    summary:
+      "Building-block catalogues -- layers and blocks (tools, systems, standards, trust networks) " +
+      "with their jurisdiction and what each is, the targets of a journey step's `uses` edges.",
+  },
+  // A workshop teaches from journeys and points at their step ids, so a
+  // journey does not change when a workshop does (bean smart-trust-demo-kg01,
+  // gap 3). `content`, as `user-scenario`.
+  workshop: {
+    anyLayer: true,
+    description:
+      "workshops over journeys (`workshops/`, by convention): one `workshop/0.1.0` file per workshop, holding its modules (the question each carries, learning objectives, the sheet it fills), reference tables a room fills or reads (decision rights, legal bases, substitution patterns, cost drivers: generic rows, named by each workshop), per journey step the questions for the room by module, the facilitator cue, the capabilities the step needs and which table rows it touches, the scales a capability is rated on, closing discussion questions, printable A3/A4 sheets, and job aids, handouts and readings. It points at `user-scenario` step ids, never the reverse. Drawn by the journeys viewer. Shape in `schemas/process/workshop.ts`.",
+    title: "Workshops",
+    renderable: false,
+    holds: "content",
+    // declared-path-literal: this table IS the declaration, as on `tool-release`.
+    schema: "schemas/process/workshop.ts",
+    nodeSchemas: {
+      "workshop/0.1.0": {},
+    },
+    summary:
+      "Workshops over journeys -- modules, learning objectives, questions for the room per " +
+      "journey step, reference tables, printable sheets, job aids and readings.",
+  },
   // ── What an Actor may do: W3C ODRL 2.2 policies — issue #1180 ──────────
   //
   // Owner, 2026-09-23: permissions are *"W3C ODRL 2.2"*, and policies are
@@ -1807,9 +1884,11 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     // (owner, 2026-10-06, bean `hp54`). folio_init only — see the field.
     newInstanceSource: { kind: "branch", keyedBy: "tip" },
     description:
-      "the work plan as a whole (`beans/`); its inner nodes are declared by `beans/beans.json`",
-    // "Work plan", not "Beans" (work item folio-assistant-dkqd); see `bean-defs`.
-    title: "Work plan",
+      "the work plans and the work items they hold (`beans/`); its inner nodes are declared by `beans/beans.json`",
+    // "Plans and work", not "Beans" (work item folio-assistant-dkqd) and no
+    // longer "Work plan": a work plan is now one epic or milestone (work item
+    // folio-assistant-exrp), so the store holds plans AND work. See `bean-defs`.
+    title: "Plans and work",
     perInstance: true,
     renderable: false,
     // The work plan. Its own declaration already splits WHAT IS BEING WORKED
@@ -2369,6 +2448,11 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "CI caches -- one `cache/1.0.0` node per cache a layer declares: key recipe, trust class, location, producer, " +
       "consumers, save policy, verify and budget. Never the entries; the stored key, size and hit rate come from the " +
       "daily cache report, so staleness is computed, never claimed.",
+    avatar: {
+      glyph: "M5 6c0-1.66 3.13-3 7-3s7 1.34 7 3v12c0 1.66-3.13 3-7 3s-7-1.34-7-3V6zm0 0c0 1.66 3.13 3 7 3s7-1.34 7-3M5 12c0 1.66 3.13 3 7 3s7-1.34 7-3M16.5 16.5l2 2 3.5-4",
+      tone: 172,
+      reads: "a stack of stored results with a tick — an output kept under its key and reused once verified",
+    },
   },
   // Tool releases and tool profiles -- the external tools this platform RUNS,
   // each at one version with the sha256 of its bytes and the runtime THAT

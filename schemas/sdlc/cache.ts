@@ -37,6 +37,7 @@
  * say so; it is a finding, not a recipe to copy.
  */
 import { z } from "zod";
+import { nodeKind } from "../kg/node-kind.ts";
 
 export const CACHE_SCHEMA_TAG = "cache/1.0.0";
 export const CACHE_INVENTORY_SCHEMA_TAG = "cache-inventory/1.0.0";
@@ -238,3 +239,16 @@ export function staleness(implied: string | { undetermined: string }, stored: St
   const want = `${prefix}${implied}`;
   return stored.key === want || stored.key.endsWith(implied) ? { state: "current", key: stored.key } : { state: "stale", stored: stored.key, implied: want };
 }
+
+/**
+ * The two families as NODE KINDS, so `node-kinds:check` counts them kinded
+ * (a new family may not join the unkinded baseline). Made from the strict
+ * schemas' shapes, so the validator nodes that name these kinds judge a file
+ * exactly as the schemas do.
+ */
+const { $schema: _cacheTag, ...cacheFields } = CacheSchema.shape;
+const { $schema: _inventoryTag, ...inventoryFields } = CacheInventorySchema.shape;
+// A versioned kind generates its own `$schema`, so the shapes are passed without theirs.
+export const CacheKind = nodeKind(CACHE_SCHEMA_TAG, [], cacheFields, { strict: true });
+export const CacheInventoryKind = nodeKind(CACHE_INVENTORY_SCHEMA_TAG, [], inventoryFields, { strict: true });
+

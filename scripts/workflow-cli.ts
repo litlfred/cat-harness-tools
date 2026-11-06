@@ -13,7 +13,7 @@
  * operations and `beans/workflows/` store writes.
  *
  * Usage:
- *   bun run cat workflow:start <process> <subject> [--bean <id>] [--root <dir>]
+ *   bun run cat workflow:start <process> <subject> [--bean <id>] [--plan <epic-id>] [--root <dir>]
  *   bun run cat workflow:next <instance> [--root <dir>]
  *   bun run cat workflow:complete <instance> <node> [--outcome <branch>] [--facts <json>] [--actor <id>] [--target <id>] [--note <text> | --stdin] [--activities <json>] [--root <dir>]
  *   bun run cat-harness-tools/scripts/workflow-cli.ts scope <instance> --change-set <CS-NNN> --blocks <label,label,…> [--root <dir>]
@@ -65,6 +65,7 @@ const VALUE_FLAGS = new Set([
   "--process",
   "--subject",
   "--bean",
+  "--plan",
   "--instance",
   "--node",
   "--activity",
@@ -180,7 +181,7 @@ function normalizeSubcommand(raw: string | undefined): "start" | "next" | "compl
 function usageText(): string {
   return [
     "usage:",
-    "  bun run cat workflow:start <process> <subject> [--bean <bean-id>] [--root <dir>] [--json <payload>]",
+    "  bun run cat workflow:start <process> <subject> [--bean <bean-id>] [--plan <epic-id>] [--root <dir>] [--json <payload>]",
     "  bun run cat workflow:next <instance> [--root <dir>] [--json <payload>]",
     "  bun run cat workflow:complete <instance> <node> [--outcome <branch>] [--facts <json>] [--actor <id>] [--target <id>] [--note <text> | --stdin] [--activities <json>] [--root <dir>] [--json <payload>]",
     "  bun run cat-harness-tools/scripts/workflow-cli.ts list [--root <dir>]",
@@ -229,12 +230,13 @@ export async function runWorkflowCli(
       const processName = flags.get("--process") ?? positionals[0] ?? strField(payload, "process");
       const subject = flags.get("--subject") ?? positionals[1] ?? strField(payload, "subject");
       const bean = flags.get("--bean") ?? positionals[2] ?? strField(payload, "bean");
+      const plan = flags.get("--plan") ?? strField(payload, "plan");
       if (!processName || !subject) {
         throw new UsageError(
-          "usage: workflow:start <process> <subject> [--bean <bean-id>] [--root <dir>]",
+          "usage: workflow:start <process> <subject> [--bean <bean-id>] [--plan <epic-id>] [--root <dir>]",
         );
       }
-      const out = await workflowStart(root, { process: processName, subject, bean }, opts);
+      const out = await workflowStart(root, { process: processName, subject, bean, plan }, opts);
       return { code: 0, out };
     }
 
