@@ -468,18 +468,27 @@ export function treeCommitIndex(log: string, repoUrl: string | undefined): TreeC
   return { $schema: TREE_COMMITS_SCHEMA, repo, depth, commits, ...(Object.keys(dates).length > 0 ? { dates } : {}) };
 }
 
-function cmdTreeCommits(a: ReturnType<typeof args>): number {
-  const site = a.one("site");
-  if (!site) throw new QaUsageError("tree-commits needs --site <dir>");
-  const max = Number(a.one("max") ?? TREE_COMMITS_MAX);
-  if (!Number.isInteger(max) || max < 1) throw new QaUsageError(`--max must be a positive integer, got ${a.one("max")}`);
-  const root = repoRoot();
+/**
+ * The tree-to-commit index of `root`'s first-parent history, read from git.
+ * The one reader for every consumer: the deploy's `tree-commits` step, and a
+ * build that dates verdicts before the deploy has written the file (core's
+ * `folio-site-blocks.ts`).
+ */
+export function readTreeCommitIndex(root: string, max: number = TREE_COMMITS_MAX): TreeCommitIndex {
   const log = spawnSync("git", ["-C", root, "log", "--first-parent", `-n${max}`, "--format=%T %H %cI", "HEAD"], {
     encoding: "utf-8",
     maxBuffer: 64 * 1024 * 1024,
   });
   if (log.status !== 0) throw new Error(`git log failed: ${log.stderr.trim()}`);
-  const index = treeCommitIndex(log.stdout, detectRepoUrl(root));
+  return treeCommitIndex(log.stdout, detectRepoUrl(root));
+}
+
+function cmdTreeCommits(a: ReturnType<typeof args>): number {
+  const site = a.one("site");
+  if (!site) throw new QaUsageError("tree-commits needs --site <dir>");
+  const max = Number(a.one("max") ?? TREE_COMMITS_MAX);
+  if (!Number.isInteger(max) || max < 1) throw new QaUsageError(`--max must be a positive integer, got ${a.one("max")}`);
+  const index = readTreeCommitIndex(repoRoot(), max);
   const qaDir = join(resolve(site), "assets", "qa");
   mkdirSync(qaDir, { recursive: true });
   writeFileSync(join(qaDir, TREE_COMMITS_FILE), `${JSON.stringify(index)}\n`);

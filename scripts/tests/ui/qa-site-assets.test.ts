@@ -21,6 +21,7 @@ import {
   decideSource,
   holdsCorpus,
   judgePublished,
+  readTreeCommitIndex,
   treeCommitIndex,
   type QaFetchState,
 } from "../../qa-site-assets.ts";
@@ -207,6 +208,12 @@ describe("tree-commits: the tree-to-commit index", () => {
     const i = treeCommitIndex(`${T("a")} ${T("1")}`, undefined);
     expect(i.commits).toEqual({ [T("a")]: T("1") });
     expect(i.dates).toBeUndefined();
+  });
+  test("readTreeCommitIndex reads this repository's own history, with dates", () => {
+    const i = readTreeCommitIndex(process.cwd(), 3);
+    expect(i.depth).toBeGreaterThan(0);
+    const [tree] = Object.keys(i.commits);
+    expect(i.dates?.[tree!]).toMatch(/^\d{4}-\d\d-\d\dT/);
   });
   test("no GitHub origin: no repo, so the panel builds no link", () => {
     expect(treeCommitIndex("", undefined).repo).toBeNull();
