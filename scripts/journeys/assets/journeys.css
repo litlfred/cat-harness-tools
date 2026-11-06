@@ -91,6 +91,8 @@ body.jv {
 .jv-card:hover { border-color: var(--jv-accent); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06); }
 .jv-card-code { font: 600 0.75rem ui-monospace, Menlo, monospace; color: var(--jv-accent); }
 .jv-card-title { font-weight: 650; font-size: 1.03rem; }
+.jv-part-mark { display: inline-block; margin-left: 0.4em; padding: 0 0.4em; border: 1px dashed currentColor; border-radius: 0.6em; font-size: 0.72rem; font-weight: 500; vertical-align: 0.1em; opacity: 0.75; }
+.jv-includes { margin: 0.2rem 0 0; }
 .jv-card-meta { color: var(--jv-muted); font-size: 0.88rem; }
 .jv-card-foot { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
 .jv-card-count { font-size: 0.8rem; color: var(--jv-muted); margin-left: auto; }
