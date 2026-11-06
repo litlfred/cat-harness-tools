@@ -1594,8 +1594,12 @@ export function entryDate(
 }
 
 /**
- * Newest first by {@link entryDate}; entries without a date, or with equal
- * dates, keep the later-written (higher index) one first, since writers append.
+ * Newest first by {@link entryDate}. On equal dates, or none, the EARLIER
+ * position comes first: order is the verdict (`list[0]` is a criterion's
+ * effective result, `projectEntryArrays` in `qa-witness.ts`), and
+ * `insertAdjudication` puts a new adjudication at the front. Verdicts on one
+ * tree all share its date, so the tie is the common case once writers stamp no
+ * clock, and it must agree with that invariant.
  */
 export function newestFirst<T extends Pick<QaCriterionEntry, "reviewed_at" | "reviewed_tree">>(
   entries: readonly T[],
@@ -1603,7 +1607,7 @@ export function newestFirst<T extends Pick<QaCriterionEntry, "reviewed_at" | "re
 ): T[] {
   return entries
     .map((e, i) => ({ e, i, d: entryDate(e, treeDates) ?? "" }))
-    .sort((a, b) => b.d.localeCompare(a.d) || b.i - a.i)
+    .sort((a, b) => b.d.localeCompare(a.d) || a.i - b.i)
     .map((x) => x.e);
 }
 
