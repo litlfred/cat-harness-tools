@@ -58,7 +58,8 @@ var QaCriterionEntry = z.object({
   verdict: DaVerdict.optional(),
   reviewer: QaReviewer,
   // ISO-8601 UTC datetime; legacy agent entries may carry a bare ISO date.
-  reviewed_at: z.string(),
+  reviewed_at: z.string().optional(),
+  // derived from reviewed_tree on read since 0.2.0 (owner rulings 2026-11-06, cards "QA dates" and "Date source")
   // Tree of repo HEAD at audit time (`HEAD^{tree}`). What producers write
   // since bean 69lr: a PR run's HEAD commit can vanish, its tree cannot.
   reviewed_tree: z.string().optional(),
@@ -79,7 +80,7 @@ var BlockQaReport = z.object({
   }).passthrough(),
   source_hashes: QaFieldHash,
   criteria: z.record(z.string(), z.array(QaCriterionEntry)),
-  updated_at: z.string()
+  updated_at: z.string().optional()
 }).passthrough();
 var QaScriptSidecar = z.object({
   $schema: z.literal("qa-script/v1"),
@@ -89,11 +90,11 @@ var QaScriptSidecar = z.object({
   script_commit_sha: z.string(),
   extra_inputs: z.array(z.string()).optional(),
   deps_hash: z.string().optional(),
-  last_run_at: z.string(),
+  last_run_at: z.string().optional(),
   last_run_sha: z.string(),
   engine_version: z.string().optional()
 }).passthrough();
-var VERSION = "0.1.0";
+var VERSION = "0.2.0";
 export {
   BlockQaReport,
   DaRuling,

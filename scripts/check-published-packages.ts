@@ -209,8 +209,18 @@ export function publishablePackages(root: string = ROOT): PublishablePackage[] {
  * resolution; the install reads the package's OWN `[project.optional-
  * dependencies] test`, so this function names no dependency of its own.
  */
+/**
+ * What the Python half runs under: no bytecode (`__pycache__/*.pyc`) and no
+ * pytest cache (`.pytest_cache/`) written into the package directory. That
+ * directory is inside a remote mount in an index checkout, and a byte written
+ * there made the mount read as edited ("no longer hash to the lock") to every
+ * later `state:mount` (bean `cat-tools-sm8r`, measured 2026-11-06).
+ */
+export const PYTHON_ENV = { PYTHONDONTWRITEBYTECODE: "1" } as const;
+export const PYTEST_ARGS = ["-m", "pytest", "-q", "-p", "no:cacheprovider"] as const;
+
 function preparePython(abs: string): { ok: true } | { ok: false; why: string } {
-  const probe = spawnSync("python3", ["-c", "import pytest, sys"], { cwd: abs, encoding: "utf-8" });
+  const probe = spawnSync("python3", ["-c", "import pytest, sys"], { cwd: abs, encoding: "utf-8", env: { ...process.env, ...PYTHON_ENV } });
   if (probe.error !== undefined) {
     return { ok: false, why: `no \`python3\` on PATH — ${probe.error.message}` };
   }
@@ -311,7 +321,7 @@ if (import.meta.main) {
       const r =
         pkg.ecosystem === "npm"
           ? spawnSync("bun", ["run", step.name], { cwd: abs, encoding: "utf-8" })
-          : spawnSync("python3", ["-m", "pytest", "-q"], { cwd: abs, encoding: "utf-8" });
+          : spawnSync("python3", [...PYTEST_ARGS], { cwd: abs, encoding: "utf-8", env: { ...process.env, ...PYTHON_ENV } });
       if (r.status === 0) continue;
       ok = false;
       const how = pkg.ecosystem === "npm" ? `bun run ${step.name}` : "python3 -m pytest";

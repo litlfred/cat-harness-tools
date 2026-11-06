@@ -558,6 +558,7 @@ export const PROPERTY_GLOSSES: Readonly<Record<string, TermGloss>> = {
   sourceCommitSha: { gloss: "The commit the export was taken at." },
   sourceCommitAt: { gloss: "When that commit was made." },
   sourceTreeDirty: { gloss: "Whether the working tree had uncommitted changes when the export ran." },
+  sourceTree: { gloss: "The git tree the export was taken from: what its content is a function of, shared by a pull request's merge commit and main's." },
   sourceCommitUnavailable: { gloss: "That the commit could not be determined — never rendered as clean." },
   // On a PER-LOCALE document only. It is the language of the document's
   // UNTAGGED strings, not of its content: for `cat-harness.fr.jsonld` the

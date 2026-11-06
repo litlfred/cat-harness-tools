@@ -111,6 +111,7 @@
     "schemas/process/decision-methodology-context.ts",
     "schemas/process/decision-request.ts",
     "schemas/process/deployment-description.ts",
+    "schemas/process/device-screen.ts",
     "schemas/process/methodology.ts",
     "schemas/process/process-element-id.ts",
     "schemas/process/role-graph.ts",

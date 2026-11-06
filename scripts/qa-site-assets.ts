@@ -434,25 +434,53 @@ export interface TreeCommitIndex {
   depth: number;
   /** Tree id → the oldest first-parent commit carrying it. */
   commits: Record<string, string>;
+  /**
+   * Tree id → that commit's committer date (ISO 8601), for each tree the log
+   * gave a date for. The date a verdict on that tree is shown and ordered by
+   * (owner rulings 2026-11-06: card "QA dates", option 1, and card "Date
+   * source", option 1: a QA date is DERIVED on read
+   * from the reviewed tree, so the verdict's bytes carry no clock). Additive:
+   * a reader of an index without it falls back to the verdict's own date.
+   */
+  dates?: Record<string, string>;
 }
 
 /**
- * The index from `git log --first-parent --format='%T %H'` output, NEWEST
+ * The index from `git log --first-parent --format='%T %H %cI'` output, NEWEST
  * first as git prints it: a later (older) line overwrites an earlier one, so
- * each tree keeps the oldest commit carrying it. Lines that are not two
- * 40-hex ids are skipped.
+ * each tree keeps the oldest commit carrying it, and that commit's date. A
+ * line is two 40-hex ids, optionally followed by an ISO 8601 date (so a
+ * `%T %H` log still reads); anything else is skipped.
  */
 export function treeCommitIndex(log: string, repoUrl: string | undefined): TreeCommitIndex {
   const commits: Record<string, string> = {};
+  const dates: Record<string, string> = {};
   let depth = 0;
   for (const line of log.split("\n")) {
-    const m = /^([0-9a-f]{40}) ([0-9a-f]{40})$/.exec(line.trim());
+    const m = /^([0-9a-f]{40}) ([0-9a-f]{40})(?: (\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:Z|[+-]\d\d:\d\d)))?$/.exec(line.trim());
     if (!m) continue;
     depth++;
     commits[m[1]!] = m[2]!;
+    if (m[3]) dates[m[1]!] = m[3];
+    else delete dates[m[1]!];
   }
   const repo = repoUrl && /^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(repoUrl) ? repoUrl : null;
-  return { $schema: TREE_COMMITS_SCHEMA, repo, depth, commits };
+  return { $schema: TREE_COMMITS_SCHEMA, repo, depth, commits, ...(Object.keys(dates).length > 0 ? { dates } : {}) };
+}
+
+/**
+ * The tree-to-commit index of `root`'s first-parent history, read from git.
+ * The one reader for every consumer: the deploy's `tree-commits` step, and a
+ * build that dates verdicts before the deploy has written the file (core's
+ * `folio-site-blocks.ts`).
+ */
+export function readTreeCommitIndex(root: string, max: number = TREE_COMMITS_MAX): TreeCommitIndex {
+  const log = spawnSync("git", ["-C", root, "log", "--first-parent", `-n${max}`, "--format=%T %H %cI", "HEAD"], {
+    encoding: "utf-8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (log.status !== 0) throw new Error(`git log failed: ${log.stderr.trim()}`);
+  return treeCommitIndex(log.stdout, detectRepoUrl(root));
 }
 
 function cmdTreeCommits(a: ReturnType<typeof args>): number {
@@ -460,13 +488,7 @@ function cmdTreeCommits(a: ReturnType<typeof args>): number {
   if (!site) throw new QaUsageError("tree-commits needs --site <dir>");
   const max = Number(a.one("max") ?? TREE_COMMITS_MAX);
   if (!Number.isInteger(max) || max < 1) throw new QaUsageError(`--max must be a positive integer, got ${a.one("max")}`);
-  const root = repoRoot();
-  const log = spawnSync("git", ["-C", root, "log", "--first-parent", `-n${max}`, "--format=%T %H", "HEAD"], {
-    encoding: "utf-8",
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  if (log.status !== 0) throw new Error(`git log failed: ${log.stderr.trim()}`);
-  const index = treeCommitIndex(log.stdout, detectRepoUrl(root));
+  const index = readTreeCommitIndex(repoRoot(), max);
   const qaDir = join(resolve(site), "assets", "qa");
   mkdirSync(qaDir, { recursive: true });
   writeFileSync(join(qaDir, TREE_COMMITS_FILE), `${JSON.stringify(index)}\n`);

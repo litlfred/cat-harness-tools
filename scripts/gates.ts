@@ -242,6 +242,44 @@ export interface StepExemption {
 export const PRECONDITION_STEPS: readonly string[] = ["bun run cat qa:working-copy"];
 
 /**
+ * The setup steps a local run performs ONCE (owner, 2026-11-06, bean
+ * `cat-tools-sm8r` item 2: "a local gates run does each setup command once").
+ *
+ * CI runs the gates as jobs, each from a fresh checkout, so every job repeats
+ * its setup: the workflow names `state:mount` eight times, `ig-index:build`
+ * three, `bun install` nine. Here every job runs in ONE checkout, so a repeat
+ * sets up nothing new, and it reads what the steps between wrote: each later
+ * `state:mount` found the mounts those steps had written into, fetched every
+ * remote, and exited 1 (305 s of a 1396 s run, all eight red).
+ *
+ * Listed, not inferred from "a serial command that repeats": a repeated
+ * CHECK may judge what a step in between wrote, and answers for itself.
+ * A repeat is reported SKIPPED with the first run's exit; the first run's
+ * failure, if any, is the one counted.
+ */
+export const RUN_ONCE_SETUP_STEPS: readonly string[] = [
+  "bun install --frozen-lockfile",
+  "bun run cat state:mount",
+  "bun run cat ig-index:build",
+  "bun run cat smart:pages",
+  "bun run smart:pages",
+];
+
+/** Which run-once setup steps have run in this local run, and how they exited. */
+export class SetupOnce {
+  private readonly ran = new Map<string, number>();
+  constructor(private readonly steps: readonly string[] = RUN_ONCE_SETUP_STEPS) {}
+  /** The first run's exit when `command` is a run-once step that has already run, else undefined (run it). */
+  ranAlready(command: string): number | undefined {
+    return this.ran.get(command);
+  }
+  /** Record a run; only a listed setup step is remembered. */
+  record(command: string, code: number): void {
+    if (this.steps.includes(command) && !this.ran.has(command)) this.ran.set(command, code);
+  }
+}
+
+/**
  * A WRITER's mark: `@covers none — writer — …` as a use in its script's
  * module docblock (` * @covers`, exactly one space either side of the star —
  * `coversIn`'s rule in audit-coverage.ts, so a mention in prose is not a use).
@@ -2508,9 +2546,15 @@ if (import.meta.main) {
     }
     return out;
   };
+  const setupOnce = new SetupOnce();
   for (const seg of segments) {
     if (!seg.parallel || jobs === 1) {
       for (const g of seg.gates) {
+        const once = setupOnce.ranAlready(g.command);
+        if (once !== undefined) {
+          process.stdout.write(`▸ ${g.command}   SKIPPED — setup, run once per local run (exit ${once} above; bean cat-tools-sm8r)\n`);
+          continue;
+        }
         // One at a time, so a gate's "before" is taken after the gate ahead of
         // it ran — the second `skill:register:check` sees the first's record.
         const [t] = triage([g]);
@@ -2526,6 +2570,7 @@ if (import.meta.main) {
         // the log rather than inferred from the total.
         process.stdout.write(`  ↳ ${((performance.now() - started) / 1000).toFixed(1)}s, exit ${r.code}: ${g.command}\n`);
         if (r.code !== 0) failed.push({ gate: g, why: salientFailures(r.output) });
+        setupOnce.record(g.command, r.code);
         if (t.script !== undefined && t.fp !== undefined) {
           skipper.record(t.script, r.code === 0 && !tracedReport(t.script, trace?.reached(againstRefsOf(pkgScripts, t.script))), t.fp, new FileDigests(ROOT));
         }

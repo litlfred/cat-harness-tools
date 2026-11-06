@@ -4,7 +4,7 @@
   "title": "BlockQaReport",
   "description": "JSON shape of a per-content-block `<block>.qa.json` QA sidecar. Each content block (a .ts + .md + optional .lean triple) may carry one sidecar recording, per QA criterion, an append-only array of reviewer verdicts pinned to the content hashes they judged. Canonical interchange reference for the folio block-QA format — readable from any language.",
   "type": "object",
-  "required": ["$schema", "label", "kind", "paths", "source_hashes", "criteria", "updated_at"],
+  "required": ["$schema", "label", "kind", "paths", "source_hashes", "criteria"],
   "additionalProperties": true,
   "properties": {
     "$schema": {
@@ -119,7 +119,7 @@
     },
     "criterionEntry": {
       "type": "object",
-      "required": ["field_hash", "result", "reviewer", "reviewed_at"],
+      "required": ["field_hash", "result", "reviewer"],
       "additionalProperties": true,
       "properties": {
         "field_hash": {

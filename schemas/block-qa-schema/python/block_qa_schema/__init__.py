@@ -27,7 +27,7 @@ from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 QaReviewerKind = Literal["script", "agent", "human"]
 
@@ -148,7 +148,10 @@ class QaCriterionEntry(BaseModel):
 
     reviewer: QaReviewer
     # ISO-8601 UTC datetime; legacy agent entries may carry a bare ISO date.
-    reviewed_at: str
+    # Optional since 0.2.0 (owner rulings 2026-11-06, cards "QA dates" and
+    # "Date source"): the date is DERIVED on read from ``reviewed_tree`` (the
+    # commit date of the commit carrying it), so a writer may omit it.
+    reviewed_at: Optional[str] = None
     reviewed_tree: Optional[str] = None
     reviewed_sha: Optional[str] = None
 
@@ -235,7 +238,7 @@ class BlockQaReport(BaseModel):
     paths: QaPaths
     source_hashes: QaFieldHash
     criteria: dict[str, list[QaCriterionEntry]]
-    updated_at: str
+    updated_at: Optional[str] = None
 
 
 class QaScriptSidecar(BaseModel):
@@ -255,7 +258,7 @@ class QaScriptSidecar(BaseModel):
     script_commit_sha: str
     extra_inputs: Optional[list[str]] = None
     deps_hash: Optional[str] = None
-    last_run_at: str
+    last_run_at: Optional[str] = None
     last_run_sha: str
     engine_version: Optional[str] = None
 

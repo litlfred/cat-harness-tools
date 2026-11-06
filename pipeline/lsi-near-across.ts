@@ -186,6 +186,7 @@ export function nearInGraph(graphKind: string, result: LsiProviderResult, text: 
 
 /** Load a discovered provider's function. Throws with the reason when the module or export is wrong. */
 export async function loadLsiUnitProvider(p: DiscoveredLsiProvider): Promise<LsiUnitProvider> {
+  // input-site: imports **/*.ts #2c2bcc37 — the LSI unit provider module an instance declaration names, which may sit anywhere in its tree
   const mod = (await import(p.modulePath)) as Record<string, unknown>;
   const fn = mod[p.export];
   if (typeof fn !== "function") throw new Error(`${relative(process.cwd(), p.modulePath)} has no exported function \`${p.export}\``);

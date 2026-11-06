@@ -419,7 +419,10 @@ describe("annotations hold to the data that chooses their targets", () => {
     expect(seen).toBeGreaterThan(0);
     // declared-path-literal: the two modules that load the declared validator refs, whose `input-site` annotations are the subject of this assertion; no declaration answers where a module of this layer sits.
     for (const file of ["kind-validator.ts", "node-kind-index.ts"]) expect(declaredBy(relTo(join(TOOLS_ROOT, "schemas/kg", file)), "validator-refs"), file).toBe(true);
-  });
+    // It loads the whole typology registry and resolves every validator ref from
+    // every instance root: 6-7 s on a composed checkout, over bun's 5 s default
+    // whenever another test file ran first in the same process.
+  }, 30_000);
 
   test("every instance themes module lies under theme-by-ref's `imports` glob", () => {
     for (const root of roots()) {
@@ -539,6 +542,24 @@ describe("the audit walks only what can run", () => {
       writeFileSync(join(root, "v.ts"), "export const v = 2;\n");
       expect(hashOf(fp(true))).toBe(traced);
       expect(hashOf(fp(false))).not.toBe(plain);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("a traced fingerprint defers a computed target unscanned; an untraced one still refuses its unreviewed site", () => {
+    const root = mkdtempSync(join(tmpdir(), "defer-computed-"));
+    try {
+      const load = "const m = await import(p);";
+      writeFileSync(join(root, "c.ts"), `export async function f(p: string) {\n  // input-site: imports v.ts #${pinOf(load)} — v\n  ${load}\n  return m;\n}\n`);
+      writeFileSync(join(root, "v.ts"), "export const v = process.env.SOME_VAR;\n");
+      const scripts = { "c:check": "bun run c.ts" };
+      const io = { inputs: [], outputs: [] };
+      const fp = (treeReplayed: boolean) => checkFingerprint(root, scripts, "c:check", io, new FileDigests(root), undefined, { treeReplayed });
+      const traced = fp(true);
+      expect("hash" in traced && traced.deferred).toEqual(["v.ts"]);
+      const plain = fp(false);
+      expect("undetermined" in plain && plain.undetermined).toContain("v.ts");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

@@ -58,6 +58,7 @@ export const INSTANCE = resolve(HARNESS_ROOT);
  * determine" must not turn into either answer.
  */
 export function checkoutHolding(dir: string): string {
+  // input-site: tree #150736c6 — the work tree holding dir, as git sees it
   const r = spawnSync("git", ["-C", dir, "rev-parse", "--show-toplevel"], { encoding: "utf-8" });
   const top = r.status === 0 ? r.stdout.trim() : "";
   if (top === "") {
@@ -188,6 +189,7 @@ export function ensureDocsPages(instanceRoot: string = INSTANCE): void {
   if (existsSync(index)) return;
   const repo = checkoutHolding(root);
   restoringTracked(qaResultDirsIn(repo), () =>
+    // input-site: runs */scripts/gen-docs-pages.ts,scripts/gen-docs-pages.ts #857537b4 — builds the docs pages a fixture checkout lacks, inheriting this environment
     spawnSync("bun", [join(TOOLS_ROOT, "scripts", "gen-docs-pages.ts")], { cwd: repo, encoding: "utf-8" }),
   );
 }
@@ -218,6 +220,7 @@ export function restoringTracked<T>(dirs: readonly string[], fn: () => T): T {
   const saved: TrackedCopy[] = [];
   for (const dir of dirs) {
     if (!existsSync(dir)) continue;
+    // input-site: tree #fbace24d — the files git tracks under dir
     const r = spawnSync("git", ["-C", dir, "ls-files", "-z", "--", "."], { encoding: "utf-8", maxBuffer: 256 * 1024 * 1024 });
     if (r.status !== 0) continue; // not in a work tree: nothing tracked to protect
     for (const rel of r.stdout.split("\0").filter((f) => f !== "")) {

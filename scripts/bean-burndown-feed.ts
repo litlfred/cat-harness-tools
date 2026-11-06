@@ -38,6 +38,7 @@ import { join } from "node:path";
 
 import { CLOSED_STATUSES } from "./bean-store-read.ts";
 import { burndown, type Snapshot } from "./epic-burndown.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 export const BURNDOWN_SCHEMA = "folio-bean-burndown/v1";
 
@@ -131,6 +132,8 @@ export function historyRef(branch: string): string {
  */
 /** The tip `state:mount` mounted for `branch` in `root`, when a marker records it. */
 export function mountedTipFor(root: string, branch: string): string | undefined {
+  // input-site: traced #76bdd87f — the state-mount markers inside .git: a run that reads them records no hash
+  inputSiteReached("bean-burndown-feed: mount markers");
   const r = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-path", "branch-mounts"], { cwd: root, encoding: "utf-8" });
   if (r.status !== 0) return undefined;
   const dir = r.stdout.trim();
@@ -151,10 +154,13 @@ export function fetchBeanHistory(
   root: string,
   opts: { branch: string; web: string; repoWeb: string; days: number; now?: Date; tip?: string },
 ): { ref: string } | { reason: string } {
+  // input-site: traced #a6a4ba0d — the clock, and the fetch below over the network: a run that fetches records no hash
+  inputSiteReached("bean-burndown-feed: fetch history");
   const now = opts.now ?? new Date();
   const since = new Date(now.getTime() - opts.days * 86_400_000).toISOString().slice(0, 10);
   const remote = opts.web === opts.repoWeb ? "origin" : `${opts.web}.git`;
   const ref = historyRef(opts.branch);
+  // input-site: inert #e55d7163 — the fetch, behind the traced site above in this function
   const r = spawnSync(
     "git",
     ["fetch", "-q", "--no-tags", `--shallow-since=${since}`, remote, `+refs/heads/${opts.branch}:${ref}`],
@@ -162,7 +168,9 @@ export function fetchBeanHistory(
   );
   if (r.status !== 0) return { reason: `could not fetch ${opts.branch} from ${remote}: ${r.stderr.trim() || `exit ${r.status}`}` };
   const pinned = opts.tip ?? mountedTipFor(root, opts.branch);
+  // input-site: inert #81f0f381 — behind the traced site above in this function
   if (pinned && spawnSync("git", ["cat-file", "-e", `${pinned}^{commit}`], { cwd: root }).status === 0) {
+    // input-site: inert #c850ee9a — behind the traced site above in this function
     spawnSync("git", ["update-ref", ref, pinned], { cwd: root });
   }
   return { ref };

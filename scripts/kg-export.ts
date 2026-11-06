@@ -321,6 +321,7 @@ export function buildContext(): Record<string, unknown> {
     sourceCommitSha: termIri("sourceCommitSha"),
     sourceCommitAt: { "@id": termIri("sourceCommitAt"), "@type": `${XSD}dateTime` },
     sourceTreeDirty: { "@id": termIri("sourceTreeDirty"), "@type": `${XSD}boolean` },
+    sourceTree: termIri("sourceTree"),
     sourceCommitUnavailable: termIri("sourceCommitUnavailable"),
 
     // §3.4's published dependency set. `uri` is a LINK — it is the thing a
@@ -937,7 +938,16 @@ interface Export {
    */
   omitted?: readonly string[];
   repository: string;
-  generatedAt: string;
+  /**
+   * When the export ran. Optional, and no longer written (owner rulings
+   * 2026-11-06, cards "QA dates" and "Date source", option 1): the export
+   * records {@link sourceTree}, and a reader derives the date from it, so the
+   * same tree exports the same bytes on a PR and on main. Kept readable for
+   * graphs exported before.
+   */
+  generatedAt?: string;
+  /** The git tree the graph was exported from (`HEAD^{tree}`): what its content is a function of. */
+  sourceTree?: string;
   /**
    * The commit the graph was generated from, as a dereferenceable IRI when the
    * repository's web host is known. `prov:wasDerivedFrom`, which is exactly
@@ -2894,6 +2904,8 @@ export interface SourceProvenance {
   /** The commit's web URL, when the remote names a forge we can address. */
   iri?: string;
   committedAt?: string;
+  /** `HEAD^{tree}`: the tree, which a PR's merge ref and main's merge commit share. */
+  tree?: string;
   dirty?: boolean;
   /** Why there is no SHA, when there is none. */
   unavailable?: string;
@@ -2930,6 +2942,7 @@ export function readSourceProvenance(root: string = ROOT): SourceProvenance {
     sha,
     iri: commitIri(git(["remote", "get-url", "origin"]), sha),
     committedAt: git(["show", "-s", "--format=%cI", sha]) || undefined,
+    tree: git(["rev-parse", "HEAD^{tree}"]) || undefined,
     // `undefined` rather than `false` when status itself failed: "the tree is
     // clean" is a claim, and an unanswered question is not that claim.
     dirty: status === undefined ? undefined : status.length > 0,
@@ -3227,6 +3240,7 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
     ...(src.unavailable ? { sourceCommitUnavailable: src.unavailable } : {}),
     ...(src.iri ? { sourceCommit: src.iri } : {}),
     ...(src.sha ? { sourceCommitSha: src.sha } : {}),
+    ...(src.tree ? { sourceTree: src.tree } : {}),
     ...(src.committedAt ? { sourceCommitAt: src.committedAt } : {}),
     ...(src.dirty === undefined ? {} : { sourceTreeDirty: src.dirty }),
   };
@@ -3409,8 +3423,8 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
     ...(isPreview && canonicalIri !== undefined ? { canonicalDocument: canonicalIri } : {}),
     repository: stub,
     ...(omitted !== undefined ? { omitted } : {}),
-    // input-site: inert #b5aa0ca3 — export timestamp; ignored by check and judge
-    generatedAt: new Date().toISOString(),
+    // No generatedAt (owner rulings 2026-11-06, "QA dates" / "Date source"):
+    // `sourceTree` (in commitFields) is what the bytes are a function of.
     ...commitFields,
     ...dependsOnFields,
     counts,
@@ -4102,7 +4116,7 @@ if (import.meta.main) {
   // default started writing `cat-harness/_kg/` while every reader still looked
   // one level up — and the stale pre-move copy at the old path made it look
   // fine locally.
-  // input-site: inert #1d8aaee1 — default export destination, an output path this script writes, never reads
+  // input-site: inert #a5ea3460 — default export destination, an output path this script writes, never reads
   // `_kg/` stands for the site root, so the document sits at its published
   // path under it, `<name>/<stub>.jsonld` (#603 decision 1b).
   const asked = arg("--out") ?? join(repoRootFor(ROOT), "_kg", docPath);

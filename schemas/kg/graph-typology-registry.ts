@@ -981,6 +981,26 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "Workshops over journeys -- modules, learning objectives, questions for the room per " +
       "journey step, reference tables, printable sheets, job aids and readings.",
   },
+  // What one person sees on one device at a journey step (owner, 2026-11-06,
+  // option A): a node of its own, so any journey can have screens without an
+  // app of its own. It points at `user-scenario` step ids, never the reverse.
+  // `content`, as `user-scenario`.
+  "device-screen": {
+    anyLayer: true,
+    description:
+      "device screens (`device-screens/`, by convention): one `device-screen/0.1.0` file per screen — what one person sees on one device (phone, tablet, scanner, desktop, kiosk) at one or more `user-scenario` steps. Its owner is an actor; its content is a list of typed, data-only blocks (header, person card, QR code, passcode, status badge, record list, fields, consent, alert, actions, note) with icons from a closed glyph list and no free HTML; a QR code or a record list may name the FHIR example it carries. Drawn by the journeys viewer as a static device mock, linked both ways with the walkthrough steps it shows. Shape in `schemas/process/device-screen.ts`.",
+    title: "Device screens",
+    renderable: false,
+    holds: "content",
+    // declared-path-literal: this table IS the declaration, as on `tool-release`.
+    schema: "schemas/process/device-screen.ts",
+    nodeSchemas: {
+      "device-screen/0.1.0": {},
+    },
+    summary:
+      "Device screens -- what one person sees on one device at a journey step, as typed " +
+      "data-only blocks (QR code, passcode, verdict, record list, consent), drawn as a device mock.",
+  },
   // ── What an Actor may do: W3C ODRL 2.2 policies — issue #1180 ──────────
   //
   // Owner, 2026-09-23: permissions are *"W3C ODRL 2.2"*, and policies are

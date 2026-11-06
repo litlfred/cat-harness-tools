@@ -70,6 +70,9 @@ describe("viewer Tools declare what they render", () => {
     // neither of which this index mounts.
     "user-scenario": "litlfred/smart-trust-demo",
     workshop: "litlfred/smart-trust-demo",
+    // Owner, 2026-11-06, option A: journeys-viewer draws the device screens of
+    // the same two instances.
+    "device-screen": "litlfred/smart-trust-demo",
   };
 
   it("every rendered kind is declared by some directory", () => {
@@ -90,6 +93,18 @@ describe("viewer Tools declare what they render", () => {
     workshop: "journeys-viewer",
   };
 
+  /**
+   * TRANSITIONAL (remove once the cat-harness PR that adds `device-screen` to
+   * journeys-viewer's `renders` is on cat-harness main): this layer draws the
+   * kind and merges first, and the Tool that renders it is defined in
+   * cat-harness, after. Until then the named Tool exists (or is itself
+   * pending, above) and does not render it yet; that is checked as exactly
+   * that, never waived. Once it renders it, the ordinary check holds it.
+   */
+  const NOT_YET_IN_THE_TOOLS_RENDERS: Record<string, string> = {
+    "device-screen": "journeys-viewer",
+  };
+
   it("every kind listed as held outside is still rendered here and still not held here", () => {
     const declared = new Set(dirs.flatMap(({ dir }) => dir.graphTypologies ?? []));
     const ids = new Set(all.map((t) => t.id));
@@ -97,6 +112,13 @@ describe("viewer Tools declare what they render", () => {
       const pending = RENDERED_BY_A_TOOL_NOT_YET_DEFINED[k];
       if (pending !== undefined && !ids.has(pending)) {
         expect(rendered.has(k), `${k} is rendered by a Tool other than ${pending}, which is not defined yet`).toBe(false);
+        expect(declared.has(k), `${k} is declared in this checkout now — drop it from HELD_OUTSIDE`).toBe(false);
+        continue;
+      }
+      const toCome = NOT_YET_IN_THE_TOOLS_RENDERS[k];
+      if (toCome !== undefined && !rendered.has(k)) {
+        // The Tool that will render it is defined, or itself pending (above).
+        expect(ids.has(toCome) || Object.values(RENDERED_BY_A_TOOL_NOT_YET_DEFINED).includes(toCome), `${k} is to be rendered by ${toCome}, which neither exists nor is pending`).toBe(true);
         expect(declared.has(k), `${k} is declared in this checkout now — drop it from HELD_OUTSIDE`).toBe(false);
         continue;
       }

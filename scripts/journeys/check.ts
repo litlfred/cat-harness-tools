@@ -3,7 +3,7 @@
  * `check:journey-refs`.
  *
  * @module scripts/journeys/check
- * @covers user-scenario, workshop, building-blocks
+ * @covers user-scenario, workshop, building-blocks, device-screen
  *
  * ## One resolver, two readers
  *
@@ -40,7 +40,17 @@
  * | `presentation.views` | a view of a model the instance's ArchiMate config names |
  * | `presentation.deviceDemo.screens[].steps` | a step of a journey the workshop teaches (or of a sub-journey of one) |
  *
- * A file of either kind that does not parse is a finding too: the viewer
+ * | a device screen names | it must resolve to |
+ * |---|---|
+ * | `owner`, a `personCard` block's `actor` | an actor, the screen's own instance first |
+ * | `steps[]` `{scenario, step}` | that journey, and a step of it |
+ * | a `qr` or `recordList` block's `example` | an entry of a `fhir-artifact-index` (could-not-determine while the index is built at publish) |
+ *
+ * | an actor's persona names | it must resolve to |
+ * |---|---|
+ * | `avatar` | a file, relative to the actor's instance root |
+ *
+ * A file of any of these kinds that does not parse is a finding too: the viewer
  * reports it and draws nothing of it, so nothing of it was checked.
  *
  * Exit 0 every reference resolves (or the checkout declares no journey and no
@@ -48,7 +58,9 @@
  * declarations could not be read, which is not a pass.
  */
 import { siteLinks } from "../gen-journeys-viz.ts";
+import { screenActors, screenExamples } from "../../schemas/process/device-screen.ts";
 import {
+  avatarFile,
   blockFor,
   instanceFile,
   journeyById,
@@ -72,6 +84,7 @@ export interface RefFinding {
 export interface RefReport {
   journeys: number;
   workshops: number;
+  screens: number;
   /** References examined, resolved or not. */
   references: number;
   findings: RefFinding[];
@@ -94,6 +107,14 @@ export function checkJourneyRefs(corpus: JourneyCorpus): RefReport {
   const couldNotDetermine: RefFinding[] = [];
   let references = 0;
   const archimate = siteLinks(corpus, "journeys", "journeys").archimateView;
+  /** A FHIR example: found, missing, or — while an artifact index is built at publish — undetermined. */
+  const example = (instance: string, file: string, at: string, k: string) => {
+    references++;
+    if (corpus.examples.has(k)) return;
+    if (corpus.examplesUnbuilt.length > 0) {
+      couldNotDetermine.push({ instance, file, at, message: `FHIR example "${k}" is in no artifact index on disk, and ${corpus.examplesUnbuilt.join(", ")} is built at publish and absent here` });
+    } else findings.push({ instance, file, at, message: `FHIR example "${k}" is in no declared fhir-artifact-index` });
+  };
 
   for (const j of corpus.journeys) {
     const sc = j.scenario;
@@ -133,17 +154,7 @@ export function checkJourneyRefs(corpus: JourneyCorpus): RefReport {
       for (const id of [...(s.requirements ?? []), ...(s.preconditions ?? []).flatMap((p) => p.requirements ?? [])]) {
         ref(requirementFor(corpus, id) !== undefined, at, `requirement "${id}" is no req: node in this checkout`);
       }
-      for (const k of new Set([...(s.examples ?? []), ...(s.fhirChanges ?? []).flatMap((c) => c.examples ?? [])])) {
-        if (!corpus.examples.has(k) && corpus.examplesUnbuilt.length > 0) {
-          references++;
-          couldNotDetermine.push({
-            instance: j.instance,
-            file: j.file,
-            at,
-            message: `FHIR example "${k}" is in no artifact index on disk, and ${corpus.examplesUnbuilt.join(", ")} is built at publish and absent here`,
-          });
-        } else ref(corpus.examples.has(k), at, `FHIR example "${k}" is in no declared fhir-artifact-index`);
-      }
+      for (const k of new Set([...(s.examples ?? []), ...(s.fhirChanges ?? []).flatMap((c) => c.examples ?? [])])) example(j.instance, j.file, at, k);
       if (s.record !== undefined && ladder !== undefined) {
         ref(ladder.some((c) => c.code === s.record!.state), at, `record.state "${s.record.state}" is no code of trust ladder ${sc.trustLadder}`);
       }
@@ -195,9 +206,35 @@ export function checkJourneyRefs(corpus: JourneyCorpus): RefReport {
     }
   }
 
+  for (const x of corpus.screens) {
+    const sc = x.screen;
+    const add = (at: string, message: string) => findings.push({ instance: x.instance, file: x.file, at, message });
+    screenActors(sc).forEach((id, i) => {
+      references++;
+      if (lookup(corpus.actors, x.instance, id) === undefined) add(i === 0 ? "owner" : "personCard", `actor "${id}" is no actor (actors/${id}.json in a declared scenarios directory)`);
+    });
+    sc.steps.forEach((st, i) => {
+      references++;
+      const j = journeyById(corpus, x.instance, st.scenario);
+      if (j === undefined) add(`steps[${i}]`, `scenario "${st.scenario}" is no journey in this checkout`);
+      else if (!j.scenario.steps.some((y) => y.id === st.step)) add(`steps[${i}]`, `step "${st.step}" is no step of journey ${st.scenario} (${j.instance}/${j.file})`);
+    });
+    for (const k of new Set(screenExamples(sc))) example(x.instance, x.file, "blocks", k);
+  }
+
+  // A persona's avatar is a file of the actor's instance.
+  for (const actors of corpus.actors.values()) {
+    for (const a of actors.values()) {
+      if (a.persona?.avatar === undefined) continue;
+      references++;
+      if (avatarFile(corpus, a) === undefined) findings.push({ instance: a.instance, file: a.file, at: "meta.persona.avatar", message: `avatar "${a.persona.avatar}" is no file of instance ${a.instance}` });
+    }
+  }
+
   return {
     journeys: corpus.journeys.length,
     workshops: corpus.workshops.length,
+    screens: corpus.screens.length,
     references,
     findings,
     couldNotDetermine,

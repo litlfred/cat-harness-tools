@@ -219,11 +219,24 @@ function run(cmd: string, cwd = REPO_ROOT): number {
  * load the original layers, and a module there that locates files from its
  * own path would write into the real mounts again.
  *
- * Returns the copy's root. The caller removes it.
+ * Returns the copy's root. The caller removes it. A copy that fails partway
+ * (a full disk, a FIFO in the tree) is removed here before the error is
+ * rethrown: its root never reaches a caller, so nothing else could remove it,
+ * and a 5 GB tree left in `os.tmpdir()` is what makes the next copy fail too.
  */
 export function scratchCopy(repoRoot = REPO_ROOT): string {
   // input-site: inert #3d98cecf — the scratch copy's directory, which the caller removes; its path never reaches the answer
   const dest = mkdtempSync(join(tmpdir(), "publish-check-tree-"));
+  try {
+    fillScratchCopy(repoRoot, dest);
+  } catch (e) {
+    rmSync(dest, { recursive: true, force: true });
+    throw e;
+  }
+  return dest;
+}
+
+function fillScratchCopy(repoRoot: string, dest: string): void {
   const linked: Array<[string, string]> = [];
   cpSync(repoRoot, dest, {
     recursive: true,
@@ -249,7 +262,6 @@ export function scratchCopy(repoRoot = REPO_ROOT): string {
       symlinkSync(src, to);
     }
   }
-  return dest;
 }
 
 if (import.meta.main) {
@@ -269,7 +281,17 @@ if (import.meta.main) {
     process.exit(run(`${scripts[writer]} --check`));
   }
   const work = scratchCopy(REPO_ROOT);
-  process.on("exit", () => rmSync(work, { recursive: true, force: true }));
+  // `exit` also fires after an uncaught throw; a cancelled CI job or a timeout
+  // sends SIGTERM (or SIGINT), which does not reach `exit`, so those remove
+  // the copy too and then exit with the signal's conventional code.
+  const removeWork = () => rmSync(work, { recursive: true, force: true });
+  process.on("exit", removeWork);
+  for (const [sig, n] of [["SIGINT", 2], ["SIGTERM", 15]] as const) {
+    process.on(sig, () => {
+      removeWork();
+      process.exit(128 + n);
+    });
+  }
   const instances = readInstances(work);
   const roots = instances.map((i) => i.root);
   // Under ANY instance's declared publish-time path or branch-stored directory
