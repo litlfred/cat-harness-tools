@@ -71,10 +71,15 @@ jobs:
         # Roman and Courier New: without them the runner's PDF breaks onto
         # different pages and lines (169 pages against 143), and a comment's
         # page-and-line citation would not match an agent-run build.
+        # Bounded: an apt that waits on a prompt or a mirror fails the publish in
+        # minutes instead of holding the gh-pages queue for the job's 6 hours.
+        timeout-minutes: 15
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
           if [ -f package.json ] && grep -q 'document-export' package.json; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq --no-install-recommends pandoc libreoffice-writer libreoffice-draw poppler-utils fonts-dejavu-core fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation2 fonts-inter
+            sudo -E timeout 600 apt-get update -qq
+            sudo -E timeout 600 apt-get install -y -qq -o Dpkg::Use-Pty=0 --no-install-recommends pandoc libreoffice-writer libreoffice-draw poppler-utils fonts-dejavu-core fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation2 fonts-inter
             pandoc --version | head -1; soffice --version; pdfinfo -v 2>&1 | head -1
           else
             echo "no document-export step: nothing to install"
