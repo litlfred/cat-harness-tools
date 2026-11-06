@@ -253,6 +253,12 @@
     }
   ],
   "_needs_comment": "The layers this instance sits on: cat-harness, whose Tool DEFINITIONS it implements, and bootstrap-tools, the tool layer one level down. Owner ruling C1 (2026-10-01, epic 7x5n, bean rmi6): this layer sits BELOW the content core -- the order is bootstrap, bootstrap-tools, cat-harness, this layer, then the content layers. It declared the content core as its one need until then, for the document adapter's server wrapper; the placement audit measured 0 of this layer's 27 files importing the core, so the edge was declared and never used. The core now needs THIS layer, and the reverse edge -- anything here importing a layer above -- is wrong-direction, which `check:import-direction` enforces from the declared `needs` lists rather than from any table. The layer above is deliberately not named here: a lower layer naming a higher one is the wrong direction `check:reference-direction` grades.",
+  "_gateExemptions_comment": "Checks this instance declares and runs in its OWN CI, not in an index's workflows. Read by scripts/gates.ts (bean 0r7u), so an index checkout does not report them as unrun.",
+  "gateExemptions": {
+    "scripts": [
+      {"script": "caches:viz:check", "kind": "covered-by", "reason": "this layer's own CI runs it: `layer-pr-checks.yml` runs every `*:check` script of the calling instance on every pull request, and an index mounts this layer at a pin that has passed it. The committed `caches/viewer.md` is rendered with the layer as root and no cache report, so the check is a byte comparison that does not depend on the checkout."}
+    ]
+  },
   "seedsWith": [
     "cat-harness"
   ],
