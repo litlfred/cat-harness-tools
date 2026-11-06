@@ -4116,7 +4116,7 @@ if (import.meta.main) {
   // default started writing `cat-harness/_kg/` while every reader still looked
   // one level up — and the stale pre-move copy at the old path made it look
   // fine locally.
-  // input-site: inert #1d8aaee1 — default export destination, an output path this script writes, never reads
+  // input-site: inert #a5ea3460 — default export destination, an output path this script writes, never reads
   // `_kg/` stands for the site root, so the document sits at its published
   // path under it, `<name>/<stub>.jsonld` (#603 decision 1b).
   const asked = arg("--out") ?? join(repoRootFor(ROOT), "_kg", docPath);

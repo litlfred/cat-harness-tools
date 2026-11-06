@@ -56,6 +56,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { beanDefsDir, isOpen, readBeans, type BeanNode } from "./beans.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 /** Where the accepted-for-now contradictions are recorded. */
 export const BASELINE_FILE = "cat-harness-tools/scripts/bean-rollup-baseline.json";
@@ -242,6 +243,8 @@ export function sweep(
 export async function openPrBeanIds(beans: BeanNode[], token: string | undefined): Promise<Set<string> | null> {
   if (!token) return null;
   try {
+    // input-site: traced #1cccf22c — GitHub's open PRs over the network: a run that asks records no hash
+    inputSiteReached("check-bean-rollup: open PRs");
     const res = await fetch(
       "https://api.github.com/repos/litlfred/folio-assistant/pulls?state=open&per_page=100",
       { headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } },
@@ -269,15 +272,20 @@ export async function checkBeanRollup(
   const found = rollupFindings(beans);
   const baseline = loadBaseline(root);
   const matched = new Set(found.map((f) => f.key).filter((k) => baseline.has(k)));
+  // The sweep reads the clock and, asked, GitHub's open PRs: neither is in any fingerprint.
+  let swept: ReturnType<typeof sweep> | null = null;
+  if (opts.sweep) {
+    // input-site: traced #d6fc1512 — the sweep's clock and GH_TOKEN for its PR lookup: a run that sweeps records no hash
+    inputSiteReached("check-bean-rollup: sweep");
+    swept = sweep(beans, opts.now ?? new Date(), opts.github ? await openPrBeanIds(beans, process.env.GH_TOKEN) : null);
+  }
   return {
     store: beanDefsDir(root),
     open: beans.filter(isOpen).length,
     problems: found.filter((f) => !baseline.has(f.key)).map((f) => f.message),
     outstanding: found.filter((f) => baseline.has(f.key)).map((f) => f.message),
     stale: [...baseline].filter((k) => !matched.has(k)).sort(),
-    sweep: opts.sweep
-      ? sweep(beans, opts.now ?? new Date(), opts.github ? await openPrBeanIds(beans, process.env.GH_TOKEN) : null)
-      : null,
+    sweep: swept,
   };
 }
 
