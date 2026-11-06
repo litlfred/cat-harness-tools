@@ -29,6 +29,10 @@
  *    ({@link verdictOf}). None green: that instance does not move.
  * 3. Asks `standingCovers` (the harness's pure coverage decision) whether the
  *    rule covers the move. Not covered: reported, not moved.
+ * 3a. The cascade ({@link alignToHeldPins}): an instance below the harness
+ *    is not pinned to its branch head but to the commit the harness's own
+ *    lock holds at the harness's new pin, because the harness commits
+ *    artefacts generated from those pins (bootstrap's checklists).
  * 4. Moves the covered pins with `seedRemote` — the same write `mount:remote
  *    --seed` makes — with the rule's grant (`standingGrantOf`), so the consent
  *    for each new pin is written in the same write, by the rule's person,
@@ -61,6 +65,12 @@ export interface GitHubApi {
   branchCommits(repository: string, branch: string, limit: number): Promise<string[]>;
   /** The commit's own combined status and check runs, reduced by {@link verdictOf}. */
   commitVerdict(repository: string, sha: string): Promise<CommitVerdict>;
+  /**
+   * The pins `repository`'s own `index.lock.json` holds at `sha`, as
+   * `{ repository → ref }`; `undefined` when it has none. Optional: an API
+   * without it applies no cascade ({@link alignToHeldPins}).
+   */
+  lockPinsAt?(repository: string, sha: string): Promise<Record<string, string> | undefined>;
 }
 
 /** The raw shapes {@link verdictOf} reads: GitHub's combined status and check-runs responses, reduced to what matters. */
@@ -113,7 +123,45 @@ export function githubApi(token = process.env.GITHUB_TOKEN ?? process.env.GH_TOK
       ]);
       return verdictOf(status, runs.check_runs);
     },
+    async lockPinsAt(repository, sha) {
+      let file: { content?: string; encoding?: string };
+      try {
+        file = await get(`/repos/${repo(repository)}/contents/index.lock.json?ref=${sha}`);
+      } catch (e) {
+        if (/HTTP 404/.test((e as Error).message)) return undefined;
+        throw e;
+      }
+      if (!file.content || file.encoding !== "base64") return undefined;
+      return lockPinsOf(JSON.parse(Buffer.from(file.content, "base64").toString("utf-8")));
+    },
   };
+}
+
+/**
+ * The harness and the instances below it, as this checkout declares them —
+ * the same derivation `bpmn-checklist.ts` uses to decide whose checklists the
+ * harness commits.
+ */
+export async function cascadeOf(root: string, harnessRoot?: string): Promise<{ harness: string; below: Set<string> }> {
+  const { instanceRootsIn, readDeclaration } = await import("../schemas/kg/cat-harness.ts");
+  const { belowHarness } = await import("./lib/needs-reach.ts");
+  harnessRoot ??= (await import("./lib/roots.ts")).HARNESS_ROOT;
+  const decls = instanceRootsIn(root).map((r) => readDeclaration(r)).filter((d) => d?.name !== undefined);
+  const needs = new Map(decls.map((d) => [d!.name!, (d!.needs ?? []) as readonly string[]] as const));
+  const harness = readDeclaration(harnessRoot)?.name ?? "";
+  return { harness, below: harness ? belowHarness(harness, needs) : new Set<string>() };
+}
+
+/** `{ repository → ref }` from an `index.lock.json`'s `mounts`: the pins that layer is built and checked against. */
+export function lockPinsOf(lock: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  const mounts = (lock as { mounts?: unknown })?.mounts;
+  if (!Array.isArray(mounts)) return out;
+  for (const m of mounts) {
+    const { repository, ref } = (m ?? {}) as { repository?: unknown; ref?: unknown };
+    if (typeof repository === "string" && typeof ref === "string") out[repository] = ref;
+  }
+  return out;
 }
 
 /**
@@ -143,6 +191,8 @@ export interface PlannedMove {
   rule: StandingConsent;
   /** Commits passed over on the way to `to` (newer, not green). */
   skipped: Array<{ sha: string; verdict: CommitVerdict }>;
+  /** Set when the cascade chose `to`: the layer(s) whose own lock holds it. */
+  alignedTo?: string;
 }
 
 export interface RepinPlan {
@@ -181,6 +231,63 @@ export async function planRepin(mounts: readonly RemoteMount[], api: GitHubApi, 
     plan.moves.push({ harness: m.harness, repository: m.repository, from: m.ref, to: found.candidate.sha, rule, skipped: found.looked.filter((l) => l.sha !== found.candidate!.sha) });
   }
   return plan;
+}
+
+/**
+ * The cascade (owner litlfred, 2026-11-06, bean `folio-assistant-pqlh`): an
+ * instance below the harness never moves to a commit other than the one the
+ * harness's OWN lock holds. The harness commits artefacts generated from those
+ * pins — `bpmn-checklist.ts` writes the checklists of every instance below it
+ * into the harness's site — so a site that moved bootstrap past the harness's
+ * pin failed `bpmn:checklist:check` (re-pin trains folio-assistant#2975…#2986).
+ * They move once the harness has re-pinned them: bottom-up, one layer at a time.
+ *
+ * Only the harness's lock caps, and only for the instances below it
+ * (`belowHarness`): a content layer's lock holds artefacts of nothing, and
+ * those locks lag and disagree, so capping by them would freeze every train.
+ *
+ * The harness's lock is read at the commit this plan pins it to (its move, or
+ * its current pin). For each instance below it with a standing rule:
+ * - the harness holds its current pin → it does not move (held);
+ * - otherwise it moves to the held pin, when its standing rule covers that
+ *   commit; one the rule does not cover is held, as any other;
+ * - the harness's lock does not name it → left as {@link planRepin} planned.
+ * A lock that cannot be read makes the run unknown, never silently unaligned.
+ */
+export async function alignToHeldPins(plan: RepinPlan, mounts: readonly RemoteMount[], api: GitHubApi, cap: { harness: string; below: ReadonlySet<string> }): Promise<RepinPlan> {
+  const holder = mounts.find((m) => m.harness === cap.harness);
+  if (!api.lockPinsAt || !holder) return plan;
+  const at = plan.moves.find((m) => m.harness === holder.harness)?.to ?? holder.ref;
+  let pins: Record<string, string>;
+  try {
+    pins = (await api.lockPinsAt(holder.repository, at)) ?? {};
+  } catch (e) {
+    return { ...plan, unknown: [...plan.unknown, { harness: holder.harness, reason: `could not read its lock at ${at.slice(0, 10)}, so the cascade cannot be checked: ${(e as Error).message}` }] };
+  }
+  const by = `${holder.harness}@${at.slice(0, 10)}`;
+  const decided = new Set<string>();
+  const moves: PlannedMove[] = [];
+  const held: RepinPlan["held"] = [];
+  for (const m of mounts) {
+    const rule = m.trust?.standing;
+    const ref = pins[m.repository];
+    if (!rule || !ref || !cap.below.has(m.harness)) continue;
+    decided.add(m.harness);
+    if (ref === m.ref) {
+      held.push({ harness: m.harness, reason: `${by} holds it at its current pin in its own lock; it moves when that layer re-pins it (cascade)` });
+      continue;
+    }
+    const verdict = rule.require === "green" ? await api.commitVerdict(m.repository, ref) : undefined;
+    const cover = standingCovers(m, { branch: rule.follows, sha: ref, ...(verdict ? { verdict } : {}) });
+    if (!cover.covered) held.push({ harness: m.harness, reason: `${by} holds it at ${ref.slice(0, 10)}, which its standing consent does not cover: ${cover.reason}` });
+    else moves.push({ harness: m.harness, repository: m.repository, from: m.ref, to: ref, rule, skipped: [], alignedTo: by });
+  }
+  return {
+    moves: [...plan.moves.filter((mv) => !decided.has(mv.harness)), ...moves],
+    held: [...plan.held.filter((h) => !decided.has(h.harness)), ...held],
+    // Its own branch no longer matters: the harness's lock decided it.
+    unknown: plan.unknown.filter((u) => !decided.has(u.harness)),
+  };
 }
 
 // ── Applying it: the existing mount:remote write paths ─────────────────────
@@ -234,7 +341,7 @@ export function summaryOf(plan: RepinPlan, dryRun: boolean): string {
     L.push("| instance | repository | from | to | follows | consent by |", "|---|---|---|---|---|---|");
     for (const m of plan.moves) {
       L.push(
-        `| ${m.harness} | ${m.repository} | \`${m.from.slice(0, 12)}\` | \`${m.to.slice(0, 12)}\` | \`${m.rule.follows}\`${m.rule.require ? ` (${m.rule.require})` : ""} | ${m.rule.consentBy} (standing, ${m.rule.consentAt}) |`,
+        `| ${m.harness} | ${m.repository} | \`${m.from.slice(0, 12)}\` | \`${m.to.slice(0, 12)}\` | ${m.alignedTo ? `held by ${m.alignedTo}` : `\`${m.rule.follows}\`${m.rule.require ? ` (${m.rule.require})` : ""}`} | ${m.rule.consentBy} (standing, ${m.rule.consentAt}) |`,
       );
     }
     L.push("");
@@ -258,7 +365,9 @@ if (import.meta.main) {
     const { readDeclaredMounts } = await import("../schemas/kg/index-config.js");
     const root = valueOf("--instance") ? resolve(valueOf("--instance")!) : checkoutRootFor(process.cwd());
     const depth = Number(valueOf("--depth") ?? 30);
-    const plan = await planRepin(readDeclaredMounts(root).mounts, githubApi(), Number.isFinite(depth) && depth > 0 ? depth : 30);
+    const api = githubApi();
+    const mounts = readDeclaredMounts(root).mounts;
+    const plan = await alignToHeldPins(await planRepin(mounts, api, Number.isFinite(depth) && depth > 0 ? depth : 30), mounts, api, await cascadeOf(root));
     const text = summaryOf(plan, dryRun);
     console.log(text);
     const summaryFile = valueOf("--summary-file");

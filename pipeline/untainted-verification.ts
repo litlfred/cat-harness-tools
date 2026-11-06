@@ -217,7 +217,10 @@ export function untaintedEntries(
   fieldHash: QaFieldHash,
   headTree?: string,
 ): QaCriterionEntry[] {
-  const at = payload.reviewed_at ?? new Date().toISOString();
+  // A caller re-recording an earlier review keeps its date; otherwise none is
+  // stamped (owner rulings 2026-11-06, "QA dates" / "Date source"): the date
+  // is derived on read from reviewed_tree.
+  const at = payload.reviewed_at;
   const address = reviewAddress(payload, headTree);
   const findings = payload.findings?.filter((f) => f.trim() && f.trim().toLowerCase() !== "none");
 
@@ -232,7 +235,7 @@ export function untaintedEntries(
       actor: payload.adjudicator.actor ?? ADJUDICATOR_ACTOR,
       ...partyFields(payload.adjudicator),
     },
-    reviewed_at: at,
+    ...(at ? { reviewed_at: at } : {}),
     ...address,
     metrics: provenanceMetrics(payload.adjudicator, { role: "adjudicator" }),
     notes: payload.reasoning,
@@ -249,7 +252,7 @@ export function untaintedEntries(
       actor: payload.checker.actor ?? CHECKER_ACTOR,
       ...partyFields(payload.checker),
     },
-    reviewed_at: at,
+    ...(at ? { reviewed_at: at } : {}),
     ...address,
     metrics: provenanceMetrics(payload.checker, { role: "checker" }),
     notes:
@@ -284,7 +287,7 @@ export function couldNotDispatchEntry(
     field_hash: fieldHash,
     result: "n/a",
     reviewer: { kind: "agent", id: payload.recorded_by.id, ...partyFields(payload.recorded_by) },
-    reviewed_at: payload.reviewed_at ?? new Date().toISOString(),
+    ...(payload.reviewed_at ? { reviewed_at: payload.reviewed_at } : {}),
     ...reviewAddress(payload, headTree),
     metrics: provenanceMetrics(payload.recorded_by, { dispatch: "unavailable" }),
     notes: `Could not dispatch: ${payload.reason.trim()}`,
@@ -431,7 +434,7 @@ export function recordUntainted(
   // report is the sweep's to create, and its record lives on `qa-reports`.
   if (prior !== undefined) {
     prior.criteria = finalised;
-    prior.updated_at = new Date().toISOString();
+    delete prior.updated_at;
     writeFileSync(sidecarPath, JSON.stringify(prior, null, 2) + "\n");
   }
   return relative(root, res.path);

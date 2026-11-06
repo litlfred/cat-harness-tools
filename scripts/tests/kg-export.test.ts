@@ -187,7 +187,10 @@ describe("kg export", () => {
     const decl = readDeclaration(join(HARNESS_ROOT))!;
     expect(EXPORT["@id"]).toBe(`${BASE}/${decl.name}/${artefactStub(decl)}.jsonld`);
     expect(EXPORT["@type"]).toBe("http://www.w3.org/ns/prov#Entity");
-    expect(EXPORT.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    // No clock (owner rulings 2026-11-06, "QA dates" / "Date source"): the
+    // export records the tree its content is a function of.
+    expect(EXPORT.generatedAt).toBeUndefined();
+    expect(EXPORT.sourceTree).toMatch(/^[0-9a-f]{40}$/);
   });
 
   test("every edge term is declared {\"@type\": \"@id\"} — otherwise it is not a graph", () => {
@@ -612,10 +615,15 @@ describe("source provenance — what the graph was generated FROM", () => {
     expect(ctx.sourceCommit?.["@type"]).toBe("@id");
   });
 
-  test("the commit's own time is distinct from the export's", () => {
+  test("the commit's own time is carried, and the export stamps no time of its own", () => {
     const d = EXPORT;
     expect(d.sourceCommitAt).toBeDefined();
-    expect(d.sourceCommitAt).not.toBe(d.generatedAt);
+    expect(d.generatedAt).toBeUndefined();
+  });
+
+  test("the recorded tree is the tree this checkout's HEAD is on", () => {
+    const head = Bun.spawnSync(["git", "rev-parse", "HEAD^{tree}"], { cwd: HARNESS_ROOT }).stdout.toString().trim();
+    expect(EXPORT.sourceTree).toBe(head);
   });
 
   test("a dirty tree is a typed flag, NOT a `problems` entry", () => {
