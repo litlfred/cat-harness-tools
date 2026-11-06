@@ -732,5 +732,6 @@ a:hover > .jp-cv-dot { fill: var(--c); }
   .jp-print-report .jp-wrap > :not(.jp-gapreport) { display: none !important; }
   .jp-print-report .jp-gapreport { border: 0; box-shadow: none; padding: 0; }
   .jp-gr-urgency, .jp-gr-counts tr { break-inside: avoid; }
-  [data-fa-staging-banner] { display: none !important; }
+  /* The site's frame stays on screen; a printed report leaves out its bar and the branch banner. */
+  .jp-print-report .fa-page-bar, [data-fa-staging-banner] { display: none !important; }
 }
