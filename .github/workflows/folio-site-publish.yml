@@ -58,6 +58,24 @@ jobs:
         with:
           ruby-version: "3.3"
 
+      - name: Install the document export tools, when a site step exports
+        # A document folio's site:export step (folio-assistant-core's
+        # document-export.ts) writes the public-comment PDF and .docx with
+        # pandoc, lays the PDF out with LibreOffice and counts its pages and
+        # lines with poppler. The runner has none of them, and document-export
+        # has no fallback, so without this every publish of such a folio fails
+        # at its last step (dth-hrh run 42076453040; bean v29t). Installed only
+        # when the repository's scripts call document-export: LibreOffice is
+        # large, and no other publish needs it.
+        run: |
+          if [ -f package.json ] && grep -q 'document-export' package.json; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends pandoc libreoffice-writer libreoffice-draw poppler-utils fonts-dejavu-core
+            pandoc --version | head -1; soffice --version; pdfinfo -v 2>&1 | head -1
+          else
+            echo "no document-export step: nothing to install"
+          fi
+
       - name: Identify the publishing commit's author, and let it push
         # The publisher clones gh-pages into a temporary directory, which does
         # not inherit the checkout's credentials: the job token goes in the
