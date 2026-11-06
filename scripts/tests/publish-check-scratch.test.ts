@@ -4,7 +4,8 @@
  * to the layers IN THE COPY, never to the originals.
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -48,5 +49,30 @@ describe("scratchCopy", () => {
   test("writing in the copy leaves the original alone", () => {
     writeFileSync(join(copy, "cat-harness", "docs", "a.svg"), "<svg changed/>");
     expect(readFileSync(join(repo, "cat-harness", "docs", "a.svg"), "utf-8")).toBe("<svg/>");
+  });
+});
+
+describe("scratchCopy that fails partway", () => {
+  test("removes its partial copy and rethrows, leaving os.tmpdir() clean", () => {
+    // A FIFO cannot be copied, so cpSync throws after the files before it
+    // have been written: the shape of a copy that runs out of disk.
+    const src = mkdtempSync(join(tmpdir(), "publish-check-fail-src-"));
+    const tmp = mkdtempSync(join(tmpdir(), "publish-check-fail-tmp-"));
+    const before = process.env.TMPDIR;
+    try {
+      writeFileSync(join(src, "a.txt"), "a");
+      mkdirSync(join(src, "z"));
+      const mk = spawnSync("mkfifo", [join(src, "z", "pipe")]);
+      expect(mk.status).toBe(0);
+      process.env.TMPDIR = tmp;
+      expect(tmpdir()).toBe(tmp);
+      expect(() => scratchCopy(src)).toThrow();
+      expect(readdirSync(tmp)).toEqual([]);
+    } finally {
+      if (before === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = before;
+      rmSync(src, { recursive: true, force: true });
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

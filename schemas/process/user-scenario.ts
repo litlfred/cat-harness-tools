@@ -439,7 +439,12 @@ export type BuildingBlocks = z.infer<typeof BuildingBlocksSchema>;
  *
  * `initials`, `color` and `icon` are optional presentation fields (owner,
  * 2026-11-05): kept on the actor when a demonstrator wants a fixed avatar,
- * derived by the viewer when absent. Nothing else in the harness reads them.
+ * derived by the viewer when absent. `avatar` (owner, 2026-11-06) is a square
+ * picture of the person, a path from the instance root
+ * (`scenarios/avatars/<actor>.webp`): the viewer draws it wherever the
+ * persona appears, and the initials (or the `icon`) on the colour stay the
+ * fallback when there is none. `check:journey-refs` checks the path. Nothing
+ * else in the harness reads them.
  */
 export const JourneyPersonaSchema = z
   .object({
@@ -455,6 +460,8 @@ export const JourneyPersonaSchema = z
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
     /** A glyph drawn in the avatar instead of the initials (a baby, who has none). */
     icon: JourneyGlyphSchema.optional(),
+    /** A square picture of the person, a path from the instance root; the initials are the fallback. */
+    avatar: z.string().regex(/^[^/][^\\]*\.(?:webp|png|jpe?g|svg)$/i, "an avatar is an image path from the instance root").optional(),
   })
   .passthrough();
 export type JourneyPersona = z.infer<typeof JourneyPersonaSchema>;

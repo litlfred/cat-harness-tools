@@ -35,6 +35,7 @@
  */
 import { escHtml } from "../thin-page.ts";
 import { renderViewPages, VIEW_SEGMENTS } from "./present-views.ts";
+import { demoScreensOf, DEVICE_GLYPH, type DemoScreen, type DemoSource } from "./screens.ts";
 import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
 import type { ScenarioStep } from "../../schemas/process/user-scenario.ts";
@@ -47,6 +48,7 @@ import {
   moduleSegment,
   parentOf,
   personaOf,
+  ROOT_MARK,
   sourceHref,
   TOOL_ID,
   type PageFile,
@@ -88,6 +90,9 @@ export interface Presentation {
   steps: PresentedStep[];
   /** Everyone a step names, in the declared order (`presentation.cast`) then of first appearance, with a stable colour each. */
   cast: PersonaView[];
+  /** The Device Demo's screens (`screens.ts`), and whether they are drawn or framed. */
+  screens: DemoScreen[];
+  demo: DemoSource;
 }
 
 /**
@@ -171,7 +176,8 @@ export function presentationOf(corpus: JourneyCorpus, w: WorkshopEntry): Present
     }
   }
   const cast = castOrder(ids, w.workshop.presentation?.cast).map((id, i) => personaOf(corpus, instanceOf.get(id)!, id, i));
-  return { w, chapters: chapters.filter((c) => c.steps.length > 0), steps, cast };
+  const demo = demoScreensOf(corpus, w, steps);
+  return { w, chapters: chapters.filter((c) => c.steps.length > 0), steps, cast, screens: demo.screens, demo: demo.source };
 }
 
 function stepsUnder(corpus: JourneyCorpus, j: Journey): { journey: Journey; step: ScenarioStep }[] {
@@ -234,11 +240,12 @@ export function mentionedChips(text: string, people: readonly PersonaView[], exc
   return who.length ? `<span class="jp-mentions" title="${e(`With ${who.map((p) => p.name).join(", ")}`)}">${who.map((p) => avatar(p, "sm")).join("")}</span>` : "";
 }
 
+/** A person's avatar: their picture when the persona names one (from the route root, `ROOT_MARK`), else their glyph or initials on their colour. */
 export function avatar(p: PersonaView, size: "sm" | "md" | "lg" = "md"): string {
-  // Initials for everyone, the baby too: one chip style wherever people are stacked or listed
-  // (owner, 2026-11-06), never a glyph among initials.
-  const inner = e(p.initials);
-  return `<span class="jp-av jp-av-${size}" style="--c:${e(p.color)}" title="${e(p.name)}" aria-hidden="true">${inner}</span>`;
+  // A persona's picture where it names one; otherwise initials for everyone, the baby too: one chip
+  // style wherever people are stacked or listed (owner, 2026-11-06), never a glyph among initials.
+  const inner = p.avatar ? `<img src="${e(ROOT_MARK + p.avatar)}" alt="" loading="lazy">` : e(p.initials);
+  return `<span class="jp-av jp-av-${size}${p.avatar ? " jp-av-img" : ""}" style="--c:${e(p.color)}" title="${e(p.name)}" aria-hidden="true">${inner}</span>`;
 }
 
 // Small line icons (24×24, stroked), drawn for these pages.
@@ -316,6 +323,36 @@ export const GLYPH: Record<string, string> = {
   tent: '<path d="M3 21L12 4l9 17zM12 4v17M9 21l3-6 3 6"/>',
   bus: '<rect x="4" y="3" width="16" height="15" rx="2"/><path d="M4 11h16M8 21v-3M16 21v-3M7 15h.01M17 15h.01"/>',
   plane: '<path d="M2 16l20-8-6 13-3-6z"/><path d="M13 15l-5 5"/>',
+  // The glyphs a device screen adds (`SCREEN_GLYPHS` of the device-screen kind).
+  syringe: '<path d="M18 2l4 4M15 5l4 4M17 7l-9.5 9.5a2 2 0 0 1-2.8 0l-.2-.2a2 2 0 0 1 0-2.8L14 4M9 11l2 2M6 14l2 2M5 19l-3 3"/>',
+  pill: '<path d="M10.5 20.5a5 5 0 0 1-7-7l10-10a5 5 0 0 1 7 7z"/><path d="M8.5 8.5l7 7"/>',
+  "pill-off": '<path d="M10.5 20.5a5 5 0 0 1-7-7l10-10a5 5 0 0 1 7 7z"/><path d="M8.5 8.5l7 7"/><circle cx="12" cy="12" r="11"/><path d="M4.2 4.2l15.6 15.6"/>',
+  pen: '<path d="M14 4l6 6M12 6l6 6-8 8H4v-6zM4 20l3-3M17 3l4 4"/>',
+  heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/>',
+  eye: ICON.eye!,
+  unlock: '<rect x="4" y="11" width="16" height="11" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.8-1.2"/>',
+  check: '<path d="M20 6L9 17l-5-5"/>',
+  cross: '<circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/>',
+  question: '<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>',
+  hash: '<path d="M4 9h16M4 15h16M10 3L8 21M16 3l-2 18"/>',
+  printer: ICON.printer!,
+  camera: '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>',
+  alert: ICON.alert!,
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  user: ICON.user!,
+  users: ICON.users!,
+  building: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/>',
+  scan: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 12h10"/>',
+  send: '<path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/>',
+  layers: '<path d="M12 2L2 7l10 5 10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  "shield-alert": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4M12 16h.01"/>',
+  monitor: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
+  kiosk: '<rect x="6" y="2" width="12" height="14" rx="1"/><path d="M9 20h6M12 16v4M9 6h6"/>',
+  scanner: '<path d="M7 2h10l1 9H6zM9 11l-1 11h5l1-11M10 5h4"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+  file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h5"/>',
+  "baby-new": '<circle cx="12" cy="8" r="4.5"/><path d="M10.2 7.5h.01M13.8 7.5h.01M10.5 9.8a2 2 0 0 0 3 0M6 21v-1.5a6 6 0 0 1 12 0V21M19 3v4M17 5h4"/>',
 };
 export const glyph = (name: string, cls = ""): string =>
   `<svg class="jp-i${cls ? ` ${cls}` : ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${GLYPH[name] ?? ""}</svg>`;
@@ -390,12 +427,18 @@ export function profilePage(pr: WorkshopPresentation, profile: string, siteRoot:
   return fromSite(`${pr.ig.href}${fillPattern(pr.ig.profile ?? "StructureDefinition-{id}.html", { id })}`, siteRoot);
 }
 
-/** The device-demo screens that show a step. */
-export function screensFor(pr: WorkshopPresentation, stepId: string): NonNullable<WorkshopPresentation["deviceDemo"]>["screens"] {
-  return (pr.deviceDemo?.screens ?? []).filter((x) => x.steps.includes(stepId));
+/** The Device Demo's screens that show a step. */
+export function screensFor(p: Presentation, s: PresentedStep): DemoScreen[] {
+  return p.screens.filter((x) => x.steps.includes(s));
 }
 
-/** A screen's address in the instance's app. */
+/** The glyph a screen's device is drawn with. */
+export const deviceGlyph = (x: DemoScreen, cls = ""): string => glyph(DEVICE_GLYPH[x.device], cls);
+
+/** The Device Demo's name on the frame: the workshop's word for it, else "Device Demo". */
+export const demoLabel = (p: Presentation): string => p.w.workshop.presentation?.deviceDemo?.label ?? "Device Demo";
+
+/** A framed screen's address in the instance's app. */
 export function screenHref(pr: WorkshopPresentation, id: string, siteRoot: string): string | undefined {
   const d = pr.deviceDemo;
   if (!d) return undefined;
@@ -506,9 +549,9 @@ ${o.prev ? `<link rel="prev" href="${e(o.prev)}">` : ""}${o.next ? `<link rel="n
 <div class="jp-app">
 <div class="jp-brand"><span class="jp-logo" aria-hidden="true">${e(name.trim().charAt(0).toUpperCase())}</span><div><div class="jp-brand-name"><span class="jp-name">${e(name)}</span>${pr.badge ? `<span class="jp-badge">${e(pr.badge)}</span>` : ""}</div>${pr.tagline ? `<p class="jp-tagline">${e(pr.tagline)}</p>` : ""}</div></div>
 <div class="jp-mode"><a${o.view === "demo" ? "" : ' class="is-on"'} href="${e(`${o.toWorkshop}overview/`)}">${icon("route", "jp-rose")}<span>Journeys</span></a>${
-    pr.deviceDemo
-      ? `<a${o.view === "demo" ? ' class="is-on" aria-current="page"' : ""} href="${e(`${o.toWorkshop}demo/`)}">${icon("phone", "jp-sky")}<span>${e(pr.deviceDemo.label ?? "Device Demo")}</span></a>`
-      : `<span class="jp-mode-off" aria-disabled="true" title="This workshop names no device demo">${icon("phone", "jp-sky")}<span>Device Demo</span></span>`
+    o.p.screens.length
+      ? `<a${o.view === "demo" ? ' class="is-on" aria-current="page"' : ""} href="${e(`${o.toWorkshop}demo/`)}">${icon("phone", "jp-sky")}<span>${e(demoLabel(o.p))}</span></a>`
+      : `<span class="jp-mode-off" aria-disabled="true" title="No device screen shows a step of this workshop">${icon("phone", "jp-sky")}<span>Device Demo</span></span>`
   }</div>
 <div class="jp-links">${links}</div>
 </div>
@@ -519,11 +562,11 @@ ${o.view === "demo" ? "" : `<nav class="jp-tabs" aria-label="Views">${nav}</nav>
 ${o.body.trim()}
 </div></main>
 ${o.foot ?? ""}
-<footer class="jp-foot">Drawn by the journeys viewer from the <code>workshop</code> and <code>user-scenario</code> nodes of ${e(o.p.w.instance)}. Every person is fictional.</footer>
+<footer class="jp-foot">Drawn by the journeys viewer from the <code>workshop</code>, <code>user-scenario</code>${o.view === "demo" && o.p.demo === "screens" ? " and <code>device-screen</code>" : ""} nodes of ${e(o.p.w.instance)}. Every person is fictional.</footer>
 </body>
 </html>
 `;
-  return withRenderedBy(html, TOOL_ID);
+  return withRenderedBy(html.split(ROOT_MARK).join(o.root), TOOL_ID);
 }
 
 // ── the record's trust ladder ─────────────────────────────────────────────
@@ -759,9 +802,14 @@ function hood(corpus: JourneyCorpus, p: Presentation, s: PresentedStep, links: S
     : "";
   const who = (id: string | undefined) => (id ? (p.cast.find((x) => x.id === id)?.name ?? lookup(corpus.actors, s.journey.instance, id)?.title ?? id) : undefined);
   const h = st.handoff;
+  /** A hand-off end that is somebody of the cast wears their avatar. */
+  const end = (id: string | undefined) => {
+    const pv = id ? p.cast.find((x) => x.id === id) : undefined;
+    return pv ? avatar(pv, "sm") : "";
+  };
   const handoff = h
     ? `<div class="jp-box"><div class="jp-box-h"><span class="jp-label">Data hand-off</span>${h.offline !== undefined ? `<span class="jp-net ${h.offline ? "is-off" : "is-on"}">${icon(h.offline ? "wifioff" : "wifi")}${h.offline ? "Works offline" : "Online"}</span>` : ""}</div>
-<div class="jp-flow">${who(h.from) ? `<span class="jp-end">${e(who(h.from)!)}</span>` : ""}<div class="jp-flow-mid"><span>${e(h.carrier ?? h.summary)}</span><i></i></div>${who(h.to) ? `<span class="jp-end">${e(who(h.to)!)}</span>` : ""}</div>
+<div class="jp-flow">${who(h.from) ? `<span class="jp-end">${end(h.from)}${e(who(h.from)!)}</span>` : ""}<div class="jp-flow-mid"><span>${e(h.carrier ?? h.summary)}</span><i></i></div>${who(h.to) ? `<span class="jp-end">${end(h.to)}${e(who(h.to)!)}</span>` : ""}</div>
 ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
     : "";
   const pr = p.w.workshop.presentation ?? {};
@@ -868,8 +916,13 @@ ${st.handoff ? `<div class="jp-handoff">${icon("arrow")}<span><b>Hand-off:</b> $
   const pic = pictureOf(corpus, s, root);
   const siteRoot = siteRootFrom(root, links);
   const lead = p.cast.find((x) => x.id === st.lead);
-  const screens = screensFor(pr, st.id)
-    .map((sc) => `<a class="jp-see" href="${e(`${toWorkshop}demo/${sc.id}/`)}">${glyph(sc.device === "tablet" ? "tablet" : "phone")}<span>See what ${e(lead?.name ?? "they")} ${lead?.name ? "sees" : "see"} <small>(screen ${e(sc.id)})</small></span>${icon("right")}</a>`)
+  const screens = screensFor(p, s)
+    .map((sc) => {
+      // Whose device it is: a drawn screen's owner, else the step's lead.
+      const ownerId = sc.node?.screen.owner;
+      const who = (ownerId ? p.cast.find((x) => x.id === ownerId) ?? personaOf(corpus, sc.node!.instance, ownerId, p.cast.length) : undefined) ?? lead;
+      return `<a class="jp-see" href="${e(`${toWorkshop}demo/${sc.id}/`)}">${who ? avatar(who, "sm") : deviceGlyph(sc)}<span>See what ${e(who?.name ?? "they")} ${who?.name ? "sees" : "see"} <small>(screen ${e(sc.id)})</small></span>${icon("right")}</a>`;
+    })
     .join("");
   void siteRoot;
   const meta = [st.when ? `<span>🕒 ${e(st.when)}</span>` : "", st.where ? `<span>📍 ${e(st.where)}</span>` : "", st.touchpoint ? `<span>${icon("phone")} ${e(st.touchpoint)}</span>` : ""].join("");

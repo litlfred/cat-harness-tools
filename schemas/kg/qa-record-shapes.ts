@@ -147,7 +147,8 @@ export interface TranslationBlockQaReport {
   po: string;
   source_hashes: TranslationFieldHash;
   criteria: Record<string, TranslationQaEntry[]>;
-  updated_at: string;
+  /** Optional and no longer written (owner rulings 2026-11-06, cards "QA dates" and "Date source"): the date is derived on read from the entries' `reviewed_tree`. */
+  updated_at?: string;
 }
 
 // ── from the tools layer's pipeline/lsi.ts ──

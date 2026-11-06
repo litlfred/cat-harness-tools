@@ -73,6 +73,8 @@ body.jv {
 .jv-av { --c: #888; display: inline-grid; place-items: center; border-radius: 50%; background: var(--c); color: #fff; font-weight: 700; flex: none; letter-spacing: 0.02em; }
 .jv-av-m { width: 36px; height: 36px; font-size: 0.78rem; }
 .jv-av-s { width: 22px; height: 22px; font-size: 0.6rem; vertical-align: middle; }
+.jv-av-img { background: #e2e8f0; overflow: hidden; }
+.jv-av-img img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 .jv-avs { display: inline-flex; }
 .jv-avs { gap: 3px; }
 .jv-avs .jv-av { box-shadow: 0 0 0 1px var(--jv-paper); }

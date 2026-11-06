@@ -228,6 +228,7 @@ function saveScriptQa(path: string, report: ScriptQaReport): void {
 
 async function run(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
+  // The run's own time: in this run's summary (`generated_at`) only, never a sidecar.
   const nowIso = new Date().toISOString();
   const headSha = gitHeadSha();
   // What a verdict records as `reviewed_tree`: the tree outlives a PR run's
@@ -273,7 +274,6 @@ async function run(): Promise<void> {
       script_path: target.rel,
       language: target.language,
       source_hash: target.source_hash,
-      updated_at: nowIso,
       criteria: {},
     };
     const metadataDrifted =
@@ -340,7 +340,6 @@ async function run(): Promise<void> {
           script_commit_sha: sh?.script_commit_sha || undefined,
           deps_hash: sh?.deps_hash,
         },
-        reviewed_at: nowIso,
         reviewed_tree: headTree,
       };
       if (checkRes.result === "fail") {
@@ -368,7 +367,9 @@ async function run(): Promise<void> {
 
     const wroteSomething = anyChange || metadataDrifted || !existing;
     if (!args.dryRun && wroteSomething) {
-      report.updated_at = nowIso;
+      // No clock (owner rulings 2026-11-06, "QA dates" / "Date source"): the
+      // date is derived on read from reviewed_tree; a stale legacy one goes.
+      delete report.updated_at;
       saveScriptQa(target.sidecar_abs, report);
     }
     if (
@@ -394,7 +395,6 @@ async function run(): Promise<void> {
         extra_inputs:
           sh.extra_inputs.length > 0 ? sh.extra_inputs : undefined,
         deps_hash: sh.deps_hash,
-        last_run_at: nowIso,
         last_run_sha: headSha,
         engine_version: engineVersion,
       };

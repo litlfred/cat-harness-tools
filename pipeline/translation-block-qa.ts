@@ -523,8 +523,8 @@ function entry(
     field_hash: fieldHash,
     result,
     reviewer: reviewer(),
-    // input-site: inert #1cab269c — reviewed_at; --check compares substantive(), which drops timestamps
-    reviewed_at: new Date().toISOString(),
+    // No reviewed_at (owner rulings 2026-11-06, cards "QA dates" and "Date
+    // source", option 1): the date is derived on read from reviewed_tree.
     // The tree, not the commit (bean 69lr; owner card Q4, 2026-11-05).
     reviewed_tree: gitHeadTree(INSTANCE_ROOT),
     ...extra,
@@ -740,8 +740,7 @@ export function buildReport(
     po: poRel,
     source_hashes: hashes,
     criteria,
-    // input-site: inert #66ee6012 — updated_at; --check compares substantive(), which drops timestamps
-    updated_at: new Date().toISOString(),
+    // No updated_at: the sidecar's date is derived from its entries' tree.
   };
 }
 
