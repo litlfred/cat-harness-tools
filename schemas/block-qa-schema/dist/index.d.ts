@@ -155,7 +155,7 @@ export declare const QaCriterionEntry: z.ZodObject<{
         agent_date: z.ZodOptional<z.ZodString>;
         agent_skill: z.ZodOptional<z.ZodString>;
     }, z.core.$loose>;
-    reviewed_at: z.ZodString;
+    reviewed_at: z.ZodOptional<z.ZodString>;
     reviewed_tree: z.ZodOptional<z.ZodString>;
     reviewed_sha: z.ZodOptional<z.ZodString>;
     notes: z.ZodOptional<z.ZodString>;
@@ -246,12 +246,12 @@ export declare const BlockQaReport: z.ZodObject<{
             agent_date: z.ZodOptional<z.ZodString>;
             agent_skill: z.ZodOptional<z.ZodString>;
         }, z.core.$loose>;
-        reviewed_at: z.ZodString;
+        reviewed_at: z.ZodOptional<z.ZodString>;
         reviewed_tree: z.ZodOptional<z.ZodString>;
         reviewed_sha: z.ZodOptional<z.ZodString>;
         notes: z.ZodOptional<z.ZodString>;
     }, z.core.$loose>>>;
-    updated_at: z.ZodString;
+    updated_at: z.ZodOptional<z.ZodString>;
 }, z.core.$loose>;
 export type BlockQaReport = z.infer<typeof BlockQaReport>;
 export declare const QaScriptSidecar: z.ZodObject<{
@@ -262,9 +262,9 @@ export declare const QaScriptSidecar: z.ZodObject<{
     script_commit_sha: z.ZodString;
     extra_inputs: z.ZodOptional<z.ZodArray<z.ZodString>>;
     deps_hash: z.ZodOptional<z.ZodString>;
-    last_run_at: z.ZodString;
+    last_run_at: z.ZodOptional<z.ZodString>;
     last_run_sha: z.ZodString;
     engine_version: z.ZodOptional<z.ZodString>;
 }, z.core.$loose>;
 export type QaScriptSidecar = z.infer<typeof QaScriptSidecar>;
-export declare const VERSION = "0.1.0";
+export declare const VERSION = "0.2.0";

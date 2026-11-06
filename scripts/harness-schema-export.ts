@@ -743,6 +743,7 @@ export async function scanInstanceZodSchemas(root: string): Promise<ZodSchemaSca
       const module = rel(join(dir, f));
       let mod: Record<string, unknown>;
       try {
+        // input-site: imports */schemas/*.ts,schemas/*.ts,*/schemas/*/*.ts,schemas/*/*.ts #de77ba20 — each instance's Zod schema modules, top level and declared concern groups, as schemaModules reads them
         mod = (await import(join(dir, f))) as Record<string, unknown>;
       } catch (e) {
         scan.problems.push(`${module}: could not be imported: ${e instanceof Error ? e.message : String(e)}`);
@@ -943,6 +944,7 @@ if (import.meta.main) {
     const i = process.argv.indexOf(f);
     return i !== -1 ? process.argv[i + 1] : undefined;
   };
+  // input-site: env KG_BASE_URL #fa804f2f — the base URL the exported ids are minted under
   const baseUrl = arg("--base-url") ?? process.env.KG_BASE_URL;
   const decl = readDeclaration(ROOT);
   const pkgFile = [join(ROOT, "package.json"), join(repoRootFor(ROOT), "package.json")].find(existsSync);
@@ -1007,6 +1009,7 @@ if (import.meta.main) {
   // default started writing `cat-harness/_kg/` while every reader still looked
   // one level up — and the stale pre-move copy at the old path made it look
   // fine locally.
+// input-site: inert #cffed427 — the default output directory, written and never read
 const outDir = arg("--out-dir") ?? join(repoRootFor(ROOT), "_kg");
   mkdirSync(outDir, { recursive: true });
 

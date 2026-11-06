@@ -15,7 +15,7 @@ from block_qa_schema import (
 
 def test_version():
     # Bump in lockstep with pyproject.toml + package.json + js/index.ts VERSION
-    assert __version__ == "0.1.0"
+    assert __version__ == "0.2.0"
 
 
 def test_minimal_report():
@@ -34,6 +34,30 @@ def test_minimal_report():
     assert r.label == "def:carbon-valence"
     assert r.criteria == {}
     assert r.paths.md is None
+
+
+def test_no_clock_required():
+    """Since 0.2.0 no clock is required: a verdict's date is derived from its
+    reviewed_tree (owner ruling 2026-11-06, "QA dates")."""
+    BlockQaReport.model_validate(
+        {
+            "$schema": "block-qa/v1",
+            "label": "def:carbon-valence",
+            "kind": "definition",
+            "paths": {"ts": "content/x/carbon-valence.ts"},
+            "source_hashes": {"ts": "a1b2c3d4e5f6"},
+            "criteria": {
+                "x": [
+                    {
+                        "field_hash": {"md": "9fb618864a10"},
+                        "result": "pass",
+                        "reviewer": {"kind": "script", "id": "x.ts"},
+                        "reviewed_tree": "a" * 40,
+                    }
+                ]
+            },
+        }
+    )
 
 
 def test_full_report_validates():

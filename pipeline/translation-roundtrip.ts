@@ -164,7 +164,10 @@ export function roundTripEntries(
   payload: RoundTripPayload,
   fieldHash: TranslationFieldHash,
 ): TranslationQaEntry[] {
-  const at = payload.reviewedAt ?? new Date().toISOString();
+  // A caller re-recording an earlier review keeps its date; otherwise none is
+  // stamped (owner rulings 2026-11-06, "QA dates" / "Date source"): the date
+  // is derived on read from reviewed_tree.
+  const at = payload.reviewedAt;
   const address = reviewAddress(
     { reviewed_tree: payload.reviewedTree, reviewed_sha: payload.reviewedSha },
     gitHeadTree(INSTANCE_ROOT),
@@ -182,7 +185,7 @@ export function roundTripEntries(
       actor: ADJUDICATOR_ACTOR,
       ...agentFields(payload.adjudicator),
     },
-    reviewed_at: at,
+    ...(at ? { reviewed_at: at } : {}),
     ...address,
     metrics: provenanceMetrics(payload.adjudicator, { role: "adjudicator" }),
     notes: payload.reasoning,
@@ -199,7 +202,7 @@ export function roundTripEntries(
       actor: CHECKER_ACTOR,
       ...agentFields(payload.backTranslator),
     },
-    reviewed_at: at,
+    ...(at ? { reviewed_at: at } : {}),
     ...address,
     metrics: provenanceMetrics(payload.backTranslator, {
       // `role` is what `isCheckerWitness` reads. Without it this entry — which
@@ -249,7 +252,7 @@ export function recordRoundTrip(payload: RoundTripPayload): string {
   // a log of every time someone re-ran it. A human ruling, if one is ever
   // recorded here, is kept — it is not this process's to supersede.
   doc.criteria[CRITERION] = [...fresh, ...kept];
-  doc.updated_at = new Date().toISOString();
+  delete doc.updated_at;
   writeFileSync(sidecar, JSON.stringify(doc, null, 2) + "\n");
   return relative(INSTANCE_ROOT, sidecar);
 }

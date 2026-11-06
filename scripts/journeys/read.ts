@@ -4,7 +4,7 @@
  * FHIR examples.
  *
  * @module scripts/journeys/read
- * @covers user-scenario, workshop
+ * @covers user-scenario, workshop, device-screen
  *
  * ## Where the journeys are: the declarations say
  *
@@ -30,6 +30,11 @@
  * | `illustration.src` | the image, relative to the instance root |
  * | `requirements` | a `req:` node (`<dir>/requirements/<id>.json`) in any declared directory |
  * | `examples` | the `index.json` of a `fhir-artifact-index` directory |
+ * | a persona's `avatar` | the image, relative to the actor's instance root |
+ *
+ * A device screen (`device-screen` kind, `device-screen.ts`) is read the same
+ * way, from a directory declaring that kind; its `owner`, person cards, steps
+ * and examples resolve as a journey's do.
  *
  * An edge that resolves to nothing is kept and drawn as unresolved, never
  * dropped: a missing story is a finding a reader should see. The same
@@ -54,6 +59,7 @@ import {
   type UserScenario,
 } from "../../schemas/process/user-scenario.ts";
 import { parseWorkshop, WORKSHOP_V01, type Workshop } from "../../schemas/process/workshop.ts";
+import { DEVICE_SCREEN_V01, parseDeviceScreen, type DeviceScreen } from "../../schemas/process/device-screen.ts";
 
 export const SCENARIO_KIND = "user-scenario";
 export const WORKSHOP_KIND = "workshop";
@@ -61,6 +67,8 @@ export const WORKSHOP_KIND = "workshop";
 export const CODE_LIST_KIND = "code-list";
 /** Where a building-block catalogue is kept: any directory declaring this kind. */
 export const BUILDING_BLOCKS_KIND = "building-blocks";
+/** Where device screens are kept: any directory declaring this kind. */
+export const DEVICE_SCREEN_KIND = "device-screen";
 
 /** An instance of the checkout, as the viewer needs it. */
 export interface InstanceInfo {
@@ -87,8 +95,19 @@ export interface WorkshopEntry {
   workshop: Workshop;
 }
 
+/** A device screen, with where it came from. */
+export interface ScreenEntry {
+  instance: string;
+  file: string;
+  screen: DeviceScreen;
+}
+
 export interface Actor {
   id: string;
+  /** The instance whose `scenarios` directory holds it. */
+  instance: string;
+  /** Instance-relative path of its file. */
+  file: string;
   title: string;
   kind?: string;
   description?: string;
@@ -140,6 +159,8 @@ export interface JourneyCorpus {
   instances: Map<string, InstanceInfo>;
   journeys: Journey[];
   workshops: WorkshopEntry[];
+  /** Device screens, every instance's. */
+  screens: ScreenEntry[];
   /** Per instance: actors by id. */
   actors: Map<string, Map<string, Actor>>;
   stories: Map<string, Map<string, Story>>;
@@ -225,6 +246,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
     instances,
     journeys: [],
     workshops: [],
+    screens: [],
     actors: new Map(),
     stories: new Map(),
     blocks: new Map(),
@@ -256,7 +278,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
       corpus.examplesUnbuilt.push(`${instance}/${rel(d.absPath)}`);
     }
     if (!existsSync(d.absPath) || !statSync(d.absPath).isDirectory()) continue;
-    if (kinds.includes(SCENARIO_KIND) || kinds.includes(WORKSHOP_KIND) || kinds.includes(CODE_LIST_KIND) || kinds.includes(BUILDING_BLOCKS_KIND)) {
+    if ([SCENARIO_KIND, WORKSHOP_KIND, CODE_LIST_KIND, BUILDING_BLOCKS_KIND, DEVICE_SCREEN_KIND].some((k) => kinds.includes(k))) {
       for (const p of jsonFilesUnder(d.absPath, 2)) {
         if (seenFiles.has(p)) continue;
         const raw = readJson(p) as { $schema?: unknown; id?: unknown; codes?: unknown } | undefined;
@@ -286,6 +308,9 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
           } else if (kinds.includes(WORKSHOP_KIND) && tag === WORKSHOP_V01) {
             seenFiles.add(p);
             corpus.workshops.push({ instance, file: rel(p), dir: dirname(p), workshop: parseWorkshop(raw, rel(p)) });
+          } else if (kinds.includes(DEVICE_SCREEN_KIND) && tag === DEVICE_SCREEN_V01) {
+            seenFiles.add(p);
+            corpus.screens.push({ instance, file: rel(p), screen: parseDeviceScreen(raw, rel(p)) });
           }
         } catch (e) {
           corpus.problems.push({ instance, file: rel(p), message: (e instanceof Error ? e.message : String(e)).replace(`${rel(p)}: `, "") });
@@ -301,6 +326,8 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
         const persona = a.meta?.persona === undefined ? undefined : JourneyPersonaSchema.safeParse(a.meta.persona);
         actors.set(a.id, {
           id: a.id,
+          instance,
+          file: rel(p),
           title: a.title ?? a.id,
           ...(a.kind ? { kind: a.kind } : {}),
           ...(a.description ? { description: a.description } : {}),
@@ -354,6 +381,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
   }
   corpus.journeys.sort((a, b) => a.instance.localeCompare(b.instance) || a.scenario.id.localeCompare(b.scenario.id));
   corpus.workshops.sort((a, b) => a.instance.localeCompare(b.instance) || a.workshop.id.localeCompare(b.workshop.id));
+  corpus.screens.sort((a, b) => a.instance.localeCompare(b.instance) || a.screen.id.localeCompare(b.screen.id, undefined, { numeric: true }));
   return corpus;
 }
 
@@ -389,6 +417,12 @@ export function journeyById(corpus: JourneyCorpus, instance: string, id: string)
 /** A requirement by the id a step names (`STT-VER-008`, `req:stt-ver-008`). */
 export function requirementFor(corpus: JourneyCorpus, id: string): Requirement | undefined {
   return corpus.requirements.get(upper(id));
+}
+
+/** A persona's avatar: the image file, absolute, when the actor names one and it exists. */
+export function avatarFile(corpus: JourneyCorpus, actor: Actor): string | undefined {
+  const src = actor.persona?.avatar;
+  return src === undefined ? undefined : instanceFile(corpus, actor.instance, src);
 }
 
 /** A path a journey names, relative to its instance's root: absolute when the file exists. */

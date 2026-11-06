@@ -12,7 +12,7 @@ import { dirname, join } from "node:path";
 
 import type { StandingConsent } from "../../../schemas/kg/mount-trust.js";
 import type { RemoteMount } from "../../../schemas/kg/remote-mount.js";
-import { applyRepin, candidateFor, planRepin, summaryOf, verdictOf, type CommitVerdict, type GitHubApi } from "../../repin-standing.ts";
+import { alignToHeldPins, applyRepin, candidateFor, lockPinsOf, planRepin, summaryOf, verdictOf, type CommitVerdict, type GitHubApi } from "../../repin-standing.ts";
 
 const A = "a".repeat(40);
 const B = "b".repeat(40);
@@ -222,5 +222,52 @@ describe("applyRepin: index.config.json and index.lock.json move through the mou
     const before = readFileSync(join(root, "index.config.json"), "utf-8");
     expect(await applyRepin(root, { moves: [], held: [], unknown: [] })).toEqual({ exit: 0 });
     expect(readFileSync(join(root, "index.config.json"), "utf-8")).toBe(before);
+  });
+});
+
+describe("alignToHeldPins: an instance below the harness follows the harness's own lock (cascade, bean pqlh)", () => {
+  const open = rule({ require: undefined });
+  const withLocks = (api: GitHubApi, locks: Record<string, Record<string, string>>): GitHubApi => ({
+    ...api,
+    async lockPinsAt(repository, sha) {
+      return locks[`${repository}@${sha}`];
+    },
+  });
+  const cap = { harness: "harness", below: new Set(["base", "base-tools"]) };
+
+  test("the lower layer moves to the pin the harness's NEW commit holds, not to its branch head", async () => {
+    const mounts = [mount("harness", A, open), mount("base", A, open), mount("base-tools", A, open), mount("content", A, open)];
+    const api = withLocks(stubApi({ "o/harness@main": [B], "o/base@main": [D], "o/base-tools@main": [D], "o/content@main": [D] }), {
+      [`o/harness@${B}`]: { "o/base": C, "o/base-tools": A, "o/content": B },
+    });
+    const plan = await alignToHeldPins(await planRepin(mounts, api), mounts, api, cap);
+    const to = Object.fromEntries(plan.moves.map((m) => [m.harness, m.to]));
+    expect(to).toEqual({ harness: B, base: C, content: D });
+    expect(plan.moves.find((m) => m.harness === "base")?.alignedTo).toBe(`harness@${B.slice(0, 10)}`);
+    expect(plan.held.map((h) => h.harness)).toEqual(["base-tools"]);
+    expect(summaryOf(plan, true)).toContain("held by harness@");
+  });
+
+  test("a held pin the standing rule does not cover is held, not moved", async () => {
+    const mounts = [mount("harness", A, open), mount("base", A, rule())];
+    const api = withLocks(stubApi({ "o/harness@main": [B], "o/base@main": [D] }, { [D]: "green", [C]: "red" }), { [`o/harness@${B}`]: { "o/base": C } });
+    const plan = await alignToHeldPins(await planRepin(mounts, api), mounts, api, cap);
+    expect(plan.moves.map((m) => m.harness)).toEqual(["harness"]);
+    expect(plan.held.find((h) => h.harness === "base")?.reason).toContain("does not cover");
+  });
+
+  test("an unreadable harness lock is unknown, never a silent pass; no lock reader means no cascade", async () => {
+    const mounts = [mount("harness", A, open), mount("base", A, open)];
+    const base = stubApi({ "o/harness@main": [B], "o/base@main": [D] });
+    const broken: GitHubApi = { ...base, async lockPinsAt() { throw new Error("HTTP 500"); } };
+    const plan = await alignToHeldPins(await planRepin(mounts, broken), mounts, broken, cap);
+    expect(plan.unknown.map((u) => u.harness)).toEqual(["harness"]);
+    const plain = await alignToHeldPins(await planRepin(mounts, base), mounts, base, cap);
+    expect(plain.moves.find((m) => m.harness === "base")?.to).toBe(D);
+  });
+
+  test("lockPinsOf reads `mounts` and ignores anything else", () => {
+    expect(lockPinsOf({ mounts: [{ repository: "o/x", ref: A }, { repository: 1 }], instances: [{ repository: "o/y", sha: B }] })).toEqual({ "o/x": A });
+    expect(lockPinsOf(null)).toEqual({});
   });
 });

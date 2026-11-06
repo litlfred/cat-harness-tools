@@ -293,6 +293,9 @@ async function run(): Promise<void> {
   // What a block verdict records as `reviewed_tree`: the tree outlives a PR
   // run's synthetic merge commit (bean 69lr; owner card Q4, 2026-11-05).
   const headTree = gitHeadTree();
+  // The run's own time. It goes in this run's summary (`generated_at` below),
+  // never into a sidecar: a verdict's date is derived from the tree it
+  // reviewed (owner ruling 2026-11-06, card "QA dates", option 1).
   const nowIso = new Date().toISOString();
   // Criterion-selection precedence (most-specific first):
   //   --only ID[,ID]    explicit criterion IDs (any axis)
@@ -461,7 +464,6 @@ async function run(): Promise<void> {
       paths: newPaths,
       source_hashes: currentHashes,
       criteria: composeCriteria({}, attested.attestations),
-      updated_at: nowIso,
     };
 
     // Detect whether metadata drifted — moved files, renamed blocks,
@@ -591,7 +593,6 @@ async function run(): Promise<void> {
           field_hash: fieldHash,
           result: "n/a",
           reviewer: { ...scriptReviewer },
-          reviewed_at: nowIso,
           reviewed_tree: headTree,
           notes: blockAdapter
             ? `criterion applies to ${criterionScope.join("/")}; block kind "${block.kind}" is ${blockAdapter}`
@@ -641,7 +642,6 @@ async function run(): Promise<void> {
           field_hash: fieldHash,
           result: "n/a",
           reviewer: { ...scriptReviewer },
-          reviewed_at: nowIso,
           reviewed_tree: headTree,
           // `folioProfile` is necessarily defined here: the undetermined
           // case returns `false` from `profileExcludesCriterion`.
@@ -677,7 +677,6 @@ async function run(): Promise<void> {
           field_hash: fieldHash,
           result: "n/a",
           reviewer: { ...scriptReviewer },
-          reviewed_at: nowIso,
           reviewed_tree: headTree,
           notes: missingCompanionNote(missingRole),
         };
@@ -716,7 +715,6 @@ async function run(): Promise<void> {
         field_hash: fieldHash,
         result: checkRes.result,
         reviewer: { ...scriptReviewer },
-        reviewed_at: nowIso,
         reviewed_tree: headTree,
       };
       // Surface checker-supplied context (e.g. a cache-staleness reason
@@ -784,7 +782,10 @@ async function run(): Promise<void> {
     const wroteSomething = verdictChanged || metadataDrifted;
     // Only advance the file's own timestamp when its content actually moved,
     // for the same reason.
-    if (wroteSomething) report.updated_at = nowIso;
+    // No clock in the sidecar (owner ruling 2026-11-06, "QA dates"): its date
+    // is derived from its entries' `reviewed_tree`. A legacy `updated_at`
+    // would now go stale, so a rewrite drops it.
+    if (wroteSomething) delete report.updated_at;
     if (wroteSomething) {
       try {
         report.criteria = finalizeCriteria(attested, report.criteria, "script", { dryRun: args.dryRun });
@@ -838,7 +839,6 @@ async function run(): Promise<void> {
         extra_inputs:
           hashes.extra_inputs.length > 0 ? hashes.extra_inputs : undefined,
         deps_hash: hashes.deps_hash,
-        last_run_at: nowIso,
         // The PLATFORM's HEAD, not `headSha`. This sidecar lives in and
         // describes folio-assistant's own checker scripts; `headSha` is the
         // CONTENT repo's HEAD (correct for a block's `reviewed_tree`, since

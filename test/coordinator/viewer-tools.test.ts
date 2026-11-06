@@ -70,6 +70,9 @@ describe("viewer Tools declare what they render", () => {
     // neither of which this index mounts.
     "user-scenario": "litlfred/smart-trust-demo",
     workshop: "litlfred/smart-trust-demo",
+    // Owner, 2026-11-06, option A: journeys-viewer draws the device screens of
+    // the same two instances.
+    "device-screen": "litlfred/smart-trust-demo",
   };
 
   it("every rendered kind is declared by some directory", () => {
@@ -77,9 +80,29 @@ describe("viewer Tools declare what they render", () => {
     expect([...rendered].filter((k) => !declared.has(k) && !(k in HELD_OUTSIDE))).toEqual([]);
   });
 
+  /**
+   * TRANSITIONAL (remove once the cat-harness PR that adds `device-screen` to
+   * journeys-viewer's `renders` is on cat-harness main): this layer draws the
+   * kind and merges first, and the Tool that renders it is defined in
+   * cat-harness, after. Until then the named Tool exists and does not render
+   * it yet; that is checked as exactly that, never waived. Once it renders it,
+   * the ordinary check holds it.
+   */
+  const NOT_YET_IN_THE_TOOLS_RENDERS: Record<string, string> = {
+    "device-screen": "journeys-viewer",
+  };
+
   it("every kind listed as held outside is still rendered here and still not held here", () => {
     const declared = new Set(dirs.flatMap(({ dir }) => dir.graphTypologies ?? []));
+    const ids = new Set(all.map((t) => t.id));
     for (const k of Object.keys(HELD_OUTSIDE)) {
+      const toCome = NOT_YET_IN_THE_TOOLS_RENDERS[k];
+      if (toCome !== undefined && !rendered.has(k)) {
+        // The Tool that will render it is defined; it does not list the kind yet.
+        expect(ids.has(toCome), `${k} is to be rendered by ${toCome}, which does not exist`).toBe(true);
+        expect(declared.has(k), `${k} is declared in this checkout now — drop it from HELD_OUTSIDE`).toBe(false);
+        continue;
+      }
       expect(rendered.has(k), `${k} is no longer rendered by any Tool — drop it from HELD_OUTSIDE`).toBe(true);
       expect(declared.has(k), `${k} is declared in this checkout now — drop it from HELD_OUTSIDE`).toBe(false);
     }

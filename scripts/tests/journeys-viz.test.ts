@@ -458,7 +458,8 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(map).toContain('data-jp-show="tech"');
     expect(map).toContain('data-row="lane" data-actor="cleo"');
     expect(map).toContain('href="../how/wallet/"');
-    expect(map).toContain("<b>Clinic EMR → Ana</b>");
+    // A hand-off end that is somebody of the cast wears their avatar.
+    expect(map).toMatch(/<b>Clinic EMR → <span class="jp-av jp-av-sm"[^>]*>A<\/span>Ana<\/b>/);
     expect(map).toContain('data-jp-panel="1" hidden');
     expect(map).toContain("Open screen S2");
     expect(map).toContain("Read across, then down.");
@@ -521,7 +522,7 @@ describe("a workshop with none of the optional data still presents", () => {
     );
     const page = (p: string) => String(bare.find((f) => f.path === `top/workshops/policy/${p}`)!.content);
     expect(page("walkthrough/P2/index.html")).not.toContain("jp-drawer");
-    expect(page("walkthrough/P2/index.html")).toContain('aria-disabled="true" title="This workshop names no device demo"');
+    expect(page("walkthrough/P2/index.html")).toContain('aria-disabled="true" title="No device screen shows a step of this workshop"');
     expect(page("how/index.html")).toContain("No building-block catalogue is declared");
     expect(bare.some((f) => f.path.includes("/demo/"))).toBe(false);
   });
@@ -587,7 +588,9 @@ describe("presentation helpers", () => {
     expect(stepByRef(corpus, p, "p2-treated#P2")?.key).toBe("P2");
     expect(stepByRef(corpus, p, "P1")?.key).toBe("P1");
     expect(stepByRef(corpus, p, "t1-away#T1")).toBeUndefined();
-    expect(screensFor(p.w.workshop.presentation!, "P2").map((x) => x.id)).toEqual(["S2"]);
+    // No device-screen node shows a step here, so the workshop's own app is framed.
+    expect(p.demo).toBe("frame");
+    expect(screensFor(p, stepByRef(corpus, p, "P2")!).map((x) => x.id)).toEqual(["S2"]);
     expect(screenHref(p.w.workshop.presentation!, "S2", "../")).toBe("../app/#/demo/S2");
   });
   test("small ones", () => {

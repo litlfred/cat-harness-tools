@@ -1591,7 +1591,15 @@ if (import.meta.main) {
   // "library" here would be a second answer to a question `harness.json`
   // already answers, and `check:declared-paths` would be right to say so.
   const libDirs = corpusDirectoriesForGraph(ROOT, "library");
-  const seg = libDirs.length > 0 ? basename(libDirs[0]!) : null;
+  // The TOP-LEVEL declared directory: a corpus declared from within a named
+  // sub-graph (cat-harness's `library/graph.json` → `corpus/`) publishes
+  // under the sub-graph's name, which is what `harness.json` declares and
+  // what its `builtAtPublish` (`docs/assets/library/`) and the slice read.
+  const topOf = (d: string): string => {
+    const first = relative(ROOT, d).split(sep)[0]!;
+    return first === "" || first === ".." ? basename(d) : first;
+  };
+  const seg = libDirs.length > 0 ? topOf(libDirs[0]!) : null;
   if (seg === null) {
     // No library directory declared by this instance — the uploads half alone
     // has nowhere to hang, and composing a name would be exactly the literal
