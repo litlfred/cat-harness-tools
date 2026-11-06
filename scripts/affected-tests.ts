@@ -38,9 +38,10 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 
 import { directRelativeImports } from "./input-hash.ts";
+import { TEST_FILE_RE } from "./input-sites.ts";
 
-/** What `bun test` collects by default: `*.test.*`, `*_test.*`, `*.spec.*`, `*_spec.*`. */
-export const TEST_FILE_RE = /(?:\.test|_test|\.spec|_spec)\.(?:[cm]?[jt]sx?)$/;
+/** What `bun test` collects by default: `*.test.*`, `*_test.*`, `*.spec.*`, `*_spec.*`. One regex, `input-sites.ts`'s. */
+export { TEST_FILE_RE };
 
 /** Directories `bun test` does not reach in these checkouts, or that hold no source. */
 const SKIP_DIRS = new Set(["node_modules", "build", "_site", "fsh-guts", "dist", "coverage"]);

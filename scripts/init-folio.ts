@@ -966,7 +966,7 @@ ${o.contentType === "paper" ? "\n# Lean build artifacts\n.lake/\n*.olean\n\n# Ra
 /**
  * The folio's before/after preview: a caller of the platform's reusable
  * `folio-staging.yml` (bean `ojcx`). Without it a folio in its own repository
- * gets no STAGING build, and a reviewer has no "after" to compare.
+ * gets no branches/ build, and a reviewer has no "after" to compare.
  *
  * **A document folio gets it ON**, building with
  * the content core's `scripts/build-document-site.ts` (bean `fyu2`). That
@@ -1032,7 +1032,7 @@ function stagingWorkflow(assistant: string, contentType: InitFolioOptions["conte
   return `name: Staging preview
 
 # A before/after preview of this folio for every pull request, published to
-# STAGING/<branch>/ on gh-pages, with the ChangeSet (what changed, block by
+# branches/<branch>/ on gh-pages, with the ChangeSet (what changed, block by
 # block) beside it. A push to main publishes main's site at the gh-pages root:
 # the "before" side. The mechanics live in the platform's reusable workflow.
 #

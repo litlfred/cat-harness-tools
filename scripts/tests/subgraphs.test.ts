@@ -25,13 +25,14 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import {
+  CatHarnessDeclarationSchema,
   isDerivedGraph,
   owningDirectory,
   resolveDirectories,
   siteDirFor,
   subgraphTree,
 } from "../../schemas/kg/cat-harness.ts";
-import { addressesPublishedTree, beanArchiveViews, overDeepLinks, resolveAcrossArchive, scanSubgraphs } from "../check-subgraphs.ts";
+import { addressesPublishedTree, beanArchiveViews, danglingLinksIn, declaredMoves, overDeepLinks, resolveAcrossArchive, resolveThroughMove, scanSubgraphs, unbuiltPublishPaths, type LinkContext } from "../check-subgraphs.ts";
 import { GraphTypologyRegistry, type GraphTypologyDef } from "../../schemas/kg/graph-typology-registry.ts";
 import { checkoutDirectories } from "../../schemas/kg/harness-config.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -335,5 +336,102 @@ describe("the bean archive view resolves like the store it sits in", () => {
       const file = join(root, "beans/defs/archive/b.md");
       expect(resolveAcrossArchive(file, "../../NOPE.md", resolve(join(root, "beans/defs/archive"), "../../NOPE.md"), views)).toBeUndefined();
       expect(resolveAcrossArchive(join(root, "beans/notes/README.md"), "../defs/c.md", join(root, "beans/defs/c.md"), views)).toBeUndefined();
+    }));
+});
+
+// folio-assistant-tsh9: a layer that moves a path other layers link to keeps
+// answering at the old path for a declared window, so the layers that link to
+// it can switch in any order (sdlc skill `two-phase-move`).
+describe("a declared move answers at the old path until its window closes", () => {
+  const withMove = (until: string, fn: (inst: string) => void) => {
+    const inst = mkdtempSync(join(tmpdir(), "moves-"));
+    try {
+      mkdirSync(join(inst, "sdlc/skills"), { recursive: true });
+      writeFileSync(join(inst, "sdlc/skills/a.md"), "x");
+      const name = inst.split("/").pop()!;
+      writeFileSync(
+        join(inst, `${name}.json`),
+        JSON.stringify({ name, directories: [], moves: [{ from: "skills/sdlc", to: "sdlc/skills", until }] }),
+      );
+      fn(inst);
+    } finally {
+      rmSync(inst, { recursive: true, force: true });
+    }
+  };
+
+  test("a link to the old path resolves at the new one", () =>
+    withMove("2099-12-31", (inst) => {
+      const moves = declaredMoves([inst], "2026-11-05");
+      expect(moves.map((m) => [m.absFrom, m.absTo, m.expired])).toEqual([[join(inst, "skills/sdlc"), join(inst, "sdlc/skills"), false]]);
+      expect(resolveThroughMove(join(inst, "skills/sdlc/a.md"), moves)?.resolved).toBe(join(inst, "sdlc/skills/a.md"));
+    }));
+
+  test("a file that is not at the new path either is still unresolved", () =>
+    withMove("2099-12-31", (inst) => {
+      expect(resolveThroughMove(join(inst, "skills/sdlc/b.md"), declaredMoves([inst], "2026-11-05"))).toBeUndefined();
+      // and a path that merely shares the prefix's spelling is not under it
+      expect(resolveThroughMove(join(inst, "skills/sdlc-x/a.md"), declaredMoves([inst], "2026-11-05"))).toBeUndefined();
+    }));
+
+  test("past `until` the move is expired and no longer honoured", () =>
+    withMove("2026-11-04", (inst) => {
+      const moves = declaredMoves([inst], "2026-11-05");
+      expect(moves[0]!.expired).toBe(true);
+      expect(resolveThroughMove(join(inst, "skills/sdlc/a.md"), moves)).toBeUndefined();
+    }));
+
+  test("the declaration refuses a move without a date", () => {
+    const decl = { name: "x", directories: [], moves: [{ from: "a", to: "b", until: "soon" }] };
+    expect(CatHarnessDeclarationSchema.safeParse(decl).success).toBe(false);
+    decl.moves[0]!.until = "2026-12-31";
+    expect(CatHarnessDeclarationSchema.safeParse(decl).success).toBe(true);
+  });
+});
+
+// A link into a declared `builtAtPublish` path cannot be judged before the
+// publish build has written it (owner ruling 2026-11-05, card "Built links",
+// option 1): unverifiable while the path is absent, judged once it exists.
+describe("a link into an unbuilt publish-time artefact is unverifiable, not dangling", () => {
+  const withInstance = (built: boolean, fn: (inst: string, ctx: LinkContext) => void) => {
+    const inst = mkdtempSync(join(tmpdir(), "bap-"));
+    try {
+      const name = inst.split("/").pop()!;
+      mkdirSync(join(inst, "notes"), { recursive: true });
+      if (built) {
+        mkdirSync(join(inst, "schemas/kinds"), { recursive: true });
+        writeFileSync(join(inst, "schemas/kinds/a.json"), "{}");
+      }
+      writeFileSync(
+        join(inst, `${name}.json`),
+        JSON.stringify({
+          name,
+          directories: [],
+          builtAtPublish: [{ path: "schemas/kinds/", writer: ["kinds:build"], because: "checkout", reason: "fixture" }],
+        }),
+      );
+      const dirs = [{ id: "notes", path: "notes", absPath: join(inst, "notes"), graphTypologies: [] as string[] }];
+      const ctx = { root: inst, own: dirs, dirs, label: (d: { id: string }) => d.id, absentOffMain: [], archiveViews: [], unbuilt: unbuiltPublishPaths([inst]) } as unknown as LinkContext;
+      fn(inst, ctx);
+    } finally {
+      rmSync(inst, { recursive: true, force: true });
+    }
+  };
+
+  test("an absent declared path is listed, with its trailing slash", () =>
+    withInstance(false, (inst) => {
+      expect(unbuiltPublishPaths([inst])).toEqual([`${join(inst, "schemas/kinds")}/`]);
+    }));
+
+  test("while unbuilt, a link into it is not dangling; a link elsewhere still is", () =>
+    withInstance(false, (inst, ctx) => {
+      const text = "[k](../schemas/kinds/a.json) [d](../schemas/kinds/) [x](../nope.md)";
+      expect(danglingLinksIn(ctx, join(inst, "notes/n.md"), text)).toEqual(["../nope.md"]);
+    }));
+
+  test("once built, a link to a file the build did not write is dangling again", () =>
+    withInstance(true, (inst, ctx) => {
+      expect(unbuiltPublishPaths([inst])).toEqual([]);
+      const text = "[k](../schemas/kinds/a.json) [m](../schemas/kinds/missing.json)";
+      expect(danglingLinksIn(ctx, join(inst, "notes/n.md"), text)).toEqual(["../schemas/kinds/missing.json"]);
     }));
 });

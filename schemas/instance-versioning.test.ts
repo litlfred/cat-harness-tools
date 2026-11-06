@@ -510,7 +510,7 @@ describe("version bump — computed from the surface, not claimed by a commit me
     });
 
     /**
-     * `current` and `dev` are a STAGING choice (§3.3). Inventing a release
+     * `current` and `dev` are a branches/ choice (§3.3). Inventing a release
      * number for one would be this module asserting a publication nobody made.
      */
     test("a pseudo-version comes back unchanged rather than coerced", () => {

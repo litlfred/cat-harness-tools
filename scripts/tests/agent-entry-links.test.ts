@@ -24,7 +24,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { ENTRY_NAMES, findEntryFiles } from "../check-agent-entry-links.js";
+import { ENTRY_NAMES, findEntryFiles, movesResolver } from "../check-agent-entry-links.js";
 import { auditMarkdownFile, parseLinks } from "../../src/core/markdown-links.js";
 import { publishTargets } from "../../src/core/git-refs.js";
 import { repoRootFor } from "../../schemas/kg/cat-harness.js";
@@ -117,5 +117,34 @@ describe("this repository, right now", () => {
     // what must never happen is a dead link in one that exists.
     expect(r.exitCode === 0 || r.exitCode === 2).toBe(true);
     if (r.exitCode === 1) throw new Error(r.text);
+  });
+});
+
+// folio-assistant-tsh9: a link into a path an instance moved resolves at the
+// new path while the move is in its window (sdlc skill `two-phase-move`).
+describe("a link into a moved path", () => {
+  const checkout = (until: string): string => {
+    const root = mkdtempSync(join(tmpdir(), "entry-moves-"));
+    mkdirSync(join(root, "a/new"), { recursive: true });
+    writeFileSync(join(root, "a/new/x.md"), "x\n");
+    writeFileSync(join(root, "a/a.json"), JSON.stringify({ name: "a", directories: [], moves: [{ from: "old", to: "new", until }] }));
+    writeFileSync(join(root, "AGENTS.md"), "# A\n\n[x](a/old/x.md)\n");
+    return root;
+  };
+
+  test("resolves at the new path in the window, and is reported as moved, not dead", () => {
+    const root = checkout("2026-12-31");
+    const r = auditMarkdownFile({ root, file: join(root, "AGENTS.md"), publishRef: "gh-pages", resolveMoved: movesResolver(root, "2026-11-05") });
+    expect(r.exitCode).toBe(0);
+    expect(r.text).toContain("0 dead");
+    expect(r.text).toContain("1 through a declared move");
+    expect(r.text).toContain("moved (a:old)");
+  });
+
+  test("past `until` the move gives no relief: the link is dead", () => {
+    const root = checkout("2026-11-04");
+    const r = auditMarkdownFile({ root, file: join(root, "AGENTS.md"), publishRef: "gh-pages", resolveMoved: movesResolver(root, "2026-11-05") });
+    expect(r.exitCode).toBe(1);
+    expect(r.text).toContain("1 dead");
   });
 });

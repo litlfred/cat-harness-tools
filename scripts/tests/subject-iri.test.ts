@@ -266,6 +266,14 @@ describe("every subject loads: its own .jsonld and page", () => {
       // A node with no name in the graph keeps its IRI as the link text, and it wraps.
       const lane = readFileSync(join(dir, "process/P/lane/L.html"), "utf-8");
       expect(lane).not.toContain("<p>Part of");
+      // Every subject page carries data-fa-pin and a pin-to-folio control (cat-harness#982).
+      expect(step).toContain(`data-fa-pin="${makeIri(DOC, "process", "P/node/T")}"`);
+      expect(step).toContain('data-fa-pin-kind="pin"');
+      expect(step).toContain('data-fa-pin-node-kind="processes"');
+      expect(step).toContain('data-fa-pin-control');
+      const skill = readFileSync(join(dir, "skill/a.html"), "utf-8");
+      expect(skill).toContain(`data-fa-pin="${makeIri(DOC, "skill", "a")}"`);
+      expect(skill).toContain('data-fa-pin-node-kind="skills"');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

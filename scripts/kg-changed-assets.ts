@@ -53,7 +53,7 @@
  *
  * `--main` is a directory holding main's published site — at least its
  * `*.jsonld` documents, at their published paths (e.g. extracted from the
- * `gh-pages` ref, `STAGING/` excluded). Without it, or when a document is not
+ * `gh-pages` ref, `branches/` excluded). Without it, or when a document is not
  * in it, each preview document says why in `changedAssetsUnavailable`.
  *
  * Exit: 0 written (a third state included — it is written down, and warned);

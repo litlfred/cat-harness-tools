@@ -13,6 +13,7 @@ import { join, resolve } from "node:path";
 
 import { AGENT_INSTRUCTIONS_ROLE, declaredAssets, repoRootFor } from "../../schemas/kg/cat-harness.js";
 import { auditInstance, isCheckable, markdownLinks } from "../check-declared-assets.js";
+import { movesResolver } from "../check-agent-entry-links.js";
 import { writeDeclaration } from "../../test/support/instance-fixture.js";
 import { checkIndexRender, leadParagraph, renderIndex } from "../index-render.js";
 
@@ -160,5 +161,32 @@ describe("leadParagraph reads headings the way a reader does", () => {
 
   test("a thematic break is not a lead paragraph, and an ATX h1 still opens the body", () => {
     expect(leadParagraph("# T\n\n---\n\nThe lead.\n")).toBe("The lead.");
+  });
+});
+
+// folio-assistant-tsh9: an asset's link into a path the instance moved is
+// `moved`, not `dead-link`, until the move's `until` (sdlc skill `two-phase-move`).
+describe("a declared move", () => {
+  const moved = (until: string): string => {
+    const root = mkdtempSync(join(tmpdir(), "assets-moves-"));
+    writeDeclaration(root, JSON.stringify({ name: "t", assets: [{ id: "a", src: "AGENTS.md" }], moves: [{ from: "old", to: "new", until }] }));
+    mkdirSync(join(root, "new"), { recursive: true });
+    writeFileSync(join(root, "new/x.md"), "x\n");
+    writeFileSync(join(root, "AGENTS.md"), "[x](old/x.md)\n");
+    return root;
+  };
+
+  test("in the window the link is reported as moved", () => {
+    const root = moved("2026-12-31");
+    const { findings } = auditInstance(root, movesResolver(root, "2026-11-05"));
+    rmSync(root, { recursive: true, force: true });
+    expect(findings.map((f) => f.kind)).toEqual(["moved"]);
+  });
+
+  test("past `until` it is a dead link again", () => {
+    const root = moved("2026-11-04");
+    const { findings } = auditInstance(root, movesResolver(root, "2026-11-05"));
+    rmSync(root, { recursive: true, force: true });
+    expect(findings.map((f) => f.kind)).toEqual(["dead-link"]);
   });
 });

@@ -28,14 +28,22 @@
  * scan below takes the same first-`-->` boundary a parser does, deliberately,
  * and then tests the body against the production.
  *
+ * ## What it reads
+ *
+ * Every `.bpmn` and `.dmn` under a directory the instance declares as
+ * `processes`, and every `.bpmn` of a declared `business-processes` directory
+ * (`businessProcessFiles`, without folio blocks): the registry names this
+ * check as what grades the second kind, whose diagrams nothing runs and so
+ * no engine gate reads.
+ *
  * Usage:  bun run cat-harness-tools/scripts/xml-comment-check.ts
  * Exits 1 and names every offending file, line and text.
  *
- * @covers processes
+ * @covers processes, business-processes
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 
-import { workflowDirs, corpusScopeFor } from "./known-skills.js";
+import { businessProcessFiles, workflowDirs, corpusScopeFor } from "./known-skills.js";
 import { join, relative, resolve } from "node:path";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -99,12 +107,24 @@ export function xmlSourcesUnder(dir: string): string[] {
   return out;
 }
 
-if (import.meta.main) {
-  const root = resolve(HARNESS_ROOT);
+/**
+ * The diagrams this check reads under one instance root: every `.bpmn` and
+ * `.dmn` of its declared `processes` directories, and every `.bpmn` of its
+ * declared `business-processes` directories (folio blocks excluded: a block
+ * carries its own drawing and is graded with its folio). Sorted, no repeats.
+ */
+export function xmlCommentFiles(root: string): { dirs: string[]; files: string[] } {
   // Every directory the instance DECLARES as holding processes, not the
   // literal `processes`. A topical layout puts them in several.
   const dirs = workflowDirs(root, corpusScopeFor(root));
-  const files = dirs.flatMap((d) => xmlSourcesUnder(d));
+  const files = new Set(dirs.flatMap((d) => xmlSourcesUnder(d)));
+  for (const f of businessProcessFiles(root, { folio: false })) files.add(f);
+  return { dirs, files: [...files].sort() };
+}
+
+if (import.meta.main) {
+  const root = resolve(HARNESS_ROOT);
+  const { dirs, files } = xmlCommentFiles(root);
 
   // An empty corpus is not a pass. Renaming `processes/` would
   // otherwise turn this gate into a silent success over nothing, which is the

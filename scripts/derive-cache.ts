@@ -220,7 +220,7 @@ function copyFiles(fromRoot: string, toRoot: string, files: readonly string[]): 
 }
 
 /**
- * Snapshot `writer`'s declared outputs into a STAGING entry (not yet visible
+ * Snapshot `writer`'s declared outputs into a branches/ entry (not yet visible
  * to {@link hasEntry}); {@link commitStaged} makes it the entry for `key`.
  */
 export function stageOutputs(cacheDir: string, writer: string, key: string, root: string, outputs: readonly string[], keep: readonly string[]): string {

@@ -31,6 +31,7 @@ import { join } from "node:path";
 
 import { WaiverNodeSchema, waiverState, type WaiverNode } from "../schemas/conduct/waiver.js";
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
+import { gateDirectoriesForGraph } from "./lib/gate-own.ts";
 
 /** The INSTANCE root — this file lives at `<instance>/scripts/`. */
 export const INSTANCE_ROOT = HARNESS_ROOT;
@@ -57,10 +58,16 @@ export interface WaiverReport {
   malformed: { file: string; reason: string }[];
 }
 
-/** Read every waiver in the declared `waiver` graph. */
-export function checkWaivers(root: string = INSTANCE_ROOT, now: Date = new Date()): WaiverReport {
+/**
+ * Read every waiver in the declared `waiver` graph, or in `dirs` when a gate
+ * scoped them to its caller's own (owner ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`).
+ */
+export function checkWaivers(
+  root: string = INSTANCE_ROOT,
+  now: Date = new Date(),
+  dirs: readonly string[] = corpusDirectoriesForGraph(root, "waiver"),
+): WaiverReport {
   const out: WaiverReport = { store: null, inForce: [], inert: [], malformed: [] };
-  const dirs = corpusDirectoriesForGraph(root, "waiver");
   if (dirs.length === 0) return out;
   out.store = dirs.join(", ");
   const files: { dir: string; name: string }[] = [];
@@ -120,7 +127,7 @@ function formatReport(r: WaiverReport): string {
 if (import.meta.main) {
   let report: WaiverReport;
   try {
-    report = checkWaivers();
+    report = checkWaivers(INSTANCE_ROOT, undefined, gateDirectoriesForGraph(INSTANCE_ROOT, "waiver").dirs);
   } catch (e) {
     console.error(`Could not check waivers: ${e instanceof Error ? e.message : e}`);
     console.error("This is NOT a pass, and it is NOT a waiver. Treat it as unknown and ask.");

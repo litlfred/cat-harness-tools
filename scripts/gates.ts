@@ -946,7 +946,7 @@ const OWN_STEP_EXEMPTIONS: StepExemption[] = [
   },
   {
     // Added by folio-assistant#2843 in `feature-staging.yml`: rewrites the
-    // `gh-pages` checkout in place (`pages/STAGING/<slug>/` -> `_staging-blob/`
+    // `gh-pages` checkout in place (`pages/branches/<slug>/` -> `_staging-blob/`
     // + `_staging-manifest/<slug>.json`) and writes `pages/404.html` and
     // `pages/_worker.js` right before the staging commit/push. Its four modes
     // (`apply`, `GC`, `write-404`, `verify`) — content-addressed deduplication,
@@ -1831,6 +1831,12 @@ const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
     kind: "covered-by",
     reason:
       "RUN IN THIS LAYER'S OWN CI: cat-harness-tools' `pr-tests.yml` measures the layer standing alone on the pull request's base and head (`check-standalone.ts --layer cat-harness-tools --measured-out …`) and its `standalone` job fails on a test that newly fails. In folio-assistant the layer is a mount at a pin that has already passed that, the way `check:cat-harness-standalone` is the index's job for cat-harness",
+  },
+  {
+    script: "check:journey-refs",
+    kind: "no-folio",
+    reason:
+      "ITS SUBJECT IS JOURNEYS AND WORKSHOPS, which no instance this index mounts declares (the `user-scenario` and `workshop` kinds are held by litlfred/smart-trust-demo and litlfred/smart-ips-pilgrimage; test/coordinator/viewer-tools.test.ts lists them as held outside), so here it would read nothing and say so. It is a `check:` script of this layer's package.json, so `run-gates.py` runs it as a declared gate in this layer's own CI and in every checkout that mounts this layer, the content instances that hold journeys among them; it moves into the index's gate set when an instance the index mounts declares a journey",
   },
 ];
 

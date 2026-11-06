@@ -321,7 +321,7 @@ export interface CarryDecision {
  * **3.2 MB of markdown** in the checkout and **111.6 MB of HTML** in a
  * preview — 681 pages at ~164 KiB each, because just-the-docs inlines the
  * whole navigation into every page. Measured across `origin/gh-pages` on
- * 2026-09-23: **776.6 MB over 13 previews, 37 % of a 2.10 GB `STAGING/`
+ * 2026-09-23: **776.6 MB over 13 previews, 37 % of a 2.10 GB `branches/`
  * tree**, against a 1 GB Pages limit the main site shares. Every preview
  * carried it, whether or not its branch mentioned the instance.
  *
@@ -824,7 +824,7 @@ export function mergeConfig(
  * publishes withheld content to the world, where nothing shows it at all.
  */
 export interface ComposeOptions {
-  /** True on a local build or a `STAGING/<slug>/` preview. Default false. */
+  /** True on a local build or a `branches/<slug>/` preview. Default false. */
   readonly staging?: boolean;
   /**
    * The branch's changed paths, repo-relative, when they are known.
@@ -1168,7 +1168,7 @@ if (import.meta.main) {
   }
 
   // `--staging` is the POSITIVE assertion that this build is not the canonical
-  // deploy: a local build, or a `STAGING/<slug>/` preview. Absent means
+  // deploy: a local build, or a `branches/<slug>/` preview. Absent means
   // canonical, which withholds. The default is the restrictive one on purpose
   // — `VisualisationSchema.publish` carries why the two error directions are
   // not symmetric.

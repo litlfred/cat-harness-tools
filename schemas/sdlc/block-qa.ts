@@ -640,10 +640,18 @@ export interface QaCriterionEntry {
   /** When the audit ran (ISO-8601 UTC). */
   reviewed_at: string;
   /**
-   * Repo HEAD at audit time (full git SHA). Producers must set this on
-   * every new entry; optional in the type only because legacy agent
-   * entries (pre-2026-06) omit it — matching the interchange schema
-   * (`tools/block-qa-schema/`), where it is likewise optional.
+   * Tree of repo HEAD at audit time (`HEAD^{tree}`, full git id, or the
+   * `unknown` sentinel outside git). Producers must set this on every new
+   * entry; optional in the type only because older entries carry
+   * `reviewed_sha` instead. The tree, not the commit, because a PR run's HEAD
+   * is GitHub's synthetic merge commit, which can vanish — the tree survives
+   * onto main unchanged (bean 69lr; owner card Q4, 2026-11-05).
+   */
+  reviewed_tree?: string;
+  /**
+   * Repo HEAD at audit time (full git SHA). No longer written — superseded
+   * by `reviewed_tree` (bean 69lr) — and kept readable so existing sidecars
+   * validate. Legacy agent entries (pre-2026-06) omit it too.
    */
   reviewed_sha?: string;
   /** Free-form notes. */

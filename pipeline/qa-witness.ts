@@ -413,6 +413,7 @@ function witnessOf(
     version: r.version,
     at: entry.reviewed_at,
     sha: entry.reviewed_sha,
+    tree: entry.reviewed_tree,
     scriptHash: r.script_hash,
     scriptCommitSha: r.script_commit_sha,
     depsHash: r.deps_hash,

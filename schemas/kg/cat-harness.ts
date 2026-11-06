@@ -903,6 +903,11 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
    */
   enableSubgraphs?: string[];
   /**
+   * Paths this instance moved and still answers for, during the window of the
+   * two-phase move rule (sdlc skill `two-phase-move`). See the schema field.
+   */
+  moves?: DeclaredMove[];
+  /**
    * What this instance's own package tasks read and write, keyed by task name
    * — the same {@link ScriptIO}-shaped facts `cat-harness-tools/scripts/task-io.ts`
    * holds for the harness's own tasks: `outputs: []` (measured to write
@@ -1339,7 +1344,7 @@ export const VisualisationSchema = z.object({
    * is what every visualisation did before this field existed.
    *
    * `"staging-only"` renders the page and keeps it OUT of the canonical
-   * deploy: visible in a local build and in a `STAGING/<slug>/` preview,
+   * deploy: visible in a local build and in a `branches/<slug>/` preview,
    * absent from the published site.
    *
    * ## Why a graph would want that
@@ -3430,6 +3435,17 @@ export const GateExemptionsSchema = z
   })
   .strict();
 
+/** One entry of a declaration's `moves` — see that field. */
+export const DeclaredMoveSchema = z
+  .object({
+    from: z.string().min(1),
+    to: z.string().min(1),
+    until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "a date, `YYYY-MM-DD`"),
+    because: z.string().min(1).optional(),
+  })
+  .strict();
+export type DeclaredMove = z.infer<typeof DeclaredMoveSchema>;
+
 const catHarnessDeclarationShape = {
   name: z.string().min(1),
   ...kgNodeLabelShape,
@@ -3697,6 +3713,17 @@ const catHarnessDeclarationShape = {
    * entries declared from within by `check:declaration-resolution`.
    */
   enableSubgraphs: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]*\.[^\s]+$/, "`<instance>.<directory id>`, e.g. `cat-harness.sdlc`")).optional(),
+  /**
+   * Paths this instance moved, each still answered for at its old place until
+   * `until` (sdlc skill `two-phase-move`). A link from any layer into `from`
+   * resolves as the same path under `to`, so the layers that link here can
+   * switch to the new path in any order, after this instance is re-pinned.
+   * Both are directory paths relative to this instance's root. Past `until`
+   * the entry is no longer honoured and `check:subgraphs --check` fails on it:
+   * remove it once nothing links to `from` (the report names the inbound
+   * links still left).
+   */
+  moves: z.array(DeclaredMoveSchema).optional(),
   /**
    * What this instance's own package tasks read and write, keyed by task name
    * — the same {@link ScriptIO}-shaped facts `cat-harness-tools/scripts/task-io.ts`

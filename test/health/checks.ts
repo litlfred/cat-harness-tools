@@ -50,6 +50,7 @@ import type {
   PagesServingObservation,
 } from "../../schemas/sdlc/health-report.ts";
 import { isPreviewName, MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
+import { PREVIEW_PREFIX } from "../../schemas/sdlc/preview-prefix.ts";
 import {
   EXPIRY_BASIS,
   EXPIRY_URGENT_DAYS,
@@ -77,7 +78,7 @@ export type StoreProbe<T> = Probe<T> | { state: "absent"; reason: string };
 
 /** One preview directory on the publish branch. */
 export interface StagingPreview {
-  /** The directory name under `STAGING/` — the sanitised branch slug. */
+  /** The directory name under `branches/` — the sanitised branch slug. */
   slug: string;
   bytes: number;
   files: number;
@@ -919,7 +920,7 @@ export const ORPHAN_THRESHOLDS: HealthThreshold[] = [
  * ## Why "no open pull request" is not the question — bean `w2g5`
  *
  * It was, until 2026-09-19, and on that day it named
- * `STAGING/claude-brave-hypatia-r820sf` an orphan while the branch carried an
+ * `branches/claude-brave-hypatia-r820sf` an orphan while the branch carried an
  * unmerged commit **two minutes old**, on a branch a sibling session had used
  * for five successive pull requests, each merged and closed before the next
  * opened. "No open PR" is true of such a branch for the entire gap between
@@ -985,7 +986,7 @@ export function stagingOrphanCheck(ctx: HealthContext): HealthCheckResult {
   // that would silence it is exactly how a three-state value gets treated as
   // a two-state one.
   const openHeads = ctx.openPrHeads.value;
-  // `STAGING/_retired/` is the retired-record store (bean `6pfo`), and other
+  // `branches/_retired/` is the retired-record store (bean `6pfo`), and other
   // `_`/dot names are reserved: none is a preview, so none has a branch or a
   // pull request to claim it. Judging them would name the record store an
   // orphan every day (folio-assistant#860). The same rule `staging-rotate.ts`
@@ -1001,7 +1002,7 @@ export function stagingOrphanCheck(ctx: HealthContext): HealthCheckResult {
   if (blind.length > 0) {
     const determined =
       orphans.length > 0
-        ? `Determined but NOT reported this run: ${orphans.map((j) => `\`STAGING/${j.preview.slug}\``).join(", ")} — ` +
+        ? `Determined but NOT reported this run: ${orphans.map((j) => `\`${PREVIEW_PREFIX}/${j.preview.slug}\``).join(", ")} — ` +
           "named here so the measurement is not lost, but nothing should be acted on while a signal is unreadable."
         : "No other preview was determined to be an orphan this run.";
     return unknownResult(
@@ -1009,7 +1010,7 @@ export function stagingOrphanCheck(ctx: HealthContext): HealthCheckResult {
       summary,
       ORPHAN_THRESHOLDS,
       `${blind.length} preview(s) could not be judged: ` +
-        `${blind.map((j) => `\`STAGING/${j.preview.slug}\` — ${j.liveness.undetermined}`).join("; ")}. ` +
+        `${blind.map((j) => `\`${PREVIEW_PREFIX}/${j.preview.slug}\` — ${j.liveness.undetermined}`).join("; ")}. ` +
         "A signal that cannot be evaluated sends that preview to `unknown`, never to the orphan list. " +
         determined,
     );
@@ -1036,7 +1037,7 @@ export function stagingOrphanCheck(ctx: HealthContext): HealthCheckResult {
   const findings: HealthFinding[] = orphans.map((j) => ({
     severity: "minor" as const,
     summary:
-      `\`STAGING/${j.preview.slug}\` (${formatBytes(j.preview.bytes)}, ${j.preview.files} files) — ` +
+      `\`${PREVIEW_PREFIX}/${j.preview.slug}\` (${formatBytes(j.preview.bytes)}, ${j.preview.files} files) — ` +
       `${j.liveness.evidence}.`,
     // THE LABEL CANNOT REACH AN ORPHAN, so it is not offered here — bean
     // `7umv`. `feature-staging.yml` says why, in its own words: `cleanup`
@@ -1838,7 +1839,7 @@ const TODO_THRESHOLDS: HealthThreshold[] = [
  * | route | result |
  * |---|---|
  * | `GET https://litlfred.github.io/folio-assistant/` | `connect_rejected`, egress policy |
- * | the same for a `STAGING/<slug>/` page | `connect_rejected` |
+ * | the same for a `branches/<slug>/` page | `connect_rejected` |
  * | `GET /repos/:o/:r/pages` | every field `null` |
  * | `GET /repos/:o/:r/pages/builds` | "not permitted through this proxy" |
  * | `actions/workflows/pages-build-deployment/runs` | `total_count` absent |

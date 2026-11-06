@@ -47,6 +47,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { instanceRootsIn, localeDirIn, translationsHomeFor } from "../schemas/kg/cat-harness.js";
+import { gateOwnsFile } from "./lib/gate-own.ts";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { extractBpmn, injectBpmn } from "../pipeline/bpmn-translate.js";
@@ -150,6 +151,17 @@ if (diagrams.length === 0) {
 // dependencies.
 const HOME = translationsHomeFor(root, HARNESS_ROOT);
 const TRANSLATIONS = HOME.root;
+
+// In a layer's PR checks, only templates the caller commits (owner ruling
+// 2026-11-05, "Move the checks"; `lib/gate-own.ts`). bootstrap's `.pot` files
+// live in cat-harness's `translations/`, so a layer above is not judged on them.
+if (wantCheck && gateOwnsFile(relative(REPO_ROOT, TRANSLATIONS)) === false) {
+  console.log(
+    `✓ translate-bpmn --check: the templates live in ${relative(REPO_ROOT, TRANSLATIONS)}, which the caller does not commit; ` +
+      "the owning layer's CI judges them.",
+  );
+  process.exit(0);
+}
 
 /**
  * The per-locale subdirectory holding a diagram's `.pot`/`.po`/injected `.bpmn`.

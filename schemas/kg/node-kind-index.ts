@@ -46,6 +46,7 @@ import { instanceRootsIn } from "./instance-roots.js";
 import { harnessRoot } from "../harness-root.js";
 import { moduleRootOf, parseValidatorRef } from "./kind-validator.js";
 import { isNodeKind, nodeKind, type NodeKind } from "./node-kind.js";
+import { WorkPlanKind } from "../sdlc/work-plan.ts";
 
 /** One node kind, as the index records it. */
 export interface NodeKindEntry {
@@ -87,15 +88,19 @@ export interface NodeKindEntry {
 }
 
 /**
- * The rules that find a kind's nodes WITHOUT a typology. One today.
+ * The rules that find a kind's nodes WITHOUT a typology. Two today.
  *
  * An instance declaration is a node (bean `ujiv`, issue #88: *"harness
  * declarations become node kinds by tagging the files"*), but it is not IN a
  * directory any typology describes. It is the file that DECLARES the
  * directories, at the instance's root, found by `findDeclarationFile`. Filing
  * it under a typology would invent a directory; the rule names where it is.
+ *
+ * A work plan (`process-tag`, work item folio-assistant-exrp) is a work item
+ * file already held as a `bean`; what makes it a plan is a `process:` tag, so
+ * the rule is that tag, and no directory is named twice.
  */
-export type NameRule = "instance-declaration";
+export type NameRule = "instance-declaration" | "process-tag";
 
 /** A kind found by a name rule: the `nodeKind()` itself, where it is declared, and the rule. */
 export interface NameRuleKind {
@@ -113,6 +118,7 @@ export interface NameRuleKind {
  */
 export const NAME_RULE_KINDS: readonly NameRuleKind[] = [
   { kind: CatHarnessDeclarationKind, file: join(import.meta.dir, "cat-harness.ts"), exportName: "CatHarnessDeclarationKind", rule: "instance-declaration" },
+  { kind: WorkPlanKind, file: join(import.meta.dir, "..", "sdlc", "work-plan.ts"), exportName: "WorkPlanKind", rule: "process-tag" },
 ];
 
 /** The instance this module belongs to: the one whose code holds {@link NAME_RULE_KINDS}. */
@@ -160,7 +166,7 @@ export const NodeKindIndexFileKind = nodeKind("node-kind-index/1.1.0", [], {
     pages: z.object({ module: z.string().min(1), exportName: z.string().min(1) }).optional(),
     holdings: z.array(z.object({ typology: z.string().min(1), family: z.string().optional() })),
     // 1.1.0 (bean `ujiv`): a kind found by a name rule rather than a typology.
-    foundBy: z.enum(["instance-declaration"]).optional(),
+    foundBy: z.enum(["instance-declaration", "process-tag"]).optional(),
   })),
   unkinded: z.array(z.object({
     typology: z.string().min(1),
@@ -219,7 +225,7 @@ export async function nodeKindIndex(
     if (!existsSync(abs)) return { declaredBy, reason: "unresolvable" };
     let mod: Record<string, unknown>;
     try {
-      // input-site: imports */schemas/**/*.ts,*/src/**/*.ts,schemas/**/*.ts,src/**/*.ts #771876e3 — validator modules referenced by graph typology and node-kind declarations
+      // input-site: declared validator-refs #771876e3 — validator modules named by graph typology and node-kind declarations, resolved from them at fingerprint time (`scripts/declared-imports.ts`); input-sites.test.ts holds the two to each other
       mod = (await import(abs)) as Record<string, unknown>;
     } catch {
       return { declaredBy, reason: "unresolvable" };

@@ -27,6 +27,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { harnessPath } from "../lib/harness-layout.ts";
 import { graphLayer, isContentGraph, isContextGraph, isDerivedGraph, isStateGraph, processMayWrite, repoRootFor } from "../../schemas/kg/cat-harness.js";
 
 import { walkBlocks } from "../../pipeline/qa-utils.js";
@@ -176,7 +177,7 @@ describe("`derived` — the fourth layer, and why `library/` is on it (bean `hqk
     // would have made a declared process a defect by the axis's own rule.
     // This is the elimination, asserted against the actual diagram.
     const bpmn = readFileSync(
-      join(repoRootFor(resolve(HARNESS_ROOT)), "cat-harness", "processes", "library", "document-ingestion.bpmn"),
+      harnessPath("library/processes/document-ingestion.bpmn", join(repoRootFor(resolve(HARNESS_ROOT)), "cat-harness")),
       "utf-8",
     );
     expect(bpmn).toContain("library");
