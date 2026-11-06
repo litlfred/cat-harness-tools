@@ -102,7 +102,6 @@ import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import { join, relative } from "path";
 
 import { commentGuard } from "./html-comments.ts";
-import { declinesNavbar } from "./lib/harness-rail.ts";
 
 /** The per-preview facts. One file per build, read by the banner at load time. */
 export interface StagingFacts {
@@ -188,10 +187,6 @@ export const RELEASE_BACKGROUND = "#6B3FA0";
  * text. White on white: the one piece of information the banner exists to
  * convey was invisible to exactly the readers using the default theme.
  */
-/** The minimal notice's style: a small pill in the bottom-left corner, over the page and never in its flow. */
-const MINIMAL_STYLE =
-  `background:${PREVIEW_BACKGROUND};color:#fff;padding:2px 8px;font-size:11px;line-height:1.4;border-radius:999px;position:fixed;bottom:8px;left:8px;z-index:2147483001;font-family:system-ui;opacity:.85;pointer-events:none`;
-
 const BANNER_STYLE =
   `background:${PREVIEW_BACKGROUND};color:#fff;padding:8px 16px;font-size:14px;text-align:center;position:fixed;top:0;left:0;right:0;box-sizing:border-box;z-index:2147483001;font-family:system-ui`;
 
@@ -437,20 +432,6 @@ export const FRAGMENT =
   `<script>${CLIENT}</script>`;
 
 /**
- * The fragment a page that DECLINES THE HARNESS FRAME gets instead
- * (`<meta name="folio-navbar" content="none">`, `declinesNavbar`): the
- * journeys viewer's workshop pages, which are told in a room with no site
- * chrome (owner, 2026-11-06: "journey pages drop the harness frame
- * entirely"). A preview must still say it is one, so the page keeps a small
- * notice in a corner — no bar across the top, no offset pushing the page
- * down, no build details — and the same client script, whose service worker
- * serves the preview's shared stylesheets. Constant, as {@link FRAGMENT} is.
- */
-export const MINIMAL_FRAGMENT =
-  `<div data-fa-staging-banner data-fa-staging-minimal lang="en" dir="ltr" style="${MINIMAL_STYLE}" title="A preview of a branch, not the published site">\u{1F500} Preview</div>` +
-  `<script>${CLIENT}</script>`;
-
-/**
  * Every `*.html` under `dir`, as absolute paths — except the pinned pdf.js
  * viewer's. That page is only ever seen inside a frame on one of ours, which
  * already carries the banner; a second banner inside the PDF frame is noise,
@@ -516,8 +497,7 @@ export type Injection = "injected" | "already" | "no-body";
  * attributes orphaned as visible text, and the real tag stripped of them.
  *
  * Idempotent: a page that already carries the banner is left alone, so a
- * second pass over a tree is a no-op rather than a doubled banner. A page that
- * declines the harness frame gets {@link MINIMAL_FRAGMENT} instead.
+ * second pass over a tree is a no-op rather than a doubled banner.
  */
 export function injectInto(html: string): { html: string; outcome: Injection } {
   // The banner ELEMENT, not the bare word: the review page names the attribute
@@ -527,7 +507,7 @@ export function injectInto(html: string): { html: string; outcome: Injection } {
   if (/<[a-z][a-z0-9-]*\s[^>]*data-fa-staging-banner[\s=>]/i.test(html)) return { html, outcome: "already" };
   const at = bodyInsertionPoint(html);
   if (at < 0) return { html, outcome: "no-body" };
-  return { html: html.slice(0, at) + (declinesNavbar(html) ? MINIMAL_FRAGMENT : FRAGMENT) + html.slice(at), outcome: "injected" };
+  return { html: html.slice(0, at) + FRAGMENT + html.slice(at), outcome: "injected" };
 }
 
 export function run(
