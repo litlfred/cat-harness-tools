@@ -19,14 +19,61 @@
  * bootstrap-tools' `export-graph.ts`, which mints fragments until its own
  * phase of #603, so its subjects get `undefined` and the caller keeps the
  * link it had — never a slash path nothing serves.
+ *
+ * ## Only where the checkout being built publishes the host's site
+ *
+ * The pages are written by `kg-export` in the HOST's own deploy: the
+ * checkout whose root is the host or an index of its layers. A downstream
+ * checkout (one whose root declares an instance of its own, the host only a
+ * mount in it) builds ITS site, and nothing in that build writes a subject
+ * page. Before this rule its links named the host's site anyway —
+ * `<host base>/<downstream>/process/<id>/node/<id>`, which the host does not
+ * publish either — so every step title in a downstream's BPMN was a 404.
+ * There the answer is `undefined`, and each caller keeps the link it falls
+ * back to: the processes viewer's page, a role's index row, the IG's page.
  */
 import { resolve } from "node:path";
-import { findInstanceRoot, readDeclaration } from "../../schemas/kg/cat-harness.js";
+import { checkoutRootFor, findInstanceRoot, readDeclaration } from "../../schemas/kg/cat-harness.js";
+import { findDeclarationFile } from "../../schemas/kg/instance-roots.js";
 import { makeIri, publishedIdentity } from "../kg-export.js";
 import { declaresOwnCanonical, instanceDocPath, publishesInstanceSchema } from "../instance-exports.js";
 import { HARNESS_ROOT } from "./roots.ts";
 
 const docIris = new Map<string, string | undefined>();
+
+/**
+ * Does building `checkout` publish the site of the host at `host`, where
+ * `kg-export` writes the subject pages? Yes when the checkout IS the host, or
+ * its root declares no instance (an index of the host's layers), or declares
+ * the host itself. No when its root declares another instance: a downstream,
+ * building its own site with the host mounted in it.
+ */
+export function publishesHostSite(checkout: string, host: string): boolean {
+  const root = resolve(checkout);
+  const h = resolve(host);
+  if (root === h) return true;
+  if (findDeclarationFile(root) === undefined) return true;
+  try {
+    const top = readDeclaration(root)?.name;
+    return top !== undefined && top === readDeclaration(h)?.name;
+  } catch {
+    return false;
+  }
+}
+
+let hostHere: boolean | undefined;
+/** {@link publishesHostSite} for this run's harness, once. */
+function hostSiteHere(): boolean {
+  if (hostHere === undefined) {
+    try {
+      hostHere = publishesHostSite(checkoutRootFor(HARNESS_ROOT), HARNESS_ROOT);
+    } catch {
+      // The checkout could not be determined: no page is known to be written.
+      hostHere = false;
+    }
+  }
+  return hostHere;
+}
 
 /** The document IRI subjects of `instanceRoot` are minted against, when kg-export publishes their pages. */
 function servingDocIri(instanceRoot: string): string | undefined {
@@ -34,6 +81,7 @@ function servingDocIri(instanceRoot: string): string | undefined {
   if (!docIris.has(key)) {
     let doc: string | undefined;
     try {
+      if (!hostSiteHere()) throw new Error("a downstream checkout: its build writes no subject pages");
       const host = key === resolve(HARNESS_ROOT);
       const decl = readDeclaration(key);
       if (host || (publishesInstanceSchema(key) && !declaresOwnCanonical(decl))) {
