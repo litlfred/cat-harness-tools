@@ -1003,13 +1003,15 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     "html.fa-bp .block-actions{opacity:1}" +
     "html.fa-bp .block-actions>.ba-ic:not(.ba-trigger):not(.ba-bookmark),html.fa-bp .fa-block-panel .block-actions>.ba-ic{display:none}" +
     // Owner, 2026-11-02 (dth-pc): "need a bit of padding between content and
-    // grill", kept: .75rem of padding either side of the content, then the
-    // 1.75rem right gutter the icons sit in.
+    // grill", kept: .75rem of backdrop either side of the white panel, 1rem
+    // inside it (owner, 2026-11-06: "need bit padding to left of text and
+    // buttons"), then the right gutter the icons sit in. The 📣's margin is
+    // the panel's 1rem padding plus the anchor's 2.25rem, so both line up.
     "@media (min-width:50rem){html.fa-bp .main-content-wrap{padding-left:.75rem;padding-right:2.5rem}" +
-    "html.fa-bp .main-content{position:relative}" +
+    "html.fa-bp .main-content{position:relative;padding-left:1rem;padding-right:1rem}" +
     "html.fa-bp .main-content :is(h1,h2,h3,h4,h5,h6):has(>.anchor-heading){position:static}" +
     "html.fa-bp .main-content .anchor-heading{left:auto;right:-2.25rem;top:auto;height:auto;width:1.5rem}" +
-    "html.fa-bp .main-content .block-actions{float:right;clear:right;width:1.5rem;margin:0 -2.25rem 6px 0;text-align:center}}" +
+    "html.fa-bp .main-content .block-actions{float:right;clear:right;width:1.5rem;margin:0 -3.25rem 6px 0;text-align:center}}" +
     "html.fa-bp .block-actions>.ba-trigger,html.fa-bp .block-actions>.ba-bookmark{width:20px;height:20px;border:0;background:none;font-size:13px;opacity:.35;filter:grayscale(1)}" +
     "html.fa-bp .block-actions>.ba-trigger .ba-n{top:-4px;right:-6px;font-size:9px;padding:0 3px}" +
     "html.fa-bp .block-actions:hover>.ba-trigger,html.fa-bp .ba-trigger:focus-visible,html.fa-bp .ba-trigger[aria-expanded=true],html.fa-bp :hover>.block-actions>.ba-trigger,html.fa-bp p:has(+.fa-blk:hover)>.block-actions>.ba-trigger" + ON +
