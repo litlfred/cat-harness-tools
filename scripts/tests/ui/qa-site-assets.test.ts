@@ -197,6 +197,17 @@ describe("tree-commits: the tree-to-commit index", () => {
     expect(i.depth).toBe(3);
     expect(i.repo).toBe("https://github.com/o/r");
   });
+  test("each tree carries its kept commit's date, so a verdict's date is derived from its tree", () => {
+    const log = [`${T("a")} ${T("1")} 2026-11-06T04:00:00Z`, `${T("b")} ${T("2")} 2026-11-05T10:00:00+01:00`, `${T("a")} ${T("3")} 2026-11-04T09:00:00Z`].join("\n");
+    const i = treeCommitIndex(log, undefined);
+    expect(i.commits[T("a")]).toBe(T("3"));
+    expect(i.dates).toEqual({ [T("a")]: "2026-11-04T09:00:00Z", [T("b")]: "2026-11-05T10:00:00+01:00" });
+  });
+  test("a log without dates still reads, and carries no dates", () => {
+    const i = treeCommitIndex(`${T("a")} ${T("1")}`, undefined);
+    expect(i.commits).toEqual({ [T("a")]: T("1") });
+    expect(i.dates).toBeUndefined();
+  });
   test("no GitHub origin: no repo, so the panel builds no link", () => {
     expect(treeCommitIndex("", undefined).repo).toBeNull();
     expect(treeCommitIndex("", "https://gitlab.com/o/r").repo).toBeNull();
