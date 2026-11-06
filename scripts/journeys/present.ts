@@ -39,7 +39,8 @@ import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
 import type { ScenarioStep } from "../../schemas/process/user-scenario.ts";
 import type { WorkshopPresentation, WorkshopStep } from "../../schemas/process/workshop.ts";
-import { blockFor, journeyById, lookup, processDrawing, processName, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
+import { blockFor, journeyById, lookup, processName, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
+import { artifactPage, DAK_ATTR, linkedProcessDrawing } from "./dak-links.ts";
 import {
   allSteps,
   bpmnFigure,
@@ -198,7 +199,7 @@ export const LAYER_TONES = ["teal", "sky", "indigo", "violet", "rose", "amber"] 
  * `PersonaText`: escaped, and a name matches only as a whole word, the longest
  * name first ("Dr. Anan" before "Anan").
  */
-export function personaText(text: string, people: readonly PersonaView[]): string {
+export function personaText(text: string, people: readonly PersonaView[], link?: (p: PersonaView) => string | undefined): string {
   const named = [...people].filter((p) => p.name.trim()).sort((a, b) => b.name.length - a.name.length);
   if (named.length === 0) return e(text);
   const re = new RegExp(`(?<![\\p{L}\\p{N}])(${named.map((p) => p.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?![\\p{L}\\p{N}])`, "gu");
@@ -206,7 +207,8 @@ export function personaText(text: string, people: readonly PersonaView[]): strin
   let last = 0;
   for (const m of text.matchAll(re)) {
     const p = named.find((x) => x.name === m[1])!;
-    out += e(text.slice(last, m.index)) + `<span class="jp-named">${e(m[1]!)}${avatar(p, "sm")}</span>`;
+    const href = link?.(p);
+    out += e(text.slice(last, m.index)) + (href ? `<a class="jp-named" href="${e(href)}" ${DAK_ATTR}>${e(m[1]!)}${avatar(p, "sm")}</a>` : `<span class="jp-named">${e(m[1]!)}${avatar(p, "sm")}</span>`);
     last = m.index! + m[0].length;
   }
   return out + e(text.slice(last));
@@ -317,8 +319,18 @@ export function emotionBadge(v: number | undefined): string {
   return `<span class="jp-emo jp-emo-${tone}" title="${label}">${icon(ic)}<span>${label}</span></span>`;
 }
 
-export const ext = (href: string, label: string, cls = ""): string =>
-  `<a class="jp-ext${cls ? ` ${cls}` : ""}" href="${e(href)}" target="_blank" rel="noopener noreferrer">${e(label)}${icon("ext")}</a>`;
+export const ext = (href: string, label: string, cls = "", attrs = ""): string =>
+  `<a class="jp-ext${cls ? ` ${cls}` : ""}" href="${e(href)}"${attrs ? ` ${attrs}` : ""} target="_blank" rel="noopener noreferrer">${e(label)}${icon("ext")}</a>`;
+
+/** A persona's IG page from a page at `siteRoot`: the ActorDefinition it plays, when the index lists it. */
+export const personaHref = (corpus: JourneyCorpus, pr: WorkshopPresentation, siteRoot: string) => (p: PersonaView): string | undefined =>
+  p.artifact ? artifactPage(corpus, pr, p.artifact, siteRoot) : undefined;
+
+/** A persona's name, linked to its IG page when there is one. */
+export function personaNameHtml(p: PersonaView, link?: (p: PersonaView) => string | undefined): string {
+  const href = link?.(p);
+  return href ? `<a href="${e(href)}" ${DAK_ATTR} title="${e(p.artifact ?? "")}">${e(p.name)}</a>` : e(p.name);
+}
 
 /** The width a drawing has at 100%: its root `<svg>`'s viewBox width, else its `width` in pixels. */
 export function viewBoxWidth(svg: string): number | undefined {
@@ -359,15 +371,19 @@ export function kramdownSlug(text: string): string {
 export function examplePage(corpus: JourneyCorpus, pr: WorkshopPresentation, key: string, siteRoot: string): string | undefined {
   const x = corpus.examples.get(key);
   if (x?.url) return x.url;
+  // An index was read and does not list it: the IG has no page for it.
+  if (x === undefined && corpus.examples.size > 0) return undefined;
   const [type, id] = key.split("/");
   if (!pr.ig || !type || !id) return undefined;
   return fromSite(`${pr.ig.href}${fillPattern(pr.ig.example ?? "{type}-{id}.html", { type, id })}`, siteRoot);
 }
 
 /** A profile's page, by StructureDefinition id (or a canonical's last segment), in the IG. */
-export function profilePage(pr: WorkshopPresentation, profile: string, siteRoot: string): string | undefined {
+export function profilePage(pr: WorkshopPresentation, profile: string, siteRoot: string, corpus?: JourneyCorpus): string | undefined {
   if (!pr.ig) return undefined;
   const id = profile.replace(/.*\//, "");
+  // An index was read and lists no such profile: the IG has no page for it.
+  if (corpus && corpus.examples.size > 0 && !corpus.examples.has(`StructureDefinition/${id}`)) return undefined;
   return fromSite(`${pr.ig.href}${fillPattern(pr.ig.profile ?? "StructureDefinition-{id}.html", { id })}`, siteRoot);
 }
 
@@ -542,8 +558,9 @@ export function chapterScene(c: Chapter): { icon: string; label: string }[] | un
   return c.journey.scenario.scene ?? c.steps.find((s) => s.journey.scenario.scene)?.journey.scenario.scene;
 }
 
-function overviewPage(corpus: JourneyCorpus, p: Presentation): string {
+function overviewPage(corpus: JourneyCorpus, p: Presentation, links?: SiteLinks): string {
   const root = "../../../../";
+  const pl = links ? personaHref(corpus, p.w.workshop.presentation ?? {}, siteRootFrom(root, links)) : undefined;
   const toWorkshop = "../";
   const ws = p.w.workshop;
   const pr = ws.presentation ?? {};
@@ -574,7 +591,7 @@ ${pic}${scene}
   const castHtml = p.cast
     .map((x) => {
       const n = p.steps.filter((s) => s.step.experiences.some((y) => y.actor === x.id)).length;
-      return `<div class="jp-person" style="--c:${e(x.color)}">${avatar(x)}<div><b>${e(x.name)}</b><span class="jp-person-role">${[x.role, x.country].filter(Boolean).map((v) => e(v!)).join(" · ")}</span>${x.goal ? `<p>${e(x.goal)}</p>` : ""}<small>Appears in ${n} of ${steps} step${steps === 1 ? "" : "s"}</small></div></div>`;
+      return `<div class="jp-person" style="--c:${e(x.color)}">${avatar(x)}<div><b>${personaNameHtml(x, pl)}</b><span class="jp-person-role">${[x.role, x.country].filter(Boolean).map((v) => e(v!)).join(" · ")}</span>${x.goal ? `<p>${e(x.goal)}</p>` : ""}<small>Appears in ${n} of ${steps} step${steps === 1 ? "" : "s"}</small></div></div>`;
     })
     .join("");
   const first = p.steps[0];
@@ -692,18 +709,18 @@ ${caps ? `<div class="jp-gap"><h4 class="jp-h">${icon("clipboard", "jp-indigo")}
 export function processLinks(corpus: JourneyCorpus, pr: WorkshopPresentation, j: Journey, process: string, siteRoot: string): string {
   const out: string[] = [];
   const name = processName(corpus, j.instance, process);
-  if (pr.ig?.processes) out.push(ext(`${fromSite(`${pr.ig.href}${pr.ig.processes}`, siteRoot)}${name ? `#${kramdownSlug(name)}` : ""}`, "Process in the IG"));
+  if (pr.ig?.processes) out.push(ext(`${fromSite(`${pr.ig.href}${pr.ig.processes}`, siteRoot)}${name ? `#${kramdownSlug(name)}` : ""}`, "Process in the IG", "", DAK_ATTR));
   for (const r of j.scenario.references ?? []) if (r.rel === "scenario") out.push(ext(fromSite(r.href, siteRoot), r.label));
   return out.join("");
 }
 
 /** The FHIR payload drawer of a step: every example it names whose JSON this build has, highlighted, with a copy button. */
-export function payloadDrawer(corpus: JourneyCorpus, st: ScenarioStep): string {
+export function payloadDrawer(corpus: JourneyCorpus, st: ScenarioStep, pageOf?: (key: string) => string | undefined): string {
   const keys = [...new Set([...(st.examples ?? []), ...(st.fhirChanges ?? []).flatMap((c) => c.examples ?? [])])].filter((k) => corpus.examples.get(k)?.json);
   if (keys.length === 0) return "";
   const tabs = keys.map((k, i) => `<button type="button" role="tab" data-jp-tab="${e(k)}" aria-selected="${i === 0}"${i === 0 ? ' class="is-on"' : ""}>${e(k)}</button>`).join("");
   const panes = keys
-    .map((k, i) => `<div class="jp-pane" role="tabpanel" data-jp-pane="${e(k)}"${i === 0 ? "" : " hidden"}><pre class="jp-json"><code>${highlightJson(corpus.examples.get(k)!.json!)}</code></pre></div>`)
+    .map((k, i) => `<div class="jp-pane" role="tabpanel" data-jp-pane="${e(k)}"${i === 0 ? "" : " hidden"}>${pageOf?.(k) ? `<p class="jp-pane-link">${ext(pageOf(k)!, `${k} in the IG`, "", DAK_ATTR)}</p>` : ""}<pre class="jp-json"><code>${highlightJson(corpus.examples.get(k)!.json!)}</code></pre></div>`)
     .join("");
   return `<aside class="jp-drawer" data-jp-drawer aria-label="FHIR payload inspector">
 <button type="button" class="jp-drawer-bar" data-jp-drawer-toggle aria-expanded="false">${icon("code", "jp-sky3")}<b>FHIR payload inspector</b><span class="jp-drawer-n">${keys.length} resource${keys.length === 1 ? "" : "s"} at this moment</span><span class="jp-drawer-hint">Click to inspect the raw FHIR JSON</span></button>
@@ -752,18 +769,18 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
   const inspect = (k: string | undefined) => (k && corpus.examples.get(k)?.json ? `<button type="button" class="jp-inspect" data-jp-inspect="${e(k)}">Inspect JSON</button>` : "");
   const exLink = (k: string, label: string) => {
     const href = examplePage(corpus, pr, k, siteRoot);
-    return href ? ext(href, label) : `<span class="jp-small">${e(label)}</span>`;
+    return href ? ext(href, label, "", DAK_ATTR) : `<span class="jp-small">${e(label)}</span>`;
   };
   const profileChip = (profile: string | undefined, of?: string) => {
     if (!profile) return "";
-    const href = profilePage(pr, profile, siteRoot);
+    const href = profilePage(pr, profile, siteRoot, corpus);
     const label = of ? `${of} profile` : "Profile";
-    return href ? `<a class="jp-prof" href="${e(href)}" target="_blank" rel="noopener noreferrer" title="${e(profile)}">${e(label)}</a>` : `<span class="jp-prof" title="${e(profile)}">${e(label)}</span>`;
+    return href ? `<a class="jp-prof" href="${e(href)}" ${DAK_ATTR} target="_blank" rel="noopener noreferrer" title="${e(profile)}">${e(label)}</a>` : `<span class="jp-prof" title="${e(profile)}">${e(label)}</span>`;
   };
   const rows = changes.length
     ? changes.map((c) => {
         const first = c.examples?.[0];
-        const head = first && examplePage(corpus, pr, first, siteRoot) ? `<a class="jp-mono" href="${e(examplePage(corpus, pr, first, siteRoot)!)}" target="_blank" rel="noopener noreferrer">${e(c.resource)}</a>` : `<span class="jp-mono">${e(c.resource)}</span>`;
+        const head = first && examplePage(corpus, pr, first, siteRoot) ? `<a class="jp-mono" href="${e(examplePage(corpus, pr, first, siteRoot)!)}" ${DAK_ATTR} target="_blank" rel="noopener noreferrer">${e(c.resource)}</a>` : `<span class="jp-mono">${e(c.resource)}</span>`;
         const json = (c.examples ?? []).find((k) => corpus.examples.get(k)?.json);
         const more = [...(c.examples ?? []).map((k) => exLink(k, k.split("/")[1] ?? k)), c.spec ? ext(c.spec, "base standard", "jp-ext-soft") : ""].filter(Boolean).join("");
         return `<li>${icon("file", "jp-sky")}<div><div class="jp-fhir-row">${head}${profileChip(c.profile, c.profileOf)}<span class="jp-fhir-change">${e(c.change)}</span>${inspect(json)}</div>${c.why ? `<p class="jp-fhir-why">${e(c.why)}</p>` : ""}${more ? `<div class="jp-fhir-links">${more}</div>` : ""}</div></li>`;
@@ -772,7 +789,7 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
         const x = corpus.examples.get(k);
         const [type] = k.split("/");
         const href = examplePage(corpus, pr, k, siteRoot);
-        return `<li>${icon("file", "jp-sky")}<div><div class="jp-fhir-row">${href ? `<a href="${e(href)}" class="jp-mono" target="_blank" rel="noopener noreferrer">${e(type!)}</a>` : `<span class="jp-mono">${e(type!)}</span>`}${profileChip(x?.profiles?.[0])}<span class="jp-fhir-id">${e(x?.title ?? k)}</span>${inspect(k)}</div></div></li>`;
+        return `<li>${icon("file", "jp-sky")}<div><div class="jp-fhir-row">${href ? `<a href="${e(href)}" class="jp-mono" ${DAK_ATTR} target="_blank" rel="noopener noreferrer">${e(type!)}</a>` : `<span class="jp-mono">${e(type!)}</span>`}${profileChip(x?.profiles?.[0])}<span class="jp-fhir-id">${e(x?.title ?? k)}</span>${inspect(k)}</div></div></li>`;
       });
   const fhir = `<div class="jp-box"><div class="jp-box-h"><span class="jp-label">FHIR resources created or changed</span></div>${
     rows.length ? `<ul class="jp-fhir">${rows.join("")}</ul>` : `<p class="jp-small">None: this moment reads data but writes nothing.</p>`
@@ -781,7 +798,7 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
   const procPage = links.processesPage?.(s.journey.instance)?.replace(/^(\.\.\/)+/, "");
   const procs = (st.realisedBy ?? [])
     .map((r) => {
-      const d = processDrawing(corpus, s.journey.instance, r.process);
+      const d = linkedProcessDrawing(corpus, links, s.journey.instance, r.process, siteRoot);
       const src = sourceHref(corpus, s.journey.instance, r.process);
       const head = `<div class="jp-proc-h">${icon("workflow")}<span class="jp-label">Business process (BPMN)</span><span class="jp-small">${e(s.journey.scenario.title)}</span></div>
 <div class="jp-proc-links">${processLinks(corpus, pr, s.journey, r.process, siteRoot)}${procPage ? `<a href="${e(toSite + procPage)}">Process viewer (tasks and skills)</a>` : ""}<a href="${e(`${root}${s.journey.instance}/${s.journey.scenario.id}/`)}">User scenario</a>${src ? ext(src, "BPMN source") : ""}</div>`;
@@ -797,7 +814,7 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
 <div class="jp-hood-in">
 ${st.technicalSummary ? `<div class="jp-sowhat">${icon("bulb", "jp-amber jp-i-lg")}<div><span class="jp-label jp-amber8">Technical so-what</span><p>${e(st.technicalSummary)}</p></div></div>` : ""}
 <div class="jp-layers">
-<div class="jp-layer jp-layer-rose"><div class="jp-layer-h"><b>${icon("users")} Experience</b><span>What people see and do</span></div><div class="jp-layer-cells jp-exp">${lead && leadDoing ? personaText(`${lead.name}: ${leadDoing}`, p.cast) : ""}</div></div>
+<div class="jp-layer jp-layer-rose"><div class="jp-layer-h"><b>${icon("users")} Experience</b><span>What people see and do</span></div><div class="jp-layer-cells jp-exp">${lead && leadDoing ? personaText(`${lead.name}: ${leadDoing}`, p.cast, personaHref(corpus, pr, siteRoot)) : ""}</div></div>
 ${layerRows}${unplacedHtml}
 </div>
 ${handoff || rows.length ? `<div class="jp-two">${handoff}${fhir}</div>` : ""}
@@ -820,10 +837,12 @@ function stepPage(corpus: JourneyCorpus, p: Presentation, s: PresentedStep, link
   const prev = prevS ? `../${prevS.key}/` : undefined;
   const next = nextS ? `../${nextS.key}/` : `${toWorkshop}discuss/`;
   const people = [...st.experiences].sort((a, b) => (a.actor === st.lead ? -1 : b.actor === st.lead ? 1 : 0));
+  const siteRoot = siteRootFrom(root, links);
+  const pl = personaHref(corpus, pr, siteRoot);
   const personCards = people
     .map((x) => {
       const pv = p.cast.find((c) => c.id === x.actor)!;
-      return `<div class="jp-who" style="--c:${e(pv.color)}"><div class="jp-who-h">${avatar(pv)}<div><b>${e(pv.name)}</b>${pv.role ? `<span>${e(pv.role)}</span>` : ""}</div>${emotionBadge(x.emotion)}</div><p>${personaText(x.doing, p.cast)}</p>${x.feeling ? `<p class="jp-feel">${e(x.feeling)}</p>` : ""}</div>`;
+      return `<div class="jp-who" style="--c:${e(pv.color)}"><div class="jp-who-h">${avatar(pv)}<div><b>${personaNameHtml(pv, pl)}</b>${pv.role ? `<span>${e(pv.role)}</span>` : ""}</div>${emotionBadge(x.emotion)}</div><p>${personaText(x.doing, p.cast, pl)}</p>${x.feeling ? `<p class="jp-feel">${e(x.feeling)}</p>` : ""}</div>`;
     })
     .join("");
   const ladder = ladderOf(corpus, s.journey);
@@ -834,9 +853,9 @@ function stepPage(corpus: JourneyCorpus, p: Presentation, s: PresentedStep, link
     ? `<section class="jp-card jp-pad jp-tone-emerald jp-record"><div class="jp-row"><h3 class="jp-h jp-emerald8">${icon("package")} ${subject ? `${e(subject)}’s record` : "The record"}</h3>${s.index > 0 && level > prevLevel ? `<span class="jp-moved">▲ Moved up</span>` : ""}</div>
 ${ladder && level >= 0 ? meter(ladder, level) : ""}
 <div class="jp-state">${e(ladder && level >= 0 ? ladder[level]!.label : st.record.state)}</div>
-<p>${personaText(st.record.description, p.cast)}</p>
+<p>${personaText(st.record.description, p.cast, pl)}</p>
 <p class="jp-small">Held in: ${e(st.record.heldWhere)}</p>
-${st.handoff ? `<div class="jp-handoff">${icon("arrow")}<span><b>Hand-off:</b> ${personaText(st.handoff.summary, p.cast)}</span></div>` : ""}</section>`
+${st.handoff ? `<div class="jp-handoff">${icon("arrow")}<span><b>Hand-off:</b> ${personaText(st.handoff.summary, p.cast, pl)}</span></div>` : ""}</section>`
     : "";
   const ask = s.ws?.askTheRoom ? `<section class="jp-ask"><h3 class="jp-h">${icon("message")} Ask the room</h3><p>${e(s.ws.askTheRoom)}</p></section>` : "";
   const whatIf = (st.whatIf ?? [])
@@ -847,7 +866,6 @@ ${st.handoff ? `<div class="jp-handoff">${icon("arrow")}<span><b>Hand-off:</b> $
   const policy = st.policy ? `<section class="jp-card jp-pad jp-tone-indigo"><h3 class="jp-h jp-indigo">${icon("landmark")} Policy takeaway</h3><p>${e(st.policy)}</p></section>` : "";
   const cue = s.ws?.facilitatorCue ? `<section class="jp-cue jp-presenter-only"><div class="jp-cue-h">${icon("mic")} Facilitator cue</div><p>${e(s.ws.facilitatorCue)}</p></section>` : "";
   const pic = pictureOf(corpus, s, root);
-  const siteRoot = siteRootFrom(root, links);
   const lead = p.cast.find((x) => x.id === st.lead);
   const screens = screensFor(pr, st.id)
     .map((sc) => `<a class="jp-see" href="${e(`${toWorkshop}demo/${sc.id}/`)}">${glyph(sc.device === "tablet" ? "tablet" : "phone")}<span>See what ${e(lead?.name ?? "they")} ${lead?.name ? "sees" : "see"} <small>(screen ${e(sc.id)})</small></span>${icon("right")}</a>`)
@@ -860,12 +878,12 @@ ${st.handoff ? `<div class="jp-handoff">${icon("arrow")}<span><b>Hand-off:</b> $
 <section class="jp-card jp-story">
 <div class="jp-story-top"><span class="jp-chapter">Chapter ${s.chapter + 1} · ${e(chapter.title)}</span>${country ? `<span class="jp-chip jp-chip-${tones.get(country)}">${e(country)}</span>` : ""}<span class="jp-pos">${e(st.id)} · ${s.index + 1}/${p.steps.length}</span></div>
 <div class="jp-story-head"><h2><a href="./" title="Link to this moment">${e(st.title)}</a></h2>${pic || chapterScene(chapter) ? `<div class="jp-story-pic">${pic}${sceneStrip(chapterScene(chapter), tones.get(country ?? "") ?? "sky", "sm")}</div>` : ""}</div>
-${st.headline ? `<p class="jp-headline">${personaText(st.headline, p.cast)}</p>` : ""}
+${st.headline ? `<p class="jp-headline">${personaText(st.headline, p.cast, pl)}</p>` : ""}
 ${meta ? `<div class="jp-meta">${meta}</div>` : ""}
 ${screens ? `<div class="jp-sees">${screens}</div>` : ""}
 </section>
 <section><h3 class="jp-h jp-h-pad">Who’s in this moment</h3><div class="jp-whos">${personCards}</div></section>
-${st.painPoint || st.enabler ? `<section class="jp-pe">${st.painPoint ? `<div class="jp-pain"><div class="jp-h">${icon("alert")} Without this</div><p>${personaText(st.painPoint, p.cast)}</p></div>` : ""}${st.enabler ? `<div class="jp-enable"><div class="jp-h">${icon("sparkles")} What makes it work</div><p>${personaText(st.enabler, p.cast)}</p></div>` : ""}</section>` : ""}
+${st.painPoint || st.enabler ? `<section class="jp-pe">${st.painPoint ? `<div class="jp-pain"><div class="jp-h">${icon("alert")} Without this</div><p>${personaText(st.painPoint, p.cast, pl)}</p></div>` : ""}${st.enabler ? `<div class="jp-enable"><div class="jp-h">${icon("sparkles")} What makes it work</div><p>${personaText(st.enabler, p.cast, pl)}</p></div>` : ""}</section>` : ""}
 </div>
 <div class="jp-walk-r">
 ${record}${ask}${whatIf}${policy}${policyPanel(p, s, toWorkshop)}${cue}
@@ -883,7 +901,7 @@ ${hood(corpus, p, s, links, root)}`;
     ...(prev ? { prev } : { prev: "../../overview/" }),
     next,
     body,
-    foot: payloadDrawer(corpus, st),
+    foot: payloadDrawer(corpus, st, (k) => artifactPage(corpus, pr, k, siteRoot)),
   });
 }
 
@@ -896,7 +914,7 @@ export function renderPresentationPages(corpus: JourneyCorpus, links: SiteLinks)
     const p = presentationOf(corpus, w);
     if (p.steps.length === 0) continue;
     const base = `${w.instance}/workshops/${w.workshop.id}`;
-    out.push({ path: `${base}/overview/index.html`, content: overviewPage(corpus, p) });
+    out.push({ path: `${base}/overview/index.html`, content: overviewPage(corpus, p, links) });
     for (const s of p.steps) out.push({ path: `${base}/walkthrough/${s.key}/index.html`, content: stepPage(corpus, p, s, links) });
     for (const f of renderViewPages(corpus, p, links)) out.push({ ...f, path: `${base}/${f.path}` });
   }

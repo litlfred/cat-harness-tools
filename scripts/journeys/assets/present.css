@@ -695,3 +695,7 @@ a:hover > .jp-cv-dot { fill: var(--c); }
   .jp-main { padding: 0; }
   .jv-print-sheets .jp-sheetlist { gap: 0; }
 }
+
+/* A persona's name and a named chip that open the persona's page in the IG: underlined, so a link reads as one. */
+.jp a[data-jv-dak]:not(.jp-ext):not(.jp-mono):not(.jp-prof) { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.jp a[data-jv-dak]:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 2px; }

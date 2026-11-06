@@ -93,6 +93,8 @@ export interface Actor {
   kind?: string;
   description?: string;
   persona?: JourneyPersona;
+  /** The roles it plays (`roles`), by role id. */
+  roles?: string[];
 }
 
 export interface Story {
@@ -296,7 +298,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
       const actorsDir = join(d.absPath, "actors");
       const actors = corpus.actors.get(instance) ?? new Map<string, Actor>();
       for (const p of existsSync(actorsDir) ? jsonFilesUnder(actorsDir, 0) : []) {
-        const a = readJson(p) as { id?: string; title?: string; kind?: string; description?: string; meta?: { persona?: unknown } } | undefined;
+        const a = readJson(p) as { id?: string; title?: string; kind?: string; description?: string; roles?: unknown; meta?: { persona?: unknown } } | undefined;
         if (typeof a?.id !== "string") continue;
         const persona = a.meta?.persona === undefined ? undefined : JourneyPersonaSchema.safeParse(a.meta.persona);
         actors.set(a.id, {
@@ -305,6 +307,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
           ...(a.kind ? { kind: a.kind } : {}),
           ...(a.description ? { description: a.description } : {}),
           ...(persona?.success ? { persona: persona.data } : {}),
+          ...(Array.isArray(a.roles) && a.roles.length ? { roles: a.roles.filter((r): r is string => typeof r === "string") } : {}),
         });
       }
       corpus.actors.set(instance, actors);

@@ -232,7 +232,7 @@ body.jv {
 .jv-jobaid { margin-top: 8px; padding: 8px 14px; border-radius: 8px; background: var(--jv-soft); font-size: 0.92rem; }
 .jv-views-list { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 14px; }
 .jv-am { margin: 0; background: var(--jv-paper); border: 1px solid var(--jv-line); border-radius: var(--jv-radius); padding: 10px; }
-.jv-am img { width: 100%; height: auto; display: block; }
+.jv-am img, .jv-am object { width: 100%; height: auto; display: block; }
 .jv-src { margin-top: 30px; font-size: 0.82rem; color: var(--jv-muted); }
 
 /* printable sheets */
@@ -277,3 +277,6 @@ body.jv {
   details { display: block; }
   details > summary { list-style: none; }
 }
+
+/* A persona's name that opens its page in the IG. */
+.jv-people b a[data-jv-dak] { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
