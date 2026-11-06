@@ -1251,9 +1251,11 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   const siteRepo = () => {
     const c = config();
     if (c && c.repo) return c.repo;
-    const h = /^([^.]+)\.github\.io$/.exec(location.hostname || "");
-    const seg = (location.pathname || "").split("/")[1];
-    return h && seg ? h[1] + "/" + seg : "";
+    // Only GitHub's own name characters pass: the result is spliced into a
+    // github.com URL, and the page address is not ours to trust.
+    const h = /^([A-Za-z0-9-]+)\\.github\\.io$/.exec(location.hostname || "");
+    const seg = /^\\/([A-Za-z0-9._-]+)\\//.exec(location.pathname || "");
+    return h && seg && seg[1] !== "." && seg[1] !== ".." ? h[1] + "/" + seg[1] : "";
   };
   const sectionBoxes = () => {
     const main = document.querySelector(".main-content");
