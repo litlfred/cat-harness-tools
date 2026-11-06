@@ -138,7 +138,8 @@ function htmlFiles(dir: string): string[] {
 
 const attrOf = (tag: string, name: string): string | undefined => {
   const v = new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1];
-  return v?.replace(/&amp;/g, "&").replace(/&quot;/g, '"');
+  // One pass, so a decoded `&` is never decoded again (`&amp;quot;` stays `&quot;`).
+  return v?.replace(/&(amp|quot);/g, (_m, name: string) => (name === "amp" ? "&" : '"'));
 };
 
 /**
