@@ -783,6 +783,14 @@ export interface ProcessModel {
    */
   logCapture?: "on" | "off";
   /**
+   * Whether the process declares that it starts from a work plan (bean `rwhr`).
+   *
+   * Optional on the diagram; small processes need none. When `true` and
+   * `workflow_start` is called with no `plan` (and no `bean`), the instance
+   * starts without refusing and says so in its output.
+   */
+  startsFromWorkPlan?: boolean;
+  /**
    * `<bpmn:documentation>` on the process element itself — what the diagram
    * is FOR. The node-level `documentation` says what one step does; this is
    * the paragraph a reader meets before any step, and `process-documented`
@@ -2327,6 +2335,7 @@ export async function loadProcessModel(
     );
   }
   const logCapture = captureDeclared as "on" | "off" | undefined;
+  const startsFromWorkPlan = readStartsFromWorkPlan(proc, bpmnPath);
 
   // `<bootstrap.processes:precondition>` — what must hold BEFORE the start event (`lv3j`).
   //
@@ -2537,6 +2546,7 @@ export async function loadProcessModel(
     enforcement,
     involvementVocabulary,
     logCapture,
+    ...(startsFromWorkPlan !== undefined ? { startsFromWorkPlan } : {}),
     preconditions,
     nodes,
     flows,
@@ -2547,6 +2557,55 @@ export async function loadProcessModel(
     children,
     ...(processInputs.size ? { inputs: [...processInputs.values()] } : {}),
   };
+}
+
+/**
+ * Whether `<bpmn:process>` declares that it starts from a work plan (bean `rwhr`).
+ *
+ * Accepts `<cat-harness.processes:work-plan/>` (or `starts="true|false"`),
+ * `<cat-harness.processes:bean/>` on the process, `<cat-harness.processes:policy workPlan="true|false"/>`,
+ * or `workPlan` / `startsFromWorkPlan` on `<bpmn:process>`. Small processes need
+ * no declaration (`undefined`). Any attribute value other than `"true"` or `"false"`
+ * is refused at load time so a typo cannot silently turn the declaration off.
+ */
+function readStartsFromWorkPlan(proc: ModdleElement, bpmnPath: string): boolean | undefined {
+  const parseBool = (raw: unknown, where: string): boolean => {
+    if (raw === "true") return true;
+    if (raw === "false") return false;
+    throw new UnsupportedBpmn(
+      `${basename(bpmnPath)}: ${where}="${String(raw)}" is not a boolean. Use "true" or "false".`,
+    );
+  };
+  const procExt = proc.extensionElements?.values ?? [];
+  const wpEl = procExt.find((v) => v.$type === "folio:work-plan" || v.$type === "folio:workPlan") as
+    | Record<string, unknown>
+    | undefined;
+  if (wpEl) {
+    const attrKey = ["starts", "required", "workPlan", "plan"].find((k) => wpEl[k] !== undefined);
+    if (attrKey === undefined) return true;
+    return parseBool(wpEl[attrKey], `cat-harness.processes:work-plan ${attrKey}`);
+  }
+  const beanEl = procExt.find((v) => v.$type === "folio:bean") as Record<string, unknown> | undefined;
+  if (beanEl) {
+    const attrKey = ["starts", "required", "workPlan", "plan"].find((k) => beanEl[k] !== undefined);
+    if (attrKey === undefined) return true;
+    return parseBool(beanEl[attrKey], `cat-harness.processes:bean ${attrKey}`);
+  }
+  const policyEl = procExt.find((v) => v.$type === "folio:policy") as Record<string, unknown> | undefined;
+  if (policyEl) {
+    const attrKey = ["workPlan", "startsFromWorkPlan", "plan"].find((k) => policyEl[k] !== undefined);
+    if (attrKey !== undefined) {
+      return parseBool(policyEl[attrKey], `cat-harness.processes:policy ${attrKey}`);
+    }
+  }
+  const attrs = (proc as unknown as { $attrs?: Record<string, unknown> }).$attrs ?? {};
+  for (const [k, v] of Object.entries(attrs)) {
+    const local = k.includes(":") ? k.slice(k.lastIndexOf(":") + 1) : k;
+    if (local === "workPlan" || local === "startsFromWorkPlan" || local === "work-plan") {
+      return parseBool(v, `bpmn:process ${k}`);
+    }
+  }
+  return undefined;
 }
 
 /**
