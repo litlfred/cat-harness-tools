@@ -3,7 +3,7 @@
   "id": "user-scenario",
   "validates": {
     "kind": "user-scenario",
-    "family": "user-scenario/0.2.0"
+    "family": "user-scenario/0.3.0"
   },
   "schema": "cat-harness-tools:schemas/process/user-scenario.ts#UserScenarioKind"
 }

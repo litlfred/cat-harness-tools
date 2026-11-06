@@ -11,7 +11,7 @@ describe("user-scenario: the draft family is read unchanged, 0.2.0 adds to it", 
     expect(UserScenarioSchema.safeParse(v01).success).toBe(true);
   });
   test("the kind refuses a newer minor and another major", () => {
-    expect(UserScenarioSchema.safeParse({ ...v01, $schema: "user-scenario/0.3.0" }).success).toBe(false);
+    expect(UserScenarioSchema.safeParse({ ...v01, $schema: "user-scenario/0.4.0" }).success).toBe(false);
     expect(UserScenarioSchema.safeParse({ ...v01, $schema: "user-scenario/1.0.0" }).success).toBe(false);
   });
   test("0.2.0 groups (partOf, no steps) and carries gaps and views", () => {
@@ -42,6 +42,16 @@ describe("user-scenario: the draft family is read unchanged, 0.2.0 adds to it", 
     expect(() => parseUserScenario({ ...v02, scene: [{ icon: "unicorn", label: "x" }] })).toThrow();
     expect(() => parseUserScenario({ ...v02, steps: [{ ...step, fhirChanges: [{ resource: "R", change: "c", examples: ["not a key"] }] }] })).toThrow();
     expect(UserScenarioV01Schema.safeParse({ ...v01, steps: [{ ...step, fhirChanges }] }).success).toBe(false);
+  });
+  test("0.3.0 links a step to its DAK assets by artefact-index key, with what each is to the step; 0.2.0 files still parse", () => {
+    const dak = [{ key: "StructureDefinition/DdRegistration", rel: "data" as const }, { key: "PlanDefinition/DT01", rel: "decides" as const }, { key: "Measure/IND03", rel: "measures" as const }, { key: "Library/DT01Logic" }];
+    const v03 = { ...v01, $schema: "user-scenario/0.3.0", steps: [{ ...step, dak }] };
+    expect(parseUserScenario(v03).steps[0]!.dak).toEqual(dak);
+    expect(() => parseUserScenario({ ...v03, steps: [{ ...step, dak: [{ key: "not a key" }] }] })).toThrow();
+    expect(() => parseUserScenario({ ...v03, steps: [{ ...step, dak: [{ key: "Measure/IND03", rel: "counts" }] }] })).toThrow();
+    expect(() => parseUserScenario({ ...v03, steps: [{ ...step, dak: [{ key: "Measure/IND03", label: "x" }] }] })).toThrow();
+    expect(UserScenarioSchema.safeParse({ ...v01, $schema: "user-scenario/0.2.0", steps: [{ ...step, gaps: ["g"] }] }).success).toBe(true);
+    expect(UserScenarioV01Schema.safeParse({ ...v01, steps: [{ ...step, dak }] }).success).toBe(false);
   });
   test("an emotion outside -2..2 is refused", () => {
     expect(() => parseUserScenario({ ...v01, steps: [{ ...step, experiences: [{ actor: "mother", doing: "x", emotion: 3 }] }] })).toThrow();

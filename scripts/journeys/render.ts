@@ -55,7 +55,7 @@ import {
   type WorkshopEntry,
 } from "./read.ts";
 import { igProcessPage, PRESENT_ASSETS, PRESENT_SEGMENTS, presentationOf, renderPresentationPages } from "./present.ts";
-import { artifactPage, DAK_ATTR, igOf, linkedProcessDrawing, personaArtifact, type StepPageLinks } from "./dak-links.ts";
+import { artifactPage, DAK_ATTR, dakGroups, igOf, linkedProcessDrawing, personaArtifact, type StepPageLinks } from "./dak-links.ts";
 
 export const TOOL_ID = "journeys-viewer";
 const ASSET_DIR = join(import.meta.dir, "assets");
@@ -649,12 +649,26 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
         })
         .join("")}</ul>`
     : "";
+  const dak = dakGroups(corpus, igOf(corpus, j.instance), s.dak, toSite);
+  const dakHtml = dak.length
+    ? `<h4>DAK assets</h4><dl class="jv-dl jv-dak">${dak
+        .map(
+          (g) =>
+            `<dt>${e(g.label)}</dt><dd>${g.assets
+              .map((a) => {
+                const tip = e(a.description ? `${a.key} — ${a.description}` : a.key);
+                return a.href ? `<a href="${e(a.href)}" class="jv-code" ${DAK_ATTR} title="${tip}">${e(a.label)}</a>` : `<span class="jv-code" title="${tip}">${e(a.label)}</span>`;
+              })
+              .join(" ")}</dd>`,
+        )
+        .join("")}</dl>`
+    : "";
   const refsHtml = st.references?.length ? `<h4>References</h4><ul>${st.references.map((r) => `<li><a href="${e(fromSite(r.href, toSite))}">${e(r.label)}</a>${r.rel ? ` <span class="jv-muted">${e(r.rel)}</span>` : ""}</li>`).join("")}</ul>` : "";
   const handoffHtml =
     s.handoff && (s.handoff.carrier || s.handoff.payload)
       ? `<h4>What travels</h4><dl class="jv-dl">${s.handoff.carrier ? `<dt>Carrier</dt><dd>${e(s.handoff.carrier)}</dd>` : ""}${s.handoff.payload ? `<dt>Payload</dt><dd>${e(s.handoff.payload)}</dd>` : ""}</dl>`
       : "";
-  const hood = [s.technicalSummary ? `<p class="jv-tech">${e(s.technicalSummary)}</p>` : "", usesHtml, handoffHtml, storiesHtml, reqHtml, exHtml, refsHtml].join("\n");
+  const hood = [s.technicalSummary ? `<p class="jv-tech">${e(s.technicalSummary)}</p>` : "", usesHtml, handoffHtml, storiesHtml, reqHtml, exHtml, dakHtml, refsHtml].join("\n");
   const processes = (s.realisedBy ?? [])
     .map((r) => {
       const d = linkedProcessDrawing(corpus, links, j.instance, r.process, toSite, igProcessPage(corpus, igOf(corpus, j.instance), j.instance, r.process, toSite));

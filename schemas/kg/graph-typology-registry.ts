@@ -917,7 +917,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   "user-scenario": {
     anyLayer: true,
     description:
-      "user scenarios told as journey maps (`scenarios/user-scenarios/`, by convention): one `user-scenario/0.2.0` file per journey (the smart-trust-demo draft `user-scenario/0.1.0` is read unchanged), keeping the DAK `UserScenario` fields (`id`, `title`, `description`, `personas`) and adding the ordered steps: per actor what they do and feel (emotion -2..2), the pain point and enabler, the policy point, how far the record can be trusted (a code of the scenario's `trustLadder` code list), the hand-off, what-ifs and gaps, and edges to user stories, BPMN tasks (`realisedBy`), `req:` requirements, FHIR examples and the building blocks it `uses`, each in its role. `follows` chains journeys into one story; `partOf` groups sub-journeys. A step may carry an `illustration` (an image, or the prompt to draw it), with the style and cast the scenario's `illustrationStyle` shares. The catalogue those `uses` edges point into is the `building-blocks` kind; a trust ladder is a code list, kept in a `code-list` directory. Every reference a step names must resolve (`check:journey-refs`). Drawn by the journeys viewer. Shapes in `schemas/process/user-scenario.ts`.",
+      "user scenarios told as journey maps (`scenarios/user-scenarios/`, by convention): one `user-scenario/0.3.0` file per journey (the smart-trust-demo draft `user-scenario/0.1.0` and `0.2.0` files are read unchanged), keeping the DAK `UserScenario` fields (`id`, `title`, `description`, `personas`) and adding the ordered steps: per actor what they do and feel (emotion -2..2), the pain point and enabler, the policy point, how far the record can be trusted (a code of the scenario's `trustLadder` code list), the hand-off, what-ifs and gaps, and edges to user stories, BPMN tasks (`realisedBy`), `req:` requirements, FHIR examples, the building blocks it `uses`, each in its role, and the DAK assets it uses (`dak`: its data sets, decision tables and indicators, by artefact-index key). `follows` chains journeys into one story; `partOf` groups sub-journeys. A step may carry an `illustration` (an image, or the prompt to draw it), with the style and cast the scenario's `illustrationStyle` shares. The catalogue those `uses` edges point into is the `building-blocks` kind; a trust ladder is a code list, kept in a `code-list` directory. Every reference a step names must resolve (`check:journey-refs`). Drawn by the journeys viewer. Shapes in `schemas/process/user-scenario.ts`.",
     title: "User scenarios",
     renderable: false,
     holds: "content",
@@ -930,11 +930,12 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     nodeSchemas: {
       "user-scenario/0.1.0": {},
       "user-scenario/0.2.0": {},
+      "user-scenario/0.3.0": {},
     },
     summary:
       "User scenarios as journey maps -- one file per journey: ordered steps, per actor what " +
       "they do and feel, pain points, enablers, the record's trust state, and edges to user " +
-      "stories, BPMN tasks, requirements, FHIR examples and the building blocks each step uses.",
+      "stories, BPMN tasks, requirements, FHIR examples, the building blocks each step uses and its DAK assets.",
   },
   // The building blocks a journey step `uses`. Owner, 2026-11-05: the
   // catalogue lives in an instance's `archimate/` directory, read by its

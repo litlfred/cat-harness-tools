@@ -409,6 +409,15 @@ a.jp-block:hover { background: var(--s50); box-shadow: var(--shadow-sm); }
 .jp-fhir-links { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 11px; }
 .jp-ext-soft { color: var(--s500) !important; }
 .jp-prof { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px; background: var(--sky50); border: 1px solid var(--sky200); color: var(--sky800) !important; }
+/* A step's DAK assets (`dak`): one small row under the hood, grouped Data, Decision logic, Indicators. */
+.jp-dak { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; border-radius: 12px; border: 1px solid var(--s200); padding: 10px 16px; }
+.jp-dak-g { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
+.jp-dak-l { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--s500); }
+.jp-dak-l .jp-i { width: 13px; height: 13px; }
+.jp-dak-a { font-size: 11px; font-weight: 600; line-height: 1.5; padding: 1px 7px; border-radius: 4px; background: var(--sky50); border: 1px solid var(--sky200); color: var(--sky800) !important; }
+a.jp-dak-a:hover { text-decoration: underline; }
+a.jp-dak-a:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.jp-dak-text { background: var(--s50); border-color: var(--s200); color: var(--s600) !important; }
 .jp-inspect { margin-left: auto; font-size: 11px; font-weight: 600; color: var(--sky700); background: none; border: 0; padding: 0; text-decoration: underline; }
 
 /* ── the scene: a journey's small picture ───────────────────────────── */
@@ -737,7 +746,7 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 }
 
 /* A persona's name and a named chip that open the persona's page in the IG: underlined, so a link reads as one. */
-.jp a[data-jv-dak]:not(.jp-ext):not(.jp-mono):not(.jp-prof) { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.jp a[data-jv-dak]:not(.jp-ext):not(.jp-mono):not(.jp-prof):not(.jp-dak-a) { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
 .jp a[data-jv-dak]:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 2px; }
 
 /* ── avatars with a picture (meta.persona.avatar) ─────────────────────── */
