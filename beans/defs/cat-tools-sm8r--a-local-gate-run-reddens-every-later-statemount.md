@@ -209,3 +209,13 @@ by its write sites, in the same style as `check:input-sites`.
 In a fresh composed checkout, after a full local gate run,
 `mount-from-lock.sh --check` reports every instance `current`, and no
 `state:mount` exits 1 for an edited mount.
+
+### Finding while measuring item 2 (2026-11-06)
+In a freshly mounted composed checkout, `qa:working-copy` fails before any
+gate runs: its writer `p2:refusals` needs
+`smart-base/fhir-artifact-index/index.json`, which only `ig-index:build`
+writes, and nothing orders one before the other. Earlier local runs passed
+only because a previous gate had already left that file inside the mount,
+which is the very write this item removes. Plan step 2 must therefore give
+`qa:refresh` a declared dependency on `ig-index:build` (or have
+`p2:refusals` read through `readPathFor`, and build the index on a miss).
