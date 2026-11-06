@@ -151,3 +151,61 @@ Committed bytes computed from the layers below are checkout-dependent, which
 is the `because: checkout` case of `built-at-publish.ts`. The fix is item 4
 (no CI step writes inside a mount), or exact pin alignment, which no layer
 controls.
+
+## Item 4: the plan (no CI step writes inside a mount), written before code
+
+Item 3 was dropped on the owner's card ("1. Drop it, plan item 3"; that is
+this item, which the card calls item 3). Pins are being aligned in its
+place (owner: "align pins"; drift check cat-harness-tools#1571).
+
+### The rule
+A mounted layer is **read-only** in a checkout that mounts it: its directory
+holds the pinned bytes and nothing else. Everything a step computes FOR a
+layer goes to one place outside the mounts:
+
+    build/layers/<instance>/<the same instance-relative path>
+
+That is one **output root** per layer, mirroring the layer's own layout, so
+`smart-trust/fhir-artifact-index/index.json` becomes
+`build/layers/smart-trust/fhir-artifact-index/index.json`. In the layer's
+OWN repository (the instance is `source.local`, not mounted), the output root
+is the layer itself, as today: nothing changes for a layer building itself.
+
+### One resolver, read and write
+`cat-harness-tools/scripts/lib/layer-output.ts` (new):
+- `outputPathFor(root, instance, rel)` is where a writer writes:
+  `build/layers/<instance>/<rel>` when the instance is a remote mount,
+  else `<instance path>/<rel>`;
+- `readPathFor(root, instance, rel)` is the output root when the file is
+  there, else the mount. An overlay: computed output over pinned bytes.
+
+Every writer and reader below moves onto these two calls. Nothing else may
+join an instance path to a computed file; a check finds a writer that does,
+by its write sites, in the same style as `check:input-sites`.
+
+### The writers, by measured volume (2026-11-06)
+
+| writer | writes today | files | readers to move |
+|---|---|---|---|
+| `qa:refresh` (QA working copy) | `<layer>/test/results/**` | 1159 | the gates that judge QA (JUDGE mode), `uml:overview`, `readme:subgraphs`, `qa:publish` |
+| `ig-index:build` (fhir-harness) | `<ig>/fhir-artifact-index/{index,menu,releases}.json`, `package.tgz`, `sidecars/`, `contexts/` | 396 + 4 per IG | `ig-pages`, the JSON view pages, `ig-site:sidecars` |
+| `glossary:page` (core) | `<layer>/glossary/generated/<instance>/*.glossary.json` | 16 | glossary pages, `check:term-mapping`, archimate-from-glossary |
+| kg-export, docs writers | `cat-harness/docs/{_data,_includes/generated,assets/{auto-docs,beans,glossary}}` | ~45 | the docs site build (`compose-docs`) |
+| prose rewrite (writer not yet identified) | `cat-harness/docs/{concepts,guides,process}/*.md`, `test/attestations/**` | 7 | to find first: it rewrites COMMITTED source, which no step may do |
+
+### Order (one PR each, measured before and after)
+1. The resolver and its write-site check, warning only.
+2. `ig-index:build` and its readers (smallest reader set; that also
+   retires smart-base#310, smart-trust#142 and smart-trust-phw#33, now
+   drafts).
+3. `glossary:page`.
+4. The docs writers.
+5. `qa:refresh`, the largest and most-read; the QA stamp work of CI speed
+   14 lands on the same paths, so coordinate.
+6. Find the prose rewriter, and stop it writing committed source.
+7. The write-site check goes from warning to red.
+
+### Done when
+In a fresh composed checkout, after a full local gate run,
+`mount-from-lock.sh --check` reports every instance `current`, and no
+`state:mount` exits 1 for an edited mount.
