@@ -148,7 +148,8 @@ class QaCriterionEntry(BaseModel):
 
     reviewer: QaReviewer
     # ISO-8601 UTC datetime; legacy agent entries may carry a bare ISO date.
-    # Optional since 0.2.0: the date is DERIVED from ``reviewed_tree`` (the
+    # Optional since 0.2.0 (owner rulings 2026-11-06, cards "QA dates" and
+    # "Date source"): the date is DERIVED on read from ``reviewed_tree`` (the
     # commit date of the commit carrying it), so a writer may omit it.
     reviewed_at: Optional[str] = None
     reviewed_tree: Optional[str] = None

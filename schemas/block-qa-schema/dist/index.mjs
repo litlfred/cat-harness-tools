@@ -59,7 +59,7 @@ var QaCriterionEntry = z.object({
   reviewer: QaReviewer,
   // ISO-8601 UTC datetime; legacy agent entries may carry a bare ISO date.
   reviewed_at: z.string().optional(),
-  // derived from reviewed_tree since 0.2.0 (owner ruling 2026-11-06, "QA dates")
+  // derived from reviewed_tree on read since 0.2.0 (owner rulings 2026-11-06, cards "QA dates" and "Date source")
   // Tree of repo HEAD at audit time (`HEAD^{tree}`). What producers write
   // since bean 69lr: a PR run's HEAD commit can vanish, its tree cannot.
   reviewed_tree: z.string().optional(),

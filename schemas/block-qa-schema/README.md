@@ -78,7 +78,7 @@ Per criterion entry:
 | `evidence` | string \| {line, text}[] | no | verbatim-quote string, or the structured location list some agent reviewers emit |
 | `metrics` | map | no | descriptive checker measures (e.g. detangler `tanglement_score`, `cone_size`, `pagerank`, `graph_energy`) |
 | `reviewer` | object | yes | `kind` (`script`/`agent`/`human`) + `id`, with script-hash or agent model/session/skill provenance |
-| `reviewed_at` | string | no (0.2.0) | ISO-8601 UTC datetime (legacy agent entries: bare date). New writers omit it: the date is derived from `reviewed_tree`, the commit date of the commit carrying it (owner ruling 2026-11-06, "QA dates") |
+| `reviewed_at` | string | no (0.2.0) | ISO-8601 UTC datetime (legacy agent entries: bare date). New writers omit it: the date is derived from `reviewed_tree`, the commit date of the commit carrying it, derived on read (owner rulings 2026-11-06, cards "QA dates" and "Date source") |
 | `reviewed_tree` | string | no | tree of repo HEAD at audit time (`HEAD^{tree}`) — what producers write: a pull-request run's HEAD commit can vanish, its tree cannot |
 | `reviewed_sha` | string | no | repo HEAD at audit time — superseded by `reviewed_tree` and no longer written; kept readable, and legacy agent entries omit it |
 | `notes` | string | no | free-form |

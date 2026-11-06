@@ -639,7 +639,8 @@ export interface QaCriterionEntry {
   reviewer: QaReviewer;
   /**
    * When the audit ran (ISO-8601 UTC). Optional, and no longer written by the
-   * platform's writers (owner ruling 2026-11-06, card "QA dates", option 1):
+   * platform's writers (owner rulings 2026-11-06: card "QA dates", option 1,
+   * derive the date; card "Date source", option 1, derive it ON READ):
    * the date a verdict is shown and ordered by is DERIVED from
    * {@link reviewed_tree} — the commit date of the commit carrying that tree
    * (`tree-commits.json`, `entryDate` in `pipeline/qa-utils.ts`) — so the

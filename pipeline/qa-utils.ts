@@ -1578,8 +1578,8 @@ export function sameScriptVerdict(
 /**
  * The date a verdict is shown and ordered by.
  *
- * Owner ruling 2026-11-06 (card "QA dates", option 1): a verdict's date is
- * DERIVED from its `reviewed_tree` — the commit date of the commit carrying
+ * Owner rulings 2026-11-06 (card "QA dates", option 1; card "Date source",
+ * option 1, derive on read): a verdict's date is DERIVED from its `reviewed_tree` — the commit date of the commit carrying
  * that tree, which `tree-commits` (`scripts/qa-site-assets.ts`) records in
  * its index's `dates` — so a writer stamps no clock, and the same verdict
  * over the same tree is the same bytes on a PR and on main. A legacy entry's
