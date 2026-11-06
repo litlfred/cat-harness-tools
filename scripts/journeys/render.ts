@@ -42,6 +42,7 @@ import type { ScenarioStep, UserScenario } from "../../schemas/process/user-scen
 import type { Workshop, WorkshopStep } from "../../schemas/process/workshop.ts";
 import {
   blockFor,
+  avatarFile,
   instanceFile,
   journeyById,
   lookup,
@@ -114,6 +115,21 @@ export interface PersonaView {
   frustrations?: string[];
   /** A glyph drawn in the avatar instead of the initials (`meta.persona.icon`). */
   icon?: string;
+  /** The persona's picture, copied beside the viewer: a path from the viewer's route root (`avatars/<instance>/<actor>.webp`). */
+  avatar?: string;
+}
+
+/**
+ * Where a page's route root is, in markup drawn before the page knows its
+ * depth (an avatar's `src`): each page wrapper replaces it with its own path
+ * to the root. Never reaches a written page.
+ */
+export const ROOT_MARK = "@@journeys-root@@/";
+
+/** A persona's picture as the viewer copies it: `avatars/<instance>/<actor><ext>`, from the route root. */
+export function avatarPath(corpus: JourneyCorpus, a: Actor): { from: string; to: string } | undefined {
+  const from = avatarFile(corpus, a);
+  return from === undefined ? undefined : { from, to: `avatars/${a.instance}/${a.id}${extname(from).toLowerCase()}` };
 }
 
 export function personaOf(corpus: JourneyCorpus, instance: string, id: string, i: number): PersonaView {
@@ -138,6 +154,7 @@ export function personaOf(corpus: JourneyCorpus, instance: string, id: string, i
     ...(p?.needs?.length ? { needs: p.needs } : {}),
     ...(p?.frustrations?.length ? { frustrations: p.frustrations } : {}),
     ...(p?.icon ? { icon: p.icon } : {}),
+    ...(a && avatarPath(corpus, a) ? { avatar: avatarPath(corpus, a)!.to } : {}),
     initials: initials || id.slice(0, 2).toUpperCase(),
     color: p?.color ?? PALETTE[i % PALETTE.length]!,
   };
@@ -148,7 +165,8 @@ function personasOf(corpus: JourneyCorpus, j: Journey): PersonaView[] {
 }
 
 function avatar(p: PersonaView, size: "s" | "m" = "m"): string {
-  return `<span class="jv-av jv-av-${size}" style="--c:${e(p.color)}" title="${e(p.name)}${p.role ? ` · ${e(p.role)}` : ""}" aria-hidden="true">${e(p.initials)}</span>`;
+  const inner = p.avatar ? `<img src="${e(ROOT_MARK + p.avatar)}" alt="" loading="lazy">` : e(p.initials);
+  return `<span class="jv-av jv-av-${size}${p.avatar ? " jv-av-img" : ""}" style="--c:${e(p.color)}" title="${e(p.name)}${p.role ? ` · ${e(p.role)}` : ""}" aria-hidden="true">${inner}</span>`;
 }
 
 function face(emotion: number | undefined): string {
@@ -285,7 +303,7 @@ ${o.body.trim()}
 </body>
 </html>
 `;
-  return withRenderedBy(html, TOOL_ID);
+  return withRenderedBy(html.split(ROOT_MARK).join(o.up), TOOL_ID);
 }
 
 // ── index pages ───────────────────────────────────────────────────────────
@@ -914,6 +932,13 @@ export function renderJourneyPages(corpus: JourneyCorpus, links: SiteLinks, decl
     if (presentationOf(corpus, w).steps.length === 0) out.push({ path: `${base}/sheets/index.html`, content: sheetsPage(corpus, w) });
   }
   out.push(...renderPresentationPages(corpus, links));
+  // Every persona's picture, once, from the route root (`ROOT_MARK`).
+  for (const actors of corpus.actors.values()) {
+    for (const a of actors.values()) {
+      const at = avatarPath(corpus, a);
+      if (at !== undefined) out.push({ path: at.to, content: new Uint8Array(readFileSync(at.from)) });
+    }
+  }
   for (const a of ASSETS) out.push({ path: posix.join("assets", a), content: readFileSync(join(ASSET_DIR, a), "utf8") });
   for (const f of FONT_FILES) out.push({ path: posix.join("assets", "fonts", f), content: new Uint8Array(readFileSync(join(ASSET_DIR, FONT_BUNDLE, f))) });
   return out;
