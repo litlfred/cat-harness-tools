@@ -23,6 +23,16 @@
  * `a === b`, or it is a finding. A layer L pins that the index does not
  * mount is not compared.
  *
+ * ## Which pairs it judges, and when it can be green
+ *
+ * Every pair: the index against EVERY mounted layer that has a lock, the
+ * harness and the content layers alike, not only the instances below the
+ * harness. Aligning the harness's own pins (cat-harness#1570, #1097) clears
+ * the pairs against cat-harness; the content layers' locks hold older pins
+ * that also disagree with each other today, so this check stays red until
+ * the bottom-up re-pin of every layer has landed (owner: "align pins"). It
+ * is run as a gate only after that.
+ *
  * ## Where a layer's lock is read
  *
  * From the mount when it is on disk (`<L path>/index.lock.json`, laid down
