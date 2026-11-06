@@ -31,6 +31,8 @@ import {
   injectInto,
   previewRootOf,
   FRAGMENT,
+  MINIMAL_FRAGMENT,
+  OFFSET_STYLE,
   type StagingFacts,
 } from "../../staging-banner.js";
 import { HARNESS_ROOT } from "../../lib/roots.ts";
@@ -221,6 +223,21 @@ describe("injection mechanics carried over from the bash version", () => {
     const twice = injectInto(once);
     expect(twice.html).toBe(once);
     expect(twice.outcome).toBe("already");
+  });
+
+  test("a page that declines the harness frame gets the minimal notice: no bar, no offset, the same client", () => {
+    const page = `<html><head><meta name="folio-navbar" content="none"></head><body class="jp">x</body></html>`;
+    const r = injectInto(page);
+    expect(r.outcome).toBe("injected");
+    expect(r.html).toContain(MINIMAL_FRAGMENT);
+    expect(r.html).not.toContain("FEATURE BRANCH");
+    expect(r.html).not.toContain(OFFSET_STYLE);
+    expect(r.html).not.toContain("<span data-fa-staging-detail>");
+    // The service worker that serves the preview's shared stylesheets still registers.
+    expect(r.html).toContain("staging-sw.js");
+    expect(injectInto(r.html).outcome).toBe("already");
+    // A page that keeps the frame keeps the full banner.
+    expect(injectInto(`<html><head><meta name="folio-navbar" content="linked"></head><body>x</body></html>`).html).toContain(FRAGMENT);
   });
 
   test("a page that only NAMES the attribute (the review page's CSS) still gets the banner", () => {

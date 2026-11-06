@@ -42,11 +42,13 @@ import type { ScenarioStep, UserScenario } from "../../schemas/process/user-scen
 import type { Workshop, WorkshopStep } from "../../schemas/process/workshop.ts";
 import {
   blockFor,
+  fromSite,
   instanceFile,
   journeyById,
   lookup,
   processDrawing,
   requirementFor,
+  siteRootFrom,
   type Actor,
   type Journey,
   type JourneyCorpus,
@@ -618,7 +620,8 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
         })
         .join("")}</ul>`
     : "";
-  const refsHtml = st.references?.length ? `<h4>References</h4><ul>${st.references.map((r) => `<li><a href="${e(r.href)}">${e(r.label)}</a>${r.rel ? ` <span class="jv-muted">${e(r.rel)}</span>` : ""}</li>`).join("")}</ul>` : "";
+  const toSite = siteRootFrom(up, links);
+  const refsHtml = st.references?.length ? `<h4>References</h4><ul>${st.references.map((r) => `<li><a href="${e(fromSite(r.href, toSite))}">${e(r.label)}</a>${r.rel ? ` <span class="jv-muted">${e(r.rel)}</span>` : ""}</li>`).join("")}</ul>` : "";
   const handoffHtml =
     s.handoff && (s.handoff.carrier || s.handoff.payload)
       ? `<h4>What travels</h4><dl class="jv-dl">${s.handoff.carrier ? `<dt>Carrier</dt><dd>${e(s.handoff.carrier)}</dd>` : ""}${s.handoff.payload ? `<dt>Payload</dt><dd>${e(s.handoff.payload)}</dd>` : ""}</dl>`
@@ -671,7 +674,7 @@ function journeyPage(corpus: JourneyCorpus, j: Journey, links: SiteLinks): strin
         }
       })()
     : mdHtml(s.description);
-  const toSite = "../".repeat(links.route.split("/").length + 2);
+  const toSite = siteRootFrom(up, links);
   const views = (s.views ?? [])
     .map((v) => {
       const t = links.archimateView?.(j.instance, v.model, v.view);
@@ -693,7 +696,7 @@ ${kids.length ? `<section class="jv-kids"><h2>Sub-journeys</h2><ol class="jv-tre
 ${s.steps.length ? journeyMap(corpus, j, personas, ladder) : ""}
 ${s.steps.length ? `<section class="jv-steps" data-jv-stepper aria-labelledby="jv-steps-h"><div class="jv-steps-bar"><h2 id="jv-steps-h">Step by step</h2><span class="jv-actions"><button type="button" class="jv-btn" data-jv-print>Print (A3)</button></span></div>${stepNav}\n${s.steps.map((x, i) => stepSection(corpus, j, x, i, personas, links, up)).join("\n")}</section>` : ""}
 ${views ? `<section class="jv-views"><h2>Architecture</h2><ul class="jv-views-list">${views}</ul></section>` : ""}
-${s.references?.length ? `<section><h2>References</h2><ul>${s.references.map((r) => `<li><a href="${e(r.href)}">${e(r.label)}</a></li>`).join("")}</ul></section>` : ""}
+${s.references?.length ? `<section><h2>References</h2><ul>${s.references.map((r) => `<li><a href="${e(fromSite(r.href, toSite))}">${e(r.label)}</a></li>`).join("")}</ul></section>` : ""}
 <p class="jv-src">${src ? `Source: <a href="${e(src)}"><code>${e(j.file)}</code></a>` : `Source: <code>${e(j.file)}</code>`} (<code>${e(s.$schema)}</code>)</p>`;
   const crumbs: Crumb[] = [{ label: "Journeys", href: up }, { label: j.instance, href: `${up}${j.instance}/` }];
   const chain: Journey[] = [];

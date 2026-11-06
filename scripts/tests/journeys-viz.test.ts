@@ -10,7 +10,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, posix } from "node:path";
 
 import { readJourneyCorpus, unescapeXml } from "../journeys/read.ts";
 import { bpmnFigure, orderByFollows, renderJourneyPages, stepAnchor, type PageFile } from "../journeys/render.ts";
@@ -30,6 +30,7 @@ import {
   screenHref,
   screensFor,
   shortTitle,
+  castOrder,
   siteRootFrom,
   viewBoxWidth,
 } from "../journeys/present.ts";
@@ -128,6 +129,11 @@ put("lower/scenarios/user-scenarios/p2.json", {
         { block: "nowhere", role: "unknown block" },
       ],
       gaps: ["No transaction for this yet."],
+      references: [
+        { label: "The walkthrough", href: "vaxlink/", rel: "illustrates" },
+        { label: "The spec", href: "https://example.org/spec" },
+        { label: "This step", href: "#p2" },
+      ],
       handoff: { summary: "The summary goes home", from: "Clinic EMR", to: "ana", offline: false },
       fhirChanges: [{ resource: "Bundle", change: "Read, not stored", why: "It is hers.", profile: "ips-bundle", profileOf: "Intl", examples: ["Bundle/ana-ips"] }],
       illustration: { src: "docs/images/p2.png", alt: "Ben reads the summary on a tablet." },
@@ -326,6 +332,23 @@ describe("a journey page", () => {
     expect(p2).toContain('href="../../top/workshops/policy/m1/"');
     expect(p2).toContain('data-jv-store');
     expect(p2).toContain("a signature crosses");
+  });
+  test("a reference's href resolves from the site's root, as the workshop pages resolve it", () => {
+    // The journey page sits at <route>/<instance>/<id>/: two up to the route root, three more out of `en/top/journeys`.
+    const toSite = "../../../../../";
+    expect(p2).toContain(`href="${toSite}journeys.html#p2">User scenario in the IG</a>`);
+    expect(p2).toContain(`href="${toSite}vaxlink/">The walkthrough</a>`);
+    expect(p2).toContain('href="https://example.org/spec">The spec</a>');
+    expect(p2).toContain('href="#p2">This step</a>');
+    expect(p2).not.toContain('href="journeys.html#p2"');
+    expect(p2).not.toContain('href="vaxlink/"');
+  });
+  test("the journey page and the workshop pages reach the same file for one relative href", () => {
+    const fromJourney = posix.join("en/top/journeys/lower/p2-treated/", "../../../../../journeys.html");
+    const ws = at("top/workshops/policy/walkthrough/P2/index.html");
+    const href = /href="([^"]*journeys\.html)#p2"/.exec(ws)?.[1];
+    expect(href).toBeDefined();
+    expect(posix.join("en/top/journeys/top/workshops/policy/walkthrough/P2/", href!)).toBe(fromJourney);
   });
   test("follows and partOf are links", () => {
     expect(p2).toContain('href="../../lower/p1-checked/" rel="prev"');
@@ -549,6 +572,16 @@ describe("presentation helpers", () => {
     expect(p.steps.map((s) => `${s.key}@${s.chapter}`)).toEqual(["P1@0", "P2@1"]);
     expect(p.cast.map((c) => c.id)).toEqual(["ana", "ben", "cleo"]);
     expect(p.steps[1]!.ws?.askTheRoom).toBe("Should the family be told?");
+  });
+  test("presentation.cast orders the cast everywhere; presentation.chapterTitles names a chapter", () => {
+    const w0 = corpus.workshops[0]!;
+    const w = { ...w0, workshop: { ...w0.workshop, presentation: { ...w0.workshop.presentation, cast: ["cleo", "ghost", "ana"], chapterTitles: { "p2-treated": "Crossing back" } } } };
+    const p = presentationOf(corpus, w);
+    // Declared first (an id no step names is dropped), then the rest in order of first appearance.
+    expect(p.cast.map((c) => c.id)).toEqual(["cleo", "ana", "ben"]);
+    expect(p.chapters.map((c) => c.title)).toEqual(["Checked", "Crossing back"]);
+    expect(castOrder(["a", "b", "c"], undefined)).toEqual(["a", "b", "c"]);
+    expect(castOrder(["a", "b", "c"], ["c", "c", "x"])).toEqual(["c", "a", "b"]);
   });
   test("personaText puts the avatar beside whole-word names, longest first, and escapes the rest", () => {
     const people = [

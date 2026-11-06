@@ -39,7 +39,7 @@ import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
 import type { ScenarioStep } from "../../schemas/process/user-scenario.ts";
 import type { WorkshopPresentation, WorkshopStep } from "../../schemas/process/workshop.ts";
-import { blockFor, journeyById, lookup, processDrawing, processName, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
+import { blockFor, fromSite, journeyById, lookup, processDrawing, processName, siteRootFrom, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
 import {
   allSteps,
   bpmnFigure,
@@ -77,7 +77,7 @@ export interface PresentedStep {
 
 export interface Chapter {
   journey: Journey;
-  /** Its title without the code in front: "Born abroad" for "J1 — Born abroad". */
+  /** Its title in the room: `presentation.chapterTitles` for its journey, else the journey title without the code in front ("Born abroad" for "J1 — Born abroad"). */
   title: string;
   steps: PresentedStep[];
 }
@@ -86,8 +86,19 @@ export interface Presentation {
   w: WorkshopEntry;
   chapters: Chapter[];
   steps: PresentedStep[];
-  /** Everyone a step names, in order of first appearance, with a stable colour each. */
+  /** Everyone a step names, in the declared order (`presentation.cast`) then of first appearance, with a stable colour each. */
   cast: PersonaView[];
+}
+
+/**
+ * The cast in the order the presentation declares (`presentation.cast`), then
+ * everyone else in order of first appearance. An id the declared order names
+ * and no step does is dropped: the cast is the people the steps name.
+ */
+export function castOrder(appearing: readonly string[], declared: readonly string[] | undefined): string[] {
+  if (!declared?.length) return [...appearing];
+  const first = declared.filter((id, i) => appearing.includes(id) && declared.indexOf(id) === i);
+  return [...first, ...appearing.filter((id) => !first.includes(id))];
 }
 
 /** "J1 — Born abroad" → "Born abroad": a step code ("J4.0", "P2", "T") and a dash or a middle dot in front are dropped. */
@@ -125,7 +136,7 @@ export function presentationOf(corpus: JourneyCorpus, w: WorkshopEntry): Present
     const root = roots[k]!;
     let c = chapters.findIndex((x) => x.journey === root);
     if (c < 0) {
-      chapters.push({ journey: root, title: shortTitle(root.scenario.title), steps: [] });
+      chapters.push({ journey: root, title: w.workshop.presentation?.chapterTitles?.[root.scenario.id] ?? shortTitle(root.scenario.title), steps: [] });
       c = chapters.length - 1;
     }
     // A journey with no steps of its own is taught through its sub-journeys.
@@ -159,7 +170,7 @@ export function presentationOf(corpus: JourneyCorpus, w: WorkshopEntry): Present
       }
     }
   }
-  const cast = ids.map((id, i) => personaOf(corpus, instanceOf.get(id)!, id, i));
+  const cast = castOrder(ids, w.workshop.presentation?.cast).map((id, i) => personaOf(corpus, instanceOf.get(id)!, id, i));
   return { w, chapters: chapters.filter((c) => c.steps.length > 0), steps, cast };
 }
 
@@ -331,13 +342,8 @@ export function viewBoxWidth(svg: string): number | undefined {
 
 // ── links out: the site, the IG, the device demo ──────────────────────────
 
-/** From a page to the site's root: the viewer's route root, then up out of the route (`en/<harness>/<id>`). */
-export const siteRootFrom = (root: string, links: SiteLinks): string => root + "../".repeat(links.route.split("/").length);
-
-/** An href a workshop names: a URL as it is, an absolute path as it is, else a path from the site's root. */
-export function fromSite(href: string, siteRoot: string): string {
-  return /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("/") || href.startsWith("#") ? href : `${siteRoot}${href}`;
-}
+// The one resolver for an href a journey or a workshop names: `read.ts`.
+export { fromSite, siteRootFrom } from "./read.ts";
 
 /** `{type}` and `{id}` filled into a page pattern. */
 export const fillPattern = (pattern: string, v: { type?: string; id: string }): string => pattern.split("{type}").join(v.type ?? "").split("{id}").join(v.id);

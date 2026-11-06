@@ -441,3 +441,22 @@ export function processName(corpus: JourneyCorpus, instance: string, process: st
   const m = /<(?:[A-Za-z_][\w.-]*:)?process\b[^>]*\sname="([^"]+)"/.exec(readFileSync(file, "utf8"));
   return m ? unescapeXml(m[1]!) : undefined;
 }
+
+// ── hrefs a journey or a workshop names ───────────────────────────────────
+
+/**
+ * From a page to the site's root: the viewer's route root, then up out of the
+ * route (`en/<harness>/<id>`). `root` is the page's way up to the route root.
+ */
+export const siteRootFrom = <L extends { route: string }>(root: string, links: L): string => root + "../".repeat(links.route.split("/").length);
+
+/**
+ * An href a journey, a step or a workshop names: a URL as it is, an absolute
+ * path or a `#fragment` as it is, else a path from the SITE'S ROOT. The one
+ * resolver the journey pages (`render.ts`) and the workshop pages
+ * (`present.ts`) share, so a relative href (`journeys.html#j1`, `vaxlink/`)
+ * reaches the same file from both.
+ */
+export function fromSite(href: string, siteRoot: string): string {
+  return /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("/") || href.startsWith("#") ? href : `${siteRoot}${href}`;
+}
