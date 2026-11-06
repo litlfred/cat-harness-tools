@@ -46,6 +46,7 @@ import { declarationChain, resolveImplementingPath } from "../kg/harness-config.
 import { instanceRootsIn } from "../kg/instance-roots.ts";
 
 import { harnessRoot } from "../harness-root.ts";
+import { subgraphHarnessPath } from "../../scripts/lib/harness-layout.ts";
 // The two profile schemas live with the declaration that carries them
 // (`contentTranslations`, bean `0r7u`); re-exported so callers keep one import.
 export { ContentTypeTranslationSchema, TranslatableFormatSchema };
@@ -100,9 +101,16 @@ export function collectContentTypeTranslations(repoRoot: string): DeclaredConten
  */
 export function resolveTranslationPath(ct: DeclaredContentTypeTranslation, rel: string): string | undefined {
   const chain = declarationChain(ct.declaredBy).map((c) => c.root).reverse();
+  // A path into a harness folder that moved into a named sub-graph (sdlc,
+  // work-plan, library) is also tried in its new spelling, so a layer that
+  // still names the old one resolves while the pins catch up. Transitional,
+  // like `harness-layout.ts` itself.
+  const spellings = [...new Set([rel, subgraphHarnessPath(rel)])];
   for (const root of chain) {
-    const abs = join(root, rel);
-    if (existsSync(abs)) return abs;
+    for (const r of spellings) {
+      const abs = join(root, r);
+      if (existsSync(abs)) return abs;
+    }
   }
   // The code moved to the layer that implements the declaring instance (bean 70lx).
   for (const root of chain) {

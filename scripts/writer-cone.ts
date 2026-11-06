@@ -461,7 +461,7 @@ export function churnReport(
 
 /** The report as a Markdown table, for a job summary. */
 export function renderChurn(r: ChurnReport): string {
-  const cell = (s: string) => s.replace(/\|/g, "\\|");
+  const cell = (s: string) => s.replace(/[\\|]/g, "\\$&");
   const lines = [
     `### Render churn against ${r.against.slice(0, 12)}`,
     "",

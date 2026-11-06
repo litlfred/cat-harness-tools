@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { diff, splitFindings } from "../scripts/split-baseline.ts";
+import { diff, judges, splitFindings } from "../scripts/split-baseline.ts";
 
 describe("split-baseline --check findings", () => {
   const base = { mcpTools: [{ name: "a", required: [], optional: [] }], knownSkills: ["x", "y"] };
@@ -17,5 +17,21 @@ describe("split-baseline --check findings", () => {
   test("a tool change still fails", () => {
     const now = { ...base, mcpTools: [] };
     expect(splitFindings(diff(base, now)).failing).toEqual(["tool gone: a"]);
+  });
+});
+
+describe("split-baseline judges only the root it was recorded at", () => {
+  // Owner, 2026-11-05: "scope to fa". A site that does not mount an instance
+  // resolves none of its skills, and each read as "no longer resolves".
+  test("the root it names is judged", () => {
+    expect(judges({ root: "folio-assistant" }, "folio-assistant")).toBe(true);
+  });
+
+  test("any other root is not", () => {
+    expect(judges({ root: "folio-assistant" }, "smart-ra")).toBe(false);
+  });
+
+  test("a baseline naming no root judges every root", () => {
+    expect(judges({}, "smart-ra")).toBe(true);
   });
 });

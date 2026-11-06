@@ -44,6 +44,7 @@ import { findDeclarationFile, instanceRootsIn } from "../schemas/kg/instance-roo
 import { StateManifestSchema, type StateManifest } from "../schemas/kg/state-manifest.ts";
 
 import { BranchStore, storeOptionsFor, tipLocations, type BranchKeying, type FileRead } from "./branch-store.ts";
+import { gateOwnInstances } from "./lib/gate-own.ts";
 import { REPO_ROOT } from "./lib/roots.ts";
 
 /** One instance directory kept on a branch. */
@@ -131,7 +132,7 @@ const KIND: Record<string, string> = {
 };
 
 function cell(s: string): string {
-  return s.replace(/\|/g, "\\|").replace(/\n+/g, " ");
+  return s.replace(/[\\|]/g, "\\$&").replace(/\n+/g, " ");
 }
 
 /**
@@ -284,7 +285,15 @@ if (import.meta.main) {
     console.log(`${one}: ${w.state} — ${w.reason}`);
     process.exit(w.state === "pushed" || w.state === "unchanged" ? 0 : 1);
   }
-  const verdicts = [...all.entries()].map(([b, d]) => verdictFor(b, d, storeReader(root, all)));
+  // In a layer's PR checks, only branches the caller's own instances declare
+  // (owner ruling 2026-11-05, "Move the checks", generator checks included; `lib/gate-own.ts`).
+  const own = gateOwnInstances();
+  const judged = [...all.entries()].filter(([, d]) => !own || d.some((x) => own.has(x.instance)));
+  if (own && judged.length === 0 && all.size > 0) {
+    console.log(`✓ branch:readme --check: none of the ${all.size} declared branch(es) is the caller's; their declaring layers' CI judges them.`);
+    process.exit(0);
+  }
+  const verdicts = judged.map(([b, d]) => verdictFor(b, d, storeReader(root, all)));
   for (const v of verdicts) console.log(`${{ current: "✓", stale: "✗", family: "·", tool: "·", unknown: "?" }[v.state]} ${v.branch} — ${v.state}${"reason" in v ? `: ${v.reason}` : ""}`);
   const unknown = verdicts.filter((v) => v.state === "unknown").length;
   const stale = verdicts.filter((v) => v.state === "stale").length;

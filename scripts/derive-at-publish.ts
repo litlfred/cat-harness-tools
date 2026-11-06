@@ -415,7 +415,7 @@ if (import.meta.main) {
   const failed = new Map<string, number | null>();
   const reused = new Map<string, string>();
   // ── Issue #400: key, reuse, and run unordered writers side by side ──
-  // input-site: inert #c6583b74 — the cache directory, the job count and the CI switch decide how the writers run, never what they write
+  // input-site: env CAT_BUILD_TYPE,CAT_WRITER_SKIP,CAT_WRITER_RECORD; inert #c6583b74 — the build type (a preview borrows main's indexes, `buildTypeOf`) and the writer skip/record switches (a skipped writer puts back main's recorded outputs) decide WHAT is written, so their values are hashed; the cache directory, the job count and the CI switch decide only how the writers run
   const env = process.env;
   const jobs = jobsOf(env);
   const cacheOn = deriveCacheEnabled(process.argv, env);
@@ -657,7 +657,7 @@ function writeChurn(against: string, entries: readonly ChurnEntry[], writerOf: (
   writeFileSync(file, JSON.stringify(report, null, 2) + "\n");
   const md = renderChurn(report);
   console.log(md);
-  // input-site: inert #7c1e04b2 — the job summary is where the report is shown, never an input of a writer
+  // input-site: inert #ab4c9ec1 — the job summary is where the report is shown, never an input of a writer
   const summary = process.env.GITHUB_STEP_SUMMARY;
   if (summary) appendFileSync(summary, md);
 }

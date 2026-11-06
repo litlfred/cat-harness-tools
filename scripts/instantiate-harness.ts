@@ -63,7 +63,7 @@
  *  8. **prepare** — the checkout script `prepare:<harness>`, when declared:
  *     what the harness's site is built from and nobody commits (an IG's AST).
  *  9. **render** — `stage-local.ts`: on this branch, the preview at
- *     `gh-pages:STAGING/<branch>/`; with `--local`, `--dry-run` (built and
+ *     `gh-pages:branches/<branch>/`; with `--local`, `--dry-run` (built and
  *     composed, nothing pushed). The site, its JSON-LD and its chrome are the
  *     steps the mounted layers declare; this file names none of them.
  *
@@ -112,7 +112,7 @@ export const USAGE = `usage: instantiate-harness.ts --repo DIR --harness OWNER/R
 
   Pin a harness and its closure over a repository that has none, mount it, commit the
   setup on a branch, open the setup-only PR, and render the branch's preview
-  (gh-pages STAGING/<branch>/). The consent evidence is read from stdin unless --evidence.
+  (gh-pages branches/<branch>/). The consent evidence is read from stdin unless --evidence.
 
   --plan     resolve the closure, print every step, and stop
   --local    commit on the branch but push nothing: the site is built and composed (--dry-run)
@@ -258,7 +258,7 @@ export function planLines(o: Options, closure: readonly ClosureEntry[], branch: 
     `harness   instantiate:${h}, when a mounted layer declares it; then commit`,
     o.local ? "publish   (--local: nothing pushed)" : `publish   push ${branch}, provision gh-pages when absent, ${o.pr ? "open the setup-only PR" : "no PR (--no-pr)"}`,
     `prepare   prepare:${h}, when a mounted layer declares it`,
-    o.local ? "render    stage-local --dry-run: built and composed, nothing pushed" : `render    stage-local: the preview at gh-pages:STAGING/${branch.replace(/[^A-Za-z0-9._-]+/g, "-")}/`,
+    o.local ? "render    stage-local --dry-run: built and composed, nothing pushed" : `render    stage-local: the preview at gh-pages:branches/${branch.replace(/[^A-Za-z0-9._-]+/g, "-")}/`,
   ];
 }
 

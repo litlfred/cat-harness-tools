@@ -109,7 +109,7 @@
     {
       "number": 215,
       "isFeature": true,
-      "why": "'we need to have feature-branch rendering in the pipeline' under STAGING/<branch>: pipeline capability change"
+      "why": "'we need to have feature-branch rendering in the pipeline' under branches/<branch>: pipeline capability change"
     },
     {
       "number": 221,

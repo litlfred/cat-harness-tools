@@ -37,6 +37,7 @@ import { execSync } from "child_process";
 import {
   hashBlockFiles,
   gitHeadSha,
+  gitHeadTree,
   loadQaReport,
   saveQaReport,
   readBlockManifest,
@@ -167,6 +168,9 @@ function run(): void {
   }
 
   const headSha = gitHeadSha();
+  // What each entry records as `reviewed_tree` (bean 69lr; owner card Q4,
+  // 2026-11-05): the tree outlives a PR run's synthetic merge commit.
+  const headTree = gitHeadTree();
   const nowIso = new Date().toISOString();
   let added = 0;
   let skipped = 0;
@@ -282,7 +286,7 @@ function run(): void {
       result: f.result,
       reviewer: batch.reviewer,
       reviewed_at: nowIso,
-      reviewed_sha: headSha,
+      reviewed_tree: headTree,
     };
     if (f.severity) entry.severity = f.severity;
     if (f.evidence) entry.evidence = f.evidence;

@@ -24,7 +24,7 @@
  *
  * Exactly the files main's publish wrote (the manifest's list) on the before
  * side, and, on the after side, every built file except the staging job's
- * own artefacts. The publish root also holds `STAGING/` and the render log,
+ * own artefacts. The publish root also holds `branches/` and the render log,
  * which are other sites. Run it BEFORE the staging banner is injected: the
  * banner names the commit, so every page would differ.
  *

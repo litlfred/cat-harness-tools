@@ -225,7 +225,7 @@ export function chaptersOf(root: string, paper: string): ChapterInfo[] {
 
 /** Escape the cell separator so a title containing `|` cannot break the table. */
 function cell(text: string): string {
-  return text.replace(/\|/g, "\\|");
+  return text.replace(/[\\|]/g, "\\$&");
 }
 
 function urlFor(path: string, cfg: ReadmeTocConfig, repoUrl: string | undefined): string | undefined {

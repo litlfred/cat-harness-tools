@@ -495,6 +495,7 @@ function findSkippedTarget(
 
   if (repoRoot && existsSync(repoRoot)) {
     try {
+      // input-site: store #68a3002b — resolves which qa-reports entry a skipped sha reads (its nearest recorded ancestor); the identity hashed for an `--against` baseline is the entry this resolves to
       const r = spawnSync("git", ["rev-list", "-n", "50", sha], { cwd: repoRoot, encoding: "utf-8" });
       if (r.status === 0 && r.stdout.trim()) {
         const commits = r.stdout.trim().split("\n").map((c) => c.trim()).filter(Boolean);
@@ -546,6 +547,7 @@ function findSkippedTargetForPrefix(
 
   if (repoRoot && existsSync(repoRoot)) {
     try {
+      // input-site: store #e0941588 — resolves a sha prefix to the qa-reports entry it reads; the identity hashed for an `--against` baseline is the entry this resolves to
       const r = spawnSync("git", ["rev-parse", "--verify", `${prefix}^{commit}`], { cwd: repoRoot, encoding: "utf-8" });
       if (r.status === 0 && r.stdout.trim()) {
         const fullSha = r.stdout.trim();

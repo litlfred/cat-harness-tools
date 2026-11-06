@@ -53,7 +53,7 @@ describe("createStagingPreview", () => {
   test("movedFrom is the URL it was served from, when the host is known", () => {
     const node = createStagingPreview(DEPLOY);
     expect(node.movedFrom).toBe(
-      "https://litlfred.github.io/folio-assistant/STAGING/claude-sleepy-babbage-ls90iz/",
+      "https://litlfred.github.io/folio-assistant/branches/claude-sleepy-babbage-ls90iz/",
     );
   });
 

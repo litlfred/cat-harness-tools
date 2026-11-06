@@ -85,6 +85,7 @@ import {
 } from "../schemas/kg/reference-direction.js";
 import { BEGIN as SUBGRAPH_README_BEGIN } from "@litlfred/bootstrap-tools/scripts/subgraph-readmes.ts";
 import { aliasRoute, visualiserRoute } from "../schemas/kg/visualiser-route.js";
+import { gateOwnInstances, gateOwnsFile } from "./lib/gate-own.ts";
 import { declaredVisualisers, forwardingParts, pageParts, siteOwnerDir } from "./viewer-declarations.js";
 import {
   againstOrUsage,
@@ -1454,6 +1455,24 @@ export function exemptionCounts(exempt: readonly { verdict: ReferenceVerdict }[]
   return counts;
 }
 
+/**
+ * The part of a report a caller is judged on: occurrences in files it owns,
+ * and its own instances among those declaring no `needs` (owner ruling
+ * 2026-11-05, "Move the checks"). `ownInstances` undefined keeps every
+ * instance.
+ */
+export function scopeReport(
+  report: ReferenceReport,
+  owns: (file: string) => boolean,
+  ownInstances: ReadonlySet<string> | undefined,
+): ReferenceReport {
+  return {
+    ...report,
+    classified: report.classified.filter((c) => owns(c.occurrence.file)),
+    undeclared: ownInstances ? report.undeclared.filter((n) => ownInstances.has(n)) : report.undeclared,
+  };
+}
+
 function main(): number {
   const args = process.argv.slice(2);
   // `--check` reads and compares; it never writes. Bean `ymsu` — a gate that
@@ -1466,7 +1485,14 @@ function main(): number {
   }
   const { against, exit: badRef } = againstOrUsage(GATE, args);
   if (badRef !== undefined) return badRef;
-  const report = analyse();
+  // In a layer's PR checks, only the caller's own files and instances are
+  // judged (owner ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`):
+  // a lower layer's file naming an instance above it is that layer's to fix,
+  // in its own CI. A scoped run writes no working copy, which covers the
+  // whole corpus and is the owning repository's.
+  const scoped = gateOwnsFile(".") !== undefined;
+  const report = scoped ? scopeReport(analyse(), (f) => gateOwnsFile(f) !== false, gateOwnInstances()) : analyse();
+  const pending = scoped ? PENDING.filter((p) => gateOwnsFile(p.file) !== false) : PENDING;
 
   if (report.instances === 0) {
     console.error("check:reference-direction: found 0 declared instances — wrong root, or the tree moved.");
@@ -1478,7 +1504,7 @@ function main(): number {
   const undet = of("undetermined");
   const exempt = of("exempt");
   const namesRepo = of("names-repository");
-  const states = directionStates(report, PENDING);
+  const states = directionStates(report, pending);
 
   console.log(`Reference direction — ${report.instances} instances, ${report.classified.length} name occurrences pointing up the dependency arrow\n`);
   console.log(`  wrong-direction   ${String(wrong.length).padStart(5)}   in ${new Set(wrong.map((c) => c.occurrence.file)).size} files`);
@@ -1542,7 +1568,7 @@ function main(): number {
   const heldFiles = new Set(states.pendingHeld.map((p) => p.file));
   const held = wrong.filter((c) => heldFiles.has(c.occurrence.file));
   console.log(
-    `\n  of the wrong-direction count, ${held.length} occurrence(s) in ${PENDING.length} file(s) are PENDING —` +
+    `\n  of the wrong-direction count, ${held.length} occurrence(s) in ${pending.length} file(s) are PENDING —` +
       ` each names more than one instance above it, so there is no single place to move it to (issue #1219)`,
   );
 
@@ -1562,13 +1588,13 @@ function main(): number {
   // refused over.
   const fresh = buildDirectionResult({
     report,
-    pending: PENDING,
+    pending,
     exemptionsDeclared: EXEMPTIONS_DECLARED,
     script: relative(REPO_ROOT, join(import.meta.dir, "check-reference-direction.ts")),
     scriptAbsPath: join(import.meta.dir, "check-reference-direction.ts"),
   });
   const where = relative(REPO_ROOT, qaResultPath(INSTANCE_ROOT, SIDECAR_STEM));
-  if (!check) writeQaResult(INSTANCE_ROOT, SIDECAR_STEM, fresh);
+  if (!check && !scoped) writeQaResult(INSTANCE_ROOT, SIDECAR_STEM, fresh);
   // The message names WHAT was compared. A `--check` that passed silently
   // would be read as a guarantee about the counts, which it is not and by
   // design cannot be.

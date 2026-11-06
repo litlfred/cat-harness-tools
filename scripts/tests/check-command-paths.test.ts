@@ -362,3 +362,30 @@ describe("the corpus is DISCOVERED, not listed", () => {
     ]);
   });
 });
+
+// folio-assistant-tsh9: a command naming a path an instance moved passes while
+// the move is in its window, reported as moved (sdlc skill `two-phase-move`).
+describe("a declared move", () => {
+  const moved = (until: string): string =>
+    fixture({
+      "AGENTS.md": "```sh\nbun run cat-harness/old/x.ts\n```\n",
+      ".mcp.json": JSON.stringify({ mcpServers: { s: { command: "cat-harness/old/x.ts", args: [] } } }),
+      "cat-harness/cat-harness.json": JSON.stringify({ name: "cat-harness", directories: [], moves: [{ from: "old", to: "new", until }] }),
+      "cat-harness/new/x.ts": "",
+    });
+
+  test("in the window the old path passes, and each use is reported as moved", () => {
+    const r = checkCommandPaths(moved("2099-12-31"));
+    expect(r.dead).toEqual([]);
+    expect(r.moved.map((m) => [m.file, m.token, m.move])).toEqual([
+      ["AGENTS.md", "cat-harness/old/x.ts", "cat-harness:old"],
+      [".mcp.json", "cat-harness/old/x.ts", "cat-harness:old"],
+    ]);
+  });
+
+  test("past `until` the move gives no relief", () => {
+    const r = checkCommandPaths(moved("2020-01-01"));
+    expect(r.moved).toEqual([]);
+    expect(r.dead.map((d) => d.file).sort()).toEqual([".mcp.json", "AGENTS.md"]);
+  });
+});

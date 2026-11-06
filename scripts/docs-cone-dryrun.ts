@@ -57,6 +57,7 @@ import {
   type RenderedImpact,
 } from "../schemas/ui/rendered-impact.ts";
 import { BranchStore, type BranchStoreOptions, storeOptionsFor } from "./branch-store.ts";
+import { PREVIEW_PREFIX_ALT } from "./lib/preview-prefix.ts";
 
 export const DOCS_CONE_DRYRUN_TAG = "docs-cone-dryrun/v1" as const;
 
@@ -248,7 +249,7 @@ export const DEPLOY_STAMPS: ReadonlyArray<readonly [RegExp, string]> = [
   // into `index.json` and `index.jsonld` alongside `"nodes"`.
   [/("nodes":\s*\d+,\s*"bytes":\s*)\d+(,\s*"sha256":\s*)"[0-9a-f]{64}"/g, '$10$2""'],
   // `gen-site-viz.ts` renders the pre-deploy `gh-pages` tip SHA, `_render-log/`
-  // count and `STAGING/` preview table into `en/cat-harness/site/index.html`.
+  // count and `branches/` preview table into `en/cat-harness/site/index.html`.
   [/(<p class="m">Tip <code>)[0-9a-f]{12}(<\/code>[^<]*?·\s*)\d+( staging preview\(s\))/g, "$1$20$3"],
   [/(<tr><td><code>_render-log\/<\/code><\/td><td>\d+<\/td><td>)\d+(<\/td><\/tr>)/g, "$10$2"],
   [/(<table><thead><tr><th>Preview<\/th><th>Pages<\/th><th>Files<\/th><\/tr><\/thead><tbody>)[\s\S]*?(<\/tbody><\/table>)/g, "$1$2"],
@@ -267,7 +268,7 @@ export const DEPLOY_STAMPS: ReadonlyArray<readonly [RegExp, string]> = [
 export const ALWAYS_REWRITTEN = /^(build\.json|\.nojekyll|writer-cone\/records\.json)$/;
 
 /** On the publish root, not the main site: other previews, the render log, git. */
-export const NOT_THE_MAIN_SITE = /^(STAGING|_render-log|\.git)(\/|$)/;
+export const NOT_THE_MAIN_SITE = new RegExp(`^(${PREVIEW_PREFIX_ALT}|_render-log|\\.git)(/|$)`);
 
 const SPLIT_SEARCH_INDEX = /^assets\/js\/search\/[^/]+\.json$/;
 const TEXTUAL = /\.(html?|css|js|json|jsonld|xml|txt|svg|md|map)$/i;

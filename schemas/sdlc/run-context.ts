@@ -5,8 +5,9 @@
  * @graphNode schema
  *
  * Test-plan executions, QA reports and tool runs all need the same version
- * facts (the checker's hash and version, the commit under test, runtimes, the
- * platform commit, the mount lock). This record states each fact once:
+ * facts (the checker's hash and version, the commit under test — a block-qa
+ * verdict's `reviewed_tree` names its tree, the legacy `reviewed_sha` its
+ * commit — runtimes, the platform commit, the mount lock). This record states each fact once:
  *
  * | field | the fact | reused from |
  * |---|---|---|

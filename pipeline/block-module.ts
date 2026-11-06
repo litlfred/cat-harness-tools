@@ -90,10 +90,10 @@ export async function loadBlockModule(
   tsPath: string,
   contributedKinds?: ReadonlySet<string>,
 ): Promise<LoadedBlock | undefined> {
-  // input-site: traced #9589922f — a content block's manifest, loaded by path
-  inputSiteReached("block-module: loadBlockModule loads a computed block file");
   // A `.json` manifest (bean `y9r6`) is data: evaluated, not imported.
   if (tsPath.endsWith(".json")) return asLoadedBlock(evaluateJsonManifest(tsPath), tsPath, contributedKinds);
+  // input-site: traced #9589922f — a content block's manifest, loaded by path
+  inputSiteReached("block-module: loadBlockModule loads a computed block file");
   const mod = (await import(tsPath)) as { default?: unknown };
   return asLoadedBlock(mod.default, tsPath, contributedKinds);
 }

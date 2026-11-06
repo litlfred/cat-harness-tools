@@ -53,6 +53,7 @@
  * @conformsTo w3c-xsd11-datatypes
  */
 import { readFileSync, readdirSync, existsSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { PROVENANCE_INLINE_STYLE, provenanceSectionFor } from "./provenance-footer.ts";
 import { tmpdir } from "node:os";
 import { basename, join, dirname, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -1663,7 +1664,10 @@ async function collectProcesses(
   const depictionOf = (abs: string): string | undefined => {
     if (svgDir === undefined) return undefined;
     const name = `${basename(abs, ".bpmn")}.svg`;
-    return existsSync(join(svgDir, name)) ? `${base!.replace(/\/+$/, "")}/assets/img/workflows/${name}` : undefined;
+    // The site copy is built at publish (cat-harness#1047); the drawing
+    // committed beside the .bpmn (bean akiq) says the same diagram is drawn.
+    const drawn = existsSync(join(svgDir, name)) || existsSync(abs.replace(/\.bpmn$/, ".svg"));
+    return drawn ? `${base!.replace(/\/+$/, "")}/assets/img/workflows/${name}` : undefined;
   };
   // Zero diagrams is a determined empty ONLY if we looked. Say which.
   //
@@ -3398,7 +3402,7 @@ export async function buildExport(opts: ExportOptions = {}): Promise<Export> {
     ...(schemaIndex !== undefined ? { conformsTo: schemaIndex } : {}),
     // A preview says so in its TYPE, not only in a side-car field: "is this
     // the canonical graph?" must be answerable from the document's own type
-    // without reading a convention. This is where the `#STAGING` marker idea
+    // without reading a convention. This is where the `#branches/` marker idea
     // belongs — as a type, not as a fragment on a URL the document is not
     // served from.
     "@type": isPreview ? [`${PROV}Entity`, termIri("PreviewGraph")] : `${PROV}Entity`,
@@ -3779,8 +3783,19 @@ export function writeSubjectDocuments(
   out: string,
   servedDocIri?: string,
   diagrams: ReadonlyMap<string, string> = new Map(),
+  sourceRoots: readonly string[] = [],
 ): string[] {
   const docIri = String(published["@id"]);
+  // The provenance footer (owner, 2026-11-05, "2B"): a subject whose node
+  // names its `sourcePath` (a process's `.bpmn`) shows the log beside it. The
+  // path is relative to the instance, or to the repository; the first root
+  // that holds the file answers.
+  const provenanceOf = (n: Node): string => {
+    const rel = typeof n.sourcePath === "string" ? n.sourcePath : undefined;
+    if (rel === undefined) return "";
+    const abs = sourceRoots.map((r) => join(r, rel)).find((f) => existsSync(f));
+    return abs === undefined ? "" : provenanceSectionFor(abs, { liquid: false });
+  };
   const copyBase = servedDocIri !== undefined && subjectBase(servedDocIri) !== subjectBase(docIri) ? subjectBase(servedDocIri) : undefined;
   const graph = (published["@graph"] ?? []) as Node[];
   const stamp = Object.fromEntries(Object.entries(stagingFields()).filter(([k]) => k in published));
@@ -3848,12 +3863,13 @@ export function writeSubjectDocuments(
     // has no banner, so it says in-band which build it came from.
     const pageView = Object.fromEntries(Object.entries(doc).filter(([k]) => !(k in stamp)));
     const page = join(dir, `${stem}.html`);
-    writeFileSync(page, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, pageDoc, diagram, labels));
+    const provenance = provenanceOf(node);
+    writeFileSync(page, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `${name}.jsonld`, pageDoc, diagram, labels, provenance));
     written.push(page);
     if (parentStems.has(stem)) {
       const index = join(dir, stem, "index.html");
       mkdirSync(dirname(index), { recursive: true });
-      writeFileSync(index, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc, diagram, labels));
+      writeFileSync(index, subjectPage(pageView, node, fragmentsOf.get(id) ?? [], `../${name}.jsonld`, pageDoc, diagram, labels, provenance));
       written.push(index);
     }
   }
@@ -3921,6 +3937,24 @@ const SUBJECT_DARK = darkRules(":root { --fg: #f5f5f7; --bg: #1c1c1e; --muted: #
 
 const SUBJECT_SEARCH_EXCLUDE = '<meta name="fa-search-exclude" content="true">';
 
+const SUBJECT_NODE_KIND: Readonly<Record<string, string>> = {
+  skill: "skills",
+  process: "processes",
+  globalTask: "processes",
+  decision: "processes",
+  actor: "scenarios",
+  role: "scenarios",
+  capability: "scenarios",
+  schema: "schemas",
+  convention: "schemas",
+  externalSchema: "external-schema",
+  "glossary-usage": "swimlane-glossary",
+  requirement: "requirements",
+  directory: "cat-harness",
+  asset: "cat-harness",
+  package: "skills",
+};
+
 /**
  * One subject's page: its fields, its flows (each at the `id` its fragment
  * names, so `…/process/P#flow/F` lands on it), and the same JSON-LD as the
@@ -3934,10 +3968,15 @@ export function subjectPage(
   docIri: string,
   diagram?: string,
   labels: ReadonlyMap<string, string> = new Map(),
+  provenance = "",
 ): string {
   const id = String(node["@id"]);
   const title = String(node.title ?? node.name ?? id.split("/").pop());
   const type = stripNamespace(String(node["@type"]));
+  const pathKind = (subjectPathOf(id, docIri) ?? id).split("/").find((seg) => seg in SUBJECT_NODE_KIND) ?? "";
+  const nodeKind = SUBJECT_NODE_KIND[pathKind] ?? "skills";
+  const pageHref = jsonldHref.replace(/\.jsonld$/, ".html");
+  const graphName = docIri.split("/").pop()!.replace(/\.jsonld$/, "");
   // The node this one is part of (a lane's or a step's process), named at the top.
   const parent = typeof node.partOf === "string" && /^https?:\/\//.test(node.partOf) ? node.partOf : undefined;
   const rows = (n: Node): string =>
@@ -3974,11 +4013,13 @@ code, .iri { font-family: ui-monospace, monospace; font-size: 0.9em; overflow-wr
 .muted { color: var(--fa-pl-muted, var(--muted)); }
 .fa-page-main .subject-kind { margin: 0; }
 .fa-page-main h1 { margin-top: 0.25rem; }
+.subject-pin { margin-left: 0.35rem; padding: 0.1rem 0.5rem; font: inherit; font-size: 0.85em; border: 1px solid var(--fa-pl-line, var(--line)); border-radius: 999px; background: transparent; color: inherit; cursor: pointer; }
+.subject-pin[aria-pressed="true"] { border-color: #2e7d32; background: #2e7d32; color: #fff; }
 table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1.5rem; table-layout: fixed; }
 th, td { text-align: left; vertical-align: top; padding: 0.3rem 0.5rem; border-top: 1px solid var(--fa-pl-line, var(--line)); overflow-wrap: anywhere; }
 th { width: 10rem; font-weight: 600; }
 td .iri { font-size: 0.8em; }
-@media (max-width: 40rem) { th { width: 6.5rem; } }
+@media (max-width: 40rem) { th { width: 6.5rem; } }${provenance === "" ? "" : PROVENANCE_INLINE_STYLE}
 </style>
 </head>
 <body>
@@ -3986,14 +4027,14 @@ td .iri { font-size: 0.8em; }
 <p class="muted subject-kind">${escHtml(type)}</p>
 <h1>${escHtml(title)}</h1>
 ${parent === undefined ? "" : `<p>Part of <a href="${escHtml(parent)}">${escHtml(labels.get(parent) ?? parent.split("/").pop()!)}</a></p>\n`}<p class="iri muted">${escHtml(id)}</p>
-<p><a href="${escHtml(jsonldHref)}">JSON-LD</a>${diagram === undefined ? "" : ` · <a href="${escHtml(diagram)}">diagram</a>`} · in graph <a class="iri" href="${escHtml(docIri)}">${escHtml(docIri.split("/").pop()!)}</a></p>${
+<p data-fa-pin="${escHtml(id)}" data-fa-pin-kind="pin" data-fa-pin-node-kind="${escHtml(nodeKind)}" data-fa-pin-title="${escHtml(title)}" data-fa-pin-href="${escHtml(pageHref)}" data-fa-pin-source="${escHtml(graphName)}"><a href="${escHtml(jsonldHref)}">JSON-LD</a>${diagram === undefined ? "" : ` · <a href="${escHtml(diagram)}">diagram</a>`} · in graph <a class="iri" href="${escHtml(docIri)}">${escHtml(docIri.split("/").pop()!)}</a> · <button type="button" class="subject-pin" data-fa-pin-control aria-pressed="false" aria-label="Pin ${escHtml(title)} to your folio glass" title="Pin to your folio">&#x1f4cc; Pin to folio</button></p>${
     typeof doc.sameAs === "string" ? `\n<p class="muted">A copy published here. The canonical address is <span class="iri">${escHtml(id)}</span> (<code>owl:sameAs</code>).</p>` : ""
   }
 <table class="fa-page-wide">
 ${rows(node)}
 </table>
 ${flows === "" ? "" : `<h2>Flows</h2>\n${flows}`}
-</main>
+${provenance}</main>
 </body>
 </html>
 `;
@@ -4086,7 +4127,7 @@ if (import.meta.main) {
   // (an own-canonical instance published on this site, #638). Its subject
   // documents are then copies named by where they are served.
   const servedAt = arg("--served-at");
-  const subjectDocs = writeSubjectDocuments(published, out, servedAt, diagramPages(published));
+  const subjectDocs = writeSubjectDocuments(published, out, servedAt, diagramPages(published), [instanceRoot ?? ROOT, repoRootFor(ROOT)]);
 
   console.log(`KG export → ${relative(ROOT, out)}\n  @id  ${data["@id"]}`);
   if (toolDocs.length > 0) console.log(`  + ${toolDocs.length} Tool document(s) → ${relative(ROOT, join(dirname(out), "tools"))}/`);

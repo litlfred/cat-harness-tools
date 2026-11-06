@@ -456,7 +456,7 @@ export function unlinkedResultDocument(r: UnlinkedReport): QaResult {
   });
 }
 
-const cell = (s: string) => s.replace(/\|/g, "\\|").replace(/\n/g, " ");
+const cell = (s: string) => s.replace(/[\\|]/g, "\\$&").replace(/\n/g, " ");
 
 /** The report as Markdown, for the terminal or `--out`. */
 export function unlinkedMarkdown(r: UnlinkedReport): string {

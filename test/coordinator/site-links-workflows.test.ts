@@ -29,7 +29,7 @@ describe("both publishing workflows check their own tiles", () => {
 
   test("`docs-site.yml` and `feature-staging.yml` each verify the links", () => {
     // Missing it in ONE workflow is the worse failure. Both publish the same
-    // tiles, so a gate on only the production site leaves the STAGING
+    // tiles, so a gate on only the production site leaves the branches/
     // preview — the place a reviewer actually checks — free to ship a dead
     // knowledge-graph tile while main stays green. Same argument the QA
     // witness copy already carries, and the same shape of test.

@@ -128,7 +128,7 @@ export function firstActivity(model: ProcessModel): ProcessNode {
 
 /** Markdown-safe: a cell may not break the table it is in. */
 function cell(s: string | undefined): string {
-  return (s ?? "").replace(/\|/g, "\\|").replace(/\r?\n/g, " ").trim();
+  return (s ?? "").replace(/[\\|]/g, "\\$&").replace(/\r?\n/g, " ").trim();
 }
 
 function invocationOf(tool: ToolDefinition): string {

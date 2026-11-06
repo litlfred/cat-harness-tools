@@ -99,6 +99,7 @@ def hash_basis(root: str, paths: list[str]) -> dict[str, Any]:
 
 def _git(cwd: str, *args: str) -> str | None:
     try:
+        # input-site: head #e148553a — `rev-parse --show-toplevel` / `HEAD` of the checkout the run is in: git's answer, which the cone replays
         r = subprocess.run(["git", "-C", cwd, *args], capture_output=True, text=True, timeout=20)
     except (OSError, subprocess.SubprocessError):
         return None

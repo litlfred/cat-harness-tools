@@ -12,7 +12,7 @@
  * root-relative link and every IRI path one level off. So the handler takes a
  * list of {@link Mount}s, each a URL prefix and the directory behind it, and
  * the longest matching prefix wins. A `gh-pages` checkout mounted at
- * `/<repo>` serves its `STAGING/<branch>/` previews with no extra rule,
+ * `/<repo>` serves its `branches/<branch>/` previews with no extra rule,
  * because they are ordinary subdirectories.
  *
  * ## What it copies from Pages, because links depend on it

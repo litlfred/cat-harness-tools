@@ -52,7 +52,7 @@ describe("what Jekyll is handed", () => {
     // `68au`: every graph tile in this navbar 404'd because an href was
     // composed without the baseurl. The site is served from
     // `/folio-assistant/` on the canonical deploy and from
-    // `/folio-assistant/STAGING/<branch>/` on a preview, and ONE include is
+    // `/folio-assistant/branches/<branch>/` on a preview, and ONE include is
     // rendered into pages at every depth — so a resolved href cannot be right
     // for more than one of them.
     const s = file();

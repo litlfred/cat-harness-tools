@@ -43,12 +43,16 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { codeListDirs, loadCodeLists } from "../schemas/library/code-list.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { builtAtPublishOf, withoutBuiltAtPublish } from "./mount-from-lock.ts";
 
 /** The code list an instance declares its retired words in. */
 export const RETIRED_WORDS_LIST = "retired-prose-words";
 
 /** Top-level directories whose Markdown is not this instance's own prose. */
 const NOT_OWN_PROSE = new Set(["library", "translations", "upstream", "uploads", "test", "node_modules"]);
+
+/** The record `kg:materialize` writes beside another graph's bytes; a directory holding one is not walked. */
+export const MATERIALIZATION_RECORD = "materialization.json";
 
 /** Any character except one that would cross a blank line. */
 const NB = String.raw`(?:(?!\n[ \t]*\n)[\s\S])`;
@@ -161,7 +165,11 @@ export async function retiredWordsOf(instanceRoot: string): Promise<Map<string, 
  * A directory walk rather than `git ls-files`: a layer mounted into a composed
  * checkout carries no `.git` of its own (that is how CI runs it), and a git
  * listing there answers "no files", which this would report as clean.
- * Dot-directories are not walked.
+ * Dot-directories are not walked, and nothing the instance declares
+ * `builtAtPublish` is listed: those pages are written by a publish build, are
+ * never committed, and so are their generator's prose. They are on disk only
+ * where a build has run (CI's QA working copy), which made the scan's answer
+ * depend on where it ran (folio-assistant#2954).
  */
 export function ownProseFiles(instanceRoot: string): string[] {
   const out: string[] = [];
@@ -172,12 +180,16 @@ export function ownProseFiles(instanceRoot: string): string[] {
       if (e.isDirectory()) {
         if (rel === "" && NOT_OWN_PROSE.has(e.name)) continue;
         if (e.name === "node_modules") continue;
+        // Another graph's bytes, materialised here with a digest beside them
+        // (`kg:materialize`): its owner's prose, not this instance's, and
+        // editing it in place breaks fixity (folio-assistant main, 2026-11-05).
+        if (existsSync(join(dir, e.name, MATERIALIZATION_RECORD))) continue;
         walk(join(dir, e.name), r);
       } else if (e.isFile() && e.name.endsWith(".md")) out.push(r);
     }
   };
   walk(instanceRoot, "");
-  return out.sort();
+  return withoutBuiltAtPublish(out, builtAtPublishOf(instanceRoot)).sort();
 }
 
 /** Every retired word in an instance's own prose, by file. */

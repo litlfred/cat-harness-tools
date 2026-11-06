@@ -118,7 +118,7 @@ export const WatchedRefSchema = NonBlank.refine(
 export const WriteRequestSchema = z
   .object({
     /**
-     * The route this write owns — `/` for the published site, `STAGING/<slug>/`
+     * The route this write owns — `/` for the published site, `branches/<slug>/`
      * for a preview. Composition is per route: two different routes compose by
      * union, two of the same route take the newer.
      */

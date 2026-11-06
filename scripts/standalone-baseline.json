@@ -61,7 +61,7 @@
         "scripts/tests/check-document-kind-sources.test.ts > what an instance can name > smart-base reaches its own library",
         "scripts/tests/check-environment.test.ts > this repository, right now > is not distorted — otherwise `bun run cat gates` refuses for everyone",
         "scripts/tests/check-published-instance-exports.test.ts > committedSidecarSubjects — the comparison has a subject (bean r7v6, C2) > the real checkout's committed bootstrap sidecar is a subject — or its absence is UNKNOWN, never an empty list",
-        "scripts/tests/check-published-instance-exports.test.ts > publishedInstances > finds it in the STAGING workflow too — the file `3jhq` showed was missed",
+        "scripts/tests/check-published-instance-exports.test.ts > publishedInstances > finds it in the branches/ workflow too — the file `3jhq` showed was missed",
         "scripts/tests/check-published-instance-exports.test.ts > publishedInstances > finds the invocation in the real deploy workflow",
         "scripts/tests/check-published-instance-exports.test.ts > the bootstrap kg-export sidecar has a WORKFLOW producer (bean 0utt) > code-quality-gates.yml runs `kg-export.ts --instance ./bootstrap`, so the sidecar is no orphan",
         "scripts/tests/check-published-instance-exports.test.ts > the bootstrap kg-export sidecar has a WORKFLOW producer (bean 0utt) > the producer step is in the PUBLISH job, ahead of the publish",

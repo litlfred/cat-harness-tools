@@ -46,6 +46,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync
 import { join, relative, resolve, sep } from "node:path";
 
 import { declarationPathIn, instanceDirectoryForGraph, kgQaHomeFor, readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { provenanceSectionFor } from "./provenance-footer.ts";
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
 import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
 import { tileCounts } from "../schemas/ui/tile-count.js";
@@ -96,6 +97,8 @@ export interface ToolRow {
   readonly qaHref?: string;
   /** The verdict read from the `kg-qa` sidecar when on disk (`pass`, `fail`, `warn`, `unknown`), or `undefined` when not on disk. */
   readonly qaVerdict?: string;
+  /** The Tool's provenance log, rendered (`provenance-footer.ts`), when it has one with entries. */
+  readonly provenance?: string;
 }
 
 /** A `satisfies` entry, however it was written. */
@@ -241,6 +244,42 @@ function toolQaResolver(
 }
 
 /**
+ * Where a Tool's provenance log is, and its rendering: `<tools dir>/<id>/<id>.prov.jsonld`
+ * in the instance named, or in any instance of the checkout. The owner chose
+ * the provenance footer on 2026-11-05 ("2B"); a Tool has no page of its own,
+ * so its log is shown on the tools page, under the tool's id.
+ */
+function toolProvenanceResolver(repo: string, opts: { instanceRoot?: string } = {}): (toolId: string) => string | undefined {
+  let roots: readonly string[] = [];
+  try {
+    roots = opts.instanceRoot !== undefined ? [opts.instanceRoot] : instanceRootsIn(repo);
+  } catch {
+    roots = [];
+  }
+  const dirs: string[] = [];
+  for (const r of roots) {
+    try {
+      const td = instanceDirectoryForGraph(r, KIND);
+      if (td) dirs.push(resolve(r, td));
+    } catch {
+      // An unreadable declaration: no log is found there.
+    }
+  }
+  return (toolId) => {
+    for (const d of dirs) {
+      const html = provenanceSectionFor(join(d, toolId, `${toolId}.json`), {
+        liquid: false,
+        item: true,
+        summary: `\`${toolId}\``,
+        id: `provenance-${toolId}`,
+      });
+      if (html !== "") return html;
+    }
+    return undefined;
+  };
+}
+
+/**
  * The Tool nodes, reduced.
  *
  * Exported so the reduction is testable without the markdown: the `satisfies`
@@ -253,6 +292,7 @@ export function toolRows(
   opts: { instanceRoot?: string; key?: string } = {},
 ): ToolRow[] {
   const qaFor = toolQaResolver(repo, opts);
+  const provenanceFor = toolProvenanceResolver(repo, opts);
   return defs
     .map((d) => {
       const t = d as Record<string, unknown>;
@@ -268,6 +308,10 @@ export function toolRows(
         inputs: io.inputs?.length ?? 0,
         outputs: io.outputs?.length ?? 0,
         ...qaFor(id),
+        ...(() => {
+          const provenance = provenanceFor(id);
+          return provenance === undefined ? {} : { provenance };
+        })(),
       };
     })
     .sort((a, b) => a.id.localeCompare(b.id, "en"));
@@ -458,7 +502,7 @@ function badge(kind: string): string {
 
 /** Escape a cell so a pipe in a description cannot break the table. */
 function cell(v: string): string {
-  return v.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+  return v.replace(/[\\|]/g, "\\$&").replace(/\r?\n/g, " ");
 }
 
 /**
@@ -617,6 +661,22 @@ export function page(
     );
   }
   b.push("");
+
+  // THE PROVENANCE OF EACH TOOL (owner, 2026-11-05, "2B"): a Tool has no page
+  // of its own, so its log is shown here, collapsed, under its id. A tool with
+  // no log is not listed.
+  const withLog = rows.filter((r) => r.provenance !== undefined);
+  if (withLog.length > 0) {
+    b.push(
+      "## Provenance",
+      "",
+      `Who decided, when, and under which work item, for the ${withLog.length} tool(s) whose provenance log has entries. Open a tool to read its record.`,
+      "",
+    );
+    // One collapsed row per tool, named by its id: a heading each made a page
+    // of 35 headings with a box under every one.
+    b.push(`<div class="fa-provenance-items">`, ...withLog.map((r) => r.provenance!.trimEnd()), `</div>`, "");
+  }
   return b.join("\n").trimEnd() + "\n";
 }
 

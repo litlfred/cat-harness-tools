@@ -190,7 +190,7 @@ export function partState(p: PartView, ref: string): string {
   return `⬇ materialised — ${p.fileCount ?? "?"} file(s)${size}, ${p.purpose ?? "no purpose"}`;
 }
 
-const cell = (s: string | undefined): string => (s ?? "—").replace(/\|/g, "\\|").replace(/\n/g, " ");
+const cell = (s: string | undefined): string => (s ?? "—").replace(/[\\|]/g, "\\$&").replace(/\n/g, " ");
 const repoLink = (r: string | undefined): string => (r ? `[\`${r}\`](https://github.com/${r})` : "—");
 
 export function render(substrates: readonly SubstrateRow[], cards: readonly SubscriptionCard[]): string {

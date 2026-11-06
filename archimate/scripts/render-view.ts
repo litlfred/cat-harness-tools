@@ -38,7 +38,9 @@
  * moved afterwards they no longer do, and the blend of the two (what Archi
  * draws) twists the line back on itself. Such a line is drawn straight. Two or
  * more straight lines between the same pair of boxes are drawn side by side,
- * not on top of each other.
+ * not on top of each other. A line whose bendpoints make it orthogonal is
+ * drawn with rounded corners (`linePath`), and a line's label sits on its
+ * longest straight run, clear of the other labels.
  *
  * A view with nothing on it says so, rather than drawing an empty frame.
  *
@@ -359,19 +361,21 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
   }
 
   // Lines over boxes, each along its route (`routeConnections`).
+  const labels: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
   for (const { connection: c, pts, half } of routeConnections(view)) {
     for (const p of pts) grow(p.x, p.y);
     const r = c.relationship ? relationships.get(c.relationship) : undefined;
     if (r) used.relationships.add(r.type);
     const st = lineStyle(r);
-    const d = `M${pts.map((p) => `${round(p.x)} ${round(p.y)}`).join(" L")}`;
+    const d = linePath(pts);
     const line =
       `<path d="${d}" fill="none" stroke="#333" stroke-width="1.2"${st.dash ? ` stroke-dasharray="${st.dash}"` : ""}` +
       `${st.start ? ` marker-start="url(#${st.start})"` : ""}${st.end ? ` marker-end="url(#${st.end})"` : ""}/>` +
       // A wide transparent twin, so a thin line is easy to point at.
       `<path d="${d}" fill="none" stroke="transparent" stroke-width="8"/>`;
     const label = [r?.name, r?.type === "Influence" ? r.strength : undefined].filter(Boolean).join(" ");
-    const text = label ? `<text class="av-rel" x="${round(half.x)}" y="${round(half.y - 3)}" text-anchor="middle">${esc(label)}</text>` : "";
+    const at = label ? labelAt(pts, half, label, labels) : half;
+    const text = label ? `<text class="av-rel" x="${round(at.x)}" y="${round(at.y - 3)}" text-anchor="middle">${esc(label)}</text>` : "";
     const title = r ? `<title>${esc(typeLabel(r.type))}${r.name ? `: ${esc(r.name)}` : ""}</title>` : "";
     out.push(r && opts.relationshipHref ? `<a href="${esc(opts.relationshipHref(r.id))}" target="_top">${title}${line}${text}</a>` : `<g>${title}${line}${text}</g>`);
   }
@@ -404,6 +408,76 @@ export function renderViewSvg(model: ArchimateModel, view: ArchimateView, opts: 
     out.join("\n") +
     `</svg>\n`
   );
+}
+
+/** The radius of a rounded corner on an orthogonal line. */
+const CORNER = 8;
+
+/** The points of a line without repeats: a bendpoint stored on a box's side repeats the clipped end. */
+function distinct(pts: readonly Pt[]): Pt[] {
+  return pts.filter((p, i) => i === 0 || Math.hypot(p.x - pts[i - 1]!.x, p.y - pts[i - 1]!.y) > 0.5);
+}
+
+/**
+ * A line's SVG path. A line whose every segment is horizontal or vertical
+ * (an orthogonal route, as a router writes it) is drawn with its corners
+ * rounded, each by up to CORNER px and never more than half of either
+ * segment beside it; any other line is drawn straight from point to point, as
+ * before. Repeated points are dropped first, so no segment is of zero length
+ * and an arrowhead always takes the direction of the segment it ends.
+ */
+export function linePath(raw: readonly Pt[]): string {
+  const pts = distinct(raw);
+  const xy = (p: Pt) => `${round(p.x)} ${round(p.y)}`;
+  const orthogonal = pts.length > 2 && pts.every((p, i) => i === 0 || Math.abs(p.x - pts[i - 1]!.x) < 0.5 || Math.abs(p.y - pts[i - 1]!.y) < 0.5);
+  if (!orthogonal) return `M${pts.map(xy).join(" L")}`;
+  let d = `M${xy(pts[0]!)}`;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = pts[i - 1]!, p = pts[i]!, b = pts[i + 1]!;
+    const la = Math.hypot(p.x - a.x, p.y - a.y), lb = Math.hypot(b.x - p.x, b.y - p.y);
+    const r = Math.min(CORNER, la / 2, lb / 2);
+    const p1 = { x: p.x + ((a.x - p.x) / la) * r, y: p.y + ((a.y - p.y) / la) * r };
+    const p2 = { x: p.x + ((b.x - p.x) / lb) * r, y: p.y + ((b.y - p.y) / lb) * r };
+    d += ` L${xy(p1)} Q${xy(p)} ${xy(p2)}`;
+  }
+  return `${d} L${xy(pts[pts.length - 1]!)}`;
+}
+
+/** The corner points of a line: repeats dropped, and points in the middle of a straight run merged into it. */
+function runs(raw: readonly Pt[]): Pt[] {
+  const pts = distinct(raw);
+  return pts.filter((p, i) => {
+    if (i === 0 || i === pts.length - 1) return true;
+    const a = pts[i - 1]!, b = pts[i + 1]!;
+    return Math.abs((p.x - a.x) * (b.y - p.y) - (p.y - a.y) * (b.x - p.x)) > 0.5;
+  });
+}
+
+type Rect = { x0: number; y0: number; x1: number; y1: number };
+const labelRect = (p: Pt, text: string): Rect => {
+  const w = text.length * 5 + 6;
+  return { x0: p.x - w / 2, y0: p.y - 13, x1: p.x + w / 2, y1: p.y - 1 };
+};
+const overlaps = (a: Rect, b: Rect): boolean => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
+/**
+ * Where a line's label goes: on its longest straight run, at the first of a
+ * few places along it (the middle first) that is clear of the labels already
+ * placed in the view, else at that run's middle. The rectangle it takes is
+ * added to `placed`.
+ */
+function labelAt(raw: readonly Pt[], fallback: Pt, text: string, placed: Rect[]): Pt {
+  const pts = runs(raw);
+  const segs = pts.slice(1).map((b, i) => ({ a: pts[i]!, b, l: Math.hypot(b.x - pts[i]!.x, b.y - pts[i]!.y) })).sort((p, q) => q.l - p.l);
+  let at = segs[0] ? { x: (segs[0].a.x + segs[0].b.x) / 2, y: (segs[0].a.y + segs[0].b.y) / 2 } : fallback;
+  search: for (const { a, b } of segs) {
+    for (const f of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+      const p = { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+      if (!placed.some((r) => overlaps(r, labelRect(p, text)))) { at = p; break search; }
+    }
+  }
+  placed.push(labelRect(at, text));
+  return at;
 }
 
 /** A connection as drawn: the points of its line, ends clipped to the boxes, and its midpoint. */

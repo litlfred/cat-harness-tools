@@ -236,7 +236,7 @@ const BADGE: Record<MethodologyRow["state"], string> = {
 
 /** Escape a cell so a pipe in prose cannot break the table. */
 function cell(v: string): string {
-  return v.replace(/\|/g, "\\|").replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
+  return v.replace(/[\\|]/g, "\\$&").replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
 }
 
 /**

@@ -87,7 +87,7 @@ export const RelationshipRulesSchema = z
 export type RelationshipRules = z.infer<typeof RelationshipRulesSchema>;
 
 /** A Markdown table cell: no pipe or line break may end the cell early. */
-const cell = (s: string): string => s.replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>");
+const cell = (s: string): string => s.replace(/[\\|]/g, "\\$&").replace(/\r?\n/g, "<br>");
 
 /** The rules table: Source | Relationship | Target | Note, in the file's order. */
 export function rulesTableMarkdown(r: RelationshipRules): string {

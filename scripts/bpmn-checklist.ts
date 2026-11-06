@@ -55,6 +55,7 @@ import { instanceRootsIn, readDeclaration, repoRootFor, siteDirFor } from "../sc
 import { loadProcessModel, processDiagrams, type ProcessModel, type ProcessNode } from "../src/workflow/process-model.ts";
 import { belowHarness } from "./lib/needs-reach.ts";
 import { workflowFiles } from "./known-skills.js";
+import { gateOwnsFile } from "./lib/gate-own.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
 const GENERATOR = "cat-harness-tools/scripts/bpmn-checklist.ts";
@@ -293,13 +294,15 @@ if (import.meta.main) {
   for (const f of failed) console.error(`? ${f}`);
   const shown = (p: string): string => relative(repoRoot, p);
   if (check) {
-    const stale = files.filter((f) => !existsSync(f.out) || readFileSync(f.out, "utf8") !== f.text).map((f) => f.out);
+    // In a layer's PR checks, only checklists the caller commits (owner ruling 2026-11-05, "Move the checks", generator checks included; `lib/gate-own.ts`).
+    const mine = (p: string) => gateOwnsFile(shown(p)) !== false;
+    const stale = files.filter((f) => mine(f.out) && (!existsSync(f.out) || readFileSync(f.out, "utf8") !== f.text)).map((f) => f.out);
     const wanted = new Set(files.map((f) => f.out));
     // Every directory a checklist is written to, and every directory holding a
     // diagram: a diagram that was deleted or renamed leaves its checklist in a
     // directory the first set may no longer name.
     const dirs = new Set([...files.map((f) => dirname(f.out)), ...sources.map((s) => dirname(s)), ...(into ? [into] : [defaultOutDir()])]);
-    const orphans = orphanChecklists(dirs, wanted);
+    const orphans = orphanChecklists(dirs, wanted).filter(mine);
     for (const s of stale) console.error(`✗ ${shown(s)} is stale or missing — run \`bun run cat bpmn:checklist\``);
     for (const o of orphans) console.error(`✗ ${shown(o)} has no diagram — remove it`);
     if (stale.length + orphans.length > 0) process.exit(1);

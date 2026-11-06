@@ -115,8 +115,8 @@ describe("APPEND-ONLY — a removal never erases what came before", () => {
 
   test("the store is OUTSIDE STAGING/, so `rm -rf STAGING/$SLUG` cannot reach it", () => {
     // Structural rather than guarded: a branch named to collide with a
-    // directory under STAGING/ slugifies to exactly that name, and git
-    // permits the ref. A store outside STAGING/ is unreachable whatever the
+    // directory under branches/ slugifies to exactly that name, and git
+    // permits the ref. A store outside branches/ is unreachable whatever the
     // slug says.
     expect(renderLogPath(AT).startsWith("STAGING/")).toBe(false);
   });

@@ -12,7 +12,7 @@ import { join } from "node:path";
 
 import { describe, expect, test } from "bun:test";
 
-import { scanWorkflows } from "../../check-lockfile-pinning.ts";
+import { knownFor, scanWorkflows } from "../../check-lockfile-pinning.ts";
 
 function workflows(...bodies: string[]): string {
   const dir = mkdtempSync(join(tmpdir(), "pinning-"));
@@ -108,5 +108,23 @@ describe("the three states the guard keeps apart", () => {
     expect(guarded).toContain("::warning::");
     expect(guarded).toContain("--frozen-lockfile");
     expect(scanWorkflows(workflows(guarded)).every((f) => f.kind === "unpinned")).toBe(true);
+  });
+});
+
+describe("the baseline judges only the root it was recorded in", () => {
+  // Owner, 2026-11-05: "scope to fa". Every site that mounts this layer runs
+  // the gate; the index's entries there read as "stale baseline entry".
+  const baseline = { root: "folio-assistant", known: ["repin-train.yml: bun install"] };
+
+  test("in the root it names, its entries apply", () => {
+    expect(knownFor(baseline, "folio-assistant")).toEqual(["repin-train.yml: bun install"]);
+  });
+
+  test("in any other root, none of them do — so none can read as stale", () => {
+    expect(knownFor(baseline, "smart-ra")).toEqual([]);
+  });
+
+  test("a baseline naming no root still judges every root", () => {
+    expect(knownFor({ known: ["x.yml: bun install"] }, "smart-ra")).toEqual(["x.yml: bun install"]);
   });
 });
