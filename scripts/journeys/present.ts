@@ -40,7 +40,7 @@ import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
 import type { ScenarioStep } from "../../schemas/process/user-scenario.ts";
 import type { WorkshopPresentation, WorkshopStep } from "../../schemas/process/workshop.ts";
-import { blockFor, fromSite, journeyById, lookup, processDrawing, processName, siteRootFrom, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
+import { blockFor, fromSite, journeyById, lookup, processName, siteRootFrom, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
 import { artifactPage, DAK_ATTR, linkedProcessDrawing } from "./dak-links.ts";
 import {
   allSteps,
