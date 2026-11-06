@@ -45,12 +45,12 @@ if (import.meta.main) {
       console.error(`? journey-refs: ${report.couldNotDetermine.length} reference(s) could not be determined here. Not a pass.`);
     } else if (report.findings.length === 0) {
       console.log(
-        report.journeys + report.workshops === 0
+        report.journeys + report.workshops + report.screens === 0
           ? `✓ journey-refs: no instance in ${relative(process.cwd(), root) || "."} declares a user-scenario or workshop directory holding a node; 0 references to check`
-          : `✓ journey-refs: ${report.references} reference(s) of ${report.journeys} journey(s) and ${report.workshops} workshop(s) resolve`,
+          : `✓ journey-refs: ${report.references} reference(s) of ${report.journeys} journey(s), ${report.workshops} workshop(s) and ${report.screens} device screen(s) resolve`,
       );
     } else {
-      console.error(`journey-refs: ${report.findings.length} finding(s) over ${report.references} reference(s) of ${report.journeys} journey(s) and ${report.workshops} workshop(s)`);
+      console.error(`journey-refs: ${report.findings.length} finding(s) over ${report.references} reference(s) of ${report.journeys} journey(s), ${report.workshops} workshop(s) and ${report.screens} device screen(s)`);
     }
   }
   process.exit(report.findings.length > 0 ? 1 : report.undetermined !== undefined || report.couldNotDetermine.length > 0 ? 2 : 0);

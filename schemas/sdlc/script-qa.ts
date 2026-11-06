@@ -58,8 +58,8 @@ export interface ScriptQaReport {
   language: ScriptLanguage;
   /** 12-char SHA-256 prefix of the script's content. */
   source_hash: string;
-  /** ISO-8601 UTC timestamp of last write. */
-  updated_at: string;
+  /** ISO-8601 UTC timestamp of last write. Optional and no longer written (owner rulings 2026-11-06, cards "QA dates" and "Date source"): the date is derived on read from the entries' `reviewed_tree`. */
+  updated_at?: string;
   /**
    * **Proper-metadata references** the script declares to
    * propositions, definitions, theorems, glossary entries, or

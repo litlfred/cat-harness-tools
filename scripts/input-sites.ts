@@ -543,6 +543,12 @@ export interface AuditedClosure {
    * not hash them (see the module comment).
    */
   computed: string[];
+  /**
+   * With `deferComputed`: the modules a computed load could reach, neither
+   * scanned nor followed here. A traced run audits the ones it opened
+   * (`ci-cone.ts` `deferredInputsOf`); one it never opened cannot have run.
+   */
+  deferred: string[];
   /** Variables whose values must be hashed. */
   env: string[];
   /** Variables that must be unset or empty. */
@@ -635,6 +641,12 @@ export function auditClosure(
   scriptEntries?: (name: string) => string[] | undefined,
   /** Resolves a `declared` verdict's source to the repo-relative modules it names; absent, such a site is undetermined. */
   declaredImports?: (source: string) => readonly string[] | undefined,
+  /**
+   * Leave the modules reached only through a computed load (`imports`,
+   * `declared`) to the trace: list them in `deferred`, unscanned. Only a
+   * caller whose run is traced may pass it (`fingerprint`'s `treeReplayed`).
+   */
+  deferComputed = false,
 ): AuditedClosure | { undetermined: string } {
   // A file is visited at most four times: IMPORTED (its `import.meta.main`
   // block does not run) or as an ENTRY (it does), each reached only through a
@@ -648,6 +660,7 @@ export function auditClosure(
   let spawnsChildren = false;
   let needsHead = false;
   const refs = new Set<string>();
+  const deferred = new Set<string>();
   const stack: { file: string; entry: boolean; computed: boolean }[] = entries.map((e) => ({ file: resolve(root, e), entry: true, computed: false }));
   const fail = (why: string): { undetermined: string } | undefined => {
     if (problems === undefined) return { undetermined: why };
@@ -669,6 +682,11 @@ export function auditClosure(
     const now = { entry: entry || (prior?.entry ?? false), computed: computed && (prior?.computed ?? true) };
     seen.set(file, now);
     if (!/\.(m?[jt]sx?)$/.test(file)) continue;
+    if (deferComputed && now.computed) {
+      deferred.add(file);
+      continue;
+    }
+    deferred.delete(file);
     const { sites, imports } = memo.read(file, root);
     for (const s of sites) {
       if (s.inMain === true && !now.entry) continue;
@@ -721,6 +739,7 @@ export function auditClosure(
   return {
     files: [...seen.keys()].map((f) => relative(root, f)).sort(),
     computed: [...seen].filter(([, v]) => v.computed).map(([f]) => relative(root, f)).sort(),
+    deferred: [...deferred].map((f) => relative(root, f)).sort(),
     env: [...env].sort(),
     envUnset: [...envUnset].sort(),
     needsTree,

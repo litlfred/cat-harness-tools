@@ -800,6 +800,27 @@ function declaresMachineWritten(kinds: readonly string[] | undefined): boolean {
   return kinds.every((k) => isStateGraph(k) || isDerivedGraph(k));
 }
 
+/** The machine-written directories each sub-graph of `root` declares from within, in `<dir>/graph.json`. */
+export function subgraphMachineWritten(root: string, dirs: readonly { path?: string; scope?: "instance" | "repository" }[]): string[] {
+  const out: string[] = [];
+  for (const d of dirs) {
+    if (d.path === undefined || d.path === "") continue;
+    const dir = join(rootForScope(root, d.scope), d.path);
+    const graph = join(dir, "graph.json");
+    if (!existsSync(graph)) continue;
+    let inner: { directories?: { path?: string; graphTypologies?: string[] }[] };
+    try {
+      inner = JSON.parse(readFileSync(graph, "utf-8")) as typeof inner;
+    } catch {
+      continue;
+    }
+    for (const e of inner.directories ?? []) {
+      if (e.path !== undefined && e.path !== "" && declaresMachineWritten(e.graphTypologies)) out.push(join(dir, e.path));
+    }
+  }
+  return out;
+}
+
 function instances(repoRoot: string): Instance[] {
   return instanceRootsIn(repoRoot).map((root) => {
     const decl = JSON.parse(readFileSync(join(root, findDeclarationFile(root)!), "utf-8")) as {
@@ -820,6 +841,11 @@ function instances(repoRoot: string): Instance[] {
     const machineWritten = (decl.directories ?? [])
       .filter((d) => d.path !== undefined && declaresMachineWritten(d.graphTypologies))
       .map((d) => join(rootForScope(root, d.scope), d.path!))
+      // A named sub-graph declares its graphs FROM WITHIN, in its own
+      // `graph.json` (#980): cat-harness's corpus is `library/graph.json`'s
+      // `corpus/`, no longer a top-level entry of `cat-harness.json`, and it
+      // is just as machine-written as when it was one.
+      .concat(subgraphMachineWritten(root, decl.directories ?? []))
       // A `builtAtPublish` path is machine-written by declaration too: each
       // entry names the `writer` that builds it at publish, and nothing there
       // is committed or authored. The checkout-built ones project OTHER

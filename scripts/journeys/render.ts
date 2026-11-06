@@ -42,10 +42,13 @@ import type { ScenarioStep, UserScenario } from "../../schemas/process/user-scen
 import type { Workshop, WorkshopStep } from "../../schemas/process/workshop.ts";
 import {
   blockFor,
+  avatarFile,
+  fromSite,
   instanceFile,
   journeyById,
   lookup,
   requirementFor,
+  siteRootFrom,
   type Actor,
   type Journey,
   type JourneyCorpus,
@@ -116,6 +119,21 @@ export interface PersonaView {
   icon?: string;
   /** The artefact-index key of the ActorDefinition it plays in the IG (`personaArtifact`), when the IG defines one. */
   artifact?: string;
+  /** The persona's picture, copied beside the viewer: a path from the viewer's route root (`avatars/<instance>/<actor>.webp`). */
+  avatar?: string;
+}
+
+/**
+ * Where a page's route root is, in markup drawn before the page knows its
+ * depth (an avatar's `src`): each page wrapper replaces it with its own path
+ * to the root. Never reaches a written page.
+ */
+export const ROOT_MARK = "@@journeys-root@@/";
+
+/** A persona's picture as the viewer copies it: `avatars/<instance>/<actor><ext>`, from the route root. */
+export function avatarPath(corpus: JourneyCorpus, a: Actor): { from: string; to: string } | undefined {
+  const from = avatarFile(corpus, a);
+  return from === undefined ? undefined : { from, to: `avatars/${a.instance}/${a.id}${extname(from).toLowerCase()}` };
 }
 
 export function personaOf(corpus: JourneyCorpus, instance: string, id: string, i: number): PersonaView {
@@ -140,6 +158,7 @@ export function personaOf(corpus: JourneyCorpus, instance: string, id: string, i
     ...(p?.needs?.length ? { needs: p.needs } : {}),
     ...(p?.frustrations?.length ? { frustrations: p.frustrations } : {}),
     ...(p?.icon ? { icon: p.icon } : {}),
+    ...(a && avatarPath(corpus, a) ? { avatar: avatarPath(corpus, a)!.to } : {}),
     initials: initials || id.slice(0, 2).toUpperCase(),
     color: p?.color ?? PALETTE[i % PALETTE.length]!,
     ...(personaArtifact(corpus, instance, id) ? { artifact: personaArtifact(corpus, instance, id)! } : {}),
@@ -151,7 +170,8 @@ function personasOf(corpus: JourneyCorpus, j: Journey): PersonaView[] {
 }
 
 function avatar(p: PersonaView, size: "s" | "m" = "m"): string {
-  return `<span class="jv-av jv-av-${size}" style="--c:${e(p.color)}" title="${e(p.name)}${p.role ? ` · ${e(p.role)}` : ""}" aria-hidden="true">${e(p.initials)}</span>`;
+  const inner = p.avatar ? `<img src="${e(ROOT_MARK + p.avatar)}" alt="" loading="lazy">` : e(p.initials);
+  return `<span class="jv-av jv-av-${size}${p.avatar ? " jv-av-img" : ""}" style="--c:${e(p.color)}" title="${e(p.name)}${p.role ? ` · ${e(p.role)}` : ""}" aria-hidden="true">${inner}</span>`;
 }
 
 /** A persona's name, linked to the ActorDefinition it plays in the IG when the IG's index lists one. */
@@ -294,7 +314,7 @@ ${o.body.trim()}
 </body>
 </html>
 `;
-  return withRenderedBy(html, TOOL_ID);
+  return withRenderedBy(html.split(ROOT_MARK).join(o.up), TOOL_ID);
 }
 
 // ── index pages ───────────────────────────────────────────────────────────
@@ -567,7 +587,7 @@ ${style?.notes?.length ? `<h5>Notes</h5><ul>${style.notes.map((n) => `<li>${e(n)
 
 function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: number, personas: PersonaView[], links: SiteLinks, up: string): string {
   const steps = j.scenario.steps;
-  const toSite = "../".repeat(links.route.split("/").length + 2);
+  const toSite = siteRootFrom(up, links);
   const lead = personas.find((p) => p.id === s.lead);
   const st = s as ScenarioStep & { gaps?: string[]; references?: { label: string; href: string; rel?: string }[] };
   const story = [
@@ -629,7 +649,7 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
         })
         .join("")}</ul>`
     : "";
-  const refsHtml = st.references?.length ? `<h4>References</h4><ul>${st.references.map((r) => `<li><a href="${e(r.href)}">${e(r.label)}</a>${r.rel ? ` <span class="jv-muted">${e(r.rel)}</span>` : ""}</li>`).join("")}</ul>` : "";
+  const refsHtml = st.references?.length ? `<h4>References</h4><ul>${st.references.map((r) => `<li><a href="${e(fromSite(r.href, toSite))}">${e(r.label)}</a>${r.rel ? ` <span class="jv-muted">${e(r.rel)}</span>` : ""}</li>`).join("")}</ul>` : "";
   const handoffHtml =
     s.handoff && (s.handoff.carrier || s.handoff.payload)
       ? `<h4>What travels</h4><dl class="jv-dl">${s.handoff.carrier ? `<dt>Carrier</dt><dd>${e(s.handoff.carrier)}</dd>` : ""}${s.handoff.payload ? `<dt>Payload</dt><dd>${e(s.handoff.payload)}</dd>` : ""}</dl>`
@@ -682,7 +702,7 @@ function journeyPage(corpus: JourneyCorpus, j: Journey, links: SiteLinks): strin
         }
       })()
     : mdHtml(s.description);
-  const toSite = "../".repeat(links.route.split("/").length + 2);
+  const toSite = siteRootFrom(up, links);
   const views = (s.views ?? [])
     .map((v) => {
       const t = links.archimateView?.(j.instance, v.model, v.view);
@@ -707,7 +727,7 @@ ${kids.length ? `<section class="jv-kids"><h2>Sub-journeys</h2><ol class="jv-tre
 ${s.steps.length ? journeyMap(corpus, j, personas, ladder) : ""}
 ${s.steps.length ? `<section class="jv-steps" data-jv-stepper aria-labelledby="jv-steps-h"><div class="jv-steps-bar"><h2 id="jv-steps-h">Step by step</h2><span class="jv-actions"><button type="button" class="jv-btn" data-jv-print>Print (A3)</button></span></div>${stepNav}\n${s.steps.map((x, i) => stepSection(corpus, j, x, i, personas, links, up)).join("\n")}</section>` : ""}
 ${views ? `<section class="jv-views"><h2>Architecture</h2><ul class="jv-views-list">${views}</ul></section>` : ""}
-${s.references?.length ? `<section><h2>References</h2><ul>${s.references.map((r) => `<li><a href="${e(r.href)}">${e(r.label)}</a></li>`).join("")}</ul></section>` : ""}
+${s.references?.length ? `<section><h2>References</h2><ul>${s.references.map((r) => `<li><a href="${e(fromSite(r.href, toSite))}">${e(r.label)}</a></li>`).join("")}</ul></section>` : ""}
 <p class="jv-src">${src ? `Source: <a href="${e(src)}"><code>${e(j.file)}</code></a>` : `Source: <code>${e(j.file)}</code>`} (<code>${e(s.$schema)}</code>)</p>`;
   const crumbs: Crumb[] = [{ label: "Journeys", href: up }, { label: j.instance, href: `${up}${j.instance}/` }];
   const chain: Journey[] = [];
@@ -928,6 +948,13 @@ export function renderJourneyPages(corpus: JourneyCorpus, links: SiteLinks, decl
     if (presentationOf(corpus, w).steps.length === 0) out.push({ path: `${base}/sheets/index.html`, content: sheetsPage(corpus, w) });
   }
   out.push(...renderPresentationPages(corpus, links));
+  // Every persona's picture, once, from the route root (`ROOT_MARK`).
+  for (const actors of corpus.actors.values()) {
+    for (const a of actors.values()) {
+      const at = avatarPath(corpus, a);
+      if (at !== undefined) out.push({ path: at.to, content: new Uint8Array(readFileSync(at.from)) });
+    }
+  }
   for (const a of ASSETS) out.push({ path: posix.join("assets", a), content: readFileSync(join(ASSET_DIR, a), "utf8") });
   for (const f of FONT_FILES) out.push({ path: posix.join("assets", "fonts", f), content: new Uint8Array(readFileSync(join(ASSET_DIR, FONT_BUNDLE, f))) });
   return out;

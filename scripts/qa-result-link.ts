@@ -38,6 +38,7 @@ import { tmpdir } from "node:os";
 import { qaStorageOf } from "./qa-results.ts";
 import { INDEX_FILE, parseQaKey, type QaLocation } from "./qa-store.ts";
 import type { QaFetchState } from "./qa-site-assets.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 /** How a link addresses its file — so a renderer can say which it is. */
 export type QaLinkAddressing =
@@ -137,7 +138,9 @@ export function linkKeyFromFetchState(state: Pick<QaFetchState, "source" | "requ
  * and where the site build passes it explicitly: `$RUNNER_TEMP/…` in CI.
  * One answer for the writer and for the generator that reads it.
  */
+// input-site: env QA_SITE_STATE,RUNNER_TEMP #bdea1774 — where the site build's fetch state is
 export function siteFetchStatePath(env: Record<string, string | undefined> = process.env): string {
+  // input-site: inert #8fd6c27d — the default state path only; the read it serves is traced in siteLinkKey
   return env.QA_SITE_STATE ?? join(env.RUNNER_TEMP ?? tmpdir(), "qa-site-assets.state.json");
 }
 
@@ -148,8 +151,12 @@ export function siteFetchStatePath(env: Record<string, string | undefined> = pro
  * naming that commit would be a confident wrong answer. With nothing to read,
  * the result is `undefined`, which addresses the tip.
  */
+// input-site: env QA_SITE_STATE,RUNNER_TEMP #017d1bac — whether the build says where its state is; the read itself is traced below
 export function siteLinkKey(env: Record<string, string | undefined> = process.env): string | undefined {
   if (!env.QA_SITE_STATE && !env.RUNNER_TEMP) return undefined;
+  // The build's fetch state is a file outside the checkout, which no
+  // fingerprint sees: a run that reads it records no hash.
+  inputSiteReached("qa-result-link: the site build's fetch state");
   const p = siteFetchStatePath(env);
   if (!existsSync(p)) return undefined;
   try {

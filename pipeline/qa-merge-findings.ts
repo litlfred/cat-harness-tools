@@ -171,7 +171,6 @@ function run(): void {
   // What each entry records as `reviewed_tree` (bean 69lr; owner card Q4,
   // 2026-11-05): the tree outlives a PR run's synthetic merge commit.
   const headTree = gitHeadTree();
-  const nowIso = new Date().toISOString();
   let added = 0;
   let skipped = 0;
   // Findings NOT merged because the attestation store could not be read.
@@ -275,7 +274,6 @@ function run(): void {
         },
         source_hashes: currentHashes,
         criteria: composeCriteria({}, attested.attestations) as BlockQaReport["criteria"],
-        updated_at: nowIso,
       };
     }
     // Refresh source hashes (best-effort).
@@ -285,7 +283,6 @@ function run(): void {
       field_hash: currentHashes,
       result: f.result,
       reviewer: batch.reviewer,
-      reviewed_at: nowIso,
       reviewed_tree: headTree,
     };
     if (f.severity) entry.severity = f.severity;
@@ -296,7 +293,9 @@ function run(): void {
     // Leads the criterion rather than appending: order IS the verdict here.
     // Rationale and the measurement in `insertAdjudication`.
     report.criteria[f.criterion] = insertAdjudication(existing, entry);
-    report.updated_at = nowIso;
+    // No clock (owner rulings 2026-11-06, "QA dates" / "Date source"): the
+    // date is derived on read from reviewed_tree; a stale legacy one goes.
+    delete report.updated_at;
     try {
       report.criteria = finalizeCriteria(attested, report.criteria, "attesting");
     } catch (err) {

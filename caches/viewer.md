@@ -8,7 +8,6 @@ Every cache this layer declares (`cache/1.0.0`, `caches/`), and the key today's 
 |---|---|---|---|---|---|---|---|---|
 | [bundle-publish-pages](#bundle-publish-pages) | artifact-reuse | a-provenance | `artifact publish-pages + record bundle-publish-pages-<digest>` | script: `sha256(recipe 3, bundle name, HEAD^{tree}, ImageOS + RUNNER_ARCH, exact bun/git/node/python3/java versions, every state ref tip + qa-reports head, extras)` | undetermined — computed only by .github/scripts/bundle-cache.sh digest | from the daily report (not read) | undetermined — the implied key: computed only by .github/scripts/bundle-cache.sh digest | from the daily report (not read) |
 | [bundle-qa-working-copy](#bundle-qa-working-copy) | artifact-reuse | a-provenance | `artifact qa-working-copy + record bundle-qa-working-copy-<digest>` | script: `sha256(recipe 3, bundle name, HEAD^{tree}, ImageOS + RUNNER_ARCH, exact bun/git/node/python3/java versions, every state ref tip + qa-reports head, extras)` | undetermined — computed only by .github/scripts/bundle-cache.sh digest | from the daily report (not read) | undetermined — the implied key: computed only by .github/scripts/bundle-cache.sh digest | from the daily report (not read) |
-| [cat-gates-notes](#cat-gates-notes) | git-ref | b | `refs/notes/cat-gates` | cache:key: `refs/notes/cat-gates` | undetermined — one key per gate (`cache:key <gate>`), not one for the cache | from the daily report (not read) | undetermined — whether its producer reads a state branch is not measured yet | from the daily report (not read) |
 | [ci-image](#ci-image) | ghcr-image | a | `ghcr.io/<owner>/<repo>-ci of the INDEX repository (folio-assistant: ghcr.io/litlfred/folio-assistant-ci), tag = key` | script: `sha256(index.lock.json, bun.lock, package.json, every file under .github/ci-image and .github/actions/ci-setup sorted by path, bun --version, $ImageOS uname -m)` | undetermined — computed only by .github/ci-image/key.sh | from the daily report (not read) | undetermined — the implied key: computed only by .github/ci-image/key.sh | from the daily report (not read) |
 | [layers-ref](#layers-ref) | git-ref | a | `refs/cat/layers/<key> (and the moving refs/cat/layers/main), in the INDEX repository` | script: `sha256(JSON.stringify(index.lock.json .instances))` | undetermined — computed only by scripts/mount-from-lock.ts#layersKey | from the daily report (not read) | undetermined — the implied key: computed only by scripts/mount-from-lock.ts#layersKey | from the daily report (not read) |
 | [lpc-cat-mount](#lpc-cat-mount) | actions-cache | a | `cat-mount-v1-` | hashFiles: `cat-mount-v1-${{ hashFiles('fa/index.lock.json') }}` | undetermined — fa/index.lock.json is not a file in this checkout | from the daily report (not read) | undetermined — whether its producer reads a state branch is not measured yet | from the daily report (not read) |
@@ -47,19 +46,6 @@ Every cache this layer declares (`cache/1.0.0`, `caches/`), and the key today's 
 - **Verify:** bundle-cache.sh fetch: (1) source run's head is this head, a parent of this commit, or a commit with this tree; (2) the tar matches manifest.txt; (3) the bundle names no foreign run id, commit or <n>/merge (until 69lr/#1509 removes the stamps)
 - **Uses:** `.github/scripts/bundle-cache.sh digest|fetch|record`, `.github/workflows/code-quality-gates.yml qa-working-copy job`
 - **Notes:** folio-assistant #2965/#2966. Not byte-reproducible yet: same commit eaa6558, runs 42025861803 and 42030336059, QA manifests 17f6fa0a… vs 7ba8341b… (determinism audit's first row).
-
-### cat-gates-notes
-
-**Local gate records (git notes)** — cat-harness-tools, trust class b, owner cache-first CI (CI speed 14).
-
-- **Holds:** gate run records as git notes on commits
-- **Derived inputs:** the tree of the commit a local gates run passed on (Class B verdicts move to refs/cat-gates/local/<script>/<key>)
-- **Producer:** gate-record.ts
-- **Consumers:** —
-- **Save policy:** not wired in any workflow
-- **Verify:** re-verified off the critical path (folio-assistant #2957/#2958), never read as a hit
-- **Uses:** `cat-harness-tools/scripts/gate-record.ts:40`
-- **Notes:** Not wired in any workflow yet.
 
 ### ci-image
 

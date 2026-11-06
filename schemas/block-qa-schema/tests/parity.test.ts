@@ -48,7 +48,7 @@ const MINIMAL = {
 describe("the Zod half matches the Pydantic half", () => {
   // mirrors: test_version
   test("VERSION is in lockstep with pyproject.toml and package.json", () => {
-    expect(VERSION).toBe("0.1.0");
+    expect(VERSION).toBe("0.2.0");
     const pkg = JSON.parse(
       readFileSync(join(import.meta.dirname, "..", "package.json"), "utf-8"),
     ) as { version: string };
@@ -61,6 +61,20 @@ describe("the Zod half matches the Pydantic half", () => {
     expect(r.label).toBe("def:carbon-valence");
     expect(r.criteria).toEqual({});
     expect(r.paths.md).toBeUndefined();
+  });
+
+  // mirrors: test_no_clock_required (0.2.0; owner ruling 2026-11-06, "QA dates")
+  test("no clock is required: a verdict's date is derived from its reviewed_tree", () => {
+    const { updated_at: _u, ...noClock } = MINIMAL;
+    expect(() => BlockQaReport.parse(noClock)).not.toThrow();
+    expect(() =>
+      QaCriterionEntry.parse({
+        field_hash: { md: "9fb618864a10" },
+        result: "pass",
+        reviewer: { kind: "script", id: "x.ts" },
+        reviewed_tree: "a".repeat(40),
+      }),
+    ).not.toThrow();
   });
 
   // mirrors: test_invalid_result_rejected

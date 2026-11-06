@@ -101,10 +101,8 @@ import { spawn } from "node:child_process";
 import { affectedTests } from "./affected-tests.ts";
 import { budgetSeconds, durationsFromLog, mergeDurations, overBudget, readDurations, readSeed, writeDurations } from "./gate-durations.ts";
 import {
-  attachNote,
   buildRecord,
   covers,
-  f017Keys,
   git,
   logPush,
   newFailures,
@@ -116,11 +114,7 @@ import {
   treeOf,
   writeRecord,
   writeResults,
-  verdictsFor,
-  writeVerdictRefs,
   LOCAL_GATE_RESULTS_SCHEMA,
-  LOCAL_VERDICT_REF_PREFIX,
-  RECORD_NOTES_REF,
   type GatesReportLike,
 } from "./gate-record.ts";
 
@@ -339,9 +333,6 @@ export async function judge(
   if (rec === undefined) return { kind: "undetermined", why: `the gates exited 0 but the report (${reportPath}) names no gate set to record` };
   rec.affectedTests = tests.kind === "all" ? { all: tests.why } : { files: tests.files, passed: true };
   writeRecord(root, rec);
-  if (git(root, ["config", "--bool", "cat.gates.noteRecords"]) !== "false") attachNote(root, rec);
-  // One Class B entry per keyed gate, beside the tree record (CI speed 14, "Cache-First CI").
-  writeVerdictRefs(root, verdictsFor(rec, f017Keys(root)));
   const testNote = tests.kind === "all" ? `; tests left to CI (${tests.why})` : `; ${tests.files} affected test file(s) passed`;
   const heldNote = slow.length > 0 ? `; ${slow.length} over the ${budget}s budget left to CI` : "";
   return { kind: "allow", why: `${rec.gates.length - rec.skipped.length} gate(s) passed, ${rec.skipped.length} skipped on unchanged inputs${heldNote}${testNote}` };
@@ -582,17 +573,9 @@ async function gitHook(root: string, remote: string): Promise<number> {
     say([`pre-push: gates BYPASSED — "${bypass}" (logged to ${p})`]);
     return 0;
   }
-  // A push of the records' own refs (the notes, the Class B entries) carries no tree to judge.
-  const judged = refs.filter((r) => r.localRef !== RECORD_NOTES_REF && !r.localRef.startsWith(LOCAL_VERDICT_REF_PREFIX));
-  if (judged.length === 0) return 0;
-  say([`pre-push: running the fast gates on ${judged.map((r) => r.localRef).join(", ")} (bypass: CAT_GATES_BYPASS='<reason>')`]);
-  const v = await judge(root, judged.map((r) => r.localSha), process.stderr, judged.map((r) => r.remoteSha));
-  return finish(root, v, { via: "git-hook", remote, refs: judged }, 1, () => {
-    if (git(root, ["config", "--bool", "cat.gates.pushRecords"]) === "true") {
-      // `--no-verify`: this push carries only records, and re-entering this hook would judge nothing.
-      git(root, ["push", "--no-verify", "--quiet", remote, `${RECORD_NOTES_REF}:${RECORD_NOTES_REF}`, `${LOCAL_VERDICT_REF_PREFIX}*:${LOCAL_VERDICT_REF_PREFIX}*`]);
-    }
-  });
+  say([`pre-push: running the fast gates on ${refs.map((r) => r.localRef).join(", ")} (bypass: CAT_GATES_BYPASS='<reason>')`]);
+  const v = await judge(root, refs.map((r) => r.localSha), process.stderr, refs.map((r) => r.remoteSha));
+  return finish(root, v, { via: "git-hook", remote, refs }, 1);
 }
 
 async function claudeHook(): Promise<number> {
@@ -638,10 +621,9 @@ async function claudeHook(): Promise<number> {
   return finish(root, v, { via: "claude-hook", command: input.tool_input.command }, 2);
 }
 
-function finish(root: string, v: Verdict, ctx: Record<string, unknown>, refuseCode: number, onAllow?: () => void): number {
+function finish(root: string, v: Verdict, ctx: Record<string, unknown>, refuseCode: number): number {
   if (v.kind === "allow") {
     say([`pre-push: ✓ ${v.why}`]);
-    onAllow?.();
     return 0;
   }
   if (v.kind === "undetermined") {

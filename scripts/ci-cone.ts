@@ -99,7 +99,7 @@ import { auditClosure, scanSource, siteProblem, type SiteVerdict } from "./input
 import { auditPython } from "./input-sites-py.ts";
 
 /** Bump when the parser or the read-set rules change. A record from another version is ignored, so every check runs. */
-export const TRACER_VERSION = 3;
+export const TRACER_VERSION = 4;
 
 /** Where the records live, relative to the checkout. `build/` is git-ignored, and the workflow caches this directory. */
 // input-site: inert #ff0c6593 — the cone's own records directory, which every read set leaves out
@@ -1021,6 +1021,9 @@ export function coneRecordOf(args: {
   for (const c of args.reads.git) git[gitKey(c)] = gitState(args.root, c);
   const child = args.testGate === true ? childInputsOf(args.root, args.reads, args.digests, args.scripts ?? {}) : { env: {}, tools: {}, external: {} };
   if ("none" in child) return { none: child.none };
+  const deferred = deferredInputsOf(args.root, args.before.deferred ?? [], args.reads, args.digests, args.scripts ?? {});
+  if ("none" in deferred) return { none: String(deferred.none) };
+  Object.assign(child.env, deferred);
   const nonEmpty = (k: "env" | "tools" | "external") => (Object.keys(child[k]).length ? { [k]: child[k] } : {});
   return { sha: args.sha, base: args.before.hash, reads, git, ...nonEmpty("env"), ...nonEmpty("tools"), ...nonEmpty("external") };
 }
@@ -1043,6 +1046,59 @@ export function externalState(path: string): string {
   } catch {
     return "absent";
   }
+}
+
+/**
+ * What the modules a computed load could reach, and the run did open, read
+ * from the environment (owner, 2026-11-06: "Both", deriving the plugin and
+ * validator modules from the trace). The traced fingerprint leaves them out
+ * (`auditClosure`'s `deferComputed`): a module the run never opened cannot
+ * have run, and one it opened is in the read set, so a change to it reruns
+ * the check. Each opened one is audited here, with its own computed loads
+ * deferred again and audited in turn when opened, and the variables they can
+ * read are recorded with their values. Any site the audit cannot answer
+ * records nothing. A module read only as text is audited too: that can only
+ * make the check run more often.
+ */
+export function deferredInputsOf(
+  root: string,
+  deferred: readonly string[],
+  reads: Extract<ReadSet, { paths: string[] }>,
+  digests: FileDigests,
+  scripts: Readonly<Record<string, string>>,
+): Record<string, string | null> | { none: string } {
+  const opened = new Set(reads.paths);
+  const audited = new Set<string>();
+  let next = deferred.filter((f) => opened.has(f));
+  const env = new Set<string>();
+  const envUnset = new Set<string>();
+  while (next.length > 0) {
+    next.forEach((f) => audited.add(f));
+    const audit = auditClosure(
+      root,
+      next,
+      digests.sites,
+      undefined,
+      (name) => entryFiles(root, scripts, name),
+      (source) => digests.declared.resolve(source),
+      true,
+    );
+    if ("undetermined" in audit) return { none: `a module the run loaded by a computed load: ${audit.undetermined}` };
+    audit.env.forEach((n) => env.add(n));
+    audit.envUnset.forEach((n) => envUnset.add(n));
+    next = audit.deferred.filter((f) => opened.has(f) && !audited.has(f));
+  }
+  if (env.size === 0 && envUnset.size === 0) return {};
+  const out: Record<string, string | null> = {};
+  // input-site: traced #659ad351 — records what the loaded modules read from the environment, on the record path only
+  inputSiteReached("ci-cone: deferred env");
+  const now = process.env;
+  for (const n of envUnset) {
+    if ((now[n] ?? "") !== "") return { none: `$${n} is set, and a loaded module names it as outside the tree` };
+    out[n] = null;
+  }
+  for (const n of env) out[n] = now[n] ?? null;
+  return out;
 }
 
 /** A program that runs this tree's TypeScript: what a test's `spawned` site starts. */
@@ -1148,6 +1204,9 @@ function jsChildEnv(
     undefined,
     (name) => entryFiles(root, scripts, name),
     (source) => digests.declared.resolve(source),
+    // Every module the run opened is an entry here; a computed load's target
+    // the run never opened cannot have run (`deferredInputsOf`).
+    true,
   );
   if ("undetermined" in audit) return { none: `a bun child's modules: ${audit.undetermined}` };
   return { env: audit.env, envUnset: audit.envUnset };
@@ -1206,12 +1265,17 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
   // polluted every traced check's read set with every instance directory and
   // declaration in the checkout (cat-harness-tools#634).
   const scriptCmd = o.scripts[o.script];
+  // A test file runs as `bun test ./<path>` itself, not under `sh`, so the
+  // traced command is bun: under `sh -c` every test had a bun "child", and its
+  // whole read set was audited as that child's sources (`childInputsOf`).
   const cmdArgs =
     o.runner !== undefined
       ? [...o.runner, o.script]
-      : scriptCmd !== undefined
-        ? ["sh", "-c", scriptCmd]
-        : [...RUNNER, o.script];
+      : isTestGate(o.script) && scriptCmd === `bun test ./${o.script.slice(TEST_GATE_PREFIX.length)}`
+        ? ["bun", "test", `./${o.script.slice(TEST_GATE_PREFIX.length)}`]
+        : scriptCmd !== undefined
+          ? ["sh", "-c", scriptCmd]
+          : [...RUNNER, o.script];
   // A test file's own run never takes `BUN_OPTIONS`: CI's test shards set it
   // to `--shard=N/M --reporter=junit ...`, and inherited by `bun test ./<one
   // file>` it shards that one file away to nothing, so the run reads nothing
