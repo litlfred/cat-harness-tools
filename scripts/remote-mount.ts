@@ -378,7 +378,13 @@ export type InstanceOutcome =
   | { instance: string; state: "local"; path: string; detail: string }
   /** An override said `skip`. */
   | { instance: string; state: "skipped"; detail: string }
-  | { instance: string; state: "missing"; path?: string; detail: string }
+  /**
+   * `edited`: on disk at the pinned instance, but some pinned bytes changed
+   * (every bad directory or asset is `modified`, none `absent`). A mount
+   * leaves such an instance untouched unless `--fresh`, so a fetch cannot
+   * change its verdict (bean `cat-tools-sm8r`).
+   */
+  | { instance: string; state: "missing"; path?: string; detail: string; edited?: true }
   /** The trust check (H8) said no — at mount time, or on re-judging a recorded basis. */
   | { instance: string; state: "refused"; path?: string; detail: string }
   /** Mounted on consent whose `by` no declared `mountApprovers` list checked. Its own state, never clean. */
@@ -1976,9 +1982,10 @@ export function checkRemote(opts: { instanceRoot?: string } = {}): CheckResult {
         if (!existsSync(abs)) bad.push(`${inst.path}/${a.src} absent`);
         else if (sha256Text(readFileSync(abs)) !== a.sha256) bad.push(`${inst.path}/${a.src} modified`);
       }
+      const edited = bad.length > 0 && bad.every((x) => x.endsWith(" modified"));
       outcomes.push(
         bad.length
-          ? { instance: inst.instance, state: "missing", path: inst.path, detail: `the pinned bytes are not on disk: ${bad.join("; ")}` }
+          ? { instance: inst.instance, state: "missing", path: inst.path, detail: `the pinned bytes are not on disk: ${bad.join("; ")}`, ...(edited ? { edited: true as const } : {}) }
           : {
             instance: inst.instance,
             state: mountedState(trust),
@@ -2065,6 +2072,26 @@ export function currentPerLock(root: string): CheckResult | undefined {
 }
 
 /**
+ * The lock check of `root` when every instance not at its pinned bytes is one
+ * a mount would leave untouched (`edited`: present, but its bytes changed),
+ * and at least one is; else undefined. Then a fetch cannot change the
+ * verdict, so `remoteFanOut` reports it without fetching.
+ *
+ * Measured 2026-11-06 (bean `cat-tools-sm8r`): a local gate run's eight
+ * `state:mount` steps each fetched every remote (32–42 s) only to report the
+ * same eight edited mounts as "left untouched", 305 s of a 1396 s run. The
+ * verdict is unchanged, still `missing`: an edited mount is not current,
+ * and saying so faster does not make it so.
+ */
+export function editedOnlyPerLock(root: string): CheckResult | undefined {
+  const c = checkRemote({ instanceRoot: root });
+  if (c.outcomes.length === 0) return undefined;
+  const off = c.outcomes.filter((o) => o.state !== "mounted" && o.state !== "unverified-approver");
+  if (off.length === 0 || !off.every((o) => o.state === "missing" && o.edited === true)) return undefined;
+  return c;
+}
+
+/**
  * What the full mount's install step would do for a current root, without
  * the fetch: `bun install` in a mounted instance that has a manifest and no
  * `node_modules/` yet. node_modules is outside every digest, so the lock check
@@ -2121,6 +2148,20 @@ export function remoteFanOut(checkout: string, opts: { check?: boolean; plan?: b
         const sum = summarise(current.outcomes);
         states.push(sum.state);
         parts.push(reportOutcomes(`Remote mounts — ${root} (current per the lock; nothing fetched)`, sum.state, sum.reason, current.outcomes));
+        continue;
+      }
+      // Bean `cat-tools-sm8r`: every instance off the lock is edited, and a
+      // mount leaves an edited instance untouched (only `--fresh` replaces
+      // it), so the fetch below could not change a single verdict.
+      const edited = opts.discardEdits ? undefined : editedOnlyPerLock(root);
+      if (edited !== undefined) {
+        if (opts.install !== false) installMissingDependencies(root, edited.outcomes.filter((o) => o.state !== "missing"), opts.install ?? "production");
+        for (const o of edited.outcomes) {
+          if (o.state === "missing" && o.edited) o.detail = `left untouched: ${o.detail} — edits there are somebody's work; move them upstream or delete the directory, then re-mount (or \`--fresh\`)`;
+        }
+        const sum = summarise(edited.outcomes);
+        states.push(sum.state);
+        parts.push(reportOutcomes(`Remote mounts — ${root} (only edited mounts are off the lock, and a mount leaves those untouched; nothing fetched)`, sum.state, sum.reason, edited.outcomes));
         continue;
       }
       const r = mountRemote({ instanceRoot: root, urlFor: opts.urlFor, purpose: opts.purpose, install: opts.install, discardEdits: opts.discardEdits });
