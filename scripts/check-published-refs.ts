@@ -48,6 +48,7 @@ export const PROVENANCE_KEYS: readonly string[] = [
   "sourceCommitAt",
   "sourceCommitUnavailable",
   "sourceTreeDirty",
+  "sourceTree",
   "identitySource",
 ];
 
