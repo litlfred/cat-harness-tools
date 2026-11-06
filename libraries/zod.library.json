@@ -122,6 +122,7 @@
     "schemas/sdlc/bean-graph.ts",
     "schemas/sdlc/bean-note.ts",
     "schemas/sdlc/binary-release.ts",
+    "schemas/sdlc/cache.ts",
     "schemas/sdlc/change-size.ts",
     "schemas/sdlc/gates-report.ts",
     "schemas/sdlc/harness-state.ts",

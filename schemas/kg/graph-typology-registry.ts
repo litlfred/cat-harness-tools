@@ -2421,6 +2421,39 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
       "schema is strict throughout, and a file a deploy phase deleted must still say where " +
       "to get it back and why it went.",
   },
+  // CI caches (cache-first CI, rule 6; owner 2026-11-05, "caches are KG nodes
+  // and get a VIEWER"). One node per cache a layer DECLARES: its key recipe,
+  // where its entries live, producer, consumers, trust class and budget --
+  // never the entries, and never the stored key, size or hit rate, which are
+  // facts about the cache service that the viewer joins from the daily cache
+  // report, so staleness is computed rather than claimed. Two families of one
+  // kind, on `tool-release`'s precedent: `cache/1.0.0` (a declaration) and
+  // `cache-inventory/1.0.0` (a dated snapshot of the caches found across the
+  // harness repositories, before each declares its own). `content`: which
+  // recipe a cache uses and which trust class it is given are decisions.
+  // NOT renderable: the viewer (`gen-caches-viz.ts`) reads it.
+  cache: {
+    description:
+      "CI caches (`caches/`) — one `cache/1.0.0` node per cache a layer declares, carrying its kind (actions-cache, artifact-reuse, ghcr-image, git-ref, branch-store, on-disk, setup-action-cache), its trust class under cache-first CI (a: verified against a reference derived from this tree; a-provenance: a carried manifest plus a source rule; b: a verdict, reported SKIPPED and re-verified later; c: saved from main only; unclassified), its location, its key recipe (`cache:key`, `cache:key --base`, `hashFiles` over a lock, or a mount-free script; `hand-listed` and `per-run` only to RECORD a key found that way, as a finding), its derived inputs, producer, consumers, save policy, verify, budget, owner and uses. Never the entries, and never the stored key, size, age or hit rate: the viewer joins those from the daily cache report, so a cache's staleness — the key today's pins imply against the key the service holds — is computed, never claimed (rule 6, owner 2026-11-05). A second family, `cache-inventory/1.0.0`, is a dated snapshot of the caches found across the harness repositories, which is never read as a declaration: each harness declares its own (rule 7). Shape in `schemas/sdlc/cache.ts`; viewer `scripts/gen-caches-viz.ts`.",
+    title: "CI caches",
+    renderable: false,
+    holds: "content",
+    // declared-path-literal: this table IS the declaration, as on `binary-release`.
+    schema: "schemas/sdlc/cache.ts",
+    nodeSchemas: {
+      "cache/1.0.0": {},
+      "cache-inventory/1.0.0": {},
+    },
+    summary:
+      "CI caches -- one `cache/1.0.0` node per cache a layer declares: key recipe, trust class, location, producer, " +
+      "consumers, save policy, verify and budget. Never the entries; the stored key, size and hit rate come from the " +
+      "daily cache report, so staleness is computed, never claimed.",
+    avatar: {
+      glyph: "M5 6c0-1.66 3.13-3 7-3s7 1.34 7 3v12c0 1.66-3.13 3-7 3s-7-1.34-7-3V6zm0 0c0 1.66 3.13 3 7 3s7-1.34 7-3M5 12c0 1.66 3.13 3 7 3s7-1.34 7-3M16.5 16.5l2 2 3.5-4",
+      tone: 172,
+      reads: "a stack of stored results with a tick — an output kept under its key and reused once verified",
+    },
+  },
   // Tool releases and tool profiles -- the external tools this platform RUNS,
   // each at one version with the sha256 of its bytes and the runtime THAT
   // release needs, and the named sets a run selects. Never the bytes.
