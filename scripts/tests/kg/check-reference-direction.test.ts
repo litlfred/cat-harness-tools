@@ -42,6 +42,7 @@ import {
   exemptionCounts,
   movedTo,
   rekeyMovedPairs,
+  subgraphMachineWritten,
   rekeyToolSplits,
   type MoveEvidence,
   EXEMPTIONS_DECLARED,
@@ -1361,6 +1362,28 @@ describe("ruling (i) — a baseline pair on a MOVED file is compared at the file
     const v = judge(grew, true);
     expect(v.exit).toBe(1);
     expect(v.diff?.added["wrong-direction"]).toEqual([{ file: "cat-harness-tools/scripts/a.ts", target: "who-iris" }]);
+  });
+});
+
+describe("a sub-graph's machine-written directories, declared from within, are not read", () => {
+  test("cat-harness's corpus under library/graph.json is excluded like a top-level library entry", () => {
+    const root = mkdtempSync(join(tmpdir(), "refdir-subgraph-"));
+    made.push(root);
+    mkdirSync(join(root, "library", "corpus"), { recursive: true });
+    writeFileSync(
+      join(root, "library", "graph.json"),
+      JSON.stringify({
+        directories: [
+          { id: "library", path: "corpus/", graphTypologies: ["library"] },
+          { id: "library-skills", path: "skills/", graphTypologies: ["skills"] },
+        ],
+      }),
+    );
+    const dirs = [{ path: "library/" }, { path: "skills/" }];
+    expect(subgraphMachineWritten(root, dirs)).toEqual([join(root, "library", "corpus/")]);
+    // Vacuity guard: without the sub-graph's graph.json nothing is added.
+    rmSync(join(root, "library", "graph.json"));
+    expect(subgraphMachineWritten(root, dirs)).toEqual([]);
   });
 });
 
