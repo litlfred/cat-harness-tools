@@ -36,6 +36,7 @@ import {
   countryTones,
   emotionBadge,
   EMOTION,
+  mentionedChips,
   ext,
   frame,
   glyph,
@@ -151,7 +152,7 @@ function mapPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): stri
             const ex = s.step.experiences.find((y) => y.actor === x.id);
             if (!ex) return cell(s, "", "jp-mc-empty");
             const lead = s.step.lead === x.id;
-            return cell(s, `<div class="jp-mcard${lead ? " is-lead" : ""}"><div class="jp-mcard-h">${emotionBadge(ex.emotion)}${lead ? '<span class="jp-lead">Lead</span>' : ""}</div><p>${personaText(ex.doing, p.cast)}</p>${ex.feeling ? `<p class="jp-feel">${e(ex.feeling)}</p>` : ""}</div>`);
+            return cell(s, `<div class="jp-mcard${lead ? " is-lead" : ""}"><div class="jp-mcard-h">${emotionBadge(ex.emotion)}${mentionedChips(ex.doing, p.cast, x.id)}${lead ? '<span class="jp-lead">Lead</span>' : ""}</div><p>${personaText(ex.doing, p.cast)}</p>${ex.feeling ? `<p class="jp-feel">${e(ex.feeling)}</p>` : ""}</div>`);
           })
           .join(""),
       ),

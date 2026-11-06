@@ -205,26 +205,39 @@ export function countryTones(countries: readonly (string | undefined)[]): Map<st
 export const LAYER_TONES = ["teal", "sky", "indigo", "violet", "rose", "amber"] as const;
 
 /**
- * Text with each person's avatar beside their name, as VaxLink's
- * `PersonaText`: escaped, and a name matches only as a whole word, the longest
- * name first ("Dr. Anan" before "Anan").
+ * A sentence that names people, as text. The names are marked
+ * (`.jp-named`) but no avatar is put inside the sentence (owner,
+ * 2026-11-06: a chip mid-sentence reads as a stray icon); a card that wants
+ * the people it names shows {@link mentioned} in its header instead.
  */
 export function personaText(text: string, people: readonly PersonaView[]): string {
-  const named = [...people].filter((p) => p.name.trim()).sort((a, b) => b.name.length - a.name.length);
+  const named = namedIn(people);
   if (named.length === 0) return e(text);
-  const re = new RegExp(`(?<![\\p{L}\\p{N}])(${named.map((p) => p.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?![\\p{L}\\p{N}])`, "gu");
-  let out = "";
-  let last = 0;
-  for (const m of text.matchAll(re)) {
-    const p = named.find((x) => x.name === m[1])!;
-    out += e(text.slice(last, m.index)) + `<span class="jp-named">${e(m[1]!)}${avatar(p, "sm")}</span>`;
-    last = m.index! + m[0].length;
-  }
-  return out + e(text.slice(last));
+  return e(text).replace(namePattern(named, true), (m) => `<span class="jp-named">${m}</span>`);
+}
+
+const namedIn = (people: readonly PersonaView[]): PersonaView[] => [...people].filter((p) => p.name.trim()).sort((a, b) => b.name.length - a.name.length);
+const namePattern = (named: readonly PersonaView[], escaped = false): RegExp =>
+  new RegExp(`(?<![\\p{L}\\p{N}])(${named.map((p) => (escaped ? e(p.name) : p.name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?![\\p{L}\\p{N}])`, "gu");
+
+/** The people a sentence names, in the cast's order, each once, leaving out `except` (the card's own person). */
+export function mentioned(text: string, people: readonly PersonaView[], except?: string): PersonaView[] {
+  const named = namedIn(people);
+  if (named.length === 0) return [];
+  const hit = new Set([...text.matchAll(namePattern(named))].map((m) => m[1]!));
+  return people.filter((p) => p.id !== except && hit.has(p.name));
+}
+
+/** The avatars of the people a card's sentence names, for its header. */
+export function mentionedChips(text: string, people: readonly PersonaView[], except?: string): string {
+  const who = mentioned(text, people, except);
+  return who.length ? `<span class="jp-mentions" title="${e(`With ${who.map((p) => p.name).join(", ")}`)}">${who.map((p) => avatar(p, "sm")).join("")}</span>` : "";
 }
 
 export function avatar(p: PersonaView, size: "sm" | "md" | "lg" = "md"): string {
-  const inner = p.icon && GLYPH[p.icon] ? glyph(p.icon) : e(p.initials);
+  // Initials for everyone, the baby too: one chip style wherever people are stacked or listed
+  // (owner, 2026-11-06), never a glyph among initials.
+  const inner = e(p.initials);
   return `<span class="jp-av jp-av-${size}" style="--c:${e(p.color)}" title="${e(p.name)}" aria-hidden="true">${inner}</span>`;
 }
 
@@ -311,7 +324,7 @@ export const glyph = (name: string, cls = ""): string =>
 export function sceneStrip(scene: readonly { icon: string; label: string }[] | undefined, tone = "sky", size: "sm" | "md" = "md"): string {
   if (!scene?.length) return "";
   return `<figure class="jp-scene jp-scene-${size} jp-scene-${tone}" aria-label="${e(scene.map((x) => x.label).join(", then "))}">${scene
-    .map((x, i) => `${i ? icon("arrow", "jp-scene-arrow") : ""}<span title="${e(x.label)}"><span class="jp-scene-i">${glyph(x.icon)}</span></span>`)
+    .map((x, i) => `${i ? icon("arrow", "jp-scene-arrow") : ""}<span class="jp-scene-p" title="${e(x.label)}"><span class="jp-scene-i">${glyph(x.icon)}</span>${size === "md" ? `<span class="jp-scene-l">${e(x.label)}</span>` : ""}</span>`)
     .join("")}</figure>`;
 }
 
@@ -560,15 +573,15 @@ function overviewPage(corpus: JourneyCorpus, p: Presentation): string {
     .map((c, i) => {
       const j = c.journey.scenario;
       const pic = c.steps.map((s) => pictureOf(corpus, s, root)).find(Boolean) ?? "";
-      const scene = sceneStrip(chapterScene(c), tones.get(j.country ?? "") ?? "sky", "sm");
+      const scene = sceneStrip(chapterScene(c), tones.get(j.country ?? "") ?? "sky", "md");
       const people = p.cast.filter((x) => c.steps.some((s) => s.step.experiences.some((y) => y.actor === x.id)));
       return `<a class="jp-card jp-moment" href="${e(walk(c.steps[0]))}">${i < p.chapters.length - 1 ? `<span class="jp-moment-arrow">${icon("arrow")}</span>` : ""}
+${pic}
 <span class="jp-moment-top"><span class="jp-num">${i + 1}</span>${chip(j.country)}</span>
 <span class="jp-moment-title">${e(c.title)}</span>
 <span class="jp-moment-meta">${[j.when, j.where].filter(Boolean).map((x) => e(x!)).join(" · ")}</span>
 <span class="jp-moment-sum">${e(j.description.replace(/\.md$/, ""))}</span>
-${pic}${scene}
-<span class="jp-stack">${people.map((x) => avatar(x, "sm")).join("")}</span>
+<span class="jp-moment-foot">${scene}<span class="jp-stack">${people.map((x) => avatar(x, "sm")).join("")}</span></span>
 </a>`;
     })
     .join("\n");
@@ -829,7 +842,7 @@ function stepPage(corpus: JourneyCorpus, p: Presentation, s: PresentedStep, link
   const personCards = people
     .map((x) => {
       const pv = p.cast.find((c) => c.id === x.actor)!;
-      return `<div class="jp-who" style="--c:${e(pv.color)}"><div class="jp-who-h">${avatar(pv)}<div><b>${e(pv.name)}</b>${pv.role ? `<span>${e(pv.role)}</span>` : ""}</div>${emotionBadge(x.emotion)}</div><p>${personaText(x.doing, p.cast)}</p>${x.feeling ? `<p class="jp-feel">${e(x.feeling)}</p>` : ""}</div>`;
+      return `<div class="jp-who" style="--c:${e(pv.color)}"><div class="jp-who-h">${avatar(pv)}<div><b>${e(pv.name)}</b>${pv.role ? `<span>${e(pv.role)}</span>` : ""}</div>${mentionedChips(x.doing, p.cast, x.actor)}${emotionBadge(x.emotion)}</div><p>${personaText(x.doing, p.cast)}</p>${x.feeling ? `<p class="jp-feel">${e(x.feeling)}</p>` : ""}</div>`;
     })
     .join("");
   const ladder = ladderOf(corpus, s.journey);

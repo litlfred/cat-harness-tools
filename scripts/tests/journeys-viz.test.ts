@@ -31,6 +31,8 @@ import {
   screensFor,
   shortTitle,
   castOrder,
+  mentioned,
+  mentionedChips,
   siteRootFrom,
   viewBoxWidth,
 } from "../journeys/present.ts";
@@ -443,9 +445,10 @@ describe("the presentation pages: a workshop told in a room, with no site chrome
     expect(p2).toContain("— a signature crosses");
     expect(p2).toContain('name="policy:viewer:status"');
   });
-  test("a step: the people, each with the avatar beside the name, and under the hood", () => {
+  test("a step: the people, each with the avatar in the card's header (never inside a sentence), and under the hood", () => {
     expect(p2).toContain('class="jp-who" style="--c:#123456"');
-    expect(p2).toContain('<span class="jp-named">Ben (nurse)<span class="jp-av jp-av-sm"');
+    expect(p2).toContain('<span class="jp-named">Ben (nurse)</span>: reads the summary');
+    expect(p2).not.toMatch(/<span class="jp-named">[^<]*<span class="jp-av/);
     expect(p2).toContain('<b>Health wallet</b><span>shows the QR</span>');
     expect(p2).toContain('data-element-id="Task_Read" data-jv-hl=""');
     expect(p2).toContain('data-jp-hood');
@@ -493,7 +496,9 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(ana).toContain('<a href="../../walkthrough/P2/"><title>P2 Step P2: Worried</title>');
     expect(ana).toContain("Ana’s touchpoints (2)");
     expect(at(`${base}/personas/index.html`)).toContain('href="ana/"');
-    expect(at(`${base}/personas/cleo/index.html`)).not.toMatch(/jp-av-lg"[^>]*>CL</);
+    // One chip style for everyone, the baby too: initials, never a glyph among them (owner, 2026-11-06).
+    expect(at(`${base}/personas/cleo/index.html`)).toMatch(/class="jp-av jp-av-lg"[^>]*title="Cleo"[^>]*>C<\/span>/);
+    expect(map).not.toMatch(/class="jp-av[^"]*"[^>]*><svg/);
   });
   test("how it works: the big ideas, the grid, a block's detail with the moments that use it", () => {
     expect(how).toContain("Carry it yourself");
@@ -573,6 +578,14 @@ describe("presentation helpers", () => {
     expect(p.cast.map((c) => c.id)).toEqual(["ana", "ben", "cleo"]);
     expect(p.steps[1]!.ws?.askTheRoom).toBe("Should the family be told?");
   });
+  test("an overview card: the picture first, the strip (labelled, VaxLink's size) and the people at its foot", () => {
+    const ov = at("top/workshops/policy/overview/index.html");
+    const card2 = [...ov.matchAll(/<a class="jp-card jp-moment"[\s\S]*?<\/a>/g)].map((m) => m[0]).find((c) => c.includes("jp-pic"))!;
+    expect(card2.indexOf('class="jp-pic"')).toBeLessThan(card2.indexOf('class="jp-moment-title"'));
+    expect(card2.indexOf('class="jp-moment-sum"')).toBeLessThan(card2.indexOf('class="jp-moment-foot"'));
+    expect(card2).toContain('jp-scene jp-scene-md');
+    expect(card2).toContain('<span class="jp-scene-l">A clinic</span>');
+  });
   test("presentation.cast orders the cast everywhere; presentation.chapterTitles names a chapter", () => {
     const w0 = corpus.workshops[0]!;
     const w = { ...w0, workshop: { ...w0.workshop, presentation: { ...w0.workshop.presentation, cast: ["cleo", "ghost", "ana"], chapterTitles: { "p2-treated": "Crossing back" } } } };
@@ -583,15 +596,24 @@ describe("presentation helpers", () => {
     expect(castOrder(["a", "b", "c"], undefined)).toEqual(["a", "b", "c"]);
     expect(castOrder(["a", "b", "c"], ["c", "c", "x"])).toEqual(["c", "a", "b"]);
   });
-  test("personaText puts the avatar beside whole-word names, longest first, and escapes the rest", () => {
+  test("personaText marks whole-word names, longest first, puts no avatar in the sentence, and escapes the rest", () => {
     const people = [
       { id: "a", name: "Anan", initials: "AN", color: "#000000" },
       { id: "d", name: "Dr. Anan", initials: "DA", color: "#111111" },
     ];
     const out = personaText("Dr. Anan meets Ananda <b>", people);
-    expect(out).toContain('<span class="jp-named">Dr. Anan<span class="jp-av jp-av-sm" style="--c:#111111"');
-    expect(out).not.toContain(">Anan<span");
-    expect(out).toContain("Ananda &lt;b&gt;");
+    expect(out).toBe('<span class="jp-named">Dr. Anan</span> meets Ananda &lt;b&gt;');
+  });
+  test("mentioned: the people a sentence names, in the cast's order, without the card's own person; their chips go in the header", () => {
+    const people = [
+      { id: "s", name: "Somsack", initials: "SS", color: "#65a30d" },
+      { id: "k", name: "Khamla", initials: "KS", color: "#f43f5e" },
+      { id: "v", name: "Vilay", initials: "VI", color: "#14b8a6" },
+    ];
+    expect(mentioned("Tells Vilay about Somsack, then Vilay again", people).map((p) => p.id)).toEqual(["s", "v"]);
+    expect(mentioned("Khamla brings Somsack", people, "k").map((p) => p.id)).toEqual(["s"]);
+    expect(mentionedChips("waits", people)).toBe("");
+    expect(mentionedChips("Tells Vilay", people)).toContain('<span class="jp-mentions" title="With Vilay"><span class="jp-av jp-av-sm" style="--c:#14b8a6" title="Vilay" aria-hidden="true">VI</span></span>');
   });
   test("links out: kramdown anchors, page patterns, the site's root, JSON colouring", () => {
     expect(kramdownSlug("J1 — Born abroad (Thailand, birth day)")).toBe("j1--born-abroad-thailand-birth-day");
