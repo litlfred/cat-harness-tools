@@ -282,6 +282,40 @@ export const SUGGEST_TOKENS_JS = `function faSuggestTokens(contributed) {
 }`;
 
 /**
+ * The block panel (owner, 2026-11-01, Q-STY-2): a block shows only icons on
+ * its right, greyed until hover; each icon slides out its own pane from the
+ * right edge. ✎ is "Help improve this section" (suggest, feedback, edit, each
+ * explained); other layers add panes (public comments: 💬). Only once the
+ * runtime has run (html.fa-bp) are the plain links hidden, so a page without
+ * JavaScript keeps them.
+ */
+export const BLOCK_PANEL_CSS = `
+html.fa-bp .block-actions { display:flex; flex-direction:column; gap:4px; align-items:flex-end; font-size:.8rem; opacity:.3; }
+html.fa-bp .block-actions:hover, html.fa-bp .block-actions:focus-within, html.fa-bp *:hover > .block-actions, html.fa-bp p:hover + .block-actions { opacity:1; }
+html.fa-bp .block-actions > a, html.fa-bp .block-actions > .ba-existing { display:none; }
+.ba-ic { position:relative; width:28px; height:28px; padding:0; border:1px solid #8885; border-radius:7px; background:color-mix(in srgb, currentColor 5%, transparent); color:inherit; font-size:14px; line-height:1; cursor:pointer; }
+.ba-ic:hover, .ba-ic:focus-visible, .ba-ic[aria-expanded="true"] { border-color:var(--link,#0b5cad); }
+.ba-ic[aria-expanded="true"] { background:var(--link,#0b5cad); color:#fff; }
+.ba-ic .ba-n { position:absolute; top:-6px; right:-8px; min-width:1.1em; padding:1px 4px; border-radius:8px; background:#b35900; color:#fff; font:700 10px/1.2 sans-serif; }
+.fa-block-panel { position:fixed; top:0; right:0; bottom:0; z-index:2147482000; width:min(380px,92vw); overflow-y:auto; box-sizing:border-box; padding:14px 18px;
+  background:var(--body-background-color,#fff); color:var(--body-text-color,inherit); border-left:1px solid #8886; box-shadow:-8px 0 24px #0003;
+  font-size:.88rem; line-height:1.45; transform:translateX(105%); transition:transform .16s ease; }
+.fa-block-panel.open { transform:none; }
+@media (prefers-reduced-motion:reduce) { .fa-block-panel { transition:none; } }
+.fa-block-panel .bp-tabs { display:flex; gap:6px; margin:0 2rem .6rem 0; }
+.fa-block-panel .bp-x { position:absolute; top:10px; right:12px; border:0; background:none; color:inherit; font-size:18px; cursor:pointer; opacity:.7; }
+.fa-block-panel h3 { margin:.2rem 0 .1rem; font-size:1rem; }
+.fa-block-panel .bp-sub { opacity:.7; font-size:.8rem; margin-bottom:.6rem; }
+html.fa-bp .fa-block-panel .block-actions { float:none; display:block; opacity:1; white-space:normal; font-size:inherit; margin:0; }
+html.fa-bp .fa-block-panel .block-actions > a { display:block; margin:.5rem 0; padding:.55rem .7rem; border:1px solid #8885; border-radius:8px; text-decoration:none; }
+.fa-block-panel .block-actions > a:hover { border-color:var(--link,#0b5cad); }
+.fa-block-panel .block-actions > a small { display:block; margin-top:.15rem; color:var(--body-text-color,#555); opacity:.85; font-size:.8rem; }
+.fa-block-panel .block-actions > .ba-existing { display:block; margin:.5rem 0; }
+html.fa-bp .fa-block-panel .block-actions > .ba-existing { display:block; }
+.fa-block-panel .block-actions > .ba-ic { display:none; }
+`;
+
+/**
  * The browser half, one script for every page: fills each `a[data-fa-link]`
  * (`edit`, `source` or `feedback`) from the facts on its nearest
  * `[data-src]` host the first time a pointer, focus or touch reaches it, so a
@@ -1225,6 +1259,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     const main = document.querySelector(".main-content");
     if (!main || main.querySelector(".fa-doc, .block-actions")) return;
     const repo = siteRepo();
+    let made = false;
     for (const h of main.querySelectorAll("h1[id], h2[id], h3[id], h4[id]")) {
       if (!h.querySelector(":scope > .anchor-heading") || h.closest(".fa-block-panel, nav")) continue;
       const sec = h.textContent.trim();
@@ -1241,7 +1276,13 @@ export const EDIT_LINKS_RUNTIME = `(() => {
         box.append(a);
       }
       h.after(box);
+      made = true;
     }
+    // A block page brings the panel's styles with its blocks; a plain page
+    // brings none, so the panel would render unstyled at the page's foot.
+    if (made && !document.getElementById("fa-bp-panel-css"))
+      // Before this runtime's own rules, which refine these and must win.
+      (document.head || document.documentElement).insertBefore(el("style", { id: "fa-bp-panel-css", textContent: ${JSON.stringify(BLOCK_PANEL_CSS)} }), document.getElementById("fa-bp-link-css"));
   };
   const icons = (root) => {
     const r = root || document;
@@ -1370,40 +1411,6 @@ export function compactActionsScript(cfg: BlockActionsConfig, page?: string): st
 ${EDIT_LINKS_RUNTIME}
 </script>`;
 }
-
-/**
- * The block panel (owner, 2026-11-01, Q-STY-2): a block shows only icons on
- * its right, greyed until hover; each icon slides out its own pane from the
- * right edge. ✎ is "Help improve this section" (suggest, feedback, edit, each
- * explained); other layers add panes (public comments: 💬). Only once the
- * runtime has run (html.fa-bp) are the plain links hidden, so a page without
- * JavaScript keeps them.
- */
-export const BLOCK_PANEL_CSS = `
-html.fa-bp .block-actions { display:flex; flex-direction:column; gap:4px; align-items:flex-end; font-size:.8rem; opacity:.3; }
-html.fa-bp .block-actions:hover, html.fa-bp .block-actions:focus-within, html.fa-bp *:hover > .block-actions, html.fa-bp p:hover + .block-actions { opacity:1; }
-html.fa-bp .block-actions > a, html.fa-bp .block-actions > .ba-existing { display:none; }
-.ba-ic { position:relative; width:28px; height:28px; padding:0; border:1px solid #8885; border-radius:7px; background:color-mix(in srgb, currentColor 5%, transparent); color:inherit; font-size:14px; line-height:1; cursor:pointer; }
-.ba-ic:hover, .ba-ic:focus-visible, .ba-ic[aria-expanded="true"] { border-color:var(--link,#0b5cad); }
-.ba-ic[aria-expanded="true"] { background:var(--link,#0b5cad); color:#fff; }
-.ba-ic .ba-n { position:absolute; top:-6px; right:-8px; min-width:1.1em; padding:1px 4px; border-radius:8px; background:#b35900; color:#fff; font:700 10px/1.2 sans-serif; }
-.fa-block-panel { position:fixed; top:0; right:0; bottom:0; z-index:2147482000; width:min(380px,92vw); overflow-y:auto; box-sizing:border-box; padding:14px 18px;
-  background:var(--body-background-color,#fff); color:var(--body-text-color,inherit); border-left:1px solid #8886; box-shadow:-8px 0 24px #0003;
-  font-size:.88rem; line-height:1.45; transform:translateX(105%); transition:transform .16s ease; }
-.fa-block-panel.open { transform:none; }
-@media (prefers-reduced-motion:reduce) { .fa-block-panel { transition:none; } }
-.fa-block-panel .bp-tabs { display:flex; gap:6px; margin:0 2rem .6rem 0; }
-.fa-block-panel .bp-x { position:absolute; top:10px; right:12px; border:0; background:none; color:inherit; font-size:18px; cursor:pointer; opacity:.7; }
-.fa-block-panel h3 { margin:.2rem 0 .1rem; font-size:1rem; }
-.fa-block-panel .bp-sub { opacity:.7; font-size:.8rem; margin-bottom:.6rem; }
-html.fa-bp .fa-block-panel .block-actions { float:none; display:block; opacity:1; white-space:normal; font-size:inherit; margin:0; }
-html.fa-bp .fa-block-panel .block-actions > a { display:block; margin:.5rem 0; padding:.55rem .7rem; border:1px solid #8885; border-radius:8px; text-decoration:none; }
-.fa-block-panel .block-actions > a:hover { border-color:var(--link,#0b5cad); }
-.fa-block-panel .block-actions > a small { display:block; margin-top:.15rem; color:var(--body-text-color,#555); opacity:.85; font-size:.8rem; }
-.fa-block-panel .block-actions > .ba-existing { display:block; margin:.5rem 0; }
-html.fa-bp .fa-block-panel .block-actions > .ba-existing { display:block; }
-.fa-block-panel .block-actions > .ba-ic { display:none; }
-`;
 
 export const BLOCK_ACTIONS_CSS = `
 .block-actions { float:right; font-size:.75rem; margin-left:.6rem; opacity:.55; white-space:nowrap; }
