@@ -44,6 +44,22 @@
  *   bun run cat-harness-tools/scripts/qa-site-assets.ts fetch --ref <ref> [--fallback <ref>]... \
  *       --results <dir> [--state FILE] [--require]
  *   bun run cat-harness-tools/scripts/qa-site-assets.ts verify --site <dir> --results <dir> [--state FILE]
+ *   bun run cat-harness-tools/scripts/qa-site-assets.ts tree-commits --site <dir> [--max N]
+ *
+ * 3. **`tree-commits`**, beside the copy. Writes `_site/assets/qa/tree-commits.json`:
+ *    for each tree on main's own line of history (`git log --first-parent`,
+ *    the newest `--max` commits, default 2000), the OLDEST commit carrying it,
+ *    i.e. where that exact content first landed. QA verdicts record the tree
+ *    they reviewed, not HEAD's commit (folio-assistant bean 69lr; owner card
+ *    Q4, 2026-11-05: "the tree is the identity"), and the panel links a
+ *    verdict's tree to that commit through this index (owner card Q5,
+ *    2026-11-05, option 1: a separate index). Separate, because putting the
+ *    commit into each witness would make the published pages depend on
+ *    history again, so a PR run's pages could not be reused on main. A tree
+ *    not in the history read (a shallow checkout, or a PR-only tree) is
+ *    simply absent: the panel then shows the tree without a link. `repo` is
+ *    the GitHub URL of `origin`, or `null` when there is none, so no link is
+ *    built for another forge.
  *
  * Exit: 0 ok (or `unavailable`, stated) · 1 a shortfall, or `unavailable` under
  * `--require` · 2 usage, or `verify` with no fetch state to judge against.
@@ -58,6 +74,7 @@ import { spawnSync } from "node:child_process";
 
 import { fetchQa, parseQaRef, QaUsageError } from "./qa-store.ts";
 import { siteFetchStatePath } from "./qa-result-link.ts";
+import { detectRepoUrl } from "../src/core/git-refs.ts";
 
 export const AVAILABILITY_SCHEMA = "folio-qa-availability/v1" as const;
 export const STATE_SCHEMA = "folio-qa-fetch-state/v1" as const;
@@ -66,6 +83,11 @@ export const AVAILABILITY_FILE = "availability.json";
 /** The results subdirectory the docs generator writes witness projections into. */
 export const WITNESS_SUBDIR = "witnesses";
 const RESULT_SUFFIX = ".qa-results.json";
+/** The tree-to-commit index `tree-commits` writes beside the evidence. */
+export const TREE_COMMITS_FILE = "tree-commits.json";
+export const TREE_COMMITS_SCHEMA = "folio-qa-tree-commits/v1" as const;
+/** How many first-parent commits `tree-commits` reads by default. */
+export const TREE_COMMITS_MAX = 2000;
 
 export type QaSource = "checkout" | "fetched" | "fetched-fallback" | "unavailable";
 
@@ -145,7 +167,7 @@ export function countResults(resultsDir: string): QaAssetCounts {
  * and neither is evidence.
  */
 /** Top-level files under `assets/qa/` that the witness tree did not put there. */
-export const PUBLISHED_NOT_EVIDENCE: readonly string[] = ["index.json", "availability.json"];
+export const PUBLISHED_NOT_EVIDENCE: readonly string[] = ["index.json", "availability.json", TREE_COMMITS_FILE];
 
 export function countPublished(siteDir: string): Pick<QaAssetCounts, "witnesses" | "results"> {
   const qa = join(siteDir, "assets", "qa");
@@ -158,8 +180,8 @@ export function countPublished(siteDir: string): Pick<QaAssetCounts, "witnesses"
     // A top-level file the witness tree itself carries (bean `4l4d`:
     // `translation-qa-pages.json`, the shared list the badge script fetches)
     // is copied here like the rest, and `countResults` counts it — so it is
-    // counted here too, or every build reads one short. The two top-level
-    // files that are NOT from the tree are excluded, as the docblock says.
+    // counted here too, or every build reads one short. The top-level
+    // files that are NOT from the tree (PUBLISHED_NOT_EVIDENCE) are excluded.
     else if (e.isFile() && e.name.endsWith(".json") && !PUBLISHED_NOT_EVIDENCE.includes(e.name)) witnesses++;
   }
   return { witnesses, results };
@@ -273,7 +295,7 @@ function args(argv: string[]) {
   const pos: string[] = [];
   const vals = new Map<string, string[]>();
   const bools = new Set<string>();
-  const VALUED = new Set(["ref", "fallback", "results", "state", "site"]);
+  const VALUED = new Set(["ref", "fallback", "results", "state", "site", "max"]);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (!a.startsWith("--")) {
@@ -404,6 +426,57 @@ function cmdVerify(a: ReturnType<typeof args>): number {
   return j.errors.length ? 1 : 0;
 }
 
+export interface TreeCommitIndex {
+  $schema: typeof TREE_COMMITS_SCHEMA;
+  /** `https://github.com/<owner>/<repo>`, or null when `origin` is not GitHub. */
+  repo: string | null;
+  /** How many first-parent commits were read; trees older than that are absent. */
+  depth: number;
+  /** Tree id → the oldest first-parent commit carrying it. */
+  commits: Record<string, string>;
+}
+
+/**
+ * The index from `git log --first-parent --format='%T %H'` output, NEWEST
+ * first as git prints it: a later (older) line overwrites an earlier one, so
+ * each tree keeps the oldest commit carrying it. Lines that are not two
+ * 40-hex ids are skipped.
+ */
+export function treeCommitIndex(log: string, repoUrl: string | undefined): TreeCommitIndex {
+  const commits: Record<string, string> = {};
+  let depth = 0;
+  for (const line of log.split("\n")) {
+    const m = /^([0-9a-f]{40}) ([0-9a-f]{40})$/.exec(line.trim());
+    if (!m) continue;
+    depth++;
+    commits[m[1]!] = m[2]!;
+  }
+  const repo = repoUrl && /^https:\/\/github\.com\/[^/]+\/[^/]+$/.test(repoUrl) ? repoUrl : null;
+  return { $schema: TREE_COMMITS_SCHEMA, repo, depth, commits };
+}
+
+function cmdTreeCommits(a: ReturnType<typeof args>): number {
+  const site = a.one("site");
+  if (!site) throw new QaUsageError("tree-commits needs --site <dir>");
+  const max = Number(a.one("max") ?? TREE_COMMITS_MAX);
+  if (!Number.isInteger(max) || max < 1) throw new QaUsageError(`--max must be a positive integer, got ${a.one("max")}`);
+  const root = repoRoot();
+  const log = spawnSync("git", ["-C", root, "log", "--first-parent", `-n${max}`, "--format=%T %H", "HEAD"], {
+    encoding: "utf-8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (log.status !== 0) throw new Error(`git log failed: ${log.stderr.trim()}`);
+  const index = treeCommitIndex(log.stdout, detectRepoUrl(root));
+  const qaDir = join(resolve(site), "assets", "qa");
+  mkdirSync(qaDir, { recursive: true });
+  writeFileSync(join(qaDir, TREE_COMMITS_FILE), `${JSON.stringify(index)}\n`);
+  console.log(
+    `qa-site-assets tree-commits: ${Object.keys(index.commits).length} tree(s) from ${index.depth} first-parent commit(s)` +
+      `${index.repo ? ` of ${index.repo}` : " (no GitHub origin: no links)"} → ${join(qaDir, TREE_COMMITS_FILE)}`,
+  );
+  return 0;
+}
+
 export function main(argv: string[]): number {
   const a = args(argv);
   switch (a.pos[0]) {
@@ -411,8 +484,10 @@ export function main(argv: string[]): number {
       return cmdFetch(a);
     case "verify":
       return cmdVerify(a);
+    case "tree-commits":
+      return cmdTreeCommits(a);
     default:
-      throw new QaUsageError(`unknown command "${a.pos[0] ?? ""}" — fetch | verify`);
+      throw new QaUsageError(`unknown command "${a.pos[0] ?? ""}" — fetch | verify | tree-commits`);
   }
 }
 

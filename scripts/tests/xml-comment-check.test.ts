@@ -13,10 +13,11 @@
  * file's own header invites the reader to open it in "any other BPMN 2.0 tool".
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-import { checkXmlComments, xmlSourcesUnder } from "../xml-comment-check.js";
+import { checkXmlComments, xmlCommentFiles, xmlSourcesUnder } from "../xml-comment-check.js";
 import { HARNESS_ROOT } from "../lib/roots.ts";
 
 const root = resolve(HARNESS_ROOT);
@@ -83,5 +84,35 @@ describe("the rule itself", () => {
     const f = checkXmlComments(`<r><!--\nfine\nfine\nbad -- here\n--></r>`, "t.bpmn");
     expect(f).toHaveLength(1);
     expect(f[0]!.line).toBe(4);
+  });
+});
+
+describe("what it reads", () => {
+  test("a declared business-processes directory is read, beside processes — the kind the registry says this check grades", () => {
+    const at = mkdtempSync(join(tmpdir(), "xml-comment-bp-"));
+    try {
+      writeFileSync(
+        join(at, "ig.json"),
+        JSON.stringify({
+          $schema: "cat-harness-declaration/1.0.0",
+          name: "ig",
+          version: "0.1.0",
+          directories: [{ id: "ig-bp", path: "input/business-processes/", graphTypologies: ["business-processes"] }],
+        }),
+      );
+      mkdirSync(join(at, "input", "business-processes"), { recursive: true });
+      const bad = join(at, "input", "business-processes", "A.bpmn");
+      writeFileSync(bad, "<bpmn:definitions><!-- a -- b --></bpmn:definitions>");
+      const { files } = xmlCommentFiles(at);
+      expect(files.map((f) => relative(at, f))).toEqual(["input/business-processes/A.bpmn"]);
+      // And it is graded, not merely listed.
+      expect(files.flatMap((f) => checkXmlComments(readFileSync(f, "utf8"), relative(at, f))).length).toBe(1);
+    } finally {
+      rmSync(at, { recursive: true, force: true });
+    }
+  });
+
+  test("this checkout's processes directories are still read", () => {
+    expect(xmlCommentFiles(root).files.filter((f) => f.startsWith(WORKFLOW_DIR + "/")).length).toBeGreaterThan(10);
   });
 });

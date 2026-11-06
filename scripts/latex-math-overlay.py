@@ -245,6 +245,7 @@ def to_markdown(preamble: str, body: str) -> tuple[str, str]:
     if shutil.which("pandoc"):
         macros = "\n".join(l for l in preamble.split("\n") if re.match(r"\s*\\(re)?newcommand|\s*\\def\\|\s*\\DeclareMathOperator", l))
         doc = f"\\documentclass{{article}}\n{macros}\n\\begin{{document}}\n{body}\n\\end{{document}}\n"
+        # input-site: inert #6c55b410 — pandoc on stdin built from the paper's own text; a traced run records pandoc's binary by digest and its file reads
         r = subprocess.run(
             ["pandoc", "-f", "latex", "-t", "markdown+tex_math_dollars-raw_attribute", "--wrap=none"],
             input=doc, capture_output=True, text=True, timeout=120,

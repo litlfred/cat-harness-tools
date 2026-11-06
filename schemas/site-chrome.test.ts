@@ -211,7 +211,7 @@ describe("the theme's markup passes leave <script> and <style> alone", () => {
 /**
  * `?v=` on a first-party asset is a hash of the asset, never the build time
  * (bean `g196`, 2026-10-23). `site.time` is new on every build, so a page that
- * prints it differs on every rebuild, and every re-push of a STAGING preview
+ * prints it differs on every rebuild, and every re-push of a branches/ preview
  * stored a whole new copy of its HTML. The hash itself is computed by
  * `_plugins/fa-asset-version.rb` once Jekyll has rendered everything; this
  * pins the templates' side of the contract, which is what an edit breaks.
@@ -262,7 +262,7 @@ describe("first-party asset versions", () => {
 /**
  * Same-site links on an HTML page are relative to the page (bean `g196`,
  * 2026-10-23), so a page that did not change is the same bytes in every
- * STAGING preview. `_plugins/fa-root-relative.rb` does the work at build
+ * branches/ preview. `_plugins/fa-root-relative.rb` does the work at build
  * time; this pins the pieces an edit could quietly undo.
  */
 describe("page-relative links", () => {

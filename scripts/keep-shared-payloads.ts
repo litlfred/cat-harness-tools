@@ -32,6 +32,7 @@
  */
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { PREVIEW_PREFIXES } from "./lib/preview-prefix.ts";
 
 /** Where content-addressed payloads live, relative to the site root. */
 export const PAYLOAD_DIR = "payload/sha256";
@@ -82,22 +83,24 @@ export function parseRetained(text: string): Retained {
   return { version: 1, kept: {} };
 }
 
-/** When each preview under `site/STAGING/` that borrows from the live site was staged (`undefined`: not known). */
+/** When each preview under `site/branches/` (or a legacy `site/STAGING/`) that borrows from the live site was staged (`undefined`: not known). */
 export function sharingPreviews(site: string): (number | undefined)[] {
-  const staging = join(site, "STAGING");
-  if (!existsSync(staging)) return [];
   const out: (number | undefined)[] = [];
-  for (const slug of readdirSync(staging)) {
-    const dir = join(staging, slug);
-    if (slug.startsWith("_") || !statSync(dir).isDirectory() || !existsSync(join(dir, "shared.json"))) continue;
-    let at: number | undefined;
-    try {
-      const t = Date.parse(readFileSync(join(dir, ".staged-at"), "utf-8").trim());
-      at = Number.isNaN(t) ? undefined : t;
-    } catch {
-      at = undefined;
+  for (const prefix of PREVIEW_PREFIXES) {
+    const staging = join(site, prefix);
+    if (!existsSync(staging)) continue;
+    for (const slug of readdirSync(staging)) {
+      const dir = join(staging, slug);
+      if (slug.startsWith("_") || !statSync(dir).isDirectory() || !existsSync(join(dir, "shared.json"))) continue;
+      let at: number | undefined;
+      try {
+        const t = Date.parse(readFileSync(join(dir, ".staged-at"), "utf-8").trim());
+        at = Number.isNaN(t) ? undefined : t;
+      } catch {
+        at = undefined;
+      }
+      out.push(at);
     }
-    out.push(at);
   }
   return out;
 }

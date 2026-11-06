@@ -29,7 +29,7 @@
 /**
  * The branch head that a staging build's reported sha corresponds to.
  *
- * THE STAGING COMMENT DOES NOT REPORT THE BRANCH HEAD. `feature-staging.yml`
+ * THE branches/ COMMENT DOES NOT REPORT THE BRANCH HEAD. `feature-staging.yml`
  * stamps `${{ github.sha }}`, and on a `pull_request` event that is the MERGE
  * COMMIT GitHub synthesises at `refs/pull/N/merge` — a commit that does not
  * exist in a contributor's clone at all, so comparing it to `git rev-parse
@@ -51,7 +51,7 @@ export function stagingHeadFromMergeSha(
   return resolveSecondParent(reported);
 }
 
-/** Branch state relative to `main` and to what STAGING last published. */
+/** Branch state relative to `main` and to what branches/ last published. */
 export type SyncState =
   | "synchronized"    // branch has nothing main lacks; rendering matches
   | "ready-for-review" // STAGING published at the branch's current head
@@ -61,7 +61,7 @@ export type SyncState =
 export interface SyncInputs {
   /** Branch head sha, or undefined if it could not be read. */
   headSha?: string;
-  /** Sha STAGING last published, or undefined if no staging build is known. */
+  /** Sha branches/ last published, or undefined if no staging build is known. */
   stagingSha?: string;
   /** Commits on the branch not yet in the base branch. */
   commitsAhead?: number;
@@ -71,8 +71,8 @@ export interface SyncInputs {
  * Derive the sync state, or decline.
  *
  * Declining is a real outcome and is returned as such — a missing staging sha
- * means "we do not know whether STAGING is current", which is NOT the same as
- * "STAGING is stale", and reporting the latter would send a reviewer to a page
+ * means "we do not know whether branches/ is current", which is NOT the same as
+ * "branches/ is stale", and reporting the latter would send a reviewer to a page
  * that may be perfectly fine.
  */
 export function syncState(i: SyncInputs): SyncState {

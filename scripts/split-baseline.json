@@ -1,5 +1,6 @@
 {
   "sha": "b7aa5d0f8eb19f691e32408697ef996f8bfc871f",
+  "root": "folio-assistant",
   "mcpTools": [
     {
       "name": "bean_query",

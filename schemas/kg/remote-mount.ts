@@ -5,24 +5,28 @@
  * @module schemas/remote-mount
  * @graphNode schema
  *
- * - **No git submodules** and **no `.deps/`** (a dot directory collides with
- *   GitHub's conventions and this repository's dot-prefix guard).
- * - A remote mount is a **declared directory with a remote source**, pinned to
- *   a full 40-character SHA (`SubgraphSource` → `kind: "remote"`).
- * - The **defaults live in the harness's own declaration** — which of its
+ * Bean `0mpw`, under the KG-subscriptions epic `fnx4` and the separation arc
+ * `7x5n`. The owner's rulings, 2026-10-06:
+ *
+ * - **no git submodules, ever**, and **no `.deps/`** — a dot directory collides
+ *   with GitHub's conventions and with this repository's own dot-prefix guard;
+ * - a remote mount is a **declared directory with a remote source**, pinned to
+ *   a full 40-character SHA (`SubgraphSource` → `kind: "remote"`);
+ * - the **defaults live in the harness's own declaration** — which of its
  *   directories a downstream mounts, and where — so a downstream names only
- *   the harness and its pin ({@link MountDefaultsSchema}).
- * - A downstream **may override** those defaults, matched on **id** (the
+ *   the harness and its pin ({@link MountDefaultsSchema});
+ * - a downstream **may override** those defaults, matched on **id** (the
  *   instance's name, then a directory's id), never on path
- *   ({@link MountOverrideSchema}).
- * - Mounts are resolved **transitively** across the dependency closure.
- * - Code arrives through the mounted code directories, so imports resolve
+ *   ({@link MountOverrideSchema});
+ * - mounts are resolved **transitively** across the dependency closure;
+ * - code arrives through the mounted code directories, so imports resolve
  *   through mounted paths.
  *
- * ## Tools: a chosen set, runnable
+ * ## Tools: a chosen set, runnable (bean `mo75` G3)
  *
  * `overrides.<instance>.tools` names Tools by id, and the mount brings each
- * one RUNNABLE:
+ * one RUNNABLE. The owner's rulings, 2026-10-24 (decision card,
+ * https://github.com/litlfred/cat-harness-tools/issues/744):
  *
  * 1. **A Tool brings its definition AND its implementation**, each with its
  *    import closure: the definition is `<tools dir>/<id>/<id>.ts` in the
@@ -35,37 +39,45 @@
  *    (`scripts/check-closure.ts`), the walk `check:tools-closure` itself runs.
  * 3. **Directory granularity**: every DECLARED directory the closure touches
  *    is mounted whole — the most specific one, so a nested directory mounts
- *    alone. The lock records directories, never a single file.
+ *    alone. The lock is unchanged: it records directories, as it always has,
+ *    and never a single file.
  *
  * With `tools` named anywhere in a mount entry, the entry's instances mount
  * what the closure touches plus the directories their override names, and
  * not their default list; a `whole` instance stays whole.
  *
- * ## Hydrated: metadata first
+ * ## Hydrated: metadata first (bean `mo75` G2)
  *
  * `hydrated: true` on a mount entry, or on `overrides.<instance>`, mounts each
  * chosen directory as ONE file: that subgraph's published
  * `index.hydrated.jsonld` at the pin (`SubgraphSource` → `kind: "hydrated"`),
- * so a downstream can read what `tools/` or `skills/` holds before choosing
- * what to materialise. No code arrives, so no `<name>.json` is written, the
- * lock marks it `hydrated`, and {@link mountedInstanceRoots} never offers it
- * to the overlay as somewhere to import from.
+ * so a downstream can read what `tools/` or `skills/` holds before it decides
+ * which of it to materialise. No code arrives, so the instance is not laid
+ * down as an instance: no `<name>.json` is written (discovery would otherwise
+ * read every absent directory as empty — `dh4f`), the lock marks it
+ * `hydrated`, and {@link mountedInstanceRoots} never offers it to the overlay
+ * as somewhere to import from.
  *
  * The file is read from the pin's git tree when a commit carries it, and
- * otherwise from the pin's subgraph index PACKAGE (published per pin, never
- * committed, never generated at mount). Such a directory's lock entry records
- * the package's URL and sha256 ({@link LockedDirectorySchema}`.package`).
+ * otherwise from the pin's subgraph index PACKAGE (bean `mo75` G2b; owner,
+ * 2026-10-24, option A: published per pin in a package, never committed and
+ * never generated at mount). Such a directory's lock entry records the
+ * package's URL and sha256 ({@link LockedDirectorySchema}`.package`).
  *
- * ## The default path is the harness's HOME path
+ * ## Why the default path is the harness's HOME path
  *
  * A mounted instance lands, by default, at the path it has in its own
- * repository (`livesAt.path`), relative to the DOWNSTREAM instance's root.
- * So `instanceRootsIn` (one level deep) finds every mounted sibling, `needs`
- * resolves as in the monorepo, and relative imports between mounted instances
- * (`../../cat-harness/schemas/…`) resolve. An override may move an instance;
- * the lock records where, and the override owns imports that climb out of it.
+ * repository (`livesAt.path`), relative to the DOWNSTREAM instance's root —
+ * where its lock sits, and for a folio repository the checkout root. Two things then hold with no further machinery:
+ * `instanceRootsIn` — which scans a checkout one level deep — finds every
+ * mounted sibling, so `needs` resolves exactly as it does in the monorepo; and
+ * a relative import from one mounted instance into another
+ * (`../../cat-harness/schemas/…`) finds the file it names, because the
+ * instances keep their relative layout. Moving one instance by override is
+ * allowed, and the lock records where it went, but it is the override that
+ * takes responsibility for imports that climb out of it.
  *
- * ## The lock is not the declaration
+ * ## What the lock is, and why it is not the declaration
  *
  * The declaration says WHAT is mounted (a harness and a pin). The lock
  * ({@link MountLockSchema}) says what the closure RESOLVED to at that pin —
@@ -502,6 +514,7 @@ export const RESERVED_ROOT_AND_ROUTE_NAMES: readonly string[] = [
   "api",
   "payload",
   "STAGING",
+  "branches",
   "beans",
   "todos",
   "fsh-guts",

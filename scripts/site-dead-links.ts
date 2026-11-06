@@ -8,6 +8,8 @@
  * @graphNode none — a check over a built site, not a schema
  * @covers none — it reads the built site's HTML, not a declared graph
  *
+ * litlfred/folio-assistant#2741: a link check of the published tree found 262
+ * missing targets linked from 399 places, and nothing in CI had ever looked.
  * `site-links.ts` checks the navbar tiles only. This checks every `href` and
  * `src` of every page, after the build, against the tree that ships.
  *
@@ -34,7 +36,7 @@
  *    preview builds only the composed instances its branch reaches
  *    (`compose-docs.ts`, `carriedInstances`), so a link into one it left out
  *    is dead here and live on the published site. When the build is a
- *    preview (`--base-path …/STAGING/<slug>`), the target's first segment is
+ *    preview (`--base-path …/branches/<slug>`), the target's first segment is
  *    a composed instance, and that instance's composed directory holds the
  *    page's source, the link goes to the same path on the published site.
  *    A canonical build never takes this rule: there a missing page is a
@@ -44,12 +46,12 @@
  *    link to a layer's file at the commit `index.lock.json` pins, or to this
  *    repository at `--sha`, becomes `…/blob/HEAD/…` with `data-fa-pin`, and
  *    the browser puts the commit back from one `pins.json`. A re-pin then
- *    changes that one file, not every page linking into the layer. Links at
- *    any other commit stay.
+ *    changes that one file, not every page linking into the layer (bean
+ *    `fwtz`, "Shrinking the cone itself"). Links at any other commit stay.
  *
- * Everything else is reported, never guessed at: exit 1 when any internal
- * link is still dead, so the workflow can carry it as "reported, not
- * blocking" the way it carries the tiles check.
+ * Everything else is reported, never guessed at. The report is the check:
+ * exit 1 when any internal link is still dead, so the workflow can carry it as
+ * "reported, not blocking" the way it carries the tiles check.
  *
  * Usage (or `bun run cat site:dead-links`):
  *   bun run cat-harness-tools/scripts/site-dead-links.ts --site  ./_site --root . [--fix] [--repo litlfred/folio-assistant --sha <commit>] [--report dead.tsv]
@@ -60,6 +62,7 @@ import { join, posix, relative, resolve, sep } from "node:path";
 import { UN_LOCALES } from "../schemas/content/translation.ts";
 import { composedInstances } from "./compose-docs.ts";
 import { unpinSite } from "./lib/pin-links.ts";
+import { PREVIEW_PREFIX_ALT, PREVIEW_PREFIXES } from "./lib/preview-prefix.ts";
 
 /** Locales a page can be TRANSLATED into: the UN set without the source. */
 export const TRANSLATED_LOCALES: ReadonlySet<string> = new Set(UN_LOCALES.filter((l) => l !== "en"));
@@ -223,7 +226,7 @@ export interface Repoint {
  * staging previews and the render log are carried over from earlier deploys,
  * so their links are each preview's own business.
  */
-const CARRIED = new Set(["STAGING", "_render-log"]);
+const CARRIED = new Set([...PREVIEW_PREFIXES, "_render-log"]);
 
 /**
  * Whether `rel` lies under a carried directory. A link INTO one is not this
@@ -307,10 +310,10 @@ export function sourceCandidates(rel: string): string[] {
 
 /**
  * The published site's root path for a PREVIEW's base path, or undefined when
- * the build is not a preview: `/folio-assistant/STAGING/x` → `/folio-assistant`.
+ * the build is not a preview: `/folio-assistant/branches/x` → `/folio-assistant`.
  */
 export function publishedRootOf(basePath: string): string | undefined {
-  const m = /^(.*)\/STAGING\/[^/]+\/?$/.exec(basePath);
+  const m = new RegExp(`^(.*)/${PREVIEW_PREFIX_ALT}/[^/]+/?$`).exec(basePath);
   return m ? m[1] : undefined;
 }
 

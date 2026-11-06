@@ -1908,6 +1908,7 @@ function testRunCriteria(skills: Set<string>): Record<string, KgCriterionEntry> 
     // determined. A branch-stored one is derived: an empty copy may be another
     // writer's side effect, so it counts only while qa:refresh computes it
     // (cat-harness-tools#759, owner's choice A).
+    // input-site: env QA_WORKING_COPY_BUILDING #a73dcccf — BUILDING_ENV: whether an empty branch-stored results copy is determined
     determined: process.env[BUILDING_ENV] === "1" || qaStorageOf(resultsDir) === undefined,
   });
   // Only a DECLARED `qa` directory that is absent is unknown. An instance that

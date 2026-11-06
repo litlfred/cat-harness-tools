@@ -8,9 +8,9 @@ import { SCRIPT_NAME, siteFields, buildConfig, DEFAULT_LAYOUT, overrideConfig, o
 import type { DeclaredArtefact } from "../../derive-at-publish.ts";
 
 describe("build-instance-site — the agent-run site recipe (bean n3h9)", () => {
-  test("a preview lands under one STAGING/ segment, whatever the branch is called", () => {
-    expect(stagingDir("claude/exciting-hawking")).toBe("STAGING/claude-exciting-hawking");
-    expect(stagingDir("fix/a b")).toBe("STAGING/fix-a-b");
+  test("a preview lands under one branches/ segment, whatever the branch is called", () => {
+    expect(stagingDir("claude/exciting-hawking")).toBe("branches/claude-exciting-hawking");
+    expect(stagingDir("fix/a b")).toBe("branches/fix-a-b");
     expect(() => stagingDir("..")).toThrow();
     expect(() => stagingDir("///")).toThrow();
   });

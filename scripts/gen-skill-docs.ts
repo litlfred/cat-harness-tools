@@ -35,6 +35,7 @@ import { wrapRaw } from "./lib/liquid-raw.ts";
 import { publishedPagePath } from "./lib/jekyll-permalink.ts";
 import { PAGE_LOCALE, visualiserSitePath } from "./viewer-declarations.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { writeProvenanceListing } from "./provenance-footer.ts";
 
 /** The repository the edit links name: this checkout's origin, else folio-assistant (bean v433). */
 const SKILL_DOCS_REPO = repoOf(detectRepoUrl(process.cwd()));
@@ -1071,6 +1072,7 @@ async function main(): Promise<void> {
   // one source group (e.g. an agent skill that also has a folio-core copy), the
   // first group wins and later duplicates are listed as a cross-reference.
   const written = new Map<string, string>(); // skill name → category that emitted it
+  const provenancePages = new Map<string, string[]>();
 
   // WHERE EVERY SKILL LANDS, computed before a single body is written.
   //
@@ -1236,6 +1238,9 @@ async function main(): Promise<void> {
       page.push("");
       emit(join(OUT_DIR, `${published}.md`), page.join("\n"));
       written.set(published, group.category);
+      // The page's source, for its provenance footer (`provenance-footer.ts`).
+      // The key is the page's path in the site, as `page.path` gives it.
+      provenancePages.set(`reference/skill-instructions/${published}`, [join(group.dir, file)]);
 
       const desc = escapePipes(indexSummary(body.match(/^#\s+.+\n+([^\n#].*)$/m)?.[1] ?? ""));
       const schemaCell = hasSchema ? `[schema](../skills/${name}.html)` : "—";
@@ -1285,6 +1290,21 @@ async function main(): Promise<void> {
   emit(join(OUT_DIR, "index.md"), idx.join("\n"));
   const total = Object.values(indexRows).reduce((n, r) => n + r.length, 0);
   console.log(`  ✓ index.md (${total} instruction bodies)`);
+  // THE PROVENANCE FOOTER (owner, 2026-11-05, "2B"): one site-data slice for
+  // these pages, read by `footer_custom.html` like every other slice.
+  {
+    const result = writeProvenanceListing({
+      siteDir: join(INSTANCE_ROOT, siteDirFor(INSTANCE_ROOT)),
+      producer: "skill-instructions",
+      pages: provenancePages,
+      check: CHECK_ONLY,
+      emit,
+    });
+    // Generated and gitignored, like the pages themselves, so a stale
+    // fragment is drift, not an error of its own.
+    for (const f of result.stale) drifted.push(`_includes/generated/provenance/skill-instructions/${f}`);
+    console.log(`  ✓ provenance footers (${result.pages} page(s), ${result.entries} entries)`);
+  }
   // BEFORE the drift report: a dropped document is not staleness, and a run
   // that exits 0 on "up to date" would bury it.
   reportCollisions();

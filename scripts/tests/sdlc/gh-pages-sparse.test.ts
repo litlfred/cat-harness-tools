@@ -26,7 +26,7 @@ const NOW = "2026-10-02T12:00:00.000Z";
 const NOW_MS = Date.parse(NOW);
 const ago = (h: number) => new Date(NOW_MS - h * 3_600_000).toISOString();
 const noGit: GitTime = () => undefined;
-const cone = (slug: string) => [`STAGING/${slug}`, "STAGING/_retired", "_render-log"];
+const cone = (slug: string) => [`branches/${slug}`, "branches/_retired", "_render-log"];
 
 const live = (body: string) =>
   `<html><head><link rel="canonical" href="https://x/p.html"><meta name="fa-staging" content=""><meta name="fa-search-index" content=""><title>P</title></head><body>${body}</body></html>`;
@@ -35,13 +35,13 @@ const previewOf = (body: string) =>
 
 describe("the cone, as git draws it", () => {
   test("root files, files beside a path to a cone directory, and everything under one", () => {
-    const dirs = ["STAGING/s1", "_render-log"];
+    const dirs = ["branches/s1", "_render-log"];
     expect(inCone("index.html", dirs)).toBe(true);
-    expect(inCone("STAGING/README.txt", dirs)).toBe(true);
-    expect(inCone("STAGING/s1/a/b.html", dirs)).toBe(true);
+    expect(inCone("branches/README.txt", dirs)).toBe(true);
+    expect(inCone("branches/s1/a/b.html", dirs)).toBe(true);
     expect(inCone("_render-log/1.jsonl", dirs)).toBe(true);
-    expect(inCone("STAGING/s10/index.html", dirs)).toBe(false);
-    expect(inCone("STAGING/b/index.html", dirs)).toBe(false);
+    expect(inCone("branches/s10/index.html", dirs)).toBe(false);
+    expect(inCone("branches/b/index.html", dirs)).toBe(false);
     expect(inCone("docs/a.html", dirs)).toBe(false);
   });
 });
@@ -57,7 +57,7 @@ describe("staging-share — the plan from git objects is the plan from a checkou
     "docs/big.bin": big,
     "payload/retained.json": JSON.stringify({ version: 1, kept: { "payload/sha256/k.bin": "2026-01-01T00:00:00Z" } }),
     "payload/sha256/k.bin": "k",
-    "STAGING/other/x.bin": Buffer.alloc(8192, 1),
+    "branches/other/x.bin": Buffer.alloc(8192, 1),
   });
   const preview = {
     "index.html": previewOf("home"),
@@ -72,33 +72,33 @@ describe("staging-share — the plan from git objects is the plan from a checkou
   };
   const full = fullClone(o);
   const sparse = sparseClone(o, cone("s1"));
-  for (const d of [full, sparse]) put(join(d, "STAGING", "s1"), preview);
+  for (const d of [full, sparse]) put(join(d, "branches", "s1"), preview);
 
   test("same shared list, kept count and bytes", () => {
-    const a = planShare(full, join(full, "STAGING", "s1"), "s1");
-    const b = planShare(sparse, join(sparse, "STAGING", "s1"), "s1");
+    const a = planShare(full, join(full, "branches", "s1"), "s1");
+    const b = planShare(sparse, join(sparse, "branches", "s1"), "s1");
     expect(b).toEqual(a);
     expect(a.shared.sort()).toEqual(["docs/big.bin", "docs/same.css", "docs/same.html"]);
   });
 
   test("a live file left on disk outside the cone is read from the index, not the disk", () => {
     const s2 = sparseClone(o, cone("s1"));
-    put(join(s2, "STAGING", "s1"), preview);
+    put(join(s2, "branches", "s1"), preview);
     put(s2, { "docs/diff.css": "b{}" }); // a stale copy that would match the preview
-    expect(planShare(s2, join(s2, "STAGING", "s1"), "s1")).toEqual(planShare(full, join(full, "STAGING", "s1"), "s1"));
+    expect(planShare(s2, join(s2, "branches", "s1"), "s1")).toEqual(planShare(full, join(full, "branches", "s1"), "s1"));
   });
 
   test("a blob fetch that fails throws, so apply removes nothing", () => {
     const s2 = sparseClone(o, cone("s1"));
-    put(join(s2, "STAGING", "s1"), preview);
+    put(join(s2, "branches", "s1"), preview);
     git(s2, "remote", "set-url", "origin", `file://${join(tmpdir(), "no-such-origin")}`);
-    expect(() => planShare(s2, join(s2, "STAGING", "s1"), "s1")).toThrow(/could not fetch/);
+    expect(() => planShare(s2, join(s2, "branches", "s1"), "s1")).toThrow(/could not fetch/);
   });
 
   test("a byte-identical file is decided by its blob id, without fetching it", () => {
     expect(blobAbsent(sparse, "docs/big.bin")).toBe(true);
     expect(blobAbsent(sparse, "docs/same.css")).toBe(true);
-    expect(blobAbsent(sparse, "STAGING/other/x.bin")).toBe(true);
+    expect(blobAbsent(sparse, "branches/other/x.bin")).toBe(true);
     // A page is compared with the per-preview edits set aside, so its blob was read.
     expect(blobAbsent(sparse, "docs/same.html")).toBe(false);
   });
@@ -108,25 +108,25 @@ describe("staging-rotate — the same plan, and the same commit, on a sparse che
   // `a` carries a size record from an earlier staging; `b` predates them.
   const files: Record<string, string | Buffer> = {
     "index.html": "live",
-    "STAGING/a/index.html": "a".repeat(300),
-    "STAGING/a/big.bin": Buffer.alloc(2000, 2),
-    [`STAGING/a/${STAGED_AT_FILE}`]: `${ago(1)}\n`,
-    "STAGING/b/index.html": "b".repeat(1000),
-    [`STAGING/b/${STAGED_AT_FILE}`]: `${ago(5)}\n`,
-    "STAGING/c/index.html": "c".repeat(500),
-    "STAGING/d/index.html": "d".repeat(500),
-    "STAGING/d/staging-preview.json": serializeStagingPreview(
+    "branches/a/index.html": "a".repeat(300),
+    "branches/a/big.bin": Buffer.alloc(2000, 2),
+    [`branches/a/${STAGED_AT_FILE}`]: `${ago(1)}\n`,
+    "branches/b/index.html": "b".repeat(1000),
+    [`branches/b/${STAGED_AT_FILE}`]: `${ago(5)}\n`,
+    "branches/c/index.html": "c".repeat(500),
+    "branches/d/index.html": "d".repeat(500),
+    "branches/d/staging-preview.json": serializeStagingPreview(
       createStagingPreview({ slug: "d", branch: "claude/d", commit: "abc1234", builtAt: ago(50) }),
     ),
-    "STAGING/_retired/old.json": "{}",
-    "STAGING/README.txt": "not a preview",
+    "branches/_retired/old.json": "{}",
+    "branches/README.txt": "not a preview",
     "_render-log/2026-10-01.jsonl":
       JSON.stringify({
         $schema: "folio-render-log/v1",
         id: "x",
         at: ago(10),
         event: "rendered",
-        subject: { kind: "staging-preview", path: "STAGING/c", slug: "c" },
+        subject: { kind: "staging-preview", path: "branches/c", slug: "c" },
         summary: "staging preview published",
         process: "Process_RenderLog",
         capture: "on",
@@ -135,14 +135,14 @@ describe("staging-rotate — the same plan, and the same commit, on a sparse che
   // The record `a` would have been given when it was staged.
   const seed = mkdtempSync(join(tmpdir(), "seed-"));
   put(seed, files);
-  writeSizeRecord(seed, join(seed, "STAGING", "a"));
-  files[`STAGING/a/${STAGED_SIZE_FILE}`] = readFileSync(join(seed, "STAGING", "a", STAGED_SIZE_FILE));
+  writeSizeRecord(seed, join(seed, "branches", "a"));
+  files[`branches/a/${STAGED_SIZE_FILE}`] = readFileSync(join(seed, "branches", "a", STAGED_SIZE_FILE));
   const o = origin(files);
 
   const fresh = () => {
     const full = fullClone(o);
     const sparse = sparseClone(o, cone("cur"));
-    for (const d of [full, sparse]) put(join(d, "STAGING", "cur"), { "index.html": "n".repeat(400) });
+    for (const d of [full, sparse]) put(join(d, "branches", "cur"), { "index.html": "n".repeat(400) });
     return { full, sparse };
   };
 
@@ -170,12 +170,12 @@ describe("staging-rotate — the same plan, and the same commit, on a sparse che
   test("a recorded size is read without the preview's blobs; an unrecorded one fetches them", () => {
     const { sparse } = fresh();
     readPreviews(sparse, noGit);
-    expect(blobAbsent(sparse, "STAGING/a/big.bin")).toBe(true);
-    expect(blobAbsent(sparse, "STAGING/b/index.html")).toBe(false);
+    expect(blobAbsent(sparse, "branches/a/big.bin")).toBe(true);
+    expect(blobAbsent(sparse, "branches/b/index.html")).toBe(false);
   });
 
   test("a size record that no longer matches the preview's files is not trusted", () => {
-    const o2 = origin({ ...files, "STAGING/a/added.txt": "written after the record" });
+    const o2 = origin({ ...files, "branches/a/added.txt": "written after the record" });
     const a = readPreviews(fullClone(o2), noGit).find((p) => p.slug === "a");
     const b = readPreviews(sparseClone(o2, cone("cur")), noGit).find((p) => p.slug === "a");
     expect(b).toEqual(a);
@@ -191,46 +191,46 @@ describe("staging-rotate — the same plan, and the same commit, on a sparse che
     expect(r1.plan.remove.map((p) => p.slug)).toEqual(["c", "d"]);
     // What the deploy step stages, in each checkout.
     for (const d of [full, sparse]) {
-      git(d, "add", "-A", "STAGING/cur", "_render-log");
-      git(d, "add", "-A", "STAGING");
+      git(d, "add", "-A", "branches/cur", "_render-log");
+      git(d, "add", "-A", "branches");
     }
     expect(git(sparse, "write-tree")).toBe(git(full, "write-tree"));
-    expect(git(full, "ls-files", "STAGING/_retired").split("\n").filter(Boolean)).toEqual([
-      "STAGING/_retired/d.json",
-      "STAGING/_retired/old.json",
+    expect(git(full, "ls-files", "branches/_retired").split("\n").filter(Boolean)).toEqual([
+      "branches/_retired/d.json",
+      "branches/_retired/old.json",
     ]);
   });
 
   test("a preview directory on disk OUTSIDE the cone is read, and removed, from the index", () => {
     const { full, sparse } = fresh();
     // What a batch writer leaves: a rewritten preview outside the cone, and an empty leftover.
-    put(join(sparse, "STAGING", "b"), { "index.html": "rewritten, never committed" });
-    mkdirSync(join(sparse, "STAGING", "c"), { recursive: true });
+    put(join(sparse, "branches", "b"), { "index.html": "rewritten, never committed" });
+    mkdirSync(join(sparse, "branches", "c"), { recursive: true });
     expect(readPreviews(sparse, noGit)).toEqual(readPreviews(full, noGit));
     const budget = 4000;
     const r1 = rotate({ dir: full, current: "cur", now: NOW, git: noGit, budget });
     const r2 = rotate({ dir: sparse, current: "cur", now: NOW, git: noGit, budget });
     expect(r2.plan).toEqual(r1.plan);
-    expect(existsSync(join(sparse, "STAGING", "c"))).toBe(false);
-    for (const d of [full, sparse]) git(d, "add", "-A", "STAGING", "_render-log");
+    expect(existsSync(join(sparse, "branches", "c"))).toBe(false);
+    for (const d of [full, sparse]) git(d, "add", "-A", "branches", "_render-log");
     expect(git(sparse, "write-tree")).toBe(git(full, "write-tree"));
-    expect(git(sparse, "ls-files", "STAGING/c")).toBe("");
+    expect(git(sparse, "ls-files", "branches/c")).toBe("");
   });
 
   test("the preview being staged outside the cone is refused, before anything is written", () => {
     const sparse = sparseClone(o, cone("cur"));
-    put(join(sparse, "STAGING", "a"), { "index.html": "new" });
+    put(join(sparse, "branches", "a"), { "index.html": "new" });
     expect(() => rotate({ dir: sparse, current: "a", now: NOW, git: noGit, budget: 1 })).toThrow(/outside the sparse checkout's cone/);
-    expect(readFileSync(join(sparse, "STAGING", "a", "index.html"), "utf8")).toBe("new");
-    expect(existsSync(join(sparse, "STAGING", "a", STAGED_AT_FILE))).toBe(false);
+    expect(readFileSync(join(sparse, "branches", "a", "index.html"), "utf8")).toBe("new");
+    expect(existsSync(join(sparse, "branches", "a", STAGED_AT_FILE))).toBe(false);
   });
 
   test("a preview NEW to gh-pages, outside the cone, is refused too, before anything is written", () => {
     const sparse = sparseClone(o, cone("cur"));
     const index = git(sparse, "ls-files", "-s");
-    put(join(sparse, "STAGING", "brand-new"), { "index.html": "new" });
+    put(join(sparse, "branches", "brand-new"), { "index.html": "new" });
     expect(() => rotate({ dir: sparse, current: "brand-new", now: NOW, git: noGit, budget: 1 })).toThrow(/outside the sparse checkout's cone/);
-    expect(existsSync(join(sparse, "STAGING", "brand-new", STAGED_AT_FILE))).toBe(false);
+    expect(existsSync(join(sparse, "branches", "brand-new", STAGED_AT_FILE))).toBe(false);
     expect(git(sparse, "ls-files", "-s")).toBe(index);
   });
 
@@ -243,7 +243,7 @@ describe("staging-rotate — the same plan, and the same commit, on a sparse che
     expect(git(sparse, "ls-files", "-s")).toBe(index);
     expect(readdirSync(join(sparse, "_render-log"))).toEqual(["2026-10-01.jsonl"]);
     expect(readFileSync(join(sparse, "_render-log", "2026-10-01.jsonl"), "utf8")).toBe(log);
-    expect(readdirSync(join(sparse, "STAGING", "_retired"))).toEqual(["old.json"]);
+    expect(readdirSync(join(sparse, "branches", "_retired"))).toEqual(["old.json"]);
   });
 
   test("the size record's digest is injective and its file count is checked", () => {
@@ -251,18 +251,18 @@ describe("staging-rotate — the same plan, and the same commit, on a sparse che
     expect(sizeDigest([{ oid: "o1", path: "p\no2 q" }])).not.toBe(sizeDigest([{ oid: "o1", path: "p" }, { oid: "o2", path: "q" }]));
     // A record that names the right files but the wrong count is not trusted.
     const forged = { ...files };
-    const rec = JSON.parse(String(files[`STAGING/a/${STAGED_SIZE_FILE}`]));
-    forged[`STAGING/a/${STAGED_SIZE_FILE}`] = `${JSON.stringify({ ...rec, files: rec.files + 1, bytes: 1 })}\n`;
+    const rec = JSON.parse(String(files[`branches/a/${STAGED_SIZE_FILE}`]));
+    forged[`branches/a/${STAGED_SIZE_FILE}`] = `${JSON.stringify({ ...rec, files: rec.files + 1, bytes: 1 })}\n`;
     const o3 = origin(forged);
     const want = readPreviews(fullClone(o3), noGit).find((x) => x.slug === "a");
     const sparse = sparseClone(o3, cone("cur"));
     expect(readPreviews(sparse, noGit).find((x) => x.slug === "a")).toEqual(want);
-    expect(blobAbsent(sparse, "STAGING/a/big.bin")).toBe(false);
+    expect(blobAbsent(sparse, "branches/a/big.bin")).toBe(false);
   });
 });
 
 describe("staging-push-gate and render-log — nothing they read is outside the cone", () => {
-  const o = origin({ "index.html": "x", "_render-log/2026-10-02.jsonl": "", "STAGING/a/x": "y" }, "staging(a): from b", "2026-10-02T11:00:00Z");
+  const o = origin({ "index.html": "x", "_render-log/2026-10-02.jsonl": "", "branches/a/x": "y" }, "staging(a): from b", "2026-10-02T11:00:00Z");
 
   test("the tip is the same", () => {
     const tip = readTip(fullClone(o));
@@ -271,7 +271,7 @@ describe("staging-push-gate and render-log — nothing they read is outside the 
   });
 
   test("the render log is appended to the same file", () => {
-    const entry = buildEntry({ event: "rendered", kind: "staging-preview", path: "STAGING/s1", slug: "s1", summary: "s", at: NOW, id: "i" });
+    const entry = buildEntry({ event: "rendered", kind: "staging-preview", path: "branches/s1", slug: "s1", summary: "s", at: NOW, id: "i" });
     const [full, sparse] = [fullClone(o), sparseClone(o, cone("s1"))];
     expect(appendEntry(sparse, entry)).toBe(appendEntry(full, entry));
     const rel = "_render-log/2026-10-02.jsonl";
@@ -292,7 +292,7 @@ describe("staging-changes — the publish root from its tree is the root from a 
     "logo.png": Buffer.alloc(3000, 4),
     "old.png": Buffer.alloc(3000, 5),
     "build.json": JSON.stringify({ sha: "base1" }),
-    "STAGING/other/a.html": "theirs",
+    "branches/other/a.html": "theirs",
     "_render-log/1.jsonl": "{}",
   });
   const site = mkdtempSync(join(tmpdir(), "site-"));
@@ -331,7 +331,7 @@ describe("staging-changes — the publish root from its tree is the root from a 
     expect(blobAbsent(tree, "logo.png")).toBe(true);
     expect(blobAbsent(tree, "old.png")).toBe(true);
     expect(blobAbsent(tree, "same.css")).toBe(true);
-    expect(blobAbsent(tree, "STAGING/other/a.html")).toBe(true);
+    expect(blobAbsent(tree, "branches/other/a.html")).toBe(true);
     // Text the base fold would change is read, so it is compared as `--before` compares it.
     expect(blobAbsent(tree, "based.css")).toBe(false);
   });

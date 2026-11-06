@@ -29,7 +29,7 @@
  * read as nothing-found.
  */
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { ownerRepo, publishedPaths } from "./git-refs";
 
@@ -53,6 +53,12 @@ export interface AuditResult {
   checked: number;
   ok: number;
   dead: DeadLink[];
+  /**
+   * Links to a path an instance has MOVED, resolved at its new place through
+   * that instance's declared `moves` (sdlc skill `two-phase-move`). Counted
+   * as resolved while the move's window is open; each is still to switch.
+   */
+  moved: Array<LinkRef & { to: string; move: string }>;
   /** Why links were not checked, and how many of each. */
   unchecked: Record<string, number>;
 }
@@ -252,10 +258,18 @@ export function auditLinks(
      * two parameters rather than one renamed.
      */
     base?: string;
+    /**
+     * Where a worktree path that does not exist resolves through a declared
+     * move whose window is open, or `undefined` — `resolveThroughMove` over
+     * `declaredMoves`, in `scripts/check-subgraphs.ts`. Absent: no move is
+     * honoured.
+     */
+    resolveMoved?: (abs: string) => { resolved: string; move: string } | undefined;
   },
 ): AuditResult {
   const base = opts.base ?? root;
   const dead: DeadLink[] = [];
+  const moved: AuditResult["moved"] = [];
   const unchecked: Record<string, number> = {};
   let ok = 0;
   let checked = 0;
@@ -282,8 +296,13 @@ export function auditLinks(
 
     if (c.kind === "worktree") {
       checked++;
-      if (existsSync(join(base, c.path!))) ok++;
-      else dead.push({ ...link, reason: `no such path in the working tree: ${c.path}` });
+      const here = existsSync(join(base, c.path!));
+      const through = here ? undefined : opts.resolveMoved?.(resolve(base, c.path!));
+      if (here) ok++;
+      else if (through !== undefined) {
+        ok++;
+        moved.push({ ...link, to: through.resolved, move: through.move });
+      } else dead.push({ ...link, reason: `no such path in the working tree: ${c.path}` });
       continue;
     }
 
@@ -300,7 +319,7 @@ export function auditLinks(
     else dead.push({ ...link, reason: `not published at ${c.ref}: ${c.path}` });
   }
 
-  return { checked, ok, dead, unchecked };
+  return { checked, ok, dead, moved, unchecked };
 }
 
 /**
@@ -322,6 +341,8 @@ export function auditMarkdownFile(opts: {
   pagesBaseUrl?: string;
   publishRef: string;
   fetch?: boolean;
+  /** As {@link auditLinks}'s option of the same name. */
+  resolveMoved?: (abs: string) => { resolved: string; move: string } | undefined;
 }): { text: string; exitCode: number } {
   if (!existsSync(opts.file)) return { text: `No file at ${opts.file}.`, exitCode: 2 };
 
@@ -331,6 +352,7 @@ export function auditMarkdownFile(opts: {
     pagesBaseUrl: opts.pagesBaseUrl,
     publishRef: opts.publishRef,
     fetch: opts.fetch,
+    resolveMoved: opts.resolveMoved,
   });
 
   const lines: string[] = [];
@@ -341,7 +363,9 @@ export function auditMarkdownFile(opts: {
   const uncheckedTotal = Object.values(result.unchecked).reduce((a, b) => a + b, 0);
   const summary =
     `${result.checked} link(s) checked, ${result.ok} resolved, ${result.dead.length} dead; ` +
-    `${uncheckedTotal} not checked`;
+    `${uncheckedTotal} not checked` +
+    (result.moved.length ? `; ${result.moved.length} through a declared move, still to switch` : "");
+  for (const m of result.moved) lines.push(`${opts.file}:${m.line}  [${m.text}](${m.target})  moved (${m.move})`);
   lines.push(result.dead.length ? `\n${summary}` : summary);
   for (const [reason, count] of Object.entries(result.unchecked).sort()) {
     lines.push(`    ${count} \u00d7 ${reason}`);

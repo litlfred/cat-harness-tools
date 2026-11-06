@@ -1,18 +1,20 @@
 #!/usr/bin/env bun
 /**
  * Build an instance's own site from its checkout, check it, and (optionally)
- * publish it: the root site, or a branch preview at `STAGING/<branch>/`.
+ * publish it: the root site, or a branch preview at `branches/<branch>/`.
  *
  * @module cat-harness-tools/scripts/build-instance-site
  *
- * Publishing and staging previews are agent-run, never a GitHub Actions
- * workflow. This is the recipe as one command, the same for an agent, a
- * person or a Routine:
+ * Owner, 2026-10-10: publishing is agent-run, never a GitHub Actions workflow,
+ * and staging previews are agent-run too (bean `n3h9`). Until now the recipe
+ * lived only as prose in a Routine's prompt (a downstream's publish Routine), so
+ * every runner re-typed it and each copy could drift. This is that recipe as
+ * one command, the same for an agent, a person or a Routine:
  *
  *   bun run cat-harness-tools/scripts/build-instance-site.ts --root <checkout> --instance <name>
  *
  * reads the steps from the instance's `index.config.json` entry `site.build` ({@link recipeFromConfig};
- * a legacy `<name>.config.json` only as a reported fallback).
+ * a legacy `<name>.config.json` only as a reported fallback, bean `ymvt`).
  * Any step flag below replaces it whole (no merging of flags and recipe):
  *
  *   bun run cat-harness-tools/scripts/build-instance-site.ts --root <checkout> \
@@ -20,16 +22,11 @@
  *     --pre <package script> --source-step <package script> --site-step <package script> \
  *     [--staging <branch>] [--publish --remote <git url>]
  *
- * `--pre`, `--source-step`, `--site-step` and `--final-step` take package
- * SCRIPT NAMES, never commands: the Tool contract admits no input that can
- * carry a shell payload (check:tools), so what runs is what the instance's
- * own package.json says.
- *
  * Steps, each a stop on failure (never a skip):
  *
  *  1. mount the closure `index.config.json` pins (`remote-mount.ts`), unless `--no-mount`.
  *     A build writes into its mounts (the harness's `_data/harness.json`, `node_modules`), and
- *     remote-mount refuses to overwrite a mount that no longer hashes to its lock. So
+ *     remote-mount rightly refuses to overwrite a mount that no longer hashes to its lock. So
  *     `--fresh` has the mount script replace the mounts the build wrote into (`remote-mount.ts
  *     --fresh`); with `--no-mount` it removes exactly the paths the lock names, and only paths the checkout
  *     itself does not track: an explicit choice, never a default
@@ -43,27 +40,32 @@
  *     script runs as `bun run <name> <site source>`
  *  4b. the writer of every declared visualiser page the site source does not hold yet — the
  *     checkout's own instance and every instance it needs — as its Tool declares it, pointed at
- *     the site source by the Tool's `site` input (`visualiser-writers.ts`)
+ *     the site source by the Tool's `site` input (`visualiser-writers.ts`; owner, 2026-10-15)
+ *
+ * `--pre`, `--source-step`, `--site-step` and `--final-step` take package SCRIPT NAMES, never commands: the
+ * Tool contract admits no input that can carry a shell payload (check:tools),
+ * so what runs is what the instance's own package.json says, and nothing else.
  *  5. Jekyll, as preview-site.sh does it: remote_theme dropped (codeload is not reachable
  *     everywhere), title and description from the instance's declaration, baseurl from the
- *     git remote (`/<repo>`, or `/<repo>/STAGING/<branch>` for a preview)
+ *     git remote (`/<repo>`, or `/<repo>/branches/<branch>` for a preview)
  *  6. each `--site-step` package script, as `bun run <name> <built site>`: a generator that
- *     writes finished pages AFTER the site is built (as a source step its pages would pass
- *     through Jekyll, which drops every `_`-prefixed directory). Then
+ *     writes finished pages AFTER the site is built (gen-node-kind-pages says so of itself).
+ *     As a source step its pages would pass through Jekyll, which drops every `_`-prefixed
+ *     directory: a node at `docs/_data/node-kinds` lost its page that way. Then
  *     mount-instance-docs, pdf-viewer, suggest-editor, set-html-lang, publish-id-lookup,
  *     rail-standalone-pages; then each `--final-step` package script, the same way, for a step
  *     that must see every page of the finished site, the platform's own too (an IG's one bar on
- *     the identifier lookup page); then `.nojekyll`
+ *     the identifier lookup page; owner, 2026-10-15); then `.nojekyll`
  *  7. every relative or base-rooted href/src/action in every page resolves to a file
  *     under the site (read with an HTML parser, HTMLRewriter, not a regex)
  *  8. for the root, the guard (`site-parity.ts`): the build is measured against the root it
  *     would replace, read from the remote's publish branch (or `--parity-against <dir>`), on
  *     the pages — the theme's side bar and search, the icon row, the rail, the top-level
  *     directories, the `folio-build.json` stamp. With `--publish` a shortfall refuses; without,
- *     it is said. An IG's main site published by this path loses nothing
+ *     it is said. Owner, 2026-10-14: an IG's main site published by this path loses nothing
  *     `folio-site.yml` gave it.
- *  9. with `--publish`: the root replaces the branch but keeps `STAGING/`, `PC/`, `_render-log/` and
- *     every `site.build.keep` entry (an IG's `branches/`); a preview replaces only `STAGING/<branch>/`
+ *  9. with `--publish`: the root replaces the branch but keeps `branches/`, `PC/`, `_render-log/` and
+ *     every `site.build.keep` entry (an IG's `branches/`); a preview replaces only `branches/<branch>/`
  *
  * Every step runs with the build's own values in its environment ({@link siteStepEnv}:
  * `SITE_INSTANCE`, `SITE_TITLE`, `SITE_BASEURL`, `SITE_URL`, `SITE_LINK_ROOT`,
@@ -108,6 +110,7 @@ import { siteCoverageShortfall } from "./site-coverage.ts";
 import { writeMissingVisualisers } from "./visualiser-writers.ts";
 import { legacyNotice, readInstanceConfig, type InstanceConfigRead } from "./instance-config.ts";
 import { PC_PREFIX } from "./publish-main-site.ts";
+import { PREVIEW_PREFIX, PREVIEW_PREFIXES, previewPath } from "./lib/preview-prefix.ts";
 
 const TOOLS = "cat-harness-tools/scripts";
 
@@ -129,6 +132,12 @@ export interface BuildOptions {
   finalSteps?: string[];
   staging?: string;
   /**
+   * Where the preview of `staging` is published, relative to the publish root, when not
+   * {@link stagingDir}'s: an IG repository's folio preview shares the IG Publisher's own
+   * `branches/<last path component>/` (owner, 2026-11-05).
+   */
+  stagingDir?: string;
+  /**
    * Run on the finished site after the link check and before the publish
    * (and when nothing is published). A preview's data steps go here: the
    * ChangeSet and the staging banner the review page reads, which only the
@@ -149,7 +158,7 @@ export interface BuildOptions {
    * instance the checkout mounts, and the title is the site's own.
    */
   identity?: { title: string; description?: string };
-  /** Root entries a root publish keeps besides `STAGING/` and `_render-log/` (an IG's `branches/` previews). */
+  /** Root entries a root publish keeps besides `branches/` and `_render-log/` (an IG's `branches/` previews). */
   keep?: string[];
   /**
    * The root publish's guard ({@link parityShortfall}): the built site is measured against
@@ -214,11 +223,11 @@ export function readUpstreamPages(file: string): Set<string> {
   return new Set(readFileSync(file, "utf-8").split(/\r?\n/).map((l) => l.trim()).filter((l) => l !== "" && !l.startsWith("#")));
 }
 
-/** A branch name safe to use as one path segment under STAGING/. */
+/** A branch's preview directory: `branches/<branch as one safe path segment>` (`lib/preview-prefix.ts`). */
 export function stagingDir(branch: string): string {
   const seg = branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
-  if (seg === "" || seg === "." || seg === "..") throw new Error(`branch ${JSON.stringify(branch)} gives no usable STAGING/ segment`);
-  return `STAGING/${seg}`;
+  if (seg === "" || seg === "." || seg === "..") throw new Error(`branch ${JSON.stringify(branch)} gives no usable ${PREVIEW_PREFIX}/ segment`);
+  return previewPath(seg);
 }
 
 /**
@@ -273,7 +282,7 @@ export interface SiteRecipe {
   siteSteps: string[];
   /** Run after the platform's own writers ({@link BuildOptions.finalSteps}). */
   finalSteps?: string[];
-  /** Root entries a root publish keeps, besides `STAGING/` and `_render-log/`: an IG keeps `branches/`, its Publisher previews. */
+  /** Root entries a root publish keeps, besides `branches/` and `_render-log/`: an IG keeps `branches/`, its Publisher previews. */
   keep?: string[];
   /**
    * Which platform steps run around the declared ones ({@link PROFILE_STEPS}): `folio` (the
@@ -458,7 +467,7 @@ export async function pageUrls(html: string): Promise<string[]> {
 /**
  * Where a URL lands under the site, or undefined when it is not ours to check
  * (external, a scheme, a bare anchor). `base` is the site's path prefix
- * (`/repo/` or `/repo/STAGING/x/`); a root-absolute path outside it is a MISS,
+ * (`/repo/` or `/repo/branches/x/`); a root-absolute path outside it is a MISS,
  * reported as such, because the published site cannot serve it.
  */
 export function targetOf(url: string, pageRel: string, base: string): string | "outside-base" | undefined {
@@ -718,7 +727,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   const title = decl.title ?? decl.name;
   for (const n of [...o.pre, ...o.sourceSteps, ...(o.siteSteps ?? []), ...(o.finalSteps ?? [])]) if (!SCRIPT_NAME.test(n)) throw new Error(`${JSON.stringify(n)} is not a package script name`);
   if (o.keep?.some((k) => k === "" || k.includes("/") || k === "." || k === "..")) throw new Error(`keep names root entries, not paths: ${JSON.stringify(o.keep)}`);
-  const staging = o.staging === undefined ? undefined : stagingDir(o.staging);
+  const staging = o.staging === undefined ? undefined : (o.stagingDir ?? stagingDir(o.staging));
   const baseurl = `/${gh.repo}${staging ? `/${staging}` : ""}`;
   const out = resolve(o.out);
   const docs = join(out, "site-source");
@@ -848,7 +857,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
   } else console.log("coverage: ✓ every declared visualiser page is in the site");
 
   // The root's guard: the built site carries everything the root it replaces carries.
-  const keep = [...new Set(["STAGING", PC_PREFIX, "_render-log", ...(o.keep ?? [])])];
+  const keep = [...new Set([...PREVIEW_PREFIXES, PC_PREFIX, "_render-log", ...(o.keep ?? [])])];
   if (!staging && (o.parity ?? "refuse") !== "off") {
     const against = o.parityAgainst ?? (o.remote ? publishedRoot(o.remote, "gh-pages", keep) : undefined);
     if (against === undefined) console.log("parity: no published root to compare with — nothing to lose");

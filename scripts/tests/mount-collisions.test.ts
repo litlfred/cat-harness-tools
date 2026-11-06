@@ -42,6 +42,7 @@ describe("RESERVED_ROOT_AND_ROUTE_NAMES", () => {
       "api",
       "payload",
       "STAGING",
+      "branches",
       "beans",
       "todos",
       "fsh-guts",

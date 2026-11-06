@@ -102,7 +102,7 @@ export interface Detected {
  *
  * A repository may call several: a folio can carry a FHIR IG under `input/`.
  * Then the FOLIO is chosen unless `prefer` says otherwise, because the folio
- * owns the publish root (`publish-main` keeps `STAGING/` and `_render-log/`
+ * owns the publish root (`publish-main` keeps `branches/` and `_render-log/`
  * there), while another publisher's root deploy may be a clean one that would
  * delete both.
  */
