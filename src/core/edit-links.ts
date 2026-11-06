@@ -1011,7 +1011,13 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     "html.fa-bp .main-content{position:relative;padding-left:1rem;padding-right:1rem}" +
     "html.fa-bp .main-content :is(h1,h2,h3,h4,h5,h6):has(>.anchor-heading){position:static}" +
     "html.fa-bp .main-content .anchor-heading{left:auto;right:-2.25rem;top:auto;height:auto;width:1.5rem}" +
-    "html.fa-bp .main-content .block-actions{float:right;clear:right;width:1.5rem;margin:0 -3.25rem 6px 0;text-align:center}}" +
+    "html.fa-bp .main-content .block-actions{float:right;clear:right;width:1.5rem;margin:0 -3.25rem 6px 0;text-align:center}" +
+    // A section's box hangs under its heading's 🔗, placed like the 🔗 against
+    // .main-content so a heading inside a bordered box still uses the gutter.
+    "html.fa-bp .main-content .fa-sec-actions{position:absolute;float:none;right:-2.25rem;margin:0}}" +
+    "html.fa-bp .fa-hot+.fa-sec-actions>.ba-ic" + ON +
+    // Its feedback link is the panel's content, not a second icon on the page.
+    "html.fa-bp .fa-sec-actions>a{display:none}html.fa-bp .fa-block-panel .fa-sec-actions>a{display:block;margin:.5rem 0;padding:.55rem .7rem;border:1px solid #8885;border-radius:8px;text-decoration:none}" +
     "html.fa-bp .block-actions>.ba-trigger,html.fa-bp .block-actions>.ba-bookmark{width:20px;height:20px;border:0;background:none;font-size:13px;opacity:.35;filter:grayscale(1)}" +
     "html.fa-bp .block-actions>.ba-trigger .ba-n{top:-4px;right:-6px;font-size:9px;padding:0 3px}" +
     "html.fa-bp .block-actions:hover>.ba-trigger,html.fa-bp .ba-trigger:focus-visible,html.fa-bp .ba-trigger[aria-expanded=true],html.fa-bp :hover>.block-actions>.ba-trigger,html.fa-bp p:has(+.fa-blk:hover)>.block-actions>.ba-trigger" + ON +
@@ -1199,6 +1205,44 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     box.append(b);
     if (window.faFolio && typeof window.faFolio.paint === "function") window.faFolio.paint(box);
   };
+  // Owner, 2026-11-06: a page with no content blocks (the landing page, any
+  // plain Jekyll page) still gets 📣 feedback and [+] bookmark-to-folio per
+  // section, in the right gutter. One box per anchored heading, placed after
+  // it; none on a page whose build drew block boxes (.fa-doc or any
+  // .block-actions), so a block page never shows both. The 📣 names the page
+  // and section, not a source file, which a plain page does not declare. Its
+  // repository is the configured one (<meta name="fa-repo">), else a GitHub
+  // Pages project site's own (<owner>.github.io/<repo>/); with neither there
+  // is no 📣, only the 🔖.
+  const siteRepo = () => {
+    const c = config();
+    if (c && c.repo) return c.repo;
+    const h = /^([^.]+)\.github\.io$/.exec(location.hostname || "");
+    const seg = (location.pathname || "").split("/")[1];
+    return h && seg ? h[1] + "/" + seg : "";
+  };
+  const sectionBoxes = () => {
+    const main = document.querySelector(".main-content");
+    if (!main || main.querySelector(".fa-doc, .block-actions")) return;
+    const repo = siteRepo();
+    for (const h of main.querySelectorAll("h1[id], h2[id], h3[id], h4[id]")) {
+      if (!h.querySelector(":scope > .anchor-heading") || h.closest(".fa-block-panel, nav")) continue;
+      const sec = h.textContent.trim();
+      const box = el("span", { className: "block-actions fa-sec-actions" });
+      box.dataset.block = h.id;
+      box.dataset.sec = sec;
+      if (repo) {
+        const q = new URLSearchParams();
+        q.set("title", "Feedback: " + (document.title ? document.title + " \\u2014 " : "") + sec);
+        q.set("body", ["**Section:** " + sec, "**On the site:** " + location.href.split("#")[0] + "#" + encodeURIComponent(h.id),
+          "", "**Type:** general | technical | editorial", "", "**Comment:**", "", ""].join("\\n"));
+        const a = el("a", { className: "ba-feedback", href: "https://github.com/" + repo + "/issues/new?" + q, textContent: "\\ud83d\\udce3 feedback", title: "Give feedback on this section (opens a GitHub issue)" });
+        a.dataset.faLink = "feedback";
+        box.append(a);
+      }
+      h.after(box);
+    }
+  };
   const icons = (root) => {
     const r = root || document;
     if (!r || typeof r.querySelectorAll !== "function") return;
@@ -1251,8 +1295,8 @@ export const EDIT_LINKS_RUNTIME = `(() => {
       const st = el("style", { id: "fa-bp-link-css", textContent: LINK_CSS });
       (document.head || document.documentElement).append(st);
     }
-    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => icons());
-    else icons();
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => { sectionBoxes(); icons(); });
+    else { sectionBoxes(); icons(); }
   }
   window.faBlockPanel = {
     pane: (id, p) => { panes[id] = p; },
