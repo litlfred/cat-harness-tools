@@ -419,7 +419,10 @@ describe("annotations hold to the data that chooses their targets", () => {
     expect(seen).toBeGreaterThan(0);
     // declared-path-literal: the two modules that load the declared validator refs, whose `input-site` annotations are the subject of this assertion; no declaration answers where a module of this layer sits.
     for (const file of ["kind-validator.ts", "node-kind-index.ts"]) expect(declaredBy(relTo(join(TOOLS_ROOT, "schemas/kg", file)), "validator-refs"), file).toBe(true);
-  });
+    // It loads the whole typology registry and resolves every validator ref from
+    // every instance root: 6-7 s on a composed checkout, over bun's 5 s default
+    // whenever another test file ran first in the same process.
+  }, 30_000);
 
   test("every instance themes module lies under theme-by-ref's `imports` glob", () => {
     for (const root of roots()) {
