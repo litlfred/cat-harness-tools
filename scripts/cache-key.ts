@@ -149,7 +149,14 @@ export function publish(root: string, step: string, key: string, paths: readonly
     const gitDir = git(root, ["rev-parse", "--absolute-git-dir"]);
     git(join(stage, "tree"), ["--git-dir", gitDir, "add", "-A", "--force", "."], env);
     const tree = git(join(stage, "tree"), ["--git-dir", gitDir, "write-tree"], env);
-    const commit = git(root, ["commit-tree", tree, "-m", `cache:publish ${step}\n\nkey: ${key}\npaths: ${paths.join(" ")}\n`]);
+    // A fixed identity and date: the commit is a function of the tree and the
+    // key alone, so two committers publishing the same output write the same
+    // commit, and a runner with no git identity can still publish.
+    const ident = {
+      GIT_AUTHOR_NAME: "cache:publish", GIT_AUTHOR_EMAIL: "cache-publish@invalid", GIT_AUTHOR_DATE: "1970-01-01T00:00:00Z",
+      GIT_COMMITTER_NAME: "cache:publish", GIT_COMMITTER_EMAIL: "cache-publish@invalid", GIT_COMMITTER_DATE: "1970-01-01T00:00:00Z",
+    };
+    const commit = git(root, ["commit-tree", tree, "-m", `cache:publish ${step}\n\nkey: ${key}\npaths: ${paths.join(" ")}\n`], ident);
     if (opts.dryRun !== true) git(root, ["push", "--quiet", opts.remote ?? "origin", `${commit}:${ref}`]);
     return { ref, commit, tree };
   } finally {

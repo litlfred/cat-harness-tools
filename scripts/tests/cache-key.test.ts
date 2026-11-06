@@ -50,6 +50,26 @@ describe("publish", () => {
     const ls = Bun.spawnSync(["git", "ls-tree", "-r", "--name-only", r.commit], { cwd: d }).stdout.toString().trim();
     expect(ls).toBe("ws/out/f.txt");
   });
+  test("the commit is the same wherever it is published, with no git identity configured", () => {
+    // CI runners have no user.name; a cache commit must not need one, and its
+    // hash must depend on the output and the key only.
+    const saved = { g: process.env.GIT_CONFIG_GLOBAL, s: process.env.GIT_CONFIG_NOSYSTEM };
+    process.env.GIT_CONFIG_GLOBAL = "/dev/null";
+    process.env.GIT_CONFIG_NOSYSTEM = "1";
+    try {
+      const commits = [0, 1].map(() => {
+        const d = mkdtempSync(join(tmpdir(), "ck-repo-"));
+        Bun.spawnSync(["git", "init", "-q", d]);
+        mkdirSync(join(d, "out"));
+        writeFileSync(join(d, "out", "f.txt"), "bytes");
+        return publish(d, "demo", "k1", ["out"], { dryRun: true }).commit;
+      });
+      expect(commits[0]).toBe(commits[1]);
+    } finally {
+      if (saved.g === undefined) delete process.env.GIT_CONFIG_GLOBAL; else process.env.GIT_CONFIG_GLOBAL = saved.g;
+      if (saved.s === undefined) delete process.env.GIT_CONFIG_NOSYSTEM; else process.env.GIT_CONFIG_NOSYSTEM = saved.s;
+    }
+  });
   test("an output that was not built is refused", () => {
     const d = mkdtempSync(join(tmpdir(), "ck-repo-"));
     Bun.spawnSync(["git", "init", "-q", d]);
