@@ -21,7 +21,7 @@
  * |---|---|
  * | `overview/index.html` | the story in one sentence, a card per chapter, the cast, the trust ladder |
  * | `walkthrough/<step>/index.html` | one step: the chapter progress bar, the story card, the people, the record, ask the room, what if, the policy layer, under the hood |
- * | `assets/present.css`, `assets/present.js` | the style, and the keys (← → W T), presenter mode and the gap strip's memory |
+ * | `assets/present.css`, `assets/present.js`, `assets/gap-report.js` | the style, and the keys (← → W T), presenter mode, the gap strip's memory and the discussion page's gap report |
  *
  * ## Chapters
  *
@@ -54,7 +54,7 @@ import {
   type SiteLinks,
 } from "./render.ts";
 
-export const PRESENT_ASSETS = ["present.css", "present.js"] as const;
+export const PRESENT_ASSETS = ["present.css", "present.js", "gap-report.js"] as const;
 /** The workshop segments these pages take: a module may not be called either. */
 export const PRESENT_SEGMENTS = ["overview", "walkthrough", ...VIEW_SEGMENTS] as const;
 

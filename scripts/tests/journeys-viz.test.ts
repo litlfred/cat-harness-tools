@@ -509,9 +509,17 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(wallet).toContain("<small>shows the QR</small>");
     expect(wallet).toContain("Read the patient&#39;s summary");
   });
-  test("the discussion: the closing question, the moments to revisit, the tables with what forces each row, the gap list", () => {
+  test("the discussion: the closing question, the moments to revisit, the tables with what forces each row, the gap report", () => {
     expect(discuss).toContain("What must countries agree on?");
-    expect(discuss).toContain('data-jp-gap="policy:viewer:status"');
+    // The gap report's model: the gap strip's own storage names, the moment's link, its first module.
+    const model = JSON.parse(/<script type="application\/json" data-jp-gapreport-model>([\s\S]*?)<\/script>/.exec(discuss)![1]!);
+    expect(model.items).toEqual([{ name: { status: "policy:viewer:status" }, capability: { id: "viewer", label: "A viewer" }, step: { id: "P2", title: "Step P2", href: "../walkthrough/P2/" }, module: "M1" }]);
+    expect(model.status.options.map((o: { id: string }) => o.id)).toEqual(["yes", "no"]);
+    expect(model.urgency).toBeUndefined();
+    expect(discuss).toContain('<script src="../../../../assets/gap-report.js" defer></script>');
+    expect(discuss).toContain("data-jp-report-print");
+    expect(discuss).toContain("data-jp-report-csv");
+    expect(files.some((f) => f.path === "assets/gap-report.js")).toBe(true);
     expect(discuss).toContain("Forced by:");
     expect(discuss).toContain('href="../walkthrough/P2/"');
   });

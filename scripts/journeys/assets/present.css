@@ -652,9 +652,30 @@ a:hover > .jp-cv-dot { fill: var(--c); }
 .jp-dt p { font-size: 13px; color: var(--s700); }
 .jp-dt small { font-size: 11px; color: var(--s500); }
 .jp-gap-act { display: flex; align-items: center; gap: 8px; }
-.jp-gaps { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
-.jp-gaps li { display: flex; align-items: center; gap: 8px; }
-.jp-gaps b { margin-left: auto; font-size: 11px; color: #be123c; }
+/* The gap report (discussion page): gaps by urgency, then module; counts per moment and per module. */
+.jp-gapreport { display: flex; flex-direction: column; gap: 10px; }
+.jp-gap-act { flex-wrap: wrap; }
+.jp-gr-urgency { border-top: 1px solid var(--s100); padding-top: 10px; }
+.jp-gr-u { font-size: 14px; font-weight: 700; color: #be123c; margin: 0 0 4px; }
+.jp-gr-urgency + .jp-gr-urgency .jp-gr-u { color: #b45309; }
+.jp-gr-urgency + .jp-gr-urgency + .jp-gr-urgency .jp-gr-u, .jp-gr-urgency.is-unset .jp-gr-u { color: var(--s600); }
+.jp-gr-m { font-size: 12px; font-weight: 600; color: #3730a3; margin: 8px 0 4px; }
+.jp-gr-rows { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.jp-gr-rows li { display: flex; align-items: center; gap: 8px; }
+.jp-gr-rows .jp-revisit span { display: none; }
+.jp-gr-cap { color: var(--s800); }
+.jp-gr-st { margin-left: auto; font-size: 11px; white-space: nowrap; color: #be123c; }
+.jp-gr-st-partial { color: #b45309; }
+.jp-gr-grid { display: grid; grid-template-columns: 1fr; gap: 16px; border-top: 1px solid var(--s100); padding-top: 10px; }
+@media (min-width: 1024px) { .jp-gr-grid { grid-template-columns: 1fr 1fr; } }
+.jp-gr-counts { border-collapse: collapse; font-size: 12px; width: 100%; }
+.jp-gr-counts caption { text-align: left; font-weight: 700; font-size: 13px; color: var(--s900); padding-bottom: 4px; }
+.jp-gr-counts th, .jp-gr-counts td { border-bottom: 1px solid var(--s100); padding: 4px 6px; text-align: right; }
+.jp-gr-counts th:first-child { text-align: left; font-weight: 500; }
+.jp-gr-counts thead th { font-size: 11px; color: var(--s500); font-weight: 600; }
+.jp-gr-counts td.is-gap { color: #be123c; font-weight: 700; }
+.jp-gr-counts .jp-gr-unrated { color: var(--s400); }
+.jp-gr-counts .jp-revisit span { display: inline; font-weight: 400; color: var(--s600); margin-left: 4px; }
 .jp-takes { display: flex; flex-direction: column; gap: 10px; }
 .jp-takes li { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; }
 .jp-takes b { color: var(--s900); }
@@ -707,4 +728,9 @@ a:hover > .jp-cv-dot { fill: var(--c); }
   .jp-wf-a { display: block !important; }
   .jp-main { padding: 0; }
   .jv-print-sheets .jp-sheetlist { gap: 0; }
+  /* "Print / Save as PDF" on the gap report prints the report alone. */
+  .jp-print-report .jp-wrap > :not(.jp-gapreport) { display: none !important; }
+  .jp-print-report .jp-gapreport { border: 0; box-shadow: none; padding: 0; }
+  .jp-gr-urgency, .jp-gr-counts tr { break-inside: avoid; }
+  [data-fa-staging-banner] { display: none !important; }
 }
