@@ -29,7 +29,7 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 import {
   getChecklistForKind,
@@ -40,21 +40,26 @@ import {
   type AdversarialFinding,
   type AdversarialReview,
 } from "../schemas/sdlc/red-flag.js";
-import { KG_QA_SCHEMA, type KgQaReport, type KgSubjectKind } from "../schemas/sdlc/kg-qa.js";
+import { KG_QA_SCHEMA, kgQaSidecarPath, type KgQaReport, type KgSubjectKind } from "../schemas/sdlc/kg-qa.js";
 import { NOT_DISCLOSED } from "@litlfred/bootstrap-tools/schemas/model-registry.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { implementingRootFor } from "../schemas/kg/harness-config.ts";
 import { declaredDirectory } from "./lib/local-site-dir.ts";
-import { repoRootFor } from "../schemas/kg/cat-harness.ts";
+import { kgQaHomeFor, repoRootFor } from "../schemas/kg/cat-harness.ts";
 import {
   ADVERSARIAL_REVIEW_FAMILY,
+  KG_QA_SIDECAR_SUFFIX,
   QA_ATTESTATIONS_SCHEMA,
   adversarialAttestationFor,
+  attestationPathFor,
+  attestationsHomeFor,
+  kgAttestationTrees,
   readAttestationFile,
   serialiseAttestations,
+  storedAdversarialReviews,
   type AdversarialReviewAttestations,
 } from "../schemas/sdlc/qa-attestations.ts";
-import { harnessRel } from "./lib/harness-layout.ts";
+import { harnessRel, subgraphHarnessPath } from "./lib/harness-layout.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -117,6 +122,40 @@ export const GATE_PATH_NODES: readonly { id: string; kind: AdversarialContentKin
   { id: "kg-qa", kind: "schema", path: "schemas/sdlc/kg-qa.ts" },
 ] as const;
 
+function skillSidecarDir(node: { id: string; kind: AdversarialContentKind; path: string }, repoRoot: string): string {
+  const fromStore = (home: string): string | undefined => {
+    for (const s of storedAdversarialReviews(home)) {
+      if (s.file.subject.kind === node.kind && s.file.subject.id === node.id && s.file.subject.path) {
+        return dirname(s.file.subject.path);
+      }
+    }
+    return undefined;
+  };
+  try {
+    const primary = resolve(attestationsHomeFor(repoRoot).root);
+    const direct = fromStore(primary);
+    if (direct !== undefined) return direct;
+    for (const t of kgAttestationTrees(repoRootFor(repoRoot), repoRoot)) {
+      const home = resolve(t.attHome);
+      if (home === primary) continue;
+      const hit = fromStore(home);
+      if (hit !== undefined) return hit;
+    }
+  } catch {
+    // instance discovery failed: fall through to path resolution
+  }
+  const rawDir = dirname(node.path);
+  if (rawDir === ".") {
+    const gateSkill = GATE_PATH_NODES.find((g) => g.kind === "skill");
+    return gateSkill ? dirname(harnessRel(gateSkill.path, repoRoot)) : "skills";
+  }
+  const sub = subgraphHarnessPath(rawDir);
+  if (existsSync(join(repoRoot, sub))) return sub;
+  const adapted = harnessRel(sub, repoRoot);
+  if (existsSync(join(repoRoot, adapted))) return adapted;
+  return rawDir;
+}
+
 /**
  * Determine the sidecar path for a node.
  */
@@ -128,7 +167,7 @@ export function resolveSidecarPath(node: { id: string; kind: AdversarialContentK
     return join(repoRoot, "test", "results", "kg-qa", "schemas", `${node.id}.kg-qa.json`);
   }
   if (node.kind === "skill") {
-    return join(repoRoot, "test", "results", "kg-qa", "skills", "sdlc", "sdlc-core", `${node.id}.kg-qa.json`);
+    return kgQaSidecarPath(repoRoot, join(repoRoot, skillSidecarDir(node, repoRoot)), node.id);
   }
   return join(repoRoot, "test", "results", "kg-qa", "processes", `${node.id}.kg-qa.json`);
 }
@@ -139,7 +178,16 @@ export function resolveSidecarPath(node: { id: string; kind: AdversarialContentK
  */
 export function reviewAttestationPath(sidecarPath: string, repoRoot: string = ROOT): { file: string; storeRoot: string } | undefined {
   try {
-    return adversarialAttestationFor(sidecarPath, repoRootFor(repoRoot), repoRoot);
+    const found = adversarialAttestationFor(sidecarPath, repoRootFor(repoRoot), repoRoot);
+    if (found !== undefined) return found;
+    const kgTree = resolve(kgQaHomeFor(repoRoot, repoRoot).root, "kg-qa");
+    const abs = resolve(sidecarPath);
+    if (!abs.startsWith(`${kgTree}${sep}`)) return undefined;
+    const home = attestationsHomeFor(repoRoot, repoRoot);
+    return {
+      file: attestationPathFor(abs, kgTree, home.root, ADVERSARIAL_REVIEW_FAMILY, KG_QA_SIDECAR_SUFFIX),
+      storeRoot: home.storeRoot,
+    };
   } catch {
     return undefined;
   }

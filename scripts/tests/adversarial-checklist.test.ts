@@ -22,6 +22,8 @@ import {
   GATE_PATH_NODES,
   gatherCandidateNodes,
   rankCandidateNodes,
+  resolveSidecarPath,
+  reviewAttestationPath,
   reviewNodeAdversarially,
 } from "../adversarial-backfill.ts";
 import {
@@ -325,4 +327,29 @@ describe("Adversarial reviews in the attestation store (D2 (a), cat-harness#857)
       expect(adversarialCoverageByGraph(root, root).get("skills")).toBe("stale");
     });
   });
+
+  it("resolveSidecarPath derives the post-#1014 sdlc skill path from the store and marks reviewed sdlc skills as reviewed in --rank", () => {
+    const skillNode = GATE_PATH_NODES.find((n) => n.kind === "skill")!;
+    expect(skillNode).toBeDefined();
+
+    const oldPre1014Sidecar = join(ROOT, "test", "results", "kg-qa", "skills", "sdlc", "sdlc-core", `${skillNode.id}.kg-qa.json`);
+    const derivedSidecar = resolveSidecarPath(skillNode, ROOT);
+
+    expect(derivedSidecar).not.toBe(oldPre1014Sidecar);
+    expect(derivedSidecar).toBe(join(ROOT, "test", "results", "kg-qa", "sdlc", "skills", "sdlc-core", `${skillNode.id}.kg-qa.json`));
+
+    const oldAtt = reviewAttestationPath(oldPre1014Sidecar, ROOT);
+    const derivedAtt = reviewAttestationPath(derivedSidecar, ROOT);
+    expect(oldAtt).toBeDefined();
+    expect(derivedAtt).toBeDefined();
+    // Fails on the old pre-#1014 path and passes on the derived one.
+    expect(existsSync(oldAtt!.file)).toBe(false);
+    expect(existsSync(derivedAtt!.file)).toBe(true);
+
+    const ranked = rankCandidateNodes(gatherCandidateNodes(ROOT), ROOT);
+    const rankedSkill = ranked.find((r) => r.id === skillNode.id);
+    expect(rankedSkill).toBeDefined();
+    expect(rankedSkill!.hasReview).toBe(true);
+    expect(rankedSkill!.isStale).toBe(false);
+  }, 30_000);
 });
