@@ -547,6 +547,24 @@ describe("the audit walks only what can run", () => {
     }
   });
 
+  test("a traced fingerprint defers a computed target unscanned; an untraced one still refuses its unreviewed site", () => {
+    const root = mkdtempSync(join(tmpdir(), "defer-computed-"));
+    try {
+      const load = "const m = await import(p);";
+      writeFileSync(join(root, "c.ts"), `export async function f(p: string) {\n  // input-site: imports v.ts #${pinOf(load)} — v\n  ${load}\n  return m;\n}\n`);
+      writeFileSync(join(root, "v.ts"), "export const v = process.env.SOME_VAR;\n");
+      const scripts = { "c:check": "bun run c.ts" };
+      const io = { inputs: [], outputs: [] };
+      const fp = (treeReplayed: boolean) => checkFingerprint(root, scripts, "c:check", io, new FileDigests(root), undefined, { treeReplayed });
+      const traced = fp(true);
+      expect("hash" in traced && traced.deferred).toEqual(["v.ts"]);
+      const plain = fp(false);
+      expect("undetermined" in plain && plain.undetermined).toContain("v.ts");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("every runtime module under schemas/ is input-site annotated after 8lcl (cat-harness-tools#634)", () => {
     // declared-path-literal: the directory of schema modules whose input-site annotations this test audits.
     const schemasRoot = join(TOOLS_ROOT, "schemas");
