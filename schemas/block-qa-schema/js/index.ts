@@ -115,7 +115,7 @@ export const QaCriterionEntry = z
 
     reviewer: QaReviewer,
     // ISO-8601 UTC datetime; legacy agent entries may carry a bare ISO date.
-    reviewed_at: z.string(),
+    reviewed_at: z.string().optional(), // derived from reviewed_tree since 0.2.0 (owner ruling 2026-11-06, "QA dates")
     // Tree of repo HEAD at audit time (`HEAD^{tree}`). What producers write
     // since bean 69lr: a PR run's HEAD commit can vanish, its tree cannot.
     reviewed_tree: z.string().optional(),
@@ -150,7 +150,7 @@ export const BlockQaReport = z
       .passthrough(),
     source_hashes: QaFieldHash,
     criteria: z.record(z.string(), z.array(QaCriterionEntry)),
-    updated_at: z.string(),
+    updated_at: z.string().optional(),
   })
   .passthrough();
 export type BlockQaReport = z.infer<typeof BlockQaReport>;
@@ -164,11 +164,11 @@ export const QaScriptSidecar = z
     script_commit_sha: z.string(),
     extra_inputs: z.array(z.string()).optional(),
     deps_hash: z.string().optional(),
-    last_run_at: z.string(),
+    last_run_at: z.string().optional(),
     last_run_sha: z.string(),
     engine_version: z.string().optional(),
   })
   .passthrough();
 export type QaScriptSidecar = z.infer<typeof QaScriptSidecar>;
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";

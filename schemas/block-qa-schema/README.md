@@ -65,7 +65,7 @@ Use the JSON Schemas directly — they are served from the npm package root (`@l
 | `paths` | object | yes | repo-relative source paths; `ts` required, `md`/`lean` optional |
 | `source_hashes` | field-hash | yes | 12-char SHA-256 prefixes of present sources, refreshed on write |
 | `criteria` | map → entry[] | yes | per-criterion append-only reviewer entries |
-| `updated_at` | string | yes | ISO-8601 UTC last-update timestamp |
+| `updated_at` | string | no (0.2.0) | ISO-8601 UTC last-update timestamp. New writers omit it: the date is derived from the entries' `reviewed_tree` |
 
 Per criterion entry:
 
@@ -78,7 +78,7 @@ Per criterion entry:
 | `evidence` | string \| {line, text}[] | no | verbatim-quote string, or the structured location list some agent reviewers emit |
 | `metrics` | map | no | descriptive checker measures (e.g. detangler `tanglement_score`, `cone_size`, `pagerank`, `graph_energy`) |
 | `reviewer` | object | yes | `kind` (`script`/`agent`/`human`) + `id`, with script-hash or agent model/session/skill provenance |
-| `reviewed_at` | string | yes | ISO-8601 UTC datetime (legacy agent entries: bare date) |
+| `reviewed_at` | string | no (0.2.0) | ISO-8601 UTC datetime (legacy agent entries: bare date). New writers omit it: the date is derived from `reviewed_tree`, the commit date of the commit carrying it (owner ruling 2026-11-06, "QA dates") |
 | `reviewed_tree` | string | no | tree of repo HEAD at audit time (`HEAD^{tree}`) — what producers write: a pull-request run's HEAD commit can vanish, its tree cannot |
 | `reviewed_sha` | string | no | repo HEAD at audit time — superseded by `reviewed_tree` and no longer written; kept readable, and legacy agent entries omit it |
 | `notes` | string | no | free-form |
@@ -96,7 +96,7 @@ Both schemas set `additionalProperties: true` — the format is intentionally ex
 | `script_commit_sha` | string | yes | last commit touching the checker |
 | `extra_inputs` | string[] | no | extra files the checker consults |
 | `deps_hash` | string | no | hash of concatenated extra inputs |
-| `last_run_at` | string | yes | ISO-8601 UTC of the most recent sweep |
+| `last_run_at` | string | no (0.2.0) | ISO-8601 UTC of the most recent sweep. New writers omit it; the run's time is in the run record |
 | `last_run_sha` | string | yes | repo HEAD at the most recent sweep |
 | `engine_version` | string | no | e.g. `bun-1.3.11+node-22` |
 

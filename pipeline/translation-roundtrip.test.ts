@@ -36,7 +36,7 @@ describe("roundTripEntries — provenance is recorded, never invented", () => {
 
   test("without them it stamps now, so a first recording is not left blank", () => {
     const e = roundTripEntries(base, { md: "h" });
-    expect(Date.parse(e[0]!.reviewed_at)).toBeGreaterThan(Date.now() - 60_000);
+    expect(Date.parse(e[0]!.reviewed_at ?? "")).toBeGreaterThan(Date.now() - 60_000);
     // The tree, not the commit (bean 69lr; owner card Q4, 2026-11-05).
     expect(e[0]!.reviewed_tree).toBeDefined();
     expect(e[0]!.reviewed_sha).toBeUndefined();

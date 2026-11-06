@@ -1576,11 +1576,43 @@ export function sameScriptVerdict(
 }
 
 /**
+ * The date a verdict is shown and ordered by.
+ *
+ * Owner ruling 2026-11-06 (card "QA dates", option 1): a verdict's date is
+ * DERIVED from its `reviewed_tree` — the commit date of the commit carrying
+ * that tree, which `tree-commits` (`scripts/qa-site-assets.ts`) records in
+ * its index's `dates` — so a writer stamps no clock, and the same verdict
+ * over the same tree is the same bytes on a PR and on main. A legacy entry's
+ * own `reviewed_at` is the fallback; with neither, there is no date, which a
+ * reader shows as unknown, never as now.
+ */
+export function entryDate(
+  e: Pick<QaCriterionEntry, "reviewed_at" | "reviewed_tree">,
+  treeDates?: Readonly<Record<string, string>>,
+): string | undefined {
+  return (e.reviewed_tree ? treeDates?.[e.reviewed_tree] : undefined) ?? e.reviewed_at;
+}
+
+/**
+ * Newest first by {@link entryDate}; entries without a date, or with equal
+ * dates, keep the later-written (higher index) one first, since writers append.
+ */
+export function newestFirst<T extends Pick<QaCriterionEntry, "reviewed_at" | "reviewed_tree">>(
+  entries: readonly T[],
+  treeDates?: Readonly<Record<string, string>>,
+): T[] {
+  return entries
+    .map((e, i) => ({ e, i, d: entryDate(e, treeDates) ?? "" }))
+    .sort((a, b) => b.d.localeCompare(a.d) || b.i - a.i)
+    .map((x) => x.e);
+}
+
+/**
  * Per-criterion freshness summary for one block.
  *
  * - `fresh-entries`: reviewer entries whose field_hash matches.
  * - `stale-entries`: reviewer entries whose field_hash does not match.
- * - `most_recent`: the newest entry (by reviewed_at), regardless of
+ * - `most_recent`: the newest entry (by {@link entryDate}), regardless of
  *   freshness; used by the watcher to surface "last result was X but
  *   it's stale" diagnostics.
  */
@@ -1624,9 +1656,7 @@ export function summariseFreshness(
       if (entryIsFresh(e, current, dependsOn, sh, def?.lean_granularity)) fresh.push(e);
       else stale.push(e);
     }
-    const sorted = [...entries].sort((a, b) =>
-      b.reviewed_at.localeCompare(a.reviewed_at),
-    );
+    const sorted = newestFirst(entries);
     out.push({
       criterion,
       fresh_entries: fresh,

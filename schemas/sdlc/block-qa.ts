@@ -637,8 +637,17 @@ export interface QaCriterionEntry {
 
   /** Reviewer identity + provenance. */
   reviewer: QaReviewer;
-  /** When the audit ran (ISO-8601 UTC). */
-  reviewed_at: string;
+  /**
+   * When the audit ran (ISO-8601 UTC). Optional, and no longer written by the
+   * platform's writers (owner ruling 2026-11-06, card "QA dates", option 1):
+   * the date a verdict is shown and ordered by is DERIVED from
+   * {@link reviewed_tree} — the commit date of the commit carrying that tree
+   * (`tree-commits.json`, `entryDate` in `pipeline/qa-utils.ts`) — so the
+   * verdict's bytes carry no clock and a PR's QA output can be reused on main.
+   * The run's own time is in its run record. Kept readable for existing
+   * sidecars.
+   */
+  reviewed_at?: string;
   /**
    * Tree of repo HEAD at audit time (`HEAD^{tree}`, full git id, or the
    * `unknown` sentinel outside git). Producers must set this on every new
@@ -698,8 +707,8 @@ export interface BlockQaReport {
    * agent + human) may co-exist; they are NOT deduplicated.
    */
   criteria: Record<string, QaCriterionEntry[]>;
-  /** Report creation / last-update timestamp (ISO-8601 UTC). */
-  updated_at: string;
+  /** Report creation / last-update timestamp (ISO-8601 UTC). Optional and no longer written, as {@link QaCriterionEntry.reviewed_at}. */
+  updated_at?: string;
   /**
    * Content-addressed reference to the `folio-run-context/v1` record of the
    * run that wrote this report (`docs/proposals/tool-releases-2026-10-07.md`,
@@ -1006,8 +1015,8 @@ export interface QaScriptSidecar {
   extra_inputs?: string[];
   /** 12-char SHA-256 of concatenated extra_inputs (omitted if none). */
   deps_hash?: string;
-  /** ISO-8601 UTC timestamp of the most recent qa-sweep run. */
-  last_run_at: string;
+  /** ISO-8601 UTC timestamp of the most recent qa-sweep run. Optional and no longer written: the run's time is in its run record. */
+  last_run_at?: string;
   /** Repo HEAD at the most recent sweep (full git SHA). */
   last_run_sha: string;
   /** Engine fingerprint — e.g. `bun-1.3.11+node-22`. */
