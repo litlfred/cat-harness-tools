@@ -437,7 +437,8 @@ export interface TreeCommitIndex {
   /**
    * Tree id → that commit's committer date (ISO 8601), for each tree the log
    * gave a date for. The date a verdict on that tree is shown and ordered by
-   * (owner ruling 2026-11-06, card "QA dates", option 1: a QA date is DERIVED
+   * (owner rulings 2026-11-06: card "QA dates", option 1, and card "Date
+   * source", option 1: a QA date is DERIVED on read
    * from the reviewed tree, so the verdict's bytes carry no clock). Additive:
    * a reader of an index without it falls back to the verdict's own date.
    */
