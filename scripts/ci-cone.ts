@@ -40,6 +40,13 @@
  * (`input-sites.ts`) hashes or refuses every other input (environment, clock,
  * network, git history). So it reads the same R and gives the same answer.
  *
+ * "The same code" is the static import closure, which the fingerprint hashes,
+ * and every module the run loaded by a computed `import()` / `require()`,
+ * which is in R: the run opened it. Which modules a computed load reaches is
+ * decided by code and data the run read, so a module it did not load cannot
+ * change its answer, and the fingerprint does not hash it (bean vgfp). The
+ * audit still walks every module the declarations could name.
+ *
  * A trace covers only the path that run took, so a run whose reads cannot be
  * enumerated is recorded as undetermined and always runs:
  * - a write inside the checkout;
@@ -72,7 +79,9 @@ import { dirname, join, normalize, resolve } from "node:path";
 import {
   againstRefsOf,
   checkFingerprint,
+  entryFiles,
   FileDigests,
+  fingerprint,
   qaBaselineIdentity,
   RECIPE_VERSION,
   TRACKED,
@@ -80,15 +89,20 @@ import {
   type Fingerprint,
   type PairIO,
 } from "./input-hash.ts";
-import { openTrace } from "../schemas/sdlc/input-trace.ts";
+import { inputSiteReached, openTrace } from "../schemas/sdlc/input-trace.ts";
 import { isProjection, projectedState, type ProjectionName } from "../schemas/sdlc/read-projections.ts";
 import { collectTaskIo } from "./task-io.ts";
 import { scriptsOf } from "../schemas/sdlc/script-table.ts";
+import { findReusable, putResult, STORE_DIR } from "./result-store.ts";
+import { testFilesUnder, testPreloads } from "./affected-tests.ts";
+import { auditClosure, scanSource, siteProblem, type SiteVerdict } from "./input-sites.ts";
+import { auditPython } from "./input-sites-py.ts";
 
 /** Bump when the parser or the read-set rules change. A record from another version is ignored, so every check runs. */
 export const TRACER_VERSION = 3;
 
 /** Where the records live, relative to the checkout. `build/` is git-ignored, and the workflow caches this directory. */
+// input-site: inert #ff0c6593 — the cone's own records directory, which every read set leaves out
 export const CONE_DIR = join("build", "ci-cone");
 export const RECORD_FILE = join(CONE_DIR, "records.json");
 
@@ -135,6 +149,12 @@ export type ReadSet =
       rewritten?: string[];
       /** How many times each path asked for in `countOpens` was opened for reading. */
       opened?: Record<string, number>;
+      /** The programs a CHILD of the traced command exec'd (absolute paths, sorted); left out when none. */
+      children?: string[];
+      /** The code children ran from their command line (`python3 -c`, `bun -e`); `null` for a script read from stdin, which no trace shows. */
+      inline?: { program: string; code: string | null }[];
+      /** Files outside the checkout under a `site-packages` / `dist-packages` directory the run read: installed Python packages. */
+      external?: string[];
     }
   | { undetermined: string };
 
@@ -422,6 +442,15 @@ export function parseTrace(
   const cwd = new Map<number, { dir: string | undefined }>();
   /** The pids that exec'd `git`, whose reads of `.git` are git's answer, not the script's. */
   const gitPids = new Set<number>();
+  /**
+   * The directories outside the checkout this run created (a successful
+   * `mkdir`, as `mkdtempSync` makes one). A git command run in one is the
+   * run's own scratch repository: what it answers is what the run wrote
+   * there, so it is neither replayed nor refused, and its reads inside the
+   * checkout, `.git` included, are kept like any other process's.
+   */
+  const scratch = new Set<string>();
+  const inScratch = (dir: string) => [...scratch].some((s) => dir === s || dir.startsWith(`${s}/`));
   const cell = (pid: number) => {
     let c = cwd.get(pid);
     if (c === undefined) {
@@ -439,6 +468,11 @@ export function parseTrace(
   const wrote = new Set<string>();
   const first = new Map<string, "read" | "absent" | "write">();
   const opened = new Map<string, number>();
+  /** The first process in the trace is the command itself; every other execve is a child's. */
+  const top = parsed[0]?.pid;
+  const children = new Set<string>();
+  const inline = new Map<string, { program: string; code: string | null }>();
+  const external = new Set<string>();
   for (const c of parsed) {
     const me = cell(c.pid);
     for (const a of c.args) {
@@ -494,11 +528,21 @@ export function parseTrace(
         if (base === undefined) return { undetermined: `${c.name}("${p}") from pid ${c.pid}: relative to a directory the trace does not name` };
         abs = normalize(join(base, p)).replace(/(.)\/+$/, "$1");
       }
+      if (c.name === "execve" && c.pid !== top && /^0\b/.test(c.ret)) {
+        children.add(abs);
+        const argv = arrayArg(c.args[1] ?? "");
+        if (argv === undefined) return { undetermined: `a child's command line strace did not print whole (${(c.args[1] ?? "").slice(0, 80)})` };
+        const code = inlineCodeOf(abs, argv);
+        if (code !== undefined) inline.set(JSON.stringify([abs, code]), { program: abs, code });
+      }
+      if ((c.name === "mkdir" || c.name === "mkdirat") && /^0\b/.test(c.ret) && repoRelative(roots, abs) === undefined) scratch.add(abs);
       if (c.name === "execve" && /(^|\/)git$/.test(abs) && /^0\b/.test(c.ret)) {
-        gitPids.add(c.pid);
         const argv = arrayArg(c.args[1] ?? "");
         if (argv === undefined) return { undetermined: `a git command line strace did not print whole (${(c.args[1] ?? "").slice(0, 80)})` };
         const where = me.dir === undefined ? undefined : repoRelative(roots, me.dir);
+        // The run's own scratch repository: an ordinary process, its reads kept.
+        if (where === undefined && me.dir !== undefined && inScratch(me.dir)) continue;
+        gitPids.add(c.pid);
         if (where === undefined) return { undetermined: `git ${argv.slice(1).join(" ")} ran outside the checkout, or where the trace does not say` };
         const call = gitReplayable(where, argv.slice(1), (abs) => repoRelative(roots, abs));
         if ("undetermined" in call) return call;
@@ -509,6 +553,7 @@ export function parseTrace(
         write = false;
       }
       const rel = repoRelative(roots, abs);
+      if (rel === undefined && !write && SITE_PACKAGES_RE.test(abs) && /^\d/.test(c.ret)) external.add(abs);
       if (rel === undefined || excluded(rel, gitPids.has(c.pid))) continue;
       if (write) writes.push(`${c.name} ${rel || "."}`);
       else paths.add(rel);
@@ -559,7 +604,50 @@ export function parseTrace(
   }
   if (writes.length > 0) return { undetermined: `the check writes inside the checkout (${writes.slice(0, 3).join(", ")})` };
   if (paths.size > MAX_PATHS) return { undetermined: `the run touched ${paths.size} paths, more than ${MAX_PATHS}` };
-  return { paths: [...paths].sort(), git: [...git.values()], ...listedOf(listed, paths) };
+  return {
+    paths: [...paths].sort(),
+    git: [...git.values()],
+    ...listedOf(listed, paths),
+    ...(children.size ? { children: [...children].sort() } : {}),
+    ...(inline.size ? { inline: [...inline.keys()].sort().map((k) => inline.get(k)!) } : {}),
+    ...(external.size ? { external: [...external].sort() } : {}),
+  };
+}
+
+/** A directory Python installs packages in. A file read under one is an input the checkout does not hold. */
+const SITE_PACKAGES_RE = /\/(?:site|dist)-packages\//;
+
+/** A Python interpreter, by the name it was exec'd under. */
+const PYTHON_RE = /(?:^|\/)python(?:3(?:\.\d+)?)?$/;
+
+/**
+ * The code a child ran from its command line, which no file in the read set
+ * holds: `python3 -c <code>`, `bun` / `node` `-e` / `-p <code>`. `null` for a
+ * Python script read from stdin (no script argument, or `-`), whose text no
+ * trace shows. `undefined` when the child ran a file, or `-m` a module.
+ */
+export function inlineCodeOf(program: string, argv: readonly string[]): string | null | undefined {
+  const args = argv.slice(1);
+  if (PYTHON_RE.test(program)) {
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i]!;
+      if (a === "-c") return args[i + 1] ?? "";
+      if (/^-[A-Za-z]*c/.test(a) && !a.startsWith("--")) return a.slice(a.indexOf("c") + 1) || (args[i + 1] ?? "");
+      if (a === "-m") return undefined;
+      if (a === "-W" || a === "-X") {
+        i++;
+        continue;
+      }
+      if (a.startsWith("-") && a !== "-") continue;
+      return a === "-" ? null : undefined;
+    }
+    return null; // no script: it reads one from stdin
+  }
+  if (JS_RUNTIME_RE.test(program)) {
+    const i = args.findIndex((a) => a === "-e" || a === "--eval" || a === "-p" || a === "--print");
+    return i < 0 ? undefined : (args[i + 1] ?? "");
+  }
+  return undefined;
 }
 
 /** `{ listed }` for the read paths that were listed, left out when there are none. */
@@ -601,11 +689,19 @@ function repoRelative(roots: readonly string[], abs: string): string | undefined
 export function excluded(rel: string, byGit: boolean): boolean {
   if (rel === "node_modules" || rel.startsWith("node_modules/")) return true;
   if (rel === CONE_DIR || rel.startsWith(`${CONE_DIR}/`)) return true;
+  if (rel === STORE_DIR || rel.startsWith(`${STORE_DIR}/`)) return true;
+  // input-site: inert #6e4de56e — the input-hash cache directory, which every read set leaves out
   const cacheDir = join("build", "regen-cache");
   if (rel === cacheDir || rel.startsWith(`${cacheDir}/`)) return true;
   if (byGit && /(^|\/)\.git(\/|$)/.test(rel)) return true;
+  // Python's bytecode cache: a .pyc is used only while it matches its source,
+  // which the read set holds, so it is neither an input nor an output.
+  if (PYCACHE_RE.test(rel)) return true;
   return false;
 }
+
+/** A path inside a Python `__pycache__` directory, or the directory itself. */
+const PYCACHE_RE = /(^|\/)__pycache__(\/|$)/;
 
 // ── The state of a path ─────────────────────────────────────────────────────
 
@@ -697,7 +793,8 @@ function statState(abs: string, rel: string, digests: FileDigests, listed: boole
   }
   let names: string[] | undefined;
   try {
-    names = readdirSync(abs).sort();
+    // A listing never shows `__pycache__`: Python creates it as it runs ({@link excluded}).
+    names = readdirSync(abs).filter((n) => n !== "__pycache__").sort();
   } catch {
     names = undefined;
   }
@@ -712,6 +809,8 @@ export function gitKey(c: GitCall): string {
 
 /** What a git command answers now: its exit status and the digests of what it printed. */
 export function gitState(root: string, c: GitCall): string {
+  // input-site: traced #a664a724 — replays a recorded git command to decide a skip; a run that reaches it records no hash
+  inputSiteReached("ci-cone: gitState");
   const r = Bun.spawnSync(["git", ...c.args], { cwd: c.cwd === "" ? root : join(root, c.cwd), stdout: "pipe", stderr: "pipe", stdin: "ignore" });
   const h = (b: Uint8Array) => createHash("sha256").update(b).digest("hex");
   return `exit ${r.exitCode} out ${h(r.stdout)} err ${h(r.stderr)}`;
@@ -729,6 +828,16 @@ export interface ConeCheck {
   reads: Record<string, string>;
   /** Every git command it ran ({@link gitKey}), and what that command answered after the run. */
   git: Record<string, string>;
+  /**
+   * A test gate whose run started a `bun` child: every variable the modules it
+   * read can read ({@link childInputsOf}), and its value then (`null`: unset).
+   * Derived from the run, never declared; absent when it started none.
+   */
+  env?: Record<string, string | null>;
+  /** A test gate whose run started children: each program outside the checkout it exec'd, and the sha-256 of its binary then ({@link childInputsOf}). */
+  tools?: Record<string, string>;
+  /** The installed Python package files it read, outside the checkout, and their state then. */
+  external?: Record<string, string>;
 }
 
 export interface ConeRecords {
@@ -771,17 +880,79 @@ export function coneFingerprint(
   digests: FileDigests,
   baseline: BaselineResolver | undefined,
 ): Fingerprint {
+  if (isTestGate(script)) {
+    // A test file is a candidate like a `{tracked}` gate: its traced read set
+    // stands in for the tree. Its fingerprint's code is the file's closure AND
+    // the bunfig `[test] preload` modules `bun test` runs before it.
+    const pre = preloadScripts(root);
+    return fingerprint(root, { ...scripts, ...pre }, [script, ...Object.keys(pre)], { inputs: [], outputs: [] }, digests, baseline, { treeReplayed: true });
+  }
   if (io?.inputs?.includes(TRACKED) !== true) return { undetermined: "not declared {tracked} in task-io, so not a candidate" };
   return checkFingerprint(root, scripts, script, { inputs: [], outputs: io.outputs }, digests, baseline, { treeReplayed: true });
 }
 
+// ── Test files as gates ──────────────────────────────────────────────────────
+
+/**
+ * A test file is asked about, recorded and reused like a gate, under the name
+ * `test:<repo-relative path>` (owner, 2026-11-05: "Traced, like gates"). Its
+ * command runs that one file: `bun test ./<path>`, the `./` so bun reads it as
+ * a path and not a name filter. Its result is reused only when its derived
+ * read set matches exactly, never on its import closure alone, which does not
+ * see fixtures, directory walks or spawned scripts (the 4rbc rule).
+ */
+export const TEST_GATE_PREFIX = "test:";
+
+export function isTestGate(name: string): boolean {
+  return name.startsWith(TEST_GATE_PREFIX);
+}
+
+/** `test:<path>` → `bun test ./<path>`, for every test file `bun test` would collect under `root`. */
+export function testGates(root: string, files: readonly string[] = testFilesUnder(root)): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const f of files) out[`${TEST_GATE_PREFIX}${f}`] = `bun test ./${f}`;
+  return out;
+}
+
+/** The bunfig `[test] preload` modules, as pseudo-scripts whose entry is the module, so the fingerprint audits their closures too. */
+export function preloadScripts(root: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const p of testPreloads(root)) out[`test-preload:${p}`] = `bun ./${p}`;
+  return out;
+}
+
 export type ConeDecision = { skip: true; sha: string; why: string } | { skip: false; why: string };
+
+/** The recipe a stored result is filed under: an entry from another tracer or fingerprint recipe is never offered. */
+export const STORE_RECIPE = `cone-${TRACER_VERSION}/f017-${RECIPE_VERSION}`;
+
+/**
+ * Main's record first, then every stored green result of the same check
+ * (`result-store.ts`). The store is what lets a PR on an older base, or a
+ * merge-train run, reuse a result main's latest record no longer holds.
+ */
+export function decideWithStore(records: ConeRecords | undefined, script: string, fp: Fingerprint, root: string, digests: FileDigests): ConeDecision {
+  const first = decideCone(records, script, fp, root, digests);
+  if (first.skip || "undetermined" in fp) return first;
+  const found = findReusable<ConeCheck>(root, script, STORE_RECIPE, (e) => matchCheck(e, fp, root, digests));
+  return found.reuse ? { skip: true, sha: found.result.entry.sha, why: found.why } : { skip: false, why: `${first.why}; result store: ${found.why}` };
+}
 
 /** Whether a PR may skip `script`: its fingerprint and every recorded path match main's green run exactly. */
 export function decideCone(records: ConeRecords | undefined, script: string, fp: Fingerprint, root: string, digests: FileDigests): ConeDecision {
   if (records === undefined) return { skip: false, why: "no record from a green main run" };
   const rec = records.checks[script];
   if (rec === undefined) return { skip: false, why: `main's run ${records.sha.slice(0, 12)} recorded nothing for this check` };
+  return matchCheck(rec, fp, root, digests);
+}
+
+/**
+ * Whether the inputs now are exactly those of one recorded green run: the same
+ * fingerprint, the same state at every path it read, and the same answer from
+ * every git command it ran. The one rule both `records.json` and the result
+ * store (`result-store.ts`) decide by.
+ */
+export function matchCheck(rec: ConeCheck, fp: Fingerprint, root: string, digests: FileDigests): ConeDecision {
   if ("undetermined" in fp) return { skip: false, why: `inputs could not be determined: ${fp.undetermined}` };
   if (fp.hash !== rec.base) return { skip: false, why: "the script, its imports, the audited environment or the baseline changed" };
   for (const [p, state] of Object.entries(rec.reads)) {
@@ -804,6 +975,18 @@ export function decideCone(records: ConeRecords | undefined, script: string, fp:
     }
     if (gitState(root, call) !== state) return { skip: false, why: `git ${call.args.join(" ")} answers differently` };
   }
+  if (rec.env !== undefined) {
+    // input-site: traced #c6583b74 — compares a test's children's recorded environment, on the decide path
+    inputSiteReached("ci-cone: child env now");
+    const env = process.env;
+    for (const [n, v] of Object.entries(rec.env)) if ((env[n] ?? null) !== v) return { skip: false, why: `$${n}, which a child's source reads, changed` };
+  }
+  for (const [program, state] of Object.entries(rec.tools ?? {})) {
+    if (externalState(program) !== state) return { skip: false, why: `the program ${program} changed` };
+  }
+  for (const [path, state] of Object.entries(rec.external ?? {})) {
+    if (externalState(path) !== state) return { skip: false, why: `the installed package file ${path} changed` };
+  }
   return { skip: true, sha: rec.sha, why: `inputs unchanged since ${rec.sha} (${Object.keys(rec.reads).length} paths)` };
 }
 
@@ -821,6 +1004,10 @@ export function coneRecordOf(args: {
   reached: string | undefined;
   root: string;
   digests: FileDigests;
+  /** The package scripts, for a `scripts` site a child's module carries. */
+  scripts?: Readonly<Record<string, string>>;
+  /** A test gate: its `bun` children's environment is derived ({@link childInputsOf}). */
+  testGate?: boolean;
 }): ConeCheck | { none: string } {
   if (!args.passed) return { none: "the check did not pass" };
   if ("undetermined" in args.before) return { none: args.before.undetermined };
@@ -832,18 +1019,152 @@ export function coneRecordOf(args: {
   for (const p of args.reads.paths) reads[p] = readState(args.root, p, args.digests, listed);
   const git: Record<string, string> = {};
   for (const c of args.reads.git) git[gitKey(c)] = gitState(args.root, c);
-  return { sha: args.sha, base: args.before.hash, reads, git };
+  const child = args.testGate === true ? childInputsOf(args.root, args.reads, args.digests, args.scripts ?? {}) : { env: {}, tools: {}, external: {} };
+  if ("none" in child) return { none: child.none };
+  const nonEmpty = (k: "env" | "tools" | "external") => (Object.keys(child[k]).length ? { [k]: child[k] } : {});
+  return { sha: args.sha, base: args.before.hash, reads, git, ...nonEmpty("env"), ...nonEmpty("tools"), ...nonEmpty("external") };
+}
+
+/**
+ * The variables that change how a Python interpreter runs any script,
+ * whatever the script reads itself: recorded for every run that started one.
+ */
+export const PYTHON_RUNTIME_ENV = [
+  "PYTHONPATH", "PYTHONHOME", "PYTHONHASHSEED", "PYTHONSAFEPATH", "PYTHONUTF8", "PYTHONIOENCODING",
+  "PYTHONWARNINGS", "PYTHONOPTIMIZE", "PYTHONNOUSERSITE", "PYTHONUSERBASE", "PYTHONDONTWRITEBYTECODE", "PYTHONPYCACHEPREFIX", "VIRTUAL_ENV",
+] as const;
+
+/** The state of a file outside the checkout (an installed package file, a child's program): its sha-256, `dir`, or `absent`. */
+export function externalState(path: string): string {
+  try {
+    const st = lstatSync(path);
+    if (st.isDirectory()) return "dir";
+    return createHash("sha256").update(readFileSync(path)).digest("hex");
+  } catch {
+    return "absent";
+  }
+}
+
+/** A program that runs this tree's TypeScript: what a test's `spawned` site starts. */
+export const JS_RUNTIME_RE = /(?:^|\/)(?:bun|bunx|node)$/;
+
+/**
+ * What a test's `bun` and `python3` children read beyond the checkout,
+ * derived from its trace (owner, 2026-11-05: "Read them from the trace";
+ * Python: "Build it anyway"). A child's modules are
+ * in the read set, so a change to one reruns the test; its environment is
+ * not, so every source module the run read is audited as an entry (its
+ * `import.meta.main` block included, since a child runs it as one), and the
+ * variables they can read are recorded with their values. A module read only
+ * as text is audited too: that can only make the test run more often. Any
+ * site the audit cannot answer records nothing. A run that started no bun
+ * child records no variables.
+ *
+ * A Python child the same, by `input-sites-py.ts` over every `.py` file the
+ * run read, plus {@link PYTHON_RUNTIME_ENV} and every installed package file
+ * it read (outside the checkout, so in no read set). Every program a child
+ * exec'd outside the checkout is recorded by the digest of its binary. Code a child ran from its command line (`-c`, `-e`) is audited from
+ * the traced command line; a script read from stdin records nothing.
+ */
+export function childInputsOf(
+  root: string,
+  reads: Extract<ReadSet, { paths: string[] }>,
+  digests: FileDigests,
+  scripts: Readonly<Record<string, string>>,
+): { env: Record<string, string | null>; tools: Record<string, string>; external: Record<string, string> } | { none: string } {
+  const env: string[] = [];
+  const envUnset: string[] = [];
+  // Code a child ran from its command line is audited from that line, as a file would be.
+  for (const { program, code } of reads.inline ?? []) {
+    if (code === null) return { none: `${program} ran a script from stdin, which no trace shows` };
+    const where = `${program} inline code`;
+    const audit = PYTHON_RE.test(program) ? auditPython([{ file: where, text: code }]) : auditInlineScript(where, code);
+    if ("undetermined" in audit) return { none: `inline code: ${audit.undetermined}` };
+    env.push(...audit.env);
+    envUnset.push(...audit.envUnset);
+  }
+  const tools: Record<string, string> = {};
+  const external: Record<string, string> = {};
+  const isFile = (p: string) => existsSync(join(root, p)) && statSync(join(root, p)).isFile();
+  if ((reads.children ?? []).some((p) => JS_RUNTIME_RE.test(p))) {
+    const js = jsChildEnv(root, reads, digests, scripts, isFile);
+    if ("none" in js) return js;
+    env.push(...js.env);
+    envUnset.push(...js.envUnset);
+  }
+  const pythons = [...new Set((reads.children ?? []).filter((p) => PYTHON_RE.test(p)))];
+  if (pythons.length > 0) {
+    const py = auditPython(reads.paths.filter((p) => p.endsWith(".py") && isFile(p)).map((file) => ({ file, text: readFileSync(join(root, file), "utf-8") })));
+    if ("undetermined" in py) return { none: `a python child's sources: ${py.undetermined}` };
+    env.push(...py.env, ...PYTHON_RUNTIME_ENV);
+    envUnset.push(...py.envUnset);
+    if ((reads.external ?? []).length > MAX_PATHS) return { none: `the run read ${reads.external!.length} installed package files, more than ${MAX_PATHS}` };
+    for (const p of reads.external ?? []) external[p] = externalState(p);
+  }
+  // Every program a child exec'd outside the checkout, by the bytes that ran:
+  // `pandoc`, the interpreter, `git`. One in the checkout is in the read set.
+  for (const p of reads.children ?? []) if (!p.startsWith(`${resolve(root)}/`)) tools[p] = externalState(p);
+  const out: Record<string, string | null> = {};
+  // input-site: traced #659ad351 — records a test's children's environment, on the record path only
+  inputSiteReached("ci-cone: child env");
+  const now = process.env;
+  for (const n of envUnset) {
+    if ((now[n] ?? "") !== "") return { none: `$${n} is set, and a child's source names it as outside the tree` };
+    out[n] = null;
+  }
+  for (const n of env) out[n] = now[n] ?? null;
+  return { env: out, tools, external };
+}
+
+/** What `bun -e <code>` can read from the environment: its sites, read as one TypeScript module's. */
+function auditInlineScript(where: string, code: string): { env: string[]; envUnset: string[] } | { undetermined: string } {
+  const env = new Set<string>();
+  const envUnset = new Set<string>();
+  for (const s of scanSource(`${where}.ts`, code)) {
+    const problem = siteProblem(s);
+    if (problem !== undefined) return { undetermined: problem };
+    for (const v of s.verdicts as SiteVerdict[]) {
+      if (v.kind === "env") v.names.forEach((n) => env.add(n));
+      else if (v.kind === "env-unset") v.names.forEach((n) => envUnset.add(n));
+      else if (v.kind !== "inert" && v.kind !== "tree" && v.kind !== "head" && v.kind !== "refs") return { undetermined: `${where}: a \`${v.kind}\` site, which inline code cannot carry` };
+    }
+  }
+  return { env: [...env], envUnset: [...envUnset] };
+}
+
+/** What a test's `bun` children's modules can read from the environment: {@link childInputsOf}'s TypeScript half. */
+function jsChildEnv(
+  root: string,
+  reads: Extract<ReadSet, { paths: string[] }>,
+  digests: FileDigests,
+  scripts: Readonly<Record<string, string>>,
+  isFile: (p: string) => boolean,
+): { env: string[]; envUnset: string[] } | { none: string } {
+  const modules = reads.paths.filter((p) => /\.(m?[jt]sx?)$/.test(p) && isFile(p));
+  const audit = auditClosure(
+    root,
+    modules,
+    digests.sites,
+    undefined,
+    (name) => entryFiles(root, scripts, name),
+    (source) => digests.declared.resolve(source),
+  );
+  if ("undetermined" in audit) return { none: `a bun child's modules: ${audit.undetermined}` };
+  return { env: audit.env, envUnset: audit.envUnset };
 }
 
 // ── CLI ─────────────────────────────────────────────────────────────────────
 
 function summary(line: string): void {
+  // input-site: inert #a4a61631 — the job summary is where the cone's report is shown, never an input of a check
   const path = process.env.GITHUB_STEP_SUMMARY;
   if (path) appendFileSync(path, `${line}\n`);
 }
 
 function straceWorks(): boolean {
   if (Bun.which("strace") === null) return false;
+  // input-site: traced #b2558986 — asks whether strace works, on the record path only
+  inputSiteReached("ci-cone: straceWorks");
   const r = Bun.spawnSync(["strace", "-f", "-qq", "-o", "/dev/null", "true"], { stdout: "ignore", stderr: "ignore" });
   return r.exitCode === 0;
 }
@@ -857,6 +1178,10 @@ export interface ConeRunOpts {
   baseline: BaselineResolver | undefined;
   /** The main commit this run is on (`GITHUB_SHA`). */
   sha: string;
+  /** When the run finished, for ordering result-store entries; never part of a key. */
+  recordedAt?: string;
+  /** What names the run in a reuse report (`<sha> run <id>`); defaults to `sha`. */
+  run?: string;
   /** `ignore` silences the check's own output (tests). */
   stdio?: "inherit" | "ignore";
   /** What runs a script by name: `bun run cat` (bean `ar1s` P4), which tests replace. */
@@ -887,15 +1212,28 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
       : scriptCmd !== undefined
         ? ["sh", "-c", scriptCmd]
         : [...RUNNER, o.script];
+  // A test file's own run never takes `BUN_OPTIONS`: CI's test shards set it
+  // to `--shard=N/M --reporter=junit ...`, and inherited by `bun test ./<one
+  // file>` it shards that one file away to nothing, so the run reads nothing
+  // and a red file "passes" and is recorded (folio-assistant#2954, 2026-11-05;
+  // `testEnv` in pre-push-gates.ts drops it for the same reason).
+  const runEnv = (base: NodeJS.ProcessEnv): NodeJS.ProcessEnv => {
+    if (!isTestGate(o.script) || base.BUN_OPTIONS === undefined) return base;
+    const out = { ...base };
+    delete out.BUN_OPTIONS;
+    return out;
+  };
   const cmdEnv = (base: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
     o.runner === undefined && scriptCmd !== undefined
       ? {
-          ...base,
+          ...runEnv(base),
           PATH: `${join(o.root, "node_modules", ".bin")}${base.PATH ? `:${base.PATH}` : ""}`,
           npm_lifecycle_event: o.script,
         }
-      : base;
+      : runEnv(base);
   const plain = (why: string) => {
+    // input-site: traced #3f7614a5 — runs the check itself, untraced, on the record path
+    inputSiteReached("ci-cone: run plain");
     const r = Bun.spawnSync(cmdArgs, { cwd: o.root, stdin: stdio, stdout: stdio, stderr: stdio, env: cmdEnv(process.env) });
     return { code: r.exitCode ?? 1, note: `not traced — ${why}` };
   };
@@ -907,7 +1245,11 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
   }
   if ("undetermined" in before) return plain(before.undetermined);
   const trace = openTrace(o.root);
+  // input-site: traced #ce261302 — the trace file's name, on the record path
+  inputSiteReached("ci-cone: trace log");
   const log = join(tmpdir(), `ci-cone-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.strace`);
+  // input-site: traced #db7dd1a6 — runs the check under strace, on the record path
+  inputSiteReached("ci-cone: run traced");
   const r = Bun.spawnSync(["strace", ...STRACE_ARGS, "-o", log, ...cmdArgs], {
     cwd: o.root,
     stdin: stdio,
@@ -919,6 +1261,8 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
   if (code !== 0) {
     // The verdict must be the check's, never the tracer's. A traced run that
     // failed is asked again, untraced, and THAT exit status is the answer.
+    // input-site: traced #d365c714 — re-runs a failed traced check untraced, on the record path
+    inputSiteReached("ci-cone: run again");
     const again = Bun.spawnSync(cmdArgs, { cwd: o.root, stdin: stdio, stdout: stdio, stderr: stdio, env: cmdEnv(process.env) });
     code = again.exitCode ?? 1;
     rmSync(log, { force: true });
@@ -940,6 +1284,8 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
       reached: trace.reached(againstRefsOf(o.scripts, o.script)),
       root: o.root,
       digests,
+      scripts: o.scripts,
+      testGate: isTestGate(o.script),
     });
     const records = loadRecords(o.root) ?? { version: TRACER_VERSION, recipe: RECIPE_VERSION, sha: o.sha, checks: {} };
     if ("none" in rec) {
@@ -947,7 +1293,8 @@ export function recordRun(o: ConeRunOpts): { code: number; note: string } {
       note = `not recorded — ${rec.none}`;
     } else {
       records.checks[o.script] = rec;
-      note = `recorded (${Object.keys(rec.reads).length} paths)`;
+      const digest = putResult<ConeCheck>(o.root, { gate: o.script, recipe: STORE_RECIPE, recordedAt: o.recordedAt ?? "", run: o.run ?? o.sha, entry: rec });
+      note = `recorded (${Object.keys(rec.reads).length} paths; result store ${digest.slice(0, 12)})`;
     }
     saveRecords(o.root, records);
   } catch (e) {
@@ -964,7 +1311,7 @@ export function decideRun(o: Omit<ConeRunOpts, "sha" | "stdio" | "runner">): Con
   try {
     const digests = new FileDigests(o.root);
     const fp = coneFingerprint(o.root, o.scripts, o.script, o.io, digests, o.baseline);
-    return decideCone(loadRecords(o.root), o.script, fp, o.root, digests);
+    return decideWithStore(loadRecords(o.root), o.script, fp, o.root, digests);
   } catch (e) {
     return { skip: false, why: `could not decide: ${(e as Error).message}` };
   }
@@ -999,7 +1346,7 @@ export function decideAll(o: {
   for (const script of o.names) {
     try {
       const fp = coneFingerprint(o.root, o.scripts, script, o.ioOf(script), digests, o.baseline);
-      decisions[script] = { ...decideCone(records, script, fp, o.root, digests), candidate: !("undetermined" in fp) };
+      decisions[script] = { ...decideWithStore(records, script, fp, o.root, digests), candidate: !("undetermined" in fp) };
     } catch (e) {
       decisions[script] = { skip: false, why: `could not decide: ${(e as Error).message}`, candidate: false };
     }
@@ -1010,8 +1357,13 @@ export function decideAll(o: {
 function main(argv: readonly string[]): number {
   const [cmd, script] = argv;
   const root = process.cwd();
+  // input-site: traced #c6583b74 — the cone CLI's environment; a check never runs this module's main()
+  inputSiteReached("ci-cone: main");
   const env = process.env;
-  const scripts = scriptsOf(root);
+  // A `test:<path>` name is a test file (see TEST_GATE_PREFIX); only asked
+  // for, so a run about package scripts never walks the tree for tests.
+  const asked = cmd === "decide-all" ? argv.slice(2) : [script ?? ""];
+  const scripts = asked.some(isTestGate) ? { ...scriptsOf(root), ...testGates(root) } : scriptsOf(root);
   if (cmd === "decide-all") {
     // `decide-all <out.json> <script>...` (cat-harness-tools#398): every
     // decision in one file, for `run-gates.py`. Exit 0 whenever the file was
@@ -1078,7 +1430,11 @@ function main(argv: readonly string[]): number {
     summary(`- \`${script}\` SKIPPED — ${d.why}`);
     return 0;
   }
-  const { code, note } = recordRun({ ...opts, sha: env.GITHUB_SHA ?? "local" });
+  const sha = env.GITHUB_SHA ?? "local";
+  const run = env.GITHUB_RUN_ID ? `${sha.slice(0, 12)} run ${env.GITHUB_RUN_ID}` : sha.slice(0, 12);
+  // input-site: inert #7dd167ca — when the run finished, which orders result-store entries and is never part of a key
+  const recordedAt = new Date().toISOString();
+  const { code, note } = recordRun({ ...opts, sha, run, recordedAt });
   console.log(`ci-cone: ${script} ${note}`);
   return code;
 }

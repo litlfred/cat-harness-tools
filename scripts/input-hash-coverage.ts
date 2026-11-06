@@ -53,7 +53,7 @@ for (const [task, io] of Object.entries(TASK_IO).sort(([a], [b]) => a.localeComp
     ? { undetermined: "does not resolve to script files" }
     : foreign !== undefined
       ? { undetermined: `${foreign} is not TypeScript/JavaScript, so its reads cannot be audited` }
-      : auditClosure(root, entries, memo, problems, (name) => entryFiles(root, scripts, name));
+      : auditClosure(root, entries, memo, problems, (name) => entryFiles(root, scripts, name), (source) => digests.declared.resolve(source));
   for (const p of problems) {
     const site = /at (\S+:\d+)/.exec(p)?.[1] ?? p;
     (blockers.get(site) ?? blockers.set(site, new Set()).get(site)!).add(task);

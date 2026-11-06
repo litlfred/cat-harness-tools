@@ -118,7 +118,7 @@ export const BranchPrefixSchema = z
  * ## `route-family`, and why its reasoning is HERE
  *
  * One entry per MEMBER of a family under a directory's path, the member
- * supplied at publish time rather than declared — the `STAGING/<slug>/`
+ * supplied at publish time rather than declared — the `branches/<slug>/`
  * previews on `gh-pages`, one per open branch. Bean `xp5j`.
  *
  * A fourth keying rather than a flag on `route`, because `route` must not carry
@@ -135,7 +135,7 @@ export const BranchPrefixSchema = z
  * 3. **A member can be REMOVED.** `route`'s contract has no case for it — "a
  *    generator that stops emitting a page must stop publishing it" — but a
  *    member's branch can be deleted, and `feature-staging.yml` already deletes
- *    `STAGING/<slug>` on PR close.
+ *    `branches/<slug>` on PR close.
  *
  * Like `route`, a `route-family` write carries NO `expect`: a member is a
  * rendering authored by nobody, so the newer generation wins.

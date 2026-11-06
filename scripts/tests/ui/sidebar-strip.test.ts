@@ -20,11 +20,11 @@
  * The rendered result is not checked HERE, but it is no longer true that it
  * cannot be. `remote_theme` resolves on the runner, so the theme's compiled
  * selectors are not in this checkout, and this environment's proxy refuses the
- * published site over HTTP — but the STAGING PREVIEW IS COMMITTED TO
+ * published site over HTTP — but the branches/ PREVIEW IS COMMITTED TO
  * `gh-pages`, and git reaches it:
  *
  *     git fetch origin gh-pages
- *     git archive FETCH_HEAD:STAGING/<slug> | tar -x -C <dir>/<baseurl>/STAGING/<slug>
+ *     git archive FETCH_HEAD:branches/<slug> | tar -x -C <dir>/<baseurl>/branches/<slug>
  *
  * Served at THAT path -- the pages address their assets under the staging
  * baseurl, and mounting them anywhere else 404s every stylesheet while still

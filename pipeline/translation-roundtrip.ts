@@ -57,8 +57,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { gitHeadSha, hashFile } from "./qa-utils.ts";
-import { ADJUDICATOR_ACTOR, CHECKER_ACTOR } from "./untainted-verification.ts";
+import { gitHeadTree, hashFile } from "./qa-utils.ts";
+import { ADJUDICATOR_ACTOR, CHECKER_ACTOR, reviewAddress } from "./untainted-verification.ts";
 import type {
   TranslationBlockQaReport,
   TranslationFieldHash,
@@ -111,8 +111,9 @@ export interface RoundTripPayload {
   /** Anything the back-translator flagged as ambiguous. */
   uncertainties?: string[];
   /**
-   * When the review ran, and the repo HEAD it ran against, if it is being
-   * re-recorded.
+   * When the review ran, and the tree of the repo HEAD it ran against, if it
+   * is being re-recorded (the tree, not the commit: bean 69lr; owner card Q4,
+   * 2026-11-05).
    *
    * Both default to now / current HEAD. Passing them matters when provenance
    * is added to a verdict that already exists: the review happened when it
@@ -123,6 +124,12 @@ export interface RoundTripPayload {
    * put the merge commit of a later PR on a 20:32 review.
    */
   reviewedAt?: string;
+  reviewedTree?: string;
+  /**
+   * Legacy: the review's commit, for a caller that still names it so. Written
+   * through as `reviewed_sha` with no tree stamped beside it — see
+   * `reviewAddress` in `untainted-verification.ts` for why.
+   */
   reviewedSha?: string;
 }
 
@@ -158,7 +165,10 @@ export function roundTripEntries(
   fieldHash: TranslationFieldHash,
 ): TranslationQaEntry[] {
   const at = payload.reviewedAt ?? new Date().toISOString();
-  const sha = payload.reviewedSha ?? gitHeadSha(INSTANCE_ROOT);
+  const address = reviewAddress(
+    { reviewed_tree: payload.reviewedTree, reviewed_sha: payload.reviewedSha },
+    gitHeadTree(INSTANCE_ROOT),
+  );
   const findings = payload.findings?.filter((f) => f.trim() && f.trim().toLowerCase() !== "none");
 
   const verdict: TranslationQaEntry = {
@@ -173,7 +183,7 @@ export function roundTripEntries(
       ...agentFields(payload.adjudicator),
     },
     reviewed_at: at,
-    reviewed_sha: sha,
+    ...address,
     metrics: provenanceMetrics(payload.adjudicator, { role: "adjudicator" }),
     notes: payload.reasoning,
   };
@@ -190,7 +200,7 @@ export function roundTripEntries(
       ...agentFields(payload.backTranslator),
     },
     reviewed_at: at,
-    reviewed_sha: sha,
+    ...address,
     metrics: provenanceMetrics(payload.backTranslator, {
       // `role` is what `isCheckerWitness` reads. Without it this entry — which
       // rules on nothing — reads as `untainted-checker` emitting a verdict and

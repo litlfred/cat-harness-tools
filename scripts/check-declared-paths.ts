@@ -73,7 +73,7 @@ import { docsSourceDirFor, readDeclaration, resolveDirectories } from "../schema
 import { isBuiltAtPublish } from "../schemas/kg/built-at-publish.js";
 import { resolveImplementingPath } from "../schemas/kg/harness-config.js";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
-import { subgraphHarnessPath } from "./lib/harness-layout.ts";
+import { legacyHarnessPath, subgraphHarnessPath } from "./lib/harness-layout.ts";
 import { isJsonManifest } from "../pipeline/json-manifest.ts";
 
 const root = resolve(HARNESS_ROOT);
@@ -495,6 +495,17 @@ export function scanDeclaredPaths(root: string, codeRoots: string[] = [...new Se
       // holds since bean `8lcl` moved it (`schemas/**/*.ts`); resolve it there
       // as the readers do (`implementingRootFor`), so the witness survives.
       let abs = join(root, value);
+      // TRANSITIONAL, as `witnessesOf` is: a harness path that moved into a
+      // named sub-graph resolves in whichever layout this checkout has, so a
+      // witness holds on both sides of the move.
+      if (!existsSync(abs)) {
+        for (const alt of [subgraphHarnessPath(value), legacyHarnessPath(value)]) {
+          if (alt !== value && existsSync(join(root, alt))) {
+            abs = join(root, alt);
+            break;
+          }
+        }
+      }
       // Code only: the implementing layer also holds its OWN state graphs
       // (its `beans/` store, say), and a harness literal naming `beans/…` is
       // not a module that moved, so it must not resolve against that layer.

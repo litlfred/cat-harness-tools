@@ -9,7 +9,7 @@
  *
  * The graph is deliberately absent from the published site, so the page is
  * declared `publish: "staging-only"` and `compose-docs.ts` withholds it unless
- * told `--staging`. A local build or a `STAGING/<slug>/` preview has the page;
+ * told `--staging`. A local build or a `branches/<slug>/` preview has the page;
  * the published site does not.
  *
  * It is an INDEX: each entry links to the file on GitHub rather than
@@ -224,7 +224,7 @@ const BADGE: Record<DeclState, string> = {
 const CSS = `
 .fg-tag{display:inline-block;padding:.05rem .4rem;border-radius:3px;font-size:.75rem;
   font-weight:600;white-space:nowrap;border:1px solid currentColor}
-/* Bean rtuo: light-page inks measured 2.19-2.29:1 on the default dark page
+/* Work item rtuo: light-page inks measured 2.19-2.29:1 on the default dark page
    (#27262b). Dark inks by default; the light scheme keeps the originals. */
 .fg-ok{color:#5cd3bd}    /* 8.23:1 on #27262b */
 .fg-side{color:#b9a8ec}  /* 7.06:1 */
@@ -261,7 +261,7 @@ export function page(files: GutsFile[], blobBase: string): string {
     "deploy and includes it in a local build or a `STAGING/<slug>/` preview.",
     "",
     "`fsh-guts` holds content that was **relocated rather than deleted**. The rule",
-    "it makes enforceable is the one `AGENTS.md` states for beans and means",
+    "it makes enforceable is the one `AGENTS.md` states for work items and means",
     "generally: a scrapped item stops the next agent re-entering a dead end, while",
     "a deleted one cannot be told from an accident. Delete here means relocate, and",
     "relocate is reversible.",

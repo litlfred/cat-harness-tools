@@ -1568,6 +1568,30 @@ jobs:
           echo "CI cone records: $KEY"
           mkdir -p fa/build/ci-cone
           cp "$RUNNER_TEMP/cone/records.json" fa/build/ci-cone/records.json
+      # The result store (scripts/result-store.ts, cat-harness-tools#1503):
+      # every green cone record pushes to main kept, many per gate, so a PR on
+      # an older base, or a merge-train run, can still match one. Restored from
+      # the newest key, like the records; a cache restores only under the path
+      # it was saved with, so it lands in RUNNER_TEMP and is copied into the
+      # root, where ci-cone.ts reads it (read sets leave it out). None
+      # restored: main's record alone decides, as before.
+      - name: The result store from the caller's main
+        id: store-restore
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/result-store
+          key: layer-pr-checks-results-v1-${{ github.repository }}-none-${{ github.run_id }}
+          restore-keys: |
+            layer-pr-checks-results-v1-${{ github.repository }}-
+      - name: Put it where ci-cone.ts reads it
+        if: steps.store-restore.outputs.cache-matched-key != ''
+        env:
+          KEY: ${{ steps.store-restore.outputs.cache-matched-key }}
+        run: |
+          set -euo pipefail
+          echo "Result store: $KEY"
+          mkdir -p fa/build
+          cp -R "$RUNNER_TEMP/result-store" fa/build/result-store
       - name: strace, for the records (a push)
         # Measured in bean `4rbc`: `strace -f` costs a traced gate 3-10x, so
         # it runs on main's pushes only, never on a PR's critical path. Not
@@ -1671,6 +1695,13 @@ jobs:
         env:
           NAME: results-${{ matrix.side }}-${{ matrix.shard }}
         run: printf '%s\n' "$NAME" > "$RUNNER_TEMP/artefact-name"
+      # A push records: carry this shard's store out (what it restored plus
+      # what ci-cone.ts run filed), for the compare job to union and keep.
+      - name: Carry the result store out (a push)
+        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        run: |
+          set -euo pipefail
+          if [ -d fa/build/result-store ]; then cp -R fa/build/result-store "$RUNNER_TEMP/result-store-out"; fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: results-${{ matrix.side }}-${{ matrix.shard }}
@@ -1680,6 +1711,7 @@ jobs:
             ${{ runner.temp }}/gates.json
             ${{ runner.temp }}/gates-shard.json
             ${{ runner.temp }}/cone-records.json
+            ${{ runner.temp }}/result-store-out
             ${{ runner.temp }}/artefact-name
 
   # `!cancelled()`, not the default `success()`: a shard or prepare job that
@@ -1924,6 +1956,29 @@ jobs:
         with:
           path: ${{ runner.temp }}/cone
           key: ${{ needs.prepare-base.outputs.cone }}
+      # The result store (cat-harness-tools#1503): the union of what main's
+      # shards carried out, newest 16 per gate, under a key of its own run. A
+      # PR restores the newest such key, so the store grows across pushes
+      # instead of being replaced.
+      - name: Join the result store (a push)
+        id: store
+        # Only a push to the default branch saves: its cache is the one every
+        # PR can restore, and a PR's own run never writes it, so no branch
+        # can plant results for another.
+        if: steps.join.outcome == 'success' && github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          python3 .github/scripts/layer-pr-checks/merge-results.py "$RUNNER_TEMP/result-store" results/results-base-*/result-store-out
+          if [ -d "$RUNNER_TEMP/result-store" ] && [ -n "$(ls -A "$RUNNER_TEMP/result-store")" ]; then echo "kept=true" >> "$GITHUB_OUTPUT"; fi
+      - name: Keep the result store for the PRs (a push)
+        if: steps.store.outputs.kept == 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/result-store
+          key: layer-pr-checks-results-v1-${{ github.repository }}-${{ github.sha }}-${{ github.run_id }}
       - name: Keep the gate seconds, to balance the next run's shards
         if: steps.join.outcome == 'success'
         continue-on-error: true

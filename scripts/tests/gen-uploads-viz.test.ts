@@ -99,7 +99,7 @@ describe("the viewer is a queue view", () => {
   test("the projection is fetched by the RELATIVE href it was given", () => {
     // #801, one layer along: an absolute site-root path resolves against the
     // ORIGIN under a baseurl, which is how twelve navbar tiles came to 404.
-    // The same bytes have to serve the canonical deploy and a STAGING preview.
+    // The same bytes have to serve the canonical deploy and a branches/ preview.
     expect(html).toContain(JSON.stringify("../../assets/uploads/index.json"));
     expect(html).not.toMatch(/fetch\(["']\//);
   });

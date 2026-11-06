@@ -25,11 +25,14 @@ import { markdownEditLink, repoOf } from "../src/core/edit-links.js";
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync, rmSync, unlinkSync } from "node:fs";
 import { workflowFiles, corpusScopeFor } from "./known-skills.js";
 import { GLOBAL_TASK_ELEMENT } from "../src/workflow/process-model.js";
+import { listInstances } from "../src/workflow/store.js";
+import { workPlanFindings, workPlanOf } from "../schemas/sdlc/work-plan.js";
 import { join, dirname, relative, resolve, posix, sep } from "node:path";
 import { instanceRepositories, type InstanceRepository } from "../schemas/kg/instance-repositories.ts";
 import type { WebPage, WebPageNode } from "../schemas/ui/webpage.ts";
 import { resolveTarget } from "../schemas/sdlc/todo-index.js";
 import { groupTodosByPage, renderTodoListing, todoListingFileFor } from "./todo-listing.js";
+import { provenanceLogFor, writeProvenanceListing } from "./provenance-footer.ts";
 import { SEMANTIC_ZOOM_FILE, readSemanticZoom } from "../schemas/kg/semantic-zoom.js";
 import {
   buildTranslationIndex,
@@ -1275,6 +1278,13 @@ const labelFile = new Map<string, string>();
 const pageRoute = new Map<string, string>();
 const publishedAt = (slug: string): string => pageRoute.get(slug) ?? publishedPagePath(OUT_DIR, slug);
 
+/**
+ * Each page's source documents, keyed as the footer looks them up, for the
+ * provenance footer (`provenance-footer.ts`). A generated page's blocks are
+ * its sources, in node order. Authored pages are added after the loop.
+ */
+const provenancePages = new Map<string, string[]>();
+
 for (const src of allDocsSources()) {
 CUR = src;
 if (!src.base) console.log(`  docs source: ${src.instance} — ${relative(repoRootFor(INSTANCE_ROOT), src.srcDir)}`);
@@ -1366,6 +1376,10 @@ for (const slug of slugs) {
   qaUnswept = [];
   const body = renderPage(page);
   emit(outPath, body);
+  provenancePages.set(
+    pageKey,
+    page.nodes.map((n) => join(src.srcDir, slug, `${n.id}.md`)),
+  );
   // The page's verdict index: what every badge on it needs to paint itself,
   // in ONE request. Written even when empty, because a page with badges and a
   // missing index is indistinguishable in the browser from a network failure,
@@ -1796,6 +1810,47 @@ function processHierarchy(): Record<string, string[]> {
     );
   }
 
+  // THE PROVENANCE FOOTER (owner, 2026-11-05, "2B"). The generated pages
+  // were collected in the loop above. An AUTHORED page is any `.md` under the
+  // site directory with a `.prov.jsonld` beside it, outside `docs/source/`
+  // (those are blocks of generated pages) and outside `assets/` (PROV traces
+  // of another shape). Both go into one slice of site data.
+  {
+    const srcRel = relative(OUT_DIR, SRC_DIR).split(sep).join("/");
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const abs = join(dir, e.name);
+        const rel = relative(OUT_DIR, abs).split(sep).join("/");
+        if (e.isDirectory()) {
+          if (e.name.startsWith("_") || e.name.startsWith(".") || rel === "assets" || rel === srcRel) continue;
+          walk(abs);
+        } else if (e.name.endsWith(".md") && existsSync(provenanceLogFor(abs))) {
+          const key = rel.replace(/\.md$/, "");
+          if (!provenancePages.has(key)) provenancePages.set(key, [abs]);
+        }
+      }
+    };
+    walk(OUT_DIR);
+    const result = writeProvenanceListing({
+      siteDir: OUT_DIR,
+      producer: "docs-pages",
+      pages: provenancePages,
+      check,
+      emit: (path, content) => emit(path, content, "data"),
+      banner: GENERATED_INCLUDE_BANNER,
+    });
+    for (const f of result.stale) {
+      if (check) {
+        console.error(`  ✗ _includes/generated/provenance/docs-pages/${f} is stale: that page has no provenance log any more`);
+        stale++;
+      }
+    }
+    console.log(
+      `  ${check ? "·" : "✓"} _includes/generated/provenance/docs-pages/ ` +
+        `(${result.pages} page(s), ${result.entries} provenance entries)`,
+    );
+  }
+
   // THE GRAPH AND A PAGE PER TODO — issue #1908. From the SAME `items`, so the
   // JSON index the board reads, the no-JS floor and the JSON-LD cannot
   // disagree about what a todo says or what it is attached to.
@@ -1929,6 +1984,44 @@ function processHierarchy(): Record<string, string[]> {
     const { edges, dangling } = blockEdges(beans);
     const blockers = blockedBy(beans);
     const blocks = blocksOf(beans);
+    // WORK PLANS (work item folio-assistant-exrp, owner 2026-11-05: "Epic is
+    // the plan"). An epic or milestone that names the process it runs, read
+    // from its `process:` / `proposal:` tags, and the instances that name it
+    // as their plan. Joined HERE, so the board renders a plan's process and
+    // its runs without reading the instance store itself. An instance store
+    // that cannot be read gives no runs, and the plan says so (`runs: null`)
+    // rather than showing none.
+    let instancesRead: ReturnType<typeof listInstances> | null;
+    try {
+      instancesRead = listInstances(repoRootFor(INSTANCE_ROOT));
+    } catch {
+      instancesRead = null;
+    }
+    const runsOf = (id: string) =>
+      instancesRead === null
+        ? null
+        : instancesRead
+            .filter((i) => i.plan === id)
+            .map((i) => ({ id: i.id, processId: i.processId, status: i.status, at: i.tokens, updatedAt: i.updatedAt }));
+    // The proposal's link, resolved HERE from the declarations: a proposal
+    // path is checkout-relative (`cat-harness/docs/proposals/x.md`), and the
+    // board's own `fileWeb` is the work-item store's repository, which does
+    // not hold it. The declaring instance's repository does (as edit links).
+    const proposalHref = (path: string): string => {
+      const at = declaredEditLocation(path);
+      return at.repo ? `https://github.com/${at.repo}/blob/main/${at.source}` : `${REPO_WEB}/blob/main/${path}`;
+    };
+    const planField = (id: string, tags: readonly string[] | undefined) => {
+      const plan = workPlanOf(tags);
+      if (plan === undefined) return {};
+      return {
+        plan: {
+          ...plan,
+          ...(plan.proposal !== undefined ? { proposalHref: proposalHref(plan.proposal) } : {}),
+          runs: runsOf(id),
+        },
+      };
+    };
     const items = beans.map((b) => ({
       id: b.id,
       title: b.title,
@@ -1936,6 +2029,10 @@ function processHierarchy(): Record<string, string[]> {
       type: b.type,
       priority: b.priority,
       parent: b.parent,
+      // Present only on a work plan: what it runs, where it came from, and
+      // the instances running under it. Absent is "not a plan", never "a
+      // plan with nothing known".
+      ...planField(b.id, b.tags),
       // Both directions, resolved once. A client given only `blocking` would
       // have to invert the whole set to answer "what is holding THIS bean up",
       // which is the question a board is actually asked. Both from the edge
@@ -1981,6 +2078,9 @@ function processHierarchy(): Record<string, string[]> {
         // `blocking-unknown` finding: reported, never dropped.
         edges,
         findings: beanFindings(beans),
+        // A work plan filed under the wrong type, or a proposal with no
+        // process: reported, never fatal (`schemas/sdlc/work-plan.ts`).
+        planFindings: workPlanFindings(beans),
         // The milestone rollup, COMPUTED HERE so the board renders a number
         // it does not derive. The board already loads every bean's `parent`,
         // `type` and `status`, so it could compute the closure client-side —

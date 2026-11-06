@@ -120,7 +120,7 @@ describe("the plan", () => {
     const o = parseArgs(["--harness", "litlfred/fhir-harness", "--consent-by", "me"]);
     const c = resolveClosure({ repository: o.harness }, o, fakeFetcher(FHIR));
     const lines = planLines(o, c, "harness/fhir-harness").join("\n");
-    for (const s of ["seed", "mount", "install", "instantiate:fhir-harness", "prepare:fhir-harness", "STAGING/harness-fhir-harness/"]) expect(lines).toContain(s);
+    for (const s of ["seed", "mount", "install", "instantiate:fhir-harness", "prepare:fhir-harness", "branches/harness-fhir-harness/"]) expect(lines).toContain(s);
     expect(planLines({ ...o, local: true }, c, "b").join("\n")).toContain("--dry-run");
   });
 });

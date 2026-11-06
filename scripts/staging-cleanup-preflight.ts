@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Is it safe to remove one `STAGING/<slug>/` review preview, RIGHT NOW?
+ * Is it safe to remove one `branches/<slug>/` review preview, RIGHT NOW?
  *
  * ```sh
  * bun run cat-harness-tools/scripts/staging-cleanup-preflight.ts --slug claude-health-checks
@@ -42,6 +42,7 @@ import { originSlug, probeBranches, probeOpenPrHeads } from "../test/health/prob
 import { RETIRED_DIR, SLUG_PATTERN } from "./restore-staging.ts";
 import { pathToFileURL } from "node:url";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { PREVIEW_PREFIX } from "./lib/preview-prefix.ts";
 
 /**
  * What a slug may contain — defined in `restore-staging.ts` beside the other
@@ -146,12 +147,12 @@ if (import.meta.main) {
   const verdict = await runPreflight(slug, { repo });
 
   if (verdict.decision === "remove") {
-    console.log(`STAGING/${slug}: no liveness signal fired — no open pull request, no branch carrying unmerged work, no recent commit.`);
+    console.log(`${PREVIEW_PREFIX}/${slug}: no liveness signal fired — no open pull request, no branch carrying unmerged work, no recent commit.`);
     console.log("Removal may proceed. It still needs the person who dispatched it to have said so, which is the confirmation input.");
     process.exit(0);
   }
   if (verdict.decision === "refuse-live") {
-    console.error(`REFUSING to remove STAGING/${slug}: it is still in use.`);
+    console.error(`REFUSING to remove ${PREVIEW_PREFIX}/${slug}: it is still in use.`);
     console.error(`  ${verdict.why}`);
     console.error(
       "This is bean `w2g5` and `oz5w`: a preview whose pull request is closed is not an abandoned one, and a session that " +
@@ -159,7 +160,7 @@ if (import.meta.main) {
     );
     process.exit(1);
   }
-  console.error(`REFUSING to remove STAGING/${slug}: liveness could not be established.`);
+  console.error(`REFUSING to remove ${PREVIEW_PREFIX}/${slug}: liveness could not be established.`);
   console.error(`  ${verdict.why}`);
   console.error("Could-not-determine refuses here, the same way it declines to accuse in the health sweep.");
   process.exit(2);

@@ -657,7 +657,7 @@ function writeChurn(against: string, entries: readonly ChurnEntry[], writerOf: (
   writeFileSync(file, JSON.stringify(report, null, 2) + "\n");
   const md = renderChurn(report);
   console.log(md);
-  // input-site: inert #7c1e04b2 — the job summary is where the report is shown, never an input of a writer
+  // input-site: inert #ab4c9ec1 — the job summary is where the report is shown, never an input of a writer
   const summary = process.env.GITHUB_STEP_SUMMARY;
   if (summary) appendFileSync(summary, md);
 }

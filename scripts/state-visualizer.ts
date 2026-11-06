@@ -68,7 +68,7 @@
  *
  * It does NOT open from `file://` — the code is inlined but the data is
  * fetched, and Chromium blocks that as cross-origin. Over any HTTP root,
- * including a staging preview under `STAGING/<slug>/`, it works with no
+ * including a staging preview under `branches/<slug>/`, it works with no
  * configuration, because every path is relative to the page.
  *
  * Usage:
@@ -820,7 +820,7 @@ export function beansBoardPage(
   src: string,
 ): string {
   return page({
-    title: "Work plan",
+    title: "Plans and work",
     body: `<h1 id="beans">${esc(g.id)}</h1>
 <p class="sv-sub">${esc(g.path)} · ${esc(g.kinds.join(", "))}</p>
 <div class="fa-workplan" data-fa-workplan data-fa-workplan-only="beans">
@@ -2473,7 +2473,7 @@ export function beansSubjectPage(
   read: BeanStoreRead = readSubjectBeans(s.instanceRoot),
   view?: Omit<WorkflowViewContext, "beans">,
 ): string {
-  const title = vis.title ?? "Work plan";
+  const title = vis.title ?? "Plans and work";
   const others = subjects
     .map((o) =>
       o.name === s.name

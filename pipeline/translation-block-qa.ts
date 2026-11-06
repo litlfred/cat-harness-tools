@@ -90,7 +90,7 @@ import { parsePo, parsePoEntries, poContextKey } from "./po-inject.ts";
 import { directoryForGraph } from "../schemas/kg/cat-harness.js";
 import { poResolveContext, resolvePoSources, type PoResolveContext } from "./po-resolve.ts";
 import { extractMarkdown, extractFromManifest, type ManifestInput } from "./pot-extract.ts";
-import { gitFileCommitSha, gitHeadSha, hashFile, sweepActor, walkBlocks } from "./qa-utils.ts";
+import { gitFileCommitSha, gitHeadTree, hashFile, sweepActor, walkBlocks } from "./qa-utils.ts";
 import { existingTranslationQaPath, translationQaPath } from "./qa-paths.ts";
 import {
   isAsciiEscaped,
@@ -525,7 +525,8 @@ function entry(
     reviewer: reviewer(),
     // input-site: inert #1cab269c — reviewed_at; --check compares substantive(), which drops timestamps
     reviewed_at: new Date().toISOString(),
-    reviewed_sha: gitHeadSha(INSTANCE_ROOT),
+    // The tree, not the commit (bean 69lr; owner card Q4, 2026-11-05).
+    reviewed_tree: gitHeadTree(INSTANCE_ROOT),
     ...extra,
   };
 }

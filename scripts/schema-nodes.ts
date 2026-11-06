@@ -30,6 +30,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
+import { ownDirectoriesForGraph } from "./lib/gate-own.ts";
 import { directoriesForGraph } from "../schemas/kg/cat-harness.js";
 import type { CorpusScope } from "./known-skills.js";
 import { withConcernGroupDirs } from "./concern-groups.ts";
@@ -67,9 +68,21 @@ import { withConcernGroupDirs } from "./concern-groups.ts";
  * `scope` is the corpus by default, which is what the gate asks. `"instance"`
  * is the instance's own declaration alone — what `kg-export` publishes for it
  * since the split (bean `4ak5` item 2), so its schema nodes are its own.
+ *
+ * `own`, when given, keeps only the corpus directories those instances commit
+ * (`scripts/lib/gate-own.ts`: owner ruling 2026-11-05, "Move the checks"). A
+ * mounted lower layer's `schemas/` is judged by that layer's own CI, so a
+ * defect committed there is not charged to every root that mounts it. With
+ * `own` and none of its directories declared, there is nothing to read: `[]`,
+ * not the `schemas/` fallback, which names the harness's own.
  */
-function schemasRoots(root: string, scope: CorpusScope = "checkout"): string[] {
-  const declared = scope === "instance" ? directoriesForGraph(root, "schemas") : corpusDirectoriesForGraph(root, "schemas");
+function schemasRoots(root: string, scope: CorpusScope = "checkout", own?: ReadonlySet<string>): string[] {
+  let declared: string[];
+  if (scope === "instance") declared = directoriesForGraph(root, "schemas");
+  else if (own) {
+    declared = ownDirectoriesForGraph(root, "schemas", own);
+    if (declared.length === 0) return [];
+  } else declared = corpusDirectoriesForGraph(root, "schemas");
   // Each directory's concern groups too (`schemas/<group>/`, declared from
   // within by `schemas.json`; bean `f8wp`), one level deep like the rest.
   return withConcernGroupDirs(declared.length > 0 ? declared : [join(root, "schemas")], "schemas");
@@ -101,9 +114,9 @@ const TAG = /@graphNode\s+(\S+)(?:\s*[—-]\s*(.*))?/;
  * mention, not a declaration — a module documenting the convention must not
  * thereby declare itself.
  */
-export function schemaModules(root: string, scope: CorpusScope = "checkout"): SchemaModule[] {
+export function schemaModules(root: string, scope: CorpusScope = "checkout", own?: ReadonlySet<string>): SchemaModule[] {
   const out: SchemaModule[] = [];
-  for (const dir of schemasRoots(root, scope)) {
+  for (const dir of schemasRoots(root, scope, own)) {
     if (!existsSync(dir)) continue;
     // The module id carries the DIRECTORY, not a bare `schemas/` prefix: three
     // directories declare this graph and two of them hold a `catalogue.ts` or an
@@ -165,11 +178,14 @@ export interface SchemaNodeAudit {
   undeclaredTests: SchemaModule[];
   /** `@graphNode none` with no reason. Silencing must cost more than declaring. */
   reasonless: SchemaModule[];
+  /** The directories read: empty only when `own` was given and none of its instances declares one. */
+  directories: string[];
 }
 
-export function auditSchemaNodes(root: string, scope: CorpusScope = "checkout"): SchemaNodeAudit {
-  const all = schemaModules(root, scope);
+export function auditSchemaNodes(root: string, scope: CorpusScope = "checkout", own?: ReadonlySet<string>): SchemaNodeAudit {
+  const all = schemaModules(root, scope, own);
   return {
+    directories: schemasRoots(root, scope, own),
     nodes: all.filter((m) => m.kind === "schema"),
     exempt: all.filter((m) => m.kind === "none" && m.reason),
     undeclared: all.filter((m) => m.kind === "undeclared" && !m.isTest),

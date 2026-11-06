@@ -31,12 +31,13 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { findDeclarationFile, repoRootFor, KG_CONTENT_GRAPH_TYPOLOGIES } from "../schemas/kg/cat-harness.js";
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
+import { gateOwnsFile } from "./lib/gate-own.ts";
 
-import { findEntryFiles } from "./check-agent-entry-links.ts";
+import { findEntryFiles, movesResolver } from "./check-agent-entry-links.ts";
 import { isSyncedSkillDir } from "./sync-remote-skills.js";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -128,6 +129,24 @@ export interface CommandPathReport {
    */
   held: { file: string; line: number; token: string; command: string }[];
   dead: { file: string; line: number; token: string; command: string }[];
+  /**
+   * Paths that resolve only through a move some instance declares, in its
+   * window (sdlc skill `two-phase-move`): checked and passing, each still to
+   * switch to the new path. Past `until` the same path is `dead`.
+   */
+  moved: { file: string; line: number; token: string; command: string; move: string }[];
+}
+
+const RESOLVERS = new Map<string, ReturnType<typeof movesResolver>>();
+
+/** Does {@link tok} resolve through a declared move? If so it is recorded on {@link report} as moved. */
+function throughMove(repo: string, tok: string, report: CommandPathReport, at: Omit<CommandPathReport["moved"][number], "token" | "move">): boolean {
+  let resolveMoved = RESOLVERS.get(repo);
+  if (resolveMoved === undefined) RESOLVERS.set(repo, (resolveMoved = movesResolver(repo)));
+  const through = resolveMoved(resolve(repo, tok));
+  if (through === undefined) return false;
+  report.moved.push({ ...at, token: tok, move: through.move });
+  return true;
 }
 
 /**
@@ -268,19 +287,24 @@ export function checkFile(repo: string, rel: string, report: CommandPathReport, 
           continue;
         }
         report.checked++;
-        if (!existsSync(join(repo, tok))) {
-          report.dead.push({ file: rel, line: block.line + 1 + i, token: tok, command: raw.trim() });
-        }
+        const at = { file: rel, line: block.line + 1 + i, command: raw.trim() };
+        if (!existsSync(join(repo, tok)) && !throughMove(repo, tok, report, at)) report.dead.push({ ...at, token: tok });
       }
     }
   }
 }
 
-export function checkCommandPaths(repo: string = repoRootFor(INSTANCE_ROOT)): CommandPathReport {
-  const report: CommandPathReport = { filesRead: 0, checked: 0, declined: 0, folioRelative: 0, exempt: 0, held: [], dead: [] };
-  for (const { file, corpus: c } of corpus(repo)) checkFile(repo, file, report, c);
-  checkHooks(repo, report);
-  checkPrintedCommands(repo, report);
+/**
+ * `owns`, when given, keeps only the files it accepts as SUBJECTS (a layer's
+ * PR checks judge only the caller's own files: owner ruling 2026-11-05, "Move
+ * the checks"; `lib/gate-own.ts`). A path a command names still resolves
+ * against the whole checkout.
+ */
+export function checkCommandPaths(repo: string = repoRootFor(INSTANCE_ROOT), owns: (rel: string) => boolean = () => true): CommandPathReport {
+  const report: CommandPathReport = { filesRead: 0, checked: 0, declined: 0, folioRelative: 0, exempt: 0, held: [], dead: [], moved: [] };
+  for (const { file, corpus: c } of corpus(repo)) if (owns(file)) checkFile(repo, file, report, c);
+  checkHooks(repo, report, owns);
+  checkPrintedCommands(repo, report, owns);
   return report;
 }
 
@@ -349,10 +373,11 @@ export function checkCommandPaths(repo: string = repoRootFor(INSTANCE_ROOT)): Co
  * line is printed it usually sits in a fenced block or a hook command, which
  * the other two readers cover.
  */
-export function checkPrintedCommands(repo: string, report: CommandPathReport): void {
+export function checkPrintedCommands(repo: string, report: CommandPathReport, owns: (rel: string) => boolean = () => true): void {
   const RUNNER = /\b(?:bun run|bunx|bash|npx|python3|python|deno run)\s+(?=[A-Za-z0-9_.])/;
   const instances = instanceRoots(repo);
   for (const file of sourceFiles(repo)) {
+    if (!owns(file)) continue;
     let text: string;
     try {
       text = readFileSync(join(repo, file), "utf8");
@@ -386,7 +411,7 @@ export function checkPrintedCommands(repo: string, report: CommandPathReport): v
           report.declined++;
           continue;
         }
-        if (existsSync(join(repo, tok))) {
+        if (existsSync(join(repo, tok)) || throughMove(repo, tok, report, { file, line: i + 1, command: cmd.trim() })) {
           report.checked++;
           continue;
         }
@@ -562,8 +587,8 @@ function walkSource(dir: string): string[] {
  */
 export const HOST_COMMAND_FILES = [join(".claude", "settings.json"), ".mcp.json"] as const;
 
-export function checkHooks(repo: string, report: CommandPathReport): void {
-  for (const file of HOST_COMMAND_FILES) checkHostCommandFile(repo, file, report);
+export function checkHooks(repo: string, report: CommandPathReport, owns: (rel: string) => boolean = () => true): void {
+  for (const file of HOST_COMMAND_FILES) if (owns(file)) checkHostCommandFile(repo, file, report);
 }
 
 function checkHostCommandFile(repo: string, file: string, report: CommandPathReport): void {
@@ -601,7 +626,7 @@ function checkHostCommandFile(repo: string, file: string, report: CommandPathRep
         continue;
       }
       report.checked++;
-      if (!existsSync(join(repo, tok))) {
+      if (!existsSync(join(repo, tok)) && !throughMove(repo, tok, report, { file, line: 0, command: cmd })) {
         report.dead.push({ file, line: 0, token: tok, command: cmd });
       }
     }
@@ -684,6 +709,10 @@ function formatReport(r: CommandPathReport): string {
     }
     out.push("      `--held` lists them. The basis is a LAYOUT, not a declaration — see FOLIO_OWNED.");
   }
+  if (r.moved.length) {
+    out.push(`  · ${r.moved.length} path(s) resolve only through a declared move — passing until its \`until\`, still to switch:`);
+    for (const m of r.moved) out.push(`      ${m.file}:${m.line}  \`${m.token}\`  (${m.move})`);
+  }
   if (r.dead.length === 0) {
     // The claim names its FRAME, because bean `7iog` is what a claim
     // without one costs: `check:workflow-paths` said "every workflow script
@@ -707,8 +736,10 @@ function formatReport(r: CommandPathReport): string {
 
 if (import.meta.main) {
   let report: CommandPathReport;
+  // In a layer's PR checks, only the caller's own files (owner ruling 2026-11-05).
+  const scoped = gateOwnsFile(".") !== undefined;
   try {
-    report = checkCommandPaths();
+    report = checkCommandPaths(undefined, (rel) => gateOwnsFile(rel) ?? true);
   } catch (e) {
     console.error(`Could not check command paths: ${e instanceof Error ? e.message : e}`);
     console.error("This is NOT a pass. Treat it as unknown.");
@@ -718,5 +749,9 @@ if (import.meta.main) {
     for (const h of report.held) console.log(`${h.file}:${h.line}  ${h.token}\n    in: ${h.command}`);
   }
   console.log(process.argv.includes("--json") ? JSON.stringify(report, null, 2) : formatReport(report));
+  if (scoped && report.filesRead === 0) {
+    console.log("✓ check:command-paths: the caller commits none of the files it reads; the mounted layers' are judged by their own CI.");
+    process.exit(0);
+  }
   process.exit(report.dead.length || report.filesRead === 0 ? 1 : 0);
 }

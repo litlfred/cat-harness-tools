@@ -407,7 +407,7 @@ export function subgraphsOf(
  *
  * ```
  * <img class="fa-harness-tile__mark"
- *      src="/folio-assistant/STAGING/<branch>/docs/assets/img/icons/cat-mark.svg">
+ *      src="/folio-assistant/branches/<branch>/docs/assets/img/icons/cat-mark.svg">
  * ```
  *
  * `docs/` is the instance's site directory, and the site build copies that
