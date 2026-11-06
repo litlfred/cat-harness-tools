@@ -988,6 +988,12 @@ export const EDIT_LINKS_RUNTIME = `(() => {
   // section (.fa-hot, set below); each block's 📣 sits in the same left
   // gutter, coloured while its block is hovered; the block's 🔗 lives only in
   // the panel, as its copy-link button.
+  // Owner, 2026-11-06, SUPERSEDING the gutter side above: "get rid of left
+  // gutter ... but display needs a bit of padding on both sides. right gutter
+  // was already there". So the theme's 32px left gutter shrinks to padding,
+  // and the 🔗, 📣 and 🔖 all hang in the right gutter. The 🔗 is placed
+  // against .main-content, not its heading, so a heading inside a bordered box
+  // (a harness section) still puts it in the page gutter, not inside the box.
   const ON = "{opacity:1;filter:none}";
   const LINK_CSS = "html.fa-bp .ba-moved{display:none!important}" +
     // A lazy page fills a block after its box: its own 🔗 is hidden by place.
@@ -997,9 +1003,13 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     "html.fa-bp .block-actions{opacity:1}" +
     "html.fa-bp .block-actions>.ba-ic:not(.ba-trigger):not(.ba-bookmark),html.fa-bp .fa-block-panel .block-actions>.ba-ic{display:none}" +
     // Owner, 2026-11-02 (dth-pc): "need a bit of padding between content and
-    // grill": the left gutter is inside the document's own box, so the icons
-    // never sit on the theme's backdrop.
-    "@media (min-width:50rem){html.fa-bp .main-content .fa-doc{padding-left:1.75rem}html.fa-bp .main-content .block-actions{float:left;clear:left;width:1.5rem;margin:0 0 6px -1.5rem;text-align:center}}" +
+    // grill", kept: .75rem of padding either side of the content, then the
+    // 1.75rem right gutter the icons sit in.
+    "@media (min-width:50rem){html.fa-bp .main-content-wrap{padding-left:.75rem;padding-right:2.5rem}" +
+    "html.fa-bp .main-content{position:relative}" +
+    "html.fa-bp .main-content :is(h1,h2,h3,h4,h5,h6):has(>.anchor-heading){position:static}" +
+    "html.fa-bp .main-content .anchor-heading{left:auto;right:-2.25rem;top:auto;height:auto;width:1.5rem}" +
+    "html.fa-bp .main-content .block-actions{float:right;clear:right;width:1.5rem;margin:0 -2.25rem 6px 0;text-align:center}}" +
     "html.fa-bp .block-actions>.ba-trigger,html.fa-bp .block-actions>.ba-bookmark{width:20px;height:20px;border:0;background:none;font-size:13px;opacity:.35;filter:grayscale(1)}" +
     "html.fa-bp .block-actions>.ba-trigger .ba-n{top:-4px;right:-6px;font-size:9px;padding:0 3px}" +
     "html.fa-bp .block-actions:hover>.ba-trigger,html.fa-bp .ba-trigger:focus-visible,html.fa-bp .ba-trigger[aria-expanded=true],html.fa-bp :hover>.block-actions>.ba-trigger,html.fa-bp p:has(+.fa-blk:hover)>.block-actions>.ba-trigger" + ON +
@@ -1151,7 +1161,7 @@ export const EDIT_LINKS_RUNTIME = `(() => {
     try { navigator.clipboard.writeText(url).then(() => done("Link copied"), () => done(url)); } catch { done(url); }
   };
   // 🔖 Bookmark (cat-harness#982): every anchored block carries a bookmark
-  // control in the left gutter and in the block panel header, wired to the
+  // control in the right gutter and in the block panel header, wired to the
   // folio glass via data-fa-pin / data-fa-pin-control.
   const pageCover = () => {
     if (!document || typeof document.querySelector !== "function") return "";
