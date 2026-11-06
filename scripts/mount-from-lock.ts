@@ -195,28 +195,76 @@ export function withoutStateMounts(dir: string, files: readonly string[], skip: 
  * so its digest is unchanged. Read with `node:fs` alone, as this file must.
  */
 export function builtAtPublishOf(dir: string): string[] {
+  // `dir` is the instance root, or one of the directories the lock pins of an
+  // instance mounted as several (smart-trust pins `fhir-artifact-index`,
+  // `document-kinds`, …). The entries are instance-relative, so they are
+  // read from the instance's declaration and rebased onto `dir`: before
+  // 2026-11-06 they were looked for in `dir` itself and compared as
+  // `dir`-relative paths, so no entry of a several-directory instance ever
+  // applied, and `ig-index:build` writing its declared index made the mount
+  // read as "somebody's work" (bean `cat-tools-sm8r`).
+  const home = instanceHomeOf(dir);
+  if (home === undefined) return [];
+  const rel = relative(home.root, resolve(dir)).split("\\").join("/");
+  if (rel === "") return home.entries;
   const out: string[] = [];
+  for (const p of home.entries) {
+    // A declared directory holding all of `dir`: every file of it is built.
+    if (p.endsWith("/") && `${rel}/`.startsWith(p)) out.push(ALL_OF_IT);
+    else if (p.startsWith(`${rel}/`)) out.push(p.slice(rel.length + 1));
+  }
+  return out;
+}
+
+/** The rebased entry that excludes every file of the directory. */
+const ALL_OF_IT = "./";
+
+/**
+ * The nearest of `dir` and its ancestors that holds a harness declaration,
+ * with that declaration's `builtAtPublish` paths. The walk stops at a
+ * checkout or index boundary (`.git`, `index.lock.json`), so a directory of an
+ * instance that declares nothing never borrows another declaration's entries.
+ */
+function instanceHomeOf(dir: string): { root: string; entries: string[] } | undefined {
+  let at = resolve(dir);
+  for (;;) {
+    const entries = declaredBuiltAtPublish(at);
+    if (entries !== undefined) return { root: at, entries };
+    if (existsSync(join(at, ".git")) || existsSync(join(at, "index.lock.json"))) return undefined;
+    const up = dirname(at);
+    if (up === at) return undefined;
+    at = up;
+  }
+}
+
+/** The `builtAtPublish` paths of the harness declaration(s) in `dir`, or undefined when it holds none. */
+function declaredBuiltAtPublish(dir: string): string[] | undefined {
   let names: string[] = [];
   try {
     names = readdirSync(dir).filter((n) => n.endsWith(".json"));
   } catch {
-    return out;
+    return undefined;
   }
+  let found = false;
+  const out: string[] = [];
   for (const n of names) {
     try {
       const d = JSON.parse(readFileSync(join(dir, n), "utf-8")) as { $schema?: unknown; builtAtPublish?: unknown };
-      if (typeof d.$schema !== "string" || !d.$schema.startsWith("cat-harness-declaration") || !Array.isArray(d.builtAtPublish)) continue;
+      if (typeof d.$schema !== "string" || !d.$schema.startsWith("cat-harness-declaration")) continue;
+      found = true;
+      if (!Array.isArray(d.builtAtPublish)) continue;
       for (const e of d.builtAtPublish) if (e && typeof e.path === "string") out.push(e.path);
     } catch {
       // Not a declaration, or not JSON: it excludes nothing, so the digest judges every byte.
     }
   }
-  return out;
+  return found ? out : undefined;
 }
 
-/** `files` minus any declared built at publish (a directory entry ends in `/`). */
+/** `files` minus any declared built at publish (a directory entry ends in `/`; `./` is all of them). */
 export function withoutBuiltAtPublish(files: readonly string[], declared: readonly string[]): string[] {
   if (declared.length === 0) return [...files];
+  if (declared.includes(ALL_OF_IT)) return [];
   return files.filter((f) => !declared.some((p) => (p.endsWith("/") ? f.startsWith(p) : f === p)));
 }
 
