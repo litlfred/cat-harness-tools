@@ -2,8 +2,8 @@
  * A viewer route that ignores itself (a `.gitignore` of `*`) is outside the
  * mount digest, like a declared `builtAtPublish` path (bean
  * folio-assistant-uldr, design A): a publish build that writes
- * folio-assistant-core's glossary routes onto cat-harness's site must not make
- * the cat-harness mount read as modified.
+ * a higher layer's viewer routes onto the host's site must not make the host's
+ * mount read as modified.
  */
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -31,10 +31,10 @@ describe("self-ignoring routes", () => {
       put(dir, "x.json", "{}");
       put(dir, "docs/index.md", "pinned");
       const before = digestOf(dir);
-      put(dir, "docs/en/folio-assistant-core/glossary/.gitignore", "# Generated\n*\n");
-      put(dir, "docs/en/folio-assistant-core/glossary/index.md", "built at publish");
-      put(dir, "docs/fr/folio-assistant-core/glossary/.gitignore", "*\n");
-      put(dir, "docs/fr/folio-assistant-core/glossary/a/index.md", "built at publish");
+      put(dir, "docs/en/upper/glossary/.gitignore", "# Generated\n*\n");
+      put(dir, "docs/en/upper/glossary/index.md", "built at publish");
+      put(dir, "docs/fr/upper/glossary/.gitignore", "*\n");
+      put(dir, "docs/fr/upper/glossary/a/index.md", "built at publish");
       expect(digestOf(dir)).toEqual(before);
       expect(coveredFiles(dir)).toEqual(["docs/index.md", "x.json"]);
     } finally {

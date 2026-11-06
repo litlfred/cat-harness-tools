@@ -223,10 +223,9 @@ export function withoutBuiltAtPublish(files: readonly string[], declared: readon
 /**
  * A `.gitignore` whose only pattern is `*`: the directory holding it ignores
  * itself, the marker file included. A viewer that writes its route onto
- * ANOTHER instance's site puts one there (folio-assistant-core's
- * `glossary-page.ts` on cat-harness's site; bean folio-assistant-uldr, owner
- * choice "A: derive + in-route ignore"), so the host lists none of its routes
- * under `builtAtPublish`.
+ * ANOTHER instance's site (`builtOnHostSite`) puts one there (bean
+ * folio-assistant-uldr, owner choice "A: derive + in-route ignore"), so the
+ * host lists none of its routes under `builtAtPublish`.
  */
 export function isSelfIgnore(text: string): boolean {
   const patterns = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l !== "" && !l.startsWith("#"));
