@@ -322,7 +322,7 @@ if (import.meta.main) {
   const ownInstances = gateOwnInstances();
   const owns = (repoPath: string) => gateOwnsFile(repoPath) !== false;
   const empty = declared.filter(
-    (a) => a.writer.includes(writer) && a.writer.at(-1) === writer && !built(a) && (!ownInstances || ownInstances.has(a.instance)),
+    (a) => a.writer.includes(writer) && a.writer.at(-1) === writer && a.optional !== true && !built(a) && (!ownInstances || ownInstances.has(a.instance)),
   );
   for (const a of empty) console.error(`✗ publish:check: ${a.instance}/${a.path} is declared built by \`${writer}\` and is missing or empty`);
 
