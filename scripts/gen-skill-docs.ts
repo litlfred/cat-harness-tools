@@ -1023,7 +1023,7 @@ function deriveTitle(body: string, name: string): string {
 }
 
 function escapePipes(s: string): string {
-  return s.replace(/\|/g, "\\|");
+  return s.replace(/[\\|]/g, "\\$&");
 }
 
 /**

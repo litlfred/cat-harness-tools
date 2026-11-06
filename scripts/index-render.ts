@@ -244,7 +244,7 @@ export function bootstrapColdStart(root: string, row: IndexInstanceRow): string 
   return rebaseLinks(body, dir === "." ? "" : dir, row.agents);
 }
 
-const cellText = (s: string): string => s.replace(/\|/g, "\\|");
+const cellText = (s: string): string => s.replace(/[\\|]/g, "\\$&");
 const link = (label: string, target: string | undefined): string =>
   target === undefined ? "—" : `[${label}](${target})`;
 

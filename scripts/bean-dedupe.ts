@@ -324,7 +324,7 @@ function summarise(cs: Conflict[]): string {
     const k = c.otherStore === "-" ? c.where : `${c.where === "(three-way hunk)" ? "hunk" : c.where} vs ${c.otherStore}`;
     n.set(k, (n.get(k) ?? 0) + 1);
   }
-  return [...n].map(([k, v]) => (v > 1 ? `${v}× ${k}` : k)).join("; ").replace(/\|/g, "\\|");
+  return [...n].map(([k, v]) => (v > 1 ? `${v}× ${k}` : k)).join("; ").replace(/[\\|]/g, "\\$&");
 }
 
 /** The common ancestor of the two branch stores, and its copy of every bean. */

@@ -99,7 +99,7 @@ export function renderTestReport(
     lines.push("|---|---|---|");
     for (const [id, c] of notPass) {
       const ev = typeof c.evidence === "string" ? c.evidence : c.reason ?? "";
-      lines.push(`| \`${id}\` | ${c.result} | ${esc(ev).replace(/\|/g, "\\|")} |`);
+      lines.push(`| \`${id}\` | ${c.result} | ${esc(ev).replace(/[\\|]/g, "\\$&")} |`);
     }
     lines.push("");
   }

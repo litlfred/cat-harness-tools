@@ -132,7 +132,7 @@ const KIND: Record<string, string> = {
 };
 
 function cell(s: string): string {
-  return s.replace(/\|/g, "\\|").replace(/\n+/g, " ");
+  return s.replace(/[\\|]/g, "\\$&").replace(/\n+/g, " ");
 }
 
 /**

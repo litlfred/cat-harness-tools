@@ -177,7 +177,7 @@ function trackedByCheckout(repo: string, rel: string): boolean {
 }
 
 function cell(text: string): string {
-  return text.replace(/\|/g, "\\|");
+  return text.replace(/[\\|]/g, "\\$&");
 }
 
 /** An italic line standing in for a table with no rows — a determined answer. */

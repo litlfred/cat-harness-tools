@@ -236,12 +236,12 @@ const CSS = `
 
 /** Escape a cell so a filename containing a pipe cannot break the table. */
 function cell(v: string): string {
-  return v.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+  return v.replace(/[\\|]/g, "\\$&").replace(/\r?\n/g, " ");
 }
 
 /** Escape an attribute value so quotes cannot break the tag. */
 function escAttr(v: string): string {
-  return v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/\|/g, "\\|");
+  return v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/[\\|]/g, "\\$&");
 }
 
 export function page(files: GutsFile[], blobBase: string): string {

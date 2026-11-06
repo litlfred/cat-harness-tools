@@ -278,7 +278,7 @@ export function forDirectory(p: GoverningProcess, repoRoot: string, dirAbs: stri
   // pipe. `subgraph-readmes` escapes its own file rows the same way; doing it
   // here rather than in the template keeps the one rule in one place, and a
   // template has no filter for it.
-  const cell = (t: string) => t.replace(/\|/g, "\\|");
+  const cell = (t: string) => t.replace(/[\\|]/g, "\\$&");
   return {
     name: p.name,
     title: p.title ?? "",
