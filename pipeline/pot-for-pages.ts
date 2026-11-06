@@ -52,10 +52,11 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-import { directoryForGraph, siteDirFor } from "../schemas/kg/cat-harness.js";
+import { directoryForGraph, readDeclaration, siteDirFor } from "../schemas/kg/cat-harness.js";
 import { extractMarkdown, formatPot, potWithoutTimestamp } from "./pot-extract.js";
 import { driftFor } from "./translation-drift.js";
-import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { gateOwnInstances, gateOwnsFile, nothingOwnLine } from "../scripts/lib/gate-own.ts";
+import { HARNESS_ROOT, REPO_ROOT } from "../scripts/lib/roots.ts";
 
 const INSTANCE_ROOT = resolve(HARNESS_ROOT);
 
@@ -209,6 +210,19 @@ export function plan(root = INSTANCE_ROOT): PotPlan[] {
 
 if (import.meta.main) {
   const check = process.argv.includes("--check");
+  // In a layer's PR checks, only templates the caller commits (owner ruling
+  // 2026-11-05, "Move the checks"; `scripts/lib/gate-own.ts`).
+  const own = gateOwnInstances();
+  const instName = readDeclaration(INSTANCE_ROOT)?.name ?? "cat-harness";
+  const dir = translationsRoot(INSTANCE_ROOT);
+  if (check && ((own !== undefined && !own.has(instName)) || gateOwnsFile(relative(REPO_ROOT, dir)) === false)) {
+    console.log(
+      own !== undefined
+        ? nothingOwnLine("translation:pot", "translations directory", own)
+        : `✓ translation:pot --check: the templates live in ${relative(REPO_ROOT, dir)}, which the caller does not commit; the owning layer's CI judges them.`,
+    );
+    process.exit(0);
+  }
   const items = plan();
 
   if (items.length === 0) {
