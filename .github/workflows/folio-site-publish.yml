@@ -66,11 +66,15 @@ jobs:
         # has no fallback, so without this every publish of such a folio fails
         # at its last step (dth-hrh run 42076453040; bean v29t). Installed only
         # when the repository's scripts call document-export: LibreOffice is
-        # large, and no other publish needs it.
+        # large, and no other publish needs it. The fonts are the metric-
+        # compatible stand-ins for the .docx's Calibri, Cambria, Aptos, Times New
+        # Roman and Courier New: without them the runner's PDF breaks onto
+        # different pages and lines (169 pages against 143), and a comment's
+        # page-and-line citation would not match an agent-run build.
         run: |
           if [ -f package.json ] && grep -q 'document-export' package.json; then
             sudo apt-get update -qq
-            sudo apt-get install -y -qq --no-install-recommends pandoc libreoffice-writer libreoffice-draw poppler-utils fonts-dejavu-core
+            sudo apt-get install -y -qq --no-install-recommends pandoc libreoffice-writer libreoffice-draw poppler-utils fonts-dejavu-core fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation2 fonts-inter
             pandoc --version | head -1; soffice --version; pdfinfo -v 2>&1 | head -1
           else
             echo "no document-export step: nothing to install"
