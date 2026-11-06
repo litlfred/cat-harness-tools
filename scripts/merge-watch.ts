@@ -175,13 +175,16 @@ function rowsFor(repo: string): Row[] {
     let mergeableState = "?";
     let verdict: Verdict;
     try {
+      // `mergeable_state` is printed as served, never judged: `unknown` means
+      // GitHub has not finished computing it, and a merged PR keeps serving
+      // its pre-merge value (bean fx5r). The verdict reads the checks only.
       const [pr] = ghLines<{ draft: boolean; sha: string; mergeable_state: string | null }>(
         `repos/${repo}/pulls/${number}`,
         "{draft, sha: .head.sha, mergeable_state}",
       );
       headSha = pr.sha;
       draft = pr.draft;
-      mergeableState = pr.mergeable_state ?? "unknown";
+      mergeableState = pr.mergeable_state ?? "unknown"; // as served, possibly stale (fx5r)
       const checks = ghLines<CheckRun>(
         `repos/${repo}/commits/${headSha}/check-runs?per_page=100`,
         ".check_runs[] | {id, name, status, conclusion, check_suite: {id: .check_suite.id}, app: {slug: .app.slug}}",
