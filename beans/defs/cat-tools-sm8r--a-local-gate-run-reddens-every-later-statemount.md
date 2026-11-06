@@ -79,3 +79,48 @@ untouched, so it cannot change the outcome.
    `ig-index:build` and the glossary writers write outside the mounts, or the
    lock digest excludes outputs the layer declares as built. Separately, the
    three stale committed glossaries need regenerating in their own layers.
+
+## Owner ruling (2026-11-06, card "Mount fix")
+
+"Build all four", in this order:
+
+1. `remote-mount` skips the fetch when it cannot help (above, fix 1);
+2. a local `gates` run does each setup command once (fix 2);
+3. regenerate the stale committed glossaries in cat-harness, who-iris and
+   folio-assistant-core against the pins, one PR per layer;
+4. **no CI step writes inside a mount**: move the IG index, the QA copy, the
+   docs and the glossary output out of the mounted layers. It touches many
+   writers, so it is a written plan in this bean before any code.
+
+Measure before and after for each.
+
+Already in flight, consistent with the ruling:
+
+- cat-harness-tools#1558: `builtAtPublish` applies to every pinned
+  directory of an instance. It was ignored for one pinned as several
+  (smart-trust ×7, smart-trust-phw ×4). A bug fix on its own.
+- cat-harness-tools#1559: `check:published-packages` runs pytest without
+  writing `__pycache__/` or `.pytest_cache/` into the mounted
+  cat-harness-tools. That is fix 4 for that writer. Two tracked `.pyc` files
+  are untracked.
+- smart-base#310, smart-trust#142, smart-trust-phw#33: declare
+  `fhir-artifact-index/sidecars/` and `contexts/` built. **Back to draft**,
+  because the ruling moves the IG index out of the mounts instead; the plan
+  in fix 4 decides whether they are needed at all.
+
+## Which step writes into which mount (measured 2026-11-06)
+
+Fresh worktree mounted from the same lock, each QA working-copy step run
+alone, `mount-from-lock.sh --check` after each:
+
+| step | time | mounts it leaves `missing` |
+|---|---|---|
+| `kg-export --instance ./bootstrap` | 3 s | cat-harness |
+| `qa:refresh` | 606 s | + fhir-harness, folio-assistant-core, folio-assistant-sci, smart-base, who-iris |
+| `glossary:page` | 18 s | (no new layer) |
+
+Files that differ from a fresh mount after a whole local run: 1604. Of
+these, 1119 are `cat-harness/test/results/` (the QA tree), 396 are
+`fhir-artifact-index/sidecars/`, and 16 are `glossary/generated/` files
+rewritten with different content. The rest are cat-harness docs and
+attestations rewritten in place.
