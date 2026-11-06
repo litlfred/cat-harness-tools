@@ -225,6 +225,19 @@ function declaredExemptions(root: string = checkoutRootFor(resolve(HARNESS_ROOT)
   return { steps, scripts };
 }
 
+/**
+ * The check scripts a layer declares it runs in its OWN CI rather than an
+ * index's workflows: `gateExemptions.scripts` entries of kind `covered-by`
+ * (cat-harness-tools' `caches:viz:check`, run by `layer-pr-checks.yml`). They
+ * are run, just not here, so what they `@covers` is covered: the coverage
+ * audit counts them (without it, a kind whose only
+ * gate is a layer's own was reported "typed and judged by nothing" in every
+ * index, as the `cache` kind was on the 2026-11-06 re-pin train).
+ */
+export function layerRunScripts(root?: string): string[] {
+  return declaredExemptions(root).scripts.filter((s) => s.kind === "covered-by").map((s) => s.script);
+}
+
 export interface StepExemption {
   /** Matched against the command as a substring — a script path, usually. */
   match: string;

@@ -91,7 +91,7 @@ import { contentIsOffCheckout, resolveSubgraphSource, type SubgraphSource } from
 // The same single reader `check:declared-dirs` uses, so the two gates cannot
 // disagree about whether a tip-keyed graph is readable here (bean `9ofm`).
 import { routePresence, tipPresence } from "./check-declared-dirs.ts";
-import { loadGatesCiRuns } from "./gates.js";
+import { layerRunScripts, loadGatesCiRuns } from "./gates.js";
 import {
   againstOrUsage,
   buildQaResult,
@@ -509,7 +509,18 @@ export function gateCoverage(root: string, repo: string): GateCoverage[] {
   // kind regardless of this tool's ability to invoke it. Using the runner's
   // list here made the census 209 and the "all N have declared" verdict narrower
   // than reality.
-  const gates = loadGatesCiRuns(repo, { all: true });
+  const ciGates = loadGatesCiRuns(repo, { all: true });
+  // And the checks a layer runs in its OWN CI (`covered-by` script
+  // exemptions): an index never runs them, yet they are run, so the kinds
+  // they `@covers` are judged ({@link layerRunScripts}).
+  const ran = new Set(ciGates.map((g) => g.command));
+  const gates: Array<Pick<(typeof ciGates)[number], "command">> = [
+    ...ciGates,
+    ...layerRunScripts(repo)
+      .map((s) => `bun run cat ${s}`)
+      .filter((c) => !ran.has(c))
+      .map((command) => ({ command })),
+  ];
   const out: GateCoverage[] = [];
   const byCommand = new Map<string, GateCoverage>();
   for (const g of gates) {

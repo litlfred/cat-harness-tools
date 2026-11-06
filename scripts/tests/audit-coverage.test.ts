@@ -19,6 +19,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { asRecord, census, coverage, coversIn, kindUniverse, scriptsFor } from "../audit-coverage.js";
+import { layerRunScripts } from "../gates.js";
 import { KG_CRITERIA, KG_SUBJECT_GRAPH_TYPOLOGIES } from "../../schemas/sdlc/kg-qa.js";
 import { defaultGraphTypologies } from "../../schemas/kg/cat-harness.js";
 import { repoRootFor } from "../../schemas/kg/cat-harness.js";
@@ -189,6 +190,20 @@ describe("the report over this repository", () => {
       // `typed-only` — the two states must partition, not overlap.
       if (r.state === "unaudited") expect(r.typed).toBe(false);
     }
+  });
+
+  test("a check a layer runs in its OWN CI counts as a gate, so the kind it covers is judged", () => {
+    // The 2026-11-06 re-pin train: `caches:viz:check` (\`@covers cache\`) runs
+    // only in the layer's own CI, declared as a `covered-by` script exemption,
+    // and the index never runs it, so `cache` read "typed and judged by
+    // nothing" and both audit:coverage gates went red there.
+    const layerRun = layerRunScripts(REPO);
+    expect(layerRun).toContain("caches:viz:check");
+    const commands = new Set(gates.map((g) => g.command));
+    for (const s of layerRun) expect(commands).toContain(`bun run cat ${s}`);
+    const cache = rows.find((r) => r.kind === "cache");
+    expect(cache?.gates).toContain("bun run cat caches:viz:check");
+    expect(cache?.state).not.toBe("typed-only");
   });
 
   test("typed-only and unaudited are different findings, not one bucket", () => {
