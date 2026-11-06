@@ -33,7 +33,7 @@
  *   bun run cat-harness-tools/scripts/gen-processes-viz.ts --check
  */
 import { escapeAngles, linkProse } from "./lib/link-prose.ts";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { declarationPathIn } from "../schemas/kg/cat-harness.js";
@@ -1404,6 +1404,27 @@ if (import.meta.main) {
     for (const [f, body] of pages) {
       mkdirSync(dirname(f), { recursive: true });
       writeFileSync(f, body);
+    }
+    // THE DRAWING EACH PAGE LINKS. A page links the site copy by stem
+    // (`assets/img/workflows/<stem>.svg`), which `render:bpmn` writes into
+    // the harness's own site — but a folio's site build composes the chrome
+    // and never runs it, and since the drawings moved beside their .bpmn
+    // (#1504) no mount carries the site copy either. dth-hrh's publish then
+    // refused 137 dead links (run 42192237981). Into a site being built, a
+    // drawing the site lacks is copied from beside its source: the same
+    // layout, its step links reaching sibling diagrams rather than this
+    // site's pages, which is a lesser drawing but never a dead one.
+    if (into !== undefined) {
+      let copied = 0;
+      for (const r of rows) {
+        if (r.svg === undefined) continue;
+        const site = join(into, "assets/img/workflows", `${r.stem}.svg`);
+        if (existsSync(site)) continue;
+        mkdirSync(dirname(site), { recursive: true });
+        copyFileSync(join(REPO, r.svg), site);
+        copied++;
+      }
+      if (copied > 0) console.log(`  copied ${copied} drawing(s) from beside their .bpmn into the site's assets/img/workflows/`);
     }
     // THE TILE COUNT (folio-assistant#931, owner's ruling 2026-10-29): the
     // index's own diagram count, keyed by the tile that opens the index.
