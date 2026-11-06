@@ -123,7 +123,7 @@ export function diffSurface(
 export function applyBump(from: string, bump: Bump): string {
   const m = /^(\d+)\.(\d+)\.(\d+)/.exec(from);
   // `current` and `dev` are pseudo-versions with no triple to bump. Returned
-  // unchanged rather than coerced to `0.0.1`: they are a STAGING choice
+  // unchanged rather than coerced to `0.0.1`: they are a branches/ choice
   // (§3.3), and inventing a release number for one would be this module
   // asserting a publication that nobody made.
   if (m === null) return from;

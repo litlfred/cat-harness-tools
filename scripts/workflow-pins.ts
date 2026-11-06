@@ -69,6 +69,17 @@ export function lockedRefs(root: string): Map<string, string> {
 export function ownName(root: string): string {
   const env = process.env.GITHUB_REPOSITORY;
   if (env?.startsWith(`${OWNER}/`)) return env.slice(OWNER.length + 1);
+  return checkoutName(root);
+}
+
+/**
+ * The repository a CHECKOUT is, from the checkout alone: its origin's name,
+ * else its directory's. Unlike {@link ownName} it never reads
+ * `GITHUB_REPOSITORY`, which names the repository whose CI is running, not
+ * the root being judged: a layer's CI judges the folio-assistant index it is
+ * mounted in, and a baseline recorded there must still apply (cat-harness-tools#1537).
+ */
+export function checkoutName(root: string): string {
   try {
     const url = execFileSync("git", ["-C", root, "remote", "get-url", "origin"], { encoding: "utf8" }).trim();
     const m = url.match(/[/:]([^/]+?)(\.git)?$/);

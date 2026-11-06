@@ -334,7 +334,7 @@ describe("the finders discriminate — falsified on a synthetic package", () => 
   });
 });
 
-describe("an instance with no knowledge graph is not applicable, not the third state", () => {
+describe("an instance with no skills directory is not applicable, not the third state", () => {
   const instanceWith = (directories: unknown[]): string => {
     const instance = mkdtempSync(join(tmpdir(), "skill-register-na-"));
     const name = "na-fixture";
@@ -348,7 +348,16 @@ describe("an instance with no knowledge graph is not applicable, not the third s
   test("a content instance that declares only a library: nothing to judge, and it says why", () => {
     const instance = instanceWith([{ id: "library", path: "library/", graphTypologies: ["library"] }]);
     try {
-      expect(notApplicable(instance)).toContain("declares no knowledge-graph directory");
+      expect(notApplicable(instance)).toContain("declares no `skills` directory");
+    } finally {
+      rmSync(instance, { recursive: true, force: true });
+    }
+  });
+
+  test("an IG that declares only scenarios (its journeys' actors): no skill to register, not the third state", () => {
+    const instance = instanceWith([{ id: "scenarios", path: "scenarios/", graphTypologies: ["scenarios"] }]);
+    try {
+      expect(notApplicable(instance)).toContain("declares no `skills` directory");
     } finally {
       rmSync(instance, { recursive: true, force: true });
     }

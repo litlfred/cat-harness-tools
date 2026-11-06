@@ -66,3 +66,33 @@ export function gateDirectoriesForGraph(
 export function nothingOwnLine(check: string, what: string, own: ReadonlySet<string>): string {
   return `✓ ${check}: ${[...own].join(", ")} commits no ${what}; the mounted layers' are judged by their own CI.`;
 }
+
+/** The caller's own instances' directories, relative to the root (`.` for an instance at the root), comma-separated. */
+export const GATE_OWN_PATHS_ENV = "CAT_GATE_OWN_PATHS";
+/** Every other instance's directory in the root, the same way. */
+export const GATE_FOREIGN_PATHS_ENV = "CAT_GATE_FOREIGN_PATHS";
+
+/**
+ * Whether the file at `rel` (relative to the root) is the caller's own, or
+ * `undefined` when this run names no own paths (judge everything). For a
+ * check whose subjects are FILES rather than declared directories: a file
+ * belongs to the deepest instance directory that contains it, and a file
+ * outside every instance directory (the index's own README) is the caller's
+ * only when one of its instances sits at the root.
+ */
+// input-site: env CAT_GATE_OWN_PATHS,CAT_GATE_FOREIGN_PATHS #6166bceb — the instance directories ownership is decided by; the values are the whole of what they contribute
+export function gateOwnsFile(rel: string, env: Readonly<Record<string, string | undefined>> = process.env): boolean | undefined {
+  const list = (name: string) => (env[name] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const own = list(GATE_OWN_PATHS_ENV);
+  if (own.length === 0) return undefined;
+  const norm = (p: string) => p.replace(/^\.\/+/, "").replace(/\/+$/, "");
+  const file = norm(rel);
+  let best: { path: string; own: boolean } | undefined;
+  for (const [paths, isOwn] of [[own, true], [list(GATE_FOREIGN_PATHS_ENV), false]] as const) {
+    for (const p of paths.map(norm)) {
+      if (p === "" || p === ".") continue;
+      if ((file === p || file.startsWith(`${p}/`)) && (best === undefined || p.length > best.path.length)) best = { path: p, own: isOwn };
+    }
+  }
+  return best ? best.own : own.map(norm).some((p) => p === "" || p === ".");
+}

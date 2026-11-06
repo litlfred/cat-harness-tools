@@ -29,6 +29,7 @@ import { join, relative } from "node:path";
 
 import { directoriesForGraph, repoRootFor } from "../schemas/kg/cat-harness.ts";
 import { checkoutDirectories } from "../schemas/kg/harness-config.ts";
+import { gateOwnInstances, nothingOwnLine } from "./lib/gate-own.ts";
 import { CONCERN_GROUP_LIST, declaredGroupsIn, groupingKinds, resolveGroups, type ResolvedGroup } from "./concern-groups.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
@@ -62,7 +63,15 @@ export function concernGroupCodes(instance: string = INSTANCE): string[] | undef
   return undefined;
 }
 
-export function collect(repo: string = repoRootFor(INSTANCE), instance: string = INSTANCE): ConcernGroupReport {
+/**
+ * `own`, when given, judges only what those instances commit (owner ruling
+ * 2026-11-05, "Move the checks"; `lib/gate-own.ts`): their directories, the
+ * groups they declare, and their redeclarations of a lower instance's group.
+ * The baseline lives in this layer's own source, so its staleness is judged
+ * only unscoped.
+ */
+export function collect(repo: string = repoRootFor(INSTANCE), instance: string = INSTANCE, own?: ReadonlySet<string>): ConcernGroupReport {
+  const mine = (name: string) => own === undefined || own.has(name);
   const problems: string[] = [];
   const codes = concernGroupCodes(instance);
   if (codes === undefined) {
@@ -74,7 +83,7 @@ export function collect(repo: string = repoRootFor(INSTANCE), instance: string =
   for (const kind of groupingKinds()) {
     // Rule 1, per directory, so one malformed file names itself and does not
     // hide every other directory's answer.
-    for (const d of checkoutDirectories(repo).filter((x) => x.graphTypologies.includes(kind as never))) {
+    for (const d of checkoutDirectories(repo).filter((x) => x.graphTypologies.includes(kind as never) && mine(x.member ?? x.declaredBy))) {
       examined += 1;
       try {
         declaredGroupsIn(d.absPath, kind);
@@ -91,7 +100,7 @@ export function collect(repo: string = repoRootFor(INSTANCE), instance: string =
     for (const g of resolved) {
       groups.push(g);
       const key = `${kind}:${g.within}/${g.code}`;
-      if (!codes.includes(g.code)) {
+      if (!codes.includes(g.code) && mine(g.declaredBy)) {
         if (KNOWN_NON_CODES[key] !== undefined) seenBaseline.add(key);
         else {
           problems.push(
@@ -100,7 +109,7 @@ export function collect(repo: string = repoRootFor(INSTANCE), instance: string =
           );
         }
       }
-      if (g.redeclaredBy.length > 0) {
+      if (g.redeclaredBy.some(mine)) {
         problems.push(
           `${g.within}/${g.code}/ is declared by ${g.declaredBy} and AGAIN by ${g.redeclaredBy.join(", ")}. ` +
             `A higher instance adds no group: its same-named directory is already a member (option A).`,
@@ -108,14 +117,19 @@ export function collect(repo: string = repoRootFor(INSTANCE), instance: string =
       }
     }
   }
-  for (const key of Object.keys(KNOWN_NON_CODES)) {
+  for (const key of own === undefined ? Object.keys(KNOWN_NON_CODES) : []) {
     if (!seenBaseline.has(key)) problems.push(`baseline entry ${key} no longer occurs — remove it (the baseline only shrinks)`);
   }
   return { codes, groups, problems, examined };
 }
 
 if (import.meta.main) {
-  const r = collect();
+  const own = gateOwnInstances();
+  const r = collect(undefined, undefined, own);
+  if (own && r.examined === 0 && r.problems.length === 0) {
+    console.log(nothingOwnLine("check:concern-groups", "grouping directory", own));
+    process.exit(0);
+  }
   if (r.examined === 0 && r.problems.length === 0) {
     console.error("NOTHING WAS EXAMINED — no grouping directory was found. That is not a pass.");
     process.exit(1);

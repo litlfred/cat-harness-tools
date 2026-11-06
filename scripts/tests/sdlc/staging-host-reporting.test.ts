@@ -1,5 +1,5 @@
 /**
- * Bean `folio-assistant-1lfx` — STAGING must report which host rendered it,
+ * Bean `folio-assistant-1lfx` — branches/ must report which host rendered it,
  * not assume gh-pages.
  *
  * ## What these guard

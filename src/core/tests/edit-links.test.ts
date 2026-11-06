@@ -56,5 +56,12 @@ describe("edit-links: one recipe for every page's edit and feedback links (bean 
     expect(t.wrap("See @cite{b}.", true)).toBe("See @cite{b}.");
     expect(t.errors("See @cite{b", true)).toEqual([]);
   });
+
+  test("the runtime includes the gutter bookmark control and folio pin attributes (cat-harness#982)", () => {
+    const asset = editLinksAsset();
+    expect(asset).toContain("ba-bookmark");
+    expect(asset).toContain('data-fa-pin-kind", "bookmark"');
+    expect(asset).toContain("data-fa-pin-control");
+  });
 });
 

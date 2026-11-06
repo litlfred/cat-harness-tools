@@ -133,6 +133,31 @@ export const AVATARS: Readonly<Record<string, Avatar>> = {
     tone: 292,
     reads: "two figures — the Actors and the Roles they take on",
   },
+  // ── Journeys, 2026-11-05 (owner, option A) ──────────────────────────────
+  //
+  // Listed in `BASE_GRAPH_TYPOLOGIES`, so their marks are here. A journey sits
+  // between a process (280) and the Actors who walk it (292); a workshop is
+  // taught from journeys but is its own thing, so it takes a free hue; a
+  // building-block catalogue is read beside the ArchiMate model it deploys
+  // into, so it is a near neighbour of `archimate` (196).
+  "user-scenario": {
+    // A winding path from a start point to an arrowhead: a journey, step by step.
+    glyph: "M5 19a2 2 0 100-4 2 2 0 000 4zm2-2h5a3 3 0 000-6H9a3 3 0 010-6h8m0 0l-2-2m2 2l-2 2",
+    tone: 286,
+    reads: "a winding path from a start to an arrow — a journey, told step by step, between the process and the people who walk it",
+  },
+  workshop: {
+    // A board on an easel with lines on it: a room taught from a sheet.
+    glyph: "M4 4h16v10H4zM12 14v3M8 21l4-4 4 4M8 8h8M8 11h5",
+    tone: 236,
+    reads: "a board on an easel — a workshop, its questions for the room written up beside the journey",
+  },
+  "building-blocks": {
+    // Two blocks with a third laid across them: things a journey is built from.
+    glyph: "M4 14h7v6H4zM13 14h7v6h-7zM8.5 6h7v6h-7z",
+    tone: 192,
+    reads: "blocks stacked on blocks, beside ArchiMate's blue — the tools, systems and standards a journey step uses",
+  },
   policies: {
     // A shield with a tick: what is permitted, and to whom. ODRL policies,
     // issue #1180.

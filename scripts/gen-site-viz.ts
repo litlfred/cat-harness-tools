@@ -7,10 +7,10 @@
  * @covers basic-cdn-site
  * @graphNode none — a generator over the site graph, not a schema itself
  *
- * The site is never in the checkout — `storage.branch` (`gh-pages`) keeps it,
- * keyed by route — so this reads that branch's TREE with git (fetched shallow,
- * trees only, through `branch-store.ts`'s `BranchStore`) and never a network
- * API.
+ * Owner, 2026-10-20 (bean `folio-assistant-6gme`): "Build route listing". The
+ * site is never in the checkout — `storage.branch` (`gh-pages`) keeps it, keyed
+ * by route — so this reads that branch's TREE with git (fetched shallow, trees
+ * only, through `branch-store.ts`'s `BranchStore`) and never a network API.
  *
  * Three states, never a zero standing in for "could not look": `present` (the
  * tree was read: one row per top-level route and per staging preview, with
@@ -32,11 +32,12 @@ import { declaredPageRoute, withRenderedByFrontMatter } from "./viewer-declarati
 import { themedPage } from "./lib/themed-page.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { siteTarget } from "./lib/site-target.ts";
+import { PREVIEW_PREFIXES } from "./lib/preview-prefix.ts";
 
 const VIEWER_TOOL = "site-viewer";
 const KIND = "basic-cdn-site";
-/** The directory on the branch that holds one preview per slug (the `site` declaration's own word). */
-const STAGING = "STAGING";
+/** The directories on the branch that hold one preview per slug (`lib/preview-prefix.ts`). */
+const PREVIEW_DIRS = new Set(PREVIEW_PREFIXES);
 
 /** One route's counts, and whether it holds an `index.html` a link to `<route>/` can land on. */
 export interface RouteRow { route: string; pages: number; files: number; index: boolean }
@@ -61,7 +62,7 @@ export function summariseTree(paths: readonly string[]): { routes: RouteRow[]; p
   for (const p of paths) {
     const segs = p.split("/");
     if (segs.length === 1) rootFiles++;
-    else if (segs[0] === STAGING && segs.length > 2) bump(previews, `${STAGING}/${segs[1]}`, p);
+    else if (PREVIEW_DIRS.has(segs[0]!) && segs.length > 2) bump(previews, `${segs[0]}/${segs[1]}`, p);
     else bump(routes, segs[0]!, p);
   }
   const sorted = (m: Map<string, RouteRow>): RouteRow[] => [...m.values()].sort((a, b) => a.route.localeCompare(b.route));

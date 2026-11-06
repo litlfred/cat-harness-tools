@@ -96,6 +96,8 @@ export type SiteVerdict =
   | { kind: "env"; names: string[] }
   | { kind: "env-unset"; names: string[] }
   | { kind: "tree" }
+  /** Implicit only, in a test file (see {@link testSpawnVerdict}): it runs a `bun` child, which only the cone audits, from its trace. */
+  | { kind: "spawned" }
   | { kind: "head" }
   | { kind: "store" }
   | { kind: "traced" }
@@ -123,6 +125,45 @@ export function isTestScratchDir(file: string, risks: readonly string[], code: s
   if (!TEST_FILE_RE.test(file)) return false;
   if (risks.length !== 1 || risks[0] !== "host") return false;
   return /\btmpdir\s*\(/.test(code) && !RISKS.host!.test(code.replace(/\btmpdir\s*\(/g, ""));
+}
+
+/** The call that starts a process, then its command or argv[0]. */
+const SPAWN_CALL = String.raw`(?:\bBun\.spawn(?:Sync)?|\bspawnSync|(?<!\w)spawn|\bexecFileSync|(?<!\w)execFile)\s*\(\s*\[?\s*`;
+/** A spawn of a literal `git`. */
+const GIT_SPAWN_RE = new RegExp(`${SPAWN_CALL}["']git["']`, "g");
+/** A spawn of `bun` itself (the literal, or the running binary) or of `python3`: a child whose sources the cone audits. */
+const CHILD_SPAWN_RE = new RegExp(`${SPAWN_CALL}(?:["'](?:bun|python3?)["']|process\\.execPath\\b)`, "g");
+
+/**
+ * The implicit verdict of a TEST file's spawn line, if it has one: the second
+ * site, after the scratch dir, that needs no annotation in a test. Its only
+ * risk is `spawn`, and every spawn on it runs a literal `git`, `bun` itself or `python3`.
+ * A test is only ever fingerprinted as a cone gate (`ci-cone.ts`, `test:`):
+ *
+ * - `git` is `tree`. The cone replays every git command the run executed in
+ *   the checkout, and keeps the reads of one it ran in a scratch directory it
+ *   created (its own repository, `parseTrace`); any other git command leaves
+ *   the run unrecorded.
+ * - `bun` or `python3` is `spawned`. The child's sources are in the traced
+ *   read set, so a change to one reruns the test, and what they read from the
+ *   environment is audited from that read set when the run is recorded
+ *   (`ci-cone.ts` `childInputsOf`; Python by `input-sites-py.ts`), never
+ *   declared. A child that ran inline code (`-c`, `-e`) records nothing.
+ *
+ * A fingerprint that does not replay a trace answers neither, so it stays
+ * undetermined.
+ */
+export function testSpawnVerdict(file: string, risks: readonly string[], raw: string): SiteVerdict[] | undefined {
+  if (!TEST_FILE_RE.test(file)) return undefined;
+  if (risks.length !== 1 || risks[0] !== "spawn") return undefined;
+  // `raw` is the line as written: the blanked code has no string text to name the command.
+  const noGit = raw.replace(GIT_SPAWN_RE, "");
+  const rest = noGit.replace(CHILD_SPAWN_RE, "");
+  if (rest === raw || RISKS.spawn!.test(rest)) return undefined;
+  const out: SiteVerdict[] = [];
+  if (rest !== noGit) out.push({ kind: "spawned" });
+  if (noGit !== raw) out.push({ kind: "tree" });
+  return out;
 }
 
 /** A line of a source file that matched a risk. */
@@ -459,6 +500,7 @@ export function scanSource(file: string, text: string): Site[] {
       else verdicts = parsed;
     }
     if (verdicts === undefined && malformed === undefined && isTestScratchDir(file, [...risks], c)) verdicts = [{ kind: "inert" }];
+    if (verdicts === undefined && malformed === undefined) verdicts = testSpawnVerdict(file, [...risks], raw);
     sites.push({ file, line: i + 1, risks: [...risks], pin, verdicts, ...(malformed ? { malformed } : {}), ...(main.has(i) ? { inMain: true } : {}) });
   }
   return sites;
@@ -507,6 +549,8 @@ export interface AuditedClosure {
   envUnset: string[];
   /** Whether some site's answer is a function of the whole tree (`tree`). */
   needsTree: boolean;
+  /** Whether some site runs a `bun` child whose reads only a trace shows (`spawned`). */
+  spawnsChildren: boolean;
   /** Whether some site reads history reachable from `HEAD` (`head`). */
   needsHead: boolean;
   /** Refs some site reads (`refs`). */
@@ -601,6 +645,7 @@ export function auditClosure(
   const env = new Set<string>();
   const envUnset = new Set<string>();
   let needsTree = false;
+  let spawnsChildren = false;
   let needsHead = false;
   const refs = new Set<string>();
   const stack: { file: string; entry: boolean; computed: boolean }[] = entries.map((e) => ({ file: resolve(root, e), entry: true, computed: false }));
@@ -637,6 +682,7 @@ export function auditClosure(
         if (v.kind === "env") v.names.forEach((n) => env.add(n));
         else if (v.kind === "env-unset") v.names.forEach((n) => envUnset.add(n));
         else if (v.kind === "tree") needsTree = true;
+        else if (v.kind === "spawned") spawnsChildren = true;
         else if (v.kind === "head") needsHead = true;
         else if (v.kind === "refs") v.names.forEach((n) => refs.add(n));
         else if (v.kind === "imports") pushGlobs(v.globs, false, true);
@@ -678,6 +724,7 @@ export function auditClosure(
     env: [...env].sort(),
     envUnset: [...envUnset].sort(),
     needsTree,
+    spawnsChildren,
     needsHead,
     refs: [...refs].sort(),
   };

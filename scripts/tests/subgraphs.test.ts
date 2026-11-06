@@ -32,7 +32,7 @@ import {
   siteDirFor,
   subgraphTree,
 } from "../../schemas/kg/cat-harness.ts";
-import { addressesPublishedTree, beanArchiveViews, declaredMoves, overDeepLinks, resolveAcrossArchive, resolveThroughMove, scanSubgraphs } from "../check-subgraphs.ts";
+import { addressesPublishedTree, beanArchiveViews, danglingLinksIn, declaredMoves, overDeepLinks, resolveAcrossArchive, resolveThroughMove, scanSubgraphs, unbuiltPublishPaths, type LinkContext } from "../check-subgraphs.ts";
 import { GraphTypologyRegistry, type GraphTypologyDef } from "../../schemas/kg/graph-typology-registry.ts";
 import { checkoutDirectories } from "../../schemas/kg/harness-config.ts";
 import { HARNESS_ROOT } from "../lib/roots.ts";
@@ -386,4 +386,52 @@ describe("a declared move answers at the old path until its window closes", () =
     decl.moves[0]!.until = "2026-12-31";
     expect(CatHarnessDeclarationSchema.safeParse(decl).success).toBe(true);
   });
+});
+
+// A link into a declared `builtAtPublish` path cannot be judged before the
+// publish build has written it (owner ruling 2026-11-05, card "Built links",
+// option 1): unverifiable while the path is absent, judged once it exists.
+describe("a link into an unbuilt publish-time artefact is unverifiable, not dangling", () => {
+  const withInstance = (built: boolean, fn: (inst: string, ctx: LinkContext) => void) => {
+    const inst = mkdtempSync(join(tmpdir(), "bap-"));
+    try {
+      const name = inst.split("/").pop()!;
+      mkdirSync(join(inst, "notes"), { recursive: true });
+      if (built) {
+        mkdirSync(join(inst, "schemas/kinds"), { recursive: true });
+        writeFileSync(join(inst, "schemas/kinds/a.json"), "{}");
+      }
+      writeFileSync(
+        join(inst, `${name}.json`),
+        JSON.stringify({
+          name,
+          directories: [],
+          builtAtPublish: [{ path: "schemas/kinds/", writer: ["kinds:build"], because: "checkout", reason: "fixture" }],
+        }),
+      );
+      const dirs = [{ id: "notes", path: "notes", absPath: join(inst, "notes"), graphTypologies: [] as string[] }];
+      const ctx = { root: inst, own: dirs, dirs, label: (d: { id: string }) => d.id, absentOffMain: [], archiveViews: [], unbuilt: unbuiltPublishPaths([inst]) } as unknown as LinkContext;
+      fn(inst, ctx);
+    } finally {
+      rmSync(inst, { recursive: true, force: true });
+    }
+  };
+
+  test("an absent declared path is listed, with its trailing slash", () =>
+    withInstance(false, (inst) => {
+      expect(unbuiltPublishPaths([inst])).toEqual([`${join(inst, "schemas/kinds")}/`]);
+    }));
+
+  test("while unbuilt, a link into it is not dangling; a link elsewhere still is", () =>
+    withInstance(false, (inst, ctx) => {
+      const text = "[k](../schemas/kinds/a.json) [d](../schemas/kinds/) [x](../nope.md)";
+      expect(danglingLinksIn(ctx, join(inst, "notes/n.md"), text)).toEqual(["../nope.md"]);
+    }));
+
+  test("once built, a link to a file the build did not write is dangling again", () =>
+    withInstance(true, (inst, ctx) => {
+      expect(unbuiltPublishPaths([inst])).toEqual([]);
+      const text = "[k](../schemas/kinds/a.json) [m](../schemas/kinds/missing.json)";
+      expect(danglingLinksIn(ctx, join(inst, "notes/n.md"), text)).toEqual(["../schemas/kinds/missing.json"]);
+    }));
 });

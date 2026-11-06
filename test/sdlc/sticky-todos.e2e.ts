@@ -1246,7 +1246,7 @@ test.describe("the todo board inside the sticky panel", () => {
  * They were not styled differently. `gen-docs-pages.ts` publishes backdrop
  * paths site-ROOT-absolute (`/assets/img/...`) because the SAME index file is
  * served from `/folio-assistant/` and from every
- * `/folio-assistant/STAGING/<branch>/` prefix, so it cannot bake one in. The
+ * `/folio-assistant/branches/<branch>/` prefix, so it cannot bake one in. The
  * client never added the prefix back, so every backdrop 404'd and the todo
  * cards showed a broken-image placeholder next to landing stickies that had
  * their art. The theme was applied the whole time; only the picture failed.

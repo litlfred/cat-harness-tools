@@ -75,6 +75,7 @@ import {
   type RenderedImpact,
   type RenderedRole,
 } from "../schemas/ui/rendered-impact.ts";
+import { PREVIEW_PREFIX_ALT } from "./lib/preview-prefix.ts";
 
 export const STAGING_CHANGES_TAG = "staging-changes/v1" as const;
 
@@ -379,7 +380,7 @@ export function predictByProvenance(sources: Sources, index: ReadonlyMap<string,
 // ─── 3. The QA check: the preview against the gh-pages root ────────────────
 
 /** Never compared: other previews, the render log, git's own files. */
-export const PUBLISH_ROOT_OTHERS = /^(STAGING|_render-log|\.git)(\/|$)/;
+export const PUBLISH_ROOT_OTHERS = new RegExp(`^(${PREVIEW_PREFIX_ALT}|_render-log|\\.git)(/|$)`);
 /** The staging job's own files beside a preview, which main's publish never writes. */
 export const PREVIEW_ARTEFACTS =
   /^(changes\/.*|changeset\.json|changeset-text\.json|rendered-impact\.json|rendered-measured\.json|blocks\.json|block-qa\.json|review-comments\.json|visual-diff\.json|visual\/.*|\.staged-at|\.staged-size\.json|staging-preview\.json)$/;

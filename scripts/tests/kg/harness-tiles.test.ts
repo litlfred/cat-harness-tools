@@ -380,7 +380,7 @@ describe("an icon is PUBLISHED, never declared — owner: \"broken image on LHS 
 
   test("the site directory's prefix is STRIPPED, because the mount does not carry it", () => {
     // Measured on the served bytes, 2026-09-21:
-    //   src="/folio-assistant/STAGING/<branch>/docs/assets/img/icons/cat-mark.svg"
+    //   src="/folio-assistant/branches/<branch>/docs/assets/img/icons/cat-mark.svg"
     // `docs/` is the instance's site directory and the build copies its
     // CONTENTS to the mount, so every reader got a 404 and a placeholder.
     const f = fixture({ host: withIcon("host") });

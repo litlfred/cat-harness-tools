@@ -35,6 +35,7 @@ import { join, resolve } from "node:path";
 
 import { findDeclarationFile, repoRootFor, KG_CONTENT_GRAPH_TYPOLOGIES } from "../schemas/kg/cat-harness.js";
 import { corpusDirectoriesForGraph } from "../schemas/kg/harness-config.js";
+import { gateOwnsFile } from "./lib/gate-own.ts";
 
 import { findEntryFiles, movesResolver } from "./check-agent-entry-links.ts";
 import { isSyncedSkillDir } from "./sync-remote-skills.js";
@@ -293,11 +294,17 @@ export function checkFile(repo: string, rel: string, report: CommandPathReport, 
   }
 }
 
-export function checkCommandPaths(repo: string = repoRootFor(INSTANCE_ROOT)): CommandPathReport {
+/**
+ * `owns`, when given, keeps only the files it accepts as SUBJECTS (a layer's
+ * PR checks judge only the caller's own files: owner ruling 2026-11-05, "Move
+ * the checks"; `lib/gate-own.ts`). A path a command names still resolves
+ * against the whole checkout.
+ */
+export function checkCommandPaths(repo: string = repoRootFor(INSTANCE_ROOT), owns: (rel: string) => boolean = () => true): CommandPathReport {
   const report: CommandPathReport = { filesRead: 0, checked: 0, declined: 0, folioRelative: 0, exempt: 0, held: [], dead: [], moved: [] };
-  for (const { file, corpus: c } of corpus(repo)) checkFile(repo, file, report, c);
-  checkHooks(repo, report);
-  checkPrintedCommands(repo, report);
+  for (const { file, corpus: c } of corpus(repo)) if (owns(file)) checkFile(repo, file, report, c);
+  checkHooks(repo, report, owns);
+  checkPrintedCommands(repo, report, owns);
   return report;
 }
 
@@ -366,10 +373,11 @@ export function checkCommandPaths(repo: string = repoRootFor(INSTANCE_ROOT)): Co
  * line is printed it usually sits in a fenced block or a hook command, which
  * the other two readers cover.
  */
-export function checkPrintedCommands(repo: string, report: CommandPathReport): void {
+export function checkPrintedCommands(repo: string, report: CommandPathReport, owns: (rel: string) => boolean = () => true): void {
   const RUNNER = /\b(?:bun run|bunx|bash|npx|python3|python|deno run)\s+(?=[A-Za-z0-9_.])/;
   const instances = instanceRoots(repo);
   for (const file of sourceFiles(repo)) {
+    if (!owns(file)) continue;
     let text: string;
     try {
       text = readFileSync(join(repo, file), "utf8");
@@ -579,8 +587,8 @@ function walkSource(dir: string): string[] {
  */
 export const HOST_COMMAND_FILES = [join(".claude", "settings.json"), ".mcp.json"] as const;
 
-export function checkHooks(repo: string, report: CommandPathReport): void {
-  for (const file of HOST_COMMAND_FILES) checkHostCommandFile(repo, file, report);
+export function checkHooks(repo: string, report: CommandPathReport, owns: (rel: string) => boolean = () => true): void {
+  for (const file of HOST_COMMAND_FILES) if (owns(file)) checkHostCommandFile(repo, file, report);
 }
 
 function checkHostCommandFile(repo: string, file: string, report: CommandPathReport): void {
@@ -728,8 +736,10 @@ function formatReport(r: CommandPathReport): string {
 
 if (import.meta.main) {
   let report: CommandPathReport;
+  // In a layer's PR checks, only the caller's own files (owner ruling 2026-11-05).
+  const scoped = gateOwnsFile(".") !== undefined;
   try {
-    report = checkCommandPaths();
+    report = checkCommandPaths(undefined, (rel) => gateOwnsFile(rel) ?? true);
   } catch (e) {
     console.error(`Could not check command paths: ${e instanceof Error ? e.message : e}`);
     console.error("This is NOT a pass. Treat it as unknown.");
@@ -739,5 +749,9 @@ if (import.meta.main) {
     for (const h of report.held) console.log(`${h.file}:${h.line}  ${h.token}\n    in: ${h.command}`);
   }
   console.log(process.argv.includes("--json") ? JSON.stringify(report, null, 2) : formatReport(report));
+  if (scoped && report.filesRead === 0) {
+    console.log("✓ check:command-paths: the caller commits none of the files it reads; the mounted layers' are judged by their own CI.");
+    process.exit(0);
+  }
   process.exit(report.dead.length || report.filesRead === 0 ? 1 : 0);
 }

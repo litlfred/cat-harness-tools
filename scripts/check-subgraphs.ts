@@ -46,6 +46,7 @@ import { checkoutDirectories, checkoutRootFor } from "../schemas/kg/harness-conf
 import { instanceRootsIn } from "../schemas/kg/instance-roots.js";
 import type { GraphTypologyRegistry } from "../schemas/kg/graph-typology-registry.js";
 import { corpusScopeFor } from "./known-skills.js";
+import { gateOwnInstances, nothingOwnLine } from "./lib/gate-own.ts";
 import { mayLeaveMain } from "./qa-results.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 
@@ -99,6 +100,10 @@ export interface SubgraphReport {
    * is neither dangling nor resolved — the third state, reported by count.
    * Bean `cxcn`: with the derived corpus absent, `test/README.md`'s generated
    * link to `results/README.md` read as a broken link.
+   *
+   * Also links into a declared `builtAtPublish` path that is not built in this
+   * checkout ({@link unbuiltPublishPaths}): the publish build writes it, so
+   * whether the target exists cannot be judged before that build has run.
    */
   unverifiable: Array<{ from: string; fromDir: string; target: string }>;
   /**
@@ -485,6 +490,43 @@ export interface LinkContext {
   archiveViews: Array<{ store: string; view: string }>;
   /** The `moves` the checkout's instances declare (sdlc skill `two-phase-move`). */
   moves?: ResolvedMove[];
+  /**
+   * Declared `builtAtPublish` paths (absolute) that are not built in this
+   * checkout. A link into one cannot be judged until the publish build runs,
+   * so it is `unverifiable`, not `dangling`; once the path exists, a missing
+   * target is dangling again. See {@link unbuiltPublishPaths}.
+   */
+  unbuilt?: string[];
+}
+
+/**
+ * The `builtAtPublish` paths the instances under {@link roots} declare that
+ * are ABSENT here, as absolute paths (a directory entry keeps its trailing
+ * `/`). Only an absent one counts: a built one is judged like any other file,
+ * so a link to a file the build did not write is still reported. An
+ * unreadable declaration contributes none (`check:harness-dirs` reports it).
+ */
+export function unbuiltPublishPaths(roots: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const root of new Set(roots.map((r) => resolve(r)))) {
+    let decl;
+    try {
+      decl = readDeclaration(root);
+    } catch {
+      continue;
+    }
+    for (const e of decl?.builtAtPublish ?? []) {
+      const abs = resolve(root, e.path);
+      if (existsSync(abs)) continue;
+      out.push(e.path.endsWith("/") ? `${abs}/` : abs);
+    }
+  }
+  return out;
+}
+
+/** Whether {@link wanted} lies at or under one of {@link unbuilt} ({@link unbuiltPublishPaths}). */
+function underUnbuilt(wanted: string, unbuilt: readonly string[]): boolean {
+  return unbuilt.some((u) => (u.endsWith("/") ? wanted === u.slice(0, -1) || wanted.startsWith(u) : wanted === u));
 }
 
 export function linkContext(root: string = ROOT): LinkContext {
@@ -507,8 +549,10 @@ export function linkContext(root: string = ROOT): LinkContext {
     .filter((d) => mayLeaveMain(d as { graphTypologies?: string[]; storage?: unknown }))
     .map((d) => resolve(d.absPath ?? join(root, d.path)))
     .filter((a) => !existsSync(a));
-  const moves = declaredMoves([root, ...instanceRootsIn(checkoutRootFor(root))]);
-  return { root, own, dirs, label, absentOffMain, archiveViews: beanArchiveViews(dirs, root), moves };
+  const instances = [root, ...instanceRootsIn(checkoutRootFor(root))];
+  const moves = declaredMoves(instances);
+  const unbuilt = unbuiltPublishPaths(instances);
+  return { root, own, dirs, label, absentOffMain, archiveViews: beanArchiveViews(dirs, root), moves, unbuilt };
 }
 
 /** Retired content is not held to link resolution — see `exempt`. */
@@ -538,6 +582,8 @@ function judgeLink(
   const through = resolveThroughMove(wanted, ctx.moves ?? []);
   if (through !== undefined) return { resolved: through.resolved, move: through.move };
   if (ctx.absentOffMain.some((a) => wanted === a || wanted.startsWith(a + "/"))) return { bucket: "unverifiable" };
+  // Into a declared publish-time artefact that is not built here: judged once the build has run.
+  if (underUnbuilt(wanted, ctx.unbuilt ?? [])) return { bucket: "unverifiable" };
   // A renderable graph addresses the PUBLISHED tree, not this one.
   // A typology `within` a renderable one is published BY it — the
   // docs graph's named groups (bean `xka5`), `proposals` and
@@ -574,7 +620,13 @@ export function danglingLinksIn(ctx: LinkContext, file: string, text: string): s
   });
 }
 
-export function scanSubgraphs(root: string = ROOT): SubgraphReport {
+/**
+ * `scope`, when given, sweeps only the directories those instances commit
+ * (owner ruling 2026-11-05, "Move the checks"; `lib/gate-own.ts`). Every
+ * directory stays a link TARGET, so an edge into a mounted layer is still
+ * resolved and reported.
+ */
+export function scanSubgraphs(root: string = ROOT, scope?: ReadonlySet<string>): SubgraphReport {
   const ctx = linkContext(root);
   const { own, dirs, label } = ctx;
   const tree = subgraphTree(own);
@@ -591,6 +643,7 @@ export function scanSubgraphs(root: string = ROOT): SubgraphReport {
   let scanned = 0;
 
   for (const dir of dirs) {
+    if (scope !== undefined && dirs !== own && !scope.has((dir as { member?: string }).member ?? (dir as { declaredBy?: string }).declaredBy ?? "")) continue;
     const abs = dir.absPath ?? join(root, dir.path);
     if (!existsSync(abs) || !statSync(abs).isDirectory()) continue;
     if (isExemptDirectory(dir)) {
@@ -661,8 +714,10 @@ export function scanSubgraphs(root: string = ROOT): SubgraphReport {
 
 if (import.meta.main) {
   const check = process.argv.includes("--check");
+  // In a layer's PR checks, only the caller's own directories are swept (owner ruling 2026-11-05).
+  const scope = gateOwnInstances();
   const { tree, edges, dangling, moves, unverifiable, derivedLinks, exempt, siteResolved, unreadable, notExamined, scanned } =
-    scanSubgraphs(ROOT);
+    scanSubgraphs(ROOT, scope);
 
   console.log(`Subgraphs  (${scanned} markdown node(s) attributed to a declared directory)\n`);
 
@@ -675,6 +730,10 @@ if (import.meta.main) {
 
   // Vacuity before the verdict. With nothing attributed, "no cross edges"
   // is a statement about the sweep and not about the corpus.
+  if (scanned === 0 && scope) {
+    console.log(nothingOwnLine("check:subgraphs", "markdown in a declared directory", scope));
+    process.exit(0);
+  }
   if (scanned === 0) {
     console.error("\n✗ ATTRIBUTED NO FILES. This is not a pass: nothing was examined.");
     process.exit(1);

@@ -2,7 +2,8 @@
 /**
  * serve-local — one command that gets each repo's rendered site and serves
  * them together at http://127.0.0.1:4007, with published IRIs opening the
- * local copy.
+ * local copy. Local server Phase 3 (issue #1179; Phases 1–2 were #1164 and
+ * #1167).
  *
  * ```sh
  * bun run cat-harness-tools/scripts/serve-local.ts --repos folio-assistant,dth-pc
@@ -15,9 +16,10 @@
  * - `--repos a,b` fetches each repo's published `gh-pages` branch into a
  *   cache (`$XDG_CACHE_HOME/cat-harness/serve-local/<repo>`, else
  *   `~/.cache/...`): a shallow, blob-less, sparse clone, so only the files
- *   checked out are downloaded. A later run updates it. `STAGING/` is left
- *   out, because previews are most of a large gh-pages branch;
- *   `--staging <branch>` adds the previews you name.
+ *   checked out are downloaded. A later run updates it. `branches/` is left
+ *   out, because previews are most of a large gh-pages branch
+ *   (folio-assistant's held 156,803 files on 2026-10-31); `--staging <branch>`
+ *   adds the previews you name.
  * - `--site <repo>=<dir>` serves a directory you built yourself, for changes
  *   not published yet. This script does not run builds: each repo builds its
  *   own way, and the build tools share folio-assistant's pins.
@@ -28,7 +30,7 @@
  * (a template with `{owner}` and `{repo}`) override it.
  *
  * Git runs through `node:child_process`, so nothing here needs Bun beyond the
- * server launcher it hands off to.
+ * server launcher it hands off to (owner, 2026-10-31: Bun now, Node later).
  *
  * @module scripts/serve-local
  */
@@ -40,6 +42,7 @@ import { join, resolve } from "node:path";
 import { safeSegment } from "../src/core/safe-path";
 import type { Mount } from "./lib/rendering-handler";
 import { DEFAULT_PORT, declaredIriOrigin, iriBasesFor, nextPrimePort, parseMount, serveRendering } from "./serve-rendering";
+import { PREVIEW_PREFIX_ALT, PREVIEW_PREFIXES } from "./lib/preview-prefix.ts";
 
 /** Where fetched sites are kept between runs. */
 export function defaultCacheDir(env: NodeJS.ProcessEnv = process.env): string {
@@ -65,14 +68,14 @@ export function remoteUrl(template: string, owner: string, repo: string): string
 }
 
 /**
- * Sparse patterns (non-cone): everything except `STAGING/`, then each named
+ * Sparse patterns (non-cone): everything except `branches/`, then each named
  * preview. A branch name is one safe segment or it is refused.
  */
 export function sparsePatterns(staging: readonly string[]): string[] {
   for (const b of staging) {
     if (safeSegment(b) === undefined) throw new Error(`serve-local: bad --staging branch: ${b}`);
   }
-  return ["/*", "!/STAGING/", ...staging.map((b) => `/STAGING/${b}/`)];
+  return ["/*", ...PREVIEW_PREFIXES.map((p) => `!/${p}/`), ...staging.flatMap((b) => PREVIEW_PREFIXES.map((p) => `/${p}/${b}/`))];
 }
 
 function git(args: readonly string[], cwd?: string): void {
@@ -100,12 +103,13 @@ export function fetchSite(o: { url: string; dir: string; branch?: string; stagin
 
 /** The previews a fetched gh-pages branch holds, read from git (they are not checked out). */
 export function listStaging(dir: string): string[] {
-  const r = spawnSync("git", ["ls-tree", "--name-only", "HEAD", "STAGING/"], { cwd: dir, encoding: "utf-8" });
+  const r = spawnSync("git", ["ls-tree", "--name-only", "HEAD", ...PREVIEW_PREFIXES.map((p) => `${p}/`)], { cwd: dir, encoding: "utf-8" });
   if (r.status !== 0) return [];
-  return r.stdout
+  const lead = new RegExp(`^${PREVIEW_PREFIX_ALT}/`);
+  return [...new Set(r.stdout
     .split("\n")
-    .map((s) => s.replace(/^STAGING\//, "").trim())
-    .filter((s) => s.length > 0);
+    .map((s) => s.replace(lead, "").trim())
+    .filter((s) => s.length > 0))];
 }
 
 /** Split `a,b , c` into repo names, refusing anything that is not one segment. */
@@ -123,7 +127,7 @@ const USAGE = `usage: serve-local.ts [--repos a,b] [--site <repo>=<dir>]... [--s
 
   --repos      fetch each repo's gh-pages branch (cached; updated each run) and serve it at /<repo>/
   --site       serve a directory you built yourself at /<repo>/ instead; repeatable
-  --staging    also fetch STAGING/<branch>/ previews; repeatable (STAGING is left out otherwise)
+  --staging    also fetch branches/<branch>/ (or old branches/<branch>/) previews; repeatable (previews are left out otherwise)
   --offline    use the cache as it is, no fetch
   --port       default ${DEFAULT_PORT}
   --iri-origin where IRIs are published (default: the declared canonicalUrl's origin)

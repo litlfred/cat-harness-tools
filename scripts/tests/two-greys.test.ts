@@ -129,7 +129,7 @@ describe.skipIf(NOT_BUILT)("read-only is SAID, not only recorded", () => {
    *
    * The first attempt put the read-only mark on the graph-tile surface —
    * `docs-ui.js` reading `t.readOnly`, CSS dashing the tile. Both shipped.
-   * Reading the STAGING DEPLOY found `readOnly` on **0 of 3** sampled pages,
+   * Reading the branches/ DEPLOY found `readOnly` on **0 of 3** sampled pages,
    * because that surface's tiles come from the ROOT instance's declaration and
    * no cat-harness directory is read-only. Live code, nothing to act on.
    *

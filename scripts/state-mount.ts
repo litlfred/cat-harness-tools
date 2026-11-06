@@ -221,8 +221,8 @@ export function mountState(opts: MountOptions = {}): MountResult {
   // fan-out that ran can still leave them stale — it leaves a mount that no
   // longer hashes to the lock untouched, and cannot run at all when the index
   // is unreadable to the tools on disk (bean folio-assistant-x38u: every fresh
-  // session dropped `/who-iris/test/attestations/**`, declared by the pinned
-  // who-iris but not by the older copy on disk). So on EVERY run the block is
+  // session dropped a content layer's `test/attestations/**`, declared by the
+  // pinned layer but not by the older copy on disk). So on EVERY run the block is
   // rewritten only when the layer mounts are verified current; otherwise it is
   // left alone, and said so.
   if (result.graphs.some(isPresent)) {

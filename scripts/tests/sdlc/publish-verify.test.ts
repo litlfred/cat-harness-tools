@@ -198,10 +198,10 @@ describe("the documents this platform actually publishes", () => {
 });
 
 describe("a staging preview's own context URLs resolve to its tree", () => {
-  // A staging export mints under `<published>/STAGING/<slug>` (`kg-export
+  // A staging export mints under `<published>/branches/<slug>` (`kg-export
   // --base-url`), so its subject documents name a context there, while the
   // preview's tree is the site's root: the file is `<dir>/bootstrap-tools/…`,
-  // never `<dir>/STAGING/<slug>/bootstrap-tools/…`.
+  // never `<dir>/branches/<slug>/bootstrap-tools/…`.
   const PUBLISHED = CONTENT_CONTEXT_URL.slice(0, CONTENT_CONTEXT_URL.indexOf("/ns/content/"));
   const STAGED = `${PUBLISHED}/STAGING/feature-x`;
   const CTX = "bootstrap-tools/bootstrap-tools.context.jsonld";
