@@ -215,11 +215,12 @@ if (import.meta.main) {
   const own = gateOwnInstances();
   const instName = readDeclaration(INSTANCE_ROOT)?.name ?? "cat-harness";
   const dir = translationsRoot(INSTANCE_ROOT);
-  if (check && ((own !== undefined && !own.has(instName)) || gateOwnsFile(relative(REPO_ROOT, dir)) === false)) {
+  const repoRoot = REPO_ROOT ?? INSTANCE_ROOT;
+  if (check && ((own !== undefined && !own.has(instName)) || gateOwnsFile(relative(repoRoot, dir)) === false)) {
     console.log(
       own !== undefined
         ? nothingOwnLine("translation:pot", "translations directory", own)
-        : `✓ translation:pot --check: the templates live in ${relative(REPO_ROOT, dir)}, which the caller does not commit; the owning layer's CI judges them.`,
+        : `✓ translation:pot --check: the templates live in ${relative(repoRoot, dir)}, which the caller does not commit; the owning layer's CI judges them.`,
     );
     process.exit(0);
   }

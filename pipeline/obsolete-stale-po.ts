@@ -251,11 +251,12 @@ function main(): void {
   const own = gateOwnInstances();
   const instName = readDeclaration(root)?.name ?? "cat-harness";
   const dir = directoryForGraph(root, "translation-sources");
-  if (check && ((own !== undefined && !own.has(instName)) || (dir !== undefined && gateOwnsFile(relative(REPO_ROOT, dir)) === false))) {
+  const repoRoot = REPO_ROOT ?? root;
+  if (check && ((own !== undefined && !own.has(instName)) || (dir !== undefined && gateOwnsFile(relative(repoRoot, dir)) === false))) {
     console.log(
       own !== undefined
         ? nothingOwnLine("translation:obsolete", "translations directory", own)
-        : `✓ translation:obsolete --check: the catalogues live in ${relative(REPO_ROOT, dir!)}, which the caller does not commit; the owning layer's CI judges them.`,
+        : `✓ translation:obsolete --check: the catalogues live in ${relative(repoRoot, dir!)}, which the caller does not commit; the owning layer's CI judges them.`,
     );
     return;
   }
