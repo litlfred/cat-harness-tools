@@ -1,14 +1,16 @@
 # Regenerate a harnessed LAYER's derived artefacts and judge them, as ONE
 # reusable workflow (bean folio-assistant-ey1c; owner, 2026-10-15: "a").
 #
-# WHERE IT RUNS (owner, 2026-11-06, options "1 3"). Derived files reach main
-# through the PR that changes their inputs, tested, and the release build
-# regenerates again before it publishes. Nothing pushes to main, and no repair
-# branch or repair PR is made any more: the `automation/post-merge-regen-*`
-# branches and their PRs piled up with no CI once Actions could no longer open
-# PRs in cat-harness. Three modes, one per caller:
+# WHERE IT RUNS (owner, 2026-11-06, options "1 3", then "full runs only on
+# manual trigger OR release build"). A run composes and regenerates the whole
+# index, 50-80 minutes of runner time, so nothing calls it on a pull_request,
+# push or schedule event: a person dispatches it, or the release build calls
+# it. Nothing pushes to main, and no repair branch or repair PR is made any
+# more: the `automation/post-merge-regen-*` branches and their PRs piled up
+# with no CI once Actions could no longer open PRs in cat-harness. Modes:
 #
-#   pr       on a pull request (owner's option 1). Regenerate at the PR's head.
+#   pr       dispatched for ONE PR, named by the `pr` input (its number, or
+#            its head branch in this repository). Regenerate at the PR's head.
 #            When a tracked file changed and the PR's branch is in this
 #            repository, commit the regen to that branch, ONE commit
 #            "chore(derived): regenerate derived artefacts for <sha>". From a
@@ -18,36 +20,41 @@
 #            `regen-push-token` (a fine-grained token or app token with
 #            contents: write on this repository) and the commit is pushed with
 #            it, so the PR's checks run on it. Without the secret the commit is
-#            still pushed, with GITHUB_TOKEN, and this check FAILS saying that
-#            no CI ran on the new head and how to start it. Either way, a regen
-#            that still changes files on a head that is itself a regen commit
-#            fails (no fixpoint), so it cannot loop.
-#   release  in the release build (owner's option 3). Regenerate INTO THE
-#            PUBLISHED ARTEFACT only: the regenerated tree is uploaded as the
-#            run artifact `regenerated-<instance>` (output `artifact`), which
-#            the release job lays over its checkout before it packs. Nothing is
-#            committed. Unrepaired checks, or READMEs that reach no fixpoint,
-#            fail the run, so the release job (which `needs:` this one) never
-#            publishes stale output.
-#   verify   the default, after a merge to main: verify and WARN. It
-#            regenerates in its own runner, says what was stale, and commits,
-#            pushes and opens nothing.
+#            still pushed, with GITHUB_TOKEN, and this run FAILS saying that
+#            no CI ran on the new head and how to start it (a comment on the
+#            PR says so too). Either way, a regen that still changes files on a
+#            head that is itself a regen commit fails (no fixpoint), so it
+#            cannot loop. Called from a `pull_request` event, it reads the PR
+#            from the event instead; no caller here does that.
+#   release  in the release build. Regenerate INTO THE PUBLISHED ARTEFACT
+#            only: the change is uploaded as the run artifact
+#            `regenerated-<instance>` (output `artifact`: `regen.patch`,
+#            `base-sha`, `changed.txt`, `checks.txt`), which the release job
+#            applies to its checkout of the same commit before it packs.
+#            Nothing is committed. Unrepaired checks, or READMEs that reach no
+#            fixpoint, fail the run, so the release job (which `needs:` this
+#            one) never publishes stale output.
+#   verify   the default, dispatched on main: verify and WARN. It regenerates
+#            in its own runner, says what was stale, and commits, pushes and
+#            opens nothing.
 #
 # NOT in branch or staging preview builds (owner, 2026-11-06: "preview builds
 # not required regen"). `folio-site-publish.yml` and the stage-local previews
 # under `STAGING/` and `branches/` do not call this workflow; do not add it.
 #
-# A caller is one `uses:` line a mode. The PR side, as its own job beside the
-# checks (a ready PR only; it regenerates the whole composed index, about an
-# hour of runner time):
+# A caller is one `uses:` line a mode. Manual, for a PR or for main:
 #
-#   on: { pull_request: { types: [opened, synchronize, reopened, ready_for_review] } }
+#   on: { workflow_dispatch: { inputs: { pr: { type: string, default: "" } } } }
 #   jobs:
-#     regen:
-#       if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft == false }}
+#     verify:
+#       if: ${{ inputs.pr == '' }}
+#       permissions: { contents: read }
+#       uses: litlfred/cat-harness-tools/.github/workflows/layer-post-merge-regen.yml@main
+#     regen-pr:
+#       if: ${{ inputs.pr != '' }}
 #       permissions: { contents: write, pull-requests: write }
 #       uses: litlfred/cat-harness-tools/.github/workflows/layer-post-merge-regen.yml@main
-#       with: { mode: pr }
+#       with: { mode: pr, pr: ${{ inputs.pr }} }
 #       secrets: { regen-push-token: ${{ secrets.REGEN_PUSH_TOKEN }} }
 #
 # The release side, ahead of the job that publishes:
@@ -62,7 +69,8 @@
 #       steps:
 #         - uses: actions/checkout@...
 #         - uses: actions/download-artifact@...
-#           with: { name: ${{ needs.regen.outputs.artifact }}, path: . }
+#           with: { name: ${{ needs.regen.outputs.artifact }}, path: ${{ runner.temp }}/regen }
+#         - run: git apply --index "$RUNNER_TEMP/regen/regen.patch"   # when non-empty
 #
 # What it does, in the layout `layer-publish-context.yml` uses:
 #   1. Check out the folio-assistant index at `index-ref` and mount every
@@ -100,6 +108,11 @@ on:
         required: false
         type: string
         default: "verify"
+      pr:
+        description: "pr mode, when dispatched: the PR to regenerate, as its number or its head branch in this repository. Empty on a pull_request event, which names it."
+        required: false
+        type: string
+        default: ""
       instance:
         description: "The instance's directory in the folio-assistant index (its mount path); empty means the calling repository's name."
         required: false
@@ -139,8 +152,8 @@ on:
 # start, so a fixed block here would force write on every caller.
 
 concurrency:
-  # A PR's runs replace each other; main's (verify, release) queue.
-  group: layer-post-merge-regen-${{ github.repository }}-${{ inputs.mode }}-${{ github.event.pull_request.number || github.ref }}
+  # One PR's runs replace each other; main's (verify, release) queue.
+  group: layer-post-merge-regen-${{ github.repository }}-${{ inputs.mode }}-${{ inputs.pr || github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ inputs.mode == 'pr' }}
 
 env:
@@ -173,6 +186,43 @@ jobs:
           bun-version: 1.4.4
       - name: Mount every instance from the index's lock
         run: bash fa/.github/mount-from-lock.sh --root fa
+      - name: Which PR? (pr mode)
+        # From the `pr` input when dispatched (a number, or a head branch in
+        # this repository), else from the pull_request event.
+        id: pr
+        if: inputs.mode == 'pr'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WANT: ${{ inputs.pr }}
+          EVENT_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          want="${WANT:-$EVENT_NUMBER}"
+          if [ -z "$want" ]; then
+            echo "::error::pr mode needs the PR: dispatch with the 'pr' input (its number or head branch)."
+            exit 2
+          fi
+          if [[ "$want" =~ ^#?[0-9]+$ ]]; then
+            json="$(gh api "repos/$GITHUB_REPOSITORY/pulls/${want#\#}")"
+          else
+            json="$(gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&head=${GITHUB_REPOSITORY_OWNER}:${want}" --jq '.[0] // empty')"
+            if [ -z "$json" ]; then
+              echo "::error::No open PR from branch '$want' in $GITHUB_REPOSITORY. Name a fork's PR by its number."
+              exit 2
+            fi
+          fi
+          state="$(jq -r .state <<<"$json")"
+          if [ "$state" != open ]; then
+            echo "::error::PR #$(jq -r .number <<<"$json") is $state: nothing to regenerate."
+            exit 2
+          fi
+          {
+            echo "number=$(jq -r .number <<<"$json")"
+            echo "repo=$(jq -r .head.repo.full_name <<<"$json")"
+            echo "ref=$(jq -r .head.ref <<<"$json")"
+            echo "sha=$(jq -r .head.sha <<<"$json")"
+          } >> "$GITHUB_OUTPUT"
+          echo "PR #$(jq -r .number <<<"$json"): $(jq -r '.head.repo.full_name + ":" + .head.ref + " at " + .head.sha[0:10]' <<<"$json")"
       - name: Check out the caller
         # In `pr` mode, the PR's HEAD (not the merge commit), from the
         # repository it lives in, so a regen commit sits on top of it. The
@@ -180,8 +230,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: src
-          repository: ${{ inputs.mode == 'pr' && github.event.pull_request.head.repo.full_name || github.repository }}
-          ref: ${{ inputs.mode == 'pr' && github.event.pull_request.head.sha || github.sha }}
+          repository: ${{ inputs.mode == 'pr' && steps.pr.outputs.repo || github.repository }}
+          ref: ${{ inputs.mode == 'pr' && steps.pr.outputs.sha || github.sha }}
           token: ${{ secrets.regen-push-token || github.token }}
       - name: Put a copy of the caller in place of its locked mount
         env:
@@ -321,10 +371,10 @@ jobs:
         if: inputs.mode == 'pr' && inputs.dry-run == false && steps.changes.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REPO: ${{ steps.pr.outputs.repo }}
+          HEAD_REF: ${{ steps.pr.outputs.ref }}
+          HEAD_SHA: ${{ steps.pr.outputs.sha }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
           HAS_PUSH_TOKEN: ${{ secrets.regen-push-token != '' }}
         run: |
           set -euo pipefail

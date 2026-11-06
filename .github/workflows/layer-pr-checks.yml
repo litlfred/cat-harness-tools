@@ -1074,9 +1074,10 @@ jobs:
       - name: Directory READMEs (QA report, never a gate)
         # Owner, 2026-10-16: "QA report, but not gate". A layer's own PR is
         # told when its directory READMEs are stale, as a warning and in the
-        # step summary; it is never failed for it. The caller's PR regen job
-        # (`layer-post-merge-regen.yml`, mode `pr`; owner, 2026-11-06)
-        # commits them to the PR's branch, or fails the PR. Run from `fa`,
+        # step summary; it is never failed for it. A dispatched regen
+        # (`layer-post-merge-regen.yml`, mode `pr`; full runs only on manual
+        # trigger or release build, owner 2026-11-06) commits them to the
+        # PR's branch. Run from `fa`,
         # so the graph typologies are the composed set, over the caller's own
         # git checkout. A locked cat-harness-tools older than `--repo` reports
         # that it could not judge, rather than a finding.
