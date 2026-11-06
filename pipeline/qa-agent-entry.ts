@@ -113,7 +113,7 @@ interface QaEntry {
   evidence?: string;
   notes?: string;
   reviewer: { kind: string; id: string; version?: string };
-  reviewed_at: string;
+  reviewed_at?: string;
   reviewed_tree: string;
 }
 interface QaSidecarDoc {
@@ -177,7 +177,8 @@ const entry: QaEntry = {
   }) as QaEntry["field_hash"],
   result,
   reviewer: { kind: "agent", id: reviewerId, version: "v1" },
-  reviewed_at: new Date().toISOString(),
+  // No reviewed_at (owner rulings 2026-11-06, "QA dates" / "Date source"):
+  // the date is derived on read from reviewed_tree.
   reviewed_tree: reviewedTree,
 };
 if (severity) entry.severity = severity;
@@ -185,7 +186,7 @@ if (evidence) entry.evidence = evidence;
 if (notes) entry.notes = notes;
 
 doc.criteria![criterion].push(entry);
-doc.updated_at = entry.reviewed_at;
+delete doc.updated_at;
 try {
   doc.criteria = finalizeCriteria(attested, doc.criteria!, "attesting");
 } catch (err) {

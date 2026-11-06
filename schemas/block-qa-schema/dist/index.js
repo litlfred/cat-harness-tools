@@ -93,7 +93,8 @@ var QaCriterionEntry = import_zod.z.object({
   verdict: DaVerdict.optional(),
   reviewer: QaReviewer,
   // ISO-8601 UTC datetime; legacy agent entries may carry a bare ISO date.
-  reviewed_at: import_zod.z.string(),
+  reviewed_at: import_zod.z.string().optional(),
+  // derived from reviewed_tree on read since 0.2.0 (owner rulings 2026-11-06, cards "QA dates" and "Date source")
   // Tree of repo HEAD at audit time (`HEAD^{tree}`). What producers write
   // since bean 69lr: a PR run's HEAD commit can vanish, its tree cannot.
   reviewed_tree: import_zod.z.string().optional(),
@@ -114,7 +115,7 @@ var BlockQaReport = import_zod.z.object({
   }).passthrough(),
   source_hashes: QaFieldHash,
   criteria: import_zod.z.record(import_zod.z.string(), import_zod.z.array(QaCriterionEntry)),
-  updated_at: import_zod.z.string()
+  updated_at: import_zod.z.string().optional()
 }).passthrough();
 var QaScriptSidecar = import_zod.z.object({
   $schema: import_zod.z.literal("qa-script/v1"),
@@ -124,11 +125,11 @@ var QaScriptSidecar = import_zod.z.object({
   script_commit_sha: import_zod.z.string(),
   extra_inputs: import_zod.z.array(import_zod.z.string()).optional(),
   deps_hash: import_zod.z.string().optional(),
-  last_run_at: import_zod.z.string(),
+  last_run_at: import_zod.z.string().optional(),
   last_run_sha: import_zod.z.string(),
   engine_version: import_zod.z.string().optional()
 }).passthrough();
-var VERSION = "0.1.0";
+var VERSION = "0.2.0";
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   BlockQaReport,

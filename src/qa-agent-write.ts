@@ -4,8 +4,9 @@
  * Centralises the staleness-stamping that every audit (script, agent,
  * human) must perform, so it is *transparent to the audit*: a reviewer
  * supplies only the verdict (result / severity / evidence); this helper
- * captures the `field_hash` (current md/ts/lean source hashes),
- * `reviewed_at`, and `reviewed_tree` uniformly — the provenance
+ * captures the `field_hash` (current md/ts/lean source hashes) and
+ * `reviewed_tree` uniformly — no `reviewed_at`, whose date is derived on read
+ * from the tree (owner rulings 2026-11-06, "QA dates" / "Date source") — the provenance
  * `qa-sweep.ts` stamps on script entries, with HEAD's tree in place of its
  * commit (bean 69lr; owner card Q4, 2026-11-05: a PR run's HEAD is a
  * synthetic merge commit that can vanish, while its tree survives onto main).
@@ -235,13 +236,14 @@ if (!report) {
     paths: relPaths,
     source_hashes: currentHashes,
     criteria: composeCriteria({}, attested.attestations) as BlockQaReport["criteria"],
-    updated_at: nowIso,
   };
 }
 
 // Refresh top-level provenance.
 report.source_hashes = currentHashes;
-report.updated_at = nowIso;
+// No clock in the sidecar (owner rulings 2026-11-06, "QA dates" / "Date
+// source"): its date is derived on read from reviewed_tree.
+delete report.updated_at;
 
 const entry: QaCriterionEntry = {
   field_hash: currentHashes,
@@ -256,7 +258,6 @@ const entry: QaCriterionEntry = {
     agent_date: today,
     agent_skill: skill,
   },
-  reviewed_at: nowIso,
   reviewed_tree: headTree,
   ...(notes ? { notes } : {}),
 };
