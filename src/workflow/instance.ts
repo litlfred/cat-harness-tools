@@ -321,6 +321,12 @@ export interface EnabledActivity {
   /** The values this call gives the global task's declared inputs, by name. */
   inputs?: Record<string, string>;
   /**
+   * Set on a non-interrupting boundary event: the activity it sits on. The
+   * step is OPTIONAL: it may be completed while that activity holds a token,
+   * which it keeps, and nothing waits for it.
+   */
+  optionalOn?: string;
+  /**
    * The chain of call activities this step sits inside, outermost first, as
    * their names read on the parent diagram. Absent at the top level.
    *
@@ -403,6 +409,11 @@ function settle(
     case "activity":
       if (!state.tokens.includes(node.id)) state.tokens.push(node.id);
       return;
+
+    case "boundary":
+      // Refused at load (no incoming flow), so this is a defect in a model
+      // built some other way; fail rather than invent a meaning.
+      throw new WorkflowError(`${node.id} is a boundary event; a sequence flow cannot arrive at it`);
 
     case "exclusive":
       // A merge (one way out) needs no decision; a split does, and the token
@@ -643,7 +654,16 @@ export function enabled(
     roles ? roleForLane(roles, node.lane, node.roleRef)?.id : undefined;
 
   // A legacy `folio-workflow-instance/v1` record has no `tokens`: nothing is enabled.
-  return (state.tokens ?? []).flatMap((id): Enabled[] => {
+  const tokens = state.tokens ?? [];
+  // Each non-interrupting boundary event on an activity that holds a token is
+  // offered too, after it, marked optional.
+  const offered = [
+    ...tokens,
+    ...[...model.nodes.values()]
+      .filter((n) => n.kind === "boundary" && n.attachedTo !== undefined && tokens.includes(n.attachedTo))
+      .map((n) => n.id),
+  ];
+  return offered.flatMap((id): Enabled[] => {
     const node = model.nodes.get(id)!;
 
     // A call activity with a subprocess running inside it is not itself work —
@@ -767,6 +787,7 @@ export function enabled(
       calledElement: node.calledElement,
       ...(node.globalTask ? { globalTask: node.globalTask.id } : {}),
       ...(node.inputs ? { inputs: node.inputs } : {}),
+      ...(node.kind === "boundary" ? { optionalOn: node.attachedTo } : {}),
       context: taskContext,
     }];
   });
@@ -817,7 +838,10 @@ export function complete(
     if (owner) return completeInSubprocess(model, state, owner, nodeId, opts);
     throw new WorkflowError(`no such node: ${nodeId}`);
   }
-  if (!state.tokens.includes(nodeId)) {
+  // A non-interrupting boundary event is enabled while its activity holds a
+  // token, and completing it leaves that token where it is.
+  const holder = node.kind === "boundary" ? node.attachedTo! : nodeId;
+  if (!state.tokens.includes(holder)) {
     const owner = subprocessOwning(model, state, nodeId);
     if (owner) return completeInSubprocess(model, state, owner, nodeId, opts);
     const open = enabled(model, state).map((e) => e.node);
