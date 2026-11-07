@@ -44,8 +44,8 @@
  *    branch, and a directory the layer adds comes with it. Without this a
  *    layer that declared a directory could never be re-pinned: the old list
  *    left the new directory absent (`check:declared-dirs`), and naming it
- *    before the move was refused at the old pin (folio-assistant#3023,
- *    smart-trust-phw). Ids are only ever ADDED: one the site left out on
+ *    before the move was refused at the old pin (folio-assistant#3023, a
+ *    content layer that added three). Ids are only ever ADDED: one the site left out on
  *    purpose stays out, and nothing the site wrote is removed.
  * 5. Re-mounts with `mountRemote`, which rewrites `index.lock.json` and runs
  *    the trust check over every instance of the closure, and re-renders the
