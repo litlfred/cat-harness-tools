@@ -81,25 +81,12 @@ describe("viewer Tools declare what they render", () => {
   });
 
   /**
-   * TRANSITIONAL (remove after cat-harness#1058 merges): the Tool that renders
-   * these kinds is DEFINED in cat-harness (#1058) and implemented here (#1516),
-   * and this layer merges first. Until the definition is on cat-harness main no
-   * Tool renders them; that is checked as exactly that — the named Tool is
-   * absent and nothing else renders them — never waived. Once the Tool exists
-   * the ordinary check below holds them like every other entry.
-   */
-  const RENDERED_BY_A_TOOL_NOT_YET_DEFINED: Record<string, string> = {
-    "user-scenario": "journeys-viewer",
-    workshop: "journeys-viewer",
-  };
-
-  /**
    * TRANSITIONAL (remove once the cat-harness PR that adds `device-screen` to
    * journeys-viewer's `renders` is on cat-harness main): this layer draws the
    * kind and merges first, and the Tool that renders it is defined in
-   * cat-harness, after. Until then the named Tool exists (or is itself
-   * pending, above) and does not render it yet; that is checked as exactly
-   * that, never waived. Once it renders it, the ordinary check holds it.
+   * cat-harness, after. Until then the named Tool exists and does not render
+   * it yet; that is checked as exactly that, never waived. Once it renders it,
+   * the ordinary check holds it.
    */
   const NOT_YET_IN_THE_TOOLS_RENDERS: Record<string, string> = {
     "device-screen": "journeys-viewer",
@@ -109,16 +96,10 @@ describe("viewer Tools declare what they render", () => {
     const declared = new Set(dirs.flatMap(({ dir }) => dir.graphTypologies ?? []));
     const ids = new Set(all.map((t) => t.id));
     for (const k of Object.keys(HELD_OUTSIDE)) {
-      const pending = RENDERED_BY_A_TOOL_NOT_YET_DEFINED[k];
-      if (pending !== undefined && !ids.has(pending)) {
-        expect(rendered.has(k), `${k} is rendered by a Tool other than ${pending}, which is not defined yet`).toBe(false);
-        expect(declared.has(k), `${k} is declared in this checkout now — drop it from HELD_OUTSIDE`).toBe(false);
-        continue;
-      }
       const toCome = NOT_YET_IN_THE_TOOLS_RENDERS[k];
       if (toCome !== undefined && !rendered.has(k)) {
-        // The Tool that will render it is defined, or itself pending (above).
-        expect(ids.has(toCome) || Object.values(RENDERED_BY_A_TOOL_NOT_YET_DEFINED).includes(toCome), `${k} is to be rendered by ${toCome}, which neither exists nor is pending`).toBe(true);
+        // The Tool that will render it is defined; it does not list the kind yet.
+        expect(ids.has(toCome), `${k} is to be rendered by ${toCome}, which does not exist`).toBe(true);
         expect(declared.has(k), `${k} is declared in this checkout now — drop it from HELD_OUTSIDE`).toBe(false);
         continue;
       }

@@ -190,7 +190,7 @@ import { contentIsOffCheckout, HydratedSourceSchema, type HydratedSource, type S
 import { enabledSubgraphs, isSubgraphEnabled, qualifiedSubgraphId, type EnabledSubgraphs } from "../schemas/kg/opt-in-subgraphs.js";
 import { publishedSubgraphDir, SUBGRAPH_HYDRATED_FILE, SubgraphHydratedSchema } from "../schemas/kg/subgraph-manifest.js";
 import { treeDigest, treeEntries } from "./kg-parts.ts";
-import { builtAtPublishOf, installDependencies, isInstallArtefact, publishLayers, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
+import { builtAtPublishOf, installDependencies, isInstallArtefact, publishLayers, stateMountedDirs, withoutBuiltAtPublish, withoutInstallArtefacts, withoutSelfIgnored, withoutStateMounts, type InstallMode } from "./mount-from-lock.ts";
 import { RemoteTree, type UrlFor } from "./remote-tree.ts";
 import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from "./subgraph-index-package.ts";
 import { toolClosure, type ClosureInstance, type ResolvedTool, type ToolChoice } from "./tool-closure.ts";
@@ -1254,9 +1254,9 @@ function digestOf(abs: string, skip: readonly string[] = []): { treeDigest: stri
   // writes them into the mount, so the lock's digest (mount-from-lock.ts
   // `digestOf`) leaves them out and this one must too, or a mount whose site
   // was built reads as modified.
-  const files = withoutBuiltAtPublish(
-    withoutInstallArtefacts(withoutStateMounts(abs, treeEntries(abs).files, skip)),
-    builtAtPublishOf(abs),
+  const files = withoutSelfIgnored(
+    abs,
+    withoutBuiltAtPublish(withoutInstallArtefacts(withoutStateMounts(abs, treeEntries(abs).files, skip)), builtAtPublishOf(abs)),
   );
   return { treeDigest: treeDigest(abs, files), files: files.length };
 }
@@ -1285,7 +1285,7 @@ export function identicalToPin(
     const pinned = existsSync(src)
       ? withoutInstallArtefacts(treeEntries(src).files.filter((f) => !(d.upstreamPath === "." && (f === ".git" || f.startsWith(".git/")))))
       : [];
-    const onDisk = existsSync(dst) ? withoutBuiltAtPublish(withoutInstallArtefacts(withoutStateMounts(dst, treeEntries(dst).files, skip)), builtAtPublishOf(dst)) : [];
+    const onDisk = existsSync(dst) ? withoutSelfIgnored(dst, withoutBuiltAtPublish(withoutInstallArtefacts(withoutStateMounts(dst, treeEntries(dst).files, skip)), builtAtPublishOf(dst))) : [];
     const have = new Set(onDisk);
     const want = new Set(pinned);
     for (const f of pinned) {
@@ -2198,7 +2198,10 @@ export function regenerateAgentSurface(root: string): { ok: boolean; lines: stri
     const r = spawnSync(process.execPath, [join(import.meta.dir, g)], { cwd: root, encoding: "utf-8" });
     const pass = r.status === 0;
     ok &&= pass;
-    lines.push(`  ${pass ? "✓" : "✗"} ${g}${pass ? "" : ` exited ${r.status ?? r.signal}: ${(r.stderr || r.stdout).trim().split("\n").slice(-3).join(" | ")}`}`);
+    const rawLines = (r.stderr || r.stdout).trim().split("\n").filter((l) => l.trim().length > 0);
+    const findings = rawLines.filter((l) => l.trim().startsWith("✗"));
+    const tail = findings.length > 0 ? findings : rawLines.slice(-3);
+    lines.push(`  ${pass ? "✓" : "✗"} ${g}${pass ? "" : ` exited ${r.status ?? r.signal}: ${tail.join(" | ")}`}`);
   }
   return { ok, lines };
 }

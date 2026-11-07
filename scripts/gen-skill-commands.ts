@@ -33,9 +33,11 @@
  * @module cat-harness/scripts/gen-skill-commands
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { basename, join, relative, resolve } from "node:path";
 
-import { checkoutRootFor, findDeclarationFile, instanceRootsIn } from "../schemas/kg/cat-harness.js";
+import { checkoutRootFor, findDeclarationFile, instanceRootsIn, readDeclaration } from "../schemas/kg/cat-harness.js";
+import { lockedMountPaths } from "../schemas/kg/index-config.js";
+import { mountScopeFor } from "../schemas/kg/remote-mount.js";
 import { userInvocableSkills, type InvocableSkill } from "./invocable-skills.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { discoverLocalPackages } from "./skill-packages.ts";
@@ -103,14 +105,32 @@ export interface CommandReport {
 }
 
 /**
+ * True when `targetRoot` is a mounted instance placed by a mount lock (bean `bx4c`).
+ * A mounted instance is a read-only copy of a pinned commit; index surface
+ * regeneration must never write inside it.
+ */
+export function isMountedInstance(targetRoot: string, baseRoot?: string): boolean {
+  const abs = resolve(targetRoot);
+  if (baseRoot !== undefined && abs === resolve(baseRoot)) return false;
+  const scope = mountScopeFor(abs);
+  if (scope !== undefined && scope !== abs) return true;
+  const base = baseRoot ? resolve(baseRoot) : checkoutRootFor(abs);
+  if (abs === base) return false;
+  return lockedMountPaths(base).some((p) => resolve(base, p) === abs);
+}
+
+/**
  * Skill packages for `repo`: an instance root gets only the skills it owns
  * (`"instance"`, bean `t5zb`), while an index root gets the checkout overlay.
  */
 export function packagesFor(repo: string = REPO_ROOT): Record<string, string> {
   const abs = resolve(repo);
-  return findDeclarationFile(abs) !== undefined
-    ? discoverLocalPackages(abs, "instance")
-    : discoverLocalPackages(resolve(HARNESS_ROOT));
+  if (findDeclarationFile(abs) !== undefined) {
+    return discoverLocalPackages(abs, "instance");
+  }
+  return abs === resolve(REPO_ROOT)
+    ? discoverLocalPackages(resolve(HARNESS_ROOT))
+    : discoverLocalPackages(abs, "checkout");
 }
 
 export function reconcile(repo: string = REPO_ROOT, packages: Record<string, string> = packagesFor(repo)): CommandReport {
@@ -138,15 +158,16 @@ export function reconcile(repo: string = REPO_ROOT, packages: Record<string, str
   return { declared: skills.length, findings, duplicates };
 }
 
-/** Write what is missing or stale and remove this generator's orphans. Returns the files changed. */
+/** Write what is missing or stale and remove this generator's orphans. Returns the files changed. Never writes inside a mounted instance (bean `bx4c`). */
 export function write(repo: string = REPO_ROOT, packages: Record<string, string> = packagesFor(repo)): string[] {
+  if (isMountedInstance(repo)) return [];
   const { skills } = userInvocableSkills(packages);
   const byName = new Map(skills.map((s) => [s.name, s]));
   const changed: string[] = [];
-  mkdirSync(join(repo, COMMANDS_DIR), { recursive: true });
   for (const f of reconcile(repo, packages).findings) {
     const abs = join(repo, f.file);
     if (f.kind === "missing" || f.kind === "stale") {
+      mkdirSync(join(repo, COMMANDS_DIR), { recursive: true });
       writeFileSync(abs, commandText(byName.get(f.name)!, repo));
       changed.push(f.file);
     } else if (f.kind === "orphaned") {
@@ -157,47 +178,98 @@ export function write(repo: string = REPO_ROOT, packages: Record<string, string>
   return changed;
 }
 
-if (import.meta.main) {
-  const dirIdx = process.argv.indexOf("--dir");
-  const explicitDir = dirIdx >= 0 && process.argv[dirIdx + 1] ? resolve(process.argv[dirIdx + 1]!) : undefined;
-  const check = process.argv.includes("--check");
-  const cwdRoot = checkoutRootFor(process.cwd());
-  const baseRoot =
-    findDeclarationFile(cwdRoot) !== undefined || existsSync(join(cwdRoot, "index.config.json")) ? cwdRoot : REPO_ROOT;
+export interface SkillCommandsRunResult {
+  ok: boolean;
+  totalBad: number;
+  mountedBad: number;
+  lines: string[];
+  mountedFindings: string[];
+}
+
+export function runSkillCommands(
+  opts: { baseRoot?: string; explicitDir?: string; check?: boolean } = {},
+): SkillCommandsRunResult {
+  const check = opts.check ?? false;
+  const explicitDir = opts.explicitDir ? resolve(opts.explicitDir) : undefined;
+  const cwd = process.cwd();
+  const cwdRoot = existsSync(join(cwd, "index.config.json")) ? resolve(cwd) : checkoutRootFor(cwd);
+  const baseRoot = opts.baseRoot
+    ? resolve(opts.baseRoot)
+    : findDeclarationFile(cwdRoot) !== undefined || existsSync(join(cwdRoot, "index.config.json"))
+      ? cwdRoot
+      : REPO_ROOT;
   const targets =
     explicitDir !== undefined
       ? [explicitDir]
       : [
           baseRoot,
-          ...(findDeclarationFile(baseRoot) === undefined
-            ? instanceRootsIn(baseRoot).filter((r) => existsSync(join(r, COMMANDS_DIR)))
-            : []),
+          ...instanceRootsIn(baseRoot).filter(
+            (r) => resolve(r) !== resolve(baseRoot) && existsSync(join(r, COMMANDS_DIR)),
+          ),
         ];
   let totalBad = 0;
+  let mountedBad = 0;
+  const lines: string[] = [];
+  const mountedFindings: string[] = [];
   for (const repo of targets) {
-    const prefix = targets.length > 1 ? `${relative(baseRoot, repo) || "."}: ` : "";
-    if (!check) {
+    const mounted = isMountedInstance(repo, baseRoot);
+    const layerName = readDeclaration(repo)?.name ?? (relative(baseRoot, repo) || basename(repo));
+    const prefix = mounted
+      ? `${layerName}: `
+      : targets.length > 1
+        ? `${relative(baseRoot, repo) || "."}: `
+        : "";
+    if (!check && !mounted) {
       const changed = write(repo);
-      console.log(changed.length ? changed.map((f) => `  wrote ${prefix}${f}`).join("\n") : `  ${prefix}nothing to write`);
+      lines.push(
+        changed.length ? changed.map((f) => `  wrote ${prefix}${f}`).join("\n") : `  ${prefix}nothing to write`,
+      );
     }
     const r = reconcile(repo);
     for (const d of r.duplicates) {
-      console.log(`✗ ${prefix}${d.name} is declared by ${d.paths.length} files: ${d.paths.map((p) => relative(repo, p)).join(", ")}`);
+      const msg = mounted
+        ? `✗ ${prefix}${d.name} is declared by ${d.paths.length} files in mounted layer ${layerName} (committed surface not rewritten): ${d.paths.map((p) => relative(repo, p)).join(", ")}`
+        : `✗ ${prefix}${d.name} is declared by ${d.paths.length} files: ${d.paths.map((p) => relative(repo, p)).join(", ")}`;
+      lines.push(msg);
+      if (mounted) mountedFindings.push(msg);
     }
     for (const f of r.findings) {
-      const why = {
-        missing: "declares user_invocable and has no command — run `bun run cat skill:commands`",
-        stale: "generated command is stale — run `bun run cat skill:commands`",
-        orphaned: "generated command whose skill no longer declares user_invocable — run `bun run cat skill:commands`",
-        undeclared: "hand-written command with no user_invocable skill of that name — give the skill `name:` and `user_invocable: true`, or remove the command (a person's call)",
-      }[f.kind];
-      console.log(`✗ ${prefix}${f.file}: ${why}`);
+      const why = mounted
+        ? {
+            missing: `declares user_invocable and has no committed command in mounted layer ${layerName} (not rewritten — regenerate in ${layerName})`,
+            stale: `committed command is stale in mounted layer ${layerName} (not rewritten — regenerate in ${layerName})`,
+            orphaned: `committed command whose skill no longer declares user_invocable in mounted layer ${layerName} (not rewritten — regenerate in ${layerName})`,
+            undeclared: `hand-written command with no user_invocable skill of that name in mounted layer ${layerName} (not rewritten)`,
+          }[f.kind]
+        : {
+            missing: "declares user_invocable and has no command — run `bun run cat skill:commands`",
+            stale: "generated command is stale — run `bun run cat skill:commands`",
+            orphaned: "generated command whose skill no longer declares user_invocable — run `bun run cat skill:commands`",
+            undeclared: "hand-written command with no user_invocable skill of that name — give the skill `name:` and `user_invocable: true`, or remove the command (a person's call)",
+          }[f.kind];
+      const msg = `✗ ${prefix}${f.file}: ${why}`;
+      lines.push(msg);
+      if (mounted) mountedFindings.push(msg);
     }
     const bad = r.findings.length + r.duplicates.length;
     totalBad += bad;
+    if (mounted) mountedBad += bad;
     if (bad === 0) {
-      console.log(`✓ ${prefix}${r.declared} user_invocable skill(s), each with a command; every command has a declared skill`);
+      lines.push(`✓ ${prefix}${r.declared} user_invocable skill(s), each with a command; every command has a declared skill`);
     }
   }
-  process.exit(check && totalBad > 0 ? 1 : 0);
+  const ok = check ? totalBad === 0 : mountedBad === 0;
+  return { ok, totalBad, mountedBad, lines, mountedFindings };
+}
+
+if (import.meta.main) {
+  const dirIdx = process.argv.indexOf("--dir");
+  const explicitDir = dirIdx >= 0 && process.argv[dirIdx + 1] ? resolve(process.argv[dirIdx + 1]!) : undefined;
+  const check = process.argv.includes("--check");
+  const r = runSkillCommands({ explicitDir, check });
+  for (const line of r.lines) console.log(line);
+  if (r.mountedFindings.length > 0) {
+    for (const f of r.mountedFindings) console.error(f);
+  }
+  process.exit(r.ok ? 0 : 1);
 }
