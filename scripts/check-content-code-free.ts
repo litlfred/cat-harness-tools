@@ -26,7 +26,12 @@
  *   `site-chrome/_includes/` or `docs/assets/` is a file the site ships to
  *   the browser, next to the include that loads it;
  * - two build helpers: the folio file-list renderer (`folio-render/`) and the
- *   Jekyll plugins (`_plugins/*.rb`), part of the same chrome layout.
+ *   Jekyll plugins (`_plugins/*.rb`), part of the same chrome layout;
+ * - anything under a path the harness declares `builtAtPublish`: written by a
+ *   writer at publish, never tracked. In a mounted checkout there is no git
+ *   index to say so, so the corpus is a walk, and a publish-built page's
+ *   script (`docs/en/cat-harness/processes/task-panel.js`, `processes:viz`)
+ *   read as code in content (folio-assistant#2985).
  *
  * Usage: bun run cat check:content-code-free [--update] [--no-baseline]
  * Exit:  0 when every code file is listed · 1 otherwise
@@ -35,6 +40,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { gitFiles } from "../schemas/sdlc/git-corpus.ts";
+import { readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
 
 export const BASELINE_PATH = resolve(TOOLS_ROOT, "scripts", "content-code-free-baseline.json");
@@ -64,9 +70,21 @@ export const isBuildHelper = (rel: string): boolean =>
 export const isCode = (rel: string): boolean =>
   CODE_EXTENSIONS.some((e) => rel.endsWith(e)) && !isBrowserAsset(rel) && !isBuildHelper(rel);
 
+/** The root-relative paths `root`'s declaration says are built at publish (`builtAtPublish`); a `/`-ended one is a directory. */
+export function builtAtPublishPaths(root: string): string[] {
+  const decl = readDeclaration(root) as { builtAtPublish?: Array<{ path?: unknown }> } | undefined;
+  return (decl?.builtAtPublish ?? []).map((b) => b.path).filter((p): p is string => typeof p === "string" && p !== "");
+}
+
+/** Pure: whether `rel` lies under one of `built` (a `/`-ended entry is a directory, else one file). */
+export const isBuiltAtPublish = (rel: string, built: readonly string[]): boolean =>
+  built.some((p) => (p.endsWith("/") ? rel.startsWith(p) : rel === p));
+
 /** Every tracked code file under `root`, as root-relative POSIX paths, sorted. */
-export function codeFiles(root: string): string[] {
-  return gitFiles(root, isCode).files.map((abs) => relative(root, abs).split("\\").join("/")).sort();
+export function codeFiles(root: string, built: readonly string[] = builtAtPublishPaths(root)): string[] {
+  return gitFiles(root, (rel) => isCode(rel) && !isBuiltAtPublish(rel, built))
+    .files.map((abs) => relative(root, abs).split("\\").join("/"))
+    .sort();
 }
 
 export interface Judgement {
