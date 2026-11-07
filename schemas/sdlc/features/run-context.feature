@@ -107,10 +107,12 @@ Feature: A run context records what a run ran on, and reports reference it by ha
     Then it is { sushi: "3.21.0", fhirVersion: "4.0.1" } with no publisher
 
   @test:schemas/sdlc/run-context.test.ts::the_reference_a_report_carries_(C1:_by_sha256)::run_and_report_schemas_accept_optional_`runContext:_{_sha256_}`_and_reject_inline_context_objects_(C1_=_a)
-  Scenario: Run and report schemas accept a runContext reference
-    Given a runContext reference { sha256 }
-    When a tool run record, test run, test report, QA report, KG QA manifest and health report each carry it
+  Scenario: Run and report schemas accept a runContext reference and refuse an inline context
+    Given a valid tool run record, test run, test report, QA report, KG QA manifest and health report, each without a runContext
     Then each parses under its own schema
+    And each still parses when it carries the runContext reference { sha256 }
+    And each is refused when its runContext is the whole run context object inline
+    And each is refused when its runContext is the reference with the context object beside the sha256
 
   @test:schemas/sdlc/run-context.test.ts::the_reference_a_report_carries_(C1:_by_sha256)::addressBook_resolves_tool-release_refs_(`<name>@<version>`)_as_`prov:Entity`_IRIs_for_`prov:used`_(Step_3)
   Scenario: The address book resolves tool-release refs as entity IRIs

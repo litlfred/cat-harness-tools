@@ -31,7 +31,7 @@ Feature: Fixed and generated test data, and the SME verdicts that review them
   @test:schemas/sdlc/test-data.test.ts::fixed_vs_generated_discrimination_from_file_content,_never_from_path_(`vm6m`)::refuses_a_generated_set_that_stores_materialised_`records`,_`cases`,_`path`,_or_`review`
   Scenario: A generated set storing materialised data is refused
     Given the generated recipe
-    When it carries records, a path, or a review
+    When it carries records, cases, a path, or a review
     Then the generated set schema refuses each
 
   @test:schemas/sdlc/test-data.test.ts::fixed_vs_generated_discrimination_from_file_content,_never_from_path_(`vm6m`)::refuses_a_document_where_`$schema`_and_`kind`_disagree

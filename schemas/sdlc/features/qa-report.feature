@@ -55,10 +55,11 @@ Feature: A QA report's summary agrees with its details
     Then it is refused with the first issue at status
 
   @test:schemas/sdlc/qa-report.test.ts::`running`_is_never_a_pass::the_three_verdicts
-  Scenario: The completed and failed verdicts
+  Scenario: The three verdicts: ok, finding and unknown
     When the baseline completed report's verdict is computed
     Then it is "ok"
     And a failed report with one error has the verdict "finding"
+    And a running report with zero errors has the verdict "unknown"
     And "failed" is a terminal status while "running" is not
 
   @test:schemas/sdlc/qa-report.test.ts::the_file_declares_what_it_is::a_document_with_no_`$schema`_tag_is_REFUSED
