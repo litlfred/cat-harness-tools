@@ -87,6 +87,7 @@ import { BEGIN as SUBGRAPH_README_BEGIN } from "@litlfred/bootstrap-tools/script
 import { aliasRoute, visualiserRoute } from "../schemas/kg/visualiser-route.js";
 import { gateOwnInstances, gateOwnsFile } from "./lib/gate-own.ts";
 import { declaredVisualisers, forwardingParts, pageParts, siteOwnerDir } from "./viewer-declarations.js";
+import { hostSiteArtefacts } from "./derive-at-publish.ts";
 import {
   againstOrUsage,
   buildQaResult,
@@ -911,7 +912,20 @@ export interface ReferenceReport {
   undeclared: string[];
 }
 
-export function analyse(root = REPO_ROOT): ReferenceReport {
+/**
+ * The routes a harness's visualisers build on ANOTHER instance's site
+ * (`builtOnHostSite`), as absolute directories: `derive:publish`'s own
+ * derivation ({@link hostSiteArtefacts}), so this check and the publish plan
+ * agree on what is built where. They sit inside the host's root, e.g.
+ * `cat-harness/docs/en/folio-assistant-core/bibliography/`, but the host
+ * declares none of them: they are another harness's built-at-publish output,
+ * machine-written exactly as a declared `builtAtPublish` path is.
+ */
+export function hostSiteDirs(root: string): string[] {
+  return hostSiteArtefacts(root).map((a) => a.abs.replace(/[\\/]+$/, ""));
+}
+
+export function analyse(root = REPO_ROOT, hostSite: readonly string[] = hostSiteDirs(root)): ReferenceReport {
   const all = instances(root).filter((i) => i.name !== "");
   const byName = new Map(all.map((i) => [i.name, i]));
   const needs = new Map(all.map((i) => [i.name, i.needs]));
@@ -996,7 +1010,12 @@ export function analyse(root = REPO_ROOT): ReferenceReport {
   // inside another's root (`cat-harness.json` declares
   // `folio-assistant-core/schemas/`), and the file is machine-written either
   // way — the declaration is about the DIRECTORY, not about who scans it.
-  const machineWritten = all.flatMap((i) => i.machineWritten);
+  // A host-site route (`builtOnHostSite`) is built at publish too, by the
+  // harness that declares the visualiser, inside the HOST's root; the host
+  // declares none of it. Judged by the directory it sits in, a core page built
+  // into cat-harness's site read as cat-harness naming whatever core's library
+  // projects (folio-assistant#2985: six bibliography files naming smart-trust).
+  const machineWritten = [...all.flatMap((i) => i.machineWritten), ...hostSite];
   const isMachineWritten = (abs: string): boolean =>
     machineWritten.some((d) => abs === d || abs.startsWith(d.endsWith(sep) ? d : d + sep));
 

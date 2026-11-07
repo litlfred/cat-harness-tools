@@ -2091,6 +2091,48 @@ export function editedOnlyPerLock(root: string): CheckResult | undefined {
   return c;
 }
 
+/** One mount whose bytes no longer hash to its lock: which root's lock, which instance, where, and what differs. */
+export interface EditedMount {
+  root: string;
+  instance: string;
+  path?: string;
+  detail: string;
+}
+
+/**
+ * Every mount in `checkout` that a plain mount would leave untouched because
+ * its bytes changed since it was laid (`edited`), over every declaring root
+ * as {@link remoteFanOut} walks them. Nothing is fetched. A publisher asks
+ * this before it mounts, so a build an earlier attempt left behind is named,
+ * with the command that re-lays it ({@link relayAdvice}), instead of failing
+ * inside the mount step (an IG's first agent publish, 2026-11-06).
+ */
+export function editedMountsIn(checkout: string): EditedMount[] {
+  return declaringInstances(checkout).roots.flatMap((root) =>
+    checkRemote({ instanceRoot: root }).outcomes.flatMap((o) =>
+      o.state === "missing" && (o as { edited?: boolean }).edited
+        ? [{ root, instance: o.instance, ...("path" in o && o.path ? { path: o.path } : {}), detail: o.detail }]
+        : [],
+    ),
+  );
+}
+
+/**
+ * What to run to re-lay `edited`, exactly: this script with `--fresh` from
+ * the checkout, which replaces only the mounts whose bytes no longer match
+ * the lock (and loses any edit in them), or the publisher's own `--fresh`.
+ */
+export function relayAdvice(checkout: string, edited: readonly EditedMount[], o: { script?: string } = {}): string {
+  const script = relative(checkout, o.script ?? join(import.meta.dir, "remote-mount.ts")) || "remote-mount.ts";
+  return [
+    `${edited.length} mount(s) no longer match the lock, so the mount step would leave them as they are and the build would not start:`,
+    ...edited.map((e) => `  - ${e.instance}${e.path ? ` (${e.path}/)` : ""}: ${e.detail}`),
+    "An earlier build most likely wrote into them. Re-lay them (any edit in them is lost):",
+    `  cd ${checkout} && bun run ${script} --fresh`,
+    "or pass --fresh to stage-local.ts (or build-instance-site.ts), which does the same before it builds.",
+  ].join("\n");
+}
+
 /**
  * What the full mount's install step would do for a current root, without
  * the fetch: `bun install` in a mounted instance that has a manifest and no

@@ -73,6 +73,11 @@ export function taskSkillsDeclared(checkout: string): boolean {
  */
 export const PANEL_CLIENT = { script: "task-panel.js", style: "task-panel.css" } as const;
 
+/** The sidecar a process page fetches when a marker is first opened: `<stem>.tasks.json`, beside the page. */
+export function panelFile(stem: string): string {
+  return `${stem}.tasks.json`;
+}
+
 /** A rectangle in diagram coordinates. */
 export interface Box {
   x: number;
@@ -269,7 +274,10 @@ export const PANEL_SCRIPT = `(function () {
   // Every href in the sidecar is relative to the sidecar (it sits beside the
   // process page), so a page elsewhere on the site that shows the same
   // drawing resolves them to the same targets.
-  var base = new URL(root.getAttribute("data-panel"), location.href);
+  // A drawing with no sidecar (a page that only highlights steps, where no
+  // processes viewer is published) gets the highlight and nothing else.
+  var sidecar = root.getAttribute("data-panel");
+  var base = new URL(sidecar || "", location.href);
   function abs(h) { try { return new URL(h, base).href; } catch (e) { return h; } }
   // A page with no server-drawn markers gets them from the sidecar.
   var drawn = !!root.querySelector(".pt-layer");
@@ -396,7 +404,7 @@ export const PANEL_SCRIPT = `(function () {
     var r = root.getBoundingClientRect(), b = a.getBoundingClientRect();
     var x = b.left - r.left, y = b.top - r.top, w = b.width, h = b.height, vw = 0, vh = 0;
     if (a.tagName.toLowerCase() === "img") { vw = a.naturalWidth; vh = a.naturalHeight; }
-    else { var vb = (a.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number); vw = vb[2]; vh = vb[3]; }
+    else { var vb = (a.getAttribute("viewBox") || "").trim().split(/[\\s,]+/).map(Number); vw = vb[2]; vh = vb[3]; }
     // An SVG keeps its aspect inside a box of another shape (xMidYMid meet).
     if (vw > 0 && vh > 0 && w > 0 && h > 0) {
       var k = vw / vh;
@@ -422,7 +430,7 @@ export const PANEL_SCRIPT = `(function () {
   root.addEventListener("load", schedule, true);
   window.addEventListener("resize", schedule);
   schedule();
-  if (!drawn) load().then(function (j) {
+  if (!drawn && sidecar) load().then(function (j) {
     (j.markers || []).forEach(function (m) {
       var t = j.tasks[m.id], to = t && t.calls ? (t.calls.diagram || t.calls.href) : null;
       if (to && m.box) {

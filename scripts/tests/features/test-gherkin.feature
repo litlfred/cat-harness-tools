@@ -26,6 +26,14 @@ Feature: Every test has a Gherkin
     Then each test is named <file>::<describe>::<title>, whitespace written as _
     And only test files are read
 
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_test_with_a_computed_title_is_found_and_reported,_never_dropped
+  Scenario: A test whose title is computed is reported, not dropped
+    Given a test file with tests titled by a loop variable and by a template with an interpolation
+    And a test inside a describe whose title is a variable, and one with a fixed template title
+    When the JS adapter reads it and the tests are joined to no Scenarios
+    Then the three computed ones are found and each is reported as having a title no tag can name
+    And only the fixed-title test is reported as having no Scenario
+
   @test:scripts/tests/test-gherkin.test.ts::language_adapters::python:_the_name_is_pytest's_node_id
   Scenario: Python tests are named by pytest's node id
     Given a test module with module-level tests, a Test class, a non-Test class, a nested def and a docstring
@@ -74,9 +82,19 @@ Feature: Every test has a Gherkin
     Given a test file with seven tests and no Scenario
     Then they are one finding that quotes five names and counts the rest
 
-  @test:schemas/sdlc/test-plan.test.ts::the_shape::under_v1.1_every_case_names_its_.feature;_a_v1_plan_without_one_parses,_deprecated
-  Scenario: test-plan/v1.1 requires a .feature on every case; v1 stays readable
-    Given a test-plan/v1.1 plan with a case that names no .feature
-    Then it is refused at that case's feature
-    Given the same plan declared test-plan/v1
-    Then it parses, and its deprecations name the version and the case
+  @test:scripts/tests/test-gherkin.test.ts::bindings_beyond_@test:,_and_Gherkin_dialects::a_translated_.feature_is_read_in_its_own_dialect;_an_unknown_dialect_is_reported
+  Scenario: A translated feature file is read in its own dialect
+    Given a feature file headed "# language: fr" with a Scénario and a Plan du scénario
+    When it is parsed
+    Then both Scenarios and their @test tags are found, and the Exemples tags are not links
+    Given a feature file headed with a language code no dialect has
+    Then it is reported as an unknown dialect
+
+  @test:scripts/tests/test-gherkin.test.ts::bindings_beyond_@test:,_and_Gherkin_dialects::@itb:_binds_a_GITB_test_case_by_suite_and_case_id;_a_missing_source_is_unresolved,_never_a_pass
+  Scenario: An @itb tag binds a GITB test case by suite id and test-case id
+    Given a GITB test suite "ts-hcert" that references test case "tc-verify", and one commented out
+    And Scenarios tagged with that case, with an absent case and with the commented-out one
+    When they are joined against the suite's checkout
+    Then only the present case resolves; the absent and commented-out ones name no target
+    When they are joined with no checkout held
+    Then every @itb tag is unresolved, "source not held", and none passes

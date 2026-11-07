@@ -72,6 +72,8 @@ export const GraphTypologyNodeSchema = z
     declarationFile: z.string().min(1).optional(),
     concernGroups: z.literal(true).optional(),
     within: z.string().min(1).optional(),
+    /** The block kind a node of this kind IS, read through the kind module's view of it. */
+    specialises: z.string().min(1).optional(),
     avatar: KindAvatarSchema.optional(),
     /** The navbar tile icon (an icon name, as `graph-tiles.ts` spells it). */
     tileIcon: z.string().min(1).optional(),

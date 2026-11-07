@@ -26,7 +26,7 @@
  * ## Chapters
  *
  * The workshop's `scenarios` are the steps, in teaching order. They are
- * grouped into chapters by `partOf`, one level below what they all share:
+ * grouped into chapters by their parents (`parts`; `partOf` in an older file), one level below what they all share:
  * five journeys of which two are part of a third make four chapters
  * (smart-trust-demo), and eight journeys all part of one make eight
  * ({@link chapterRoots}).
@@ -43,10 +43,11 @@ import type { WorkshopPresentation, WorkshopStep } from "../../schemas/process/w
 import { blockFor, fromSite, journeyById, lookup, processName, siteRootFrom, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
 import { artifactPage, DAK_ATTR, dakGroups, linkedProcessDrawing, type DakGroup } from "./dak-links.ts";
 import {
-  allSteps,
   bpmnFigure,
+  childrenOf,
   illustrationPath,
   moduleSegment,
+  panelHead,
   parentOf,
   personaOf,
   ROOT_MARK,
@@ -113,7 +114,7 @@ export function shortTitle(title: string): string {
   return m ? m[1]!.trim() : title.trim();
 }
 
-/** The chain of journeys from the top of a journey's `partOf` tree down to it. */
+/** The chain of journeys from the top of a journey's tree of parts down to it, through its first parent. */
 function ancestry(corpus: JourneyCorpus, j: Journey): Journey[] {
   const chain: Journey[] = [j];
   for (let p = parentOf(corpus, j); p !== undefined && !chain.includes(p); p = parentOf(corpus, p)) chain.unshift(p);
@@ -181,17 +182,11 @@ export function presentationOf(corpus: JourneyCorpus, w: WorkshopEntry): Present
   return { w, chapters: chapters.filter((c) => c.steps.length > 0), steps, cast, screens: demo.screens, demo: demo.source };
 }
 
-function stepsUnder(corpus: JourneyCorpus, j: Journey): { journey: Journey; step: ScenarioStep }[] {
-  const out: { journey: Journey; step: ScenarioStep }[] = [];
-  const ids = new Set(allSteps(corpus, j).map((s) => s.id));
-  for (const x of corpus.journeys) {
-    if (x.instance !== j.instance) continue;
-    if (!ancestry(corpus, x).includes(j)) continue;
-    for (const step of x.scenario.steps) if (ids.has(step.id)) out.push({ journey: x, step });
-  }
-  // In the order allSteps walks them.
-  const order = allSteps(corpus, j).map((s) => s.id);
-  return out.sort((a, b) => order.indexOf(a.step.id) - order.indexOf(b.step.id));
+/** A journey's steps and its parts', in story order: each journey once (a part of two parents, or a cycle of parts). */
+function stepsUnder(corpus: JourneyCorpus, j: Journey, seen = new Set<Journey>()): { journey: Journey; step: ScenarioStep }[] {
+  if (seen.has(j)) return [];
+  seen.add(j);
+  return [...j.scenario.steps.map((step) => ({ journey: j, step })), ...childrenOf(corpus, j).flatMap((c) => stepsUnder(corpus, c, seen))];
 }
 
 // ── small helpers ─────────────────────────────────────────────────────────
@@ -579,6 +574,7 @@ ${NAVBAR_OPT_OUT}
 <link rel="stylesheet" href="${o.root}assets/present.css">
 <script>try{if(localStorage.getItem("jp:presenter")==="off")document.documentElement.setAttribute("data-presenter","off")}catch(_){}</script>
 <script src="${o.root}assets/present.js" defer></script>
+${panelHead(o.body, `${o.root}assets/`)}
 ${o.head ?? ""}
 ${o.prev ? `<link rel="prev" href="${e(o.prev)}">` : ""}${o.next ? `<link rel="next" href="${e(o.next)}">` : ""}
 </head>
@@ -906,7 +902,8 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
       const zoom = `<div class="jp-zoom" role="group" aria-label="Zoom"><button type="button" data-jp-zoom="fit">Fit</button><button type="button" data-jp-zoom="1" class="is-on">100%</button><button type="button" data-jp-zoom="1.5">150%</button><button type="button" data-jp-zoom="2">200%</button><button type="button" data-jp-zoom="full">Full screen</button></div>`;
       const caption = `<code>${e(r.process)}</code>${r.tasks?.length ? ` · ${r.tasks.length} flow node${r.tasks.length === 1 ? "" : "s"} highlighted` : " · the whole process"}`;
       const vw = d ? viewBoxWidth(d.svg) : undefined;
-      const fig = d ? bpmnFigure(d.svg, r.tasks, caption).replace('<figure class="jv-bpmn', `<figure${vw ? ` style="--vw:${vw}px"` : ""} class="jv-bpmn`) : "";
+      const panel = links.processPanel?.(s.journey.instance, r.process);
+      const fig = d ? bpmnFigure(d.svg, r.tasks, caption, panel === undefined ? undefined : fromSite(panel, toSite)).replace("<figure ", `<figure${vw ? ` style="--vw:${vw}px"` : ""} `) : "";
       return `<div class="jp-box jp-proc">${head}${d ? `${zoom}${fig}` : `<p class="jp-small jp-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`}</div>`;
     })
     .join("");

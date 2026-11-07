@@ -22,21 +22,42 @@
  * persona-level (one fictional caregiver). The step's `stories` edge joins
  * the two.
  *
- * ## Journeys, chains and sub-journeys
+ * ## A journey IS a DAK user scenario
  *
- * One scenario is one journey (one BPMN process, usually). Two relations
- * arrange them, and they are different:
+ * The kind specialises the DAK user scenario (the `user-scenario` block kind
+ * of the DAK vocabulary; the registry says so in `specialises`). It keeps the
+ * DAK fields and adds the journey metadata, all of it optional from 0.4.0: a
+ * file with only `id`, `title`, `description` and `personas` is a plain DAK
+ * user scenario, listed by the viewer with no journey map.
  *
- * - `follows` CHAINS journeys into one story told in order: the journey this
- *   one continues. The first of a chain has none.
- * - `partOf` GROUPS: the journey this one is a sub-journey of. A parent may
- *   have steps of its own or none (`user-scenario/0.2.0` allows an empty
- *   `steps` for a journey that only groups).
+ * The two `personas` are one list read two ways. Here an entry is an actor
+ * (one fictional person) or a role; the DAK's personas are ROLES (the BPMN
+ * swimlanes), so a DAK reader gets them DERIVED: each actor's `roles`, and a
+ * role as it is (`dakUserScenario`, `scripts/journeys/derive.ts`). Nothing
+ * says the roles twice.
  *
- * The journeys viewer draws both: an index tree by `partOf`, ordered along
- * `follows` within each level.
+ * ## Composition: a journey lists its parts
  *
- * ## Three families, one shape
+ * Journeys are narrative, so their composition is AUTHORED, never inferred
+ * from the BPMN: a process with sub-processes gets no journey unless somebody
+ * writes one. One direction is authored (0.4.0):
+ *
+ * - `parts` on the PARENT, in story order: each a journey, `optional` when
+ *   the story may skip it, `repeats` when it may happen more than once. A
+ *   journey may be a part of more than one parent. Within a parent, which
+ *   part a part follows is derived from the order, as is whose part it is.
+ * - `includes` on a STEP: the step IS that journey, as a BPMN call activity
+ *   is a process. When the step's `realisedBy` names a call activity,
+ *   `check:journey-refs` checks that it calls a process the included journey
+ *   is realised by.
+ * - `follows` still chains journeys that no parent lists (J1, J2, J3, J4).
+ *
+ * `partOf` (0.2.0) said the same as `parts` from the child's side, one
+ * parent only. It is read in an older file and refused in a 0.4.0 one, so a
+ * 0.4.0 checkout has one way to group. A journey a parent lists carries no
+ * `follows` (`check:journey-refs`: the parent's order says it).
+ *
+ * ## Four families, one shape
  *
  * `user-scenario/0.1.0` is the draft smart-trust-demo wrote and checked
  * (`docs/proposals/user-scenario/`, frozen 2026-11-05); every 0.1.0 file is
@@ -49,11 +70,18 @@
  * `user-scenario/0.3.0` adds a step's `dak`: the DAK assets the step uses, each
  * an artefact-index key and what it is to the step (the data set it records,
  * the decision table that decides it, the indicator that measures it).
- * Nothing of an earlier minor changes meaning, and the kind accepts a 0.1.0 or
- * 0.2.0 file as it is.
+ * `user-scenario/0.4.0` adds `parts` and a step's `includes`, refuses
+ * `partOf`, and makes what can be derived optional: `personas` (from the
+ * parts', for a journey that only groups), `steps`, and a step's `lead` and
+ * `experiences` (by default, the actors who play the lanes of its
+ * `realisedBy` tasks). Its `personas` may name roles as well as actors.
+ * Nothing of an earlier minor changes meaning, and the kind accepts a 0.1.0,
+ * 0.2.0 or 0.3.0 file as it is, by that file's own rules.
  *
  * ## What is NOT here, on purpose
  *
+ * - Composition inferred from BPMN: a call activity or a sub-process is not
+ *   a journey until somebody writes one.
  * - The workshop layer (questions a room is asked of a step, modules,
  *   decision rights, job aids): the `workshop` kind (`workshop.ts`), which
  *   points at step ids, so a scenario does not depend on any one workshop.
@@ -62,12 +90,13 @@
  */
 import { z } from "zod";
 
-import { nodeKind } from "../kg/node-kind.ts";
+import { acceptsSchemaTag, nodeKind, parseSchemaTag } from "../kg/node-kind.ts";
 
 /** The family tags this module validates. */
 export const USER_SCENARIO_V01 = "user-scenario/0.1.0";
 export const USER_SCENARIO_V02 = "user-scenario/0.2.0";
 export const USER_SCENARIO_V03 = "user-scenario/0.3.0";
+export const USER_SCENARIO_V04 = "user-scenario/0.4.0";
 export const BUILDING_BLOCKS_V01 = "building-blocks/0.1.0";
 
 /**
@@ -320,6 +349,29 @@ const StepV03 = {
   dak: z.array(DakLinkSchema).optional(),
 };
 
+const StepV04 = {
+  ...StepV03,
+  /** Absent (0.4.0): the first actor the step's lanes derive. */
+  lead: Id.optional(),
+  /** Absent (0.4.0): one per actor who plays a lane of the step's `realisedBy` tasks, doing those tasks. Authored, they are the narrative. */
+  experiences: z.array(ExperienceSchema).min(1).optional(),
+  /** The journey this step IS, as a BPMN call activity is a process: drawn as a link to it. */
+  includes: Id.optional(),
+};
+
+/** One part of a journey, in story order. */
+export const PartSchema = z
+  .object({
+    /** The journey that is this part. */
+    scenario: Id,
+    /** The story may skip it. */
+    optional: z.literal(true).optional(),
+    /** It may happen more than once. */
+    repeats: z.literal(true).optional(),
+  })
+  .strict();
+export type Part = z.infer<typeof PartSchema>;
+
 /** An ArchiMate view of a journey: a model id of the instance's `cat-archimate.config.json` and a view id in it. */
 export const ViewRefSchema = z.object({ model: Text, view: Text, label: Text.optional() }).strict();
 
@@ -330,7 +382,7 @@ const ScenarioV01 = {
   title: Text,
   /** DAK UserScenario.description[x]: Markdown. */
   description: Text,
-  /** DAK UserScenario.personas: actor ids. Every actor a step names is listed here. */
+  /** DAK UserScenario.personas: actor ids. Every actor a step names is listed here. From 0.4.0 also role ids; optional when the journey has parts. */
   personas: z.array(Id).min(1),
   /** The scenario this one continues, when one story is told as several. */
   follows: Id.optional(),
@@ -341,31 +393,72 @@ const ScenarioV01 = {
   trustLadder: Text.optional(),
 };
 
-function uniqueSteps(s: { steps: readonly { id: string; experiences: readonly { actor: string }[]; lead: string }[]; personas: readonly string[] }, ctx: z.RefinementCtx): void {
+type RefinedScenario = {
+  $schema?: string;
+  personas?: readonly string[];
+  partOf?: string;
+  parts?: readonly { scenario: string }[];
+  steps?: readonly { id: string; experiences?: readonly { actor: string }[]; lead?: string }[];
+};
+
+/** Is this a file of 0.4.0 or later, whose personas may be roles and whose derivable fields may be absent? */
+export function derivesFields(tag: string | undefined): boolean {
+  const t = tag === undefined ? undefined : parseSchemaTag(tag);
+  return t !== undefined && (t.major > 0 || t.minor >= 4);
+}
+
+/**
+ * The rules no field's own schema can say. A step id appears once. Before
+ * 0.4.0 a file says everything itself: `personas`, a step's `lead` and
+ * `experiences` are present, and every actor a step names is a persona. From
+ * 0.4.0 those may be derived, so `check:journey-refs` holds them against the
+ * derived values, and `partOf` is refused (the parent's `parts` says it).
+ */
+function uniqueSteps(s: RefinedScenario, ctx: z.RefinementCtx): void {
+  const issue = (message: string) => ctx.addIssue({ code: "custom", message });
+  const derives = derivesFields(s.$schema);
   const seen = new Set<string>();
-  const personas = new Set(s.personas);
-  for (const step of s.steps) {
-    if (seen.has(step.id)) ctx.addIssue({ code: "custom", message: `step id "${step.id}" appears twice` });
+  const personas = new Set(s.personas ?? []);
+  if (!derives && s.personas === undefined) issue(`personas is required before ${USER_SCENARIO_V04}`);
+  if (derives && s.partOf !== undefined) issue(`partOf is refused in ${USER_SCENARIO_V04}: list this journey in its parent's \`parts\``);
+  if (derives && s.personas === undefined && !(s.parts?.length)) issue("personas is required unless the journey has parts, whose personas it then has");
+  const parts = new Set<string>();
+  for (const p of s.parts ?? []) {
+    if (parts.has(p.scenario)) issue(`part "${p.scenario}" appears twice`);
+    parts.add(p.scenario);
+  }
+  for (const step of s.steps ?? []) {
+    if (seen.has(step.id)) issue(`step id "${step.id}" appears twice`);
     seen.add(step.id);
+    if (derives) continue;
+    if (step.lead === undefined || step.experiences === undefined) {
+      issue(`step ${step.id}: lead and experiences are required before ${USER_SCENARIO_V04}`);
+      continue;
+    }
     for (const a of new Set([step.lead, ...step.experiences.map((e) => e.actor)])) {
-      if (!personas.has(a)) ctx.addIssue({ code: "custom", message: `step ${step.id} names actor "${a}", who is not among the scenario's personas` });
+      if (!personas.has(a)) issue(`step ${step.id} names actor "${a}", who is not among the scenario's personas`);
     }
   }
 }
 
 /**
- * `user-scenario/0.3.0`, as a node kind: 0.1.0 plus grouping, views,
- * references, illustrations and per-step gaps (0.2.0), and a step's DAK assets
- * (0.3.0). A minor bump only adds, so the kind accepts a `user-scenario/0.1.0`
- * or `0.2.0` file as it is (`acceptsSchemaTag`).
+ * `user-scenario/0.4.0`, as a node kind: 0.1.0 plus grouping, views,
+ * references, illustrations and per-step gaps (0.2.0), a step's DAK assets
+ * (0.3.0), and parts, a step's `includes` and derivable fields left out
+ * (0.4.0). A minor bump only adds, so the kind accepts a 0.1.0, 0.2.0 or
+ * 0.3.0 file as it is (`acceptsSchemaTag`), each by its own rules
+ * ({@link uniqueSteps}).
  */
 export const UserScenarioKind = nodeKind(
-  USER_SCENARIO_V03,
+  USER_SCENARIO_V04,
   [],
   {
     ...ScenarioV01,
-    /** The journey this one is a sub-journey of. */
+    personas: z.array(Id).min(1).optional(),
+    /** The journey this one is a sub-journey of (0.2.0–0.3.0; refused in 0.4.0, where the parent lists it in `parts`). */
     partOf: Id.optional(),
+    /** The journeys this one is made of, in story order (0.4.0). */
+    parts: z.array(PartSchema).min(1).optional(),
     /** ArchiMate views of the journey. */
     views: z.array(ViewRefSchema).optional(),
     references: z.array(ReferenceSchema).optional(),
@@ -373,8 +466,8 @@ export const UserScenarioKind = nodeKind(
     illustrationStyle: IllustrationStyleSchema.optional(),
     /** The journey's small picture, a few glyphs in order (VaxLink's moment icons): drawn on its chapter card and map column. */
     scene: z.array(SceneSchema).min(1).max(5).optional(),
-    /** The steps in order. May be empty for a journey that only groups its sub-journeys. */
-    steps: z.array(z.object(StepV03).strict()),
+    /** The steps in order. May be empty, or (0.4.0) absent, for a journey that only groups its parts or a plain DAK user scenario. */
+    steps: z.array(z.object(StepV04).strict()).default([]),
   },
   { strict: true, refine: uniqueSteps },
 );
@@ -390,9 +483,27 @@ export const UserScenarioV01Schema = z
   .strict()
   .superRefine(uniqueSteps);
 
-/** A user scenario of either family, as a reader takes it. */
+/** A user scenario of any family, as its file says it. */
 export type UserScenario = z.infer<typeof UserScenarioSchema>;
-export type ScenarioStep = UserScenario["steps"][number];
+/** A step as its file says it: from 0.4.0 its `lead` and `experiences` may be left to derivation. */
+export type AuthoredStep = UserScenario["steps"][number];
+/** A step as a reader takes it: `lead` and `experiences` authored, or derived from its lanes. */
+export type ScenarioStep = Omit<AuthoredStep, "lead" | "experiences"> & { lead: string; experiences: Experience[] };
+/** A journey as a reader takes it: its personas (actors) and its steps' people, authored or derived (`scripts/journeys/derive.ts`). */
+export type Scenario = Omit<UserScenario, "steps" | "personas"> & { personas: string[]; steps: ScenarioStep[] };
+
+/**
+ * The DAK `UserScenario` a journey is, as a DAK reader takes it: the logical
+ * model's `id`, `title`, `description` and `personas`, the personas being
+ * ROLES (the BPMN swimlanes), derived from the journey's actors.
+ */
+export interface DakUserScenario {
+  id: string;
+  title: string;
+  description: string;
+  /** Role ids, in the order the journey's personas first reach them. */
+  personas: string[];
+}
 
 /** One block of a building-block catalogue. */
 export const BuildingBlockSchema = z
@@ -501,15 +612,15 @@ export const JourneyPersonaSchema = z
   .passthrough();
 export type JourneyPersona = z.infer<typeof JourneyPersonaSchema>;
 
-/** Parse a user scenario of either family; throws with every issue. */
+/** Parse a user scenario of any family; throws with every issue. */
 export function parseUserScenario(raw: unknown, where = "user scenario"): UserScenario {
   const r = UserScenarioSchema.safeParse(raw);
   if (!r.success) throw new Error(`${where}: ${r.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; ")}`);
   return r.data;
 }
 
-/** Is this parsed JSON a user scenario (either family)? */
+/** Is this parsed JSON a user scenario (any family the kind accepts)? */
 export function isUserScenario(raw: unknown): boolean {
   const tag = (raw as { $schema?: unknown } | null)?.$schema;
-  return tag === USER_SCENARIO_V01 || tag === USER_SCENARIO_V02 || tag === USER_SCENARIO_V03;
+  return typeof tag === "string" && acceptsSchemaTag(UserScenarioKind, tag);
 }
