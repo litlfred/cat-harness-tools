@@ -18,6 +18,7 @@ import {
   candidateFor,
   extendExplicitDirectories,
   inCheckoutDirectoryIds,
+  movesSince,
   lockPinsOf,
   newlyDeclaredDirectoryIds,
   planRepin,
@@ -348,5 +349,34 @@ describe("extendExplicitDirectories: a directory the new pin declares joins an e
     expect(upEntry.ref).toBe(up.second);
     expect(upEntry.overrides).toEqual({ up: { directories: ["library", "scenarios", "tools"] } });
     expect(after.instances.find((i: { name: string }) => i.name === "other")).toEqual(otherBefore);
+  });
+});
+
+describe("movesSince + applyRepin({ seed: false }): step 4a after the pins already moved (--extend-from)", () => {
+  test("only instances whose ref changed AND carry a standing rule are moves", () => {
+    const before = { instances: [
+      { name: "up", source: { remote: { ref: A } } },
+      { name: "still", source: { remote: { ref: B } } },
+      { name: "norule", source: { remote: { ref: A } } },
+      { name: "local", source: { local: { at: "." } } },
+    ] };
+    const now = [mount("up", B, rule()), mount("still", B, rule()), mount("norule", C), mount("new", D, rule())];
+    expect(movesSince(before, now).map((m) => [m.harness, m.from, m.to])).toEqual([["up", A, B]]);
+    expect(movesSince(undefined, now)).toEqual([]);
+  });
+
+  test("seed: false writes the added ids and leaves the pin and its consent exactly as they are", async () => {
+    const root = site();
+    const f = join(root, "index.config.json");
+    const cfg = JSON.parse(readFileSync(f, "utf-8"));
+    cfg.instances.find((i: { name: string }) => i.name === "up").source.remote.overrides = { up: { directories: ["library"] } };
+    writeFileSync(f, JSON.stringify(cfg, null, 2));
+    const trustBefore = cfg.instances.find((i: { name: string }) => i.name === "up").source.remote.trust;
+    const plan: RepinPlan = { moves: [{ harness: "up", repository: "o/up", from: up.second, to: up.first, rule: rule(), skipped: [], addDirectories: ["scenarios"] }], held: [], unknown: [] };
+    await applyRepin(root, plan, { seed: false, mount: false });
+    const upEntry = JSON.parse(readFileSync(f, "utf-8")).instances.find((i: { name: string }) => i.name === "up").source.remote;
+    expect(upEntry.ref).toBe(up.first);
+    expect(upEntry.trust).toEqual(trustBefore);
+    expect(upEntry.overrides).toEqual({ up: { directories: ["library", "scenarios"] } });
   });
 });
