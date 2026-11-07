@@ -59,6 +59,7 @@ describe("a host that does not list the writer declares no order for it (a downs
   // that read the IG's docs and before the context; the IG root, the host,
   // lists its context before its pages and no glossary. Read as listed by the
   // host, the routes at its end closed a cycle and nothing was built.
+  // declared-path-literal: test vectors for the host-site order rule, declarations the test builds itself; that the platform's built context exists in a checkout is beside the point.
   const declared = [
     entry("platform", "docs/assets/glossary/", "glossary:page", { index: true }),
     entry("platform", "docs/base/", "base:pages"),
