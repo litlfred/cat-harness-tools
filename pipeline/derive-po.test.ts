@@ -450,9 +450,15 @@ describe("the two halves of the round trip agree about where the code is (`ig4a`
     ];
     const redeclared = SHARED.filter((n) => new RegExp(`^const ${n}\\s*=`, "m").test(inject));
     expect(redeclared).toEqual([]);
-    // ...and the injector must actually USE them, or "no duplicate" would be
-    // satisfiable by the injector having quietly stopped parsing markdown.
-    const unused = SHARED.filter((n) => !inject.includes(n));
+    // ...and the injector must still parse markdown, or "no duplicate" would be
+    // satisfiable by it having quietly stopped. It does so by calling the
+    // extractor's own segmentation, which reads every one of these, rather than
+    // by importing the regexes into a second state machine — the copy that let
+    // a wrapped list item be one msgid on extract and one line on inject.
+    expect(inject).toMatch(/\bsegmentMarkdown\(/);
+    const extractSrc = readFileSync(new URL("./pot-extract.ts", import.meta.url).pathname, "utf-8");
+    const segmenter = extractSrc.slice(extractSrc.indexOf("export function segmentMarkdown("));
+    const unused = SHARED.filter((n) => !segmenter.includes(n));
     expect(unused).toEqual([]);
     // Anti-vacuity: the names have to be real exports, not a list of typos that
     // trivially fails to match anything.
