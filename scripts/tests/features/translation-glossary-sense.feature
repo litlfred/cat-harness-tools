@@ -88,3 +88,10 @@ Feature: Glossary terms in sense keep their fixed translation
     When the Glossary consistency section is drawn
     Then only the violation counts as a finding
     And the pending, other-sense and exception uses each have their own table
+
+  @test:pipeline/translation-glossary.test.ts::in_an_index_run,_the_gate_judges_the_caller's_own_instances::only_own_instance_paths_that_declare_translation-sources_are_judged;_none_named_means_the_harness,_as_before
+  Scenario: In an IG's index run the gate judges only the IG's catalogues
+    Given the runner names the caller's own instance directories
+    When the glossary check runs with no --instance
+    Then it judges only the own instances that declare translation-sources
+    And with none named it judges the harness, as before

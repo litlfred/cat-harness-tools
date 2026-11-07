@@ -128,6 +128,7 @@ import {
 } from "../schemas/kg/glossary-sense.ts";
 import { declarationChain } from "../schemas/kg/harness-config.ts";
 import { explicitInstanceRoot, HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
+import { GATE_OWN_PATHS_ENV } from "../scripts/lib/gate-own.ts";
 import { buildQaResult, writeQaResult } from "../scripts/qa-results.ts";
 import { GLOSSARY_SUBJECT_KIND } from "../scripts/kg-qa-report.ts";
 import { parsePoEntries, type PoEntry } from "./po-inject.ts";
@@ -851,8 +852,39 @@ function args(argv: readonly string[], name: string): string[] {
   return out;
 }
 
+/**
+ * The roots a run with no `--instance` judges. The layer PR-check runner names
+ * the caller's own instance directories in {@link GATE_OWN_PATHS_ENV}: a gate
+ * run in an IG's index judges that IG's catalogues, not the platform's, which
+ * their own CI judges (owner ruling 2026-11-05, "Move the checks"). Only those
+ * that declare a `translation-sources` directory are returned; `undefined`
+ * when the run names no own paths (a local run: the harness, as before).
+ */
+export function ownTranslationRoots(
+  base: string = process.cwd(),
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string[] | undefined {
+  const paths = (env[GATE_OWN_PATHS_ENV] ?? "").split(",").map((p) => p.trim()).filter(Boolean);
+  if (paths.length === 0) return undefined;
+  return paths.map((p) => resolve(base, p)).filter((r) => {
+    const t = translationsOf(r);
+    return t !== undefined && existsSync(t);
+  });
+}
+
 function main(argv: readonly string[]): number {
-  const root = explicitInstanceRoot(argv) ?? resolve(HARNESS_ROOT);
+  const explicit = explicitInstanceRoot(argv);
+  if (explicit) return mainFor(explicit, argv);
+  const own = ownTranslationRoots();
+  if (own === undefined) return mainFor(resolve(HARNESS_ROOT), argv);
+  if (own.length === 0) {
+    console.log("✓ translation:glossary:check: the caller's own instances declare no translation-sources; the mounted layers' catalogues are judged by their own CI.");
+    return 0;
+  }
+  return Math.max(...own.map((r) => mainFor(r, argv)));
+}
+
+function mainFor(root: string, argv: readonly string[]): number {
   const check = argv.includes("--check");
   const translations = translationsOf(root);
   if (translations === undefined || !existsSync(translations)) {

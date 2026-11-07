@@ -19,6 +19,7 @@ import {
   glossarySources,
   keptAsName,
   msgidSha256,
+  ownTranslationRoots,
   pendingQuestions,
   readSchemeScope,
   renders,
@@ -511,5 +512,16 @@ describe("the verdict store and the adjudicator's entry points", () => {
     expect(md).toContain("##### Other sense");
     expect(md).toContain("##### Exceptions");
     expect(md).toContain("the app's own label (adjudicator-1)");
+  });
+});
+
+describe("in an index run, the gate judges the caller's own instances", () => {
+  test("only own instance paths that declare translation-sources are judged; none named means the harness, as before", () => {
+    acme("own-ig");
+    acme("own-plain", false);
+    const env = { CAT_GATE_OWN_PATHS: "own-ig,own-plain,missing" };
+    expect(ownTranslationRoots(base, env)).toEqual([join(base, "own-ig")]);
+    expect(ownTranslationRoots(base, { CAT_GATE_OWN_PATHS: "own-plain" })).toEqual([]);
+    expect(ownTranslationRoots(base, {})).toBeUndefined();
   });
 });
