@@ -2,7 +2,7 @@
 # fixpoint, and gateCoverage() reads the browser jobs and lists itself.
 Feature: The audit-coverage report is a fixpoint and covers every gate, itself included
 
-  @test:test/coordinator/audit-coverage-workflows.test.ts::the_report_is_a_fixpoint::running_it_once_is_enough_to_satisfy_the_gate
+  @test:test/coordinator/audit-coverage-workflows.test.ts::the_report_is_a_fixpoint::two_runs_over_one_checkout_report_the_same_rows,_and_the_`qa`_row_is_among_them
   Scenario: Two consecutive coverage runs report the same rows
     Given the checkout root
     When coverage is computed twice

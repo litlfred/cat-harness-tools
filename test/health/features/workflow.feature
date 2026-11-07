@@ -26,6 +26,7 @@ Feature: The health sweep's issue body says what went blind, what was found and 
     When the report is rendered
     Then the body contains "staging-preview-size", "3.13 GB", "branches/claude-two" and "staging:cleanup"
     And the body does not propose anything for the preview "claude-one"
+    And the report has at least one finding, and for every finding of every check the body carries its severity and summary as a bullet and its action under "What to do"
 
   @test:test/health/workflow.test.ts::the_issue_body::shows_every_threshold_with_the_basis_it_was_chosen_on
   Scenario: The body has a thresholds section that names its bases
@@ -34,6 +35,7 @@ Feature: The health sweep's issue body says what went blind, what was found and 
     Then the body contains "Thresholds, and what each is based on"
     And it contains "owner's explicit instruction"
     And it contains "NO EXTERNAL STANDARD"
+    And the report has at least one threshold, and for every threshold of every check the body names its metric and carries its severity and basis
 
   @test:test/health/workflow.test.ts::the_issue_body::gates_on_a_major_finding,_and_not_on_a_minor_one_alone
   Scenario: A major finding gates; a minor one gates only when minors are asked to

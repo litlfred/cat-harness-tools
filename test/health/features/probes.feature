@@ -18,9 +18,12 @@ Feature: The health probes gather evidence, and tell a determined empty from a f
   @test:test/health/probes.test.ts::probeBranches::carries_only_the_branches_a_preview_slug_asks_about_—_226_branches_must_not_cost_226_fetches
   Scenario: Only the branches a preview slug names are carried
     Given the remote with "claude/merged" and "claude/still-going"
+    And five more unmerged branches "claude/other-0" to "claude/other-4" on it
+    And a `git` on PATH that logs every fetch before running the real one
     When the branches are probed for the preview slug "claude-still-going" alone
     Then the state is "ok"
     And the candidates are exactly "claude/still-going"
+    And exactly two fetches were made: "fetch --no-tags origin main" and "fetch --no-tags origin refs/heads/claude/still-going"
 
   @test:test/health/probes.test.ts::probeBranches::an_empty_candidate_set_is_a_DETERMINED_answer,_not_a_failure_to_look
   Scenario: No branch matching a slug is a determined empty answer
@@ -261,11 +264,10 @@ Feature: The health probes gather evidence, and tell a determined empty from a f
   @test:test/health/probes.test.ts::doneWhenState_—_the_four_states_`fkjo`_needs_kept_apart::the_real_store_yields_all_four_states_—_not_a_parse_that_matches_nothing
   Scenario: The real bean store and its archive yield all four Done-when states
     Given the beans probed at the current working directory
-    And, when there is a bean archive, the Done-when state of each archived bean
+    Then the probe's state is "ok", and any other state fails the test
+    Given, when there is a bean archive, the Done-when state of each archived bean
     When the Done-when kinds are collected
     Then they include "all-ticked", "open", "absent" and "unreadable"
-    # Gap: when the bean probe is not "ok" the test returns before asserting
-    # anything, so it passes without checking the store.
 
   @test:test/health/probes.test.ts::probeSpecialBranches_—_unique_bytes::counts_a_blob_once_however_many_paths_name_it,_which_is_what_a_clone_costs
   Scenario: A blob named by several paths is counted once

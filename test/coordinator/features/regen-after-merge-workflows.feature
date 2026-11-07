@@ -45,7 +45,9 @@ Feature: regen pairs each gate with a declared writer that writes, and records t
     And its writer's script does not pass --check
 
   @test:test/coordinator/regen-after-merge-workflows.test.ts::the_default_asks_the_WHOLE_gate_set_—_bean_`i1q7`,_item_3::render:bpmn:check_and_bat:sync:check_are_pairs_regen_asks_by_default
-  Scenario: render:bpmn:check and bat:sync:check are paired with their writers in the --all set
+  Scenario: render:bpmn:check and bat:sync:check are paired with their writers in the set regen asks by default
+    Given regen's own source
+    Then it sets "fast" only from "--fast", sets "all" to "!fast", and loads its gates with "{ all }"
     Given the pairs derived from the --all gates
     When render:bpmn:check and bat:sync:check are looked up
     Then render:bpmn:check's writer is "render:bpmn"

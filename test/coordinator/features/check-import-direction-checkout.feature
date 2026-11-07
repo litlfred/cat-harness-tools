@@ -15,3 +15,5 @@ Feature: The import-direction check reads the real needs and allows imports down
     Given the same planted tree
     When the import direction is analysed
     Then there is no finding on "cat-harness-tools/src/server.ts"
+    And the one finding on "cat-harness/src/planted.ts" is from "cat-harness" to "cat-harness-tools"
+    And its verdict is "wrong-direction" when cat-harness's needs are declared, and "undetermined" when they are not

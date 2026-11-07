@@ -33,11 +33,13 @@ Feature: Every skill a remote package declares can be served, and the formerly u
     And it has no "stub:" line
 
   @test:test/coordinator/remote-skill-servable.test.ts::remote-package_declarations_vs_what_this_instance_can_serve::every_declared_skill_names_a_wrapper_that_exists,_so_a_finding_is_actionable
-  Scenario: Every declaration names a .json wrapper file and a skill
+  Scenario: Every declaration names a .json wrapper file that exists and lists the skill
     Given the remote-package declarations
     When each is read
     Then its file ends with ".json"
     And its skill name is not empty
+    And a file of that name is in the "remote-packages" directory of at least one declared skills root
+    And at least one such file lists the skill among its wrapper's skills
 
   @test:test/coordinator/remote-skill-servable.test.ts::remote-package_declarations_vs_what_this_instance_can_serve::every_declared_skill_comes_from_a_wrapper_that_syncs,_pinned,_never_auto-updating
   Scenario: Every declared skill comes from a pinned sync that does not auto-update

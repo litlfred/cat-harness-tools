@@ -10,10 +10,12 @@ Feature: The memory corpus is valid, routed by agent and role, and its generated
     Then there are more than 20
 
   @test:test/coordinator/agent-memory-repo-root.test.ts::the_corpus::every_node_validates,_and_none_is_a_baseline_without_provenance
-  Scenario: Every memory node validates against the schema
+  Scenario: Every memory node validates, and no baseline lacks its provenance
     Given the memory nodes of the checkout
     When each is parsed with the memory node schema
     Then every parse succeeds
+    And no node labelled "baseline" is without "measured"
+    And the first node, relabelled "baseline" with its "measured" removed, does not parse
 
   @test:test/coordinator/agent-memory-repo-root.test.ts::the_corpus::ids_are_unique_—_overlay_resolves_by_id,_so_a_collision_hides_an_entry
   Scenario: Memory node ids are unique
@@ -53,10 +55,10 @@ Feature: The memory corpus is valid, routed by agent and role, and its generated
     And the difference equals the number of nodes tagged "build-pipeline"
 
   @test:test/coordinator/agent-memory-repo-root.test.ts::the_role_axis_discriminates_—_memoryForRoles_is_not_dead_code::role_tags_do_not_change_what_an_AGENT_is_handed
-  Scenario: Every agent's file stays unchanged with role tags in the corpus
-    Given the agent memory files
-    When they are synced without writing
-    Then every agent's file is "unchanged"
+  Scenario: Changing every entry's role tags does not change what any agent is handed
+    Given the memory nodes of the checkout, at least one of which carries a role tag
+    When memoryForAgent is asked for each agent over the nodes as they are, with every role tag removed, and with every node tagged "reviewer" alone
+    Then each agent is handed the same entry ids all three times
 
   @test:test/coordinator/agent-memory-repo-root.test.ts::round_trip_—_no_entry_is_lost::every_entry_in_every_generated_file_parses_back_to_a_node
   Scenario: Every entry in every generated memory file parses back to a node

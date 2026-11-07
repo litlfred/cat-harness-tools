@@ -31,7 +31,7 @@ Feature: Content-type skill packages are held by their owners, and role edges po
     And no role in cat-harness's roles.json names one of them
 
   @test:test/coordinator/placement-pr1-content-up.test.ts::placement_PR1:_role_edges_point_down::the_checkout's_role_graph_still_carries_each_edge,_through_the_owner's_extension
-  Scenario: The checkout's role graph still carries each edge
+  Scenario: The checkout's role graph still carries each edge, added by the owning instance's extension
     Given the role graph of the checkout
     When the skills of sample roles are read
     Then lean-authoring-agent has formalizer
@@ -39,3 +39,7 @@ Feature: Content-type skill packages are held by their owners, and role edges po
     And build-pipeline has fhir-validation
     And business-analyst has l2-dak-authoring
     And qc-reviewer has quality-control
+    Given the harness's own role graph, overlaid with the checkout's extensions
+    Then the harness's own graph declares no lean-authoring-agent role, because its owning instance declares that role
+    And for build-pipeline → fhir-validation and qc-reviewer → quality-control the harness's own graph lacks the edge
+    And the only extension recorded as adding it is the one of the instance that holds the skill's package
