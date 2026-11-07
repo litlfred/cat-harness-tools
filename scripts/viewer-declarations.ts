@@ -664,7 +664,17 @@ export function viewersOf(
   // or — for an entry `siteDirectories` presented from the checkout root —
   // the root. A `repository`-scoped path resolves from the checkout either way.
   const own = readRaw(instanceRoot);
-  const owner = (own?.directories ?? []).some((x) => x.id === d.id) ? own?.name : (readRaw(repoRoot)?.name ?? own?.name);
+  //
+  // Only a REPOSITORY-scoped entry can be the root's: a directory declared
+  // inside this instance's own tree by a nested declaration (`beans/beans.json`'s
+  // `defs/`, `notes/`, `workflows/`) is absent from `own.directories` too, and
+  // was handed to the root — core's and tools' work items then opened
+  // `beans/dth-hrh/`, the site owner's page, under a second name
+  // (check:nav-names, dth-hrh run 42343581318).
+  const owner =
+    (own?.directories ?? []).some((x) => x.id === d.id) || d.scope !== "repository"
+      ? own?.name
+      : (readRaw(repoRoot)?.name ?? own?.name);
   if (owner === undefined) return [];
   const absDir = join(d.scope === "repository" ? repoRoot : instanceRoot, d.path);
   let site: string | undefined = siteDir;
