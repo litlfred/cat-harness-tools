@@ -26,6 +26,9 @@ Feature: A user scenario of any draft minor is read unchanged, and each minor ad
     When each is parsed
     Then the group is accepted
     And the child's step carries the gap "not yet"
+    And the child reads back as part of "j", with its view as given
+    And a view with no view id, or with an unknown key, throws
+    And the 0.1.0 shape refuses a scenario with views
 
   @test:schemas/process/user-scenario.test.ts::user-scenario:_the_draft_family_is_read_unchanged,_each_minor_adds_to_it::0.2.0_carries_an_illustration_(alt_required)_and_the_scenario's_shared_style;_0.1.0_does_not
   Scenario: A 0.2.0 step carries an illustration with alt text; 0.1.0 does not
@@ -42,10 +45,10 @@ Feature: A user scenario of any draft minor is read unchanged, and each minor ad
     Then each throws, the first saying the step appears twice and the second that the actor is not among the scenario's personas
 
   @test:schemas/process/user-scenario.test.ts::user-scenario:_the_draft_family_is_read_unchanged,_each_minor_adds_to_it::0.2.0_carries_a_scene,_FHIR_changes_and_a_hand-off_in_words;_a_glyph_not_on_the_list_is_refused
-  Scenario: A 0.2.0 scenario carries a scene and FHIR changes; an unlisted glyph is refused
-    Given a 0.2.0 scenario with a "hospital" scene and a step with FHIR changes and a hand-off
+  Scenario: A 0.2.0 scenario carries a scene, FHIR changes and a hand-off; an unlisted glyph is refused
+    Given a 0.2.0 scenario with a "hospital" scene and a step with FHIR changes and a hand-off from "Thai hospital" to "mother"
     When it is parsed
-    Then its scene and the step's FHIR changes are read back as given
+    Then its scene, the step's FHIR changes and the step's hand-off are read back as given
     And a scene glyph "unicorn" throws
     And a FHIR change whose example is "not a key" throws
     And the 0.1.0 shape refuses a step with FHIR changes

@@ -144,10 +144,11 @@ Feature: An actor performs a task in a process as a role, using that role's skil
     And the warning says it is deprecated
 
   @test:schemas/process/role-graph.test.ts::laneRoleRef_—_a_lane_names_its_Role_by_partitionElementRef_(owner,_2026-10-16)::the_legacy_element_is_matched_by_local_name,_whatever_prefix_the_reader_registered
-  Scenario: The legacy role extension is matched by local name
-    Given a lane with a folio:role extension naming "editor"
-    When its role ref is read
-    Then its source is the legacy role ref
+  Scenario: The legacy role extension is matched by local name, whatever its prefix
+    Given lanes with a role extension naming "editor" under the prefixes folio, bootstrap.processes, x and a.b.c
+    When each one's role ref is read
+    Then each one's source is the legacy role ref, naming "editor"
+    And extensions whose local name is roles, notrole or role-ref bind nothing
 
   @test:schemas/process/role-graph.test.ts::laneRoleRef_—_a_lane_names_its_Role_by_partitionElementRef_(owner,_2026-10-16)::partitionElementRef_wins_over_a_disagreeing_legacy_ref,_and_says_so
   Scenario: partitionElementRef wins over a disagreeing legacy ref
@@ -203,19 +204,22 @@ Feature: An actor performs a task in a process as a role, using that role's skil
     Then it is defined
 
   @test:schemas/process/role-graph.test.ts::this_repository's_own_role_graph::every_role's_summary_says_what_the_position_is,_not_just_its_name
-  Scenario: Every role in this repository has a description longer than 20 characters
+  Scenario: Every role in this repository has a description that says more than its name
     Given this repository's own role graph
     Then every role's description is longer than 20 characters
+    And with the words of the role's title and id taken out, at least three words of its description remain
 
   @test:schemas/process/role-graph.test.ts::this_repository's_own_role_graph::findRole_and_toJsonLd_agree_on_the_declared_set
   Scenario: findRole and the JSON-LD view of this repository's role graph
     Given this repository's own role graph
     Then the role found for "author" is titled "Author"
     And its JSON-LD view has as many roles as the graph, the first with @id "#user"
+    And findRole finds every role the JSON-LD view lists, by the id in its @id
+    And the JSON-LD ids, with no repeat, are exactly the declared role ids
 
   @test:schemas/process/role-graph.test.ts::this_repository's_actor_registry,_after_the_roles[]_migration::no_entry_still_carries_the_deprecated_`inherits`
   Scenario: No actor in the registry still carries inherits
-    Given the actor registry found from three directories above schemas/process, and this repository's role graph
+    Given the actor registry and the role graph of the harness root
     Then no actor looks like a role
 
   @test:schemas/process/role-graph.test.ts::this_repository's_actor_registry,_after_the_roles[]_migration::every_role_an_actor_lists_is_declared
@@ -250,10 +254,11 @@ Feature: An actor performs a task in a process as a role, using that role's skil
     Then every capability an actor lists names a probe file
 
   @test:schemas/process/role-graph.test.ts::permissions_are_an_actor_property,_not_a_role_property::a_permission_genuinely_cross-cuts_roles_—_which_is_why_it_cannot_live_on_Role
-  Scenario: A permission is held by actors of more than one role
+  Scenario: A permission is held by actors of more than one role, and not by every actor of a role
     Given the actor registry, with grants read from this repository's ODRL policies
     Then the actors holding "content-authoring" take more than one role between them
     And so do the actors holding "qa-reporting"
+    And for each of the two, some role has actors who hold it and actors who do not
 
   @test:schemas/process/role-graph.test.ts::permissions_are_an_actor_property,_not_a_role_property::an_unparseable_vocabulary_throws_rather_than_reading_as_empty
   Scenario: A permission vocabulary that is not JSON throws
@@ -354,9 +359,9 @@ Feature: An actor performs a task in a process as a role, using that role's skil
 
   @test:schemas/process/role-graph.test.ts::lane_holding:_when_the_lane_is_needed,_and_who_holds_it_(owner_rulings,_2026-11-07)::the_result_does_not_depend_on_the_order_of_the_listing
   Scenario: Election does not depend on the listing order
-    Given sessions A, B and C
-    When the holder is elected from C, B, A and from A, B, C
-    Then the two results are equal
+    Given sessions A, B and C, and D, a second P0 owner created with B
+    When the holder is elected from every ordering of A and B, of A, B and C, and of A, B, C and D
+    Then each listing elects the same holder in every one of its orderings
 
   @test:schemas/process/role-graph.test.ts::lane_holding:_when_the_lane_is_needed,_and_who_holds_it_(owner_rulings,_2026-11-07)::a_lone_session_holds_the_lane_for_itself_only_when_the_role_allows_it
   Scenario: A lone session holds the lane only when the role allows it
@@ -378,10 +383,11 @@ Feature: An actor performs a task in a process as a role, using that role's skil
     Then there is no holder
 
   @test:schemas/process/role-graph.test.ts::lane_holding:_when_the_lane_is_needed,_and_who_holds_it_(owner_rulings,_2026-11-07)::the_stall_and_heartbeat_windows_are_required
-  Scenario: The heartbeat window is required
+  Scenario: The stall and heartbeat windows are required
     Given the lane holding with heartbeatMinutes removed
     When it is parsed
     Then it is refused
+    And the lane holding with stalledAfterMinutes removed is refused too
 
   @test:schemas/process/role-graph.test.ts::lane_holding:_when_the_lane_is_needed,_and_who_holds_it_(owner_rulings,_2026-11-07)::an_unreadable_creation_time_sorts_last_rather_than_dropping_the_candidate
   Scenario: An unreadable creation time sorts last rather than dropping the candidate

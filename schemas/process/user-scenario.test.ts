@@ -17,8 +17,15 @@ describe("user-scenario: the draft family is read unchanged, each minor adds to 
   test("0.2.0 groups (partOf, no steps) and carries gaps and views", () => {
     const group = { ...v01, $schema: "user-scenario/0.2.0", id: "j", steps: [] };
     expect(UserScenarioSchema.safeParse(group).success).toBe(true);
-    const child = { ...v01, $schema: "user-scenario/0.2.0", partOf: "j", views: [{ model: "0.1.0", view: "id-1" }], steps: [{ ...step, gaps: ["not yet"] }] };
-    expect(parseUserScenario(child).steps[0]).toMatchObject({ gaps: ["not yet"] });
+    const views = [{ model: "0.1.0", view: "id-1" }];
+    const child = { ...v01, $schema: "user-scenario/0.2.0", partOf: "j", views, steps: [{ ...step, gaps: ["not yet"] }] };
+    const parsed = parseUserScenario(child);
+    expect(parsed.steps[0]).toMatchObject({ gaps: ["not yet"] });
+    expect(parsed).toMatchObject({ partOf: "j", views });
+    // A view names its model and its view, and nothing else; 0.1.0 has no views.
+    expect(() => parseUserScenario({ ...child, views: [{ model: "0.1.0" }] })).toThrow();
+    expect(() => parseUserScenario({ ...child, views: [{ ...views[0], colour: "red" }] })).toThrow();
+    expect(UserScenarioV01Schema.safeParse({ ...v01, views }).success).toBe(false);
   });
   test("0.2.0 carries an illustration (alt required) and the scenario's shared style; 0.1.0 does not", () => {
     const il = { src: "docs/images/p3.png", alt: "Helped toward the clinic.", prompt: "A tent city at midday; no readable text." };
@@ -36,9 +43,11 @@ describe("user-scenario: the draft family is read unchanged, each minor adds to 
   test("0.2.0 carries a scene, FHIR changes and a hand-off in words; a glyph not on the list is refused", () => {
     const v02 = { ...v01, $schema: "user-scenario/0.2.0", scene: [{ icon: "hospital", label: "A clinic" }] };
     const fhirChanges = [{ resource: "Immunization ×2", change: "primarySource flipped", profile: "LaoImm", profileOf: "LA", examples: ["Immunization/J3HepB"], spec: "https://hl7.org/fhir/immunization.html" }];
-    const parsed = parseUserScenario({ ...v02, steps: [{ ...step, fhirChanges, handoff: { summary: "s", from: "Thai hospital", to: "mother" } }] });
+    const handoff = { summary: "s", from: "Thai hospital", to: "mother" };
+    const parsed = parseUserScenario({ ...v02, steps: [{ ...step, fhirChanges, handoff }] });
     expect(parsed.scene).toEqual([{ icon: "hospital", label: "A clinic" }]);
     expect(parsed.steps[0]!.fhirChanges).toEqual(fhirChanges);
+    expect(parsed.steps[0]!.handoff).toEqual(handoff);
     expect(() => parseUserScenario({ ...v02, scene: [{ icon: "unicorn", label: "x" }] })).toThrow();
     expect(() => parseUserScenario({ ...v02, steps: [{ ...step, fhirChanges: [{ resource: "R", change: "c", examples: ["not a key"] }] }] })).toThrow();
     expect(UserScenarioV01Schema.safeParse({ ...v01, steps: [{ ...step, fhirChanges }] }).success).toBe(false);
