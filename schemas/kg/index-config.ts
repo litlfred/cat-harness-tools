@@ -169,6 +169,20 @@ export const IndexSiteSchema = z
      */
     agentRun: z.boolean().optional(),
     /**
+     * Whether the ⓘ task panel on this site's BPMN drawings shows skills: the
+     * skills a task requires and the skills its lane's role has. Absent or
+     * `true` shows them, as every knowledge-graph site does; `false` hides
+     * them, for a site whose processes are not modelled with skills, such as
+     * an implementation guide's business processes (owner, 2026-11-06: "i
+     * dont think skills are modelled in DAK ... dont necc turn those on but i
+     * want common styling"; "maybe in future DAK personas get skills"). The
+     * rest of the panel (the step, its lane and role, the process, a called
+     * process) is shown either way. A fact about how THIS checkout publishes,
+     * so it sits on the index's `site` beside `landing` and `agentRun`.
+     * Read by `task-panel.ts` `taskSkillsDeclared`.
+     */
+    taskSkills: z.boolean().optional(),
+    /**
      * The workflow files that publish this repository's site and stage a
      * preview of it, by file name under `.github/workflows/`. The
      * `pages-publish` and `feature-staging` Tools run them through

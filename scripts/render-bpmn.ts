@@ -287,12 +287,24 @@ for (const file of sources) {
   // activity's [+] opens the process it calls. Only live once the SVG is in the
   // DOM — inside an `<img>` it is inert — which docs-ui.js arranges by
   // inlining these figures. `diagram-links.ts` says why each is shaped so.
+  //
+  // A step with no page of its own — a downstream site, where kg-export
+  // writes no subject pages (#1581) — still has a title link: to its
+  // process's page in the processes viewer, which lists the steps. Every site
+  // that publishes this drawing publishes that page (the visualiser writes it
+  // from the same sources), whereas a docs page presenting the diagram may
+  // be the host's alone, so it is the one target sure to resolve. Every
+  // title is then clickable on every site, and a page that shows the drawing
+  // — a process page, a guide's business-processes page — shows the same
+  // affordances.
   const steps = stepsOf(xml);
   const stepName = new Map(steps.map((s) => [s.id, s.name]));
   const titles = new Map<string, { href: string; name: string }>();
   for (const s of steps) {
-    const href = subjectHref(file, "process", `${s.process}/node/${s.id}`);
-    if (href) titles.set(s.id, { href, name: s.name });
+    const href =
+      subjectHref(file, "process", `${s.process}/node/${s.id}`) ??
+      SITE_UP + processTarget(basename(file, ".bpmn"), undefined);
+    titles.set(s.id, { href, name: s.name });
   }
   const expands = new Map([...subprocessLinks(xml)].map(([id, href]) => [id, { href, name: stepName.get(id) ?? id }]));
   const linked = linkSteps(responsive, titles, expands);

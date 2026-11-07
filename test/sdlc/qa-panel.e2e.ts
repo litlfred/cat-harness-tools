@@ -338,6 +338,50 @@ test("a field the sidecar does not record prints 'not recorded', never blank", a
   await expect(witness).toContainText("not recorded");
 });
 
+test("a verdict that records no date is dated by its tree's commit, from tree-commits.json", async ({ page }) => {
+  // Owner rulings 2026-11-06 (cards "QA dates" and "Date source", option 1):
+  // a writer stamps no clock in a verdict; the panel derives its date ON READ
+  // from the index the deploy writes beside the evidence.
+  const TREE = "a".repeat(40);
+  const DATED = (() => {
+    const doc = JSON.parse(BLOCK_JSON) as {
+      criteria: Array<{ id: string; witnesses?: Array<Record<string, unknown>> }>;
+    };
+    for (const c of doc.criteria) {
+      if (c.id !== LOUD_ID) continue;
+      for (const w of c.witnesses ?? []) {
+        if (w.kind !== "script") continue;
+        delete w.at;
+        delete w.sha;
+        w.tree = TREE;
+      }
+    }
+    return JSON.stringify(doc);
+  })();
+  await page.route("http://qa.test/assets/qa/block.json", (route) =>
+    route.fulfill({ contentType: "application/json", body: DATED }));
+  await page.route("http://qa.test/assets/qa/tree-commits.json", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        $schema: "folio-qa-tree-commits/v1",
+        repo: null,
+        depth: 1,
+        commits: { [TREE]: "b".repeat(40) },
+        dates: { [TREE]: "2026-11-01T12:00:00Z" },
+      }),
+    }));
+  await page.goto(PAGE_URL);
+  await page.locator(".fa-qa-fam-block").first().click();
+  await page.locator(".fa-qa-crit").first().click();
+
+  const witness = page.locator(".fa-qa-witness").first();
+  const when = witness.locator(".fa-qa-field", { hasText: "when" }).first().locator(".fa-qa-field-value");
+  await expect(when).toContainText("2026-11-01");
+  await expect(when).not.toHaveClass(/fa-qa-absent/);
+  await expect(when).toHaveAttribute("title", new RegExp(`commit date of the commit on main carrying the reviewed tree ${TREE}`));
+});
+
 test("a 404 projection says so and names the file", async ({ page }) => {
   await page.goto(PAGE_URL);
   await page.locator(".fa-qa-fam-block").nth(2).click();
