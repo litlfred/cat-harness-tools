@@ -245,6 +245,17 @@ describe("the report over this repository", () => {
     expect(beanDefs?.gates.length).toBeGreaterThan(0);
   });
 
+  test("a kind judged only by a check its own layer's CI runs is covered, not typed-only", () => {
+    // `cache` is judged by `caches:viz:check`, which cat-harness-tools
+    // exempts as `covered-by` (its own `layer-pr-checks.yml` runs it at
+    // every pin). Before, the index read the kind as TYPED and judged by
+    // nothing, and `audit:coverage:strict` failed every re-pin that mounted it.
+    const cache = rows.find((r) => r.kind === "cache");
+    expect(cache?.files).toBeGreaterThan(0);
+    expect(cache?.gates).toContain("bun run cat caches:viz:check");
+    expect(cache?.state).toBe("covered");
+  });
+
   test("the bean store is reported as audited — the defect that prompted this", () => {
     // 2026-09-23: an agent read zero `kg-qa` sidecars over the bean store and
     // reported beans "effectively unaudited". This is the assertion that the

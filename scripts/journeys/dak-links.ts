@@ -19,6 +19,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, posix, relative, resolve } from "node:path";
 
+import type { DakLink, DakRel } from "../../schemas/process/user-scenario.ts";
 import type { WorkshopPresentation } from "../../schemas/process/workshop.ts";
 import { linkSteps, stepsOf } from "../../src/workflow/diagram-links.ts";
 import { instanceFile, lookup, processDrawing, type JourneyCorpus } from "./read.ts";
@@ -112,6 +113,65 @@ export function artifactPage(corpus: JourneyCorpus, pr: WorkshopPresentation | u
   if (!pr?.ig || !type || !id) return undefined;
   const page = (pr.ig.example ?? "{type}-{id}.html").split("{type}").join(type).split("{id}").join(id);
   return fromSiteRoot(`${pr.ig.href}${page}`, siteRoot);
+}
+
+// ── a step's DAK assets ───────────────────────────────────────────────────
+
+/** What each `rel` of a step's `dak` is called on a page, in the order a DAK row draws the groups. */
+export const DAK_REL_LABEL: Readonly<Record<DakRel, string>> = { data: "Data", decides: "Decision logic", measures: "Indicators" };
+
+/** A step's DAK link's `rel`; when it says none, the one its resource type implies, else undefined. */
+export function dakRel(l: DakLink): DakRel | undefined {
+  if (l.rel !== undefined) return l.rel;
+  switch (l.key.split("/")[0]) {
+    case "StructureDefinition":
+      return "data";
+    case "PlanDefinition":
+    case "Library":
+      return "decides";
+    case "Measure":
+      return "measures";
+    default:
+      return undefined;
+  }
+}
+
+/** One DAK asset as a DAK row draws it: its key, the index's title for it, and its page in the IG when the index lists it. */
+export interface DakAsset {
+  key: string;
+  label: string;
+  description?: string;
+  href?: string;
+}
+
+/** A DAK row's group: the assets of one `rel` (`other`: a link that says none and whose type implies none). */
+export interface DakGroup {
+  rel: DakRel | "other";
+  label: string;
+  assets: DakAsset[];
+}
+
+/**
+ * A step's `dak` links, grouped by what each is to the step (Data, Decision
+ * logic, Indicators, then Other), each asset linked to its page in the IG
+ * through {@link artifactPage}: an asset the artefact index does not list is
+ * left as text. A key named twice is drawn once. Empty when the step names
+ * none.
+ */
+export function dakGroups(corpus: JourneyCorpus, pr: WorkshopPresentation | undefined, links: readonly DakLink[] | undefined, siteRoot: string): DakGroup[] {
+  const by = new Map<DakRel | "other", DakAsset[]>();
+  const seen = new Set<string>();
+  for (const l of links ?? []) {
+    if (seen.has(l.key)) continue;
+    seen.add(l.key);
+    const x = corpus.examples.get(l.key);
+    const href = artifactPage(corpus, pr, l.key, siteRoot);
+    const rel = dakRel(l) ?? "other";
+    const asset: DakAsset = { key: l.key, label: x?.title ?? l.key.slice(l.key.indexOf("/") + 1), ...(x?.description ? { description: x.description } : {}), ...(href ? { href } : {}) };
+    (by.get(rel) ?? by.set(rel, []).get(rel)!).push(asset);
+  }
+  const order: (DakRel | "other")[] = [...(Object.keys(DAK_REL_LABEL) as DakRel[]), "other"];
+  return order.filter((r) => by.has(r)).map((rel) => ({ rel, label: rel === "other" ? "Other" : DAK_REL_LABEL[rel], assets: by.get(rel)! }));
 }
 
 // ── the check over a staged site ──────────────────────────────────────────

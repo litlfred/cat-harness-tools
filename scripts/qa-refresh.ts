@@ -173,7 +173,11 @@ export const QA_WRITERS: readonly QaWriter[] = [
     because: "every declared instance's KG verdicts, hosted homes included (bootstrap, bootstrap-tools, cat-harness-tools, cat-openapi, folio-assistant, folio-assistant-state, and any declared instance in this checkout hosted under cat-harness)",
   },
   { id: "kg:detangle", run: ["kg:detangle"], writes: [`${R}/detangle/**`], because: "detangle measurements per instance graph" },
-  { id: "translation:block-qa", run: ["translation:block-qa"], writes: [`${R}/translation-qa/**`], because: "translation verdicts; read by the witnesses below" },
+  // `translation:page-qa` is `translation:block-qa --catalogues`: the same block
+  // and page passes plus the catalogue pass (translations/<rel>.<locale>), so
+  // main's stored tree carries the baseline `translation:page-qa:check` judges
+  // against (owner, 2026-11-07, "A. Two steps"). One run, not two.
+  { id: "translation:block-qa", run: ["translation:page-qa"], writes: [`${R}/translation-qa/**`], because: "translation verdicts, catalogues included; read by the witnesses below" },
   {
     id: "qa-sweep:docs",
     // declared-path-literal: the sweep's target is cat-harness's authored docs tree, one fixed directory of the harness this step refreshes, passed as the CLI argument qa-sweep.ts takes.

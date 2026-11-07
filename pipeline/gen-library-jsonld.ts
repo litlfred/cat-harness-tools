@@ -390,9 +390,23 @@ export function libraryInstanceOf(entryDir: string): string | undefined {
   // `undefined` rather than a guess. Measured 2026-11-02: cat-harness filed
   // its 74 entries into groups and every manifest IRI fell back to the
   // relative form, 5531 nodes stale.
-  const library = dirname(parent);
-  if (!presentGroupsIn(library, "library").has(basename(parent))) return undefined;
-  return readDeclaration(dirname(library))?.name;
+  const grouped = dirname(parent);
+  const library = presentGroupsIn(grouped, "library").has(basename(parent)) ? grouped : parent;
+  const above = readDeclaration(dirname(library))?.name;
+  if (above !== undefined) return above;
+  // A library declared from WITHIN a sub-graph (cat-harness#1032:
+  // `library/corpus/<group>/<id>`, the corpus a directory below the
+  // instance): the declaring instance is further up. Walked to the nearest
+  // declaration, and only when that instance's checkout declares THIS folder
+  // a `library` corpus — never a guess from the folder's name. Measured
+  // 2026-11-07: with the corpus moved, 5611 nodes read as stale.
+  for (let at = dirname(dirname(library)); at !== dirname(at); at = dirname(at)) {
+    const decl = readDeclaration(at);
+    if (decl === undefined) continue;
+    const declared = corpusDirectoriesForGraph(at, "library").map((d) => resolve(d));
+    return declared.includes(library) ? decl.name : undefined;
+  }
+  return undefined;
 }
 
 /**

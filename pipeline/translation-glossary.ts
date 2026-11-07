@@ -38,13 +38,13 @@
  * policy) carry no sense of their own, so applying them as fixed translations
  * to health content gives wrong answers — FHIR `Reference(...)`, IHE "actors",
  * health "policy" (政策, not the harness's 策略). The owner chose "scoped fixed
- * terms" (`folio-glossary/v1`, folio-assistant-core #663): a scheme, or a
+ * terms" (`folio-glossary/v1`, 2026-11-07): a scheme, or a
  * term, declares the subject area its translations bind in (`subject`,
  * `dcterms:subject`); a term's own overrides its scheme's; with neither, the
  * term binds only in its own scheme (`<instance>--<scheme id>`). Only
  * `authored` terms fix anything. `scopeNote` is prose and is never compared.
  * The glossary is read as data from the file each scheme catalogue's `#:`
- * names, since its schema belongs to the content core above this layer.
+ * names, since its schema belongs to a layer above this one.
  *
  * Precedence applies within one subject area. A term binds the instance's
  * catalogues when its area is one of the instance's own (its glossaries'
@@ -113,7 +113,7 @@ export interface GlossarySource {
 
 /**
  * The subject area an entry of `s` binds in — `subjectOf(scheme, term)` of
- * `folio-glossary/v1` (owner's choice, "scoped fixed terms", core #663): the
+ * `folio-glossary/v1` (owner's choice, "scoped fixed terms"): the
  * term's `subject`, else its scheme's, else the scheme itself
  * (`<instance>--<scheme id>`, the catalogue's own name). A reference glossary
  * is its own area and binds everything; a terminology `glossary.po` is its
@@ -169,7 +169,7 @@ const LANG_SOURCE = (t: unknown): string | undefined =>
 /**
  * Read a glossary file's subject areas: the scheme's `subject` and each term's
  * own (by prefLabel and altLabel), and which terms are not `authored` (they fix
- * nothing). Read as DATA — the schema is the content core's, above this layer.
+ * nothing). Read as DATA — the schema belongs to a layer above this one.
  * A JSON Schema that publishes its terms in `$defs` and a top-level `subject`
  * is read the same way: that subject, for every term.
  */

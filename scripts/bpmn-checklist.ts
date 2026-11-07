@@ -76,6 +76,8 @@ function walkOrder(model: ProcessModel): ProcessNode[] {
       const to = model.flows.get(f)?.to;
       if (to && !seen.has(to)) queue.push(to);
     }
+    // A boundary event follows the step it sits on.
+    for (const b of model.nodes.values()) if (b.attachedTo === id && !seen.has(b.id)) queue.unshift(b.id);
   }
   // Anything unreachable from a start event is still listed — silently
   // dropping it would make the checklist disagree with the diagram.
@@ -145,6 +147,15 @@ export function checklistFor(model: ProcessModel, sourceRel: string): string {
       } else {
         out.push(`- Record it: \`workflow_complete\` with \`node: "${n.id}"\`.`);
       }
+      out.push(`- ${nextLine(model, n)}`, "");
+    } else if (n.kind === "boundary") {
+      out.push(`### Optional, while ${ref(model, n.attachedTo ?? "")} is open — ${head}`, "");
+      const d = firstSentence(n.documentation);
+      if (d) out.push(`- ${d}`);
+      out.push(
+        `- Only if it happens: \`workflow_complete\` with \`node: "${n.id}"\` while ${ref(model, n.attachedTo ?? "")} is enabled. ` +
+          "That step stays enabled and nothing waits for this path; skipping it is the default.",
+      );
       out.push(`- ${nextLine(model, n)}`, "");
     } else if (n.kind === "exclusive" && n.outgoing.length > 1) {
       out.push(`### Decide — ${head}`, "");

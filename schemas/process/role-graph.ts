@@ -333,6 +333,13 @@ export interface RoleDef {
    * (Q-DS-3 A). See {@link StoreDef}.
    */
   store?: StoreDef;
+  /**
+   * For a lane one session holds at a time, such as the merge steward: when
+   * the lane is needed at all, how sibling sessions choose its holder, and
+   * whether a lone session holds it for itself (owner rulings, 2026-11-07).
+   * See {@link LaneHolding}, {@link laneNeeded} and {@link electHolder}.
+   */
+  holding?: LaneHolding;
 }
 
 /**
@@ -474,6 +481,133 @@ export const FormerNameSchema = z
   })
   .strict();
 
+/**
+ * The election rules, applied in order: each narrows the candidates, and
+ * the last tie is broken by session id, so two sessions reading the same
+ * listing always choose the same holder.
+ *
+ * - `owns-p0`: keep the sessions that own a P0 PR (the fix for a red main,
+ *   or the re-pin chain), when any does.
+ * - `earliest-created`: keep the earliest-created session.
+ */
+export const ELECTION_RULES = ["owns-p0", "earliest-created"] as const;
+export type ElectionRule = (typeof ELECTION_RULES)[number];
+
+/**
+ * When a lane held by one session at a time is needed, and who holds it.
+ *
+ * Owner rulings, 2026-11-07: "merge manager needed if lots of conflicting CI
+ * runners causing merge slowdown"; "if no merge manager, siblings
+ * self-determine which will play that role"; "if single, can merge manage
+ * self". The condition is measured, never asserted: {@link laneNeeded}
+ * reads it from live numbers.
+ */
+export const LaneHoldingSchema = z
+  .object({
+    neededWhen: z
+      .object({
+        /** At least this many active sessions have ready PRs in the same repositories. */
+        minActiveSessions: z.number().int().min(2),
+        /** Contention: more queued runs than this on a repository... */
+        maxQueuedRuns: z.number().int().min(0),
+        /** ...or the oldest queued run older than this many minutes... */
+        maxOldestQueuedMinutes: z.number().min(0),
+        /** ...or, when true, PRs that conflict with or supersede each other. */
+        conflictsCount: z.boolean(),
+      })
+      .strict(),
+    /** Applied in order by {@link electHolder}. */
+    election: z.array(z.enum(ELECTION_RULES)).min(1),
+    /** A session alone in its coordination group holds the lane for itself. */
+    loneSessionHolds: z.boolean(),
+    /** What the holder announces to every sibling and the owner, e.g. `merge manager: <session id>`. */
+    announce: z.string().min(1),
+    /** The holder acknowledges each request, and posts a heartbeat, within this many minutes. */
+    heartbeatMinutes: z.number().int().min(1),
+    /** A session silent for longer than this is stalled: not a candidate, and its lane is vacant. */
+    stalledAfterMinutes: z.number().int().min(1),
+  })
+  .strict();
+export type LaneHolding = z.infer<typeof LaneHoldingSchema>;
+
+/** The live numbers {@link laneNeeded} reads; never stored. */
+export interface LaneReading {
+  /** Active sessions with ready PRs in the same repositories. */
+  activeSessions: number;
+  /** The most queued runs on any one of those repositories. */
+  queuedRuns: number;
+  /** Age of the oldest queued run, in minutes (0 with none queued). */
+  oldestQueuedMinutes: number;
+  /** Open PRs that conflict with or supersede another open PR. */
+  conflictingPrs: number;
+}
+
+/**
+ * Whether the lane is needed now: enough active sessions AND contention,
+ * where contention is either runner bound crossed or, if counted,
+ * conflicting PRs. When it is false the lane lapses and each session merges
+ * its own green PRs with the owner's approval.
+ */
+export function laneNeeded(holding: LaneHolding, r: LaneReading): boolean {
+  const w = holding.neededWhen;
+  if (r.activeSessions < w.minActiveSessions) return false;
+  return (
+    r.queuedRuns > w.maxQueuedRuns ||
+    r.oldestQueuedMinutes > w.maxOldestQueuedMinutes ||
+    (w.conflictsCount && r.conflictingPrs > 0)
+  );
+}
+
+/** One active session that could hold the lane. */
+export interface HolderCandidate {
+  sessionId: string;
+  /** ISO 8601 creation time, as `list_sessions` reports it. */
+  createdAt: string;
+  /** It owns a P0 PR: the fix for a red main, or a link of the re-pin chain. */
+  ownsP0: boolean;
+  /** Minutes since it last answered or posted a heartbeat; unknown counts as live. */
+  minutesSinceAnswer?: number;
+}
+
+/**
+ * Whether a session has stalled: silent for longer than the lane's stall
+ * window. Any agent may stall, the holder included (owner ruling,
+ * 2026-11-07); a sibling whose request goes unacknowledged that long treats
+ * the lane as vacant and re-elects without it.
+ */
+export function isStalled(holding: LaneHolding, minutesSinceAnswer: number | undefined): boolean {
+  return minutesSinceAnswer !== undefined && minutesSinceAnswer > holding.stalledAfterMinutes;
+}
+
+/**
+ * The session that holds the lane, chosen deterministically from the active
+ * candidates, or `undefined` with none. Stalled sessions are not
+ * candidates. A lone candidate holds it when `loneSessionHolds`; otherwise
+ * the election rules narrow the field in order and the session id breaks the
+ * last tie.
+ */
+export function electHolder(holding: LaneHolding, all: HolderCandidate[]): string | undefined {
+  const candidates = all.filter((c) => !isStalled(holding, c.minutesSinceAnswer));
+  if (candidates.length === 0) return undefined;
+  if (candidates.length === 1) return holding.loneSessionHolds ? candidates[0].sessionId : undefined;
+  let field = [...candidates];
+  for (const rule of holding.election) {
+    if (rule === "owns-p0") {
+      const p0 = field.filter((c) => c.ownsP0);
+      if (p0.length > 0) field = p0;
+    } else {
+      // An unreadable time sorts last rather than dropping the candidate.
+      const at = (c: HolderCandidate) => {
+        const t = Date.parse(c.createdAt);
+        return Number.isNaN(t) ? Infinity : t;
+      };
+      const first = Math.min(...field.map(at));
+      field = field.filter((c) => at(c) === first);
+    }
+  }
+  return field.map((c) => c.sessionId).sort()[0];
+}
+
 export const RoleDefSchema = z.object({
   // Declared in the Zod shape as well as the interface: a field TypeScript
   // accepts and Zod strips is written by an author, type-checks, and vanishes
@@ -507,6 +641,7 @@ export const RoleDefSchema = z.object({
   judgementOnly: z.boolean().optional(),
   requiredCapabilities: ModelCapabilitiesSchema.optional(),
   store: StoreDefSchema.optional(),
+  holding: LaneHoldingSchema.optional(),
   // STRICT: an unknown key is an ERROR, not something to drop quietly.
   //
   // `readRoleGraph` already refuses a bad `actorKinds` and a dangling
