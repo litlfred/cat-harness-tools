@@ -522,6 +522,10 @@ export const LaneHoldingSchema = z
     loneSessionHolds: z.boolean(),
     /** What the holder announces to every sibling and the owner, e.g. `merge manager: <session id>`. */
     announce: z.string().min(1),
+    /** The holder acknowledges each request, and posts a heartbeat, within this many minutes. */
+    heartbeatMinutes: z.number().int().min(1),
+    /** A session silent for longer than this is stalled: not a candidate, and its lane is vacant. */
+    stalledAfterMinutes: z.number().int().min(1),
   })
   .strict();
 export type LaneHolding = z.infer<typeof LaneHoldingSchema>;
@@ -561,15 +565,29 @@ export interface HolderCandidate {
   createdAt: string;
   /** It owns a P0 PR: the fix for a red main, or a link of the re-pin chain. */
   ownsP0: boolean;
+  /** Minutes since it last answered or posted a heartbeat; unknown counts as live. */
+  minutesSinceAnswer?: number;
+}
+
+/**
+ * Whether a session has stalled: silent for longer than the lane's stall
+ * window. Any agent may stall, the holder included (owner ruling,
+ * 2026-11-07); a sibling whose request goes unacknowledged that long treats
+ * the lane as vacant and re-elects without it.
+ */
+export function isStalled(holding: LaneHolding, minutesSinceAnswer: number | undefined): boolean {
+  return minutesSinceAnswer !== undefined && minutesSinceAnswer > holding.stalledAfterMinutes;
 }
 
 /**
  * The session that holds the lane, chosen deterministically from the active
- * candidates, or `undefined` with none. A lone candidate holds it when
- * `loneSessionHolds`; otherwise the election rules narrow the field in order
- * and the session id breaks the last tie.
+ * candidates, or `undefined` with none. Stalled sessions are not
+ * candidates. A lone candidate holds it when `loneSessionHolds`; otherwise
+ * the election rules narrow the field in order and the session id breaks the
+ * last tie.
  */
-export function electHolder(holding: LaneHolding, candidates: HolderCandidate[]): string | undefined {
+export function electHolder(holding: LaneHolding, all: HolderCandidate[]): string | undefined {
+  const candidates = all.filter((c) => !isStalled(holding, c.minutesSinceAnswer));
   if (candidates.length === 0) return undefined;
   if (candidates.length === 1) return holding.loneSessionHolds ? candidates[0].sessionId : undefined;
   let field = [...candidates];

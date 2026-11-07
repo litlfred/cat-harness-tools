@@ -35,6 +35,7 @@ import {
   LaneHoldingSchema,
   laneNeeded,
   electHolder,
+  isStalled,
 } from "./role-graph";
 
 import { requireHarnessRoot } from "../harness-root.ts";
@@ -580,6 +581,8 @@ describe("lane holding: when the lane is needed, and who holds it (owner rulings
     election: ["owns-p0", "earliest-created"],
     loneSessionHolds: true,
     announce: "merge manager: <session id>",
+    heartbeatMinutes: 10,
+    stalledAfterMinutes: 30,
   });
   const quiet = { activeSessions: 3, queuedRuns: 2, oldestQueuedMinutes: 5, conflictingPrs: 0 };
 
@@ -632,6 +635,23 @@ describe("lane holding: when the lane is needed, and who holds it (owner rulings
     expect(electHolder(holding, [a])).toBe("session_A");
     expect(electHolder({ ...holding, loneSessionHolds: false }, [a])).toBeUndefined();
     expect(electHolder(holding, [])).toBeUndefined();
+  });
+
+  test("a stalled session is never elected, even the P0 owner or the earliest", () => {
+    expect(isStalled(holding, 31)).toBe(true);
+    expect(isStalled(holding, 30)).toBe(false);
+    expect(isStalled(holding, undefined)).toBe(false);
+    expect(electHolder(holding, [a, b, { ...c, minutesSinceAnswer: 45 }])).toBe("session_B");
+    expect(electHolder(holding, [a, { ...b, minutesSinceAnswer: 31 }])).toBe("session_A");
+  });
+
+  test("a lone session that has stalled holds nothing: the lane is vacant", () => {
+    expect(electHolder(holding, [{ ...a, minutesSinceAnswer: 90 }])).toBeUndefined();
+  });
+
+  test("the stall and heartbeat windows are required", () => {
+    const { heartbeatMinutes: _h, ...noHeartbeat } = holding;
+    expect(LaneHoldingSchema.safeParse(noHeartbeat).success).toBe(false);
   });
 
   test("an unreadable creation time sorts last rather than dropping the candidate", () => {
