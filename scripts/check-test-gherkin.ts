@@ -28,6 +28,7 @@
  *
  * Exit: 0 every test and Scenario linked, 1 an orphan either way, 2 could not check.
  *
+ * @covers code — the tests and `.feature` files under `--root`, read by each language adapter
  * @module scripts/check-test-gherkin
  */
 import { execFileSync } from "node:child_process";
