@@ -249,12 +249,52 @@ export function glossaryConsistencyMarkdown(rec: NonNullable<QaRecord["record"]>
   ];
   for (const [locale, f] of Object.entries(rec.families ?? {})) {
     const entries = (f.entries ?? []) as Array<Record<string, unknown>>;
-    lines.push(`${h}# ${locale}`, "", `${cell(f.summary)}. ${entries.length === 0 ? "No findings." : `${entries.length} finding(s):`}`, "");
-    if (!entries.length) continue;
-    lines.push("| rule | term | fixed (layer) | where | rendering |", "|---|---|---|---|---|");
-    for (const e of entries) {
+    const inSense = entries.filter((e) => e.rule === "not-fixed-rendering").length;
+    lines.push(
+      `${h}# ${locale}`,
+      "",
+      `${cell(f.summary)}. ${entries.length === 0 ? "No findings." : `${entries.length} finding(s), ${inSense} of them in-sense violation(s):`}`,
+      "",
+    );
+    if (entries.length) {
+      lines.push("| rule | term | fixed (layer) | where | rendering |", "|---|---|---|---|---|");
+      for (const e of entries) {
+        const rule = `\`${cell(e.rule)}\`${e.inSense ? ` (in sense by ${e.inSense === "rule" ? "rule" : "verdict"})` : ""}`;
+        lines.push(
+          `| ${rule} | ${cell(e.term)} | ${e.fixed ? `${cell(e.fixed)} (${cell(e.layer)})` : "—"} | ${e.catalogue ? `\`${cell(e.catalogue)}\`` : "—"} | ${cell(e.rendering)} |`,
+        );
+      }
+      lines.push("");
+    }
+    lines.push(...adjudicationMarkdown((f as GlossaryFamily).adjudication, `${h}##`));
+  }
+  return lines;
+}
+
+/** A glossary family's adjudication lists, as `translation:glossary` records them beside its findings. */
+interface GlossaryFamily extends QaFamily {
+  adjudication?: Partial<Record<"pending" | "otherSense" | "exceptions", Array<Record<string, unknown>>>>;
+}
+
+/**
+ * The uses of a term whose sense an adjudicator decides: pending (listed,
+ * failing nothing), ruled other-sense (not checked) and exceptions (in sense,
+ * the fixed translation ruled wrong there; passing).
+ */
+function adjudicationMarkdown(a: GlossaryFamily["adjudication"], h: string): string[] {
+  if (!a) return [];
+  const lines: string[] = [];
+  const parts: Array<[string, Array<Record<string, unknown>>, string]> = [
+    ["Exceptions", a.exceptions ?? [], "in sense, but the fixed translation was ruled wrong here; they pass"],
+    ["Pending adjudication", a.pending ?? [], "a term of another subject area, not yet ruled on; they fail nothing"],
+    ["Other sense", a.otherSense ?? [], "ruled another concept; not checked"],
+  ];
+  for (const [title, list, what] of parts) {
+    if (!list.length) continue;
+    lines.push(`${h} ${title}`, "", `${list.length} use(s): ${what}.`, "", "| term | fixed (layer) | where | sentence | ruling |", "|---|---|---|---|---|");
+    for (const o of list) {
       lines.push(
-        `| \`${cell(e.rule)}\` | ${cell(e.term)} | ${e.fixed ? `${cell(e.fixed)} (${cell(e.layer)})` : "—"} | ${e.catalogue ? `\`${cell(e.catalogue)}\`` : "—"} | ${cell(e.rendering)} |`,
+        `| ${cell(o.term)} | ${cell(o.fixed)} (${cell(o.layer)}) | \`${cell(o.catalogue)}\` | ${cell(String(o.msgid ?? "").slice(0, 120))} | ${o.reason ? `${cell(o.reason)} (${cell(o.decidedBy)})` : "—"} |`,
       );
     }
     lines.push("");
