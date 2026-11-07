@@ -21,10 +21,12 @@ Feature: Every published page has one path, computed from its case
     And with no subject, for the graph library, it is "/cat-harness/library/"
 
   @test:schemas/kg/url-space.test.ts::publishedPath:_the_three_cases::a_locale_leads_a_viewer_page,_and_only_a_viewer_page_(owner,_2026-10-20)
-  Scenario: A locale leads a viewer path
+  Scenario: A locale leads a viewer path, and only a viewer path
     When the published path of the cat-harness todos viewer in locale "en" is computed
     Then it is "/en/cat-harness/todos/"
     And an empty locale throws "not a path segment"
+    And a root or an instance location with a locale does not type-check
+    And with the locale forced past the type, the root's path is "/" and the instance's is "/bootstrap/bootstrap.jsonld", with no locale in either
 
   @test:schemas/kg/url-space.test.ts::publishedPath:_the_three_cases::with_a_locale,_the_viewer_case_is_visualiserRoute's_route:_two_resolvers,_one_answer
   Scenario: A localised viewer path equals the visualiser route
@@ -42,6 +44,7 @@ Feature: Every published page has one path, computed from its case
     Given the base "https://litlfred.github.io/folio-assistant/"
     Then the root under it is the base itself
     And bootstrap.jsonld of the instance bootstrap, under the base without its slash, is ".../folio-assistant/bootstrap/bootstrap.jsonld"
+    And index.html of the cat-harness todos viewer in locale "en", under the base with and without its slash, is ".../folio-assistant/en/cat-harness/todos/index.html"
 
   @test:schemas/kg/url-space.test.ts::publishedPath:_the_three_cases::a_segment_or_path_that_steps_outside_is_refused,_not_normalised
   Scenario: Segments and paths that step outside are refused

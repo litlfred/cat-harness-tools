@@ -69,7 +69,7 @@ Feature: A node's images come in layout variants, and a renderer can tell which 
     And their three text regions all differ
     And each has a positive width and height and a text region
 
-  @test:schemas/kg/kg-node.test.ts::this_instance's_own_declaration::the_laptop_backdrop_is_declared,_with_a_region_inside_the_cloud
+  @test:schemas/kg/kg-node.test.ts::this_instance's_own_declaration::the_laptop_backdrop_is_declared,_with_its_measured_text_region_pinned
   Scenario: The laptop backdrop's region is pinned
     Given this instance's declaration
     When the "laptop" layout of "landing" is picked
@@ -83,10 +83,10 @@ Feature: A node's images come in layout variants, and a renderer can tell which 
     And no single newline stands outside a blank-line pair
 
   @test:schemas/kg/kg-node.test.ts::the_description_survives_Jekyll's_markdown_renderer::the_last_rung's_leading_character_is_U+00A0,_not_a_space
-  Scenario: The c@t-harness rung starts with a no-break space
+  Scenario: The last rung, c@t-harness, starts with a no-break space
     Given this instance's declared description split into blocks
-    When the first block containing "c@t-harness" is found
-    Then it exists
+    When the last block is taken
+    Then it contains "c@t-harness"
     And it starts with U+00A0
 
   @test:schemas/kg/kg-node.test.ts::the_description_survives_Jekyll's_markdown_renderer::the_lead_block_comes_first,_since_typography_is_by_position

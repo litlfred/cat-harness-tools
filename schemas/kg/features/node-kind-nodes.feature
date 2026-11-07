@@ -11,10 +11,12 @@ Feature: A kind's nodes are the files in its typologies' directories whose $sche
     Then they are a filed under todo and deep/b filed under sub-todo, in that order
 
   @test:schemas/kg/node-kind-nodes.test.ts::nodesOfKind::an_earlier_minor_is_accepted;_another_major,_no_tag_and_a_plain_README_are_not_nodes
-  Scenario: Another major, no tag and a README are not nodes
+  Scenario: An earlier minor is a node; another major, no tag and a README are not
     Given items/ also holds c tagged todo/2.0.0, d with no $schema, and a README.md
+    And the kind sub-todo is at 1.2.0 while deep/b is tagged sub-todo/1.1.0
     When the nodes of "todo" are listed
-    Then none of c, d or README is among them
+    Then deep/b is among them, filed under sub-todo with its sub-todo/1.1.0 tag
+    And none of c, d or README is among them
 
   @test:schemas/kg/node-kind-nodes.test.ts::nodesOfKind::a_subclass's_own_page_does_not_include_its_parent's_nodes
   Scenario: A subclass's nodes do not include its parent's

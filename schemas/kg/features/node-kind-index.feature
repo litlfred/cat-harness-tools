@@ -37,10 +37,14 @@ Feature: Node kinds are indexed through the typologies, and unkinded families ar
     Then neither appears in the unkinded list
 
   @test:schemas/kg/node-kind-index.test.ts::nodeKindIndex::no_collisions_when_one_kind_is_reached_twice
-  Scenario: The index reports no collisions
-    Given the registry of widgets, solo and prose
+  Scenario: A kind reached twice is one entry and no collision
+    Given the registry of widgets, solo and prose, in which base/v1 is reached both as solo's validator and as child/v1's parent
     When the node kind index is built
-    Then its collisions are empty
+    Then base/v1 is one entry, held by solo, and child/v1's parent is base/v1
+    And its collisions are empty
+    And for a registry whose typologies left and right both name the Child kind as validator
+    Then child/v1 is one entry holding left and right
+    And that index's collisions are empty too
 
   @test:schemas/kg/node-kind-index.test.ts::the_ratchet::a_family_unkinded_now_and_absent_from_the_baseline_is_NEW
   Scenario: An unkinded family absent from the baseline is new

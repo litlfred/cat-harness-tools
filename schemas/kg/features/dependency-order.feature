@@ -10,11 +10,14 @@ Feature: Steps are ordered by what they need, and failures and conflicts are rep
     And the order is a, b, c
 
   @test:schemas/kg/dependency-order.test.ts::rule_1_—_a_node_runs_after_everything_it_needs::the_owner's_pipeline:_kg_→_readme_→_the_dynamic_renders
-  Scenario: The readme and the viewer run after the KG export
+  Scenario: The readme, the viewer and the visualisers run after the KG export
     Given steps kg-export, readme, kg-viewer and visualisers, the last three needing kg-export
     When they are flattened
-    Then readme comes after kg-export
+    Then there are no problems
+    And the order holds exactly those four steps
+    And readme comes after kg-export
     And kg-viewer comes after kg-export
+    And visualisers comes after kg-export
 
   @test:schemas/kg/dependency-order.test.ts::rule_2_—_ties_break_on_declaration_order::two_independent_steps_keep_the_order_they_were_declared_in
   Scenario: Independent steps keep their declaration order
@@ -26,7 +29,9 @@ Feature: Steps are ordered by what they need, and failures and conflicts are rep
   Scenario: Renaming a step does not move an unrelated sibling
     Given the independent steps a, m, z, and the same with m renamed m2
     When both are flattened
-    Then z has the same position in both orders
+    Then the orders are a, m, z and a, m2, z
+    And m2 holds the position m held
+    And with the renamed node left out, the two orders are identical
 
   @test:schemas/kg/dependency-order.test.ts::rule_3_—_a_cycle_is_reported,_never_broken::returns_no_order_at_all
   Scenario: A cycle yields no order and one problem
@@ -46,6 +51,7 @@ Feature: Steps are ordered by what they need, and failures and conflicts are rep
     Given an independent step ok beside a cycle between a and b
     When they are flattened
     Then the order is empty
+    And there is exactly one problem, a cycle naming a and b and not ok
 
   @test:schemas/kg/dependency-order.test.ts::rule_4_—_a_missing_dependency_is_reported,_never_dropped::is_a_problem,_and_the_step_is_not_silently_ordered
   Scenario: A missing dependency is a problem and nothing is ordered
@@ -58,7 +64,8 @@ Feature: Steps are ordered by what they need, and failures and conflicts are rep
   Scenario: A duplicate id is a problem
     Given two steps both with id a
     When they are flattened
-    Then the first problem is "duplicate"
+    Then the order is empty
+    And there is exactly one problem, a "duplicate" naming the id a
 
   @test:schemas/kg/dependency-order.test.ts::fatal_is_per_step::a_fatal_failure_stops_the_run
   Scenario: A fatal failure stops the run
