@@ -24,15 +24,19 @@ Feature: Detangling a view clears its crossings and writes back only what moved
     And the written-back XML has a "<bendpoint", and line "id-c1" reads back with bendpoints
 
   @test:archimate/scripts/detangle.test.ts::detangle::slides_a_box_into_free_space_inside_its_parent_to_clear_a_line,_never_out_of_it
-  Scenario: A box in a line's way is cleared without a swap, and a box never leaves its parent
+  Scenario: A box slides into free space to clear a line, and never out of its parent
     Given boxes a and b with a line between them, and a box m of a different size on the line
     And the view scores one line through a box
     When it is detangled in one pass
     Then no line runs through a box
-    And some change is a slide or a route, and none is a swap
-    And given three boxes in a row inside a group, with a line from the first to the last
+    And the only change is a slide of box a, and no line is re-routed
+    And box a, slid, overlaps no other box
+    Given boxes a, m and b in a row inside a group with room below them, m of a different size and on the line from a to b
     When that view is detangled in one pass
-    Then every box of the group stays inside it
+    Then the only change is a slide of box a, no line runs through a box, a overlaps no other box, and every box of the group stays inside it
+    Given the same boxes in a group with no room inside it
+    When that view is detangled in one pass
+    Then no box slides, every box keeps its place, and every box of the group stays inside it
 
   @test:archimate/scripts/detangle.test.ts::detangle::leaves_a_clean_view_as_it_is
   Scenario: A clean view is left as it is

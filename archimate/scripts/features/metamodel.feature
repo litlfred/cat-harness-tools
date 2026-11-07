@@ -10,10 +10,13 @@ Feature: The metamodel a model uses is checked against ArchiMate's relationship 
     Then its ArchiMate version is "3.2", its source licence is "MIT", and key "r" is "RealizationRelationship"
 
   @test:archimate/scripts/metamodel.test.ts::the_relationship_table::is_checked_by_its_own_schema,_the_validator_of_its_$schema_family
-  Scenario: The table passes its own schema, and a wrong key name does not
-    When the relationship table is checked by the relationship-table schema
+  Scenario: The table passes its own schema, the one its $schema family's validator names
+    Given the relationship table, whose $schema is "archimate-relationship-table/v1"
+    When it is checked by the relationship-table schema
     Then it passes
     And the table with key "r" renamed "Realization" fails
+    And the table with $schema "archimate-relationship-table/v2" fails
+    And cat-harness's validator node "archimate-relationship-table" validates kind "schemas", family the table's $schema, with the schema "cat-harness-tools:archimate/schemas/metamodel.ts#RelationshipTableSchema"
 
   @test:archimate/scripts/metamodel.test.ts::the_relationship_table::allows,_refuses,_and_does_not_guess
   Scenario: A relationship is allowed, refused, or unknown
@@ -52,6 +55,9 @@ Feature: The metamodel a model uses is checked against ArchiMate's relationship 
     And the service to component edge carries its label, categories, layers and a vee arrowhead
     When it is drawn as Mermaid
     Then it is a class diagram with "ApplicationComponent ..> DataObject : accesses ×1"
+    And the DOT lines are exactly access of the data object, serving of the component, and "✗ serves ×1" from the data object to the goal
+    And each DOT line is a Mermaid line with the same source, target and label
+    And the red colour is on the data object to goal line only
 
   @test:archimate/scripts/metamodel.test.ts::the_metamodel_in_use::keeps_the_picture_readable:_one_line_per_pair,_self-relationships_in_the_box,_no_associations_or_groupings
   Scenario: The drawing has one line per pair, self-relationships in the box, and no associations or groupings
@@ -66,7 +72,10 @@ Feature: The metamodel a model uses is checked against ArchiMate's relationship 
     And the SVG of one of two categories is "metamodel.dependency.svg", and of both is "metamodel.svg"
 
   @test:archimate/scripts/metamodel.test.ts::the_metamodel_in_use::reports_in_plain_text,_the_refusal_first
-  Scenario: The plain-text report names the refusal and the placeholders
+  Scenario: The plain-text report names the refusal first, then the placeholders
     Given the same model's metamodel
     When it is reported
     Then the text contains "✗ 1 relationship(s) in 1 pattern(s) ArchiMate does not allow", "Data Object serves Goal ×1: id-r3" and "2 placeholder element(s)"
+    And its first line is the heading "1.0.0 (Tiny): …"
+    And the second and third lines are the refusal and its pattern "Data Object serves Goal ×1: id-r3"
+    And the placeholders follow on the fourth line
