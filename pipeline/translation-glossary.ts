@@ -481,7 +481,7 @@ export function uses(term: string, msgid: string): boolean {
   return new RegExp(`(?<![A-Za-z0-9_\\-/.@])${esc}(?![A-Za-z0-9_\\-/@]|\\.\\w)`, flags).test(clean);
 }
 
-/** A token that is a name, not prose: Capitalised, ALL-CAPS, or an identifier (`Provenance.agent`, `smart-trust-phw`). */
+/** A token that is a name, not prose: Capitalised, ALL-CAPS, or an identifier (`Provenance.agent`, `my-ig-repo`). */
 const NAME_TOKEN = /^(?:[A-Z][\p{L}\p{N}]*|[\p{L}\p{N}]+(?:[._:/-][\p{L}\p{N}]+)+)$/u;
 /** An identifier: a name with a separator inside it — code, a path, a repository. */
 const IDENTIFIER = /^[\p{L}\p{N}]+(?:[._:/-][\p{L}\p{N}]+)+$/u;
