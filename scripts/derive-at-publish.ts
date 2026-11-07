@@ -82,11 +82,14 @@
 import { spawn, spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 
 import { judge, readTree, renderingOrder, trackedIn, type PublishArtefact } from "./check-derived-from.ts";
 import { readInstances } from "./check-import-direction.ts";
 import { readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { DEFAULT_LOCALE } from "../schemas/content/translation.ts";
+import { discoverTools } from "../tools/discover.ts";
+import { declaredVisualisers, siteOwnerDir, visualiserPageDir } from "./viewer-declarations.ts";
 import { flattenDependencies } from "../schemas/kg/dependency-order.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { NOT_APPLICABLE_EXIT, NOT_APPLICABLE_REASON_ENV } from "./lib/not-applicable.ts";
@@ -162,6 +165,14 @@ export interface DeclaredArtefact {
   fills?: readonly string[];
   /** A whole-corpus index: a `preview` build puts back main's copy rather than running its writer (`lib/build-type.ts`). */
   index?: true;
+  /**
+   * Derived from a visualiser's `builtOnHostSite` for a translated locale
+   * ({@link hostSiteArtefacts}): the writer writes it only when that locale
+   * holds strings for it, so an absent route is not a missing output.
+   */
+  optional?: true;
+  /** The harness whose `builtOnHostSite` visualiser this route was derived from ({@link hostSiteArtefacts}). */
+  hostSiteOf?: string;
 }
 
 /**
@@ -206,6 +217,99 @@ export function declaredPlan(repoRoot = REPO_ROOT, cause?: "checkout" | "state")
         ...(e.reads?.length ? { reads: e.reads } : {}),
         ...(fills.length ? { fills } : {}),
         ...(e.index === true ? { index: true as const } : {}),
+      });
+    }
+  }
+  return withHostSiteArtefacts(out, hostSiteArtefacts(repoRoot, out, cause));
+}
+
+/**
+ * `declared` with the host-site routes placed in the host's writer order: a
+ * harness's host-site viewers run together, in the order it declares them,
+ * at the place the first one already holds. Each route goes after the host's
+ * last entry of its own writer; failing that, after the last route placed for
+ * the same harness; failing both, at the end. Placed this way, deriving the
+ * routes the host used to list leaves the writer order unchanged.
+ */
+export function withHostSiteArtefacts(declared: readonly DeclaredArtefact[], derived: readonly DeclaredArtefact[]): DeclaredArtefact[] {
+  const out = [...declared];
+  const lastOf = new Map<string, number>();
+  for (const d of derived) {
+    let at = -1;
+    for (let k = out.length - 1; k >= 0; k--) {
+      if (out[k]!.instance === d.instance && out[k]!.writer.includes(d.writer[0]!)) {
+        at = k;
+        break;
+      }
+    }
+    if (at < 0) at = lastOf.get(d.hostSiteOf ?? "") ?? out.length - 1;
+    out.splice(at + 1, 0, d);
+    for (const [h, k] of lastOf) if (k > at) lastOf.set(h, k + 1);
+    lastOf.set(d.hostSiteOf ?? "", at + 1);
+  }
+  return out;
+}
+
+/** The locale directories every instance's `translation-sources` directory holds, the page locale aside. */
+export function translatedLocales(repoRoot = REPO_ROOT): string[] {
+  const out = new Set<string>();
+  for (const i of readInstances(repoRoot)) {
+    const decl = readDeclaration(i.root) as { directories?: Array<{ path: string; graphTypologies?: string[] }> } | undefined;
+    for (const d of decl?.directories ?? []) {
+      if (!(d.graphTypologies ?? []).includes("translation-sources")) continue;
+      const dir = join(i.root, d.path);
+      if (!existsSync(dir)) continue;
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        if (e.isDirectory() && /^[a-z]{2,3}(?:-[A-Za-z0-9]+)*$/.test(e.name) && e.name !== DEFAULT_LOCALE) out.add(e.name);
+      }
+    }
+  }
+  return [...out].sort();
+}
+
+/**
+ * The routes visualisers build on the HOST site (`builtOnHostSite`; bean
+ * folio-assistant-uldr, owner option "1", 2026-11-06), as plan entries of the
+ * host instance, so the host lists none of them. One per locale the viewer
+ * writes: the page locale, and with `translated` each locale of
+ * {@link translatedLocales}. The writer is the `renderedBy` Tool's
+ * `invoke.shell` script; a Tool that does not resolve to one is refused, not
+ * guessed. A route an entry already declares (itself or a parent) is left to
+ * that entry. Each route counts as an index when every declared entry of its
+ * writer does, so a preview borrows it with the rest of that writer's output.
+ */
+export function hostSiteArtefacts(repoRoot = REPO_ROOT, declared: readonly DeclaredArtefact[] = [], cause?: "checkout" | "state"): DeclaredArtefact[] {
+  if (cause === "state") return [];
+  const vis = declaredVisualisers(repoRoot).filter((v) => (v as { builtOnHostSite?: unknown }).builtOnHostSite !== undefined);
+  if (vis.length === 0) return [];
+  const site = siteOwnerDir(repoRoot);
+  const host = readInstances(repoRoot).find((i) => (resolve(site) + sep).startsWith(resolve(i.root) + sep));
+  if (host === undefined) throw new Error(`derive:publish: no instance holds the host site ${site}`);
+  const covered = (abs: string) => declared.some((a) => (a.path.endsWith("/") ? (resolve(abs) + sep).startsWith(resolve(a.abs) + sep) : resolve(abs) === resolve(a.abs)));
+  let translated: string[] | undefined;
+  const out: DeclaredArtefact[] = [];
+  for (const v of vis) {
+    const tool = discoverTools(repoRoot, undefined, v.harnessRoot).tools.find((t) => t.id === v.renderedBy);
+    const shell = (tool as { invoke?: { shell?: string } } | undefined)?.invoke?.shell;
+    const writer = /^bun run (?:cat )?(\S+)$/.exec(shell?.trim() ?? "")?.[1];
+    if (writer === undefined) {
+      throw new Error(`derive:publish: visualiser ${v.harness}/${v.id} is builtOnHostSite, but its Tool ${v.renderedBy} has no \`bun run cat <script>\` invoke.shell (got ${JSON.stringify(shell)})`);
+    }
+    const mine = declared.filter((a) => a.writer.includes(writer));
+    const index = mine.length > 0 && mine.every((a) => a.index === true);
+    const locales = [DEFAULT_LOCALE as string, ...((v as { builtOnHostSite?: { translated?: true } }).builtOnHostSite?.translated ? (translated ??= translatedLocales(repoRoot)) : [])];
+    for (const locale of locales) {
+      const abs = visualiserPageDir(site, { locale, harness: v.harness, visualiser: v.id });
+      if (covered(abs)) continue;
+      out.push({
+        instance: host.name,
+        abs: abs + "/",
+        path: relative(host.root, abs).split(sep).join("/") + "/",
+        writer: [writer],
+        because: "checkout",
+        ...(index ? { index: true as const } : {}),
+        ...(locale !== DEFAULT_LOCALE ? { optional: true as const } : {}),
+        hostSiteOf: v.harness,
       });
     }
   }

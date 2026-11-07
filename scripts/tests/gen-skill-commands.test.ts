@@ -12,7 +12,16 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { REPO_ROOT, commandText, isGenerated, packagesFor, reconcile, write } from "../gen-skill-commands.ts";
+import {
+  REPO_ROOT,
+  commandText,
+  isGenerated,
+  isMountedInstance,
+  packagesFor,
+  reconcile,
+  runSkillCommands,
+  write,
+} from "../gen-skill-commands.ts";
 import { userInvocableSkills } from "../../src/tools/skill-prompts.ts";
 
 const made: string[] = [];
@@ -136,6 +145,91 @@ describe("instance vs index scope (bean t5zb)", () => {
     expect(Object.keys(pkgs)).toEqual(["child-pkg"]);
     expect(write(child)).toEqual([join(".claude", "commands", "c.md")]);
     expect(reconcile(child).findings).toEqual([]);
+  });
+
+  test("mounted layers are never written into; stale committed commands are reported naming the layer (bean bx4c)", () => {
+    const indexRoot = mkdtempSync(join(tmpdir(), "skill-mounted-"));
+    made.push(indexRoot);
+    const mountedDir = join(indexRoot, "mounted-layer");
+    mkdirSync(join(mountedDir, "skills", "mounted-pkg"), { recursive: true });
+    mkdirSync(join(mountedDir, ".claude", "commands"), { recursive: true });
+    writeFileSync(
+      join(mountedDir, "mounted-layer.json"),
+      JSON.stringify({
+        $schema: "cat-harness-declaration/1.0.0",
+        name: "mounted-layer",
+        directories: [{ id: "skills", path: "skills", graphTypologies: ["skills"] }],
+      }),
+    );
+    writeFileSync(join(mountedDir, "skills", "mounted-pkg", "m.md"), skill("m", true));
+    const staleCmd = [
+      "---",
+      'description: "outdated description"',
+      'argument-hint: "[what to run it on]"',
+      "generated: cat-harness-tools/scripts/gen-skill-commands.ts",
+      "---",
+      "",
+      "# /m",
+      "",
+      "stale body",
+      "",
+    ].join("\n");
+    const mountedCmdPath = join(mountedDir, ".claude", "commands", "m.md");
+    writeFileSync(mountedCmdPath, staleCmd);
+
+    writeFileSync(
+      join(indexRoot, "index.config.json"),
+      JSON.stringify({
+        $schema: "folio-index-config/v1",
+        instances: [
+          {
+            name: "mounted-layer",
+            source: { remote: { repository: "o/mounted-layer", ref: "a".repeat(40) } },
+          },
+        ],
+      }),
+    );
+    writeFileSync(
+      join(indexRoot, "index.lock.json"),
+      JSON.stringify({
+        $schema: "cat-harness-mount-lock/v1",
+        mounts: [{ harness: "mounted-layer", repository: "o/mounted-layer", ref: "a".repeat(40) }],
+        instances: [
+          {
+            instance: "mounted-layer",
+            repository: "o/mounted-layer",
+            sha: "a".repeat(40),
+            upstreamRoot: "",
+            path: "mounted-layer",
+            via: "mounted-layer",
+            pinnedBy: "declared",
+            declaration: { file: "mounted-layer.json", sha256: "0".repeat(64) },
+            directories: [{ id: "*", path: "mounted-layer", upstreamPath: ".", treeDigest: "0".repeat(64), files: 2 }],
+            trust: { basis: "consent", by: "test", on: "2026-11-05", ref: "a".repeat(40), approver: "declared" },
+          },
+        ],
+      }),
+    );
+
+    expect(isMountedInstance(mountedDir, indexRoot)).toBe(true);
+    expect(isMountedInstance(indexRoot, indexRoot)).toBe(false);
+
+    // Direct write() on a mounted layer is a no-op.
+    expect(write(mountedDir)).toEqual([]);
+    expect(readFileSync(mountedCmdPath, "utf8")).toBe(staleCmd);
+
+    // Running over the index checkout writes the index's own command surface,
+    // leaves the mounted layer untouched, and reports the stale committed
+    // surface naming the mounted layer.
+    const r = runSkillCommands({ baseRoot: indexRoot, check: false });
+    expect(existsSync(join(indexRoot, ".claude", "commands", "m.md"))).toBe(true);
+    expect(readFileSync(mountedCmdPath, "utf8")).toBe(staleCmd);
+    expect(r.ok).toBe(false);
+    expect(r.mountedBad).toBe(1);
+    expect(r.mountedFindings).toHaveLength(1);
+    expect(r.mountedFindings[0]).toContain("mounted-layer");
+    expect(r.mountedFindings[0]).toContain(".claude/commands/m.md");
+    expect(r.mountedFindings[0]).toContain("not rewritten");
   });
 });
 
