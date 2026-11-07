@@ -96,6 +96,54 @@ describe("language adapters", () => {
     expect(JS_ADAPTER.matches("a/b.ts")).toBe(false);
   });
 
+  test("js: a regex literal holding a quote or backtick opens no string", () => {
+    const src = [
+      "const name = (r: string) => /`([^`]+)`/.exec(r)![1];",
+      "const spec = /from\\s*[\"']([^\"']+)[\"']/g;",
+      'describe("after the regexes", () => {',
+      '  test("first", () => {});',
+      "});",
+      "const mounted = true;",
+      'describe.skipIf(!mounted)("a skipIf scope", () => {',
+      '  test("second", () => {});',
+      "});",
+    ].join("\n");
+    expect(names(JS_ADAPTER.findTests("r.test.ts", src))).toEqual([
+      "r.test.ts::after_the_regexes::first",
+      "r.test.ts::a_skipIf_scope::second",
+    ]);
+  });
+
+  test("js: a template nested in a template's ${} does not close it; id[${key}] is a fixed name", () => {
+    const src = [
+      "const conn = (label: string) => `<g>${label ? `<text>${label}</text>` : \"\"}</g>`;",
+      'describe("after a nested template", () => {',
+      '  test("found", () => {});',
+      "});",
+      'describe("a second top-level scope", () => {',
+      "  test(`looped[${key}]`, () => {});",
+      "  describe(key, () => { test(`inLoop[${key}]`, () => {}); test(`case ${key}`, () => {}); });",
+      "});",
+    ].join("\n");
+    const found = JS_ADAPTER.findTests("t.test.ts", src);
+    expect(found.map((t) => [t.name, t.dynamic ?? false])).toEqual([
+      ["t.test.ts::after_a_nested_template::found", false],
+      ["t.test.ts::a_second_top-level_scope::looped[${key}]", false],
+      ["t.test.ts::a_second_top-level_scope::inLoop[${key}]", false],
+      ["t.test.ts::a_second_top-level_scope::<computed>::<computed_at_line_7>", true],
+    ]);
+  });
+
+  test("js: a block comment mentioning a /* glob still closes", () => {
+    const src = ["/** loads `schemas/**` and `x/*.ts` */", 'test("after the comment", () => {});'].join("\n");
+    expect(names(JS_ADAPTER.findTests("c.test.ts", src))).toEqual(["c.test.ts::after_the_comment"]);
+  });
+
+  test("js: a division is not read as a regex literal", () => {
+    const src = ["const half = total / 2; const q = a / b / c;", 'test("after division", () => {});'].join("\n");
+    expect(names(JS_ADAPTER.findTests("d.test.ts", src))).toEqual(["d.test.ts::after_division"]);
+  });
+
   test("js: a test with a computed title is found and reported, never dropped", () => {
     const src = [
       'for (const [name] of cases) {',
