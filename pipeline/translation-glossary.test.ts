@@ -16,6 +16,7 @@ import {
   checkLocale,
   glossaryResult,
   glossarySources,
+  readSchemeScope,
   renders,
   termBase,
   uses,
@@ -82,23 +83,40 @@ describe("termBase — the lower layer fixes, a higher one may only add", () => 
     { layer: "app", file: mine, reference: false },
   ];
 
-  test("the first layer's translation wins; empty, localised and long labels fix nothing", () => {
+  const get = (tb: ReturnType<typeof termBase>, label: string) => [...tb.terms.values()].filter((t) => t.term.toLowerCase() === label);
+
+  test("each term binds in its scheme when no subject is declared; empty, localised and long labels fix nothing", () => {
     const tb = termBase("app", "fr", src());
-    expect(tb.terms.get("actor")).toMatchObject({ fixed: "Acteur", layer: "core", inScope: false });
-    expect(tb.terms.get("health worker")).toMatchObject({ fixed: "Agent de santé", layer: "app", inScope: true });
-    expect(tb.terms.get("immunization")).toMatchObject({ layer: "who", inScope: true });
-    expect(tb.terms.has("localised")).toBe(false);
-    expect(tb.terms.has("empty")).toBe(false);
-    expect([...tb.terms.keys()].some((k) => k.startsWith("a long label"))).toBe(false);
+    expect(get(tb, "actor").map((t) => [t.scope, t.fixed, t.inScope])).toEqual([
+      ["core--terms", "Acteur", false],
+      ["app--terms", "Intervenant", true],
+    ]);
+    expect(get(tb, "health worker")[0]).toMatchObject({ fixed: "Agent de santé", layer: "app", inScope: true });
+    expect(get(tb, "immunization")[0]).toMatchObject({ layer: "who", scope: "reference:who", inScope: true });
+    expect(get(tb, "localised")).toEqual([]);
+    expect(get(tb, "empty")).toEqual([]);
+    expect([...tb.terms.values()].some((t) => t.term.startsWith("A long label"))).toBe(false);
   });
-  test("changing a term another domain fixed is a sense check, not an override", () => {
+  test("the instance translating another area's label otherwise is a sense check, not an override", () => {
     const tb = termBase("app", "fr", src());
     expect(tb.overrides).toEqual([]);
-    expect(tb.senseOverrides.map((o) => `${o.term}:${o.fixed.layer}->${o.layer}`)).toEqual(["Actor:core->app", "Skill:core->app"]);
+    expect(tb.senseOverrides.map((o) => `${o.term}:${o.fixed.scope}->${o.layer}`)).toEqual(["Actor:core--terms->app", "Skill:core--terms->app"]);
   });
-  test("changing an in-scope fixed term is an override", () => {
-    const tb = termBase("core", "fr", src()); // checking `core`: its own scheme binds it
-    expect(tb.overrides.map((o) => `${o.term}:${o.fixed.layer}->${o.layer}`)).toEqual(["Actor:core->app", "Skill:core->app"]);
+  test("in ONE subject area the lower layer fixes, and a second translation is an override", () => {
+    const shared = (x: GlossarySource): GlossarySource => ({ ...x, scope: "harness-vocabulary" });
+    const tb = termBase("app", "fr", [shared(src()[1]!), shared(src()[2]!)]);
+    expect(get(tb, "actor").map((t) => t.fixed)).toEqual(["Acteur"]);
+    expect(tb.overrides.map((o) => `${o.term}:${o.fixed.layer}->${o.layer}`)).toEqual(["Actor:core->app"]);
+  });
+  test("a term's own subject overrides its scheme's; a term that is not authored fixes nothing", () => {
+    const s = { ...src()[1]!, scope: "harness-vocabulary", termScopes: new Map<string, string | null>([["actor", "digital-health-trust"], ["skill", null]]) };
+    const tb = termBase("app", "fr", [s]);
+    expect(get(tb, "actor")[0]!.scope).toBe("digital-health-trust");
+    expect(get(tb, "skill")).toEqual([]);
+  });
+  test("an instance binds in the subject areas it declares", () => {
+    const tb = termBase("app", "fr", [{ ...src()[1]!, scope: "digital-health-trust" }], new Set(["digital-health-trust"]));
+    expect(get(tb, "actor")[0]!.inScope).toBe(true);
   });
   test("a reference glossary binds every instance", () => {
     const tb = termBase("app", "fr", [
@@ -106,6 +124,56 @@ describe("termBase — the lower layer fixes, a higher one may only add", () => 
       { layer: "app", file: w("tb/mine2/fr/glossary.po", HEADER + plain("Immunization", "Immunisation")), reference: false },
     ]);
     expect(tb.overrides.map((o) => o.term)).toEqual(["Immunization"]);
+  });
+});
+
+describe("subject areas are read from the glossary each scheme catalogue names", () => {
+  test("readSchemeScope: the scheme's subject, a term's own, and non-authored terms", () => {
+    const f = w(
+      "scope/x.glossary.json",
+      JSON.stringify({
+        $schema: "folio-glossary/v1",
+        id: "terms",
+        title: "T",
+        subject: "harness-vocabulary",
+        terms: [
+          { id: "actor", prefLabel: "Actor", altLabel: ["Participant"], status: "authored", definition: "d" },
+          { id: "policy", prefLabel: { en: "Policy" }, subject: "digital-health-trust", status: "authored", definition: "d" },
+          { id: "draft", prefLabel: "Draft", status: "candidate" },
+        ],
+      }),
+    );
+    const sc = readSchemeScope(f)!;
+    expect(sc.subject).toBe("harness-vocabulary");
+    expect(sc.terms.get("policy")).toBe("digital-health-trust");
+    expect(sc.terms.get("draft")).toBeNull();
+    expect(sc.terms.has("actor")).toBe(false); // the scheme's subject applies
+    expect(readSchemeScope(w("scope/not.json", "{}"))).toBeUndefined();
+  });
+  test("glossarySources finds the glossary from the catalogue's #: reference", () => {
+    const root = join(base, "scoped");
+    mkdirSync(join(root, "glossary"), { recursive: true });
+    mkdirSync(join(root, "translations", "fr", "glossary"), { recursive: true });
+    writeFileSync(
+      join(root, "acme.json"),
+      JSON.stringify({
+        name: "acme",
+        directories: [
+          { id: "translations", path: "translations/", graphTypologies: ["translation-sources"] },
+          { id: "glossary", path: "glossary/", graphTypologies: ["glossary"] },
+        ],
+      }),
+    );
+    writeFileSync(
+      join(root, "glossary", "health.glossary.json"),
+      JSON.stringify({ $schema: "folio-glossary/v1", id: "health", title: "H", subject: "who-health-guidance", terms: [{ id: "hw", prefLabel: "Health worker", status: "authored", definition: "d" }] }),
+    );
+    writeFileSync(
+      join(root, "translations", "fr", "glossary", "acme--health.po"),
+      HEADER + `\n#: glossary/health.glossary.json:1\n#. Glossary term label: https://example.org/t/hw\nmsgid "Health worker"\nmsgstr "Agent de santé"\n`,
+    );
+    const src = glossarySources(root, "fr").find((x) => x.file.endsWith("acme--health.po"))!;
+    expect(src.scope).toBe("who-health-guidance");
   });
 });
 

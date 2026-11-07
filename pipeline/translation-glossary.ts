@@ -32,18 +32,26 @@
  * not a sentence) under 60 characters, with a non-empty msgstr, not marked
  * `#, localised` (which says the term is localised, not how) and not fuzzy.
  *
- * ## Scope: a fixed term binds only content of its own domain
+ * ## Scope: a fixed term binds only within its subject area
  *
  * The platform's terms (bootstrap's Reference, Actor, Skill; cat-harness's
- * policy) carry no sense or scope, so applying them as fixed translations to
- * health content gives wrong answers — "Reference Architecture", IHE "actors",
- * health "policy". The glossary schema (`folio-glossary/v1`) has no
- * machine-readable scope: `scopeNote` is free text (3 terms in the index use
- * it), so it cannot decide a match. Until the owner picks a schema option, the
- * one structural scope is the SCHEME, and a term binds the instance's
- * catalogues when its scheme is the instance's own, or it came from a
- * `--layer` reference glossary. Any other match is a SENSE CHECK note: printed,
- * recorded in the summary, never a violation.
+ * policy) carry no sense of their own, so applying them as fixed translations
+ * to health content gives wrong answers — FHIR `Reference(...)`, IHE "actors",
+ * health "policy" (政策, not the harness's 策略). The owner chose "scoped fixed
+ * terms" (`folio-glossary/v1`, folio-assistant-core #663): a scheme, or a
+ * term, declares the subject area its translations bind in (`subject`,
+ * `dcterms:subject`); a term's own overrides its scheme's; with neither, the
+ * term binds only in its own scheme (`<instance>--<scheme id>`). Only
+ * `authored` terms fix anything. `scopeNote` is prose and is never compared.
+ * The glossary is read as data from the file each scheme catalogue's `#:`
+ * names, since its schema belongs to the content core above this layer.
+ *
+ * Precedence applies within one subject area. A term binds the instance's
+ * catalogues when its area is one of the instance's own (its glossaries'
+ * subjects and schemes, its terminology file), or it came from a `--layer`
+ * reference glossary, whose area is every area. A label that matches a term of
+ * another area is a SENSE CHECK note for a person: printed, counted in the
+ * summary, never a violation.
  *
  * ## What is flagged, per locale
  *
@@ -53,8 +61,9 @@
  *   word stem (ru, ar, fr, es) or substring (zh, ar), as the prior art did.
  * - `inconsistent`: a term that two or more of the instance's entries — whose
  *   whole msgid is the term — render differently in one locale.
- * - `override`: a higher layer whose glossary gives an in-scope fixed term a
- *   different translation. An out-of-scope one is a sense check.
+ * - `override`: a second, different translation of a fixed term in the SAME
+ *   subject area (or of a reference glossary's term). The instance translating
+ *   another area's label otherwise is a sense check.
  *
  * Exit: 0 clean, 1 on findings, 2 when it cannot determine (no declared
  * `translation-sources`, an unknown locale). Without `--check` the result is
@@ -96,15 +105,37 @@ export interface GlossarySource {
   file: string;
   /** From `--layer`: normative, binds every catalogue of the instance. */
   reference: boolean;
+  /** The scheme's subject area (`dcterms:subject`), when its glossary declares one. */
+  scope?: string;
+  /** Per lower-cased label: the term's own subject, where it overrides the scheme's; `null` for a term that is not `authored`. */
+  termScopes?: Map<string, string | null>;
 }
 
-/** A fixed term: the first in-precedence translation of a label. */
+/**
+ * The subject area an entry of `s` binds in — `subjectOf(scheme, term)` of
+ * `folio-glossary/v1` (owner's choice, "scoped fixed terms", core #663): the
+ * term's `subject`, else its scheme's, else the scheme itself
+ * (`<instance>--<scheme id>`, the catalogue's own name). A reference glossary
+ * is its own area and binds everything; a terminology `glossary.po` is its
+ * layer's.
+ */
+export function scopeOf(s: GlossarySource, label: string): string {
+  if (s.reference) return `reference:${s.layer}`;
+  const own = s.termScopes?.get(label.toLowerCase());
+  if (typeof own === "string") return own;
+  if (s.scope !== undefined) return s.scope;
+  return basename(s.file) === "glossary.po" ? `${s.layer}--terminology` : basename(s.file).replace(/\.po$/, "");
+}
+
+/** A fixed term: the first in-precedence translation of a label in one subject area. */
 export interface FixedTerm {
   term: string;
   fixed: string;
   layer: string;
   file: string;
-  /** Whether it binds the checked instance's catalogues. */
+  /** The subject area it is fixed in. */
+  scope: string;
+  /** Whether it binds the checked instance's catalogues: a reference, or one of the instance's own areas. */
   inScope: boolean;
 }
 
@@ -118,10 +149,90 @@ export interface Override {
 }
 
 export interface TermBase {
+  /** Keyed by subject area and lower-cased label. */
   terms: Map<string, FixedTerm>;
+  /** A different translation of a fixed term IN ITS SUBJECT AREA: a violation. */
   overrides: Override[];
-  /** Out-of-scope overrides: a different sense, reported as a note. */
+  /** The same label translated otherwise in ANOTHER area, by the instance: a sense check. */
   senseOverrides: Override[];
+}
+
+/** One `folio-glossary/v1` file, as far as scope goes. */
+interface SchemeScope {
+  subject?: string;
+  terms: Map<string, string | null>;
+}
+
+const LANG_SOURCE = (t: unknown): string | undefined =>
+  typeof t === "string" ? t : t && typeof t === "object" ? ((t as Record<string, string>).en ?? Object.values(t as Record<string, string>)[0]) : undefined;
+
+/**
+ * Read a glossary file's subject areas: the scheme's `subject` and each term's
+ * own (by prefLabel and altLabel), and which terms are not `authored` (they fix
+ * nothing). Read as DATA — the schema is the content core's, above this layer.
+ */
+export function readSchemeScope(file: string): SchemeScope | undefined {
+  let g: { $schema?: string; subject?: unknown; terms?: Array<Record<string, unknown>> };
+  try {
+    g = JSON.parse(readFileSync(file, "utf-8"));
+  } catch {
+    return undefined;
+  }
+  if (g?.$schema !== "folio-glossary/v1") return undefined;
+  const terms = new Map<string, string | null>();
+  for (const t of g.terms ?? []) {
+    const value = t.status !== "authored" ? null : typeof t.subject === "string" ? t.subject : undefined;
+    for (const l of [LANG_SOURCE(t.prefLabel), ...((t.altLabel as string[] | undefined) ?? [])]) {
+      if (l && value !== undefined) terms.set(l.toLowerCase(), value);
+    }
+  }
+  return { ...(typeof g.subject === "string" ? { subject: g.subject } : {}), terms };
+}
+
+/** The glossary file a scheme catalogue was extracted from: its first `#:` reference, under one of `roots`. */
+function schemeFileOf(po: string, roots: readonly string[]): string | undefined {
+  const ref = parsePoEntries(readFileSync(po, "utf-8")).flatMap((e) => e.references)[0];
+  if (ref === undefined) return undefined;
+  const path = ref.split(/\s+/)[0]!.replace(/:\d+$/, "");
+  return roots.map((r) => join(r, path)).find((p) => existsSync(p));
+}
+
+/**
+ * Every subject area the instance's OWN content belongs to: its glossaries'
+ * scheme and term subjects (the scheme itself where none is declared), and its
+ * terminology file's.
+ */
+export function instanceScopes(instanceRoot: string, sources: readonly GlossarySource[] = []): Set<string> {
+  const self = readDeclaration(instanceRoot)?.name ?? basename(instanceRoot);
+  const out = new Set<string>([`${self}--terminology`]);
+  let dirs: string[] = [];
+  try {
+    const d = directoryForGraph(instanceRoot, "glossary");
+    if (d !== undefined) dirs = [d];
+  } catch {
+    // Two declared glossary directories: the catalogues below still say.
+  }
+  for (const d of dirs) {
+    if (!existsSync(d)) continue;
+    for (const f of readdirSync(d).filter((x) => x.endsWith(".glossary.json"))) {
+      const sc = readSchemeScope(join(d, f));
+      if (sc === undefined) continue;
+      let id: string | undefined;
+      try {
+        id = (JSON.parse(readFileSync(join(d, f), "utf-8")) as { id?: string }).id;
+      } catch {
+        id = undefined;
+      }
+      out.add(sc.subject ?? `${self}--${id}`);
+      for (const v of sc.terms.values()) if (v) out.add(v);
+    }
+  }
+  for (const s of sources) {
+    if (s.layer !== self || s.reference) continue;
+    out.add(s.scope ?? scopeOf(s, ""));
+    for (const v of s.termScopes?.values() ?? []) if (v) out.add(v);
+  }
+  return out;
 }
 
 // ── reading ─────────────────────────────────────────────────────
@@ -157,6 +268,8 @@ export function glossarySources(
   const self = readDeclaration(instanceRoot)?.name ?? basename(instanceRoot);
   const chain = declarationChain(instanceRoot).map((c) => ({ name: c.own ? self : c.name, root: c.root }));
   const rank = new Map(chain.map((c, i) => [c.name, i]));
+  // A `#:` reference names its glossary from the checkout, or from its layer.
+  const roots = [...new Set([...chain.map((c) => c.root), ...chain.map((c) => dirname(c.root))])];
   const ranked: Array<GlossarySource & { at: number; seq: number }> = [];
   let seq = 0;
   chain.forEach((c, at) => {
@@ -167,14 +280,25 @@ export function glossarySources(
       for (const f of readdirSync(schemes).filter((x) => x.endsWith(".po")).sort()) {
         const owner = /^(.+?)--/.exec(f)?.[1];
         const layer = owner !== undefined && rank.has(owner) ? owner : c.name;
-        ranked.push({ layer, file: join(schemes, f), reference: false, at: rank.get(layer) ?? at, seq: seq++ });
+        const file = join(schemes, f);
+        const json = schemeFileOf(file, roots);
+        const sc = json === undefined ? undefined : readSchemeScope(json);
+        ranked.push({
+          layer,
+          file,
+          reference: false,
+          ...(sc?.subject !== undefined ? { scope: sc.subject } : {}),
+          ...(sc !== undefined ? { termScopes: sc.terms } : {}),
+          at: rank.get(layer) ?? at,
+          seq: seq++,
+        });
       }
     }
     const terminology = join(dir, locale, "glossary.po");
     if (existsSync(terminology)) ranked.push({ layer: c.name, file: terminology, reference: false, at, seq: seq++ });
   });
   ranked.sort((a, b) => a.at - b.at || a.seq - b.seq);
-  for (const { layer, file, reference } of ranked) out.push({ layer, file, reference });
+  for (const { at: _at, seq: _seq, ...src } of ranked) out.push(src);
   return out;
 }
 
@@ -188,29 +312,44 @@ function expand(pattern: string): string[] {
 }
 
 /**
- * Merge the glossaries into one term base: the first translation of a label
- * wins; a later, different one is an override (in scope) or a sense note.
+ * Merge the glossaries into one term base, ONE SUBJECT AREA AT A TIME: in an
+ * area the first translation of a label wins and a later, different one is an
+ * override (a violation). The same label in another area is a different term;
+ * where the instance translates it otherwise, that is a sense-check note.
  */
-export function termBase(instance: string, locale: string, sources: readonly GlossarySource[]): TermBase {
+export function termBase(
+  instance: string,
+  locale: string,
+  sources: readonly GlossarySource[],
+  scopes: ReadonlySet<string> = new Set(),
+): TermBase {
   const terms = new Map<string, FixedTerm>();
   const overrides: Override[] = [];
   const senseOverrides: Override[] = [];
-  const binds = (s: GlossarySource) => s.reference || s.layer === instance;
+  const mine = new Set(scopes);
+  for (const s of sources) if (s.layer === instance && !s.reference) mine.add(s.scope ?? scopeOf(s, ""));
   for (const s of sources) {
     const terminology = basename(s.file) === "glossary.po";
     for (const e of parsePoEntries(readFileSync(s.file, "utf-8"))) {
       if (!e.msgstr.trim() || e.flags.includes("localised") || e.flags.includes("fuzzy") || !isLabel(e, terminology)) continue;
-      const k = e.msgid.toLowerCase();
+      if (s.termScopes?.get(e.msgid.toLowerCase()) === null) continue; // not an authored term
+      const scope = scopeOf(s, e.msgid);
+      const k = `${scope}\u0000${e.msgid.toLowerCase()}`;
       const have = terms.get(k);
       if (have === undefined) {
-        terms.set(k, { term: e.msgid, fixed: e.msgstr, layer: s.layer, file: s.file, inScope: binds(s) });
+        for (const other of terms.values()) {
+          if (other.scope === scope || other.term.toLowerCase() !== e.msgid.toLowerCase()) continue;
+          if (norm(other.fixed, locale) === norm(e.msgstr, locale)) continue;
+          const o = { term: e.msgid, fixed: other, rendering: e.msgstr, layer: s.layer, file: s.file };
+          // A reference glossary's area is every area: changing its term is an override.
+          if (other.scope.startsWith("reference:")) overrides.push(o);
+          else if (s.layer === instance) senseOverrides.push(o);
+        }
+        terms.set(k, { term: e.msgid, fixed: e.msgstr, layer: s.layer, file: s.file, scope, inScope: s.reference || mine.has(scope) });
         continue;
       }
-      if (have.layer === s.layer || norm(have.fixed, locale) === norm(e.msgstr, locale)) continue;
-      const o: Override = { term: e.msgid, fixed: have, rendering: e.msgstr, layer: s.layer, file: s.file };
-      // An override changes a fixed translation within ONE domain. The fixed
-      // term must bind the overriding layer's content for that to be the case.
-      (have.inScope || have.layer === s.layer ? overrides : senseOverrides).push(o);
+      if (norm(have.fixed, locale) === norm(e.msgstr, locale)) continue;
+      overrides.push({ term: e.msgid, fixed: have, rendering: e.msgstr, layer: s.layer, file: s.file });
     }
   }
   return { terms, overrides, senseOverrides };
@@ -303,7 +442,9 @@ export function checkLocale(
   sources?: readonly GlossarySource[],
 ): LocaleResult {
   const instance = readDeclaration(root)?.name ?? basename(root);
-  const base = termBase(instance, locale, sources ?? glossarySources(root, locale, references));
+  const srcs = sources ?? glossarySources(root, locale, references);
+  const base = termBase(instance, locale, srcs, instanceScopes(root, srcs));
+  const labels = new Set([...base.terms.values()].map((t) => t.term.toLowerCase()));
   const findings: GlossaryFinding[] = [];
   const sense: SenseNote[] = [];
   for (const o of base.overrides) {
@@ -314,6 +455,8 @@ export function checkLocale(
   }
   // Longest first, so "Health worker" is judged before "worker".
   const terms = [...base.terms.values()].sort((a, b) => b.term.length - a.term.length);
+  // A label that binds here in one area is not also a sense check from another.
+  const binding = new Set(terms.filter((t) => t.inScope).map((t) => t.term.toLowerCase()));
   const exact = new Map<string, Map<string, string[]>>();
   const files = catalogues(join(translations, locale));
   for (const po of files) {
@@ -321,7 +464,7 @@ export function checkLocale(
     for (const e of parsePoEntries(readFileSync(po, "utf-8"))) {
       if (!e.msgstr.trim() || e.flags.includes("fuzzy")) continue;
       const whole = e.msgid.trim().toLowerCase();
-      if (whole.length < MAX_TERM && (base.terms.has(whole) || basename(po) === "glossary.po" || isLabel(e, false))) {
+      if (whole.length < MAX_TERM && (labels.has(whole) || basename(po) === "glossary.po" || isLabel(e, false))) {
         const r = exact.get(whole) ?? new Map<string, string[]>();
         const n = norm(e.msgstr.trim(), locale);
         r.set(n, [...(r.get(n) ?? []), `${rel}: ${e.msgstr.trim()}`]);
@@ -331,13 +474,13 @@ export function checkLocale(
         if (!uses(t.term, e.msgid) || renders(t.fixed, e.msgstr, locale)) continue;
         if (t.file === po) continue; // the glossary entry itself
         if (t.inScope) findings.push({ rule: "not-fixed-rendering", term: t.term, fixed: t.fixed, layer: t.layer, catalogue: rel, msgid: e.msgid, rendering: e.msgstr });
-        else sense.push({ term: t.term, fixed: t.fixed, layer: t.layer, catalogue: rel, msgid: e.msgid });
+        else if (!binding.has(t.term.toLowerCase())) sense.push({ term: t.term, fixed: t.fixed, layer: t.layer, catalogue: rel, msgid: e.msgid });
       }
     }
   }
   for (const [term, renderings] of exact) {
     if (renderings.size < 2) continue;
-    findings.push({ rule: "inconsistent", term: base.terms.get(term)?.term ?? term, rendering: [...renderings.values()].map((v) => v[0]!) });
+    findings.push({ rule: "inconsistent", term: [...base.terms.values()].find((t) => t.term.toLowerCase() === term)?.term ?? term, rendering: [...renderings.values()].map((v) => v[0]!) });
   }
   return { locale, fixedTerms: base.terms.size, catalogues: files.length, findings, sense };
 }
