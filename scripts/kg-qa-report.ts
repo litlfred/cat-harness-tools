@@ -6,7 +6,7 @@
  * Owner, 2026-11-06: *"QA report should link to harness QA reports = FHIR QA
  * reports + KG QA"*. The FHIR half is the layer that builds an IG's; this
  * module is the other half, and knows nothing of FHIR or of any IG. A layer
- * above composes the two into one page (fhir-harness `ig-qa-page.ts`).
+ * above composes the two into one page (an IG layer's QA page).
  *
  * Two sources, both read off declarations, never a path:
  *
@@ -144,7 +144,7 @@ export function copyKgQaRecords(report: KgQaReport, site: string, assets: string
 
 const cell = (v: unknown): string => {
   const s = typeof v === "string" ? v : v === undefined || v === null ? "" : JSON.stringify(v);
-  return s.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+  return s.replace(/[\\|]/g, "\\$&").replace(/\r?\n/g, " ");
 };
 
 /** A record's findings, as the sum of its families when it gives no total. */
