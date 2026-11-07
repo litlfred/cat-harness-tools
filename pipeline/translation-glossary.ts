@@ -170,6 +170,8 @@ const LANG_SOURCE = (t: unknown): string | undefined =>
  * Read a glossary file's subject areas: the scheme's `subject` and each term's
  * own (by prefLabel and altLabel), and which terms are not `authored` (they fix
  * nothing). Read as DATA — the schema belongs to a layer above this one.
+ * A JSON Schema that publishes its terms in `$defs` and a top-level `subject`
+ * is read the same way: that subject, for every term.
  */
 export function readSchemeScope(file: string): SchemeScope | undefined {
   let g: { $schema?: string; subject?: unknown; terms?: Array<Record<string, unknown>> };
@@ -178,7 +180,17 @@ export function readSchemeScope(file: string): SchemeScope | undefined {
   } catch {
     return undefined;
   }
-  if (g?.$schema !== "folio-glossary/v1") return undefined;
+  if (g?.$schema !== "folio-glossary/v1") {
+    // A JSON Schema whose `$defs` ARE the terms (bootstrap's graph.schema.json,
+    // read as a scheme by the content core): the subject area it publishes
+    // beside them applies to every term, and every term is authored (owner,
+    // 2026-11-07: "do it in the schema"; litlfred/bootstrap-tools#82).
+    const schema = g as { $defs?: unknown; subject?: unknown } | null;
+    if (schema && typeof schema.$defs === "object" && typeof schema.subject === "string") {
+      return { subject: schema.subject, terms: new Map() };
+    }
+    return undefined;
+  }
   const terms = new Map<string, string | null>();
   for (const t of g.terms ?? []) {
     const value = t.status !== "authored" ? null : typeof t.subject === "string" ? t.subject : undefined;
