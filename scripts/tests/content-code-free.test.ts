@@ -32,6 +32,7 @@ describe("check:content-code-free", () => {
   });
 
   test("a path the harness declares builtAtPublish is never tracked, so its code is not content's", () => {
+    // declared-path-literal: test vectors for the builtAtPublish rule, which the harness declares for these paths; whether they exist on disk in a checkout is beside the point.
     const built = ["docs/en/cat-harness/processes/", "docs/assets/processes/index.json"];
     expect(isBuiltAtPublish("docs/en/cat-harness/processes/task-panel.js", built)).toBe(true);
     expect(isBuiltAtPublish("docs/en/cat-harness/processes-x/a.js", built)).toBe(false);
