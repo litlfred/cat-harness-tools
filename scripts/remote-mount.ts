@@ -16,6 +16,7 @@
  *   bun run cat mount:remote --plan       # resolve the closure and print it; write nothing
  *   bun run cat mount:remote:check        # disk against lock against declaration — no network
  *   bun run cat mount:remote --no-install # lay the bytes down without `bun install` in each mount
+ *   bun run cat mount:remote --no-health  # a re-pin that moves cat-harness-tools does not regenerate the health report (lib/repin-health.ts)
  *   bun run cat mount:remote --help       # print this header; run nothing
  *   echo "<where they said yes>" | bun run cat mount:remote --seed <name>=<owner/repo>@<sha> --consent-by <who> [--whole]
  *                                          # create or re-pin a remote instance in index.config.json, WITH its consent
@@ -196,6 +197,7 @@ import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from 
 import { toolClosure, type ClosureInstance, type ResolvedTool, type ToolChoice } from "./tool-closure.ts";
 import { upstreamConcernMembers, upstreamDirectories, type UpstreamDirectory } from "./upstream-directories.ts";
 import { run as syncWorkflowPins } from "./workflow-pins.ts";
+import { afterMountHealth } from "./lib/repin-health.ts";
 import { ConcernGroupCodeSchema } from "../schemas/kg/concern-groups.ts";
 
 /**
@@ -2223,6 +2225,14 @@ export function afterMount(root: string, before: string | undefined, argv: strin
     console.log(`\n## Agent surface — the lock changed, so the skills and memory agents read were re-rendered\n\n${r.lines.join("\n")}`);
     if (!r.ok) console.log("\nRe-run the failed generator before committing this re-pin: the new layer and the old agent surface disagree.");
   }
+  if (!argv.includes("--no-health")) {
+    // Owner, 2026-11-07, card "Layer health": "A. The re-pin does it". A move
+    // of the cat-harness-tools pin moves the health checker, so this
+    // checkout's own report is regenerated and pushed here. Report only: it
+    // never changes the exit code (`lib/repin-health.ts`).
+    const h = afterMountHealth(root, before, lockBytes(root));
+    if (h) console.log(h.join("\n"));
+  }
   if (code === 0 && !argv.includes("--no-layers-publish")) {
     // The committer who changed the lock writes its layers cache ref, so CI
     // only fetches and verifies it (skill `remote-mount`, "The layers cache").
@@ -2250,6 +2260,7 @@ export const MOUNT_REMOTE_FLAGS: ReadonlyMap<string, "switch" | "value"> = new M
   ["--install-all", "switch"],
   ["--no-agent-surface", "switch"],
   ["--no-layers-publish", "switch"],
+  ["--no-health", "switch"],
   ["--fresh", "switch"],
   ["--whole", "switch"],
   ["--instance", "value"],
