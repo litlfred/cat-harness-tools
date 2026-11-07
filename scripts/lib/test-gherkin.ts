@@ -442,7 +442,7 @@ export function itbResolver(source: string | undefined): BindingResolver {
       const targets = new Set<string>();
       for (const f of listFiles(source)) {
         if (!f.endsWith(".xml")) continue;
-        const xml = readFileSync(join(source, f), "utf-8").replace(/<!--[\s\S]*?-->/g, "");
+        const xml = withoutXmlComments(readFileSync(join(source, f), "utf-8"));
         const suite = /<(?:[\w-]+:)?testsuite\b[^>]*?\bid\s*=\s*"([^"]+)"/.exec(xml);
         if (!suite) continue;
         for (const tc of xml.matchAll(/<(?:[\w-]+:)?testcase\b[^>]*?\bid\s*=\s*"([^"]+)"/g)) targets.add(`${suite[1]}/${tc[1]}`);
@@ -450,6 +450,24 @@ export function itbResolver(source: string | undefined): BindingResolver {
       return { held: true, targets };
     },
   };
+}
+
+/**
+ * `src` with every `<!-- … -->` cut out, by scanning rather than one regex
+ * pass: an unterminated comment drops the rest of the file, so a commented-out
+ * `<testcase>` can never be read as present.
+ */
+export function withoutXmlComments(src: string): string {
+  let out = "";
+  let at = 0;
+  for (;;) {
+    const open = src.indexOf("<!--", at);
+    if (open < 0) return out + src.slice(at);
+    out += src.slice(at, open);
+    const close = src.indexOf("-->", open + 4);
+    if (close < 0) return out;
+    at = close + 3;
+  }
 }
 
 /** The binding schemes every scan knows, besides `test`. A new scheme is a new entry here and a resolver. */

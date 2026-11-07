@@ -11,6 +11,7 @@ import { join } from "node:path";
 import {
   JS_ADAPTER,
   itbResolver,
+  withoutXmlComments,
   KOTLIN_ADAPTER,
   PYTHON_ADAPTER,
   RUST_ADAPTER,
@@ -287,5 +288,8 @@ describe("bindings beyond @test:, and Gherkin dialects", () => {
     expect(notHeld.findings.map((f) => f.kind)).toEqual(["binding-unresolved", "binding-unresolved", "binding-unresolved"]);
     expect(notHeld.findings[0].detail).toContain("source not held");
     expect(joinTestsToScenarios([], [feature]).findings.every((f) => f.kind === "binding-unresolved")).toBe(true);
+    // An unterminated or nested-looking comment never leaves a case readable.
+    expect(withoutXmlComments('a<!-- <testcase id="x"/> --><!--<!-- -->b')).toBe("ab");
+    expect(withoutXmlComments('a<!-- <testcase id="x"/>')).toBe("a");
   });
 });
