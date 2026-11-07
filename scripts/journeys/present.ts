@@ -41,7 +41,7 @@ import { withRenderedBy } from "../viewer-declarations.ts";
 import type { ScenarioStep } from "../../schemas/process/user-scenario.ts";
 import type { WorkshopPresentation, WorkshopStep } from "../../schemas/process/workshop.ts";
 import { blockFor, fromSite, journeyById, lookup, processName, siteRootFrom, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
-import { artifactPage, DAK_ATTR, linkedProcessDrawing } from "./dak-links.ts";
+import { artifactPage, DAK_ATTR, dakGroups, linkedProcessDrawing, type DakGroup } from "./dak-links.ts";
 import {
   allSteps,
   bpmnFigure,
@@ -280,6 +280,7 @@ const ICON: Record<string, string> = {
   sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/>',
   branch: '<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9c0 5-6 4-11 8"/>',
   landmark: '<path d="M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M2 10l10-6 10 6z"/>',
+  chart: '<path d="M3 3v18h18M7 16v1M11 11v6M15 8v9M19 5v12"/>',
   scroll: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>',
   clipboard: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 2h6v4H9zM9 14l2 2 4-4"/>',
   mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/>',
@@ -444,6 +445,28 @@ export function profilePage(pr: WorkshopPresentation, profile: string, siteRoot:
   // An index was read and lists no such profile: the IG has no page for it.
   if (corpus && corpus.examples.size > 0 && !corpus.examples.has(`StructureDefinition/${id}`)) return undefined;
   return fromSite(`${pr.ig.href}${fillPattern(pr.ig.profile ?? "StructureDefinition-{id}.html", { id })}`, siteRoot);
+}
+
+const DAK_ICON: Record<DakGroup["rel"], IconName> = { data: "scroll", decides: "branch", measures: "chart", other: "file" };
+
+/**
+ * A step's DAK assets as one small row under the hood: "DAK", then each group
+ * (Data, Decision logic, Indicators) with its assets as chips, each linked to
+ * its page in the IG when the artefact index lists it. Empty for a step that
+ * names none.
+ */
+export function dakRow(groups: readonly DakGroup[]): string {
+  if (groups.length === 0) return "";
+  const chip = (a: DakGroup["assets"][number]) => {
+    const tip = e(a.description ? `${a.key} — ${a.description}` : a.key);
+    return a.href
+      ? `<a class="jp-dak-a" href="${e(a.href)}" ${DAK_ATTR} target="_blank" rel="noopener noreferrer" title="${tip}">${e(a.label)}</a>`
+      : `<span class="jp-dak-a jp-dak-text" title="${tip}">${e(a.label)}</span>`;
+  };
+  const gs = groups
+    .map((g) => `<div class="jp-dak-g" data-jp-dak-rel="${e(g.rel)}"><span class="jp-dak-l">${icon(DAK_ICON[g.rel])}${e(g.label)}</span><span class="jp-dak-as">${g.assets.map(chip).join("")}</span></div>`)
+    .join("");
+  return `<div class="jp-dak" data-jp-dak><span class="jp-label" title="The DAK assets this moment uses: its data sets, the decision tables that decide it, the indicators that measure it">DAK</span>${gs}</div>`;
 }
 
 /** The Device Demo's screens that show a step. */
@@ -871,6 +894,7 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
   const fhir = `<div class="jp-box"><div class="jp-box-h"><span class="jp-label">FHIR resources created or changed</span></div>${
     rows.length ? `<ul class="jp-fhir">${rows.join("")}</ul>` : `<p class="jp-small">None: this moment reads data but writes nothing.</p>`
   }</div>`;
+  const dak = dakRow(dakGroups(corpus, pr, st.dak, siteRoot));
   const toSite = root + "../".repeat(links.route.split("/").length);
   const procPage = links.processesPage?.(s.journey.instance)?.replace(/^(\.\.\/)+/, "");
   const procs = (st.realisedBy ?? [])
@@ -895,6 +919,7 @@ ${st.technicalSummary ? `<div class="jp-sowhat">${icon("bulb", "jp-amber jp-i-lg
 ${layerRows}${unplacedHtml}
 </div>
 ${handoff || rows.length ? `<div class="jp-two">${handoff}${fhir}</div>` : ""}
+${dak}
 ${procs}
 </div>
 </section>`;

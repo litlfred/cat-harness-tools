@@ -182,6 +182,8 @@ body.jv {
 .jv-dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 0.9rem; margin: 0; }
 .jv-dl dt { color: var(--jv-muted); }
 .jv-dl dd { margin: 0; }
+.jv-dak dd { display: flex; flex-wrap: wrap; gap: 4px; }
+.jv-dak .jv-code { white-space: normal; }
 .jv-procs { margin-top: 10px; }
 .jv-bpmn { margin: 6px 0 12px; }
 .jv-bpmn-scroll { overflow-x: auto; border: 1px solid var(--jv-line); border-radius: 8px; background: #fff; }

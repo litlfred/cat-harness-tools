@@ -236,6 +236,30 @@ describe("an artifact index built at publish", () => {
   });
 });
 
+describe("a step's DAK assets (user-scenario 0.3.0)", () => {
+  const withDak = (files: ReturnType<typeof clean>) => {
+    files["base/fhir/index.json"] = { artifacts: [{ key: "Bundle/kamal-ips", title: "Kamal's summary" }, { key: "PlanDefinition/dt-01", title: "DT.01 Is the card genuine?" }] };
+    edit(files, "demo/journeys/p4.json", (j) => {
+      j.$schema = "user-scenario/0.3.0";
+      j.steps[0].dak = [{ key: "PlanDefinition/dt-01", rel: "decides" }, { key: "Measure/ind-09" }];
+    });
+    return files;
+  };
+  test("each key resolves through the artifact index, as an example does; one it does not list is a finding", () => {
+    const report = checkJourneyRefsAt(checkout(withDak(clean())));
+    expect(report.couldNotDetermine).toEqual([]);
+    expect(report.findings.map((f) => `${f.file} · ${f.at}: ${f.message}`)).toEqual(['journeys/p4.json · step P4: DAK asset "Measure/ind-09" is in no declared fhir-artifact-index']);
+  });
+  test("with the index built at publish and absent, each key is could-not-determine, never missing", () => {
+    const files = withDak(clean());
+    delete files["base/fhir/index.json"];
+    const report = checkJourneyRefsAt(checkout(files));
+    expect(report.findings).toEqual([]);
+    const dak = report.couldNotDetermine.filter((f) => f.message.startsWith("DAK asset"));
+    expect(dak.map((f) => f.message.split(" is ")[0])).toEqual(['DAK asset "PlanDefinition/dt-01"', 'DAK asset "Measure/ind-09"']);
+  });
+});
+
 describe("the command", () => {
   test("exits 2, not 0 or 1, when the only open reference is in an index built at publish", () => {
     const files = clean();

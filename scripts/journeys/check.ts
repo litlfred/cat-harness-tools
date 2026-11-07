@@ -25,7 +25,7 @@
  * | `realisedBy[].tasks` | an element id in that file |
  * | `uses[].block` | a block of a catalogue in a directory declaring `building-blocks` |
  * | `requirements`, `preconditions[].requirements` | a `req:` node |
- * | `examples`, `fhirChanges[].examples` | an entry of a `fhir-artifact-index` |
+ * | `examples`, `fhirChanges[].examples`, `dak[].key` | an entry of a `fhir-artifact-index` (could-not-determine while the index is built at publish) |
  * | `illustration.src` | a file, relative to the instance root |
  * | `follows`, `partOf` | a journey |
  * | `trustLadder`, `record.state` | a code list in a `code-list` directory, and a code of it |
@@ -107,13 +107,13 @@ export function checkJourneyRefs(corpus: JourneyCorpus): RefReport {
   const couldNotDetermine: RefFinding[] = [];
   let references = 0;
   const archimate = siteLinks(corpus, "journeys", "journeys").archimateView;
-  /** A FHIR example: found, missing, or — while an artifact index is built at publish — undetermined. */
-  const example = (instance: string, file: string, at: string, k: string) => {
+  /** An artefact-index key (a FHIR example, a DAK asset): found, missing, or — while an artifact index is built at publish — undetermined. */
+  const example = (instance: string, file: string, at: string, k: string, what = "FHIR example") => {
     references++;
     if (corpus.examples.has(k)) return;
     if (corpus.examplesUnbuilt.length > 0) {
-      couldNotDetermine.push({ instance, file, at, message: `FHIR example "${k}" is in no artifact index on disk, and ${corpus.examplesUnbuilt.join(", ")} is built at publish and absent here` });
-    } else findings.push({ instance, file, at, message: `FHIR example "${k}" is in no declared fhir-artifact-index` });
+      couldNotDetermine.push({ instance, file, at, message: `${what} "${k}" is in no artifact index on disk, and ${corpus.examplesUnbuilt.join(", ")} is built at publish and absent here` });
+    } else findings.push({ instance, file, at, message: `${what} "${k}" is in no declared fhir-artifact-index` });
   };
 
   for (const j of corpus.journeys) {
@@ -155,6 +155,7 @@ export function checkJourneyRefs(corpus: JourneyCorpus): RefReport {
         ref(requirementFor(corpus, id) !== undefined, at, `requirement "${id}" is no req: node in this checkout`);
       }
       for (const k of new Set([...(s.examples ?? []), ...(s.fhirChanges ?? []).flatMap((c) => c.examples ?? [])])) example(j.instance, j.file, at, k);
+      for (const k of new Set((s.dak ?? []).map((d) => d.key))) example(j.instance, j.file, at, k, "DAK asset");
       if (s.record !== undefined && ladder !== undefined) {
         ref(ladder.some((c) => c.code === s.record!.state), at, `record.state "${s.record.state}" is no code of trust ladder ${sc.trustLadder}`);
       }

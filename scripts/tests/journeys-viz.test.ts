@@ -97,6 +97,10 @@ put("lower/fhir-artifact-index/index.json", {
     { key: "Bundle/ana-ips", title: "Ana's IPS", profiles: ["http://example.org/StructureDefinition/ips-bundle"], materialization: { localPath: "output-ast/Bundle-ana-ips.json" } },
     // The role Ana plays, as the IG defines it: her name links here.
     { key: "ActorDefinition/Demo.Role.Pilgrim", title: "Pilgrim" },
+    // The DAK assets step P2 uses: a data set, a decision table, an indicator.
+    { key: "StructureDefinition/DdTreatment", title: "DD.P2 Treatment abroad", description: "What the clinic records." },
+    { key: "PlanDefinition/DT01", title: "DT.01 Is the summary genuine?" },
+    { key: "Measure/IND02", title: "IND.02 Summaries read abroad" },
   ],
 });
 put("lower/output-ast/Bundle-ana-ips.json", { resourceType: "Bundle", id: "ana-ips", type: "document", total: 1, entry: null });
@@ -112,7 +116,7 @@ put("lower/code-lists/trust.json", {
   ],
 });
 put("lower/scenarios/user-scenarios/p2.json", {
-  $schema: "user-scenario/0.2.0",
+  $schema: "user-scenario/0.3.0",
   id: "p2-treated",
   title: "P2 — Treated",
   description: "Ana is treated.",
@@ -134,6 +138,8 @@ put("lower/scenarios/user-scenarios/p2.json", {
       realisedBy: [{ process: "processes/care.bpmn", tasks: ["Task_Read"] }],
       requirements: ["LOW-REQ-001", "LOW-REQ-404"],
       examples: ["Bundle/ana-ips"],
+      // Out of order, one with no rel (its type says decision logic), one the index does not list.
+      dak: [{ key: "Measure/IND02", rel: "measures" }, { key: "StructureDefinition/DdTreatment", rel: "data" }, { key: "PlanDefinition/DT01" }, { key: "Measure/IND99", rel: "measures" }],
       uses: [
         { block: "wallet", role: "shows the QR" },
         { block: "nowhere", role: "unknown block" },
@@ -781,6 +787,31 @@ describe("personas and other DAK assets link to their pages in the IG", () => {
   });
 });
 
+describe("a step's DAK assets: one row, grouped by what each is to the step, linked into the IG", () => {
+  const dakPages = ["StructureDefinition-DdTreatment.html", "PlanDefinition-DT01.html", "Measure-IND02.html"];
+  test("the walkthrough's hood draws Data, Decision logic, Indicators in that order, each asset linked; one the index does not list stays text", () => {
+    const page = sitePath("top/workshops/policy/walkthrough/P2/index.html");
+    const walk = at("top/workshops/policy/walkthrough/P2/index.html");
+    const row = /<div class="jp-dak" data-jp-dak>[\s\S]*?<\/span><\/div><\/div>/.exec(walk)?.[0] ?? "";
+    expect([...row.matchAll(/data-jp-dak-rel="([a-z]+)"/g)].map((m) => m[1])).toEqual(["data", "decides", "measures"]);
+    expect([...row.matchAll(/<span class="jp-dak-l">.*?<\/svg>([^<]+)<\/span>/g)].map((m) => m[1])).toEqual(["Data", "Decision logic", "Indicators"]);
+    expect(hrefsOf(row, DAK_ATTR).map((h) => landsAt(page, h))).toEqual(dakPages);
+    expect(row).toContain('title="StructureDefinition/DdTreatment — What the clinic records.">DD.P2 Treatment abroad</a>');
+    expect(row).toContain('<span class="jp-dak-a jp-dak-text" title="Measure/IND99">IND99</span>');
+  });
+  test("the journey page's step lists the same assets under DAK assets", () => {
+    const page = sitePath("lower/p2-treated/index.html");
+    const html = at("lower/p2-treated/index.html");
+    const dl = /<h4>DAK assets<\/h4><dl class="jv-dl jv-dak">[\s\S]*?<\/dl>/.exec(html)?.[0] ?? "";
+    expect([...dl.matchAll(/<dt>([^<]+)<\/dt>/g)].map((m) => m[1])).toEqual(["Data", "Decision logic", "Indicators"]);
+    expect(hrefsOf(dl, DAK_ATTR).map((h) => landsAt(page, h))).toEqual(dakPages);
+    expect(dl).toContain('<span class="jv-code" title="Measure/IND99">IND99</span>');
+  });
+  test("a step that names none draws no row", () => {
+    expect(at("top/workshops/policy/walkthrough/P1/index.html")).not.toContain("data-jp-dak");
+  });
+});
+
 describe("the check over a staged site: every DAK link resolves to a file", () => {
   const site = mkdtempSync(join(tmpdir(), "journeys-site-"));
   afterAll(() => rmSync(site, { recursive: true, force: true }));
@@ -805,7 +836,7 @@ describe("the check over a staged site: every DAK link resolves to a file", () =
   write("archimate/ra/views/v-p2.svg", '<svg xmlns="http://www.w3.org/2000/svg"><a href="../../../en/lower/archimate/ra/elements/wallet/" target="_top"><rect/></a></svg>');
   write("en/lower/archimate/ra/elements/wallet/index.html", "<!doctype html>");
   test("every rendered DAK link names a page the IG and the KG publish", () => {
-    expect([...targets]).toEqual(expect.arrayContaining(["ActorDefinition-Demo.Role.Pilgrim.html", "Bundle-ana-ips.html", "kg/lower/processes/care/P/node/Task_Read/"]));
+    expect([...targets]).toEqual(expect.arrayContaining(["ActorDefinition-Demo.Role.Pilgrim.html", "Bundle-ana-ips.html", "PlanDefinition-DT01.html", "Measure-IND02.html", "StructureDefinition-DdTreatment.html", "kg/lower/processes/care/P/node/Task_Read/"]));
     const r = checkDakLinks(site, LINKS.route);
     expect(r.findings).toEqual([]);
     expect(r.checked).toBeGreaterThan(10);

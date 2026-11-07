@@ -135,6 +135,8 @@ export interface Requirement {
 export interface FhirExample {
   key: string;
   title?: string;
+  /** The index's description of it, in a sentence or two. */
+  description?: string;
   code?: string;
   /** Its published page (`published.html`, else `.json`). */
   url?: string;
@@ -347,7 +349,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
     }
     if (kinds.includes("fhir-artifact-index")) {
       const idx = readJson(join(d.absPath, "index.json")) as { artifacts?: unknown[]; entries?: unknown[] } | undefined;
-      type Entry = { key?: string; title?: string; code?: { text?: string }; published?: Record<string, { url?: string }>; profiles?: unknown; materialization?: { localPath?: unknown } };
+      type Entry = { key?: string; title?: string; description?: string; code?: { text?: string }; published?: Record<string, { url?: string }>; profiles?: unknown; materialization?: { localPath?: unknown } };
       for (const a of (idx?.artifacts ?? idx?.entries ?? []) as Entry[]) {
         if (typeof a.key !== "string") continue;
         const url = a.published?.html?.url ?? a.published?.json?.url;
@@ -358,6 +360,7 @@ export function readJourneyCorpus(start: string): JourneyCorpus {
         corpus.examples.set(a.key, {
           key: a.key,
           ...(a.title ? { title: a.title } : {}),
+          ...(typeof a.description === "string" && a.description ? { description: a.description } : {}),
           ...(a.code?.text ? { code: a.code.text } : {}),
           ...(url ? { url } : {}),
           ...(jsonUrl ? { jsonUrl } : {}),

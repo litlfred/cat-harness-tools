@@ -36,7 +36,7 @@
  * The journeys viewer draws both: an index tree by `partOf`, ordered along
  * `follows` within each level.
  *
- * ## Two families, one shape
+ * ## Three families, one shape
  *
  * `user-scenario/0.1.0` is the draft smart-trust-demo wrote and checked
  * (`docs/proposals/user-scenario/`, frozen 2026-11-05); every 0.1.0 file is
@@ -46,8 +46,11 @@
  * specification does not yet cover), `references`, `illustration` and
  * `fhirChanges` (the FHIR resources it creates or changes, told for a room),
  * and on a journey its `scene` (a few glyphs that picture it).
- * Nothing of 0.1.0 changes meaning, and the kind accepts a 0.1.0 file as it
- * is.
+ * `user-scenario/0.3.0` adds a step's `dak`: the DAK assets the step uses, each
+ * an artefact-index key and what it is to the step (the data set it records,
+ * the decision table that decides it, the indicator that measures it).
+ * Nothing of an earlier minor changes meaning, and the kind accepts a 0.1.0 or
+ * 0.2.0 file as it is.
  *
  * ## What is NOT here, on purpose
  *
@@ -64,6 +67,7 @@ import { nodeKind } from "../kg/node-kind.ts";
 /** The family tags this module validates. */
 export const USER_SCENARIO_V01 = "user-scenario/0.1.0";
 export const USER_SCENARIO_V02 = "user-scenario/0.2.0";
+export const USER_SCENARIO_V03 = "user-scenario/0.3.0";
 export const BUILDING_BLOCKS_V01 = "building-blocks/0.1.0";
 
 /**
@@ -272,6 +276,30 @@ export const FhirChangeSchema = z
   .strict();
 export type FhirChange = z.infer<typeof FhirChangeSchema>;
 
+/**
+ * What a DAK asset is to a step: `data` a data set it records or exchanges (a
+ * logical model of the data dictionary), `decides` a decision table that
+ * decides something in it, `measures` an indicator that counts what it does.
+ */
+export const DAK_RELS = ["data", "decides", "measures"] as const;
+export const DakRelSchema = z.enum(DAK_RELS);
+export type DakRel = z.infer<typeof DakRelSchema>;
+
+/**
+ * One DAK asset a step uses, by its key in the instance's
+ * `fhir-artifact-index` (`StructureDefinition/<logical model>`,
+ * `PlanDefinition/<decision table>`, `Measure/<indicator>`), resolved like the
+ * step's `examples`. `rel` says what it is to the step; absent, a reader goes
+ * by the key's resource type.
+ */
+export const DakLinkSchema = z
+  .object({
+    key: ExampleKey,
+    rel: DakRelSchema.optional(),
+  })
+  .strict();
+export type DakLink = z.infer<typeof DakLinkSchema>;
+
 /** One part of a journey's small picture: a glyph and what it stands for. */
 export const SceneSchema = z.object({ icon: JourneyGlyphSchema, label: Text }).strict();
 
@@ -284,6 +312,12 @@ const StepV02 = {
   references: z.array(ReferenceSchema).optional(),
   /** The step's picture, or the brief for drawing it. */
   illustration: IllustrationSchema.optional(),
+};
+
+const StepV03 = {
+  ...StepV02,
+  /** The DAK assets the step uses: its data sets, the decision tables that decide it, the indicators that measure it. */
+  dak: z.array(DakLinkSchema).optional(),
 };
 
 /** An ArchiMate view of a journey: a model id of the instance's `cat-archimate.config.json` and a view id in it. */
@@ -320,12 +354,13 @@ function uniqueSteps(s: { steps: readonly { id: string; experiences: readonly { 
 }
 
 /**
- * `user-scenario/0.2.0`, as a node kind: 0.1.0 plus grouping, views,
- * references, illustrations and per-step gaps. A minor bump only adds, so the kind accepts a
- * `user-scenario/0.1.0` file as it is (`acceptsSchemaTag`).
+ * `user-scenario/0.3.0`, as a node kind: 0.1.0 plus grouping, views,
+ * references, illustrations and per-step gaps (0.2.0), and a step's DAK assets
+ * (0.3.0). A minor bump only adds, so the kind accepts a `user-scenario/0.1.0`
+ * or `0.2.0` file as it is (`acceptsSchemaTag`).
  */
 export const UserScenarioKind = nodeKind(
-  USER_SCENARIO_V02,
+  USER_SCENARIO_V03,
   [],
   {
     ...ScenarioV01,
@@ -339,7 +374,7 @@ export const UserScenarioKind = nodeKind(
     /** The journey's small picture, a few glyphs in order (VaxLink's moment icons): drawn on its chapter card and map column. */
     scene: z.array(SceneSchema).min(1).max(5).optional(),
     /** The steps in order. May be empty for a journey that only groups its sub-journeys. */
-    steps: z.array(z.object(StepV02).strict()),
+    steps: z.array(z.object(StepV03).strict()),
   },
   { strict: true, refine: uniqueSteps },
 );
@@ -476,5 +511,5 @@ export function parseUserScenario(raw: unknown, where = "user scenario"): UserSc
 /** Is this parsed JSON a user scenario (either family)? */
 export function isUserScenario(raw: unknown): boolean {
   const tag = (raw as { $schema?: unknown } | null)?.$schema;
-  return tag === USER_SCENARIO_V01 || tag === USER_SCENARIO_V02;
+  return tag === USER_SCENARIO_V01 || tag === USER_SCENARIO_V02 || tag === USER_SCENARIO_V03;
 }
