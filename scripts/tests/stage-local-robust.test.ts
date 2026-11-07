@@ -87,6 +87,11 @@ describe("1. origin has no gh-pages: it is started as an orphan holding .nojekyl
     // origin reads as GitHub, and talks to the local bare repository.
     git(repo, "remote", "set-url", "origin", "https://github.com/o/r");
     git(repo, "config", `url.${bare}.insteadOf`, "https://github.com/o/r");
+    // The publish commit is made by stage-local's own git calls, which read the
+    // repository's identity: a runner with no global git identity (the
+    // standalone rehearsal) refused it, so the checkout carries its own.
+    git(repo, "config", "user.name", "t");
+    git(repo, "config", "user.email", "t@t");
     git(repo, "checkout", "-q", "-b", "feature");
     expect(remoteHasBranch(bare, "gh-pages")).toBe(false);
     const standIn: SitePublisher = {
