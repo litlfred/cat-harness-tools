@@ -96,6 +96,45 @@ describe("language adapters", () => {
     expect(JS_ADAPTER.matches("a/b.ts")).toBe(false);
   });
 
+  test("js: a regex literal holding a quote or backtick opens no string", () => {
+    const src = [
+      "const name = (r: string) => /`([^`]+)`/.exec(r)![1];",
+      "const spec = /from\\s*[\"']([^\"']+)[\"']/g;",
+      'describe("after the regexes", () => {',
+      '  test("first", () => {});',
+      "});",
+      "const mounted = true;",
+      'describe.skipIf(!mounted)("a skipIf scope", () => {',
+      '  test("second", () => {});',
+      "});",
+    ].join("\n");
+    expect(names(JS_ADAPTER.findTests("r.test.ts", src))).toEqual([
+      "r.test.ts::after_the_regexes::first",
+      "r.test.ts::a_skipIf_scope::second",
+    ]);
+  });
+
+  test("js: a template nested in a template's ${} does not close it", () => {
+    const src = [
+      "const conn = (label: string) => `<g>${label ? `<text>${label}</text>` : \"\"}</g>`;",
+      'describe("after a nested template", () => {',
+      '  test("found", () => {});',
+      "});",
+      'describe("a second top-level scope", () => {',
+      "  test(`looped[${key}]`, () => {});",
+      "});",
+    ].join("\n");
+    expect(names(JS_ADAPTER.findTests("t.test.ts", src))).toEqual([
+      "t.test.ts::after_a_nested_template::found",
+      "t.test.ts::a_second_top-level_scope::looped[${key}]",
+    ]);
+  });
+
+  test("js: a division is not read as a regex literal", () => {
+    const src = ["const half = total / 2; const q = a / b / c;", 'test("after division", () => {});'].join("\n");
+    expect(names(JS_ADAPTER.findTests("d.test.ts", src))).toEqual(["d.test.ts::after_division"]);
+  });
+
   test("python: the name is pytest's node id", () => {
     const src = [
       "def helper():",

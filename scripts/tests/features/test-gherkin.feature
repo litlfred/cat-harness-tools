@@ -26,6 +26,27 @@ Feature: Every test has a Gherkin
     Then each test is named <file>::<describe>::<title>, whitespace written as _
     And only test files are read
 
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_regex_literal_holding_a_quote_or_backtick_opens_no_string
+  Scenario: A regex literal with a quote or backtick hides no test
+    Given a test file whose first lines hold a regex literal with backticks and one with quotes
+    And then a describe() scope and a describe.skipIf(cond)() scope, each holding a test
+    When the JS adapter reads it
+    Then both tests are found, each named through its scope
+
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_template_nested_in_a_template's_${}_does_not_close_it
+  Scenario: A template nested in a template's ${} does not close it
+    Given a test file whose first line nests a template literal inside another's ${…}
+    And then two top-level describe() scopes, the second holding a test titled with ${key}
+    When the JS adapter reads it
+    Then each test is named through its own scope only
+    And the ${key} in a title is kept verbatim
+
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_division_is_not_read_as_a_regex_literal
+  Scenario: A division is not read as a regex literal
+    Given a test file whose first line divides with /
+    When the JS adapter reads it
+    Then the test after it is found
+
   @test:scripts/tests/test-gherkin.test.ts::language_adapters::python:_the_name_is_pytest's_node_id
   Scenario: Python tests are named by pytest's node id
     Given a test module with module-level tests, a Test class, a non-Test class, a nested def and a docstring

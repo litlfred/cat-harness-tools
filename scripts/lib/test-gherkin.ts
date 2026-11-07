@@ -103,6 +103,103 @@ export function qualifiedTestName(file: string, scopes: readonly string[], name:
 // ── A lexer shared by the brace languages ───────────────────────────────────
 
 /**
+ * The end (just past the closing backtick) of the JS template literal opening
+ * at `i`, and its literal text. Each `${…}` is skipped by brace depth, and the
+ * strings, templates and comments inside it are skipped whole, so a backtick
+ * nested in an expression does not close the outer template.
+ */
+function templateEnd(src: string, i: number): { end: number; text: string } {
+  let j = i + 1;
+  let text = "";
+  while (j < src.length) {
+    const ch = src[j];
+    if (ch === "\\") {
+      text += src.slice(j, j + 2);
+      j += 2;
+      continue;
+    }
+    if (ch === "`") return { end: j + 1, text };
+    if (ch === "$" && src[j + 1] === "{") {
+      // The expression's source is kept verbatim in the text, as before:
+      // a looped test's title `id[${key}]` is its name.
+      const from = j;
+      j += 2;
+      let depth = 1;
+      while (j < src.length && depth > 0) {
+        const e = src[j];
+        if (e === "`") {
+          j = templateEnd(src, j).end;
+          continue;
+        }
+        if (e === '"' || e === "'") {
+          let k = j + 1;
+          while (k < src.length && src[k] !== e && src[k] !== "\n") k += src[k] === "\\" ? 2 : 1;
+          j = k + 1;
+          continue;
+        }
+        if (e === "/" && src[j + 1] === "/") {
+          const nl = src.indexOf("\n", j);
+          j = nl < 0 ? src.length : nl;
+          continue;
+        }
+        if (e === "/" && src[j + 1] === "*") {
+          const close = src.indexOf("*/", j + 2);
+          j = close < 0 ? src.length : close + 2;
+          continue;
+        }
+        if (e === "{") depth++;
+        else if (e === "}") depth--;
+        j++;
+      }
+      text += src.slice(from, j);
+      continue;
+    }
+    text += ch;
+    j++;
+  }
+  return { end: src.length, text };
+}
+
+/**
+ * If the `/` at `i` opens a JS regex literal, the offset just past it (flags
+ * included); otherwise 0. A `/` opens a regex where an expression may start:
+ * after an operator or opening punctuation, after `return`-like keywords, or
+ * at the start of the file. `masked` is the output so far, so the previous
+ * significant character is read with comments and strings already blanked.
+ */
+function regexLiteralEnd(src: string, i: number, masked: readonly string[]): number {
+  if (src[i + 1] === "/" || src[i + 1] === "*") return 0;
+  // The last ~16 significant characters, walking back over the output so far.
+  let tail = "";
+  for (let k = masked.length - 1; k >= 0 && tail.replace(/\s+$/, "").length < 16; k--) tail = masked[k] + tail;
+  const before = tail.replace(/\s+$/, "");
+  const prev = before.at(-1);
+  const keyword = /(?:^|[^\w$])(?:return|typeof|case|do|else|in|of|void|yield|await|throw|delete|new)$/.test(before);
+  // `>` only as the arrow `=>`: after a closing angle (`</t>`, a generic) a
+  // `/` is not a regex.
+  const opens = prev !== undefined && (/[(,=:[!&|?{};+\-*%~^]/.test(prev) || before.endsWith("=>"));
+  if (prev !== undefined && !keyword && !opens) return 0;
+  let j = i + 1;
+  let inClass = false;
+  while (j < src.length) {
+    const ch = src[j];
+    if (ch === "\n") return 0;
+    if (ch === "\\") {
+      j += 2;
+      continue;
+    }
+    if (ch === "[") inClass = true;
+    else if (ch === "]") inClass = false;
+    else if (ch === "/" && !inClass) break;
+    j++;
+  }
+  if (j >= src.length) return 0;
+  j++;
+  while (j < src.length && /[a-z]/.test(src[j])) j++;
+  return j;
+}
+
+/**
  * Blank out comments and string literals, keeping every newline and every
  * other character's offset. What is left is code a regex can be run over
  * without matching a `{` in a string or a `#[test]` in a comment. The string
@@ -165,7 +262,28 @@ export function maskSource(
       i = stop;
       continue;
     }
-    if (c === '"' || (c === "'" && !opts.rustChars) || (c === "`" && opts.templates)) {
+    if (opts.templates && c === "/") {
+      // A JS regex literal: its quotes and backticks open no string. Without
+      // this, `/`([^`]+)`/` or `/["']x["']/` started a "string" that swallowed
+      // the tests after it.
+      const end = regexLiteralEnd(src, i, out);
+      if (end > 0) {
+        out.push(blank(src.slice(i, end)));
+        i = end;
+        continue;
+      }
+    }
+    if (c === "`" && opts.templates) {
+      // A template literal: its `${…}` expressions may hold strings and
+      // further templates, so the closing backtick is found by nesting,
+      // not by the next backtick. The literal text is its string.
+      const { end, text } = templateEnd(src, i);
+      strings.set(i, text);
+      out.push(blank(src.slice(i, end)));
+      i = end;
+      continue;
+    }
+    if (c === '"' || (c === "'" && !opts.rustChars)) {
       let j = i + 1;
       let body = "";
       while (j < src.length && src[j] !== c) {
@@ -174,7 +292,7 @@ export function maskSource(
           j += 2;
           continue;
         }
-        if (c !== "`" && src[j] === "\n") break; // unterminated: stop at the line
+        if (src[j] === "\n") break; // unterminated: stop at the line
         body += src[j];
         j++;
       }
