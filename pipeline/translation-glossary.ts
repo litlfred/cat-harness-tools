@@ -802,7 +802,12 @@ export function pendingQuestions(results: readonly LocaleResult[]) {
           catalogues: [],
         };
       if (!q.locales.includes(r.locale)) q.locales.push(r.locale);
-      const cat = o.catalogue.replace(new RegExp(`(^|/)${r.locale}/`), "$1<locale>/");
+      // The first directory segment that IS the locale becomes `<locale>`. A
+      // segment match, not a RegExp: the locale comes from the command line.
+      const parts = o.catalogue.split("/");
+      const at = parts.findIndex((p, i) => p === r.locale && i < parts.length - 1);
+      if (at >= 0) parts[at] = "<locale>";
+      const cat = parts.join("/");
       if (!q.catalogues.includes(cat)) q.catalogues.push(cat);
       out.set(k, q);
     }
