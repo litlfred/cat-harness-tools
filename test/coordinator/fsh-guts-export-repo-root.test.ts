@@ -13,8 +13,7 @@
  * standing alone too.
  */
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { extname, join, resolve } from "node:path";
 
@@ -74,23 +73,24 @@ describe("the real corpus", () => {
     expect(doc.nodeCount).toBeGreaterThan(0);
     expect(doc["@graph"]).toHaveLength(doc.nodeCount);
     expect(doc.scans).toContain("fsh-guts");
-    // Every COMMITTED node, by path: each file git tracks in a scanned
-    // directory (outside a frozen subtree, which is one item) that reads as a
-    // node has an entry whose `sourcePath` is it.
+    // Every committed node, by path: each file in a scanned directory
+    // (outside a frozen subtree, which is one item) that reads as a node has
+    // an entry whose `sourcePath` is it. Listed from the disk, not with
+    // `git ls-files`: the trashcan is kept on its own branch and MOUNTED
+    // (`state:mount`), as bytes the checkout ignores, so git tracks none of it.
     const inDoc = new Set(doc["@graph"].map((n) => n.sourcePath));
-    const committed: string[] = [];
+    const nodes: string[] = [];
     for (const dir of fshGutsDirs(ROOT)) {
-      const ls = spawnSync("git", ["ls-files", "-z"], { cwd: dir.absPath, encoding: "utf-8" });
-      expect(ls.status).toBe(0);
-      const tracked = ls.stdout.split("\0").filter(Boolean);
-      for (const f of withoutFrozenSubtrees(dir.absPath, tracked).live) {
-        const abs = join(dir.absPath, f);
-        if (![".md", ".json"].includes(extname(f).toLowerCase()) || !existsSync(abs)) continue;
-        if (readFshGutsNode(readFileSync(abs, "utf8")).node) committed.push(join(dir.path, f));
+      const files = (readdirSync(dir.absPath, { recursive: true }) as string[])
+        .map((f) => f.split("\\").join("/"))
+        .filter((f) => statSync(join(dir.absPath, f)).isFile());
+      for (const f of withoutFrozenSubtrees(dir.absPath, files).live) {
+        if (![".md", ".json"].includes(extname(f).toLowerCase())) continue;
+        if (readFshGutsNode(readFileSync(join(dir.absPath, f), "utf8")).node) nodes.push(join(dir.path, f));
       }
     }
-    expect(committed.length).toBeGreaterThan(0);
-    expect(committed.filter((rel) => !inDoc.has(rel))).toEqual([]);
+    expect(nodes.length).toBeGreaterThan(0);
+    expect(nodes.filter((rel) => !inDoc.has(rel))).toEqual([]);
   });
 
   test("the directory is resolved from the declaration, not spelled", () => {

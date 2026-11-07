@@ -40,5 +40,6 @@ Feature: Content-type skill packages are held by their owners, and role edges po
     And business-analyst has l2-dak-authoring
     And qc-reviewer has quality-control
     Given the harness's own role graph, overlaid with the checkout's extensions
-    Then for lean-authoring-agent → formalizer, build-pipeline → fhir-validation and qc-reviewer → quality-control the harness's own graph lacks the edge
+    Then the harness's own graph declares no lean-authoring-agent role, because its owning instance declares that role
+    And for build-pipeline → fhir-validation and qc-reviewer → quality-control the harness's own graph lacks the edge
     And the only extension recorded as adding it is the one of the instance that holds the skill's package

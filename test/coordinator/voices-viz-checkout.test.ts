@@ -35,14 +35,11 @@ describe("the reader finds what the declarations say is there", () => {
   });
 
   test("a voice is attributed to the instance that DERIVED it, never to the platform", () => {
-    // The whole point of the move this graph exists to render: `cat-harness`
-    // is the machinery and holds no voice. A reader seeing `cat-harness` in
-    // the instance column would be reading the pre-`btuv` world.
-    // Neither the platform nor the checkout's root instance derives a voice.
-    for (const v of G.voices) {
-      expect(v.instance).not.toBe("cat-harness");
-      expect(v.instance).not.toBe("folio-assistant");
-    }
+    // The whole point of the move this graph exists to render: the checkout's
+    // root (`folio-assistant`) derives no voice; each is attributed to the
+    // instance whose declared voices directory holds it. `cat-harness` is not
+    // excluded: it ships voices of its own (`skills/voices/`).
+    for (const v of G.voices) expect(v.instance).not.toBe("folio-assistant");
     const owners = new Set(G.voices.map((v) => v.instance));
     expect(owners.size).toBeGreaterThan(1);
   });

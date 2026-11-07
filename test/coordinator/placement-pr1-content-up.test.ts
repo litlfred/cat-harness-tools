@@ -115,14 +115,16 @@ describe("placement PR1: role edges point down", () => {
     expect(skillsOf("build-pipeline")).toContain("fhir-validation");
     expect(skillsOf("business-analyst")).toContain("l2-dak-authoring");
     expect(skillsOf("qc-reviewer")).toContain("quality-control");
-    // Through the OWNER's extension: for each edge naming a moved package's
-    // skill, the harness's own graph lacks it and the overlay records the
-    // owning instance as the one that added it.
+    // Through the OWNER: the harness's own graph carries none of these edges.
+    // `lean-authoring-agent` is a role its owner DECLARES, so the harness does
+    // not know the role at all; the other two are harness roles the owning
+    // instance extends, and the overlay records that instance as the one
+    // that added the skill.
     const own = roleGraphFor(PLATFORM, "instance")!;
     const ownSkillsOf = (id: string): string[] => own.roles.find((r) => r.id === id)?.skills ?? [];
+    expect(own.roles.map((r) => r.id)).not.toContain("lean-authoring-agent");
     const { extensions } = checkoutRoleGraph(PLATFORM, own)!;
     for (const [role, skill] of [
-      ["lean-authoring-agent", "formalizer"],
       ["build-pipeline", "fhir-validation"],
       ["qc-reviewer", "quality-control"],
     ] as const) {

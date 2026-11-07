@@ -10,7 +10,7 @@ Feature: The fsh-guts export reads the declared trashcan and keeps every summary
     Then its node count is more than zero
     And its @graph has exactly that many nodes
     And it scans "fsh-guts"
-    And at least one file git tracks in a scanned directory, outside a frozen subtree, is a markdown or JSON node
+    And at least one file on disk in a scanned directory (the mounted branch), outside a frozen subtree, is a markdown or JSON node
     And every such file has a node in the @graph whose sourcePath is its path
 
   @test:test/coordinator/fsh-guts-export-repo-root.test.ts::the_real_corpus::the_directory_is_resolved_from_the_declaration,_not_spelled
