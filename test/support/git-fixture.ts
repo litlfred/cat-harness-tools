@@ -62,8 +62,10 @@ export interface GitFixtureOptions {
  * asserts.
  */
 export function gitFixtureRepo(opts: GitFixtureOptions = {}): GitFixture {
+  // input-site: inert #d37a2b31 — a scratch repository under the temp dir, removed by its cleanup; its name never reaches an answer
   const root = mkdtempSync(join(tmpdir(), "git-fixture-"));
   const git = (...args: string[]): string =>
+    // input-site: tree #9757f5b2 — git in the fixture's own scratch repository, with every setting a test relies on set locally: git's answer, which the cone records
     execFileSync("git", ["-C", root, ...args], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }).trim();
   git("init", "-q", "-b", "main");
   git("config", "user.name", "Fixture");
