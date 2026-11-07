@@ -26,11 +26,13 @@ Feature: An Archi model is read, its views are drawn, and an instance's pages ar
     And the component has type "ApplicationComponent", layer "Application", its documentation, folder "Application" and the property owner "WHO"
 
   @test:archimate/scripts/archimate.test.ts::reading_a_model::reads_relationships,_defaulting_nothing_it_was_told
-  Scenario: Relationships are read with their type, ends and access type
+  Scenario: Relationships are read as told, and only an untold access type is defaulted
     Given the model
     When it is parsed
-    Then "id-r1" is a Serving from the service to the component
-    And "id-r2" is an Access with access type "read"
+    Then "id-r1" is exactly a Serving from the service to the component, with no name, access type or direction and no properties
+    And "id-r2", told access type "1", is an Access with access type "read"
+    And told access types "0", "2" and "3", it is "write", "access" and "readwrite"
+    And told no access type, it takes Archi's default "write"
 
   @test:archimate/scripts/archimate.test.ts::reading_a_model::makes_a_nested_object's_bounds_absolute,_and_gives_-1_Archi's_default_size
   Scenario: A nested box's bounds are made absolute, and -1 becomes Archi's default size
@@ -57,10 +59,13 @@ Feature: An Archi model is read, its views are drawn, and an instance's pages ar
     Then BusinessActor, Node, Goal, Capability, WorkPackage and Grouping are in Business, Technology, Motivation, Strategy, Implementation & Migration and Other
 
   @test:archimate/scripts/archimate.test.ts::drawing_a_view::escapes_every_string_from_the_model
-  Scenario: The component's name is escaped in the drawing
+  Scenario: Every string from the model is escaped in the drawing
     Given the model
     When its view is drawn with element links
     Then it contains "Registry &lt;script&gt;" and no "<script>"
+    Given the model with markup in the service's, data object's, group's and view's names and in the note
+    When its view is drawn
+    Then for each of the model name's "<RA>", "<script>", "<i>", "<s>", "<u>", "<v>" and the note's "<em>", the drawing has the escaped form and not the raw tag
 
   @test:archimate/scripts/archimate.test.ts::drawing_a_view::links_each_box_to_its_element,_and_draws_each_relationship_with_its_own_ends
   Scenario: Boxes link to their elements and relationships have their own ends
@@ -96,6 +101,7 @@ Feature: An Archi model is read, its views are drawn, and an instance's pages ar
     Then its key has "Key", "Software: systems", "Serving: serves", "Access: reads or writes data", "a grouping for layout only" and "Note: a comment"
     And it has no "Influence" and no "Why: who cares"
     And drawn with the key off, there is no key
+    And the drawing with the key is taller, in its height and its viewBox, than the drawing without it
 
   @test:archimate/scripts/archimate.test.ts::drawing_a_view::says_a_view_with_nothing_on_it_is_empty,_rather_than_drawing_an_empty_frame
   Scenario: A view with nothing on it says it is empty
@@ -154,12 +160,12 @@ Feature: An Archi model is read, its views are drawn, and an instance's pages ar
     And every JSON-LD file's "@id" is its own IRI
     And the component's JSON-LD type is "archimate:ApplicationComponent", and the serving's source is the service's IRI
 
-  @test:archimate/scripts/archimate.test.ts::an_instance::a_page_copies_nothing_of_the_model:_its_config_points_at_the_normalised_model_relative_to_itself
-  Scenario: A page points at the normalised model relative to itself and does not copy the documentation
+  @test:archimate/scripts/archimate.test.ts::an_instance::a_page_copies_none_of_the_model's_documentation,_properties_or_notes:_its_config_points_at_the_normalised_model_relative_to_itself
+  Scenario: A page points at the normalised model relative to itself and copies no documentation, property or note
     Given the throwaway instance
     When its pages are generated
     Then each page's config names "model.json" relative to the page's depth
-    And no page contains the component's documentation
+    And no page contains the component's documentation "Holds the records.", its property key "owner" or value "WHO", or the note's text
 
   @test:archimate/scripts/archimate.test.ts::an_instance::declares_the_rail's_left-hand_section:_the_model's_views,_relative_to_each_page
   Scenario: The rail's left-hand section lists the model's views, relative to each page
@@ -181,7 +187,7 @@ Feature: An Archi model is read, its views are drawn, and an instance's pages ar
     When its pages are generated in the graph
     Then the page root is "archimate", the view's SVG links the element's slug, and no page names a Tool
 
-  @test:archimate/scripts/archimate.test.ts::an_instance::in_a_site,_writes_nothing_for_an_instance_that_declares_no_route_for_these_pages
+  @test:archimate/scripts/archimate.test.ts::an_instance::in_a_site,_refuses_an_instance_that_declares_no_route_for_these_pages
   Scenario: In a site, an instance with no route for these pages is refused
     Given the throwaway instance with no visualisers declared
     When its pages are generated for a site
