@@ -107,11 +107,10 @@ Feature: A resolved theme has all three layouts, and its backdrop names a role w
     Then parsing throws
 
   @test:schemas/ui/theme.test.ts::the_scrim_is_what_makes_ink_over_art_legible,_and_the_number_is_measured::grumpy-cat's_ink_clears_AAA_over_its_scrim_on_the_DARKEST_possible_art
-  Scenario: Ink clears AAA over the scrim on black art
-    # The title names grumpy-cat; the body uses an ink "#221f1b" and a scrim
-    # written in the test, not read from the shipped grumpy-cat theme.
-    Given the scrim rgba(237, 234, 228, 0.86) composited over pure black
-    When the contrast of ink "#221f1b" on it is computed
+  Scenario: The shipped grumpy-cat ink clears AAA over its shipped scrim on black art
+    Given the shipped "grumpy-cat" theme, which has a backdrop scrim
+    And its scrim composited over pure black
+    When the contrast of its palette ink on it is computed
     Then it is at least 7:1
 
   @test:schemas/ui/theme.test.ts::the_scrim_is_what_makes_ink_over_art_legible,_and_the_number_is_measured::...and_on_the_LIGHTEST,_since_a_scrim_cuts_both_ways

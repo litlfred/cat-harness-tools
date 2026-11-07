@@ -2,11 +2,6 @@
 # projection's tile-count field, and readTileCounts, its one reader, which
 # reads a declared count as declared and an absent or malformed one as
 # nothing, never as zero (issue #856, bean tis1).
-#
-# The two table-driven describe blocks in the test file ("ABSENT is not ZERO"
-# with 8 inputs, and the 10 malformed entries of "a malformed entry is
-# dropped") generate their test titles in a loop; the test-gherkin check does
-# not see those titles, so they have no Scenario here.
 Feature: A tile's declared count is read as declared, and an absent one is not zero
 
   @test:schemas/ui/tile-count.test.ts::a_declared_count_is_read_as_declared::count_and_unit_survive_the_round_trip
@@ -32,6 +27,18 @@ Feature: A tile's declared count is read as declared, and an absent one is not z
     Given tile counts written for "library" as 8 and "uploads" as 20
     When they are read back
     Then the two counts differ
+
+  @test:schemas/ui/tile-count.test.ts::ABSENT_is_not_ZERO_—_every_one_of_these_must_yield_nothing::%s_—_no_counts_at_all
+  Scenario: A projection with no readable tile-count field yields no counts
+    Given each of 8 inputs: a projection with no tile-count field, null, undefined, a string, a number, an array, a tile-count field that is null, and a tile-count field that is the string "12"
+    When each is read
+    Then reading it gives no entries at all
+
+  @test:schemas/ui/tile-count.test.ts::a_malformed_entry_is_dropped,_and_never_rounded_to_zero::%s_—_no_entry_at_all
+  Scenario: A malformed entry yields no entry for its directory
+    Given a tile-count field whose "beans" entry is each of 10 malformed values: count missing, a string, NaN, Infinity or null; unit missing, blank or not a string; the entry a number; the entry null
+    When it is read
+    Then there is no entry for "beans"
 
   @test:schemas/ui/tile-count.test.ts::a_malformed_entry_is_dropped,_and_never_rounded_to_zero::NaN_in_particular_does_not_slip_through_a_`typeof`_check
   Scenario: A NaN count is dropped

@@ -52,12 +52,12 @@ Feature: Card windows stack by order of opening and raising, separately from sem
     Then the open list is still empty
 
   @test:schemas/ui/window-stack.test.ts::open,_close,_raise::every_operation_returns_a_NEW_stack_—_the_input_is_never_mutated
-  Scenario: Open, close and raise leave their input stack unchanged
-    # The title also says each operation returns a new stack; the body checks
-    # only that the input is not mutated.
+  Scenario: Open, close and raise return new stacks and leave their input unchanged
     Given a stack with "a" open
     When "b" is opened on it, "a" is closed on it, and "a" is raised on it
-    Then its open list is still "a"
+    Then each result is a different object from the input, with a different open list
+    And the opened stack is "a", "b"; the closed stack is empty; the raised stack is "a"
+    And the input's open list is still "a"
 
   @test:schemas/ui/window-stack.test.ts::zIndexOf_derives_the_number_and_never_stores_it::bottom_to_top,_one-based
   Scenario: The z-index counts from one at the bottom
@@ -99,9 +99,8 @@ Feature: Card windows stack by order of opening and raising, separately from sem
     Then it is 3
 
   @test:schemas/ui/window-stack.test.ts::the_two_mechanisms_stay_separate,_and_that_is_checked_rather_than_intended::an_open_window_is_unaffected_by_the_card's_zoom_answer
-  Scenario: A note renders as an avatar at 100px while its window stays open
-    # The body makes the zoom call and the stack calls independently; no
-    # width is ever passed to the stack, so nothing links the two answers.
-    Given a stack with "note-1" open
-    Then a note renders as an avatar at 100px
-    And "note-1" is still open and topmost
+  Scenario: The stack reads the same whichever way the card's zoom answers
+    Given a stack with "note-0" and then "note-1" open
+    Then a note renders as an avatar at 100px and not at 400px
+    And at each of those widths the stack's open list is unchanged, "note-1" is open and topmost, and its z-index is 2
+    And the window-stack module imports nothing, so no zoom state can reach it

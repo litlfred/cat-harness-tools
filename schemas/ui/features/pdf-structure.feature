@@ -72,13 +72,14 @@ Feature: A PDF's structure.json conforms to pdf-structure/v1
     And a source.ocr_engine field is refused
 
   @test:schemas/ui/pdf-structure.test.ts::pdf-structure/v1::an_unrecognised_mimetype_is_null_with_its_reason,_never_guessed
-  Scenario: An unrecognised mimetype is accepted as null with its reason
-    # The title also says a mimetype is never guessed; the body checks only
-    # that null with mimetype_source "unrecognised" is accepted, and refuses
-    # nothing.
+  Scenario: An unrecognised mimetype is null with a required reason, and no guess is a reason
+    # Gap: the schema does not pair the two fields, so a sniffed mimetype with
+    # mimetype_source "unrecognised", or null with "magic-bytes", still parses.
     Given the minimal structure whose mimetype_sniffed is null and mimetype_source is "unrecognised"
     When it is parsed
     Then it parses
+    And the same structure with no mimetype_source is refused
+    And the same structure with mimetype_source "extension", "file-extension" or "guessed" is refused
 
   @test:schemas/ui/pdf-structure.test.ts::pdf-structure/v1::a_duplicate_copy_names_its_preferred_entry;_the_preferred_entry_lists_its_copies
   Scenario: Duplicates name their preferred entry, and the preferred entry lists its copies

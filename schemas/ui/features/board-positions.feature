@@ -109,13 +109,11 @@ Feature: Board positions are a deterministic layer over notes, one position per 
     Then none is reported
 
   @test:schemas/ui/board-positions.test.ts::orphans_are_reported,_never_removed::the_document_is_not_mutated_by_asking
-  Scenario: Asking for orphans is run against a fresh sample document
-    # The body renders one fresh sample, asks for orphans on a second fresh
-    # sample, and renders a third; it never re-renders the document it asked
-    # about, so it cannot observe a mutation.
-    Given the rendered text of the sample document
-    When orphans are asked for on a separately built sample with no known notes
-    Then a newly built sample still renders to the same text
+  Scenario: Asking for orphans leaves the document asked about unchanged
+    Given the sample document and its rendered text
+    When orphans are asked for on that document with no known notes
+    Then both of its positions are reported as orphans
+    And the same document still renders to the same text
 
   @test:schemas/ui/board-positions.test.ts::the_arrow_runs_ONE_way_—_a_note_knows_nothing_about_a_board::no_note_schema_carries_a_position_or_a_board
   Scenario: No note schema declares a position or a board field
@@ -137,12 +135,11 @@ Feature: Board positions are a deterministic layer over notes, one position per 
     And an empty positions document, which carries the tag, parses
 
   @test:schemas/ui/board-positions.test.ts::the_document_declares_what_it_is::an_empty_document_is_VALID_—_a_folio_with_no_board_yet
-  Scenario: The empty positions document has no boards
-    # The title says the empty document is valid; this body only checks it has
-    # no boards. Its validity is asserted in the scenario above.
+  Scenario: The empty positions document has no boards and is valid
     Given an empty positions document
     When its boards are listed
     Then there are none
+    And the document validates against the board-positions schema
 
   @test:schemas/ui/board-positions.test.ts::the_document_declares_what_it_is::a_non-finite_coordinate_is_refused
   Scenario: A non-finite coordinate is refused
@@ -176,12 +173,12 @@ Feature: Board positions are a deterministic layer over notes, one position per 
     Then each move returns undefined
 
   @test:schemas/ui/board-positions.test.ts::moveBy_—_a_move_edits_the_LAYER_and_reaches_no_note::it_returns_a_NEW_document_and_leaves_the_old_one_alone
-  Scenario: A move leaves the original document unchanged
-    # The title also says a new document is returned; the body checks only
-    # that the original is unchanged.
+  Scenario: A move returns a new document and leaves the original unchanged
     Given the placed document and its rendered text
     When "n1" is moved by (100, 100)
-    Then the original document still renders to the same text
+    Then the result is a different object from the original, as are its boards and board "b"
+    And in the result "n1" is at (110, 120)
+    And the original document still renders to the same text
 
   @test:schemas/ui/board-positions.test.ts::moveBy_—_a_move_edits_the_LAYER_and_reaches_no_note::moving_one_note_leaves_every_other_position_untouched
   Scenario: Moving one note leaves the others where they were

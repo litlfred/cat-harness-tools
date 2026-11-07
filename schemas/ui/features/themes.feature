@@ -32,10 +32,11 @@ Feature: The shipped themes are what was asked for, legible, and resolvable
     When the gradated theme ids are counted
     Then there are at least 2
 
-  @test:schemas/ui/themes.test.ts::the_default::it_resolves,_and_it_is_a_sage_—_the_owner_asked_for_one_to_match_the_staging_bar
-  Scenario: The default theme resolves and is a sage
-    # The title mentions matching the staging bar; the body does not check
-    # that, and the file records it as a human judgement on PR #405.
+  @test:schemas/ui/themes.test.ts::the_default::it_resolves,_and_it_is_a_pale_sage
+  Scenario: The default theme resolves and is a pale sage
+    # That it matches the staging bar is a human judgement, made on the
+    # staging preview of PR #405 and confirmed by the owner on 2026-09-19; no
+    # test asserts it, because a checkout cannot see the banner.
     When the default theme id is looked up
     Then it resolves to a theme of that id
     And the id starts with "pale-sage"

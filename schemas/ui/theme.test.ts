@@ -18,6 +18,7 @@ import {
   themeCssVars,
   ResolvedThemeSchema,
 } from "./theme.js";
+import { themeById } from "./themes.js";
 
 const GEOM = { minWidth: "17rem", padding: "0.7em 0.8em", fontScale: 1 };
 
@@ -259,9 +260,13 @@ describe("the scrim is what makes ink over art legible, and the number is measur
     // Worst case, not typical case: the art is whatever an instance declares,
     // so the only safe assumption is pure black underneath. If it holds there it
     // holds for every image.
-    const { rgb, alpha } = rgba(BACKDROP.scrim);
+    // The SHIPPED theme's own ink and scrim, read from `themes.ts` — not
+    // colours restated here, which would keep passing after the theme moved.
+    const shipped = themeById("grumpy-cat");
+    expect(shipped?.backdrop?.scrim).toBeDefined();
+    const { rgb, alpha } = rgba(shipped!.backdrop!.scrim);
     const ground = over(rgb, alpha, [0, 0, 0]);
-    const ratio = contrast(hex("#221f1b"), ground);
+    const ratio = contrast(hex(shipped!.palette.ink), ground);
     expect(ratio).toBeGreaterThanOrEqual(7); // WCAG AAA, normal text
   });
 
