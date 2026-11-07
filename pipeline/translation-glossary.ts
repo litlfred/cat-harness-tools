@@ -1,0 +1,427 @@
+/**
+ * Glossary consistency of an instance's translations, against a term base
+ * merged from the glossaries of the layers it mounts.
+ *
+ * Owner, 2026-11-06, for the translation watcher: the layered glossaries
+ * provide precedence for fixed translation terms. The rules are ported from
+ * the instance-side `tools/translation/glossary_qa.py` (smart-trust-demo #54,
+ * by the EN translation team) and made generic: every path comes from a
+ * declaration, and no instance is named here.
+ *
+ * ## The term base, and which layer wins
+ *
+ * A term's translation in a locale is FIXED by the first glossary that
+ * translates it, in this order:
+ *
+ * 1. reference glossaries named with `--layer <name>=<pattern>` (normative
+ *    content, such as a WHO glossary, outranks the platform);
+ * 2. the layers of the instance's `needs` chain, deepest (most authoritative)
+ *    first — `declarationChain`, the order every layered reader here uses;
+ * 3. the instance's own glossaries, last: they may ADD terms, never change one.
+ *
+ * In each layer the glossaries are its declared `translation-sources`
+ * directory's `<locale>/glossary/<owner>--<scheme>.po` (the per-scheme
+ * catalogues `glossary:pot` writes) and `<locale>/glossary.po` (the
+ * hand-authored terminology file). A scheme catalogue is ranked by the layer
+ * that OWNS the scheme (its `<owner>--` prefix), not by the layer that hosts
+ * the file: cat-harness hosts bootstrap's terms, and bootstrap is the lower
+ * layer.
+ *
+ * What fixes a term: a label (a scheme entry whose `#.` comment says "Glossary
+ * term label" or "alternative label"; in `glossary.po`, any short entry that is
+ * not a sentence) under 60 characters, with a non-empty msgstr, not marked
+ * `#, localised` (which says the term is localised, not how) and not fuzzy.
+ *
+ * ## Scope: a fixed term binds only content of its own domain
+ *
+ * The platform's terms (bootstrap's Reference, Actor, Skill; cat-harness's
+ * policy) carry no sense or scope, so applying them as fixed translations to
+ * health content gives wrong answers — "Reference Architecture", IHE "actors",
+ * health "policy". The glossary schema (`folio-glossary/v1`) has no
+ * machine-readable scope: `scopeNote` is free text (3 terms in the index use
+ * it), so it cannot decide a match. Until the owner picks a schema option, the
+ * one structural scope is the SCHEME, and a term binds the instance's
+ * catalogues when its scheme is the instance's own, or it came from a
+ * `--layer` reference glossary. Any other match is a SENSE CHECK note: printed,
+ * recorded in the summary, never a violation.
+ *
+ * ## What is flagged, per locale
+ *
+ * - `not-fixed-rendering`: a msgid uses an in-scope fixed term (prefLabel or
+ *   altLabel; whole word; case-insensitive, except a short all-caps acronym)
+ *   and its msgstr does not use the term's fixed translation. Matching is by
+ *   word stem (ru, ar, fr, es) or substring (zh, ar), as the prior art did.
+ * - `inconsistent`: a term that two or more of the instance's entries — whose
+ *   whole msgid is the term — render differently in one locale.
+ * - `override`: a higher layer whose glossary gives an in-scope fixed term a
+ *   different translation. An out-of-scope one is a sense check.
+ *
+ * Exit: 0 clean, 1 on findings, 2 when it cannot determine (no declared
+ * `translation-sources`, an unknown locale). Without `--check` the result is
+ * also written as `glossary-consistency.qa-results.json` (`qa-results/v1`, one
+ * family per locale) in the instance's QA directory, where `kg-qa-report`
+ * reads it into its "Glossary consistency" section.
+ *
+ * Usage:
+ *   bun run cat translation:glossary:check --instance <dir> --locale fr [--layer who=<dir>/{locale}/*.po]
+ *   bun run cat translation:glossary --instance <dir>        # every locale; writes the record
+ *
+ * @module pipeline/translation-glossary
+ * @covers translation-sources, qa
+ */
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { basename, dirname, join, relative, resolve } from "node:path";
+
+import { directoryForGraph, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import { declarationChain } from "../schemas/kg/harness-config.ts";
+import { explicitInstanceRoot, HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
+import { buildQaResult, writeQaResult } from "../scripts/qa-results.ts";
+import { GLOSSARY_SUBJECT_KIND } from "../scripts/kg-qa-report.ts";
+import { parsePoEntries, type PoEntry } from "./po-inject.ts";
+
+/** This module, as a QA producer names it. */
+export const GLOSSARY_CHECK_SCRIPT = "pipeline/translation-glossary.ts";
+
+/** The `qa-results/v1` stem, and the subject kind `kg-qa-report` renders as "Glossary consistency". */
+export const GLOSSARY_RESULT_STEM = "glossary-consistency";
+export { GLOSSARY_SUBJECT_KIND };
+
+/** Labels this long or longer are prose, not terms (the prior art's rule). */
+const MAX_TERM = 60;
+
+/** One glossary file in precedence order. */
+export interface GlossarySource {
+  /** The layer the entry is ranked by: the scheme's owner, or the hosting layer. */
+  layer: string;
+  file: string;
+  /** From `--layer`: normative, binds every catalogue of the instance. */
+  reference: boolean;
+}
+
+/** A fixed term: the first in-precedence translation of a label. */
+export interface FixedTerm {
+  term: string;
+  fixed: string;
+  layer: string;
+  file: string;
+  /** Whether it binds the checked instance's catalogues. */
+  inScope: boolean;
+}
+
+export interface Override {
+  term: string;
+  fixed: FixedTerm;
+  /** The later layer's translation, and where. */
+  rendering: string;
+  layer: string;
+  file: string;
+}
+
+export interface TermBase {
+  terms: Map<string, FixedTerm>;
+  overrides: Override[];
+  /** Out-of-scope overrides: a different sense, reported as a note. */
+  senseOverrides: Override[];
+}
+
+// ── reading ─────────────────────────────────────────────────────
+
+function isLabel(e: PoEntry, terminology: boolean): boolean {
+  if (e.msgid.length >= MAX_TERM) return false;
+  if (terminology) return !/[.;:]\s|\.$/.test(e.msgid) && !e.msgid.startsWith("<");
+  return e.comments.some((c) => /^Glossary term (label|alternative label)\b/.test(c));
+}
+
+/** The declared `translation-sources` of `root`, or undefined (a layer that declares two is skipped, not guessed). */
+function translationsOf(root: string): string | undefined {
+  try {
+    return directoryForGraph(root, "translation-sources");
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Every glossary for `locale`, in precedence order: references, then the
+ * `needs` chain deepest first, then the instance itself.
+ */
+export function glossarySources(
+  instanceRoot: string,
+  locale: string,
+  references: ReadonlyArray<{ name: string; pattern: string }> = [],
+): GlossarySource[] {
+  const out: GlossarySource[] = [];
+  for (const r of references) {
+    for (const file of expand(r.pattern.replaceAll("{locale}", locale))) out.push({ layer: r.name, file, reference: true });
+  }
+  const self = readDeclaration(instanceRoot)?.name ?? basename(instanceRoot);
+  const chain = declarationChain(instanceRoot).map((c) => ({ name: c.own ? self : c.name, root: c.root }));
+  const rank = new Map(chain.map((c, i) => [c.name, i]));
+  const ranked: Array<GlossarySource & { at: number; seq: number }> = [];
+  let seq = 0;
+  chain.forEach((c, at) => {
+    const dir = translationsOf(c.root);
+    if (dir === undefined) return;
+    const schemes = join(dir, locale, "glossary");
+    if (existsSync(schemes)) {
+      for (const f of readdirSync(schemes).filter((x) => x.endsWith(".po")).sort()) {
+        const owner = /^(.+?)--/.exec(f)?.[1];
+        const layer = owner !== undefined && rank.has(owner) ? owner : c.name;
+        ranked.push({ layer, file: join(schemes, f), reference: false, at: rank.get(layer) ?? at, seq: seq++ });
+      }
+    }
+    const terminology = join(dir, locale, "glossary.po");
+    if (existsSync(terminology)) ranked.push({ layer: c.name, file: terminology, reference: false, at, seq: seq++ });
+  });
+  ranked.sort((a, b) => a.at - b.at || a.seq - b.seq);
+  for (const { layer, file, reference } of ranked) out.push({ layer, file, reference });
+  return out;
+}
+
+/** A path, or a `*` pattern in its last segment. */
+function expand(pattern: string): string[] {
+  if (!pattern.includes("*")) return existsSync(pattern) ? [pattern] : [];
+  const dir = dirname(pattern);
+  if (!existsSync(dir)) return [];
+  const re = new RegExp(`^${basename(pattern).split("*").map((s) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*")}$`);
+  return readdirSync(dir).filter((f) => re.test(f)).sort().map((f) => join(dir, f));
+}
+
+/**
+ * Merge the glossaries into one term base: the first translation of a label
+ * wins; a later, different one is an override (in scope) or a sense note.
+ */
+export function termBase(instance: string, locale: string, sources: readonly GlossarySource[]): TermBase {
+  const terms = new Map<string, FixedTerm>();
+  const overrides: Override[] = [];
+  const senseOverrides: Override[] = [];
+  const binds = (s: GlossarySource) => s.reference || s.layer === instance;
+  for (const s of sources) {
+    const terminology = basename(s.file) === "glossary.po";
+    for (const e of parsePoEntries(readFileSync(s.file, "utf-8"))) {
+      if (!e.msgstr.trim() || e.flags.includes("localised") || e.flags.includes("fuzzy") || !isLabel(e, terminology)) continue;
+      const k = e.msgid.toLowerCase();
+      const have = terms.get(k);
+      if (have === undefined) {
+        terms.set(k, { term: e.msgid, fixed: e.msgstr, layer: s.layer, file: s.file, inScope: binds(s) });
+        continue;
+      }
+      if (have.layer === s.layer || norm(have.fixed, locale) === norm(e.msgstr, locale)) continue;
+      const o: Override = { term: e.msgid, fixed: have, rendering: e.msgstr, layer: s.layer, file: s.file };
+      // An override changes a fixed translation within ONE domain. The fixed
+      // term must bind the overriding layer's content for that to be the case.
+      (have.inScope || have.layer === s.layer ? overrides : senseOverrides).push(o);
+    }
+  }
+  return { terms, overrides, senseOverrides };
+}
+
+// ── matching (ported from glossary_qa.py) ───────────────────────
+
+const TASHKEEL = /[ً-ْـ]/g;
+
+export function norm(s: string, locale: string): string {
+  let t = s.normalize("NFC").toLowerCase();
+  if (locale === "ar") t = t.replace(TASHKEEL, "").replace(/[أإآ]/g, "ا").replaceAll("ى", "ي").replaceAll("ة", "ه");
+  return t.replaceAll("’", "'");
+}
+
+function stem(w: string, locale: string): string {
+  if (locale === "ru" && w.length === 4) return w.slice(0, 3);
+  if (w.length <= 4) return w;
+  const cut = locale === "ru" && w.length > 6 ? 3 : 2;
+  return w.slice(0, Math.max(4, w.length - cut));
+}
+
+/** Does `msgstr` use the fixed translation? By stem, or by substring in zh and ar. */
+export function renders(fixed: string, msgstr: string, locale: string): boolean {
+  const t = norm(msgstr, locale);
+  let f = norm(fixed, locale);
+  if (locale === "zh") return t.includes(f);
+  if (locale === "ar") {
+    f = f.replace(/(^|\s)ال/g, "$1");
+    return f.split(/\s+/).filter(Boolean).every((w) => t.includes(w));
+  }
+  const toks = t.match(/[\p{L}\p{N}_]+/gu) ?? [];
+  return (f.match(/[\p{L}\p{N}_]+/gu) ?? []).every((w) => toks.some((x) => x.startsWith(stem(w, locale))));
+}
+
+/** Is `term` a word of the prose in `msgid` — not inside an identifier, a path, code or a placeholder? */
+export function uses(term: string, msgid: string): boolean {
+  const clean = msgid.replace(/\{[^}]*\}|`[^`]*`|https?:\/\/\S+/g, " ");
+  // An acronym is case-sensitive: DID is not "did".
+  const flags = term === term.toUpperCase() && term.length <= 6 && /[A-Z]/.test(term) ? "u" : "iu";
+  const esc = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<![A-Za-z0-9_\\-/.@])${esc}(?![A-Za-z0-9_\\-/@]|\\.\\w)`, flags).test(clean);
+}
+
+// ── the check ───────────────────────────────────────────────────
+
+export type GlossaryRule = "not-fixed-rendering" | "inconsistent" | "override";
+
+export interface GlossaryFinding {
+  rule: GlossaryRule;
+  term: string;
+  fixed?: string;
+  layer?: string;
+  catalogue?: string;
+  msgid?: string;
+  rendering?: string | string[];
+}
+
+export interface SenseNote {
+  term: string;
+  fixed: string;
+  layer: string;
+  catalogue: string;
+  msgid: string;
+}
+
+export interface LocaleResult {
+  locale: string;
+  fixedTerms: number;
+  catalogues: number;
+  findings: GlossaryFinding[];
+  sense: SenseNote[];
+}
+
+/** Every `.po` under the instance's `<translations>/<locale>/`, the glossaries included. */
+function catalogues(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true })
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((e) => (e.isDirectory() ? catalogues(join(dir, e.name)) : e.name.endsWith(".po") ? [join(dir, e.name)] : []));
+}
+
+/** Check one locale of the instance at `root`, whose catalogues are in `translations`. */
+export function checkLocale(
+  root: string,
+  translations: string,
+  locale: string,
+  references: ReadonlyArray<{ name: string; pattern: string }> = [],
+  /** The glossaries in precedence order; {@link glossarySources} when not given. */
+  sources?: readonly GlossarySource[],
+): LocaleResult {
+  const instance = readDeclaration(root)?.name ?? basename(root);
+  const base = termBase(instance, locale, sources ?? glossarySources(root, locale, references));
+  const findings: GlossaryFinding[] = [];
+  const sense: SenseNote[] = [];
+  for (const o of base.overrides) {
+    findings.push({ rule: "override", term: o.term, fixed: o.fixed.fixed, layer: o.fixed.layer, catalogue: relative(root, o.file), rendering: o.rendering });
+  }
+  for (const o of base.senseOverrides) {
+    sense.push({ term: o.term, fixed: o.fixed.fixed, layer: o.fixed.layer, catalogue: relative(root, o.file), msgid: `${o.layer} renders it «${o.rendering}»` });
+  }
+  // Longest first, so "Health worker" is judged before "worker".
+  const terms = [...base.terms.values()].sort((a, b) => b.term.length - a.term.length);
+  const exact = new Map<string, Map<string, string[]>>();
+  const files = catalogues(join(translations, locale));
+  for (const po of files) {
+    const rel = relative(root, po);
+    for (const e of parsePoEntries(readFileSync(po, "utf-8"))) {
+      if (!e.msgstr.trim() || e.flags.includes("fuzzy")) continue;
+      const whole = e.msgid.trim().toLowerCase();
+      if (whole.length < MAX_TERM && (base.terms.has(whole) || basename(po) === "glossary.po" || isLabel(e, false))) {
+        const r = exact.get(whole) ?? new Map<string, string[]>();
+        const n = norm(e.msgstr.trim(), locale);
+        r.set(n, [...(r.get(n) ?? []), `${rel}: ${e.msgstr.trim()}`]);
+        exact.set(whole, r);
+      }
+      for (const t of terms) {
+        if (!uses(t.term, e.msgid) || renders(t.fixed, e.msgstr, locale)) continue;
+        if (t.file === po) continue; // the glossary entry itself
+        if (t.inScope) findings.push({ rule: "not-fixed-rendering", term: t.term, fixed: t.fixed, layer: t.layer, catalogue: rel, msgid: e.msgid, rendering: e.msgstr });
+        else sense.push({ term: t.term, fixed: t.fixed, layer: t.layer, catalogue: rel, msgid: e.msgid });
+      }
+    }
+  }
+  for (const [term, renderings] of exact) {
+    if (renderings.size < 2) continue;
+    findings.push({ rule: "inconsistent", term: base.terms.get(term)?.term ?? term, rendering: [...renderings.values()].map((v) => v[0]!) });
+  }
+  return { locale, fixedTerms: base.terms.size, catalogues: files.length, findings, sense };
+}
+
+/** One finding as one line of output. */
+export function findingLine(locale: string, f: GlossaryFinding): string {
+  switch (f.rule) {
+    case "not-fixed-rendering":
+      return `✗ ${locale} not-fixed-rendering «${f.term}» → «${f.fixed}» (${f.layer}) not used in ${f.catalogue}: ${JSON.stringify(f.msgid?.slice(0, 80))}`;
+    case "inconsistent":
+      return `✗ ${locale} inconsistent «${f.term}» rendered ${(f.rendering as string[]).length} ways: ${(f.rendering as string[]).join(" | ")}`;
+    case "override":
+      return `✗ ${locale} override «${f.term}»: ${f.layer} fixes «${f.fixed}», ${f.catalogue} has «${f.rendering}»`;
+  }
+}
+
+/** The `qa-results/v1` record: one family per locale. */
+export function glossaryResult(instance: string, results: readonly LocaleResult[]) {
+  return buildQaResult({
+    script: GLOSSARY_CHECK_SCRIPT,
+    scriptAbsPath: join(TOOLS_ROOT, GLOSSARY_CHECK_SCRIPT),
+    subject: { kind: GLOSSARY_SUBJECT_KIND, id: instance },
+    families: Object.fromEntries(
+      results.map((r) => [
+        r.locale,
+        {
+          summary:
+            `${r.fixedTerms} fixed term(s), ${r.catalogues} catalogue(s); ` +
+            `${r.sense.length} sense-check note(s) (a term of another domain rendered otherwise), not counted as findings`,
+          entries: r.findings,
+        },
+      ]),
+    ),
+  });
+}
+
+function args(argv: readonly string[], name: string): string[] {
+  const out: string[] = [];
+  argv.forEach((a, i) => {
+    if (a === `--${name}` && argv[i + 1] !== undefined) out.push(argv[i + 1]!);
+    else if (a.startsWith(`--${name}=`)) out.push(a.slice(name.length + 3));
+  });
+  return out;
+}
+
+function main(argv: readonly string[]): number {
+  const root = explicitInstanceRoot(argv) ?? resolve(HARNESS_ROOT);
+  const check = argv.includes("--check");
+  const translations = translationsOf(root);
+  if (translations === undefined || !existsSync(translations)) {
+    console.error(`translation-glossary: ${root} declares no \`translation-sources\` directory — nothing can be determined (exit 2)`);
+    return 2;
+  }
+  const have = readdirSync(translations, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();
+  const asked = args(argv, "locale").flatMap((l) => l.split(",")).filter(Boolean);
+  const unknown = asked.filter((l) => !have.includes(l));
+  if (unknown.length > 0) {
+    console.error(`translation-glossary: no ${unknown.join(", ")} under ${relative(root, translations)}/ — nothing can be determined (exit 2)`);
+    return 2;
+  }
+  const references = args(argv, "layer").map((s) => {
+    const i = s.indexOf("=");
+    return { name: s.slice(0, i), pattern: resolve(s.slice(i + 1)) };
+  });
+  if (references.some((r) => !r.name)) {
+    console.error("translation-glossary: --layer takes <name>=<path with {locale}> (exit 2)");
+    return 2;
+  }
+  const instance = readDeclaration(root)?.name ?? basename(root);
+  const results = (asked.length ? asked : have).map((l) => checkLocale(root, translations, l, references));
+  let findings = 0;
+  for (const r of results) {
+    for (const f of r.findings) console.log(findingLine(r.locale, f));
+    for (const n of r.sense) console.log(`· ${r.locale} sense-check «${n.term}» (${n.layer}: «${n.fixed}») in ${n.catalogue}: ${JSON.stringify(n.msgid.slice(0, 80))}`);
+    console.log(`  ${r.locale}: ${r.fixedTerms} fixed term(s), ${r.catalogues} catalogue(s), ${r.findings.length} finding(s), ${r.sense.length} sense-check note(s)`);
+    findings += r.findings.length;
+  }
+  if (!check) {
+    // `qaResultPath`'s one composition: `<instance>/test/results/`, the `qa`
+    // directory every instance in an index declares, where `kg-qa-report` reads it.
+    const out = writeQaResult(root, GLOSSARY_RESULT_STEM, glossaryResult(instance, results));
+    console.log(`  wrote ${relative(root, out)}`);
+  }
+  return findings > 0 ? 1 : 0;
+}
+
+if (import.meta.main) process.exit(main(process.argv));
