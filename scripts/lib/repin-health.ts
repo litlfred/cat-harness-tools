@@ -135,9 +135,30 @@ export function refreshOwnHealth(root: string, paths: readonly string[], run: Ru
  * checkout's own instances declare `health`, refresh and push the report.
  * Returns the lines to print, or `undefined` when there was nothing to do.
  */
-export function afterMountHealth(root: string, before: string | undefined, after: string | undefined, run: Runner = realRunner): string[] | undefined {
+export function afterMountHealth(
+  root: string,
+  before: string | undefined,
+  after: string | undefined,
+  run: Runner = realRunner,
+  findPaths: (root: string) => string[] = ownHealthPaths,
+): string[] | undefined {
   if (!checkerMoved(before, after)) return undefined;
-  const paths = ownHealthPaths(root);
+  // Report only, never a failure of the mount: a declaration this layer's
+  // registry cannot read (a kind another mounted layer declares, as
+  // `l1-extraction` on 2026-11-07) used to throw out of `afterMount` and turn
+  // a clean mount's exit code to 1.
+  let paths: string[];
+  try {
+    paths = findPaths(root);
+  } catch (e) {
+    return [
+      `\n## Health report — the cat-harness-tools pin moved, but this checkout's own health directories could not be determined`,
+      "",
+      `  ? ${(e as Error).message.split("\n")[0]}`,
+      "",
+      "Not refreshed: run `bun run cat state:mount && bun run cat health -- --warn && bun run cat state:push` from the checkout, or this re-pin's `health-result-is-from-the-current-producer` fails once the old report is past its grace.",
+    ];
+  }
   if (paths.length === 0) return undefined;
   const r = refreshOwnHealth(root, paths, run);
   return [
