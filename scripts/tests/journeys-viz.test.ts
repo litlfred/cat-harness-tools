@@ -10,7 +10,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, posix } from "node:path";
 
 import { readJourneyCorpus, unescapeXml } from "../journeys/read.ts";
 import { bpmnFigure, orderByFollows, renderJourneyPages, stepAnchor, type PageFile } from "../journeys/render.ts";
@@ -30,6 +30,9 @@ import {
   screenHref,
   screensFor,
   shortTitle,
+  castOrder,
+  mentioned,
+  mentionedChips,
   siteRootFrom,
   viewBoxWidth,
 } from "../journeys/present.ts";
@@ -128,6 +131,11 @@ put("lower/scenarios/user-scenarios/p2.json", {
         { block: "nowhere", role: "unknown block" },
       ],
       gaps: ["No transaction for this yet."],
+      references: [
+        { label: "The walkthrough", href: "vaxlink/", rel: "illustrates" },
+        { label: "The spec", href: "https://example.org/spec" },
+        { label: "This step", href: "#p2" },
+      ],
       handoff: { summary: "The summary goes home", from: "Clinic EMR", to: "ana", offline: false },
       fhirChanges: [{ resource: "Bundle", change: "Read, not stored", why: "It is hers.", profile: "ips-bundle", profileOf: "Intl", examples: ["Bundle/ana-ips"] }],
       illustration: { src: "docs/images/p2.png", alt: "Ben reads the summary on a tablet." },
@@ -327,6 +335,23 @@ describe("a journey page", () => {
     expect(p2).toContain('data-jv-store');
     expect(p2).toContain("a signature crosses");
   });
+  test("a reference's href resolves from the site's root, as the workshop pages resolve it", () => {
+    // The journey page sits at <route>/<instance>/<id>/: two up to the route root, three more out of `en/top/journeys`.
+    const toSite = "../../../../../";
+    expect(p2).toContain(`href="${toSite}journeys.html#p2">User scenario in the IG</a>`);
+    expect(p2).toContain(`href="${toSite}vaxlink/">The walkthrough</a>`);
+    expect(p2).toContain('href="https://example.org/spec">The spec</a>');
+    expect(p2).toContain('href="#p2">This step</a>');
+    expect(p2).not.toContain('href="journeys.html#p2"');
+    expect(p2).not.toContain('href="vaxlink/"');
+  });
+  test("the journey page and the workshop pages reach the same file for one relative href", () => {
+    const fromJourney = posix.join("en/top/journeys/lower/p2-treated/", "../../../../../journeys.html");
+    const ws = at("top/workshops/policy/walkthrough/P2/index.html");
+    const href = /href="([^"]*journeys\.html)#p2"/.exec(ws)?.[1];
+    expect(href).toBeDefined();
+    expect(posix.join("en/top/journeys/top/workshops/policy/walkthrough/P2/", href!)).toBe(fromJourney);
+  });
   test("follows and partOf are links", () => {
     expect(p2).toContain('href="../../lower/p1-checked/" rel="prev"');
     expect(at("top/t1-away/index.html")).toContain('href="../../top/t-group/" rel="up"');
@@ -420,9 +445,10 @@ describe("the presentation pages: a workshop told in a room, with no site chrome
     expect(p2).toContain("— a signature crosses");
     expect(p2).toContain('name="policy:viewer:status"');
   });
-  test("a step: the people, each with the avatar beside the name, and under the hood", () => {
+  test("a step: the people, each with the avatar in the card's header (never inside a sentence), and under the hood", () => {
     expect(p2).toContain('class="jp-who" style="--c:#123456"');
-    expect(p2).toContain('<span class="jp-named">Ben (nurse)<span class="jp-av jp-av-sm"');
+    expect(p2).toContain('<span class="jp-named">Ben (nurse)</span>: reads the summary');
+    expect(p2).not.toMatch(/<span class="jp-named">[^<]*<span class="jp-av/);
     expect(p2).toContain('<b>Health wallet</b><span>shows the QR</span>');
     expect(p2).toContain('data-element-id="Task_Read" data-jv-hl=""');
     expect(p2).toContain('data-jp-hood');
@@ -471,7 +497,9 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(ana).toContain('<a href="../../walkthrough/P2/"><title>P2 Step P2: Worried</title>');
     expect(ana).toContain("Ana’s touchpoints (2)");
     expect(at(`${base}/personas/index.html`)).toContain('href="ana/"');
-    expect(at(`${base}/personas/cleo/index.html`)).not.toMatch(/jp-av-lg"[^>]*>CL</);
+    // One chip style for everyone, the baby too: initials, never a glyph among them (owner, 2026-11-06).
+    expect(at(`${base}/personas/cleo/index.html`)).toMatch(/class="jp-av jp-av-lg"[^>]*title="Cleo"[^>]*>C<\/span>/);
+    expect(map).not.toMatch(/class="jp-av[^"]*"[^>]*><svg/);
   });
   test("how it works: the big ideas, the grid, a block's detail with the moments that use it", () => {
     expect(how).toContain("Carry it yourself");
@@ -482,9 +510,17 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(wallet).toContain("<small>shows the QR</small>");
     expect(wallet).toContain("Read the patient&#39;s summary");
   });
-  test("the discussion: the closing question, the moments to revisit, the tables with what forces each row, the gap list", () => {
+  test("the discussion: the closing question, the moments to revisit, the tables with what forces each row, the gap report", () => {
     expect(discuss).toContain("What must countries agree on?");
-    expect(discuss).toContain('data-jp-gap="policy:viewer:status"');
+    // The gap report's model: the gap strip's own storage names, the moment's link, its first module.
+    const model = JSON.parse(/<script type="application\/json" data-jp-gapreport-model>([\s\S]*?)<\/script>/.exec(discuss)![1]!);
+    expect(model.items).toEqual([{ name: { status: "policy:viewer:status" }, capability: { id: "viewer", label: "A viewer" }, step: { id: "P2", title: "Step P2", href: "../walkthrough/P2/" }, module: "M1" }]);
+    expect(model.status.options.map((o: { id: string }) => o.id)).toEqual(["yes", "no"]);
+    expect(model.urgency).toBeUndefined();
+    expect(discuss).toContain('<script src="../../../../assets/gap-report.js" defer></script>');
+    expect(discuss).toContain("data-jp-report-print");
+    expect(discuss).toContain("data-jp-report-csv");
+    expect(files.some((f) => f.path === "assets/gap-report.js")).toBe(true);
     expect(discuss).toContain("Forced by:");
     expect(discuss).toContain('href="../walkthrough/P2/"');
   });
@@ -551,15 +587,42 @@ describe("presentation helpers", () => {
     expect(p.cast.map((c) => c.id)).toEqual(["ana", "ben", "cleo"]);
     expect(p.steps[1]!.ws?.askTheRoom).toBe("Should the family be told?");
   });
-  test("personaText puts the avatar beside whole-word names, longest first, and escapes the rest", () => {
+  test("an overview card: the picture first, the strip (labelled, VaxLink's size) and the people at its foot", () => {
+    const ov = at("top/workshops/policy/overview/index.html");
+    const card2 = [...ov.matchAll(/<a class="jp-card jp-moment"[\s\S]*?<\/a>/g)].map((m) => m[0]).find((c) => c.includes("jp-pic"))!;
+    expect(card2.indexOf('class="jp-pic"')).toBeLessThan(card2.indexOf('class="jp-moment-title"'));
+    expect(card2.indexOf('class="jp-moment-sum"')).toBeLessThan(card2.indexOf('class="jp-moment-foot"'));
+    expect(card2).toContain('jp-scene jp-scene-md');
+    expect(card2).toContain('<span class="jp-scene-l">A clinic</span>');
+  });
+  test("presentation.cast orders the cast everywhere; presentation.chapterTitles names a chapter", () => {
+    const w0 = corpus.workshops[0]!;
+    const w = { ...w0, workshop: { ...w0.workshop, presentation: { ...w0.workshop.presentation, cast: ["cleo", "ghost", "ana"], chapterTitles: { "p2-treated": "Crossing back" } } } };
+    const p = presentationOf(corpus, w);
+    // Declared first (an id no step names is dropped), then the rest in order of first appearance.
+    expect(p.cast.map((c) => c.id)).toEqual(["cleo", "ana", "ben"]);
+    expect(p.chapters.map((c) => c.title)).toEqual(["Checked", "Crossing back"]);
+    expect(castOrder(["a", "b", "c"], undefined)).toEqual(["a", "b", "c"]);
+    expect(castOrder(["a", "b", "c"], ["c", "c", "x"])).toEqual(["c", "a", "b"]);
+  });
+  test("personaText marks whole-word names, longest first, puts no avatar in the sentence, and escapes the rest", () => {
     const people = [
       { id: "a", name: "Anan", initials: "AN", color: "#000000" },
       { id: "d", name: "Dr. Anan", initials: "DA", color: "#111111" },
     ];
     const out = personaText("Dr. Anan meets Ananda <b>", people);
-    expect(out).toContain('<span class="jp-named">Dr. Anan<span class="jp-av jp-av-sm" style="--c:#111111"');
-    expect(out).not.toContain(">Anan<span");
-    expect(out).toContain("Ananda &lt;b&gt;");
+    expect(out).toBe('<span class="jp-named">Dr. Anan</span> meets Ananda &lt;b&gt;');
+  });
+  test("mentioned: the people a sentence names, in the cast's order, without the card's own person; their chips go in the header", () => {
+    const people = [
+      { id: "s", name: "Somsack", initials: "SS", color: "#65a30d" },
+      { id: "k", name: "Khamla", initials: "KS", color: "#f43f5e" },
+      { id: "v", name: "Vilay", initials: "VI", color: "#14b8a6" },
+    ];
+    expect(mentioned("Tells Vilay about Somsack, then Vilay again", people).map((p) => p.id)).toEqual(["s", "v"]);
+    expect(mentioned("Khamla brings Somsack", people, "k").map((p) => p.id)).toEqual(["s"]);
+    expect(mentionedChips("waits", people)).toBe("");
+    expect(mentionedChips("Tells Vilay", people)).toContain('<span class="jp-mentions" title="With Vilay"><span class="jp-av jp-av-sm" style="--c:#14b8a6" title="Vilay" aria-hidden="true">VI</span></span>');
   });
   test("links out: kramdown anchors, page patterns, the site's root, JSON colouring", () => {
     expect(kramdownSlug("J1 — Born abroad (Thailand, birth day)")).toBe("j1--born-abroad-thailand-birth-day");

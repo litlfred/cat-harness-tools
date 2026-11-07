@@ -40,6 +40,7 @@ import {
   emotionBadge,
   examplePage,
   EMOTION,
+  mentionedChips,
   ext,
   frame,
   glyph,
@@ -155,7 +156,7 @@ function mapPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): stri
             const ex = s.step.experiences.find((y) => y.actor === x.id);
             if (!ex) return cell(s, "", "jp-mc-empty");
             const lead = s.step.lead === x.id;
-            return cell(s, `<div class="jp-mcard${lead ? " is-lead" : ""}"><div class="jp-mcard-h">${emotionBadge(ex.emotion)}${lead ? '<span class="jp-lead">Lead</span>' : ""}</div><p>${personaText(ex.doing, p.cast)}</p>${ex.feeling ? `<p class="jp-feel">${e(ex.feeling)}</p>` : ""}</div>`);
+            return cell(s, `<div class="jp-mcard${lead ? " is-lead" : ""}"><div class="jp-mcard-h">${emotionBadge(ex.emotion)}${mentionedChips(ex.doing, p.cast, x.id)}${lead ? '<span class="jp-lead">Lead</span>' : ""}</div><p>${personaText(ex.doing, p.cast)}</p>${ex.feeling ? `<p class="jp-feel">${e(ex.feeling)}</p>` : ""}</div>`);
           })
           .join(""),
       ),
@@ -497,28 +498,67 @@ function discussPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks): 
     })
     .join("");
   const scales = ws.assessment?.scales ?? [];
-  const caps = p.steps.flatMap((s) => (s.ws?.capabilities ?? []).map((c) => ({ s, c })));
-  const gap =
-    caps.length && scales.length
-      ? `<section class="jp-card jp-pad jp-gaplist" data-jp-gaplist><div class="jp-row"><h3 class="jp-h">${icon("clipboard", "jp-rose")} Our gap list</h3><span class="jp-gap-act"><span class="jp-small"><b data-jp-gap-count>0</b> of ${caps.length} capabilities marked</span><button type="button" class="jp-btn-line" data-jv-print>${icon("printer")} Print</button><button type="button" class="jp-btn-line" data-jp-gap-clear>Clear</button></span></div><p class="jp-small">Assembled from the gap strip on every moment of the walkthrough, in this browser only. ${e(ws.assessment?.standingLine ?? "")}</p>
-<ul class="jp-gaps">${caps
-          .map(({ s, c }) => {
-            const name = `${ws.id}:${c.id}:${scales[0]!.id}`;
-            return `<li data-jp-gap="${e(name)}" data-jp-gap-ok="${e(scales[0]!.options[0]!.id)}" hidden>${stepChip(a, s, s.step.id)}<span>${e(c.label)}</span><b data-jp-gap-value></b></li>`;
-          })
-          .join("")}</ul><p class="jp-small jp-gap-none" data-jp-gap-none>Nothing marked partial or absent yet. Open a moment in the walkthrough and use its gap strip.</p></section>`
-      : "";
-  const options = JSON.stringify(Object.fromEntries((scales[0]?.options ?? []).map((o) => [o.id, o.label])));
+  const model = gapReportModel(p, (s) => walkHref(a, s));
+  const gap = model
+    ? `<section class="jp-card jp-pad jp-gapreport" data-jp-gapreport><div class="jp-row"><h3 class="jp-h">${icon("clipboard", "jp-rose")} Gap report</h3><span class="jp-gap-act jp-noprint"><span class="jp-small"><b data-jp-gap-count>0</b> of ${model.items.length} capabilities marked as gaps</span><button type="button" class="jp-btn-line" data-jp-report-print>${icon("printer")} Print / Save as PDF</button><button type="button" class="jp-btn-line" data-jp-report-csv>${icon("file")} Download CSV</button><button type="button" class="jp-btn-line" data-jp-gap-clear>Clear</button></span></div><p class="jp-small">Assembled from the gap strip on every moment of the walkthrough, <b>in this browser only</b>: nothing is sent anywhere, and another browser keeps its own answers. ${e(ws.assessment?.standingLine ?? "")}</p>
+<script type="application/json" data-jp-gapreport-model>${jsonInHtml(model)}</script>
+<div data-jp-gapreport-body></div><p class="jp-small jp-gap-none" data-jp-gap-none>Nothing marked ${e(scales[0]!.options.slice(1).map((o) => o.label.toLowerCase()).join(" or "))} yet. Open a moment in the walkthrough and use its gap strip.</p></section>`
+    : "";
   const takeaways = p.steps.filter((s) => s.step.policy);
   const body = `<section class="jp-dhero"><span class="jp-kicker">${icon("message")} Questions for the room</span><h2>${e(pr.closingQuestion ?? "Closing discussion")}</h2></section>
 ${cards ? `<div class="jp-dqs">${cards}</div>` : ""}
 ${ws.promise ? `<section class="jp-promise"><b>The scope promise.</b> ${e(ws.promise)}</section>` : ""}
 ${byModule ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("message", "jp-indigo")} The journey’s questions, module by module</h3><div class="jp-dms">${byModule}</div></section>` : ""}
 ${tables}
-${gap ? gap.replace("data-jp-gaplist>", `data-jp-gaplist data-jp-gap-labels="${e(options)}">`) : ""}
+${gap}
 ${takeaways.length ? `<section class="jp-card jp-pad"><h3 class="jp-h">${icon("landmark", "jp-indigo")} Every moment’s policy takeaway</h3><ul class="jp-takes">${takeaways.map((s) => `<li>${stepChip(a, s, s.step.id)}<div><b>${e(s.step.title)}</b><p>${e(s.step.policy!)}</p></div></li>`).join("")}</ul></section>` : ""}`;
-  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body });
+  return frame({ p, root: a.root, toWorkshop: a.toWorkshop, view: "discuss", title: `Discussion — ${presentationName(p)}`, ...note(p, "discuss"), ...(gap ? { head: `<script src="${a.root}assets/gap-report.js" defer></script>` } : {}), prev: `${a.toWorkshop}walkthrough/${p.steps[p.steps.length - 1]!.key}/`, body });
 }
+
+// ── the gap report ───────────────────────────────────────────────────────
+
+/** A scale of the workshop's assessment, as the report reads it. */
+export interface GapScale {
+  id: string;
+  label: string;
+  options: { id: string; label: string }[];
+}
+
+/** What the discussion page hands `assets/gap-report.js`: every capability the walkthrough rates, and where its answers are stored. */
+export interface GapReportModel {
+  status: GapScale;
+  urgency?: GapScale;
+  modules: { id: string; title: string }[];
+  items: { name: { status: string; urgency?: string }; capability: { id: string; label: string }; step: { id: string; title: string; href: string }; module?: string }[];
+}
+
+/**
+ * The gap report's model, or undefined when the workshop rates nothing. The
+ * first scale is where a capability stands, the second (if any) how urgent a
+ * gap is; each capability is filed under the first module its moment's
+ * questions name. The storage names are the gap strip's own
+ * (`<workshop>:<capability>:<scale>`), so the report reads what the strip wrote.
+ */
+export function gapReportModel(p: Presentation, href: (s: PresentedStep) => string): GapReportModel | undefined {
+  const ws = p.w.workshop;
+  const scales = ws.assessment?.scales ?? [];
+  const items = p.steps.flatMap((s) =>
+    (s.ws?.capabilities ?? []).map((c) => {
+      const module = s.ws?.questions?.[0]?.module;
+      return {
+        name: { status: `${ws.id}:${c.id}:${scales[0]?.id}`, ...(scales[1] ? { urgency: `${ws.id}:${c.id}:${scales[1].id}` } : {}) },
+        capability: { id: c.id, label: c.label },
+        step: { id: s.step.id, title: s.step.title, href: href(s) },
+        ...(module ? { module } : {}),
+      };
+    }),
+  );
+  if (items.length === 0 || scales.length === 0) return undefined;
+  return { status: scales[0]!, ...(scales[1] ? { urgency: scales[1] } : {}), modules: ws.modules.map((m) => ({ id: m.id, title: m.title })), items };
+}
+
+/** JSON safe inside a `<script>` element: no `</script>` or `<!--` can end it early. */
+const jsonInHtml = (v: unknown): string => JSON.stringify(v).replace(/</g, "\\u003c");
 
 // ── the table sheets ─────────────────────────────────────────────────────
 

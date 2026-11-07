@@ -87,6 +87,12 @@ const Text = z.string().min(1);
 export const ReferenceSchema = z
   .object({
     label: Text,
+    /**
+     * A URL (`https:`, `mailto:` …), an absolute path or a `#fragment` as it
+     * is; anything else is a path from the SITE'S ROOT (`vaxlink/`,
+     * `journeys.html#j1`), resolved the same way on the journey page and the
+     * workshop pages (`fromSite`, `scripts/journeys/read.ts`).
+     */
     href: Text,
     /** What the link is to the step or journey: `specifies`, `illustrates`, `reading`. Free text. */
     rel: Text.optional(),

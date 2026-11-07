@@ -21,7 +21,7 @@
  * |---|---|
  * | `overview/index.html` | the story in one sentence, a card per chapter, the cast, the trust ladder |
  * | `walkthrough/<step>/index.html` | one step: the chapter progress bar, the story card, the people, the record, ask the room, what if, the policy layer, under the hood |
- * | `assets/present.css`, `assets/present.js` | the style, and the keys (← → W T), presenter mode and the gap strip's memory |
+ * | `assets/present.css`, `assets/present.js`, `assets/gap-report.js` | the style, and the keys (← → W T), presenter mode, the gap strip's memory and the discussion page's gap report |
  *
  * ## Chapters
  *
@@ -40,7 +40,7 @@ import { NAVBAR_OPT_OUT } from "../viewer-page.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
 import type { ScenarioStep } from "../../schemas/process/user-scenario.ts";
 import type { WorkshopPresentation, WorkshopStep } from "../../schemas/process/workshop.ts";
-import { blockFor, journeyById, lookup, processDrawing, processName, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
+import { blockFor, fromSite, journeyById, lookup, processDrawing, processName, siteRootFrom, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
 import {
   allSteps,
   bpmnFigure,
@@ -56,7 +56,7 @@ import {
   type SiteLinks,
 } from "./render.ts";
 
-export const PRESENT_ASSETS = ["present.css", "present.js"] as const;
+export const PRESENT_ASSETS = ["present.css", "present.js", "gap-report.js"] as const;
 /** The workshop segments these pages take: a module may not be called either. */
 export const PRESENT_SEGMENTS = ["overview", "walkthrough", ...VIEW_SEGMENTS] as const;
 
@@ -79,7 +79,7 @@ export interface PresentedStep {
 
 export interface Chapter {
   journey: Journey;
-  /** Its title without the code in front: "Born abroad" for "J1 — Born abroad". */
+  /** Its title in the room: `presentation.chapterTitles` for its journey, else the journey title without the code in front ("Born abroad" for "J1 — Born abroad"). */
   title: string;
   steps: PresentedStep[];
 }
@@ -88,11 +88,22 @@ export interface Presentation {
   w: WorkshopEntry;
   chapters: Chapter[];
   steps: PresentedStep[];
-  /** Everyone a step names, in order of first appearance, with a stable colour each. */
+  /** Everyone a step names, in the declared order (`presentation.cast`) then of first appearance, with a stable colour each. */
   cast: PersonaView[];
   /** The Device Demo's screens (`screens.ts`), and whether they are drawn or framed. */
   screens: DemoScreen[];
   demo: DemoSource;
+}
+
+/**
+ * The cast in the order the presentation declares (`presentation.cast`), then
+ * everyone else in order of first appearance. An id the declared order names
+ * and no step does is dropped: the cast is the people the steps name.
+ */
+export function castOrder(appearing: readonly string[], declared: readonly string[] | undefined): string[] {
+  if (!declared?.length) return [...appearing];
+  const first = declared.filter((id, i) => appearing.includes(id) && declared.indexOf(id) === i);
+  return [...first, ...appearing.filter((id) => !first.includes(id))];
 }
 
 /** "J1 — Born abroad" → "Born abroad": a step code ("J4.0", "P2", "T") and a dash or a middle dot in front are dropped. */
@@ -130,7 +141,7 @@ export function presentationOf(corpus: JourneyCorpus, w: WorkshopEntry): Present
     const root = roots[k]!;
     let c = chapters.findIndex((x) => x.journey === root);
     if (c < 0) {
-      chapters.push({ journey: root, title: shortTitle(root.scenario.title), steps: [] });
+      chapters.push({ journey: root, title: w.workshop.presentation?.chapterTitles?.[root.scenario.id] ?? shortTitle(root.scenario.title), steps: [] });
       c = chapters.length - 1;
     }
     // A journey with no steps of its own is taught through its sub-journeys.
@@ -164,7 +175,7 @@ export function presentationOf(corpus: JourneyCorpus, w: WorkshopEntry): Present
       }
     }
   }
-  const cast = ids.map((id, i) => personaOf(corpus, instanceOf.get(id)!, id, i));
+  const cast = castOrder(ids, w.workshop.presentation?.cast).map((id, i) => personaOf(corpus, instanceOf.get(id)!, id, i));
   const demo = demoScreensOf(corpus, w, steps);
   return { w, chapters: chapters.filter((c) => c.steps.length > 0), steps, cast, screens: demo.screens, demo: demo.source };
 }
@@ -200,27 +211,40 @@ export function countryTones(countries: readonly (string | undefined)[]): Map<st
 export const LAYER_TONES = ["teal", "sky", "indigo", "violet", "rose", "amber"] as const;
 
 /**
- * Text with each person's avatar beside their name, as VaxLink's
- * `PersonaText`: escaped, and a name matches only as a whole word, the longest
- * name first ("Dr. Anan" before "Anan").
+ * A sentence that names people, as text. The names are marked
+ * (`.jp-named`) but no avatar is put inside the sentence (owner,
+ * 2026-11-06: a chip mid-sentence reads as a stray icon); a card that wants
+ * the people it names shows {@link mentioned} in its header instead.
  */
 export function personaText(text: string, people: readonly PersonaView[]): string {
-  const named = [...people].filter((p) => p.name.trim()).sort((a, b) => b.name.length - a.name.length);
+  const named = namedIn(people);
   if (named.length === 0) return e(text);
-  const re = new RegExp(`(?<![\\p{L}\\p{N}])(${named.map((p) => p.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?![\\p{L}\\p{N}])`, "gu");
-  let out = "";
-  let last = 0;
-  for (const m of text.matchAll(re)) {
-    const p = named.find((x) => x.name === m[1])!;
-    out += e(text.slice(last, m.index)) + `<span class="jp-named">${e(m[1]!)}${avatar(p, "sm")}</span>`;
-    last = m.index! + m[0].length;
-  }
-  return out + e(text.slice(last));
+  return e(text).replace(namePattern(named, true), (m) => `<span class="jp-named">${m}</span>`);
+}
+
+const namedIn = (people: readonly PersonaView[]): PersonaView[] => [...people].filter((p) => p.name.trim()).sort((a, b) => b.name.length - a.name.length);
+const namePattern = (named: readonly PersonaView[], escaped = false): RegExp =>
+  new RegExp(`(?<![\\p{L}\\p{N}])(${named.map((p) => (escaped ? e(p.name) : p.name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?![\\p{L}\\p{N}])`, "gu");
+
+/** The people a sentence names, in the cast's order, each once, leaving out `except` (the card's own person). */
+export function mentioned(text: string, people: readonly PersonaView[], except?: string): PersonaView[] {
+  const named = namedIn(people);
+  if (named.length === 0) return [];
+  const hit = new Set([...text.matchAll(namePattern(named))].map((m) => m[1]!));
+  return people.filter((p) => p.id !== except && hit.has(p.name));
+}
+
+/** The avatars of the people a card's sentence names, for its header. */
+export function mentionedChips(text: string, people: readonly PersonaView[], except?: string): string {
+  const who = mentioned(text, people, except);
+  return who.length ? `<span class="jp-mentions" title="${e(`With ${who.map((p) => p.name).join(", ")}`)}">${who.map((p) => avatar(p, "sm")).join("")}</span>` : "";
 }
 
 /** A person's avatar: their picture when the persona names one (from the route root, `ROOT_MARK`), else their glyph or initials on their colour. */
 export function avatar(p: PersonaView, size: "sm" | "md" | "lg" = "md"): string {
-  const inner = p.avatar ? `<img src="${e(ROOT_MARK + p.avatar)}" alt="" loading="lazy">` : p.icon && GLYPH[p.icon] ? glyph(p.icon) : e(p.initials);
+  // A persona's picture where it names one; otherwise initials for everyone, the baby too: one chip
+  // style wherever people are stacked or listed (owner, 2026-11-06), never a glyph among initials.
+  const inner = p.avatar ? `<img src="${e(ROOT_MARK + p.avatar)}" alt="" loading="lazy">` : e(p.initials);
   return `<span class="jp-av jp-av-${size}${p.avatar ? " jp-av-img" : ""}" style="--c:${e(p.color)}" title="${e(p.name)}" aria-hidden="true">${inner}</span>`;
 }
 
@@ -337,7 +361,7 @@ export const glyph = (name: string, cls = ""): string =>
 export function sceneStrip(scene: readonly { icon: string; label: string }[] | undefined, tone = "sky", size: "sm" | "md" = "md"): string {
   if (!scene?.length) return "";
   return `<figure class="jp-scene jp-scene-${size} jp-scene-${tone}" aria-label="${e(scene.map((x) => x.label).join(", then "))}">${scene
-    .map((x, i) => `${i ? icon("arrow", "jp-scene-arrow") : ""}<span title="${e(x.label)}"><span class="jp-scene-i">${glyph(x.icon)}</span></span>`)
+    .map((x, i) => `${i ? icon("arrow", "jp-scene-arrow") : ""}<span class="jp-scene-p" title="${e(x.label)}"><span class="jp-scene-i">${glyph(x.icon)}</span>${size === "md" ? `<span class="jp-scene-l">${e(x.label)}</span>` : ""}</span>`)
     .join("")}</figure>`;
 }
 
@@ -368,13 +392,8 @@ export function viewBoxWidth(svg: string): number | undefined {
 
 // ── links out: the site, the IG, the device demo ──────────────────────────
 
-/** From a page to the site's root: the viewer's route root, then up out of the route (`en/<harness>/<id>`). */
-export const siteRootFrom = (root: string, links: SiteLinks): string => root + "../".repeat(links.route.split("/").length);
-
-/** An href a workshop names: a URL as it is, an absolute path as it is, else a path from the site's root. */
-export function fromSite(href: string, siteRoot: string): string {
-  return /^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("/") || href.startsWith("#") ? href : `${siteRoot}${href}`;
-}
+// The one resolver for an href a journey or a workshop names: `read.ts`.
+export { fromSite, siteRootFrom } from "./read.ts";
 
 /** `{type}` and `{id}` filled into a page pattern. */
 export const fillPattern = (pattern: string, v: { type?: string; id: string }): string => pattern.split("{type}").join(v.type ?? "").split("{id}").join(v.id);
@@ -597,15 +616,15 @@ function overviewPage(corpus: JourneyCorpus, p: Presentation): string {
     .map((c, i) => {
       const j = c.journey.scenario;
       const pic = c.steps.map((s) => pictureOf(corpus, s, root)).find(Boolean) ?? "";
-      const scene = sceneStrip(chapterScene(c), tones.get(j.country ?? "") ?? "sky", "sm");
+      const scene = sceneStrip(chapterScene(c), tones.get(j.country ?? "") ?? "sky", "md");
       const people = p.cast.filter((x) => c.steps.some((s) => s.step.experiences.some((y) => y.actor === x.id)));
       return `<a class="jp-card jp-moment" href="${e(walk(c.steps[0]))}">${i < p.chapters.length - 1 ? `<span class="jp-moment-arrow">${icon("arrow")}</span>` : ""}
+${pic}
 <span class="jp-moment-top"><span class="jp-num">${i + 1}</span>${chip(j.country)}</span>
 <span class="jp-moment-title">${e(c.title)}</span>
 <span class="jp-moment-meta">${[j.when, j.where].filter(Boolean).map((x) => e(x!)).join(" · ")}</span>
 <span class="jp-moment-sum">${e(j.description.replace(/\.md$/, ""))}</span>
-${pic}${scene}
-<span class="jp-stack">${people.map((x) => avatar(x, "sm")).join("")}</span>
+<span class="jp-moment-foot">${scene}<span class="jp-stack">${people.map((x) => avatar(x, "sm")).join("")}</span></span>
 </a>`;
     })
     .join("\n");
@@ -871,7 +890,7 @@ function stepPage(corpus: JourneyCorpus, p: Presentation, s: PresentedStep, link
   const personCards = people
     .map((x) => {
       const pv = p.cast.find((c) => c.id === x.actor)!;
-      return `<div class="jp-who" style="--c:${e(pv.color)}"><div class="jp-who-h">${avatar(pv)}<div><b>${e(pv.name)}</b>${pv.role ? `<span>${e(pv.role)}</span>` : ""}</div>${emotionBadge(x.emotion)}</div><p>${personaText(x.doing, p.cast)}</p>${x.feeling ? `<p class="jp-feel">${e(x.feeling)}</p>` : ""}</div>`;
+      return `<div class="jp-who" style="--c:${e(pv.color)}"><div class="jp-who-h">${avatar(pv)}<div><b>${e(pv.name)}</b>${pv.role ? `<span>${e(pv.role)}</span>` : ""}</div>${mentionedChips(x.doing, p.cast, x.actor)}${emotionBadge(x.emotion)}</div><p>${personaText(x.doing, p.cast)}</p>${x.feeling ? `<p class="jp-feel">${e(x.feeling)}</p>` : ""}</div>`;
     })
     .join("");
   const ladder = ladderOf(corpus, s.journey);

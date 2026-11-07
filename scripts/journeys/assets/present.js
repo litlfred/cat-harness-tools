@@ -187,40 +187,170 @@
     }
   }
 
-  function gapList(g) {
-    var labels = {};
+  // The gap report on the discussion page: the gap strip's answers in this
+  // browser, summarised by assets/gap-report.js, drawn, printed and downloaded.
+  function gapReport(g) {
+    var lib = window.jpGapReport;
+    var src = g.querySelector("[data-jp-gapreport-model]");
+    if (!src) return;
+    // gap-report.js is deferred after this script; DOMContentLoaded waits for every deferred script.
+    if (!lib) {
+      if (!g.hasAttribute("data-jp-waited")) {
+        g.setAttribute("data-jp-waited", "");
+        doc.addEventListener("DOMContentLoaded", function () {
+          gapReport(g);
+        });
+      }
+      return;
+    }
+    var model;
     try {
-      labels = JSON.parse(g.getAttribute("data-jp-gap-labels") || "{}");
+      model = JSON.parse(src.textContent);
     } catch (_e) {
-      labels = {};
+      return;
+    }
+    var body = g.querySelector("[data-jp-gapreport-body]");
+    var report = null;
+    function el(tag, cls, text) {
+      var n = doc.createElement(tag);
+      if (cls) n.className = cls;
+      if (text !== undefined) n.textContent = text;
+      return n;
+    }
+    function answer(name) {
+      return store("jv:" + name);
+    }
+    function stepLink(step) {
+      var a = el("a", "jp-revisit");
+      a.href = step.href;
+      a.title = step.title;
+      a.appendChild(el("b", null, step.id));
+      a.appendChild(el("span", null, step.title));
+      return a;
+    }
+    function countsTable(caption, rows, head) {
+      var t = el("table", "jp-gr-counts");
+      t.appendChild(el("caption", null, caption));
+      var tr = el("tr");
+      tr.appendChild(el("th", null, head));
+      report.statusOptions.forEach(function (o) {
+        tr.appendChild(el("th", null, o.label));
+      });
+      tr.appendChild(el("th", null, "Not rated"));
+      var thead = el("thead");
+      thead.appendChild(tr);
+      t.appendChild(thead);
+      var tb = el("tbody");
+      rows.forEach(function (r) {
+        var row = el("tr");
+        var th = el("th");
+        th.scope = "row";
+        if (r.link) th.appendChild(r.link);
+        else th.textContent = r.label;
+        row.appendChild(th);
+        report.statusOptions.forEach(function (o, i) {
+          var n = r.counts.byStatus[o.id];
+          row.appendChild(el("td", n && i > 0 ? "is-gap" : null, String(n)));
+        });
+        row.appendChild(el("td", "jp-gr-unrated", String(r.counts.unrated)));
+        tb.appendChild(row);
+      });
+      t.appendChild(tb);
+      return t;
     }
     function draw() {
-      var n = 0;
-      Array.prototype.forEach.call(g.querySelectorAll("[data-jp-gap]"), function (li) {
-        var v = store("jv:" + li.getAttribute("data-jp-gap"));
-        var marked = v !== null && v !== li.getAttribute("data-jp-gap-ok");
-        li.hidden = !marked;
-        if (marked) {
-          n++;
-          li.querySelector("[data-jp-gap-value]").textContent = labels[v] || v;
-        }
+      report = lib.summarise(model, answer);
+      body.textContent = "";
+      g.querySelector("[data-jp-gap-count]").textContent = String(report.gapCount);
+      g.querySelector("[data-jp-gap-none]").hidden = report.gapCount > 0;
+      report.gaps.forEach(function (u) {
+        var sec = el("section", "jp-gr-urgency" + (u.urgency === null ? " is-unset" : ""));
+        var n = 0;
+        u.modules.forEach(function (m) {
+          n += m.rows.length;
+        });
+        sec.appendChild(el("h4", "jp-gr-u", u.label + " (" + n + ")"));
+        u.modules.forEach(function (m) {
+          sec.appendChild(el("h5", "jp-gr-m", (m.module ? m.module + " · " : "") + m.title));
+          var ul = el("ul", "jp-gr-rows");
+          m.rows.forEach(function (r) {
+            var li = el("li");
+            li.appendChild(stepLink(r.step));
+            li.appendChild(el("span", "jp-gr-cap", r.capability.label));
+            li.appendChild(el("b", "jp-gr-st jp-gr-st-" + r.status, r.statusLabel));
+            ul.appendChild(li);
+          });
+          sec.appendChild(ul);
+        });
+        body.appendChild(sec);
       });
-      g.querySelector("[data-jp-gap-count]").textContent = String(n);
-      g.querySelector("[data-jp-gap-none]").hidden = n > 0;
+      var grid = el("div", "jp-gr-grid");
+      grid.appendChild(
+        countsTable(
+          "Per moment",
+          report.perMoment.map(function (x) {
+            return { link: stepLink(x.step), counts: x.counts };
+          }),
+          "Moment",
+        ),
+      );
+      grid.appendChild(
+        countsTable(
+          "Per module",
+          report.perModule.map(function (x) {
+            return { label: (x.module ? x.module + " · " : "") + x.title, counts: x.counts };
+          }),
+          "Module",
+        ),
+      );
+      body.appendChild(grid);
+    }
+    var print = g.querySelector("[data-jp-report-print]");
+    if (print) {
+      print.addEventListener("click", function () {
+        root.classList.add("jp-print-report");
+        window.print();
+      });
+      window.addEventListener("afterprint", function () {
+        root.classList.remove("jp-print-report");
+      });
+    }
+    var csvBtn = g.querySelector("[data-jp-report-csv]");
+    if (csvBtn) {
+      csvBtn.addEventListener("click", function () {
+        var text = lib.csv(report || lib.summarise(model, answer), location.href);
+        var url = URL.createObjectURL(new Blob(["﻿" + text], { type: "text/csv;charset=utf-8" }));
+        var a = el("a");
+        a.href = url;
+        a.download = "gap-report.csv";
+        doc.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () {
+          URL.revokeObjectURL(url);
+        }, 1000);
+      });
     }
     var clear = g.querySelector("[data-jp-gap-clear]");
     if (clear) {
       clear.addEventListener("click", function () {
-        Array.prototype.forEach.call(g.querySelectorAll("[data-jp-gap]"), function (li) {
-          try {
-            window.localStorage.removeItem("jv:" + li.getAttribute("data-jp-gap"));
-          } catch (_e) {
-            /* storage unavailable */
-          }
+        model.items.forEach(function (it) {
+          [it.name.status, it.name.urgency].forEach(function (k) {
+            if (!k) return;
+            try {
+              window.localStorage.removeItem("jv:" + k);
+            } catch (_e) {
+              /* storage unavailable */
+            }
+          });
         });
         draw();
       });
     }
+    // Another tab answering the gap strip updates this one.
+    window.addEventListener("storage", function (ev) {
+      if (ev.key && ev.key.indexOf("jv:") === 0) draw();
+    });
     draw();
   }
 
@@ -269,7 +399,7 @@
       o.addEventListener("load", fit);
       fit();
     });
-    each("[data-jp-gaplist]", gapList);
+    each("[data-jp-gapreport]", gapReport);
     each("[data-jv-print]", function (b) {
       b.addEventListener("click", function () {
         window.print();
