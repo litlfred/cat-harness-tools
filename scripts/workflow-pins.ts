@@ -67,6 +67,7 @@ export function lockedRefs(root: string): Map<string, string> {
 
 /** This repository's name on GitHub: GITHUB_REPOSITORY, else origin's URL, else the directory. */
 export function ownName(root: string): string {
+  // input-site: env GITHUB_REPOSITORY #bd3896fa — this repository's name, when CI says it
   const env = process.env.GITHUB_REPOSITORY;
   if (env?.startsWith(`${OWNER}/`)) return env.slice(OWNER.length + 1);
   return checkoutName(root);

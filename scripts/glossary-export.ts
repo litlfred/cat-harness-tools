@@ -93,6 +93,7 @@ import { applyVocabMapping, vocabMapping } from "../schemas/content/vocab-mappin
 import { HARNESS_NAME, HARNESS_ROOT } from "./lib/roots.ts";
 import { nodeKindIndex } from "../schemas/kg/node-kind-index.js";
 import { isNodeKind, type NodeKind } from "../schemas/kg/node-kind.js";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 const SKOS = "http://www.w3.org/2004/02/skos/core#";
@@ -350,7 +351,7 @@ export async function nodeKindTerms(instanceRoot: string, repoRoot: string): Pro
   const own = index.kinds.filter((k) => k.declaredBy === name && k.module !== undefined && k.exportName !== undefined);
   for (const e of own) {
     try {
-      // input-site: imports */schemas/**/*.ts,schemas/**/*.ts #771876e3 — the validator modules the node-kind index already named
+      // input-site: imports */schemas/**/*.ts,schemas/**/*.ts #20fa4b57 — the validator modules the node-kind index already named
       const mod = (await import(resolve(repoRoot, e.module!))) as Record<string, unknown>;
       const k = mod[e.exportName!];
       if (isNodeKind(k)) walk(k);
@@ -462,7 +463,11 @@ export interface GlossaryBuild {
 
 /** Today, as an ISO date — injectable so a test is not a clock. */
 export type Today = () => string;
-const isoToday: Today = () => new Date().toISOString().slice(0, 10);
+const isoToday: Today = () => {
+  // input-site: traced #ced8684a — today, when the caller gives no date: a run that reaches it records no hash
+  inputSiteReached("glossary-export: today");
+  return new Date().toISOString().slice(0, 10);
+};
 
 /**
  * The glossary document's own IRI, derived from the graph document's PATH.
