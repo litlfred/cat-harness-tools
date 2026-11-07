@@ -10,6 +10,8 @@ import { join } from "node:path";
 
 import {
   JS_ADAPTER,
+  itbResolver,
+  withoutXmlComments,
   KOTLIN_ADAPTER,
   PYTHON_ADAPTER,
   RUST_ADAPTER,
@@ -169,7 +171,7 @@ describe("joining tests to Scenarios", () => {
       [
         ["scenario-names-no-test", 5],
         ["tag-names-no-test", "x.rs::gone"],
-        ["tag-on-feature", "x.rs::on_feature"],
+        ["tag-on-feature", "test:x.rs::on_feature"],
         ["test-in-two-scenarios", "x.rs::twice"],
         ["test-without-scenario", "x.rs::orphan"],
       ].sort(),
@@ -245,5 +247,49 @@ describe("the kg-audit criterion test-has-gherkin", () => {
     expect(entry.findings).toHaveLength(1);
     expect(entry.findings[0].detail).toContain("test-without-scenario: 7");
     expect(entry.findings[0].detail).toContain("and 2 more");
+  });
+});
+
+describe("bindings beyond @test:, and Gherkin dialects", () => {
+  test("a translated .feature is read in its own dialect; an unknown dialect is reported", () => {
+    const fr = parseFeature(
+      "fr.feature",
+      ["# language: fr", "Fonctionnalité: plans", "  @test:a.rs::un", "  Scénario: un plan est lu", "  @test:a.rs::deux", "  Plan du scénario: chaque ligne", "    Exemples:", "      | x |"].join("\n"),
+    );
+    expect(fr.scenarios.map((s) => [s.title, s.tests])).toEqual([
+      ["un plan est lu", ["a.rs::un"]],
+      ["chaque ligne", ["a.rs::deux"]],
+    ]);
+    const xx = parseFeature("xx.feature", "# language: xx-nope\nFeature: f\n  Scenario: s\n");
+    expect(xx.unknownLanguage).toBe("xx-nope");
+    expect(joinTestsToScenarios([], [xx]).findings.map((f) => f.kind)).toContain("unknown-dialect");
+  });
+
+  test("@itb: binds a GITB test case by suite and case id; a missing source is unresolved, never a pass", () => {
+    const itb = mkdtempSync(join(tmpdir(), "itb-"));
+    mkdirSync(join(itb, "suites", "hcert"), { recursive: true });
+    writeFileSync(
+      join(itb, "suites", "hcert", "suite.xml"),
+      '<?xml version="1.0"?>\n<testsuite id="ts-hcert" xmlns="http://www.gitb.com/tdl/v1/">\n  <!-- <testcase id="commented"/> -->\n  <testcase id="tc-verify"/>\n</testsuite>\n',
+    );
+    const feature = parseFeature(
+      "f.feature",
+      ["Feature: f", "  @itb:ts-hcert/tc-verify", "  Scenario: held and present", "  @itb:ts-hcert/tc-gone", "  Scenario: held, absent", "  @itb:ts-hcert/commented", "  Scenario: only in a comment"].join("\n"),
+    );
+    expect(feature.scenarios[0].bindings).toEqual([{ scheme: "itb", target: "ts-hcert/tc-verify" }]);
+
+    const held = joinTestsToScenarios([], [feature], [itbResolver(itb)]);
+    expect(held.findings.map((f) => [f.kind, f.test])).toEqual([
+      ["tag-names-no-target", "@itb:ts-hcert/tc-gone"],
+      ["tag-names-no-target", "@itb:ts-hcert/commented"],
+    ]);
+
+    const notHeld = joinTestsToScenarios([], [feature], [itbResolver(undefined)]);
+    expect(notHeld.findings.map((f) => f.kind)).toEqual(["binding-unresolved", "binding-unresolved", "binding-unresolved"]);
+    expect(notHeld.findings[0].detail).toContain("source not held");
+    expect(joinTestsToScenarios([], [feature]).findings.every((f) => f.kind === "binding-unresolved")).toBe(true);
+    // An unterminated or nested-looking comment never leaves a case readable.
+    expect(withoutXmlComments('a<!-- <testcase id="x"/> --><!--<!-- -->b')).toBe("ab");
+    expect(withoutXmlComments('a<!-- <testcase id="x"/>')).toBe("a");
   });
 });

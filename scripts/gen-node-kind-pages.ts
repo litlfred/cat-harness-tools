@@ -271,7 +271,12 @@ function href(from: string, to: string): string {
 function lineage(here: string, k: NodeKindEntry, byId: Map<string, NodeKindEntry>, locale: string): string {
   const link = (id: string) => {
     const t = byId.get(id);
-    return t?.declaredBy ? `<a href="${href(here, kindDir(locale, t))}">${esc(id)}</a>` : `<span>${esc(id)}</span>`;
+    // Linked only where a page is WRITTEN, by the test the writer itself uses
+    // (`declaredBy` and `version`; see plannedPages): a kind declared without
+    // a version, like cat-harness's `work-plan` under `bean`, gets no page,
+    // and linking it published `../work-plan/` as a dead link that refused
+    // dth-hrh's site (run 42342932329).
+    return t?.declaredBy && t.version ? `<a href="${href(here, kindDir(locale, t))}">${esc(id)}</a>` : `<span>${esc(id)}</span>`;
   };
   const parts: string[] = [];
   if (k.parents.length) parts.push(`extends ${k.parents.map(link).join(", ")}`);

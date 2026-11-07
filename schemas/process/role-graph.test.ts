@@ -31,6 +31,11 @@ import {
   MECHANICAL_KINDS,
   fulfilmentKindsForBpmnType,
   type RoleGraph,
+  RoleDefSchema,
+  LaneHoldingSchema,
+  laneNeeded,
+  electHolder,
+  isStalled,
 } from "./role-graph";
 
 import { requireHarnessRoot } from "../harness-root.ts";
@@ -567,5 +572,90 @@ describe("readRoleGraph — a role inherits a role of an instance it needs", () 
     } finally {
       rmSync(repo, { recursive: true, force: true });
     }
+  });
+});
+
+describe("lane holding: when the lane is needed, and who holds it (owner rulings, 2026-11-07)", () => {
+  const holding = LaneHoldingSchema.parse({
+    neededWhen: { minActiveSessions: 2, maxQueuedRuns: 10, maxOldestQueuedMinutes: 30, conflictsCount: true },
+    election: ["owns-p0", "earliest-created"],
+    loneSessionHolds: true,
+    announce: "merge manager: <session id>",
+    heartbeatMinutes: 10,
+    stalledAfterMinutes: 30,
+  });
+  const quiet = { activeSessions: 3, queuedRuns: 2, oldestQueuedMinutes: 5, conflictingPrs: 0 };
+
+  test("a role may declare it, and the strict schema refuses an unknown key inside it", () => {
+    const role = { id: "merge-steward", title: "Merge steward", description: "d", actorKinds: ["agent"], holding };
+    expect(RoleDefSchema.safeParse(role).success).toBe(true);
+    const bad = { ...role, holding: { ...holding, appointedBy: "owner" } };
+    expect(RoleDefSchema.safeParse(bad).success).toBe(false);
+  });
+
+  test("not needed with one active session, however busy the runners", () => {
+    expect(laneNeeded(holding, { ...quiet, activeSessions: 1, queuedRuns: 50 })).toBe(false);
+  });
+
+  test("not needed when several sessions are active but nothing is contended", () => {
+    expect(laneNeeded(holding, quiet)).toBe(false);
+  });
+
+  test("needed when runners are contended by queue length, by age, or when PRs conflict", () => {
+    expect(laneNeeded(holding, { ...quiet, queuedRuns: 11 })).toBe(true);
+    expect(laneNeeded(holding, { ...quiet, oldestQueuedMinutes: 31 })).toBe(true);
+    expect(laneNeeded(holding, { ...quiet, conflictingPrs: 1 })).toBe(true);
+    expect(laneNeeded({ ...holding, neededWhen: { ...holding.neededWhen, conflictsCount: false } }, { ...quiet, conflictingPrs: 1 })).toBe(false);
+  });
+
+  const a = { sessionId: "session_A", createdAt: "2026-11-07T05:00:00Z", ownsP0: false };
+  const b = { sessionId: "session_B", createdAt: "2026-11-07T04:00:00Z", ownsP0: false };
+  const c = { sessionId: "session_C", createdAt: "2026-11-07T06:00:00Z", ownsP0: true };
+
+  test("the owner of the P0 PR is elected over an earlier session", () => {
+    expect(electHolder(holding, [a, b, c])).toBe("session_C");
+  });
+
+  test("with no P0 owner, the earliest-created session is elected", () => {
+    expect(electHolder(holding, [a, b])).toBe("session_B");
+  });
+
+  test("two P0 owners: the earlier-created; an exact tie: the lower session id", () => {
+    const d = { ...b, ownsP0: true };
+    expect(electHolder(holding, [c, d])).toBe("session_B");
+    const e = { ...c, sessionId: "session_0" };
+    expect(electHolder(holding, [c, e])).toBe("session_0");
+  });
+
+  test("the result does not depend on the order of the listing", () => {
+    expect(electHolder(holding, [c, b, a])).toBe(electHolder(holding, [a, b, c]));
+  });
+
+  test("a lone session holds the lane for itself only when the role allows it", () => {
+    expect(electHolder(holding, [a])).toBe("session_A");
+    expect(electHolder({ ...holding, loneSessionHolds: false }, [a])).toBeUndefined();
+    expect(electHolder(holding, [])).toBeUndefined();
+  });
+
+  test("a stalled session is never elected, even the P0 owner or the earliest", () => {
+    expect(isStalled(holding, 31)).toBe(true);
+    expect(isStalled(holding, 30)).toBe(false);
+    expect(isStalled(holding, undefined)).toBe(false);
+    expect(electHolder(holding, [a, b, { ...c, minutesSinceAnswer: 45 }])).toBe("session_B");
+    expect(electHolder(holding, [a, { ...b, minutesSinceAnswer: 31 }])).toBe("session_A");
+  });
+
+  test("a lone session that has stalled holds nothing: the lane is vacant", () => {
+    expect(electHolder(holding, [{ ...a, minutesSinceAnswer: 90 }])).toBeUndefined();
+  });
+
+  test("the stall and heartbeat windows are required", () => {
+    const { heartbeatMinutes: _h, ...noHeartbeat } = holding;
+    expect(LaneHoldingSchema.safeParse(noHeartbeat).success).toBe(false);
+  });
+
+  test("an unreadable creation time sorts last rather than dropping the candidate", () => {
+    expect(electHolder(holding, [{ ...a, createdAt: "not a date" }, b])).toBe("session_B");
+    expect(electHolder(holding, [{ ...a, createdAt: "x" }, { ...b, createdAt: "y" }])).toBe("session_A");
   });
 });

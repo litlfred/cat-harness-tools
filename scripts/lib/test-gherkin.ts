@@ -9,7 +9,7 @@
  * - **tests**, found by a LANGUAGE ADAPTER per source language, each named by
  *   its qualified name `<file>::<scope>::…::<name>`;
  * - **Scenarios**, found in `.feature` files, each carrying zero or more
- *   `@test:<qualified name>` tags.
+ *   `@test:<qualified name>` tags (and other binding tags, below).
  *
  * ## The one grammar
  *
@@ -20,6 +20,15 @@
  * whitespace — {@link normaliseSegment} is applied to tests and tags alike.
  * Sibling sessions backfill `.feature` files against this grammar, so a change
  * to it is a change to every one of those files: announce it before making it.
+ *
+ * ## Other bindings, and dialects
+ *
+ * Owner, 2026-11-07: binding is by tag, and the schemes are an extensible
+ * list. Besides `@test:`, a Scenario may carry `@itb:<testSuite id>/<testCase
+ * id>` — a WHO-ITB GITB TDL test case — resolved by {@link itbResolver}
+ * against a pinned checkout. A new scheme is an entry in
+ * {@link BINDING_SCHEMES} and a {@link BindingResolver}. Feature files may be
+ * written in any Gherkin dialect; the keywords are `gherkin-dialects.ts`.
  *
  * ## What the adapters are, and are not
  *
@@ -36,6 +45,8 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
+
+import { GHERKIN_DIALECTS, type GherkinDialect } from "./gherkin-dialects.ts";
 
 /** One executable test, as a language adapter found it. */
 export interface FoundTest {
@@ -64,6 +75,8 @@ export interface FoundScenario {
   title: string;
   /** The qualified names its `@test:` tags carry, normalised. */
   tests: string[];
+  /** Its other bindings — `@<scheme>:<target>` for every non-`test` scheme the scan knows (e.g. `itb`). */
+  bindings: Binding[];
   /** Tagged `@manual`: a person executes it, so it needs no `@test:` tag. */
   manual: boolean;
 }
@@ -71,7 +84,9 @@ export interface FoundScenario {
 export interface ParsedFeature {
   file: string;
   scenarios: FoundScenario[];
-  /** `@test:` tags on a `Feature:` or `Rule:` line — inherited by every Scenario, so refused. */
+  /** The `# language:` the file declares, when no dialect has that code. Parsed as English. */
+  unknownLanguage?: string;
+  /** Binding tags on a `Feature:` or `Rule:` line — inherited by every Scenario, so refused. */
   misplaced: { line: number; tag: string }[];
 }
 
@@ -383,17 +398,128 @@ export const TEST_LANGUAGE_ADAPTERS: readonly TestLanguageAdapter[] = [RUST_ADAP
 
 // ── Gherkin ─────────────────────────────────────────────────────────────────
 
-const SCENARIO_KW = /^\s*(?:Scenario Outline|Scenario Template|Scenario|Example):\s*(.*)$/;
-const CONTAINER_KW = /^\s*(?:Feature|Rule):/;
-const OTHER_KW = /^\s*(?:Background|Examples|Scenarios):/;
+/** One `@<scheme>:<target>` tag on a Scenario, other than `@test:`. */
+export interface Binding {
+  scheme: string;
+  target: string;
+}
 
-/** Parse the Scenarios of one `.feature` file, and the tags each carries. English keywords only. */
-export function parseFeature(file: string, src: string): ParsedFeature {
+/**
+ * What a binding tag names, and how to tell whether it exists.
+ *
+ * Owner, 2026-11-07: binding is BY TAG, and the tag schemes are an extensible
+ * list — `@test:` binds an executable test in this tree, `@itb:` a WHO-ITB
+ * (GITB TDL) test case. A resolver says which targets exist. When its source
+ * is not held, it says so, and every tag it would have resolved is reported
+ * as unresolved: never a pass over a source nobody read.
+ *
+ * `@test:` is not a resolver: its targets are the tests the language adapters
+ * find, and it is the one scheme checked in BOTH directions (every test needs
+ * a Scenario). A resolver's targets are checked one way only — a tag must
+ * name one that exists — because an external suite is not this repository's
+ * to cover.
+ */
+export interface BindingResolver {
+  /** The tag prefix, without `@` and `:` — `itb` for `@itb:`. */
+  scheme: string;
+  /** The targets that exist, or why they could not be read. */
+  resolve(): { held: true; targets: ReadonlySet<string> } | { held: false; reason: string };
+}
+
+/**
+ * `@itb:<testSuite id>/<testCase id>` — a GITB TDL test case, named by the
+ * `id` attribute of the `<testsuite>` and of the `<testcase>` it references.
+ * Ids, not paths: ITB reports results by id, and ids survive a re-layout.
+ * `source` is a checkout of the test suites at a pinned commit; absent, every
+ * `@itb:` tag is unresolved ("source not held").
+ */
+export function itbResolver(source: string | undefined): BindingResolver {
+  return {
+    scheme: "itb",
+    resolve() {
+      if (!source) return { held: false, reason: "source not held — pass the ITB test-suite checkout (`--itb <dir>`)" };
+      if (!existsSync(source) || !statSync(source).isDirectory()) return { held: false, reason: `source not held — ${source} is not a directory` };
+      const targets = new Set<string>();
+      for (const f of listFiles(source)) {
+        if (!f.endsWith(".xml")) continue;
+        const xml = withoutXmlComments(readFileSync(join(source, f), "utf-8"));
+        const suite = /<(?:[\w-]+:)?testsuite\b[^>]*?\bid\s*=\s*"([^"]+)"/.exec(xml);
+        if (!suite) continue;
+        for (const tc of xml.matchAll(/<(?:[\w-]+:)?testcase\b[^>]*?\bid\s*=\s*"([^"]+)"/g)) targets.add(`${suite[1]}/${tc[1]}`);
+      }
+      return { held: true, targets };
+    },
+  };
+}
+
+/**
+ * `src` with every `<!-- … -->` cut out, by scanning rather than one regex
+ * pass: an unterminated comment drops the rest of the file, so a commented-out
+ * `<testcase>` can never be read as present.
+ */
+export function withoutXmlComments(src: string): string {
+  let out = "";
+  let at = 0;
+  for (;;) {
+    const open = src.indexOf("<!--", at);
+    if (open < 0) return out + src.slice(at);
+    out += src.slice(at, open);
+    const close = src.indexOf("-->", open + 4);
+    if (close < 0) return out;
+    at = close + 3;
+  }
+}
+
+/** The binding schemes every scan knows, besides `test`. A new scheme is a new entry here and a resolver. */
+export const BINDING_SCHEMES: readonly string[] = ["itb"];
+
+/** The dialect's element keywords, longest first so `Scenario Outline` wins over `Scenario`. */
+function keywordMatchers(d: GherkinDialect) {
+  const re = (words: readonly string[]) => {
+    const alts = [...words].sort((a, b) => b.length - a.length).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    return new RegExp(`^\\s*(?:${alts.join("|")})\\s*:\\s*(.*)$`, "u");
+  };
+  return {
+    scenario: re([...d.scenario, ...d.scenarioOutline]),
+    container: re([...d.feature, ...d.rule]),
+    other: re([...d.background, ...d.examples]),
+  };
+}
+const MATCHERS = new Map<string, ReturnType<typeof keywordMatchers>>();
+const matchersFor = (lang: string) => {
+  let m = MATCHERS.get(lang);
+  if (!m) MATCHERS.set(lang, (m = keywordMatchers(GHERKIN_DIALECTS[lang])));
+  return m;
+};
+
+/**
+ * Parse the Scenarios of one `.feature` file, and the binding tags each
+ * carries. Any Gherkin dialect: the `# language:` header picks the keywords
+ * (owner, 2026-11-07 — a translated `.feature` stays valid); none means `en`.
+ */
+export function parseFeature(file: string, src: string, schemes: readonly string[] = BINDING_SCHEMES): ParsedFeature {
   const scenarios: FoundScenario[] = [];
   const misplaced: ParsedFeature["misplaced"] = [];
+  const lines = src.split("\n");
+  // The header comment may appear only before the first non-comment line.
+  let lang = "en";
+  let unknownLanguage: string | undefined;
+  for (const l of lines) {
+    const t = l.trim();
+    if (!t) continue;
+    if (!t.startsWith("#")) break;
+    const m = /^#\s*language\s*:\s*([\w-]+)/.exec(t);
+    if (m) {
+      if (GHERKIN_DIALECTS[m[1]]) lang = m[1];
+      else unknownLanguage = m[1];
+      break;
+    }
+  }
+  const kw = matchersFor(lang);
+  const isBinding = (tag: string) => tag.startsWith("@test:") || schemes.some((s) => tag.startsWith(`@${s}:`));
   let tags: { line: number; tag: string }[] = [];
   let inDoc: string | null = null;
-  src.split("\n").forEach((raw, idx) => {
+  lines.forEach((raw, idx) => {
     const line = raw.trim();
     if (inDoc) {
       if (line.startsWith(inDoc)) inDoc = null;
@@ -408,26 +534,30 @@ export function parseFeature(file: string, src: string): ParsedFeature {
       return;
     }
     if (!line || line.startsWith("#")) return;
-    const sc = SCENARIO_KW.exec(raw);
+    const sc = kw.scenario.exec(raw);
     if (sc) {
       scenarios.push({
         file,
         line: idx + 1,
         title: sc[1].trim(),
         tests: tags.filter((t) => t.tag.startsWith("@test:")).map((t) => t.tag.slice("@test:".length).split("::").map(normaliseSegment).join("::")),
+        bindings: tags.flatMap((t) => {
+          const scheme = schemes.find((s) => t.tag.startsWith(`@${s}:`));
+          return scheme ? [{ scheme, target: t.tag.slice(scheme.length + 2) }] : [];
+        }),
         manual: tags.some((t) => t.tag === "@manual"),
       });
       tags = [];
       return;
     }
-    if (CONTAINER_KW.test(raw)) {
-      misplaced.push(...tags.filter((t) => t.tag.startsWith("@test:")));
+    if (kw.container.test(raw)) {
+      misplaced.push(...tags.filter((t) => isBinding(t.tag)));
       tags = [];
       return;
     }
-    if (OTHER_KW.test(raw)) tags = []; // Examples tags are per-row, not links
+    if (kw.other.test(raw)) tags = []; // Examples tags are per-row, not links
   });
-  return { file, scenarios, misplaced };
+  return { file, scenarios, misplaced, ...(unknownLanguage ? { unknownLanguage } : {}) };
 }
 
 // ── Joining the two ─────────────────────────────────────────────────────────
@@ -438,7 +568,10 @@ export type GherkinFindingKind =
   | "test-in-two-scenarios"
   | "scenario-names-no-test"
   | "tag-on-feature"
-  | "ambiguous-test-name";
+  | "ambiguous-test-name"
+  | "tag-names-no-target"
+  | "binding-unresolved"
+  | "unknown-dialect";
 
 export interface GherkinFinding {
   kind: GherkinFindingKind;
@@ -456,7 +589,11 @@ export interface GherkinReport {
 }
 
 /** Join tests to Scenarios and report every orphan, both ways. Pure. */
-export function joinTestsToScenarios(tests: readonly FoundTest[], features: readonly ParsedFeature[]): GherkinReport {
+export function joinTestsToScenarios(
+  tests: readonly FoundTest[],
+  features: readonly ParsedFeature[],
+  resolvers: readonly BindingResolver[] = [],
+): GherkinReport {
   const findings: GherkinFinding[] = [];
   const byName = new Map<string, FoundTest[]>();
   for (const t of tests) byName.set(t.name, [...(byName.get(t.name) ?? []), t]);
@@ -472,10 +609,28 @@ export function joinTestsToScenarios(tests: readonly FoundTest[], features: read
     }
   }
   const scenarios = features.flatMap((f) => f.scenarios);
+  // Each resolver is read once per join.
+  const cache = new Map<string, ReturnType<BindingResolver["resolve"]> | undefined>();
+  const resolved = (scheme: string) => {
+    if (!cache.has(scheme)) cache.set(scheme, resolvers.find((r) => r.scheme === scheme)?.resolve());
+    return cache.get(scheme);
+  };
+  for (const f of features) {
+    if (f.unknownLanguage) {
+      findings.push({ kind: "unknown-dialect", file: f.file, line: 1, detail: `\`# language: ${f.unknownLanguage}\` is no Gherkin dialect — read as English, so its Scenarios may be missed` });
+    }
+  }
   const linkedBy = new Map<string, FoundScenario[]>();
   for (const s of scenarios) {
-    if (s.tests.length === 0 && !s.manual) {
-      findings.push({ kind: "scenario-names-no-test", file: s.file, line: s.line, detail: `Scenario "${s.title}" carries no \`@test:\` tag and is not \`@manual\` — nothing executes it` });
+    if (s.tests.length === 0 && s.bindings.length === 0 && !s.manual) {
+      findings.push({ kind: "scenario-names-no-test", file: s.file, line: s.line, detail: `Scenario "${s.title}" carries no binding tag (\`@test:\`, ${BINDING_SCHEMES.map((b) => `\`@${b}:\``).join(", ")}) and is not \`@manual\` — nothing executes it` });
+    }
+    for (const b of s.bindings) {
+      const r = resolved(b.scheme);
+      const tag = `@${b.scheme}:${b.target}`;
+      if (!r) findings.push({ kind: "binding-unresolved", file: s.file, line: s.line, test: tag, detail: `\`${tag}\` is unresolved — no resolver for \`${b.scheme}\` was given` });
+      else if (!r.held) findings.push({ kind: "binding-unresolved", file: s.file, line: s.line, test: tag, detail: `\`${tag}\` is unresolved — ${r.reason}` });
+      else if (!r.targets.has(b.target)) findings.push({ kind: "tag-names-no-target", file: s.file, line: s.line, test: tag, detail: `\`${tag}\` names no ${b.scheme} target that exists` });
     }
     for (const name of new Set(s.tests)) {
       if (!byName.has(name)) {
@@ -486,7 +641,7 @@ export function joinTestsToScenarios(tests: readonly FoundTest[], features: read
   }
   for (const f of features) {
     for (const m of f.misplaced) {
-      findings.push({ kind: "tag-on-feature", file: f.file, line: m.line, test: m.tag.slice(6), detail: `\`${m.tag}\` is on a Feature or Rule line, so every Scenario under it would inherit it — tag the Scenario` });
+      findings.push({ kind: "tag-on-feature", file: f.file, line: m.line, test: m.tag.slice(1), detail: `\`${m.tag}\` is on a Feature or Rule line, so every Scenario under it would inherit it — tag the Scenario` });
     }
   }
   for (const [name, ts] of byName) {
@@ -540,11 +695,15 @@ export interface ScanOptions {
   /** Restrict to these repo-relative directories or files. Names stay relative to `root`. */
   under?: readonly string[];
   adapters?: readonly TestLanguageAdapter[];
+  /** Resolvers for the non-`test` binding schemes. Default: `itb`, with no source held. */
+  resolvers?: readonly BindingResolver[];
 }
 
 /** Scan `root`: every test the adapters find, every `.feature`, joined. */
 export function scanTree(root: string, opts: ScanOptions = {}): GherkinReport {
   const adapters = opts.adapters ?? TEST_LANGUAGE_ADAPTERS;
+  const resolvers = opts.resolvers ?? [itbResolver(undefined)];
+  const schemes = [...new Set([...BINDING_SCHEMES, ...resolvers.map((r) => r.scheme)])];
   // A directory or a single file, repo-relative.
   const under = (opts.under ?? []).map((u) => u.replace(/^\.\//, "").replace(/\/+$/, ""));
   const files = listFiles(root).filter((f) => under.length === 0 || under.some((u) => f === u || f.startsWith(u + "/")));
@@ -552,11 +711,11 @@ export function scanTree(root: string, opts: ScanOptions = {}): GherkinReport {
   const features: ParsedFeature[] = [];
   for (const f of files) {
     if (f.endsWith(".feature")) {
-      features.push(parseFeature(f, readFileSync(join(root, f), "utf-8")));
+      features.push(parseFeature(f, readFileSync(join(root, f), "utf-8"), schemes));
       continue;
     }
     const a = adapters.find((x) => x.matches(f));
     if (a) tests.push(...a.findTests(f, readFileSync(join(root, f), "utf-8")));
   }
-  return joinTestsToScenarios(tests, features);
+  return joinTestsToScenarios(tests, features, resolvers);
 }
