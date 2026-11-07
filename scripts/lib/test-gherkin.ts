@@ -118,9 +118,13 @@ export function maskSource(
       let depth = 1;
       let j = i + 2;
       while (j < src.length && depth > 0) {
-        if (src[j] === "/" && src[j + 1] === "*") (depth++, (j += 2));
-        else if (src[j] === "*" && src[j + 1] === "/") (depth--, (j += 2));
-        else j++;
+        if (src[j] === "/" && src[j + 1] === "*") {
+          depth++;
+          j += 2;
+        } else if (src[j] === "*" && src[j + 1] === "/") {
+          depth--;
+          j += 2;
+        } else j++;
       }
       out.push(blank(src.slice(i, j)));
       i = j;
