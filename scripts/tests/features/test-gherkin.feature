@@ -80,3 +80,20 @@ Feature: Every test has a Gherkin
     Then it is refused at that case's feature
     Given the same plan declared test-plan/v1
     Then it parses, and its deprecations name the version and the case
+
+  @test:scripts/tests/test-gherkin.test.ts::bindings_beyond_@test:,_and_Gherkin_dialects::a_translated_.feature_is_read_in_its_own_dialect;_an_unknown_dialect_is_reported
+  Scenario: A translated feature file is read in its own dialect
+    Given a feature file headed "# language: fr" with a Scénario and a Plan du scénario
+    When it is parsed
+    Then both Scenarios and their @test tags are found, and the Exemples tags are not links
+    Given a feature file headed with a language code no dialect has
+    Then it is reported as an unknown dialect
+
+  @test:scripts/tests/test-gherkin.test.ts::bindings_beyond_@test:,_and_Gherkin_dialects::@itb:_binds_a_GITB_test_case_by_suite_and_case_id;_a_missing_source_is_unresolved,_never_a_pass
+  Scenario: An @itb tag binds a GITB test case by suite id and test-case id
+    Given a GITB test suite "ts-hcert" that references test case "tc-verify", and one commented out
+    And Scenarios tagged with that case, with an absent case and with the commented-out one
+    When they are joined against the suite's checkout
+    Then only the present case resolves; the absent and commented-out ones name no target
+    When they are joined with no checkout held
+    Then every @itb tag is unresolved, "source not held", and none passes

@@ -14,9 +14,16 @@
  * reports the size of the gap, and the kg-audit criterion `test-has-gherkin`
  * records it. A repository that has backfilled can gate on the exit code.
  *
+ * A Scenario may also bind an EXTERNAL test case by tag — `@itb:<testSuite id>/<testCase id>`
+ * for a WHO-ITB (GITB TDL) test case (owner, 2026-11-07). Those tags resolve
+ * against the checkout `--itb` names; without one they are reported
+ * "unresolved — source not held", never passed. Feature files may be in any
+ * Gherkin dialect (`# language: <code>`).
+ *
  * Usage:
  *   bun run cat check:test-gherkin
  *   bun run cat check:test-gherkin -- --root ../smart-trust-tools --under tools/hcert-rust
+ *   bun run cat check:test-gherkin -- --itb ../who-itb     # resolve @itb: tags
  *   bun run cat check:test-gherkin -- --json
  *
  * Exit: 0 every test and Scenario linked, 1 an orphan either way, 2 could not check.
@@ -27,7 +34,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { scanTree, type GherkinFindingKind } from "./lib/test-gherkin.ts";
+import { itbResolver, scanTree, type GherkinFindingKind } from "./lib/test-gherkin.ts";
 
 const ORDER: GherkinFindingKind[] = [
   "test-without-scenario",
@@ -36,6 +43,9 @@ const ORDER: GherkinFindingKind[] = [
   "scenario-names-no-test",
   "tag-on-feature",
   "ambiguous-test-name",
+  "tag-names-no-target",
+  "binding-unresolved",
+  "unknown-dialect",
 ];
 
 function defaultRoot(): string {
@@ -51,13 +61,15 @@ if (import.meta.main) {
   let root: string | undefined;
   const under: string[] = [];
   let json = false;
+  let itb: string | undefined;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--root") root = args[++i];
     else if (a === "--under") under.push(args[++i]);
     else if (a === "--json") json = true;
+    else if (a === "--itb") itb = args[++i];
     else {
-      console.error(`check:test-gherkin: unknown argument \`${a}\`. Usage: [--root DIR] [--under DIR]… [--json]`);
+      console.error(`check:test-gherkin: unknown argument \`${a}\`. Usage: [--root DIR] [--under DIR]… [--itb DIR] [--json]`);
       process.exit(2);
     }
   }
@@ -66,7 +78,7 @@ if (import.meta.main) {
     console.error(`check:test-gherkin: ${dir} is not a directory — could not check.`);
     process.exit(2);
   }
-  const report = scanTree(dir, { under });
+  const report = scanTree(dir, { under, resolvers: [itbResolver(itb && resolve(itb))] });
   if (json) {
     console.log(JSON.stringify({ root: dir, tests: report.tests.length, scenarios: report.scenarios.length, findings: report.findings }, null, 2));
   } else {
