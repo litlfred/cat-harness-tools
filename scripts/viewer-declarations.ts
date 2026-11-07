@@ -725,8 +725,20 @@ export function viewersOf(
     // `writer` is declared relative to the HARNESS (its own scripts), and read
     // repository-relative like `ref`, so a mount path is never written down.
     // ...where it is IMPLEMENTED: the harness's scripts live in cat-harness-tools (bean 70lx).
+    //
+    // A writer neither the declaring instance nor its implementers hold may be
+    // spelled from the CHECKOUT root, where the layers are mounted: smart-ra
+    // declares `cat-harness-tools/archimate/scripts/gen-archimate-pages.ts`,
+    // which resolves when smart-ra is the checkout but, read against its mount
+    // (`dpi-h-ra/`), named `dpi-h-ra/cat-harness-tools/…` and failed
+    // check:derived-from in dth-hrh (run 42343581318). Taken only when the
+    // file is there, so a genuinely dangling writer is still reported.
+    const writerAt = (w: string): string => {
+      const at = join(implementingRootFor(v.harnessRoot, w), w);
+      return !existsSync(at) && existsSync(join(repoRoot, w)) ? join(repoRoot, w) : at;
+    };
     const writer =
-      v.writer?.map((w) => renderedPath(repoRoot, join(implementingRootFor(v.harnessRoot, w), w))) ??
+      v.writer?.map((w) => renderedPath(repoRoot, writerAt(w))) ??
       (existsSync(join(repoRoot, ref)) ? undefined : (builtAtPublishWriter(repoRoot, v.harnessRoot, ref) ?? heldPageWriter(repoRoot, v)));
     // The directory's tile is the DEFAULT dress; what the visualiser declares
     // about itself wins, since a directory drawn twice needs two names.
