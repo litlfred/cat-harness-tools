@@ -150,6 +150,21 @@ describe("subject areas are read from the glossary each scheme catalogue names",
     expect(sc.terms.has("actor")).toBe(false); // the scheme's subject applies
     expect(readSchemeScope(w("scope/not.json", "{}"))).toBeUndefined();
   });
+  test("readSchemeScope: a schema publishing its terms in $defs carries its subject as data", () => {
+    const f = w(
+      "scope/graph.schema.json",
+      JSON.stringify({
+        $schema: "http://json-schema.org/draft-07/schema#",
+        subject: "harness-vocabulary",
+        $defs: { Reference: { title: "Reference", description: "A Node's naming of another Node by its IRI." } },
+      }),
+    );
+    const sc = readSchemeScope(f)!;
+    expect(sc.subject).toBe("harness-vocabulary");
+    expect(sc.terms.size).toBe(0); // every term takes the schema's subject
+    const none = w("scope/plain.schema.json", JSON.stringify({ $defs: { Node: { title: "Node" } } }));
+    expect(readSchemeScope(none)).toBeUndefined(); // no subject published: the scheme itself, as before
+  });
   test("glossarySources finds the glossary from the catalogue's #: reference", () => {
     const root = join(base, "scoped");
     mkdirSync(join(root, "glossary"), { recursive: true });
