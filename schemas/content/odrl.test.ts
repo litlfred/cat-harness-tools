@@ -19,11 +19,14 @@ import {
   decide,
   decideWithConsent,
   effectiveRules,
+  loadHl7PurposeOfUseFromActReason,
   permits,
   permitsWithConsent,
   readPolicies,
   readPolicyGrants,
   type ConsentEvaluator,
+  type Decision,
+  type OdrlOperator,
   type OdrlPolicy,
 } from "./odrl.ts";
 import { ProvActivitySchema } from "./prov.ts";
@@ -219,6 +222,17 @@ describe("permits(): three answers", () => {
       { id: "y", includedIn: ["x", "odrl:use"] },
     ]);
     expect([...broaderOrSelf("x", cyc)].sort()).toEqual(["odrl:use", "x", "y"]);
+    // Several roots: "p" sits under two actions that are under nothing, beside
+    // ODRL's own root odrl:use. Each root reaches only itself.
+    const forest = actionGraph([
+      { id: "p", includedIn: ["r1", "r2"] },
+      { id: "r1", includedIn: [] },
+      { id: "r2", includedIn: [] },
+    ]);
+    expect([...broaderOrSelf("p", forest)].sort()).toEqual(["p", "r1", "r2"]);
+    expect([...broaderOrSelf("r1", forest)]).toEqual(["r1"]);
+    expect([...broaderOrSelf("r2", forest)]).toEqual(["r2"]);
+    expect([...broaderOrSelf("odrl:use", forest)]).toEqual(["odrl:use"]);
   });
 
   test("inheritFrom brings the parent's rules; a dangling one throws", () => {
@@ -257,7 +271,26 @@ describe("the schema refuses what it cannot mean", () => {
     expect(c("odrl:eq", ["t"])).toBe(false);
   });
   test("a scope outside Process, Task, Role, purpose, dateTime and elapsedTime is refused", () => {
-    expect(bad({ permission: [{ assignee: "a", action: "b", constraint: [{ leftOperand: "odrl:spatial", operator: "odrl:eq", rightOperand: "x" }] }] })).toBe(false);
+    const scoped = (leftOperand: string, rightOperand: string) =>
+      bad({ permission: [{ assignee: "a", action: "b", constraint: [{ leftOperand, operator: "odrl:eq", rightOperand }] }] });
+    for (const outside of ["odrl:spatial", "odrl:count", "odrl:recipient", "odrl:industry", "odrl:event", "cat-harness:folio", "process"]) {
+      expect({ outside, parses: scoped(outside, "x") }).toEqual({ outside, parses: false });
+    }
+    // The six inside the list are accepted, prefixed and (ODRL's) unprefixed.
+    const inside: Array<[string, string]> = [
+      ["cat-harness:process", "p"],
+      ["cat-harness:task", "t"],
+      ["cat-harness:role", "r"],
+      ["odrl:purpose", "HRESCH"],
+      ["purpose", "HRESCH"],
+      ["odrl:dateTime", "2026-12-31T00:00:00Z"],
+      ["dateTime", "2026-12-31T00:00:00Z"],
+      ["odrl:elapsedTime", "P90D"],
+      ["elapsedTime", "P90D"],
+    ];
+    for (const [operand, value] of inside) {
+      expect({ operand, parses: scoped(operand, value) }).toEqual({ operand, parses: true });
+    }
   });
   test("a purpose constraint accepts HL7 PurposeOfUse codes and refuses draft vocabularies (DPV)", () => {
     expect(
@@ -287,7 +320,17 @@ describe("the schema refuses what it cannot mean", () => {
     for (const action of ["odrl:delete", "odrl:attribute", "odrl:inform", "odrl:obtainConsent"]) {
       expect(bad({ permission: [{ assignee: "a", action: "b", duty: [{ action }] }] })).toBe(true);
     }
-    expect(bad({ permission: [{ assignee: "a", action: "b", duty: [{ action: "odrl:compensate" }] }] })).toBe(false);
+    // ODRL's bare JSON-LD spellings of the same four are accepted too.
+    for (const action of ["delete", "attribute", "inform", "obtainConsent"]) {
+      expect(bad({ permission: [{ assignee: "a", action: "b", duty: [{ action }] }] })).toBe(true);
+    }
+    // Every other action, ODRL duty actions included, is refused.
+    for (const action of ["odrl:compensate", "compensate", "odrl:anonymize", "odrl:archive", "odrl:nextPolicy", "odrl:use", "odrl:read", "b", ""]) {
+      expect({ action, parses: bad({ permission: [{ assignee: "a", action: "b", duty: [{ action }] }] }) }).toEqual({
+        action,
+        parses: false,
+      });
+    }
   });
 });
 
@@ -332,7 +375,7 @@ describe("computable DSA constraints and duties (bean s4v2)", () => {
   });
 
   test("dateTime lt permits before and denies after (and lteq/gt/gteq evaluate boundaries)", () => {
-    const dsa = policy({
+    const dsaWith = (operator: OdrlOperator) => policy({
       "@type": "Agreement",
       assigner: "org:who",
       assignee: "org:ministry",
@@ -340,10 +383,15 @@ describe("computable DSA constraints and duties (bean s4v2)", () => {
         {
           assignee: "org:ministry",
           action: "odrl:use",
-          constraint: [{ leftOperand: "odrl:dateTime", operator: "odrl:lt", rightOperand: "2026-12-31T00:00:00Z" }],
+          constraint: [{ leftOperand: "odrl:dateTime", operator, rightOperand: "2026-12-31T00:00:00Z" }],
         },
       ],
     });
+    const dsa = dsaWith("odrl:lt");
+    const askWith = (operator: OdrlOperator, dateTime: string) => {
+      const p = dsaWith(operator);
+      return permits({ actor: "org:ministry", action: "read-dataset", scope: { "odrl:dateTime": dateTime } }, p, one(p), g);
+    };
     const ask = (dateTime?: string) =>
       permits(
         {
@@ -359,6 +407,19 @@ describe("computable DSA constraints and duties (bean s4v2)", () => {
     expect(ask("2026-12-31T00:00:00Z")).toBe("deny");
     expect(ask("2027-01-01T00:00:00Z")).toBe("deny");
     expect(ask()).toBe("unknown");
+
+    // Before, AT and after the boundary, for each of the other three.
+    const before = "2026-06-15T12:00:00Z";
+    const at = "2026-12-31T00:00:00Z";
+    const after = "2027-01-01T00:00:00Z";
+    const expected: Partial<Record<OdrlOperator, Decision[]>> = {
+      "odrl:lteq": ["permit", "permit", "deny"],
+      "odrl:gt": ["deny", "deny", "permit"],
+      "odrl:gteq": ["deny", "permit", "permit"],
+    };
+    for (const [operator, want] of Object.entries(expected) as Array<[OdrlOperator, Decision[]]>) {
+      expect({ operator, got: [before, at, after].map((d) => askWith(operator, d)) }).toEqual({ operator, got: want });
+    }
   });
 
   test("a 90-day delete duty: permit inside 90 days; after, deny without a deletion PROV record, permit with one, unknown when records are absent", () => {
@@ -479,6 +540,35 @@ describe("computable DSA constraints and duties (bean s4v2)", () => {
     expect(
       permits({ actor: "org:ministry", action: "read-dataset", provRecords: [attrProv, informProv] }, dsa, one(dsa), g),
     ).toBe("permit");
+
+    // obtainConsent, the third immediate duty. Fulfilled by a PROV record of
+    // the obtainConsent task; unmet when the consent verdict is deny; unknown
+    // with no record and no verdict. (A record set that lacks the task also
+    // reads as unknown, never deny: bean a7c1 lets only a consent verdict deny.)
+    const consentDsa = policy({
+      "@type": "Agreement",
+      uid: "urn:dsa:consent",
+      assigner: "org:who",
+      assignee: "org:ministry",
+      permission: [{ assignee: "org:ministry", action: "odrl:use", duty: [{ action: "odrl:obtainConsent" }] }],
+    });
+    const consentProv = ProvActivitySchema.parse({
+      "@type": "prov:Activity",
+      "@id": "urn:run:consent",
+      "prov:startedAtTime": "2026-10-01T10:10:00Z",
+      "prov:qualifiedAssociation": {
+        "prov:agent": "org:ministry",
+        "prov:hadRole": "recipient",
+        "prov:hadPlan": "dsa-lifecycle#Task_obtainConsent",
+      },
+      "cat-harness:underPolicy": "urn:dsa:consent",
+    });
+    const askConsent = (extra: Record<string, unknown>) =>
+      permits({ actor: "org:ministry", action: "read-dataset", ...extra }, consentDsa, one(consentDsa), g);
+    expect(askConsent({})).toBe("unknown");
+    expect(askConsent({ provRecords: [consentProv] })).toBe("permit");
+    expect(askConsent({ consentVerdict: "deny" })).toBe("deny");
+    expect(askConsent({ provRecords: [attrProv] })).toBe("unknown");
   });
 });
 
@@ -688,6 +778,10 @@ describe("odrl:obtainConsent duty evaluated via injected ConsentEvaluator (beans
     const csBytes = readFileSync(join(fixtureDir, "CodeSystem-v3-ActReason.json"));
     const sha = createHash("sha256").update(csBytes).digest("hex");
     expect(sha).toBe(prov.packages[HL7_TERMINOLOGY_PACKAGE_ID].files["CodeSystem-v3-ActReason.json"].sha256);
+    // odrl.ts's table IS what its loader reads from that published file — not
+    // a hand-typed copy that happens to agree on the codes spot-checked below.
+    expect(HL7_PURPOSE_OF_USE).toEqual(loadHl7PurposeOfUseFromActReason(join(fixtureDir, "CodeSystem-v3-ActReason.json")));
+    expect(odrlSrc).toContain("HL7_PURPOSE_OF_USE: Readonly<Record<string, readonly string[]>> = loadHl7PurposeOfUseFromActReason()");
 
     // Verified from published hl7.terminology.r4#5.3.0 CodeSystem-v3-ActReason.json:
     // CLINTRL, POPHLTH, and COC are subsumedBy TREAT; CAREMGT is subsumedBy HOPERAT only (not TREAT);

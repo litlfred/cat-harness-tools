@@ -92,12 +92,13 @@ Feature: ODRL policies decide who may do what, answering permit, deny or unknown
     Then the answers are deny, permit and deny
 
   @test:schemas/content/odrl.test.ts::permits():_three_answers::an_includedIn_cycle_does_not_hang,_and_the_graph_need_not_have_one_root
-  Scenario: An includedIn cycle does not hang
+  Scenario: An includedIn cycle does not hang, and a graph may have several roots
     Given an action graph where "x" is included in "y", and "y" in "x" and "odrl:use"
     When the broader actions of "x" are taken
     Then they are "odrl:use", "x" and "y"
-    # The title also says the graph need not have one root; this graph has the
-    # single root "odrl:use", so that is not exercised.
+    Given an action graph where "p" is included in "r1" and "r2", which are included in nothing
+    Then the broader actions of "p" are "p", "r1" and "r2"
+    And the broader actions of each root "r1", "r2" and "odrl:use" are only itself
 
   @test:schemas/content/odrl.test.ts::permits():_three_answers::inheritFrom_brings_the_parent's_rules;_a_dangling_one_throws
   Scenario: inheritFrom brings the parent's rules; a dangling one throws
@@ -123,11 +124,11 @@ Feature: ODRL policies decide who may do what, answering permit, deny or unknown
     Then only isAnyOf on a list is accepted
 
   @test:schemas/content/odrl.test.ts::the_schema_refuses_what_it_cannot_mean::a_scope_outside_Process,_Task,_Role,_purpose,_dateTime_and_elapsedTime_is_refused
-  Scenario: A constraint on odrl:spatial is refused
-    When a constraint with the left operand "odrl:spatial" is parsed
-    Then it is refused
-    # The title names the whole allowed set; the body tries only one operand
-    # outside it, and none inside it.
+  Scenario: A constraint outside the six scopes is refused, and each of the six is accepted
+    When constraints with the left operands "odrl:spatial", "odrl:count", "odrl:recipient", "odrl:industry", "odrl:event", "cat-harness:folio" and "process" are parsed
+    Then each is refused
+    When constraints on "cat-harness:process", "cat-harness:task", "cat-harness:role", purpose, dateTime and elapsedTime are parsed, the last three both "odrl:"-prefixed and unprefixed, each with a value of its kind
+    Then each is accepted
 
   @test:schemas/content/odrl.test.ts::the_schema_refuses_what_it_cannot_mean::a_purpose_constraint_accepts_HL7_PurposeOfUse_codes_and_refuses_draft_vocabularies_(DPV)
   Scenario: A purpose constraint accepts an HL7 PurposeOfUse code and refuses DPV
@@ -136,11 +137,12 @@ Feature: ODRL policies decide who may do what, answering permit, deny or unknown
     And the second is refused
 
   @test:schemas/content/odrl.test.ts::the_schema_refuses_what_it_cannot_mean::a_duty_accepts_only_the_supported_ODRL_duty_actions_(delete,_attribute,_inform,_obtainConsent)
-  Scenario: A duty accepts the supported duty actions and refuses compensate
+  Scenario: A duty accepts only the four supported duty actions
     When duties with the actions "odrl:delete", "odrl:attribute", "odrl:inform" and "odrl:obtainConsent" are parsed
     Then each is accepted
-    When a duty with the action "odrl:compensate" is parsed
-    Then it is refused
+    And so is each of their unprefixed spellings
+    When duties with the actions "odrl:compensate", "compensate", "odrl:anonymize", "odrl:archive", "odrl:nextPolicy", "odrl:use", "odrl:read", "b" and the empty string are parsed
+    Then each is refused
 
   @test:schemas/content/odrl.test.ts::computable_DSA_constraints_and_duties_(bean_s4v2)::purpose_isA_HL7_PurposeOfUse_HRESCH_permits_a_subclass_purpose_and_denies_an_unrelated_one
   Scenario: Purpose isA HRESCH permits its subclasses and denies unrelated purposes
@@ -151,11 +153,14 @@ Feature: ODRL policies decide who may do what, answering permit, deny or unknown
     And with no purpose the answer is unknown
 
   @test:schemas/content/odrl.test.ts::computable_DSA_constraints_and_duties_(bean_s4v2)::dateTime_lt_permits_before_and_denies_after_(and_lteq/gt/gteq_evaluate_boundaries)
-  Scenario: dateTime lt permits before the bound and denies at or after it
+  Scenario: dateTime lt, lteq, gt and gteq each decide before, at and after the bound
     Given an Agreement permitting "odrl:use" while the dateTime is before "2026-12-31T00:00:00Z"
     When "org:ministry" asks to "read-dataset" at 2026-06-15, at exactly the bound, at 2027-01-01, and with no dateTime
     Then the answers are permit, deny, deny and unknown
-    # The title also names lteq, gt and gteq; the body tests only lt.
+    When the same is asked, before, at and after the bound, of the Agreement with the operator lteq, gt and gteq in turn
+    Then lteq answers permit, permit, deny
+    And gt answers deny, deny, permit
+    And gteq answers deny, permit, permit
 
   @test:schemas/content/odrl.test.ts::computable_DSA_constraints_and_duties_(bean_s4v2)::a_90-day_delete_duty:_permit_inside_90_days;_after,_deny_without_a_deletion_PROV_record,_permit_with_one,_unknown_when_records_are_absent
   Scenario: A 90-day delete duty follows the deletion PROV record
@@ -168,13 +173,16 @@ Feature: ODRL policies decide who may do what, answering permit, deny or unknown
     And P91D with no records given at all is unknown
 
   @test:schemas/content/odrl.test.ts::computable_DSA_constraints_and_duties_(bean_s4v2)::immediate_duties_(attribute,_inform,_obtainConsent):_permit_when_fulfilled,_deny_when_unmet,_unknown_when_records_are_absent
-  Scenario: Attribute and inform duties follow their PROV records
+  Scenario: Attribute, inform and obtainConsent duties: permit when fulfilled, deny when unmet, unknown when absent
     Given an Agreement "urn:dsa:attr" permitting use with duties to attribute and to inform
     And PROV records of the attribute task and the inform task under it
     When "org:ministry" asks to "read-dataset" with no records, with the attribute record, and with both
     Then the answers are unknown, deny and permit
-    # The title also names obtainConsent; this body's policy has no
-    # obtainConsent duty.
+    Given an Agreement "urn:dsa:consent" permitting use with a duty to obtainConsent
+    And a PROV record of the obtainConsent task under it
+    When "org:ministry" asks with no records, with that record, and with a consent verdict of deny
+    Then the answers are unknown, permit and deny
+    And with only the attribute record, which does not fulfil it, the answer is unknown, not deny
 
   @test:schemas/content/odrl.test.ts::odrl:obtainConsent_duty_evaluated_via_injected_ConsentEvaluator_(beans_a7c1,_2egb,_6jnx)::DSA_+_no_consent_(or_inactive/draft_consent_returning_unknown)_gives_unknown,_never_permit_or_deny
   Scenario: With no consent verdict, or an unknown one, the answer is unknown
@@ -205,9 +213,9 @@ Feature: ODRL policies decide who may do what, answering permit, deny or unknown
     Then it contains none of "pcf:", "FhirConsent", "PcfConsent", nor the words Bundle, OperationOutcome, Patient, Practitioner or Encounter
     And the SHA-256 of the v3-ActReason fixture equals the one its provenance records
     And CLINTRL, POPHLTH and COC are subsumed by TREAT; CAREMGT by HOPERAT; HTEST by SYSDEV; LABELING and METAMGT by HSYSADMIN
+    And odrl.ts's PurposeOfUse table equals what its loader reads from that fixture file
+    And odrl.ts defines that table as the loader's result
     And HAAUTH is absent, and there are 60 codes
-    # The body checks the fixture's hash and some of the hierarchy's values; it
-    # does not check that odrl.ts reads the hierarchy from that fixture.
 
   @test:schemas/content/odrl.test.ts::PROV-O_activity::a_task_run_parses
   Scenario: A task run parses

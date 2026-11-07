@@ -39,14 +39,16 @@ Feature: A vocabulary module types its kinds and adds its rules, or says what is
     And "no-such-kind" gives BlockSchema
 
   @test:schemas/content/vocabulary-modules.test.ts::composition,_in_whatever_checkout_this_runs::a_module's_rule_replaces_a_built-in_rule_with_the_same_id,_so_no_rule_runs_twice
-  Scenario: The composed rules have unique ids and keep every built-in id
+  Scenario: A module's rule wins over a built-in with the same id, and no id appears twice
+    # Gap: the modules are those this checkout discovers. Standing alone it
+    # discovers none, so the replacing branch is not reached here; a checkout
+    # with a vocabulary module contributing a built-in id exercises it.
     Given whatever vocabulary modules this checkout discovers
     When all constraint rules are composed
     Then no rule id appears twice
     And every built-in rule's id is present
-    # The title says a module's rule replaces a built-in rule with the same id;
-    # the body checks only unique ids and that each built-in id is present, not
-    # which rule holds an id a module also defines.
+    And each composed rule is the module's own rule object when a module contributes its id, and the built-in rule object otherwise
+    And every rule a module contributes is among them
 
   @test:schemas/content/vocabulary-modules.test.ts::composition,_in_whatever_checkout_this_runs::every_module's_constraint_context_contributor_is_composed,_and_only_those
   Scenario: The composed constraint context contributors are exactly the modules'

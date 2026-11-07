@@ -20,12 +20,16 @@ Feature: A notebook structure reads by cell, and anything unrecognised is a reas
     And with it is accepted
 
   @test:schemas/content/document-structure.test.ts::the_notebook_variant::a_section_cannot_end_before_it_starts
-  Scenario: A section ending before it starts gives a reason
+  Scenario: A section ending before it starts gives a reason naming the order
     Given the two-section notebook structure with its first section, starting at cell 0, ending at cell -1
     When its structure is read
     Then the answer is a reason
-    # A negative cell_end is also out of range on its own; the body does not
-    # separate "ends before it starts" from "negative".
+    Given the structure with its second section starting at cell 3 and ending at cell 2
+    When its structure is read
+    Then the reason contains "cell_end is before cell_start"
+    Given the structure with its second section starting and ending at cell 2
+    When its structure is read
+    Then the answer is not a reason
 
   @test:schemas/content/document-structure.test.ts::anything_else_is_a_reason,_never_an_empty_section_list::an_unknown_tag_is_named
   Scenario: An unknown tag is named in the reason

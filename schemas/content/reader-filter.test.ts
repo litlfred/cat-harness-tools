@@ -12,9 +12,10 @@ import {
   readerFilterProblem,
   readerShows,
   visibleOn,
+  type FilterableNode,
 } from "./reader-filter.js";
 import { BoardSchema, boardContent } from "../ui/board.js";
-import { BoardPositionsSchema, place, renderPositions } from "../ui/board-positions.js";
+import { BoardPositionsSchema, place, positionOf, renderPositions } from "../ui/board-positions.js";
 
 type Node = { page: string; node: string; kind?: string; properties?: Record<string, string> };
 
@@ -39,6 +40,15 @@ describe("an absent filter filters nothing", () => {
   test("every node the board shows stays shown", () => {
     expect(visibleOn(NODES, NO_READER_FILTER)).toEqual(NODES);
     expect(readerFilterProblem(NO_READER_FILTER)).toBeUndefined();
+    // On a board: what the board shows is what the reader sees, node for node,
+    // for a scoped board and the whole-folio one alike.
+    for (const board of [PAGE_ONE, WHOLE]) {
+      const shown = boardContent(board, NODES);
+      expect(shown.length).toBeGreaterThan(0);
+      const visible = visibleOn(shown, NO_READER_FILTER);
+      expect(visible).toHaveLength(shown.length);
+      visible.forEach((n, i) => expect(n).toBe(shown[i]!));
+    }
   });
 });
 
@@ -163,7 +173,27 @@ describe("it commits NOTHING — the separation, asserted rather than named", ()
     doc = place(doc, "one", "a", { x: 1, y: 2 });
     doc = place(doc, "one", "b", { x: 3, y: 4 });
     const before = renderPositions(doc);
-    visibleOn(NODES, { kinds: ["bean"] });
+    // A filter that hides both placed notes leaves both placed.
+    expect(visibleOn(NODES, { kinds: ["bean"] }).map((n) => n.node)).toEqual(["c"]);
+    expect(renderPositions(doc)).toBe(before);
+    expect(positionOf(doc, "one", "a")).toEqual({ x: 1, y: 2 });
+    expect(positionOf(doc, "one", "b")).toEqual({ x: 3, y: 4 });
+    // And handed the layout document's own entries, frozen so any write would
+    // throw, it filters them and writes nothing.
+    const freeze = <T>(o: T): T => {
+      if (o && typeof o === "object") {
+        for (const v of Object.values(o)) freeze(v);
+        Object.freeze(o);
+      }
+      return o;
+    };
+    freeze(doc);
+    // A position carries neither a kind nor properties, so it is typed as the
+    // node shape here only to hand it to the filter.
+    const entries = Object.values(doc.boards.one!) as FilterableNode[];
+    expect(visibleOn(entries, NO_READER_FILTER)).toEqual(entries);
+    expect(visibleOn(entries, { kinds: ["bean"] })).toEqual([]);
+    expect(visibleOn(entries, { properties: { status: ["open"] } })).toEqual([]);
     expect(renderPositions(doc)).toBe(before);
   });
 
@@ -173,6 +203,20 @@ describe("it commits NOTHING — the separation, asserted rather than named", ()
     const src = readFileSync(new URL("./reader-filter.ts", import.meta.url), "utf-8");
     expect(src).not.toContain("$schema:");
     expect(src).not.toMatch(/\.json"/);
+    // The CODE, comments removed (the prose names what it refuses to hold).
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    expect(code.length).toBeGreaterThan(0);
+    expect(code).not.toContain("$schema");
+    expect(code).not.toMatch(/SCHEMA_TAG|_FILE\b/);
+    // No string literal names a file or a versioned tag.
+    const literals = [...code.matchAll(/(["'`])((?:\\.|(?!\1).)*)\1/g)].map((m) => m[2]!);
+    for (const lit of literals) {
+      expect({ lit, file: /\.(json|jsonld|ya?ml|md|ts|js)\b/.test(lit) }).toEqual({ lit, file: false });
+      expect({ lit, tag: /^[\w-]+\/v\d+$/.test(lit) }).toEqual({ lit, tag: false });
+    }
+    // And it imports nothing, so it has no way to read or write a file.
+    expect(code).not.toMatch(/^\s*import\b/m);
+    expect(code).not.toMatch(/\brequire\(|readFileSync|writeFileSync/);
   });
 });
 
