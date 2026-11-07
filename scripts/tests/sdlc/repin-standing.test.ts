@@ -12,7 +12,21 @@ import { dirname, join } from "node:path";
 
 import type { StandingConsent } from "../../../schemas/kg/mount-trust.js";
 import type { RemoteMount } from "../../../schemas/kg/remote-mount.js";
-import { alignToHeldPins, applyRepin, candidateFor, lockPinsOf, planRepin, summaryOf, verdictOf, type CommitVerdict, type GitHubApi } from "../../repin-standing.ts";
+import {
+  alignToHeldPins,
+  applyRepin,
+  candidateFor,
+  extendExplicitDirectories,
+  inCheckoutDirectoryIds,
+  lockPinsOf,
+  newlyDeclaredDirectoryIds,
+  planRepin,
+  summaryOf,
+  verdictOf,
+  type CommitVerdict,
+  type GitHubApi,
+  type RepinPlan,
+} from "../../repin-standing.ts";
 
 const A = "a".repeat(40);
 const B = "b".repeat(40);
@@ -269,5 +283,70 @@ describe("alignToHeldPins: an instance below the harness follows the harness's o
   test("lockPinsOf reads `mounts` and ignores anything else", () => {
     expect(lockPinsOf({ mounts: [{ repository: "o/x", ref: A }, { repository: 1 }], instances: [{ repository: "o/y", sha: B }] })).toEqual({ "o/x": A });
     expect(lockPinsOf(null)).toEqual({});
+  });
+});
+
+describe("extendExplicitDirectories: a directory the new pin declares joins an explicit list (folio-assistant#3023)", () => {
+  const decl = (...dirs: object[]) => ({ name: "up", directories: dirs });
+  const OLD = decl({ id: "library", path: "library/" }, { id: "ast", path: "fhir-ast/", storage: { branchPrefix: "x/" } });
+  const NEW = decl(
+    { id: "library", path: "library/" },
+    { id: "ast", path: "fhir-ast/", storage: { branchPrefix: "x/" } },
+    { id: "scenarios", path: "scenarios/" },
+    { id: "tools", path: "tools/" },
+    { id: "cache", path: "cache/", storage: { branchPrefix: "c/" } },
+    { id: "extra", path: "extra/", optIn: true },
+  );
+  const withDecls = (decls: Record<string, unknown>): GitHubApi => ({
+    ...stubApi({}),
+    async declarationAt(_r, sha) {
+      return decls[sha];
+    },
+  });
+  const listed = (dirs: string[] | undefined): RemoteMount => ({ ...mount("up", A, rule()), ...(dirs ? { overrides: { up: { directories: dirs } } } : {}) }) as RemoteMount;
+  const moved = (): RepinPlan => ({ moves: [{ harness: "up", repository: "o/up", from: A, to: B, rule: rule(), skipped: [] }], held: [], unknown: [] });
+
+  test("in the checkout only: a branch-kept or opt-in directory is never added", () => {
+    expect(inCheckoutDirectoryIds(NEW)).toEqual(["library", "scenarios", "tools"]);
+    expect(newlyDeclaredDirectoryIds(OLD, NEW)).toEqual(["scenarios", "tools"]);
+    expect(inCheckoutDirectoryIds(undefined)).toEqual([]);
+  });
+
+  test("an explicit list gains the new ids, less those it already names", async () => {
+    const plan = await extendExplicitDirectories(moved(), [listed(["library", "tools"])], withDecls({ [A]: OLD, [B]: NEW }));
+    expect(plan.moves[0]!.addDirectories).toEqual(["scenarios"]);
+    expect(summaryOf(plan, false)).toContain("- up: `scenarios`");
+  });
+
+  test("no explicit list: nothing to extend, and no declaration is read", async () => {
+    let read = 0;
+    const api: GitHubApi = { ...stubApi({}), async declarationAt() { read++; return NEW; } };
+    const plan = await extendExplicitDirectories(moved(), [listed(undefined)], api);
+    expect(plan.moves[0]!.addDirectories).toBeUndefined();
+    expect(read).toBe(0);
+  });
+
+  test("a declaration it cannot read withdraws the move as could-not-determine, never a short list", async () => {
+    const plan = await extendExplicitDirectories(moved(), [listed(["library"])], withDecls({ [A]: OLD }));
+    expect(plan.moves).toEqual([]);
+    expect(plan.unknown[0]!.reason).toContain("cannot be told");
+    const failing: GitHubApi = { ...stubApi({}), async declarationAt() { throw new Error("HTTP 500"); } };
+    expect((await extendExplicitDirectories(moved(), [listed(["library"])], failing)).unknown[0]!.reason).toContain("HTTP 500");
+  });
+
+  test("applyRepin writes the added ids after the site's own, and touches no other entry", async () => {
+    const root = site();
+    const f = join(root, "index.config.json");
+    const cfg = JSON.parse(readFileSync(f, "utf-8"));
+    cfg.instances.find((i: { name: string }) => i.name === "up").source.remote.overrides = { up: { directories: ["library"] } };
+    writeFileSync(f, JSON.stringify(cfg, null, 2));
+    const otherBefore = cfg.instances.find((i: { name: string }) => i.name === "other");
+    const plan: RepinPlan = { moves: [{ harness: "up", repository: "o/up", from: up.first, to: up.second, rule: rule(), skipped: [], addDirectories: ["scenarios", "tools"] }], held: [], unknown: [] };
+    await applyRepin(root, plan, { on: "2026-11-07", mount: false });
+    const after = JSON.parse(readFileSync(f, "utf-8"));
+    const upEntry = after.instances.find((i: { name: string }) => i.name === "up").source.remote;
+    expect(upEntry.ref).toBe(up.second);
+    expect(upEntry.overrides).toEqual({ up: { directories: ["library", "scenarios", "tools"] } });
+    expect(after.instances.find((i: { name: string }) => i.name === "other")).toEqual(otherBefore);
   });
 });
