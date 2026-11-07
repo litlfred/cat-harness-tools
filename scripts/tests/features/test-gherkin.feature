@@ -26,6 +26,12 @@ Feature: Every test has a Gherkin
     Then each test is named <file>::<describe>::<title>, whitespace written as _
     And only test files are read
 
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_regex_literal_is_not_a_string,_and_division_is_not_a_regex
+  Scenario: A regex literal does not hide the tests after it
+    Given a test file whose tests contain a regex with a backtick, a regex with a double quote, and divisions after a name and after a string
+    When the JS adapter reads it
+    Then all four tests are found, by their titles, in order
+
   @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_test_with_a_computed_title_is_found_and_reported,_never_dropped
   Scenario: A test whose title is computed is reported, not dropped
     Given a test file with tests titled by a loop variable and by a template with an interpolation

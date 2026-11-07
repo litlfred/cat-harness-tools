@@ -96,6 +96,21 @@ describe("language adapters", () => {
     expect(JS_ADAPTER.matches("a/b.ts")).toBe(false);
   });
 
+  test("js: a regex literal is not a string, and division is not a regex", () => {
+    const src = [
+      'test("before", () => { const n = (line.match(/`/g) ?? []).length; });',
+      'test("quote in a regex", () => { expect("a").toMatch(/"|\\//); });',
+      'test("division", () => { const h = w / 2 / 3; const s = "a" / 2; });',
+      'test("after", () => {});',
+    ].join("\n");
+    expect(names(JS_ADAPTER.findTests("r.test.ts", src))).toEqual([
+      "r.test.ts::before",
+      "r.test.ts::quote_in_a_regex",
+      "r.test.ts::division",
+      "r.test.ts::after",
+    ]);
+  });
+
   test("js: a test with a computed title is found and reported, never dropped", () => {
     const src = [
       'for (const [name] of cases) {',

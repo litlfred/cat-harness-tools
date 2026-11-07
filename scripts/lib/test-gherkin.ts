@@ -171,6 +171,29 @@ export function maskSource(
       i = stop;
       continue;
     }
+    if (opts.templates && c === "/" && regexMayStart(out)) {
+      // A JS regex literal: `/`/g` must not open a template string, nor
+      // `/"/` a string. Skip to the closing unescaped `/` outside a class.
+      let j = i + 1;
+      let inClass = false;
+      while (j < src.length && src[j] !== "\n") {
+        if (src[j] === "\\") {
+          j += 2;
+          continue;
+        }
+        if (src[j] === "[") inClass = true;
+        else if (src[j] === "]") inClass = false;
+        else if (src[j] === "/" && !inClass) break;
+        j++;
+      }
+      if (src[j] === "/") {
+        j++;
+        while (j < src.length && /[a-z]/i.test(src[j])) j++;
+        out.push(blank(src.slice(i, j)));
+        i = j;
+        continue;
+      }
+    }
     if (c === '"' || (c === "'" && !opts.rustChars) || (c === "`" && opts.templates)) {
       let j = i + 1;
       let body = "";
@@ -185,7 +208,10 @@ export function maskSource(
         j++;
       }
       strings.set(i, body);
-      out.push(blank(src.slice(i, Math.min(j + 1, src.length))));
+      const masked = blank(src.slice(i, Math.min(j + 1, src.length)));
+      // In JS, keep the closing quote: a string is an operand, so a `/`
+      // after it divides (see regexMayStart). Offsets are unchanged.
+      out.push(opts.templates && masked.endsWith(" ") ? masked.slice(0, -1) + '"' : masked);
       i = j + 1;
       continue;
     }
@@ -203,6 +229,20 @@ export function maskSource(
     i++;
   }
   return { code: out.join(""), strings };
+}
+
+/**
+ * Can a `/` here start a regex literal rather than divide? Only where an
+ * operand is expected: after an operator or opening bracket, or after a
+ * keyword like `return`. After an identifier, a number or `)` it divides.
+ * `out` is the masked code so far; a masked string or comment reads as
+ * spaces, and a string is an operand, which `"` at its end records.
+ */
+function regexMayStart(out: readonly string[]): boolean {
+  const code = out.slice(Math.max(0, out.length - 40)).join("").trimEnd();
+  if (code === "") return true;
+  if (/(?:^|[^\w$])(?:return|typeof|case|in|of|void|delete|throw|new|yield|await|else|do)$/.test(code)) return true;
+  return /[(,=:[!&|?{};+\-*%<>~^]$/.test(code);
 }
 
 const lineAt = (src: string, offset: number): number => src.slice(0, offset).split("\n").length;
