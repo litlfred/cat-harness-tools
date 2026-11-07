@@ -66,8 +66,11 @@ function reachableFromStarts(m: ProcessModel): Set<string> {
   const queue = [...m.startNodes];
   while (queue.length > 0) {
     const id = queue.shift()!;
-    for (const f of m.nodes.get(id)?.outgoing ?? []) {
-      const to = m.flows.get(f)?.to;
+    const next = (m.nodes.get(id)?.outgoing ?? []).map((f) => m.flows.get(f)?.to);
+    // A boundary event is reached with the activity it sits on: it has no
+    // incoming flow of its own.
+    for (const [bid, b] of m.nodes) if (b.attachedTo === id) next.push(bid);
+    for (const to of next) {
       if (to !== undefined && !seen.has(to)) {
         seen.add(to);
         queue.push(to);
