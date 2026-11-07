@@ -63,6 +63,13 @@ describe("matching", () => {
     expect(renders("卫生工作者", "每位卫生工作者登录", "zh")).toBe(true);
     expect(renders("العامل الصحي", "يسجل العامل الصحي الدخول", "ar")).toBe(true);
   });
+  test("a Russian noun with a fleeting vowel is found in its oblique cases", () => {
+    expect(renders("Узел", "Из какого одного узла могут происходить все они?", "ru")).toBe(true);
+    expect(renders("Узел", "узлы графа", "ru")).toBe(true);
+    expect(renders("Узел", "Узел графа", "ru")).toBe(true);
+    expect(renders("Узел", "вершина графа", "ru")).toBe(false);
+    expect(renders("Обвязка", "слой обвязки", "ru")).toBe(true);
+  });
 });
 
 describe("termBase — the lower layer fixes, a higher one may only add", () => {

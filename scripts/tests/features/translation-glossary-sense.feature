@@ -103,3 +103,10 @@ Feature: Glossary terms in sense keep their fixed translation
     Then the term counts as rendered
     And text that does not render the term still fails
 
+
+  @test:pipeline/translation-glossary.test.ts::matching::a_Russian_noun_with_a_fleeting_vowel_is_found_in_its_oblique_cases
+  Scenario: A Russian noun whose vowel drops in its oblique cases still renders the term
+    Given the fixed Russian translation «Узел»
+    When running text uses «узла» or «узлы»
+    Then the term counts as rendered
+    And a different word does not
