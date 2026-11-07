@@ -12,11 +12,13 @@ const NONE = () => {
 describe("which Chromium Playwright launches", () => {
   it("an explicitly named binary wins over everything else", () => {
     const c = resolveChromium(
+      // input-site: inert #ed10fbb4 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
       { PLAYWRIGHT_CHROMIUM_PATH: "/tmp/mine/chrome", PLAYWRIGHT_BROWSERS_PATH: "/opt/pw" },
       LS(["chromium-1194"]),
       () => true,
     );
     expect(c.kind).toBe("explicit");
+    // input-site: inert #936c47ce — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(c.path).toBe("/tmp/mine/chrome");
   });
 

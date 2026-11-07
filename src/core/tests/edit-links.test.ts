@@ -12,6 +12,7 @@ describe("edit-links: one recipe for every page's edit and feedback links (bean 
     expect(asset).toBe(editLinksAsset());
   });
 
+  // input-site: inert #fcaf7f8b — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
   const urls = new Function(`${BLOCK_URLS_JS}; return faBlockUrls;`)() as (c: unknown, b: unknown) => { edit: string; source: string; feedback: string };
   const b = { label: "h-intro", source: "input/pagecontent/index.md", section: "Introduction", line: 12, repo: "who/smart-base" };
 
@@ -35,6 +36,7 @@ describe("edit-links: one recipe for every page's edit and feedback links (bean 
   });
 
   type Tokens = { wrap: (md: string, ownOnly?: boolean) => string; errors: (md: string, ownOnly?: boolean) => string[] };
+  // input-site: inert #78abe6ad — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
   const tokensOf = new Function(`${SUGGEST_TOKENS_JS}; return faSuggestTokens;`)() as (rules?: unknown[]) => Tokens;
 
   test("the suggest editor's own tokens are Liquid and directives, and no content type's", () => {

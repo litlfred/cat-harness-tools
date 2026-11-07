@@ -43,6 +43,7 @@ describe("the first-paint scheme — stored, else the OS, else light", () => {
     const window: Record<string, unknown> = {};
     if (o.os === "throws") window.matchMedia = () => { throw new Error("no"); };
     else if (o.os !== "absent") window.matchMedia = (q: string) => ({ matches: o.os !== "none" && q === `(prefers-color-scheme: ${o.os})` });
+    // input-site: inert #6b2812cd — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
     new Function("document", "localStorage", "window", body)(document, localStorage, window);
     return attrs["data-fa-scheme"] ?? null;
   }

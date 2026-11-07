@@ -39,6 +39,7 @@ describe("comparePixels", () => {
   });
 
   test("is self-contained, so the page runs exactly this function", () => {
+    // input-site: inert #61cbc6a6 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
     const again = new Function(`return (${comparePixels.toString()})`)();
     expect(again(img(1, 1, [0, 0, 0, 255]), img(1, 1, [255, 0, 0, 255]), 24).changed).toBe(1);
   });
