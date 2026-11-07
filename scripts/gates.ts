@@ -1509,6 +1509,14 @@ export interface ScriptExemption {
  */
 const OWN_SCRIPT_EXEMPTIONS: ScriptExemption[] = [
   {
+    script: "translate-user-scenarios:check",
+    kind: "no-folio",
+    reason:
+      "judges an instance's user-scenario templates, and the platform declares no user-scenario directory, so here it can " +
+      "only exit 2 (nothing to examine). Each instance that declares one runs it in its own CI over its own scenarios, as " +
+      "the IGs run their translation template checks",
+  },
+  {
     script: "check:context-leak",
     kind: "report",
     reason:
