@@ -126,6 +126,16 @@ describe("pdf-structure/v1", () => {
     for (const guess of ["extension", "file-extension", "guessed"]) {
       expect(PdfStructureSchema.safeParse({ ...d, source: { ...src, mimetype_source: guess } }).success).toBe(false);
     }
+    // The two fields are one fact: null exactly when nothing was recognised.
+    const pair = (mimetype_sniffed: string | null, mimetype_source: string) =>
+      PdfStructureSchema.safeParse({ ...d, source: { ...src, mimetype_sniffed, mimetype_source } }).success;
+    expect(pair(null, "unreadable")).toBe(true);
+    expect(pair("application/pdf", "magic-bytes")).toBe(true);
+    expect(pair("application/vnd.openxmlformats-officedocument.presentationml.presentation", "zip-package")).toBe(true);
+    expect(pair(null, "magic-bytes")).toBe(false);
+    expect(pair(null, "zip-package")).toBe(false);
+    expect(pair("application/pdf", "unrecognised")).toBe(false);
+    expect(pair("application/pdf", "unreadable")).toBe(false);
   });
   test("a duplicate copy names its preferred entry; the preferred entry lists its copies", () => {
     const d = minimal();

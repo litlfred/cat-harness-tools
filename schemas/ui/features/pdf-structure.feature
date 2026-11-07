@@ -73,13 +73,13 @@ Feature: A PDF's structure.json conforms to pdf-structure/v1
 
   @test:schemas/ui/pdf-structure.test.ts::pdf-structure/v1::an_unrecognised_mimetype_is_null_with_its_reason,_never_guessed
   Scenario: An unrecognised mimetype is null with a required reason, and no guess is a reason
-    # Gap: the schema does not pair the two fields, so a sniffed mimetype with
-    # mimetype_source "unrecognised", or null with "magic-bytes", still parses.
     Given the minimal structure whose mimetype_sniffed is null and mimetype_source is "unrecognised"
     When it is parsed
     Then it parses
     And the same structure with no mimetype_source is refused
     And the same structure with mimetype_source "extension", "file-extension" or "guessed" is refused
+    And a null mimetype parses with "unreadable" and is refused with "magic-bytes" or "zip-package"
+    And a sniffed mimetype parses with "magic-bytes" or "zip-package" and is refused with "unrecognised" or "unreadable"
 
   @test:schemas/ui/pdf-structure.test.ts::pdf-structure/v1::a_duplicate_copy_names_its_preferred_entry;_the_preferred_entry_lists_its_copies
   Scenario: Duplicates name their preferred entry, and the preferred entry lists its copies
