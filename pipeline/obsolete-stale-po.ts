@@ -37,9 +37,10 @@ import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from "
 import { join, relative } from "node:path";
 
 import { extractMarkdown } from "./pot-extract.ts";
-import { directoryForGraph } from "../schemas/kg/cat-harness.ts";
+import { directoryForGraph, readDeclaration } from "../schemas/kg/cat-harness.ts";
 import { siteRoot } from "./translation-index.ts";
-import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { gateOwnInstances, gateOwnsFile, nothingOwnLine } from "../scripts/lib/gate-own.ts";
+import { HARNESS_ROOT, REPO_ROOT } from "../scripts/lib/roots.ts";
 
 /** Locale directories, which are never a source page. */
 const LOCALE_DIR_RE = /(^|\/)(ar|es|fr|ru|zh)(\/|$)/;
@@ -245,6 +246,20 @@ export function obsoleteEntries(poText: string, stale: readonly string[]): strin
 function main(): void {
   const root = join(HARNESS_ROOT);
   const check = process.argv.includes("--check");
+  // In a layer's PR checks, only catalogues the caller commits (owner ruling
+  // 2026-11-05, "Move the checks"; `scripts/lib/gate-own.ts`).
+  const own = gateOwnInstances();
+  const instName = readDeclaration(root)?.name ?? "cat-harness";
+  const dir = directoryForGraph(root, "translation-sources");
+  const repoRoot = REPO_ROOT ?? root;
+  if (check && ((own !== undefined && !own.has(instName)) || (dir !== undefined && gateOwnsFile(relative(repoRoot, dir)) === false))) {
+    console.log(
+      own !== undefined
+        ? nothingOwnLine("translation:obsolete", "translations directory", own)
+        : `✓ translation:obsolete --check: the catalogues live in ${relative(repoRoot, dir!)}, which the caller does not commit; the owning layer's CI judges them.`,
+    );
+    return;
+  }
   const rows = survey(root);
 
   const comparable = rows.filter((r) => !isUnresolved(r.source));
