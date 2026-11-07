@@ -119,6 +119,13 @@ describe("pdf-structure/v1", () => {
     const d = minimal();
     const src = { ...(d.source as object), mimetype_sniffed: null, mimetype_source: "unrecognised" };
     expect(PdfStructureSchema.safeParse({ ...d, source: src }).success).toBe(true);
+    // The reason is required: a null with no source says nothing about why.
+    const { mimetype_source: _reason, ...noReason } = src;
+    expect(PdfStructureSchema.safeParse({ ...d, source: noReason }).success).toBe(false);
+    // A guess is not a reason: no source names the file extension.
+    for (const guess of ["extension", "file-extension", "guessed"]) {
+      expect(PdfStructureSchema.safeParse({ ...d, source: { ...src, mimetype_source: guess } }).success).toBe(false);
+    }
   });
   test("a duplicate copy names its preferred entry; the preferred entry lists its copies", () => {
     const d = minimal();

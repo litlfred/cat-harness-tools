@@ -50,14 +50,17 @@ Feature: The rendered files a change alters are measured, pinned and checked aga
     And p.html, a content page, is unconfirmed
 
   @test:schemas/ui/rendered-impact.test.ts::comparePrediction::could-not-determine_is_carried,_never_read_as_no_change
-  Scenario: An undetermined input is carried through parsing
-    # The title says undetermined is never read as no change; the body only
-    # parses an impact and checks the entry is kept. comparePrediction is not
-    # called.
+  Scenario: An undetermined input is carried, pinned, and not read as no change
+    # Gap: comparePrediction's result has no field for undetermined inputs, so
+    # it cannot report them itself; the prediction carries them.
     Given a cone impact with no files and one undetermined input sushi-config.yaml, site-wide
     When it is parsed with the rendered-impact schema
     Then its files are empty
-    And it carries one undetermined entry
+    And it carries exactly that undetermined entry
+    When it is pinned
+    Then it still carries that one entry, with a 64-hex pin
+    When it is compared with a build-diff that changed other.html
+    Then other.html is reported missed and nothing is confirmed
 
   @test:schemas/ui/rendered-impact.test.ts::pinImpact::a_file_is_pinned_to_the_changed_inputs_on_its_via,_and_nothing_else_on_it
   Scenario: A file's pin depends on the inputs on its via, not on other via entries
@@ -80,11 +83,10 @@ Feature: The rendered files a change alters are measured, pinned and checked aga
     Then idx.json carries no pin
 
   @test:schemas/ui/rendered-impact.test.ts::pinImpact::a_removed_input_pins_as_absent,_which_differs_from_any_version_of_it
-  Scenario: A removed input moves the pin
-    # The body compares against one version of a.md, not any version.
-    Given the pinned impact
-    When it is pinned again with a.md absent
-    Then p.html's pin differs from its pin with a.md present
+  Scenario: A removed input pins differently from every version of it
+    Given the base impact
+    When it is pinned with a.md absent
+    Then p.html's and q.html's pins each differ from their pins with a.md at version "1", "1b", the empty string, or forty zeros
 
   @test:schemas/ui/rendered-impact.test.ts::RenderedMeasuredSchema::missedFiles_returns_the_measured_files_the_prediction_did_not_name,_with_their_pins
   Scenario: The missed files come back with their pins

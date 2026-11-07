@@ -51,8 +51,9 @@ Feature: A content type is marked by a file or by a section of index.config.json
     Then both are refused
 
   @test:schemas/content/content-type.test.ts::index.config.json_is_never_itself_a_harness_marker::a_repository_carrying_only_an_index_is_not_a_harness
-  Scenario: A repository with only an index has no base content type
+  Scenario: A repository with only an index has no base content type, whatever the index holds
     Given a fresh registry with the base content types registered
-    And a repository holding only an index.config.json with a "widget" section
-    When it is described
-    Then it has no type
+    When a repository holding only an index.config.json is described, for an index with a "widget" section, with no sections, with a "harness" section, with a harness's name and stub fields, and that is not JSON
+    Then each has no type
+    When a repository holding the same index and an "acme.config.json" is described
+    Then its one type is "harness", marked by "acme.config.json"

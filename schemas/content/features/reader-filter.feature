@@ -14,11 +14,12 @@ Feature: A reader's filter narrows their view of a board and commits nothing
     And a whole-folio board "all", and a board "one" filtered to page "one"
 
   @test:schemas/content/reader-filter.test.ts::an_absent_filter_filters_nothing::every_node_the_board_shows_stays_shown
-  Scenario: No reader filter keeps every node and is no problem
+  Scenario: No reader filter keeps every node a board shows, and is no problem
     When the nodes are filtered with no reader filter
     Then all five nodes are visible, in order
     And the absent filter has no problem
-    # The body filters the node list directly, not a board's content.
+    When the content of the page-one board, and of the whole-folio board, is filtered with no reader filter
+    Then for each board the visible nodes are exactly the nodes it shows, the same objects in the same order, and there is at least one
 
   @test:schemas/content/reader-filter.test.ts::OR_within_an_axis,_AND_across_—_the_declared_filter's_logic,_deliberately::two_kinds_is_a_union
   Scenario: Two kinds is a union
@@ -95,20 +96,24 @@ Feature: A reader's filter narrows their view of a board and commits nothing
 
   @test:schemas/content/reader-filter.test.ts::it_commits_NOTHING_—_the_separation,_asserted_rather_than_named::and_leaves_the_layout_document_byte-identical
   Scenario: Filtering leaves the layout document unchanged
-    Given a board-positions document placing "a" and "b" on board "one"
+    Given a board-positions document placing "a" at (1, 2) and "b" at (3, 4) on board "one"
     When the nodes are filtered to the kind "bean"
-    Then the positions document renders the same as before
-    # The filter is never given the positions document, so this holds by
-    # construction; the body does not check that a filtered-out note keeps
-    # its position beyond that.
+    Then only "c" is visible
+    And the positions document renders the same as before
+    And "a" and "b", both filtered out, keep their positions
+    When the document is deeply frozen and its own position entries on board "one" are filtered with no filter, the kind "bean", and the status "open"
+    Then no filter returns them all, and the other two return none
+    And the positions document still renders the same as before
 
   @test:schemas/content/reader-filter.test.ts::it_commits_NOTHING_—_the_separation,_asserted_rather_than_named::the_module_holds_no_file_name_and_no_schema_tag,_which_is_the_design
-  Scenario: The module's source holds no schema tag and no JSON file name
+  Scenario: The module's code holds no schema tag and no file name
     When the source of reader-filter.ts is read
     Then it does not contain "$schema:"
     And it does not contain a quoted name ending in ".json"
-    # The title says no file name at all; the body looks only for one ending
-    # in ".json".
+    When its comments are removed
+    Then the code does not contain "$schema", "SCHEMA_TAG" or a "_FILE" name
+    And no string literal in it names a .json, .jsonld, .yaml, .yml, .md, .ts or .js file, or is a versioned tag like "name/v1"
+    And it has no import, require, readFileSync or writeFileSync
 
   @test:schemas/content/reader-filter.test.ts::propertyValues_populates_a_control_from_the_corpus::every_value_present,_sorted,_deduplicated
   Scenario: A property's values are every value present, sorted and deduplicated

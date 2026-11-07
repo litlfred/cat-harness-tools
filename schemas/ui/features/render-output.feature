@@ -14,12 +14,11 @@ Feature: A tool output renders by its hint, and a window's detail is fetched on 
     And each contains "&lt;script&gt;"
 
   @test:schemas/ui/render-output.test.ts::renderToolOutput::url_—_links_a_safe_scheme,_and_SHOWS_a_refused_one_as_text
-  Scenario: A url output links a safe scheme and does not link a refused one
-    # The title says a refused URL is shown as text; the body checks only
-    # that no link is made for it, not that its text appears.
+  Scenario: A url output links a safe scheme and shows a refused one as text
     When "https://example.org/a" is rendered as "url"
     Then the output links href "https://example.org/a"
     And "javascript:alert(1)", a TAB-split "java<TAB>script:alert(1)" and a data: URL each render with no "<a" and no "href="
+    And each refused URL renders as exactly its own text, HTML-escaped
 
   @test:schemas/ui/render-output.test.ts::renderToolOutput::markdown_—_renders_markup,_but_raw_HTML_and_a_javascript:_link_do_not_survive
   Scenario: Markdown renders markup but not raw HTML or a javascript: link
@@ -37,12 +36,12 @@ Feature: A tool output renders by its hint, and a window's detail is fetched on 
     And it contains exactly one "</pre>"
 
   @test:schemas/ui/render-output.test.ts::the_hint's_own_rules::absent_is_allowed,_and_means_text
-  Scenario: An output port with no render hint parses
-    # The title also says an absent hint means text; the body checks only
-    # that the port parses.
+  Scenario: An output port with no render hint parses, and renders as text
     Given a tool output port of schema Markdown with no render hint
     When it is parsed with the tool output schema
-    Then it parses
+    Then it parses, with no render hint
+    And the payload rendered with no hint is the same as rendered with hint "text"
+    And "**bold**" rendered with no hint is "**bold**", not markup
 
   @test:schemas/ui/render-output.test.ts::the_hint's_own_rules::anything_but_text_needs_a_stated_reason
   Scenario: A non-text hint needs a reason
@@ -53,11 +52,13 @@ Feature: A tool output renders by its hint, and a window's detail is fetched on 
 
   @test:schemas/ui/render-output.test.ts::the_hint's_own_rules::url_and_markdown_only_on_an_output_whose_schema_IS_Url_/_Markdown
   Scenario: The url and markdown hints only fit outputs of that schema
-    # The body does not check the markdown hint on a Markdown output.
     When a Url output with hint "url" is parsed
     Then it parses
+    And a Markdown output with hint "markdown" parses
     And a Text output with hint "url" is refused
     And a Text output with hint "markdown" is refused
+    And a Url output with hint "markdown" is refused
+    And a Markdown output with hint "url" is refused
 
   @test:schemas/ui/render-output.test.ts::lazy_window_content_fetch_on_open_—_bean_q2wm::rendering_the_board_with_N_cards_makes_0_detail_fetches_up_front;_opening_1_window_fetches_only_that_card_and_caches_it
   Scenario: Board tiles fetch nothing; opening a window fetches that card once
@@ -92,20 +93,18 @@ Feature: A tool output renders by its hint, and a window's detail is fetched on 
     And the second has no "<script" and shows the script escaped
 
   @test:schemas/ui/render-output.test.ts::lazy_window_content_fetch_on_open_—_bean_q2wm::cardDetailHref_and_renderWindowDetail_preserve_inline_comments_when_jsonldHref_is_only_a_fallback
-  Scenario: A card with an inline comment has no detail href to fetch
-    # The title says renderWindowDetail preserves inline comments; the body
-    # only renders an empty detail and checks its placeholder.
+  Scenario: A card with an inline comment has no detail href to fetch, and its comment is rendered
     When the detail href is asked for a card with an inline comment and a jsonldHref
     Then there is none
     And for a card with only a jsonldHref it is that href
+    And rendering a detail with the comment "Already inline" contains "<p>Already inline</p>" and not "No detail recorded."
     And rendering an empty detail says "No detail recorded."
 
   @test:schemas/ui/render-output.test.ts::lazy_window_content_fetch_on_open_—_bean_q2wm::docs-ui.js_wires_lazy_fetchCardDetail_on_openCard_(not_todoSlot)_and_renders_tool_outputs_via_renderToolOutput
-  Scenario: docs-ui.js fetches card detail in openCard, not in todoSlot
-    # The title says tool outputs are rendered via renderToolOutput; the body
-    # checks only that such a function is defined in docs-ui.js.
+  Scenario: docs-ui.js fetches card detail in openCard, not in todoSlot, and renders outputs via renderToolOutput
     Given the harness's site-chrome/assets/js/docs-ui.js
     When its source is read
     Then it defines "function renderToolOutput(value, hint)" and "function fetchCardDetail(todo, done)"
     And the todoSlot function, up to "syncStickyPins();", does not call fetchCardDetail
     And the openCard function, up to the "No semantic zoom" comment, calls fetchCardDetail(todo
+    And the renderWindowOutputs function calls renderToolOutput(item.value, item.render)

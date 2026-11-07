@@ -9,11 +9,11 @@ Feature: An href passes only with an allowed scheme or as a relative reference
     Then each comes back unchanged
 
   @test:schemas/ui/safe-url.test.ts::the_allowed_schemes_pass::the_list_is_what_decides_—_nothing_is_special-cased_past_it
-  Scenario: Every scheme on the allowed list passes
-    # The title also says nothing is special-cased past the list; the body
-    # checks only that each listed scheme passes.
+  Scenario: A scheme passes exactly when it is on the allowed list
     When safeHref is given "<scheme>//example.invalid" for each allowed scheme
     Then each gives a defined href
+    When it is given the same for ftp:, file:, data:, javascript:, vbscript:, blob:, ws:, wss:, sms:, about:, chrome:, git:, ssh:, irc: and x-custom:, none of which is listed
+    Then each of those is refused
 
   @test:schemas/ui/safe-url.test.ts::relative_references_pass,_because_they_cannot_introduce_a_scheme::paths,_fragments_and_queries
   Scenario: Relative paths, fragments and queries pass unchanged

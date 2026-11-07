@@ -4,6 +4,8 @@
  * @module schemas/window-stack.test
  */
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import {
   EMPTY_STACK,
@@ -70,9 +72,16 @@ describe("open, close, raise", () => {
   test("every operation returns a NEW stack — the input is never mutated", () => {
     const before = openWindow(EMPTY_STACK, "a");
     const snapshot = [...before.open];
-    openWindow(before, "b");
-    closeWindow(before, "a");
-    raise(before, "a");
+    const opened = openWindow(before, "b");
+    const closed = closeWindow(before, "a");
+    const raised = raise(before, "a");
+    for (const after of [opened, closed, raised]) {
+      expect(after).not.toBe(before);
+      expect(after.open).not.toBe(before.open);
+    }
+    expect(opened.open).toEqual(["a", "b"]);
+    expect(closed.open).toEqual([]);
+    expect(raised.open).toEqual(["a"]);
     expect(before.open).toEqual(snapshot);
   });
 });
@@ -138,9 +147,22 @@ describe("the two mechanisms stay separate, and that is checked rather than inte
     // The card goes on becoming its avatar as the board shrinks; the window it
     // spawned is a different object and simply stays. Nothing in the stack
     // changes when the width does, because the width is not an input to it.
-    const s = openWindow(EMPTY_STACK, "note-1");
+    const s = openWindow(openWindow(EMPTY_STACK, "note-0"), "note-1");
+    const snapshot = [...s.open];
+    // The card's zoom answer flips across the threshold...
     expect(rendersAvatar(zoom, "note", 100)).toBe(true);
-    expect(isOpen(s, "note-1")).toBe(true);
-    expect(topmost(s)).toBe("note-1");
+    expect(rendersAvatar(zoom, "note", 400)).toBe(false);
+    // ...and the stack reads the same on either side of it.
+    for (const width of [100, 400]) {
+      rendersAvatar(zoom, "note", width);
+      expect(s.open).toEqual(snapshot);
+      expect(isOpen(s, "note-1")).toBe(true);
+      expect(topmost(s)).toBe("note-1");
+      expect(zIndexOf(s, "note-1")).toBe(2);
+    }
+    // No width can reach the stack: the stack module imports nothing, so not
+    // the zoom module either.
+    const src = readFileSync(join(import.meta.dir, "window-stack.ts"), "utf-8");
+    expect(src).not.toMatch(/^import /m);
   });
 });
