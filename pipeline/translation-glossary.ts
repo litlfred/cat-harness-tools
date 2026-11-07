@@ -287,6 +287,9 @@ export function glossarySources(
   chain.forEach((c, at) => {
     const dir = translationsOf(c.root);
     if (dir === undefined) return;
+    // declared-path-literal: the per-locale `glossary/` subdirectory INSIDE a
+    // declared translation-sources directory, where the scheme catalogues sit;
+    // it is not an instance's declared `glossary` directory.
     const schemes = join(dir, locale, "glossary");
     if (existsSync(schemes)) {
       for (const f of readdirSync(schemes).filter((x) => x.endsWith(".po")).sort()) {
