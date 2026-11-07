@@ -36,6 +36,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import { gitFiles } from "../schemas/sdlc/git-corpus.ts";
 import { HARNESS_ROOT, TOOLS_ROOT } from "./lib/roots.ts";
+import { PANEL_CLIENT } from "./lib/task-panel.ts";
 
 export const BASELINE_PATH = resolve(TOOLS_ROOT, "scripts", "content-code-free-baseline.json");
 
@@ -47,7 +48,7 @@ export const CODE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".mjs", ".
 export const BROWSER_ASSET_DIRS = ["site-chrome/assets/", "site-chrome/_includes/", "docs/assets/"] as const;
 
 export const isBrowserAsset = (rel: string): boolean =>
-  /\.m?js$/.test(rel) && (BROWSER_ASSET_DIRS.some((d) => rel.startsWith(d)) || BUILT_PAGE_ASSET.test(rel));
+  /\.m?js$/.test(rel) && (BROWSER_ASSET_DIRS.some((d) => rel.startsWith(d)) || BUILT_PAGE_ASSET.test(rel) || BUILT_PANEL_CLIENT.test(rel));
 
 /**
  * A page built at publish under `docs/<lang>/` ships its script beside it in an
@@ -55,6 +56,18 @@ export const isBrowserAsset = (rel: string): boolean =>
  * It is a browser asset by the same rule as above, and it is never tracked.
  */
 export const BUILT_PAGE_ASSET = /^docs\/[a-z]{2}(?:-[A-Za-z]+)?\/(?:[^/]+\/)*assets\/[^/]+\.m?js$/;
+
+/**
+ * The process viewer's task-panel client, which `processes:viz` writes BESIDE
+ * its pages (`<lang>/<harness>/processes/task-panel.js`, `lib/task-panel.ts`
+ * `PANEL_CLIENT`) at publish, never tracked. A layer mounted without its git
+ * metadata is walked rather than asked, so the copy a build wrote counted as
+ * code in content (dth-hrh run 42343581318). Named exactly, not by folder: no
+ * other script beside a page is excused by it.
+ */
+export const BUILT_PANEL_CLIENT = new RegExp(
+  `^docs/[a-z]{2}(?:-[A-Za-z]+)?/(?:[^/]+/)*processes/${PANEL_CLIENT.script.replace(".", "\\.")}$`,
+);
 
 /** The folio file-list renderer and the Jekyll plugins, kept by owner card (2026-10-30, option A). */
 // declared-path-literal: a classifier over repo-relative paths, as BROWSER_ASSET_DIRS above
