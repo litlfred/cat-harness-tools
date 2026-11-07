@@ -768,3 +768,107 @@ export function evaluateAgenticPromotion(
   };
 }
 
+
+// ---------------------------------------------------------------------------
+// The merge request a sibling sends the merge manager
+// ---------------------------------------------------------------------------
+
+/**
+ * The six-line merge request (owner, 2026-11-07: "anything that indicated to
+ * merge should have link to PR, claude session, explanation of changes,
+ * preview URL"; "put that in chat then ask to merge by card"). A sibling
+ * sends it; the merge manager posts it in its chat, then asks the owner by
+ * card, and sends back a request with no rendered preview and no reason.
+ *
+ * It is a MESSAGE, not a queue entry: it carries the head SHA it was green
+ * at, which {@link MergeQueueEntrySchema} must never store.
+ *
+ * The text form, one labelled line each, in this order:
+ *
+ * ```
+ * ready: https://github.com/<owner>/<repo>/pull/<n> <40-hex head sha>
+ * session: https://claude.ai/code/session_<id>
+ * changes: <1-3 sentences>
+ * preview: <rendered URL>          (or)   no preview: <reason>
+ * look for: <what to check in the preview>
+ * full tier green as judged
+ * ```
+ */
+export const MERGE_REQUEST_GREEN_LINE = "full tier green as judged";
+
+/** At most this many sentences in `changes`. */
+export const MERGE_REQUEST_MAX_SENTENCES = 3;
+
+const sentenceCount = (text: string): number =>
+  text.split(/(?<=[.!?])\s+(?=\S)/).filter((s) => s.trim().length > 0).length;
+
+export const MergeRequestPreviewSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("url"), url: z.string().url() }).strict(),
+  z.object({ kind: z.literal("none"), reason: z.string().trim().min(1) }).strict(),
+]);
+export type MergeRequestPreview = z.infer<typeof MergeRequestPreviewSchema>;
+
+export const MergeRequestSchema = z
+  .object({
+    prUrl: z.string().regex(/^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/\d+$/, "a GitHub pull request URL"),
+    headSha: z.string().regex(/^[0-9a-f]{40}$/, "the full 40-hex head SHA"),
+    sessionUrl: z.string().regex(/^https:\/\/claude\.ai\/code\/session_[A-Za-z0-9]+$/, "a claude.ai session URL"),
+    changes: z
+      .string()
+      .trim()
+      .min(1)
+      .refine((t) => sentenceCount(t) <= MERGE_REQUEST_MAX_SENTENCES, {
+        message: `the changes in at most ${MERGE_REQUEST_MAX_SENTENCES} sentences`,
+      }),
+    preview: MergeRequestPreviewSchema,
+    /** What to look for in the preview. Required when there is one. */
+    lookFor: z.string().trim().min(1).optional(),
+    /** The sender's statement that the full tier is green as judged (every judge). */
+    fullTierGreen: z.literal(true),
+  })
+  .strict()
+  .superRefine((r, ctx) => {
+    if (r.preview.kind === "url" && !r.lookFor) {
+      ctx.addIssue({ code: "custom", path: ["lookFor"], message: "say what to look for in the preview" });
+    }
+  });
+export type MergeRequest = z.infer<typeof MergeRequestSchema>;
+
+/** The six lines of a {@link MergeRequest}, in order. */
+export function formatMergeRequest(r: MergeRequest): string {
+  return [
+    `ready: ${r.prUrl} ${r.headSha}`,
+    `session: ${r.sessionUrl}`,
+    `changes: ${r.changes}`,
+    r.preview.kind === "url" ? `preview: ${r.preview.url}` : `no preview: ${r.preview.reason}`,
+    `look for: ${r.lookFor ?? "-"}`,
+    MERGE_REQUEST_GREEN_LINE,
+  ].join("\n");
+}
+
+/**
+ * Read a merge request from a message. Lines may come in any order and
+ * other lines are ignored; what is missing or malformed is reported by
+ * {@link MergeRequestSchema}, so the merge manager can send it back with
+ * the reason.
+ */
+export function parseMergeRequest(text: string): ReturnType<typeof MergeRequestSchema.safeParse> {
+  const lines = text.split(/\r?\n/).map((l) => l.trim());
+  const after = (label: string): string | undefined => {
+    const line = lines.find((l) => l.toLowerCase().startsWith(`${label}:`));
+    return line === undefined ? undefined : line.slice(label.length + 1).trim();
+  };
+  const ready = after("ready")?.split(/\s+/) ?? [];
+  const url = after("preview");
+  const none = after("no preview");
+  const lookFor = after("look for");
+  return MergeRequestSchema.safeParse({
+    prUrl: ready[0],
+    headSha: ready[1],
+    sessionUrl: after("session"),
+    changes: after("changes"),
+    preview: url !== undefined ? { kind: "url", url } : none !== undefined ? { kind: "none", reason: none } : undefined,
+    ...(lookFor !== undefined && lookFor !== "-" ? { lookFor } : {}),
+    fullTierGreen: lines.some((l) => l.toLowerCase() === MERGE_REQUEST_GREEN_LINE) ? true : undefined,
+  });
+}
