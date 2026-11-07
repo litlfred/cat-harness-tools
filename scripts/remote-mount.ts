@@ -2198,7 +2198,10 @@ export function regenerateAgentSurface(root: string): { ok: boolean; lines: stri
     const r = spawnSync(process.execPath, [join(import.meta.dir, g)], { cwd: root, encoding: "utf-8" });
     const pass = r.status === 0;
     ok &&= pass;
-    lines.push(`  ${pass ? "✓" : "✗"} ${g}${pass ? "" : ` exited ${r.status ?? r.signal}: ${(r.stderr || r.stdout).trim().split("\n").slice(-3).join(" | ")}`}`);
+    const rawLines = (r.stderr || r.stdout).trim().split("\n").filter((l) => l.trim().length > 0);
+    const findings = rawLines.filter((l) => l.trim().startsWith("✗"));
+    const tail = findings.length > 0 ? findings : rawLines.slice(-3);
+    lines.push(`  ${pass ? "✓" : "✗"} ${g}${pass ? "" : ` exited ${r.status ?? r.signal}: ${tail.join(" | ")}`}`);
   }
   return { ok, lines };
 }
