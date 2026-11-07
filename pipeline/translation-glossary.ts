@@ -126,7 +126,7 @@ import {
   type GlossarySenseStore,
   type GlossarySenseVerdict,
 } from "../schemas/kg/glossary-sense.ts";
-import { declarationChain } from "../schemas/kg/harness-config.ts";
+import { declarationChain, resolveInstanceGraph } from "../schemas/kg/harness-config.ts";
 import { explicitInstanceRoot, HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import { GATE_OWN_PATHS_ENV } from "../scripts/lib/gate-own.ts";
 import { buildQaResult, writeQaResult } from "../scripts/qa-results.ts";
@@ -907,6 +907,18 @@ function main(argv: readonly string[]): number {
   return Math.max(...own.map((r) => mainFor(r, argv)));
 }
 
+/**
+ * The `needs` of the instance at `root` that resolve to nothing on disk, as the
+ * instance graph reports them. Without such a layer its scheme catalogues still
+ * sit in the instance's `translations/` (glossary:pot writes them there), so they
+ * would be read as the instance's own and judged in sense by rule — a wrong
+ * verdict, not a missing one. Measured: a bare clone of the platform without its
+ * foundation beside it reported 95 violations where the mounted layer had 12.
+ */
+export function absentLayers(root: string): string[] {
+  return resolveInstanceGraph(root).problems.filter((p) => p.kind === "missing").map((p) => p.detail);
+}
+
 function mainFor(root: string, argv: readonly string[]): number {
   const check = argv.includes("--check");
   const translations = translationsOf(root);
@@ -927,6 +939,14 @@ function mainFor(root: string, argv: readonly string[]): number {
   });
   if (references.some((r) => !r.name)) {
     console.error("translation-glossary: --layer takes <name>=<path with {locale}> (exit 2)");
+    return 2;
+  }
+  const absent = absentLayers(root);
+  if (absent.length > 0) {
+    for (const d of absent) console.error(`translation-glossary: ${d}`);
+    console.error(
+      `translation-glossary: a layer ${relative(process.cwd(), root) || "."} needs is not on disk, so its glossaries would be read as this instance's own and every use judged in sense by rule — mount the layers (\`mount:lock\`) and run again (exit 2)`,
+    );
     return 2;
   }
   const instance = readDeclaration(root)?.name ?? basename(root);
