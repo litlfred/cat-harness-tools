@@ -30,10 +30,11 @@ Feature: Class and sequence diagrams are derived from an ArchiMate model
     And text that is not a numbered list gives no attributes
 
   @test:archimate/scripts/diagrams.test.ts::derived_data_class_diagrams_(D5)::captures_Product_Master_Data_compositions,_association_cardinalities,_FSH_references,_and_accessors
-  Scenario: Association cardinalities, accessors and FSH references are captured
+  Scenario: Compositions, association cardinalities, accessors and FSH references are captured
     Given the data model derived with the FSH Logical models
     When relationship names are parsed for role and cardinality
     Then "classification 0..*", "contains 0..* (packaging hierarchy)" and "authorisedTradeItem 1..1" give their role and cardinality, a parenthesis kept in the role
+    And Product Master Data's compositions are of Generic Product, Product Classification, Regulated Trade Item and Trade Item
     And Product Master Data is accessed by "National Product Catalogue" (readwrite) and by "Data Owner" (association "approves changes")
     And the Reference(FacilityModel) field gives an association from Health Worker to Facility with role "primaryFacility" and cardinality "0..1"
 
@@ -83,11 +84,14 @@ Feature: Class and sequence diagrams are derived from an ArchiMate model
     And the Markdown has the heading "Sequence Diagrams (RA_D5)", a section for the ITI-41 view and a Mermaid sequence diagram
 
   @test:archimate/scripts/diagrams.test.ts::integration_with_archimate-pages_and_archimate-diagrams::writes_data-model_and_sequences_artefacts_and_sections_onto_the_metamodel_page,_and_every_link_resolves_in-graph_and_in-site
-  Scenario: The diagrams are written as files and as metamodel-page sections, and every site link resolves
+  Scenario: The diagrams are written as files and as metamodel-page sections, and every link resolves in a site and in the graph
     Given a throwaway instance with the model, its config, the FSH under "input/fsh/models" and the BPMN under "processes"
     When its diagrams are made
     Then the data model has nine classes and there are three sequences, the report says "data model: 9 class(es)", and PlantUML and Mermaid formats are given
     When its pages are generated for a site
     Then the data model is written as JSON, PlantUML, Mermaid, DOT and SVG, and the sequences as JSON, PlantUML and Mermaid
     And the metamodel page has the sections "Data class diagram" and "Sequence diagrams"
-    And every relative href, src and data attribute of each page, and each "node", "model", "svg" and "metamodel" of a non-root page's config, resolves to a written file or folder
+    And every relative href, src and data attribute of each page, and each "node", "model", "svg" and "metamodel" of a non-root page's config, resolves to a written file or folder, and there is at least one
+    When its pages are generated in the graph
+    Then the pages sit beside their data, the metamodel page has the section "Data class diagram"
+    And every such link resolves to a written file or folder, and there is at least one
