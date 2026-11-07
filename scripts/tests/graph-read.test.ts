@@ -47,7 +47,9 @@ function mount(root: string, id: string, into: string): void {
   mkdirSync(into, { recursive: true });
   const p = markerPath(root, id);
   mkdirSync(join(p, ".."), { recursive: true });
-  writeFileSync(p, JSON.stringify({ $schema: MOUNT_MARKER_SCHEMA, id, branch: TIP.branch, path: "beans", into, tip: "0".repeat(40), files: {} }));
+  // The declared path of the graph `id` (every fixture here declares `<id>/`): a marker
+  // naming another path is another graph's, and `tipPresence` refuses it.
+  writeFileSync(p, JSON.stringify({ $schema: MOUNT_MARKER_SCHEMA, id, branch: TIP.branch, path: id, into, tip: "0".repeat(40), files: {} }));
 }
 
 describe("a directory that never moved", () => {
