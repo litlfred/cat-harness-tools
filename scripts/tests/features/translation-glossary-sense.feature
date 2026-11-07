@@ -95,3 +95,11 @@ Feature: Glossary terms in sense keep their fixed translation
     When the glossary check runs with no --instance
     Then it judges only the own instances that declare translation-sources
     And with none named it judges the harness, as before
+
+  @test:pipeline/translation-glossary.test.ts::a_fixed_translation's_parenthetical_gloss::the_term_rendered_without_the_fixed_translation's_parenthetical_gloss_still_renders_it
+  Scenario: A fixed translation's parenthetical gloss is not required in running text
+    Given a fixed translation that glosses itself in parentheses, an abbreviation or the English
+    When running text renders the term without the gloss
+    Then the term counts as rendered
+    And text that does not render the term still fails
+

@@ -525,3 +525,12 @@ describe("in an index run, the gate judges the caller's own instances", () => {
     expect(ownTranslationRoots(base, {})).toBeUndefined();
   });
 });
+
+describe("a fixed translation's parenthetical gloss", () => {
+  test("the term rendered without the fixed translation's parenthetical gloss still renders it", () => {
+    expect(renders("Infrastructure à clés publiques (ICP)", "Gère l'infrastructure à clés publiques du participant.", "fr")).toBe(true);
+    expect(renders("Servicio de confianza (Trusted Service)", "un servicio de confianza prestado por un nodo", "es")).toBe(true);
+    expect(renders("Infrastructure à clés publiques (ICP)", "Gère les clés du participant.", "fr")).toBe(false);
+    expect(renders("公钥基础设施（PKI）", "管理参与者的公钥基础设施。", "zh")).toBe(true);
+  });
+});

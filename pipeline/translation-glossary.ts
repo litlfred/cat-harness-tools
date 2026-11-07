@@ -462,6 +462,16 @@ function stem(w: string, locale: string): string {
 
 /** Does `msgstr` use the fixed translation? By stem, or by substring in zh and ar. */
 export function renders(fixed: string, msgstr: string, locale: string): boolean {
+  // A fixed translation may gloss itself in parentheses — an abbreviation, «Infrastructure
+  // à clés publiques (ICP)», or the English, «Servicio de confianza (Trusted Service)».
+  // The gloss is given once, where the term is introduced; running text that renders
+  // the term without it still renders the term.
+  const bare = fixed.replace(/\s*[(（][^()（）]*[)）]\s*/gu, " ").trim();
+  if (bare && bare !== fixed.trim() && rendersExactly(bare, msgstr, locale)) return true;
+  return rendersExactly(fixed, msgstr, locale);
+}
+
+function rendersExactly(fixed: string, msgstr: string, locale: string): boolean {
   const t = norm(msgstr, locale);
   let f = norm(fixed, locale);
   if (locale === "zh") return t.includes(f);
