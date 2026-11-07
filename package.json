@@ -193,6 +193,7 @@
     "check:lane-documentation:check": "bun run cat-harness-tools/scripts/check-lane-documentation.ts --check",
     "check:layout-norms": "bun run cat-harness-tools/scripts/check-layout-norms.ts",
     "check:layout-norms:check": "bun run cat-harness-tools/scripts/check-layout-norms.ts --check",
+    "check:lock-consistency": "bun run cat-harness-tools/scripts/check-lock-consistency.ts",
     "check:lockfile-pinning": "bun run cat-harness-tools/scripts/check-lockfile-pinning.ts",
     "check:maintained-artefacts": "bun run cat-harness-tools/scripts/check-maintained-artefacts.ts",
     "check:merged": "bun run cat-harness-tools/scripts/check-merged.ts",
