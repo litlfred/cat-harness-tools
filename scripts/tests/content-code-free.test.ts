@@ -32,7 +32,9 @@ describe("check:content-code-free", () => {
   });
 
   test("a path the harness declares builtAtPublish is never tracked, so its code is not content's", () => {
+    // declared-path-literal: test inputs to the builtAtPublish classifier, not reads
     const built = ["docs/en/cat-harness/processes/", "docs/assets/processes/index.json"];
+    // declared-path-literal: test inputs to the builtAtPublish classifier, not reads
     expect(isBuiltAtPublish("docs/en/cat-harness/processes/task-panel.js", built)).toBe(true);
     expect(isBuiltAtPublish("docs/en/cat-harness/processes-x/a.js", built)).toBe(false);
     expect(isBuiltAtPublish("schemas/x.ts", built)).toBe(false);
