@@ -39,6 +39,9 @@ Feature: A document's relationship rules are drawn as tables and checked against
     When the model is checked against the rules
     Then three of its five relationships are checked
     And the first rule is used once and the second never
+    And the uncovered patterns hold only "id-r2" and "id-r3", not the grouping's aggregation nor the influence on the placeholder "Goal"
+    When rules for a grouping aggregating a component and a component influencing a goal are added
+    Then still three relationships are checked, and both added rules are used zero times
 
   @test:archimate/scripts/blocks.test.ts::checking_a_model_against_the_rules::reports_the_patterns_no_rule_covers,_most_used_first
   Scenario: The patterns no rule covers are reported
@@ -46,6 +49,9 @@ Feature: A document's relationship rules are drawn as tables and checked against
     When the model is checked against the rules
     Then the only uncovered pattern is a service serving a component, used twice
     And two relationships are uncovered
+    When the realisation rule is removed
+    Then the uncovered patterns are the serving, used twice, then the realisation, used once
+    And three relationships are uncovered
 
   @test:archimate/scripts/blocks.test.ts::checking_a_model_against_the_rules::flags_a_rule_ArchiMate_does_not_allow,_and_a_relationship_type_the_document_never_explains
   Scenario: A rule ArchiMate does not allow, and an unexplained relationship type, are flagged
