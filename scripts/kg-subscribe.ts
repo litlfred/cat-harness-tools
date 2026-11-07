@@ -154,6 +154,7 @@ import {
 import { NESTED_DIR, NODES_DIR, NODES_RECORD_FILE, PART_RECORD_FILE, type PartView, safeRelPath, viewOf } from "./kg-parts.js";
 import { git, pinnedRef, shallowFetch } from "./sync-remote-skills.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 const INSTANCE = join(HARNESS_ROOT);
 
@@ -404,6 +405,8 @@ export async function judgeSubstrate(repository: string, ref: string, fetch: Roo
   if (!up.ok) return { state: "not-a-substrate", reason: up.why };
   let dir: string;
   try {
+    // input-site: traced #56af338f — fetches the subscribed repository over the network: a run that reaches it records no hash
+    inputSiteReached("kg-subscribe: fetch");
     dir = await fetch(repository, ref, up.path !== undefined ? { upstreamPath: up.path } : {});
   } catch (e) {
     return {
@@ -452,6 +455,7 @@ export function gitDeclarationFetcher(urlFor: (repository: string) => string = (
         const dirs = root.filter((e) => e.type === "tree" && !e.path.startsWith(".")).map((e) => `${e.path}/`);
         names = [...blobs(root), ...(dirs.length ? blobs(entries(["--", ...dirs])) : [])];
       }
+      // input-site: inert #09ad4eda — the scratch root a subscribed graph is staged in
       const out = mkdtempSync(join(tmpdir(), "kg-subscribe-root-"));
       for (const n of names.filter((x) => x.endsWith(".json"))) {
         mkdirSync(dirname(join(out, n)), { recursive: true });

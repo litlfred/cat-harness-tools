@@ -55,6 +55,7 @@ export function contentDocuments(repo: string = REPO): string[] {
   if (listed !== undefined) return listed;
 
   const out: string[] = [];
+  // input-site: inert #6a968168 — names the build output directories a corpus walk skips; never reads them
   const skip = new Set(["node_modules", "_kg", "_site", "_docs", ".git"]);
   const walk = (dir: string): void => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
