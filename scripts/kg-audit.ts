@@ -52,7 +52,7 @@ import { defaultGraphTypologies } from "../schemas/kg/graph-typology-registry.js
 import { contractFile, contractRefProblem, skillContracts } from "./skill-contracts.js";
 import { checkTestRuns, testRunFiles, type RunFinding } from "./test-run-conformance.js";
 import { BUILDING_ENV } from "./qa-working-copy.ts";
-import { auditCertifications, auditTestPlans, jsonFilesUnder, auditTestPlanExitCriteria } from "./test-plan-audit.js";
+import { auditCertifications, auditTestGherkin, auditTestPlans, jsonFilesUnder, auditTestPlanExitCriteria } from "./test-plan-audit.js";
 import { processArrowFindings, schemaArrowFindings } from "./arrow-direction.js";
 import { contentCodeFindings, contentInstanceCode } from "./content-holds-code.js";
 import { orphanSubjectResolves } from "./orphan-detector.js";
@@ -1978,6 +1978,8 @@ function testPlanCriteria(actors: LoadedActor[]): Record<string, KgCriterionEntr
       plans: planFiles,
       dmnBases: [WORKFLOW_DIR],
     }),
+    // Owner, 2026-11-06: every test has a Gherkin, and every plan case names one.
+    "test-has-gherkin": auditTestGherkin({ root, plans: planFiles }),
     // Bean `zaui`: the certifications `A_FileCertification` files, judged.
     "certification-resolves": auditCertifications({
       root,
