@@ -24,6 +24,16 @@
  * `<instance>.json` (`translation-sources`), and the site directory from
  * `siteDirFor`. Neither is written here; `site-dir-single-answer.test.ts`
  * guards the second across the whole tree.
+ *
+ * ## `--instance <dir>`: another instance's catalogues, reported
+ *
+ * The page and projection this generator writes are THIS instance's viewer, at
+ * a route this instance declares, so another instance's numbers are not
+ * written there. With `--instance`, the instance at `<dir>` is measured from
+ * its own `translation-sources` declaration and the per-locale table is
+ * printed (or emitted as the projection's `locales` array with `--json`);
+ * nothing is written, with or without `--check`. An instance that declares no
+ * such directory exits 2, as this one would.
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -33,7 +43,7 @@ import { tileCounts } from "../schemas/ui/tile-count.js";
 import { siteRootFrom } from "../schemas/kg/visualiser-route.js";
 import { pageParts, tileDirectories, visualiserSitePath, withRenderedByFrontMatter } from "./viewer-declarations.js";
 import { themedPage } from "./lib/themed-page.ts";
-import { HARNESS_ROOT } from "./lib/roots.ts";
+import { explicitInstanceRoot, HARNESS_ROOT } from "./lib/roots.ts";
 import { localSiteDir } from "./lib/local-site-dir.ts";
 import { siteArg, sitePageAt, siteTarget } from "./lib/site-target.ts";
 import { SKILL_PAGES_DIR } from "./lib/skill-pages.ts";
@@ -627,7 +637,43 @@ and needs review; adding it to <em>translated</em> would flatter exactly the ent
   });
 }
 
+/** One locale as a line of the `--instance` report. */
+export function statusLine(l: LocaleStatus): string {
+  const v = share(l.translated, l.entries);
+  // Plain text: `pct` renders the page's HTML for "no basis".
+  const p = v === null ? "no basis" : `${v}%`;
+  return (
+    `  ${l.locale.padEnd(6)} ${String(l.catalogues).padStart(4)} catalogue(s) of ${String(l.templates).padStart(4)} template(s)  ` +
+    `${String(l.translated).padStart(6)}/${String(l.entries).padEnd(6)} translated (${p})  ` +
+    `${l.fuzzy} fuzzy, ${l.untranslated} empty` + (l.officiality ? `  ${officialityLabel(l.officiality)}` : "") +
+    (l.unreadable.length > 0 ? `  UNREADABLE: ${l.unreadable.join(", ")}` : "")
+  );
+}
+
+/** `--instance <dir>`: measure that instance's catalogues and print them. Writes nothing. */
+function reportInstance(root: string): number {
+  const translationsDir = translationsDirOf(root);
+  if (translationsDir === undefined || !existsSync(translationsDir)) {
+    console.error(`gen-translation-status: ${root} declares no \`translation-sources\` directory, or it is absent.`);
+    console.error("This is NOT a pass. Treat it as unknown.");
+    return 2;
+  }
+  const locales = localeStatuses(translationsDir);
+  if (process.argv.includes("--json")) {
+    console.log(JSON.stringify({ $schema: TRANSLATION_STATUS_SCHEMA, scope: `${readDeclaration(root)?.name ?? root}/${relative(root, translationsDir)}`, locales }, null, 2));
+    return locales.some((l) => l.unreadable.length > 0) ? 2 : 0;
+  }
+  console.log(`${readDeclaration(root)?.name ?? root}: ${relative(root, translationsDir)}/`);
+  for (const l of locales) console.log(statusLine(l));
+  const unreadable = locales.reduce((n, l) => n + l.unreadable.length, 0);
+  console.log(`${locales.length} locale(s)` + (unreadable > 0 ? `, ${unreadable} catalogue(s) unreadable` : ""));
+  // An unreadable catalogue is "could not determine", never a zero: exit 2.
+  return unreadable > 0 ? 2 : 0;
+}
+
 function main(): void {
+  const explicit = explicitInstanceRoot();
+  if (explicit !== undefined) process.exit(reportInstance(explicit));
   const check = process.argv.includes("--check");
   const translationsDir = translationsDirOf(ROOT);
 

@@ -97,6 +97,10 @@ put("lower/fhir-artifact-index/index.json", {
     { key: "Bundle/ana-ips", title: "Ana's IPS", profiles: ["http://example.org/StructureDefinition/ips-bundle"], materialization: { localPath: "output-ast/Bundle-ana-ips.json" } },
     // The role Ana plays, as the IG defines it: her name links here.
     { key: "ActorDefinition/Demo.Role.Pilgrim", title: "Pilgrim" },
+    // The DAK assets step P2 uses: a data set, a decision table, an indicator.
+    { key: "StructureDefinition/DdTreatment", title: "DD.P2 Treatment abroad", description: "What the clinic records." },
+    { key: "PlanDefinition/DT01", title: "DT.01 Is the summary genuine?" },
+    { key: "Measure/IND02", title: "IND.02 Summaries read abroad" },
   ],
 });
 put("lower/output-ast/Bundle-ana-ips.json", { resourceType: "Bundle", id: "ana-ips", type: "document", total: 1, entry: null });
@@ -112,7 +116,7 @@ put("lower/code-lists/trust.json", {
   ],
 });
 put("lower/scenarios/user-scenarios/p2.json", {
-  $schema: "user-scenario/0.2.0",
+  $schema: "user-scenario/0.3.0",
   id: "p2-treated",
   title: "P2 — Treated",
   description: "Ana is treated.",
@@ -134,6 +138,8 @@ put("lower/scenarios/user-scenarios/p2.json", {
       realisedBy: [{ process: "processes/care.bpmn", tasks: ["Task_Read"] }],
       requirements: ["LOW-REQ-001", "LOW-REQ-404"],
       examples: ["Bundle/ana-ips"],
+      // Out of order, one with no rel (its type says decision logic), one the index does not list.
+      dak: [{ key: "Measure/IND02", rel: "measures" }, { key: "StructureDefinition/DdTreatment", rel: "data" }, { key: "PlanDefinition/DT01" }, { key: "Measure/IND99", rel: "measures" }],
       uses: [
         { block: "wallet", role: "shows the QR" },
         { block: "nowhere", role: "unknown block" },
@@ -781,6 +787,31 @@ describe("personas and other DAK assets link to their pages in the IG", () => {
   });
 });
 
+describe("a step's DAK assets: one row, grouped by what each is to the step, linked into the IG", () => {
+  const dakPages = ["StructureDefinition-DdTreatment.html", "PlanDefinition-DT01.html", "Measure-IND02.html"];
+  test("the walkthrough's hood draws Data, Decision logic, Indicators in that order, each asset linked; one the index does not list stays text", () => {
+    const page = sitePath("top/workshops/policy/walkthrough/P2/index.html");
+    const walk = at("top/workshops/policy/walkthrough/P2/index.html");
+    const row = /<div class="jp-dak" data-jp-dak>[\s\S]*?<\/span><\/div><\/div>/.exec(walk)?.[0] ?? "";
+    expect([...row.matchAll(/data-jp-dak-rel="([a-z]+)"/g)].map((m) => m[1])).toEqual(["data", "decides", "measures"]);
+    expect([...row.matchAll(/<span class="jp-dak-l">.*?<\/svg>([^<]+)<\/span>/g)].map((m) => m[1])).toEqual(["Data", "Decision logic", "Indicators"]);
+    expect(hrefsOf(row, DAK_ATTR).map((h) => landsAt(page, h))).toEqual(dakPages);
+    expect(row).toContain('title="StructureDefinition/DdTreatment — What the clinic records.">DD.P2 Treatment abroad</a>');
+    expect(row).toContain('<span class="jp-dak-a jp-dak-text" title="Measure/IND99">IND99</span>');
+  });
+  test("the journey page's step lists the same assets under DAK assets", () => {
+    const page = sitePath("lower/p2-treated/index.html");
+    const html = at("lower/p2-treated/index.html");
+    const dl = /<h4>DAK assets<\/h4><dl class="jv-dl jv-dak">[\s\S]*?<\/dl>/.exec(html)?.[0] ?? "";
+    expect([...dl.matchAll(/<dt>([^<]+)<\/dt>/g)].map((m) => m[1])).toEqual(["Data", "Decision logic", "Indicators"]);
+    expect(hrefsOf(dl, DAK_ATTR).map((h) => landsAt(page, h))).toEqual(dakPages);
+    expect(dl).toContain('<span class="jv-code" title="Measure/IND99">IND99</span>');
+  });
+  test("a step that names none draws no row", () => {
+    expect(at("top/workshops/policy/walkthrough/P1/index.html")).not.toContain("data-jp-dak");
+  });
+});
+
 describe("the check over a staged site: every DAK link resolves to a file", () => {
   const site = mkdtempSync(join(tmpdir(), "journeys-site-"));
   afterAll(() => rmSync(site, { recursive: true, force: true }));
@@ -805,7 +836,7 @@ describe("the check over a staged site: every DAK link resolves to a file", () =
   write("archimate/ra/views/v-p2.svg", '<svg xmlns="http://www.w3.org/2000/svg"><a href="../../../en/lower/archimate/ra/elements/wallet/" target="_top"><rect/></a></svg>');
   write("en/lower/archimate/ra/elements/wallet/index.html", "<!doctype html>");
   test("every rendered DAK link names a page the IG and the KG publish", () => {
-    expect([...targets]).toEqual(expect.arrayContaining(["ActorDefinition-Demo.Role.Pilgrim.html", "Bundle-ana-ips.html", "kg/lower/processes/care/P/node/Task_Read/"]));
+    expect([...targets]).toEqual(expect.arrayContaining(["ActorDefinition-Demo.Role.Pilgrim.html", "Bundle-ana-ips.html", "PlanDefinition-DT01.html", "Measure-IND02.html", "StructureDefinition-DdTreatment.html", "kg/lower/processes/care/P/node/Task_Read/"]));
     const r = checkDakLinks(site, LINKS.route);
     expect(r.findings).toEqual([]);
     expect(r.checked).toBeGreaterThan(10);
@@ -823,5 +854,59 @@ describe("the check over a staged site: every DAK link resolves to a file", () =
     expect(checkDakLinks(site, LINKS.route).findings.some((f) => f.why === 'no id "nowhere" in Bundle-ana-ips.html')).toBe(true);
     expect(BARE_VHL.test("https://profiles.ihe.net/ITI/VHL")).toBe(true);
     expect(BARE_VHL.test("https://profiles.ihe.net/ITI/VHL/volume-1.html")).toBe(false);
+  });
+});
+
+describe("composition (user-scenario 0.4.0): a parent's parts, in its order, and a step that is a journey", () => {
+  // A checkout of its own: one instance, every journey of it 0.4.0. The
+  // instance sits one level down, as `lower` and `top` do: an instance at
+  // the temporary directory's top would make the system temporary directory
+  // its checkout, read with every other test's fixtures in it.
+  const ROOT = mkdtempSync(join(tmpdir(), "journeys-compose-"));
+  afterAll(() => rmSync(ROOT, { recursive: true, force: true }));
+  const putc = (rel: string, body: object): void => {
+    mkdirSync(join(ROOT, dirname(rel)), { recursive: true });
+    writeFileSync(join(ROOT, rel), JSON.stringify(body, null, 2));
+  };
+  putc("compose/compose.json", {
+    name: "compose",
+    directories: [
+      { id: "scenarios", path: "scenarios/", graphTypologies: ["scenarios"] },
+      { id: "user-scenarios", path: "journeys/", graphTypologies: ["user-scenario"] },
+    ],
+  });
+  putc("compose/scenarios/actors/ana.json", { id: "ana", title: "Ana", roles: ["traveller"], meta: { persona: { name: "Ana" } } });
+  putc("compose/scenarios/roles.json", { roles: [{ id: "traveller", title: "Traveller" }] });
+  const v04 = (id: string, title: string, extra: object) => ({ $schema: "user-scenario/0.4.0", id, title, description: "d", ...extra });
+  putc("compose/journeys/trip.json", v04("trip", "C — The trip", { parts: [{ scenario: "home" }, { scenario: "away", optional: true, repeats: true }] }));
+  putc("compose/journeys/away.json", v04("away", "C2 — Away", { personas: ["ana"], steps: [step("C2", "ana")] }));
+  putc("compose/journeys/home.json", v04("home", "C1 — Home", { personas: ["traveller"], steps: [step("C1", "ana", { includes: "away" })] }));
+  clearDeclaredVisualisers();
+  const c = readJourneyCorpus(join(ROOT, "compose"));
+  const pages = renderJourneyPages(c, { ...LINKS, route: "en/compose/journeys" }, "compose");
+  const page = (path: string) => String(pages.find((x) => x.path === path)!.content);
+
+  test("the parent's page lists its parts in its order, marking an optional or repeating one", () => {
+    const trip = page("compose/trip/index.html");
+    const parts = trip.slice(trip.indexOf("Parts, in story order"));
+    expect(parts.indexOf("C1 — Home")).toBeGreaterThan(0);
+    expect(parts.indexOf("C1 — Home")).toBeLessThan(parts.indexOf("C2 — Away"));
+    const away = parts.slice(parts.indexOf("C2 — Away"), parts.indexOf("</a>", parts.indexOf("C2 — Away")));
+    expect(away).toContain('class="jv-part-mark" title="The story may skip it">optional</span>');
+    expect(away).toContain(">repeats</span>");
+    // Its people are its parts', derived.
+    expect(c.journeys.find((j) => j.scenario.id === "trip")!.scenario.personas).toEqual(["ana"]);
+  });
+  test("the index nests the parts in that order; a part's neighbours are its parent's", () => {
+    const index = page("index.html");
+    const trip = index.slice(index.indexOf("C — The trip"));
+    expect(trip).toContain("2 parts");
+    expect(trip.indexOf("C1 — Home")).toBeLessThan(trip.indexOf("C2 — Away"));
+    const home = page("compose/home/index.html");
+    expect(home).toContain('href="../../compose/trip/" rel="up"');
+    expect(home).toContain('href="../../compose/away/" rel="next"');
+  });
+  test("a step that includes a journey links to it", () => {
+    expect(page("compose/home/index.html")).toContain('<p class="jv-includes">This step is the journey <a href="../../compose/away/"><b>C2 — Away</b></a>.</p>');
   });
 });

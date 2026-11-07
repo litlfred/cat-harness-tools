@@ -269,6 +269,21 @@ describe("analyse over a synthetic tree", () => {
     expect(analyse(r).skippedMachineWritten).toBe(1);
   });
 
+  test("a route another harness builds on this instance's site (builtOnHostSite) is not read as this instance's", () => {
+    // `high`'s viewer built into `low`'s site: the page names `high`'s own
+    // material, and `low` declares none of it.
+    const files = { "low/docs/en/high/bibliography/references.jsonld": '{"x":"high"}\n', "low/notes.md": "about high\n" };
+    const r = tree(files);
+    expect(verdicts(r).sort()).toEqual(["low/docs/en/high/bibliography/references.jsonld wrong-direction", "low/notes.md wrong-direction"]);
+    const withHostSite = analyse(r, [join(r, "low/docs/en/high/bibliography")]);
+    expect(withHostSite.classified.map((c) => c.occurrence.file)).toEqual(["low/notes.md"]);
+    expect(withHostSite.skippedMachineWritten).toBe(1);
+  });
+
+  test("a tree with no builtOnHostSite visualiser derives no host-site route", () => {
+    expect(analyse(tree({ "low/notes.md": "about high\n" })).skippedMachineWritten).toBe(0);
+  });
+
   test("a directory holding an AUTHORED graph is read — the exclusion is the declaration, not the shape", () => {
     const files = { "low/out/index.json": '{"x":"high"}\n' };
     // `docs` holds "content". Same file, same name, different declaration.

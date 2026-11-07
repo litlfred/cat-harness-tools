@@ -114,6 +114,15 @@ export const BeanIndexSchema = z
         .strict(),
     ),
     /**
+     * Work plans filed wrong: an item naming a process that is not an epic or
+     * a milestone, or a proposal naming no process (`workPlanFindings`,
+     * `schemas/sdlc/work-plan.ts`). Written by `gen-docs-pages.ts` since
+     * 089be6f8, which left this schema rejecting the index it wrote
+     * (check:kind-validators, dth-hrh run 42343581318). OPTIONAL, as `plan`
+     * is: an index written before the field is still valid.
+     */
+    planFindings: z.array(z.object({ id: z.string(), problem: z.string() }).strict()).optional(),
+    /**
      * The milestone rollup the board renders. OPTIONAL, because an index
      * written before this field existed is still a valid index — and because
      * "no plan in the projection" is a state the renderer distinguishes from

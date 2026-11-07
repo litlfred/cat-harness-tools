@@ -26,7 +26,7 @@
  * ## Chapters
  *
  * The workshop's `scenarios` are the steps, in teaching order. They are
- * grouped into chapters by `partOf`, one level below what they all share:
+ * grouped into chapters by their parents (`parts`; `partOf` in an older file), one level below what they all share:
  * five journeys of which two are part of a third make four chapters
  * (smart-trust-demo), and eight journeys all part of one make eight
  * ({@link chapterRoots}).
@@ -41,10 +41,10 @@ import { withRenderedBy } from "../viewer-declarations.ts";
 import type { ScenarioStep } from "../../schemas/process/user-scenario.ts";
 import type { WorkshopPresentation, WorkshopStep } from "../../schemas/process/workshop.ts";
 import { blockFor, fromSite, journeyById, lookup, processName, siteRootFrom, type Journey, type JourneyCorpus, type WorkshopEntry } from "./read.ts";
-import { artifactPage, DAK_ATTR, linkedProcessDrawing } from "./dak-links.ts";
+import { artifactPage, DAK_ATTR, dakGroups, linkedProcessDrawing, type DakGroup } from "./dak-links.ts";
 import {
-  allSteps,
   bpmnFigure,
+  childrenOf,
   illustrationPath,
   moduleSegment,
   parentOf,
@@ -113,7 +113,7 @@ export function shortTitle(title: string): string {
   return m ? m[1]!.trim() : title.trim();
 }
 
-/** The chain of journeys from the top of a journey's `partOf` tree down to it. */
+/** The chain of journeys from the top of a journey's tree of parts down to it, through its first parent. */
 function ancestry(corpus: JourneyCorpus, j: Journey): Journey[] {
   const chain: Journey[] = [j];
   for (let p = parentOf(corpus, j); p !== undefined && !chain.includes(p); p = parentOf(corpus, p)) chain.unshift(p);
@@ -181,17 +181,11 @@ export function presentationOf(corpus: JourneyCorpus, w: WorkshopEntry): Present
   return { w, chapters: chapters.filter((c) => c.steps.length > 0), steps, cast, screens: demo.screens, demo: demo.source };
 }
 
-function stepsUnder(corpus: JourneyCorpus, j: Journey): { journey: Journey; step: ScenarioStep }[] {
-  const out: { journey: Journey; step: ScenarioStep }[] = [];
-  const ids = new Set(allSteps(corpus, j).map((s) => s.id));
-  for (const x of corpus.journeys) {
-    if (x.instance !== j.instance) continue;
-    if (!ancestry(corpus, x).includes(j)) continue;
-    for (const step of x.scenario.steps) if (ids.has(step.id)) out.push({ journey: x, step });
-  }
-  // In the order allSteps walks them.
-  const order = allSteps(corpus, j).map((s) => s.id);
-  return out.sort((a, b) => order.indexOf(a.step.id) - order.indexOf(b.step.id));
+/** A journey's steps and its parts', in story order: each journey once (a part of two parents, or a cycle of parts). */
+function stepsUnder(corpus: JourneyCorpus, j: Journey, seen = new Set<Journey>()): { journey: Journey; step: ScenarioStep }[] {
+  if (seen.has(j)) return [];
+  seen.add(j);
+  return [...j.scenario.steps.map((step) => ({ journey: j, step })), ...childrenOf(corpus, j).flatMap((c) => stepsUnder(corpus, c, seen))];
 }
 
 // ── small helpers ─────────────────────────────────────────────────────────
@@ -280,6 +274,7 @@ const ICON: Record<string, string> = {
   sparkles: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/>',
   branch: '<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9c0 5-6 4-11 8"/>',
   landmark: '<path d="M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M2 10l10-6 10 6z"/>',
+  chart: '<path d="M3 3v18h18M7 16v1M11 11v6M15 8v9M19 5v12"/>',
   scroll: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>',
   clipboard: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 2h6v4H9zM9 14l2 2 4-4"/>',
   mic: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/>',
@@ -444,6 +439,28 @@ export function profilePage(pr: WorkshopPresentation, profile: string, siteRoot:
   // An index was read and lists no such profile: the IG has no page for it.
   if (corpus && corpus.examples.size > 0 && !corpus.examples.has(`StructureDefinition/${id}`)) return undefined;
   return fromSite(`${pr.ig.href}${fillPattern(pr.ig.profile ?? "StructureDefinition-{id}.html", { id })}`, siteRoot);
+}
+
+const DAK_ICON: Record<DakGroup["rel"], IconName> = { data: "scroll", decides: "branch", measures: "chart", other: "file" };
+
+/**
+ * A step's DAK assets as one small row under the hood: "DAK", then each group
+ * (Data, Decision logic, Indicators) with its assets as chips, each linked to
+ * its page in the IG when the artefact index lists it. Empty for a step that
+ * names none.
+ */
+export function dakRow(groups: readonly DakGroup[]): string {
+  if (groups.length === 0) return "";
+  const chip = (a: DakGroup["assets"][number]) => {
+    const tip = e(a.description ? `${a.key} — ${a.description}` : a.key);
+    return a.href
+      ? `<a class="jp-dak-a" href="${e(a.href)}" ${DAK_ATTR} target="_blank" rel="noopener noreferrer" title="${tip}">${e(a.label)}</a>`
+      : `<span class="jp-dak-a jp-dak-text" title="${tip}">${e(a.label)}</span>`;
+  };
+  const gs = groups
+    .map((g) => `<div class="jp-dak-g" data-jp-dak-rel="${e(g.rel)}"><span class="jp-dak-l">${icon(DAK_ICON[g.rel])}${e(g.label)}</span><span class="jp-dak-as">${g.assets.map(chip).join("")}</span></div>`)
+    .join("");
+  return `<div class="jp-dak" data-jp-dak><span class="jp-label" title="The DAK assets this moment uses: its data sets, the decision tables that decide it, the indicators that measure it">DAK</span>${gs}</div>`;
 }
 
 /** The Device Demo's screens that show a step. */
@@ -871,6 +888,7 @@ ${h.payload ? `<div class="jp-payload">${e(h.payload)}</div>` : ""}</div>`
   const fhir = `<div class="jp-box"><div class="jp-box-h"><span class="jp-label">FHIR resources created or changed</span></div>${
     rows.length ? `<ul class="jp-fhir">${rows.join("")}</ul>` : `<p class="jp-small">None: this moment reads data but writes nothing.</p>`
   }</div>`;
+  const dak = dakRow(dakGroups(corpus, pr, st.dak, siteRoot));
   const toSite = root + "../".repeat(links.route.split("/").length);
   const procPage = links.processesPage?.(s.journey.instance)?.replace(/^(\.\.\/)+/, "");
   const procs = (st.realisedBy ?? [])
@@ -895,6 +913,7 @@ ${st.technicalSummary ? `<div class="jp-sowhat">${icon("bulb", "jp-amber jp-i-lg
 ${layerRows}${unplacedHtml}
 </div>
 ${handoff || rows.length ? `<div class="jp-two">${handoff}${fhir}</div>` : ""}
+${dak}
 ${procs}
 </div>
 </section>`;

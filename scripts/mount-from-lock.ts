@@ -58,7 +58,20 @@ import { createHash } from "node:crypto";
 import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
+
+/**
+ * `input-trace.ts`'s hook, restated here because this script imports only
+ * `node:*` (above): CI and the session-start hook check out THIS FILE ALONE
+ * from the pinned cat-harness-tools commit and run it, so a relative import
+ * fails before anything is mounted. Keep it equal to `inputSiteReached` there:
+ * append the site to the trace file `INPUT_HASH_TRACE` (`read-projections.ts`
+ * `TRACE_ENV`) names, when a recording run named one.
+ */
+function inputSiteReached(what: string): void {
+  // input-site: inert #2ac4c84b — names the trace file of the recording run; what is written there is never part of an answer
+  const path = process.env.INPUT_HASH_TRACE;
+  if (path) appendFileSync(path, `${what}\n`);
+}
 
 /** The lock's shape, read structurally — this file may not import the schema (see the header). */
 export interface LockDir {
