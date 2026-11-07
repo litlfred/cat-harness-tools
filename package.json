@@ -289,6 +289,7 @@
     "merge:overlap": "bun run cat-harness-tools/scripts/merge-overlap.ts",
     "merge:leftover": "bun run cat-harness-tools/scripts/merge-leftover.ts",
     "merge:watch": "bun run cat-harness-tools/scripts/merge-watch.ts",
+    "merge:request:check": "bun run cat-harness-tools/scripts/merge-request-check.ts",
     "beans:rollover": "bun run cat-harness-tools/scripts/bean-rollover.ts",
     "beans:retag": "bun run cat-harness-tools/scripts/beans-retag.ts",
     "beans:retag:check": "bun run cat-harness-tools/scripts/beans-retag.ts --check",
