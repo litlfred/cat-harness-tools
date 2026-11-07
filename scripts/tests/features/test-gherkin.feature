@@ -26,6 +26,14 @@ Feature: Every test has a Gherkin
     Then each test is named <file>::<describe>::<title>, whitespace written as _
     And only test files are read
 
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_test_with_a_computed_title_is_found_and_reported,_never_dropped
+  Scenario: A test whose title is computed is reported, not dropped
+    Given a test file with tests titled by a loop variable and by a template with an interpolation
+    And a test inside a describe whose title is a variable, and one with a fixed template title
+    When the JS adapter reads it and the tests are joined to no Scenarios
+    Then the three computed ones are found and each is reported as having a title no tag can name
+    And only the fixed-title test is reported as having no Scenario
+
   @test:scripts/tests/test-gherkin.test.ts::language_adapters::python:_the_name_is_pytest's_node_id
   Scenario: Python tests are named by pytest's node id
     Given a test module with module-level tests, a Test class, a non-Test class, a nested def and a docstring
@@ -73,13 +81,6 @@ Feature: Every test has a Gherkin
     Then test-has-gherkin is n/a, never a pass over nothing
     Given a test file with seven tests and no Scenario
     Then they are one finding that quotes five names and counts the rest
-
-  @test:schemas/sdlc/test-plan.test.ts::the_shape::under_v1.1_every_case_names_its_.feature;_a_v1_plan_without_one_parses,_deprecated
-  Scenario: test-plan/v1.1 requires a .feature on every case; v1 stays readable
-    Given a test-plan/v1.1 plan with a case that names no .feature
-    Then it is refused at that case's feature
-    Given the same plan declared test-plan/v1
-    Then it parses, and its deprecations name the version and the case
 
   @test:scripts/tests/test-gherkin.test.ts::bindings_beyond_@test:,_and_Gherkin_dialects::a_translated_.feature_is_read_in_its_own_dialect;_an_unknown_dialect_is_reported
   Scenario: A translated feature file is read in its own dialect
