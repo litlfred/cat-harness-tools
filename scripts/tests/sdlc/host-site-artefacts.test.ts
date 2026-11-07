@@ -62,8 +62,8 @@ describe("a host that does not list the writer declares no order for it (a downs
   const declared = [
     entry("platform", "docs/assets/glossary/", "glossary:page", { index: true }),
     entry("platform", "docs/base/", "base:pages"),
-    entry("platform", "ns/context/v1.jsonld", "jsonld:contexts"),
-    entry("ig", "ns/context/v1.jsonld", "jsonld:contexts"),
+    entry("platform", "ns/context/v1.jsonld", "jsonld:contexts"), // declared-path-literal: a writer-order test fixture (a declared route in memory), not a read; it matches this repo's built context only where jsonld:contexts already ran
+    entry("ig", "ns/context/v1.jsonld", "jsonld:contexts"), // declared-path-literal: a writer-order test fixture (a declared route in memory), not a read; it matches this repo's built context only where jsonld:contexts already ran
     entry("ig", "docs/", "ig:pages"),
   ];
   const derived = [
