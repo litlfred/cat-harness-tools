@@ -58,7 +58,21 @@ import { createHash } from "node:crypto";
 import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
+
+/**
+ * `input-trace.ts`'s hook, restated rather than imported for the reason the
+ * header gives: this file imports nothing but `node:*`. `.github/mount-from-lock.sh`
+ * fetches this one file and runs it, so any relative import fails to resolve
+ * and no layer is mounted. The variable is `read-projections.ts`'s `TRACE_ENV`.
+ */
+const TRACE_ENV = "INPUT_HASH_TRACE";
+
+/** Say that a `traced` input site is about to read something the input hash cannot see (`input-trace.ts`). */
+function inputSiteReached(what: string): void {
+  // input-site: inert #aff7f52b — names the trace file of the recording run; what is written there is never part of an answer
+  const path = process.env[TRACE_ENV];
+  if (path) appendFileSync(path, `${what}\n`);
+}
 
 /** The lock's shape, read structurally — this file may not import the schema (see the header). */
 export interface LockDir {
