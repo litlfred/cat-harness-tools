@@ -50,7 +50,10 @@
  *
  * - an instance's own declared order: each of its writers runs after the one
  *   it lists before it (`processes:viz` after `render:bpmn`, `navbar:include`
- *   after the `docs:harness` whose `harness.json` it renders);
+ *   after the `docs:harness` whose `harness.json` it renders). A route
+ *   derived from a `builtOnHostSite` visualiser is not listed by its host and
+ *   adds no such edge; a harness's host-site viewers run in the order it
+ *   declares them;
  * - a READ EDGE (`reads` on an entry, `schemas/kg/built-at-publish.ts` in
  *   cat-harness): the entry's writers run after the writers of every OTHER
  *   instance's entry that fills (`directory`) a directory of one of those
@@ -325,18 +328,33 @@ export interface WriterEdge {
 
 /**
  * The ordering edges the plan declares (see "Writer order" above): each
- * instance's writers in the order it lists them, and every `reads` edge.
+ * instance's writers in the order it lists them, each harness's host-site
+ * viewers in the order it declares them, and every `reads` edge.
+ *
+ * A host-site route ({@link hostSiteArtefacts}) is not listed by its host, so
+ * it adds no "lists" edge: its place in the plan is where it RUNS when nothing
+ * orders it, not an order the host declared. Read as one, a host that does not
+ * list the route's writer itself (an IG root such as smart-trust, whose only
+ * entries are its own pages and context) was made to declare its pages before
+ * the glossary, while cat-harness declares the glossary before the pages it
+ * reads: a cycle, and derive:publish refused to build anything (smart-trust#150,
+ * smart-ips-pilgrimage#23). The routes of one harness keep their own order.
  */
 export function writerEdges(plan: readonly DeclaredArtefact[]): WriterEdge[] {
   const edges: WriterEdge[] = [];
   const byInstance = new Map<string, string[]>();
+  const byHarness = new Map<string, string[]>();
   for (const a of plan) {
-    const seq = byInstance.get(a.instance) ?? [];
+    const [key, into] = a.hostSiteOf === undefined ? [a.instance, byInstance] : [a.hostSiteOf, byHarness];
+    const seq = into.get(key) ?? [];
     for (const w of a.writer) if (!seq.includes(w)) seq.push(w);
-    byInstance.set(a.instance, seq);
+    into.set(key, seq);
   }
   for (const [instance, seq] of byInstance) {
     for (let k = 1; k < seq.length; k++) edges.push({ before: seq[k - 1]!, after: seq[k]!, why: `${instance} lists ${seq[k - 1]} before ${seq[k]}` });
+  }
+  for (const [harness, seq] of byHarness) {
+    for (let k = 1; k < seq.length; k++) edges.push({ before: seq[k - 1]!, after: seq[k]!, why: `${harness} declares its host-site viewer of ${seq[k - 1]} before that of ${seq[k]}` });
   }
   for (const reader of plan) {
     for (const kind of reader.reads ?? []) {

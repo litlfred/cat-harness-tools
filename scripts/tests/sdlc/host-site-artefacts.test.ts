@@ -10,7 +10,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { translatedLocales, withHostSiteArtefacts, writersOf, type DeclaredArtefact } from "../../derive-at-publish.ts";
+import { translatedLocales, withHostSiteArtefacts, writerEdges, writersOf, type DeclaredArtefact } from "../../derive-at-publish.ts";
 
 const entry = (instance: string, path: string, writer: string, extra: Partial<DeclaredArtefact> = {}): DeclaredArtefact => ({
   instance,
@@ -51,6 +51,37 @@ describe("a derived route keeps the host's writer order", () => {
 
   test("with no place to go, a route goes at the end", () => {
     expect(withHostSiteArtefacts([], derived.slice(2)).map((a) => a.path)).toEqual(["docs/en/core/bibliography/"]);
+  });
+});
+
+describe("a host that does not list the writer declares no order for it (smart-trust#150)", () => {
+  // The shape that failed: the platform lists the glossary before the pages
+  // that read the IG's docs and before the context; the IG root, the host,
+  // lists its context before its pages and no glossary. Read as listed by the
+  // host, the routes at its end closed a cycle and nothing was built.
+  const declared = [
+    entry("platform", "docs/assets/glossary/", "glossary:page", { index: true }),
+    entry("platform", "docs/base/", "base:pages"),
+    entry("platform", "ns/context/v1.jsonld", "jsonld:contexts"),
+    entry("ig", "ns/context/v1.jsonld", "jsonld:contexts"),
+    entry("ig", "docs/", "ig:pages"),
+  ];
+  const derived = [
+    entry("ig", "docs/en/core/glossary/", "glossary:page", { index: true, hostSiteOf: "core" }),
+    entry("ig", "docs/en/core/bibliography/", "bibliography:page", { hostSiteOf: "core" }),
+  ];
+
+  test("no cycle, and the harness's own viewers keep their order", () => {
+    const order = writersOf(withHostSiteArtefacts(declared, derived));
+    expect(order).toContain("ig:pages");
+    expect(order.indexOf("glossary:page")).toBeLessThan(order.indexOf("bibliography:page"));
+    expect(order.indexOf("glossary:page")).toBeLessThan(order.indexOf("base:pages"));
+  });
+
+  test("the edges name the harness, never the host, for its routes", () => {
+    const whys = writerEdges(withHostSiteArtefacts(declared, derived)).map((e) => e.why);
+    expect(whys.some((w) => w.startsWith("ig lists") && /glossary|bibliography/.test(w))).toBe(false);
+    expect(whys).toContain("core declares its host-site viewer of glossary:page before that of bibliography:page");
   });
 });
 
