@@ -280,6 +280,15 @@ describe("the CLI: one finding per line, exit 0 / 1 / 2", () => {
     expect(run(["--check", "--instance", acme("cli-bare", false)], base).code).toBe(2);
     expect(run(["--check", "--instance", acme("cli-loc"), "--locale", "xx"], base).code).toBe(2);
   });
+  test("a layer the instance needs is not on disk: exits 2, naming it, rather than judging its glossary as the instance's own", () => {
+    const root = acme("cli-absent");
+    const decl = JSON.parse(readFileSync(join(root, "acme.json"), "utf-8"));
+    writeFileSync(join(root, "acme.json"), JSON.stringify({ ...decl, needs: ["foundation"] }));
+    const r = run(["--check", "--instance", root, "--locale", "fr"], base);
+    expect(r.code).toBe(2);
+    expect(r.out).toContain("`foundation`");
+    expect(r.out).toContain("mount the layers");
+  });
   test("without --check it writes the qa-results record, one family per locale", () => {
     const root = acme("cli-write");
     run(["--instance", root], base);

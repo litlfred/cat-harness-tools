@@ -103,3 +103,10 @@ Feature: Glossary terms in sense keep their fixed translation
     Then the term counts as rendered
     And text that does not render the term still fails
 
+
+  @test:pipeline/translation-glossary.test.ts::the_CLI:_one_finding_per_line,_exit_0_/_1_/_2::a_layer_the_instance_needs_is_not_on_disk:_exits_2,_naming_it,_rather_than_judging_its_glossary_as_the_instance's_own
+  Scenario: A layer the instance needs is absent, so the check refuses to judge
+    Given an instance whose needs name a layer that is not on disk
+    When the glossary check runs
+    Then it exits 2 and names the absent layer
+    And it judges nothing, since that layer's glossary would be read as the instance's own
