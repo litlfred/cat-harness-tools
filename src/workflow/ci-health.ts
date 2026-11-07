@@ -26,6 +26,7 @@
  */
 
 import { parse as parseYaml } from "yaml";
+import { inputSiteReached } from "../../schemas/sdlc/input-trace.ts";
 
 /**
  * Does a workflow's YAML fire on every push to its branches?
@@ -396,9 +397,15 @@ export const NOT_A_VERDICT: ReadonlySet<string> = new Set(["cancelled", "skipped
  */
 export function classifyRuns(
   runs: RunSummary[],
-  now = new Date(),
+  asOf?: Date,
   headSha?: string,
 ): Omit<WorkflowHealth, "workflow"> {
+  let now = asOf;
+  if (now === undefined) {
+    // input-site: traced #7ab6c4e8 — the time runs are aged against when the caller gives none: a run that reaches it records no hash
+    inputSiteReached("ci-health: classify's time");
+    now = new Date();
+  }
   const settled = runs.filter((r) => r.status === "completed" && !NOT_A_VERDICT.has(r.conclusion ?? ""));
 
   const lastSuccessRun = settled.find((r) => r.conclusion === "success");
@@ -602,7 +609,12 @@ function youth(
 }
 
 export function assess(runs: RunSummary[], opts: AssessOptions = {}): WorkflowHealth[] {
-  const now = opts.now ?? new Date();
+  let now = opts.now;
+  if (now === undefined) {
+    // input-site: traced #7ab6c4e8 — the time workflows are assessed against when the caller gives none: a run that reaches it records no hash
+    inputSiteReached("ci-health: assess's time");
+    now = new Date();
+  }
   const live = opts.workflowExists
     ? runs.filter((r) => !r.path || opts.workflowExists!(r.path))
     : runs;
