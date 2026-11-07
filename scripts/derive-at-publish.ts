@@ -334,11 +334,11 @@ export interface WriterEdge {
  * A host-site route ({@link hostSiteArtefacts}) is not listed by its host, so
  * it adds no "lists" edge: its place in the plan is where it RUNS when nothing
  * orders it, not an order the host declared. Read as one, a host that does not
- * list the route's writer itself (an IG root such as smart-trust, whose only
+ * list the route's writer itself (a downstream IG root, whose only
  * entries are its own pages and context) was made to declare its pages before
  * the glossary, while cat-harness declares the glossary before the pages it
- * reads: a cycle, and derive:publish refused to build anything (smart-trust#150,
- * smart-ips-pilgrimage#23). The routes of one harness keep their own order.
+ * reads: a cycle, and derive:publish refused to build anything in such a
+ * root. The routes of one harness keep their own order.
  */
 export function writerEdges(plan: readonly DeclaredArtefact[]): WriterEdge[] {
   const edges: WriterEdge[] = [];

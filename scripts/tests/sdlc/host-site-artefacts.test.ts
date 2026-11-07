@@ -54,7 +54,7 @@ describe("a derived route keeps the host's writer order", () => {
   });
 });
 
-describe("a host that does not list the writer declares no order for it (smart-trust#150)", () => {
+describe("a host that does not list the writer declares no order for it (a downstream IG root)", () => {
   // The shape that failed: the platform lists the glossary before the pages
   // that read the IG's docs and before the context; the IG root, the host,
   // lists its context before its pages and no glossary. Read as listed by the
