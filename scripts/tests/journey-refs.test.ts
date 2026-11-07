@@ -27,6 +27,14 @@ const step = (id: string, extra: object = {}) => ({
   ...extra,
 });
 
+/** The process P4 is realised by: two lanes, one a role by reference and one by name, and a call into another process. */
+const BPMN_CARE = `<?xml version="1.0"?><bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Defs"><bpmn:process id="Process_Care">
+<bpmn:laneSet id="LS"><bpmn:lane id="Lane_P" name="Pilgrim" partitionElementRef="pilgrim"><bpmn:flowNodeRef>Task_Show</bpmn:flowNodeRef></bpmn:lane>
+<bpmn:lane id="Lane_N" name="Nurse"><bpmn:flowNodeRef>Task_Scan</bpmn:flowNodeRef><bpmn:flowNodeRef>Call_Triage</bpmn:flowNodeRef></bpmn:lane></bpmn:laneSet>
+<bpmn:task id="Task_Show" name="Show the code"/><bpmn:task id="Task_Scan" name="Scan"/><bpmn:callActivity id="Call_Triage" name="Triage" calledElement="Process_Triage"/><bpmn:callActivity id="Call_Unnamed"/>
+</bpmn:process></bpmn:definitions>`;
+const BPMN_TRIAGE = '<?xml version="1.0"?><bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Defs2"><bpmn:process id="Process_Triage"><bpmn:task id="Task_Triage" name="Triage"/></bpmn:process></bpmn:definitions>';
+
 /** A checkout of two instances: `base` holds actors, a catalogue beside its ArchiMate, a requirement and an example index; `demo` holds the journeys, the BPMN they name (instance-relative) and a workshop. */
 function clean(): Files {
   return {
@@ -42,8 +50,9 @@ function clean(): Files {
         { id: "fhir", path: "fhir/", graphTypologies: ["fhir-artifact-index"] },
       ],
     },
-    "base/scenarios/actors/kamal.json": { id: "kamal", title: "Kamal (pilgrim)", meta: { persona: { name: "Kamal", initials: "KM", color: "#0f766e" } } },
-    "base/scenarios/actors/reem.json": { id: "reem", title: "Reem (nurse)" },
+    "base/scenarios/actors/kamal.json": { id: "kamal", title: "Kamal (pilgrim)", roles: ["pilgrim"], meta: { persona: { name: "Kamal", initials: "KM", color: "#0f766e" } } },
+    "base/scenarios/actors/reem.json": { id: "reem", title: "Reem (nurse)", roles: ["host-health-worker"] },
+    "base/scenarios/roles.json": { roles: [{ id: "pilgrim", title: "Pilgrim" }, { id: "host-health-worker", title: "Host health worker", otherNames: ["Nurse"] }] },
     "base/scenarios/stories.json": { stories: [{ id: "pilgrim-1", role: { role: "pilgrim" }, want: "Show my summary abroad" }] },
     "base/archimate/building-blocks/blocks.json": {
       $schema: "building-blocks/0.1.0",
@@ -51,7 +60,7 @@ function clean(): Files {
       blocks: [{ id: "wallet", name: "Wallet", kind: "tool", layer: "apps", jurisdiction: "International", what: "Holds the summary." }],
     },
     "base/code-lists/trust.json": { $schema: "folio-code-list/v1", id: "trust", title: "T", description: "d", source: { note: "f" }, codes: [{ code: "signed", label: "Signed", definition: "d" }] },
-    "demo/processes/care.bpmn": '<?xml version="1.0"?><bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Defs"><bpmn:process id="Process_Care"><bpmn:task id="Task_Scan" name="Scan"/></bpmn:process></bpmn:definitions>',
+    "demo/processes/care.bpmn": BPMN_CARE,
     "base/skills/requirements/req-001.json": { id: "req:stt-ver-001", title: "Verify" },
     "base/fhir/index.json": { artifacts: [{ key: "Bundle/kamal-ips", title: "Kamal's summary" }] },
     "demo/demo.json": {
@@ -257,6 +266,150 @@ describe("a step's DAK assets (user-scenario 0.3.0)", () => {
     expect(report.findings).toEqual([]);
     const dak = report.couldNotDetermine.filter((f) => f.message.startsWith("DAK asset"));
     expect(dak.map((f) => f.message.split(" is ")[0])).toEqual(['DAK asset "PlanDefinition/dt-01"', 'DAK asset "Measure/ind-09"']);
+  });
+});
+
+describe("a journey is a DAK user scenario (user-scenario specialises it)", () => {
+  test("its DAK personas are the roles its actors play, derived, and a role persona is read as it is", async () => {
+    const { readJourneyCorpus } = await import("../journeys/read.ts");
+    const { dakUserScenario } = await import("../journeys/derive.ts");
+    const corpus = readJourneyCorpus(checkout(clean()));
+    const p4 = corpus.journeys.find((j) => j.scenario.id === "p4-scanned")!;
+    expect(dakUserScenario(corpus, p4)).toEqual({ id: "p4-scanned", title: "P4", description: "d", personas: ["pilgrim", "host-health-worker"] });
+  });
+  test("a journey none of whose actors plays a role, or whose actor plays a role nobody declares, is a finding", () => {
+    const files = clean();
+    edit(files, "base/scenarios/actors/kamal.json", (a) => delete a.roles);
+    edit(files, "base/scenarios/actors/reem.json", (a) => (a.roles = ["ghost-role"]));
+    const messages = checkJourneyRefsAt(checkout(files)).findings.map((f) => `${f.file}: ${f.message}`);
+    expect(messages).toContain("journeys/p-all.json: as a DAK user-scenario it has no personas: none of its persona actors plays a role (an actor's `roles`)");
+    expect(messages).toContain('journeys/p4.json: as a DAK user-scenario its persona "ghost-role" (a role of its actors) is no role in a declared scenarios directory');
+  });
+  test("0.4.0: a plain DAK user scenario (personas are roles, no steps) passes, and its role lists the actors who play it", async () => {
+    const files = clean();
+    files["demo/journeys/plain.json"] = { $schema: "user-scenario/0.4.0", id: "plain", title: "Plain", description: "d", personas: ["pilgrim"] };
+    const root = checkout(files);
+    expect(checkJourneyRefsAt(root).findings).toEqual([]);
+    const { readJourneyCorpus } = await import("../journeys/read.ts");
+    expect(readJourneyCorpus(root).journeys.find((j) => j.scenario.id === "plain")!.scenario.personas).toEqual(["kamal"]);
+  });
+});
+
+describe("composition (user-scenario 0.4.0): a parent lists its parts", () => {
+  const composed = (files = clean()) => {
+    edit(files, "demo/journeys/p-all.json", (j) => {
+      j.$schema = "user-scenario/0.4.0";
+      j.parts = [{ scenario: "p3-ill" }, { scenario: "p4-scanned", optional: true, repeats: true }];
+      delete j.personas;
+    });
+    edit(files, "demo/journeys/p4.json", (j) => {
+      delete j.partOf;
+      delete j.follows;
+    });
+    return files;
+  };
+  const messagesOf = (files: Files) => checkJourneyRefsAt(checkout(files)).findings.map((f) => `${f.file} · ${f.at}: ${f.message}`);
+
+  test("parts resolve, the parent's personas are derived from them, and nothing is said twice", async () => {
+    const root = checkout(composed());
+    expect(checkJourneyRefsAt(root).findings).toEqual([]);
+    const { readJourneyCorpus } = await import("../journeys/read.ts");
+    const corpus = readJourneyCorpus(root);
+    expect(corpus.journeys.find((j) => j.scenario.id === "p-all")!.scenario.personas).toEqual(["kamal", "reem"]);
+  });
+  test("a part that names no journey, and a cycle of parts, are findings", () => {
+    const files = composed();
+    edit(files, "demo/journeys/p-all.json", (j) => j.parts.push({ scenario: "p9-nowhere" }));
+    edit(files, "demo/journeys/p4.json", (j) => {
+      j.$schema = "user-scenario/0.4.0";
+      j.parts = [{ scenario: "p-all" }];
+    });
+    const m = messagesOf(files);
+    expect(m).toContain('journeys/p-all.json · (root): part "p9-nowhere" is no journey in this checkout');
+    expect(m.some((x) => x.includes("parts and includes form a cycle: p-all → p4-scanned → p-all"))).toBe(true);
+  });
+  test("what the parts say is not said again: follows and partOf on a listed part, personas that are exactly the parts'", () => {
+    const files = composed();
+    edit(files, "demo/journeys/p4.json", (j) => {
+      j.follows = "p3-ill";
+      j.partOf = "p-all";
+    });
+    edit(files, "demo/journeys/p-all.json", (j) => (j.personas = ["reem", "kamal"]));
+    const m = messagesOf(files);
+    expect(m).toContain('journeys/p4.json · (root): redundant follows "p3-ill": a parent lists this journey in its parts, whose order says what it follows; remove it');
+    expect(m).toContain('journeys/p4.json · (root): redundant partOf "p-all": that journey lists this one in its parts; remove it');
+    expect(m).toContain("journeys/p-all.json · (root): redundant personas: they are exactly its parts' personas, from which they are derived; remove them");
+  });
+});
+
+describe("a step that includes a journey (user-scenario 0.4.0)", () => {
+  const including = (called: string, files = clean()) => {
+    files["demo/processes/triage.bpmn"] = BPMN_TRIAGE;
+    files["demo/journeys/triage.json"] = {
+      $schema: "user-scenario/0.4.0",
+      id: "triage",
+      title: "Triage",
+      description: "d",
+      personas: ["reem"],
+      steps: [{ id: "T1", title: "Triage", lead: "reem", experiences: [{ actor: "reem", doing: "triages" }], realisedBy: [{ process: "processes/triage.bpmn" }] }],
+    };
+    edit(files, "demo/journeys/p4.json", (j) => {
+      j.$schema = "user-scenario/0.4.0";
+      j.steps.push({ id: "P4b", title: "Triaged", lead: "reem", experiences: [{ actor: "reem", doing: "triages" }], includes: "triage", realisedBy: [{ process: "processes/care.bpmn", tasks: [called] }] });
+      delete j.partOf;
+    });
+    return files;
+  };
+  test("agrees with the call activity its realisedBy names", () => {
+    const r = checkJourneyRefsAt(checkout(including("Call_Triage")));
+    expect(r.findings).toEqual([]);
+    expect(r.couldNotDetermine).toEqual([]);
+  });
+  test("a call activity of another process is a finding naming both; one naming no process is could-not-determine", () => {
+    const files = including("Call_Triage");
+    files["demo/processes/triage.bpmn"] = BPMN_TRIAGE.replace("Process_Triage", "Process_Other");
+    const bad = checkJourneyRefsAt(checkout(files)).findings.map((f) => f.message);
+    expect(bad).toEqual(['includes "triage" disagrees with its realisedBy: call activity Call_Triage calls Process_Triage, but journey triage is realised by Process_Other']);
+    const unknown = checkJourneyRefsAt(checkout(including("Call_Unnamed")));
+    expect(unknown.findings).toEqual([]);
+    expect(unknown.couldNotDetermine.map((f) => f.message)).toEqual(['whether includes "triage" is the process its call activity calls: call activity Call_Unnamed names no calledElement']);
+  });
+  test("a call activity with no includes is silent, and an includes naming no journey is a finding", () => {
+    const files = including("Call_Triage");
+    edit(files, "demo/journeys/p4.json", (j) => (j.steps[1].includes = "nowhere"));
+    expect(checkJourneyRefsAt(checkout(files)).findings.map((f) => f.message)).toEqual(['includes "nowhere", which is no journey in this checkout']);
+    edit(files, "demo/journeys/p4.json", (j) => delete j.steps[1].includes);
+    expect(checkJourneyRefsAt(checkout(files)).findings).toEqual([]);
+  });
+});
+
+describe("a step's people default to its lanes (user-scenario 0.4.0)", () => {
+  const laneOnly = (tasks: string[], lead?: string) => {
+    const files = clean();
+    edit(files, "demo/journeys/p4.json", (j) => {
+      j.$schema = "user-scenario/0.4.0";
+      delete j.partOf;
+      delete j.steps[0].experiences;
+      delete j.steps[0].lead;
+      if (lead) j.steps[0].lead = lead;
+      j.steps[0].realisedBy = [{ process: "processes/care.bpmn", tasks }];
+    });
+    return files;
+  };
+  test("with no experiences, the actors who play its tasks' lanes do them, the first leading", async () => {
+    const root = checkout(laneOnly(["Task_Show", "Task_Scan"]));
+    expect(checkJourneyRefsAt(root).findings).toEqual([]);
+    const { readJourneyCorpus } = await import("../journeys/read.ts");
+    const step = readJourneyCorpus(root).journeys.find((j) => j.scenario.id === "p4-scanned")!.scenario.steps[0]!;
+    expect(step.lead).toBe("kamal");
+    expect(step.experiences).toEqual([{ actor: "kamal", doing: "Show the code" }, { actor: "reem", doing: "Scan" }]);
+  });
+  test("a lead that repeats the derived one is redundant, and a step whose lanes no persona plays is a finding", () => {
+    expect(checkJourneyRefsAt(checkout(laneOnly(["Task_Show"], "kamal")))
+      .findings.map((f) => f.message)).toEqual(['redundant lead "kamal": it is the first actor its lanes derive; remove it']);
+    const files = laneOnly(["Task_Scan"]);
+    edit(files, "demo/journeys/p4.json", (j) => (j.personas = ["kamal"]));
+    expect(checkJourneyRefsAt(checkout(files)).findings.map((f) => f.message)).toContain("has no experiences, and none derive: no persona plays a lane of its realisedBy tasks; write them");
   });
 });
 

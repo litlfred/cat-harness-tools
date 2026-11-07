@@ -4,14 +4,14 @@ import { BuildingBlocksSchema, JourneyPersonaSchema, parseUserScenario, UserScen
 const step = { id: "J1", title: "Born abroad", lead: "mother", experiences: [{ actor: "mother", doing: "holds the cards", emotion: 1 }] };
 const v01 = { $schema: "user-scenario/0.1.0", id: "j1", title: "J1", description: "d", personas: ["mother"], steps: [step] };
 
-describe("user-scenario: the draft family is read unchanged, 0.2.0 adds to it", () => {
+describe("user-scenario: the draft family is read unchanged, each minor adds to it", () => {
   test("a 0.1.0 file parses as it is, by the draft's own shape and by the kind", () => {
     expect(UserScenarioV01Schema.safeParse(v01).success).toBe(true);
     expect(UserScenarioV01Schema.safeParse({ ...v01, partOf: "j" }).success).toBe(false);
     expect(UserScenarioSchema.safeParse(v01).success).toBe(true);
   });
   test("the kind refuses a newer minor and another major", () => {
-    expect(UserScenarioSchema.safeParse({ ...v01, $schema: "user-scenario/0.4.0" }).success).toBe(false);
+    expect(UserScenarioSchema.safeParse({ ...v01, $schema: "user-scenario/0.5.0" }).success).toBe(false);
     expect(UserScenarioSchema.safeParse({ ...v01, $schema: "user-scenario/1.0.0" }).success).toBe(false);
   });
   test("0.2.0 groups (partOf, no steps) and carries gaps and views", () => {
@@ -52,6 +52,28 @@ describe("user-scenario: the draft family is read unchanged, 0.2.0 adds to it", 
     expect(() => parseUserScenario({ ...v03, steps: [{ ...step, dak: [{ key: "Measure/IND03", label: "x" }] }] })).toThrow();
     expect(UserScenarioSchema.safeParse({ ...v01, $schema: "user-scenario/0.2.0", steps: [{ ...step, gaps: ["g"] }] }).success).toBe(true);
     expect(UserScenarioV01Schema.safeParse({ ...v01, steps: [{ ...step, dak }] }).success).toBe(false);
+  });
+  test("0.4.0: a parent lists its parts in order, a step may include a journey, and partOf is refused", () => {
+    const v04 = { ...v01, $schema: "user-scenario/0.4.0" };
+    const parts = [{ scenario: "j1" }, { scenario: "j2", optional: true as const, repeats: true as const }];
+    expect(parseUserScenario({ ...v04, parts, steps: [] }).parts).toEqual(parts);
+    expect(parseUserScenario({ ...v04, steps: [{ ...step, includes: "j2" }] }).steps[0]!.includes).toBe("j2");
+    expect(() => parseUserScenario({ ...v04, partOf: "j" })).toThrow(/partOf is refused/);
+    expect(() => parseUserScenario({ ...v04, parts: [{ scenario: "j1" }, { scenario: "j1" }] })).toThrow(/appears twice/);
+    expect(() => parseUserScenario({ ...v04, parts: [{ scenario: "j1", optional: false }] })).toThrow();
+    // An older file keeps partOf.
+    expect(parseUserScenario({ ...v01, $schema: "user-scenario/0.3.0", partOf: "j" }).partOf).toBe("j");
+  });
+  test("0.4.0 leaves derivable fields out: personas with parts, steps, a step's lead and experiences; earlier families still need them", () => {
+    const plain = { $schema: "user-scenario/0.4.0", id: "s", title: "S", description: "d", personas: ["caregiver"] };
+    expect(parseUserScenario(plain).steps).toEqual([]);
+    expect(parseUserScenario({ ...plain, personas: undefined, parts: [{ scenario: "a" }] }).personas).toBeUndefined();
+    expect(() => parseUserScenario({ ...plain, personas: undefined })).toThrow(/personas is required unless the journey has parts/);
+    expect(parseUserScenario({ ...plain, steps: [{ id: "S1", title: "t", realisedBy: [{ process: "p.bpmn", tasks: ["T"] }] }] }).steps[0]!.lead).toBeUndefined();
+    // 0.4.0 personas may be roles, so whether a step's actor is among them is check:journey-refs' to say.
+    expect(parseUserScenario({ ...plain, steps: [step] }).steps).toHaveLength(1);
+    expect(() => parseUserScenario({ ...v01, $schema: "user-scenario/0.3.0", personas: undefined })).toThrow(/personas is required before/);
+    expect(() => parseUserScenario({ ...v01, $schema: "user-scenario/0.3.0", steps: [{ id: "S1", title: "t" }] })).toThrow(/lead and experiences are required before/);
   });
   test("an emotion outside -2..2 is refused", () => {
     expect(() => parseUserScenario({ ...v01, steps: [{ ...step, experiences: [{ actor: "mother", doing: "x", emotion: 3 }] }] })).toThrow();

@@ -856,3 +856,57 @@ describe("the check over a staged site: every DAK link resolves to a file", () =
     expect(BARE_VHL.test("https://profiles.ihe.net/ITI/VHL/volume-1.html")).toBe(false);
   });
 });
+
+describe("composition (user-scenario 0.4.0): a parent's parts, in its order, and a step that is a journey", () => {
+  // A checkout of its own: one instance, every journey of it 0.4.0. The
+  // instance sits one level down, as `lower` and `top` do: an instance at
+  // the temporary directory's top would make the system temporary directory
+  // its checkout, read with every other test's fixtures in it.
+  const ROOT = mkdtempSync(join(tmpdir(), "journeys-compose-"));
+  afterAll(() => rmSync(ROOT, { recursive: true, force: true }));
+  const putc = (rel: string, body: object): void => {
+    mkdirSync(join(ROOT, dirname(rel)), { recursive: true });
+    writeFileSync(join(ROOT, rel), JSON.stringify(body, null, 2));
+  };
+  putc("compose/compose.json", {
+    name: "compose",
+    directories: [
+      { id: "scenarios", path: "scenarios/", graphTypologies: ["scenarios"] },
+      { id: "user-scenarios", path: "journeys/", graphTypologies: ["user-scenario"] },
+    ],
+  });
+  putc("compose/scenarios/actors/ana.json", { id: "ana", title: "Ana", roles: ["traveller"], meta: { persona: { name: "Ana" } } });
+  putc("compose/scenarios/roles.json", { roles: [{ id: "traveller", title: "Traveller" }] });
+  const v04 = (id: string, title: string, extra: object) => ({ $schema: "user-scenario/0.4.0", id, title, description: "d", ...extra });
+  putc("compose/journeys/trip.json", v04("trip", "C — The trip", { parts: [{ scenario: "home" }, { scenario: "away", optional: true, repeats: true }] }));
+  putc("compose/journeys/away.json", v04("away", "C2 — Away", { personas: ["ana"], steps: [step("C2", "ana")] }));
+  putc("compose/journeys/home.json", v04("home", "C1 — Home", { personas: ["traveller"], steps: [step("C1", "ana", { includes: "away" })] }));
+  clearDeclaredVisualisers();
+  const c = readJourneyCorpus(join(ROOT, "compose"));
+  const pages = renderJourneyPages(c, { ...LINKS, route: "en/compose/journeys" }, "compose");
+  const page = (path: string) => String(pages.find((x) => x.path === path)!.content);
+
+  test("the parent's page lists its parts in its order, marking an optional or repeating one", () => {
+    const trip = page("compose/trip/index.html");
+    const parts = trip.slice(trip.indexOf("Parts, in story order"));
+    expect(parts.indexOf("C1 — Home")).toBeGreaterThan(0);
+    expect(parts.indexOf("C1 — Home")).toBeLessThan(parts.indexOf("C2 — Away"));
+    const away = parts.slice(parts.indexOf("C2 — Away"), parts.indexOf("</a>", parts.indexOf("C2 — Away")));
+    expect(away).toContain('class="jv-part-mark" title="The story may skip it">optional</span>');
+    expect(away).toContain(">repeats</span>");
+    // Its people are its parts', derived.
+    expect(c.journeys.find((j) => j.scenario.id === "trip")!.scenario.personas).toEqual(["ana"]);
+  });
+  test("the index nests the parts in that order; a part's neighbours are its parent's", () => {
+    const index = page("index.html");
+    const trip = index.slice(index.indexOf("C — The trip"));
+    expect(trip).toContain("2 parts");
+    expect(trip.indexOf("C1 — Home")).toBeLessThan(trip.indexOf("C2 — Away"));
+    const home = page("compose/home/index.html");
+    expect(home).toContain('href="../../compose/trip/" rel="up"');
+    expect(home).toContain('href="../../compose/away/" rel="next"');
+  });
+  test("a step that includes a journey links to it", () => {
+    expect(page("compose/home/index.html")).toContain('<p class="jv-includes">This step is the journey <a href="../../compose/away/"><b>C2 — Away</b></a>.</p>');
+  });
+});
