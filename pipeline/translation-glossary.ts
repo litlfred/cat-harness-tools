@@ -49,16 +49,44 @@
  * Precedence applies within one subject area. A term binds the instance's
  * catalogues when its area is one of the instance's own (its glossaries'
  * subjects and schemes, its terminology file), or it came from a `--layer`
- * reference glossary, whose area is every area. A label that matches a term of
- * another area is a SENSE CHECK note for a person: printed, counted in the
- * summary, never a violation.
+ * reference glossary, whose area is every area.
+ *
+ * ## In sense: by rule, then by an adjudicator
+ *
+ * Owner, 2026-11-07: "If a glossary term is used in the narrative in the
+ * correct context, then the glossary translation is used in the translated
+ * narrative." Each use of a fixed term in a msgid is one of:
+ *
+ * - **in sense by rule**: the term binds here (above), so the catalogue's
+ *   subject area is the term's. Its fixed translation is enforced.
+ * - **pending**: a term of another area. Undecided until an untainted
+ *   adjudicator agent, given the term, its definition and the sentence, rules
+ *   `in-sense`, `other-sense` or `exception` (`--pending --json` lists what
+ *   to ask, `--record <file>` stores the answers). Listed; fails nothing.
+ * - **adjudicated**: `in-sense` is enforced, `other-sense` checks nothing,
+ *   `exception` ("in sense, but the fixed term is wrong here because …")
+ *   passes and is listed. An `exception` also passes a use in sense by rule.
+ *
+ * Verdicts are stored in the instance, `<translation-sources>/glossary-sense.json`
+ * (`schemas/kg/glossary-sense.ts`), keyed by the term's id and the msgid's
+ * SHA-256: sense is a property of the English, so one verdict serves every
+ * locale, and a changed msgid is asked again. This script never asks a model;
+ * the adjudication is an agent's, outside it.
+ *
+ * A use whose msgstr renders the fixed translation needs no verdict. Keeping
+ * the English term verbatim counts as rendering it only where the term is part
+ * of a code or resource name: the term and a name-shaped neighbour (Capitalised,
+ * ALL-CAPS, or an identifier such as `Provenance.agent`) kept together, as
+ * written, in the msgstr — "WHO SMART Trust" left as the product's name. The
+ * term kept alone, in prose, is not a rendering.
  *
  * ## What is flagged, per locale
  *
- * - `not-fixed-rendering`: a msgid uses an in-scope fixed term (prefLabel or
- *   altLabel; whole word; case-insensitive, except a short all-caps acronym)
- *   and its msgstr does not use the term's fixed translation. Matching is by
- *   word stem (ru, ar, fr, es) or substring (zh, ar), as the prior art did.
+ * - `not-fixed-rendering`: a msgid uses a fixed term IN SENSE (by rule or by
+ *   verdict; prefLabel or altLabel; whole word; case-insensitive, except a
+ *   short all-caps acronym) and its msgstr does not use the term's fixed
+ *   translation. Matching is by word stem (ru, ar, fr, es) or substring (zh,
+ *   ar), as the prior art did.
  * - `inconsistent`: a term that two or more of the instance's entries — whose
  *   whole msgid is the term — render differently in one locale.
  * - `override`: a second, different translation of a fixed term in the SAME
@@ -71,17 +99,33 @@
  * family per locale) in the instance's QA directory, where `kg-qa-report`
  * reads it into its "Glossary consistency" section.
  *
+ * A use pending adjudication, or ruled `other-sense` or `exception`, never
+ * changes the exit code.
+ *
  * Usage:
  *   bun run cat translation:glossary:check --instance <dir> --locale fr [--layer who=<dir>/{locale}/*.po]
+ *   bun run cat translation:glossary:check --instance <dir> --all-locales
  *   bun run cat translation:glossary --instance <dir>        # every locale; writes the record
+ *   bun run cat translation:glossary:check --instance <dir> --pending --json   # what the adjudicator is asked
+ *   bun run cat translation:glossary:check --instance <dir> --record <verdicts.json>
  *
  * @module pipeline/translation-glossary
  * @covers translation-sources, qa
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { directoryForGraph, readDeclaration } from "../schemas/kg/cat-harness.ts";
+import {
+  GLOSSARY_SENSE_FILE,
+  GLOSSARY_SENSE_SCHEMA,
+  GlossarySenseStoreSchema,
+  GlossarySenseVerdictSchema,
+  senseKey,
+  type GlossarySenseStore,
+  type GlossarySenseVerdict,
+} from "../schemas/kg/glossary-sense.ts";
 import { declarationChain } from "../schemas/kg/harness-config.ts";
 import { explicitInstanceRoot, HARNESS_ROOT, TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import { buildQaResult, writeQaResult } from "../scripts/qa-results.ts";
@@ -130,6 +174,10 @@ export function scopeOf(s: GlossarySource, label: string): string {
 /** A fixed term: the first in-precedence translation of a label in one subject area. */
 export interface FixedTerm {
   term: string;
+  /** The term's id, the same in every locale: its IRI (a scheme catalogue's `#.` comment), else `<scope>#<label>`. */
+  id: string;
+  /** What the term means: the English definition its scheme catalogue carries, or a terminology pin's comment. */
+  definition?: string;
   fixed: string;
   layer: string;
   file: string;
@@ -342,7 +390,13 @@ export function termBase(
   for (const s of sources) if (s.layer === instance && !s.reference) mine.add(s.scope ?? scopeOf(s, ""));
   for (const s of sources) {
     const terminology = basename(s.file) === "glossary.po";
-    for (const e of parsePoEntries(readFileSync(s.file, "utf-8"))) {
+    const entries = parsePoEntries(readFileSync(s.file, "utf-8"));
+    const definitions = new Map<string, string>();
+    for (const e of entries) {
+      const iri = termIri(e, "definition");
+      if (iri !== undefined) definitions.set(iri, e.msgid);
+    }
+    for (const e of entries) {
       if (!e.msgstr.trim() || e.flags.includes("localised") || e.flags.includes("fuzzy") || !isLabel(e, terminology)) continue;
       if (s.termScopes?.get(e.msgid.toLowerCase()) === null) continue; // not an authored term
       const scope = scopeOf(s, e.msgid);
@@ -357,7 +411,18 @@ export function termBase(
           if (other.scope.startsWith("reference:")) overrides.push(o);
           else if (s.layer === instance) senseOverrides.push(o);
         }
-        terms.set(k, { term: e.msgid, fixed: e.msgstr, layer: s.layer, file: s.file, scope, inScope: s.reference || mine.has(scope) });
+        const iri = termIri(e, "label");
+        const definition = iri !== undefined ? definitions.get(iri) : e.comments.filter((c) => !c.startsWith("Glossary term")).join(" ").trim() || undefined;
+        terms.set(k, {
+          term: e.msgid,
+          id: iri ?? `${scope}#${e.msgid.toLowerCase()}`,
+          ...(definition !== undefined ? { definition } : {}),
+          fixed: e.msgstr,
+          layer: s.layer,
+          file: s.file,
+          scope,
+          inScope: s.reference || mine.has(scope),
+        });
         continue;
       }
       if (norm(have.fixed, locale) === norm(e.msgstr, locale)) continue;
@@ -365,6 +430,16 @@ export function termBase(
     }
   }
   return { terms, overrides, senseOverrides };
+}
+
+/** The IRI a scheme catalogue's `#. Glossary term label|alternative label|definition: <IRI>` comment names. */
+function termIri(e: PoEntry, what: "label" | "definition"): string | undefined {
+  const re = what === "label" ? /^Glossary term (?:label|alternative label):\s*(.+?)\s*$/ : /^Glossary term definition:\s*(.+?)\s*$/;
+  for (const c of e.comments) {
+    const m = re.exec(c);
+    if (m) return m[1];
+  }
+  return undefined;
 }
 
 // ── matching (ported from glossary_qa.py) ───────────────────────
@@ -406,6 +481,54 @@ export function uses(term: string, msgid: string): boolean {
   return new RegExp(`(?<![A-Za-z0-9_\\-/.@])${esc}(?![A-Za-z0-9_\\-/@]|\\.\\w)`, flags).test(clean);
 }
 
+/** A token that is a name, not prose: Capitalised, ALL-CAPS, or an identifier (`Provenance.agent`, `smart-trust-phw`). */
+const NAME_TOKEN = /^(?:[A-Z][\p{L}\p{N}]*|[\p{L}\p{N}]+(?:[._:/-][\p{L}\p{N}]+)+)$/u;
+/** An identifier: a name with a separator inside it — code, a path, a repository. */
+const IDENTIFIER = /^[\p{L}\p{N}]+(?:[._:/-][\p{L}\p{N}]+)+$/u;
+
+/** Prose with code, placeholders, URLs and inline tags blanked, as {@link uses} reads it. */
+const prose = (s: string): string => s.replace(/\{[^}]*\}|`[^`]*`|https?:\/\/\S+|<\/?[a-z]\d*>/g, " ");
+
+/** A quotation's text: "…", “…”, «…». */
+const QUOTED = /"([^"]+)"|“([^”]+)”|«\s*([^»]+?)\s*»/g;
+
+/**
+ * Is `term`, kept verbatim in `msgstr`, part of a code or resource name there?
+ *
+ * - the msgid writes it beside a neighbour that is an identifier
+ *   (`Provenance.agent verifier`), or, the term itself name-shaped, beside a
+ *   name-shaped one ("WHO SMART Trust"), and the msgstr keeps that pair as
+ *   written; or
+ * - it is inside a quotation (a cited title) that the msgstr keeps whole.
+ *
+ * The term on its own kept in English is untranslated prose, not a name.
+ */
+export function keptAsName(term: string, msgid: string, msgstr: string): boolean {
+  const target = prose(msgstr).replace(/\s+/g, " ");
+  for (const m of prose(msgid).matchAll(QUOTED)) {
+    const q = (m[1] ?? m[2] ?? m[3] ?? "").replace(/\s+/g, " ").trim();
+    if (q && uses(term, q) && target.includes(q)) return true;
+  }
+  const words = term.split(/\s+/).filter(Boolean).map((w) => w.toLowerCase());
+  const toks = prose(msgid).split(/[\s()]+/).map((t) => t.replace(/^["'«“]+|["'»”,;:!?.]+$/g, "")).filter(Boolean);
+  for (let i = 0; i + words.length <= toks.length; i++) {
+    const at = toks.slice(i, i + words.length);
+    if (!words.every((w, j) => at[j]!.toLowerCase() === w)) continue;
+    const named = at.every((t) => NAME_TOKEN.test(t));
+    const pairs: Array<[string | undefined, string[]]> = [
+      [toks[i - 1], [toks[i - 1]!, ...at]],
+      [toks[i + words.length], [...at, toks[i + words.length]!]],
+    ];
+    for (const [n, pair] of pairs) {
+      if (n === undefined || !(IDENTIFIER.test(n) || (named && NAME_TOKEN.test(n)))) continue;
+      // As written in the msgstr: the pair, allowing the punctuation between them.
+      const esc = pair.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+      if (new RegExp(esc.join(`[\\s()"'«»“”,:]+`), "u").test(target)) return true;
+    }
+  }
+  return false;
+}
+
 // ── the check ───────────────────────────────────────────────────
 
 export type GlossaryRule = "not-fixed-rendering" | "inconsistent" | "override";
@@ -418,8 +541,11 @@ export interface GlossaryFinding {
   catalogue?: string;
   msgid?: string;
   rendering?: string | string[];
+  /** For `not-fixed-rendering`: how the use was found in sense — by rule (subject area), or by an adjudicator's verdict. */
+  inSense?: "rule" | "adjudicated";
 }
 
+/** The instance translating another subject area's glossary label otherwise: a note on the term base, never a violation. */
 export interface SenseNote {
   term: string;
   fixed: string;
@@ -428,12 +554,91 @@ export interface SenseNote {
   msgid: string;
 }
 
+/** One use of a fixed term in a msgid whose sense matters: pending, ruled other-sense, or an exception. */
+export interface Occurrence {
+  /** The label that matched. */
+  term: string;
+  /** The term's id, the first half of a verdict's key. */
+  termId: string;
+  definition?: string;
+  fixed: string;
+  layer: string;
+  scope: string;
+  catalogue: string;
+  msgid: string;
+  /** The second half of a verdict's key. */
+  msgidSha256: string;
+  rendering: string;
+  /** The verdict, when one is recorded. */
+  verdict?: GlossarySenseVerdict;
+}
+
 export interface LocaleResult {
   locale: string;
   fixedTerms: number;
   catalogues: number;
   findings: GlossaryFinding[];
   sense: SenseNote[];
+  /** Uses no rule decides and no verdict covers yet: listed, never failing. */
+  pending: Occurrence[];
+  /** Uses an adjudicator ruled another sense: not checked. */
+  otherSense: Occurrence[];
+  /** Uses in sense whose fixed translation an adjudicator ruled wrong here: passing, listed. */
+  exceptions: Occurrence[];
+}
+
+// ── the verdict store ───────────────────────────────────────────
+
+/** SHA-256 (hex) of a msgid, exactly as the catalogue holds it. */
+export const msgidSha256 = (msgid: string): string => createHash("sha256").update(msgid, "utf-8").digest("hex");
+
+/** The verdicts, by {@link senseKey}. */
+export type Verdicts = ReadonlyMap<string, GlossarySenseVerdict>;
+
+/** Where an instance keeps its verdicts: `<translation-sources>/glossary-sense.json`. */
+export const senseStorePath = (translations: string): string => join(translations, GLOSSARY_SENSE_FILE);
+
+/** Read the store; an absent file is an empty one. Throws on a file that does not parse against the schema. */
+export function readVerdicts(file: string): Map<string, GlossarySenseVerdict> {
+  const out = new Map<string, GlossarySenseVerdict>();
+  if (!existsSync(file)) return out;
+  const store = GlossarySenseStoreSchema.parse(JSON.parse(readFileSync(file, "utf-8")));
+  for (const v of store.verdicts) out.set(senseKey(v.term, v.msgidSha256), v);
+  return out;
+}
+
+/**
+ * Merge `incoming` into the store at `file` (a later verdict on the same key
+ * replaces the earlier) and write it, sorted so it diffs well. Each incoming
+ * verdict may give `msgid` instead of `msgidSha256`; a given hash must match a
+ * given msgid. Returns how many were added and replaced.
+ */
+export function recordVerdicts(file: string, incoming: unknown): { added: number; replaced: number } {
+  const list = Array.isArray(incoming) ? incoming : (incoming as { verdicts?: unknown })?.verdicts;
+  if (!Array.isArray(list)) throw new Error("expected an array of verdicts, or { verdicts: [...] }");
+  const store = readVerdicts(file);
+  let added = 0;
+  let replaced = 0;
+  list.forEach((raw, i) => {
+    const r = { ...(raw as Record<string, unknown>) };
+    if (typeof r.msgid === "string") {
+      const h = msgidSha256(r.msgid);
+      if (r.msgidSha256 !== undefined && r.msgidSha256 !== h) throw new Error(`verdict ${i}: msgidSha256 does not match its msgid`);
+      r.msgidSha256 = h;
+    }
+    const v = GlossarySenseVerdictSchema.parse(r);
+    const k = senseKey(v.term, v.msgidSha256);
+    if (store.has(k)) replaced++;
+    else added++;
+    store.set(k, v);
+  });
+  const doc: GlossarySenseStore = {
+    $schema: GLOSSARY_SENSE_SCHEMA,
+    verdicts: [...store.values()].sort((a, b) => a.term.localeCompare(b.term) || a.msgidSha256.localeCompare(b.msgidSha256)),
+  };
+  GlossarySenseStoreSchema.parse(doc);
+  writeFileSync(file, `${JSON.stringify(doc, null, 2)}\n`);
+  return { added, replaced };
 }
 
 /** Every `.po` under the instance's `<translations>/<locale>/`, the glossaries included. */
@@ -452,7 +657,13 @@ export function checkLocale(
   references: ReadonlyArray<{ name: string; pattern: string }> = [],
   /** The glossaries in precedence order; {@link glossarySources} when not given. */
   sources?: readonly GlossarySource[],
+  /** The adjudicator's verdicts; the instance's store when not given. */
+  verdicts?: Verdicts,
 ): LocaleResult {
+  const ruled = verdicts ?? readVerdicts(senseStorePath(translations));
+  const pending: Occurrence[] = [];
+  const otherSense: Occurrence[] = [];
+  const exceptions: Occurrence[] = [];
   const instance = readDeclaration(root)?.name ?? basename(root);
   const srcs = sources ?? glossarySources(root, locale, references);
   const base = termBase(instance, locale, srcs, instanceScopes(root, srcs));
@@ -482,11 +693,47 @@ export function checkLocale(
         r.set(n, [...(r.get(n) ?? []), `${rel}: ${e.msgstr.trim()}`]);
         exact.set(whole, r);
       }
+      let hash: string | undefined;
       for (const t of terms) {
-        if (!uses(t.term, e.msgid) || renders(t.fixed, e.msgstr, locale)) continue;
+        if (!uses(t.term, e.msgid)) continue;
         if (t.file === po) continue; // the glossary entry itself
-        if (t.inScope) findings.push({ rule: "not-fixed-rendering", term: t.term, fixed: t.fixed, layer: t.layer, catalogue: rel, msgid: e.msgid, rendering: e.msgstr });
-        else if (!binding.has(t.term.toLowerCase())) sense.push({ term: t.term, fixed: t.fixed, layer: t.layer, catalogue: rel, msgid: e.msgid });
+        // A label that binds here in one area is decided by that area alone.
+        if (!t.inScope && binding.has(t.term.toLowerCase())) continue;
+        if (renders(t.fixed, e.msgstr, locale) || keptAsName(t.term, e.msgid, e.msgstr)) continue;
+        hash ??= msgidSha256(e.msgid);
+        const v = ruled.get(senseKey(t.id, hash));
+        const occ = (): Occurrence => ({
+          term: t.term,
+          termId: t.id,
+          ...(t.definition !== undefined ? { definition: t.definition } : {}),
+          fixed: t.fixed,
+          layer: t.layer,
+          scope: t.scope,
+          catalogue: rel,
+          msgid: e.msgid,
+          msgidSha256: hash!,
+          rendering: e.msgstr,
+          ...(v !== undefined ? { verdict: v } : {}),
+        });
+        const violation = (inSense: "rule" | "adjudicated"): GlossaryFinding => ({
+          rule: "not-fixed-rendering",
+          term: t.term,
+          fixed: t.fixed,
+          layer: t.layer,
+          catalogue: rel,
+          msgid: e.msgid,
+          rendering: e.msgstr,
+          inSense,
+        });
+        // In sense by rule: the catalogue's subject area is the term's. Only an
+        // exception lets it pass; a rule is not overruled by an `other-sense`.
+        if (t.inScope) {
+          if (v?.verdict === "exception") exceptions.push(occ());
+          else findings.push(violation("rule"));
+        } else if (v === undefined) pending.push(occ());
+        else if (v.verdict === "other-sense") otherSense.push(occ());
+        else if (v.verdict === "exception") exceptions.push(occ());
+        else findings.push(violation("adjudicated"));
       }
     }
   }
@@ -494,14 +741,14 @@ export function checkLocale(
     if (renderings.size < 2) continue;
     findings.push({ rule: "inconsistent", term: [...base.terms.values()].find((t) => t.term.toLowerCase() === term)?.term ?? term, rendering: [...renderings.values()].map((v) => v[0]!) });
   }
-  return { locale, fixedTerms: base.terms.size, catalogues: files.length, findings, sense };
+  return { locale, fixedTerms: base.terms.size, catalogues: files.length, findings, sense, pending, otherSense, exceptions };
 }
 
 /** One finding as one line of output. */
 export function findingLine(locale: string, f: GlossaryFinding): string {
   switch (f.rule) {
     case "not-fixed-rendering":
-      return `✗ ${locale} not-fixed-rendering «${f.term}» → «${f.fixed}» (${f.layer}) not used in ${f.catalogue}: ${JSON.stringify(f.msgid?.slice(0, 80))}`;
+      return `✗ ${locale} not-fixed-rendering «${f.term}» → «${f.fixed}» (${f.layer}) not used in ${f.catalogue}${f.inSense === "adjudicated" ? " (in sense by verdict)" : ""}: ${JSON.stringify(f.msgid?.slice(0, 80))}`;
     case "inconsistent":
       return `✗ ${locale} inconsistent «${f.term}» rendered ${(f.rendering as string[]).length} ways: ${(f.rendering as string[]).join(" | ")}`;
     case "override":
@@ -509,9 +756,63 @@ export function findingLine(locale: string, f: GlossaryFinding): string {
   }
 }
 
+/** One use that is pending, other-sense or an exception, as one line of output. */
+export function occurrenceLine(locale: string, kind: "pending" | "other-sense" | "exception", o: Occurrence): string {
+  const why = o.verdict ? ` — ${o.verdict.decidedBy}: ${o.verdict.reason}` : "";
+  return `· ${locale} ${kind} «${o.term}» (${o.layer}: «${o.fixed}», ${o.scope}) in ${o.catalogue}: ${JSON.stringify(o.msgid.slice(0, 80))}${why}`;
+}
+
+/** A use as the record keeps it: enough to find it again, and the verdict's who and why. */
+const recorded = (o: Occurrence) => ({
+  term: o.term,
+  termId: o.termId,
+  fixed: o.fixed,
+  layer: o.layer,
+  catalogue: o.catalogue,
+  msgid: o.msgid,
+  msgidSha256: o.msgidSha256,
+  ...(o.verdict ? { reason: o.verdict.reason, decidedBy: o.verdict.decidedBy } : {}),
+});
+
+/**
+ * The uses an adjudicator is asked about, once each across `results`: sense is
+ * a property of the English, so a use pending in several locales is one
+ * question. Each carries what the adjudicator is given — the term, its
+ * definition and the sentence — and the key its verdict is recorded under.
+ */
+export function pendingQuestions(results: readonly LocaleResult[]) {
+  const out = new Map<
+    string,
+    { term: string; label: string; definition?: string; scope: string; layer: string; msgid: string; msgidSha256: string; locales: string[]; catalogues: string[] }
+  >();
+  for (const r of results) {
+    for (const o of r.pending) {
+      const k = senseKey(o.termId, o.msgidSha256);
+      const q =
+        out.get(k) ??
+        {
+          term: o.termId,
+          label: o.term,
+          ...(o.definition !== undefined ? { definition: o.definition } : {}),
+          scope: o.scope,
+          layer: o.layer,
+          msgid: o.msgid,
+          msgidSha256: o.msgidSha256,
+          locales: [],
+          catalogues: [],
+        };
+      if (!q.locales.includes(r.locale)) q.locales.push(r.locale);
+      const cat = o.catalogue.replace(new RegExp(`(^|/)${r.locale}/`), "$1<locale>/");
+      if (!q.catalogues.includes(cat)) q.catalogues.push(cat);
+      out.set(k, q);
+    }
+  }
+  return [...out.values()];
+}
+
 /** The `qa-results/v1` record: one family per locale. */
 export function glossaryResult(instance: string, results: readonly LocaleResult[]) {
-  return buildQaResult({
+  const rec = buildQaResult({
     script: GLOSSARY_CHECK_SCRIPT,
     scriptAbsPath: join(TOOLS_ROOT, GLOSSARY_CHECK_SCRIPT),
     subject: { kind: GLOSSARY_SUBJECT_KIND, id: instance },
@@ -521,12 +822,19 @@ export function glossaryResult(instance: string, results: readonly LocaleResult[
         {
           summary:
             `${r.fixedTerms} fixed term(s), ${r.catalogues} catalogue(s); ` +
+            `${r.pending.length} use(s) pending adjudication, ${r.otherSense.length} other-sense, ${r.exceptions.length} exception(s), ` +
             `${r.sense.length} sense-check note(s) (a term of another domain rendered otherwise), not counted as findings`,
           entries: r.findings,
         },
       ]),
     ),
   });
+  // The adjudication lists beside each locale's findings: listed, never counted.
+  for (const r of results) {
+    const f = rec.families[r.locale] as (typeof rec.families)[string] & { adjudication?: unknown };
+    f.adjudication = { pending: r.pending.map(recorded), otherSense: r.otherSense.map(recorded), exceptions: r.exceptions.map(recorded) };
+  }
+  return rec;
 }
 
 function args(argv: readonly string[], name: string): string[] {
@@ -562,14 +870,59 @@ function main(argv: readonly string[]): number {
     return 2;
   }
   const instance = readDeclaration(root)?.name ?? basename(root);
-  const results = (asked.length ? asked : have).map((l) => checkLocale(root, translations, l, references));
+  const store = senseStorePath(translations);
+  const record = args(argv, "record");
+  if (record.length > 0) {
+    // The adjudicator's answers: merged into the store, nothing else run.
+    try {
+      for (const f of record) {
+        const { added, replaced } = recordVerdicts(store, JSON.parse(readFileSync(resolve(f), "utf-8")));
+        console.log(`translation-glossary: ${f}: ${added} verdict(s) added, ${replaced} replaced in ${relative(root, store)}`);
+      }
+    } catch (e) {
+      console.error(`translation-glossary: --record: ${(e as Error).message} (exit 2)`);
+      return 2;
+    }
+    return 0;
+  }
+  let verdicts: Verdicts;
+  try {
+    verdicts = readVerdicts(store);
+  } catch (e) {
+    console.error(`translation-glossary: ${relative(root, store)} does not parse: ${(e as Error).message} (exit 2)`);
+    return 2;
+  }
+  const locales = asked.length && !argv.includes("--all-locales") ? asked : have;
+  const results = locales.map((l) => checkLocale(root, translations, l, references, undefined, verdicts));
+  if (argv.includes("--pending")) {
+    // What the adjudicator is asked; listing it fails nothing.
+    const questions = pendingQuestions(results);
+    if (argv.includes("--json")) {
+      console.log(JSON.stringify({ instance, store: relative(root, store), verdicts: ["in-sense", "other-sense", "exception"], pending: questions }, null, 2));
+    } else {
+      for (const q of questions) console.log(`· pending «${q.label}» (${q.term}) [${q.locales.join(",")}]: ${JSON.stringify(q.msgid.slice(0, 100))}`);
+      console.log(`  ${questions.length} use(s) pending adjudication`);
+    }
+    return 0;
+  }
   let findings = 0;
+  const known = new Set<string>();
   for (const r of results) {
     for (const f of r.findings) console.log(findingLine(r.locale, f));
+    for (const o of r.exceptions) console.log(occurrenceLine(r.locale, "exception", o));
+    for (const o of r.otherSense) console.log(occurrenceLine(r.locale, "other-sense", o));
+    for (const o of r.pending) console.log(occurrenceLine(r.locale, "pending", o));
     for (const n of r.sense) console.log(`· ${r.locale} sense-check «${n.term}» (${n.layer}: «${n.fixed}») in ${n.catalogue}: ${JSON.stringify(n.msgid.slice(0, 80))}`);
-    console.log(`  ${r.locale}: ${r.fixedTerms} fixed term(s), ${r.catalogues} catalogue(s), ${r.findings.length} finding(s), ${r.sense.length} sense-check note(s)`);
+    const inSense = r.findings.filter((f) => f.rule === "not-fixed-rendering").length;
+    console.log(
+      `  ${r.locale}: ${r.fixedTerms} fixed term(s), ${r.catalogues} catalogue(s), ${r.findings.length} finding(s) (${inSense} in-sense violation(s)), ` +
+        `${r.pending.length} pending adjudication, ${r.otherSense.length} other-sense, ${r.exceptions.length} exception(s), ${r.sense.length} sense-check note(s)`,
+    );
     findings += r.findings.length;
+    for (const o of [...r.pending, ...r.otherSense, ...r.exceptions]) known.add(senseKey(o.termId, o.msgidSha256));
   }
+  const stale = [...verdicts.keys()].filter((k) => !known.has(k)).length;
+  if (stale > 0) console.log(`  ${stale} recorded verdict(s) match no use that needs one (a changed msgid, or a use now rendered)`);
   if (!check) {
     // `qaResultPath`'s one composition: `<instance>/test/results/`, the `qa`
     // directory every instance in an index declares, where `kg-qa-report` reads it.

@@ -12,10 +12,14 @@ import { join } from "node:path";
 
 import { TOOLS_ROOT } from "../scripts/lib/roots.ts";
 import { glossaryConsistencyMarkdown } from "../scripts/kg-qa-report.ts";
+import { GlossarySenseStoreSchema, senseKey, type GlossarySenseVerdict } from "../schemas/kg/glossary-sense.ts";
 import {
   checkLocale,
   glossaryResult,
   glossarySources,
+  keptAsName,
+  msgidSha256,
+  pendingQuestions,
   readSchemeScope,
   renders,
   termBase,
@@ -228,9 +232,9 @@ describe("checkLocale — the three rules, and scope", () => {
       "inconsistent:Actor", // page.po «Acteur», other.po «Intervenant»
       "not-fixed-rendering:Health worker", // page.po: «soignant», not «agent de santé»
     ]);
-    // Platform terms in health content: notes, not violations — "Clinic" in a
-    // sentence, and "Actor" rendered otherwise in other.po.
-    expect(r.sense.map((n) => n.term).sort()).toEqual(["Actor", "Clinic"]);
+    // Platform terms in health content: pending adjudication, not violations —
+    // "Clinic" in a sentence, and "Actor" rendered otherwise in other.po.
+    expect(r.pending.map((n) => n.term).sort()).toEqual(["Actor", "Clinic"]);
   });
   test("a clean locale has no findings", () => {
     const root = join(base, "clean");
@@ -289,8 +293,8 @@ describe("the CLI: one finding per line, exit 0 / 1 / 2", () => {
 describe("the KG QA report's Glossary consistency section", () => {
   test("one sub-section per locale, its findings in a table", () => {
     const rec = glossaryResult("acme", [
-      { locale: "fr", fixedTerms: 3, catalogues: 2, sense: [], findings: [{ rule: "inconsistent", term: "Actor", rendering: ["a.po: Acteur", "b.po: Intervenant"] }] },
-      { locale: "ar", fixedTerms: 3, catalogues: 2, sense: [], findings: [] },
+      { locale: "fr", fixedTerms: 3, catalogues: 2, sense: [], pending: [], otherSense: [], exceptions: [], findings: [{ rule: "inconsistent", term: "Actor", rendering: ["a.po: Acteur", "b.po: Intervenant"] }] },
+      { locale: "ar", fixedTerms: 3, catalogues: 2, sense: [], pending: [], otherSense: [], exceptions: [], findings: [] },
     ]);
     const md = glossaryConsistencyMarkdown(rec, { href: "assets/kg-qa/acme/glossary-consistency.qa-results.json", level: 3 }).join("\n");
     expect(md).toContain("### Glossary consistency");
@@ -298,5 +302,214 @@ describe("the KG QA report's Glossary consistency section", () => {
     expect(md).toContain("#### ar");
     expect(md).toContain("| `inconsistent` | Actor |");
     expect(md).toContain("No findings.");
+  });
+});
+
+// ── in sense: by rule, then by an adjudicator ───────────────────
+
+const PLATFORM_IRI = "https://example.org/t/actor";
+/** A scheme entry with its definition, as `glossary:pot` writes one. */
+const schemeTerm = (id: string, str: string, def: string, defStr: string) =>
+  `\n#. Glossary term label: https://example.org/t/${id.toLowerCase()}\nmsgid "${id}"\nmsgstr "${str}"\n` +
+  `\n#. Glossary term definition: https://example.org/t/${id.toLowerCase()}\nmsgid "${def}"\nmsgstr "${defStr}"\n`;
+
+/**
+ * `sense`: an instance whose own glossary fixes "Health worker", below a
+ * platform layer (`core`, another subject area) that fixes "Actor", and one
+ * content catalogue per locale.
+ */
+function senseInstance(dir: string, locales: Record<string, { hw: string; actor: string; page: string }>): { root: string; sources: (l: string) => GlossarySource[] } {
+  const root = join(base, dir);
+  mkdirSync(root, { recursive: true });
+  writeFileSync(
+    join(root, "acme.json"),
+    JSON.stringify({ name: "acme", directories: [{ id: "translations", path: "translations/", graphTypologies: ["translation-sources"] }] }),
+  );
+  for (const [l, t] of Object.entries(locales)) {
+    mkdirSync(join(root, "translations", l, "glossary"), { recursive: true });
+    writeFileSync(join(root, "translations", l, "glossary", "acme--terms.po"), HEADER + label("Health worker", t.hw));
+    writeFileSync(join(root, "translations", l, "page.po"), HEADER + t.page);
+    w(`${dir}-core/${l}/glossary/core--terms.po`, HEADER + schemeTerm("Actor", t.actor, "A participant that takes on roles.", "x"));
+  }
+  return {
+    root,
+    sources: (l) => [{ layer: "core", file: join(base, `${dir}-core`, l, "glossary", "core--terms.po"), reference: false }, ...glossarySources(root, l)],
+  };
+}
+
+const ACTOR_SENTENCE = "Each actor signs the record.";
+const verdict = (v: GlossarySenseVerdict["verdict"], msgid = ACTOR_SENTENCE, reason = "a person in the journey, not a platform actor"): GlossarySenseVerdict => ({
+  term: PLATFORM_IRI,
+  label: "actor",
+  msgidSha256: msgidSha256(msgid),
+  verdict: v,
+  reason,
+  decidedBy: "adjudicator-1",
+});
+const verdicts = (...vs: GlossarySenseVerdict[]) => new Map(vs.map((v) => [senseKey(v.term, v.msgidSha256), v]));
+
+describe("in sense: by rule, then by an adjudicator", () => {
+  const fr = {
+    hw: "Agent de santé",
+    actor: "Acteur",
+    page: plain("Every health worker signs in.", "Chaque soignant se connecte.") + plain(ACTOR_SENTENCE, "Chaque intervenant signe le dossier."),
+  };
+
+  test("a use in the term's own subject area is in sense by rule, and a msgstr without the fixed term fails", () => {
+    const { root, sources } = senseInstance("sense-rule", { fr });
+    const r = checkLocale(root, join(root, "translations"), "fr", [], sources("fr"), new Map());
+    expect(r.findings.map((f) => [f.rule, f.term, f.inSense])).toEqual([["not-fixed-rendering", "Health worker", "rule"]]);
+  });
+
+  test("a use of another area's term is pending: listed with its term id, definition and sentence, never a finding", () => {
+    const { root, sources } = senseInstance("sense-pending", { fr });
+    const r = checkLocale(root, join(root, "translations"), "fr", [], sources("fr"), new Map());
+    expect(r.findings.some((f) => f.term === "Actor")).toBe(false);
+    expect(r.pending).toHaveLength(1);
+    expect(r.pending[0]).toMatchObject({
+      term: "Actor",
+      termId: PLATFORM_IRI,
+      definition: "A participant that takes on roles.",
+      msgid: ACTOR_SENTENCE,
+      msgidSha256: msgidSha256(ACTOR_SENTENCE),
+    });
+  });
+
+  test("an other-sense verdict checks nothing; an in-sense verdict is enforced", () => {
+    const { root, sources } = senseInstance("sense-verdicts", { fr });
+    const other = checkLocale(root, join(root, "translations"), "fr", [], sources("fr"), verdicts(verdict("other-sense")));
+    expect(other.pending).toEqual([]);
+    expect(other.otherSense.map((o) => o.term)).toEqual(["Actor"]);
+    expect(other.findings.some((f) => f.term === "Actor")).toBe(false);
+    const inSense = checkLocale(root, join(root, "translations"), "fr", [], sources("fr"), verdicts(verdict("in-sense")));
+    expect(inSense.findings.filter((f) => f.term === "Actor").map((f) => f.inSense)).toEqual(["adjudicated"]);
+  });
+
+  test("a changed msgid invalidates its verdict: the use is pending again", () => {
+    const { root, sources } = senseInstance("sense-changed", { fr });
+    const r = checkLocale(root, join(root, "translations"), "fr", [], sources("fr"), verdicts(verdict("other-sense", "Each actor signs the old record.")));
+    expect(r.otherSense).toEqual([]);
+    expect(r.pending.map((o) => o.term)).toEqual(["Actor"]);
+  });
+
+  test("an exception passes and is listed, for an adjudicated use and for one in sense by rule", () => {
+    const { root, sources } = senseInstance("sense-exception", { fr });
+    const hw: GlossarySenseVerdict = {
+      term: "https://example.org/t/health worker",
+      msgidSha256: msgidSha256("Every health worker signs in."),
+      verdict: "exception",
+      reason: "the sign-in screen names the role as the app does",
+      decidedBy: "adjudicator-1",
+    };
+    const r = checkLocale(root, join(root, "translations"), "fr", [], sources("fr"), verdicts(verdict("exception"), hw));
+    expect(r.findings).toEqual([]);
+    expect(r.exceptions.map((o) => [o.term, o.verdict?.reason]).sort()).toEqual([
+      ["Actor", "a person in the journey, not a platform actor"],
+      ["Health worker", "the sign-in screen names the role as the app does"],
+    ]);
+  });
+
+  test("zh matches the fixed term as a substring; ru by stem, a 4-letter word by its first three letters", () => {
+    expect(renders("行动者", "每个行动者签署记录", "zh")).toBe(true);
+    expect(renders("行动者", "每个参与者签署记录", "zh")).toBe(false);
+    expect(renders("сеть доверия", "в сети доверия", "ru")).toBe(true);
+    expect(renders("медицинский работник", "медицинского работника", "ru")).toBe(true);
+    expect(renders("сеть доверия", "в системе доверия", "ru")).toBe(false);
+    const { root, sources } = senseInstance("sense-zh-ru", {
+      zh: { hw: "卫生工作者", actor: "行动者", page: plain("Every health worker signs in.", "每位卫生工作者登录。") },
+      ru: { hw: "медицинский работник", actor: "участник", page: plain("Every health worker signs in.", "Каждый медицинский работник входит.") },
+    });
+    for (const l of ["zh", "ru"]) expect(checkLocale(root, join(root, "translations"), l, [], sources(l), new Map()).findings).toEqual([]);
+  });
+
+  test("the English term kept verbatim renders it only as part of a code or resource name", () => {
+    expect(keptAsName("WHO", "against WHO SMART Trust PHW", "par rapport à WHO SMART Trust PHW")).toBe(true);
+    expect(keptAsName("verifier", "Provenance.agent (verifier)", "Provenance.agent (verifier)")).toBe(true);
+    expect(keptAsName("Reference", "Reference(Patient)", "Reference(Patient)")).toBe(true);
+    expect(keptAsName("Verifiable Health Link", 'its title, "Receiver of Verifiable Health Link"', 'son titre, « Receiver of Verifiable Health Link »')).toBe(true);
+    expect(keptAsName("WHO", "the guidance WHO publishes", "les orientations que WHO publie")).toBe(false); // prose
+    expect(keptAsName("health worker", "a health worker signs", "a health worker signe")).toBe(false);
+  });
+});
+
+describe("the verdict store and the adjudicator's entry points", () => {
+  test("--pending --json asks each use once across locales, with term, definition and sentence; it exits 0", () => {
+    // Sense is a property of the English: the same use pending in fr and es is one question.
+    const occ = (l: string) => ({
+      term: "Actor", termId: PLATFORM_IRI, definition: "A participant that takes on roles.", fixed: "x", layer: "core", scope: "core--terms",
+      catalogue: `translations/${l}/page.po`, msgid: ACTOR_SENTENCE, msgidSha256: msgidSha256(ACTOR_SENTENCE), rendering: "y",
+    });
+    const result = (l: string) => ({ locale: l, fixedTerms: 1, catalogues: 1, findings: [], sense: [], pending: [occ(l)], otherSense: [], exceptions: [] });
+    expect(pendingQuestions([result("fr"), result("es")])).toEqual([
+      {
+        term: PLATFORM_IRI,
+        label: "Actor",
+        definition: "A participant that takes on roles.",
+        scope: "core--terms",
+        layer: "core",
+        msgid: ACTOR_SENTENCE,
+        msgidSha256: msgidSha256(ACTOR_SENTENCE),
+        locales: ["fr", "es"],
+        catalogues: ["translations/<locale>/page.po"],
+      },
+    ]);
+    const { root } = senseInstance("sense-cli-pending", { fr: { hw: "Agent de santé", actor: "Acteur", page: plain(ACTOR_SENTENCE, "Chaque intervenant signe.") } });
+    const r = run(["--check", "--instance", root, "--all-locales", "--pending", "--json"], base);
+    expect(r.code).toBe(0);
+    expect(JSON.parse(r.out)).toMatchObject({ instance: "acme", store: "translations/glossary-sense.json", pending: [] });
+  });
+
+  test("--record merges verdicts keyed by term and msgid hash; the check then lists them, and exits 1 only on an in-sense violation", () => {
+    const { root } = senseInstance("sense-cli-record", {
+      fr: { hw: "Agent de santé", actor: "Acteur", page: plain("Clinic hours", "Heures") + plain("A health worker arrives.", "Un agent de santé arrive.") },
+    });
+    // The instance's own terminology pins a term of its own area.
+    writeFileSync(join(root, "translations", "fr", "glossary.po"), HEADER + "\n#. A place of care.\nmsgid \"Clinic\"\nmsgstr \"Clinique\"\n");
+    const fails = run(["--check", "--instance", root, "--locale", "fr"], base);
+    expect(fails.code).toBe(1);
+    expect(fails.out).toContain("✗ fr not-fixed-rendering «Clinic» → «Clinique»");
+    const file = w("sense-cli-record-verdicts.json", JSON.stringify([
+      { term: "acme--terminology#clinic", msgid: "Clinic hours", verdict: "exception", reason: "the column header the app prints", decidedBy: "adjudicator-1" },
+    ]));
+    const rec = run(["--check", "--instance", root, "--record", file], base);
+    expect(rec.code).toBe(0);
+    const store = GlossarySenseStoreSchema.parse(JSON.parse(readFileSync(join(root, "translations", "glossary-sense.json"), "utf-8")));
+    expect(store.verdicts.map((v) => [v.term, v.msgidSha256])).toEqual([["acme--terminology#clinic", msgidSha256("Clinic hours")]]);
+    const passes = run(["--check", "--instance", root, "--locale", "fr"], base);
+    expect(passes.code).toBe(0);
+    expect(passes.out).toContain("· fr exception «Clinic»");
+    // A verdict without its reason is refused, and nothing is written.
+    const bad = w("sense-cli-record-bad.json", JSON.stringify([{ term: "x", msgid: "y", verdict: "in-sense", decidedBy: "a" }]));
+    expect(run(["--check", "--instance", root, "--record", bad], base).code).toBe(2);
+  });
+
+  test("the store refuses two verdicts on one use", () => {
+    const v = verdict("in-sense");
+    expect(GlossarySenseStoreSchema.safeParse({ $schema: "glossary-sense/v1", verdicts: [v] }).success).toBe(true);
+    expect(GlossarySenseStoreSchema.safeParse({ $schema: "glossary-sense/v1", verdicts: [v, { ...v, verdict: "other-sense" }] }).success).toBe(false);
+  });
+
+  test("the KG QA report lists in-sense violations, exceptions, pending and other-sense uses", () => {
+    const occ = { term: "Actor", termId: PLATFORM_IRI, fixed: "Acteur", layer: "core", scope: "core--terms", catalogue: "translations/fr/page.po", msgid: ACTOR_SENTENCE, msgidSha256: msgidSha256(ACTOR_SENTENCE), rendering: "x" };
+    const rec = glossaryResult("acme", [
+      {
+        locale: "fr",
+        fixedTerms: 2,
+        catalogues: 1,
+        sense: [],
+        findings: [{ rule: "not-fixed-rendering", term: "Health worker", fixed: "Agent de santé", layer: "acme", catalogue: "translations/fr/page.po", msgid: "m", rendering: "r", inSense: "rule" }],
+        pending: [occ],
+        otherSense: [{ ...occ, verdict: verdict("other-sense") }],
+        exceptions: [{ ...occ, verdict: verdict("exception", ACTOR_SENTENCE, "the app's own label") }],
+      },
+    ]);
+    expect(rec.total).toBe(1); // only the violation counts
+    const md = glossaryConsistencyMarkdown(rec, { href: "r.json", level: 3 }).join("\n");
+    expect(md).toContain("1 finding(s), 1 of them in-sense violation(s)");
+    expect(md).toContain("| `not-fixed-rendering` (in sense by rule) | Health worker |");
+    expect(md).toContain("##### Pending adjudication");
+    expect(md).toContain("##### Other sense");
+    expect(md).toContain("##### Exceptions");
+    expect(md).toContain("the app's own label (adjudicator-1)");
   });
 });
