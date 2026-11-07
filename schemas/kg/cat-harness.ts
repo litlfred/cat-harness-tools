@@ -943,7 +943,15 @@ export interface CatHarnessDeclaration extends KgNodeLabels {
    */
   gateExemptions?: {
     steps?: Array<{ match: string; kind: "covered-by" | "ci-only" | "no-folio"; reason: string }>;
-    scripts?: Array<{ script: string; kind: "report" | "covered-by" | "no-folio" | "scheduled"; reason: string }>;
+    scripts?: Array<{
+      script: string;
+      kind: "report" | "covered-by" | "no-folio" | "scheduled" | "pending-baseline";
+      reason: string;
+      /** `pending-baseline` only: the script that writes the baseline, which CI must run. */
+      writer?: string;
+      /** `pending-baseline` only: the change that wires the check once the baseline exists. */
+      followUp?: string;
+    }>;
     /**
      * Files of THIS instance that one named gate's allowlist admits, each with
      * its reason — `gate` is the check's script name (`check:structure-accessor`),
@@ -3424,10 +3432,21 @@ export const GateExemptionsSchema = z
         z
           .object({
             script: z.string().min(1),
-            kind: z.enum(["report", "covered-by", "no-folio", "scheduled"]),
+            kind: z.enum(["report", "covered-by", "no-folio", "scheduled", "pending-baseline"]),
             reason: z.string().trim().min(1),
+            // `pending-baseline` only (owner, 2026-11-07, "A. Two steps"): the
+            // writer CI runs now, and the follow-up that wires the check.
+            writer: z.string().min(1).optional(),
+            followUp: z.string().trim().min(1).optional(),
           })
-          .strict(),
+          .strict()
+          .refine(
+            (e) =>
+              e.kind === "pending-baseline"
+                ? e.writer !== undefined && e.followUp !== undefined
+                : e.writer === undefined && e.followUp === undefined,
+            { message: "a `pending-baseline` exemption names its `writer` and its `followUp`, and no other kind does" },
+          ),
       )
       .optional(),
     files: z

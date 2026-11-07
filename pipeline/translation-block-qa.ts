@@ -1174,6 +1174,13 @@ function settleSidecar(
   console.log(`  ✓ ${relative(INSTANCE_ROOT, out)} (${cov?.translated}/${cov?.total} strings)`);
 }
 
+/**
+ * The flags `--check` accepts besides `--check` itself. `--catalogues` selects
+ * the gate (`translation:page-qa:check`), so it is one of them: without it the
+ * package.json script was refused as "unknown flag(s): --catalogues".
+ */
+export const JUDGE_FLAGS: readonly string[] = ["--catalogues", "--root", "--locales", "--against", "--instance"];
+
 if (import.meta.main) {
   // `--instance <dir>`: sweep that instance, through ITS declarations. Set
   // before anything reads INSTANCE_ROOT (`derivedStored` memoises on it).
@@ -1185,7 +1192,7 @@ if (import.meta.main) {
   if (check) {
     const argv = process.argv.slice(2);
     // `--root` and `--locales` take values; judgeUsage reads only the flags.
-    const usage = judgeUsage(GATE, argv, ["--root", "--locales", "--against", "--instance"]);
+    const usage = judgeUsage(GATE, argv, JUDGE_FLAGS);
     if (usage !== undefined) process.exit(usage);
     const a = againstOrUsage(GATE, argv);
     if (a.exit !== undefined) process.exit(a.exit);
