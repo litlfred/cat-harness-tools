@@ -55,6 +55,14 @@ Feature: Every test has a Gherkin
     When the JS adapter reads it
     Then the test after it is found
 
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_modifiers_with_their_own_arguments_chain_before_the_title_call
+  Scenario: Chained modifiers with arguments do not hide a test
+    Given tests written as test.skipIf(c).each(t)(…), test.if(c).each(t)(…), it.skip.each(t)(…) and test.skipIf(c)(…)
+    And a describe.skipIf(c)(…) scope holding a test, and a test.each passed around as a value
+    When the JS adapter reads them
+    Then the four tests and the scoped test are found by their titles
+    And the value is not taken for a test
+
   @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_test_with_a_computed_title_is_found_and_reported,_never_dropped
   Scenario: A test whose title is computed is reported, not dropped
     Given a test file with tests titled by a loop variable and by a template with an interpolation

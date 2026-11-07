@@ -426,8 +426,18 @@ export const KOTLIN_ADAPTER: TestLanguageAdapter = {
 // ── JavaScript / TypeScript (bun:test, vitest, jest, node:test) ─────────────
 
 const JS_TEST_FILE = /(?:\.(?:test|spec)\.[cm]?[jt]sx?|(?:^|\/)__tests__\/.+\.[cm]?[jt]sx?)$/;
-/** `test(`, `it(`, `test.skip(`, `it.only(`, `test.each(…)(`, and `describe(` for a scope. */
-const JS_CALL = /(?<![\w.$])(describe|suite|context|test|it)((?:\.(?:skip|only|todo|failing|concurrent|serial|if|skipIf|runIf|each))*)\s*(\()/g;
+/**
+ * The head of a test or scope call: `test`, `it`, `describe` and friends.
+ * What follows is walked by hand (`callChain`), because modifiers can carry
+ * their own arguments and chain: `test.skipIf(c).each(t)("… %s", …)`. A
+ * regex over the modifier names alone missed every chain with arguments
+ * between them, and the test it hid read as no test at all.
+ */
+const JS_HEAD = /(?<![\w.$])(describe|suite|context|test|it)(?=\s*[.(])/g;
+/** Modifiers that take no arguments. */
+const JS_BARE_MODS = new Set(["skip", "only", "todo", "failing", "concurrent", "serial"]);
+/** Modifiers whose own argument list comes before the title call. */
+const JS_ARG_MODS = new Set(["each", "if", "skipIf", "runIf"]);
 
 /** `id[${key}]`: a literal id, then one interpolation in brackets, nothing else computed. */
 const LOOPED_ID = /^[^`$\s\[\]]+\[\$\{[^{}`]*\}\]$/;
@@ -466,14 +476,30 @@ export const JS_ADAPTER: TestLanguageAdapter = {
     };
     const scopes: { from: number; to: number; title: string | undefined }[] = [];
     const calls: { at: number; title: string | undefined }[] = [];
-    for (const m of code.matchAll(JS_CALL)) {
-      let open = m.index! + m[0].length - 1;
-      // `.each(table)(title, …)` and `.if(cond)(title, …)`: the title is in the second call.
-      if (/\.(?:each|if|skipIf|runIf)$/.test(m[2])) {
-        const next = /^\s*\(/.exec(code.slice(closeOf(open) + 1));
-        if (!next) continue;
-        open = closeOf(open) + next[0].length;
+    /**
+     * Walk `.mod`, `.mod(args)` links after a head to the `(` of the title
+     * call, or `undefined` when the chain is not a call of a known shape
+     * (e.g. `test.each` passed as a value).
+     */
+    const callChain = (from: number): number | undefined => {
+      let j = from;
+      for (;;) {
+        const ws = /^\s*/.exec(code.slice(j))![0].length;
+        j += ws;
+        if (code[j] === "(") return j;
+        const mod = /^\.\s*([A-Za-z_$][\w$]*)/.exec(code.slice(j));
+        if (!mod) return undefined;
+        j += mod[0].length;
+        if (JS_BARE_MODS.has(mod[1])) continue;
+        if (!JS_ARG_MODS.has(mod[1])) return undefined;
+        const argsOpen = j + /^\s*/.exec(code.slice(j))![0].length;
+        if (code[argsOpen] !== "(") return undefined;
+        j = closeOf(argsOpen) + 1;
       }
+    };
+    for (const m of code.matchAll(JS_HEAD)) {
+      const open = callChain(m.index! + m[0].length);
+      if (open === undefined) continue;
       const title = firstArgString(open);
       if (m[1] === "test" || m[1] === "it") calls.push({ at: m.index!, title });
       else scopes.push({ from: open, to: closeOf(open), title });
