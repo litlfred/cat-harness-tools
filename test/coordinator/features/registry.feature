@@ -10,11 +10,14 @@ Feature: The generated skill registry satisfies its schema and lists what is on 
     Then it parses with no issues
 
   @test:test/coordinator/registry.test.ts::generated_skill_registry::carries_the_role_rules_that_are_on_disk
-  Scenario: The registry carries role assignments in descending priority
+  Scenario: The registry carries exactly the role assignments on disk, in descending priority
     Given the generated registry
     When its role assignments are read
     Then there is at least one
     And their priorities are in descending order
+    Given the rules in the checkout's .claude/scenarios/role-assignments.json, as an array or under "assignments"
+    Then the file holds at least one rule
+    And the registry's role assignments, as written, equal the file's rules sorted highest priority first
 
   @test:test/coordinator/registry.test.ts::generated_skill_registry::hooks_are_HookCommands,_not_raw_settings_entries
   Scenario: Every hook command is a command HookCommand

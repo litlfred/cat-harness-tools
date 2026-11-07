@@ -10,10 +10,11 @@ Feature: The voices graph lists every shipped voice once, with honest provenance
     And no id repeats
 
   @test:test/coordinator/voices-viz-checkout.test.ts::the_reader_finds_what_the_declarations_say_is_there::a_voice_is_attributed_to_the_instance_that_DERIVED_it,_never_to_the_platform
-  Scenario: No voice is attributed to folio-assistant, and several instances own voices
+  Scenario: No voice is attributed to the platform or the root instance, and several instances own voices
     Given the voices graph
     When each voice's instance is read
-    Then none is "folio-assistant"
+    Then none is "cat-harness"
+    And none is "folio-assistant"
     And there is more than one owning instance
 
   @test:test/coordinator/voices-viz-checkout.test.ts::the_reader_finds_what_the_declarations_say_is_there::the_path_it_reports_is_the_file_a_reader_can_actually_open

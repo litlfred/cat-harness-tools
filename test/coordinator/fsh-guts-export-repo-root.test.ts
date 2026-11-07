@@ -13,12 +13,14 @@
  * standing alone too.
  */
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { extname, join, resolve } from "node:path";
 
 import { buildFshGutsExport, fshGutsDirs } from "../../scripts/fsh-guts-export.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.js";
+import { readFshGutsNode, withoutFrozenSubtrees } from "../../schemas/kg/fsh-guts.js";
 import { writeDeclaration } from "../support/instance-fixture.js";
 
 /**
@@ -72,6 +74,23 @@ describe("the real corpus", () => {
     expect(doc.nodeCount).toBeGreaterThan(0);
     expect(doc["@graph"]).toHaveLength(doc.nodeCount);
     expect(doc.scans).toContain("fsh-guts");
+    // Every COMMITTED node, by path: each file git tracks in a scanned
+    // directory (outside a frozen subtree, which is one item) that reads as a
+    // node has an entry whose `sourcePath` is it.
+    const inDoc = new Set(doc["@graph"].map((n) => n.sourcePath));
+    const committed: string[] = [];
+    for (const dir of fshGutsDirs(ROOT)) {
+      const ls = spawnSync("git", ["ls-files", "-z"], { cwd: dir.absPath, encoding: "utf-8" });
+      expect(ls.status).toBe(0);
+      const tracked = ls.stdout.split("\0").filter(Boolean);
+      for (const f of withoutFrozenSubtrees(dir.absPath, tracked).live) {
+        const abs = join(dir.absPath, f);
+        if (![".md", ".json"].includes(extname(f).toLowerCase()) || !existsSync(abs)) continue;
+        if (readFshGutsNode(readFileSync(abs, "utf8")).node) committed.push(join(dir.path, f));
+      }
+    }
+    expect(committed.length).toBeGreaterThan(0);
+    expect(committed.filter((rel) => !inDoc.has(rel))).toEqual([]);
   });
 
   test("the directory is resolved from the declaration, not spelled", () => {

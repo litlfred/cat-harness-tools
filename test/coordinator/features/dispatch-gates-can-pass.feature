@@ -9,6 +9,8 @@ Feature: A gate can pass on every event its workflow declares
     When it is read
     Then it contains 'bun run cat translation:catalogue:check -- --base "$base"'
     And it contains "git merge-base origin/main HEAD"
+    And the merge-base call comes before the "--base" call
+    And no "translation:catalogue:check" call lies between the two
 
   @test:test/coordinator/dispatch-gates-can-pass.test.ts::the_catalogue_gate_can_pass_on_a_non-pull_request_event::a_base_that_still_cannot_be_found_stays_exit_2,_never_a_pass
   Scenario: A base that cannot be found exits 2

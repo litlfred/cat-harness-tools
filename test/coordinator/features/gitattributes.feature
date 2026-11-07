@@ -21,8 +21,10 @@ Feature: -merge covers only files whose producer owns them outright, and those f
     When git resolves the merge attribute of "cat-harness/docs/_data/harness.json"
     Then it is not "unset"
 
-  @test:test/coordinator/gitattributes.test.ts::every_-merge_path_is_gated_in_CI::a_wrong_resolution_reddens_rather_than_ships
-  Scenario: The gates covering -merge paths are in the CI workflow
+  @test:test/coordinator/gitattributes.test.ts::every_-merge_path_is_gated_in_CI::each_path_git_marks_-merge_has_its_covering_gate_named_in_CI
+  Scenario: Each path marked -merge has its covering gate in the CI workflow
     Given the text of code-quality-gates.yml
-    When it is read
-    Then it contains "check:glossary", "auto:docs:check" and "docs:pages:check"
+    And the two glossary pages paired with "check:glossary", the auto-docs index with "auto:docs:check" and the beans index JSON with "docs:pages:check"
+    When git is asked each path's merge attribute
+    Then every one of those paths is marked -merge
+    And the workflow names the gate paired with each

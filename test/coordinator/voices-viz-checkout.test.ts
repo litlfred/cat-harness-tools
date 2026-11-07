@@ -38,7 +38,11 @@ describe("the reader finds what the declarations say is there", () => {
     // The whole point of the move this graph exists to render: `cat-harness`
     // is the machinery and holds no voice. A reader seeing `cat-harness` in
     // the instance column would be reading the pre-`btuv` world.
-    for (const v of G.voices) expect(v.instance).not.toBe("folio-assistant");
+    // Neither the platform nor the checkout's root instance derives a voice.
+    for (const v of G.voices) {
+      expect(v.instance).not.toBe("cat-harness");
+      expect(v.instance).not.toBe("folio-assistant");
+    }
     const owners = new Set(G.voices.map((v) => v.instance));
     expect(owners.size).toBeGreaterThan(1);
   });

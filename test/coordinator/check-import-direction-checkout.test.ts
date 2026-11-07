@@ -51,5 +51,13 @@ describe("check:import-direction — the cat-harness / cat-harness-tools boundar
 
   test("cat-harness-tools → cat-harness, down the arrow, is allowed", () => {
     expect(report.findings.some((f) => f.file === "cat-harness-tools/src/server.ts")).toBe(false);
+    // Not a check that reports nothing at all: the planted import UP the
+    // arrow, in the same tree, is reported — as the wrong direction once
+    // cat-harness's needs are declared, and as undetermined while they are not
+    // (a standalone clone, where the test above fails).
+    const verdict = report.undeclaredNeeds.includes("cat-harness") ? "undetermined" : "wrong-direction";
+    expect(report.findings.filter((f) => f.file === "cat-harness/src/planted.ts").map((f) => ({ from: f.fromInstance, to: f.toInstance, verdict: f.verdict }))).toEqual([
+      { from: "cat-harness", to: "cat-harness-tools", verdict },
+    ]);
   });
 });

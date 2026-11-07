@@ -10,11 +10,14 @@ Feature: Subgraph containment and attribution are derived from declared paths
     And the owner is smart-base's methodologies directory
 
   @test:test/coordinator/subgraphs-checkout.test.ts::the_entanglement_report::the_dangling_category_exists_and_is_computed,_not_skipped
-  Scenario: The dangling-link category is computed and empty
+  Scenario: The dangling-link category is computed, and the real corpus is clean
     Given the subgraph scan of the checkout
     When its dangling links are read
     Then they are a list
-    And it is empty
+    Given a throwaway instance declaring a "code" directory "notes/" holding "n.md" with a link "./no-such-file.md" to nothing
+    When the subgraph scan sweeps that instance
+    Then its dangling links are exactly "notes/n.md → ./no-such-file.md"
+    And the real scan's dangling list is empty
 
   @test:test/coordinator/subgraphs-checkout.test.ts::repository-scoped_directories_are_attributed::fsh-guts_is_exempt_because_it_DECLARES_an_unpublished_kind
   Scenario: fsh-guts is exempt, and few directories are

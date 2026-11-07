@@ -28,17 +28,18 @@ const SITE = join(ROOT, siteDirFor(ROOT));
 // rather than rely on another file in this shard having run it first (#411).
 ensureDocsPages(ROOT);
 
-/** Declared subgraph id → the committed document that publishes its contents. */
-const PUBLISHED: ReadonlyArray<{ id: string; file: string }> = [{ id: "todos", file: join(SITE, "todos.jsonld") }];
+/** The one adopting publisher: the `todos` subgraph, published by the document `docs:pages` writes. */
+const TODOS_DOC = join(SITE, "todos.jsonld");
 
 describe("every adopting publisher follows the pattern", () => {
-  for (const { id, file } of PUBLISHED) {
-    // The document is written at publish and gitignored (bean w1gy F18).
-    test.skipIf(siteNotBuilt(`the ${id} document \`docs:pages\` writes at publish (gitignored)`, file))(`${id}: ${file.slice(ROOT.length + 1)}`, () => {
-      const declared = declaredSubgraphNode(ROOT, id);
+  // The document is written at publish and gitignored (bean w1gy F18).
+  test.skipIf(siteNotBuilt("the todos document `docs:pages` writes at publish (gitignored)", TODOS_DOC))(
+    "todos: the published todos.jsonld has no publication finding against the declared todos subgraph",
+    () => {
+      const declared = declaredSubgraphNode(ROOT, "todos");
       expect(declared).toBeDefined();
-      const doc = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
+      const doc = JSON.parse(readFileSync(TODOS_DOC, "utf8")) as Record<string, unknown>;
       expect(subgraphPublicationFindings(doc, { iri: declared!.iri })).toEqual([]);
-    });
-  }
+    },
+  );
 });

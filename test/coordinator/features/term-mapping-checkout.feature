@@ -13,10 +13,13 @@ Feature: Every glossary candidate is mapped to both targets, and an unusable sna
     And the FHIR scope has an unreachable reason exactly when some FHIR row is undetermined
 
   @test:test/coordinator/term-mapping-checkout.test.ts::corpus_—_the_real_glossary,_asserting_scope_rather_than_a_count::the_pin_and_its_snapshot_agree_on_the_version
-  Scenario: A loaded pinned terminology has a version starting with "v" and a digit
+  Scenario: The real pin and its snapshot agree on the version
     Given the pinned terminology of the current directory
+    When it does not load and a reason is returned instead
+    Then the reason is not the "holds … while … pins" version disagreement
     When it loads as a terminology rather than a reason
     Then its version matches "v" followed by a digit
+    And it equals the version the pin record names
 
   @test:test/coordinator/term-mapping-checkout.test.ts::corpus_—_the_real_glossary,_asserting_scope_rather_than_a_count::an_unusable_snapshot_is_a_reason,_not_a_silent_zero::a_well-formed_snapshot_still_loads_—_the_control
   Scenario: A well-formed snapshot loads

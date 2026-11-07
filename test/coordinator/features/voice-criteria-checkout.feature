@@ -1,7 +1,6 @@
 # Specifies voiceOverlayCriteria, shippedVoices and judgesBlocks
 # (pipeline/voice-criteria.ts) and their reach into qaCriteriaFor and
-# qaCriteriaByIdFor, over the voices the checkout ships. The per-criterion
-# tests have computed titles and are not tagged here.
+# qaCriteriaByIdFor, over the voices the checkout ships.
 Feature: Voice-overlay criteria are derived from the shipped voices and reach every consumer
 
   @test:test/coordinator/voice-criteria-checkout.test.ts::the_derivation_reproduces_the_hand-written_criteria::every_voice_this_repository_ships_that_judges_BLOCKS_produces_one_criterion
@@ -10,6 +9,16 @@ Feature: Voice-overlay criteria are derived from the shipped voices and reach ev
     When the voice-overlay criteria are derived
     Then there is one per voice that judges blocks
     And there is at least one
+
+  @test:test/coordinator/voice-criteria-checkout.test.ts::the_derivation_reproduces_the_hand-written_criteria::%s_keeps_its_severity,_domain,_voices,_deps_and_automated_flag
+  Scenario: Each formerly hand-written voice criterion keeps its fields
+    Given a table of criterion ids and severities: voice-overlay-who-editorial major, voice-overlay-who-guideline-development critical, voice-overlay-who-publication-design major, voice-overlay-milnor minor
+    When the derived criterion with the row's id is found
+    Then it exists with the row's default severity
+    And its domain is "voice"
+    And its voices are exactly the id without "voice-overlay-"
+    And it depends on exactly "md"
+    And it is not automated
 
   @test:test/coordinator/voice-criteria-checkout.test.ts::the_derivation_reproduces_the_hand-written_criteria::no_criterion_appeared_that_was_not_registered_before
   Scenario: The four previously hand-written criteria are all derived

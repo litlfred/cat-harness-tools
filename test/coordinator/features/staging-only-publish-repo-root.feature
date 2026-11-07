@@ -25,11 +25,14 @@ Feature: The fsh-guts page is published only to staging, and reports undeclared 
     And nothing is withheld
 
   @test:test/coordinator/staging-only-publish-repo-root.test.ts::composing_honours_the_default,_which_is_the_restrictive_one::the_two_trees_differ_by_exactly_the_withheld_files
-  Scenario: The canonical and staging trees differ in size by the withheld count
+  Scenario: The canonical and staging trees differ by exactly the withheld files
     Given a canonical and a staging compose of the checkout
     When the files each supplied are counted
     Then the staging tree has exactly as many more files as the canonical compose withheld
     And at least one file was withheld
+    When the files each supplied are compared by path
+    Then every file of the canonical tree is in the staging tree
+    And the files only the staging tree has are exactly the files the canonical compose withheld
 
   @test:test/coordinator/staging-only-publish-repo-root.test.ts::the_fsh-guts_page_reports_the_declaration_gap_rather_than_hiding_it::reads_a_non-empty_corpus
   Scenario: The fsh-guts corpus is not empty

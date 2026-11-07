@@ -14,6 +14,7 @@
  */
 import { describe, expect, test } from "bun:test";
 
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -125,6 +126,15 @@ describe("the default asks the WHOLE gate set — bean `i1q7`, item 3", () => {
     // browser. regen never runs `playwright test`, so that boundary is not
     // regen's, and render:bpmn was stale after every merge that changed a
     // process while regen printed it as a footnote.
+    //
+    // regen's default IS the whole set: `all` is false only under `--fast`,
+    // and that flag is what reaches `loadGates`. Read from regen's own source,
+    // since the flag is parsed at module load and running regen is not a unit
+    // test's job.
+    const src = readFileSync(join(import.meta.dir, "..", "..", "scripts", "regen-after-merge.ts"), "utf-8");
+    expect(src).toContain('const fast = process.argv.includes("--fast");');
+    expect(src).toContain("const all = !fast;");
+    expect(src).toContain("const gates = loadGates(repoRoot, { all });");
     const pairs = repairableGates(loadGates(REPO, { all: true }), SCRIPTS);
     expect(pairs.find((p) => p.check === "render:bpmn:check")?.writer).toBe("render:bpmn");
     expect(pairs.find((p) => p.check === "bat:sync:check")?.writer).toBe("bat:sync");

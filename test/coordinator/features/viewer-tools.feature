@@ -21,6 +21,14 @@ Feature: Viewer Tools and declared visualisers agree on what is rendered
     When the rendered kinds are compared with the declared ones
     Then each is declared, or is archimate, business-processes, user-scenario, workshop or device-screen
 
+  @test:test/coordinator/viewer-tools.test.ts::viewer_Tools_declare_what_they_render::a_kind_arriving_in_this_index_is_still_rendered,_and_declared_by_no_instance_but_the_one_it_arrives_in
+  Scenario: A kind arriving in this index is still rendered, and declared only by the instance it arrives in
+    Given the kinds listed as arriving, each with the instance it arrives in: business-processes in smart-trust-phw
+    When each is checked
+    Then it is not also listed as held outside
+    And some Tool still renders it
+    And no instance but the one it arrives in declares a directory of that kind
+
   @test:test/coordinator/viewer-tools.test.ts::viewer_Tools_declare_what_they_render::every_kind_listed_as_held_outside_is_still_rendered_here_and_still_not_held_here
   Scenario: Every kind listed as held outside is still rendered and still not declared here
     Given the kinds listed as held outside

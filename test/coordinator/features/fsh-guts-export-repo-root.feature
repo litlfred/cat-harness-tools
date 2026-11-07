@@ -4,12 +4,14 @@
 Feature: The fsh-guts export reads the declared trashcan and keeps every summary
 
   @test:test/coordinator/fsh-guts-export-repo-root.test.ts::the_real_corpus::every_committed_node_is_in_the_document
-  Scenario: The export of the real trashcan is non-empty and self-consistent
+  Scenario: Every committed node of the real trashcan is in the export
     Given the checkout
     When the fsh-guts export is built
     Then its node count is more than zero
     And its @graph has exactly that many nodes
     And it scans "fsh-guts"
+    And at least one file git tracks in a scanned directory, outside a frozen subtree, is a markdown or JSON node
+    And every such file has a node in the @graph whose sourcePath is its path
 
   @test:test/coordinator/fsh-guts-export-repo-root.test.ts::the_real_corpus::the_directory_is_resolved_from_the_declaration,_not_spelled
   Scenario: The trashcan directory is resolved from the declaration
