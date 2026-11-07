@@ -79,6 +79,7 @@ describe("the standalone fixture copies the real nodes", () => {
   test("the monorepo never scans the fixture", () => {
     // The preload sets the variable only when the checkout holds no
     // vocabulary; here it does, so a test passing here passed on real nodes.
+    // input-site: env FOLIO_FIXTURE_CHECKOUT #f3cdefab — the test asserts this variable is unset
     if (sourcesPresent) expect(process.env.FOLIO_FIXTURE_CHECKOUT).toBeUndefined();
   });
 });

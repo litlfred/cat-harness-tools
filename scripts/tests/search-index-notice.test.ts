@@ -53,6 +53,7 @@ const HEAD = readFileSync(join(HARNESS_ROOT, siteFileFor(HARNESS_ROOT, "_include
 function noticeFn(): (state: string) => string | null {
   const m = /function searchIndexNotice\(state\) \{[\s\S]*?\n  \}/.exec(JS);
   if (!m) throw new Error("searchIndexNotice not found in docs-ui.js");
+  // input-site: inert #a63ac241 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
   return new Function(`${m[0]}; return searchIndexNotice;`)() as (s: string) => string | null;
 }
 

@@ -29,7 +29,9 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
         `10 openat(AT_FDCWD</work/repo>, "data/a.json", O_RDONLY|O_CLOEXEC) = 3</work/repo/data/a.json>`,
         `10 openat(AT_FDCWD</work/repo>, "/work/repo/data", O_RDONLY|O_CLOEXEC|O_DIRECTORY) = 4</work/repo/data>`,
         `10 newfstatat(AT_FDCWD</work/repo>, "data/maybe.json", 0x7ffc, 0) = -1 ENOENT (No such file or directory)`,
+        // input-site: inert #e77e8245 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
         `10 openat(AT_FDCWD</work/repo>, "/usr/lib/libc.so.6", O_RDONLY|O_CLOEXEC) = 3</usr/lib/libc.so.6>`,
+        // input-site: inert #55d97b93 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
         `10 openat(AT_FDCWD</work/repo>, "/tmp/scratch", O_WRONLY|O_CREAT, 0644) = 5</tmp/scratch>`,
       ].join("\n"),
     );
@@ -87,6 +89,7 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
     const r = read(
       [
         `20 getcwd("/work/repo", 4096) = 11`,
+        // input-site: inert #b95de63a — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
         `20 execve("/usr/bin/git", ["git", "rev-parse", "--show-toplevel"], 0x1 /* 3 vars */) = 0`,
         `20 openat(AT_FDCWD</work/repo>, ".git/HEAD", O_RDONLY) = 3</work/repo/.git/HEAD>`,
         `10 openat(AT_FDCWD</work/repo>, ".git/config", O_RDONLY) = 3</work/repo/.git/config>`,
@@ -124,6 +127,7 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
   });
 
   test("a git command that cannot be replayed makes the whole read set undetermined", () => {
+    // input-site: inert #16b4582f — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     const r = read([`20 getcwd("/work/repo", 4096) = 11`, `20 execve("/usr/bin/git", ["git", "fetch", "origin"], 0x1 /* 3 vars */) = 0`].join("\n"));
     expect("undetermined" in r && r.undetermined).toContain("git fetch");
   });
@@ -131,60 +135,86 @@ describe("parseTrace — what a traced run read, or why that cannot be enumerate
   test("git in a directory the run created is its own scratch repository: kept as an ordinary process", () => {
     const r = read(
       [
+        // input-site: inert #e7c547d5 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
         `10 mkdir("/tmp/probe-ab12", 0700) = 0`,
+        // input-site: inert #edad0e52 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
         `20 getcwd("/tmp/probe-ab12", 4096) = 16`,
+        // input-site: inert #a2b8ef9b — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
         `20 execve("/usr/bin/git", ["git", "commit", "-qm", "x"], 0x1 /* 3 vars */) = 0`,
         `20 openat(AT_FDCWD</tmp/probe-ab12>, ".git/index", O_RDONLY|O_CLOEXEC) = 3</tmp/probe-ab12/.git/index>`,
         // Its reads of the checkout's .git are kept: no replay answers them.
         `20 openat(AT_FDCWD</tmp/probe-ab12>, "/work/repo/.git/HEAD", O_RDONLY|O_CLOEXEC) = 4</work/repo/.git/HEAD>`,
       ].join("\n"),
     );
+    // input-site: inert #bc3a4664 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(r).toEqual({ paths: [".git/HEAD"], git: [], children: ["/usr/bin/git"] });
   });
 
   test("the programs a child exec'd are named; the command's own exec is not", () => {
     const r = read(
       [
+        // input-site: inert #32d89b5b — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
         `10 execve("/usr/bin/bun", ["bun", "test"], 0x1 /* 3 vars */) = 0`,
+        // input-site: inert #628ea74f — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
         `20 execve("/usr/bin/bun", ["bun", "x.ts"], 0x1 /* 3 vars */) = 0`,
+        // input-site: inert #2ddf12b8 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
         `21 execve("/usr/bin/nope", ["nope"], 0x1 /* 3 vars */) = -1 ENOENT (No such file or directory)`,
       ].join("\n"),
     );
+    // input-site: inert #9b8e89e4 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(r).toEqual({ paths: [], git: [], children: ["/usr/bin/bun"] });
   });
 
   test("a child that ran inline code is named; installed package files it read are kept outside the read set", () => {
     const r = read(
       [
+        // input-site: inert #32d89b5b — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
         `10 execve("/usr/bin/bun", ["bun", "test"], 0x1 /* 3 vars */) = 0`,
+        // input-site: inert #91185dbc — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
         `20 execve("/usr/bin/python3", ["python3", "-c", "import x"], 0x1 /* 3 vars */) = 0`,
+        // input-site: inert #99c9e692 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
         `20 openat(AT_FDCWD</work/repo>, "/usr/lib/python3/dist-packages/x/__init__.py", O_RDONLY|O_CLOEXEC) = 3</usr/lib/python3/dist-packages/x/__init__.py>`,
+        // input-site: inert #983aebab — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
         `20 openat(AT_FDCWD</work/repo>, "/usr/lib/python3/dist-packages/y.py", O_RDONLY|O_CLOEXEC) = -1 ENOENT (No such file or directory)`,
       ].join("\n"),
     );
     expect(r).toEqual({
       paths: [],
       git: [],
+      // input-site: inert #de00af49 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
       children: ["/usr/bin/python3"],
+      // input-site: inert #950f806e — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
       inline: [{ program: "/usr/bin/python3", code: "import x" }],
+      // input-site: inert #8a23f93d — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
       external: ["/usr/lib/python3/dist-packages/x/__init__.py"],
     });
   });
 
   test("inlineCodeOf: python -c and bun -e give their code; a script on stdin is null; a file or -m is none", () => {
+    // input-site: inert #3afd3461 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(inlineCodeOf("/usr/bin/python3", ["python3", "-c", "x", "arg"])).toBe("x");
+    // input-site: inert #62880d23 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(inlineCodeOf("/usr/bin/python3", ["python3", "-Bc", "y"])).toBe("y");
+    // input-site: inert #d46b5793 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(inlineCodeOf("/usr/bin/python3", ["python3"])).toBeNull();
+    // input-site: inert #b6e29a60 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(inlineCodeOf("/usr/bin/python3", ["python3", "-u", "-"])).toBeNull();
+    // input-site: inert #a6417898 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(inlineCodeOf("/usr/bin/python3", ["python3", "-W", "ignore", "s.py"])).toBeUndefined();
+    // input-site: inert #fff14ef0 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(inlineCodeOf("/usr/bin/python3.12", ["python3.12", "-m", "json.tool"])).toBeUndefined();
+    // input-site: inert #ad63b965 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(inlineCodeOf("/usr/bin/bun", ["bun", "-e", "1"])).toBe("1");
+    // input-site: inert #3d2ca746 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(inlineCodeOf("/usr/bin/bun", ["bun", "x.ts"])).toBeUndefined();
+    // input-site: inert #336c2cb6 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     expect(inlineCodeOf("/usr/bin/git", ["git", "-c", "a=b", "log"])).toBeUndefined();
   });
 
   test("git outside the checkout in a directory the run did not create is still undetermined", () => {
+    // input-site: inert #2aba9449 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
     for (const mk of [`10 mkdir("/tmp/other", 0700) = 0`, `10 mkdir("/tmp/probe-ab12", 0700) = -1 EEXIST (File exists)`]) {
+      // input-site: inert #bafa198e — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
       const r = read([mk, `20 getcwd("/tmp/probe-ab12", 4096) = 16`, `20 execve("/usr/bin/git", ["git", "status"], 0x1 /* 3 vars */) = 0`].join("\n"));
       expect("undetermined" in r && r.undetermined).toContain("ran outside the checkout");
     }

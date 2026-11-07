@@ -10,6 +10,7 @@
 import { test, expect, describe } from "bun:test";
 import { parseLeanDecls, parentName } from "../check-mirror-drift.ts";
 
+// input-site: inert #bffb1353 — an absolute path used as test data (a fixture string, a trace line, a path a guard must refuse); the test never reads it
 const F = "/tmp/x.lean";
 
 describe("parseLeanDecls", () => {

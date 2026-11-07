@@ -157,6 +157,7 @@ describe("the theme's markup passes leave <script> and <style> alone", () => {
   const scripts = (html: string) =>
     [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map((m) => {
       try {
+        // input-site: inert #ec7c3244 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
         new Function(m[1]);
         return { body: m[1], parses: true };
       } catch {

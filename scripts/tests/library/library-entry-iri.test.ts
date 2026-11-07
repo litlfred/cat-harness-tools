@@ -58,6 +58,7 @@ const readIndex = (): LibraryIndex =>
   NOT_BUILT ? ({ entries: [] } as unknown as LibraryIndex) : LibraryIndexSchema.parse(JSON.parse(readFileSync(INDEX, "utf-8")));
 
 /** The shipped source, evaluated — what is tested is what the page runs. */
+// input-site: inert #e164e46d — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
 const { entryFromPath, legacyKey } = new Function(`${ADDRESS_JS}\nreturn { entryFromPath, legacyKey };`)() as {
   entryFromPath: (p: string, root: string) => { instance: string; id: string } | null;
   legacyKey: (h: string) => string;
@@ -110,6 +111,7 @@ describe("a row's TITLE opens the entry's own page (owner, 2026-10-02)", () => {
   // The shipped script, run against stubs: the projection fetch never
   // resolves, so only the module-level definitions run and COLS is returned.
   const pageUrl = "https://example.test/folio-assistant/cat-harness/library/smart-base/";
+  // input-site: inert #c17f51b2 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
   const run = new Function(
     "document",
     "location",

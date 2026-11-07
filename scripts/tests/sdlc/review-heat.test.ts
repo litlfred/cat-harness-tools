@@ -112,6 +112,7 @@ describe("computeHeat", () => {
   });
 
   test("is self-contained, so the page can embed exactly this function", () => {
+    // input-site: inert #5a952969 — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
     const embedded = new Function(`return (${computeHeat.toString()})`)() as typeof computeHeat;
     expect(embedded({ changes, blocks, comments: [] })).toEqual(computeHeat({ changes, blocks, comments: [] }));
   });

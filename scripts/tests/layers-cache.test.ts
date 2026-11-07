@@ -22,6 +22,7 @@ import { digestOf, LAYERS_MAIN_REF, layersKey, layersRef, layersSummaryLine, pub
 
 const ENV = { GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
 function git(cwd: string, ...args: string[]): string {
+  // input-site: tree #a0997295 — git in the test's own scratch repository, with the environment handed whole plus a fixed identity: git's answer, which the cone replays or records
   const r = spawnSync("git", args, { cwd, encoding: "utf-8", env: { ...process.env, ...ENV } });
   if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
   return r.stdout.trim();
@@ -39,6 +40,7 @@ let prior: Record<string, string | undefined>;
 
 /** A layer repository at `<base>/o/<name>` with a declaration and one `scripts/` directory. */
 function layer(name: string, body: string): { sha: string; inst: (sha?: string) => LockInstance } {
+  // input-site: inert #4481d431 — a unique scratch name or throwaway token; no assertion depends on its value
   const work = join(base, `${name}-work-${Math.random().toString(36).slice(2)}`);
   mkdirSync(work, { recursive: true });
   git(work, "init", "-q", "-b", "main");
@@ -72,6 +74,7 @@ function layer(name: string, body: string): { sha: string; inst: (sha?: string) 
 
 /** A fixture index: a bare `origin`, and a working clone whose committed lock pins `instances`. */
 function index(instances: LockInstance[]): { origin: string; work: string } {
+  // input-site: inert #37120c16 — a unique scratch name or throwaway token; no assertion depends on its value
   const id = Math.random().toString(36).slice(2);
   const origin = join(base, `index-${id}.git`);
   git(base, "init", "-q", "--bare", "-b", "main", origin);
@@ -84,6 +87,7 @@ function index(instances: LockInstance[]): { origin: string; work: string } {
   return { origin, work };
 }
 function freshClone(origin: string): string {
+  // input-site: inert #94964ff0 — a unique scratch name or throwaway token; no assertion depends on its value
   const dir = join(base, `clone-${Math.random().toString(36).slice(2)}`);
   git(base, "clone", "-q", origin, dir);
   return dir;
@@ -106,6 +110,7 @@ let b: ReturnType<typeof layer>;
 
 beforeAll(() => {
   base = mkdtempSync(join(tmpdir(), "layers-cache-"));
+  // input-site: inert #a7739ef9 — saves the environment to restore it after the test, or strips names before handing it to a child; no assertion reads the values
   prior = { CAT_MOUNT_URL_PREFIX: process.env.CAT_MOUNT_URL_PREFIX, CAT_LAYERS_URL: process.env.CAT_LAYERS_URL, CAT_LAYERS_CACHE: process.env.CAT_LAYERS_CACHE, CAT_MOUNT_CACHE_DIR: process.env.CAT_MOUNT_CACHE_DIR };
   process.env.CAT_MOUNT_URL_PREFIX = `file://${base}`;
   delete process.env.CAT_LAYERS_URL;

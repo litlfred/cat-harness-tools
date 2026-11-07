@@ -18,6 +18,7 @@ import { dirname, join } from "node:path";
 import { digestOf, priorPins, run } from "../mount-from-lock.ts";
 
 function git(cwd: string, ...args: string[]): string {
+  // input-site: tree #7150efbd — git in the test's own scratch repository, with the environment handed whole plus a fixed identity: git's answer, which the cone replays or records
   const r = spawnSync("git", args, { cwd, encoding: "utf-8", env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" } });
   if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
   return r.stdout.trim();

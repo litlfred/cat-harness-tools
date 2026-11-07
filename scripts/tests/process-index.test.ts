@@ -42,6 +42,7 @@ type Api = {
 /** The shipped script, evaluated with no document — so it exposes its pure half and mounts nothing. */
 function viewerApi(): Api {
   const win: { faProcessIndex?: Api } = {};
+  // input-site: inert #1c70f39d — evaluates browser-side or toString'd source from this tree's own modules, already in the read set; it reads no environment
   new Function("window", "document", VIEWER)(win, undefined);
   return win.faProcessIndex!;
 }
