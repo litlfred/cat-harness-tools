@@ -83,6 +83,15 @@ describe("refreshOwnHealth", () => {
 });
 
 describe("afterMountHealth", () => {
+  test("a declaration the registry cannot read is reported, never thrown (2026-11-07, l1-extraction)", () => {
+    const { run, calls } = recorder();
+    const lines = afterMountHealth("/x", lock("a".repeat(40)), lock("c".repeat(40)), run, () => {
+      throw new Error('declares unknown graph typology "l1-extraction"');
+    });
+    expect(lines!.join("\n")).toContain("could not be determined");
+    expect(lines!.join("\n")).toContain("l1-extraction");
+    expect(calls).toEqual([]);
+  });
   test("nothing runs when the checker did not move", () => {
     const { run, calls } = recorder();
     expect(afterMountHealth("/x", lock("a".repeat(40)), lock("a".repeat(40)), run)).toBeUndefined();
