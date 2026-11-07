@@ -1737,6 +1737,18 @@ export const HarnessVisualiserSchema = TileSchema.extend({
   subgraphUnder: z.record(z.string().min(1), z.string().regex(/^[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*$/, "a /-separated path of URL segments")).optional(),
   /** Opt-in `<base>/<alias>/` redirect to the canonical route (bean `t4xb`). */
   alias: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "a URL segment").optional(),
+  /**
+   * Its pages are built at publish on the HOST site (the site owner's, e.g.
+   * cat-harness's), at `<site>/<locale>/<harness>/<id>/`, so the publish plan
+   * derives those routes from this entry and the host lists none of them
+   * (bean folio-assistant-uldr, owner option "1", 2026-11-06). `translated`:
+   * it also writes one route per locale the checkout's translation sources
+   * hold, besides the page locale. The writer is the `renderedBy` Tool's
+   * `invoke.shell` script, and it marks each route it writes with a
+   * self-ignoring `.gitignore` (`*`), which keeps the route out of git and out
+   * of the mount digest.
+   */
+  builtOnHostSite: z.object({ translated: z.literal(true).optional() }).strict().optional(),
 }).refine((v) => v.covers !== undefined || v.coversKinds !== undefined, {
   message: "a visualiser covers something: declare `covers` (directory ids) or `coversKinds` (graph typologies)",
 });

@@ -14,7 +14,7 @@
  * `ho66`): standing alone, cat-harness has no such root to read.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -38,6 +38,7 @@ import {
   droppedEntryReport,
   droppedTargetNodesReport,
   entriesPastBudget,
+  isMountedInstance,
   ROOT,
   lowestPriorityFirst,
   memoryDirsFor,
@@ -49,6 +50,7 @@ import {
   renderAntigravityRule,
   renderAntigravitySkillWithBudget,
   repoWideMemory,
+  runAgentMemory,
   slugify,
   spliceAgentsMdRegion,
   spliceRegion,
@@ -610,5 +612,108 @@ describe("Repo-wide AGENTS.md section and per-target budgets (bean 31ni)", () =>
     expect(rebaseAgentsMdLinks("See [`x`](../skills/ui/ui-core/render-logging.md).", ROOT)).toBe(
       "See [`x`](skills/ui/ui-core/render-logging.md).",
     );
+  });
+
+  test("mounted layers are never written into; stale committed memory surfaces are reported naming the layer (bean bx4c)", async () => {
+    const indexRoot = mkdtempSync(join(tmpdir(), "memory-mounted-"));
+    try {
+      const mountedDir = join(indexRoot, "mounted-layer");
+      mkdirSync(join(mountedDir, "memory"), { recursive: true });
+      mkdirSync(join(mountedDir, ".claude", "agents"), { recursive: true });
+      mkdirSync(join(mountedDir, ".claude", "agent-memory", "watcher"), { recursive: true });
+      mkdirSync(join(mountedDir, ".agents", "rules"), { recursive: true });
+
+      writeFileSync(
+        join(mountedDir, "mounted-layer.json"),
+        JSON.stringify({
+          $schema: "cat-harness-declaration/1.0.0",
+          name: "mounted-layer",
+          directories: [{ id: "memory", path: "memory", graphTypologies: ["memory"] }],
+        }),
+      );
+      writeFileSync(
+        join(mountedDir, "memory", "lesson-one.md"),
+        [
+          "---",
+          `$schema: ${MEMORY_SCHEMA_TAG}`,
+          "id: lesson-one",
+          "label: stable",
+          'summary: "mounted lesson summary"',
+          "createdAt: 2026-11-05",
+          "references:",
+          "  agents:",
+          "    - watcher",
+          "---",
+          "mounted lesson body",
+          "",
+        ].join("\n"),
+      );
+      writeFileSync(
+        join(mountedDir, ".claude", "agents", "watcher.md"),
+        "---\nname: watcher\ndescription: Watches.\n---\n\nPrompt body.\n",
+      );
+      const staleMemoryMd = `# watcher — memory\n\n${BEGIN}\n## STABLE — outdated summary\nold body\n${END}\n`;
+      const mountedMemoryPath = join(mountedDir, ".claude", "agent-memory", "watcher", "MEMORY.md");
+      writeFileSync(mountedMemoryPath, staleMemoryMd);
+      const staleRuleMd = `# Agent Memory\n\n${BEGIN}\noutdated rule\n${END}\n`;
+      const mountedRulePath = join(mountedDir, ".agents", "rules", "agent-memory.md");
+      writeFileSync(mountedRulePath, staleRuleMd);
+
+      writeFileSync(
+        join(indexRoot, "index.config.json"),
+        JSON.stringify({
+          $schema: "folio-index-config/v1",
+          instances: [
+            {
+              name: "mounted-layer",
+              source: { remote: { repository: "o/mounted-layer", ref: "b".repeat(40) } },
+            },
+          ],
+        }),
+      );
+      writeFileSync(
+        join(indexRoot, "index.lock.json"),
+        JSON.stringify({
+          $schema: "cat-harness-mount-lock/v1",
+          mounts: [{ harness: "mounted-layer", repository: "o/mounted-layer", ref: "b".repeat(40) }],
+          instances: [
+            {
+              instance: "mounted-layer",
+              repository: "o/mounted-layer",
+              sha: "b".repeat(40),
+              upstreamRoot: "",
+              path: "mounted-layer",
+              via: "mounted-layer",
+              pinnedBy: "declared",
+              declaration: { file: "mounted-layer.json", sha256: "0".repeat(64) },
+              directories: [{ id: "*", path: "mounted-layer", upstreamPath: ".", treeDigest: "0".repeat(64), files: 5 }],
+              trust: { basis: "consent", by: "test", on: "2026-11-05", ref: "b".repeat(40), approver: "declared" },
+            },
+          ],
+        }),
+      );
+
+      expect(isMountedInstance(mountedDir, indexRoot)).toBe(true);
+      expect(isMountedInstance(indexRoot, indexRoot)).toBe(false);
+
+      const r = await runAgentMemory({ baseRoot: indexRoot, check: false });
+      // The index's own surface is rendered at the root.
+      expect(existsSync(join(indexRoot, ".agents", "rules", "agent-memory.md"))).toBe(true);
+      expect(readFileSync(join(indexRoot, ".agents", "rules", "agent-memory.md"), "utf8")).toContain(
+        "mounted lesson summary",
+      );
+      // Nothing inside the mounted instance is rewritten or created.
+      expect(readFileSync(mountedMemoryPath, "utf8")).toBe(staleMemoryMd);
+      expect(readFileSync(mountedRulePath, "utf8")).toBe(staleRuleMd);
+      expect(existsSync(join(mountedDir, ".agents", "skills"))).toBe(false);
+      expect(existsSync(join(mountedDir, ".gemini"))).toBe(false);
+      // The stale committed surface in the mounted layer is reported, naming the layer.
+      expect(r.ok).toBe(false);
+      expect(r.mountedStale).toBeGreaterThan(0);
+      expect(r.mountedFindings.length).toBeGreaterThan(0);
+      expect(r.mountedFindings.every((f) => f.includes("mounted-layer") && f.includes("not rewritten"))).toBe(true);
+    } finally {
+      rmSync(indexRoot, { recursive: true, force: true });
+    }
   });
 });

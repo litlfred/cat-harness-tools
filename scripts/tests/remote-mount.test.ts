@@ -23,7 +23,7 @@ import { declarationChain } from "../../schemas/kg/harness-config.ts";
 import { instanceRootsIn } from "../../schemas/kg/instance-roots.ts";
 import { RemoteSourceSchema, resolveSubgraphSource } from "../../schemas/kg/subgraph-source.ts";
 import { MountLockSchema, mountedInstanceRoots } from "../../schemas/kg/remote-mount.ts";
-import { AGENT_SURFACE_GENERATORS, checkRemote, editedOnlyPerLock, exitCode, mountRemote, planRemote, remoteFanOut, summarise } from "../remote-mount.ts";
+import { AGENT_SURFACE_GENERATORS, checkRemote, editedOnlyPerLock, exitCode, mountRemote, planRemote, regenerateAgentSurface, remoteFanOut, summarise } from "../remote-mount.ts";
 import { IGNORE_BLOCK_BEGIN, IGNORE_BLOCK_END, INDEX_CONFIG_SCHEMA, readDeclaredMounts } from "../../schemas/kg/index-config.ts";
 import { run as replayLocks } from "../mount-from-lock.ts";
 import { gitCorpus } from "../../schemas/sdlc/git-corpus.ts";
@@ -826,6 +826,99 @@ describe("a changed lock re-renders the agent surface", () => {
   // spawn of a missing file — a failure at re-pin time rather than here.
   test("every agent-surface generator exists beside remote-mount.ts", () => {
     for (const g of AGENT_SURFACE_GENERATORS) expect(existsSync(join(import.meta.dir, "..", g)), g).toBe(true);
+  });
+
+  test("mount:remote + regenerateAgentSurface writes nothing under a mounted instance and reports stale committed surfaces naming the layer (bean bx4c)", () => {
+    const staleCmd = [
+      "---",
+      'description: "outdated description"',
+      'argument-hint: "[what to run it on]"',
+      "generated: cat-harness-tools/scripts/gen-skill-commands.ts",
+      "---",
+      "",
+      "# /hello",
+      "",
+      "stale command body",
+      "",
+    ].join("\n");
+    const staleMem = [
+      "# watcher — memory",
+      "",
+      "<!-- folio:memory:begin -->",
+      "## STABLE — outdated lesson",
+      "old lesson body",
+      "<!-- folio:memory:end -->",
+      "",
+    ].join("\n");
+    const surf = bareRepo(base, "surf", {
+      "surf.json": decl("surf", {
+        mountDefaults: { whole: true },
+        directories: [
+          { id: "skills", path: "skills/", graphTypologies: ["skills"] },
+          { id: "memory", path: "memory/", graphTypologies: ["memory"] },
+        ],
+      }),
+      // declared-path-literal: fixture keys of the bare repository this test builds under its temp base
+      "skills/pkg/hello.md": "---\nname: hello\ndescription: The hello skill.\nuser_invocable: true\n---\n\n# hello\n",
+      "memory/lesson.md": [
+        "---",
+        "$schema: folio-memory/v1",
+        "id: lesson",
+        "label: stable",
+        'summary: "fresh mounted lesson"',
+        "createdAt: 2026-11-05",
+        "references:",
+        "  agents:",
+        "    - watcher",
+        "---",
+        "fresh mounted lesson body",
+        "",
+      ].join("\n"),
+      ".claude/commands/hello.md": staleCmd,
+      ".claude/agents/watcher.md": "---\nname: watcher\ndescription: Watches.\n---\n\nWatcher prompt.\n",
+      ".claude/agent-memory/watcher/MEMORY.md": staleMem,
+    });
+    const surfUrl = (r: string) => (r === "o/surf" ? `file://${surf.bare}` : urlFor(r));
+    const root = join(base, `surf-index-${++n}`);
+    mkdirSync(root, { recursive: true });
+    git(root, "init", "-q", "-b", "main");
+    write(root, {
+      "index.config.json": {
+        $schema: INDEX_CONFIG_SCHEMA,
+        mountApprovers: ["test"],
+        instances: [
+          {
+            name: "surf",
+            source: {
+              remote: {
+                repository: "o/surf",
+                ref: surf.sha,
+                ...consentFor(surf.sha),
+                overrides: { surf: { whole: true } },
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    const m = mountRemote({ instanceRoot: root, urlFor: surfUrl, install: false });
+    expect(m.plan.outcomes.find((o) => o.instance === "surf")!.state).toBe("mounted");
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+
+    const surface = regenerateAgentSurface(root);
+    // 1. The index's own surface is rendered at the index root.
+    expect(existsSync(join(root, ".claude/commands/hello.md"))).toBe(true);
+    expect(existsSync(join(root, ".agents/rules/agent-memory.md"))).toBe(true);
+    expect(readFileSync(join(root, ".agents/rules/agent-memory.md"), "utf-8")).toContain("fresh mounted lesson");
+    // 2. Nothing under the mounted instance's directory was written: lock digests still match.
+    expect(readFileSync(join(root, "surf/.claude/commands/hello.md"), "utf-8")).toBe(staleCmd);
+    expect(readFileSync(join(root, "surf/.claude/agent-memory/watcher/MEMORY.md"), "utf-8")).toBe(staleMem);
+    expect(checkRemote({ instanceRoot: root }).state).toBe("mounted");
+    expect(replayLocks(root, true).outcomes.map((o) => o.state)).toEqual(["current"]);
+    // 3. The stale committed surface in the mounted layer is reported, naming the layer `surf`.
+    expect(surface.ok).toBe(false);
+    expect(surface.lines.every((l) => l.includes("surf") && l.includes("not rewritten"))).toBe(true);
   });
 });
 

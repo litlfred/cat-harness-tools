@@ -11,17 +11,17 @@
  *
  * ## How injection works
  *
- * The injector uses the **same state machine** as `pot-extract.ts`
- * (which mirrors `extract_translations.extract_markdown`) to identify
- * every translatable text span in the source markdown. For each span,
+ * The injector takes its spans from `segmentMarkdown` in `pot-extract.ts`
+ * (which mirrors `extract_translations.extract_markdown`) — the same call
+ * `extractMarkdown` writes the catalogue from, not a copy of its rules. For each span,
  * it looks up the `msgid` (after cleaning) in the PO translations
  * dictionary and substitutes the `msgstr`.
  *
  * Key design choices (from upstream):
  *
- * - **Paragraph re-wrapping:** When a multi-line paragraph is translated,
- *   the first line is replaced with the full translated text and
- *   continuation lines are blanked. Markdown renderers treat consecutive
+ * - **Re-wrapping:** When a multi-line paragraph, list item or blockquote
+ *   is translated, the first line keeps its marker and indentation and
+ *   takes the full translated text; continuation lines are removed. Markdown renderers treat consecutive
  *   non-blank lines as one paragraph, so this is functionally equivalent.
  *
  * - **Liquid variable restoration:** `{lqd_expr}` in the translated text
@@ -38,17 +38,7 @@ import {
   cleanMarkdownWithTokens,
   type CleanedMarkdown,
   isTranslatable,
-  MD_BLOCKQUOTE_RE,
-  MD_CODE_FENCE_RE,
-  MD_FRONT_MATTER_DELIM,
-  MD_HEADING_RE,
-  MD_HLINE_RE,
-  MD_HTML_CLOSE_TAG_RE,
-  MD_HTML_SKIP_OPEN_RE,
-  MD_KRAMDOWN_ATTR_RE,
-  MD_LIST_ITEM_RE,
-  MD_MATH_ENV_OPEN_RE,
-  MD_TABLE_SEP_RE,
+  segmentMarkdown,
   splitTableCells,
 } from "./pot-extract";
 
@@ -304,9 +294,10 @@ export interface InjectionResult {
 /**
  * Inject translations into a Markdown file.
  *
- * Uses the same state machine as `extractMarkdown()` to identify
- * every translatable text span, looks up the translation via the
- * cleaned msgid, restores Liquid `{{ }}` syntax in the translated
+ * Takes its units from `segmentMarkdown()`, the segmentation `extractMarkdown()`
+ * writes the catalogue from, so a wrapped paragraph, list item or blockquote is
+ * looked up as the one joined `msgid` it was extracted as. For each, it looks
+ * up the translation via the cleaned msgid, restores Liquid `{{ }}` syntax in the translated
  * string, and writes it back into the source lines.
  *
  * Mirrors upstream `inject_markdown()` in `inject_translations.py`
@@ -319,7 +310,7 @@ export function injectMarkdown(
   const lines = sourceMd.split("\n");
   const outLines = [...lines];
   /**
-   * Indices {@link flushParagraph} collapsed away — **not** lines that are empty.
+   * Indices a multi-line span's substitution collapsed away — **not** lines that are empty.
    *
    * This used to be expressed by setting the line to `""` and ending the function
    * with `outLines.filter((line) => line !== "")`, under a comment reading
@@ -346,14 +337,6 @@ export function injectMarkdown(
   let totalSpans = 0;
   let translatedSpans = 0;
   let untranslatedSpans = 0;
-
-  let inFrontMatter = false;
-  let inCodeBlock = false;
-  let codeFence: string | null = null;
-  let inHtmlBlock = false;
-  let htmlCloseTag = "";
-  let inMathBlock: string | null = null;
-  const paragraphBuf: Array<{ idx: number; text: string }> = [];
 
   /** Look up translation for raw text, return placeholder-restored result or null. */
   const translate = (rawText: string): string | null => {
@@ -389,213 +372,42 @@ export function injectMarkdown(
     return null;
   };
 
-  const flushParagraph = () => {
-    if (paragraphBuf.length === 0) return;
-    const raw = paragraphBuf.map((p) => p.text).join(" ");
-    const translated = translate(raw);
-    if (translated) {
-      // Replace first line with full translated text, blank continuation lines
-      outLines[paragraphBuf[0].idx] = translated;
-      for (let i = 1; i < paragraphBuf.length; i++) {
-        collapsed.add(paragraphBuf[i].idx);
-      }
-      changed = true;
-    }
-    paragraphBuf.length = 0;
-  };
-
-  for (let idx = 0; idx < lines.length; idx++) {
-    const line = lines[idx];
-    const lineno = idx + 1;
-    const stripped = line.trim();
-
-    // --- YAML front matter ---
-    if (lineno === 1 && MD_FRONT_MATTER_DELIM.test(line)) {
-      inFrontMatter = true;
+  // The units are the extractor's own (`segmentMarkdown`), so what is looked up
+  // here is by construction what `extractMarkdown` wrote into the catalogue. A
+  // second state machine here is how a wrapped list item came to be looked up
+  // one line at a time — see `MarkdownSpan`.
+  /** Translated cells of each table row, by line index and cell position. */
+  const rowCells = new Map<number, Map<number, string>>();
+  for (const span of segmentMarkdown(sourceMd)) {
+    const translated = translate(span.raw);
+    if (!translated) continue;
+    const [first, ...rest] = span.lines;
+    if (span.kind === "table-cell") {
+      const cells = rowCells.get(first.idx) ?? new Map<number, string>();
+      cells.set(span.cell!, translated);
+      rowCells.set(first.idx, cells);
       continue;
     }
-    if (inFrontMatter) {
-      if (MD_FRONT_MATTER_DELIM.test(line) && lineno > 1) {
-        inFrontMatter = false;
-      }
-      continue;
-    }
-
-    // --- Fenced code blocks ---
-    // `stripped`, not `line` — mirroring `extractMarkdown`, so both halves of the
-    // round trip recognise an indented fence.
-    //
-    // Two things measured before changing it, because the obvious story was wrong.
-    // The old column-0 anchor did NOT let a translation through into an indented
-    // fence: nothing is substituted there, for a command or for ordinary prose, so
-    // something else already protects this. And the change is behaviour-neutral —
-    // every one of this instance's 16 real (catalogue, source) pairs injects
-    // BYTE-IDENTICALLY either way. It is here so the two halves cannot disagree
-    // about where the code is, not because a corruption was observed. Bean `ig4a`.
-    const fenceMatch = stripped.match(MD_CODE_FENCE_RE);
-    if (fenceMatch) {
-      if (!inCodeBlock) {
-        flushParagraph();
-        inCodeBlock = true;
-        codeFence = fenceMatch[1];
-      } else if (codeFence && stripped.startsWith(codeFence[0].repeat(codeFence.length))) {
-        inCodeBlock = false;
-        codeFence = null;
-      }
-      continue;
-    }
-    if (inCodeBlock) continue;
-
-    // --- HTML blocks ---
-    if (inHtmlBlock) {
-      const closeMatch = stripped.match(MD_HTML_CLOSE_TAG_RE);
-      if (closeMatch && closeMatch[1].toLowerCase() === htmlCloseTag) {
-        inHtmlBlock = false;
-        htmlCloseTag = "";
-      }
-      continue;
-    }
-    const openMatch = stripped.match(MD_HTML_SKIP_OPEN_RE);
-    if (openMatch) {
-      const tagName = openMatch[1].toLowerCase();
-      flushParagraph();
-      const closeMatch = stripped.match(MD_HTML_CLOSE_TAG_RE);
-      if (closeMatch && closeMatch[1].toLowerCase() === tagName) continue;
-      inHtmlBlock = true;
-      htmlCloseTag = tagName;
-      continue;
-    }
-
-    // --- Display math blocks ($$...$$, \[...\], \begin{env}...\end{env}) ---
-    if (inMathBlock !== null) {
-      if (stripped.includes(inMathBlock)) {
-        inMathBlock = null;
-      }
-      continue;
-    }
-    if (stripped.startsWith("$$")) {
-      const rest = stripped.slice(2);
-      const closeIdx = rest.indexOf("$$");
-      if (closeIdx === -1) {
-        flushParagraph();
-        inMathBlock = "$$";
-        continue;
-      }
-      if (rest.slice(closeIdx + 2).trim() === "") {
-        flushParagraph();
-        continue;
-      }
-    } else if (stripped.startsWith("\\[")) {
-      const rest = stripped.slice(2);
-      const closeIdx = rest.indexOf("\\]");
-      if (closeIdx === -1) {
-        flushParagraph();
-        inMathBlock = "\\]";
-        continue;
-      }
-      if (rest.slice(closeIdx + 2).trim() === "") {
-        flushParagraph();
-        continue;
-      }
-    } else {
-      const mathEnvMatch = stripped.match(MD_MATH_ENV_OPEN_RE);
-      if (mathEnvMatch) {
-        const closeToken = `\\end{${mathEnvMatch[1]}}`;
-        flushParagraph();
-        if (!stripped.includes(closeToken)) {
-          inMathBlock = closeToken;
-        }
-        continue;
-      }
-    }
-
-    // --- Blank line ---
-    if (!stripped) {
-      flushParagraph();
-      continue;
-    }
-
-    // --- Headings ---
-    const headingMatch = line.match(MD_HEADING_RE);
-    if (headingMatch) {
-      flushParagraph();
-      const [, prefix, text] = headingMatch;
-      const translated = translate(text);
-      if (translated) {
-        outLines[idx] = prefix + translated;
-        changed = true;
-      }
-      continue;
-    }
-
-    // --- Horizontal rules / table separators ---
-    if (MD_HLINE_RE.test(stripped) || MD_TABLE_SEP_RE.test(stripped)) {
-      flushParagraph();
-      continue;
-    }
-
-    // --- List items ---
-    const listMatch = line.match(MD_LIST_ITEM_RE);
-    if (listMatch) {
-      flushParagraph();
-      const [, prefix, text] = listMatch;
-      const translated = translate(text.trim());
-      if (translated) {
-        outLines[idx] = prefix + translated;
-        changed = true;
-      }
-      continue;
-    }
-
-    // --- Blockquote lines ---
-    const bqMatch = line.match(MD_BLOCKQUOTE_RE);
-    if (bqMatch) {
-      flushParagraph();
-      const [, prefix, text] = bqMatch;
-      const translated = translate(text);
-      if (translated) {
-        outLines[idx] = prefix + translated;
-        changed = true;
-      }
-      continue;
-    }
-
-    // --- Table rows ---
-    if (stripped.startsWith("|") && stripped.endsWith("|")) {
-      flushParagraph();
-      const cells = splitTableCells(stripped.slice(1, -1));
-      const newCells: string[] = [];
-      let rowChanged = false;
-      for (const cell of cells) {
-        const translated = translate(cell.trim());
-        if (translated) {
-          // Preserve original cell whitespace for alignment
-          const leading = cell.slice(0, cell.length - cell.trimStart().length) || " ";
-          const trailing = cell.slice(cell.trimEnd().length) || " ";
-          newCells.push(leading + translated + trailing);
-          rowChanged = true;
-        } else {
-          newCells.push(cell);
-        }
-      }
-      if (rowChanged) {
-        outLines[idx] = "|" + newCells.join("|") + "|";
-        changed = true;
-      }
-      continue;
-    }
-
-    // --- Kramdown attribute lists ---
-    if (MD_KRAMDOWN_ATTR_RE.test(stripped)) {
-      flushParagraph();
-      continue;
-    }
-
-    // --- Paragraph continuation ---
-    paragraphBuf.push({ idx, text: stripped });
+    // The whole translation goes on the first line, after the original's marker
+    // and indentation; the lines it wrapped over are removed, which markdown
+    // reads as the same paragraph, item or quote.
+    outLines[first.idx] = span.prefix + translated;
+    for (const line of rest) collapsed.add(line.idx);
+    changed = true;
   }
-
-  flushParagraph();
+  for (const [idx, translatedCells] of rowCells) {
+    const cells = splitTableCells(lines[idx].trim().slice(1, -1));
+    const newCells = cells.map((cell, i) => {
+      const translated = translatedCells.get(i);
+      if (translated === undefined) return cell;
+      // Preserve original cell whitespace for alignment
+      const leading = cell.slice(0, cell.length - cell.trimStart().length) || " ";
+      const trailing = cell.slice(cell.trimEnd().length) || " ";
+      return leading + translated + trailing;
+    });
+    outLines[idx] = "|" + newCells.join("|") + "|";
+    changed = true;
+  }
 
   // Drop exactly the continuation lines a collapsed paragraph left behind. Every
   // other line survives, blank ones included — see `collapsed` above for the

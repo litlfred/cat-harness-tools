@@ -33,7 +33,7 @@
  *   bun run cat-harness-tools/scripts/gen-processes-viz.ts --check
  */
 import { escapeAngles, linkProse } from "./lib/link-prose.ts";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 import { declarationPathIn } from "../schemas/kg/cat-harness.js";
@@ -65,7 +65,11 @@ import {
   diagramBounds,
   markersFor,
   methodologyPageDir,
+  PANEL_CLIENT,
+  PANEL_CSS,
+  PANEL_SCRIPT,
   svgViewBox,
+  taskSkillsDeclared,
   type Marker,
   type PanelData,
   type PanelLink,
@@ -711,7 +715,13 @@ export function panelContext(repo = REPO, skillPages: ReadonlySet<string> = skil
  * Role → its skills. Pure over the row and the context, so the join is
  * testable without a site.
  */
-export function taskPanelData(row: ProcessRow, rows: readonly ProcessRow[], ctx: PanelContext): PanelData {
+export function taskPanelData(
+  row: ProcessRow,
+  rows: readonly ProcessRow[],
+  ctx: PanelContext,
+  opts: { skills?: boolean } = {},
+): PanelData {
+  const skillsOn = opts.skills !== false;
   const link = (name: string, href: string | undefined): PanelLink => (href ? { name, href } : { name });
   const byId = new Map(rows.map((r) => [r.id, r]));
   const laneByName = new Map(row.laneDetails.map((l) => [l.name, l]));
@@ -729,7 +739,7 @@ export function taskPanelData(row: ProcessRow, rows: readonly ProcessRow[], ctx:
       ...(href ? { href } : {}),
       ...(st.lane ? { lane: st.lane } : {}),
       ...(laneHref ? { laneHref } : {}),
-      skills: st.skills.map((s) => {
+      skills: (skillsOn ? st.skills : []).map((s) => {
         const ms = ctx.usesMethodology(s);
         return { ...link(s, ctx.skillHref(s)), ...(ms ? { methodologies: ms.map((m) => link(m, ctx.methodologyHref(m))) } : {}) };
       }),
@@ -750,7 +760,7 @@ export function taskPanelData(row: ProcessRow, rows: readonly ProcessRow[], ctx:
             role: {
               ...link(roleId, ctx.roleHref(roleId)),
               ...(ctx.roleTitle(roleId) ? { title: ctx.roleTitle(roleId) } : {}),
-              skills: lane!.roleSkills.map((p) => ({ ...link(p.skill, ctx.skillHref(p.skill)), ...(p.via !== roleId ? { via: p.via } : {}) })),
+              skills: (skillsOn ? lane!.roleSkills : []).map((p) => ({ ...link(p.skill, ctx.skillHref(p.skill)), ...(p.via !== roleId ? { via: p.via } : {}) })),
             },
           }
         : lane
@@ -759,7 +769,14 @@ export function taskPanelData(row: ProcessRow, rows: readonly ProcessRow[], ctx:
     };
   }
   const processHref = ctx.subjectHref(row.file, "process", row.id);
-  return { $schema: "process-task-panel/v1", process: row.id, ...(processHref ? { processHref } : {}), tasks };
+  return {
+    $schema: "process-task-panel/v1",
+    process: row.id,
+    ...(skillsOn ? {} : { skills: false as const }),
+    ...(row.markers ? { markers: row.markers } : {}),
+    ...(processHref ? { processHref } : {}),
+    tasks,
+  };
 }
 
 /** skill → the diagrams that run it. The join nothing else exposes. */
@@ -1375,6 +1392,9 @@ if (import.meta.main) {
     if (sub !== undefined) pages.set(join(into ?? baseDocsDir(REPO), sub), publishedIndex(x.rows, REPO, skillPages, instances, { instance: x.name }));
   }
   const ctx = panelContext(REPO, skillPages);
+  // Whether the ⓘ panel shows skills: the site's declaration, on unless it
+  // says `site.taskSkills: false` (`taskSkillsDeclared`).
+  const skills = taskSkillsDeclared(REPO);
   for (const r of rows.filter((x) => x.loadError === undefined)) {
     const refs = new Set<string>();
     pages.set(join(dirname(out), `${r.stem}.md`), processPage(r, rows, skillPages, presented.get(r.file), instances, (x) => refs.add(x)));
@@ -1384,8 +1404,15 @@ if (import.meta.main) {
       console.error(`⚠ ${r.file}: documentation names ${x.startsWith("skill:") ? `skill \`${x.slice(6)}\`, which has no instruction page` : `\`${x}\`, which no loaded diagram declares`}`);
     }
     // The ⓘ panel's data, fetched by the page only when a marker is opened.
-    if (r.markers) pages.set(join(dirname(out), panelFile(r.stem)), `${JSON.stringify(taskPanelData(r, rows, ctx), null, 1)}\n`);
+    if (r.markers) pages.set(join(dirname(out), panelFile(r.stem)), `${JSON.stringify(taskPanelData(r, rows, ctx, { skills }), null, 1)}\n`);
   }
+  // The panel's client and styles as files beside the sidecars, the same text
+  // each process page carries inline, so any page of the site that shows a
+  // drawing (a guide's business-processes page) gives it the same ⓘ panel:
+  // `<div class="pt-diagram" data-panel="<route>/<stem>.tasks.json">` around
+  // the drawing's <img>, and these two files.
+  pages.set(join(dirname(out), PANEL_CLIENT.script), `${PANEL_SCRIPT}\n`);
+  pages.set(join(dirname(out), PANEL_CLIENT.style), `${PANEL_CSS}\n`);
   // A page whose diagram is gone is REPORTED, never deleted — the
   // deletion-requires-confirmation rule, applied to generated output too.
   const orphans = (existsSync(dirname(out)) ? readdirSync(dirname(out)) : [])
@@ -1404,6 +1431,27 @@ if (import.meta.main) {
     for (const [f, body] of pages) {
       mkdirSync(dirname(f), { recursive: true });
       writeFileSync(f, body);
+    }
+    // THE DRAWING EACH PAGE LINKS. A page links the site copy by stem
+    // (`assets/img/workflows/<stem>.svg`), which `render:bpmn` writes into
+    // the harness's own site — but a folio's site build composes the chrome
+    // and never runs it, and since the drawings moved beside their .bpmn
+    // (#1504) no mount carries the site copy either. dth-hrh's publish then
+    // refused 137 dead links (run 42192237981). Into a site being built, a
+    // drawing the site lacks is copied from beside its source: the same
+    // layout, its step links reaching sibling diagrams rather than this
+    // site's pages, which is a lesser drawing but never a dead one.
+    if (into !== undefined) {
+      let copied = 0;
+      for (const r of rows) {
+        if (r.svg === undefined) continue;
+        const site = join(into, "assets/img/workflows", `${r.stem}.svg`);
+        if (existsSync(site)) continue;
+        mkdirSync(dirname(site), { recursive: true });
+        copyFileSync(join(REPO, r.svg), site);
+        copied++;
+      }
+      if (copied > 0) console.log(`  copied ${copied} drawing(s) from beside their .bpmn into the site's assets/img/workflows/`);
     }
     // THE TILE COUNT (folio-assistant#931, owner's ruling 2026-10-29): the
     // index's own diagram count, keyed by the tile that opens the index.

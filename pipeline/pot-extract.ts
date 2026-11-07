@@ -18,8 +18,10 @@
  *
  * - Prose paragraphs (accumulated across continuation lines → one `msgid`)
  * - Headings (each heading → one `msgid`)
- * - List items (each item → one `msgid`, bullet/number stripped)
- * - Blockquote lines (each `>` line → one `msgid`, prefix stripped)
+ * - List items (each item, with the lines it wraps over → one `msgid`,
+ *   bullet/number stripped)
+ * - Blockquotes (consecutive `>` lines at one depth → one `msgid`, prefix
+ *   stripped)
  * - Table cells (each cell → one `msgid`)
  * - Image alt text
  *
@@ -482,23 +484,60 @@ export interface PotEntry {
   comment?: string;
 }
 
-// ── Markdown extraction (mirrors upstream extract_markdown) ─────
+// ── Markdown segmentation (mirrors upstream extract_markdown) ───
+
+/** The markdown constructs {@link segmentMarkdown} cuts a page into. */
+export type MarkdownSpanKind = Extract<
+  PotEntryKind,
+  "heading" | "paragraph" | "list-item" | "blockquote" | "table-cell"
+>;
 
 /**
- * Extract translatable strings from a Markdown file.
+ * One unit of translation in a markdown page: what becomes ONE `msgid` on the
+ * extract side and is replaced by ONE `msgstr` on the inject side.
+ *
+ * Both halves read this, rather than each walking the lines with its own state
+ * machine. They used to, and the injector's copy did not learn that a wrapped
+ * list item or blockquote is one unit when the extractor did (bean `lvk9`): the
+ * catalogue held the joined sentence, the injector looked up the first line on
+ * its own, found nothing, and left the page in English after its first line.
+ */
+export interface MarkdownSpan {
+  kind: MarkdownSpanKind;
+  /**
+   * The source lines the span covers, in order, by 0-based index into
+   * `md.split("\n")`, each with the text it contributes — marker, `>` prefix
+   * and surrounding whitespace removed. A table cell has exactly one.
+   */
+  lines: Array<{ idx: number; text: string }>;
+  /** The lines' text joined with single spaces: what the `msgid` is cleaned from. */
+  raw: string;
+  /**
+   * What stands before the text on the first line and must survive a
+   * substitution: `## ` for a heading, the indentation and marker of a list
+   * item, the `>` run of a blockquote. Empty for a paragraph and a table cell.
+   */
+  prefix: string;
+  /** For a table cell, its position in `splitTableCells` of its row. */
+  cell?: number;
+}
+
+/**
+ * Cut a markdown page into its translation units.
  *
  * Uses the same state machine as upstream `extract_markdown()`:
  * YAML front matter → fenced code blocks → HTML skip blocks →
  * blank lines → headings → horizontal rules → list items →
  * blockquotes → table rows → kramdown attributes → paragraph
- * continuation. Each translatable span becomes one `PotEntry`.
+ * continuation. A paragraph, a list item and a blockquote are each
+ * accumulated across the lines they wrap over, so each is ONE span.
  *
- * @param md       The markdown content.
- * @param source   Source file path (for POT `#:` references).
- * @returns        Array of extracted POT entries.
+ * Every span is returned, translatable or not; the caller decides with
+ * {@link isTranslatable} on the cleaned {@link MarkdownSpan.raw}. A list that a
+ * consuming kramdown directive (`{:toc}`) replaces is not returned at all.
  */
-export function extractMarkdown(md: string, source: string): PotEntry[] {
-  const entries: PotEntry[] = [];
+export function segmentMarkdown(md: string): MarkdownSpan[] {
+  const spans: MarkdownSpan[] = [];
   const lines = md.split("\n");
 
   let inFrontMatter = false;
@@ -529,7 +568,9 @@ export function extractMarkdown(md: string, source: string): PotEntry[] {
   let pending:
     | {
         kind: PendingKind;
-        lines: Array<{ lineno: number; text: string }>;
+        lines: Array<{ idx: number; text: string }>;
+        /** See {@link MarkdownSpan.prefix}. */
+        prefix: string;
         /** For a list item, the column its content starts at — see {@link continuesItem}. */
         contentCol: number;
         /** For a blockquote, how many `>` deep it is. A change in depth is a new quote. */
@@ -538,29 +579,26 @@ export function extractMarkdown(md: string, source: string): PotEntry[] {
     | null = null;
 
   /**
-   * Emit the accumulated construct as ONE entry, at the line it started on.
+   * Emit the accumulated construct as ONE span, at the line it started on.
    *
-   * `cleanMarkdownText` runs on the JOINED text rather than per line, which is the
-   * half that fixes the split `**` span: an emphasis run opened on one line and
+   * The caller cleans the JOINED text rather than each line, which is the half
+   * that fixes the split `**` span: an emphasis run opened on one line and
    * closed on the next is a single span once the lines are joined, and nothing
    * else can make it one.
    */
   const flushPending = (): void => {
     if (pending === null) return;
     const raw = pending.lines.map((p) => p.text).join(" ");
-    const text = cleanMarkdownText(raw);
-    if (isTranslatable(text)) {
-      entries.push({ source, line: pending.lines[0].lineno, msgid: text, kind: pending.kind });
-    }
+    spans.push({ kind: pending.kind, lines: pending.lines, raw, prefix: pending.prefix });
     pending = null;
   };
 
   /**
-   * Where the current run of consecutive list items began in `entries`.
+   * Where the current run of consecutive list items began in `spans`.
    *
    * `null` when the last significant line was not a list item. A kramdown
    * directive that CONSUMES its block arrives AFTER the list it replaces, so
-   * the items are already in `entries` by then — this is what lets them be
+   * the items are already in `spans` by then — this is what lets them be
    * taken back out. Bean `lrbx`.
    *
    * A run, not a single item, because `{:toc}` attaches to the whole list. The
@@ -743,10 +781,12 @@ export function extractMarkdown(md: string, source: string): PotEntry[] {
     const headingMatch = line.match(MD_HEADING_RE);
     if (headingMatch) {
       flushPending();
-      const text = cleanMarkdownText(headingMatch[2]);
-      if (isTranslatable(text)) {
-        entries.push({ source, line: lineno, msgid: text, kind: "heading" });
-      }
+      spans.push({
+        kind: "heading",
+        lines: [{ idx, text: headingMatch[2] }],
+        raw: headingMatch[2],
+        prefix: headingMatch[1],
+      });
       continue;
     }
 
@@ -762,10 +802,11 @@ export function extractMarkdown(md: string, source: string): PotEntry[] {
       // Flush BEFORE capturing `listRunStart`, so the index is where this run
       // begins rather than where the preceding paragraph still sat unflushed.
       flushPending();
-      if (listRunStart === null) listRunStart = entries.length;
+      if (listRunStart === null) listRunStart = spans.length;
       pending = {
         kind: "list-item",
-        lines: [{ lineno, text: listMatch[2].trim() }],
+        lines: [{ idx, text: listMatch[2].trim() }],
+        prefix: listMatch[1],
         contentCol: listMatch[1].length,
         depth: 0,
       };
@@ -784,12 +825,18 @@ export function extractMarkdown(md: string, source: string): PotEntry[] {
         continue;
       }
       if (pending?.kind === "blockquote" && pending.depth === depth) {
-        pending.lines.push({ lineno, text: content });
+        pending.lines.push({ idx, text: content });
         continue;
       }
       // A change of depth is a different quote, so it does not continue this one.
       flushPending();
-      pending = { kind: "blockquote", lines: [{ lineno, text: content }], contentCol: 0, depth };
+      pending = {
+        kind: "blockquote",
+        lines: [{ idx, text: content }],
+        prefix: bqMatch[1],
+        contentCol: 0,
+        depth,
+      };
       continue;
     }
 
@@ -797,12 +844,10 @@ export function extractMarkdown(md: string, source: string): PotEntry[] {
     if (stripped.startsWith("|") && stripped.endsWith("|")) {
       flushPending();
       const cells = splitTableCells(stripped.slice(1, -1));
-      for (const cell of cells) {
-        const text = cleanMarkdownText(cell.trim());
-        if (isTranslatable(text)) {
-          entries.push({ source, line: lineno, msgid: text, kind: "table-cell" });
-        }
-      }
+      cells.forEach((cell, i) => {
+        const text = cell.trim();
+        spans.push({ kind: "table-cell", lines: [{ idx, text }], raw: text, prefix: "", cell: i });
+      });
       continue;
     }
 
@@ -816,7 +861,7 @@ export function extractMarkdown(md: string, source: string): PotEntry[] {
       // `1. TOC` as a heading, which is the correct reading of a string that
       // should never have been shown to them. Bean `lrbx`.
       if (MD_KRAMDOWN_CONSUMING_RE.test(stripped) && listRunStart !== null) {
-        entries.length = listRunStart;
+        spans.length = listRunStart;
       }
       endListRun();
       continue;
@@ -824,17 +869,38 @@ export function extractMarkdown(md: string, source: string): PotEntry[] {
 
     // --- Continuation of a list item, else paragraph ---
     if (continuesItem(line, stripped)) {
-      pending!.lines.push({ lineno, text: stripped });
+      pending!.lines.push({ idx, text: stripped });
       continue;
     }
     if (pending !== null && pending.kind !== "paragraph") flushPending();
-    pending ??= { kind: "paragraph", lines: [], contentCol: 0, depth: 0 };
-    pending.lines.push({ lineno, text: stripped });
+    pending ??= { kind: "paragraph", lines: [], prefix: "", contentCol: 0, depth: 0 };
+    pending.lines.push({ idx, text: stripped });
   }
 
   // Flush whatever construct was still being accumulated at EOF.
   flushPending();
 
+  return spans;
+}
+
+// ── Markdown extraction ─────────────────────────────────────────
+
+/**
+ * Extract translatable strings from a Markdown file: each translatable
+ * {@link segmentMarkdown} span becomes one `PotEntry`, at the line it starts on.
+ *
+ * @param md       The markdown content.
+ * @param source   Source file path (for POT `#:` references).
+ * @returns        Array of extracted POT entries.
+ */
+export function extractMarkdown(md: string, source: string): PotEntry[] {
+  const entries: PotEntry[] = [];
+  for (const span of segmentMarkdown(md)) {
+    const msgid = cleanMarkdownText(span.raw);
+    if (isTranslatable(msgid)) {
+      entries.push({ source, line: span.lines[0].idx + 1, msgid, kind: span.kind });
+    }
+  }
   return entries;
 }
 

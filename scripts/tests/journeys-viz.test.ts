@@ -10,10 +10,11 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, posix } from "node:path";
 
 import { readJourneyCorpus, unescapeXml } from "../journeys/read.ts";
-import { bpmnFigure, orderByFollows, renderJourneyPages, stepAnchor, type PageFile } from "../journeys/render.ts";
+import { bpmnFigure, orderByFollows, renderJourneyPages, stepAnchor, type PageFile, type SiteLinks } from "../journeys/render.ts";
+import { BARE_VHL, checkDakLinks, DAK_ATTR, pascal, personaArtifact } from "../journeys/dak-links.ts";
 import { journeyFiles, journeysRoute } from "../gen-journeys-viz.ts";
 import {
   chapterRoots,
@@ -30,6 +31,9 @@ import {
   screenHref,
   screensFor,
   shortTitle,
+  castOrder,
+  mentioned,
+  mentionedChips,
   siteRootFrom,
   viewBoxWidth,
 } from "../journeys/present.ts";
@@ -71,7 +75,7 @@ put("lower/lower.json", {
     { id: "fhir-artifact-index", path: "fhir-artifact-index/", graphTypologies: ["fhir-artifact-index"] },
   ],
 });
-put("lower/scenarios/actors/ana.json", { id: "ana", title: "Ana (pilgrim)", kind: "person", meta: { persona: { name: "Ana", role: "Pilgrim", color: "#123456", needs: ["Her summary abroad"], frustrations: ["Paper gets lost"] } } });
+put("lower/scenarios/actors/ana.json", { id: "ana", title: "Ana (pilgrim)", kind: "person", roles: ["traveller", "pilgrim"], meta: { persona: { name: "Ana", role: "Pilgrim", color: "#123456", needs: ["Her summary abroad"], frustrations: ["Paper gets lost"] } } });
 put("lower/scenarios/actors/cleo.json", { id: "cleo", title: "Cleo (baby)", kind: "person", meta: { persona: { name: "Cleo", role: "Baby", icon: "baby" } } });
 put("lower/scenarios/actors/ben.json", { id: "ben", title: "Ben (nurse)", kind: "person" });
 put("lower/scenarios/stories.json", { name: "lower", stories: [{ id: "pilgrim-1", role: { role: "pilgrim" }, want: "Show my summary abroad", soThat: "I am treated safely" }] });
@@ -88,7 +92,13 @@ put("lower/archimate/building-blocks/blocks.json", {
   ideas: [{ id: "carry", title: "Carry it yourself", text: "The record travels with the person.", blocks: ["wallet"] }],
 });
 // An artifact index with a local copy of one example, as fhir-harness builds it at publish.
-put("lower/fhir-artifact-index/index.json", { artifacts: [{ key: "Bundle/ana-ips", title: "Ana's IPS", profiles: ["http://example.org/StructureDefinition/ips-bundle"], materialization: { localPath: "output-ast/Bundle-ana-ips.json" } }] });
+put("lower/fhir-artifact-index/index.json", {
+  artifacts: [
+    { key: "Bundle/ana-ips", title: "Ana's IPS", profiles: ["http://example.org/StructureDefinition/ips-bundle"], materialization: { localPath: "output-ast/Bundle-ana-ips.json" } },
+    // The role Ana plays, as the IG defines it: her name links here.
+    { key: "ActorDefinition/Demo.Role.Pilgrim", title: "Pilgrim" },
+  ],
+});
 put("lower/output-ast/Bundle-ana-ips.json", { resourceType: "Bundle", id: "ana-ips", type: "document", total: 1, entry: null });
 put("lower/code-lists/trust.json", {
   $schema: "folio-code-list/v1",
@@ -108,6 +118,7 @@ put("lower/scenarios/user-scenarios/p2.json", {
   description: "Ana is treated.",
   personas: ["ana", "ben", "cleo"],
   follows: "p1-checked",
+  views: [{ model: "ra", view: "v-p2", label: "P2 on the RA" }],
   trustLadder: "trust",
   scene: [{ icon: "hospital", label: "A clinic" }, { icon: "qr", label: "A QR" }],
   references: [{ label: "User scenario in the IG", href: "journeys.html#p2", rel: "scenario" }],
@@ -128,6 +139,11 @@ put("lower/scenarios/user-scenarios/p2.json", {
         { block: "nowhere", role: "unknown block" },
       ],
       gaps: ["No transaction for this yet."],
+      references: [
+        { label: "The walkthrough", href: "vaxlink/", rel: "illustrates" },
+        { label: "The spec", href: "https://example.org/spec" },
+        { label: "This step", href: "#p2" },
+      ],
       handoff: { summary: "The summary goes home", from: "Clinic EMR", to: "ana", offline: false },
       fhirChanges: [{ resource: "Bundle", change: "Read, not stored", why: "It is hers.", profile: "ips-bundle", profileOf: "Intl", examples: ["Bundle/ana-ips"] }],
       illustration: { src: "docs/images/p2.png", alt: "Ben reads the summary on a tablet." },
@@ -142,11 +158,11 @@ put("lower/scenarios/user-scenarios/p1.json", {
   personas: ["ana"],
   steps: [step("P1", "ana")],
 });
-put("lower/processes/care.bpmn", '<definitions><bpmn:process id="P" name="Read the patient&#x27;s summary"/></definitions>');
+put("lower/processes/care.bpmn", '<definitions><bpmn:process id="P" name="Read the patient&#x27;s summary"><bpmn:task id="Task_Read" name="Read the summary"/><bpmn:task id="Task_Other" name="Other"/></bpmn:process></definitions>');
 put("lower/docs/images/p2.png", "\x89PNG fixture");
 put(
   "lower/processes/care.svg",
-  '<?xml version="1.0"?><!DOCTYPE svg><!-- generated --><svg xmlns="http://www.w3.org/2000/svg"><g class="djs-element djs-shape" data-element-id="Task_Read"><g class="djs-visual"><rect/></g></g><g class="djs-element djs-shape" data-element-id="Task_Other"><g class="djs-visual"><rect/></g></g></svg>',
+  '<?xml version="1.0"?><!DOCTYPE svg><!-- generated --><svg xmlns="http://www.w3.org/2000/svg"><g class="djs-element djs-shape" data-element-id="Task_Read"><g class="djs-visual"><rect/><text class="djs-label"><tspan>Read the summary</tspan></text></g></g><g class="djs-element djs-shape" data-element-id="Task_Other"><g class="djs-visual"><rect/><text class="djs-label"><tspan>Other</tspan></text></g></g></svg>',
 );
 put("lower/skills/requirements/low-req-001.json", { id: "req:low-req-001", title: "Read the summary", statements: [{ requirement: "The reader SHALL show the summary." }] });
 
@@ -235,7 +251,18 @@ clearDeclaredVisualisers();
 
 const TOP = join(REPO, "top");
 const corpus = readJourneyCorpus(TOP);
-const files = renderJourneyPages(corpus, { route: "en/top/journeys", title: "Top demonstrator" }, "top");
+/**
+ * Where the site puts a step's page and an ArchiMate view, as the generator
+ * would say (`siteLinks`): site-relative, so a link must climb from the
+ * page's own depth to reach them.
+ */
+const LINKS: SiteLinks = {
+  route: "en/top/journeys",
+  title: "Top demonstrator",
+  stepPage: (instance, bpmn, process, task) => `kg/${instance}/${bpmn.replace(/\.bpmn$/, "")}/${process}/node/${task}/`,
+  archimateView: (instance, model, view) => ({ svg: `archimate/${model}/views/${view}.svg`, page: `en/${instance}/archimate/${model}/views/${view}/`, name: "P2 view" }),
+};
+const files = renderJourneyPages(corpus, LINKS, "top");
 const at = (path: string): string => {
   const f = files.find((x: PageFile) => x.path === path);
   if (!f) throw new Error(`no page ${path}; have ${files.map((x) => x.path).join(", ")}`);
@@ -326,6 +353,23 @@ describe("a journey page", () => {
     expect(p2).toContain('href="../../top/workshops/policy/m1/"');
     expect(p2).toContain('data-jv-store');
     expect(p2).toContain("a signature crosses");
+  });
+  test("a reference's href resolves from the site's root, as the workshop pages resolve it", () => {
+    // The journey page sits at <route>/<instance>/<id>/: two up to the route root, three more out of `en/top/journeys`.
+    const toSite = "../../../../../";
+    expect(p2).toContain(`href="${toSite}journeys.html#p2">User scenario in the IG</a>`);
+    expect(p2).toContain(`href="${toSite}vaxlink/">The walkthrough</a>`);
+    expect(p2).toContain('href="https://example.org/spec">The spec</a>');
+    expect(p2).toContain('href="#p2">This step</a>');
+    expect(p2).not.toContain('href="journeys.html#p2"');
+    expect(p2).not.toContain('href="vaxlink/"');
+  });
+  test("the journey page and the workshop pages reach the same file for one relative href", () => {
+    const fromJourney = posix.join("en/top/journeys/lower/p2-treated/", "../../../../../journeys.html");
+    const ws = at("top/workshops/policy/walkthrough/P2/index.html");
+    const href = /href="([^"]*journeys\.html)#p2"/.exec(ws)?.[1];
+    expect(href).toBeDefined();
+    expect(posix.join("en/top/journeys/top/workshops/policy/walkthrough/P2/", href!)).toBe(fromJourney);
   });
   test("follows and partOf are links", () => {
     expect(p2).toContain('href="../../lower/p1-checked/" rel="prev"');
@@ -420,9 +464,10 @@ describe("the presentation pages: a workshop told in a room, with no site chrome
     expect(p2).toContain("— a signature crosses");
     expect(p2).toContain('name="policy:viewer:status"');
   });
-  test("a step: the people, each with the avatar beside the name, and under the hood", () => {
+  test("a step: the people, each with the avatar in the card's header (never inside a sentence), and under the hood", () => {
     expect(p2).toContain('class="jp-who" style="--c:#123456"');
-    expect(p2).toContain('<span class="jp-named">Ben (nurse)<span class="jp-av jp-av-sm"');
+    expect(p2).toContain('<span class="jp-named">Ben (nurse)</span>: reads the summary');
+    expect(p2).not.toMatch(/<span class="jp-named">[^<]*<span class="jp-av/);
     expect(p2).toContain('<b>Health wallet</b><span>shows the QR</span>');
     expect(p2).toContain('data-element-id="Task_Read" data-jv-hl=""');
     expect(p2).toContain('data-jp-hood');
@@ -471,7 +516,9 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(ana).toContain('<a href="../../walkthrough/P2/"><title>P2 Step P2: Worried</title>');
     expect(ana).toContain("Ana’s touchpoints (2)");
     expect(at(`${base}/personas/index.html`)).toContain('href="ana/"');
-    expect(at(`${base}/personas/cleo/index.html`)).not.toMatch(/jp-av-lg"[^>]*>CL</);
+    // One chip style for everyone, the baby too: initials, never a glyph among them (owner, 2026-11-06).
+    expect(at(`${base}/personas/cleo/index.html`)).toMatch(/class="jp-av jp-av-lg"[^>]*title="Cleo"[^>]*>C<\/span>/);
+    expect(map).not.toMatch(/class="jp-av[^"]*"[^>]*><svg/);
   });
   test("how it works: the big ideas, the grid, a block's detail with the moments that use it", () => {
     expect(how).toContain("Carry it yourself");
@@ -482,9 +529,17 @@ describe("the presentation views: map, persona lens, how it works, discussion, s
     expect(wallet).toContain("<small>shows the QR</small>");
     expect(wallet).toContain("Read the patient&#39;s summary");
   });
-  test("the discussion: the closing question, the moments to revisit, the tables with what forces each row, the gap list", () => {
+  test("the discussion: the closing question, the moments to revisit, the tables with what forces each row, the gap report", () => {
     expect(discuss).toContain("What must countries agree on?");
-    expect(discuss).toContain('data-jp-gap="policy:viewer:status"');
+    // The gap report's model: the gap strip's own storage names, the moment's link, its first module.
+    const model = JSON.parse(/<script type="application\/json" data-jp-gapreport-model>([\s\S]*?)<\/script>/.exec(discuss)![1]!);
+    expect(model.items).toEqual([{ name: { status: "policy:viewer:status" }, capability: { id: "viewer", label: "A viewer" }, step: { id: "P2", title: "Step P2", href: "../walkthrough/P2/" }, module: "M1" }]);
+    expect(model.status.options.map((o: { id: string }) => o.id)).toEqual(["yes", "no"]);
+    expect(model.urgency).toBeUndefined();
+    expect(discuss).toContain('<script src="../../../../assets/gap-report.js" defer></script>');
+    expect(discuss).toContain("data-jp-report-print");
+    expect(discuss).toContain("data-jp-report-csv");
+    expect(files.some((f) => f.path === "assets/gap-report.js")).toBe(true);
     expect(discuss).toContain("Forced by:");
     expect(discuss).toContain('href="../walkthrough/P2/"');
   });
@@ -551,15 +606,42 @@ describe("presentation helpers", () => {
     expect(p.cast.map((c) => c.id)).toEqual(["ana", "ben", "cleo"]);
     expect(p.steps[1]!.ws?.askTheRoom).toBe("Should the family be told?");
   });
-  test("personaText puts the avatar beside whole-word names, longest first, and escapes the rest", () => {
+  test("an overview card: the picture first, the strip (labelled, VaxLink's size) and the people at its foot", () => {
+    const ov = at("top/workshops/policy/overview/index.html");
+    const card2 = [...ov.matchAll(/<a class="jp-card jp-moment"[\s\S]*?<\/a>/g)].map((m) => m[0]).find((c) => c.includes("jp-pic"))!;
+    expect(card2.indexOf('class="jp-pic"')).toBeLessThan(card2.indexOf('class="jp-moment-title"'));
+    expect(card2.indexOf('class="jp-moment-sum"')).toBeLessThan(card2.indexOf('class="jp-moment-foot"'));
+    expect(card2).toContain('jp-scene jp-scene-md');
+    expect(card2).toContain('<span class="jp-scene-l">A clinic</span>');
+  });
+  test("presentation.cast orders the cast everywhere; presentation.chapterTitles names a chapter", () => {
+    const w0 = corpus.workshops[0]!;
+    const w = { ...w0, workshop: { ...w0.workshop, presentation: { ...w0.workshop.presentation, cast: ["cleo", "ghost", "ana"], chapterTitles: { "p2-treated": "Crossing back" } } } };
+    const p = presentationOf(corpus, w);
+    // Declared first (an id no step names is dropped), then the rest in order of first appearance.
+    expect(p.cast.map((c) => c.id)).toEqual(["cleo", "ana", "ben"]);
+    expect(p.chapters.map((c) => c.title)).toEqual(["Checked", "Crossing back"]);
+    expect(castOrder(["a", "b", "c"], undefined)).toEqual(["a", "b", "c"]);
+    expect(castOrder(["a", "b", "c"], ["c", "c", "x"])).toEqual(["c", "a", "b"]);
+  });
+  test("personaText marks whole-word names, longest first, puts no avatar in the sentence, and escapes the rest", () => {
     const people = [
       { id: "a", name: "Anan", initials: "AN", color: "#000000" },
       { id: "d", name: "Dr. Anan", initials: "DA", color: "#111111" },
     ];
     const out = personaText("Dr. Anan meets Ananda <b>", people);
-    expect(out).toContain('<span class="jp-named">Dr. Anan<span class="jp-av jp-av-sm" style="--c:#111111"');
-    expect(out).not.toContain(">Anan<span");
-    expect(out).toContain("Ananda &lt;b&gt;");
+    expect(out).toBe('<span class="jp-named">Dr. Anan</span> meets Ananda &lt;b&gt;');
+  });
+  test("mentioned: the people a sentence names, in the cast's order, without the card's own person; their chips go in the header", () => {
+    const people = [
+      { id: "s", name: "Somsack", initials: "SS", color: "#65a30d" },
+      { id: "k", name: "Khamla", initials: "KS", color: "#f43f5e" },
+      { id: "v", name: "Vilay", initials: "VI", color: "#14b8a6" },
+    ];
+    expect(mentioned("Tells Vilay about Somsack, then Vilay again", people).map((p) => p.id)).toEqual(["s", "v"]);
+    expect(mentioned("Khamla brings Somsack", people, "k").map((p) => p.id)).toEqual(["s"]);
+    expect(mentionedChips("waits", people)).toBe("");
+    expect(mentionedChips("Tells Vilay", people)).toContain('<span class="jp-mentions" title="With Vilay"><span class="jp-av jp-av-sm" style="--c:#14b8a6" title="Vilay" aria-hidden="true">VI</span></span>');
   });
   test("links out: kramdown anchors, page patterns, the site's root, JSON colouring", () => {
     expect(kramdownSlug("J1 — Born abroad (Thailand, birth day)")).toBe("j1--born-abroad-thailand-birth-day");
@@ -624,5 +706,122 @@ describe("helpers", () => {
   });
   test("bpmnFigure leaves a drawing alone when no task is named", () => {
     expect(bpmnFigure('<svg><g data-element-id="A"></g></svg>', undefined, "c")).not.toContain("data-jv-hl");
+  });
+});
+
+// ── DAK links: diagrams clickable as the KG site renders them, assets linked into the IG ──
+
+/** Where `href`, written on the page at site path `page`, lands: a site path, or the absolute URL as it is. */
+const landsAt = (page: string, href: string): string => (/^[a-z][a-z0-9+.-]*:/i.test(href) ? href : posix.normalize(posix.join(posix.dirname(page), href.replace(/[?#].*$/, ""))));
+const sitePath = (path: string): string => `${LINKS.route}/${path}`;
+const hrefsOf = (html: string, marker: string): string[] => [...html.matchAll(/<(?:a|object)\b[^>]*>/g)].map((m) => m[0]).filter((t) => t.includes(marker)).map((t) => /\s(?:href|data)="([^"]*)"/.exec(t)![1]!.replace(/&amp;/g, "&"));
+
+describe("the drawings are clickable the way the KG site renders them", () => {
+  const journey = sitePath("lower/p2-treated/index.html");
+  const walk = sitePath("top/workshops/policy/walkthrough/P2/index.html");
+  test("a BPMN step's TITLE links to its page (linkSteps), from the journey page's depth and the walkthrough's", () => {
+    for (const [page, html] of [[journey, at("lower/p2-treated/index.html")], [walk, at("top/workshops/policy/walkthrough/P2/index.html")]] as const) {
+      const titles = hrefsOf(html, 'class="fa-task-link"');
+      expect(titles.length).toBe(2);
+      expect(titles.map((h) => landsAt(page, h))).toEqual(["kg/lower/processes/care/P/node/Task_Read/", "kg/lower/processes/care/P/node/Task_Other/"]);
+      // On the title alone, with its accessible name, and the highlight kept.
+      expect(html).toMatch(/<a class="fa-task-link" href="[^"]+" target="_top" aria-label="Open step: Read the summary"><title>Open step: Read the summary<\/title><text class="djs-label">/);
+      expect(html).toContain('data-element-id="Task_Read" data-jv-hl=""');
+    }
+  });
+  test("an absolute step page (a subject IRI) is linked as it is", () => {
+    const abs = renderJourneyPages(corpus, { ...LINKS, stepPage: (_i, _b, p, t) => `https://example.org/kg/process/${p}/node/${t}` }, "top");
+    const html = String(abs.find((f) => f.path === "lower/p2-treated/index.html")!.content);
+    expect(hrefsOf(html, 'class="fa-task-link"')).toContain("https://example.org/kg/process/P/node/Task_Read");
+  });
+  test("where no step page is published (a downstream site), a title links the process's section in the IG instead", () => {
+    const none = renderJourneyPages(corpus, { ...LINKS, stepPage: () => undefined }, "top");
+    for (const [path, page] of [["lower/p2-treated/index.html", sitePath("lower/p2-treated/index.html")], ["top/workshops/policy/walkthrough/P2/index.html", sitePath("top/workshops/policy/walkthrough/P2/index.html")]] as const) {
+      const html = String(none.find((f) => f.path === path)!.content);
+      const titles = hrefsOf(html, 'class="fa-task-link"');
+      expect(titles.length).toBe(2);
+      // `landsAt` drops the anchor: the page, then the anchor itself.
+      expect(new Set(titles.map((h) => landsAt(page, h)))).toEqual(new Set(["business-processes.html"]));
+      expect(titles.every((h) => h.endsWith("business-processes.html#read-the-patients-summary"))).toBe(true);
+    }
+  });
+  test("an ArchiMate view is an <object>, so the elements in it open their pages; its data and caption resolve from the page", () => {
+    const html = at("lower/p2-treated/index.html");
+    expect(html).not.toMatch(/<img[^>]*archimate/);
+    const obj = /<object type="image\/svg\+xml" data="([^"]+)" aria-label="P2 on the RA">/.exec(html);
+    expect(obj).not.toBeNull();
+    expect(landsAt(journey, obj![1]!)).toBe("archimate/ra/views/v-p2.svg");
+    expect(hrefsOf(html, DAK_ATTR).map((h) => landsAt(journey, h))).toContain("en/lower/archimate/ra/views/v-p2/");
+  });
+});
+
+describe("personas and other DAK assets link to their pages in the IG", () => {
+  test("a persona plays a role the IG defines: its name links to that ActorDefinition; one with none stays text", () => {
+    expect(pascal("birth-clinic-vaccinator")).toBe("BirthClinicVaccinator");
+    expect(personaArtifact(corpus, "lower", "ana")).toBe("ActorDefinition/Demo.Role.Pilgrim");
+    expect(personaArtifact(corpus, "lower", "ben")).toBeUndefined();
+    const walk = at("top/workshops/policy/walkthrough/P2/index.html");
+    const pages = [sitePath("top/workshops/policy/walkthrough/P2/index.html"), sitePath("lower/p2-treated/index.html"), sitePath("top/workshops/policy/overview/index.html")];
+    const htmls = [walk, at("lower/p2-treated/index.html"), at("top/workshops/policy/overview/index.html")];
+    htmls.forEach((html, i) => expect(hrefsOf(html, DAK_ATTR).map((h) => landsAt(pages[i]!, h))).toContain("ActorDefinition-Demo.Role.Pilgrim.html"));
+    expect(walk).toContain("<b>Ben (nurse)</b>");
+    // A name inside the prose is marked, linked the same way when its persona has a page, with no avatar in the sentence.
+    const people = [{ id: "ana", name: "Ana", initials: "A", color: "#123456", artifact: "ActorDefinition/Demo.Role.Pilgrim" }, { id: "ben", name: "Ben", initials: "B", color: "#654321" }];
+    const chips = personaText("Ana waits; Ben reads.", people, (x) => (x.artifact ? `../${x.artifact.replace("/", "-")}.html` : undefined));
+    expect(chips).toMatch(/^<a class="jp-named" href="\.\.\/ActorDefinition-Demo\.Role\.Pilgrim\.html" data-jv-dak>Ana<\/a>/);
+    expect(chips).toContain('<span class="jp-named">Ben</span>');
+    expect(chips).not.toContain("jp-av");
+  });
+  test("a FHIR example links to its IG page, in the hood and in the payload drawer; a profile the index does not list stays text", () => {
+    const page = sitePath("top/workshops/policy/walkthrough/P2/index.html");
+    const walk = at("top/workshops/policy/walkthrough/P2/index.html");
+    expect(hrefsOf(walk, DAK_ATTR).map((h) => landsAt(page, h))).toContain("Bundle-ana-ips.html");
+    expect(walk).toMatch(/<p class="jp-pane-link"><a class="jp-ext" href="[^"]*Bundle-ana-ips\.html" data-jv-dak/);
+    expect(walk).toContain('<span class="jp-prof" title="ips-bundle">Intl profile</span>');
+  });
+});
+
+describe("the check over a staged site: every DAK link resolves to a file", () => {
+  const site = mkdtempSync(join(tmpdir(), "journeys-site-"));
+  afterAll(() => rmSync(site, { recursive: true, force: true }));
+  const write = (rel: string, body: string | Uint8Array): void => {
+    mkdirSync(join(site, dirname(rel)), { recursive: true });
+    writeFileSync(join(site, rel), body);
+  };
+  for (const f of files) write(sitePath(f.path), f.content);
+  // What the rest of the site publishes: the IG's pages, the step pages, the ArchiMate view and the element it links.
+  // Each target page, with an element for every anchor a link names on it.
+  const anchors = new Map<string, Set<string>>();
+  for (const f of files) if (f.path.endsWith(".html")) for (const h of hrefsOf(String(f.content), DAK_ATTR).concat(hrefsOf(String(f.content), 'class="fa-task-link"'))) {
+    const t = landsAt(sitePath(f.path), h);
+    if (/^[a-z]+:/.test(t)) continue;
+    const ids = anchors.get(t) ?? new Set<string>();
+    const id = /#(.+)$/.exec(h)?.[1];
+    if (id) ids.add(id);
+    anchors.set(t, ids);
+  }
+  const targets = new Set(anchors.keys());
+  for (const [t, ids] of anchors) if (!t.endsWith(".svg")) write(t.endsWith("/") ? `${t}index.html` : t, `<!doctype html>${[...ids].map((id) => `<h3 id="${id}">x</h3>`).join("")}`);
+  write("archimate/ra/views/v-p2.svg", '<svg xmlns="http://www.w3.org/2000/svg"><a href="../../../en/lower/archimate/ra/elements/wallet/" target="_top"><rect/></a></svg>');
+  write("en/lower/archimate/ra/elements/wallet/index.html", "<!doctype html>");
+  test("every rendered DAK link names a page the IG and the KG publish", () => {
+    expect([...targets]).toEqual(expect.arrayContaining(["ActorDefinition-Demo.Role.Pilgrim.html", "Bundle-ana-ips.html", "kg/lower/processes/care/P/node/Task_Read/"]));
+    const r = checkDakLinks(site, LINKS.route);
+    expect(r.findings).toEqual([]);
+    expect(r.checked).toBeGreaterThan(10);
+  });
+  test("a page that is not there, an element link inside a drawing that is not there, and the bare IHE VHL root are findings", () => {
+    rmSync(join(site, "ActorDefinition-Demo.Role.Pilgrim.html"));
+    rmSync(join(site, "en/lower/archimate/ra/elements/wallet/index.html"));
+    write(sitePath("vhl/index.html"), '<a href="https://profiles.ihe.net/ITI/VHL/">VHL</a> <a href="https://profiles.ihe.net/ITI/VHL/volume-1.html">VHL</a>');
+    const why = checkDakLinks(site, LINKS.route).findings.map((f) => `${f.page} ${f.why}`);
+    expect(why.some((w) => w.includes("no file at ActorDefinition-Demo.Role.Pilgrim.html"))).toBe(true);
+    expect(why.some((w) => w.startsWith("archimate/ra/views/v-p2.svg no file at en/lower/archimate/ra/elements/wallet/index.html"))).toBe(true);
+    expect(why.filter((w) => w.includes("bare IHE VHL root"))).toHaveLength(1);
+    // A page that is there, with an anchor that is not.
+    write(sitePath("anchor/index.html"), '<a data-jv-dak href="../../../../Bundle-ana-ips.html#nowhere">x</a>');
+    expect(checkDakLinks(site, LINKS.route).findings.some((f) => f.why === 'no id "nowhere" in Bundle-ana-ips.html')).toBe(true);
+    expect(BARE_VHL.test("https://profiles.ihe.net/ITI/VHL")).toBe(true);
+    expect(BARE_VHL.test("https://profiles.ihe.net/ITI/VHL/volume-1.html")).toBe(false);
   });
 });

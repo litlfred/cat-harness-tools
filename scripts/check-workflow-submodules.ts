@@ -26,6 +26,13 @@
  * checkout at the workspace root. `.github/actions/ci-setup` (bean `ay33`)
  * mounts this way, from the prepared CI image or by a replay.
  *
+ * A REMOTE action counts the same way when it is pinned to exactly the commit
+ * the lock mounts: `uses: <owner>/<repo>/.github/actions/<name>@<sha>`, where
+ * `index.lock.json` mounts `<owner>/<repo>` whole at `<sha>`, is read from the
+ * mount, `<mount>/.github/actions/<name>/action.yml`, because the mount IS
+ * that commit. Any other ref (a branch, a tag, a sha the lock does not hold)
+ * is not read, so it clears nothing.
+ *
  * Blind spot, printed every run: a composite action or reusable workflow that
  * RUNS platform code on the caller's behalf.
  *
@@ -144,6 +151,51 @@ export function ciScriptsOnly(block: readonly string[]): boolean {
 export type ActionReader = (dir: string) => string | undefined;
 
 const LOCAL_ACTION = /uses:\s*\.\/(\.github\/actions\/[A-Za-z0-9._/-]+?)\/?\s*(?:#.*)?$/;
+const REMOTE_ACTION = /uses:\s*([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)\/(\.github\/actions\/[A-Za-z0-9._/-]+?)\/?@([0-9a-f]{40})\s*(?:#.*)?$/;
+
+/** A repository the lock mounts whole: its pinned commit and where it is mounted. */
+export interface PinnedMount {
+  readonly sha: string;
+  readonly path: string;
+}
+
+/** `owner/repo` → its whole-repository mount, from `index.lock.json`'s `instances`. */
+export type PinnedMounts = ReadonlyMap<string, PinnedMount>;
+
+/**
+ * The repository-relative directory of the action a `uses:` line names, when
+ * it can be read here: a local `./.github/actions/<name>`, or a remote one
+ * pinned to exactly the commit the lock mounts its repository at. Otherwise
+ * `undefined`.
+ */
+export function actionDirOf(line: string, pinned?: PinnedMounts): string | undefined {
+  const local = LOCAL_ACTION.exec(line)?.[1];
+  if (local !== undefined) return local;
+  const r = REMOTE_ACTION.exec(line);
+  if (r === null || pinned === undefined) return undefined;
+  const m = pinned.get(r[1]!);
+  if (m === undefined || m.sha !== r[3]) return undefined;
+  return m.path === "" || m.path === "." ? r[2]! : `${m.path.replace(/\/+$/, "")}/${r[2]!}`;
+}
+
+/**
+ * The lock's whole-repository mounts: instances mounted from the repository
+ * root (`upstreamRoot` empty, one `*` directory at `.`). A partial mount is
+ * left out, since its `.github/` may not be the pinned commit's.
+ */
+export function pinnedMountsOf(lock: unknown): PinnedMounts {
+  const out = new Map<string, PinnedMount>();
+  const instances = (lock as { instances?: unknown })?.instances;
+  if (!Array.isArray(instances)) return out;
+  for (const i of instances as Array<Record<string, unknown>>) {
+    const dirs = i.directories as Array<Record<string, unknown>> | undefined;
+    const whole = (i.upstreamRoot ?? "") === "" && Array.isArray(dirs) && dirs.length === 1 && dirs[0]!.id === "*" && dirs[0]!.upstreamPath === ".";
+    if (whole && typeof i.repository === "string" && typeof i.sha === "string" && typeof i.path === "string") {
+      out.set(i.repository, { sha: i.sha, path: i.path });
+    }
+  }
+  return out;
+}
 const REPLAY_ROOT = /mount-from-lock\.(?:ts|sh)["']?\s+--root\s+["']?([^"'\s;]+)/;
 
 /**
@@ -160,7 +212,7 @@ export function actionMountsWorkspace(text: string): boolean {
 }
 
 /** Every `actions/checkout` in one job, with the `with:` keys that matter here. */
-export function checkoutsOf(job: Job, readAction?: ActionReader): CheckoutStep[] {
+export function checkoutsOf(job: Job, readAction?: ActionReader, pinned?: PinnedMounts): CheckoutStep[] {
   const out: CheckoutStep[] = [];
   for (const [i, line] of job.lines.entries()) {
     if (!/uses:\s*actions\/checkout/.test(line)) continue;
@@ -187,7 +239,7 @@ export function checkoutsOf(job: Job, readAction?: ActionReader): CheckoutStep[]
       root === "." &&
       readAction !== undefined &&
       after.some((l) => {
-        const dir = LOCAL_ACTION.exec(l)?.[1];
+        const dir = actionDirOf(l, pinned);
         const text = dir === undefined ? undefined : readAction(dir);
         return text !== undefined && actionMountsWorkspace(text);
       });
@@ -235,11 +287,12 @@ export function auditWorkflow(
   file: string,
   src: string,
   readAction?: ActionReader,
+  pinned?: PinnedMounts,
 ): { findings: Finding[]; composites: Finding[] } {
   const findings: Finding[] = [];
   const composites: Finding[] = [];
   for (const job of jobsOf(src)) {
-    const checkouts = checkoutsOf(job, readAction).filter((c) => !c.publish);
+    const checkouts = checkoutsOf(job, readAction, pinned).filter((c) => !c.publish);
     const runs = bunRunsOf(job);
     if (runs.length === 0) {
       // A job that runs no platform script but delegates to a composite action
@@ -290,8 +343,10 @@ if (import.meta.main) {
     .sort();
   const findings: Finding[] = [];
   const composites: Finding[] = [];
+  // No lock (a layer's own checkout): no remote action is readable, so none clears a checkout.
+  const pinned = existsSync("index.lock.json") ? pinnedMountsOf(JSON.parse(readFileSync("index.lock.json", "utf8"))) : new Map<string, PinnedMount>();
   for (const f of files) {
-    const r = auditWorkflow(f, readFileSync(join(WORKFLOWS, f), "utf8"), readLocalAction);
+    const r = auditWorkflow(f, readFileSync(join(WORKFLOWS, f), "utf8"), readLocalAction, pinned);
     findings.push(...r.findings);
     composites.push(...r.composites);
   }

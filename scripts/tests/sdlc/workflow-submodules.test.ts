@@ -8,7 +8,7 @@
 
 import { describe, expect, test } from "bun:test";
 
-import { auditWorkflow, bunRunsOf, checkoutsOf, jobsOf } from "../../check-workflow-submodules.ts";
+import { actionDirOf, auditWorkflow, bunRunsOf, checkoutsOf, jobsOf, pinnedMountsOf } from "../../check-workflow-submodules.ts";
 
 /** The defect as it actually appeared in `feature-staging.yml`'s `cleanup` job. */
 const BROKEN = `name: staging
@@ -253,5 +253,53 @@ jobs:
 
   test("it serves only a checkout at the workspace root: one at `source` is still a finding", () => {
     expect(auditWorkflow("g.yml", job("source"), reader(IMAGE)).findings).toHaveLength(1);
+  });
+});
+
+describe("a remote action pinned to the commit the lock mounts", () => {
+  const SHA = "55b19257830df716a86caf0ab22731acf9a604dc";
+  const OTHER = "0000000000000000000000000000000000000001";
+  const lock = {
+    instances: [
+      { instance: "cat-harness-tools", repository: "litlfred/cat-harness-tools", sha: SHA, upstreamRoot: "", path: "cat-harness-tools", directories: [{ id: "*", path: "cat-harness-tools", upstreamPath: "." }] },
+      { instance: "part", repository: "litlfred/part", sha: SHA, upstreamRoot: "sub", path: "part", directories: [{ id: "*", path: "part", upstreamPath: "." }] },
+    ],
+  };
+  const pinned = pinnedMountsOf(lock);
+  const job = (uses: string) => `name: gates
+on: [pull_request]
+jobs:
+  gates-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up from the prepared CI image
+        uses: ${uses}
+      - run: bun run cat-harness-tools/scripts/check-something.ts
+`;
+  const IMAGE = "runs:\n  using: composite\n  steps:\n    - shell: bash\n      run: bun run cat mount:lock:check\n";
+  const reader = (dir: string) => (dir === "cat-harness-tools/.github/actions/ci-setup" ? IMAGE : undefined);
+
+  test("only whole-repository mounts are read from the lock", () => {
+    expect([...pinned.keys()]).toEqual(["litlfred/cat-harness-tools"]);
+  });
+
+  test("at the locked sha it is read from the mount", () => {
+    expect(actionDirOf(`uses: litlfred/cat-harness-tools/.github/actions/ci-setup@${SHA} # index.lock.json`, pinned)).toBe("cat-harness-tools/.github/actions/ci-setup");
+    expect(auditWorkflow("g.yml", job(`litlfred/cat-harness-tools/.github/actions/ci-setup@${SHA}`), reader, pinned).findings).toHaveLength(0);
+  });
+
+  test("at another sha, a branch, or with no lock, it clears nothing", () => {
+    expect(auditWorkflow("g.yml", job(`litlfred/cat-harness-tools/.github/actions/ci-setup@${OTHER}`), reader, pinned).findings).toHaveLength(1);
+    expect(auditWorkflow("g.yml", job("litlfred/cat-harness-tools/.github/actions/ci-setup@main"), reader, pinned).findings).toHaveLength(1);
+    expect(auditWorkflow("g.yml", job(`litlfred/cat-harness-tools/.github/actions/ci-setup@${SHA}`), reader).findings).toHaveLength(1);
+  });
+
+  test("a repository the lock mounts only in part is not read", () => {
+    expect(actionDirOf(`uses: litlfred/part/.github/actions/ci-setup@${SHA}`, pinned)).toBeUndefined();
+  });
+
+  test("a local action still resolves to its own directory", () => {
+    expect(actionDirOf("uses: ./.github/actions/ci-setup", pinned)).toBe(".github/actions/ci-setup");
   });
 });
