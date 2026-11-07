@@ -144,6 +144,24 @@ describe("language adapters", () => {
     expect(names(JS_ADAPTER.findTests("d.test.ts", src))).toEqual(["d.test.ts::after_division"]);
   });
 
+  test("js: modifiers with their own arguments chain before the title call", () => {
+    const src = [
+      'test.skipIf(cond).each([1, 2])("skip-if each %d", (n) => {});',
+      'test.if(cond).each([1])("if each %d", () => {});',
+      'it.skip.each([1])("skip each %d", () => {});',
+      'test.skipIf(cond)("plain skip-if", () => {});',
+      'describe.skipIf(cond)("scope", () => { test("inner", () => {}); });',
+      'const t = test.each; t([1])("not a head", () => {});',
+    ].join("\n");
+    expect(names(JS_ADAPTER.findTests("c.test.ts", src))).toEqual([
+      "c.test.ts::skip-if_each_%d",
+      "c.test.ts::if_each_%d",
+      "c.test.ts::skip_each_%d",
+      "c.test.ts::plain_skip-if",
+      "c.test.ts::scope::inner",
+    ]);
+  });
+
   test("js: a test with a computed title is found and reported, never dropped", () => {
     const src = [
       'for (const [name] of cases) {',
