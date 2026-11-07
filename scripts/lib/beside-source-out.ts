@@ -6,7 +6,7 @@
  * reads its own copy (`<site>/assets/img/workflows/`), and a drawing written
  * beside an IG's `input/business-processes/*.bpmn` is an untracked file under
  * `input/`, so the next run read the cached IG AST as `stale-inputs` and
- * refused a root publish (smart-trust-phw, 2026-11-06). A build therefore
+ * refused a root publish (an IG's first agent publish, 2026-11-06). A build therefore
  * names a directory outside the checkout in {@link BESIDE_SOURCE_OUT_ENV},
  * and the drawings go there, at their repository-relative paths.
  *

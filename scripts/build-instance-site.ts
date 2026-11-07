@@ -758,7 +758,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     }
     if (o.mount) {
       // A mount an earlier build wrote into is left as it is by a plain mount, which then
-      // fails the build with a lock table. Say what to run instead (smart-trust-phw, 2026-11-06).
+      // fails the build with a lock table. Say what to run instead (an IG's first agent publish, 2026-11-06).
       const edited = editedMountsIn(root);
       if (edited.length) throw new Error(relayAdvice(root, edited));
       run("mount the pinned closure", `bun run ${shellQuote(join(import.meta.dir, "remote-mount.ts"))}`, root);
@@ -938,7 +938,7 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
       ? { site, remote: o.remote, into: staging, message, name: "Claude", email: "noreply@anthropic.com" }
       : { site, remote: o.remote, keep, message, name: "Claude", email: "noreply@anthropic.com" };
     // A first publish: origin has no gh-pages yet, and publish-site clones it,
-    // so start it as an orphan holding .nojekyll (smart-trust-phw#35).
+    // so start it as an orphan holding .nojekyll (an IG's first agent publish, 2026-11-06).
     ensurePublishBranch(o.remote, "gh-pages", { log: (l) => console.log(l) });
     const r = publishSite(opts);
     if (r.state === "failed") throw new Error(`publish failed: ${r.reason}`);

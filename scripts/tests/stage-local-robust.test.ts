@@ -1,7 +1,7 @@
 /**
- * Three ways an agent-run publish used to fail, each hit on smart-trust-phw's
- * first publish (2026-11-06; its `tools/publish/publish.sh` worked around them
- * in smart-trust-phw#35), and each now handled by the publisher. Every origin
+ * Three ways an agent-run publish used to fail, each hit on an IG's
+ * first publish (2026-11-06; its own publish script worked around them
+ * by hand), and each now handled by the publisher. Every origin
  * here is a local bare repository, so nothing reaches the network.
  *
  * 1. origin has no `gh-pages`: started as an orphan holding `.nojekyll`.

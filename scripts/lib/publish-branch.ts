@@ -3,10 +3,10 @@
  * only `.nojekyll`, pushed to the remote, so a first publish has a branch to
  * clone and replace instead of failing.
  *
- * smart-trust-phw's first publish (2026-11-06) failed with "could not clone
+ * An IG's first agent publish (2026-11-06) failed with "could not clone
  * gh-pages" because origin had no `gh-pages` yet, and the repository grew a
- * pre-check in its own `tools/publish/publish.sh` (smart-trust-phw#35) to
- * make the branch by hand. The publisher makes it instead.
+ * pre-check in its own publish script to make the branch by hand. The
+ * publisher makes it instead.
  *
  * Built with plumbing in a throwaway bare repository (`hash-object`,
  * `mktree`, `commit-tree`), so no checkout, worktree or ref of the caller's

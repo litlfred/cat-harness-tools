@@ -2105,7 +2105,7 @@ export interface EditedMount {
  * as {@link remoteFanOut} walks them. Nothing is fetched. A publisher asks
  * this before it mounts, so a build an earlier attempt left behind is named,
  * with the command that re-lays it ({@link relayAdvice}), instead of failing
- * inside the mount step (smart-trust-phw, 2026-11-06).
+ * inside the mount step (an IG's first agent publish, 2026-11-06).
  */
 export function editedMountsIn(checkout: string): EditedMount[] {
   return declaringInstances(checkout).roots.flatMap((root) =>

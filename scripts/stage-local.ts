@@ -583,7 +583,7 @@ interface PushLoop {
 async function pushLoop(o: PushLoop): Promise<{ pushed: boolean; commit?: string; composed?: string }> {
   const pages = mkdtempSync(join(tmpdir(), "stage-local-"));
   // No publish branch yet (a first publish): start one, an orphan holding
-  // `.nojekyll`, and publish onto it as onto any other (smart-trust-phw#35).
+  // `.nojekyll`, and publish onto it as onto any other (an IG's first agent publish, 2026-11-06).
   // A dry run pushes nothing, so it composes on an orphan worktree instead.
   let exists = spawnSync("git", ["-C", o.repo, "ls-remote", "--exit-code", "--heads", "origin", o.publishBranch], { stdio: "ignore" }).status === 0;
   if (!exists && !o.dryRun) {
@@ -730,7 +730,7 @@ export interface SitePublisher extends PublisherWorkflows {
 const HOST: PublisherHost = { formatPlan, pushLoop, writeArtifact, listSite, run, git, platformScript };
 
 /**
- * Mounts an earlier attempt left "modified" (smart-trust-phw, 2026-11-06): a
+ * Mounts an earlier attempt left "modified" (an IG's first agent publish, 2026-11-06): a
  * plain mount leaves them as they are, so the build's mount step refuses.
  * With `fresh`, re-lay them now (`remote-mount.ts --fresh`, which replaces
  * only the mounts off the lock); without it, a plan says what to run, and the
