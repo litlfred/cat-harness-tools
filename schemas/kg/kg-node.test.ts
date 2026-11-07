@@ -100,7 +100,7 @@ describe("this instance's own declaration", () => {
     }
   });
 
-  test("the laptop backdrop is declared, with a region inside the cloud", async () => {
+  test("the laptop backdrop is declared, with its measured text region pinned", async () => {
     // Guards the numbers that were found by rendering candidates and looking
     // at them — a later re-crop of the image must not silently keep a region
     // measured against the old one.
@@ -147,8 +147,9 @@ describe("the description survives Jekyll's markdown renderer", () => {
     // load-bearing — it lines `c@t` up under `c&at` so the ladder reads as a
     // derivation — so a plain space here is a silent misalignment.
     const d = await description();
-    const rung = d.split(/\n{2,}/).find((l) => l.includes("c@t-harness"));
-    expect(rung).toBeDefined();
+    const blocks = d.split(/\n{2,}/);
+    const rung = blocks[blocks.length - 1];
+    expect(rung).toContain("c@t-harness");
     expect(rung!.startsWith("\u00a0")).toBe(true);
   });
 

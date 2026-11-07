@@ -39,10 +39,14 @@ Feature: A deployment description places actors, and the checks find a placement
     Then it is refused
 
   @test:schemas/process/deployment-description.test.ts::the_schema::jurisdiction_is_four_optional_fields
-  Scenario: A jurisdiction parses, and an audience outside its list is refused
+  Scenario: A jurisdiction is four optional fields, and an audience outside its list is refused
     Given today's deployment as "sovereign-cloud" with a jurisdiction of publication base, audience "authenticated" and residency "in-country"
     When it is parsed
     Then it is accepted
+    And a jurisdiction of all four fields, publication base, audience, retention and residency, is accepted
+    And a jurisdiction of any one of the four alone is accepted
+    And an empty jurisdiction, and no jurisdiction at all, are accepted
+    And a jurisdiction of the four plus a fifth field "currency" is refused
     And the same with audience "everyone" is refused
 
   @test:schemas/process/deployment-description.test.ts::deploymentProblems::a_well-formed_description_has_none

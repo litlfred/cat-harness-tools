@@ -249,7 +249,14 @@ describe("laneRoleRef — a lane names its Role by partitionElementRef (owner, 2
   });
 
   test("the legacy element is matched by local name, whatever prefix the reader registered", () => {
-    expect(laneRoleRef({ extensionElements: { values: [{ $type: "folio:role", ref: "editor" }] } }).source).toBe("legacy-role-ref");
+    for (const $type of ["folio:role", "bootstrap.processes:role", "x:role", "a.b.c:role"]) {
+      const r = laneRoleRef({ extensionElements: { values: [{ $type, ref: "editor" }] } });
+      expect([$type, r.source, r.ref]).toEqual([$type, "legacy-role-ref", "editor"]);
+    }
+    // The LOCAL name must be `role`: another element under any prefix is not a binding.
+    for (const $type of ["folio:roles", "folio:notrole", "folio:role-ref"]) {
+      expect([$type, laneRoleRef({ extensionElements: { values: [{ $type, ref: "editor" }] } }).source]).toEqual([$type, "none"]);
+    }
   });
 
   test("partitionElementRef wins over a disagreeing legacy ref, and says so", () => {
@@ -324,7 +331,14 @@ describe("this repository's own role graph", () => {
   });
 
   test("every role's summary says what the position is, not just its name", () => {
-    for (const r of g!.roles) expect(r.description.length).toBeGreaterThan(20);
+    const words = (t: string) => t.toLowerCase().match(/[a-z0-9]+/g) ?? [];
+    for (const r of g!.roles) {
+      expect([r.id, r.description.length > 20]).toEqual([r.id, true]);
+      // With the role's own name (its title and its id) taken out, words remain.
+      const name = new Set([...words(r.title), ...words(r.id)]);
+      const rest = words(r.description).filter((w) => !name.has(w));
+      expect([r.id, rest.length >= 3]).toEqual([r.id, true]);
+    }
   });
 
   test("findRole and toJsonLd agree on the declared set", () => {
@@ -332,11 +346,16 @@ describe("this repository's own role graph", () => {
     const ld = toJsonLd(g!) as { roles: { "@id": string }[] };
     expect(ld.roles.length).toBe(g!.roles.length);
     expect(ld.roles[0]!["@id"]).toBe("#user");
+    // The same set, both ways: every JSON-LD role is one findRole finds, and every declared role is in the JSON-LD.
+    const ldIds = ld.roles.map((r) => r["@id"].replace(/^#/, ""));
+    expect(ldIds.map((id) => findRole(g!, id)?.id)).toEqual(ldIds);
+    expect(new Set(ldIds)).toEqual(new Set(g!.roles.map((r) => r.id)));
+    expect(new Set(ldIds).size).toBe(ldIds.length);
   });
 });
 
 describe("this repository's actor registry, after the roles[] migration", () => {
-  const actors = readActors(actorsDir(join(import.meta.dir, "..", "..", ".."))!);
+  const actors = readActors(actorsDir(requireHarnessRoot())!);
   const g = readRoleGraph(join(requireHarnessRoot(), "scenarios"))!;
 
   test("no entry still carries the deprecated `inherits`", () => {
@@ -372,7 +391,7 @@ describe("this repository's actor registry, after the roles[] migration", () => 
 
 describe("permissions are an actor property, not a role property", () => {
   const kg = join(requireHarnessRoot(), "skills");
-  const actorsDirPath = actorsDir(join(import.meta.dir, "..", "..", ".."))!;
+  const actorsDirPath = actorsDir(requireHarnessRoot())!;
 
   test("the vocabulary is declared and every id is unique", () => {
     const v = readPermissions(kg);
@@ -391,7 +410,7 @@ describe("permissions are an actor property, not a role property", () => {
   test("`capabilities[]` now holds probes only — no permission and no skill leaked back in", async () => {
     const { readdirSync } = await import("node:fs");
     const probes = new Set(
-      readdirSync(capabilitiesDir(join(import.meta.dir, "..", "..", ".."))!).map((f: string) =>
+      readdirSync(capabilitiesDir(requireHarnessRoot())!).map((f: string) =>
         f.replace(/\.json$/, ""),
       ),
     );
@@ -411,6 +430,15 @@ describe("permissions are an actor property, not a role property", () => {
       new Set(actors.filter((a) => (a.permissions ?? []).includes(perm)).flatMap((a) => a.roles ?? []));
     expect(rolesOf("content-authoring").size).toBeGreaterThan(1);
     expect(rolesOf("qa-reporting").size).toBeGreaterThan(1);
+    // Why it cannot live on Role: within one role, some actors hold the
+    // permission and others do not, so no per-role value could say it.
+    const g = readRoleGraph(join(requireHarnessRoot(), "scenarios"))!;
+    const splitRoles = (perm: string) =>
+      g.roles
+        .map((r) => actors.filter((a) => (a.roles ?? []).includes(r.id)))
+        .filter((as) => as.some((a) => (a.permissions ?? []).includes(perm)) && as.some((a) => !(a.permissions ?? []).includes(perm)));
+    expect(splitRoles("content-authoring").length).toBeGreaterThan(0);
+    expect(splitRoles("qa-reporting").length).toBeGreaterThan(0);
   });
 
   test("an unparseable vocabulary throws rather than reading as empty", () => {
@@ -423,7 +451,7 @@ describe("permissions are an actor property, not a role property", () => {
 });
 
 describe("the actor kind is three-way: human, agentic, mechanical", () => {
-  const actorsDirPath = actorsDir(join(import.meta.dir, "..", "..", ".."))!;
+  const actorsDirPath = actorsDir(requireHarnessRoot())!;
 
   function withActor(entry: unknown): string {
     const dir = mkdtempSync(join(tmpdir(), "actors-"));
@@ -628,7 +656,13 @@ describe("lane holding: when the lane is needed, and who holds it (owner rulings
   });
 
   test("the result does not depend on the order of the listing", () => {
-    expect(electHolder(holding, [c, b, a])).toBe(electHolder(holding, [a, b, c]));
+    const permutations = <T>(xs: T[]): T[][] =>
+      xs.length <= 1 ? [xs] : xs.flatMap((x, i) => permutations([...xs.slice(0, i), ...xs.slice(i + 1)]).map((p) => [x, ...p]));
+    const d = { ...b, sessionId: "session_D", ownsP0: true };
+    for (const listing of [[a, b], [a, b, c], [a, b, c, d]]) {
+      const expected = electHolder(holding, listing);
+      for (const p of permutations(listing)) expect(electHolder(holding, p)).toBe(expected);
+    }
   });
 
   test("a lone session holds the lane for itself only when the role allows it", () => {
@@ -652,6 +686,8 @@ describe("lane holding: when the lane is needed, and who holds it (owner rulings
   test("the stall and heartbeat windows are required", () => {
     const { heartbeatMinutes: _h, ...noHeartbeat } = holding;
     expect(LaneHoldingSchema.safeParse(noHeartbeat).success).toBe(false);
+    const { stalledAfterMinutes: _s, ...noStall } = holding;
+    expect(LaneHoldingSchema.safeParse(noStall).success).toBe(false);
   });
 
   test("an unreadable creation time sorts last rather than dropping the candidate", () => {

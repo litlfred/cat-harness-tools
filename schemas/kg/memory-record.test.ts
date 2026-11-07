@@ -22,7 +22,9 @@ describe("the layers", () => {
 
   test("a memory record on its own: scope required, entries structured", () => {
     expect(MemoryRecordKind.schema.safeParse({ $schema: "memory-record/1.0.0", id: "m1", scope: "shared", entries: [e] }).success).toBe(true);
-    expect(MemoryRecordKind.schema.safeParse({ $schema: "memory-record/1.0.0", id: "m1", scope: "everyone" }).success).toBe(false);
+    // Scope required: absent, or not one of the scopes, is refused — each with valid entries, so the scope is the only fault.
+    expect(MemoryRecordKind.schema.safeParse({ $schema: "memory-record/1.0.0", id: "m1", entries: [e] }).success).toBe(false);
+    expect(MemoryRecordKind.schema.safeParse({ $schema: "memory-record/1.0.0", id: "m1", scope: "everyone", entries: [e] }).success).toBe(false);
     expect(MemoryRecordKind.schema.safeParse({ $schema: "memory-record/1.0.0", id: "m1", scope: "run", entries: [{ ...e, kind: "gossip" }] }).success).toBe(false);
   });
 });

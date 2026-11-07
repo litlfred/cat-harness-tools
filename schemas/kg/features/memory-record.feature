@@ -18,7 +18,8 @@ Feature: A memory record holds structured entries, and a bean is one with more s
     Given a memory record with scope "shared" and one well-formed entry
     When it is parsed with the memory-record kind's schema
     Then it parses
-    And a record with scope "everyone" is refused
+    And the same record with no scope is refused
+    And the same record with scope "everyone" is refused
     And a record whose entry has the kind "gossip" is refused
 
   @test:schemas/kg/memory-record.test.ts::an_entry_as_a_body_line::round-trips,_metadata_included

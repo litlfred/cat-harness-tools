@@ -29,9 +29,12 @@ describe("rule 1 — a node runs after everything it needs", () => {
       step("kg-viewer", ["kg-export"]),
       step("visualisers", ["kg-export"]),
     ]);
+    expect(r.problems).toEqual([]);
     const ids = r.order.map((s) => s.id);
+    expect([...ids].sort()).toEqual(["kg-export", "kg-viewer", "readme", "visualisers"]);
     expect(ids.indexOf("readme")).toBeGreaterThan(ids.indexOf("kg-export"));
     expect(ids.indexOf("kg-viewer")).toBeGreaterThan(ids.indexOf("kg-export"));
+    expect(ids.indexOf("visualisers")).toBeGreaterThan(ids.indexOf("kg-export"));
   });
 });
 
@@ -46,7 +49,11 @@ describe("rule 2 — ties break on declaration order", () => {
   it("renaming a node does not reshuffle its unrelated siblings", () => {
     const before = flattenDependencies([step("a"), step("m"), step("z")]).order.map((s) => s.id);
     const after = flattenDependencies([step("a"), step("m2"), step("z")]).order.map((s) => s.id);
-    expect(before.indexOf("z")).toBe(after.indexOf("z"));
+    expect(before).toEqual(["a", "m", "z"]);
+    // The renamed node keeps its slot, and every unrelated sibling keeps its own.
+    expect(after).toEqual(["a", "m2", "z"]);
+    expect(after.indexOf("m2")).toBe(before.indexOf("m"));
+    expect(after.filter((id) => id !== "m2")).toEqual(before.filter((id) => id !== "m"));
   });
 });
 
@@ -67,6 +74,11 @@ describe("rule 3 — a cycle is reported, never broken", () => {
   it("a clean subgraph beside a cycle is still not ordered — partial output gets run", () => {
     const r = flattenDependencies([step("ok"), step("a", ["b"]), step("b", ["a"])]);
     expect(r.order).toEqual([]);
+    // The cycle is still reported, naming only the nodes in it — not the clean one.
+    expect(r.problems).toHaveLength(1);
+    const p = r.problems[0]!;
+    expect(p.kind).toBe("cycle");
+    expect(p.kind === "cycle" && p.ids).toEqual(["a", "b"]);
   });
 });
 
@@ -80,7 +92,11 @@ describe("rule 4 — a missing dependency is reported, never dropped", () => {
 
   it("a duplicate id is a problem — nothing says which of the two was ordered", () => {
     const r = flattenDependencies([step("a"), step("a")]);
-    expect(r.problems[0]!.kind).toBe("duplicate");
+    expect(r.order).toEqual([]);
+    expect(r.problems).toHaveLength(1);
+    const p = r.problems[0]!;
+    expect(p.kind).toBe("duplicate");
+    expect(p.kind === "duplicate" && p.id).toBe("a");
   });
 });
 

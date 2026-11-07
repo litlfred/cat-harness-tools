@@ -22,10 +22,11 @@ Feature: A state manifest records how its branch is keyed, seeded and kept
     Then it is refused
 
   @test:schemas/kg/state-manifest.test.ts::state-manifest/v1::a_route-keyed_manifest_without_its_writer_or_gate_is_refused_—_those_are_what_make_it_regenerable
-  Scenario: A route-keyed manifest without its writer is refused
+  Scenario: A route-keyed manifest without its writer or its gate is refused
     Given the route-keyed manifest without its writer
     When it is parsed
     Then it is refused
+    And the route-keyed manifest without its gate is refused too
 
   @test:schemas/kg/state-manifest.test.ts::state-manifest/v1::a_status_outside_the_four_is_refused
   Scenario: An unknown status is refused

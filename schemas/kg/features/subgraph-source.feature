@@ -65,10 +65,11 @@ Feature: A declared subgraph's content source is one union, resolved by one reso
     Then it throws an error mentioning "both"
 
   @test:schemas/kg/subgraph-source.test.ts::precedence_—_config,_then_source,_then_legacy_storage,_then_directory::a_qa_subgraph_keyed_by_tip_is_refused_(#1937's_rule,_whichever_field_says_it)
-  Scenario: A qa subgraph with a tip-keyed branch source is refused
+  Scenario: A qa subgraph keyed by tip is refused, whichever field says it
     Given a qa entry whose source is a tip-keyed branch "cat/cat-harness/qa-reports"
     When its source is resolved
-    Then it throws an error mentioning "qa"
+    Then it throws an error saying the `qa` subgraph is keyed by commit
+    And a qa entry whose legacy storage is the same branch keyed by tip throws the same error
 
   @test:schemas/kg/subgraph-source.test.ts::the_presence_checks_ask_one_question_of_either_spelling::a_branch_source,_or_a_legacy_storage,_is_off_the_checkout;_a_directory_source_or_none_is_not
   Scenario: Branch sources and storages are off the checkout; directories are not
@@ -95,10 +96,10 @@ Feature: A declared subgraph's content source is one union, resolved by one reso
     Then it is a family with that prefix and key, declared in "storage"
 
   @test:schemas/kg/subgraph-source.test.ts::a_branch_FAMILY_(bean_lehh)::the_source_spelling_resolves_the_same_way
-  Scenario: A family source resolves to a family
-    Given the ig-ast entry with a family source
+  Scenario: A family source resolves to a family, as the storage spelling does
+    Given the ig-ast entry with a family source with prefix "cat/fhir-harness/fhir-ast/" and keyFrom "the IG's package id"
     When its source is resolved
-    Then it is a family declared in "declaration"
+    Then it is a family with that prefix and that keyFrom, declared in "declaration"
 
   @test:schemas/kg/subgraph-source.test.ts::a_branch_FAMILY_(bean_lehh)::a_prefix_must_end_in_/,_and_a_family_keying_names_no_single_branch
   Scenario: A family prefix ends in /, and a family storage names no single branch
@@ -118,12 +119,14 @@ Feature: A declared subgraph's content source is one union, resolved by one reso
     And a resolved family source's JSON-LD is { kind: family, branch: the prefix, keyFrom, declaredIn }
 
   @test:schemas/kg/subgraph-source.test.ts::a_branch_FAMILY's_repository_(owner:_read_remote,_or_materialise_locally)::absent_means_this_repository;_present_names_the_remote,_through_both_spellings_and_the_JSON-LD
-  Scenario: A family's repository is absent locally and named when remote
+  Scenario: A family's repository is absent locally and named when remote, in either spelling
     Given family storages with no repository and with repository "litlfred/smart-trust"
     When each is resolved
     Then the first has no repository
     And the second names litlfred/smart-trust
     And the second's JSON-LD has familyRepository litlfred/smart-trust
+    And family sources with no repository and with repository "litlfred/smart-trust" resolve the same way
+    And the remote source is declared in "declaration" and its JSON-LD has familyRepository litlfred/smart-trust
 
   @test:schemas/kg/subgraph-source.test.ts::a_branch_FAMILY's_repository_(owner:_read_remote,_or_materialise_locally)::a_repository_is_owner/repo,_not_a_URL
   Scenario: A family repository is owner/repo, not a URL

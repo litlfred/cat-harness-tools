@@ -29,7 +29,8 @@ Feature: Graph typologies are declared as nodes and loaded from the checkouts on
   Scenario: Two files claiming one kind name are refused
     Given a checkout in which alpha and beta both declare the kind "widget"
     When the registry is asked for "widget"
-    Then it throws an error matching "alpha…beta" or "declared by"
+    Then it throws an error saying "declared by"
+    And the message names both alpha's and beta's typologies/widget.json files
 
   @test:schemas/kg/graph-typology-node.test.ts::a_declared_kind::a_declared_name_that_the_code_also_lists_is_refused
   Scenario: A declared kind the code also lists is refused
@@ -87,6 +88,7 @@ Feature: Graph typologies are declared as nodes and loaded from the checkouts on
     Given validator nodes "a" and "b" for the family "widget/v1", naming different schemas
     When the registry is asked for "widget"
     Then it throws an error mentioning "two validators"
+    And the message names both validator files, validators/a.json and validators/b.json
 
   @test:schemas/kg/graph-typology-node.test.ts::validators_as_nodes_(bean_riit):_the_validator_names_the_family::a_family_that_already_names_DIFFERENT_code_is_two_answers,_and_refused
   Scenario: A validator node for a family that already names code is refused

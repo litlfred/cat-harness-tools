@@ -62,7 +62,8 @@ describe("precedence — config, then source, then legacy storage, then director
     expect(() => resolveSubgraphSource({ ...ENTRY, source: BRANCH, storage: { branch: "x", keyedBy: "tip" } })).toThrow(/both/);
   });
   test("a qa subgraph keyed by tip is refused (#1937's rule, whichever field says it)", () => {
-    expect(() => resolveSubgraphSource({ id: "qa", path: "qa/", graphTypologies: ["qa"], source: { ...BRANCH, branch: "cat/cat-harness/qa-reports" } })).toThrow(/qa/);
+    expect(() => resolveSubgraphSource({ id: "qa", path: "qa/", graphTypologies: ["qa"], source: { ...BRANCH, branch: "cat/cat-harness/qa-reports" } })).toThrow(/`qa` subgraph: it is keyed by commit/);
+    expect(() => resolveSubgraphSource({ id: "qa", path: "qa/", graphTypologies: ["qa"], storage: { branch: "cat/cat-harness/qa-reports", keyedBy: "tip" } })).toThrow(/`qa` subgraph: it is keyed by commit/);
   });
 });
 
@@ -101,8 +102,10 @@ describe("a branch FAMILY (bean lehh)", () => {
     expect(r).toMatchObject({ kind: "family", branchPrefix: "cat/fhir-harness/fhir-ast/", keyFrom: "the IG's package id", declaredIn: "storage" });
   });
   test("the source spelling resolves the same way", () => {
-    const r = resolveSubgraphSource({ ...FAMILY_ENTRY, source: { kind: "family", branchPrefix: "cat/x/y/", keyFrom: "k" } });
-    expect(r).toMatchObject({ kind: "family", declaredIn: "declaration" });
+    const r = resolveSubgraphSource(
+      { ...FAMILY_ENTRY, source: { kind: "family", branchPrefix: "cat/fhir-harness/fhir-ast/", keyFrom: "the IG's package id" } },
+    );
+    expect(r).toMatchObject({ kind: "family", branchPrefix: "cat/fhir-harness/fhir-ast/", keyFrom: "the IG's package id", declaredIn: "declaration" });
   });
   test("a prefix must end in /, and a family keying names no single branch", () => {
     expect(SubgraphSourceSchema.safeParse({ kind: "family", branchPrefix: "cat/x/y", keyFrom: "k" }).success).toBe(false);
@@ -130,6 +133,12 @@ describe("a branch FAMILY's repository (owner: read remote, or materialise local
     );
     expect(remote).toMatchObject({ kind: "family", repository: "litlfred/smart-trust" });
     expect(contentSourceJsonLd(remote)).toMatchObject({ familyRepository: "litlfred/smart-trust" });
+    // The source spelling: absent is this repository, present names the remote.
+    const localSource = resolveSubgraphSource({ ...E, source: { kind: "family", branchPrefix: "cat/x/", keyFrom: "k" } });
+    expect(localSource.kind === "family" && localSource.repository).toBe(undefined);
+    const remoteSource = resolveSubgraphSource({ ...E, source: { kind: "family", branchPrefix: "cat/x/", keyFrom: "k", repository: "litlfred/smart-trust" } });
+    expect(remoteSource).toMatchObject({ kind: "family", repository: "litlfred/smart-trust", declaredIn: "declaration" });
+    expect(contentSourceJsonLd(remoteSource)).toMatchObject({ familyRepository: "litlfred/smart-trust" });
   });
   test("a repository is owner/repo, not a URL", () => {
     expect(SubgraphSourceSchema.safeParse({ kind: "family", branchPrefix: "cat/x/", keyFrom: "k", repository: "https://github.com/a/b" }).success).toBe(false);

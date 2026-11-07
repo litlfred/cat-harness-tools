@@ -42,5 +42,6 @@ Feature: A device screen is typed data with no free markup
     And of phone, tablet, scanner, desktop and kiosk, the wide ones are tablet, desktop and kiosk
 
   @test:schemas/process/device-screen.test.ts::device-screen:_a_screen_is_typed_data::the_union_holds_exactly_the_block_types_the_table_lists
-  Scenario: The block union has as many members as the block type table
+  Scenario: The block union holds exactly the block types of the table
     Then the number of options in the screen block union equals the number of block types
+    And the options' type literals, in order, are exactly the block types of the table

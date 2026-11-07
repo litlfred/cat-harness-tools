@@ -51,31 +51,35 @@ Feature: The attestation store holds judgements only, and a read says which stat
 
   @test:schemas/sdlc/qa-attestations.test.ts::reading_—_five_states,_and_a_miss_or_an_absent_store_is_'never_attested'_only_after_the_prior_is_read::no_store_at_all_is_ABSENT,_not_a_miss_—_the_writer_then_moves_the_prior's_judgements_(owner_ruling_2)
   Scenario: No store at all reads as absent
-    Given an attestation path under a temporary home
+    Given an attestation path under a fresh temporary home of its own
     When it is read against a store root that does not exist
     Then the state is "absent"
 
   @test:schemas/sdlc/qa-attestations.test.ts::reading_—_five_states,_and_a_miss_or_an_absent_store_is_'never_attested'_only_after_the_prior_is_read::a_store_path_that_is_not_a_directory_is_UNKNOWN
   Scenario: A store root that is a file reads as unknown
-    Given the store root is an empty regular file
+    Given a fresh temporary home of its own
+    And the store root is an empty regular file in it
     When the attestation path is read against it
     Then the state is "unknown"
 
   @test:schemas/sdlc/qa-attestations.test.ts::reading_—_five_states,_and_a_miss_or_an_absent_store_is_'never_attested'_only_after_the_prior_is_read::a_store_with_no_file_for_this_subject_is_a_miss_—_even_with_no_family_tree_under_it_yet
   Scenario: An existing store with no file for the subject reads as a miss
+    Given a fresh temporary home of its own
     When the attestation path is read against the home directory, which has no kg-qa tree
     Then the state is "miss"
     And after the kg-qa tree is created, reading against it is still "miss"
 
   @test:schemas/sdlc/qa-attestations.test.ts::reading_—_five_states,_and_a_miss_or_an_absent_store_is_'never_attested'_only_after_the_prior_is_read::a_conflict-marked_or_invalid_file_is_CORRUPT,_never_an_empty_list
   Scenario: A conflict-marked or invalid file reads as corrupt
+    Given a fresh temporary home of its own, with the subject's directory created
     When the attestation file holds git conflict markers
     Then the state is "corrupt"
     And a file with only $schema and family is also "corrupt"
 
   @test:schemas/sdlc/qa-attestations.test.ts::reading_—_five_states,_and_a_miss_or_an_absent_store_is_'never_attested'_only_after_the_prior_is_read::a_valid_file_is_a_hit,_returned_as_written_—_key_order_included
   Scenario: A valid file reads as a hit, exactly as written
-    Given a valid attestation file whose pair attestation's keys are not in schema order, written with serialiseAttestations
+    Given a fresh temporary home of its own, with the subject's directory created
+    And a valid attestation file whose pair attestation's keys are not in schema order, written with serialiseAttestations
     When it is read
     Then the state is "hit"
     And the returned file serialises identically to what was written, key order included
