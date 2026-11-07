@@ -511,6 +511,7 @@ export function bibSlug(file: string): string {
     // document was in, and `--promote` reported the entry incomplete rather
     // than missing.
     "print(m.derive_doc_id_from_pdf(sys.argv[1]))\n";
+  // input-site: spawned #ae0c4e79 — python3 on a document this tool was handed; the cone audits the child from its read set
   const r = Bun.spawnSync(["python3", "-c", py, file]);
   const out = new TextDecoder().decode(r.stdout).trim();
   if (r.exitCode !== 0 || !out) {
@@ -647,6 +648,7 @@ try:
 except Exception as e:
     print(json.dumps({"error": str(e)}))
 `;
+  // input-site: spawned #363b130f — python3 on a document this tool was handed; the cone audits the child from its read set
   const r = Bun.spawnSync(["python3", "-c", py, pdf]);
   const raw = parseProbe(new TextDecoder().decode(r.stdout)) as Probe & {
     toc?: [string, number][];
@@ -719,6 +721,7 @@ export function sniffMimetype(file: string): string | null {
     `spec = u.spec_from_file_location('t', ${JSON.stringify(helper)})\n` +
     "m = u.module_from_spec(spec); spec.loader.exec_module(m)\n" +
     "print(json.dumps(m.sniff_effective_mimetype(sys.argv[1])[0]))\n";
+  // input-site: spawned #ae0c4e79 — python3 on a document this tool was handed; the cone audits the child from its read set
   const r = Bun.spawnSync(["python3", "-c", py, file]);
   if (r.exitCode !== 0) return null;
   try {
@@ -736,6 +739,7 @@ export function tabularDelimiter(file: string): string | null {
     `spec = u.spec_from_file_location('t', ${JSON.stringify(pyHelper("tabular-records.py"))})\n` +
     "m = u.module_from_spec(spec); spec.loader.exec_module(m)\n" +
     "print(json.dumps(m.is_tabular_text(sys.argv[1])))\n";
+  // input-site: spawned #ae0c4e79 — python3 on a document this tool was handed; the cone audits the child from its read set
   const r = Bun.spawnSync(["python3", "-c", py, file]);
   if (r.exitCode !== 0) return null;
   try {
@@ -1041,6 +1045,7 @@ export function refreshMeta(pdf: string, libRoot = libraryRoot()): string {
     "d['source'] = {**d.get('source', {}), **m.tech_meta(sys.argv[1])}\n" +
     "open(p, 'w').write(json.dumps(d, indent=ind) + ('\\n' if raw.endswith('\\n') else ''))\n" +
     "print(d['source']['mimetype_source'])\n";
+  // input-site: spawned #24f26d86 — python3 on a document this tool was handed; the cone audits the child from its read set
   const r = Bun.spawnSync(["python3", "-c", py, pdf, structure]);
   if (r.exitCode !== 0) {
     throw new Error(`refreshing ${slug}: ${new TextDecoder().decode(r.stderr).trim()}`);
@@ -1063,6 +1068,7 @@ export function refreshTitle(pdf: string, libRoot = libraryRoot()): string {
   const slug = bibSlug(pdf);
   const structure = join(resolve(INSTANCE_ROOT, libRoot), slug, STRUCTURE_FILENAME);
   if (!existsSync(structure)) throw new Error(`${structure}: no such entry to refresh`);
+  // input-site: spawned #700cd046 — python3 on a document this tool was handed; the cone audits the child from its read set
   const r = Bun.spawnSync(["python3", pyHelper("_pdf_title.py"), "--refresh", structure, pdf]);
   if (r.exitCode !== 0) {
     throw new Error(`refreshing the title of ${slug}: ${new TextDecoder().decode(r.stderr).trim()}`);

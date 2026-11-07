@@ -1101,7 +1101,7 @@ export function deferredInputsOf(
   return out;
 }
 
-/** A program that runs this tree's TypeScript: what a test's `spawned` site starts. */
+/** A program that runs this tree's TypeScript: what a `spawned` site starts. */
 export const JS_RUNTIME_RE = /(?:^|\/)(?:bun|bunx|node)$/;
 
 /**
