@@ -130,6 +130,11 @@ describe("language adapters", () => {
     ]);
   });
 
+  test("js: a block comment mentioning a /* glob still closes", () => {
+    const src = ["/** loads `schemas/**` and `x/*.ts` */", 'test("after the comment", () => {});'].join("\n");
+    expect(names(JS_ADAPTER.findTests("c.test.ts", src))).toEqual(["c.test.ts::after_the_comment"]);
+  });
+
   test("js: a division is not read as a regex literal", () => {
     const src = ["const half = total / 2; const q = a / b / c;", 'test("after division", () => {});'].join("\n");
     expect(names(JS_ADAPTER.findTests("d.test.ts", src))).toEqual(["d.test.ts::after_division"]);

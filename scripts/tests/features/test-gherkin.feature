@@ -41,6 +41,12 @@ Feature: Every test has a Gherkin
     Then each test is named through its own scope only
     And the ${key} in a title is kept verbatim
 
+  @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_block_comment_mentioning_a_/*_glob_still_closes
+  Scenario: A JS block comment mentioning a glob still closes
+    Given a test file whose doc comment mentions `schemas/**` and `x/*.ts`
+    When the JS adapter reads it
+    Then the test after the comment is found
+
   @test:scripts/tests/test-gherkin.test.ts::language_adapters::js:_a_division_is_not_read_as_a_regex_literal
   Scenario: A division is not read as a regex literal
     Given a test file whose first line divides with /

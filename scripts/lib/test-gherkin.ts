@@ -225,12 +225,13 @@ export function maskSource(
       continue;
     }
     if (c === "/" && n === "*") {
-      // Rust and Kotlin nest block comments; JS does not, but nesting never
-      // starts inside a JS comment that closes, so counting is safe for both.
+      // Rust and Kotlin nest block comments; JS does not, and a JS comment
+      // that mentions a glob (`schemas/**`) would never close if counted.
+      const nests = !opts.templates;
       let depth = 1;
       let j = i + 2;
       while (j < src.length && depth > 0) {
-        if (src[j] === "/" && src[j + 1] === "*") {
+        if (nests && src[j] === "/" && src[j + 1] === "*") {
           depth++;
           j += 2;
         } else if (src[j] === "*" && src[j + 1] === "/") {
