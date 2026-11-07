@@ -858,28 +858,31 @@ describe("the check over a staged site: every DAK link resolves to a file", () =
 });
 
 describe("composition (user-scenario 0.4.0): a parent's parts, in its order, and a step that is a journey", () => {
-  // A checkout of its own: one instance, every journey of it 0.4.0.
+  // A checkout of its own: one instance, every journey of it 0.4.0. The
+  // instance sits one level down, as `lower` and `top` do: an instance at
+  // the temporary directory's top would make the system temporary directory
+  // its checkout, read with every other test's fixtures in it.
   const ROOT = mkdtempSync(join(tmpdir(), "journeys-compose-"));
   afterAll(() => rmSync(ROOT, { recursive: true, force: true }));
   const putc = (rel: string, body: object): void => {
     mkdirSync(join(ROOT, dirname(rel)), { recursive: true });
     writeFileSync(join(ROOT, rel), JSON.stringify(body, null, 2));
   };
-  putc("compose.json", {
+  putc("compose/compose.json", {
     name: "compose",
     directories: [
       { id: "scenarios", path: "scenarios/", graphTypologies: ["scenarios"] },
       { id: "user-scenarios", path: "journeys/", graphTypologies: ["user-scenario"] },
     ],
   });
-  putc("scenarios/actors/ana.json", { id: "ana", title: "Ana", roles: ["traveller"], meta: { persona: { name: "Ana" } } });
-  putc("scenarios/roles.json", { roles: [{ id: "traveller", title: "Traveller" }] });
+  putc("compose/scenarios/actors/ana.json", { id: "ana", title: "Ana", roles: ["traveller"], meta: { persona: { name: "Ana" } } });
+  putc("compose/scenarios/roles.json", { roles: [{ id: "traveller", title: "Traveller" }] });
   const v04 = (id: string, title: string, extra: object) => ({ $schema: "user-scenario/0.4.0", id, title, description: "d", ...extra });
-  putc("journeys/trip.json", v04("trip", "C — The trip", { parts: [{ scenario: "home" }, { scenario: "away", optional: true, repeats: true }] }));
-  putc("journeys/away.json", v04("away", "C2 — Away", { personas: ["ana"], steps: [step("C2", "ana")] }));
-  putc("journeys/home.json", v04("home", "C1 — Home", { personas: ["traveller"], steps: [step("C1", "ana", { includes: "away" })] }));
+  putc("compose/journeys/trip.json", v04("trip", "C — The trip", { parts: [{ scenario: "home" }, { scenario: "away", optional: true, repeats: true }] }));
+  putc("compose/journeys/away.json", v04("away", "C2 — Away", { personas: ["ana"], steps: [step("C2", "ana")] }));
+  putc("compose/journeys/home.json", v04("home", "C1 — Home", { personas: ["traveller"], steps: [step("C1", "ana", { includes: "away" })] }));
   clearDeclaredVisualisers();
-  const c = readJourneyCorpus(ROOT);
+  const c = readJourneyCorpus(join(ROOT, "compose"));
   const pages = renderJourneyPages(c, { ...LINKS, route: "en/compose/journeys" }, "compose");
   const page = (path: string) => String(pages.find((x) => x.path === path)!.content);
 
