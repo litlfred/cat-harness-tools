@@ -13,9 +13,11 @@
  * 1. **The request is well formed**: {@link parseMergeRequest} accepts it.
  * 2. **The head is current**: the SHA on the `ready:` line is the PR's head
  *    now, and the PR is open. A push after the request makes it stale.
- * 3. **The preview was built for that head.** For folio-assistant, the latest
- *    "Staging preview" bot comment on the PR names the commit it built
- *    (its `Commit` field), which must be that head; the preview URL must have
+ * 3. **The preview was built for that head.** For folio-assistant, the
+ *    "Staging preview" bot comment on the PR (one per PR, edited in place on
+ *    each build; its latest body is read) names the commit it built (its
+ *    `Commit` field, a short SHA, matched as a prefix of the head), and its
+ *    `Status` must not read "staged … queued" (not live yet); the preview URL must have
  *    the form `https://litlfred.github.io/folio-assistant/branches/<slug>/`,
  *    with the comment's slug when the comment gives one. Another repository
  *    has no build record to check: the preview is reported as not verified,
@@ -61,7 +63,9 @@ export interface IssueComment {
 }
 
 /** The latest "Staging preview" comment's commit and preview slug. */
-export function stagingPreview(comments: readonly IssueComment[]): { commit: string | null; slug: string | null } | null {
+export function stagingPreview(
+  comments: readonly IssueComment[],
+): { commit: string | null; slug: string | null; live: boolean } | null {
   const staging = comments.filter((c) => c.body && STAGING.test(c.body));
   if (staging.length === 0) return null;
   const at = (c: IssueComment) => Date.parse(c.updated_at ?? c.created_at);
@@ -69,7 +73,10 @@ export function stagingPreview(comments: readonly IssueComment[]): { commit: str
   const body = latest.body ?? "";
   const commit = COMMIT.exec(body)?.[1]?.toLowerCase() ?? null;
   const url = /https:\/\/litlfred\.github\.io\/folio-assistant\/branches\/[^/\s)]+\//.exec(body)?.[0];
-  return { commit, slug: url ? (FOLIO_PREVIEW.exec(url)?.[1] ?? null) : null };
+  // "pushed to `gh-pages` …; live by about …" is rendered; "staged — … queued" is not yet.
+  const status = /\*\*Status:\*\*\s*(.*)/i.exec(body)?.[1] ?? "";
+  const live = !/\bstaged\b|\bqueued\b/i.test(status);
+  return { commit, slug: url ? (FOLIO_PREVIEW.exec(url)?.[1] ?? null) : null, live };
 }
 
 /** A short commit names the head when the head starts with it. */
@@ -100,6 +107,7 @@ export function previewFindings(r: MergeRequest, repo: string, comments: readonl
   else if (!sameCommit(built.commit, r.headSha)) {
     reasons.push(`preview built for ${built.commit}, head is ${r.headSha.slice(0, 12)}: wait for the rebuild`);
   }
+  if (!built.live) reasons.push("the preview is staged, not live yet: wait for the Pages build");
   if (slug && built.slug && slug !== built.slug) reasons.push(`preview slug ${slug} is not the built one, ${built.slug}`);
   return { reasons, notes };
 }

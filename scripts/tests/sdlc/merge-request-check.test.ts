@@ -44,9 +44,51 @@ const folio = (head: string, comments: IssueComment[], state = "open") =>
 describe("the Staging preview comment", () => {
   test("the latest one wins; its Commit and slug are read", () => {
     const old = staging("89668b7", "2026-11-07T07:00:00Z");
-    expect(stagingPreview([staging("3441735"), old])).toEqual({ commit: "3441735", slug: "claude-fix-nav" });
+    expect(stagingPreview([staging("3441735"), old])).toEqual({ commit: "3441735", slug: "claude-fix-nav", live: true });
     expect(stagingPreview([{ body: "Commit: 3441735d", created_at: "x" }])).toBeNull();
     expect(stagingPreview([{ body: "Staging preview\n**Commit:** 3441735d", created_at: "2026-11-07T00:00:00Z" }])?.commit).toBe("3441735d");
+  });
+});
+
+/**
+ * A real comment, pinned: folio-assistant#2985, comment 6675908708 (one per
+ * PR, edited in place on each build), as of 2026-11-07T06:42:54Z.
+ */
+const REAL = [
+  "<!-- staging-preview-comment -->",
+  "## 🔍 Staging preview",
+  "",
+  "**URL:** https://litlfred.github.io/folio-assistant/branches/ccr-cce3e36b-lgh7fe/",
+  "**Commit:** `c1fbb65`",
+  "**Branch:** `ccr-cce3e36b-lgh7fe`",
+  "",
+  "**Status:** pushed to `gh-pages` at 06:42 UTC; live by about **06:47 UTC**, once the Pages build finishes (...)",
+].join("\n");
+const REAL_HEAD = "c1fbb65" + "0".repeat(33);
+
+describe("the real folio-assistant comment (#2985)", () => {
+  const comment = (body: string): IssueComment => ({ body, created_at: "2026-11-07T06:30:00Z", updated_at: "2026-11-07T06:42:54Z" });
+  test("its short Commit, slug and live status are read", () => {
+    expect(stagingPreview([comment(REAL)])).toEqual({ commit: "c1fbb65", slug: "ccr-cce3e36b-lgh7fe", live: true });
+  });
+  test("a request for its head and URL (or a page under it) is ok", () => {
+    const api = stub({
+      [`repos/${FOLIO}/pulls/7`]: { state: "open", head: { sha: REAL_HEAD } },
+      [`repos/${FOLIO}/issues/7/comments?per_page=100`]: [comment(REAL)],
+    });
+    for (const url of ["https://litlfred.github.io/folio-assistant/branches/ccr-cce3e36b-lgh7fe/", "https://litlfred.github.io/folio-assistant/branches/ccr-cce3e36b-lgh7fe/changes/"]) {
+      expect(checkMergeRequest(api, request({ sha: REAL_HEAD, preview: `preview: ${url}` }))).toEqual({ kind: "ok", notes: [] });
+    }
+  });
+  test("staged and queued is not rendered yet", () => {
+    const staged = REAL.replace(/\*\*Status:\*\*.*/, "**Status:** staged — Pages build queued");
+    expect(stagingPreview([comment(staged)])?.live).toBe(false);
+    const api = stub({
+      [`repos/${FOLIO}/pulls/7`]: { state: "open", head: { sha: REAL_HEAD } },
+      [`repos/${FOLIO}/issues/7/comments?per_page=100`]: [comment(staged)],
+    });
+    const v = checkMergeRequest(api, request({ sha: REAL_HEAD, preview: "preview: https://litlfred.github.io/folio-assistant/branches/ccr-cce3e36b-lgh7fe/" }));
+    expect(formatCheck(v)).toContain("staged, not live yet");
   });
 });
 
