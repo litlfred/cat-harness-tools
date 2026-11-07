@@ -461,6 +461,18 @@ function stem(w: string, locale: string): string {
   return w.slice(0, Math.max(4, w.length - cut));
 }
 
+/**
+ * The stems a word of a fixed translation may appear under. Russian drops a
+ * fleeting «е»/«о»/«ё» before a final consonant in every form but the
+ * nominative singular — «узел» → «узла», «узлу», «узлы» — so the nominative's
+ * stem «узе» never prefixes them; the stem without that vowel, «узл», does.
+ */
+function stems(w: string, locale: string): string[] {
+  const out = [stem(w, locale)];
+  if (locale === "ru" && w.length >= 4 && /[^аеёиоуыэюяйь][еоё][^аеёиоуыэюяйь]$/u.test(w)) out.push(w.slice(0, -2) + w.slice(-1));
+  return out;
+}
+
 /** Does `msgstr` use the fixed translation? By stem, or by substring in zh and ar. */
 export function renders(fixed: string, msgstr: string, locale: string): boolean {
   // A fixed translation may gloss itself in parentheses — an abbreviation, «Infrastructure
@@ -481,7 +493,7 @@ function rendersExactly(fixed: string, msgstr: string, locale: string): boolean 
     return f.split(/\s+/).filter(Boolean).every((w) => t.includes(w));
   }
   const toks = t.match(/[\p{L}\p{N}_]+/gu) ?? [];
-  return (f.match(/[\p{L}\p{N}_]+/gu) ?? []).every((w) => toks.some((x) => x.startsWith(stem(w, locale))));
+  return (f.match(/[\p{L}\p{N}_]+/gu) ?? []).every((w) => stems(w, locale).some((s) => toks.some((x) => x.startsWith(s))));
 }
 
 /** Is `term` a word of the prose in `msgid` — not inside an identifier, a path, code or a placeholder? */

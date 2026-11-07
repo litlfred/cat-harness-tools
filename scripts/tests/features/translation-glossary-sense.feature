@@ -104,6 +104,13 @@ Feature: Glossary terms in sense keep their fixed translation
     And text that does not render the term still fails
 
 
+  @test:pipeline/translation-glossary.test.ts::matching::a_Russian_noun_with_a_fleeting_vowel_is_found_in_its_oblique_cases
+  Scenario: A Russian noun whose vowel drops in its oblique cases still renders the term
+    Given the fixed Russian translation «Узел»
+    When running text uses «узла» or «узлы»
+    Then the term counts as rendered
+    And a different word does not
+
   @test:pipeline/translation-glossary.test.ts::the_CLI:_one_finding_per_line,_exit_0_/_1_/_2::a_layer_the_instance_needs_is_not_on_disk:_exits_2,_naming_it,_rather_than_judging_its_glossary_as_the_instance's_own
   Scenario: A layer the instance needs is absent, so the check refuses to judge
     Given an instance whose needs name a layer that is not on disk
