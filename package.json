@@ -635,6 +635,8 @@
     "translate-kg-viewer:check": "bun run cat-harness-tools/scripts/translate-kg-viewer.ts --check",
     "translation:block-qa": "bun run cat-harness-tools/pipeline/translation-block-qa.ts",
     "translation:block-qa:check": "bun run cat-harness-tools/pipeline/translation-block-qa.ts --check --against main",
+    "translation:glossary": "bun run cat-harness-tools/pipeline/translation-glossary.ts",
+    "translation:glossary:check": "bun run cat-harness-tools/pipeline/translation-glossary.ts --check",
     "translation:page-qa": "bun run cat-harness-tools/pipeline/translation-block-qa.ts --catalogues",
     "translation:page-qa:check": "bun run cat-harness-tools/pipeline/translation-block-qa.ts --catalogues --check --against main",
     "translation:drift:check": "bun run cat-harness-tools/pipeline/translation-drift.ts",

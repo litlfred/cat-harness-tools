@@ -44,6 +44,7 @@ import {
 import { checkoutProcessPresentations, processTarget } from "./process-presentations.js";
 import { isGlobalTasksFile } from "../src/workflow/process-model.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { BESIDE_SOURCE_OUT_ENV, besideSourceTarget } from "./lib/beside-source-out.ts";
 import { subjectHref } from "./lib/subject-pages.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
@@ -103,6 +104,14 @@ const OUT_DIR = join(ROOT, siteDirFor(ROOT), "assets/img/workflows");
 const VIEWER = join(repoRootFor(ROOT), VIEWER_BUNDLE);
 
 const check = process.argv.includes("--check");
+
+/**
+ * A site build sends the beside-source drawings out of the checkout
+ * (`lib/beside-source-out.ts`): written beside an IG's `input/` they made its
+ * cached AST stale. `--check` always compares the committed copies.
+ */
+const besideOut = check ? undefined : process.env[BESIDE_SOURCE_OUT_ENV] || undefined;
+if (besideOut) console.log(`beside-source drawings → ${besideOut} (${BESIDE_SOURCE_OUT_ENV}), not beside each .bpmn`);
 
 if (!existsSync(VIEWER)) {
   console.error(
@@ -334,7 +343,7 @@ for (const file of sources) {
       process.exitCode = 1;
       continue;
     }
-    await emit(file.replace(/\.bpmn$/, ".svg"), own.svg);
+    await emit(besideSourceTarget(file, repoRootFor(ROOT), besideOut), own.svg);
   }
 }
 

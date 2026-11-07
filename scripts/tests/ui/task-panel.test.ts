@@ -24,6 +24,7 @@ import {
   expandMarkerBox,
   methodologyPageDir,
   PANEL_CLIENT,
+  panelFile,
   PANEL_SCRIPT,
   svgViewBox,
   taskSkillsDeclared,
@@ -238,7 +239,8 @@ describe("the site's switch (index.config.json site.taskSkills)", () => {
 
 describe("the client, for a page other than the process page", () => {
   test("hrefs resolve against the sidecar, not the page that loads it", () => {
-    expect(PANEL_SCRIPT).toContain('new URL(root.getAttribute("data-panel"), location.href)');
+    expect(PANEL_SCRIPT).toContain('var sidecar = root.getAttribute("data-panel");');
+    expect(PANEL_SCRIPT).toContain('new URL(sidecar || "", location.href)');
     expect(PANEL_SCRIPT).toContain("e.href = abs(l.href)");
   });
   test("with no server-drawn layer, the markers come from the data", () => {
@@ -255,6 +257,15 @@ describe("the client, for a page other than the process page", () => {
   });
   test("the client and styles are published as files under fixed names", () => {
     expect(PANEL_CLIENT).toEqual({ script: "task-panel.js", style: "task-panel.css" });
+    expect(panelFile("care")).toBe("care.tasks.json");
+  });
+  test("an inline drawing's viewBox is split on its spaces, so the markers keep its aspect", () => {
+    // In the template literal a lone backslash-s was an "s": "0 0 500 400" never split.
+    expect(PANEL_SCRIPT).toContain(".split(/[\\s,]+/).map(Number)");
+  });
+  test("a drawing with no sidecar is highlighted and fetches nothing", () => {
+    expect(PANEL_SCRIPT).toContain('var sidecar = root.getAttribute("data-panel");');
+    expect(PANEL_SCRIPT).toContain("if (!drawn && sidecar) load()");
   });
 });
 

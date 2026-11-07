@@ -114,7 +114,7 @@ describe("language adapters", () => {
     ]);
   });
 
-  test("js: a template nested in a template's ${} does not close it", () => {
+  test("js: a template nested in a template's ${} does not close it; id[${key}] is a fixed name", () => {
     const src = [
       "const conn = (label: string) => `<g>${label ? `<text>${label}</text>` : \"\"}</g>`;",
       'describe("after a nested template", () => {',
@@ -122,11 +122,15 @@ describe("language adapters", () => {
       "});",
       'describe("a second top-level scope", () => {',
       "  test(`looped[${key}]`, () => {});",
+      "  describe(key, () => { test(`inLoop[${key}]`, () => {}); test(`case ${key}`, () => {}); });",
       "});",
     ].join("\n");
-    expect(names(JS_ADAPTER.findTests("t.test.ts", src))).toEqual([
-      "t.test.ts::after_a_nested_template::found",
-      "t.test.ts::a_second_top-level_scope::looped[${key}]",
+    const found = JS_ADAPTER.findTests("t.test.ts", src);
+    expect(found.map((t) => [t.name, t.dynamic ?? false])).toEqual([
+      ["t.test.ts::after_a_nested_template::found", false],
+      ["t.test.ts::a_second_top-level_scope::looped[${key}]", false],
+      ["t.test.ts::a_second_top-level_scope::inLoop[${key}]", false],
+      ["t.test.ts::a_second_top-level_scope::<computed>::<computed_at_line_7>", true],
     ]);
   });
 
@@ -138,6 +142,27 @@ describe("language adapters", () => {
   test("js: a division is not read as a regex literal", () => {
     const src = ["const half = total / 2; const q = a / b / c;", 'test("after division", () => {});'].join("\n");
     expect(names(JS_ADAPTER.findTests("d.test.ts", src))).toEqual(["d.test.ts::after_division"]);
+  });
+
+  test("js: a test with a computed title is found and reported, never dropped", () => {
+    const src = [
+      'for (const [name] of cases) {',
+      '  test(name, () => {});',
+      '  test(`case ${name}`, () => {});',
+      '}',
+      'describe(label, () => { test("inside", () => {}); });',
+      'test(`fixed template`, () => {});',
+    ].join("\n");
+    const found = JS_ADAPTER.findTests("t.test.ts", src);
+    expect(found.map((t) => [t.name, t.dynamic ?? false])).toEqual([
+      ["t.test.ts::<computed_at_line_2>", true],
+      ["t.test.ts::<computed_at_line_3>", true],
+      ["t.test.ts::<computed>::inside", true],
+      ["t.test.ts::fixed_template", false],
+    ]);
+    const r = joinTestsToScenarios(found, []);
+    expect(r.findings.filter((f) => f.kind === "test-name-not-static").map((f) => f.line)).toEqual([2, 3, 5]);
+    expect(r.findings.filter((f) => f.kind === "test-without-scenario").map((f) => f.test)).toEqual(["t.test.ts::fixed_template"]);
   });
 
   test("python: the name is pytest's node id", () => {

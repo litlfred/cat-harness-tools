@@ -33,6 +33,13 @@ import { instanceDirectoriesForGraph, readDeclaration } from "../schemas/kg/cat-
 import { visualiserRoute } from "../schemas/kg/visualiser-route.ts";
 import { checkoutInstanceRoots, declaredVisualisers, pageParts } from "./viewer-declarations.ts";
 
+/**
+ * The subject kind of the record `translation:glossary` writes. A record of
+ * this kind is drawn as a "Glossary consistency" section, one sub-section per
+ * locale (one family each), rather than as a generic table.
+ */
+export const GLOSSARY_SUBJECT_KIND = "glossary-consistency";
+
 /** One family of a `qa-results/v1` record. */
 export interface QaFamily {
   summary?: string;
@@ -193,6 +200,10 @@ export function kgQaMarkdown(report: KgQaReport, o: { assets: string; up?: strin
         continue;
       }
       const rec = r.record!;
+      if (rec.subject?.kind === GLOSSARY_SUBJECT_KIND) {
+        lines.push(...glossaryConsistencyMarkdown(rec, { href: `${up}${recordHref(o.assets, i.instance, r.file)}`, level: (o.level ?? 2) + 1 }));
+        continue;
+      }
       const total = recordTotal(rec);
       lines.push(
         `**${name}:** ${total === 0 ? "no findings" : `${total} finding(s)`}, written by \`${rec.producer?.script ?? "?"}\`` +
@@ -217,6 +228,36 @@ export function kgQaMarkdown(report: KgQaReport, o: { assets: string; up?: strin
         lines.push("", "</details>", "");
       }
     }
+  }
+  return lines;
+}
+
+/**
+ * A glossary-consistency record (`translation:glossary`) as its own section:
+ * one sub-section per locale, its summary (fixed terms, catalogues, sense-check
+ * notes) and its findings by rule.
+ */
+export function glossaryConsistencyMarkdown(rec: NonNullable<QaRecord["record"]>, o: { href: string; level?: number }): string[] {
+  const h = "#".repeat(o.level ?? 3);
+  const total = recordTotal(rec);
+  const lines = [
+    `${h} Glossary consistency`,
+    "",
+    `${total === 0 ? "No findings" : `${total} finding(s)`} against the term base merged from the layers' glossaries, ` +
+      `written by \`${rec.producer?.script ?? "?"}\`${rec.subject?.id ? ` about \`${rec.subject.id}\`` : ""}. [Record (JSON)](${o.href})`,
+    "",
+  ];
+  for (const [locale, f] of Object.entries(rec.families ?? {})) {
+    const entries = (f.entries ?? []) as Array<Record<string, unknown>>;
+    lines.push(`${h}# ${locale}`, "", `${cell(f.summary)}. ${entries.length === 0 ? "No findings." : `${entries.length} finding(s):`}`, "");
+    if (!entries.length) continue;
+    lines.push("| rule | term | fixed (layer) | where | rendering |", "|---|---|---|---|---|");
+    for (const e of entries) {
+      lines.push(
+        `| \`${cell(e.rule)}\` | ${cell(e.term)} | ${e.fixed ? `${cell(e.fixed)} (${cell(e.layer)})` : "—"} | ${e.catalogue ? `\`${cell(e.catalogue)}\`` : "—"} | ${cell(e.rendering)} |`,
+      );
+    }
+    lines.push("");
   }
   return lines;
 }
