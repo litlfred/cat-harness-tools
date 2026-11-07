@@ -29,7 +29,7 @@
  * so it is kept by the index that took it, not here (`check:reference-direction`).
  *
  * Usage:
- *   bun run cat-harness-tools/scripts/gen-caches-viz.ts                       # the committed caches/viewer.md
+ *   bun run cat-harness-tools/scripts/gen-caches-viz.ts                       # writes VIEW_FILE, the committed viewer page
  *   bun run cat-harness-tools/scripts/gen-caches-viz.ts --out <file> [--stored <report.json>]   # a live page
  *   bun run cat-harness-tools/scripts/gen-caches-viz.ts --check
  */
