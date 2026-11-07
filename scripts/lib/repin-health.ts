@@ -11,8 +11,8 @@
  * health report written by a checker that no longer exists, once it is older
  * than its grace period. The checker lives in cat-harness-tools, so a layer's
  * report goes stale exactly when that pin moves. No schedule refreshed a
- * layer's report (who-iris's was written by hand on seven days in four weeks),
- * so who-iris#187, a re-pin, failed on a report three days old.
+ * layer's report (one content layer's was written by hand on seven days in
+ * four weeks), so a re-pin of that layer failed on a report three days old.
  *
  * The step, after a mount whose lock moved the cat-harness-tools pin, for a
  * checkout whose OWN instances declare a `health` graph:

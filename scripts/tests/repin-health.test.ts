@@ -1,7 +1,7 @@
 /**
  * A re-pin that moves cat-harness-tools regenerates the checkout's own health
  * report and pushes only that graph (owner, 2026-11-07, card "Layer health":
- * "A. The re-pin does it"). Found on who-iris#187: a re-pin failed
+ * "A. The re-pin does it"). Found on a content layer's re-pin: it failed
  * `health-result-is-from-the-current-producer` on a report three days old,
  * because nothing refreshed a layer's report when its checker moved.
  */
@@ -31,7 +31,7 @@ describe("checkerMoved", () => {
 const DRY_RUN = JSON.stringify({
   state: "would-push",
   graphs: [
-    { id: "root.health", path: "test/health/results", branch: "cat/who-iris/health" },
+    { id: "root.health", path: "test/health/results", branch: "cat/upper-layer/health" },
     { id: "cat-harness-tools.health", path: "cat-harness-tools/health", branch: "litlfred/cat-harness-tools:cat/cat-harness-tools/health" },
     { id: "lower.health", path: "test/health/results/", branch: "litlfred/lower:cat/lower/health" },
     { id: "beans", path: "beans", branch: "cat/cat-harness/beans" },
