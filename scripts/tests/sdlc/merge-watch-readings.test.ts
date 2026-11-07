@@ -146,6 +146,8 @@ describe("per-PR flags", () => {
       "owner-consent (pins smart-base)",
     ]);
     expect(prFlags({ repo: "litlfred/cat-harness", files: [], pinChanges: [smart] }, ["other"])).toEqual([]);
+    expect(prFlags({ repo: "litlfred/cat-harness", files: [], pinChanges: [smart] }, ["smart-base"])).toEqual(["owner-consent (pins smart-base)"]);
+    expect(prFlags({ repo: "litlfred/cat-harness", files: [], pinChanges: [{ ...smart, instance: "smartish", repository: "o/smartish" }] })).toEqual([]);
   });
   test("pin changes are the instances whose SHA moved", () => {
     const base = [

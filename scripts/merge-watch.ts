@@ -65,7 +65,7 @@
  * |---|---|
  * | `direct-merge (.github/workflows)` | it changes a workflow: the merge needs the workflows permission, not the train |
  * | `merge-train` | a folio-assistant PR with no workflow change: the `merge-train` label path |
- * | `owner-consent (pins <layer>)` | it changes the pin of an excluded layer (`smart-base` by default) |
+ * | `owner-consent (pins <layer>)` | it changes the pin of an excluded layer (by default `smart-*`, the WHO SMART upstream layers the role may not touch) |
  * | `superseded by #N` | every pin it changes is an ancestor of (or equal to) #N's pin of the same layer |
  *
  * Pins are read from `index.lock.json` (or a legacy `*.mount-lock.json`) at
@@ -78,7 +78,7 @@
  *
  * Flags: `--repo <owner/name>` (repeatable) · `--repos a,b` · `--config
  * <file>` (`{"repos": [...], "staleHours": 2, "queuedMinutes": 60,
- * "excludedLayers": ["smart-base"]}`) · `--stale-hours <n>` ·
+ * "excludedLayers": ["smart-*"]}`; a trailing `*` matches a prefix) · `--stale-hours <n>` ·
  * `--queued-minutes <n>` (a queued run this old is a relief candidate) ·
  * `--exclude-layer <name>` (repeatable; replaces the default) · `--json`.
  *
@@ -367,7 +367,13 @@ export interface PinChange extends Pin {
   from: string | null;
 }
 
-export const DEFAULT_EXCLUDED_LAYERS = ["smart-base"];
+/** The WHO SMART upstream layers (merge-manager-watcher §"Safety rules"). A trailing `*` matches a prefix. */
+export const DEFAULT_EXCLUDED_LAYERS = ["smart-*"];
+
+/** Does `name` match an excluded-layer entry: exact, or a prefix when the entry ends in `*`? */
+export function layerExcluded(name: string, excluded: readonly string[]): boolean {
+  return excluded.some((e) => (e.endsWith("*") ? name.startsWith(e.slice(0, -1)) : name === e));
+}
 
 const LOCK_FILE = /(^|\/)(index\.lock\.json|[^/]+\.mount-lock\.json)$/;
 
@@ -404,8 +410,9 @@ export function prFlags(
   const workflows = pr.files.some((f) => f.startsWith(".github/workflows/"));
   if (workflows) flags.push("direct-merge (.github/workflows)");
   else if (pr.repo.split("/").pop() === "folio-assistant") flags.push("merge-train");
-  const excluded = new Set(excludedLayers);
-  const consent = uniq(pr.pinChanges.filter((p) => excluded.has(p.instance) || excluded.has(layerName(p))).map((p) => p.instance));
+  const consent = uniq(
+    pr.pinChanges.filter((p) => layerExcluded(p.instance, excludedLayers) || layerExcluded(layerName(p), excludedLayers)).map((p) => p.instance),
+  );
   if (consent.length > 0) flags.push(`owner-consent (pins ${consent.join(", ")})`);
   return flags;
 }
