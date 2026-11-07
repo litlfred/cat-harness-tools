@@ -133,6 +133,8 @@ import { readIndexConfig } from "../schemas/kg/index-config.ts";
 import { buildInstanceSite, recipeFromConfig, siteFields, type SiteRecipe } from "./build-instance-site.ts";
 import { makeRecord, RECORD_FILE } from "./preview-record.ts";
 import { isPreviewPath, PREVIEW_PREFIX, previewPath } from "./lib/preview-prefix.ts";
+import { ensurePublishBranch } from "./lib/publish-branch.ts";
+import { editedMountsIn, relayAdvice } from "./remote-mount.ts";
 
 /** Files one Artifact publish may carry, the page included (the Artifact tool's limit is 255; one is the page). */
 export const ARTIFACT_MAX_FILES = 254;
@@ -526,6 +528,8 @@ export interface StageOptions {
   main?: boolean;
   /** Write an Artifact bundle here instead of pushing. */
   artifact?: string;
+  /** Re-lay, before the build, every mount whose bytes no longer match the lock ({@link relayEditedMounts}). */
+  fresh?: boolean;
   /** A declared publisher: read the reusable workflow from this local checkout instead of fetching it. */
   workflowSource?: string;
   /** Which publisher, when the repository's workflows call several (the folio by default). */
@@ -578,7 +582,14 @@ interface PushLoop {
  */
 async function pushLoop(o: PushLoop): Promise<{ pushed: boolean; commit?: string; composed?: string }> {
   const pages = mkdtempSync(join(tmpdir(), "stage-local-"));
-  const exists = spawnSync("git", ["-C", o.repo, "ls-remote", "--exit-code", "--heads", "origin", o.publishBranch], { stdio: "ignore" }).status === 0;
+  // No publish branch yet (a first publish): start one, an orphan holding
+  // `.nojekyll`, and publish onto it as onto any other (smart-trust-phw#35).
+  // A dry run pushes nothing, so it composes on an orphan worktree instead.
+  let exists = spawnSync("git", ["-C", o.repo, "ls-remote", "--exit-code", "--heads", "origin", o.publishBranch], { stdio: "ignore" }).status === 0;
+  if (!exists && !o.dryRun) {
+    ensurePublishBranch(git(o.repo, ["remote", "get-url", "origin"]), o.publishBranch, { log: o.log });
+    exists = true;
+  }
   const orphan = exists ? undefined : `stage-local-orphan-${process.pid}`;
   try {
     if (exists) {
@@ -718,6 +729,30 @@ export interface SitePublisher extends PublisherWorkflows {
 
 const HOST: PublisherHost = { formatPlan, pushLoop, writeArtifact, listSite, run, git, platformScript };
 
+/**
+ * Mounts an earlier attempt left "modified" (smart-trust-phw, 2026-11-06): a
+ * plain mount leaves them as they are, so the build's mount step refuses.
+ * With `fresh`, re-lay them now (`remote-mount.ts --fresh`, which replaces
+ * only the mounts off the lock); without it, a plan says what to run, and the
+ * build's mount step refuses with the same words (`build-instance-site.ts`).
+ * Answers what was re-laid.
+ */
+export function relayEditedMounts(repo: string, o: { fresh?: boolean; plan?: boolean }, log: (s: string) => void, relay: (repo: string) => void = relayMounts): string[] {
+  const edited = editedMountsIn(repo);
+  if (edited.length === 0) return [];
+  if (o.plan || !o.fresh) {
+    if (o.plan) log(relayAdvice(repo, edited, { script: join(import.meta.dir, "remote-mount.ts") }));
+    return [];
+  }
+  log(`· --fresh: re-laying ${edited.length} mount(s) that no longer match the lock: ${edited.map((e) => e.path ?? e.instance).join(", ")}`);
+  relay(repo);
+  return edited.map((e) => e.path ?? e.instance);
+}
+
+function relayMounts(repo: string): void {
+  run(repo, "bun", ["run", join(import.meta.dir, "remote-mount.ts"), "--fresh"]);
+}
+
 /** The declared publishers for `repo`, or none, said, when its dependencies cannot be read. */
 function publishersFor(repo: string, log: (s: string) => void): readonly SitePublisher[] {
   try {
@@ -759,6 +794,7 @@ export async function stageLocal(o: StageOptions): Promise<StageResult> {
 
   if (detected.kind !== FOLIO_PUBLISHER_KIND) {
     const publisher = declared.find((p) => p.kind === detected.kind)!;
+    relayEditedMounts(repo, o, log);
     return publisher.stage({ o, log, repo, detected, branch, sha, ownerRepo, pagesRoot, runUrl, defaultBranch, target, caller, workflow }, HOST);
   }
 
@@ -905,6 +941,7 @@ export async function stageDeclared(
     log(`keeps       branches/, STAGING/, _render-log/${(d.recipe.keep ?? []).map((k) => `, ${k}/`).join("")}`);
     log(`guard       the build is measured against the published root (site-parity.ts: theme side bar and search, icon row, rail, top-level directories, folio-build.json); a shortfall refuses the publish${publish ? "" : " (said, not refused, as nothing is published)"}`);
   }
+  relayEditedMounts(repo, o, log);
   if (o.plan) return { kind: "folio", via: "site.build", instance: d.instance, target, url, pushed: false };
   const open = target === "preview" ? await openPrFor(owner, name, branch, log) : undefined;
   const pr = open?.number;
@@ -1129,7 +1166,7 @@ export function writeReviewBrief(site: string, owner: string, name: string, pr: 
   log(`· review brief: PR #${pr}${n ? ` and issue #${n}` : ""} copied to review-brief.json`);
 }
 
-const USAGE = `usage: stage-local.ts [--repo DIR] [--branch B] [--base B] [--run-url URL] [--main] [--plan | --dry-run | --artifact DIR] [--workflow-source DIR] [--publisher KIND] [--bare-ig]
+const USAGE = `usage: stage-local.ts [--repo DIR] [--branch B] [--base B] [--run-url URL] [--main] [--fresh] [--plan | --dry-run | --artifact DIR] [--workflow-source DIR] [--publisher KIND] [--bare-ig]
 
   One command for every agent-run publish: a folio that declares its site in
   its index.config.json entry site.build (built by build-instance-site.ts), a folio whose workflow calls
@@ -1140,6 +1177,8 @@ const USAGE = `usage: stage-local.ts [--repo DIR] [--branch B] [--base B] [--run
   --plan             print what would be built and where, and stop
   --dry-run          build, and compose the commit in a temporary publish-branch worktree; push nothing
   --main             publish the main site (implied on the default branch; refused off it)
+  --fresh            first re-lay every mount an earlier build left modified (remote-mount.ts --fresh);
+                     without it, such a mount refuses the build and the error says what to run
   --artifact DIR     write a claude.ai Artifact bundle instead of pushing
   --workflow-source  a declared publisher: read the reusable workflow from this checkout instead of fetching it
   --publisher        folio, or a declared publisher's kind (e.g. ig), when the repository's workflows call
@@ -1173,6 +1212,7 @@ if (import.meta.main) {
           dryRun: argv.includes("--dry-run"),
           plan: argv.includes("--plan"),
           main: argv.includes("--main"),
+          fresh: argv.includes("--fresh"),
           ...(opt("artifact") ? { artifact: opt("artifact")! } : {}),
         },
         declared,
@@ -1188,6 +1228,7 @@ if (import.meta.main) {
       dryRun: argv.includes("--dry-run"),
       plan: argv.includes("--plan"),
       main: argv.includes("--main"),
+      fresh: argv.includes("--fresh"),
       ...(opt("artifact") ? { artifact: opt("artifact")! } : {}),
       ...(opt("workflow-source") ? { workflowSource: opt("workflow-source")! } : {}),
       ...(opt("publisher") ? { publisher: publisherOf(opt("publisher")!) } : {}),

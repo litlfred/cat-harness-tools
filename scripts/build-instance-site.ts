@@ -91,7 +91,10 @@ import { checkInlineScripts } from "./check-inline-scripts.ts";
 import { checkAnchors } from "./check-anchors.ts";
 import { shellQuote } from "./run-script.ts";
 import { chromeLayers, writeForwardingPages } from "./compose-docs.ts";
+import { ensurePublishBranch } from "./lib/publish-branch.ts";
 import { ownsScript, writerCommand } from "./lib/script-command.ts";
+import { editedMountsIn, relayAdvice } from "./remote-mount.ts";
+import { BESIDE_SOURCE_OUT_ENV } from "./lib/beside-source-out.ts";
 import { built, declaredPlan, runWriter, writersOf, type DeclaredArtefact, type WriterOutcome } from "./derive-at-publish.ts";
 import { describeFeatures, droppedByRuling, type DroppedByRuling, parityShortfall, siteFeatures } from "./site-parity.ts";
 
@@ -753,7 +756,13 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
       }
       console.log(`▶ fresh: removed ${paths.length} mount path(s) the lock names`);
     }
-    if (o.mount) run("mount the pinned closure", `bun run ${shellQuote(join(import.meta.dir, "remote-mount.ts"))}`, root);
+    if (o.mount) {
+      // A mount an earlier build wrote into is left as it is by a plain mount, which then
+      // fails the build with a lock table. Say what to run instead (smart-trust-phw, 2026-11-06).
+      const edited = editedMountsIn(root);
+      if (edited.length) throw new Error(relayAdvice(root, edited));
+      run("mount the pinned closure", `bun run ${shellQuote(join(import.meta.dir, "remote-mount.ts"))}`, root);
+    }
   }
   const mounted = lockedMountPaths(root);
   const ownPackage = existsSync(join(root, "package.json"));
@@ -772,6 +781,9 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     }),
     [STEP_ENV.baseurl]: baseurl,
     [STEP_ENV.upstreamPages]: upstreamFile,
+    // render:bpmn's drawing beside each .bpmn goes here, out of the checkout: beside an IG's
+    // input/business-processes/ it was an untracked file that made the cached AST stale.
+    [BESIDE_SOURCE_OUT_ENV]: join(out, "beside-source-drawings"),
   };
   for (const p of gateSteps(o.pre)) run(`pre: ${p}`, stepCommand(root, p), root, env);
   // The data the build's steps write (`sync-docs-harness`, `gen-landing-data`) lands in
@@ -925,6 +937,9 @@ export async function buildInstanceSite(o: BuildOptions): Promise<{ site: string
     const opts: Parameters<typeof publishSite>[0] & { into?: string; keep?: string[] } = staging
       ? { site, remote: o.remote, into: staging, message, name: "Claude", email: "noreply@anthropic.com" }
       : { site, remote: o.remote, keep, message, name: "Claude", email: "noreply@anthropic.com" };
+    // A first publish: origin has no gh-pages yet, and publish-site clones it,
+    // so start it as an orphan holding .nojekyll (smart-trust-phw#35).
+    ensurePublishBranch(o.remote, "gh-pages", { log: (l) => console.log(l) });
     const r = publishSite(opts);
     if (r.state === "failed") throw new Error(`publish failed: ${r.reason}`);
     console.log(r.state === "published" ? `published ${r.commit} (attempt ${r.attempt})` : "branch already current");
