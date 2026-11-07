@@ -544,6 +544,7 @@ interface PullDetail {
   labels: { name: string }[];
   head: { sha: string; ref: string };
   base: { sha: string };
+  /** Printed as served, never judged: possibly stale or `unknown` (bean fx5r). */
   mergeable_state: string | null;
 }
 

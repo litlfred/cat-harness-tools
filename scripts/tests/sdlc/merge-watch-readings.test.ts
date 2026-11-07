@@ -231,7 +231,7 @@ describe("watchRepo over the stub", () => {
     labels: labels.map((name) => ({ name })),
     head: { sha: head(n), ref: `b${n}` },
     base: { sha: "base" },
-    mergeable_state: "clean",
+    mergeable_state: "clean", // printed as served, never judged (bean fx5r)
   });
   const judged = (n: number, newFailures: number) => ({
     [`repos/${R}/commits/${head(n)}/check-runs?per_page=100`]: {
