@@ -10,7 +10,7 @@
  * `tests/graph-typology-docs.test.ts`, so the two cannot drift.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, sep } from "node:path";
+import { dirname, join, posix, relative, sep } from "node:path";
 
 import { BASE_GRAPH_TYPOLOGIES, GRAPH_TYPOLOGY_ALIASES, defaultGraphTypologies } from "../schemas/kg/cat-harness.js";
 import { graphTypologyLayer } from "../schemas/kg/graph-typology-registry.ts";
@@ -31,6 +31,36 @@ export const KIND_TABLE_ROOT = join(HARNESS_ROOT);
  */
 // declared-path-literal: a page BUILT AT PUBLISH (cat-harness builtAtPublish), so no committed file resolves it; kind:table writes it.
 export const KIND_TABLE_DOC = "docs/cat-harness/kind-table.md";
+/**
+ * The directory a kind's `description` writes its relative links against:
+ * the skill that documents kinds, `skills/kg/kg-core/directory-conventions.md`,
+ * where the table was first rendered. The page is two levels shallower, so a
+ * link written for the skill, rendered verbatim onto the page, points one
+ * `../` too high (`check-subgraphs` `overDeepLinks`; the re-pin train
+ * folio-assistant#3023, after cat-harness-tools#1609 fixed five of them for
+ * the skill's base). {@link rebaseLinks} moves each onto the page's own.
+ */
+// declared-path-literal: the base the kinds' description prose is written against, a directory of the harness this module renders for.
+export const DESCRIPTION_LINK_BASE = "skills/kg/kg-core";
+
+/**
+ * Rewrite every RELATIVE markdown link target in `text` from `fromDir` to
+ * `toDir`, both relative to the same root. An absolute URL, a site-absolute
+ * path, a bare fragment, `mailto:` and an autolink are left alone; a
+ * `#fragment` or `?query` rides along. Pure.
+ */
+export function rebaseLinks(text: string, fromDir: string, toDir: string): string {
+  return text.replace(/\]\(([^)\s]+)\)/g, (whole, target: string) => {
+    if (/^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(target)) return whole;
+    const cut = target.search(/[#?]/);
+    const path = cut < 0 ? target : target.slice(0, cut);
+    const rest = cut < 0 ? "" : target.slice(cut);
+    if (path === "") return whole;
+    const rebased = posix.relative(toDir, posix.normalize(posix.join(fromDir, path)));
+    return `](${rebased}${rest})`;
+  });
+}
+
 /** The table's header row, verbatim. Renaming a column is a deliberate edit. */
 export const KIND_TABLE_HEADER = "| kind | declared by | contents | renderable |";
 
@@ -118,7 +148,9 @@ export function renderKindTable(root: string = KIND_TABLE_ROOT): string {
   const rows = ordered.map((k) => {
     const d = defaultGraphTypologies.get(k)!;
     // Escape a bare pipe; one already escaped in the prose stays as it is.
-    const contents = (d.description ?? d.summary).replace(/(?<!\\)\|/g, "\\|");
+    // Its links are written for DESCRIPTION_LINK_BASE; the page is elsewhere.
+    const contents = rebaseLinks(d.description ?? d.summary, DESCRIPTION_LINK_BASE, posix.dirname(KIND_TABLE_DOC))
+      .replace(/(?<!\\)\|/g, "\\|");
     const rendered = `${d.renderable ? "**yes**" : "no"}${d.renderableNote ? ` — ${d.renderableNote}` : ""}`;
     return `| \`${k}\` | ${declaredByCell(k, root)} | ${contents} | ${rendered} |`;
   });
