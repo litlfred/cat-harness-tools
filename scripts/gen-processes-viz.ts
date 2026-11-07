@@ -66,6 +66,7 @@ import {
   markersFor,
   methodologyPageDir,
   PANEL_CLIENT,
+  panelFile,
   PANEL_CSS,
   PANEL_SCRIPT,
   svgViewBox,
@@ -629,10 +630,6 @@ async function taskMarkers(xml: string, svgText: string, acts: readonly { id: st
   }
 }
 
-/** The sidecar a process page fetches when a marker is first opened: `<stem>.tasks.json`, beside the page. */
-export function panelFile(stem: string): string {
-  return `${stem}.tasks.json`;
-}
 
 /**
  * What the ⓘ panel links to, resolved once per run. Every href is relative to

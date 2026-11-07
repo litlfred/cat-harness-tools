@@ -13,7 +13,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, posix } from "node:path";
 
 import { readJourneyCorpus, unescapeXml } from "../journeys/read.ts";
-import { bpmnFigure, orderByFollows, renderJourneyPages, stepAnchor, type PageFile, type SiteLinks } from "../journeys/render.ts";
+import { bpmnFigure, orderByFollows, panelHead, renderJourneyPages, stepAnchor, type PageFile, type SiteLinks } from "../journeys/render.ts";
+import { PANEL_CSS, PANEL_SCRIPT } from "../lib/task-panel.ts";
 import { BARE_VHL, checkDakLinks, DAK_ATTR, pascal, personaArtifact } from "../journeys/dak-links.ts";
 import { journeyFiles, journeysRoute } from "../gen-journeys-viz.ts";
 import {
@@ -267,6 +268,7 @@ const LINKS: SiteLinks = {
   title: "Top demonstrator",
   stepPage: (instance, bpmn, process, task) => `kg/${instance}/${bpmn.replace(/\.bpmn$/, "")}/${process}/node/${task}/`,
   archimateView: (instance, model, view) => ({ svg: `archimate/${model}/views/${view}.svg`, page: `en/${instance}/archimate/${model}/views/${view}/`, name: "P2 view" }),
+  processPanel: (_instance, bpmn) => `en/kg/processes/${posix.basename(bpmn, ".bpmn")}.tasks.json`,
 };
 const files = renderJourneyPages(corpus, LINKS, "top");
 const at = (path: string): string => {
@@ -341,10 +343,14 @@ describe("a journey page", () => {
     expect(p2).toContain("<b>Shared</b>");
     expect(p2).toContain("No transaction for this yet.");
   });
-  test("the BPMN drawing, inlined, with the step's flow nodes highlighted", () => {
-    expect(p2).toContain('data-element-id="Task_Read" data-jv-hl=""');
-    expect(p2).not.toContain('data-element-id="Task_Other" data-jv-hl');
+  test("the BPMN drawing, inlined in the common block, with the step's flow nodes named for the task panel to highlight", () => {
+    expect(p2).toMatch(/<figure class="bpmn-figure pt-diagram jv-bpmn" id="jv-fig-\d+" data-panel="[^"]+" data-pt-highlight="Task_Read">/);
+    expect(p2).not.toContain("data-jv-hl");
     expect(p2).not.toContain("<?xml");
+    // The scroll box takes keyboard focus; the client and its styles are the common ones.
+    expect(p2).toContain('<div class="jv-bpmn-scroll" tabindex="0" role="group"');
+    expect(p2).toContain('<link rel="stylesheet" href="../../assets/task-panel.css">');
+    expect(p2).toContain('<script src="../../assets/task-panel.js" defer></script>');
   });
   test("stories, requirements, examples and blocks resolve, and what does not is drawn as unresolved", () => {
     expect(p2).toContain("Show my summary abroad".charAt(0).toLowerCase() + "how my summary abroad");
@@ -475,7 +481,7 @@ describe("the presentation pages: a workshop told in a room, with no site chrome
     expect(p2).toContain('<span class="jp-named">Ben (nurse)</span>: reads the summary');
     expect(p2).not.toMatch(/<span class="jp-named">[^<]*<span class="jp-av/);
     expect(p2).toContain('<b>Health wallet</b><span>shows the QR</span>');
-    expect(p2).toContain('data-element-id="Task_Read" data-jv-hl=""');
+    expect(p2).toContain('data-pt-highlight="Task_Read"');
     expect(p2).toContain('data-jp-hood');
   });
   test("the workshop page links to the presentation, and its discussion has an anchor", () => {
@@ -707,11 +713,21 @@ describe("helpers", () => {
     const out = bpmnFigure(svg, ["A"], "c");
     expect(out).toContain("<!<!---->--<g");
     expect(out).not.toMatch(/<!--(?!--)<g/);
-    expect(out).toContain('data-element-id="A" data-jv-hl=""');
+    expect(out).toContain('data-pt-highlight="A"');
     expect(out).toContain("<figcaption>c</figcaption>");
   });
-  test("bpmnFigure leaves a drawing alone when no task is named", () => {
-    expect(bpmnFigure('<svg><g data-element-id="A"></g></svg>', undefined, "c")).not.toContain("data-jv-hl");
+  test("bpmnFigure leaves a drawing alone: no task named, no highlight; no sidecar, no panel", () => {
+    const out = bpmnFigure('<svg><g data-element-id="A"></g></svg>', undefined, "c");
+    expect(out).toContain('<g data-element-id="A"></g>');
+    expect(out).not.toContain("data-pt-highlight");
+    expect(out).not.toContain("data-panel");
+    expect(bpmnFigure("<svg></svg>", ["A", "B", "A"], "c", "../x.tasks.json")).toContain('data-panel="../x.tasks.json" data-pt-highlight="A B"');
+  });
+  test("the common task panel's client and styles are written with the assets, and only a page with a drawing loads them", () => {
+    expect(at("assets/task-panel.js")).toBe(`${PANEL_SCRIPT}\n`);
+    expect(at("assets/task-panel.css")).toBe(`${PANEL_CSS}\n`);
+    expect(at("index.html")).not.toContain("task-panel");
+    expect(panelHead("<p>no drawing</p>", "../")).toBe("");
   });
 });
 
@@ -732,7 +748,9 @@ describe("the drawings are clickable the way the KG site renders them", () => {
       expect(titles.map((h) => landsAt(page, h))).toEqual(["kg/lower/processes/care/P/node/Task_Read/", "kg/lower/processes/care/P/node/Task_Other/"]);
       // On the title alone, with its accessible name, and the highlight kept.
       expect(html).toMatch(/<a class="fa-task-link" href="[^"]+" target="_top" aria-label="Open step: Read the summary"><title>Open step: Read the summary<\/title><text class="djs-label">/);
-      expect(html).toContain('data-element-id="Task_Read" data-jv-hl=""');
+      expect(html).toContain('data-pt-highlight="Task_Read"');
+      // The ⓘ panel's sidecar, from the page's own depth, where the processes viewer writes it.
+      expect(landsAt(page, /data-panel="([^"]+)"/.exec(html)![1]!)).toBe("en/kg/processes/care.tasks.json");
     }
   });
   test("an absolute step page (a subject IRI) is linked as it is", () => {

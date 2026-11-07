@@ -37,6 +37,7 @@ import remarkHtml from "remark-html";
 
 import { escHtml, DEFAULT_ICON } from "../thin-page.ts";
 import { NAVBAR_LINKED } from "../lib/harness-rail.ts";
+import { PANEL_CLIENT, PANEL_CSS, PANEL_SCRIPT } from "../lib/task-panel.ts";
 import { withRenderedBy } from "../viewer-declarations.ts";
 import type { Part, ScenarioStep } from "../../schemas/process/user-scenario.ts";
 import { parentsOf, partsOf } from "./derive.ts";
@@ -77,6 +78,8 @@ export interface SiteLinks extends StepPageLinks {
   route: string;
   /** Site-relative page of each process drawing's viewer, by instance; absent when no processes viewer is declared. */
   processesPage?: (instance: string) => string | undefined;
+  /** Site-relative ⓘ panel sidecar of a BPMN file (instance-relative) the processes viewer draws; absent when no processes viewer is declared. */
+  processPanel?: (instance: string, bpmn: string) => string | undefined;
   /** An ArchiMate view's drawing and page, site-relative; absent when it cannot be placed. */
   archimateView?: (instance: string, model: string, view: string) => { svg: string; page: string; name: string } | undefined;
   /** Title of the site's declaring instance, for the index heading. */
@@ -326,6 +329,7 @@ function page(o: { title: string; up: string; crumbs: Crumb[]; body: string; kin
 ${NAVBAR_LINKED}
 <link rel="stylesheet" href="${o.up}assets/journeys.css">
 <script src="${o.up}assets/journeys.js" defer></script>
+${panelHead(o.body, `${o.up}assets/`)}
 </head>
 <body class="jv jv-${o.kind}${o.print ? ` jv-print-${o.print}` : ""}">
 <nav class="jv-crumbs" aria-label="Breadcrumb">${crumbs}</nav>
@@ -512,22 +516,34 @@ ${[head, ...lanes, curve, pain, enabler, record, handoff].join("\n")}
 let figureSeq = 0;
 
 /**
- * A process drawing with the step's flow nodes highlighted: the SVG inlined,
- * its XML prologue and doctype dropped. Comments are left as they are: they
- * are harmless inside inline SVG, and a one-pass strip could JOIN the pieces
- * of a nested one (`<!<!---->--`) into a `<!--` that swallows the page.
+ * A process drawing as every page of the site shows one: `render:bpmn`'s
+ * linked drawing, inlined, in the common BPMN block (`bpmn-figure
+ * pt-diagram`, `scripts/lib/task-panel.ts`). The step's flow nodes are named
+ * in `data-pt-highlight` and the task panel's client marks them; `panel` is
+ * the processes viewer's sidecar for the drawing, so its ⓘ markers and [+]
+ * links come too, and without one the drawing is highlighted only. The
+ * scroll box takes keyboard focus, so a wide drawing scrolls from the keys.
+ *
+ * The XML prologue and doctype are dropped. Comments are left as they are:
+ * they are harmless inside inline SVG, and a one-pass strip could JOIN the
+ * pieces of a nested one (`<!<!---->--`) into a `<!--` that swallows the page.
  */
-export function bpmnFigure(svg: string, tasks: readonly string[] | undefined, caption: string): string {
+export function bpmnFigure(svg: string, tasks: readonly string[] | undefined, caption: string, panel?: string): string {
   const id = `jv-fig-${++figureSeq}`;
-  let body = svg
+  const body = svg
     .replace(/<\?xml[^>]*\?>/g, "")
     .replace(/<!DOCTYPE[^>]*>/gi, "")
     .trim();
-  const hl = new Set(tasks ?? []);
-  if (hl.size) {
-    body = body.replace(/data-element-id="([^"]+)"/g, (m, elementId: string) => (hl.has(elementId) ? `${m} data-jv-hl=""` : m));
-  }
-  return `<figure class="jv-bpmn${hl.size ? " jv-has-hl" : ""}" id="${id}"><div class="jv-bpmn-scroll">${body}</div><figcaption>${caption}</figcaption></figure>`;
+  const hl = [...new Set(tasks ?? [])];
+  const attrs = `${panel ? ` data-panel="${e(panel)}"` : ""}${hl.length ? ` data-pt-highlight="${e(hl.join(" "))}"` : ""}`;
+  return `<figure class="bpmn-figure pt-diagram jv-bpmn" id="${id}"${attrs}><div class="jv-bpmn-scroll" tabindex="0" role="group" aria-label="Process drawing, scrolls with the arrow keys">${body}</div><figcaption>${caption}</figcaption></figure>`;
+}
+
+/** The task panel's client and styles, for a page that carries a {@link bpmnFigure}; nothing for one that does not. */
+export function panelHead(body: string, assets: string): string {
+  return body.includes("pt-diagram")
+    ? `<link rel="stylesheet" href="${e(`${assets}${PANEL_CLIENT.style}`)}">\n<script src="${e(`${assets}${PANEL_CLIENT.script}`)}" defer></script>`
+    : "";
 }
 
 function assessmentGrid(w: WorkshopEntry, s: WorkshopStep): string {
@@ -697,7 +713,8 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
       const d = linkedProcessDrawing(corpus, links, j.instance, r.process, toSite, igProcessPage(corpus, igOf(corpus, j.instance), j.instance, r.process, toSite));
       const page = links.processesPage?.(j.instance);
       const caption = `<code>${e(r.process)}</code>${r.tasks?.length ? ` · ${r.tasks.length} flow node${r.tasks.length === 1 ? "" : "s"} highlighted: ${r.tasks.map((t) => `<code>${e(t)}</code>`).join(" ")}` : " · the whole process"}${page ? ` · <a href="${e(page)}">processes viewer</a>` : ""}`;
-      return d ? bpmnFigure(d.svg, r.tasks, caption) : `<p class="jv-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`;
+      const panel = links.processPanel?.(j.instance, r.process);
+      return d ? bpmnFigure(d.svg, r.tasks, caption, panel === undefined ? undefined : fromSite(panel, toSite)) : `<p class="jv-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`;
     })
     .join("\n");
   const prev = steps[i - 1];
@@ -1004,6 +1021,9 @@ export function renderJourneyPages(corpus: JourneyCorpus, links: SiteLinks, decl
     }
   }
   for (const a of ASSETS) out.push({ path: posix.join("assets", a), content: readFileSync(join(ASSET_DIR, a), "utf8") });
+  // The common task panel's client and styles, the text the processes viewer writes beside its sidecars.
+  out.push({ path: posix.join("assets", PANEL_CLIENT.script), content: `${PANEL_SCRIPT}\n` });
+  out.push({ path: posix.join("assets", PANEL_CLIENT.style), content: `${PANEL_CSS}\n` });
   for (const f of FONT_FILES) out.push({ path: posix.join("assets", "fonts", f), content: new Uint8Array(readFileSync(join(ASSET_DIR, FONT_BUNDLE, f))) });
   return out;
 }
