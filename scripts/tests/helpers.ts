@@ -338,6 +338,7 @@ export function extractEnvironments(texFile: string): LatexEnvironment[] {
 
 export function getCommitSha(): string {
   try {
+    // input-site: head #1789ac18 — the checkout's HEAD commit
     return execSync("git rev-parse HEAD", { cwd: REPO_ROOT, encoding: "utf-8" }).trim();
   } catch {
     return "unknown";

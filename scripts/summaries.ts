@@ -365,6 +365,7 @@ export function record(file: DraftFile, root = ROOT): { written: string[]; block
   if (by.data.kind !== "agent") {
     throw new Error(`drafted_by.kind is "${by.data.kind}": this records an AGENT's drafts, and names its model`);
   }
+  // input-site: inert #7f8bce3f — the date a recorded draft is stamped with when the file gives none: written, never read back
   const at = file.drafted_at ?? new Date().toISOString().slice(0, 10);
 
   // Index every summarisable block once. Slugs are unique across libraries —
