@@ -25,6 +25,7 @@ import { dirname, join } from "node:path";
 
 import { MOUNT_MARKER_SCHEMA, gitBlobId, markerPath, resolveTipLocation, tipLocations } from "../branch-store.ts";
 import { tipPresence } from "../check-declared-dirs.ts";
+import { graphReadPath } from "../graph-read.ts";
 import { stateMountedDirs } from "../mount-from-lock.ts";
 import { mountState } from "../state-mount.ts";
 import { pushState } from "../state-push.ts";
@@ -229,5 +230,84 @@ describe("a marker written before locations were keyed", () => {
     // origin in the index layout, and that is where its edits go back.
     expect(onBranch(f.origin, "cat/alpha/health", `alpha/${HEALTH}/report.json`)).toBe('{"from":"index copy","edited":true}\n');
     expect(onBranch(f.repos.alpha!, "cat/alpha/health", `${HEALTH}/report.json`)).toBe('{"from":"alpha"}\n');
+  });
+});
+
+describe("a mounted layer's own work plan is never the checkout's", () => {
+  /**
+   * smart-ips-pilgrimage#25 (2026-11-07; owner's ruling: the checkout's `beans`
+   * resolves only to the checkout's own). `plat` declares the checkout-level
+   * `beans` (REPOSITORY-scoped, at `beans/`, as cat-harness does) on a branch
+   * the checkout's origin does not carry, so it is absent here. `up`, a
+   * mounted layer, keeps its own `beans` on its own branch, and that one
+   * mounts. The checkout's work plan must stay absent, not become `up`'s.
+   */
+  function withUpstreamBeans() {
+    const base = mkdtempSync(join(tmpdir(), "state-mount-own-beans-"));
+    made.push(base);
+    const origin = join(base, "origin.git");
+    git(base, "init", "-q", "--bare", "-b", "main", origin);
+    const up = join(base, "up.git");
+    git(base, "init", "-q", "--bare", "-b", "main", up);
+    seed(base, up, "cat/up/beans", { "manifest.json": MANIFEST, "beans/defs/up-0001--an-upstream-issue.md": "---\ntitle: an upstream issue\n---\n" });
+
+    const work = join(base, "work");
+    mkdirSync(work);
+    git(work, "init", "-q", "-b", "main");
+    writeFileSync(join(work, "README.md"), "index\n");
+    git(work, "add", "README.md");
+    git(work, "commit", "-q", "-m", "root");
+    git(work, "remote", "add", "origin", `file://${origin}`);
+    const decl = (name: string, beans: Record<string, unknown>) => {
+      mkdirSync(join(work, name));
+      writeFileSync(join(work, name, `${name}.json`), JSON.stringify({ $schema: "cat-harness-declaration/1.0.0", name, directories: [beans] }));
+    };
+    decl("plat", { id: "beans", path: "beans/", scope: "repository", graphTypologies: ["beans"], source: { kind: "branch", branch: "cat/plat/beans", keyedBy: "tip" } });
+    decl("up", { id: "beans", path: "beans/", graphTypologies: ["beans"], source: { kind: "branch", branch: "cat/up/beans", keyedBy: "tip" } });
+    writeFileSync(
+      join(work, "index.lock.json"),
+      JSON.stringify({
+        $schema: "cat-harness-mount-lock/v1",
+        mounts: ["plat", "up"].map((n) => ({ harness: n, repository: `test/${n}`, ref: SHA })),
+        instances: ["plat", "up"].map((n) => ({
+          instance: n,
+          repository: `test/${n}`,
+          sha: SHA,
+          upstreamRoot: "",
+          path: n,
+          via: n,
+          pinnedBy: "declared",
+          declaration: { file: `${n}.json`, sha256: "0".repeat(64) },
+          directories: [],
+        })),
+        unmounted: [],
+      }),
+    );
+    const urlFor = (repository: string): string => (repository === "test/up" ? `file://${up}` : `file://${join(base, "plat.git")}`);
+    return { work, store: { urlFor } };
+  }
+
+  test("the upstream's beans mount as ITS graph, and the checkout-level `beans` stays unmounted", () => {
+    const f = withUpstreamBeans();
+    const r = mountState({ repoRoot: f.work, store: f.store });
+    const states = Object.fromEntries(r.graphs.map((g) => [g.id, g.state]));
+    expect(states["up.beans"]).toBe("mounted");
+    expect(states["plat.beans"]).not.toBe("mounted");
+    expect(existsSync(join(f.work, "up", "beans", "defs", "up-0001--an-upstream-issue.md"))).toBe(true);
+    // The upstream's own graph is still readable as such...
+    expect(tipPresence({ id: "beans", branch: "cat/up/beans", keyedBy: "tip" }, join(f.work, "up", "beans"), f.work)).toEqual({
+      state: "mounted",
+      into: join(f.work, "up", "beans"),
+    });
+    // ...and is not the checkout's: the checkout-level `beans` has no mount.
+    expect(tipPresence({ id: "beans", branch: "cat/plat/beans", keyedBy: "tip" }, join(f.work, "beans"), f.work).state).toBe("unmounted");
+  });
+
+  test("the checkout's bean store resolves to nothing, not to the upstream's beans", () => {
+    const f = withUpstreamBeans();
+    mountState({ repoRoot: f.work, store: f.store });
+    const read = graphReadPath("beans", f.work);
+    expect(read.state).toBe("refused");
+    if (read.state === "ok") throw new Error(`resolved to ${read.at}`);
   });
 });
