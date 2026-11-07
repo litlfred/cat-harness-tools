@@ -477,6 +477,18 @@ describe("resolveBeanGraphNode and the workflow instance store", () => {
     expect(() => workflowDir(cut)).toThrow(/cannot resolve the workflow instance directory/);
     clearWorkflowDirCache();
   });
+
+  test("`workflowStateAbsent`: only a mount's recorded ABSENCE is not-applicable; unreachable is not", async () => {
+    const { workflowStateAbsent } = await import("../../src/workflow/store.ts");
+    const { recordAbsence } = await import("../branch-store.ts");
+    expect(workflowStateAbsent(graphRepo())).toBeUndefined();
+
+    const cut = repo([{ id: "beans", path: "beans/", graphTypologies: ["beans"], storage: TIP }]);
+    expect(workflowStateAbsent(cut)).toBeUndefined();
+
+    recordAbsence(cut, { id: "beans", path: "beans" }, "cat-harness", "declared for every checkout by cat-harness, not by this root, and this checkout's remote carries no cat/cat-harness/* branch");
+    expect(workflowStateAbsent(cut)).toContain("carries no cat/cat-harness/* branch");
+  });
 });
 
 describe("a branch FAMILY (bean lehh)", () => {
