@@ -44,6 +44,7 @@ import { TEST_FILE_RE } from "./input-sites.ts";
 export { TEST_FILE_RE };
 
 /** Directories `bun test` does not reach in these checkouts, or that hold no source. */
+// input-site: inert #01918c0a — names the build output directories the test walk skips; never reads them
 const SKIP_DIRS = new Set(["node_modules", "build", "_site", "fsh-guts", "dist", "coverage"]);
 
 /** Files every test runs under: a change to one of them can affect them all. */

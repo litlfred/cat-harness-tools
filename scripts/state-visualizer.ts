@@ -169,6 +169,7 @@ import {
 import { HARNESS_ROOT } from "./lib/roots.ts";
 import { wrapRaw } from "./lib/liquid-raw.ts";
 import { siteTarget } from "./lib/site-target.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 /** This generator's Tool node (`tools/viewers.ts`), named on every page it draws. */
 export const VIEWER_TOOL = "state-viewer";
@@ -1720,6 +1721,8 @@ export async function writeDynamicState(
   // `dynamicStateTarget` writes it under the site root.
   const canonical = readDeclaration(opts.root ?? ROOT)?.canonicalUrl;
   const docIri = canonical ? `${canonical.replace(/\/+$/, "")}/${harness}/${DYNAMIC_STATE_FILE}` : undefined;
+  // input-site: traced #574cb84e — the wall clock stamped into the dynamic state document, unless the caller gives one: a run that reads it records no hash
+  inputSiteReached("state-visualizer: dynamic state's time");
   const doc = dynamicStateDocument(harness, inputs, opts.now ?? new Date(), unread, docIri);
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(doc, null, 2) + "\n");
@@ -2563,6 +2566,7 @@ export function codeDirectoriesOf(
 }
 
 /** Directory names a source listing never descends into. */
+// input-site: inert #57373ec0 — names the build and dependency directories a code walk skips; never reads them
 const CODE_SKIP = new Set(["node_modules", ".git", ".lake", "__pycache__", "dist", "build"]);
 
 /** At most this many files are listed per directory; the total is always given. */
@@ -2879,6 +2883,8 @@ const hubs: string[] = [];
 // The start of the UTC day, not the instant: ages are counted in days, and an
 // instant gave every page new bytes on every build, so every writer reading
 // these pages ran again (cat-harness-tools#1230).
+// input-site: traced #f3740f0d — today, which every age on the generated pages is measured against: a run that reads it records no hash
+inputSiteReached("state-visualizer: today");
 const NOW = startOfUtcDay(new Date());
 const todosForView = readViewTodos();
 // Bean `v49e`, item 3: the working context of each step holding a token. Read

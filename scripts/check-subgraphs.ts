@@ -49,6 +49,7 @@ import { corpusScopeFor } from "./known-skills.js";
 import { gateOwnInstances, nothingOwnLine } from "./lib/gate-own.ts";
 import { mayLeaveMain } from "./qa-results.js";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { inputSiteReached } from "../schemas/sdlc/input-trace.ts";
 
 const ROOT = resolve(HARNESS_ROOT);
 
@@ -434,7 +435,13 @@ export interface ResolvedMove {
  * declaration). An unreadable declaration contributes none; reporting it is
  * `check:harness-dirs`'s job.
  */
-export function declaredMoves(roots: readonly string[], today: string = new Date().toISOString().slice(0, 10)): ResolvedMove[] {
+export function declaredMoves(roots: readonly string[], asOf?: string): ResolvedMove[] {
+  let today = asOf;
+  if (today === undefined) {
+    // input-site: traced #d197ddc4 — today, which decides whether a declared move has expired, unless the caller gives a date: a run that reads it records no hash
+    inputSiteReached("check-subgraphs: today");
+    today = new Date().toISOString().slice(0, 10);
+  }
   const out: ResolvedMove[] = [];
   for (const root of new Set(roots.map((r) => resolve(r)))) {
     let decl;
