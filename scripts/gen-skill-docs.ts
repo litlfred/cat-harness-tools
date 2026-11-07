@@ -488,6 +488,13 @@ const SKILLS_CATEGORIES: Record<string, string> = {
   "folio-paper-adapter": "Paper adapter (folio-paper-adapter)",
   "authoring-math": "Mathematical authoring (authoring-math)",
   "authoring-who-smart-guidelines": "WHO SMART Guidelines (authoring-who-smart-guidelines)",
+  // Packages of a health-credential library layer mounted above this one
+  // (owner, 2026-11-07). Headings say what the skills are about, never which
+  // instance holds them: this layer may not name a higher one.
+  hcert: "Health certificates — encoding, signing and verifying an HCERT (hcert)",
+  "hcert-library": "Health-certificate libraries — architecture, contract and conformance (hcert-library)",
+  vhl: "Verifiable Health Links — sharing and receiving (vhl)",
+  wallet: "Health-credential wallets — holding, handing over and scanning (wallet)",
   // Placement PR1 (bean `ybwt`): packages split out of the harness's content
   // packages when they moved up to their owning instance, by #1702's theme.
   "fhir-ig-authoring": "FHIR IG authoring (fhir-ig-authoring)",

@@ -35,6 +35,7 @@
  *
  * @module scripts/gates
  */
+import { QA_WRITERS } from "./qa-refresh.ts";
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
@@ -1484,8 +1485,19 @@ export function unclassifiedSteps(root: string): ForeignStep[] {
 export interface ScriptExemption {
   /** The script name, matched EXACTLY. Never a substring — see below. */
   script: string;
-  kind: "report" | "covered-by" | "no-folio" | "scheduled";
+  kind: "report" | "covered-by" | "no-folio" | "scheduled" | "pending-baseline";
   reason: string;
+  /**
+   * `pending-baseline` only (owner, 2026-11-07, "A. Two steps"): the script
+   * that WRITES the stored baseline this check judges against. A new check
+   * judged against a baseline main has never written reports every finding as
+   * new, so it is wired in two steps: the writer first, so main's push records
+   * the baseline, then the check. The exemption holds only while CI runs this
+   * writer; with the writer unwired, the check is reported unrun as before.
+   */
+  writer?: string;
+  /** `pending-baseline` only: the change that wires the check, named so the wait is visible. */
+  followUp?: string;
 }
 
 /**
@@ -1940,9 +1952,97 @@ export function commandsCiRuns(root: string): string[] {
  */
 export function unrunScripts(root: string): string[] {
   const commands = commandsCiRuns(root);
-  return checkScriptNames(root).filter(
-    (n) => !commands.some((c) => commandRunsScript(c, n)) && !scriptExemptionFor(n),
-  );
+  return unrunFrom(checkScriptNames(root), commands, SCRIPT_EXEMPTIONS, writersRunBy(commands));
+}
+
+/** The commands that run every `QA_WRITERS` entry: `qa:refresh`, and `qa:working-copy`, which runs it. */
+const QA_RUNNERS = ["qa:refresh", "qa:working-copy"];
+
+/**
+ * The scripts CI runs INDIRECTLY, as `QA_WRITERS` entries of a `qa:refresh`
+ * some workflow runs. A baseline writer is usually one of these rather than a
+ * step of its own: the stored tree is what `qa:working-copy` builds.
+ */
+export function writersRunBy(commands: readonly string[]): string[] {
+  if (!commands.some((c) => QA_RUNNERS.some((r) => commandRunsScript(c, r)))) return [];
+  return QA_WRITERS.map((w) => w.run[0]!).filter(Boolean);
+}
+
+/**
+ * {@link unrunScripts} over given inputs, pure. A `pending-baseline` exemption
+ * covers its check only while some command CI runs invokes its `writer`.
+ */
+export function unrunFrom(
+  names: readonly string[],
+  commands: readonly string[],
+  exemptions: readonly ScriptExemption[],
+  indirect: readonly string[] = [],
+): string[] {
+  const runs = (script: string) => commands.some((c) => commandRunsScript(c, script));
+  const writerRuns = (w: string) => runs(w) || indirect.includes(w);
+  return names.filter((n) => {
+    if (runs(n)) return false;
+    const e = exemptions.find((x) => x.script === n);
+    if (!e) return true;
+    return e.kind === "pending-baseline" ? !(e.writer && writerRuns(e.writer)) : false;
+  });
+}
+
+/** Where one `pending-baseline` exemption stands. */
+export interface PendingBaseline {
+  script: string;
+  writer: string;
+  followUp: string;
+  /** CI runs the writer: the exemption holds. */
+  writerRun: boolean;
+  /** CI runs the check itself: the wait is over and the exemption can go. */
+  checkRun: boolean;
+}
+
+/** Every `pending-baseline` exemption, and whether its writer and its check are wired. Pure. */
+export function pendingBaselinesFrom(
+  commands: readonly string[],
+  exemptions: readonly ScriptExemption[],
+  indirect: readonly string[] = [],
+): PendingBaseline[] {
+  const runs = (script: string) => commands.some((c) => commandRunsScript(c, script));
+  return exemptions
+    .filter((e) => e.kind === "pending-baseline")
+    .map((e) => ({
+      script: e.script,
+      writer: e.writer ?? "",
+      followUp: e.followUp ?? "",
+      writerRun: !!e.writer && (runs(e.writer) || indirect.includes(e.writer)),
+      checkRun: runs(e.script),
+    }));
+}
+
+/**
+ * Print every check waiting on its first baseline. Unconditional, like
+ * {@link reportUnresolved}: a wait is a fact about the gate set whether or not
+ * the run is green, and an exemption nobody sees is the silent skip this table
+ * exists to prevent. A check already wired is printed as done, never failed:
+ * the exemption is declared by the index, and failing on it would hold the
+ * follow-up hostage to a second change.
+ */
+function reportPendingBaselines(root: string): void {
+  let rows: PendingBaseline[];
+  try {
+    const commands = commandsCiRuns(root);
+    rows = pendingBaselinesFrom(commands, SCRIPT_EXEMPTIONS, writersRunBy(commands));
+  } catch {
+    return;
+  }
+  if (rows.length === 0) return;
+  console.log(`\n· ${rows.length} check(s) WAITING FOR A FIRST BASELINE — not gated yet, and not counted clean:`);
+  for (const r of rows) {
+    const state = r.checkRun
+      ? "the check is wired now: remove this exemption"
+      : r.writerRun
+        ? `writer \`${r.writer}\` runs, so main stores the baseline; the check is wired by ${r.followUp}`
+        : `writer \`${r.writer}\` is NOT run, so the check is reported unrun`;
+    console.log(`    ${r.script}   (${state})`);
+  }
 }
 
 /**
@@ -2466,6 +2566,7 @@ if (import.meta.main) {
     // commands it will NOT run belong here most of all. Omitting them would
     // make the list read as the whole gate set.
     reportUnresolved(ROOT, { all });
+    reportPendingBaselines(ROOT);
     console.log(
       all ? "" : "\n`--all` adds the jobs that need a browser (bpmn-js renders through Chromium).",
     );
@@ -2692,6 +2793,7 @@ if (import.meta.main) {
         for (const { gate } of skippedGates) console.log(`    - ${gate.command}`);
       }
       reportUnresolved(ROOT, { all });
+      reportPendingBaselines(ROOT);
       if (!all) console.log("  `bun run cat gates --all` adds the browser jobs before you push.");
       process.exit(0);
     }
@@ -2712,6 +2814,7 @@ if (import.meta.main) {
     process.exit(1);
   }
   reportUnresolved(ROOT, { all });
+  reportPendingBaselines(ROOT);
   if (skippedGates.length > 0) {
     console.log(`  (${skippedGates.length} gate(s) SKIPPED — inputs unchanged since each last passed; \`--no-cache\` asks them)`);
   }

@@ -57,6 +57,12 @@ export interface FoundTest {
   line: number;
   /** Which adapter found it. */
   language: string;
+  /**
+   * Its title (or an enclosing scope's) is computed — a variable, or a
+   * template with `${…}` — so no tag can name it. Reported, never dropped:
+   * a test the scan cannot name is still a test.
+   */
+  dynamic?: true;
 }
 
 /** A language adapter: which files it reads, and the tests it finds in one. */
@@ -103,6 +109,103 @@ export function qualifiedTestName(file: string, scopes: readonly string[], name:
 // ── A lexer shared by the brace languages ───────────────────────────────────
 
 /**
+ * The end (just past the closing backtick) of the JS template literal opening
+ * at `i`, and its literal text. Each `${…}` is skipped by brace depth, and the
+ * strings, templates and comments inside it are skipped whole, so a backtick
+ * nested in an expression does not close the outer template.
+ */
+function templateEnd(src: string, i: number): { end: number; text: string } {
+  let j = i + 1;
+  let text = "";
+  while (j < src.length) {
+    const ch = src[j];
+    if (ch === "\\") {
+      text += src.slice(j, j + 2);
+      j += 2;
+      continue;
+    }
+    if (ch === "`") return { end: j + 1, text };
+    if (ch === "$" && src[j + 1] === "{") {
+      // The expression's source is kept verbatim in the text, as before:
+      // a looped test's title `id[${key}]` is its name.
+      const from = j;
+      j += 2;
+      let depth = 1;
+      while (j < src.length && depth > 0) {
+        const e = src[j];
+        if (e === "`") {
+          j = templateEnd(src, j).end;
+          continue;
+        }
+        if (e === '"' || e === "'") {
+          let k = j + 1;
+          while (k < src.length && src[k] !== e && src[k] !== "\n") k += src[k] === "\\" ? 2 : 1;
+          j = k + 1;
+          continue;
+        }
+        if (e === "/" && src[j + 1] === "/") {
+          const nl = src.indexOf("\n", j);
+          j = nl < 0 ? src.length : nl;
+          continue;
+        }
+        if (e === "/" && src[j + 1] === "*") {
+          const close = src.indexOf("*/", j + 2);
+          j = close < 0 ? src.length : close + 2;
+          continue;
+        }
+        if (e === "{") depth++;
+        else if (e === "}") depth--;
+        j++;
+      }
+      text += src.slice(from, j);
+      continue;
+    }
+    text += ch;
+    j++;
+  }
+  return { end: src.length, text };
+}
+
+/**
+ * If the `/` at `i` opens a JS regex literal, the offset just past it (flags
+ * included); otherwise 0. A `/` opens a regex where an expression may start:
+ * after an operator or opening punctuation, after `return`-like keywords, or
+ * at the start of the file. `masked` is the output so far, so the previous
+ * significant character is read with comments and strings already blanked.
+ */
+function regexLiteralEnd(src: string, i: number, masked: readonly string[]): number {
+  if (src[i + 1] === "/" || src[i + 1] === "*") return 0;
+  // The last ~16 significant characters, walking back over the output so far.
+  let tail = "";
+  for (let k = masked.length - 1; k >= 0 && tail.replace(/\s+$/, "").length < 16; k--) tail = masked[k] + tail;
+  const before = tail.replace(/\s+$/, "");
+  const prev = before.at(-1);
+  const keyword = /(?:^|[^\w$])(?:return|typeof|case|do|else|in|of|void|yield|await|throw|delete|new)$/.test(before);
+  // `>` only as the arrow `=>`: after a closing angle (`</t>`, a generic) a
+  // `/` is not a regex.
+  const opens = prev !== undefined && (/[(,=:[!&|?{};+\-*%~^]/.test(prev) || before.endsWith("=>"));
+  if (prev !== undefined && !keyword && !opens) return 0;
+  let j = i + 1;
+  let inClass = false;
+  while (j < src.length) {
+    const ch = src[j];
+    if (ch === "\n") return 0;
+    if (ch === "\\") {
+      j += 2;
+      continue;
+    }
+    if (ch === "[") inClass = true;
+    else if (ch === "]") inClass = false;
+    else if (ch === "/" && !inClass) break;
+    j++;
+  }
+  if (j >= src.length) return 0;
+  j++;
+  while (j < src.length && /[a-z]/.test(src[j])) j++;
+  return j;
+}
+
+/**
  * Blank out comments and string literals, keeping every newline and every
  * other character's offset. What is left is code a regex can be run over
  * without matching a `{` in a string or a `#[test]` in a comment. The string
@@ -128,12 +231,13 @@ export function maskSource(
       continue;
     }
     if (c === "/" && n === "*") {
-      // Rust and Kotlin nest block comments; JS does not, but nesting never
-      // starts inside a JS comment that closes, so counting is safe for both.
+      // Rust and Kotlin nest block comments; JS does not, and a JS comment
+      // that mentions a glob (`schemas/**`) would never close if counted.
+      const nests = !opts.templates;
       let depth = 1;
       let j = i + 2;
       while (j < src.length && depth > 0) {
-        if (src[j] === "/" && src[j + 1] === "*") {
+        if (nests && src[j] === "/" && src[j + 1] === "*") {
           depth++;
           j += 2;
         } else if (src[j] === "*" && src[j + 1] === "/") {
@@ -165,7 +269,28 @@ export function maskSource(
       i = stop;
       continue;
     }
-    if (c === '"' || (c === "'" && !opts.rustChars) || (c === "`" && opts.templates)) {
+    if (opts.templates && c === "/") {
+      // A JS regex literal: its quotes and backticks open no string. Without
+      // this, `/`([^`]+)`/` or `/["']x["']/` started a "string" that swallowed
+      // the tests after it.
+      const end = regexLiteralEnd(src, i, out);
+      if (end > 0) {
+        out.push(blank(src.slice(i, end)));
+        i = end;
+        continue;
+      }
+    }
+    if (c === "`" && opts.templates) {
+      // A template literal: its `${…}` expressions may hold strings and
+      // further templates, so the closing backtick is found by nesting,
+      // not by the next backtick. The literal text is its string.
+      const { end, text } = templateEnd(src, i);
+      strings.set(i, text);
+      out.push(blank(src.slice(i, end)));
+      i = end;
+      continue;
+    }
+    if (c === '"' || (c === "'" && !opts.rustChars)) {
       let j = i + 1;
       let body = "";
       while (j < src.length && src[j] !== c) {
@@ -174,7 +299,7 @@ export function maskSource(
           j += 2;
           continue;
         }
-        if (c !== "`" && src[j] === "\n") break; // unterminated: stop at the line
+        if (src[j] === "\n") break; // unterminated: stop at the line
         body += src[j];
         j++;
       }
@@ -304,6 +429,9 @@ const JS_TEST_FILE = /(?:\.(?:test|spec)\.[cm]?[jt]sx?|(?:^|\/)__tests__\/.+\.[c
 /** `test(`, `it(`, `test.skip(`, `it.only(`, `test.each(…)(`, and `describe(` for a scope. */
 const JS_CALL = /(?<![\w.$])(describe|suite|context|test|it)((?:\.(?:skip|only|todo|failing|concurrent|serial|if|skipIf|runIf|each))*)\s*(\()/g;
 
+/** `id[${key}]`: a literal id, then one interpolation in brackets, nothing else computed. */
+const LOOPED_ID = /^[^`$\s\[\]]+\[\$\{[^{}`]*\}\]$/;
+
 export const JS_ADAPTER: TestLanguageAdapter = {
   id: "js",
   matches: (f) => JS_TEST_FILE.test(f),
@@ -318,16 +446,26 @@ export const JS_ADAPTER: TestLanguageAdapter = {
       }
       return code.length;
     };
-    /** The string literal that is the call's first argument, if it is one. */
+    /**
+     * The call's first argument as a fixed title, or `undefined` when it is
+     * computed: an identifier, an expression, or a template with `${…}`.
+     * One template is fixed: a literal id followed by a single `[${…}]`, the
+     * looped-test convention `id[${key}]` (owner, 2026-11-06). It is named
+     * verbatim, so its tag names `id[${key}]`, and the id stays unique in its
+     * file however many cases the loop runs.
+     */
     const firstArgString = (open: number): string | undefined => {
       for (let j = open + 1; j < code.length; j++) {
-        if (strings.has(j)) return strings.get(j);
+        if (strings.has(j)) {
+          const body = strings.get(j)!;
+          return src[j] === "`" && body.includes("${") && !LOOPED_ID.test(body) ? undefined : body;
+        }
         if (!/\s/.test(code[j])) return undefined;
       }
       return undefined;
     };
-    const scopes: { from: number; to: number; title: string }[] = [];
-    const calls: { at: number; title: string }[] = [];
+    const scopes: { from: number; to: number; title: string | undefined }[] = [];
+    const calls: { at: number; title: string | undefined }[] = [];
     for (const m of code.matchAll(JS_CALL)) {
       let open = m.index! + m[0].length - 1;
       // `.each(table)(title, …)` and `.if(cond)(title, …)`: the title is in the second call.
@@ -337,16 +475,24 @@ export const JS_ADAPTER: TestLanguageAdapter = {
         open = closeOf(open) + next[0].length;
       }
       const title = firstArgString(open);
-      if (title === undefined) continue;
       if (m[1] === "test" || m[1] === "it") calls.push({ at: m.index!, title });
       else scopes.push({ from: open, to: closeOf(open), title });
     }
-    return calls.map((c) => ({
-      name: qualifiedTestName(file, scopes.filter((d) => d.from < c.at && c.at < d.to).map((d) => d.title), c.title),
-      file,
-      line: lineAt(src, c.at),
-      language: "js",
-    }));
+    return calls.map((c) => {
+      const line = lineAt(src, c.at);
+      // A looped test `id[${key}]` carries its loop key itself, so a computed
+      // describe around it (`describe(label, …)` in the same loop) adds
+      // nothing a tag needs: it is left out of the name, not reported.
+      const looped = c.title !== undefined && LOOPED_ID.test(c.title);
+      const enclosing = scopes.filter((d) => d.from < c.at && c.at < d.to && !(looped && d.title === undefined));
+      const dynamic = c.title === undefined || enclosing.some((d) => d.title === undefined);
+      const name = qualifiedTestName(
+        file,
+        enclosing.map((d) => d.title ?? "<computed>"),
+        c.title ?? `<computed at line ${line}>`,
+      );
+      return { name, file, line, language: "js", ...(dynamic ? { dynamic: true as const } : {}) };
+    });
   },
 };
 
@@ -571,7 +717,8 @@ export type GherkinFindingKind =
   | "ambiguous-test-name"
   | "tag-names-no-target"
   | "binding-unresolved"
-  | "unknown-dialect";
+  | "unknown-dialect"
+  | "test-name-not-static";
 
 export interface GherkinFinding {
   kind: GherkinFindingKind;
@@ -596,7 +743,19 @@ export function joinTestsToScenarios(
 ): GherkinReport {
   const findings: GherkinFinding[] = [];
   const byName = new Map<string, FoundTest[]>();
-  for (const t of tests) byName.set(t.name, [...(byName.get(t.name) ?? []), t]);
+  for (const t of tests) {
+    if (t.dynamic) {
+      findings.push({
+        kind: "test-name-not-static",
+        file: t.file,
+        line: t.line,
+        test: t.name,
+        detail: "the test's title (or an enclosing describe's) is computed, so no `@test:` tag can name it — give it a literal title, or write the loop as `test.each(…)(\"… %s\")`",
+      });
+      continue;
+    }
+    byName.set(t.name, [...(byName.get(t.name) ?? []), t]);
+  }
   for (const [name, ts] of byName) {
     if (ts.length > 1) {
       findings.push({
