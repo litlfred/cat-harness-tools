@@ -47,7 +47,6 @@ import {
   instanceFile,
   journeyById,
   lookup,
-  processDrawing,
   requirementFor,
   siteRootFrom,
   type Actor,
@@ -55,7 +54,8 @@ import {
   type JourneyCorpus,
   type WorkshopEntry,
 } from "./read.ts";
-import { PRESENT_ASSETS, PRESENT_SEGMENTS, presentationOf, renderPresentationPages } from "./present.ts";
+import { igProcessPage, PRESENT_ASSETS, PRESENT_SEGMENTS, presentationOf, renderPresentationPages } from "./present.ts";
+import { artifactPage, DAK_ATTR, igOf, linkedProcessDrawing, personaArtifact, type StepPageLinks } from "./dak-links.ts";
 
 export const TOOL_ID = "journeys-viewer";
 const ASSET_DIR = join(import.meta.dir, "assets");
@@ -71,7 +71,7 @@ export interface PageFile {
 }
 
 /** Where things are in the site, for links that leave the viewer. */
-export interface SiteLinks {
+export interface SiteLinks extends StepPageLinks {
   /** Site-relative route of the viewer, no trailing slash: `en/<harness>/<id>`. */
   route: string;
   /** Site-relative page of each process drawing's viewer, by instance; absent when no processes viewer is declared. */
@@ -117,6 +117,8 @@ export interface PersonaView {
   frustrations?: string[];
   /** A glyph drawn in the avatar instead of the initials (`meta.persona.icon`). */
   icon?: string;
+  /** The artefact-index key of the ActorDefinition it plays in the IG (`personaArtifact`), when the IG defines one. */
+  artifact?: string;
   /** The persona's picture, copied beside the viewer: a path from the viewer's route root (`avatars/<instance>/<actor>.webp`). */
   avatar?: string;
 }
@@ -159,6 +161,7 @@ export function personaOf(corpus: JourneyCorpus, instance: string, id: string, i
     ...(a && avatarPath(corpus, a) ? { avatar: avatarPath(corpus, a)!.to } : {}),
     initials: initials || id.slice(0, 2).toUpperCase(),
     color: p?.color ?? PALETTE[i % PALETTE.length]!,
+    ...(personaArtifact(corpus, instance, id) ? { artifact: personaArtifact(corpus, instance, id)! } : {}),
   };
 }
 
@@ -169,6 +172,12 @@ function personasOf(corpus: JourneyCorpus, j: Journey): PersonaView[] {
 function avatar(p: PersonaView, size: "s" | "m" = "m"): string {
   const inner = p.avatar ? `<img src="${e(ROOT_MARK + p.avatar)}" alt="" loading="lazy">` : e(p.initials);
   return `<span class="jv-av jv-av-${size}${p.avatar ? " jv-av-img" : ""}" style="--c:${e(p.color)}" title="${e(p.name)}${p.role ? ` · ${e(p.role)}` : ""}" aria-hidden="true">${inner}</span>`;
+}
+
+/** A persona's name, linked to the ActorDefinition it plays in the IG when the IG's index lists one. */
+function personaName(corpus: JourneyCorpus, j: Journey, p: PersonaView, toSite: string): string {
+  const href = p.artifact ? artifactPage(corpus, igOf(corpus, j.instance), p.artifact, toSite) : undefined;
+  return href ? `<a href="${e(href)}" ${DAK_ATTR} title="${e(p.artifact!)}">${e(p.name)}</a>` : e(p.name);
 }
 
 function face(emotion: number | undefined): string {
@@ -578,6 +587,7 @@ ${style?.notes?.length ? `<h5>Notes</h5><ul>${style.notes.map((n) => `<li>${e(n)
 
 function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: number, personas: PersonaView[], links: SiteLinks, up: string): string {
   const steps = j.scenario.steps;
+  const toSite = siteRootFrom(up, links);
   const lead = personas.find((p) => p.id === s.lead);
   const st = s as ScenarioStep & { gaps?: string[]; references?: { label: string; href: string; rel?: string }[] };
   const story = [
@@ -634,11 +644,11 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
     ? `<h4>FHIR examples produced</h4><ul class="jv-examples">${s.examples
         .map((k) => {
           const x = corpus.examples.get(k);
-          return `<li>${x?.url ? `<a href="${e(x.url)}" class="jv-code">${e(k)}</a>` : `<span class="jv-code">${e(k)}</span>`}${x?.code ? ` ${e(x.code)}` : ""}</li>`;
+          const href = artifactPage(corpus, igOf(corpus, j.instance), k, toSite);
+          return `<li>${href ? `<a href="${e(href)}" class="jv-code" ${DAK_ATTR}>${e(k)}</a>` : `<span class="jv-code">${e(k)}</span>`}${x?.code ? ` ${e(x.code)}` : ""}</li>`;
         })
         .join("")}</ul>`
     : "";
-  const toSite = siteRootFrom(up, links);
   const refsHtml = st.references?.length ? `<h4>References</h4><ul>${st.references.map((r) => `<li><a href="${e(fromSite(r.href, toSite))}">${e(r.label)}</a>${r.rel ? ` <span class="jv-muted">${e(r.rel)}</span>` : ""}</li>`).join("")}</ul>` : "";
   const handoffHtml =
     s.handoff && (s.handoff.carrier || s.handoff.payload)
@@ -647,7 +657,7 @@ function stepSection(corpus: JourneyCorpus, j: Journey, s: ScenarioStep, i: numb
   const hood = [s.technicalSummary ? `<p class="jv-tech">${e(s.technicalSummary)}</p>` : "", usesHtml, handoffHtml, storiesHtml, reqHtml, exHtml, refsHtml].join("\n");
   const processes = (s.realisedBy ?? [])
     .map((r) => {
-      const d = processDrawing(corpus, j.instance, r.process);
+      const d = linkedProcessDrawing(corpus, links, j.instance, r.process, toSite, igProcessPage(corpus, igOf(corpus, j.instance), j.instance, r.process, toSite));
       const page = links.processesPage?.(j.instance);
       const caption = `<code>${e(r.process)}</code>${r.tasks?.length ? ` · ${r.tasks.length} flow node${r.tasks.length === 1 ? "" : "s"} highlighted: ${r.tasks.map((t) => `<code>${e(t)}</code>`).join(" ")}` : " · the whole process"}${page ? ` · <a href="${e(page)}">processes viewer</a>` : ""}`;
       return d ? bpmnFigure(d.svg, r.tasks, caption) : `<p class="jv-unresolved">No drawing beside <code>${e(r.process)}</code> (run <code>render:bpmn</code>).</p>`;
@@ -697,7 +707,10 @@ function journeyPage(corpus: JourneyCorpus, j: Journey, links: SiteLinks): strin
     .map((v) => {
       const t = links.archimateView?.(j.instance, v.model, v.view);
       if (!t) return `<li class="jv-unresolved">ArchiMate view <code>${e(v.view)}</code> of model <code>${e(v.model)}</code>: not drawn in this site</li>`;
-      return `<li><figure class="jv-am"><a href="${e(toSite + t.page)}"><img src="${e(toSite + t.svg)}" alt="${e(v.label ?? t.name)}"></a><figcaption><a href="${e(toSite + t.page)}">${e(v.label ?? t.name)}</a></figcaption></figure></li>`;
+      // An <object>, as the view's own page shows it: the drawing's links are
+      // written relative to the SVG and open with target="_top", so each
+      // element opens its page; inside an <img> they were inert.
+      return `<li><figure class="jv-am"><object type="image/svg+xml" data="${e(toSite + t.svg)}" aria-label="${e(v.label ?? t.name)}"><a href="${e(toSite + t.page)}" ${DAK_ATTR}>${e(v.label ?? t.name)}</a></object><figcaption><a href="${e(toSite + t.page)}" ${DAK_ATTR}>${e(v.label ?? t.name)}</a></figcaption></figure></li>`;
     })
     .join("");
   const src = sourceHref(corpus, j.instance, j.file);
@@ -707,7 +720,7 @@ function journeyPage(corpus: JourneyCorpus, j: Journey, links: SiteLinks): strin
 <h1>${e(s.title)}</h1>
 <div class="jv-lede">${description}</div>
 <dl class="jv-facts">${s.when ? `<div><dt>When</dt><dd>${e(s.when)}</dd></div>` : ""}${s.where ? `<div><dt>Where</dt><dd>${e(s.where)}</dd></div>` : ""}${s.country ? `<div><dt>Country</dt><dd>${e(s.country)}</dd></div>` : ""}<div><dt>Steps</dt><dd>${s.steps.length}</dd></div></dl>
-<ul class="jv-people">${personas.map((p) => `<li>${avatar(p)}<span><b>${e(p.name)}</b>${p.role || p.country ? `<span class="jv-muted">${[p.role, p.country].filter(Boolean).map((x) => e(x!)).join(" · ")}</span>` : ""}${p.goal ? `<span class="jv-goal">${e(p.goal)}</span>` : ""}</span></li>`).join("")}</ul>
+<ul class="jv-people">${personas.map((p) => `<li>${avatar(p)}<span><b>${personaName(corpus, j, p, toSite)}</b>${p.role || p.country ? `<span class="jv-muted">${[p.role, p.country].filter(Boolean).map((x) => e(x!)).join(" · ")}</span>` : ""}${p.goal ? `<span class="jv-goal">${e(p.goal)}</span>` : ""}</span></li>`).join("")}</ul>
 <nav class="jv-seq" aria-label="The story">${prev ? `<a href="${e(journeyHref(prev, up))}" rel="prev">← follows <b>${e(prev.scenario.title)}</b></a>` : "<span></span>"}${parent ? `<a href="${e(journeyHref(parent, up))}" rel="up">↑ part of <b>${e(parent.scenario.title)}</b></a>` : ""}${nexts.map((n) => `<a href="${e(journeyHref(n, up))}" rel="next">followed by <b>${e(n.scenario.title)}</b> →</a>`).join("")}</nav>
 </header>
 ${kids.length ? `<section class="jv-kids"><h2>Sub-journeys</h2><ol class="jv-tree">${kids.map((k) => journeyCard(corpus, k, up)).join("\n")}</ol></section>` : ""}

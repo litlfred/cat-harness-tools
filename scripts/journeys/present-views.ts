@@ -29,6 +29,7 @@
 import type { BuildingBlock } from "../../schemas/process/user-scenario.ts";
 import { escHtml } from "../thin-page.ts";
 import { journeyById, lookup, processDrawing, processName, type JourneyCorpus } from "./read.ts";
+import { DAK_ATTR } from "./dak-links.ts";
 import { moduleSegment, personaOf, sheetsHtml, sourceHref, type PageFile, type PersonaView, type SiteLinks } from "./render.ts";
 import { DEVICE_LABEL, renderDevice, type DemoScreen, type ScreenContext } from "./screens.ts";
 import {
@@ -48,6 +49,8 @@ import {
   LAYER_TONES,
   ladderOf,
   fromSite,
+  personaHref,
+  personaNameHtml,
   personaText,
   processLinks,
   rungOf,
@@ -339,7 +342,7 @@ function personaPage(corpus: JourneyCorpus, p: Presentation, links: SiteLinks, w
   const body = `<div class="jp-lens">
 <aside class="jp-lens-l"><h3 class="jp-h">Whose journey?</h3><nav class="jp-plists" aria-label="People">${list}</nav></aside>
 <div class="jp-lens-r">
-<section class="jp-card jp-phead" style="--c:${e(who.color)}"><div class="jp-phead-top">${avatar(who, "lg")}<div><h2>${e(who.name)}${who.role || who.country ? ` <small>${e([who.role, who.country].filter(Boolean).join(" · "))}</small>` : ""}</h2>${who.goal ? `<p class="jp-goal">${icon("compass")}<b>Goal:</b> ${e(who.goal)}</p>` : ""}</div></div>${who.needs?.length || who.frustrations?.length ? `<div class="jp-pboxes">${listOf("Needs", icon("smile", "jp-emerald"), who.needs)}${listOf("Frustrations", icon("alert", "jp-rose"), who.frustrations)}</div>` : ""}</section>
+<section class="jp-card jp-phead" style="--c:${e(who.color)}"><div class="jp-phead-top">${avatar(who, "lg")}<div><h2>${personaNameHtml(who, personaHref(corpus, p.w.workshop.presentation ?? {}, a.siteRoot))}${who.role || who.country ? ` <small>${e([who.role, who.country].filter(Boolean).join(" · "))}</small>` : ""}</h2>${who.goal ? `<p class="jp-goal">${icon("compass")}<b>Goal:</b> ${e(who.goal)}</p>` : ""}</div></div>${who.needs?.length || who.frustrations?.length ? `<div class="jp-pboxes">${listOf("Needs", icon("smile", "jp-emerald"), who.needs)}${listOf("Frustrations", icon("alert", "jp-rose"), who.frustrations)}</div>` : ""}</section>
 <section class="jp-card jp-pad"><div class="jp-row"><h3 class="jp-h">How ${e(who.name)} feels along the way</h3><span class="jp-small">A dashed line: not present in between · a point opens that moment</span></div>${feelingPoints(p, who.id).length ? curveSvg(p, who, a.toWorkshop) : `<p class="jp-small">No step says how ${e(who.name)} feels.</p>`}</section>
 <section><h3 class="jp-h jp-h-pad">${e(who.name)}’s touchpoints (${mine.length})</h3><ol class="jp-tps">${touch}</ol></section>
 </div>
@@ -438,7 +441,7 @@ ${b.links?.length ? `<div><div class="jp-label">Learn more</div><ul class="jp-bl
 ${views
   .map(
     (x, i) =>
-      `<div class="jp-ampane" data-jp-pane="am-${i}"${i ? " hidden" : ""}><div class="jp-amlinks"><b>${e(x.t.name)}</b>${ext(toSite + x.t.page, "View page")}${ext(`${toSite}${x.t.page}../../`, "All views and elements")}</div><object type="image/svg+xml" data-jp-fit data="${e(toSite + x.t.svg)}" aria-label="${e(x.t.name)}"><a href="${e(toSite + x.t.page)}">${e(x.t.name)}</a></object></div>`,
+      `<div class="jp-ampane" data-jp-pane="am-${i}"${i ? " hidden" : ""}><div class="jp-amlinks"><b>${e(x.t.name)}</b>${ext(toSite + x.t.page, "View page", "", DAK_ATTR)}${ext(`${toSite}${x.t.page}../../`, "All views and elements", "", DAK_ATTR)}</div><object type="image/svg+xml" data-jp-fit data="${e(toSite + x.t.svg)}" aria-label="${e(x.t.name)}"><a href="${e(toSite + x.t.page)}">${e(x.t.name)}</a></object></div>`,
   )
   .join("")}</section>`
     : "";
