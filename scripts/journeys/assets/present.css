@@ -396,8 +396,7 @@ a.jp-block:hover { background: var(--s50); box-shadow: var(--shadow-sm); }
 .jp .jv-bpmn-scroll > svg { display: block; width: calc(var(--z, 1) * var(--vw, 900px)) !important; max-width: none !important; height: auto !important; }
 .jp .jv-bpmn.is-fit .jv-bpmn-scroll > svg { width: 100% !important; }
 .jp .jv-bpmn figcaption { font-size: 11px; color: var(--s500); margin-top: 4px; }
-.jp .jv-bpmn [data-jv-hl] > .djs-visual > :first-child { stroke: #d97706 !important; stroke-width: 4px !important; fill: #fff3d6 !important; }
-.jp .jv-bpmn [data-jv-hl] > .djs-visual > path:first-child { fill: none !important; }
+.jp .jv-bpmn-scroll:focus-visible { outline: 2px solid var(--sky500); outline-offset: 2px; }
 .jp .jv-bpmn:fullscreen { background: #fff; padding: 16px; }
 .jp .jv-bpmn:fullscreen .jv-bpmn-scroll { max-height: calc(100vh - 60px); }
 
