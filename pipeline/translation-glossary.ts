@@ -336,6 +336,7 @@ export function glossarySources(
   chain.forEach((c, at) => {
     const dir = translationsOf(c.root);
     if (dir === undefined) return;
+    // declared-path-literal: `<translations>/<locale>/glossary/` is where glossary:pot writes the scheme catalogues inside the declared translation-sources directory, not an instance's `glossary` directory.
     const schemes = join(dir, locale, "glossary");
     if (existsSync(schemes)) {
       for (const f of readdirSync(schemes).filter((x) => x.endsWith(".po")).sort()) {
