@@ -174,6 +174,19 @@ export const WorkshopPresentationSchema = z
     lede: Text.optional(),
     /** The actor whose record the trust ladder follows ("Somsack's record"). */
     recordOf: Id.optional(),
+    /**
+     * The order the cast is listed in, everywhere it is listed (the overview,
+     * the journey map's lanes, the persona lens): actor ids. An actor a step
+     * names and this list does not follows, in order of first appearance; an
+     * id no step names is not drawn. Absent: order of first appearance.
+     */
+    cast: z.array(Id).optional(),
+    /**
+     * A chapter's title in the room, by the id of the journey the chapter is
+     * (`"j4-family-records-abroad": "Crossing back"`). Absent: the journey's
+     * title without its code in front.
+     */
+    chapterTitles: z.record(Id, Text).optional(),
     /** The presenter's note on the overview; a step's note is its `facilitatorCue`. */
     presenterNote: Text.optional(),
     /** A band on the overview naming what the walkthrough demonstrates, with `links`. */

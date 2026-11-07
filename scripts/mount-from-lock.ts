@@ -271,9 +271,43 @@ export function withoutBuiltAtPublish(files: readonly string[], declared: readon
   return files.filter((f) => !declared.some((p) => (p.endsWith("/") ? f.startsWith(p) : f === p)));
 }
 
+/**
+ * A `.gitignore` whose only pattern is `*`: the directory holding it ignores
+ * itself, the marker file included. A viewer that writes its route onto
+ * ANOTHER instance's site (`builtOnHostSite`) puts one there (bean
+ * folio-assistant-uldr, owner choice "A: derive + in-route ignore"), so the
+ * host lists none of its routes under `builtAtPublish`.
+ */
+export function isSelfIgnore(text: string): boolean {
+  const patterns = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l !== "" && !l.startsWith("#"));
+  return patterns.length === 1 && patterns[0] === "*";
+}
+
+/**
+ * `files` (relative to `dir`) minus everything in a directory below `dir` that
+ * ignores itself ({@link isSelfIgnore}). The pinned commit cannot hold such a
+ * directory's files, the marker included, since git ignores them all, so like a
+ * declared `builtAtPublish` path none of them is a pinned byte. `dir`'s own
+ * root `.gitignore` is never read as one: a root `*` would hide the instance.
+ */
+export function withoutSelfIgnored(dir: string, files: readonly string[]): string[] {
+  const routes = files
+    .filter((f) => f.endsWith("/.gitignore"))
+    .filter((f) => {
+      try {
+        return isSelfIgnore(readFileSync(join(dir, f), "utf-8"));
+      } catch {
+        return false;
+      }
+    })
+    .map((f) => f.slice(0, -".gitignore".length));
+  if (routes.length === 0) return [...files];
+  return files.filter((f) => !routes.some((r) => f.startsWith(r)));
+}
+
 /** The files under `dir` a mount digest hashes: no install artefacts, no state mounts, nothing built at publish. */
 export function coveredFiles(dir: string, skip: readonly string[] = []): string[] {
-  return withoutBuiltAtPublish(withoutInstallArtefacts(withoutStateMounts(dir, treeFiles(dir), skip)), builtAtPublishOf(dir));
+  return withoutSelfIgnored(dir, withoutBuiltAtPublish(withoutInstallArtefacts(withoutStateMounts(dir, treeFiles(dir), skip)), builtAtPublishOf(dir)));
 }
 
 export function digestOf(dir: string, skip: readonly string[] = []): { treeDigest: string; files: number } {

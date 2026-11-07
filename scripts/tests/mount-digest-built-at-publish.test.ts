@@ -40,6 +40,7 @@ put(
     { path: "fhir-artifact-index/index.json", writer: ["ig-index:build"] },
     { path: "fhir-artifact-index/sidecars/", writer: ["ig-index:build"] },
     { path: "built-whole/", writer: ["x"] },
+    // declared-path-literal: a fixture entry written into a temp checkout; it matches this repo's built context only where jsonld:contexts already ran
     { path: "ns/context/v1.jsonld", writer: ["jsonld:contexts"] },
   ]),
 );
