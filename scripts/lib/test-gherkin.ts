@@ -57,6 +57,12 @@ export interface FoundTest {
   line: number;
   /** Which adapter found it. */
   language: string;
+  /**
+   * Its title (or an enclosing scope's) is computed — a variable, or a
+   * template with `${…}` — so no tag can name it. Reported, never dropped:
+   * a test the scan cannot name is still a test.
+   */
+  dynamic?: true;
 }
 
 /** A language adapter: which files it reads, and the tests it finds in one. */
@@ -318,16 +324,22 @@ export const JS_ADAPTER: TestLanguageAdapter = {
       }
       return code.length;
     };
-    /** The string literal that is the call's first argument, if it is one. */
+    /**
+     * The call's first argument as a fixed title, or `undefined` when it is
+     * computed: an identifier, an expression, or a template with `${…}`.
+     */
     const firstArgString = (open: number): string | undefined => {
       for (let j = open + 1; j < code.length; j++) {
-        if (strings.has(j)) return strings.get(j);
+        if (strings.has(j)) {
+          const body = strings.get(j)!;
+          return src[j] === "`" && body.includes("${") ? undefined : body;
+        }
         if (!/\s/.test(code[j])) return undefined;
       }
       return undefined;
     };
-    const scopes: { from: number; to: number; title: string }[] = [];
-    const calls: { at: number; title: string }[] = [];
+    const scopes: { from: number; to: number; title: string | undefined }[] = [];
+    const calls: { at: number; title: string | undefined }[] = [];
     for (const m of code.matchAll(JS_CALL)) {
       let open = m.index! + m[0].length - 1;
       // `.each(table)(title, …)` and `.if(cond)(title, …)`: the title is in the second call.
@@ -337,16 +349,20 @@ export const JS_ADAPTER: TestLanguageAdapter = {
         open = closeOf(open) + next[0].length;
       }
       const title = firstArgString(open);
-      if (title === undefined) continue;
       if (m[1] === "test" || m[1] === "it") calls.push({ at: m.index!, title });
       else scopes.push({ from: open, to: closeOf(open), title });
     }
-    return calls.map((c) => ({
-      name: qualifiedTestName(file, scopes.filter((d) => d.from < c.at && c.at < d.to).map((d) => d.title), c.title),
-      file,
-      line: lineAt(src, c.at),
-      language: "js",
-    }));
+    return calls.map((c) => {
+      const line = lineAt(src, c.at);
+      const enclosing = scopes.filter((d) => d.from < c.at && c.at < d.to);
+      const dynamic = c.title === undefined || enclosing.some((d) => d.title === undefined);
+      const name = qualifiedTestName(
+        file,
+        enclosing.map((d) => d.title ?? "<computed>"),
+        c.title ?? `<computed at line ${line}>`,
+      );
+      return { name, file, line, language: "js", ...(dynamic ? { dynamic: true as const } : {}) };
+    });
   },
 };
 
@@ -571,7 +587,8 @@ export type GherkinFindingKind =
   | "ambiguous-test-name"
   | "tag-names-no-target"
   | "binding-unresolved"
-  | "unknown-dialect";
+  | "unknown-dialect"
+  | "test-name-not-static";
 
 export interface GherkinFinding {
   kind: GherkinFindingKind;
@@ -596,7 +613,19 @@ export function joinTestsToScenarios(
 ): GherkinReport {
   const findings: GherkinFinding[] = [];
   const byName = new Map<string, FoundTest[]>();
-  for (const t of tests) byName.set(t.name, [...(byName.get(t.name) ?? []), t]);
+  for (const t of tests) {
+    if (t.dynamic) {
+      findings.push({
+        kind: "test-name-not-static",
+        file: t.file,
+        line: t.line,
+        test: t.name,
+        detail: "the test's title (or an enclosing describe's) is computed, so no `@test:` tag can name it — give it a literal title, or write the loop as `test.each(…)(\"… %s\")`",
+      });
+      continue;
+    }
+    byName.set(t.name, [...(byName.get(t.name) ?? []), t]);
+  }
   for (const [name, ts] of byName) {
     if (ts.length > 1) {
       findings.push({

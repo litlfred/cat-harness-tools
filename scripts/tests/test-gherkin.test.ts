@@ -96,6 +96,27 @@ describe("language adapters", () => {
     expect(JS_ADAPTER.matches("a/b.ts")).toBe(false);
   });
 
+  test("js: a test with a computed title is found and reported, never dropped", () => {
+    const src = [
+      'for (const [name] of cases) {',
+      '  test(name, () => {});',
+      '  test(`case ${name}`, () => {});',
+      '}',
+      'describe(label, () => { test("inside", () => {}); });',
+      'test(`fixed template`, () => {});',
+    ].join("\n");
+    const found = JS_ADAPTER.findTests("t.test.ts", src);
+    expect(found.map((t) => [t.name, t.dynamic ?? false])).toEqual([
+      ["t.test.ts::<computed_at_line_2>", true],
+      ["t.test.ts::<computed_at_line_3>", true],
+      ["t.test.ts::<computed>::inside", true],
+      ["t.test.ts::fixed_template", false],
+    ]);
+    const r = joinTestsToScenarios(found, []);
+    expect(r.findings.filter((f) => f.kind === "test-name-not-static").map((f) => f.line)).toEqual([2, 3, 5]);
+    expect(r.findings.filter((f) => f.kind === "test-without-scenario").map((f) => f.test)).toEqual(["t.test.ts::fixed_template"]);
+  });
+
   test("python: the name is pytest's node id", () => {
     const src = [
       "def helper():",

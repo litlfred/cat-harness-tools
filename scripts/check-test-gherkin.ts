@@ -46,6 +46,7 @@ const ORDER: GherkinFindingKind[] = [
   "tag-names-no-target",
   "binding-unresolved",
   "unknown-dialect",
+  "test-name-not-static",
 ];
 
 function defaultRoot(): string {
@@ -82,7 +83,7 @@ if (import.meta.main) {
   if (json) {
     console.log(JSON.stringify({ root: dir, tests: report.tests.length, scenarios: report.scenarios.length, findings: report.findings }, null, 2));
   } else {
-    const linked = report.tests.length - report.findings.filter((f) => f.kind === "test-without-scenario").length;
+    const linked = report.tests.length - report.findings.filter((f) => f.kind === "test-without-scenario" || f.kind === "test-name-not-static").length;
     console.log(`check:test-gherkin: ${report.tests.length} test(s), ${report.scenarios.length} Scenario(s), ${linked} test(s) linked — under ${dir}`);
     for (const kind of ORDER) {
       const fs = report.findings.filter((f) => f.kind === kind);
