@@ -254,11 +254,9 @@ Feature: Each health check fires on the evidence that breaches it, and is unknow
 
   @test:test/health/checks.test.ts::bean-rendered-decision-records::the_table_`renderDecision`_emits_is_recognised
   Scenario: The full rendered decision table is recognised
-    Given a table with a header row, a separator, and the rows "What it does", "Pro", "Con", "Downstream" and "Reversibility"
+    Given the text renderDecision produces for a two-option decision "a" (recommended) or "b"
     When it is checked for a rendered decision
     Then it is one
-    # Gap: the table is written by hand in the shape renderDecision emits;
-    # renderDecision itself is not called, so its real output is not checked.
 
   # ── bean-store: session-log roots ──
 
@@ -282,8 +280,8 @@ Feature: Each health check fires on the evidence that breaches it, and is unknow
     Given a "Session: x" epic s1 and a "QA: verdicts" epic e1
     When sessionLogRootBeans is asked
     Then it returns exactly s1
-    # Gap: the check itself is not run here, so the title's "same answer the
-    # check gives" is not compared.
+    When the bean store check runs over the same beans
+    Then the bean ids its "bean-session-log-roots" findings name are exactly the ones sessionLogRootBeans returns
 
   # ── bean-store: quiet claims and their children ──
 
@@ -326,6 +324,8 @@ Feature: Each health check fires on the evidence that breaches it, and is unknow
     Then there is at least one finding
     And its action contains "workflow_dispatch", "cleanup_slug: gone-branch" and "cleanup_confirm: gone-branch"
     And its action says the label "DOES NOT WORK" or "does not work", and contains "w2g5"
+    And "staging:cleanup" is named exactly once, as "`staging:cleanup` LABEL DOES NOT WORK", after "workflow_dispatch"
+    And the action never tells the reader to apply or add a label
 
   # ── bean-store: duplicate titles ──
 
@@ -401,9 +401,9 @@ Feature: Each health check fires on the evidence that breaches it, and is unknow
     Given an in-progress bean "done" with 4 of 4 boxes ticked and an in-progress bean "open" with 3 of 4
     When the bean store check runs
     Then the findings are exactly "bean-self-declared-done"
+    And the finding's severity is "minor"
     And the summary contains "all 4 of its Done-when boxes ticked"
     And the action contains "RE-DERIVE"
-    # Gap: the title says `minor`; the body does not assert the severity.
 
   @test:test/health/checks.test.ts::bean-store::a_claim_its_own_criteria_say_is_finished_—_`fkjo`::a_ticked_claim_touched_inside_the_window_is_mid-flight:_counted,_not_a_finding
   Scenario: A ticked claim updated 10 hours ago is counted as mid-flight, not reported
@@ -454,8 +454,8 @@ Feature: Each health check fires on the evidence that breaches it, and is unknow
     Given an in-progress bean "stale" updated 2026-08-01 and one "fresh" updated 2026-09-18
     When the bean store check runs
     Then the findings are exactly "bean-stale-in-progress"
+    And the finding's severity is "minor"
     And the summary contains "`stale`" and "49 days"
-    # Gap: the title says `minor`; the body does not assert the severity.
 
   @test:test/health/checks.test.ts::bean-store::an_`in-progress`_bean_with_no_timestamp_is_not_reported_as_stale
   Scenario: An in-progress bean with no timestamp is not stale
@@ -503,8 +503,10 @@ Feature: Each health check fires on the evidence that breaches it, and is unknow
     Given a todo store read with no todos
     When the todo store check runs
     Then its state is "ok"
-    # Gap: no empty bean store is checked, so "unlike an empty bean store" is
-    # not compared.
+    Given a fixture repository declaring both a todo store and a bean store, each directory empty
+    When both stores are probed and their checks run
+    Then the todo probe is "ok" with no todos and the todo store check is "ok"
+    And the bean probe is "unknown" and the bean store check is "unknown"
 
   # ── the registry and the report ──
 
@@ -515,10 +517,12 @@ Feature: Each health check fires on the evidence that breaches it, and is unknow
     Then the result ids, sorted, equal the registered HEALTH_CHECKS ids, sorted
 
   @test:test/health/checks.test.ts::the_registry_and_the_report::every_threshold_states_its_basis
-  Scenario: Every threshold carries a basis longer than 40 characters
+  Scenario: Every threshold carries a basis of its own, in prose
     Given the healthy context
     When every health check runs
     Then every threshold of every result has a basis longer than 40 characters
+    And each basis holds at least five words of letters once its digits are removed
+    And no basis text is shared by thresholds of two different metrics
 
   @test:test/health/checks.test.ts::the_registry_and_the_report::every_finding_names_something_a_person_does
   Scenario: Every finding carries an action longer than 20 characters
@@ -725,8 +729,10 @@ Feature: Each health check fires on the evidence that breaches it, and is unknow
     Given a family row "cat/x/lake-cache/"
     When its members are found on a remote holding "cat/x/lake-cache/b", "cat/x/lake-cache/a", "cat/x/lake-cachey" and "main"
     Then it resolves to "cat/x/lake-cache/" with the members "cat/x/lake-cache/a" and "cat/x/lake-cache/b"
-    # Gap: the remote does not hold a branch named exactly the prefix, so
-    # "the prefix itself is not a member" is not exercised.
+    When its members are found on a remote holding "cat/x/lake-cache/", "cat/x/lake-cache" and "cat/x/lake-cache/a"
+    Then it resolves to "cat/x/lake-cache/" with the single member "cat/x/lake-cache/a"
+    When its members are found on a remote holding only "cat/x/lake-cache/" and "cat/x/lake-cache"
+    Then there are no members and nothing is resolved
 
   @test:test/health/checks.test.ts::membersFor_—_the_table's_resolution_rule::nothing_on_the_remote_is_a_determined_absence
   Scenario: A family with no branch on the remote has no members and no resolution

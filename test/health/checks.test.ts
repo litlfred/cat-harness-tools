@@ -25,6 +25,7 @@ import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "bun:test";
 
+import { renderDecision } from "../../schemas/process/decision-request.ts";
 import { HealthReportSchema, healthVerdict, type PagesServingObservation } from "../../schemas/sdlc/health-report.ts";
 import type { QaTreeRead } from "../../scripts/qa-store.ts";
 import { MAX_PREVIEW_BYTES } from "../../scripts/staging-rotate.ts";
@@ -57,7 +58,7 @@ import {
   type SpecialBranchMeasure,
   type StagingPreview,
 } from "./checks.ts";
-import { declaredFamilyPrefix, hasRenderedDecision, membersFor, probePagesServing, readSpecialBranches, type SpecialBranchDecl } from "./probes.ts";
+import { declaredFamilyPrefix, hasRenderedDecision, membersFor, probeBeans, probePagesServing, probeTodos, readSpecialBranches, type SpecialBranchDecl } from "./probes.ts";
 
 const MB = 1024 * 1024;
 
@@ -687,15 +688,19 @@ describe("bean-rendered-decision-records", () => {
   });
 
   it("the table `renderDecision` emits is recognised", () => {
-    const table = [
-      "| | **a** *(recommended)* | b |",
-      "|---|---|---|",
-      "| **What it does** | x | y |",
-      "| **Pro** | x | y |",
-      "| **Con** | x | y |",
-      "| **Downstream** | x | y |",
-      "| **Reversibility** | x | y |",
-    ].join("\n");
+    const table = renderDecision({
+      decides: "whether x or y",
+      glossary: {},
+      options: [
+        { label: "a", does: "x", pro: "x", con: "x", downstream: "x", reversibility: "x" },
+        { label: "b", does: "y", pro: "y", con: "y", downstream: "y", reversibility: "y" },
+      ],
+      recommends: "a",
+      because: "x",
+      ifSilent: "a",
+      question: "a or b?",
+      othersPending: 0,
+    });
     expect(hasRenderedDecision(table)).toBe(true);
   });
 });
@@ -746,6 +751,10 @@ describe("bean-store", () => {
         bean({ id: "e1", title: "QA: verdicts", type: "epic" }),
       ];
       expect(sessionLogRootBeans(beans).map((b) => b.id)).toEqual(["s1"]);
+      const flagged = run(beans)
+        .findings.filter((x) => x.metric === "bean-session-log-roots")
+        .map((x) => /^`([^`]+)`/.exec(x.summary)?.[1]);
+      expect(flagged).toEqual(sessionLogRootBeans(beans).map((b) => b.id));
     });
   });
 
@@ -865,6 +874,12 @@ describe("bean-store", () => {
     // a reader who has already tried it needs to know why it did nothing.
     expect(action).toMatch(/DOES NOT WORK|does not work/);
     expect(action).toContain("w2g5");
+    // Not offered: the label is named once, and that once is the sentence that
+    // says it does not work — after the dispatch, never as a step to take.
+    expect(action.split("staging:cleanup").length - 1).toBe(1);
+    expect(action).toMatch(/`staging:cleanup` LABEL DOES NOT WORK/);
+    expect(action.indexOf("workflow_dispatch")).toBeLessThan(action.indexOf("staging:cleanup"));
+    expect(action).not.toMatch(/\b(apply|add)\b[^.]*\blabel\b/i);
   });
 
   it("fires `major` on a duplicate title — the 14,688-duplicate shape, at its leading edge", () => {
@@ -1045,6 +1060,7 @@ describe("bean-store", () => {
         },
       }));
       expect(metrics(r)).toEqual(["bean-self-declared-done"]);
+      expect(r.findings[0]!.severity).toBe("minor");
       expect(r.findings[0]!.summary).toContain("all 4 of its Done-when boxes ticked");
       // The action must not tell anybody to close it. `bean-coordination` closes
       // on evidence re-derived, never on the bean's own claim about itself, and
@@ -1168,6 +1184,7 @@ describe("bean-store", () => {
       },
     }));
     expect(metrics(r)).toEqual(["bean-stale-in-progress"]);
+    expect(r.findings[0].severity).toBe("minor");
     expect(r.findings[0].summary).toContain("`stale`");
     expect(r.findings[0].summary).toContain("49 days");
   });
@@ -1225,6 +1242,31 @@ describe("todo-store", () => {
   it("an empty todo store is a determined `ok`, unlike an empty bean store", () => {
     const r = todoStoreCheck(healthyContext({ todos: { state: "ok", value: [] } }));
     expect(r.state).toBe("ok");
+
+    // The contrast, through the probes: both stores declared and both empty.
+    // The todo probe calls that a determined empty; the bean probe refuses to
+    // report a clean work plan over an empty walk, so the bean check is not ok.
+    const root = mkdtempSync(join(tmpdir(), "health-empty-stores-"));
+    try {
+      mkdirSync(join(root, "todos", "items"), { recursive: true });
+      writeFileSync(
+        join(root, "todos", "todos.json"),
+        JSON.stringify({ name: "fixture", directories: [{ id: "items", path: "items", graphTypologies: ["todo-items"] }] }),
+      );
+      mkdirSync(join(root, "beans", "defs"), { recursive: true });
+      writeFileSync(
+        join(root, "beans", "beans.json"),
+        JSON.stringify({ name: "fixture", directories: [{ id: "defs", path: "defs", graphTypologies: ["bean-defs"] }] }),
+      );
+      const todos = probeTodos(root);
+      expect(todos).toMatchObject({ state: "ok", value: [] });
+      expect(todoStoreCheck(healthyContext({ todos })).state).toBe("ok");
+      const beans = probeBeans(root);
+      expect(beans.state).toBe("unknown");
+      expect(beanStoreCheck(healthyContext({ beans })).state).toBe("unknown");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
@@ -1237,11 +1279,21 @@ describe("the registry and the report", () => {
   it("every threshold states its basis", () => {
     // The structural half is in the schema; this is the corpus half — no
     // shipped check may carry a bare number.
+    const byBasis = new Map<string, string[]>();
     for (const r of runHealthChecks(healthyContext())) {
       for (const t of r.thresholds) {
         expect(t.basis.length).toBeGreaterThan(40);
+        // A basis is prose, not a number dressed up: at least five words of
+        // letters once every digit is taken away.
+        const words = t.basis.replace(/[0-9.,%]+/g, " ").match(/[A-Za-z]{2,}/g) ?? [];
+        expect(words.length).toBeGreaterThanOrEqual(5);
+        const key = t.basis.trim();
+        byBasis.set(key, [...(byBasis.get(key) ?? []), `${r.id}/${t.metric}`]);
       }
     }
+    // And it is THIS threshold's basis: no text is pasted under two metrics.
+    const shared = [...byBasis.values()].filter((names) => new Set(names.map((n) => n.split("/")[1])).size > 1);
+    expect(shared).toEqual([]);
   });
 
   it("every finding names something a person does", () => {
@@ -1595,6 +1647,9 @@ describe("membersFor — the table's resolution rule", () => {
   });
   it("a family is every branch under its prefix, and the prefix itself is not a member", () => {
     expect(membersFor(row("family", "cat/x/lake-cache/"), ["cat/x/lake-cache/b", "cat/x/lake-cache/a", "cat/x/lake-cachey", "main"])).toEqual({ resolved: "cat/x/lake-cache/", refs: ["cat/x/lake-cache/a", "cat/x/lake-cache/b"] });
+    // A head named exactly the prefix, with or without its slash, is not a member.
+    expect(membersFor(row("family", "cat/x/lake-cache/"), ["cat/x/lake-cache/", "cat/x/lake-cache", "cat/x/lake-cache/a"])).toEqual({ resolved: "cat/x/lake-cache/", refs: ["cat/x/lake-cache/a"] });
+    expect(membersFor(row("family", "cat/x/lake-cache/"), ["cat/x/lake-cache/", "cat/x/lake-cache"])).toEqual({ refs: [] });
   });
   it("nothing on the remote is a determined absence", () => {
     expect(membersFor(row("family", "cat/x/auto-docs/"), ["main"])).toEqual({ refs: [] });
