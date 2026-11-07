@@ -108,6 +108,7 @@ function declaredByCell(kind: string, root: string): string {
  * region of the skill `skills/kg/kg-core/directory-conventions.md`, and the
  * descriptions still link as that skill would (cat-harness-tools c751864).
  */
+// declared-path-literal: the directory kind descriptions' links are written relative to; only joined into a link, never read
 export const KIND_LINK_BASE = "skills/kg/kg-core";
 
 /**
