@@ -116,8 +116,7 @@ export function listStaging(dir: string): string[] {
  * Where to start reading a served directory that has no `index.html` of its
  * own: the subdirectories one level down that do, sorted. A `--site` of a
  * checkout serves the repository folder, so a layer whose pages sit in
- * `site/` or `docs/` (who-iris, issue litlfred/who-iris#196) would otherwise
- * print only a root that lists nothing.
+ * `site/` or `docs/` would otherwise print only a root that lists nothing.
  */
 export function pagesBelow(dir: string): string[] {
   if (!existsSync(dir) || existsSync(join(dir, "index.html"))) return [];
