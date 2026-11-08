@@ -39,6 +39,16 @@ describe("the notebook variant", () => {
     const bad = notebook();
     (bad.sections as Array<Record<string, unknown>>)[0]!.cell_end = -1;
     expect("reason" in structureOf(bad)).toBe(true);
+    // A non-negative end before its start: refused for the ORDER, not for a
+    // negative index — and named as such.
+    const backwards = notebook();
+    Object.assign((backwards.sections as Array<Record<string, unknown>>)[1]!, { cell_start: 3, cell_end: 2 });
+    const r = structureOf(backwards);
+    expect("reason" in r && r.reason).toContain("cell_end is before cell_start");
+    // The boundary: a one-cell section, ending where it starts, is fine.
+    const single = notebook();
+    Object.assign((single.sections as Array<Record<string, unknown>>)[1]!, { cell_start: 2, cell_end: 2 });
+    expect("reason" in structureOf(single)).toBe(false);
   });
 });
 

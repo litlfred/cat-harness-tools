@@ -49,9 +49,16 @@ describe("the corpus", () => {
     // `readMemoryNodes` throws on an invalid node, so reaching here is the
     // assertion; parsing again makes the failure name the schema rather than
     // the loader.
-    for (const n of readMemoryNodes()) {
+    const nodes = readMemoryNodes();
+    for (const n of nodes) {
       expect(MemoryNodeSchema.safeParse(n).success).toBe(true);
     }
+    // No `baseline` entry lacks its `measured` provenance…
+    expect(nodes.filter((n) => n.label === "baseline" && n.measured === undefined).map((n) => n.id)).toEqual([]);
+    // …and that is the schema's doing: a real node relabelled `baseline` with
+    // no `measured` does not parse.
+    const { measured: _measured, ...bare } = nodes[0];
+    expect(MemoryNodeSchema.safeParse({ ...bare, label: "baseline" }).success).toBe(false);
   });
 
   test("ids are unique — overlay resolves by id, so a collision hides an entry", () => {
@@ -125,8 +132,13 @@ describe("the role axis discriminates — memoryForRoles is not dead code", () =
     // and must not churn the generated files. If this breaks, the two axes
     // have been wired together -- which is the composition mistake the role
     // model already paid for once.
-    for (const r of syncAll(false)) {
-      expect({ agent: r.agent, state: r.state }).toEqual({ agent: r.agent, state: "unchanged" });
+    const nodes = readMemoryNodes();
+    expect(nodes.some((n) => n.tags.roles.length > 0)).toBe(true);
+    const withRoles = (roles: string[]) => nodes.map((n) => ({ ...n, tags: { ...n.tags, roles } }));
+    for (const agent of agentNames()) {
+      const handed = memoryForAgent(nodes, agent).map((n) => n.id);
+      expect({ agent, handed: memoryForAgent(withRoles([]), agent).map((n) => n.id) }).toEqual({ agent, handed });
+      expect({ agent, handed: memoryForAgent(withRoles(["reviewer"]), agent).map((n) => n.id) }).toEqual({ agent, handed });
     }
   });
 });

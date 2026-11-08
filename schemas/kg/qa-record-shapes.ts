@@ -127,7 +127,7 @@ export interface QaResult {
  * the block, so the roles list is the wrong place for it and widening it there
  * would be a schema change reaching well past this sweep.
  */
-export type TranslationFieldHash = QaFieldHash & { po?: string };
+export type TranslationFieldHash = QaFieldHash & { po?: string; pot?: string };
 
 /** A block-qa entry whose hashed inputs include the PO. */
 export type TranslationQaEntry = Omit<QaCriterionEntry, "field_hash"> & {
@@ -141,8 +141,12 @@ export interface TranslationBlockQaReport {
   /** The content block this translates, by ITS label — a different identity. */
   block?: string;
   locale: string;
-  /** Repo-relative paths of the block's files. */
-  paths: { md: string; ts?: string };
+  /**
+   * Repo-relative paths of the subject's files: a block's or page's `.md` (and
+   * `.ts`), or — for a catalogue measured against its template, which has no
+   * page of its own here (an IG page, a glossary) — the `.pot`.
+   */
+  paths: { md?: string; ts?: string; pot?: string };
   /** The PO this verdict was measured against, repo-relative. */
   po: string;
   source_hashes: TranslationFieldHash;

@@ -1789,6 +1789,23 @@ export const KG_CRITERIA: readonly KgCriterionDefinition[] = [
       "A verdict in a test report names the system under test as its reviewer — a system judging itself " +
       "(untainted-verification). The schema refuses it; this records it under its own name.",
   },
+  // Owner, 2026-11-06: "A test should always have a Gherkin." Instance-scoped
+  // rather than a per-block `depends_on: ["feature"]` criterion: tests are not
+  // content blocks, and no built-in content adapter declares a `feature`
+  // companion, so a block criterion would record `n/a` everywhere outside one
+  // contributed adapter — coverage that is not there. `major`, so an instance
+  // that has not backfilled records the gap without failing `--check`.
+  // Implemented in `scripts/test-plan-audit.ts`; scanner `scripts/lib/test-gherkin.ts`.
+  {
+    id: "test-has-gherkin",
+    applies: ["graph"],
+    scope: "instance",
+    severity: "major",
+    summary:
+      "An executable test that no Gherkin Scenario names with `@test:<file>::<scope>::<name>`, a `@test:` tag " +
+      "that names no test, a test named by two Scenarios, a Scenario that names no test and is not `@manual`, or a " +
+      "test-plan case whose `.feature` is missing or does not resolve (skill test-engineer, \"Every test has a Gherkin\").",
+  },
   // The certification family (bean `zaui`, Done-when 2): until this, nothing
   // judged `<attestations>/certification/**`, so audit:coverage could count the
   // family only as typed. Implemented beside the four above, in

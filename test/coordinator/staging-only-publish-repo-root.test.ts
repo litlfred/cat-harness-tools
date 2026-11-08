@@ -106,6 +106,12 @@ describe("composing honours the default, which is the restrictive one", () => {
       const b = Object.keys(stage.report.suppliedBy).length;
       expect(b - a).toBe(canon.report.withheld.length);
       expect(canon.report.withheld.length).toBeGreaterThan(0);
+      // By name, not only by count: the canonical tree is the staging tree
+      // with exactly the withheld files taken out.
+      const canonKeys = new Set(Object.keys(canon.report.suppliedBy));
+      const stageKeys = new Set(Object.keys(stage.report.suppliedBy));
+      expect([...canonKeys].filter((k) => !stageKeys.has(k))).toEqual([]);
+      expect([...stageKeys].filter((k) => !canonKeys.has(k)).sort()).toEqual([...canon.report.withheld].sort());
     } finally {
       rmSync(canon.dir, { recursive: true, force: true });
       rmSync(stage.dir, { recursive: true, force: true });

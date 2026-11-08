@@ -68,5 +68,8 @@ describe("device-screen: a screen is typed data", () => {
   });
   test("the union holds exactly the block types the table lists", () => {
     expect(ScreenBlockSchema.options.length).toBe(BLOCK_TYPES.length);
+    // The same types, not just the same count: each member's `type` literal, in table order.
+    const types = ScreenBlockSchema.options.map((o) => (o as unknown as { shape: { type: { value: string } } }).shape.type.value);
+    expect(types).toEqual([...BLOCK_TYPES]);
   });
 });

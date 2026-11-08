@@ -41,22 +41,20 @@ function declaredName(instance: string): string | undefined {
 const STAGED = REPOS.filter((r): r is typeof r & { instance: string } => r.instance !== undefined);
 
 describe("every staged target repo agrees with its instance's declaration", () => {
-  for (const repo of STAGED) {
-    test(`${repo.id}: \`${repo.instance}\` is declared under that name`, () => {
-      const declared = declaredName(repo.instance);
-      expect(
-        declared,
-        `REPOS says target \`${repo.id}\` is staged in \`${repo.instance}/\`, but no ` +
-          `\`${repo.instance}/${repo.instance}.json\` declares a name. Either the ` +
-          `directory moved, or \`instance\` should be dropped because nothing stages ` +
-          `this target yet — do not leave it pointing at nothing.`,
-      ).toBeDefined();
-      expect(
-        declared,
-        `\`${repo.instance}/\` declares itself \`${declared}\`, which is not ` +
-          `\`${repo.instance}\`. The DECLARATION wins: update REPOS[].instance, ` +
-          `never the declaration, to match it.`,
-      ).toBe(repo.instance);
-    });
-  }
+  test.each(STAGED.map((r): [string, string, (typeof STAGED)[number]] => [r.id, r.instance, r]))("%s: `%s` is declared under that name", (_id, _instance, repo) => {
+    const declared = declaredName(repo.instance);
+    expect(
+      declared,
+      `REPOS says target \`${repo.id}\` is staged in \`${repo.instance}/\`, but no ` +
+        `\`${repo.instance}/${repo.instance}.json\` declares a name. Either the ` +
+        `directory moved, or \`instance\` should be dropped because nothing stages ` +
+        `this target yet — do not leave it pointing at nothing.`,
+    ).toBeDefined();
+    expect(
+      declared,
+      `\`${repo.instance}/\` declares itself \`${declared}\`, which is not ` +
+        `\`${repo.instance}\`. The DECLARATION wins: update REPOS[].instance, ` +
+        `never the declaration, to match it.`,
+    ).toBe(repo.instance);
+  });
 });

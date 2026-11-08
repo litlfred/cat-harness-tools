@@ -13,12 +13,13 @@
  * standing alone too.
  */
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { extname, join, resolve } from "node:path";
 
 import { buildFshGutsExport, fshGutsDirs } from "../../scripts/fsh-guts-export.ts";
 import { repoRootFor } from "../../schemas/kg/cat-harness.js";
+import { readFshGutsNode, withoutFrozenSubtrees } from "../../schemas/kg/fsh-guts.js";
 import { writeDeclaration } from "../support/instance-fixture.js";
 
 /**
@@ -72,6 +73,24 @@ describe("the real corpus", () => {
     expect(doc.nodeCount).toBeGreaterThan(0);
     expect(doc["@graph"]).toHaveLength(doc.nodeCount);
     expect(doc.scans).toContain("fsh-guts");
+    // Every committed node, by path: each file in a scanned directory
+    // (outside a frozen subtree, which is one item) that reads as a node has
+    // an entry whose `sourcePath` is it. Listed from the disk, not with
+    // `git ls-files`: the trashcan is kept on its own branch and MOUNTED
+    // (`state:mount`), as bytes the checkout ignores, so git tracks none of it.
+    const inDoc = new Set(doc["@graph"].map((n) => n.sourcePath));
+    const nodes: string[] = [];
+    for (const dir of fshGutsDirs(ROOT)) {
+      const files = (readdirSync(dir.absPath, { recursive: true }) as string[])
+        .map((f) => f.split("\\").join("/"))
+        .filter((f) => statSync(join(dir.absPath, f)).isFile());
+      for (const f of withoutFrozenSubtrees(dir.absPath, files).live) {
+        if (![".md", ".json"].includes(extname(f).toLowerCase())) continue;
+        if (readFshGutsNode(readFileSync(join(dir.absPath, f), "utf8")).node) nodes.push(join(dir.path, f));
+      }
+    }
+    expect(nodes.length).toBeGreaterThan(0);
+    expect(nodes.filter((rel) => !inDoc.has(rel))).toEqual([]);
   });
 
   test("the directory is resolved from the declaration, not spelled", () => {

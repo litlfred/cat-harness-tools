@@ -11,8 +11,10 @@
  */
 import { afterEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 
+import { instanceDirectoryForGraph, instanceRootsIn } from "../../schemas/kg/cat-harness.js";
+import { buildToolTypes } from "../../scripts/harness-schema-export.ts";
 import { discoverTools, tools, toolsOf } from "../../tools/discover.js";
 
 /** The directory these tests were written in (`cat-harness/scripts/tests/`): every path below is composed from it exactly as it was before the move, so nothing they read changed. */
@@ -33,6 +35,15 @@ describe("tools() over this checkout", () => {
     const d = discoverTools();
     expect(d.failures).toEqual([]);
     expect(d.sources.map((s) => s.instance)).toEqual(expect.arrayContaining(["cat-harness", "fhir-harness", "smart-base"]));
+    // EVERY declaring instance, not three named ones: each instance root in the
+    // checkout whose declaration resolves a `tools` graph is a source.
+    const repo = resolve(ORIGIN_DIR, "../../..");
+    const declaring = instanceRootsIn(repo)
+      .filter((r) => instanceDirectoryForGraph(r, "tools") !== undefined)
+      .map((r) => relative(repo, r) || ".");
+    expect(declaring.length).toBeGreaterThanOrEqual(3);
+    const sourced = new Set(discoverTools(repo).sources.map((s) => s.instance));
+    expect(declaring.filter((i) => !sourced.has(i))).toEqual([]);
   });
 
   test("toolsOf(cat-harness) is the harness's own graph only — what its document publishes", () => {
@@ -47,5 +58,8 @@ describe("tools() over this checkout", () => {
     // nobody publishes. Discovery mints every instance against the harness.
     const bases = new Set(tools().flatMap((t) => [...t.io.inputs, ...t.io.outputs].map((p) => p.schema.split("#")[0])));
     expect(bases.size).toBe(1);
+    // And that one base is the address the harness's types document is
+    // published at — the `$id` its own writer gives it.
+    expect([...bases]).toEqual([buildToolTypes().$id as string]);
   });
 });

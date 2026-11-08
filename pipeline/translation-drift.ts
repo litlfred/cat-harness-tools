@@ -34,17 +34,30 @@
  * Same shape as `SCRIPT_EXEMPTIONS` in `scripts/gates.ts`, for the same
  * reason — an exemption nobody can review is one somebody added to get green.
  *
+ * ## `--instance <dir>`: another instance, and its catalogues
+ *
+ * With `--instance`, the instance at `<dir>` is read through its own
+ * declaration: its Jekyll site ({@link instanceSiteRoot}) for the page
+ * comparison above, and its `translation-sources` directory for a second
+ * comparison every instance can have, site or not — {@link catalogueDriftFor},
+ * each locale's `.po` against the `.pot` template beside it. A string the
+ * template gained and the catalogue does not carry, or one the catalogue still
+ * offers that the template dropped, is a catalogue that has not been refreshed
+ * since its source changed. An instance with no site has its catalogues
+ * compared and its pages reported unreadable, never passed.
+ *
  * @module pipeline/translation-drift
  * @covers translation-sources
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 import { directoryForGraph, repoRootFor } from "../schemas/kg/cat-harness.ts";
-import { buildTranslationIndex, siteRoot } from "./translation-index.ts";
+import { buildTranslationIndex, instanceSiteRoot, siteRoot } from "./translation-index.ts";
+import { parsePoEntries, poContextKey } from "./po-inject.ts";
 import { sourceForPermalink } from "../scripts/lib/jekyll-permalink.ts";
 import { pathToFileURL } from "node:url";
-import { HARNESS_ROOT } from "../scripts/lib/roots.ts";
+import { explicitInstanceRoot, HARNESS_ROOT } from "../scripts/lib/roots.ts";
 import { PAGE_LOCALE, routesRecordedInSite, visualisersRenderedBy } from "../scripts/viewer-declarations.ts";
 import { visualiserRoute } from "../schemas/kg/visualiser-route.ts";
 
@@ -221,6 +234,56 @@ export function catalogueFor(instanceRoot: string, locale: string, page: string)
   return join(dir, locale, `${page}.po`);
 }
 
+/** One catalogue compared with the template beside it. */
+export interface CatalogueDrift {
+  /** The catalogue, relative to the instance root. */
+  po: string;
+  /** Strings the `.pot` offers and the `.po` does not carry at all. */
+  missing: string[];
+  /** Strings the `.po` still offers (not `#~` obsolete) that the `.pot` no longer has. */
+  extra: string[];
+}
+
+/** The key a string is matched on: its context, when it has one, and its msgid. */
+function entryKey(e: { context?: string; msgid: string }): string {
+  return e.context ? poContextKey(e.context, e.msgid) : e.msgid;
+}
+
+/**
+ * Every locale's `.po` compared with the `.pot` template beside it, in the
+ * `translation-sources` directory the instance DECLARES.
+ *
+ * `undefined` when the instance declares none — a state, reported by the caller,
+ * never an empty list: no declaration is not the same answer as no drift. A
+ * `.po` with no `.pot` beside it (a hand-authored terminology file) has no
+ * template to drift from and is not compared; `templates` counts what was.
+ */
+export function catalogueDriftFor(
+  instanceRoot: string,
+): { dir: string; compared: number; drifted: CatalogueDrift[] } | undefined {
+  const dir = directoryForGraph(instanceRoot, "translation-sources");
+  if (dir === undefined || !existsSync(dir)) return undefined;
+  const drifted: CatalogueDrift[] = [];
+  let compared = 0;
+  const walk = (abs: string): string[] =>
+    readdirSync(abs, { withFileTypes: true })
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .flatMap((e) => (e.isDirectory() ? walk(join(abs, e.name)) : e.name.endsWith(".po") ? [join(abs, e.name)] : []));
+  for (const locale of readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort()) {
+    for (const po of walk(join(dir, locale))) {
+      const pot = `${po}t`;
+      if (!existsSync(pot)) continue;
+      compared++;
+      const want = new Set(parsePoEntries(readFileSync(pot, "utf-8")).map(entryKey));
+      const have = new Set(parsePoEntries(readFileSync(po, "utf-8")).map(entryKey));
+      const missing = [...want].filter((k) => !have.has(k));
+      const extra = [...have].filter((k) => !want.has(k));
+      if (missing.length > 0 || extra.length > 0) drifted.push({ po: relative(instanceRoot, po), missing, extra });
+    }
+  }
+  return { dir, compared, drifted };
+}
+
 /**
  * Site-absolute URL -> the file that serves it.
  *
@@ -313,9 +376,11 @@ export function uncatalogedFor(repoRoot: string, site?: string): UncatalogedTran
  */
 export function driftFor(
   instanceRoot: string,
-  opts: { ignoreKnownDrift?: boolean } = {},
+  opts: { ignoreKnownDrift?: boolean; site?: string } = {},
 ): DriftResult {
-  const site = siteRoot(instanceRoot);
+  // `site` is named by a caller that resolved ANOTHER instance's site from its
+  // declaration (`--instance`); a key present with `undefined` means it has none.
+  const site = "site" in opts ? opts.site : siteRoot(instanceRoot);
   const findings: DriftFinding[] = [];
   if (!site) {
     return {
@@ -335,7 +400,7 @@ export function driftFor(
       ? []
       : KNOWN_DRIFT.map((k) => `${k.translation} ${k.sourceShape}->${k.translationShape}`),
   );
-  const { index } = buildTranslationIndex(instanceRoot);
+  const { index } = buildTranslationIndex(instanceRoot, "site" in opts ? site : undefined);
   let compared = 0;
 
   for (const page of Object.values(index.pages)) {
@@ -429,7 +494,65 @@ export class NothingCompared extends Error {
   }
 }
 
+/**
+ * `--instance <dir>`: the instance's pages, if it declares a site, and its
+ * catalogues against their templates. Exit 2 when neither could be compared,
+ * 1 on any drift, else 0.
+ */
+function runInstance(root: string): number {
+  const site = instanceSiteRoot(root);
+  let unreadable = 0;
+  let errors = 0;
+  let compared = 0;
+  if (site === undefined) {
+    console.log(`? (site)                       ${root} declares no Jekyll site — no published translated page to compare`);
+  } else {
+    const r = driftFor(root, { site });
+    for (const f of r.findings) console.log(`${f.severity === "error" ? "✗" : "?"} ${f.subject.padEnd(28)} ${f.message}`);
+    unreadable += r.findings.filter((f) => f.severity === "unreadable").length;
+    errors += r.findings.filter((f) => f.severity === "error").length;
+    compared += r.compared;
+    console.log(`  ${r.compared} published translation(s) compared`);
+  }
+  const cat = catalogueDriftFor(root);
+  if (cat === undefined) {
+    console.log(`? (catalogues)                 ${root} declares no \`translation-sources\` directory`);
+  } else {
+    for (const d of cat.drifted) {
+      console.log(
+        `✗ ${d.po}  ${d.missing.length} string(s) in its .pot and not in it, ` +
+          `${d.extra.length} offered that its .pot no longer has`,
+      );
+      for (const m of d.missing.slice(0, 2)) console.log(`      + ${JSON.stringify(m.slice(0, 88))}`);
+      for (const x of d.extra.slice(0, 2)) console.log(`      - ${JSON.stringify(x.slice(0, 88))}`);
+    }
+    errors += cat.drifted.length;
+    compared += cat.compared;
+    console.log(
+      `  ${cat.compared} catalogue(s) in ${relative(root, cat.dir) || "."}/ compared with their .pot, ` +
+        `${cat.drifted.length} drifted`,
+    );
+  }
+  if (compared === 0) {
+    console.error(`✗ ${new NothingCompared().message}`);
+    return 2;
+  }
+  if (unreadable) return 2;
+  if (errors) {
+    console.log(
+      "  A drifted catalogue has not been refreshed since its source changed: re-extract the\n" +
+        "  template, merge it into the catalogue, and obsolete what the source dropped\n" +
+        "  (`translation:obsolete --instance`).",
+    );
+    return 1;
+  }
+  console.log("  ✓ no drift — every catalogue carries exactly its template's strings");
+  return 0;
+}
+
 function run(): number {
+  const explicit = explicitInstanceRoot();
+  if (explicit !== undefined) return runInstance(explicit);
   const root = pathToFileURL(HARNESS_ROOT + "/").pathname.replace(/\/$/, "");
   const { findings, compared } = driftFor(root);
 

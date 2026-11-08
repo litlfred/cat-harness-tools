@@ -128,11 +128,47 @@ describe("probeBranches", () => {
   });
 
   it("carries only the branches a preview slug asks about — 226 branches must not cost 226 fetches", () => {
-    const dir = local(remoteWithBranches());
-    const p = probeBranches({ repoRoot: dir, remote: "origin", previewSlugs: ["claude-still-going"] });
+    // Five more unmerged branches the preview does not ask about: each would
+    // cost a fetch of its own if the probe walked every head on the remote.
+    const remote = remoteWithBranches();
+    run(remote, "git", ["config", "--bool", "core.bare", "false"]);
+    for (let i = 0; i < 5; i++) {
+      run(remote, "git", ["checkout", "-q", "-b", `claude/other-${i}`, "main"]);
+      writeFileSync(join(remote, `other-${i}.txt`), String(i));
+      run(remote, "git", ["add", "-A"]);
+      run(remote, "git", ["commit", "-qm", `other ${i}`]);
+    }
+    run(remote, "git", ["checkout", "-q", "main"]);
+    run(remote, "git", ["config", "--bool", "core.bare", "true"]);
+    const dir = local(remote);
+
+    // Count the fetches the probe makes, through a `git` on PATH that logs
+    // each `fetch` and hands every call on to the real one.
+    const realGit = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf-8" }).stdout.trim();
+    const shim = mkdtempSync(join(tmpdir(), "health-git-shim-"));
+    made.push(shim);
+    const log = join(shim, "fetches.log");
+    writeFileSync(log, "");
+    writeFileSync(
+      join(shim, "git"),
+      `#!/bin/sh\nif [ "$1" = fetch ]; then echo "$*" >> '${log}'; fi\nexec '${realGit}' "$@"\n`,
+      { mode: 0o755 },
+    );
+    const savedPath = process.env.PATH;
+    process.env.PATH = `${shim}:${savedPath ?? ""}`;
+    let p: ReturnType<typeof probeBranches>;
+    try {
+      p = probeBranches({ repoRoot: dir, remote: "origin", previewSlugs: ["claude-still-going"] });
+    } finally {
+      process.env.PATH = savedPath;
+    }
     expect(p.state).toBe("ok");
     if (p.state !== "ok") return;
     expect(p.value.candidates.map((c) => c.ref)).toEqual(["claude/still-going"]);
+    // Seven heads on the remote, two fetches: the default branch and the one
+    // branch asked about — never one per head.
+    const fetches = readFileSync(log, "utf-8").trim().split("\n");
+    expect(fetches).toEqual(["fetch --no-tags origin main", "fetch --no-tags origin refs/heads/claude/still-going"]);
   });
 
   it("an empty candidate set is a DETERMINED answer, not a failure to look", () => {
@@ -532,7 +568,10 @@ describe("doneWhenState — the four states `fkjo` needs kept apart", () => {
     // regex narrowed by a later edit would make every bean `absent`, and every
     // assertion above is a literal that would keep passing.
     const p = probeBeans(process.cwd());
-    if (p.state !== "ok") return;
+    // The store is declared here, so anything but `ok` is a failure to read it —
+    // never a pass with nothing asserted.
+    expect(p.state).toBe("ok");
+    if (p.state !== "ok") throw new Error(`probeBeans was not ok: ${p.state}`);
     const kinds = new Set(p.value.map((b) => b.doneWhen?.kind));
     // The archive view too: a drain archives finished beans, and with them
     // most of the ticked lists (cat-harness-tools#1248).

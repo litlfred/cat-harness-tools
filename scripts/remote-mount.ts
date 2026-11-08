@@ -16,6 +16,7 @@
  *   bun run cat mount:remote --plan       # resolve the closure and print it; write nothing
  *   bun run cat mount:remote:check        # disk against lock against declaration — no network
  *   bun run cat mount:remote --no-install # lay the bytes down without `bun install` in each mount
+ *   bun run cat mount:remote --no-health  # a re-pin that moves cat-harness-tools does not regenerate the health report (lib/repin-health.ts)
  *   bun run cat mount:remote --help       # print this header; run nothing
  *   echo "<where they said yes>" | bun run cat mount:remote --seed <name>=<owner/repo>@<sha> --consent-by <who> [--whole]
  *                                          # create or re-pin a remote instance in index.config.json, WITH its consent
@@ -196,6 +197,7 @@ import { fetchSubgraphIndex, type PackageUrlFor, type SubgraphIndexFetch } from 
 import { toolClosure, type ClosureInstance, type ResolvedTool, type ToolChoice } from "./tool-closure.ts";
 import { upstreamConcernMembers, upstreamDirectories, type UpstreamDirectory } from "./upstream-directories.ts";
 import { run as syncWorkflowPins } from "./workflow-pins.ts";
+import { afterMountHealth } from "./lib/repin-health.ts";
 import { ConcernGroupCodeSchema } from "../schemas/kg/concern-groups.ts";
 
 /**
@@ -2091,6 +2093,48 @@ export function editedOnlyPerLock(root: string): CheckResult | undefined {
   return c;
 }
 
+/** One mount whose bytes no longer hash to its lock: which root's lock, which instance, where, and what differs. */
+export interface EditedMount {
+  root: string;
+  instance: string;
+  path?: string;
+  detail: string;
+}
+
+/**
+ * Every mount in `checkout` that a plain mount would leave untouched because
+ * its bytes changed since it was laid (`edited`), over every declaring root
+ * as {@link remoteFanOut} walks them. Nothing is fetched. A publisher asks
+ * this before it mounts, so a build an earlier attempt left behind is named,
+ * with the command that re-lays it ({@link relayAdvice}), instead of failing
+ * inside the mount step (an IG's first agent publish, 2026-11-06).
+ */
+export function editedMountsIn(checkout: string): EditedMount[] {
+  return declaringInstances(checkout).roots.flatMap((root) =>
+    checkRemote({ instanceRoot: root }).outcomes.flatMap((o) =>
+      o.state === "missing" && (o as { edited?: boolean }).edited
+        ? [{ root, instance: o.instance, ...("path" in o && o.path ? { path: o.path } : {}), detail: o.detail }]
+        : [],
+    ),
+  );
+}
+
+/**
+ * What to run to re-lay `edited`, exactly: this script with `--fresh` from
+ * the checkout, which replaces only the mounts whose bytes no longer match
+ * the lock (and loses any edit in them), or the publisher's own `--fresh`.
+ */
+export function relayAdvice(checkout: string, edited: readonly EditedMount[], o: { script?: string } = {}): string {
+  const script = relative(checkout, o.script ?? join(import.meta.dir, "remote-mount.ts")) || "remote-mount.ts";
+  return [
+    `${edited.length} mount(s) no longer match the lock, so the mount step would leave them as they are and the build would not start:`,
+    ...edited.map((e) => `  - ${e.instance}${e.path ? ` (${e.path}/)` : ""}: ${e.detail}`),
+    "An earlier build most likely wrote into them. Re-lay them (any edit in them is lost):",
+    `  cd ${checkout} && bun run ${script} --fresh`,
+    "or pass --fresh to stage-local.ts (or build-instance-site.ts), which does the same before it builds.",
+  ].join("\n");
+}
+
 /**
  * What the full mount's install step would do for a current root, without
  * the fetch: `bun install` in a mounted instance that has a manifest and no
@@ -2223,6 +2267,14 @@ export function afterMount(root: string, before: string | undefined, argv: strin
     console.log(`\n## Agent surface — the lock changed, so the skills and memory agents read were re-rendered\n\n${r.lines.join("\n")}`);
     if (!r.ok) console.log("\nRe-run the failed generator before committing this re-pin: the new layer and the old agent surface disagree.");
   }
+  if (!argv.includes("--no-health")) {
+    // Owner, 2026-11-07, card "Layer health": "A. The re-pin does it". A move
+    // of the cat-harness-tools pin moves the health checker, so this
+    // checkout's own report is regenerated and pushed here. Report only: it
+    // never changes the exit code (`lib/repin-health.ts`).
+    const h = afterMountHealth(root, before, lockBytes(root));
+    if (h) console.log(h.join("\n"));
+  }
   if (code === 0 && !argv.includes("--no-layers-publish")) {
     // The committer who changed the lock writes its layers cache ref, so CI
     // only fetches and verifies it (skill `remote-mount`, "The layers cache").
@@ -2250,6 +2302,7 @@ export const MOUNT_REMOTE_FLAGS: ReadonlyMap<string, "switch" | "value"> = new M
   ["--install-all", "switch"],
   ["--no-agent-surface", "switch"],
   ["--no-layers-publish", "switch"],
+  ["--no-health", "switch"],
   ["--fresh", "switch"],
   ["--whole", "switch"],
   ["--instance", "value"],

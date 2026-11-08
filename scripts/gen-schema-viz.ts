@@ -1555,6 +1555,22 @@ const emit = (path: string, content: string): void => {
   emitOrCheck(path, content);
 };
 
+/**
+ * The instances this writer draws a subject page for: those with a schema
+ * module or a source descriptor in a declared `schemas` directory of the
+ * checkout. ONE rule, read by the writer below and by the site's coverage guard
+ * (`site-coverage.ts` SUBJECT_READERS), so the guard never owes a page this
+ * writer rightly draws nothing for: a `schemas` directory holding only JSON
+ * contracts in a sub-folder (smart-trust-tools' `schemas/skills/`) has no
+ * module to show (smart-ips-pilgrimage#25's root publish, 2026-11-07).
+ */
+export function schemaSubjects(start: string = ROOT, g: SchemaGraph | null = readSchemaGraph(start, { scope: "checkout" })): string[] {
+  if (g === null) return [];
+  const repoRoot = repoRootFor(start);
+  const sources = sourceDescriptorRows(g.roots, repoRoot, rootInstanceName(repoRoot));
+  return [...new Set([...g.modules.map((m) => m.instance), ...sources.map((r) => r.instance)])].sort();
+}
+
 if (import.meta.main) {
   // The WHOLE checkout, dependencies included (issue #2278). This is a
   // handler publishing one page per subject, and bootstrap is a subject: the
@@ -1649,7 +1665,7 @@ if (import.meta.main) {
   // holds them (bean `folio-assistant-1nu0`) has something to show and gets
   // its page, rather than a tile reading "no viewer yet".
   const sources = sourceDescriptorRows(g.roots, REPO_ROOT, rootInstanceName(REPO_ROOT));
-  const subjects = [...new Set([...g.modules.map((m) => m.instance), ...sources.map((r) => r.instance)])].sort();
+  const subjects = schemaSubjects(ROOT, g);
 
   /**
    * Each subject page's tile count, keyed by the DECLARED directory id.

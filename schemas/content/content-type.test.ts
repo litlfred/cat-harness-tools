@@ -98,8 +98,26 @@ describe("index.config.json is never itself a harness marker", () => {
     const { registerBaseContentTypes } = await import("./content-types-base");
     const r = new ContentTypeRegistry();
     registerBaseContentTypes(r);
-    repo({ "index.config.json": index({ widget: {} }) }, (root) => {
-      expect(describeRepository(root, r).types.map((t) => t.id)).toEqual([]);
+    // Whatever the index holds — a section, none, a section named for the
+    // harness, the harness's own fields, or not JSON at all — it is not one.
+    const indexes = [
+      index({ widget: {} }),
+      index(),
+      index({ harness: { name: "h" } }),
+      JSON.stringify({ name: "index", stub: "x" }),
+      "not json",
+    ];
+    for (const body of indexes) {
+      repo({ "index.config.json": body }, (root) => {
+        expect({ body, types: describeRepository(root, r).types.map((t) => t.id) }).toEqual({ body, types: [] });
+      });
+    }
+    // The check can fire: the same registry does find a harness by a
+    // `.config.json` marker of any other name, beside the same index.
+    repo({ "index.config.json": index({ widget: {} }), "acme.config.json": "{}" }, (root) => {
+      const found = describeRepository(root, r).types;
+      expect(found.map((t) => t.id)).toEqual(["harness"]);
+      expect(found[0]!.marker).toBe("acme.config.json");
     });
   });
 });

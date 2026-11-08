@@ -529,6 +529,22 @@ export interface GraphTypologyDef {
    */
   within?: string;
   /**
+   * The BLOCK KIND (a `folio-block-kind/v1` node's `kind`, in whichever layer
+   * declares it) that a node of this kind IS, read through the kind module's
+   * view of it: a journey is a DAK user scenario.
+   *
+   * There was no way to say one kind specialises another across layers.
+   * `nodeKind()` parents compose FIELDS by import, so a parent must be in
+   * this layer or below, and the general kind may be in a layer above (the
+   * DAK vocabulary is): naming it by its `kind` string keeps the reference
+   * direction. The specialising kind's module exports the view that yields
+   * the general kind's fields, DERIVED where they mean something else here
+   * (a journey's personas are actors; the DAK's are roles), and its gate
+   * reads this field and holds every node to what the view must yield
+   * (`check:journey-refs` for `user-scenario`).
+   */
+  specialises?: string;
+  /**
    * The kind's mark, when the kind is DECLARED as a node (bean dmx1) rather
    * than listed here: it travels with the kind, so `schemas/content/avatars.ts` does
    * not have to be a second central table. A kind listed here keeps its entry
@@ -916,8 +932,11 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // (`journeys-viewer`) and a directory of it is what that viewer covers.
   "user-scenario": {
     anyLayer: true,
+    // A journey IS a DAK user scenario (owner, 2026-11-06, option A): its
+    // personas are actors, the DAK's roles, derived (`dakUserScenario`).
+    specialises: "user-scenario",
     description:
-      "user scenarios told as journey maps (`scenarios/user-scenarios/`, by convention): one `user-scenario/0.2.0` file per journey (the smart-trust-demo draft `user-scenario/0.1.0` is read unchanged), keeping the DAK `UserScenario` fields (`id`, `title`, `description`, `personas`) and adding the ordered steps: per actor what they do and feel (emotion -2..2), the pain point and enabler, the policy point, how far the record can be trusted (a code of the scenario's `trustLadder` code list), the hand-off, what-ifs and gaps, and edges to user stories, BPMN tasks (`realisedBy`), `req:` requirements, FHIR examples and the building blocks it `uses`, each in its role. `follows` chains journeys into one story; `partOf` groups sub-journeys. A step may carry an `illustration` (an image, or the prompt to draw it), with the style and cast the scenario's `illustrationStyle` shares. The catalogue those `uses` edges point into is the `building-blocks` kind; a trust ladder is a code list, kept in a `code-list` directory. Every reference a step names must resolve (`check:journey-refs`). Drawn by the journeys viewer. Shapes in `schemas/process/user-scenario.ts`.",
+      "user scenarios told as journey maps (`scenarios/user-scenarios/`, by convention): one `user-scenario/0.4.0` file per journey (`0.1.0` to `0.3.0` files are read unchanged). A journey IS a DAK user scenario (`specialises`): it keeps the DAK `UserScenario` fields (`id`, `title`, `description`, `personas`), its personas being actors (or roles) from which the DAK's roles are derived, and a file with only those is a plain DAK user scenario. It adds the ordered steps: per actor what they do and feel (emotion -2..2), the pain point and enabler, the policy point, how far the record can be trusted (a code of the scenario's `trustLadder` code list), the hand-off, what-ifs and gaps, and edges to user stories, BPMN tasks (`realisedBy`), `req:` requirements, FHIR examples, the building blocks it `uses`, each in its role, and the DAK assets it uses (`dak`: its data sets, decision tables and indicators, by artefact-index key). A parent lists its `parts` in story order (each may be `optional` or `repeats`, and a journey may be a part of several); a step that IS another journey says `includes`, checked against the call activity its `realisedBy` names. `follows` chains journeys no parent lists; `partOf` is read in older files. A step's `lead` and `experiences` default to the actors who play the lanes of its `realisedBy` tasks. A step may carry an `illustration` (an image, or the prompt to draw it), with the style and cast the scenario's `illustrationStyle` shares. The catalogue those `uses` edges point into is the `building-blocks` kind; a trust ladder is a code list, kept in a `code-list` directory. Every reference a step names must resolve (`check:journey-refs`). Drawn by the journeys viewer. Shapes in `schemas/process/user-scenario.ts`.",
     title: "User scenarios",
     renderable: false,
     holds: "content",
@@ -930,11 +949,14 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
     nodeSchemas: {
       "user-scenario/0.1.0": {},
       "user-scenario/0.2.0": {},
+      "user-scenario/0.3.0": {},
+      "user-scenario/0.4.0": {},
     },
     summary:
       "User scenarios as journey maps -- one file per journey: ordered steps, per actor what " +
       "they do and feel, pain points, enablers, the record's trust state, and edges to user " +
-      "stories, BPMN tasks, requirements, FHIR examples and the building blocks each step uses.",
+      "stories, BPMN tasks, requirements, FHIR examples, the building blocks each step uses and its DAK assets; " +
+      "a DAK user scenario, composed of other journeys in order.",
   },
   // The building blocks a journey step `uses`. Owner, 2026-11-05: the
   // catalogue lives in an instance's `archimate/` directory, read by its
@@ -1462,7 +1484,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // none of them and reported a clean run over the lot.
   qa: {
     description:
-      "QA verdicts and their projections under `test/results/` — **seven `$schema` families**, each named in the kind's `nodeSchemas` (see §\"Node schemas, one per `$schema` family\"): `kg-qa/v1`, `block-qa/v1` and `folio-test-run/v1` are Zod-validated, `qa-witness/v1`, `qa-results/v1` and `translation-qa/v1` are TypeScript shapes, and `folio-qa-index/v1` has no declared type at all. This row said \"one `qa-witness/v1` document per subject\" until 2026-09-23, when 591 of the 728 nodes were other families. Generated, never hand-edited. **The checkout holds the WORKING COPY; the record is on the orphan `qa-reports` branch**, keyed `main/<sha>/` or `pr/<n>/<sha>/`, written by the CI job `qa-publish` through `scripts/qa-store.ts` (arc `3fva`) — see §\"`storage` — a directory kept on a branch\". Judgements are not here: they are the `attestations` kind. Read witnesses with the [`qa-witness`](../../sdlc/sdlc-core/qa-witness.md) skill.",
+      "QA verdicts and their projections under `test/results/` — **seven `$schema` families**, each named in the kind's `nodeSchemas` (see §\"Node schemas, one per `$schema` family\"): `kg-qa/v1`, `block-qa/v1` and `folio-test-run/v1` are Zod-validated, `qa-witness/v1`, `qa-results/v1` and `translation-qa/v1` are TypeScript shapes, and `folio-qa-index/v1` has no declared type at all. This row said \"one `qa-witness/v1` document per subject\" until 2026-09-23, when 591 of the 728 nodes were other families. Generated, never hand-edited. **The checkout holds the WORKING COPY; the record is on the orphan `qa-reports` branch**, keyed `main/<sha>/` or `pr/<n>/<sha>/`, written by the CI job `qa-publish` through `scripts/qa-store.ts` (arc `3fva`) — see §\"`storage` — a directory kept on a branch\". Judgements are not here: they are the `attestations` kind. Read witnesses with the [`qa-witness`](../../../sdlc/skills/sdlc-core/qa-witness.md) skill.",
     title: "QA",
     perInstance: true,
     renderable: false,
@@ -1981,7 +2003,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // append to (`ob3m` cost five hand-merges in one afternoon, 2026-10-02).
   "bean-notes": {
     description:
-      "one pull request's addendum to a bean — one Markdown file per branch per bean, `$schema: folio-bean-note/v1` in its front matter, named `<bean>--<date>--<branch>.md` so two pull requests never write one path; `README.md` beside them is the generated index. Bean `m61r`: `ob3m` cost five hand-merges in one afternoon while every finding was appended to the bean. `state`, and `recordsWork: false` because a note is a record about a bean, whose work is counted on the bean. Convention: [`bean-coordination`](../../sdlc/sdlc-core/bean-coordination.md) §\"Adding to a bean — a note, not an append\".",
+      "one pull request's addendum to a bean — one Markdown file per branch per bean, `$schema: folio-bean-note/v1` in its front matter, named `<bean>--<date>--<branch>.md` so two pull requests never write one path; `README.md` beside them is the generated index. Bean `m61r`: `ob3m` cost five hand-merges in one afternoon while every finding was appended to the bean. `state`, and `recordsWork: false` because a note is a record about a bean, whose work is counted on the bean. Convention: [`bean-coordination`](../../../work-plan/skills/work-plan/bean-coordination.md) §\"Adding to a bean — a note, not an append\".",
     renderable: false,
     // Written by a session as it works, like the beans it adds to. Not
     // `context`: a process writes it.
@@ -2096,7 +2118,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // workflow-state). A held entry with an unexpired hold is open work.
   "merge-queue": {
     description:
-      "a merge steward's DECISIONS about an open pull request — one JSON each, `\"$schema\": \"folio-merge-queue-entry/v1\"`: priority class, rank or override with its reason, a hold with its expiry, the train it joined, an ejection with its evidence. **Never a fact GitHub owns** — CI, mergeability, labels and the head SHA are read live at decision time and refused BY NAME by the schema, because a stored copy is a second answer that goes stale on the next push. The one exception is an evidence snapshot on a FINISHED train run, which is history rather than a claim about now. Declared at `beans/queue/`, beside `workflow-state`: this holds the decisions, a finished run next door holds the evidence they met. `state` because a steward writes it as the train proceeds; `recordsWork: true` because a held entry is open work. Shape in `schemas/sdlc/merge-queue.ts`; read with [`merge-queue`](../../sdlc/sdlc-core/merge-queue.md). Bean `hfag`.",
+      "a merge steward's DECISIONS about an open pull request — one JSON each, `\"$schema\": \"folio-merge-queue-entry/v1\"`: priority class, rank or override with its reason, a hold with its expiry, the train it joined, an ejection with its evidence. **Never a fact GitHub owns** — CI, mergeability, labels and the head SHA are read live at decision time and refused BY NAME by the schema, because a stored copy is a second answer that goes stale on the next push. The one exception is an evidence snapshot on a FINISHED train run, which is history rather than a claim about now. Declared at `beans/queue/`, beside `workflow-state`: this holds the decisions, a finished run next door holds the evidence they met. `state` because a steward writes it as the train proceeds; `recordsWork: true` because a held entry is open work. Shape in `schemas/sdlc/merge-queue.ts`; read with [`merge-queue`](../../../sdlc/skills/sdlc-core/merge-queue.md). Bean `hfag`.",
     renderable: false,
     holds: "state",
     recordsWork: true,
@@ -2876,7 +2898,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
   // longer the head, which is exactly what `stale` should mean.
   "merge-reviews": {
     description:
-      "the adversarial review verdict on a pull request's HEAD — one `merge-review/v1` file per head, `<head sha>.json`, naming `base_sha`, `head_sha` and the reviews with their RED FLAG findings. Written by a reviewing session that is not the author, read by `check:adversarial-review`. On its own branch so that recording a verdict never moves the head it is bound to. Method: [`adversarial-code-review`](../../sdlc/sdlc-core/adversarial-code-review.md); shape in `schemas/sdlc/red-flag.ts`.",
+      "the adversarial review verdict on a pull request's HEAD — one `merge-review/v1` file per head, `<head sha>.json`, naming `base_sha`, `head_sha` and the reviews with their RED FLAG findings. Written by a reviewing session that is not the author, read by `check:adversarial-review`. On its own branch so that recording a verdict never moves the head it is bound to. Method: [`adversarial-code-review`](../../../sdlc/skills/sdlc-core/adversarial-code-review.md); shape in `schemas/sdlc/red-flag.ts`.",
     title: "Merge reviews",
     renderable: false,
     holds: "state",
@@ -2891,7 +2913,7 @@ export const BASE_GRAPH_TYPOLOGIES: Readonly<Record<string, GraphTypologyDef>> =
 
   "issue-marks": {
     description:
-      "how far an agent has read an issue — `lastCommentId`, `lastUpdatedAt`, `checkedAt`, one file per issue. **Not the comments**: an id and two timestamps, never a body. Two marks because a comment EDITED after being read keeps its id. Read with [`issue-working`](../../sdlc/sdlc-core/issue-working.md); shape in `src/issue-watch/seen-comments.ts`.",
+      "how far an agent has read an issue — `lastCommentId`, `lastUpdatedAt`, `checkedAt`, one file per issue. **Not the comments**: an id and two timestamps, never a body. Two marks because a comment EDITED after being read keeps its id. Read with [`issue-working`](../../../sdlc/skills/sdlc-core/issue-working.md); shape in `src/issue-watch/seen-comments.ts`.",
     title: "Issue marks",
     renderable: false,
     holds: "state",
