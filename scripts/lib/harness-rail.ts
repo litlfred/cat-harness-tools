@@ -544,8 +544,8 @@ export function renderRailRegions(sharedJson: string, page: RailPage): string {
           return { ...rest, current: true };
         });
   // The page tree, at any depth, marks the page too — but KEEPS its link.
-  // Owner, 2026-11-08, on fhir-harness/fhir/: *"you should be able to navigate
-  // to pages like .../fhir/ by click on Page name on LHS navbar but it doesnt
+  // Owner, 2026-11-08, on a section landing page: *"you should be able to navigate
+  // to pages like [that one] by click on Page name on LHS navbar but it doesnt
   // work"*. A page that has children is a section's landing page; as a dead,
   // dimmed row it read as broken. It stays a link, drawn as current
   // (`aria-current="page"`), so a click reloads it the way a reader expects.
