@@ -46,6 +46,7 @@ import {
 } from "../schemas/sdlc/bean-graph.ts";
 import { WORKFLOW_DIR } from "../src/workflow/store.js";
 import { graphReadPath } from "./graph-read.ts";
+import { BeanStoreAbsentError, exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
 
 export interface HarnessDirsReport {
   /** A parseable `beans/beans.json` was found. */
@@ -88,6 +89,9 @@ export function checkHarnessDirs(root: string): HarnessDirsReport {
   let declaredWorkflowState = join(DEFAULT_BEAN_GRAPH_ROOT, "workflows");
 
   const where = graphReadPath("beans", root);
+  // An instance with no bean store has no harness directories to agree
+  // (smart-ips-pilgrimage#13): the gate says not applicable, the reader stops.
+  if (where.state === "refused" && where.absent) throw new BeanStoreAbsentError(where.reason);
   const graphRoot = where.state === "ok" ? where.at : join(root, DEFAULT_BEAN_GRAPH_ROOT);
 
   // The bean graph is the DECLARATION. It used to be `harness.config.json`'s
@@ -201,6 +205,7 @@ if (import.meta.main) {
   try {
     report = checkHarnessDirs(root);
   } catch (e) {
+    exitIfBeanStoreAbsent("check:harness-dirs", e);
     console.error(`Could not check harness directories: ${e instanceof Error ? e.message : e}`);
     console.error("This is NOT a pass. Treat it as unknown.");
     process.exit(2);

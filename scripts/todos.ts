@@ -41,6 +41,7 @@ import { deferResolution, repoRootFor } from "../schemas/kg/cat-harness.js";
 import { corpusDirectoryForGraph } from "../schemas/kg/harness-config.js";
 import { graphReadPath } from "./graph-read.ts";
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { StoreAbsentError } from "./lib/bean-store-absent.ts";
 
 export const ROOT = resolve(HARNESS_ROOT);
 
@@ -62,7 +63,12 @@ export const ROOT = resolve(HARNESS_ROOT);
 function todoRootNow(): string {
   const repoRoot = repoRootFor(ROOT);
   const where = graphReadPath("todos", repoRoot);
-  if (where.state === "refused") throw new Error(`cannot read the todo graph: ${where.reason}`);
+  if (where.state === "refused") {
+    // Determined absent (an instance with no todo store) is its own error, so a
+    // gate can say not applicable instead of could-not-determine (smart-ips-pilgrimage#13).
+    if (where.absent) throw new StoreAbsentError("todo", where.reason);
+    throw new Error(`cannot read the todo graph: ${where.reason}`);
+  }
   if (where.state === "ok") return where.at;
   // declared-path-literal: the convention fallback, at the call site so the choice is visible.
   return corpusDirectoryForGraph(ROOT, "todos") ?? join(repoRoot, "todos");

@@ -65,7 +65,14 @@ export function libraryResolver(repo: string, instanceRoot: string): LibraryReso
   }
   const handler = readDeclaration(instanceRoot)?.name;
   const libs = corpusDirectoriesForGraph(instanceRoot, "library");
-  const seg = libs.length > 0 ? basename(libs[0]!) : undefined;
+  // The segment `gen-library-viz.ts` publishes under: the TOP-LEVEL declared
+  // directory, so a corpus declared from within a named sub-graph
+  // (cat-harness#1032: `library/corpus/`) is `library`, not `corpus`.
+  const topOf = (d: string): string => {
+    const first = relative(instanceRoot, d).split(sep)[0]!;
+    return first === "" || first === ".." ? basename(d) : first;
+  };
+  const seg = libs.length > 0 ? topOf(libs[0]!) : undefined;
   const projection = base === undefined ? undefined : join(base, "assets", "library", "index.json");
   const entries: Entry[] =
     projection !== undefined && existsSync(projection)

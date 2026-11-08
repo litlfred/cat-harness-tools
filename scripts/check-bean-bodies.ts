@@ -43,6 +43,7 @@ import {
 } from "./bean-store-read.ts";
 // The HARNESS, not this layer: these scripts moved up in 70lx B2b and read cat-harness.
 import { HARNESS_ROOT } from "./lib/roots.ts";
+import { exitIfBeanStoreAbsent } from "./lib/bean-store-absent.ts";
 
 /**
  * A blocker written the way the corpus actually writes one:
@@ -464,6 +465,7 @@ if (import.meta.main) {
     // question asked in the wrong place.
     report = checkBeanBodies(repoRootFor(HARNESS_ROOT));
   } catch (e) {
+    exitIfBeanStoreAbsent("check:bean-bodies", e);
     console.error(`Could not check bean bodies: ${e instanceof Error ? e.message : e}`);
     console.error("This is NOT a pass. Treat it as unknown.");
     process.exit(2);

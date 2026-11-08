@@ -20,7 +20,8 @@
  * LOWEST layer's, so a literal list here would point up the layer order.
  * {@link instanceRootsIn} answers which directories are instances; each one's
  * `package.json` is read for `checkoutScripts`. A name defined twice is an
- * error, not a precedence rule.
+ * error, not a precedence rule, except within the root's own manifest, where
+ * `scripts` wins over the same name in its `checkoutScripts`.
  *
  * @graphNode none — functions that read the script table; no schema
  * @covers none — a reader of the script table, not a graph audit
@@ -66,8 +67,16 @@ export function scriptTable(repoRoot: string): Map<string, ScriptEntry> {
       out.set(name, { name, command, manifest });
     }
   };
-  add(readJson(join(root, "package.json"))?.scripts, "package.json");
-  add(readJson(join(root, "package.json"))?.[CHECKOUT_SCRIPTS_KEY], "package.json");
+  const rootPkg = readJson(join(root, "package.json"));
+  add(rootPkg?.scripts, "package.json");
+  // A root that is itself an instance (an IRIS or IG repository) declares each script twice in
+  // ONE manifest: `scripts` with root paths, `checkoutScripts` with the paths a
+  // host that mounts it uses. At its own root the `scripts` spelling is the one
+  // that runs, so a `checkoutScripts` name it already has is not a second declaration.
+  const own = rootPkg?.[CHECKOUT_SCRIPTS_KEY];
+  if (own !== null && typeof own === "object") {
+    add(Object.fromEntries(Object.entries(own as Record<string, unknown>).filter(([n]) => !out.has(n))), "package.json");
+  }
   for (const inst of instanceRootsIn(root)) {
     if (resolve(inst) === root) continue;
     const manifest = join(relative(root, inst), "package.json");
