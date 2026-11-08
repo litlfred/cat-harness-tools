@@ -673,6 +673,7 @@
     "mount:lock": "bun run cat-harness-tools/scripts/mount-from-lock.ts",
     "mount:lock:check": "bun run cat-harness-tools/scripts/mount-from-lock.ts --check",
     "layers:publish": "bun run cat-harness-tools/scripts/mount-from-lock.ts --publish",
+    "layers:check": "bun run cat-harness-tools/scripts/mount-from-lock.ts --check-layers",
     "index-config:migrate": "bun run cat-harness-tools/scripts/index-config-migrate.ts",
     "index-config:migrate:check": "bun run cat-harness-tools/scripts/index-config-migrate.ts --check",
     "index-config:inline:check": "bun run cat-harness-tools/scripts/index-config-migrate.ts --inline --check",
