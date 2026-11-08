@@ -3,7 +3,7 @@
  * The processes graph → a searchable index over every executable BPMN diagram.
  *
  * @module cat-harness/scripts/gen-processes-viz
- * @covers processes
+ * @covers processes, business-processes — the viewer lists both: the engine's diagrams and the descriptive ones (DAK business processes, folio blocks)
  *
  * These diagrams are executable — `workflow_start` / `workflow_next` /
  * `workflow_complete` run them, and `workflow_complete` refuses a step that is

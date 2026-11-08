@@ -18,7 +18,7 @@
  * its page and each call activity's [+] to the process it calls
  * (`src/workflow/diagram-links.ts`).
  *
- * @covers processes
+ * @covers processes, business-processes — it draws both kinds' diagrams (a folio block brings its own SVG)
  *
  * @conformsTo omg-bpmn-2.0
  * @conformsTo omg-dd-1.0
