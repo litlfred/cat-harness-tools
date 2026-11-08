@@ -92,12 +92,34 @@ render() {
     'exit /b %ERRORLEVEL%'
 }
 
+# Why an ABSENT entry is not this root's to wrap, or nothing when it is
+# (cat-harness-tools#1701, smart-ips-pilgrimage#13). WRAPPED lists the scripts
+# of the HARNESS index — the root carrying the gates workflow — and of the
+# layers it mounts. In a CONTENT root (no such workflow, the same generic rule
+# as scripts/lib/root-gate-set.ts `rootProfile`) an entry is excused when no
+# mounted instance holds it: a root-level path such as .claude/skills/... is
+# the harness root's, and a layer this root does not mount (no <seg>/<seg>.json)
+# is not here at all. An absent entry under a MOUNTED instance is still an
+# error, and a harness root is judged exactly as before.
+not_ours() {
+  local sh="$1" seg="${1%%/*}"
+  [ -f "$REPO_ROOT/.github/workflows/code-quality-gates.yml" ] && return 1
+  [ "$seg" != "$sh" ] && [ -f "$REPO_ROOT/$seg/$seg.json" ] && return 1
+  echo "a content root (no .github/workflows/code-quality-gates.yml), and no mounted instance holds it: it is the harness index's or an unmounted layer's"
+}
+
 check="${1:-}"
 stale=0
+excused=0
 for sh in "${WRAPPED[@]}"; do
   target_sh="$sh"
   if [ ! -f "$target_sh" ] && [ -f "$INSTANCE_ROOT/${sh#cat-harness/}" ]; then
     target_sh="$INSTANCE_ROOT/${sh#cat-harness/}"
+  fi
+  if [ ! -f "$target_sh" ] && why="$(not_ours "$sh")"; then
+    echo "· $sh not applicable here — $why"
+    excused=$((excused + 1))
+    continue
   fi
   [ -f "$target_sh" ] || { echo "ERROR: $sh does not exist — remove it from WRAPPED" >&2; exit 2; }
   bat="${target_sh%.sh}.bat"
@@ -111,6 +133,6 @@ for sh in "${WRAPPED[@]}"; do
   fi
 done
 if [ "$check" = "--check" ]; then
-  [ "$stale" = 0 ] && echo "all $((${#WRAPPED[@]})) .bat wrappers up to date"
+  [ "$stale" = 0 ] && { note=""; [ "$excused" -gt 0 ] && note=" ($excused not applicable here)"; echo "all $((${#WRAPPED[@]} - excused)) .bat wrappers up to date$note"; }
   exit $stale
 fi
