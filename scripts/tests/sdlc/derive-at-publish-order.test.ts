@@ -123,7 +123,7 @@ describe("a cycle is refused", () => {
 });
 
 /**
- * folio-assistant#2953 (2026-11-08): smart-base declares its artefact index as
+ * folio-assistant#2953 (2026-11-08): an IG layer declares its artefact index as
  * a directory of kind `fhir-artifact-index`, but the `builtAtPublish` entries
  * that `ig-index:build` writes into it (`fhir-artifact-index/index.json`, ...)
  * name no `directory`. So they filled no kind, nothing could be ordered after

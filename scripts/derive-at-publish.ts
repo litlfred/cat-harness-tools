@@ -197,7 +197,7 @@ export function writingOrder(repoRoot = REPO_ROOT): string[] {
  * The kinds of the declared directory that holds `path`, for an entry that
  * names no `directory`: the deepest one whose `path` contains it. Its writer
  * writes inside that directory, so a reader of the directory's kinds runs
- * after it. Without this, smart-base's `fhir-artifact-index/index.json`
+ * after it. Without this, an IG's `fhir-artifact-index/index.json`
  * (writer `ig-index:build`, which also rewrites `sidecars/`) filled no kind,
  * and `uml:overview`, which draws every declared directory, ran beside it and
  * read a sidecar while it was being replaced (folio-assistant#2953, ENOENT on
