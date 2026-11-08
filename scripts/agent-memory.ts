@@ -816,7 +816,7 @@ export const AGENT_MEMORY_TARGETS: readonly AgentMemoryTargetDef[] = [
  * one folder per skill holding a required `SKILL.md` (the Agent Skills open
  * standard; Antigravity also reads the older `.agent/skills`). Measured from
  * the library's own copy of the vendor docs,
- * `cat-harness/library/conduct/agent-skills---google-antigravity-docs/`, page 1 and 4.
+ * `cat-harness/library/corpus/conduct/agent-skills---google-antigravity-docs/`, page 1 and 4.
  *
  * Antigravity has no per-agent memory like Claude's `memory: project`, so each
  * agent's memory is published as one skill the agent model sees by name and
